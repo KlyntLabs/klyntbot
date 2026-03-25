@@ -91,12 +91,8 @@ pub const BROWSERS: &[BrowserDef] = &[
 pub fn is_browser(app_name: &str, bundle_id: Option<&str>) -> bool {
     BROWSERS.iter().any(|b| {
         app_name.eq_ignore_ascii_case(b.name)
-            || (bundle_id.is_some()
-                && !b.bundle_prefix.is_empty()
-                && bundle_id
-                    .unwrap()
-                    .to_ascii_lowercase()
-                    .starts_with(b.bundle_prefix))
+            || (!b.bundle_prefix.is_empty()
+                && bundle_id.is_some_and(|id| id.to_ascii_lowercase().starts_with(b.bundle_prefix)))
     })
 }
 
@@ -145,11 +141,29 @@ pub fn extract_site_name(window_title: &str) -> Option<String> {
 ///
 /// Works for Chrome-family browsers (Chrome, Brave, Vivaldi, Edge, Opera, Arc)
 /// and Safari. Returns `None` for non-browser apps or if the script fails.
+///
+/// **Blocking:** Uses `std::process::Command` which can block for seconds.
+/// Callers in async contexts must use `tokio::task::spawn_blocking`.
 #[cfg(target_os = "macos")]
 pub fn get_browser_url(app_name: &str, bundle_id: Option<&str>) -> Option<String> {
     if !is_browser(app_name, bundle_id) {
         return None;
     }
+
+    // Sanitize app_name to prevent AppleScript injection — escape backslashes
+    // and double-quotes, strip control characters.
+    let safe_name = {
+        let mut out = String::with_capacity(app_name.len() + 4);
+        for ch in app_name.chars() {
+            match ch {
+                '\\' => out.push_str("\\\\"),
+                '"' => out.push_str("\\\""),
+                c if c.is_control() => {}
+                c => out.push(c),
+            }
+        }
+        out
+    };
 
     let script = if app_name.eq_ignore_ascii_case("safari") {
         r#"tell application "Safari" to get URL of front document"#.to_string()
@@ -157,7 +171,7 @@ pub fn get_browser_url(app_name: &str, bundle_id: Option<&str>) -> Option<String
         // Chrome, Brave, Vivaldi, Edge, Opera, Arc, Chromium all use Chrome's scripting API
         format!(
             r#"tell application "{}" to get URL of active tab of front window"#,
-            app_name
+            safe_name
         )
     };
 

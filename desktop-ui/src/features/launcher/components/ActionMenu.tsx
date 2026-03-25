@@ -134,14 +134,14 @@ export function ActionMenu() {
               </span>
               <span className="text-sm text-foreground flex-1">{action.label}</span>
               {action.shortcut && (
-                <span className="text-[10px] text-muted-foreground">{action.shortcut}</span>
+                <span className="text-2xs text-muted-foreground">{action.shortcut}</span>
               )}
             </button>
           ))}
         </div>
 
         {/* Footer hint */}
-        <div className="px-4 py-1.5 border-t border-border text-[10px] text-muted-foreground">
+        <div className="px-4 py-1.5 border-t border-border text-2xs text-muted-foreground">
           1-9 quick select &middot; &uarr;&darr; navigate &middot; Esc close
         </div>
       </div>

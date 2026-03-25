@@ -22,12 +22,10 @@ pub use repos::Repos;
 pub use vector_store::{sanitize_predicate_value, CognitiveFactParams, VectorStore};
 
 // ── Actions / Tasks / Projects ──────────────────────────────────────
-pub use repos::action_repo::TimeEntryWithTask;
-pub use repos::{ActionFilter, ActionPatch, ActionRepo, ActionSummary};
 pub use repos::{CustomColumnRepo, ItemSummary, TaskGroupRepo};
 pub use repos::{EntityLinkRepo, ProjectSourceRepo};
 pub use repos::{ProjectFilter, ProjectPatch, ProjectRepo, ProjectWithStats};
-pub use repos::{TaskFilter, TaskPatch, TaskRepo, TaskSummary};
+pub use repos::{TaskFilter, TaskPatch, TaskRepo, TaskSummary, TimeEntryWithTask};
 
 // ── OKR ─────────────────────────────────────────────────────────────
 pub use repos::{AreaRepo, KeyResultRepo, ObjectiveRepo};
@@ -35,10 +33,15 @@ pub use repos::{AreaRepo, KeyResultRepo, ObjectiveRepo};
 // ── Sessions / Context ──────────────────────────────────────────────
 pub use repos::{SessionContextParams, SessionContextRepo, SessionRepo};
 
+// ── Autotuner ────────────────────────────────────────────────────────
+pub use repos::TrialRepo;
+pub use rows::trial::{ExperimentRow, ShadowLogRow, TrialRow};
+
 // ── Agent / Learning ────────────────────────────────────────────────
 pub use repos::StatusWorkflowRepo;
 pub use repos::ToolUsageRepo;
 pub use repos::{AgentTaskRepo, CronRepo, UsageRepo};
+pub use repos::{CoachingInterventionLogRepo, InterventionLogRow};
 pub use repos::{CoachingStrategyRepo, CoachingStrategyRow, UpsertCoachingStrategy};
 pub use repos::{DecisionLogRepo, InteractionLogRepo, LearningStateRepo, OutcomeRepo};
 pub use repos::{OverallStats, StrategyRepo, ToolStatsRow};
@@ -52,7 +55,6 @@ pub use repos::{
 };
 
 // ── Row structs ─────────────────────────────────────────────────────
-pub use rows::action::{ActionAttachmentRow, ActionDependencyRow, ActionRow, ActionTimeEntryRow};
 pub use rows::agent_task::AgentTaskRow;
 pub use rows::area::AreaRow;
 pub use rows::cron::CronJobRow;

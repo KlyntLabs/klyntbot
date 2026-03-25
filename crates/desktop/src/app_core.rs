@@ -13,7 +13,7 @@ use feature_productivity::dashboard_emitter::{DashboardEmitter, DashboardEvent};
 use tauri::{Emitter, Manager};
 use tokio::sync::mpsc;
 use tokio_util::sync::CancellationToken;
-use tracing::warn;
+use tracing::{debug, info, warn};
 
 /// Bridges `AppEventEmitter` to Tauri's native event system.
 struct TauriEventEmitter {
@@ -155,7 +155,14 @@ fn wire_event_channels(core: &AppCore, channels: EventChannels, app_handle: &tau
     // Distraction alerts → Tauri events (intervention overlay + detected banner)
     if let Some(distraction_rx) = channels.distraction_alert_rx {
         spawn_channel_forwarder(distraction_rx, app_handle, shutdown, |handle, alert| {
-            // Emit intervention event (for DistractionOverlay.tsx)
+            info!(
+                app = %alert.app_name,
+                title = ?alert.window_title,
+                needs_llm = alert.needs_llm,
+                "Distraction alert received — showing overlay"
+            );
+
+            // Build intervention payload
             let intervention = events::InterventionPayload {
                 app_name: alert.app_name.clone(),
                 window_title: alert.window_title, // moved — not needed by detected payload
@@ -167,8 +174,26 @@ fn wire_event_channels(core: &AppCore, channels: EventChannels, app_handle: &tau
                     "confident_distracting".to_string()
                 },
             };
+
+            // Show overlay window on the monitor where the cursor is (= where the distracting app is)
+            if let Some(overlay) = handle.get_webview_window("distraction-overlay") {
+                // Position on the active monitor before showing
+                if let Err(e) = center_on_cursor_monitor(&overlay) {
+                    debug!("failed to position overlay on cursor monitor: {e}");
+                }
+                let _ = overlay.show();
+                let _ = overlay.set_focus();
+                // Emit directly to the overlay window
+                if let Err(e) = overlay.emit(events::DISTRACTION_INTERVENTION, &intervention) {
+                    warn!("failed to emit intervention to overlay: {e}");
+                }
+            } else {
+                warn!("distraction-overlay window not found");
+            }
+
+            // Also broadcast for other listeners (e.g. main window banner)
             if let Err(e) = handle.emit(events::DISTRACTION_INTERVENTION, intervention) {
-                warn!("failed to emit distraction intervention: {e}");
+                warn!("failed to broadcast distraction intervention: {e}");
             }
 
             // Emit detected event (for DistractionInterventionBanner.tsx)
@@ -203,10 +228,7 @@ fn wire_event_channels(core: &AppCore, channels: EventChannels, app_handle: &tau
                 .and_then(|w| w.is_focused().ok())
                 .unwrap_or(false);
             if !main_focused {
-                if let Some(tray_window) = handle.get_webview_window("tray") {
-                    let _ = tray_window.show();
-                    let _ = tray_window.set_focus();
-                }
+                crate::focus_timer::open_tray_window(handle);
             }
         },
     );
@@ -266,6 +288,27 @@ fn wire_event_channels(core: &AppCore, channels: EventChannels, app_handle: &tau
                             bus::DomainEvent::ToolCallExecuted { .. } => "general",
                             bus::DomainEvent::BehavioralPatternDetected { .. } => "learning",
                             bus::DomainEvent::ContradictionDetected { .. } => "learning",
+                            bus::DomainEvent::AutotunerDecision { .. } => "learning",
+                            bus::DomainEvent::KnowledgeAtomCreated { .. }
+                            | bus::DomainEvent::KnowledgeAtomAccepted { .. }
+                            | bus::DomainEvent::KnowledgeAtomArchived { .. }
+                            | bus::DomainEvent::AtomFlashcardReviewed { .. }
+                            | bus::DomainEvent::AtomReinforced { .. }
+                            | bus::DomainEvent::AtomInteracted { .. }
+                            | bus::DomainEvent::RetentionMilestoneReached { .. }
+                            | bus::DomainEvent::TranslationCompleted { .. }
+                            | bus::DomainEvent::NoteStudied { .. }
+                            | bus::DomainEvent::PracticeUnitCompleted { .. }
+                            | bus::DomainEvent::PracticeSessionCompleted { .. }
+                            | bus::DomainEvent::KnowledgeTransferDetected { .. }
+                            | bus::DomainEvent::CoachingLearningDigest { .. }
+                            | bus::DomainEvent::FlashcardSessionCompleted { .. } => "learning",
+                            bus::DomainEvent::InterventionTriggered { .. } => "productivity",
+                            bus::DomainEvent::MemoryPendingConfirmation { .. } => "memory",
+                            bus::DomainEvent::SkillRouted { .. } => "agent",
+                            bus::DomainEvent::TrialActivated { .. } => "autotuner",
+                            bus::DomainEvent::MirrorTrialKilled { .. } => "mirror",
+                            bus::DomainEvent::MirrorSnippetCreated { .. } => "mirror",
                         };
                         let salience_str = match salience {
                             cognitive::types::SalienceVerdict::Extract => "extract",
@@ -320,6 +363,47 @@ fn wire_event_channels(core: &AppCore, channels: EventChannels, app_handle: &tau
             }
         });
     }
+}
+
+/// Center a window on the monitor where the cursor is currently located.
+/// All coordinates are in physical pixels for consistent comparison.
+fn center_on_cursor_monitor(
+    window: &tauri::WebviewWindow,
+) -> Result<(), Box<dyn std::error::Error>> {
+    // cursor_position() returns PhysicalPosition<f64>
+    let cursor = window.cursor_position()?;
+    let monitors = window.available_monitors()?;
+
+    // Find the monitor containing the cursor (all values in physical pixels)
+    let target = monitors.iter().find(|m| {
+        let pos = m.position(); // PhysicalPosition<i32>
+        let size = m.size(); // PhysicalSize<u32>
+        let (mx, my) = (pos.x as f64, pos.y as f64);
+        let (mw, mh) = (size.width as f64, size.height as f64);
+        cursor.x >= mx && cursor.x < mx + mw && cursor.y >= my && cursor.y < my + mh
+    });
+
+    if let Some(monitor) = target {
+        let mon_pos = monitor.position();
+        let mon_size = monitor.size();
+        let win_size = window.outer_size()?; // PhysicalSize
+
+        // All math in physical pixels
+        let mon_w = mon_size.width as f64;
+        let mon_h = mon_size.height as f64;
+        let win_w = win_size.width as f64;
+        let win_h = win_size.height as f64;
+
+        // Center horizontally, position in upper third vertically
+        let x = mon_pos.x as f64 + (mon_w - win_w) / 2.0;
+        let y = mon_pos.y as f64 + (mon_h - win_h) / 3.0;
+
+        window.set_position(tauri::Position::Physical(tauri::PhysicalPosition::new(
+            x as i32, y as i32,
+        )))?;
+    }
+
+    Ok(())
 }
 
 /// Spawn a background task that receives from a channel and emits Tauri events.

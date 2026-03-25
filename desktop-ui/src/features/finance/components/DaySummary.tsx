@@ -32,11 +32,7 @@ export function DaySummary({
   const spendingDisplay = fmtCompact(convertTotal(totalSpending), displayCur, hidden);
 
   return (
-    <div
-      role="status"
-      aria-live="polite"
-      className="glass-card flex items-start justify-between gap-3"
-    >
+    <output aria-live="polite" className="glass-card flex items-start justify-between gap-3">
       <div className="flex-1 min-w-0">
         <p className="text-[13px] font-medium text-foreground mb-1.5">
           {dateLabel} &mdash;{" "}
@@ -50,7 +46,7 @@ export function DaySummary({
             {categories.map((cat) => (
               <span
                 key={cat}
-                className="px-2 py-0.5 rounded-md bg-accent border border-border text-[10px] font-light text-dim capitalize"
+                className="px-2 py-0.5 rounded-md bg-accent border border-border text-2xs font-light text-dim capitalize"
               >
                 {cat}
               </span>
@@ -63,10 +59,10 @@ export function DaySummary({
         type="button"
         onClick={onClose}
         aria-label="Close day summary"
-        className="p-1 rounded-lg text-dim hover:text-foreground hover:bg-accent transition-colors shrink-0 text-[14px] leading-none"
+        className="p-1 rounded-lg text-dim hover:text-foreground hover:bg-accent transition-colors shrink-0 text-sm leading-none"
       >
         &times;
       </button>
-    </div>
+    </output>
   );
 }

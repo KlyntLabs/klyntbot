@@ -197,7 +197,7 @@ impl FinanceTool {
             seed,
         };
 
-        let result = FIRECalculator::withdrawal_simulation(&params);
+        let result = FIRECalculator::withdrawal_simulation(&params)?;
         Ok(serde_json::to_string_pretty(&json!({
             "success_rate": result.success_rate.to_string(),
             "median_final": result.simulation.terminal_values.median.to_string(),

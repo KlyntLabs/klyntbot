@@ -91,6 +91,7 @@ fn test_delivered_intervention(trigger: &str) -> DeliveredIntervention {
         message: "test intervention".into(),
         delivered_at: Utc::now(),
         trigger_name: trigger.into(),
+        action_url: None,
     }
 }
 
@@ -646,9 +647,11 @@ fn distraction_situation() -> cognitive::situation::UserSituation {
 }
 
 #[test]
-fn test_signal_accumulator_distraction_streak() {
+fn test_signal_accumulator_distraction_streak_removed() {
     let mut acc = SignalAccumulator::new();
 
+    // distraction_streak condition was removed — events are tracked for
+    // pattern detection but no longer trigger coaching popups.
     for _ in 0..3 {
         acc.push_event(&DomainEvent::DistractionDetected {
             app: "reddit".into(),
@@ -659,10 +662,10 @@ fn test_signal_accumulator_distraction_streak() {
 
     let fired = acc.evaluate(&distraction_situation());
     assert!(
-        fired
+        !fired
             .iter()
             .any(|t| t.condition_name == "distraction_streak"),
-        "Should detect distraction streak"
+        "distraction_streak should no longer fire as a coaching trigger"
     );
 }
 
@@ -670,26 +673,36 @@ fn test_signal_accumulator_distraction_streak() {
 fn test_signal_accumulator_cooldown_prevents_refire() {
     let mut acc = SignalAccumulator::new();
 
-    for _ in 0..5 {
-        acc.push_event(&DomainEvent::DistractionDetected {
-            app: "reddit".into(),
-            duration_secs: None,
-            context: "test".into(),
+    // Use budget_warning trigger (distraction_streak was removed as a coaching trigger).
+    // Push enough budget alerts to fire the condition.
+    for _ in 0..3 {
+        acc.push_event(&DomainEvent::BudgetAlert {
+            category: "dining".into(),
+            spent: 280.0,
+            limit: 300.0,
         });
     }
 
     let situation = distraction_situation();
 
-    // First eval fires
+    // First eval fires budget_warning
     let fired1 = acc.evaluate(&situation);
-    assert!(!fired1.is_empty());
+    assert!(
+        fired1.iter().any(|t| t.condition_name == "budget_warning"),
+        "First eval should fire budget_warning"
+    );
 
-    // Second eval — cooldown blocks
+    // Push another alert immediately
+    acc.push_event(&DomainEvent::BudgetAlert {
+        category: "dining".into(),
+        spent: 290.0,
+        limit: 300.0,
+    });
+
+    // Second eval — cooldown blocks re-fire
     let fired2 = acc.evaluate(&situation);
-    let has_distraction = fired2
-        .iter()
-        .any(|t| t.condition_name == "distraction_streak");
-    assert!(!has_distraction, "Cooldown should prevent re-fire");
+    let has_budget = fired2.iter().any(|t| t.condition_name == "budget_warning");
+    assert!(!has_budget, "Cooldown should prevent re-fire");
 }
 
 // ── Coaching: intervention routing + rate limiting ─────────────

@@ -26,7 +26,7 @@ export function DebateView({
         <span className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">
           Squad Debate
         </span>
-        {consensusReached && <span className="text-[10px] text-green-400">Consensus reached</span>}
+        {consensusReached && <span className="text-2xs text-green-400">Consensus reached</span>}
       </div>
       {rounds.map((round, i) => {
         const judgeForRound = judgeDecisions.find((j) => j.round === round.round);

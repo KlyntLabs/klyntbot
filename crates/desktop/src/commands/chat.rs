@@ -2,7 +2,9 @@
 
 use std::sync::Arc;
 
-use desktop_shared::commands::{ChatMessageResponse, ChatThreadResponse, SessionContextInput};
+use desktop_shared::commands::{
+    ChatMessageResponse, ChatSessionResponse, ChatThreadResponse, SessionContextInput,
+};
 use desktop_shared::errors::ApiError;
 use tauri::{Emitter, State};
 
@@ -89,6 +91,30 @@ pub async fn chat_respond_interaction(
 }
 
 #[tauri::command]
+pub async fn chat_get_session(
+    state: State<'_, Arc<AppCore>>,
+    session_key: String,
+) -> Result<ChatSessionResponse, ApiError> {
+    state.chat_get_session(session_key).await
+}
+
+#[tauri::command]
+pub async fn chat_list_sessions_by_project(
+    state: State<'_, Arc<AppCore>>,
+    project_id: String,
+) -> Result<Vec<ChatThreadResponse>, ApiError> {
+    state.chat_list_sessions_by_project(project_id).await
+}
+
+#[tauri::command]
+pub async fn chat_delete_stale_sessions(
+    state: State<'_, Arc<AppCore>>,
+    before_days: u32,
+) -> Result<u64, ApiError> {
+    state.chat_delete_stale_sessions(before_days).await
+}
+
+#[tauri::command]
 pub async fn chat_cancel(
     state: State<'_, Arc<AppCore>>,
     session_key: String,
@@ -104,6 +130,9 @@ pub async fn chat_cancel(
 pub(crate) const DEV_COMMANDS: &[&str] = &[
     "chat_threads",
     "chat_messages",
+    "chat_get_session",
+    "chat_list_sessions_by_project",
+    "chat_delete_stale_sessions",
     "chat_pin_thread",
     "chat_rename_thread",
     "chat_delete_thread",
@@ -127,6 +156,18 @@ pub(crate) async fn dispatch_dev(
                 core.chat_messages(session_key, dev::get(body, "limit"))
                     .await,
             )
+        }
+        "chat_get_session" => {
+            let session_key = try_field!(dev::get_str(body, "sessionKey"));
+            dev::val(core.chat_get_session(session_key).await)
+        }
+        "chat_list_sessions_by_project" => {
+            let project_id = try_field!(dev::get_str(body, "projectId"));
+            dev::val(core.chat_list_sessions_by_project(project_id).await)
+        }
+        "chat_delete_stale_sessions" => {
+            let before_days: u32 = try_field!(dev::require(body, "beforeDays"));
+            dev::val(core.chat_delete_stale_sessions(before_days).await)
         }
         "chat_pin_thread" => {
             let session_key = try_field!(dev::get_str(body, "sessionKey"));

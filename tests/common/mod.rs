@@ -200,8 +200,8 @@ pub async fn test_repos() -> klyntbot::storage::Repos {
     klyntbot::storage::Repos::from_pool(&test_pool().await)
 }
 
-pub async fn test_action_repo() -> klyntbot::storage::ActionRepo {
-    klyntbot::storage::ActionRepo::new(test_pool().await.inner().clone())
+pub async fn test_task_repo() -> klyntbot::storage::TaskRepo {
+    klyntbot::storage::TaskRepo::new(test_pool().await.inner().clone())
 }
 
 /// Create an AreaRepo backed by an in-memory pool.

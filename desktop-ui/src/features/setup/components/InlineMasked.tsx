@@ -46,7 +46,7 @@ export function InlineMasked({
         onClick={() => setShow(!show)}
         className="text-muted-foreground hover:text-foreground transition-colors"
       >
-        {show ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+        {show ? <EyeOff className="size-3.5" /> : <Eye className="size-3.5" />}
       </button>
     </span>
   );

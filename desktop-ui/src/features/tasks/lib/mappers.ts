@@ -22,7 +22,7 @@ export interface LabelInterface {
 
 export type { Status, Priority };
 
-export type TaskState = "new" | "focused" | "has-history" | "completed";
+export type TaskState = "new" | "has-history" | "completed";
 export type ActorType = "user" | "agent" | "system";
 export type SuggestionStatus = "pending" | "applied" | "dismissed";
 
@@ -76,22 +76,6 @@ export interface SubIssue {
   status: Status;
   priority: Priority;
   completed: boolean;
-}
-
-export interface TaskMemory {
-  lastSessionSummary: string;
-  continuityNote: string;
-  relatedFacts: string[];
-}
-
-export interface FocusSession {
-  startedAt: string;
-  elapsed: number;
-  totalTracked: number;
-  qualityScore: number | null;
-  distractionCount: number | null;
-  flowState: string | null;
-  qualityHistory: number[] | null;
 }
 
 /** The Issue shape consumed by list/board components. */
@@ -329,7 +313,6 @@ export function taskToSubIssue(task: Task, labels: StatusLabel[]): SubIssue {
 
 export function deriveTaskState(task: DetailTask): TaskState {
   if (task.completed) return "completed";
-  if (task.focusedAt) return "focused";
   if (task.totalTrackedSecs > 0) return "has-history";
   return "new";
 }
@@ -406,25 +389,6 @@ export function timelineToActivity(entry: TimelineEntry): ActivityEntry {
     action,
     detail: detail ?? null,
     createdAt: entry.startedAt,
-  };
-}
-
-// ── Build focus session ───────────────────────────────────
-
-export function buildFocusSession(task: DetailTask): FocusSession | null {
-  if (!task.focusedAt) return null;
-
-  const startedAt = task.focusedAt;
-  const elapsed = Math.floor((Date.now() - new Date(startedAt).getTime()) / 1000);
-
-  return {
-    startedAt,
-    elapsed,
-    totalTracked: task.totalTrackedSecs ?? 0,
-    qualityScore: null,
-    distractionCount: null,
-    flowState: null,
-    qualityHistory: null,
   };
 }
 

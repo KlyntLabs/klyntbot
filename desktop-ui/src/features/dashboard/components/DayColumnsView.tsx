@@ -1,4 +1,3 @@
-import { ActivityFeed } from "@features/productivity/components/ActivityFeed";
 import { useEvent } from "@shared/hooks/useEvent";
 import { useQuery } from "@shared/hooks/useQuery";
 import { formatHumanDuration, minutesSinceMidnight, TZ_OFFSET_MINS } from "@shared/lib/dates";
@@ -12,10 +11,15 @@ import type {
 } from "@shared/types";
 import { ChevronDown, ChevronUp } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useTimelineDrag } from "../hooks/useTimelineDrag";
 import { type LayerKey, useEnabledLayers, useSidebarOpen } from "../lib/layers";
+import { computeOverlapLayout } from "../lib/timeline-utils";
 import { ActivityTrack, type SessionBlock } from "./ActivityTrack";
 import { CalendarTrack } from "./CalendarTrack";
 import { ContextRibbon } from "./ContextRibbon";
+import { DraggableTaskBlock } from "./DraggableTaskBlock";
+import { DueTodayTray } from "./DueTodayTray";
+import { ActivityFeed } from "./productivity/ActivityFeed";
 import { SummaryPanel } from "./SummaryPanel";
 
 const DEFAULT_HOUR_HEIGHT = 60;
@@ -133,7 +137,6 @@ export function DayColumnsView({
   const totalHeight = 24 * hourHeight;
 
   // Scroll to current hour on mount (intentionally excludes hourHeight — don't re-scroll on zoom)
-  // biome-ignore lint/correctness/useExhaustiveDependencies: only scroll on mount/date change
   useEffect(() => {
     if (scrollRef.current) {
       const targetHour = isToday ? new Date().getHours() - 1 : 8;
@@ -204,20 +207,64 @@ export function DayColumnsView({
     setHourHeight(DEFAULT_HOUR_HEIGHT);
   }, []);
 
-  // Group entries by column (skip activity — it has its own track)
-  const columnEntries = useMemo(() => {
-    const map = new Map<LayerKey, TimelineEntry[]>();
-    for (const col of COLUMNS) map.set(col.key, []);
+  // Timeline drag-and-drop for task scheduling
+  const {
+    drag: timelineDrag,
+    ghost,
+    isDragging,
+    startMove,
+    startResize,
+    startTrayDrag,
+    onMouseMove: onDragMouseMove,
+    onMouseUp: onDragMouseUp,
+  } = useTimelineDrag(date, pxPerMin);
+
+  useEffect(() => {
+    if (!isDragging) return;
+    document.addEventListener("mousemove", onDragMouseMove);
+    document.addEventListener("mouseup", onDragMouseUp);
+    return () => {
+      document.removeEventListener("mousemove", onDragMouseMove);
+      document.removeEventListener("mouseup", onDragMouseUp);
+    };
+  }, [isDragging, onDragMouseMove, onDragMouseUp]);
+
+  // Group entries by column (skip activity — it has its own track) and compute overlap layouts
+  const { columnEntries, columnLayouts } = useMemo(() => {
+    const entryMap = new Map<LayerKey, TimelineEntry[]>();
+    for (const col of COLUMNS) entryMap.set(col.key, []);
     for (const entry of entries) {
       for (const col of COLUMNS) {
         if (col.filter(entry)) {
-          map.get(col.key)?.push(entry);
+          entryMap.get(col.key)?.push(entry);
           break;
         }
       }
     }
-    return map;
+    // Compute overlap layout for each column
+    const layoutMap = new Map<LayerKey, Map<string, { colIndex: number; totalCols: number }>>();
+    for (const [key, colEntries] of entryMap) {
+      layoutMap.set(key, computeOverlapLayout(colEntries));
+    }
+    return { columnEntries: entryMap, columnLayouts: layoutMap };
   }, [entries]);
+
+  // Split task entries into scheduled (timeline blocks) and unscheduled (tray chips)
+  const { scheduledTaskEntries, trayTaskEntries } = useMemo(() => {
+    const taskEntries = columnEntries.get("tasks") ?? [];
+    const scheduled: TimelineEntry[] = [];
+    const tray: TimelineEntry[] = [];
+    for (const entry of taskEntries) {
+      if (entry.entryType === "taskDue") {
+        const meta = entry.metadata as Record<string, unknown> | undefined;
+        if (meta?.scheduled === true) scheduled.push(entry);
+        else tray.push(entry);
+      } else {
+        scheduled.push(entry); // taskCreated, taskCompleted
+      }
+    }
+    return { scheduledTaskEntries: scheduled, trayTaskEntries: tray };
+  }, [columnEntries]);
 
   // Only show columns whose layer is enabled
   const visibleColumns = useMemo(() => COLUMNS.filter((col) => enabled.has(col.key)), [enabled]);
@@ -253,7 +300,7 @@ export function DayColumnsView({
 
         {/* Zoom indicator — shown when zoomed away from default */}
         {hourHeight !== DEFAULT_HOUR_HEIGHT && (
-          <div className="px-3 py-1 flex items-center justify-between border-b border-border text-[10px] text-muted-foreground">
+          <div className="px-3 py-1 flex items-center justify-between border-b border-border text-2xs text-muted-foreground">
             <span className="tabular-nums">
               Zoom: {Math.round((hourHeight / DEFAULT_HOUR_HEIGHT) * 100)}%
             </span>
@@ -298,14 +345,16 @@ export function DayColumnsView({
                 className="absolute w-full flex items-start"
                 style={{ top: h * hourHeight }}
               >
+                {/* biome-ignore lint/a11y/noStaticElementInteractions: drag-to-zoom gutter; first cell is an accessible slider, rest are presentation */}
+                {/* biome-ignore lint/a11y/useAriaPropsSupportedByRole: aria attrs are only rendered for h===0 (slider role) */}
                 <div
-                  role={h === 0 ? "slider" : undefined}
+                  role={h === 0 ? "slider" : "presentation"}
                   aria-label={h === 0 ? "Timeline zoom level" : undefined}
                   aria-valuemin={h === 0 ? MIN_HOUR_HEIGHT : undefined}
                   aria-valuemax={h === 0 ? MAX_HOUR_HEIGHT : undefined}
                   aria-valuenow={h === 0 ? hourHeight : undefined}
                   tabIndex={h === 0 ? 0 : undefined}
-                  className="text-[10px] text-muted-foreground text-right pr-2 select-none cursor-ns-resize"
+                  className="text-2xs text-muted-foreground text-right pr-2 select-none cursor-ns-resize"
                   style={{ width: HOUR_GUTTER }}
                   onMouseDown={handleGutterMouseDown}
                   onKeyDown={
@@ -393,7 +442,68 @@ export function DayColumnsView({
                   );
                 }
 
+                // Tasks column: split into tray (unscheduled) and draggable blocks (scheduled)
+                if (col.key === "tasks") {
+                  const layouts = columnLayouts.get(col.key);
+                  return (
+                    <div
+                      key={col.key}
+                      className="relative border-r border-border last:border-r-0 min-w-0 flex flex-col"
+                    >
+                      <DueTodayTray
+                        entries={trayTaskEntries}
+                        onStartDrag={startTrayDrag}
+                        onSelect={handleSelectEntry}
+                        selectedEntryId={selectedEntry?.id ?? null}
+                      />
+                      <div className="relative flex-1">
+                        {scheduledTaskEntries.map((entry) => {
+                          const meta = entry.metadata as Record<string, unknown> | undefined;
+                          const isScheduled = meta?.scheduled === true;
+                          const taskId = (meta?.taskId as string) ?? entry.entityId ?? entry.id;
+                          const startMin = minutesSinceMidnight(entry.startedAt);
+                          const dur = entry.durationSecs ?? 0;
+                          const endMin = dur > 0 ? startMin + dur / 60 : startMin + 30;
+                          const isThisDragging = isDragging && timelineDrag?.taskId === taskId;
+
+                          if (isScheduled) {
+                            return (
+                              <DraggableTaskBlock
+                                key={entry.id}
+                                entry={entry}
+                                pxPerMin={pxPerMin}
+                                selected={selectedEntry?.id === entry.id}
+                                layout={layouts?.get(entry.id)}
+                                isDragging={isThisDragging}
+                                ghostTopMin={isThisDragging ? ghost?.topMin : undefined}
+                                ghostEndMin={isThisDragging ? ghost?.endMin : undefined}
+                                onMouseDownMove={(e) => startMove(e, taskId, startMin, endMin)}
+                                onMouseDownResize={(e) => startResize(e, taskId, startMin, endMin)}
+                                onClick={() => handleSelectEntry(entry)}
+                              />
+                            );
+                          }
+
+                          // taskCreated, taskCompleted — regular ColumnEntry
+                          return (
+                            <ColumnEntry
+                              key={entry.id}
+                              entry={entry}
+                              column={col}
+                              pxPerMin={pxPerMin}
+                              selected={selectedEntry?.id === entry.id}
+                              onClick={() => handleSelectEntry(entry)}
+                              layout={layouts?.get(entry.id)}
+                            />
+                          );
+                        })}
+                      </div>
+                    </div>
+                  );
+                }
+
                 const colEntries = columnEntries.get(col.key) ?? [];
+                const layouts = columnLayouts.get(col.key);
                 return (
                   <div
                     key={col.key}
@@ -407,6 +517,7 @@ export function DayColumnsView({
                         pxPerMin={pxPerMin}
                         selected={selectedEntry?.id === entry.id}
                         onClick={() => handleSelectEntry(entry)}
+                        layout={layouts?.get(entry.id)}
                       />
                     ))}
                   </div>
@@ -428,9 +539,9 @@ export function DayColumnsView({
               className="flex items-center gap-2 px-3 py-2 text-xs text-muted-foreground hover:text-foreground transition-colors w-full"
             >
               {feedExpanded ? (
-                <ChevronDown className="w-3.5 h-3.5" />
+                <ChevronDown className="size-3.5" />
               ) : (
-                <ChevronUp className="w-3.5 h-3.5" />
+                <ChevronUp className="size-3.5" />
               )}
               Live Activity Feed
             </button>
@@ -467,17 +578,30 @@ function ColumnEntry({
   pxPerMin,
   selected,
   onClick,
+  layout,
 }: {
   entry: TimelineEntry;
   column: ColumnDef;
   pxPerMin: number;
   selected: boolean;
   onClick: () => void;
+  layout?: { colIndex: number; totalCols: number };
 }) {
   const startMin = minutesSinceMidnight(entry.startedAt);
   const top = startMin * pxPerMin;
   const dur = entry.durationSecs ?? 0;
   const height = Math.max(dur > 0 ? (dur / 60) * pxPerMin : MIN_BLOCK_HEIGHT, MIN_BLOCK_HEIGHT);
+
+  // Overlap layout: compute left/width percentages
+  const colIndex = layout?.colIndex ?? 0;
+  const totalCols = layout?.totalCols ?? 1;
+  const leftPct = totalCols > 1 ? `${(colIndex / totalCols) * 100}%` : undefined;
+  const widthPct = totalCols > 1 ? `${(1 / totalCols) * 100}%` : undefined;
+
+  // Shared positioning style for overlap layout
+  const posStyle: React.CSSProperties = leftPct
+    ? { top, left: leftPct, width: widthPct, paddingLeft: 4, paddingRight: 2 }
+    : { top, left: 4, right: 4 };
 
   // Time entries — rich blocks with title + time
   if (column.key === "timeEntries") {
@@ -490,16 +614,16 @@ function ColumnEntry({
         type="button"
         onClick={onClick}
         className={cn(
-          "absolute left-1 right-1 rounded-md px-1.5 py-0.5 text-[11px] leading-tight overflow-hidden cursor-pointer",
+          "absolute rounded-md px-1.5 py-0.5 text-[11px] leading-tight overflow-hidden cursor-pointer",
           "border-l-2 border-l-timeline-task bg-timeline-task/15 hover:bg-timeline-task/25 transition-colors",
           selected && "ring-1 ring-brand",
         )}
-        style={{ top, height }}
+        style={{ ...posStyle, height }}
         title={entry.title}
       >
         <span className="text-muted-foreground truncate block">{entry.title}</span>
         {height > 28 && (
-          <span className="text-muted-foreground text-[10px] truncate block">
+          <span className="text-muted-foreground text-2xs truncate block">
             {dur > 0 && `${formatHumanDuration(dur)} · `}
             {timeStr}
           </span>
@@ -518,21 +642,19 @@ function ColumnEntry({
         type="button"
         onClick={onClick}
         className={cn(
-          "absolute left-1 right-1 rounded-md px-1.5 py-0.5 text-[11px] leading-tight overflow-hidden cursor-pointer transition-colors",
+          "absolute rounded-md px-1.5 py-0.5 text-[11px] leading-tight overflow-hidden cursor-pointer transition-colors",
           isDue
             ? "border-l-2 border-l-[var(--timeline-todo)] bg-[var(--timeline-todo)]/15 hover:bg-[var(--timeline-todo)]/25"
-            : "border-l border-border bg-card hover:bg-muted",
+            : "border-l-2 border-l-[var(--timeline-todo)]/50 bg-[var(--timeline-todo)]/8 hover:bg-[var(--timeline-todo)]/15",
           isCompleted && "opacity-60 line-through",
           selected && "ring-1 ring-brand",
         )}
-        style={{ top, height: Math.max(height, 20) }}
+        style={{ ...posStyle, height: Math.max(height, 20) }}
         title={entry.title}
       >
         <span className="text-muted-foreground truncate block">{entry.title}</span>
         {isDue && status && height > 28 && (
-          <span className="text-muted-foreground text-[10px] truncate block capitalize">
-            {status}
-          </span>
+          <span className="text-muted-foreground text-2xs truncate block capitalize">{status}</span>
         )}
       </button>
     );
@@ -546,13 +668,13 @@ function ColumnEntry({
         type="button"
         onClick={onClick}
         className={cn(
-          "absolute left-0.5 right-0.5 rounded-md px-1.5 py-0.5 text-[10px] leading-tight overflow-hidden cursor-pointer transition-colors",
+          "absolute rounded-md px-1.5 py-0.5 text-2xs leading-tight overflow-hidden cursor-pointer transition-colors",
           isExpense
             ? "border-l-2 border-l-[var(--timeline-finance-expense)] bg-[var(--timeline-finance-expense)]/15 hover:bg-[var(--timeline-finance-expense)]/25"
             : "border-l-2 border-l-[var(--timeline-finance-income)] bg-[var(--timeline-finance-income)]/15 hover:bg-[var(--timeline-finance-income)]/25",
           selected && "ring-1 ring-brand",
         )}
-        style={{ top, height: Math.max(height, 18) }}
+        style={{ ...posStyle, height: Math.max(height, 18) }}
         title={entry.title}
       >
         <span
@@ -569,25 +691,21 @@ function ColumnEntry({
     );
   }
 
-  // Notes — dot + label
+  // Notes — colored box like tasks
   if (column.key === "notes") {
     return (
       <button
         type="button"
         onClick={onClick}
         className={cn(
-          "absolute left-1 right-1 flex items-center gap-1 text-[10px] cursor-pointer transition-colors",
-          "text-muted-foreground hover:text-muted-foreground",
-          selected && "text-brand",
+          "absolute rounded-md px-1.5 py-0.5 text-2xs leading-tight overflow-hidden cursor-pointer transition-colors",
+          "border-l-2 border-l-[var(--timeline-note)]/60 bg-[var(--timeline-note)]/8 hover:bg-[var(--timeline-note)]/15",
+          selected && "ring-1 ring-brand",
         )}
-        style={{ top }}
+        style={{ ...posStyle, height: Math.max(height, 18) }}
         title={entry.title}
       >
-        <span
-          className="w-2 h-2 rounded-full shrink-0"
-          style={{ backgroundColor: "var(--timeline-note)" }}
-        />
-        <span className="truncate">{entry.title}</span>
+        <span className="text-muted-foreground truncate block">{entry.title}</span>
       </button>
     );
   }
@@ -598,13 +716,13 @@ function ColumnEntry({
       type="button"
       onClick={onClick}
       className={cn(
-        "absolute left-1 right-1 flex items-center gap-1 text-[10px] text-muted-foreground hover:text-muted-foreground cursor-pointer transition-colors",
+        "absolute flex items-center gap-1 text-2xs text-muted-foreground hover:text-muted-foreground cursor-pointer transition-colors",
         selected && "text-brand",
       )}
-      style={{ top }}
+      style={posStyle}
       title={entry.title}
     >
-      <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: column.color }} />
+      <span className="size-2 rounded-full shrink-0" style={{ backgroundColor: column.color }} />
       <span className="truncate">{entry.title}</span>
     </button>
   );
@@ -621,7 +739,7 @@ function NowLine({ pxPerMin }: { pxPerMin: number }) {
   return (
     <div className="absolute w-full pointer-events-none z-10" style={{ top, left: HOUR_GUTTER }}>
       <div className="flex items-center">
-        <div className="w-2 h-2 rounded-full bg-destructive -ml-1" />
+        <div className="size-2 rounded-full bg-destructive -ml-1" />
         <div className="flex-1 border-t border-destructive" />
       </div>
     </div>

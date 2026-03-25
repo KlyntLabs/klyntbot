@@ -10,12 +10,12 @@ const TODO_CACHE_TTL_SECS: i64 = 60;
 
 /// Provides active tasks summary with TTL caching.
 pub struct TodoSource {
-    repo: storage::ActionRepo,
+    repo: storage::TaskRepo,
     cache: TtlCache,
 }
 
 impl TodoSource {
-    pub fn new(repo: storage::ActionRepo) -> Self {
+    pub fn new(repo: storage::TaskRepo) -> Self {
         Self {
             repo,
             cache: TtlCache::new(TODO_CACHE_TTL_SECS),

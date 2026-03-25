@@ -13,6 +13,7 @@ use bus::DomainEvent;
 use cognitive::situation::UserSituation;
 
 use crate::feedback::FeedbackTracker;
+use crate::learning_templates;
 use crate::pattern_detector::PatternDetector;
 use crate::reasoner::{CoachingReasonerHandler, InterventionType, ReasonerInput};
 use crate::router::{DeliveredIntervention, InterventionRouter, RoutingResult};
@@ -35,6 +36,7 @@ impl CoachingService {
         situation: Arc<Mutex<UserSituation>>,
         reasoner: Arc<dyn CoachingReasonerHandler>,
         intervention_tx: mpsc::Sender<DeliveredIntervention>,
+        intervention_log: Option<storage::CoachingInterventionLogRepo>,
         cancel: CancellationToken,
     ) -> Self {
         let cancel_clone = cancel.clone();
@@ -81,6 +83,7 @@ impl CoachingService {
                                             let mut fb = feedback.lock().await;
                                             fb.record_delivery(&intervention);
                                         }
+                                        persist_intervention(intervention_log.as_ref(), &intervention).await;
                                         let _ = intervention_tx.send(intervention).await;
                                     }
 
@@ -131,7 +134,67 @@ impl CoachingService {
                                 det.detect_patterns()
                             };
 
-                            // Build reasoner input
+                            // Fast-path: use deterministic templates for learning patterns
+                            let learning_patterns: Vec<_> = patterns.iter()
+                                .filter(|p| p.domain == "learning")
+                                .collect();
+
+                            if !learning_patterns.is_empty() {
+                                for pattern in &learning_patterns {
+                                    let msg = learning_templates::learning_message(
+                                        &pattern.name, &pattern.description,
+                                    );
+                                    let action_url = match pattern.name.as_str() {
+                                        n if n.starts_with("study_streak_") => Some("/learn/review".to_string()),
+                                        "retention_decay_detected" | "domain_retention_gap" => Some("/learn/knowledge".to_string()),
+                                        _ => None,
+                                    };
+                                    let intervention = DeliveredIntervention {
+                                        id: uuid::Uuid::new_v4().to_string(),
+                                        intervention_type: msg.intervention_type,
+                                        message: msg.message,
+                                        trigger_name: pattern.name.clone(),
+                                        delivered_at: chrono::Utc::now(),
+                                        action_url,
+                                    };
+
+                                    // Route through rate limiter
+                                    let routing = {
+                                        let decision = crate::reasoner::CoachingDecision {
+                                            should_intervene: true,
+                                            confidence: pattern.confidence,
+                                            message: Some(intervention.message.clone()),
+                                            intervention_type: intervention.intervention_type.clone(),
+                                            reasoning: format!("learning template: {}", pattern.name),
+                                            observations: vec![],
+                                        };
+                                        let mut r = router.lock().await;
+                                        r.route(&decision, &pattern.name)
+                                    };
+
+                                    match routing {
+                                        RoutingResult::Delivered(routed) => {
+                                            debug!(
+                                                "Learning intervention delivered: {} via {:?}",
+                                                pattern.name, routed.intervention_type
+                                            );
+                                            {
+                                                let mut fb = feedback.lock().await;
+                                                fb.record_delivery(&routed);
+                                            }
+                                            persist_intervention(intervention_log.as_ref(), &routed).await;
+                                            let _ = intervention_tx.send(routed).await;
+                                        }
+                                        RoutingResult::RateLimited { reason } => {
+                                            debug!("Learning intervention rate-limited: {reason}");
+                                        }
+                                        RoutingResult::Skipped => {}
+                                    }
+                                }
+                                continue;
+                            }
+
+                            // Non-learning patterns: pass through LLM reasoner
                             let input = ReasonerInput {
                                 situation: sit.clone(),
                                 trigger: trigger.clone(),
@@ -166,6 +229,8 @@ impl CoachingService {
                                         let mut fb = feedback.lock().await;
                                         fb.record_delivery(&intervention);
                                     }
+                                    // Persist to intervention log
+                                    persist_intervention(intervention_log.as_ref(), &intervention).await;
                                     // Send to consumer
                                     let _ = intervention_tx.send(intervention).await;
                                 }
@@ -245,6 +310,7 @@ async fn build_focus_debrief(
                 message,
                 delivered_at: chrono::Utc::now(),
                 trigger_name: "focus_session_debrief".into(),
+                action_url: None,
             })
         }
         Ok(_) => {
@@ -264,6 +330,7 @@ async fn build_focus_debrief(
                     ),
                     delivered_at: chrono::Utc::now(),
                     trigger_name: "focus_session_debrief".into(),
+                    action_url: None,
                 })
             } else {
                 None
@@ -299,6 +366,28 @@ async fn update_situation_from_event(situation: &Arc<Mutex<UserSituation>>, even
     }
 }
 
+/// Persist a delivered intervention to the coaching_intervention_log table.
+async fn persist_intervention(
+    log_repo: Option<&storage::CoachingInterventionLogRepo>,
+    intervention: &DeliveredIntervention,
+) {
+    if let Some(repo) = log_repo {
+        if let Err(e) = repo
+            .insert(
+                &intervention.id,
+                intervention.intervention_type.as_str(),
+                &intervention.message,
+                &intervention.trigger_name,
+                &intervention.delivered_at.to_rfc3339(),
+                intervention.action_url.as_deref(),
+            )
+            .await
+        {
+            warn!("failed to persist intervention to log: {e}");
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -316,7 +405,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_coaching_service_processes_distraction_events() {
+    async fn test_coaching_service_processes_budget_events() {
         let accumulator = Arc::new(Mutex::new(SignalAccumulator::new()));
         let detector = Arc::new(Mutex::new(PatternDetector::new()));
         let router = Arc::new(Mutex::new(InterventionRouter::default()));
@@ -330,7 +419,7 @@ mod tests {
             decision: CoachingDecision {
                 should_intervene: true,
                 confidence: 0.8,
-                message: Some("Take a break!".into()),
+                message: Some("Check your budget!".into()),
                 intervention_type: InterventionType::ChatMessage,
                 reasoning: "test".into(),
                 observations: vec![],
@@ -351,17 +440,16 @@ mod tests {
             situation,
             reasoner,
             intervention_tx,
+            None,
             cancel.clone(),
         );
 
-        // Push 3 distraction events to trigger distraction_streak
-        for _ in 0..3 {
-            bus.publish(DomainEvent::DistractionDetected {
-                app: "reddit".into(),
-                duration_secs: None,
-                context: "test".into(),
-            });
-        }
+        // Push a budget alert to trigger budget_warning
+        bus.publish(DomainEvent::BudgetAlert {
+            category: "food".into(),
+            spent: 450.0,
+            limit: 500.0,
+        });
 
         // Wait briefly for processing
         tokio::time::sleep(std::time::Duration::from_millis(100)).await;
@@ -372,7 +460,7 @@ mod tests {
             intervention.is_ok(),
             "Expected an intervention to be delivered"
         );
-        assert_eq!(intervention.unwrap().message, "Take a break!");
+        assert_eq!(intervention.unwrap().message, "Check your budget!");
 
         cancel.cancel();
     }
@@ -408,6 +496,7 @@ mod tests {
             situation,
             reasoner,
             tx,
+            None,
             cancel.clone(),
         );
 

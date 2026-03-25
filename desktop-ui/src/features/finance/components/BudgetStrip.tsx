@@ -26,7 +26,7 @@ export function BudgetStrip({ budgets }: { budgets: FinanceBudgetUsage[] }) {
         return (
           <Card key={b.id} className="p-3.5">
             <div className="flex justify-between items-center mb-2">
-              <span className="text-[12px] text-muted-foreground">{b.name}</span>
+              <span className="text-xs text-muted-foreground">{b.name}</span>
               <span className="text-[13px] font-light tabular-nums" style={{ color }}>
                 {p}%
               </span>

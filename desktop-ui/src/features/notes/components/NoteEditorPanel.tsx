@@ -1,6 +1,5 @@
 import type { Note, NoteUpdateParams } from "@shared/types";
-import { useCallback, useRef } from "react";
-import type { SplitMode } from "./editor/SplitEditor";
+import { useCallback, useEffect, useRef } from "react";
 import { NoteEditor } from "./NoteEditor";
 import { NoteTags, type NoteTagsHandle } from "./NoteTags";
 
@@ -15,8 +14,6 @@ interface NoteEditorPanelProps {
   onToggleFocusMode?: () => void;
   focusModeActive?: boolean;
   onGenerateCards?: (selectedText?: string) => void;
-  splitMode?: SplitMode | null;
-  onSplitModeChange?: (mode: SplitMode | null) => void;
 }
 
 export function NoteEditorPanel({
@@ -28,35 +25,62 @@ export function NoteEditorPanel({
   onToggleFocusMode,
   focusModeActive,
   onGenerateCards,
-  splitMode,
-  onSplitModeChange,
 }: NoteEditorPanelProps) {
   const titleRef = useRef<HTMLDivElement>(null);
   const tagsRef = useRef<NoteTagsHandle>(null);
   const lastTitleRef = useRef(note.title);
+  const editorFocusRef = useRef<() => void>();
+  const titleSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Update last known title when note changes
   if (lastTitleRef.current !== note.title && titleRef.current) {
     lastTitleRef.current = note.title;
   }
 
+  // Cleanup debounce timer on unmount
+  useEffect(() => {
+    return () => {
+      if (titleSaveTimerRef.current) clearTimeout(titleSaveTimerRef.current);
+    };
+  }, []);
+
+  const saveTitle = useCallback(
+    (newTitle: string) => {
+      if (newTitle && newTitle !== lastTitleRef.current) {
+        onRenameNote(note.id, newTitle);
+        lastTitleRef.current = newTitle;
+      }
+    },
+    [note.id, onRenameNote],
+  );
+
+  const handleTitleInput = useCallback(() => {
+    const newTitle = (titleRef.current?.textContent || "").trim();
+    if (titleSaveTimerRef.current) clearTimeout(titleSaveTimerRef.current);
+    titleSaveTimerRef.current = setTimeout(() => saveTitle(newTitle), 500);
+  }, [saveTitle]);
+
   const handleTitleBlur = useCallback(() => {
+    // Flush any pending debounced save immediately
+    if (titleSaveTimerRef.current) {
+      clearTimeout(titleSaveTimerRef.current);
+      titleSaveTimerRef.current = null;
+    }
     const el = titleRef.current;
     if (!el) return;
     const newTitle = (el.textContent || "").trim();
-    if (newTitle && newTitle !== note.title) {
-      onRenameNote(note.id, newTitle);
-      lastTitleRef.current = newTitle;
-    } else if (!newTitle) {
-      // Restore previous title if empty
+    if (newTitle) {
+      saveTitle(newTitle);
+    } else {
       el.textContent = note.title;
     }
-  }, [note.id, note.title, onRenameNote]);
+  }, [note.title, saveTitle]);
 
   const handleTitleKeyDown = useCallback((e: React.KeyboardEvent) => {
-    if (e.key === "Enter") {
+    if (e.key === "Enter" || e.key === "Tab") {
       e.preventDefault();
       titleRef.current?.blur();
+      editorFocusRef.current?.();
     }
   }, []);
 
@@ -70,7 +94,7 @@ export function NoteEditorPanel({
   return (
     <div className="flex-1 flex flex-col min-w-0 min-h-0">
       {/* Header: title + tags */}
-      <div className="px-3 shrink-0">
+      <div className="px-8 shrink-0">
         {/* Editable title */}
         {/* biome-ignore lint/a11y/useSemanticElements: contentEditable div used as inline title editor */}
         <div
@@ -80,9 +104,10 @@ export function NoteEditorPanel({
           contentEditable
           suppressContentEditableWarning
           onBlur={handleTitleBlur}
+          onInput={handleTitleInput}
           onKeyDown={handleTitleKeyDown}
           data-placeholder="Untitled"
-          className="text-2xl font-bold text-foreground outline-none min-h-[1.5em] empty:before:content-[attr(data-placeholder)] empty:before:text-muted-foreground/50"
+          className="text-4xl font-bold text-foreground outline-none min-h-[1.5em] empty:before:content-[attr(data-placeholder)] empty:before:text-muted-foreground/50"
         >
           {note.title}
         </div>
@@ -103,8 +128,7 @@ export function NoteEditorPanel({
         onToggleFocusMode={onToggleFocusMode}
         focusModeActive={focusModeActive}
         onGenerateCards={onGenerateCards}
-        splitMode={splitMode}
-        onSplitModeChange={onSplitModeChange}
+        editorFocusRef={editorFocusRef}
       />
     </div>
   );

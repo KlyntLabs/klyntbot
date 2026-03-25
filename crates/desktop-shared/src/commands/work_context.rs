@@ -69,7 +69,7 @@ impl From<activity_log::WorkResource> for WorkResourceResponse {
 pub struct WorkContextDetailResponse {
     pub context: WorkContextResponse,
     pub resources: Vec<WorkResourceResponse>,
-    pub linked_action_ids: Vec<String>,
+    pub linked_task_ids: Vec<String>,
     pub recent_events: Vec<ActivityEventResponse>,
 }
 

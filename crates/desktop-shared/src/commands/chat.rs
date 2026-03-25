@@ -46,6 +46,22 @@ pub struct ChatMessageResponse {
     pub persona_name: Option<String>,
 }
 
+/// Detailed session response for `chat_get_session`.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ChatSessionResponse {
+    pub session_key: String,
+    pub title: String,
+    pub message_count: i64,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
+    pub project_id: Option<String>,
+    pub conversation_type: Option<String>,
+    pub pinned: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub squad_id: Option<String>,
+}
+
 /// Optional session context sent from the frontend alongside a chat message.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]

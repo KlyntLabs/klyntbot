@@ -34,6 +34,29 @@ pub fn sanitize_predicate_value(value: &str) -> Result<String, StorageError> {
     Ok(value.replace('\'', "''"))
 }
 
+/// Validate a full predicate expression for dangerous patterns.
+///
+/// Unlike [`sanitize_predicate_value`] (which escapes a single interpolated value),
+/// this checks an assembled predicate for structural injection indicators:
+/// semicolons (multi-statement), comment markers, and line breaks.
+///
+/// Single-quote safety is the caller's responsibility — use [`sanitize_predicate_value`]
+/// for each interpolated value before assembling the predicate.
+pub(crate) fn validate_predicate(predicate: &str) -> Result<(), StorageError> {
+    if predicate.contains(';')
+        || predicate.contains('\n')
+        || predicate.contains('\r')
+        || predicate.contains("--")
+        || predicate.contains("/*")
+    {
+        return Err(StorageError::Vector(format!(
+            "Predicate contains disallowed characters: {:?}",
+            &predicate[..predicate.len().min(60)]
+        )));
+    }
+    Ok(())
+}
+
 impl VectorStore {
     /// Upsert an embedding vector (insert-then-delete-old for crash safety).
     ///
@@ -96,15 +119,16 @@ impl VectorStore {
             .await
             .map_err(|e| StorageError::Vector(format!("LanceDB add to {table}: {e}")))?;
 
-        // Delete old rows SECOND (safe: crash here = temporary duplicate,
-        // cleaned up on next upsert). We delete rows with matching ID that
-        // have an older timestamp than `now`.
+        // Delete old rows SECOND (best-effort cleanup). Crash or failure here
+        // leaves a temporary duplicate, cleaned up on next upsert or maintenance.
+        // We intentionally do NOT propagate delete errors — the new row is already
+        // persisted, so the upsert semantically succeeded.
         let safe_id = sanitize_predicate_value(id)?;
         let safe_now = sanitize_predicate_value(&now)?;
         let predicate = format!("id = '{safe_id}' AND {ts_col_name} < '{safe_now}'");
-        tbl.delete(&predicate)
-            .await
-            .map_err(|e| StorageError::Vector(format!("LanceDB cleanup old in {table}: {e}")))?;
+        if let Err(e) = tbl.delete(&predicate).await {
+            tracing::warn!("LanceDB cleanup old in {table} (non-fatal): {e}");
+        }
 
         Ok(())
     }
@@ -181,7 +205,12 @@ impl VectorStore {
     }
 
     /// Delete all rows matching a SQL predicate.
+    ///
+    /// The predicate is validated for dangerous patterns (semicolons, comment
+    /// markers, line breaks) before being passed to LanceDB. Individual values
+    /// within the predicate should already be escaped via [`sanitize_predicate_value`].
     pub async fn delete_where(&self, table: &str, predicate: &str) -> Result<(), StorageError> {
+        validate_predicate(predicate)?;
         let tbl = match self.db.open_table(table).execute().await {
             Ok(t) => t,
             Err(_) => return Ok(()), // table may not exist yet

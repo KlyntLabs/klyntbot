@@ -105,27 +105,7 @@ CREATE INDEX IF NOT EXISTS idx_activity_events_focus_session
     ON activity_events(focus_session_id)
     WHERE focus_session_id IS NOT NULL;
 
--- ── Focus sessions ───────────────────────────────────────────────────────────
-
-CREATE TABLE IF NOT EXISTS focus_sessions (
-    id                 TEXT PRIMARY KEY,
-    action_id          TEXT,
-    project_id         TEXT,
-    session_type       TEXT NOT NULL DEFAULT 'focus',
-    target_mins        INTEGER,
-    started_at         TEXT NOT NULL,
-    ended_at           TEXT,
-    actual_mins        INTEGER,
-    interruptions      INTEGER NOT NULL DEFAULT 0,
-    distraction_events TEXT,
-    quality_score      REAL,
-    completed          BOOLEAN NOT NULL DEFAULT FALSE,
-    notes              TEXT,
-    source             TEXT NOT NULL DEFAULT 'manual'
-);
-
-CREATE INDEX IF NOT EXISTS idx_focus_sessions_started ON focus_sessions(started_at DESC);
-CREATE INDEX IF NOT EXISTS idx_focus_sessions_action ON focus_sessions(action_id);
+-- NOTE: focus_sessions table removed — replaced by productivity_sessions.
 
 -- ── Daily summaries ──────────────────────────────────────────────────────────
 

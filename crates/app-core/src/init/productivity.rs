@@ -76,7 +76,14 @@ pub(super) async fn init_productivity(
             ));
 
             // Daily aggregator for live summaries.
-            let agg = Arc::new(DailyAggregator::new(prod_repos.clone()));
+            let quality_scorer = feature_productivity::intelligence::QualityScorer::new(
+                prod_repos.intelligence_sessions.clone(),
+                prod_repos.quality_scores.clone(),
+                Arc::clone(domain_event_bus),
+            );
+            let agg = Arc::new(
+                DailyAggregator::new(prod_repos.clone()).with_quality_scorer(quality_scorer),
+            );
 
             // Build and start the productivity engine (tracker + all subscribers).
             let categories = prod_repos.categories.list_all().await.unwrap_or_default();

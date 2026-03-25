@@ -17,7 +17,8 @@ pub use ttl_cache::TtlCache;
 pub use assembler::{AssembledContext, ContextEngine, ContextRequest, ExecutionStrategy};
 pub use budget::{BudgetAllocator, BudgetConfig, BudgetReport, Priority};
 pub use history_compressor::{
-    CompressedHistory, CompressorConfig, CompressorMode, HistoryCompressor, HistorySummary,
+    first_snippet, CompressedHistory, CompressorConfig, CompressorMode, HistoryCompressor,
+    HistorySummary,
 };
 pub use insight_forge::{
     CircuitBreaker, DecomposerLlm, DomainSearcher, FallbackDecomposer, HeuristicDecomposer,
@@ -28,5 +29,12 @@ pub use memory_retriever::{MemoryEntry, MemoryRetriever, MemorySource};
 pub use source::{ContextSource, SourceContext};
 pub use summary_provider::SummaryProvider;
 pub use token_counter::{
-    best_token_counter, default_token_counter, CharTokenCounter, TiktokenCounter, TokenCounter,
+    best_token_counter, default_token_counter, estimate_message_tokens, token_counter_for_model,
+    AnthropicTokenCounter, CharTokenCounter, TiktokenCounter, TokenCounter,
+};
+
+pub mod rewriter;
+pub use rewriter::{
+    ActiveTaskContext, ActiveView, CorrectionContext, QueryRewriter, RetrievalContext,
+    RewriteResult, RewriteSource, UserSituationSnapshot,
 };

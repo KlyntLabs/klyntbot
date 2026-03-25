@@ -47,8 +47,10 @@ impl StrategyRepo {
                                            max_iterations, success, user_satisfaction,
                                            response_time_ms, chat_id,
                                            tool_name, tool_success, tool_duration_ms,
-                                           complexity_signals, execution_mode)
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17)
+                                           complexity_signals, execution_mode,
+                                           retrieved_memory_count,
+                                           rewrite_triggered, rewrite_source)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19, ?20)
              RETURNING *",
         )
         .bind(row.id)
@@ -68,6 +70,9 @@ impl StrategyRepo {
         .bind(row.tool_duration_ms)
         .bind(&row.complexity_signals)
         .bind(&row.execution_mode)
+        .bind(row.retrieved_memory_count)
+        .bind(row.rewrite_triggered)
+        .bind(&row.rewrite_source)
         .fetch_one(&self.pool)
         .await?;
         Ok(result)
@@ -201,6 +206,37 @@ impl StrategyRepo {
         Ok(count)
     }
 
+    /// Get stats since a given date: total records, accuracy, avg response time, avg satisfaction.
+    pub async fn get_stats_since(
+        &self,
+        since: DateTime<Utc>,
+    ) -> Result<OverallStats, StorageError> {
+        let row: (i64, i64, i64, Option<f64>) = sqlx::query_as(
+            "SELECT COUNT(*),
+                    COALESCE(SUM(CASE WHEN predicted_strategy = actual_strategy THEN 1 ELSE 0 END), 0),
+                    CAST(COALESCE(AVG(response_time_ms), 0) AS INTEGER),
+                    AVG(user_satisfaction)
+             FROM strategy_records
+             WHERE timestamp >= ?1",
+        )
+        .bind(since)
+        .fetch_one(&self.pool)
+        .await?;
+
+        let accuracy = if row.0 > 0 {
+            row.1 as f64 / row.0 as f64
+        } else {
+            0.0
+        };
+
+        Ok(OverallStats {
+            total_records: row.0,
+            accuracy,
+            avg_response_time_ms: row.2,
+            avg_satisfaction: row.3,
+        })
+    }
+
     /// Get overall stats: total records, accuracy, avg response time, avg satisfaction.
     pub async fn get_overall_stats(&self) -> Result<OverallStats, StorageError> {
         let row: (i64, i64, i64, Option<f64>) = sqlx::query_as(
@@ -224,6 +260,72 @@ impl StrategyRepo {
             accuracy,
             avg_response_time_ms: row.2,
             avg_satisfaction: row.3,
+        })
+    }
+
+    /// Compute memory relevance as the fraction of messages where memories were
+    /// retrieved (retrieved_memory_count > 0) out of all messages that have the
+    /// field populated (non-NULL). Returns `None` if no records have the field set.
+    pub async fn memory_relevance_since(
+        &self,
+        since: DateTime<Utc>,
+    ) -> Result<Option<f64>, StorageError> {
+        let row: (i64, i64) = sqlx::query_as(
+            "SELECT COUNT(*),
+                    COALESCE(SUM(CASE WHEN retrieved_memory_count > 0 THEN 1 ELSE 0 END), 0)
+             FROM strategy_records
+             WHERE timestamp >= ?1 AND retrieved_memory_count IS NOT NULL",
+        )
+        .bind(since)
+        .fetch_one(&self.pool)
+        .await?;
+
+        if row.0 == 0 {
+            Ok(None)
+        } else {
+            Ok(Some(row.1 as f64 / row.0 as f64))
+        }
+    }
+
+    /// Fraction of messages where rewrite_triggered = 1, since `since`.
+    pub async fn rewrite_trigger_rate_since(
+        &self,
+        since: DateTime<Utc>,
+    ) -> Result<f64, StorageError> {
+        let row: (i64, i64) = sqlx::query_as(
+            "SELECT COUNT(*) as total,
+                    SUM(CASE WHEN rewrite_triggered = 1 THEN 1 ELSE 0 END) as triggered
+             FROM strategy_records
+             WHERE timestamp >= ?1",
+        )
+        .bind(since)
+        .fetch_one(&self.pool)
+        .await?;
+        Ok(if row.0 == 0 {
+            0.0
+        } else {
+            row.1 as f64 / row.0 as f64
+        })
+    }
+
+    /// Fraction of rewritten messages where retrieved_memory_count > 0.
+    pub async fn rewrite_engagement_rate_since(
+        &self,
+        since: DateTime<Utc>,
+    ) -> Result<f64, StorageError> {
+        let row: (i64, i64) = sqlx::query_as(
+            "SELECT COUNT(*) as total,
+                    SUM(CASE WHEN retrieved_memory_count > 0 THEN 1 ELSE 0 END) as engaged
+             FROM strategy_records
+             WHERE timestamp >= ?1 AND rewrite_triggered = 1",
+        )
+        .bind(since)
+        .fetch_one(&self.pool)
+        .await?;
+        Ok(if row.0 == 0 {
+            0.0
+        } else {
+            row.1 as f64 / row.0 as f64
         })
     }
 
@@ -274,6 +376,9 @@ mod tests {
             tool_duration_ms: None,
             complexity_signals: serde_json::Value::Null,
             execution_mode: None,
+            retrieved_memory_count: None,
+            rewrite_triggered: 0,
+            rewrite_source: None,
         };
 
         let created = repo.create(&row).await.unwrap();
@@ -306,6 +411,9 @@ mod tests {
             tool_duration_ms: None,
             complexity_signals: serde_json::Value::Null,
             execution_mode: None,
+            retrieved_memory_count: None,
+            rewrite_triggered: 0,
+            rewrite_source: None,
         };
 
         let created = repo.create(&row).await.unwrap();
@@ -338,6 +446,9 @@ mod tests {
             tool_duration_ms: None,
             complexity_signals: serde_json::Value::Null,
             execution_mode: None,
+            retrieved_memory_count: None,
+            rewrite_triggered: 0,
+            rewrite_source: None,
         };
         repo.create(&row).await.unwrap();
 
@@ -393,6 +504,9 @@ mod tests {
             tool_duration_ms: None,
             complexity_signals: serde_json::Value::Null,
             execution_mode: None,
+            retrieved_memory_count: None,
+            rewrite_triggered: 0,
+            rewrite_source: None,
         };
         let newer = StrategyRecordRow {
             id: uuid::Uuid::new_v4(),
@@ -412,6 +526,9 @@ mod tests {
             tool_duration_ms: None,
             complexity_signals: serde_json::Value::Null,
             execution_mode: None,
+            retrieved_memory_count: None,
+            rewrite_triggered: 0,
+            rewrite_source: None,
         };
 
         repo.create(&older).await.unwrap();
@@ -457,6 +574,9 @@ mod tests {
             tool_duration_ms: None,
             complexity_signals: serde_json::Value::Null,
             execution_mode: None,
+            retrieved_memory_count: None,
+            rewrite_triggered: 0,
+            rewrite_source: None,
         };
         repo.create(&row).await.unwrap();
         assert_eq!(repo.count_all().await.unwrap(), 1);
@@ -494,6 +614,9 @@ mod tests {
                 tool_duration_ms: None,
                 complexity_signals: serde_json::Value::Null,
                 execution_mode: None,
+                retrieved_memory_count: None,
+                rewrite_triggered: 0,
+                rewrite_source: None,
             };
             repo.create(&row).await.unwrap();
         }
@@ -534,6 +657,9 @@ mod tests {
                 tool_duration_ms: Some(50),
                 complexity_signals: serde_json::Value::Null,
                 execution_mode: None,
+                retrieved_memory_count: None,
+                rewrite_triggered: 0,
+                rewrite_source: None,
             };
             repo.create(&row).await.unwrap();
         }
@@ -543,5 +669,138 @@ mod tests {
         let todo = stats.iter().find(|s| s.tool_name == "todo").unwrap();
         assert_eq!(todo.total_calls, 3);
         assert_eq!(todo.success_count, 2);
+    }
+
+    #[tokio::test]
+    async fn test_memory_relevance_since_empty() {
+        let pool = crate::StoragePool::connect_in_memory().await.unwrap();
+        let repo = StrategyRepo::new(pool.inner().clone());
+        let since = chrono::Utc::now() - chrono::Duration::hours(1);
+
+        // No records at all → None
+        let result = repo.memory_relevance_since(since).await.unwrap();
+        assert!(result.is_none());
+    }
+
+    #[tokio::test]
+    async fn test_memory_relevance_since_all_null() {
+        let pool = crate::StoragePool::connect_in_memory().await.unwrap();
+        let repo = StrategyRepo::new(pool.inner().clone());
+        let since = chrono::Utc::now() - chrono::Duration::hours(1);
+
+        // Record with retrieved_memory_count = NULL (legacy data) → None
+        let row = StrategyRecordRow {
+            id: uuid::Uuid::new_v4(),
+            timestamp: chrono::Utc::now(),
+            request_id: "req-null".to_string(),
+            predicted_strategy: "DirectResponse".to_string(),
+            actual_strategy: "DirectResponse".to_string(),
+            escalation_count: 0,
+            iterations_used: 1,
+            max_iterations: 1,
+            success: true,
+            user_satisfaction: None,
+            response_time_ms: 100,
+            chat_id: None,
+            tool_name: None,
+            tool_success: None,
+            tool_duration_ms: None,
+            complexity_signals: serde_json::Value::Null,
+            execution_mode: None,
+            retrieved_memory_count: None,
+            rewrite_triggered: 0,
+            rewrite_source: None,
+        };
+        repo.create(&row).await.unwrap();
+
+        let result = repo.memory_relevance_since(since).await.unwrap();
+        assert!(result.is_none(), "NULL records should be excluded");
+    }
+
+    #[tokio::test]
+    async fn test_memory_relevance_since_mixed() {
+        let pool = crate::StoragePool::connect_in_memory().await.unwrap();
+        let repo = StrategyRepo::new(pool.inner().clone());
+        let since = chrono::Utc::now() - chrono::Duration::hours(1);
+
+        // Record with memories retrieved
+        let with_mem = StrategyRecordRow {
+            id: uuid::Uuid::new_v4(),
+            timestamp: chrono::Utc::now(),
+            request_id: "req-mem".to_string(),
+            predicted_strategy: "DirectResponse".to_string(),
+            actual_strategy: "DirectResponse".to_string(),
+            escalation_count: 0,
+            iterations_used: 1,
+            max_iterations: 1,
+            success: true,
+            user_satisfaction: None,
+            response_time_ms: 100,
+            chat_id: None,
+            tool_name: None,
+            tool_success: None,
+            tool_duration_ms: None,
+            complexity_signals: serde_json::Value::Null,
+            execution_mode: None,
+            retrieved_memory_count: Some(3),
+            rewrite_triggered: 0,
+            rewrite_source: None,
+        };
+        repo.create(&with_mem).await.unwrap();
+
+        // Record without memories
+        let without_mem = StrategyRecordRow {
+            id: uuid::Uuid::new_v4(),
+            timestamp: chrono::Utc::now(),
+            request_id: "req-no-mem".to_string(),
+            predicted_strategy: "DirectResponse".to_string(),
+            actual_strategy: "DirectResponse".to_string(),
+            escalation_count: 0,
+            iterations_used: 1,
+            max_iterations: 1,
+            success: true,
+            user_satisfaction: None,
+            response_time_ms: 100,
+            chat_id: None,
+            tool_name: None,
+            tool_success: None,
+            tool_duration_ms: None,
+            complexity_signals: serde_json::Value::Null,
+            execution_mode: None,
+            retrieved_memory_count: Some(0),
+            rewrite_triggered: 0,
+            rewrite_source: None,
+        };
+        repo.create(&without_mem).await.unwrap();
+
+        // Record with NULL (legacy) — should be excluded from computation
+        let legacy = StrategyRecordRow {
+            id: uuid::Uuid::new_v4(),
+            timestamp: chrono::Utc::now(),
+            request_id: "req-legacy".to_string(),
+            predicted_strategy: "DirectResponse".to_string(),
+            actual_strategy: "DirectResponse".to_string(),
+            escalation_count: 0,
+            iterations_used: 1,
+            max_iterations: 1,
+            success: true,
+            user_satisfaction: None,
+            response_time_ms: 100,
+            chat_id: None,
+            tool_name: None,
+            tool_success: None,
+            tool_duration_ms: None,
+            complexity_signals: serde_json::Value::Null,
+            execution_mode: None,
+            retrieved_memory_count: None,
+            rewrite_triggered: 0,
+            rewrite_source: None,
+        };
+        repo.create(&legacy).await.unwrap();
+
+        // 1 with memories / 2 non-null records = 0.5 (legacy NULL excluded)
+        let result = repo.memory_relevance_since(since).await.unwrap();
+        assert!(result.is_some());
+        assert!((result.unwrap() - 0.5).abs() < f64::EPSILON);
     }
 }

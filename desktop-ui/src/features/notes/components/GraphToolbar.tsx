@@ -56,7 +56,7 @@ export function GraphToolbar({
                 key={r}
                 type="button"
                 onClick={() => onHopRadiusChange(r)}
-                className={`w-6 h-6 rounded-md text-xs flex items-center justify-center transition-all ${
+                className={`size-6 rounded-md text-xs flex items-center justify-center transition-all ${
                   hopRadius === r
                     ? "bg-brand/20 text-brand font-medium"
                     : "text-muted-foreground hover:text-foreground hover:bg-accent"
@@ -74,7 +74,7 @@ export function GraphToolbar({
 
       {/* Search input */}
       <div className="relative">
-        <Search className="absolute left-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-dim pointer-events-none" />
+        <Search className="absolute left-2 top-1/2 -translate-y-1/2 size-3.5 text-dim pointer-events-none" />
         <input
           type="text"
           value={searchQuery}

@@ -1,4 +1,5 @@
 import { SettingsCard } from "@shared/composites/SettingsCard/SettingsCard";
+import { useCopyToClipboard } from "@shared/hooks/useCopyToClipboard";
 import { ipc } from "@shared/hooks/useIpc";
 import { useQuery } from "@shared/hooks/useQuery";
 import { Check, Copy, RefreshCw, Terminal, X } from "lucide-react";
@@ -30,7 +31,7 @@ export function IntegrationsSettings() {
 
   const [installing, setInstalling] = useState(false);
   const [tokenVisible, setTokenVisible] = useState(false);
-  const [copied, setCopied] = useState(false);
+  const { copied, copy } = useCopyToClipboard();
 
   const handleInstall = async () => {
     setInstalling(true);
@@ -57,12 +58,8 @@ export function IntegrationsSettings() {
     refetchToken();
   };
 
-  const handleCopyToken = () => {
-    if (token) {
-      navigator.clipboard.writeText(token);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    }
+  const handleCopyToken = async () => {
+    if (token) await copy(token);
   };
 
   return (
@@ -77,20 +74,20 @@ export function IntegrationsSettings() {
         <div className="flex flex-col gap-3">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <Terminal className="w-4 h-4 text-muted-foreground" strokeWidth={1.5} />
+              <Terminal className="size-4 text-muted-foreground" strokeWidth={1.5} />
               <span className="text-[13px] text-muted-foreground">
                 {hookStatus?.installed ? "Installed" : "Not installed"}
               </span>
-              {hookStatus?.installed && <span className="w-2 h-2 rounded-full bg-success" />}
+              {hookStatus?.installed && <span className="size-2 rounded-full bg-success" />}
             </div>
             {hookStatus?.installed ? (
               <button
                 type="button"
                 onClick={handleUninstall}
                 disabled={installing}
-                className="flex items-center gap-1.5 px-3 py-1.5 text-[12px] rounded-lg text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
+                className="flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-lg text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
               >
-                <X className="w-3 h-3" />
+                <X className="size-3" />
                 Uninstall
               </button>
             ) : (
@@ -98,7 +95,7 @@ export function IntegrationsSettings() {
                 type="button"
                 onClick={handleInstall}
                 disabled={installing}
-                className="flex items-center gap-1.5 px-3 py-1.5 text-[12px] rounded-lg bg-brand/20 text-brand hover:bg-brand/30 transition-colors"
+                className="flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-lg bg-brand/20 text-brand hover:bg-brand/30 transition-colors"
               >
                 Install
               </button>
@@ -117,14 +114,14 @@ export function IntegrationsSettings() {
         <div className="flex flex-col gap-3">
           <div className="flex items-center justify-between">
             <span className="text-[13px] text-muted-foreground">Endpoint</span>
-            <code className="text-[12px] text-muted-foreground bg-accent px-2 py-0.5 rounded">
+            <code className="text-xs text-muted-foreground bg-accent px-2 py-0.5 rounded">
               http://127.0.0.1:3456/api/v1/ingest
             </code>
           </div>
           <div className="flex items-center justify-between">
             <span className="text-[13px] text-muted-foreground">Auth Token</span>
             <div className="flex items-center gap-2">
-              <code className="text-[12px] text-muted-foreground bg-accent px-2 py-0.5 rounded max-w-[200px] truncate">
+              <code className="text-xs text-muted-foreground bg-accent px-2 py-0.5 rounded max-w-[200px] truncate">
                 {tokenVisible ? (token ?? "—") : "••••••••••••"}
               </code>
               <button
@@ -141,9 +138,9 @@ export function IntegrationsSettings() {
                 title="Copy token"
               >
                 {copied ? (
-                  <Check className="w-3.5 h-3.5 text-success" />
+                  <Check className="size-3.5 text-success" />
                 ) : (
-                  <Copy className="w-3.5 h-3.5" />
+                  <Copy className="size-3.5" />
                 )}
               </button>
               <button
@@ -152,7 +149,7 @@ export function IntegrationsSettings() {
                 className="text-muted-foreground hover:text-foreground"
                 title="Regenerate token"
               >
-                <RefreshCw className="w-3.5 h-3.5" />
+                <RefreshCw className="size-3.5" />
               </button>
             </div>
           </div>
@@ -165,7 +162,7 @@ export function IntegrationsSettings() {
           <SettingsCard title="Event Sources (Last 24h)">
             <div className="flex flex-col gap-1.5">
               {Object.entries(captureStatus.eventCountLast24h).map(([source, count]) => (
-                <div key={source} className="flex items-center justify-between text-[12px]">
+                <div key={source} className="flex items-center justify-between text-xs">
                   <span className="text-muted-foreground capitalize">
                     {source.replace(/_/g, " ")}
                   </span>
@@ -178,7 +175,7 @@ export function IntegrationsSettings() {
 
       {/* Browser Extension placeholder */}
       <SettingsCard title="Browser Extension">
-        <p className="text-[12px] text-muted-foreground">
+        <p className="text-xs text-muted-foreground">
           Chrome extension coming soon. In the meantime, external plugins can send events to the
           ingestion API endpoint above.
         </p>

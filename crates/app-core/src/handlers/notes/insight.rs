@@ -227,6 +227,8 @@ impl AppCore {
         let note_id_owned = note_id.to_string();
         let content_hash_clone = content_hash.clone();
 
+        let pipeline_pool = self.storage_pool.inner().clone();
+        let pipeline_bus = self.domain_event_bus.clone();
         tokio::spawn(async move {
             run_insight_pipeline(InsightPipelineArgs {
                 provider,
@@ -241,6 +243,8 @@ impl AppCore {
                 parent_insight_id,
                 scope_note_ids,
                 scope_config: scope,
+                pool: pipeline_pool,
+                domain_event_bus: pipeline_bus,
             })
             .await;
         });
@@ -402,6 +406,15 @@ impl AppCore {
             .as_ref()
             .ok_or_else(|| ApiError::new("NOT_AVAILABLE", "Flashcard repo not available"))?;
 
+        let atom_repo = cognitive::KnowledgeAtomRepo::new(self.storage_pool.inner().clone());
+        let active_atoms = atom_repo
+            .list_for_note(&params.note_id)
+            .await
+            .unwrap_or_default()
+            .into_iter()
+            .filter(|a| a.status == "active")
+            .collect::<Vec<_>>();
+
         let cards: Vec<cognitive::NewFlashcard> = params
             .questions
             .iter()
@@ -418,6 +431,14 @@ impl AppCore {
                     } else {
                         Some(format!("From: {}", q.source_notes.join(", ")))
                     },
+                    atom_id: active_atoms
+                        .iter()
+                        .find(|a| {
+                            q.question
+                                .to_lowercase()
+                                .contains(&a.subject.to_lowercase())
+                        })
+                        .map(|a| a.id.clone()),
                     deck: params.deck_name.clone(),
                     front: q.question.clone(),
                     back: q.correct_answer.clone(),
@@ -428,6 +449,8 @@ impl AppCore {
                     tags: vec![],
                     stability,
                     difficulty,
+                    difficulty_estimate: None,
+                    prerequisite_concepts: None,
                 }
             })
             .collect();
@@ -469,6 +492,33 @@ impl AppCore {
             .compute_progress(&params.insight_review_id, &note.body, Some(params.score))
             .await
             .map_err(|e| ApiError::new("INTERNAL_ERROR", e.to_string()))?;
+
+        // Emit AtomInteracted for active atoms on this note (quiz engagement signal)
+        if let Some(bus) = &self.domain_event_bus {
+            let pool = self.storage_pool.inner();
+            // Batch-update all active atoms' last_interaction_ts in one query
+            let now = chrono::Utc::now().to_rfc3339();
+            let _ = sqlx::query(
+                "UPDATE knowledge_atoms SET last_interaction_ts = ?1, updated_at = ?1 \
+                 WHERE source_note_id = ?2 AND status = 'active'",
+            )
+            .bind(&now)
+            .bind(&insight.note_id)
+            .execute(pool)
+            .await;
+
+            // Emit events per atom (in-memory, cheap)
+            let atom_repo = cognitive::KnowledgeAtomRepo::new(pool.clone());
+            if let Ok(atoms) = atom_repo.list_for_note(&insight.note_id).await {
+                for atom in atoms.iter().filter(|a| a.status == "active") {
+                    bus.publish(bus::DomainEvent::AtomInteracted {
+                        atom_id: atom.id.clone(),
+                        interaction_type: "quiz_answer".to_string(),
+                        note_id: Some(insight.note_id.clone()),
+                    });
+                }
+            }
+        }
 
         Ok(())
     }
@@ -891,8 +941,7 @@ impl AppCore {
         let config = self.config.read().await;
         let params = providers::cognitive_chat_params(&config, 4096);
         drop(config);
-        let blackboard_repo =
-            cognitive::BlackboardRepo::new(self.storage_pool.inner().clone());
+        let blackboard_repo = cognitive::BlackboardRepo::new(self.storage_pool.inner().clone());
         let session_key = format!("debate:insight:{}:{}", note_id, uuid::Uuid::new_v4());
 
         // Build context from note content
@@ -902,8 +951,7 @@ impl AppCore {
         );
 
         // Create event channel for debate events
-        let (event_tx, mut event_rx) =
-            tokio::sync::mpsc::channel::<agent::AgentEvent>(64);
+        let (event_tx, mut event_rx) = tokio::sync::mpsc::channel::<agent::AgentEvent>(64);
 
         // Clone emitter for the relay task
         let emitter = Arc::clone(&self.event_emitter);
@@ -1010,6 +1058,7 @@ impl AppCore {
                 &session_key,
                 "insight",
                 Some(&event_tx),
+                None,
             )
             .await;
 
@@ -1067,6 +1116,8 @@ struct InsightPipelineArgs {
     parent_insight_id: Option<String>,
     scope_note_ids: Vec<String>,
     scope_config: feature_insights::ScopeConfig,
+    pool: sqlx::SqlitePool,
+    domain_event_bus: Option<Arc<bus::DomainEventBus>>,
 }
 
 async fn run_insight_pipeline(args: InsightPipelineArgs) {
@@ -1083,6 +1134,8 @@ async fn run_insight_pipeline(args: InsightPipelineArgs) {
         parent_insight_id,
         scope_note_ids,
         scope_config,
+        pool,
+        domain_event_bus,
     } = args;
 
     let synthesis = stream_synthesis(&provider, &emitter, &context, &params).await;
@@ -1212,7 +1265,7 @@ async fn run_insight_pipeline(args: InsightPipelineArgs) {
             perspectives,
         };
         let persona_ids: Vec<String> = personas.iter().map(|p| p.id.clone()).collect();
-        let _ = service
+        if let Ok(row) = service
             .store_insight(
                 &note_id,
                 &content,
@@ -1222,7 +1275,109 @@ async fn run_insight_pipeline(args: InsightPipelineArgs) {
                 parent_insight_id.as_deref(),
                 &scope_note_ids,
             )
-            .await;
+            .await
+        {
+            if let Some(gap_content) = &content.gap_analysis {
+                let pool = pool.clone();
+                let note_id = note_id.clone();
+                let insight_id = row.id.clone();
+                let gap_content = gap_content.clone();
+                let bus = domain_event_bus.clone();
+                tokio::spawn(async move {
+                    create_atoms_from_gaps(&pool, &note_id, &gap_content, &insight_id, &bus).await;
+                });
+            }
+        }
+    }
+}
+
+/// Parse gap analysis JSON and create suggested atoms for unmatched gaps.
+async fn create_atoms_from_gaps(
+    pool: &sqlx::SqlitePool,
+    note_id: &str,
+    gap_content: &str,
+    insight_review_id: &str,
+    domain_event_bus: &Option<Arc<bus::DomainEventBus>>,
+) {
+    // Parse JSON block from gap content (trailing ```json block)
+    let Some(json_start) = gap_content.find("```json") else {
+        return;
+    };
+    let json_body = &gap_content[json_start + 7..];
+    let Some(json_end) = json_body.find("```") else {
+        return;
+    };
+    let json_str = json_body[..json_end].trim();
+
+    let gaps: Vec<serde_json::Value> = match serde_json::from_str(json_str) {
+        Ok(v) => v,
+        Err(_) => return,
+    };
+
+    let atom_repo = cognitive::KnowledgeAtomRepo::new(pool.clone());
+    // Fetch existing atoms ONCE before the loop (not per-gap)
+    let existing_atoms = atom_repo.list_for_note(note_id).await.unwrap_or_default();
+    let existing_subjects: std::collections::HashSet<String> = existing_atoms
+        .iter()
+        .map(|a| a.subject.to_lowercase())
+        .collect();
+
+    for gap in &gaps {
+        let Some(topic) = gap.get("topic").and_then(|v| v.as_str()) else {
+            continue;
+        };
+        let description = gap
+            .get("description")
+            .and_then(|v| v.as_str())
+            .unwrap_or("");
+
+        // Check if atom already exists for this subject on this note
+        if existing_subjects.contains(&topic.to_lowercase()) {
+            continue;
+        }
+
+        let metadata = serde_json::json!({
+            "source": "gap_analysis",
+            "insight_review_id": insight_review_id,
+        });
+
+        let new_atom = cognitive::NewKnowledgeAtom {
+            subject: topic.to_string(),
+            atom_type: "concept".to_string(),
+            domain: "general".to_string(),
+            source_note_id: Some(note_id.to_string()),
+            source_context: Some(description.to_string()),
+            metadata: Some(metadata.to_string()),
+            status: "suggested".to_string(),
+            ..Default::default()
+        };
+
+        match atom_repo.create(&new_atom).await {
+            Ok(atom) => {
+                if let Ok(t) = atom_repo
+                    .get_or_create_topic(&atom.domain, &atom.domain)
+                    .await
+                {
+                    let _ = sqlx::query("UPDATE knowledge_atoms SET topic_id = ?1 WHERE id = ?2")
+                        .bind(&t.id)
+                        .bind(&atom.id)
+                        .execute(pool)
+                        .await;
+                }
+                if let Some(bus) = domain_event_bus {
+                    bus.publish(bus::DomainEvent::KnowledgeAtomCreated {
+                        atom_id: atom.id,
+                        atom_type: "concept".to_string(),
+                        domain: "general".to_string(),
+                        source_note_id: Some(note_id.to_string()),
+                        personal_importance: 0.7,
+                    });
+                }
+            }
+            Err(e) => {
+                tracing::debug!("Failed to create gap atom: {e}");
+            }
+        }
     }
 }
 

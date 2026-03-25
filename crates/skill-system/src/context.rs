@@ -40,16 +40,32 @@ impl SkillContextSource {
     }
 
     /// Load always_skills reference files from the orchestrator's directory.
-    fn always_skill_content(&self, orchestrator: &SkillPackage) -> Vec<String> {
+    /// Filters multi-token references by relevance to the user message.
+    fn always_skill_content(
+        &self,
+        orchestrator: &SkillPackage,
+        message: Option<&str>,
+    ) -> Vec<String> {
         let mut content = Vec::new();
+        let msg_lower = message.map(|m| m.to_lowercase());
+
         for skill_name in orchestrator.always_skills() {
-            // Try exact path key first (filesystem skills)
+            // Relevance check: single-token refs always load, multi-token refs need a match
+            if let Some(ref msg) = msg_lower {
+                if !is_reference_relevant(skill_name, msg) {
+                    tracing::debug!(
+                        skill = %skill_name,
+                        "Skipping always-skill reference (not relevant to message)"
+                    );
+                    continue;
+                }
+            }
+
             let fs_key = format!(
                 "{}/references/{}.md",
                 orchestrator.location.display(),
                 skill_name
             );
-            // Then try name-based key (built-in skills)
             let builtin_key = format!(
                 "builtin::{}/references/{}.md",
                 orchestrator.name, skill_name
@@ -105,7 +121,7 @@ impl ContextSource for SkillContextSource {
         true
     }
 
-    async fn provide(&self, _ctx: &SourceContext) -> Option<String> {
+    async fn provide(&self, ctx: &SourceContext) -> Option<String> {
         let orchestrator_guard = self.active_orchestrator.read().await;
         let orchestrator = orchestrator_guard.as_ref()?;
 
@@ -128,9 +144,10 @@ impl ContextSource for SkillContextSource {
         }
 
         // Always-loaded skills
-        sections.extend(self.always_skill_content(orchestrator));
+        let message_text = ctx.message.as_deref();
+        sections.extend(self.always_skill_content(orchestrator, message_text));
 
-        // Per-message activated skills (with deduplication)
+        // Per-message activated skills: inject SUMMARY only (progressive loading)
         let skills_guard = self.activated_skills.read().await;
         for pkg in skills_guard.iter() {
             let already_active = !names_guard.insert(pkg.name.clone());
@@ -138,11 +155,12 @@ impl ContextSource for SkillContextSource {
                 tracing::debug!(skill = %pkg.name, "Skipping duplicate skill activation");
                 continue;
             }
+            // Progressive: summary + resource listing (not full body)
             sections.push(format!(
-                "<skill_content name=\"{}\">\n# Skill: {} (activated)\n\n{}{}",
+                "<skill_content name=\"{}\" mode=\"summary\">\n# Skill: {} (activated)\n\n{}\n\nUse the `skill_reference` tool to load full instructions if needed.{}",
                 pkg.name,
                 pkg.name,
-                pkg.body,
+                pkg.summary,
                 Self::resource_listing(pkg)
             ));
             sections.push("</skill_content>".to_string());
@@ -156,8 +174,43 @@ impl ContextSource for SkillContextSource {
     }
 
     fn estimated_tokens(&self) -> usize {
-        500
+        // Compute from actual content rather than hardcoding 500.
+        // Use blocking try_read to avoid async in a sync trait method;
+        // falls back to a conservative estimate if locks are held.
+        let orchestrator_tokens = self
+            .active_orchestrator
+            .try_read()
+            .ok()
+            .and_then(|guard| guard.as_ref().map(|pkg| pkg.body.len() / 4))
+            .unwrap_or(500);
+
+        let activated_tokens = self
+            .activated_skills
+            .try_read()
+            .ok()
+            .map(|guard| guard.iter().map(|pkg| pkg.summary.len() / 4).sum::<usize>())
+            .unwrap_or(0);
+
+        // Add overhead for XML tags, headings, resource listings
+        let overhead = 50;
+        orchestrator_tokens + activated_tokens + overhead
     }
+}
+
+/// Check if a reference name is relevant to the user message.
+/// Single-token references (no hyphens) are always loaded.
+/// Multi-token references require at least one token match.
+fn is_reference_relevant(reference_name: &str, message_lower: &str) -> bool {
+    let mut tokens = reference_name.split('-');
+    let first = tokens.next().unwrap_or("");
+    // Single-token references always load
+    if tokens.next().is_none() {
+        return true;
+    }
+    // Multi-token: check if any token (including first) appears in the message
+    std::iter::once(first)
+        .chain(tokens)
+        .any(|t| t.len() > 2 && message_lower.contains(t))
 }
 
 #[cfg(test)]
@@ -238,6 +291,115 @@ mod tests {
         assert!(
             source.protected(),
             "Skill context should be protected from compaction"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_estimated_tokens_scales_with_content() {
+        let (catalog, refs) = make_catalog_with_always_skills();
+        let pkg = catalog.get("task-mgmt").unwrap().clone();
+        let body_len = pkg.body.len();
+
+        let active = Arc::new(RwLock::new(Some(pkg)));
+        let activated = Arc::new(RwLock::new(vec![]));
+        let source = SkillContextSource::new(active, activated, Arc::new(refs));
+
+        let estimate = source.estimated_tokens();
+        // Should be roughly body_len/4 + overhead, NOT the old hardcoded 500
+        assert!(estimate > 50, "estimate should include overhead at minimum");
+        // Should scale with the orchestrator body length
+        let expected_min = body_len / 4;
+        assert!(
+            estimate >= expected_min,
+            "estimate ({estimate}) should be at least body_len/4 ({expected_min})"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_activated_skills_inject_summary_not_full_body() {
+        let skills = vec![
+            (
+                "general".to_string(),
+                "---\nname: general\ndescription: General.\nmetadata:\n  klyntbot:\n    type: orchestrator\n---\nOrchestrator body.".to_string(),
+            ),
+            (
+                "helper".to_string(),
+                "---\nname: helper\ndescription: Helper skill.\nmetadata:\n  klyntbot:\n    type: skill\n    summary: Helper does X and Y.\n---\nThis is a very long full body that should NOT appear in activated skill context. It contains detailed instructions.".to_string(),
+            ),
+        ];
+        let source = SkillSource::BuiltIn(skills);
+        let catalog = SkillCatalog::discover_sync(&[source]).unwrap();
+
+        let orchestrator = catalog.get("general").unwrap().clone();
+        let helper = catalog.get("helper").unwrap().clone();
+
+        let active = Arc::new(RwLock::new(Some(orchestrator)));
+        let activated = Arc::new(RwLock::new(vec![helper]));
+        let source = SkillContextSource::new(active, activated, Arc::new(HashMap::new()));
+
+        let ctx = SourceContext {
+            channel: "test".into(),
+            chat_id: "1".into(),
+            message: None,
+            intent_summary: None,
+            project_id: None,
+        };
+        let result = source.provide(&ctx).await.unwrap();
+
+        assert!(
+            result.contains("Orchestrator body"),
+            "orchestrator gets full body"
+        );
+        assert!(
+            result.contains("Helper does X and Y"),
+            "activated skill shows summary"
+        );
+        assert!(
+            !result.contains("very long full body"),
+            "activated skill should NOT show full body"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_always_skills_filtered_by_relevance() {
+        let skills = vec![(
+            "task-mgmt".to_string(),
+            "---\nname: task-mgmt\ndescription: Task management.\nmetadata:\n  klyntbot:\n    type: orchestrator\n    always_skills: [todo, daily-planner]\n---\nYou are the task agent.".to_string(),
+        )];
+        let source_data = SkillSource::BuiltIn(skills);
+        let catalog = SkillCatalog::discover_sync(&[source_data]).unwrap();
+
+        let mut reference_files = HashMap::new();
+        reference_files.insert(
+            "builtin::task-mgmt/references/todo.md".to_string(),
+            "# Todo Workflow\nCreate and manage tasks.".to_string(),
+        );
+        reference_files.insert(
+            "builtin::task-mgmt/references/daily-planner.md".to_string(),
+            "# Daily Planner\nPlan your day with time blocking.".to_string(),
+        );
+
+        let pkg = catalog.get("task-mgmt").unwrap().clone();
+        let active = Arc::new(RwLock::new(Some(pkg)));
+        let activated = Arc::new(RwLock::new(vec![]));
+        let ctx_source = SkillContextSource::new(active, activated, Arc::new(reference_files));
+
+        let ctx = SourceContext {
+            channel: "test".into(),
+            chat_id: "1".into(),
+            message: Some("mark my task as done".to_string()),
+            intent_summary: None,
+            project_id: None,
+        };
+        let result = ctx_source.provide(&ctx).await.unwrap();
+
+        assert!(
+            result.contains("Todo Workflow"),
+            "single-token ref should always load"
+        );
+        assert!(
+            !result.contains("Daily Planner"),
+            "multi-token ref should be filtered when irrelevant"
         );
     }
 }

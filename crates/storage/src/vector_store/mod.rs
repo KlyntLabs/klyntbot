@@ -1,7 +1,7 @@
 //! LanceDB-backed vector store for embedding similarity search.
 //!
 //! Split into submodules by concern:
-//!   - `schemas`     — Arrow schema definitions for all 5 tables
+//!   - `schemas`     — Arrow schema definitions for all embedding tables
 //!   - `crud`        — upsert, search, delete, count
 //!   - `cognitive`   — cognitive fact upsert + domain-filtered search
 //!   - `conv`        — conversation embedding search
@@ -27,7 +27,7 @@ pub use crud::sanitize_predicate_value;
 
 /// LanceDB-backed vector store for embedding similarity search.
 ///
-/// Manages seven tables (all share the convention: `id` first, `vector` second,
+/// Manages eight tables (all share the convention: `id` first, `vector` second,
 /// extra string fields, timestamp last):
 ///
 /// - `todo_embeddings`              — id, vector(384), model, updated_at
@@ -37,6 +37,7 @@ pub use crud::sanitize_predicate_value;
 /// - `cognitive_fact_embeddings`    — id, vector(384), domain, text, importance, stability, confidence, updated_at
 /// - `activity_embeddings`          — id, vector(384), source, work_context_id, timestamp, updated_at
 /// - `work_context_embeddings`      — id, vector(384), updated_at
+/// - `flashcard_embeddings`         — id, vector(384), card_id, side, timestamp
 #[derive(Clone)]
 pub struct VectorStore {
     pub(crate) db: Arc<Connection>,
@@ -94,6 +95,12 @@ impl VectorStore {
             .await?;
         store
             .ensure_table("entity_embeddings", schemas::entity_embedding_schema())
+            .await?;
+        store
+            .ensure_table(
+                "flashcard_embeddings",
+                schemas::flashcard_embedding_schema(),
+            )
             .await?;
         Ok(store)
     }

@@ -67,32 +67,32 @@ export function PermissionsCard() {
               <div className="flex-shrink-0 mt-0.5">
                 {granted ? (
                   <div
-                    className="w-5 h-5 rounded-full flex items-center justify-center"
+                    className="size-5 rounded-full flex items-center justify-center"
                     style={{
                       background: "color-mix(in srgb, var(--success) 15%, transparent)",
                     }}
                   >
                     <Check
-                      className="w-3 h-3"
+                      className="size-3"
                       style={{ color: "var(--success)" }}
                       strokeWidth={2.5}
                     />
                   </div>
                 ) : denied ? (
                   <div
-                    className="w-5 h-5 rounded-full flex items-center justify-center"
+                    className="size-5 rounded-full flex items-center justify-center"
                     style={{
                       background: "color-mix(in srgb, var(--destructive) 15%, transparent)",
                     }}
                   >
                     <X
-                      className="w-3 h-3"
+                      className="size-3"
                       style={{ color: "var(--destructive)" }}
                       strokeWidth={2.5}
                     />
                   </div>
                 ) : (
-                  <div className="w-5 h-5 rounded-full bg-muted" />
+                  <div className="size-5 rounded-full bg-muted" />
                 )}
               </div>
 
@@ -100,9 +100,9 @@ export function PermissionsCard() {
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2">
                   <span className="text-[13px] font-medium text-foreground">{p.label}</span>
-                  {granted && <span className="text-[10px] text-success">Granted</span>}
+                  {granted && <span className="text-2xs text-success">Granted</span>}
                   {denied && (
-                    <span className="text-[10px]" style={{ color: "var(--destructive)" }}>
+                    <span className="text-2xs" style={{ color: "var(--destructive)" }}>
                       Not granted
                     </span>
                   )}
@@ -115,9 +115,9 @@ export function PermissionsCard() {
                 <button
                   type="button"
                   onClick={() => handleOpen(p)}
-                  className="flex-shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-md text-[12px] font-medium transition-colors bg-brand/10 text-brand hover:bg-brand/20"
+                  className="flex-shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-colors bg-brand/10 text-brand hover:bg-brand/20"
                 >
-                  <ExternalLink className="w-3 h-3" />
+                  <ExternalLink className="size-3" />
                   Open Settings
                 </button>
               )}
@@ -125,9 +125,9 @@ export function PermissionsCard() {
                 <button
                   type="button"
                   onClick={() => handleOpen(p)}
-                  className="flex-shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-md text-[12px] text-dim hover:text-muted-foreground transition-colors"
+                  className="flex-shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs text-dim hover:text-muted-foreground transition-colors"
                 >
-                  <ExternalLink className="w-3 h-3" />
+                  <ExternalLink className="size-3" />
                   Open
                 </button>
               )}
@@ -139,14 +139,14 @@ export function PermissionsCard() {
       {/* Warning if any permission is denied */}
       {Object.values(statuses).some((s) => s === false) && (
         <div
-          className="mt-3 flex items-start gap-2 p-3 rounded-lg text-[12px]"
+          className="mt-3 flex items-start gap-2 p-3 rounded-lg text-xs"
           style={{
             background: "color-mix(in srgb, var(--destructive) 5%, transparent)",
             border: "1px solid color-mix(in srgb, var(--destructive) 15%, transparent)",
           }}
         >
           <ShieldAlert
-            className="w-4 h-4 flex-shrink-0 mt-0.5"
+            className="size-4 flex-shrink-0 mt-0.5"
             style={{ color: "var(--destructive)" }}
             strokeWidth={1.5}
           />

@@ -25,6 +25,8 @@ export function SlidePanel({ open, onClose, title, children }: SlidePanelProps) 
   return (
     <>
       {/* Backdrop */}
+      {/* biome-ignore lint/a11y/noStaticElementInteractions: modal backdrop dismissal */}
+      {/* biome-ignore lint/a11y/useKeyWithClickEvents: Escape key handled via document keydown listener */}
       <div
         className={`fixed inset-0 z-40 bg-overlay transition-opacity duration-300 ${
           open ? "opacity-100" : "opacity-0 pointer-events-none"
@@ -40,13 +42,13 @@ export function SlidePanel({ open, onClose, title, children }: SlidePanelProps) 
       >
         <div className="bg-card flex-1 flex flex-col rounded-[var(--glass-radius-inner)]">
           <div className="flex items-center justify-between px-5 py-4 border-b border-border shrink-0">
-            <h3 className="text-[14px] font-medium text-foreground">{title}</h3>
+            <h3 className="text-sm font-medium text-foreground">{title}</h3>
             <button
               type="button"
               onClick={onClose}
-              className="w-7 h-7 rounded-md flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
+              className="size-7 rounded-md flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
             >
-              <X className="w-4 h-4" />
+              <X className="size-4" />
             </button>
           </div>
 

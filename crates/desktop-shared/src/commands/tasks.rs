@@ -33,6 +33,8 @@ pub struct TaskResponse {
     pub focused_at: Option<String>,
     pub created_at: Option<String>,
     pub updated_at: Option<String>,
+    pub scheduled_start: Option<String>,
+    pub scheduled_end: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -153,6 +155,8 @@ pub struct TaskUpdateParams {
     pub energy_level: Option<String>,
     pub execution_state: Option<String>,
     pub estimated_minutes: Option<Option<i32>>,
+    pub scheduled_start: Option<Option<String>>,
+    pub scheduled_end: Option<Option<String>>,
 }
 
 // ── Status Workflows ──────────────────────────────────────────────────

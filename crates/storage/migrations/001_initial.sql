@@ -121,90 +121,6 @@ CREATE TABLE IF NOT EXISTS task_groups (
 CREATE INDEX idx_task_groups_project_id ON task_groups(project_id);
 
 -- ============================================================
--- Actions (replaces todos)
--- ============================================================
-CREATE TABLE actions (
-    id                   TEXT PRIMARY KEY,
-    title                TEXT NOT NULL,
-    description          TEXT,
-    area_id              TEXT NOT NULL REFERENCES areas(id) ON DELETE CASCADE,
-    project_id           TEXT REFERENCES projects(id) ON DELETE SET NULL,
-    key_result_id        TEXT REFERENCES key_results(id) ON DELETE SET NULL,
-    parent_id            TEXT REFERENCES actions(id) ON DELETE SET NULL,
-    priority             INTEGER,
-    due_date             TEXT,
-    tags                 TEXT NOT NULL DEFAULT '[]',
-    status               TEXT NOT NULL DEFAULT 'todo',
-    focused_at           TEXT,
-    focus_deadline       TEXT,
-    focus_expired_count  INTEGER NOT NULL DEFAULT 0,
-    created_at           TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
-    updated_at           TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
-    completed_at         TEXT,
-    total_tracked_secs   INTEGER NOT NULL DEFAULT 0,
-    estimated_minutes    INTEGER,
-    calendar_event_uid   TEXT,
-    last_reminded_at     TEXT,
-    recurrence_rule      TEXT,
-    recurrence_parent_id TEXT,
-    is_template          INTEGER NOT NULL DEFAULT 0,
-    next_instance_date   TEXT,
-    status_label_id      TEXT REFERENCES status_labels(id) ON DELETE SET NULL,
-    position             INTEGER NOT NULL DEFAULT 0,
-    group_id             TEXT REFERENCES task_groups(id) ON DELETE SET NULL
-);
-CREATE INDEX idx_actions_area_id ON actions(area_id);
-CREATE INDEX idx_actions_project_id ON actions(project_id);
-CREATE INDEX idx_actions_key_result_id ON actions(key_result_id);
-CREATE INDEX idx_actions_parent_id ON actions(parent_id);
-CREATE INDEX idx_actions_status ON actions(status);
-CREATE INDEX idx_actions_due_date ON actions(due_date);
-CREATE INDEX idx_actions_focused_at ON actions(focused_at) WHERE focused_at IS NOT NULL;
-CREATE INDEX idx_actions_is_template ON actions(is_template) WHERE is_template = 1;
-CREATE INDEX idx_actions_status_label_id ON actions(status_label_id);
-CREATE INDEX idx_actions_position ON actions(position);
-CREATE INDEX idx_actions_group_id ON actions(group_id);
-
--- ============================================================
--- Action Attachments
--- ============================================================
-CREATE TABLE action_attachments (
-    id              TEXT PRIMARY KEY,
-    action_id       TEXT NOT NULL REFERENCES actions(id) ON DELETE CASCADE,
-    attachment_type TEXT NOT NULL,
-    value           TEXT NOT NULL,
-    title           TEXT,
-    tags            TEXT NOT NULL DEFAULT '[]',
-    created_at      TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now'))
-);
-CREATE INDEX idx_action_attachments_action_id ON action_attachments(action_id);
-
--- ============================================================
--- Action Time Entries
--- ============================================================
-CREATE TABLE action_time_entries (
-    id            TEXT PRIMARY KEY,
-    action_id     TEXT NOT NULL REFERENCES actions(id) ON DELETE CASCADE,
-    source        TEXT NOT NULL DEFAULT 'focus',
-    started_at    TEXT NOT NULL,
-    ended_at      TEXT,
-    duration_secs INTEGER,
-    note          TEXT
-);
-CREATE INDEX idx_action_time_entries_action_id ON action_time_entries(action_id);
-
--- ============================================================
--- Action Dependencies
--- ============================================================
-CREATE TABLE action_dependencies (
-    action_id  TEXT NOT NULL REFERENCES actions(id) ON DELETE CASCADE,
-    blocker_id TEXT NOT NULL REFERENCES actions(id) ON DELETE CASCADE,
-    PRIMARY KEY (action_id, blocker_id),
-    CHECK (action_id != blocker_id)
-);
-CREATE INDEX idx_action_dependencies_blocker_id ON action_dependencies(blocker_id);
-
--- ============================================================
 -- Sessions
 -- ============================================================
 CREATE TABLE sessions (
@@ -272,9 +188,13 @@ CREATE TABLE strategy_records (
     tool_success       INTEGER,
     tool_duration_ms   INTEGER,
     complexity_signals TEXT NOT NULL DEFAULT '{}',
-    execution_mode     TEXT
+    execution_mode     TEXT,
+    retrieved_memory_count INTEGER,
+    rewrite_triggered  INTEGER DEFAULT 0,
+    rewrite_source     TEXT
 );
 CREATE INDEX idx_strategy_records_chat_id ON strategy_records(chat_id);
+CREATE INDEX idx_strategy_records_timestamp ON strategy_records(timestamp);
 
 -- ============================================================
 -- Enrichment Feedback
@@ -793,7 +713,7 @@ CREATE TABLE IF NOT EXISTS custom_columns (
 );
 
 CREATE TABLE IF NOT EXISTS custom_column_values (
-    task_id TEXT NOT NULL REFERENCES actions(id) ON DELETE CASCADE,
+    task_id TEXT NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
     column_id TEXT NOT NULL REFERENCES custom_columns(id) ON DELETE CASCADE,
     value_json TEXT NOT NULL,
     PRIMARY KEY (task_id, column_id)

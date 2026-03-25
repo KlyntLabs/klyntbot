@@ -1,6 +1,6 @@
 import * as PopoverPrimitive from "@radix-ui/react-popover";
+import { cn } from "@shared/lib/utils";
 import * as React from "react";
-import { cn } from "../../lib/utils";
 import { usePortalContainer } from "../portal-context";
 
 const Popover = PopoverPrimitive.Root;

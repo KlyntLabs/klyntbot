@@ -65,16 +65,16 @@ function CompletedToolSegment({ segment, nested }: { segment: ToolSegment; neste
       >
         {canExpand ? (
           <ChevronRight
-            className={`w-3 h-3 transition-transform ${expanded ? "rotate-90" : ""}`}
+            className={`size-3 transition-transform ${expanded ? "rotate-90" : ""}`}
             strokeWidth={1.5}
           />
         ) : (
           <span className="w-3" />
         )}
         {segment.success ? (
-          <Check className="w-3 h-3" strokeWidth={2} />
+          <Check className="size-3" strokeWidth={2} />
         ) : (
-          <X className="w-3 h-3 text-destructive" strokeWidth={2} />
+          <X className="size-3 text-destructive" strokeWidth={2} />
         )}
         <span>{qualifiedName}</span>
         {durationLabel && <span className="text-dim">{durationLabel}</span>}
@@ -86,7 +86,7 @@ function CompletedToolSegment({ segment, nested }: { segment: ToolSegment; neste
               {formattedResult}
             </pre>
           )}
-          <div className="flex items-center gap-2 text-[10px] font-light text-dim">
+          <div className="flex items-center gap-2 text-2xs font-light text-dim">
             {durationLabel && <span>{durationLabel}</span>}
             {segment.estimatedTokens && (
               <span>~{formatTokens(segment.estimatedTokens)} tokens</span>
@@ -111,13 +111,13 @@ function DelegateGroup({ delegate, subTools }: { delegate: ToolSegment; subTools
         className={`flex items-center gap-1.5 text-[11px] font-light transition-colors ${color.text} hover:opacity-80`}
       >
         <ChevronRight
-          className={`w-3 h-3 transition-transform ${expanded ? "rotate-90" : ""}`}
+          className={`size-3 transition-transform ${expanded ? "rotate-90" : ""}`}
           strokeWidth={1.5}
         />
         {delegate.success ? (
-          <Check className="w-3 h-3" strokeWidth={2} />
+          <Check className="size-3" strokeWidth={2} />
         ) : (
-          <X className="w-3 h-3 text-destructive" strokeWidth={2} />
+          <X className="size-3 text-destructive" strokeWidth={2} />
         )}
         <span>delegate</span>
         {delegate.durationMs > 0 && (
@@ -152,7 +152,7 @@ export function ActiveToolIndicator({ name, nested }: { name: string; nested?: b
       className={`${nested ? "my-0.5" : "my-1.5"} flex items-center gap-1.5 text-[11px] font-light`}
     >
       <div
-        className={`w-3 h-3 rounded-full border-[1.5px] ${color.ring} border-t-transparent animate-spin`}
+        className={`size-3 rounded-full border-[1.5px] ${color.ring} border-t-transparent animate-spin`}
       />
       <span className={color.text}>{name}</span>
       <span className="text-dim">&hellip;</span>

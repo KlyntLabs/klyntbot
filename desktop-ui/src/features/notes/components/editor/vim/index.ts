@@ -136,16 +136,23 @@ function createVimPlugins(opts: Required<VimModeOptions>) {
         editorView.dispatch(editorView.state.tr);
       });
 
-      adapter.on("dialog", (data: { template: unknown; callback: Function; options?: unknown }) => {
-        // Determine prefix from template
-        let prefix = ":";
-        if (data.template instanceof HTMLElement) {
-          const text = data.template.textContent || "";
-          if (text.includes("/")) prefix = "/";
-          else if (text.includes("?")) prefix = "?";
-        }
-        opts.onOpenCommandLine(prefix);
-      });
+      adapter.on(
+        "dialog",
+        (data: {
+          template: unknown;
+          callback: (...args: unknown[]) => void;
+          options?: unknown;
+        }) => {
+          // Determine prefix from template
+          let prefix = ":";
+          if (data.template instanceof HTMLElement) {
+            const text = data.template.textContent || "";
+            if (text.includes("/")) prefix = "/";
+            else if (text.includes("?")) prefix = "?";
+          }
+          opts.onOpenCommandLine(prefix);
+        },
+      );
 
       adapter.on("save", () => {
         document.dispatchEvent(new CustomEvent(VIM_SAVE_EVENT));
@@ -159,6 +166,21 @@ function createVimPlugins(opts: Required<VimModeOptions>) {
 
       // Enter vim mode
       vim.enterVimMode(adapter);
+
+      // Register leader-key actions for editor features (\a, \f, \t, \i)
+      const editorActions = [
+        { key: "\\\\a", action: "annotate" },
+        { key: "\\\\f", action: "flashcard" },
+        { key: "\\\\t", action: "translate" },
+        { key: "\\\\i", action: "ask-ai" },
+      ];
+      for (const { key, action } of editorActions) {
+        vim.defineAction(`editor-${action}`, () => {
+          window.dispatchEvent(new CustomEvent("editor-action", { detail: { action } }));
+        });
+        vim.mapCommand(key, "action", `editor-${action}`, {}, { context: "normal" });
+        vim.mapCommand(key, "action", `editor-${action}`, {}, { context: "visual" });
+      }
 
       return {
         update() {
@@ -190,8 +212,8 @@ function createVimPlugins(opts: Required<VimModeOptions>) {
           return false;
         }
 
-        // Let Meta combos pass through (Cmd+C, Cmd+V, etc.)
-        if (event.metaKey) return false;
+        // Let Meta and Alt combos pass through (Cmd+C, ⌥A, ⌥F, etc.)
+        if (event.metaKey || event.altKey) return false;
 
         const key = vimKeyFromEvent(event);
         if (!key) return false;

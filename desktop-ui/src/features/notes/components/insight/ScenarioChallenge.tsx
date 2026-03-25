@@ -27,12 +27,12 @@ export function ScenarioChallenge({ scenario }: Props) {
         </span>
       </div>
 
-      <p className="text-[12px] text-muted-foreground leading-relaxed whitespace-pre-wrap">
+      <p className="text-xs text-muted-foreground leading-relaxed whitespace-pre-wrap">
         {scenario.situation}
       </p>
 
       <div className="space-y-2">
-        <span className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">
+        <span className="text-2xs font-medium text-muted-foreground uppercase tracking-wider">
           Decision Points
         </span>
         {scenario.questions.map((q, i) => (
@@ -46,7 +46,7 @@ export function ScenarioChallenge({ scenario }: Props) {
       <button
         type="button"
         onClick={() => setShowAnswer((p) => !p)}
-        className="flex items-center gap-1 text-[10px] text-brand hover:text-brand/80 transition-colors"
+        className="flex items-center gap-1 text-2xs text-brand hover:text-brand/80 transition-colors"
       >
         <ChevronDown
           size={10}

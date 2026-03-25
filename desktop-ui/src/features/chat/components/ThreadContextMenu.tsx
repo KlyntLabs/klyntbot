@@ -21,12 +21,12 @@ export function ThreadContextMenu({
 }: ThreadContextMenuProps) {
   return (
     <ContextMenu x={x} y={y} onClose={onClose}>
-      <ContextMenuItem icon={<Pencil className="w-4 h-4" />} onClick={() => onRename(thread)}>
+      <ContextMenuItem icon={<Pencil className="size-4" />} onClick={() => onRename(thread)}>
         Rename
       </ContextMenuItem>
       <ContextMenuSeparator />
       <ContextMenuItem
-        icon={<Trash2 className="w-4 h-4" />}
+        icon={<Trash2 className="size-4" />}
         onClick={() => onDelete(thread.sessionKey)}
         destructive
       >

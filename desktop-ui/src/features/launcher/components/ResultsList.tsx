@@ -11,6 +11,17 @@ export function ResultsList({ onExecute }: ResultsListProps) {
   const selectedIndex = useLauncherStore((s) => s.selectedIndex);
   const isSearching = useLauncherStore((s) => s.isSearching);
   const listRef = useRef<HTMLDivElement>(null);
+  // Prevent hover selection when results render under a stationary cursor.
+  // Only allow mouse-based selection after the mouse physically moves.
+  const mouseMovedRef = useRef(false);
+
+  // Reset mouse-moved flag when results change — use first item ID as a
+  // stable identity signal (length alone can't distinguish different result sets).
+  const resultsKey = results.length > 0 ? results[0].id : "";
+  // biome-ignore lint/correctness/useExhaustiveDependencies: intentionally reacting to result identity change
+  useEffect(() => {
+    mouseMovedRef.current = false;
+  }, [resultsKey]);
 
   // Scroll selected item into view
   useEffect(() => {
@@ -47,7 +58,14 @@ export function ResultsList({ onExecute }: ResultsListProps) {
   }
 
   return (
-    <div ref={listRef} className="max-h-[500px] overflow-y-auto py-1">
+    <div
+      ref={listRef}
+      role="listbox"
+      className="max-h-[500px] overflow-y-auto py-1"
+      onMouseMove={() => {
+        mouseMovedRef.current = true;
+      }}
+    >
       {results.map((item, index) => (
         <ResultRow
           key={item.id}
@@ -55,7 +73,11 @@ export function ResultsList({ onExecute }: ResultsListProps) {
           index={index}
           isSelected={index === selectedIndex}
           onClick={() => onExecute(index)}
-          onMouseEnter={() => useLauncherStore.getState().setSelectedIndex(index)}
+          onMouseEnter={() => {
+            if (mouseMovedRef.current) {
+              useLauncherStore.getState().setSelectedIndex(index);
+            }
+          }}
         />
       ))}
     </div>
@@ -130,10 +152,10 @@ const ICON_MAP: Record<string, string> = {
 
 function ItemIcon({ kind, icon }: { kind: string; icon?: string | null }) {
   if (icon?.startsWith("data:")) {
-    return <img src={icon} alt="" className="w-6 h-6 shrink-0 rounded" />;
+    return <img src={icon} alt="" className="size-6 shrink-0 rounded" />;
   }
   return (
-    <span className="w-6 h-6 flex items-center justify-center text-sm shrink-0">
+    <span className="size-6 flex items-center justify-center text-sm shrink-0">
       {ICON_MAP[kind] || "\u2022"}
     </span>
   );
@@ -164,7 +186,7 @@ const KIND_LABELS: Record<string, string> = {
 
 function KindBadge({ type }: { type: string }) {
   return (
-    <span className="text-[10px] text-muted-foreground px-1.5 py-0.5 rounded bg-accent shrink-0">
+    <span className="text-2xs text-muted-foreground px-1.5 py-0.5 rounded bg-accent shrink-0">
       {KIND_LABELS[type] || type}
     </span>
   );

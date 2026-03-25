@@ -1,4 +1,4 @@
-import { cn } from "@shared/lib/cn";
+import { cn } from "@shared/lib/utils";
 
 export interface ToggleProps {
   checked: boolean;
@@ -13,6 +13,8 @@ export function Toggle({ checked, onChange, disabled, size = "default", classNam
   return (
     <button
       type="button"
+      role="switch"
+      aria-checked={checked}
       onClick={() => onChange(!checked)}
       disabled={disabled}
       className={cn(
@@ -25,7 +27,7 @@ export function Toggle({ checked, onChange, disabled, size = "default", classNam
       <span
         className={cn(
           "absolute top-0.5 left-0.5 rounded-full bg-white transition-transform",
-          isSmall ? "w-3 h-3" : "w-4 h-4",
+          isSmall ? "size-3" : "size-4",
           checked ? (isSmall ? "translate-x-3" : "translate-x-4") : "",
         )}
       />

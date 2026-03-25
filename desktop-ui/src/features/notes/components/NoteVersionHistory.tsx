@@ -1,5 +1,6 @@
 import { ipc } from "@shared/hooks/useIpc";
 import { useQuery } from "@shared/hooks/useQuery";
+import { formatRelativeTime } from "@shared/lib/dates";
 import type { Note, NoteVersion } from "@shared/types";
 import { RotateCcw } from "lucide-react";
 import { useCallback, useState } from "react";
@@ -13,12 +14,14 @@ export function NoteVersionHistory({ noteId, onRestore }: NoteVersionHistoryProp
   const { data: versions, refetch } = useQuery<NoteVersion[]>("note_version_list", { noteId }, []);
   const [previewId, setPreviewId] = useState<string | null>(null);
   const [restoring, setRestoring] = useState(false);
+  const [restoreError, setRestoreError] = useState<string | null>(null);
 
   const previewVersion = versions.find((v) => v.id === previewId);
 
   const handleRestore = useCallback(
     async (versionId: string) => {
       setRestoring(true);
+      setRestoreError(null);
       try {
         const restored = await ipc<Note>("note_version_restore", { versionId, noteId });
         onRestore(restored);
@@ -26,26 +29,13 @@ export function NoteVersionHistory({ noteId, onRestore }: NoteVersionHistoryProp
         setPreviewId(null);
       } catch (e) {
         console.error("Failed to restore version:", e);
+        setRestoreError(e instanceof Error ? e.message : "Failed to restore version");
       } finally {
         setRestoring(false);
       }
     },
     [noteId, onRestore, refetch],
   );
-
-  const formatTime = (iso: string) => {
-    const d = new Date(iso);
-    const now = new Date();
-    const diffMs = now.getTime() - d.getTime();
-    const diffMin = Math.floor(diffMs / 60000);
-    if (diffMin < 1) return "just now";
-    if (diffMin < 60) return `${diffMin}m ago`;
-    const diffHr = Math.floor(diffMin / 60);
-    if (diffHr < 24) return `${diffHr}h ago`;
-    const diffDay = Math.floor(diffHr / 24);
-    if (diffDay < 7) return `${diffDay}d ago`;
-    return d.toLocaleDateString();
-  };
 
   return (
     <div className="w-64 glass-panel rounded-2xl flex flex-col min-h-0">
@@ -57,7 +47,7 @@ export function NoteVersionHistory({ noteId, onRestore }: NoteVersionHistoryProp
         {versions.length === 0 && (
           <div className="px-3 py-8 text-center">
             <div className="text-dim text-xs">No versions yet</div>
-            <div className="text-dim/60 text-[10px] mt-1">
+            <div className="text-dim/60 text-2xs mt-1">
               Versions are created automatically as you edit
             </div>
           </div>
@@ -81,9 +71,9 @@ export function NoteVersionHistory({ noteId, onRestore }: NoteVersionHistoryProp
               <div
                 className={`text-xs ${v.id === previewId ? "text-foreground font-medium" : "font-light text-muted-foreground"}`}
               >
-                {formatTime(v.createdAt)}
+                {formatRelativeTime(v.createdAt)}
               </div>
-              <div className="text-[10px] text-dim mt-0.5 truncate">
+              <div className="text-2xs text-dim mt-0.5 truncate">
                 {v.body.slice(0, 80)}
                 {v.body.length > 80 ? "..." : ""}
               </div>
@@ -95,7 +85,7 @@ export function NoteVersionHistory({ noteId, onRestore }: NoteVersionHistoryProp
       {/* Preview + Restore */}
       {previewVersion && (
         <div className="border-t border-border px-3 py-2">
-          <div className="text-[10px] text-dim mb-1.5 max-h-20 overflow-y-auto whitespace-pre-wrap">
+          <div className="text-2xs text-dim mb-1.5 max-h-20 overflow-y-auto whitespace-pre-wrap">
             {previewVersion.body.slice(0, 500)}
           </div>
           <button
@@ -104,9 +94,10 @@ export function NoteVersionHistory({ noteId, onRestore }: NoteVersionHistoryProp
             disabled={restoring}
             className="flex items-center gap-1.5 px-2 py-1 rounded-md text-[11px] font-light text-brand hover:bg-brand/10 transition-colors disabled:opacity-50"
           >
-            <RotateCcw className="w-3 h-3" strokeWidth={1.5} />
+            <RotateCcw className="size-3" strokeWidth={1.5} />
             {restoring ? "Restoring..." : "Restore this version"}
           </button>
+          {restoreError && <p className="text-2xs text-destructive mt-1">{restoreError}</p>}
         </div>
       )}
     </div>

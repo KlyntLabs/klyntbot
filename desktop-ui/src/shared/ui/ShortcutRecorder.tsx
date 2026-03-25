@@ -152,7 +152,7 @@ export function ShortcutRecorder({ value, defaultValue, onChange, error }: Short
             title="Reset to default"
             className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
           >
-            <RotateCcw className="w-3.5 h-3.5" />
+            <RotateCcw className="size-3.5" />
           </button>
         )}
       </div>

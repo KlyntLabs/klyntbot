@@ -1,0 +1,20 @@
+[package]
+name = "autotuner"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+common.workspace = true
+config.workspace = true
+storage.workspace = true
+bus.workspace = true
+async-trait.workspace = true
+chrono = { workspace = true }
+uuid = { workspace = true }
+serde = { workspace = true }
+serde_json.workspace = true
+tracing.workspace = true
+
+[dev-dependencies]
+sqlx = { workspace = true }
+tokio = { workspace = true, features = ["macros", "test-util"] }

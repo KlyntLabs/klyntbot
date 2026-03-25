@@ -1,3 +1,4 @@
+use crate::handlers::notes::card_generation::embed_flashcard_batch;
 use crate::state::AppCore;
 use cognitive::repos::flashcard::ReviewQuality;
 use desktop_shared::commands::{
@@ -6,12 +7,29 @@ use desktop_shared::commands::{
 };
 use desktop_shared::errors::ApiError;
 
+/// Cosine similarity between two vectors: dot(a,b) / (||a|| * ||b||).
+fn cosine_similarity(a: &[f32], b: &[f32]) -> f64 {
+    let (mut dot, mut norm_a, mut norm_b) = (0.0_f64, 0.0_f64, 0.0_f64);
+    for (x, y) in a.iter().zip(b.iter()) {
+        let (xf, yf) = (*x as f64, *y as f64);
+        dot += xf * yf;
+        norm_a += xf * xf;
+        norm_b += yf * yf;
+    }
+    let denom = norm_a.sqrt() * norm_b.sqrt();
+    if denom == 0.0 {
+        0.0
+    } else {
+        dot / denom
+    }
+}
+
 fn parse_json_col(s: Option<&str>) -> Option<serde_json::Value> {
     s.and_then(|v| serde_json::from_str(v).ok())
 }
 
 /// Map a FlashcardRow to a FlashcardResponse.
-pub(super) fn flashcard_to_response(r: cognitive::FlashcardRow) -> FlashcardResponse {
+pub(crate) fn flashcard_to_response(r: cognitive::FlashcardRow) -> FlashcardResponse {
     FlashcardResponse {
         id: r.id,
         deck: r.deck,
@@ -85,6 +103,47 @@ impl AppCore {
             .record_review(&params.card_id, quality, params.recall_speed_ms)
             .await
             .map_err(|e: sqlx::Error| ApiError::new("INTERNAL_ERROR", e.to_string()))?;
+
+        // Emit AtomFlashcardReviewed if card is linked to an atom
+        if let Some(atom_id) = &card.atom_id {
+            // FSRS-5: R(t) = (1 + t/(9*S))^(-1). Just-reviewed card → t≈0 → R≈1.0.
+            // Use 0.9 (desired retention) as a conservative estimate for the stored metric.
+            let retention_pct = 0.9_f64;
+
+            if let Some(bus) = &self.domain_event_bus {
+                bus.publish(bus::DomainEvent::AtomFlashcardReviewed {
+                    atom_id: atom_id.clone(),
+                    card_id: card.id.clone(),
+                    quality: quality as u8,
+                    recall_speed_ms: params.recall_speed_ms.unwrap_or(0) as u64,
+                    new_retention_pct: retention_pct,
+                    source_note_id: card.source_note_id.clone(),
+                });
+                // NOTE: RetentionMilestoneReached is emitted by the Phase 2 decay cron
+                // when retention drops below thresholds and then recovers via review.
+                // Not meaningful here since retention_pct is a static 0.9 estimate.
+            }
+            // Update atom retention + touch last_interaction_ts in one DB call
+            if let Some(atom_repo) = &self.knowledge_atom_repo {
+                let _ = atom_repo
+                    .update_retention(atom_id, retention_pct, card.stability, card.difficulty)
+                    .await;
+            }
+        }
+
+        // Fire-and-forget: propagate review to related cards via knowledge graph (FIRe).
+        let prop_repo = repo.clone();
+        let prop_card = card.clone();
+        let prop_quality = params.quality.clone();
+        tokio::spawn(async move {
+            if let Err(e) =
+                super::graph_propagation::propagate_review(&prop_repo, &prop_card, &prop_quality)
+                    .await
+            {
+                tracing::warn!("Graph propagation failed: {e}");
+            }
+        });
+
         Ok(flashcard_to_response(card))
     }
 
@@ -106,6 +165,7 @@ impl AppCore {
         let card = cognitive::NewFlashcard {
             source_note_id: params.source_note_id,
             source_context: None,
+            atom_id: None,
             deck: params.deck,
             front: params.front,
             back: params.back,
@@ -116,11 +176,24 @@ impl AppCore {
             tags: params.tags.unwrap_or_default(),
             stability: 1.0,
             difficulty: 5.0,
+            difficulty_estimate: None,
+            prerequisite_concepts: None,
         };
         let row = repo
             .create_single(card)
             .await
             .map_err(|e| ApiError::new("INTERNAL_ERROR", e.to_string()))?;
+
+        // Fire-and-forget: embed the newly created card in the background.
+        if let (Some(engine), Some(vs)) = (self.embedding_engine.clone(), self.vector_store.clone())
+        {
+            let row_for_embed = row.clone();
+            let repo_opt = self.flashcard_repo.clone();
+            tokio::spawn(async move {
+                embed_flashcard_batch(engine, &vs, &[row_for_embed], repo_opt.as_ref()).await;
+            });
+        }
+
         Ok(flashcard_to_response(row))
     }
 
@@ -184,5 +257,47 @@ impl AppCore {
         repo.total_due_count()
             .await
             .map_err(|e| ApiError::new("INTERNAL_ERROR", e.to_string()))
+    }
+
+    /// Compute cosine similarity between a user's answer and the stored back-side
+    /// embedding for a given card.
+    ///
+    /// Returns a score in [0.0, 1.0]. Returns 0.0 if:
+    /// - No embedding engine is available
+    /// - No vector store is available
+    /// - The card has no stored embedding
+    /// - Embedding the user answer fails
+    pub async fn compute_answer_similarity(&self, card_id: &str, user_answer: &str) -> f64 {
+        let (Some(engine), Some(vs)) = (self.embedding_engine.clone(), self.vector_store.clone())
+        else {
+            return 0.0;
+        };
+
+        // Embed the user's answer
+        let text = common::truncate_at_boundary(user_answer, 2000).to_string();
+        let answer_vec = match engine.embed_async(text).await {
+            Ok(v) => v,
+            Err(e) => {
+                tracing::debug!(card_id, "answer embedding failed: {e}");
+                return 0.0;
+            }
+        };
+
+        // Fetch the stored back-side embedding directly by ID
+        let back_id = format!("{card_id}_back");
+        let back_vec = match vs.get_embedding("flashcard_embeddings", &back_id).await {
+            Ok(Some(v)) => v,
+            Ok(None) => {
+                tracing::debug!(card_id, "no back embedding found");
+                return 0.0;
+            }
+            Err(e) => {
+                tracing::debug!(card_id, "flashcard embedding lookup failed: {e}");
+                return 0.0;
+            }
+        };
+
+        // Compute cosine similarity in-process
+        cosine_similarity(&answer_vec, &back_vec).clamp(0.0, 1.0)
     }
 }

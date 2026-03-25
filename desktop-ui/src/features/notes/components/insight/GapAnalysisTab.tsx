@@ -61,13 +61,13 @@ export function GapAnalysisTab({ status, content, onCreateNote }: GapAnalysisTab
 
   return (
     <div className="space-y-4">
-      <div className="text-[12px] text-muted-foreground leading-relaxed">
+      <div className="text-xs text-muted-foreground leading-relaxed">
         <MarkdownContent content={markdown} />
       </div>
 
       {gaps.length > 0 && (
         <div className="space-y-2 pt-2 border-t border-border">
-          <div className="text-[10px] font-medium text-dim uppercase tracking-wider">
+          <div className="text-2xs font-medium text-dim uppercase tracking-wider">
             Knowledge Gaps — Deep Dive
           </div>
           {gaps.map((gap) => (
@@ -82,7 +82,7 @@ export function GapAnalysisTab({ status, content, onCreateNote }: GapAnalysisTab
                 <div className="text-[11px] text-muted-foreground group-hover:text-foreground">
                   {gap.topic}
                 </div>
-                <div className="text-[10px] text-dim mt-0.5 line-clamp-2">{gap.description}</div>
+                <div className="text-2xs text-dim mt-0.5 line-clamp-2">{gap.description}</div>
               </div>
             </button>
           ))}

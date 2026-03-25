@@ -2,15 +2,16 @@ import { MiniCalendar } from "@shared/components/MiniCalendar";
 import { DataTable, type DataTableColumn } from "@shared/composites/DataTable";
 import { useMutation } from "@shared/hooks/useMutation";
 import { invalidateQueries, useQuery } from "@shared/hooks/useQuery";
-import { cn } from "@shared/lib/cn";
 import { humanizeJobName, humanizeSchedule, ORIGIN_STYLES, relativeTime } from "@shared/lib/cron";
 import { toLocalDateTime, toLocalISO } from "@shared/lib/dates";
+import { cn } from "@shared/lib/utils";
 import type {
   CronJob,
   CronJobCreateParams,
   CronJobUpdateParams,
   CronOrigin,
   CronSchedule,
+  CronStatusResponse,
 } from "@shared/types";
 import { Toggle } from "@shared/ui";
 import { Clock, Play, Plus, Search, Trash2, X } from "lucide-react";
@@ -26,7 +27,7 @@ function OriginBadge({ origin }: { origin: CronOrigin }) {
   return (
     <span
       className={cn(
-        "px-1.5 py-0.5 rounded text-[10px] font-medium uppercase tracking-wide",
+        "px-1 py-px rounded text-2xs leading-tight font-medium uppercase tracking-wide",
         style.className,
       )}
     >
@@ -40,7 +41,9 @@ function OriginBadge({ origin }: { origin: CronOrigin }) {
 function ScheduleTypeBadge({ schedule }: { schedule: CronSchedule }) {
   const label = schedule.kind === "every" ? "Interval" : schedule.kind === "cron" ? "Cron" : "Once";
   return (
-    <span className="px-1.5 py-0.5 rounded text-[10px] font-light text-dim bg-accent">{label}</span>
+    <span className="px-1 py-px rounded text-2xs leading-tight font-light text-dim bg-accent">
+      {label}
+    </span>
   );
 }
 
@@ -88,7 +91,7 @@ function InlineTextCell({
         onClick={(e) => e.stopPropagation()}
         placeholder={placeholder}
         className={cn(
-          "bg-transparent border-b border-brand outline-none w-full text-[12px] font-light text-foreground",
+          "bg-transparent border-b border-brand outline-none w-full text-xs font-light text-foreground",
           className,
         )}
       />
@@ -277,11 +280,11 @@ function SchedulePanel({
             >
               <span
                 className={cn(
-                  "w-4 h-4 rounded-full border-2 transition-colors flex items-center justify-center",
+                  "size-4 rounded-full border-2 transition-colors flex items-center justify-center",
                   fields.mode === key ? "border-brand" : "border-border group-hover:border-border",
                 )}
               >
-                {fields.mode === key && <span className="w-2 h-2 rounded-full bg-brand" />}
+                {fields.mode === key && <span className="size-2 rounded-full bg-brand" />}
               </span>
               <span
                 className={cn(
@@ -427,7 +430,7 @@ function InlineScheduleCell({
         type="button"
         onClick={handleOpen}
         className={cn(
-          "text-[12px] font-light text-muted-foreground text-left truncate",
+          "text-xs font-light text-muted-foreground text-left truncate",
           editable && "cursor-text rounded px-1 -mx-1 transition-colors hover:bg-accent",
         )}
       >
@@ -436,6 +439,7 @@ function InlineScheduleCell({
       {open &&
         createPortal(
           <>
+            {/* biome-ignore lint/a11y/noStaticElementInteractions: backdrop overlay */}
             <div
               className="fixed inset-0 z-[9998]"
               onClick={() => setOpen(false)}
@@ -443,6 +447,7 @@ function InlineScheduleCell({
                 if (e.key === "Escape") setOpen(false);
               }}
             />
+            {/* biome-ignore lint/a11y/noStaticElementInteractions: stop-propagation container */}
             <div
               className="fixed z-[9999] glass-dropdown p-5 w-[310px] max-h-[calc(100vh-32px)] overflow-y-auto rounded-xl"
               style={{ top: pos.top, left: pos.left }}
@@ -565,7 +570,7 @@ function AutomationCreateForm({
           type="button"
           onClick={handleSubmit}
           disabled={loading || !name.trim() || !message.trim()}
-          className="bg-brand hover:bg-brand-hover text-white px-3 py-1.5 rounded-xl text-[12px] font-light disabled:opacity-40 transition-colors"
+          className="bg-brand hover:bg-brand-hover text-white px-3 py-1.5 rounded-xl text-xs font-light disabled:opacity-40 transition-colors"
         >
           {loading ? "Creating…" : "Create"}
         </button>
@@ -595,6 +600,8 @@ export function AutomationsPage() {
     loading,
     refetch,
   } = useQuery<CronJob[]>("cron_list", { includeDisabled: true }, []);
+
+  const { data: status } = useQuery<CronStatusResponse | null>("cron_status", {}, null);
 
   const { mutate: enableJob } = useMutation<CronJob, { id: string; enabled: boolean }>(
     "cron_enable",
@@ -724,7 +731,7 @@ export function AutomationsPage() {
               value={job.payload.message}
               editable={editable}
               onSave={(v) => handleUpdate(job.id, { message: v })}
-              className="text-[12px] font-light text-muted-foreground"
+              className="text-xs font-light text-muted-foreground"
               placeholder="No message"
             />
           );
@@ -751,7 +758,7 @@ export function AutomationsPage() {
         width: "w-28",
         align: "right",
         renderCell: (job) => (
-          <span className="text-[12px] font-light text-dim">
+          <span className="text-xs font-light text-dim">
             {job.state.lastRunAtMs ? relativeTime(job.state.lastRunAtMs) : "—"}
             {job.state.lastStatus && job.state.lastStatus !== "ok" && (
               <span className="ml-1 text-destructive">!</span>
@@ -765,7 +772,7 @@ export function AutomationsPage() {
         width: "w-24",
         align: "right",
         renderCell: (job) => (
-          <span className="text-[12px] font-light text-dim">
+          <span className="text-xs font-light text-dim">
             {job.enabled && job.state.nextRunAtMs ? relativeTime(job.state.nextRunAtMs) : "—"}
           </span>
         ),
@@ -776,6 +783,7 @@ export function AutomationsPage() {
         width: "w-20",
         align: "right",
         renderCell: (job) => (
+          // biome-ignore lint/a11y/noStaticElementInteractions: stop-propagation wrapper for action buttons
           <div
             className="flex items-center justify-end gap-1"
             onClick={(e) => e.stopPropagation()}
@@ -833,7 +841,7 @@ export function AutomationsPage() {
           <button
             type="button"
             onClick={() => setShowCreate(true)}
-            className="bg-brand hover:bg-brand-hover text-white mt-4 px-3 py-1.5 rounded-xl text-[12px] font-light flex items-center gap-2 transition-colors"
+            className="bg-brand hover:bg-brand-hover text-white mt-4 px-3 py-1.5 rounded-xl text-xs font-light flex items-center gap-2 transition-colors"
           >
             <Plus className="w-[14px] h-[14px]" strokeWidth={1.5} /> Create your first automation
           </button>
@@ -853,7 +861,7 @@ export function AutomationsPage() {
               type="button"
               onClick={() => setOriginFilter(tab.key)}
               className={cn(
-                "px-3 py-1.5 rounded-lg text-[12px] font-light transition-colors",
+                "px-3 py-1.5 rounded-lg text-xs font-light transition-colors",
                 originFilter === tab.key
                   ? "bg-muted text-foreground"
                   : "text-muted-foreground hover:text-foreground",
@@ -873,7 +881,7 @@ export function AutomationsPage() {
             />
             <input
               type="text"
-              className="glass-input pl-8 pr-3 py-1.5 text-[12px] font-light w-48 rounded-lg"
+              className="glass-input pl-8 pr-3 py-1.5 text-xs font-light w-48 rounded-lg"
               placeholder="Search automations…"
               value={searchQ}
               onChange={(e) => handleSearch(e.target.value)}
@@ -881,10 +889,27 @@ export function AutomationsPage() {
           </div>
         </div>
 
+        {status && (
+          <div className="flex items-center gap-2 mr-3">
+            <span
+              className={cn(
+                "inline-block w-1.5 h-1.5 rounded-full",
+                status.enabled ? "bg-green-500" : "bg-red-500",
+              )}
+            />
+            <span className="text-[11px] text-muted-foreground">
+              {status.enabled ? "Running" : "Stopped"}
+              {status.enabled && status.nextWakeAtMs != null && (
+                <span className="text-dim"> · next {relativeTime(status.nextWakeAtMs)}</span>
+              )}
+            </span>
+          </div>
+        )}
+
         <button
           type="button"
           onClick={() => setShowCreate(true)}
-          className="bg-brand hover:bg-brand-hover text-white px-3 py-1.5 rounded-xl text-[12px] font-light flex items-center gap-2 transition-colors"
+          className="bg-brand hover:bg-brand-hover text-white px-3 py-1.5 rounded-xl text-xs font-light flex items-center gap-2 transition-colors"
         >
           <Plus className="w-[14px] h-[14px]" strokeWidth={1.5} /> Add automation
         </button>

@@ -12,6 +12,9 @@ pub enum AgentEvent {
     /// A chunk of content streamed from the LLM.
     ContentChunk { data: String },
 
+    /// Pipeline processing has begun (emitted immediately, before classification).
+    PipelineStarted,
+
     /// A tool execution has started.
     ToolStart {
         name: String,
@@ -251,6 +254,15 @@ pub enum AgentEvent {
         summary: String,
     },
 
+    /// Mid-loop context compression was triggered during a reactive execution.
+    ContextCompressed {
+        #[serde(rename = "beforeTokens")]
+        before_tokens: usize,
+        #[serde(rename = "afterTokens")]
+        after_tokens: usize,
+        iteration: usize,
+    },
+
     /// A memory was promoted from one scope to a higher scope.
     MemoryPromoted {
         #[serde(rename = "factId")]
@@ -262,4 +274,11 @@ pub enum AgentEvent {
         subject: String,
         predicate: String,
     },
+
+    /// AutoTuner nightly cycle report.
+    AutoTunerReport(::autotuner::AutoTunerReport),
+    /// AutoTuner promoted a new champion.
+    AutoTunerPromotion(::autotuner::AutoTunerPromotion),
+    /// AutoTuner auto-reverted after regression.
+    AutoTunerRollback(::autotuner::AutoTunerRollback),
 }

@@ -7,6 +7,7 @@ import { useQuery } from "@shared/hooks/useQuery";
 import { useSetToggle } from "@shared/hooks/useSetToggle";
 import { useTransparentBackground } from "@shared/hooks/useTransparentBackground";
 import { useWindowAutoResize } from "@shared/hooks/useWindowAutoResize";
+import { todayISO } from "@shared/lib/dates";
 import { isTauri } from "@shared/lib/utils";
 import type { CalendarEvent, TodayTask } from "@shared/types";
 import { Badge, Checkbox } from "@shared/ui";
@@ -31,7 +32,11 @@ export function SystemTray() {
     undefined,
     [],
   );
-  const { data: calendarEvents } = useQuery<CalendarEvent[]>("calendar_events", { limit: 5 }, []);
+  const { data: calendarEvents } = useQuery<CalendarEvent[]>(
+    "productivity_calendar_events",
+    { date: todayISO() },
+    [],
+  );
 
   // Coaching nudge (Channel 2: tray nudge) — 30s auto-collapse for compact tray
   const { nudge: coachingNudge, handleFeedback: handleCoachingFeedback } = useCoachingNudge({
@@ -132,8 +137,8 @@ export function SystemTray() {
           {coachingNudge && (
             <div className="px-4 py-3" style={{ animation: "nudge-slide-in 0.25s ease-out" }}>
               <div className="flex items-start gap-2.5">
-                <Lightbulb className="w-3.5 h-3.5 text-info shrink-0 mt-0.5" strokeWidth={1.5} />
-                <p className="flex-1 text-[12px] text-muted-foreground font-light leading-relaxed">
+                <Lightbulb className="size-3.5 text-info shrink-0 mt-0.5" strokeWidth={1.5} />
+                <p className="flex-1 text-xs text-muted-foreground font-light leading-relaxed">
                   {coachingNudge.message}
                 </p>
               </div>
@@ -142,27 +147,27 @@ export function SystemTray() {
                   type="button"
                   onClick={() => handleCoachingFeedback(coachingNudge.id, "helpful")}
                   title="Helpful"
-                  className="h-6 px-2 flex items-center gap-1 rounded-md text-[10px] text-muted-foreground hover:text-success hover:bg-accent transition-colors"
+                  className="h-6 px-2 flex items-center gap-1 rounded-md text-2xs text-muted-foreground hover:text-success hover:bg-accent transition-colors"
                 >
-                  <Check className="w-3 h-3" strokeWidth={2} />
+                  <Check className="size-3" strokeWidth={2} />
                   Helpful
                 </button>
                 <button
                   type="button"
                   onClick={() => handleCoachingFeedback(coachingNudge.id, "dismissed")}
                   title="Dismiss"
-                  className="h-6 px-2 flex items-center gap-1 rounded-md text-[10px] text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
+                  className="h-6 px-2 flex items-center gap-1 rounded-md text-2xs text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
                 >
-                  <X className="w-3 h-3" strokeWidth={2} />
+                  <X className="size-3" strokeWidth={2} />
                   Dismiss
                 </button>
                 <button
                   type="button"
                   onClick={() => handleCoachingFeedback(coachingNudge.id, "stop")}
                   title="Stop suggesting this"
-                  className="h-6 px-2 flex items-center gap-1 rounded-md text-[10px] text-muted-foreground hover:text-destructive hover:bg-accent transition-colors"
+                  className="h-6 px-2 flex items-center gap-1 rounded-md text-2xs text-muted-foreground hover:text-destructive hover:bg-accent transition-colors"
                 >
-                  <XCircle className="w-3 h-3" strokeWidth={2} />
+                  <XCircle className="size-3" strokeWidth={2} />
                   Stop
                 </button>
               </div>
@@ -183,7 +188,7 @@ export function SystemTray() {
                     Today
                   </span>
                   {activeCount > 0 && (
-                    <span className="glass-badge px-2 py-0.5 text-[10px] text-muted-foreground font-light">
+                    <span className="glass-badge px-2 py-0.5 text-2xs text-muted-foreground font-light">
                       {activeCount}
                     </span>
                   )}
@@ -203,7 +208,7 @@ export function SystemTray() {
                         <button
                           type="button"
                           onClick={() => handleOpenTask(task.id)}
-                          className={`flex-1 text-[12px] font-light truncate text-left hover:underline ${
+                          className={`flex-1 text-xs font-light truncate text-left hover:underline ${
                             done
                               ? "text-dim line-through"
                               : task.isOverdue
@@ -214,13 +219,13 @@ export function SystemTray() {
                           {task.title}
                         </button>
                         {!done && task.priority && (
-                          <Badge variant="brand" className="text-[10px] px-1.5 py-0">
+                          <Badge variant="brand" className="text-2xs px-1.5 py-0">
                             {task.priority}
                           </Badge>
                         )}
                         {!done && task.dueDisplay && (
                           <span
-                            className={`text-[10px] font-light flex-shrink-0 ${
+                            className={`text-2xs font-light flex-shrink-0 ${
                               task.isOverdue ? "text-destructive" : "text-muted-foreground"
                             }`}
                           >
@@ -251,7 +256,7 @@ export function SystemTray() {
                         style={{ backgroundColor: event.color ?? "var(--brand)" }}
                       />
                       <div className="flex-1 min-w-0">
-                        <p className="text-[12px] font-light text-muted-foreground truncate">
+                        <p className="text-xs font-light text-muted-foreground truncate">
                           {event.title}
                         </p>
                       </div>
@@ -276,30 +281,25 @@ export function SystemTray() {
               type="button"
               onClick={handleOpenDashboard}
               title="Open Dashboard"
-              className="w-7 h-7 flex items-center justify-center rounded-lg text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
+              className="size-7 flex items-center justify-center rounded-lg text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
             >
-              <Monitor className="w-3.5 h-3.5" strokeWidth={1.5} />
+              <Monitor className="size-3.5" strokeWidth={1.5} />
             </button>
             <button
               type="button"
               onClick={handleOpenSettings}
               title="Settings"
-              className="w-7 h-7 flex items-center justify-center rounded-lg text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
+              className="size-7 flex items-center justify-center rounded-lg text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
             >
-              <Settings className="w-3.5 h-3.5" strokeWidth={1.5} />
+              <Settings className="size-3.5" strokeWidth={1.5} />
             </button>
             <button
               type="button"
               onClick={handleOpenGitHub}
               title="GitHub"
-              className="w-7 h-7 flex items-center justify-center rounded-lg text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
+              className="size-7 flex items-center justify-center rounded-lg text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
             >
-              <svg
-                className="w-3.5 h-3.5"
-                viewBox="0 0 24 24"
-                fill="currentColor"
-                aria-hidden="true"
-              >
+              <svg className="size-3.5" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
                 <path d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.531 1.032 1.531 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0 1 12 6.844a9.59 9.59 0 0 1 2.504.337c1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.02 10.02 0 0 0 22 12.017C22 6.484 17.522 2 12 2Z" />
               </svg>
             </button>
@@ -307,9 +307,9 @@ export function SystemTray() {
               type="button"
               onClick={handleQuit}
               title="Quit Klynt"
-              className="w-7 h-7 flex items-center justify-center rounded-lg text-muted-foreground hover:text-destructive hover:bg-accent transition-colors"
+              className="size-7 flex items-center justify-center rounded-lg text-muted-foreground hover:text-destructive hover:bg-accent transition-colors"
             >
-              <LogOut className="w-3.5 h-3.5" strokeWidth={1.5} />
+              <LogOut className="size-3.5" strokeWidth={1.5} />
             </button>
           </div>
         </div>

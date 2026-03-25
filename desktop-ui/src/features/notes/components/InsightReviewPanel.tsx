@@ -1,4 +1,7 @@
+import * as PopoverPrimitive from "@radix-ui/react-popover";
+import { useCopyToClipboard } from "@shared/hooks/useCopyToClipboard";
 import { ipc } from "@shared/hooks/useIpc";
+import { cn } from "@shared/lib/utils";
 import {
   BookOpen,
   Brain,
@@ -8,7 +11,6 @@ import {
   History,
   RefreshCw,
   RotateCcw,
-  Sliders,
   Sparkles,
   X,
 } from "lucide-react";
@@ -24,6 +26,7 @@ import type {
 import { useInsightSSE } from "../hooks/useInsightSSE";
 import { useInsightVersions } from "../hooks/useInsightVersions";
 import { usePersonas } from "../hooks/usePersonas";
+import { AtomsTab } from "./insight/AtomsTab";
 import { ChangesBanner } from "./insight/ChangesBanner";
 import { ConceptMapTab } from "./insight/ConceptMapTab";
 import { FlashcardReview } from "./insight/FlashcardReview";
@@ -38,6 +41,7 @@ import { InsightVersionList } from "./insight/InsightVersionList";
 import { KnowledgeGrowthMetrics } from "./insight/KnowledgeGrowthMetrics";
 import { ManagePersonasModal } from "./insight/ManagePersonasModal";
 import { PerspectivesTab } from "./insight/PerspectivesTab";
+import { PracticeHistoryTab } from "./insight/PracticeHistoryTab";
 import { SelfAssessmentTab } from "./insight/SelfAssessmentTab";
 import { SquadManager } from "./insight/SquadManager";
 import { SquadPicker } from "./insight/SquadPicker";
@@ -57,11 +61,13 @@ interface InsightReviewPanelProps {
 // ---------------------------------------------------------------------------
 
 const TABS: { id: TabId; label: string }[] = [
+  { id: "atoms", label: "Atoms" },
   { id: "synthesis", label: "Synthesis" },
   { id: "gaps", label: "Gap Analysis" },
   { id: "assessment", label: "Self-Assessment" },
   { id: "concept-map", label: "Concept Map" },
   { id: "perspectives", label: "Perspectives" },
+  { id: "practice" as TabId, label: "Practice" },
 ];
 
 // ---------------------------------------------------------------------------
@@ -84,6 +90,8 @@ function statusDotClass(status: TabStatus): string {
 
 function tabStatus(state: InsightReviewState, tabId: TabId): TabStatus {
   switch (tabId) {
+    case "atoms":
+      return "done";
     case "synthesis":
       return state.tabs.synthesis.status;
     case "gaps":
@@ -94,6 +102,8 @@ function tabStatus(state: InsightReviewState, tabId: TabId): TabStatus {
       return state.tabs.conceptMap.status;
     case "perspectives":
       return state.tabs.perspectives.status;
+    case "practice":
+      return "done";
   }
 }
 
@@ -102,11 +112,10 @@ function tabStatus(state: InsightReviewState, tabId: TabId): TabStatus {
 // ---------------------------------------------------------------------------
 
 export function InsightReviewPanel({ state, actions }: InsightReviewPanelProps) {
-  const [copied, setCopied] = useState(false);
+  const { copied, copy } = useCopyToClipboard();
   const [showPersonaManager, setShowPersonaManager] = useState(false);
   const [showSquadManager, setShowSquadManager] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
-  const [showScope, setShowScope] = useState(false);
   const [scopeConfig, setScopeConfig] = useState<ScopeConfig>(DEFAULT_SCOPE);
   const [showFlashcardReview, setShowFlashcardReview] = useState(false);
   const [allPersonas, personaActions] = usePersonas();
@@ -124,8 +133,16 @@ export function InsightReviewPanel({ state, actions }: InsightReviewPanelProps) 
     if (!state.isOpen) {
       evolution.clear();
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [showHistory, state.isOpen, state.noteId]);
+  }, [
+    showHistory,
+    state.isOpen,
+    state.noteId,
+    evolution.clear,
+    evolution.fetch,
+    versions.fetch,
+    evolution,
+    versions,
+  ]);
 
   const handleCreateDeepDiveNote = useCallback(async (title: string, body: string) => {
     try {
@@ -138,6 +155,8 @@ export function InsightReviewPanel({ state, actions }: InsightReviewPanelProps) 
   // Get active tab content as text
   const getActiveContent = useCallback((): string => {
     switch (state.activeTab) {
+      case "atoms":
+        return "";
       case "synthesis":
         return state.tabs.synthesis.content;
       case "gaps":
@@ -150,6 +169,8 @@ export function InsightReviewPanel({ state, actions }: InsightReviewPanelProps) 
         return state.tabs.conceptMap.mermaid || state.tabs.conceptMap.fallbackText;
       case "perspectives":
         return state.tabs.perspectives.content;
+      case "practice":
+        return "";
     }
   }, [state]);
 
@@ -157,11 +178,8 @@ export function InsightReviewPanel({ state, actions }: InsightReviewPanelProps) 
 
   const handleCopy = useCallback(async () => {
     const content = getActiveContent();
-    if (!content) return;
-    await navigator.clipboard.writeText(content);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
-  }, [getActiveContent]);
+    if (content) await copy(content);
+  }, [getActiveContent, copy]);
 
   const handleInsertIntoNote = useCallback(async () => {
     const content = getActiveContent();
@@ -193,24 +211,8 @@ export function InsightReviewPanel({ state, actions }: InsightReviewPanelProps) 
       {/* Header */}
       <div className="flex items-center gap-2 px-3 py-2.5 border-b border-border shrink-0">
         <Brain size={14} className="text-purple shrink-0" />
-        <span className="text-[12px] font-medium text-foreground flex-1">Insight Review</span>
-        <div className="relative">
-          <button
-            type="button"
-            onClick={() => setShowScope((p) => !p)}
-            className="p-1 rounded-md text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
-            title="Scope Config"
-          >
-            <Sliders size={12} />
-          </button>
-          {showScope && (
-            <InsightScopePopover
-              value={scopeConfig}
-              onChange={setScopeConfig}
-              onClose={() => setShowScope(false)}
-            />
-          )}
-        </div>
+        <span className="text-xs font-medium text-foreground flex-1">Learn</span>
+        <InsightScopePopover value={scopeConfig} onChange={setScopeConfig} />
         <button
           type="button"
           onClick={() => setShowHistory((p) => !p)}
@@ -232,7 +234,7 @@ export function InsightReviewPanel({ state, actions }: InsightReviewPanelProps) 
           type="button"
           onClick={() => actions.close()}
           className="p-1 rounded-md text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
-          aria-label="Close Insight Review"
+          aria-label="Close"
         >
           <X size={14} />
         </button>
@@ -240,7 +242,7 @@ export function InsightReviewPanel({ state, actions }: InsightReviewPanelProps) 
 
       {/* Scope coverage hint */}
       {state.isOpen && (
-        <div className="px-3 py-1.5 border-b border-border text-[10px] text-dim flex items-center gap-1">
+        <div className="px-3 py-1.5 border-b border-border text-2xs text-dim flex items-center gap-1">
           <span>Scope:</span>
           <span className="text-muted-foreground capitalize">{scopeConfig.scopeType}</span>
           {scopeConfig.deepDive && <span className="text-purple text-[9px] ml-1">(deep dive)</span>}
@@ -257,7 +259,7 @@ export function InsightReviewPanel({ state, actions }: InsightReviewPanelProps) 
       {state.changesSummary && <ChangesBanner summary={state.changesSummary} />}
 
       {/* Knowledge growth metrics */}
-      <KnowledgeGrowthMetrics isOpen={state.isOpen} />
+      <KnowledgeGrowthMetrics noteId={state.noteId} />
 
       {/* Tab bar */}
       <div className="flex border-b border-border shrink-0 overflow-x-auto">
@@ -314,7 +316,11 @@ export function InsightReviewPanel({ state, actions }: InsightReviewPanelProps) 
 
       {/* Content area */}
       <div className="flex-1 overflow-y-auto p-4 min-h-0">
-        {activeStatus === "idle" || activeStatus === "error" ? (
+        {state.activeTab === "practice" ? (
+          <PracticeHistoryTab noteId={state.noteId} />
+        ) : state.activeTab === "atoms" ? (
+          <AtomsTab noteId={state.noteId} />
+        ) : activeStatus === "idle" || activeStatus === "error" ? (
           <div className="flex flex-col items-center justify-center h-full gap-3">
             <p className="text-[11px] text-dim">
               {activeStatus === "error" ? "Generation failed" : "No content generated yet"}
@@ -385,7 +391,7 @@ export function InsightReviewPanel({ state, actions }: InsightReviewPanelProps) 
           type="button"
           onClick={handleInsertIntoNote}
           disabled={!hasActiveContent}
-          className="flex items-center gap-1 text-[10px] px-2 py-1 rounded-md bg-accent text-muted-foreground hover:text-foreground hover:bg-accent/80 transition-colors disabled:text-dim disabled:cursor-not-allowed"
+          className="flex items-center gap-1 text-2xs px-2 py-1 rounded-md bg-accent text-muted-foreground hover:text-foreground hover:bg-accent/80 transition-colors disabled:text-dim disabled:cursor-not-allowed"
           title="Insert into note"
         >
           <FileInput size={10} />
@@ -395,7 +401,7 @@ export function InsightReviewPanel({ state, actions }: InsightReviewPanelProps) 
           type="button"
           onClick={handleCreateInsightNote}
           disabled={!hasActiveContent}
-          className="flex items-center gap-1 text-[10px] px-2 py-1 rounded-md bg-accent text-muted-foreground hover:text-foreground hover:bg-accent/80 transition-colors disabled:text-dim disabled:cursor-not-allowed"
+          className="flex items-center gap-1 text-2xs px-2 py-1 rounded-md bg-accent text-muted-foreground hover:text-foreground hover:bg-accent/80 transition-colors disabled:text-dim disabled:cursor-not-allowed"
           title="Create note from insight"
         >
           <FilePlus size={10} />
@@ -408,27 +414,47 @@ export function InsightReviewPanel({ state, actions }: InsightReviewPanelProps) 
             <button
               type="button"
               onClick={() => actions.saveFlashcards(`insight-${Date.now()}`)}
-              className="flex items-center gap-1 text-[10px] px-2 py-1 rounded-md bg-brand/20 text-brand hover:bg-brand/30 transition-colors"
+              className="flex items-center gap-1 text-2xs px-2 py-1 rounded-md bg-brand/20 text-brand hover:bg-brand/30 transition-colors"
               title="Save as flashcard deck"
             >
               <BookOpen size={10} />
               Save as Deck
             </button>
           )}
-        <button
-          type="button"
-          onClick={() => setShowFlashcardReview(true)}
-          className="flex items-center gap-1 text-[10px] px-2 py-1 rounded-md bg-white/[0.04] text-muted-foreground hover:text-foreground hover:bg-white/[0.06]"
-          title="Review due flashcards"
-        >
-          <RotateCcw size={10} />
-          Review
-        </button>
+        <PopoverPrimitive.Root open={showFlashcardReview} onOpenChange={setShowFlashcardReview}>
+          <PopoverPrimitive.Trigger asChild>
+            <button
+              type="button"
+              className="flex items-center gap-1 text-2xs px-2 py-1 rounded-md bg-white/[0.04] text-muted-foreground hover:text-foreground hover:bg-white/[0.06]"
+              title="Review due flashcards"
+            >
+              <RotateCcw size={10} />
+              Review
+            </button>
+          </PopoverPrimitive.Trigger>
+          <PopoverPrimitive.Portal>
+            <PopoverPrimitive.Content
+              side="left"
+              align="end"
+              sideOffset={12}
+              collisionPadding={16}
+              className={cn(
+                "z-50 w-[360px] max-h-[min(520px,80vh)] overflow-y-auto rounded-xl border border-border glass-panel p-0 text-foreground shadow-xl outline-none",
+                "data-[state=open]:animate-in data-[state=closed]:animate-out",
+                "data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0",
+                "data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95",
+                "data-[side=left]:slide-in-from-right-2 data-[side=top]:slide-in-from-bottom-2",
+              )}
+            >
+              <FlashcardReview onClose={() => setShowFlashcardReview(false)} />
+            </PopoverPrimitive.Content>
+          </PopoverPrimitive.Portal>
+        </PopoverPrimitive.Root>
         {hasActiveContent && (
           <button
             type="button"
             onClick={() => actions.regenerateTab(state.activeTab)}
-            className="flex items-center gap-1 text-[10px] px-2 py-1 rounded-md bg-accent text-muted-foreground hover:text-foreground hover:bg-accent/80 transition-colors"
+            className="flex items-center gap-1 text-2xs px-2 py-1 rounded-md bg-accent text-muted-foreground hover:text-foreground hover:bg-accent/80 transition-colors"
             title="Regenerate this tab"
           >
             <RefreshCw size={10} />
@@ -438,18 +464,14 @@ export function InsightReviewPanel({ state, actions }: InsightReviewPanelProps) 
           type="button"
           onClick={handleCopy}
           disabled={!hasActiveContent}
-          className="flex items-center gap-1 text-[10px] px-2 py-1 rounded-md bg-accent text-muted-foreground hover:text-foreground hover:bg-accent/80 transition-colors disabled:text-dim disabled:cursor-not-allowed ml-auto"
+          className="flex items-center gap-1 text-2xs px-2 py-1 rounded-md bg-accent text-muted-foreground hover:text-foreground hover:bg-accent/80 transition-colors disabled:text-dim disabled:cursor-not-allowed ml-auto"
           title="Copy to clipboard"
         >
           <Copy size={10} />
           {copied ? "Copied!" : "Copy"}
         </button>
       </div>
-      {showFlashcardReview && (
-        <div className="absolute inset-0 z-30 bg-surface-base/95 rounded-xl overflow-y-auto">
-          <FlashcardReview onClose={() => setShowFlashcardReview(false)} />
-        </div>
-      )}
+      {/* FlashcardReview now renders in a Radix Popover portal above */}
       {showPersonaManager && (
         <ManagePersonasModal
           personas={allPersonas}

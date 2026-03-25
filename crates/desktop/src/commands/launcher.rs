@@ -5,7 +5,6 @@ use std::sync::Arc;
 use desktop_shared::errors::ApiError;
 use feature_launcher::{
     ClipboardEntry, DashboardData, LauncherItem, ScriptRunner, SystemAction, SystemCommands,
-    WindowAction,
 };
 use tauri::State;
 
@@ -59,14 +58,6 @@ pub async fn launcher_clipboard_pin(
 }
 
 #[tauri::command]
-pub async fn launcher_window_action(action: WindowAction) -> Result<(), ApiError> {
-    // Window management is handled on the frontend side via Tauri window APIs.
-    // This command is a placeholder for future native window manipulation.
-    let _ = action;
-    Ok(())
-}
-
-#[tauri::command]
 pub async fn launcher_run_script(path: String) -> Result<String, ApiError> {
     let script_path = std::path::Path::new(&path);
     ScriptRunner::execute(script_path)
@@ -101,6 +92,7 @@ pub async fn launcher_open_app(path: String) -> Result<(), ApiError> {
     Ok(())
 }
 
+#[allow(dead_code)]
 pub(crate) const DEV_COMMANDS: &[&str] = &[
     "launcher_search",
     "launcher_execute",
@@ -108,7 +100,6 @@ pub(crate) const DEV_COMMANDS: &[&str] = &[
     "launcher_clipboard_paste",
     "launcher_clipboard_delete",
     "launcher_clipboard_pin",
-    "launcher_window_action",
     "launcher_run_script",
     "launcher_system_command",
     "launcher_open_app",
@@ -145,10 +136,6 @@ pub(crate) async fn dispatch_dev(
             let id: i64 = dev::get(body, "id").unwrap_or_default();
             let pinned: bool = dev::get(body, "pinned").unwrap_or_default();
             dev::val(core.launcher_clipboard_pin(id, pinned).await)
-        }
-        "launcher_window_action" => {
-            let action: WindowAction = dev::get(body, "action").unwrap_or(WindowAction::Center);
-            dev::val(launcher_window_action(action).await)
         }
         "launcher_run_script" => {
             let path: String = dev::get(body, "path").unwrap_or_default();

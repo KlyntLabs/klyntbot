@@ -125,8 +125,20 @@ impl AgentTaskRepo {
         Ok(pending
             .into_iter()
             .filter(|t| {
-                let blocked: Vec<String> = serde_json::from_str(&t.blocked_by).unwrap_or_default();
-                blocked.iter().all(|id| completed_ids.contains(id))
+                match serde_json::from_str::<Vec<String>>(&t.blocked_by) {
+                    Ok(blocked) => blocked.iter().all(|id| completed_ids.contains(id)),
+                    Err(e) => {
+                        // Malformed blocked_by JSON — treat as still blocked rather than
+                        // silently unblocking the task.
+                        tracing::warn!(
+                            task_id = %t.id,
+                            blocked_by = %t.blocked_by,
+                            error = %e,
+                            "Malformed blocked_by JSON — treating task as blocked"
+                        );
+                        false
+                    }
+                }
             })
             .collect())
     }
@@ -236,6 +248,30 @@ mod tests {
             .unwrap();
         let available2 = repo.list_available("sess:1").await.unwrap();
         assert_eq!(available2.len(), 2); // t2 and t3
+    }
+
+    #[tokio::test]
+    async fn test_malformed_blocked_by_treated_as_blocked() {
+        let repo = setup().await;
+
+        // Create a task, then manually corrupt its blocked_by JSON
+        let task = repo
+            .create("sess:1", "Corrupted", &[] as &[String])
+            .await
+            .unwrap();
+
+        sqlx::query("UPDATE agent_tasks SET blocked_by = 'not-valid-json' WHERE id = ?1")
+            .bind(&task.id)
+            .execute(&repo.pool)
+            .await
+            .unwrap();
+
+        // list_available should exclude the corrupted task (treat as blocked)
+        let available = repo.list_available("sess:1").await.unwrap();
+        assert!(
+            available.is_empty(),
+            "task with malformed blocked_by should be treated as blocked"
+        );
     }
 
     #[tokio::test]

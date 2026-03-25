@@ -70,7 +70,7 @@ export function InlineTags({
               onClick={() => removeTag(i)}
               className="hover:opacity-70 transition-opacity"
             >
-              <X className="w-3 h-3" />
+              <X className="size-3" />
             </button>
           )}
         </span>

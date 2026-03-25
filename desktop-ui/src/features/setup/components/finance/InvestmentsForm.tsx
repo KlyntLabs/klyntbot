@@ -76,50 +76,47 @@ export function InvestmentsForm({ registerSave, onDirty }: InvestmentsFormProps)
         (i) => (i.symbol.trim() || i.name.trim()) && !savedKeysRef.current.has(i.key),
       );
       if (validInvestments.length > 0 && portfolioName.trim()) {
-        try {
-          // Reuse existing portfolio if already created
-          if (!portfolioIdRef.current) {
-            const portfolio = await ipc<{ id: string }>("finance_portfolio_create", {
-              params: {
-                name: portfolioName.trim(),
-                description: null,
-                currency: null,
-              },
-            });
-            portfolioIdRef.current = portfolio?.id ?? null;
+        // Reuse existing portfolio if already created
+        if (!portfolioIdRef.current) {
+          const portfolio = await ipc<{ id: string }>("finance_portfolio_create", {
+            params: {
+              name: portfolioName.trim(),
+              description: null,
+              currency: null,
+            },
+          });
+          portfolioIdRef.current = portfolio?.id ?? null;
+        }
+        if (portfolioIdRef.current) {
+          const results = await Promise.allSettled(
+            validInvestments.map((inv) =>
+              ipc("finance_investment_create", {
+                params: {
+                  portfolioId: portfolioIdRef.current,
+                  assetType: inv.assetType,
+                  symbol: inv.symbol.trim() || null,
+                  name: inv.name.trim() || null,
+                  quantity: Number.parseFloat(inv.quantity) || 0,
+                  costBasis: inv.costBasis ? Math.round(Number.parseFloat(inv.costBasis) * 100) : 0,
+                  currency: null,
+                  purchaseDate: null,
+                  notes: null,
+                },
+              }),
+            ),
+          );
+          for (let i = 0; i < results.length; i++) {
+            if (results[i].status === "fulfilled")
+              savedKeysRef.current.add(validInvestments[i].key);
+            else
+              console.error(
+                "Failed to save investment:",
+                (results[i] as PromiseRejectedResult).reason,
+              );
           }
-          if (portfolioIdRef.current) {
-            const results = await Promise.allSettled(
-              validInvestments.map((inv) =>
-                ipc("finance_investment_create", {
-                  params: {
-                    portfolioId: portfolioIdRef.current,
-                    assetType: inv.assetType,
-                    symbol: inv.symbol.trim() || null,
-                    name: inv.name.trim() || null,
-                    quantity: Number.parseFloat(inv.quantity) || 0,
-                    costBasis: inv.costBasis
-                      ? Math.round(Number.parseFloat(inv.costBasis) * 100)
-                      : 0,
-                    currency: null,
-                    purchaseDate: null,
-                    notes: null,
-                  },
-                }),
-              ),
-            );
-            for (let i = 0; i < results.length; i++) {
-              if (results[i].status === "fulfilled")
-                savedKeysRef.current.add(validInvestments[i].key);
-              else
-                console.error(
-                  "Failed to save investment:",
-                  (results[i] as PromiseRejectedResult).reason,
-                );
-            }
-          }
-        } catch (e) {
-          console.error("Failed to save investments:", e);
+          const failCount = results.filter((r) => r.status === "rejected").length;
+          if (failCount > 0)
+            throw new Error(`Failed to save ${failCount} investment${failCount === 1 ? "" : "s"}`);
         }
       }
     });
@@ -127,14 +124,14 @@ export function InvestmentsForm({ registerSave, onDirty }: InvestmentsFormProps)
 
   return (
     <div>
-      <h3 className="text-[14px] font-medium text-muted-foreground mb-1">Investments</h3>
+      <h3 className="text-sm font-medium text-muted-foreground mb-1">Investments</h3>
       <p className="text-[11px] text-dim mb-4">
         Track your investment portfolio. You can add more later.
       </p>
 
       <div className="space-y-4">
         <label className="block">
-          <span className="block text-[12px] font-medium text-muted-foreground mb-1.5">
+          <span className="block text-xs font-medium text-muted-foreground mb-1.5">
             Portfolio name
           </span>
           <input
@@ -158,7 +155,7 @@ export function InvestmentsForm({ registerSave, onDirty }: InvestmentsFormProps)
                 <select
                   value={inv.assetType}
                   onChange={(e) => updateInvestment(inv.key, { assetType: e.target.value })}
-                  className="w-28 px-2 py-1.5 text-[12px] text-foreground bg-accent border border-border rounded-md focus:outline-none focus:border-brand/50 transition-colors"
+                  className="w-28 px-2 py-1.5 text-xs text-foreground bg-accent border border-border rounded-md focus:outline-none focus:border-brand/50 transition-colors"
                 >
                   {ASSET_TYPE_OPTIONS.map((t) => (
                     <option key={t.value} value={t.value} className="bg-popover">
@@ -171,14 +168,14 @@ export function InvestmentsForm({ registerSave, onDirty }: InvestmentsFormProps)
                   value={inv.symbol}
                   onChange={(e) => updateInvestment(inv.key, { symbol: e.target.value })}
                   placeholder="Symbol (e.g. AAPL)"
-                  className="flex-1 px-2 py-1.5 text-[12px] text-foreground bg-accent border border-border rounded-md focus:outline-none focus:border-brand/50 transition-colors placeholder:text-dim"
+                  className="flex-1 px-2 py-1.5 text-xs text-foreground bg-accent border border-border rounded-md focus:outline-none focus:border-brand/50 transition-colors placeholder:text-dim"
                 />
                 <button
                   type="button"
                   onClick={() => removeInvestment(inv.key)}
                   className="p-1 text-dim hover:text-destructive transition-colors"
                 >
-                  <X className="w-3.5 h-3.5" />
+                  <X className="size-3.5" />
                 </button>
               </div>
               <div className="flex gap-2">
@@ -188,7 +185,7 @@ export function InvestmentsForm({ registerSave, onDirty }: InvestmentsFormProps)
                   onChange={(e) => updateInvestment(inv.key, { quantity: e.target.value })}
                   placeholder="Qty"
                   step="any"
-                  className="w-24 px-2 py-1.5 text-[12px] text-foreground bg-accent border border-border rounded-md focus:outline-none focus:border-brand/50 transition-colors placeholder:text-dim"
+                  className="w-24 px-2 py-1.5 text-xs text-foreground bg-accent border border-border rounded-md focus:outline-none focus:border-brand/50 transition-colors placeholder:text-dim"
                 />
                 <input
                   type="number"
@@ -196,7 +193,7 @@ export function InvestmentsForm({ registerSave, onDirty }: InvestmentsFormProps)
                   onChange={(e) => updateInvestment(inv.key, { costBasis: e.target.value })}
                   placeholder="Cost basis"
                   step="0.01"
-                  className="flex-1 px-2 py-1.5 text-[12px] text-foreground bg-accent border border-border rounded-md focus:outline-none focus:border-brand/50 transition-colors placeholder:text-dim"
+                  className="flex-1 px-2 py-1.5 text-xs text-foreground bg-accent border border-border rounded-md focus:outline-none focus:border-brand/50 transition-colors placeholder:text-dim"
                 />
               </div>
             </div>
@@ -206,9 +203,9 @@ export function InvestmentsForm({ registerSave, onDirty }: InvestmentsFormProps)
         <button
           type="button"
           onClick={addInvestment}
-          className="flex items-center gap-1.5 text-[12px] text-muted-foreground hover:text-foreground transition-colors"
+          className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
         >
-          <Plus className="w-3.5 h-3.5" />
+          <Plus className="size-3.5" />
           Add investment
         </button>
       </div>

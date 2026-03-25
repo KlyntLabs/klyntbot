@@ -3,11 +3,12 @@
 use chrono::Utc;
 use desktop_shared::commands::{FocusSessionResponse, IntelligenceSessionResponse};
 use desktop_shared::errors::ApiError;
+use desktop_shared::events::AutoFocusPayload;
 use feature_productivity::auto_focus::AutoFocusEvent;
 use feature_productivity::types::FocusSession;
 
 use super::converters::session_to_response;
-use crate::errors::{map_prod_err, parse_date_or_err, parse_local_day_range};
+use crate::errors::{map_prod_err, parse_date_or_err, parse_local_day_range, parse_rfc3339_or_err};
 use crate::state::AppCore;
 
 impl AppCore {
@@ -249,5 +250,44 @@ impl AppCore {
             .map_err(map_prod_err)?;
 
         Ok(session_to_response(updated))
+    }
+
+    /// Confirm and persist a completed auto-detected focus session.
+    /// Called from the UI toast after the FSM has already ended the session.
+    pub async fn productivity_auto_focus_confirm(
+        &self,
+        payload: AutoFocusPayload,
+    ) -> Result<FocusSessionResponse, ApiError> {
+        let repos = self.productivity_repos()?;
+
+        let started_at = parse_rfc3339_or_err("started_at", &payload.started_at)?;
+        let ended_at = parse_rfc3339_or_err("ended_at", &payload.ended_at)?;
+
+        let session = FocusSession {
+            id: uuid::Uuid::new_v4().to_string(),
+            action_id: None,
+            project_id: None,
+            session_type: feature_productivity::types::SessionType::Focus,
+            target_mins: None,
+            started_at,
+            ended_at: Some(ended_at),
+            actual_mins: Some(payload.duration_mins),
+            interruptions: 0,
+            distraction_events: vec![],
+            quality_score: Some(payload.productive_ratio),
+            completed: true,
+            notes: Some(format!(
+                "Auto-detected: {} ({}min)",
+                payload.dominant_app, payload.duration_mins
+            )),
+            source: feature_productivity::types::SessionSource::AutoDetected,
+        };
+
+        repos
+            .sessions
+            .create(&session)
+            .await
+            .map_err(map_prod_err)?;
+        Ok(session_to_response(session))
     }
 }

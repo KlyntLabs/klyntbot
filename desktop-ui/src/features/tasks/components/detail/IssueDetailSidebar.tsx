@@ -3,7 +3,6 @@ import type { useIssueDetail } from "../../hooks/useIssueDetail";
 import { SidebarAiInsights } from "./SidebarAiInsights";
 import { SidebarProperties } from "./SidebarProperties";
 import { SidebarTime } from "./SidebarTime";
-import { SidebarWorkState } from "./SidebarWorkState";
 
 interface IssueDetailSidebarProps {
   detail: ReturnType<typeof useIssueDetail>;
@@ -12,8 +11,6 @@ interface IssueDetailSidebarProps {
 
 export function IssueDetailSidebar({ detail, onClose }: IssueDetailSidebarProps) {
   const { taskState } = detail;
-  // State table: focused + completed show work state section
-  const showWorkState = taskState === "focused" || taskState === "completed";
   const showTime = taskState !== "new" || detail.task.estimatedMinutes != null;
 
   return (
@@ -32,19 +29,7 @@ export function IssueDetailSidebar({ detail, onClose }: IssueDetailSidebarProps)
         </button>
       </div>
       <div className="divide-y divide-border">
-        <SidebarProperties
-          task={detail.task}
-          compact={taskState === "focused"}
-          onUpdate={detail.updateTask}
-        />
-        {showWorkState && (
-          <SidebarWorkState
-            task={detail.task}
-            taskState={taskState}
-            focusSession={detail.focusSession}
-            onStopFocus={detail.stopFocus}
-          />
-        )}
+        <SidebarProperties task={detail.task} compact={false} onUpdate={detail.updateTask} />
         {showTime && (
           <SidebarTime
             task={detail.task}
@@ -58,7 +43,6 @@ export function IssueDetailSidebar({ detail, onClose }: IssueDetailSidebarProps)
           task={detail.task}
           taskState={taskState}
           suggestions={detail.suggestions}
-          taskMemory={detail.taskMemory}
           onApply={detail.applySuggestion}
           onDismiss={detail.dismissSuggestion}
           onFetchSuggestions={detail.fetchSuggestions}

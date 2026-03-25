@@ -32,12 +32,13 @@ pub struct SkillPackage {
     pub scope: SkillScope,
     pub location: PathBuf,
     pub body: String,
-    pub manifest: Option<SkillManifest>,
     pub metadata: SkillMetadata,
     /// Bundled resource file paths (scripts/, references/, assets/) — enumerated at discovery.
     pub resources: Vec<String>,
     pub loaded_at: SystemTime,
     pub trusted: bool,
+    /// One-line summary for progressive skill catalog. From frontmatter or first sentence of body.
+    pub summary: String,
 }
 
 impl SkillPackage {
@@ -89,6 +90,15 @@ impl SkillPackage {
             .map(|k| k.always_skills.as_slice())
             .unwrap_or(&[])
     }
+
+    /// Trigger phrases for routing boost.
+    pub fn triggers(&self) -> &[String] {
+        self.metadata
+            .klyntbot
+            .as_ref()
+            .map(|k| k.triggers.as_slice())
+            .unwrap_or(&[])
+    }
 }
 
 #[derive(Debug, Clone, Default)]
@@ -109,13 +119,10 @@ pub struct KlyntbotMeta {
     pub always_skills: Vec<String>,
     /// Skills this one may chain to (e.g., task-management → productivity).
     pub invokes: Vec<String>,
-}
-
-#[derive(Debug, Clone, Default)]
-pub struct SkillManifest {
-    pub schema_version: String,
-    pub entities: HashMap<String, serde_json::Value>,
-    pub permissions: Vec<String>,
+    /// Trigger phrases that boost this skill during routing.
+    pub triggers: Vec<String>,
+    /// Short summary for progressive skill loading (Tier 1 catalog).
+    pub summary: Option<String>,
 }
 
 #[derive(Debug, Clone)]
@@ -164,11 +171,11 @@ mod tests {
             scope: SkillScope::BuiltIn,
             location: PathBuf::new(),
             body: String::new(),
-            manifest: None,
             metadata: SkillMetadata::default(),
             resources: Vec::new(),
             loaded_at: SystemTime::now(),
             trusted: true,
+            summary: String::new(),
         };
         assert!(pkg.allowed_tool_names().is_none());
     }
@@ -189,10 +196,10 @@ mod tests {
             scope: SkillScope::BuiltIn,
             location: PathBuf::new(),
             body: String::new(),
-            manifest: None,
             resources: Vec::new(),
             loaded_at: SystemTime::now(),
             trusted: true,
+            summary: String::new(),
         };
         let allowed = pkg.allowed_tool_names().unwrap();
         assert!(allowed.contains("tasks"));
@@ -217,10 +224,10 @@ mod tests {
             scope: SkillScope::BuiltIn,
             location: PathBuf::new(),
             body: String::new(),
-            manifest: None,
             resources: Vec::new(),
             loaded_at: SystemTime::now(),
             trusted: true,
+            summary: String::new(),
         };
         assert!(pkg.allows_mcp_server("anything"));
     }
@@ -235,10 +242,10 @@ mod tests {
             scope: SkillScope::BuiltIn,
             location: PathBuf::new(),
             body: String::new(),
-            manifest: None,
             resources: Vec::new(),
             loaded_at: SystemTime::now(),
             trusted: true,
+            summary: String::new(),
         };
         assert!(!pkg.allows_mcp_server("linear"));
     }

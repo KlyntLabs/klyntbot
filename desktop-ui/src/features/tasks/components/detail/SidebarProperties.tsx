@@ -1,11 +1,11 @@
 import { formatDate, formatHumanDuration } from "@shared/lib/dates";
+import { cn } from "@shared/lib/utils";
 import { Check } from "lucide-react";
 import { useState } from "react";
 import { useStatusWorkflow } from "../../contexts/StatusWorkflowContext";
 import type { DetailTask } from "../../lib/mappers";
 import { priorities } from "../../lib/priority-icons";
 import { renderStatusIcon } from "../../lib/status-utils";
-import { cn } from "../../lib/utils";
 import {
   Command,
   CommandEmpty,

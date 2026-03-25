@@ -21,7 +21,7 @@ export function VoiceToggle({ mode, onChange }: VoiceToggleProps) {
           key={value}
           type="button"
           onClick={() => onChange(value)}
-          className={`flex items-center gap-1 text-[10px] px-2 py-1 rounded transition-colors ${
+          className={`flex items-center gap-1 text-2xs px-2 py-1 rounded transition-colors ${
             mode === value
               ? "bg-purple/20 text-purple-300"
               : "text-muted-foreground hover:text-foreground"

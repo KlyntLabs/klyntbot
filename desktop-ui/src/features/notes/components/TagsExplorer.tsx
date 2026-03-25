@@ -42,12 +42,12 @@ export function TagsExplorer({
   return (
     <div className="flex flex-col gap-1">
       <div className="flex items-center justify-between px-2 py-1">
-        <span className="text-[10px] uppercase tracking-wider text-dim">Tags</span>
+        <span className="text-2xs uppercase tracking-wider text-dim">Tags</span>
         {activeTags.length > 0 && (
           <button
             type="button"
             onClick={onClearTags}
-            className="text-[10px] text-muted-foreground hover:text-foreground"
+            className="text-2xs text-muted-foreground hover:text-foreground"
           >
             Clear
           </button>

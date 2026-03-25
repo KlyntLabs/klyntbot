@@ -46,13 +46,14 @@ export function FireForm({ registerSave, onDirty }: FireFormProps) {
         });
       } catch (e) {
         console.error("Failed to save FIRE config:", e);
+        throw e;
       }
     });
-  }, [enabled, currentAge, retirementAge, expenses, rate, fireType, registerSave]);
+  }, [enabled, currentAge, retirementAge, expenses, rate, fireType, registerSave, fireNumber]);
 
   return (
     <div>
-      <h3 className="text-[14px] font-medium text-muted-foreground mb-1">FIRE Planning</h3>
+      <h3 className="text-sm font-medium text-muted-foreground mb-1">FIRE Planning</h3>
       <p className="text-[11px] text-dim mb-4">
         Financial Independence, Retire Early. Track your path to freedom.
       </p>
@@ -73,7 +74,7 @@ export function FireForm({ registerSave, onDirty }: FireFormProps) {
           <>
             <div className="flex gap-3">
               <label className="flex-1">
-                <span className="block text-[12px] font-medium text-muted-foreground mb-1.5">
+                <span className="block text-xs font-medium text-muted-foreground mb-1.5">
                   Current age
                 </span>
                 <input
@@ -88,7 +89,7 @@ export function FireForm({ registerSave, onDirty }: FireFormProps) {
                 />
               </label>
               <label className="flex-1">
-                <span className="block text-[12px] font-medium text-muted-foreground mb-1.5">
+                <span className="block text-xs font-medium text-muted-foreground mb-1.5">
                   Target retirement age
                 </span>
                 <input
@@ -106,7 +107,7 @@ export function FireForm({ registerSave, onDirty }: FireFormProps) {
 
             <div className="flex gap-3">
               <label className="flex-1">
-                <span className="block text-[12px] font-medium text-muted-foreground mb-1.5">
+                <span className="block text-xs font-medium text-muted-foreground mb-1.5">
                   Annual expenses
                 </span>
                 <input
@@ -122,7 +123,7 @@ export function FireForm({ registerSave, onDirty }: FireFormProps) {
                 />
               </label>
               <label className="flex-1">
-                <span className="block text-[12px] font-medium text-muted-foreground mb-1.5">
+                <span className="block text-xs font-medium text-muted-foreground mb-1.5">
                   Safe withdrawal rate (%)
                 </span>
                 <input
@@ -139,7 +140,7 @@ export function FireForm({ registerSave, onDirty }: FireFormProps) {
             </div>
 
             <div>
-              <span className="block text-[12px] font-medium text-muted-foreground mb-2">
+              <span className="block text-xs font-medium text-muted-foreground mb-2">
                 FIRE type
               </span>
               <div className="grid grid-cols-2 gap-2">
@@ -163,8 +164,8 @@ export function FireForm({ registerSave, onDirty }: FireFormProps) {
                       }}
                       className="sr-only"
                     />
-                    <span className="text-[12px] font-medium text-foreground">{ft.label}</span>
-                    <p className="text-[10px] text-dim mt-0.5">{ft.desc}</p>
+                    <span className="text-xs font-medium text-foreground">{ft.label}</span>
+                    <p className="text-2xs text-dim mt-0.5">{ft.desc}</p>
                   </label>
                 ))}
               </div>

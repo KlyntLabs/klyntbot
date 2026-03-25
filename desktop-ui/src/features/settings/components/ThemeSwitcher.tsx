@@ -38,13 +38,14 @@ export function ThemeSwitcher() {
               <p className="text-xs text-muted-foreground mt-0.5">{t.description}</p>
             </div>
             {theme === t.id && (
-              <div className="absolute top-2 right-2 w-5 h-5 rounded-full bg-brand flex items-center justify-center">
+              <div className="absolute top-2 right-2 size-5 rounded-full bg-brand flex items-center justify-center">
                 <svg
-                  className="w-3 h-3 text-white"
+                  className="size-3 text-white"
                   fill="none"
                   viewBox="0 0 24 24"
                   stroke="currentColor"
                   strokeWidth={3}
+                  aria-hidden="true"
                 >
                   <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
                 </svg>

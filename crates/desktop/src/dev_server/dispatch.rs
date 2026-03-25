@@ -61,6 +61,24 @@ pub(super) async fn dispatch(
     if let Some(r) = commands::annotations::dispatch_dev(cmd, core, &body).await {
         return into_api_result(r);
     }
+    if let Some(r) = commands::language::dispatch_dev(cmd, core, &body).await {
+        return into_api_result(r);
+    }
+    if let Some(r) = commands::practice::dispatch_dev(cmd, core, &body).await {
+        return into_api_result(r);
+    }
+    if let Some(r) = commands::atoms::dispatch_dev(cmd, core, &body).await {
+        return into_api_result(r);
+    }
+    if let Some(r) = commands::knowledge_health::dispatch_dev(cmd, core, &body).await {
+        return into_api_result(r);
+    }
+    if let Some(r) = commands::morning_briefing::dispatch_dev(cmd, core, &body).await {
+        return into_api_result(r);
+    }
+    if let Some(r) = commands::retention_history::dispatch_dev(cmd, core, &body).await {
+        return into_api_result(r);
+    }
     if let Some(r) = commands::project_sources::dispatch_dev(cmd, core, &body).await {
         return into_api_result(r);
     }
@@ -130,6 +148,9 @@ pub(super) async fn dispatch(
     if let Some(r) = commands::agents::dispatch_dev(cmd, core, &body).await {
         return into_api_result(r);
     }
+    if let Some(r) = commands::autotuner::dispatch_dev(cmd, core, &body).await {
+        return into_api_result(r);
+    }
     if let Some(r) = commands::integrations::dispatch_dev(cmd, core, &body).await {
         return into_api_result(r);
     }
@@ -140,6 +161,12 @@ pub(super) async fn dispatch(
         return into_api_result(r);
     }
     if let Some(r) = commands::squads::dispatch_dev(cmd, core, &body).await {
+        return into_api_result(r);
+    }
+    if let Some(r) = commands::mirror::dispatch_dev(cmd, core, &body).await {
+        return into_api_result(r);
+    }
+    if let Some(r) = commands::view::dispatch_dev(cmd, core, &body).await {
         return into_api_result(r);
     }
 

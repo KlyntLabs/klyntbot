@@ -8,7 +8,7 @@ use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
-use storage::{ActionAttachmentRow, ActionRow, ActionTimeEntryRow};
+use storage::TaskRow;
 
 // ── Type aliases for backward compatibility ──────────────────────────────────
 pub type Todo = Action;
@@ -234,8 +234,8 @@ pub enum TimeEntrySource {
 
 // ── Row <-> Domain Conversions ──────────────────────────────────────────────
 
-impl From<ActionRow> for Action {
-    fn from(row: ActionRow) -> Self {
+impl From<TaskRow> for Action {
+    fn from(row: TaskRow) -> Self {
         Self {
             id: row.id,
             title: row.title,
@@ -273,7 +273,7 @@ impl From<ActionRow> for Action {
     }
 }
 
-impl From<&Action> for ActionRow {
+impl From<&Action> for TaskRow {
     fn from(action: &Action) -> Self {
         Self {
             id: action.id.clone(),
@@ -304,39 +304,20 @@ impl From<&Action> for ActionRow {
             status_label_id: action.status_label_id.clone(),
             position: action.position,
             group_id: action.group_id.clone(),
-        }
-    }
-}
-
-impl From<ActionAttachmentRow> for Attachment {
-    fn from(row: ActionAttachmentRow) -> Self {
-        Self {
-            id: row.id.to_string(),
-            attachment_type: match row.attachment_type.as_str() {
-                "file" => AttachmentType::File,
-                "url" => AttachmentType::Url,
-                _ => AttachmentType::Note,
-            },
-            title: row.title,
-            value: row.value,
-            tags: row.tags,
-            created_at: row.created_at,
-        }
-    }
-}
-
-impl From<ActionTimeEntryRow> for TimeEntry {
-    fn from(row: ActionTimeEntryRow) -> Self {
-        Self {
-            id: row.id.to_string(),
-            started_at: row.started_at,
-            ended_at: row.ended_at,
-            duration_secs: row.duration_secs.map(|s| s as u64),
-            note: row.note,
-            source: match row.source.as_str() {
-                "manual" => TimeEntrySource::Manual,
-                _ => TimeEntrySource::Focus,
-            },
+            task_type: "standard".to_string(),
+            acceptance_criteria: None,
+            agent_config: None,
+            execution_state: "idle".to_string(),
+            spawned_execution_id: None,
+            context_snapshot: None,
+            energy_level: None,
+            estimated_focus_blocks: None,
+            actual_minutes: None,
+            complexity_score: None,
+            completed: action.status == ActionStatus::Done,
+            objective_id: None,
+            scheduled_start: None,
+            scheduled_end: None,
         }
     }
 }
@@ -393,10 +374,10 @@ pub struct TodoSummary {
     pub upcoming_week: Vec<String>,
 }
 
-/// Convert a domain `TodoPatch` into a storage `ActionPatch`.
+/// Convert a domain `TodoPatch` into a storage `TaskPatch`.
 impl TodoPatch {
-    pub fn to_storage_patch(&self, id: &str) -> storage::ActionPatch {
-        storage::ActionPatch {
+    pub fn to_storage_patch(&self, id: &str) -> storage::TaskPatch {
+        storage::TaskPatch {
             id: id.to_string(),
             title: self.title.clone(),
             description: self.description.clone(),
@@ -415,14 +396,15 @@ impl TodoPatch {
             status_label_id: None,
             position: None,
             group_id: None,
+            ..Default::default()
         }
     }
 }
 
-/// Convert a domain `TodoFilter` into a storage `ActionFilter`.
+/// Convert a domain `TodoFilter` into a storage `TaskFilter`.
 impl TodoFilter {
-    pub fn to_storage_filter(&self) -> storage::ActionFilter {
-        storage::ActionFilter {
+    pub fn to_storage_filter(&self) -> storage::TaskFilter {
+        storage::TaskFilter {
             status: self.status.map(|s| s.as_str().to_string()),
             tags: self.tag.as_ref().map(|t| vec![t.clone()]),
             area_id: self.area_id.clone(),
@@ -437,6 +419,7 @@ impl TodoFilter {
             root_only: false,
             status_group: None,
             group_id: None,
+            ..Default::default()
         }
     }
 }

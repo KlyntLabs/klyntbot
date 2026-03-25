@@ -17,13 +17,14 @@ fn test_full_pipeline_builtin_skills() {
 
     // Router can select orchestrators
     let router = SkillRouter::new(&catalog);
-    let selected = router.select_orchestrator("create a task for my project planning", &catalog);
+    let selected =
+        router.select_orchestrator("create a task for my project planning", &catalog, None);
     assert_eq!(selected.name, "task-management");
 
-    let selected = router.select_orchestrator("check my budget spending", &catalog);
+    let selected = router.select_orchestrator("check my budget spending", &catalog, None);
     assert_eq!(selected.name, "finance-management");
 
-    let selected = router.select_orchestrator("hello there!", &catalog);
+    let selected = router.select_orchestrator("hello there!", &catalog, None);
     assert_eq!(selected.name, "general");
 
     // Catalog prompt is valid XML-ish

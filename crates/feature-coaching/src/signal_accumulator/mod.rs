@@ -90,18 +90,6 @@ impl SignalAccumulator {
         _now: DateTime<Utc>,
     ) -> Option<TriggerFired> {
         match condition.name.as_str() {
-            "distraction_streak" => {
-                let distraction_count = self.count_events("DistractionDetected");
-                if distraction_count >= 3 {
-                    Some(TriggerFired {
-                        condition_name: "distraction_streak".into(),
-                        confidence: 0.8,
-                        context: format!("{distraction_count} distractions in last 30min"),
-                    })
-                } else {
-                    None
-                }
-            }
             "low_productivity" => {
                 // productive_ratio is not directly in UserSituation, use energy + distraction_risk
                 if situation.distraction_risk > 0.7 && situation.energy_level < 0.4 {
@@ -144,20 +132,6 @@ impl SignalAccumulator {
                     None
                 }
             }
-            "context_switch_overload" => {
-                if situation.recent_context_switches > 10 {
-                    Some(TriggerFired {
-                        condition_name: "context_switch_overload".into(),
-                        confidence: 0.75,
-                        context: format!(
-                            "{} context switches in last 30min",
-                            situation.recent_context_switches
-                        ),
-                    })
-                } else {
-                    None
-                }
-            }
             "budget_warning" => {
                 let budget_alerts = self.count_events("BudgetAlert");
                 if budget_alerts >= 1 {
@@ -176,6 +150,120 @@ impl SignalAccumulator {
                         condition_name: "task_avoidance".into(),
                         confidence: 0.6,
                         context: "Task avoidance behavior detected".into(),
+                    })
+                } else {
+                    None
+                }
+            }
+            "flashcard_reviewed" => {
+                let count = self.count_events("AtomFlashcardReviewed");
+                if count >= 1 {
+                    Some(TriggerFired {
+                        condition_name: "flashcard_reviewed".into(),
+                        confidence: 0.9,
+                        context: format!("{count} flashcard review(s) in window"),
+                    })
+                } else {
+                    None
+                }
+            }
+            "atom_created" => {
+                let count = self.count_events("KnowledgeAtomCreated");
+                if count >= 1 {
+                    Some(TriggerFired {
+                        condition_name: "atom_created".into(),
+                        confidence: 0.9,
+                        context: format!("{count} atom(s) created in window"),
+                    })
+                } else {
+                    None
+                }
+            }
+            "coaching_learning_digest" => {
+                let count = self.count_events("CoachingLearningDigest");
+                if count >= 1 {
+                    Some(TriggerFired {
+                        condition_name: "coaching_learning_digest".into(),
+                        confidence: 0.9,
+                        context: format!("{count} learning digest(s) in window"),
+                    })
+                } else {
+                    None
+                }
+            }
+            "knowledge_transfer" => {
+                let count = self.count_events("KnowledgeTransferDetected");
+                if count >= 1 {
+                    Some(TriggerFired {
+                        condition_name: "knowledge_transfer".into(),
+                        confidence: 0.8,
+                        context: format!("{count} knowledge transfer(s) detected"),
+                    })
+                } else {
+                    None
+                }
+            }
+            "learning_streak_milestone" => {
+                let count = self.count_events("RetentionMilestoneReached");
+                if count >= 1 {
+                    Some(TriggerFired {
+                        condition_name: "learning_streak_milestone".into(),
+                        confidence: 0.9,
+                        context: format!("{count} retention milestone(s) reached"),
+                    })
+                } else {
+                    None
+                }
+            }
+            "retention_drop_important" => {
+                // Fires when digest signals indicate fading important atoms
+                let fading_signals: Vec<_> = self
+                    .window
+                    .iter()
+                    .filter(|s| {
+                        s.event_type == "CoachingLearningDigest"
+                            && s.metadata.amount.is_some_and(|a| a > 0.0)
+                    })
+                    .collect();
+                if !fading_signals.is_empty() {
+                    Some(TriggerFired {
+                        condition_name: "retention_drop_important".into(),
+                        confidence: 0.85,
+                        context: format!(
+                            "{} digest signal(s) with fading atoms in window",
+                            fading_signals.len()
+                        ),
+                    })
+                } else {
+                    None
+                }
+            }
+            "learning_momentum_shift" => {
+                // Fires when there is any learning activity (both creation and review)
+                let created = self.count_events("KnowledgeAtomCreated");
+                let reviewed = self.count_events("AtomFlashcardReviewed");
+                if created >= 1 && reviewed >= 1 {
+                    Some(TriggerFired {
+                        condition_name: "learning_momentum_shift".into(),
+                        confidence: 0.7,
+                        context: format!(
+                            "{created} atom(s) created + {reviewed} review(s) in window"
+                        ),
+                    })
+                } else {
+                    None
+                }
+            }
+            "domain_retention_decline" => {
+                // Fires when digest signals indicate domain-level weakness
+                let digest_count = self.count_events("CoachingLearningDigest");
+                if digest_count >= 2 {
+                    Some(TriggerFired {
+                        condition_name: "domain_retention_decline".into(),
+                        confidence: 0.8,
+                        context: format!(
+                            "{digest_count} learning digest(s) suggest domain retention decline"
+                        ),
                     })
                 } else {
                     None
@@ -240,10 +328,10 @@ mod tests {
     }
 
     #[test]
-    fn test_distraction_streak_fires() {
+    fn test_distraction_events_no_longer_trigger() {
         let mut acc = SignalAccumulator::new();
 
-        for _ in 0..3 {
+        for _ in 0..5 {
             acc.push_event(&DomainEvent::DistractionDetected {
                 app: "reddit".into(),
                 duration_secs: None,
@@ -253,7 +341,9 @@ mod tests {
 
         let sit = situation_with(0.5, 0.5, 0.2);
         let fired = acc.evaluate(&sit);
-        assert!(fired
+        // distraction_streak condition removed — events are tracked for
+        // pattern detection but no longer trigger coaching popups
+        assert!(!fired
             .iter()
             .any(|t| t.condition_name == "distraction_streak"));
     }
@@ -293,26 +383,28 @@ mod tests {
     fn test_cooldown_prevents_re_fire() {
         let mut acc = SignalAccumulator::new();
 
-        for _ in 0..5 {
-            acc.push_event(&DomainEvent::DistractionDetected {
-                app: "reddit".into(),
-                duration_secs: None,
-                context: "test".into(),
-            });
-        }
+        acc.push_event(&DomainEvent::BudgetAlert {
+            category: "food".into(),
+            spent: 450.0,
+            limit: 500.0,
+        });
 
-        let sit = situation_with(0.5, 0.5, 0.2);
+        let sit = situation_with(0.0, 1.0, 0.0);
 
         // First evaluation fires
         let fired1 = acc.evaluate(&sit);
-        assert!(!fired1.is_empty());
+        assert!(fired1.iter().any(|t| t.condition_name == "budget_warning"));
+
+        // Push another budget alert
+        acc.push_event(&DomainEvent::BudgetAlert {
+            category: "food".into(),
+            spent: 480.0,
+            limit: 500.0,
+        });
 
         // Second evaluation — cooldown blocks
         let fired2 = acc.evaluate(&sit);
-        let distraction_fired = fired2
-            .iter()
-            .any(|t| t.condition_name == "distraction_streak");
-        assert!(!distraction_fired);
+        assert!(!fired2.iter().any(|t| t.condition_name == "budget_warning"));
     }
 
     #[test]
@@ -393,14 +485,16 @@ mod tests {
     }
 
     #[test]
-    fn test_context_switch_overload() {
+    fn test_context_switch_overload_disabled() {
+        // context_switch_overload is disabled — data used for analytics only,
+        // distraction overlay handles real-time intervention.
         let mut acc = SignalAccumulator::new();
         let sit = UserSituation {
             recent_context_switches: 15,
             ..situation_with(0.0, 1.0, 0.0)
         };
         let fired = acc.evaluate(&sit);
-        assert!(fired
+        assert!(!fired
             .iter()
             .any(|t| t.condition_name == "context_switch_overload"));
     }

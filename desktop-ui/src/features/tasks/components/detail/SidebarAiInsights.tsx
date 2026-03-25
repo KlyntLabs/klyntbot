@@ -1,13 +1,12 @@
 import { Bot, ChevronDown, Sparkles, Zap } from "lucide-react";
 import { useState } from "react";
-import type { DetailTask, Suggestion, TaskMemory, TaskState } from "../../lib/mappers";
+import type { DetailTask, Suggestion, TaskState } from "../../lib/mappers";
 import { SectionLabel } from "./SectionLabel";
 
 interface SidebarAiInsightsProps {
   task: DetailTask;
   taskState: TaskState;
   suggestions: Suggestion[];
-  taskMemory: TaskMemory | null;
   onApply: (id: string) => void;
   onDismiss: (id: string) => void;
   onFetchSuggestions: () => void;
@@ -19,13 +18,14 @@ export function SidebarAiInsights({
   task,
   taskState,
   suggestions,
-  taskMemory,
   onApply,
   onDismiss,
   onFetchSuggestions,
   suggestionsLoading,
   aiError,
 }: SidebarAiInsightsProps) {
+  const pendingSuggestions = suggestions.filter((s) => s.status === "pending");
+
   return (
     <div className="px-4 py-3 space-y-4">
       <SectionLabel>AI Insights</SectionLabel>
@@ -36,33 +36,22 @@ export function SidebarAiInsights({
         </div>
       )}
 
-      {taskState === "completed" && taskMemory ? (
-        <WhatAiLearned memory={taskMemory} />
+      {pendingSuggestions.length > 0 ? (
+        <SuggestionsList suggestions={pendingSuggestions} onApply={onApply} onDismiss={onDismiss} />
       ) : (
-        <>
-          {suggestions.filter((s) => s.status === "pending").length > 0 ? (
-            <SuggestionsList suggestions={suggestions} onApply={onApply} onDismiss={onDismiss} />
-          ) : (
-            <WhyThisTaskNow task={task} />
-          )}
-        </>
+        <WhyThisTaskNow task={task} />
       )}
 
-      {taskState !== "completed" &&
-        suggestions.filter((s) => s.status === "pending").length === 0 && (
-          <button
-            type="button"
-            onClick={onFetchSuggestions}
-            disabled={suggestionsLoading}
-            className="w-full flex items-center justify-center gap-1.5 text-xs px-3 py-1.5 rounded-md border border-purple-500/30 text-purple-300 hover:bg-purple-500/10 transition-colors disabled:opacity-50"
-          >
-            <Sparkles className="size-3" />
-            {suggestionsLoading ? "Analyzing..." : "Get Suggestions"}
-          </button>
-        )}
-
-      {taskState !== "completed" && taskState !== "new" && taskMemory && (
-        <TaskMemorySection memory={taskMemory} />
+      {taskState !== "completed" && pendingSuggestions.length === 0 && (
+        <button
+          type="button"
+          onClick={onFetchSuggestions}
+          disabled={suggestionsLoading}
+          className="w-full flex items-center justify-center gap-1.5 text-xs px-3 py-1.5 rounded-md border border-purple-500/30 text-purple-300 hover:bg-purple-500/10 transition-colors disabled:opacity-50"
+        >
+          <Sparkles className="size-3" />
+          {suggestionsLoading ? "Analyzing..." : "Get Suggestions"}
+        </button>
       )}
     </div>
   );
@@ -78,9 +67,8 @@ function SuggestionsList({
   onDismiss: (id: string) => void;
 }) {
   const [expanded, setExpanded] = useState(false);
-  const pending = suggestions.filter((s) => s.status === "pending");
-  const top = pending[0];
-  const rest = pending.slice(1);
+  const top = suggestions[0];
+  const rest = suggestions.slice(1);
 
   if (!top) return null;
 
@@ -123,7 +111,7 @@ function SuggestionCard({
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2">
             <span className="text-sm font-medium text-foreground">{suggestion.title}</span>
-            <span className="text-[10px] px-1 py-0.5 rounded bg-purple/20 text-purple shrink-0">
+            <span className="text-2xs px-1 py-0.5 rounded bg-purple/20 text-purple shrink-0">
               {Math.round(suggestion.confidence * 100)}%
             </span>
           </div>
@@ -191,11 +179,6 @@ function computeReasons(task: DetailTask): TaskReason[] {
     }
   }
 
-  // Focus momentum
-  if (task.focusedAt) {
-    reasons.push({ icon: Zap, text: "You're already in flow", weight: 85 });
-  }
-
   // Energy match
   if (task.energyLevel) {
     const hour = now.getHours();
@@ -236,48 +219,6 @@ function WhyThisTaskNow({ task }: { task: DetailTask }) {
           </div>
         ))}
       </div>
-    </div>
-  );
-}
-
-function WhatAiLearned({ memory }: { memory: TaskMemory }) {
-  return (
-    <div className="space-y-2">
-      <div className="flex items-center gap-1.5 text-sm font-medium text-foreground">
-        <Bot className="size-3.5 text-purple" />
-        What AI Learned
-      </div>
-      <p className="text-xs text-muted-foreground">{memory.lastSessionSummary}</p>
-      {memory.relatedFacts.map((fact) => (
-        <div key={fact} className="flex items-start gap-1.5 text-xs text-muted-foreground">
-          <span className="text-purple/60 shrink-0">•</span>
-          {fact}
-        </div>
-      ))}
-    </div>
-  );
-}
-
-function TaskMemorySection({ memory }: { memory: TaskMemory }) {
-  return (
-    <div className="space-y-2 pt-2 border-t border-border/50">
-      <span className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">
-        Task Memory
-      </span>
-      <p className="text-xs text-muted-foreground">{memory.lastSessionSummary}</p>
-      {memory.continuityNote && (
-        <p className="text-xs text-muted-foreground italic">{memory.continuityNote}</p>
-      )}
-      {memory.relatedFacts.length > 0 && (
-        <div className="space-y-0.5">
-          {memory.relatedFacts.map((fact) => (
-            <div key={fact} className="flex items-start gap-1.5 text-xs text-muted-foreground">
-              <span className="text-purple/60 shrink-0">•</span>
-              {fact}
-            </div>
-          ))}
-        </div>
-      )}
     </div>
   );
 }

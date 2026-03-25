@@ -130,7 +130,8 @@ fn withdrawal_sim_high_success_with_low_rate() {
         inflation: InflationModel::Fixed(dec!(0.03)),
         monte_carlo_runs: 1000,
         seed: Some(42),
-    });
+    })
+    .unwrap();
     // Log-normal with 15% std dev produces a wide return distribution;
     // 3% withdrawal over 30yr yields ~80-85% success in this model.
     assert!(result.success_rate > dec!(0.75));
@@ -150,7 +151,8 @@ fn withdrawal_sim_immediate_ruin() {
         inflation: InflationModel::Fixed(dec!(0.03)),
         monte_carlo_runs: 100,
         seed: Some(42),
-    });
+    })
+    .unwrap();
     assert_eq!(result.success_rate, dec!(0));
 }
 

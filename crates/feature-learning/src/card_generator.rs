@@ -22,6 +22,10 @@ Rules:
 7. For cloze cards: front contains the text with {{c1::hidden}} markers, back is the full revealed text
 8. For vocabulary cards: front is the word (with reading if applicable), back is the meaning + example
 
+For each card, also include:
+- "difficulty_estimate": integer 1-5 (1=recall a single fact, 2=understand a concept, 3=apply knowledge, 4=analyze relationships, 5=synthesize multiple concepts)
+- "prerequisite_concepts": array of 0-3 strings naming concepts the learner should already know to answer this card
+
 Respond ONLY with a JSON array. No markdown fences, no explanation, no preamble."#.to_string();
 
     let mut user = String::new();

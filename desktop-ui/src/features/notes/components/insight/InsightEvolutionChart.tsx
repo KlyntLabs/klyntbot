@@ -100,7 +100,7 @@ export function InsightEvolutionChart({ versions }: Props) {
         </AreaChart>
       </ResponsiveContainer>
       {versions.length > 0 && (
-        <p className="text-[10px] text-dim italic px-1">
+        <p className="text-2xs text-dim italic px-1">
           Latest: {versions[versions.length - 1]?.changeNote}
         </p>
       )}

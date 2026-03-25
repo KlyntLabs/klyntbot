@@ -49,7 +49,7 @@ export function StudyModeView({ noteId, sectionId: _ }: StudyModeViewProps) {
           {cards.length} card{cards.length !== 1 ? "s" : ""}
         </h3>
         {dueCards.length > 0 && (
-          <span className="rounded-full bg-amber-500/15 px-2 py-0.5 text-[10px] text-amber-400">
+          <span className="rounded-full bg-amber-500/15 px-2 py-0.5 text-2xs text-amber-400">
             {dueCards.length} due
           </span>
         )}
@@ -74,7 +74,7 @@ export function StudyModeView({ noteId, sectionId: _ }: StudyModeViewProps) {
                 <p className="text-xs text-muted">{card.back}</p>
               </div>
             )}
-            {!revealed && <p className="mt-1 text-[10px] text-muted">Click to reveal</p>}
+            {!revealed && <p className="mt-1 text-2xs text-muted">Click to reveal</p>}
           </button>
         );
       })}

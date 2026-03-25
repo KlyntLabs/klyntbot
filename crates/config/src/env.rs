@@ -10,7 +10,7 @@ use super::schema::{Config, Secret};
 
 /// Apply a string env var override to a config field.
 macro_rules! env_string {
-    ($config:expr, $var:literal, $field:expr) => {
+    ($var:literal, $field:expr) => {
         if let Ok(val) = std::env::var($var) {
             $field = val;
         }
@@ -30,7 +30,7 @@ macro_rules! env_parse {
 
 /// Apply a Secret<String> env var override.
 macro_rules! env_secret {
-    ($config:expr, $var:literal, $field:expr) => {
+    ($var:literal, $field:expr) => {
         if let Ok(val) = std::env::var($var) {
             $field = Secret::new(val);
         }
@@ -50,12 +50,10 @@ pub async fn load_with_env_overrides() -> Result<Config> {
 
     // Agent defaults
     env_string!(
-        config,
         "KLYNTBOT_AGENTS__DEFAULTS__MODEL",
         config.agents.defaults.model
     );
     env_string!(
-        config,
         "KLYNTBOT_AGENTS__DEFAULTS__WORKSPACE",
         config.agents.defaults.workspace
     );
@@ -72,62 +70,50 @@ pub async fn load_with_env_overrides() -> Result<Config> {
 
     // Provider API keys
     env_secret!(
-        config,
         "KLYNTBOT_PROVIDERS__ANTHROPIC__API_KEY",
         config.providers.anthropic.api_key
     );
     env_secret!(
-        config,
         "KLYNTBOT_PROVIDERS__OPENAI__API_KEY",
         config.providers.openai.api_key
     );
     env_secret!(
-        config,
         "KLYNTBOT_PROVIDERS__OPENROUTER__API_KEY",
         config.providers.openrouter.api_key
     );
     env_secret!(
-        config,
         "KLYNTBOT_PROVIDERS__DEEPSEEK__API_KEY",
         config.providers.deepseek.api_key
     );
     env_secret!(
-        config,
         "KLYNTBOT_PROVIDERS__GEMINI__API_KEY",
         config.providers.gemini.api_key
     );
     env_secret!(
-        config,
         "KLYNTBOT_PROVIDERS__GROQ__API_KEY",
         config.providers.groq.api_key
     );
     env_secret!(
-        config,
         "KLYNTBOT_PROVIDERS__VLLM__API_KEY",
         config.providers.vllm.api_key
     );
     env_secret!(
-        config,
         "KLYNTBOT_PROVIDERS__ZHIPU__API_KEY",
         config.providers.zhipu.api_key
     );
     env_secret!(
-        config,
         "KLYNTBOT_PROVIDERS__DASHSCOPE__API_KEY",
         config.providers.dashscope.api_key
     );
     env_secret!(
-        config,
         "KLYNTBOT_PROVIDERS__MOONSHOT__API_KEY",
         config.providers.moonshot.api_key
     );
     env_secret!(
-        config,
         "KLYNTBOT_PROVIDERS__MINIMAX__API_KEY",
         config.providers.minimax.api_key
     );
     env_secret!(
-        config,
         "KLYNTBOT_PROVIDERS__AIHUBMIX__API_KEY",
         config.providers.aihubmix.api_key
     );
@@ -141,29 +127,24 @@ pub async fn load_with_env_overrides() -> Result<Config> {
 
     // Channel tokens
     env_secret!(
-        config,
         "KLYNTBOT_CHANNELS__TELEGRAM__TOKEN",
         config.channels.telegram.token
     );
     env_secret!(
-        config,
         "KLYNTBOT_CHANNELS__DISCORD__TOKEN",
         config.channels.discord.token
     );
     env_secret!(
-        config,
         "KLYNTBOT_CHANNELS__SLACK__BOT_TOKEN",
         config.channels.slack.bot_token
     );
     env_secret!(
-        config,
         "KLYNTBOT_CHANNELS__SLACK__APP_TOKEN",
         config.channels.slack.app_token
     );
 
     // Tools
     env_secret!(
-        config,
         "KLYNTBOT_TOOLS__WEB__BRAVE_API_KEY",
         config.tools.web.brave_api_key
     );

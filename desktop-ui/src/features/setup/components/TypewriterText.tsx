@@ -32,15 +32,9 @@ export function TypewriterText({
   // During animation: typewriter the text before the blank
   if (isAnimating) {
     return (
-      <span
-        onClick={handleClick}
-        onKeyDown={(e) => e.key === "Enter" && handleClick()}
-        role="button"
-        tabIndex={0}
-        className="cursor-pointer"
-      >
+      <button type="button" onClick={handleClick} className="cursor-pointer text-left">
         {displayed}
-      </span>
+      </button>
     );
   }
 
@@ -48,17 +42,11 @@ export function TypewriterText({
   if (!showInput && hasInput) {
     // Show a visual blank placeholder (underlined space)
     return (
-      <span
-        onClick={handleClick}
-        onKeyDown={(e) => e.key === "Enter" && handleClick()}
-        role="button"
-        tabIndex={0}
-        className="cursor-pointer"
-      >
+      <button type="button" onClick={handleClick} className="cursor-pointer text-left">
         {before}
         <span className="inline-block border-b-2 border-accent/40 min-w-[80px]">&nbsp;</span>
         {after}
-      </span>
+      </button>
     );
   }
 

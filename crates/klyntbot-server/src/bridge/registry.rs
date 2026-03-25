@@ -17,27 +17,48 @@ use super::schema;
 /// Bridges klyntbot's ToolRegistry to MCP protocol.
 pub struct ToolRegistryBridge {
     registry: Arc<RwLock<ToolRegistry>>,
-    whitelist: HashSet<String>,
+    whitelist: Arc<std::sync::RwLock<HashSet<String>>>,
 }
 
 impl ToolRegistryBridge {
     pub fn new(registry: Arc<RwLock<ToolRegistry>>, whitelist: Vec<String>) -> Self {
         Self {
             registry,
-            whitelist: whitelist.into_iter().collect(),
+            whitelist: Arc::new(std::sync::RwLock::new(whitelist.into_iter().collect())),
         }
     }
 
+    /// Update the whitelist at runtime.
+    pub fn update_whitelist(&self, tools: Vec<String>) {
+        let mut wl = self.whitelist.write().expect("whitelist lock");
+        *wl = tools.into_iter().collect();
+    }
+
     /// Check whether a tool name is in the whitelist.
+    pub fn is_whitelisted(&self, name: &str) -> bool {
+        self.whitelist
+            .read()
+            .expect("whitelist lock")
+            .contains(name)
+    }
+
+    /// Alias for [`is_whitelisted`] — backwards compatibility.
     pub fn is_exposed(&self, name: &str) -> bool {
-        self.whitelist.contains(name)
+        self.is_whitelisted(name)
     }
 
     /// List all whitelisted tools as MCP Tool definitions.
     pub async fn list_tools(&self) -> Vec<McpTool> {
+        let names: Vec<String> = self
+            .whitelist
+            .read()
+            .expect("whitelist lock")
+            .iter()
+            .cloned()
+            .collect();
         let reg = self.registry.read().await;
         let mut tools = Vec::new();
-        for name in &self.whitelist {
+        for name in &names {
             if let Some(tool) = reg.get(name) {
                 let params = tool.parameters();
                 tools.push(schema::internal_to_mcp_tool(
@@ -55,19 +76,20 @@ impl ToolRegistryBridge {
         &self,
         tool_name: &str,
         arguments: serde_json::Value,
+        session_id: &str,
     ) -> Result<CallToolResult, McpError> {
         // Whitelist check
-        if !self.whitelist.contains(tool_name) {
+        if !self.is_whitelisted(tool_name) {
             return Err(McpError::invalid_request(
                 format!("Tool '{tool_name}' is not exposed via MCP"),
                 None,
             ));
         }
 
-        // Build MCP routing context
+        // Build MCP routing context with per-connection session isolation
         let ctx = RoutingContext {
             channel: ChannelName::new(MCP_CHANNEL),
-            chat_id: ChatId::new("mcp-session"),
+            chat_id: ChatId::new(format!("mcp:{}", session_id)),
             interaction_tx: None,
             is_direct_mode: true,
             delegation_depth: 0,
@@ -75,6 +97,7 @@ impl ToolRegistryBridge {
             interaction_channel: None,
             squad_id: None,
             squad_mode: None,
+            champion_params: None,
         };
 
         // Acquire read lock, prepare (validate + clone Arc<dyn Tool>), then drop lock
@@ -109,7 +132,9 @@ mod tests {
             let registry = Arc::new(RwLock::new(ToolRegistry::new()));
             let bridge = ToolRegistryBridge::new(registry, vec!["task".into()]);
 
-            let result = bridge.execute("read_file", serde_json::json!({})).await;
+            let result = bridge
+                .execute("read_file", serde_json::json!({}), "test-session")
+                .await;
             assert!(result.is_err());
         });
     }
@@ -124,7 +149,11 @@ mod tests {
             // Tool passes whitelist but is not registered -> NotFound maps to
             // Err(McpError) since prepare() fails before execute().
             let result = bridge
-                .execute("task", serde_json::json!({"action": "list"}))
+                .execute(
+                    "task",
+                    serde_json::json!({"action": "list"}),
+                    "test-session",
+                )
                 .await;
             assert!(result.is_err());
         });
@@ -137,8 +166,25 @@ mod tests {
             let registry = Arc::new(RwLock::new(ToolRegistry::new()));
             let bridge = ToolRegistryBridge::new(registry, vec![]);
 
-            let result = bridge.execute("task", serde_json::json!({})).await;
+            let result = bridge
+                .execute("task", serde_json::json!({}), "test-session")
+                .await;
             assert!(result.is_err());
         });
+    }
+
+    #[test]
+    fn whitelist_reflects_updates_at_call_time() {
+        let registry = Arc::new(RwLock::new(ToolRegistry::new()));
+        let bridge = ToolRegistryBridge::new(registry, vec!["tasks".to_string()]);
+
+        // Initially "notes" is not whitelisted
+        assert!(!bridge.is_whitelisted("notes"));
+
+        // Update whitelist to include "notes"
+        bridge.update_whitelist(vec!["tasks".to_string(), "notes".to_string()]);
+
+        // Now it should be whitelisted
+        assert!(bridge.is_whitelisted("notes"));
     }
 }

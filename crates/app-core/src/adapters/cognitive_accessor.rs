@@ -13,6 +13,7 @@ pub struct CognitiveAccessorImpl {
     rule_repo: cognitive::ProceduralRuleRepo,
     entity_repo: cognitive::repos::EntityRepo,
     temporal_svc: cognitive::TemporalService,
+    atom_repo: cognitive::KnowledgeAtomRepo,
 }
 
 impl CognitiveAccessorImpl {
@@ -21,6 +22,7 @@ impl CognitiveAccessorImpl {
         memory_repo: cognitive::EpisodicMemoryRepo,
         rule_repo: cognitive::ProceduralRuleRepo,
         entity_repo: cognitive::repos::EntityRepo,
+        atom_repo: cognitive::KnowledgeAtomRepo,
     ) -> Self {
         let temporal_svc = cognitive::TemporalService::new(fact_repo.clone());
         Self {
@@ -29,6 +31,7 @@ impl CognitiveAccessorImpl {
             rule_repo,
             entity_repo,
             temporal_svc,
+            atom_repo,
         }
     }
 }
@@ -145,6 +148,17 @@ impl CognitiveAccessor for CognitiveAccessorImpl {
                         &v.fact.valid_from, subject, v.fact.predicate, v.fact.object,
                     )
                 })
+                .collect(),
+            Err(_) => Vec::new(),
+        }
+    }
+
+    async fn search_atoms(&self, note_id: &str) -> Vec<String> {
+        match self.atom_repo.list_for_note(note_id).await {
+            Ok(atoms) => atoms
+                .into_iter()
+                .filter(|a| a.status == "active")
+                .map(|a| a.subject)
                 .collect(),
             Err(_) => Vec::new(),
         }

@@ -1,7 +1,7 @@
-import { cn } from "@shared/lib/cn";
+import * as DialogPrimitive from "@radix-ui/react-dialog";
+import { cn } from "@shared/lib/utils";
 import { X } from "lucide-react";
-import { type ReactNode, useCallback, useEffect, useRef } from "react";
-import { createPortal } from "react-dom";
+import type { ReactNode } from "react";
 
 export interface DialogProps {
   open: boolean;
@@ -20,53 +20,43 @@ const sizeClasses = {
 };
 
 export function Dialog({ open, onClose, title, children, size = "md", className }: DialogProps) {
-  const backdropRef = useRef<HTMLDivElement>(null);
-
-  const handleKeyDown = useCallback(
-    (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
-    },
-    [onClose],
-  );
-
-  useEffect(() => {
-    if (!open) return;
-    document.addEventListener("keydown", handleKeyDown);
-    return () => document.removeEventListener("keydown", handleKeyDown);
-  }, [open, handleKeyDown]);
-
-  if (!open) return null;
-
-  const handleBackdropClick = (e: React.MouseEvent) => {
-    if (e.target === backdropRef.current) onClose();
-  };
-
-  return createPortal(
-    <div
-      ref={backdropRef}
-      onClick={handleBackdropClick}
-      className="fixed inset-0 z-50 flex items-start justify-center bg-overlay backdrop-blur-sm pt-[15vh]"
+  return (
+    <DialogPrimitive.Root
+      open={open}
+      onOpenChange={(isOpen) => {
+        if (!isOpen) onClose();
+      }}
     >
-      <div
-        className={cn("glass-panel w-full", sizeClasses[size], className)}
-        style={{ animation: "glass-appear 0.2s ease-out" }}
-      >
-        <div className="bg-card rounded-[var(--glass-radius-inner)]">
-          <div className="flex items-center justify-between px-5 py-4 border-b border-border">
-            <h3 className="text-[14px] font-medium text-foreground">{title}</h3>
-            <button
-              type="button"
-              onClick={onClose}
-              aria-label="Close dialog"
-              className="w-7 h-7 rounded-md flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
-            >
-              <X className="w-4 h-4" />
-            </button>
+      <DialogPrimitive.Portal>
+        <DialogPrimitive.Overlay className="fixed inset-0 z-50 bg-overlay backdrop-blur-sm" />
+        <DialogPrimitive.Content
+          className={cn(
+            "fixed left-1/2 top-[15vh] z-50 -translate-x-1/2 glass-panel w-full",
+            sizeClasses[size],
+            className,
+          )}
+          style={{ animation: "glass-appear 0.2s ease-out" }}
+        >
+          <DialogPrimitive.Description className="sr-only">{title}</DialogPrimitive.Description>
+          <div className="bg-card rounded-[var(--glass-radius-inner)]">
+            <div className="flex items-center justify-between px-5 py-4 border-b border-border">
+              <DialogPrimitive.Title className="text-[14px] font-medium text-foreground">
+                {title}
+              </DialogPrimitive.Title>
+              <DialogPrimitive.Close asChild>
+                <button
+                  type="button"
+                  aria-label="Close dialog"
+                  className="size-7 rounded-md flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
+                >
+                  <X className="size-4" />
+                </button>
+              </DialogPrimitive.Close>
+            </div>
+            <div className="px-5 py-4">{children}</div>
           </div>
-          <div className="px-5 py-4">{children}</div>
-        </div>
-      </div>
-    </div>,
-    document.body,
+        </DialogPrimitive.Content>
+      </DialogPrimitive.Portal>
+    </DialogPrimitive.Root>
   );
 }

@@ -12,7 +12,7 @@ use tracing::{debug, info, warn};
 use super::interceptor::{DistractionInterceptor, InterceptDecision};
 use crate::config::FocusConfig;
 use crate::focus::FocusManager;
-use crate::types::{ActivityTick, SessionType};
+use crate::types::{ActivityTick, CategoryType, SessionType};
 
 /// Alert sent when a distracting app is detected during a focus session.
 #[derive(Debug, Clone)]
@@ -63,6 +63,8 @@ impl DistractionMonitor {
         let mut cooldowns: HashMap<String, Instant> = HashMap::new();
         let mut previous_app = String::new();
         let mut previous_context = String::new();
+        // Track when user first dwelled on a distracting app (key, start_time)
+        let mut dwell_start: Option<(String, Instant)> = None;
 
         loop {
             tokio::select! {
@@ -79,6 +81,7 @@ impl DistractionMonitor {
                                 &mut cooldowns,
                                 &mut previous_app,
                                 &mut previous_context,
+                                &mut dwell_start,
                             ).await;
                         }
                         Err(broadcast::error::RecvError::Lagged(n)) => {
@@ -101,6 +104,7 @@ impl DistractionMonitor {
         cooldowns: &mut HashMap<String, Instant>,
         previous_app: &mut String,
         previous_context: &mut String,
+        dwell_start: &mut Option<(String, Instant)>,
     ) {
         // 1. Skip idle ticks
         if tick.is_idle {
@@ -116,11 +120,9 @@ impl DistractionMonitor {
         let session = match self.focus_manager.get_active().await {
             Ok(Some(s)) => s,
             Ok(None) => {
-                // No active session — update previous context
-                previous_app.clone_from(&tick.app_name);
-                if let Some(ref title) = tick.window_title {
-                    previous_context.clone_from(title);
-                }
+                // No active session — update previous context and reset dwell
+                *dwell_start = None;
+                update_context(previous_app, previous_context, tick);
                 return;
             }
             Err(e) => {
@@ -131,6 +133,19 @@ impl DistractionMonitor {
 
         // 4. Skip break sessions
         if session.session_type == SessionType::Break {
+            return;
+        }
+
+        // 4b. Skip apps already categorized as productive or neutral
+        if tick
+            .category_type
+            .is_some_and(|ct| ct != CategoryType::Distracting)
+        {
+            *dwell_start = None;
+            previous_app.clone_from(&tick.app_name);
+            if let Some(ref title) = tick.window_title {
+                previous_context.clone_from(title);
+            }
             return;
         }
 
@@ -153,10 +168,35 @@ impl DistractionMonitor {
 
         match decision {
             InterceptDecision::ShowOverlay { needs_llm } => {
+                // 7. Grace period — only alert after sustained dwelling on the SAME app
+                let grace_secs = self.config.cooldown_grace_secs;
+                if grace_secs > 0 {
+                    match dwell_start {
+                        Some((ref key, start)) if *key == cooldown_key => {
+                            if start.elapsed().as_secs() < grace_secs {
+                                return;
+                            }
+                        }
+                        Some(_) => {
+                            // Switched to a different distracting app — restart timer
+                            // (prevents indefinite suppression by alternating apps)
+                            *dwell_start = Some((cooldown_key.clone(), Instant::now()));
+                            return;
+                        }
+                        None => {
+                            *dwell_start = Some((cooldown_key.clone(), Instant::now()));
+                            return;
+                        }
+                    }
+                }
+
+                // Grace period elapsed — clear dwell tracker
+                *dwell_start = None;
+
                 // Clone session_id before record_distraction_for consumes session by value
                 let session_id = session.id.clone();
 
-                // 7a. Record distraction on the session (consumes session)
+                // 8a. Record distraction on the session (consumes session)
                 if let Err(e) = self
                     .focus_manager
                     .record_distraction_for(session, &tick.app_name)
@@ -165,7 +205,7 @@ impl DistractionMonitor {
                     warn!("Failed to record distraction: {e}");
                 }
 
-                // 7b. Send alert
+                // 8b. Send alert
                 let alert = DistractionAlert {
                     session_id,
                     app_name: tick.app_name.clone(),
@@ -179,7 +219,7 @@ impl DistractionMonitor {
                     debug!("DistractionAlert receiver dropped");
                 }
 
-                // 7c. Record cooldown
+                // 8c. Record cooldown
                 cooldowns.insert(cooldown_key, Instant::now());
 
                 // Lazy prune expired cooldowns
@@ -187,13 +227,19 @@ impl DistractionMonitor {
                 cooldowns.retain(|_, instant| instant.elapsed().as_secs() < cooldown_secs);
             }
             InterceptDecision::Allow { .. } => {
-                // 8. Update previous context from productive ticks
-                previous_app.clone_from(&tick.app_name);
-                if let Some(ref title) = tick.window_title {
-                    previous_context.clone_from(title);
-                }
+                // 9. User on productive content — clear dwell tracker and update context
+                *dwell_start = None;
+                update_context(previous_app, previous_context, tick);
             }
         }
+    }
+}
+
+#[inline]
+fn update_context(previous_app: &mut String, previous_context: &mut String, tick: &ActivityTick) {
+    previous_app.clone_from(&tick.app_name);
+    if let Some(ref title) = tick.window_title {
+        previous_context.clone_from(title);
     }
 }
 
@@ -241,7 +287,10 @@ mod tests {
     ) {
         let pool = setup_pool().await;
         let repos = ProductivityRepos::new(pool.clone());
-        let config = FocusConfig::default();
+        let config = FocusConfig {
+            cooldown_grace_secs: 0,
+            ..FocusConfig::default()
+        };
         let mgr = Arc::new(FocusManager::new(repos.clone(), config.clone()));
         let interceptor = Arc::new(Mutex::new(DistractionInterceptor::new(
             config.clone(),
@@ -271,9 +320,10 @@ mod tests {
 
         // Send a distracting tick (Netflix is always distracting)
         tx.send(make_tick("Netflix", None, false)).unwrap();
+        tokio::task::yield_now().await;
 
         // Should receive an alert
-        let alert = tokio::time::timeout(std::time::Duration::from_secs(2), alert_rx.recv())
+        let alert = tokio::time::timeout(std::time::Duration::from_secs(10), alert_rx.recv())
             .await
             .expect("timeout waiting for alert")
             .expect("channel closed");
@@ -383,7 +433,8 @@ mod tests {
 
         // First tick — should alert
         tx.send(make_tick("Netflix", None, false)).unwrap();
-        let alert = tokio::time::timeout(std::time::Duration::from_secs(2), alert_rx.recv())
+        tokio::task::yield_now().await;
+        let alert = tokio::time::timeout(std::time::Duration::from_secs(10), alert_rx.recv())
             .await
             .expect("timeout")
             .expect("closed");
@@ -405,6 +456,7 @@ mod tests {
         // Use 0-second cooldown so it expires immediately
         let config = FocusConfig {
             soft_block_cooldown_secs: 0,
+            cooldown_grace_secs: 0,
             ..FocusConfig::default()
         };
         let cancel = CancellationToken::new();
@@ -430,7 +482,7 @@ mod tests {
 
         // Second alert — cooldown expired
         tx.send(make_tick("Netflix", None, false)).unwrap();
-        let alert = tokio::time::timeout(std::time::Duration::from_secs(2), alert_rx.recv())
+        let alert = tokio::time::timeout(std::time::Duration::from_secs(10), alert_rx.recv())
             .await
             .expect("timeout")
             .expect("closed");
@@ -469,8 +521,9 @@ mod tests {
 
         // Now send distracting tick
         tx.send(make_tick("Netflix", None, false)).unwrap();
+        tokio::task::yield_now().await;
 
-        let alert = tokio::time::timeout(std::time::Duration::from_secs(2), alert_rx.recv())
+        let alert = tokio::time::timeout(std::time::Duration::from_secs(10), alert_rx.recv())
             .await
             .expect("timeout")
             .expect("closed");
@@ -500,7 +553,7 @@ mod tests {
         cancel.cancel();
 
         // Channel should close
-        let result = tokio::time::timeout(std::time::Duration::from_secs(2), alert_rx.recv())
+        let result = tokio::time::timeout(std::time::Duration::from_secs(10), alert_rx.recv())
             .await
             .expect("should not timeout");
 

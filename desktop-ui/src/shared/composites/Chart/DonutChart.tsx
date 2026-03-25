@@ -98,7 +98,7 @@ export function DonutChart({
       <div className="flex flex-wrap gap-x-3 gap-y-0.5 justify-center mt-2">
         {segments.map((seg) => (
           <div key={seg.name} className="flex items-center gap-1">
-            <div className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: seg.color }} />
+            <div className="size-1.5 rounded-full" style={{ backgroundColor: seg.color }} />
             <span className="text-[9px] text-dim font-light">{seg.name}</span>
           </div>
         ))}

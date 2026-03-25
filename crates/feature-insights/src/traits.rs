@@ -21,6 +21,8 @@ pub trait CognitiveAccessor: Send + Sync {
     async fn entity_neighborhood(&self, note_id: &str, depth: u8) -> Vec<String>;
     /// Get temporal fact history (deep dive only).
     async fn fact_history(&self, subject: &str) -> Vec<String>;
+    /// Get accepted knowledge atom subjects for a note.
+    async fn search_atoms(&self, note_id: &str) -> Vec<String>;
 }
 
 /// Provides flashcard review data for learning progress computation.
@@ -60,6 +62,9 @@ impl CognitiveAccessor for NoopCognitiveAccessor {
         Vec::new()
     }
     async fn fact_history(&self, _: &str) -> Vec<String> {
+        Vec::new()
+    }
+    async fn search_atoms(&self, _: &str) -> Vec<String> {
         Vec::new()
     }
 }

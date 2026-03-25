@@ -87,9 +87,7 @@ export function PersonaChat({
         </div>
       ))}
       {loading && (
-        <div className="text-[10px] text-dim italic animate-pulse">
-          {personaName} is thinking...
-        </div>
+        <div className="text-2xs text-dim italic animate-pulse">{personaName} is thinking...</div>
       )}
       <div className="flex gap-1">
         <input

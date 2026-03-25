@@ -4,6 +4,8 @@
 //! memory retrieval, consolidation, extraction, reflection, etc.
 //! Domain types live in [`crate::types`], storage in [`crate::repos`].
 
+pub mod atom_decay;
+pub mod atom_extraction;
 pub mod background;
 pub mod compaction;
 pub mod consolidation;

@@ -196,6 +196,33 @@ pub struct FinanceInvestmentUpdateParams {
     pub notes: Option<Option<String>>,
 }
 
+// ── Allocation Target Params ─────────────────────────────────────────
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct FinanceAllocationTargetUpsertParams {
+    pub portfolio_id: String,
+    pub asset_class: String,
+    pub target_weight: String,
+    pub tolerance_band: String,
+}
+
+// ── Investment Transaction Params ────────────────────────────────────
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct FinanceInvestmentTxCreateParams {
+    pub investment_id: String,
+    pub tx_type: String,
+    pub total_amount: i64,
+    pub currency: String,
+    pub tx_date: String,
+    pub quantity: Option<f64>,
+    pub price_per_unit: Option<i64>,
+    pub fees: Option<i64>,
+    pub notes: Option<String>,
+}
+
 // ── Date Range Params ────────────────────────────────────────────────
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]

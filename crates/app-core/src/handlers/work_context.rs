@@ -54,14 +54,14 @@ impl AppCore {
             .map_err(map_err)?
             .ok_or_else(|| ApiError::new("NOT_FOUND", format!("work context {id} not found")))?;
 
-        let (resources, linked_action_ids, recent_events) = tokio::try_join!(
+        let (resources, linked_task_ids, recent_events) = tokio::try_join!(
             async {
                 activity_log::WorkResourceRepo::list_by_context(&self.storage_pool, &id)
                     .await
                     .map_err(map_err)
             },
             async {
-                activity_log::ContextActionRepo::list_actions_for_context(&self.storage_pool, &id)
+                activity_log::ContextTaskRepo::list_tasks_for_context(&self.storage_pool, &id)
                     .await
                     .map_err(map_err)
             },
@@ -75,7 +75,7 @@ impl AppCore {
         Ok(WorkContextDetailResponse {
             context: ctx.into(),
             resources: resources.into_iter().map(Into::into).collect(),
-            linked_action_ids,
+            linked_task_ids,
             recent_events: recent_events.into_iter().map(Into::into).collect(),
         })
     }

@@ -146,13 +146,33 @@ impl AppCore {
             .filter(|p| p.expires_at > now)
             .map(|p| DeliveredInterventionResponse {
                 id: p.intervention.id.clone(),
-                intervention_type: serde_json::to_value(&p.intervention.intervention_type)
-                    .ok()
-                    .and_then(|v| v.as_str().map(String::from))
-                    .unwrap_or_else(|| format!("{:?}", p.intervention.intervention_type)),
+                intervention_type: p.intervention.intervention_type.to_string(),
                 message: p.intervention.message.clone(),
                 trigger_name: p.intervention.trigger_name.clone(),
                 timestamp: p.intervention.delivered_at.to_rfc3339(),
+            })
+            .collect())
+    }
+
+    pub async fn coaching_intervention_log(
+        &self,
+        limit: Option<i64>,
+    ) -> Result<Vec<InterventionLogResponse>, ApiError> {
+        let repo = self.coaching_log_repo()?;
+        let rows = repo
+            .list_recent(limit.unwrap_or(50))
+            .await
+            .map_err(|e| ApiError::new("STORAGE_ERROR", e.to_string()))?;
+        Ok(rows
+            .into_iter()
+            .map(|r| InterventionLogResponse {
+                id: r.id,
+                intervention_type: r.intervention_type,
+                message: r.message,
+                trigger_name: r.trigger_name,
+                feedback: r.feedback,
+                delivered_at: r.delivered_at,
+                feedback_at: r.feedback_at,
             })
             .collect())
     }
@@ -175,6 +195,15 @@ impl AppCore {
     pub async fn coaching_clear_signals(&self) -> Result<bool, ApiError> {
         let mut acc = self.signal_accumulator()?.lock().await;
         *acc = feature_coaching::SignalAccumulator::new();
+        Ok(true)
+    }
+
+    /// Seed test trigger data into the pattern detector for debugging.
+    pub async fn coaching_seed_patterns(&self) -> Result<bool, ApiError> {
+        let mut detector = self.pattern_detector()?.lock().await;
+        detector.seed_test_triggers("distraction_streak", 5);
+        detector.seed_test_triggers("task_avoidance", 4);
+        detector.seed_test_triggers("budget_warning", 3);
         Ok(true)
     }
 
@@ -218,6 +247,18 @@ impl AppCore {
             trigger_name
         };
 
+        // Persist feedback to intervention log (works for both live and retroactive feedback)
+        if let Ok(repo) = self.coaching_log_repo() {
+            let feedback_str = match feedback_response {
+                bus::FeedbackResponse::Helpful => "helpful",
+                bus::FeedbackResponse::Dismissed => "dismissed",
+                bus::FeedbackResponse::StopSuggesting => "stop",
+            };
+            if let Err(e) = repo.update_feedback(&intervention_id, feedback_str).await {
+                debug!("failed to persist coaching feedback: {e}");
+            }
+        }
+
         // If dismissed/stop, record dismissal in router for backoff
         if matches!(
             feedback_response,
@@ -249,6 +290,14 @@ impl AppCore {
             .fetch_add(1, Ordering::Relaxed)
             + 1;
         debug!("coaching nudge ignored (id={intervention_id}), consecutive={count}");
+
+        // Persist "ignored" feedback to intervention log
+        if let Ok(repo) = self.coaching_log_repo() {
+            if let Err(e) = repo.update_feedback(&intervention_id, "ignored").await {
+                debug!("failed to persist ignored feedback: {e}");
+            }
+        }
+
         Ok(true)
     }
 }

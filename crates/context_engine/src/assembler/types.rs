@@ -34,6 +34,8 @@ pub struct ContextRequest {
     pub context_window: usize,
     /// Optional session key for per-session circuit-breaker tracking in InsightForge.
     pub session_key: Option<String>,
+    /// Contextual signals for query rewriting (active skill, task, situation, etc.)
+    pub retrieval_context: Option<crate::rewriter::RetrievalContext>,
 }
 
 /// The assembled context ready to send to the LLM.
@@ -51,4 +53,11 @@ pub struct AssembledContext {
     pub budget_remaining: usize,
     /// Context version — incremented on each expand() call.
     pub version: u32,
+    /// Number of memory entries retrieved from the memory retriever/InsightForge.
+    /// Used by the autotuner to compute the `memory_relevance` metric.
+    pub retrieved_memory_count: usize,
+    /// Whether query rewriting was triggered during memory retrieval.
+    pub rewrite_triggered: bool,
+    /// Source of the rewrite: "heuristic" or "llm", or None if not triggered.
+    pub rewrite_source: Option<String>,
 }

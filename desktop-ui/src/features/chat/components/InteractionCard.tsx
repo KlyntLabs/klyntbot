@@ -13,7 +13,7 @@ interface InteractionCardProps {
 
 function optionButtonClass(isSelected: boolean, isFocused: boolean) {
   return cn(
-    "rounded-lg border text-[12px] font-light transition-colors",
+    "rounded-lg border text-xs font-light transition-colors",
     isSelected
       ? "border-brand bg-brand/10 text-foreground"
       : isFocused
@@ -241,7 +241,7 @@ export function InteractionCard({
                       optionButtonClass(isSelected, focusIndex === i),
                     )}
                   >
-                    <div className="text-[12px] font-light">{opt.label}</div>
+                    <div className="text-xs font-light">{opt.label}</div>
                     {opt.description && (
                       <div className="text-[11px] font-light text-muted-foreground mt-0.5">
                         {opt.description}
@@ -294,7 +294,7 @@ export function InteractionCard({
                     }
                   }}
                   placeholder={question.answer_type.placeholder ?? ""}
-                  className="w-full bg-muted text-foreground text-[12px] font-light px-3 py-2 rounded-lg border border-border"
+                  className="w-full bg-muted text-foreground text-xs font-light px-3 py-2 rounded-lg border border-border"
                 />
               );
             })()}
@@ -308,7 +308,7 @@ export function InteractionCard({
             disabled={submitting}
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-light text-muted-foreground hover:text-foreground hover:bg-muted transition-colors disabled:opacity-50"
           >
-            <X className="w-3 h-3" strokeWidth={1.5} />
+            <X className="size-3" strokeWidth={1.5} />
             Cancel
           </button>
           <button
@@ -317,7 +317,7 @@ export function InteractionCard({
             disabled={submitting}
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-brand text-[11px] font-light hover:bg-brand/90 transition-colors disabled:opacity-50"
           >
-            <Check className="w-3 h-3" strokeWidth={2} />
+            <Check className="size-3" strokeWidth={2} />
             Submit
           </button>
         </div>

@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AccountsForm } from "./finance/AccountsForm";
 import { FinanceBasicsForm } from "./finance/FinanceBasicsForm";
 import { FireForm } from "./finance/FireForm";
@@ -33,6 +33,7 @@ interface FinancePanelProps {
 export function FinancePanel({ onComplete }: FinancePanelProps) {
   const [subStep, setSubStep] = useState(0);
   const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
   const subSaveMap = useRef<Map<number, () => Promise<void>>>(new Map());
 
   const makeRegisterSave = useCallback(
@@ -47,16 +48,33 @@ export function FinancePanel({ onComplete }: FinancePanelProps) {
     [makeRegisterSave],
   );
 
-  const markDirty = useCallback(() => {}, []); // No-op — panel doesn't need dirty tracking
+  const [isDirty, setIsDirty] = useState(false);
+  const markDirty = useCallback(() => setIsDirty(true), []);
+
+  // Warn on page leave when there are unsaved changes
+  useEffect(() => {
+    if (!isDirty) return;
+    const handler = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+    };
+    window.addEventListener("beforeunload", handler);
+    return () => window.removeEventListener("beforeunload", handler);
+  }, [isDirty]);
 
   const handleNext = async () => {
     setSaving(true);
+    setSaveError(null);
     try {
       const save = subSaveMap.current.get(subStep);
       await save?.();
-    } finally {
+    } catch (e) {
+      console.error("Failed to save finance step:", e);
+      setSaveError(e instanceof Error ? e.message : "Failed to save. Please try again.");
       setSaving(false);
+      return;
     }
+    setSaving(false);
+    setIsDirty(false);
 
     if (subStep < SUB_STEPS.length - 1) {
       setSubStep((s) => s + 1);
@@ -78,7 +96,7 @@ export function FinancePanel({ onComplete }: FinancePanelProps) {
             key={step}
             type="button"
             onClick={() => setSubStep(i)}
-            className={`text-[10px] px-2 py-0.5 rounded-full transition-colors ${
+            className={`text-2xs px-2 py-0.5 rounded-full transition-colors ${
               i === subStep
                 ? "bg-brand text-white"
                 : i < subStep
@@ -114,6 +132,9 @@ export function FinancePanel({ onComplete }: FinancePanelProps) {
         <GoalsForm registerSave={registerSaves[6]} onDirty={markDirty} />
       </div>
 
+      {/* Error feedback */}
+      {saveError && <p className="text-xs text-destructive mt-4">{saveError}</p>}
+
       {/* Navigation */}
       <div className="flex items-center justify-between mt-6 pt-4 border-t border-border">
         <div className="flex gap-2">
@@ -121,7 +142,7 @@ export function FinancePanel({ onComplete }: FinancePanelProps) {
             <button
               type="button"
               onClick={handleBack}
-              className="px-3 py-1.5 text-[12px] text-muted-foreground hover:text-foreground transition-colors"
+              className="px-3 py-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
             >
               Back
             </button>
@@ -129,7 +150,7 @@ export function FinancePanel({ onComplete }: FinancePanelProps) {
           <button
             type="button"
             onClick={onComplete}
-            className="px-3 py-1.5 text-[12px] text-muted-foreground hover:text-foreground transition-colors"
+            className="px-3 py-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
           >
             Skip
           </button>
@@ -138,7 +159,7 @@ export function FinancePanel({ onComplete }: FinancePanelProps) {
           type="button"
           onClick={handleNext}
           disabled={saving}
-          className="px-4 py-1.5 text-[12px] font-medium text-white bg-brand hover:bg-brand-hover rounded-lg transition-colors disabled:opacity-50"
+          className="px-4 py-1.5 text-xs font-medium text-white bg-brand hover:bg-brand-hover rounded-lg transition-colors disabled:opacity-50"
         >
           {saving ? "Saving..." : subStep === SUB_STEPS.length - 1 ? "Done" : "Next"}
         </button>

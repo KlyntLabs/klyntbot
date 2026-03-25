@@ -3,7 +3,7 @@ interface McpServerIconProps {
   className?: string;
 }
 
-export function McpServerIcon({ name, className = "w-5 h-5" }: McpServerIconProps) {
+export function McpServerIcon({ name, className = "size-5" }: McpServerIconProps) {
   const icon = icons[name];
   if (!icon) {
     // Fallback: first two letters

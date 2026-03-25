@@ -99,6 +99,13 @@ pub async fn retrieve_relevant_facts(
         temporal: params.relevance_weight_temporal,
     };
 
+    debug!(
+        query = query,
+        use_vector = use_vector,
+        domains = ?domains,
+        "🔎 retrieve_relevant_facts: searching"
+    );
+
     let mut scored = if use_vector {
         let embedder = embedder.unwrap(); // safe: checked above
         match embedder

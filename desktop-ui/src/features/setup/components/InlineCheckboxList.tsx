@@ -69,7 +69,7 @@ export function InlineCheckboxList({
                   isChecked ? "bg-brand border-brand" : "border-border"
                 }`}
               >
-                {isChecked && <Check className="w-3 h-3 text-white" />}
+                {isChecked && <Check className="size-3 text-white" />}
               </div>
 
               {/* Label */}
@@ -78,7 +78,7 @@ export function InlineCheckboxList({
               {/* Detection badge */}
               {opt.detected !== undefined && (
                 <span
-                  className={`text-[10px] font-medium px-1.5 py-0.5 rounded-md flex-shrink-0 ${
+                  className={`text-2xs font-medium px-1.5 py-0.5 rounded-md flex-shrink-0 ${
                     opt.detected ? "bg-success/10 text-success" : "bg-accent text-dim"
                   }`}
                 >

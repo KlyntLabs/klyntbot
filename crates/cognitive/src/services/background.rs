@@ -260,6 +260,7 @@ impl BackgroundConsolidationService {
             let mut promotion_queue: Vec<Observation> = Vec::new();
 
             let session_start = chrono::Utc::now().to_rfc3339();
+            let mut batch_count: u64 = 0;
 
             loop {
                 // Collect batch (3s window, max 10 events)
@@ -437,29 +438,63 @@ impl BackgroundConsolidationService {
                         // ── Contradiction detection ──────────────────────────
                         if let Some(ref bus) = domain_bus {
                             for (candidate, op) in candidates.iter().zip(ops.iter()) {
-                                if let crate::types::MemoryOp::Update { id: _, old_id } = op {
-                                    let new = &candidate.candidate;
-                                    if let Ok(Some(old_fact)) = repo.get(old_id).await {
-                                        if old_fact.confidence < 0.7
-                                            || old_fact.source != "user_stated"
-                                        {
-                                            continue;
-                                        }
-                                        if old_fact.object != new.object
-                                            && !is_same_session(
-                                                &old_fact.recorded_at,
-                                                &session_start,
-                                            )
-                                        {
-                                            bus.publish(DomainEvent::ContradictionDetected {
-                                                existing_subject: old_fact.subject.clone(),
-                                                existing_predicate: old_fact.predicate.clone(),
-                                                existing_object: old_fact.object.clone(),
-                                                new_object: new.object.clone(),
-                                                confidence: new.confidence,
-                                            });
+                                match op {
+                                    crate::types::MemoryOp::Update { id: _, old_id } => {
+                                        let new = &candidate.candidate;
+                                        if let Ok(Some(old_fact)) = repo.get(old_id).await {
+                                            if old_fact.confidence < 0.7
+                                                || old_fact.source != "user_stated"
+                                            {
+                                                continue;
+                                            }
+                                            if old_fact.object != new.object
+                                                && !is_same_session(
+                                                    &old_fact.recorded_at,
+                                                    &session_start,
+                                                )
+                                            {
+                                                bus.publish(DomainEvent::ContradictionDetected {
+                                                    existing_subject: old_fact.subject.clone(),
+                                                    existing_predicate: old_fact.predicate.clone(),
+                                                    existing_object: old_fact.object.clone(),
+                                                    new_object: new.object.clone(),
+                                                    confidence: new.confidence,
+                                                });
+                                            }
                                         }
                                     }
+                                    crate::types::MemoryOp::Add { .. } => {
+                                        let new = &candidate.candidate;
+                                        for existing in &candidate.existing {
+                                            if existing.superseded_at.is_some() {
+                                                continue;
+                                            }
+                                            // Same guards as Update path: skip low-confidence
+                                            // or non-user-stated facts, and same-session writes
+                                            if existing.confidence < 0.7
+                                                || existing.source != "user_stated"
+                                            {
+                                                continue;
+                                            }
+                                            if existing.object != new.object
+                                                && existing.subject == new.subject
+                                                && existing.predicate == new.predicate
+                                                && !is_same_session(
+                                                    &existing.recorded_at,
+                                                    &session_start,
+                                                )
+                                            {
+                                                bus.publish(DomainEvent::ContradictionDetected {
+                                                    existing_subject: existing.subject.clone(),
+                                                    existing_predicate: existing.predicate.clone(),
+                                                    existing_object: existing.object.clone(),
+                                                    new_object: new.object.clone(),
+                                                    confidence: new.confidence,
+                                                });
+                                            }
+                                        }
+                                    }
+                                    _ => {}
                                 }
                             }
                         }
@@ -576,6 +611,19 @@ impl BackgroundConsolidationService {
                         }
                     }
                 }
+
+                batch_count += 1;
+                if batch_count % 100 == 0 {
+                    if let Some(ref dlq) = failed_obs_repo {
+                        let removed = dlq.cleanup_permanently_failed().await;
+                        if removed > 0 {
+                            info!(
+                                "DLQ cleanup: removed {} permanently failed observations",
+                                removed
+                            );
+                        }
+                    }
+                }
             }
         });
 
@@ -616,6 +664,7 @@ fn event_to_observation(event: &DomainEvent) -> Option<Observation> {
         DomainEvent::UserCorrectedAI {
             original,
             correction,
+            ..
         } => Some(Observation {
             domain: "meta".into(),
             content: format!("User corrected: '{original}' → '{correction}'"),
@@ -623,6 +672,35 @@ fn event_to_observation(event: &DomainEvent) -> Option<Observation> {
             source_event: "UserCorrectedAI".into(),
             timestamp: now,
         }),
+        DomainEvent::AutotunerDecision {
+            verdict,
+            improvement_pct,
+            affected_params,
+            ..
+        } => {
+            let params_text = if affected_params.is_empty() {
+                "general parameters".into()
+            } else {
+                affected_params.join(", ")
+            };
+            let content = if verdict == "reverted" {
+                format!(
+                    "I noticed a recent change to {params_text} wasn't working well and reverted to my previous approach."
+                )
+            } else {
+                format!(
+                    "I refined how I handle your requests — adjusted {params_text}, \
+                     improving response alignment by {improvement_pct:.1}%."
+                )
+            };
+            Some(Observation {
+                domain: "meta".into(),
+                content,
+                importance: if verdict == "reverted" { 0.9 } else { 0.8 },
+                source_event: "AutotunerDecision".into(),
+                timestamp: now,
+            })
+        }
         DomainEvent::BudgetAlert {
             category,
             spent,
@@ -998,10 +1076,31 @@ fn event_type_key(event: &DomainEvent) -> String {
         DomainEvent::TaskStatusChanged { .. } => "TaskStatusChanged".into(),
         DomainEvent::TaskPriorityChanged { .. } => "TaskPriorityChanged".into(),
         DomainEvent::TaskFieldUpdated { .. } => "TaskFieldUpdated".into(),
+        DomainEvent::AutotunerDecision { .. } => "AutotunerDecision".into(),
         DomainEvent::ContradictionDetected { .. } => "ContradictionDetected".into(),
         DomainEvent::NoteContentChanged { .. } => "NoteContentChanged".into(),
         DomainEvent::NoteDeleted { .. } => "NoteDeleted".into(),
         DomainEvent::TaskHierarchyChanged { .. } => "TaskHierarchyChanged".into(),
+        DomainEvent::KnowledgeAtomCreated { .. } => "KnowledgeAtomCreated".into(),
+        DomainEvent::KnowledgeAtomAccepted { .. } => "KnowledgeAtomAccepted".into(),
+        DomainEvent::KnowledgeAtomArchived { .. } => "KnowledgeAtomArchived".into(),
+        DomainEvent::AtomFlashcardReviewed { .. } => "AtomFlashcardReviewed".into(),
+        DomainEvent::AtomReinforced { .. } => "AtomReinforced".into(),
+        DomainEvent::AtomInteracted { .. } => "AtomInteracted".into(),
+        DomainEvent::RetentionMilestoneReached { .. } => "RetentionMilestoneReached".into(),
+        DomainEvent::TranslationCompleted { .. } => "TranslationCompleted".into(),
+        DomainEvent::NoteStudied { .. } => "NoteStudied".into(),
+        DomainEvent::PracticeUnitCompleted { .. } => "PracticeUnitCompleted".into(),
+        DomainEvent::PracticeSessionCompleted { .. } => "PracticeSessionCompleted".into(),
+        DomainEvent::KnowledgeTransferDetected { .. } => "KnowledgeTransferDetected".into(),
+        DomainEvent::CoachingLearningDigest { .. } => "CoachingLearningDigest".into(),
+        DomainEvent::FlashcardSessionCompleted { .. } => "FlashcardSessionCompleted".into(),
+        DomainEvent::InterventionTriggered { .. } => "InterventionTriggered".into(),
+        DomainEvent::MemoryPendingConfirmation { .. } => "MemoryPendingConfirmation".into(),
+        DomainEvent::SkillRouted { .. } => "SkillRouted".into(),
+        DomainEvent::TrialActivated { .. } => "TrialActivated".into(),
+        DomainEvent::MirrorTrialKilled { .. } => "MirrorTrialKilled".into(),
+        DomainEvent::MirrorSnippetCreated { .. } => "MirrorSnippetCreated".into(),
     }
 }
 

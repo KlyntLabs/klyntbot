@@ -66,7 +66,7 @@ export const NoteTags = forwardRef<NoteTagsHandle, NoteTagsProps>(function NoteT
             className="opacity-0 group-hover:opacity-100 transition-opacity ml-0.5"
             aria-label={`Remove tag ${tag}`}
           >
-            <X className="w-2.5 h-2.5" />
+            <X className="size-2.5" />
           </button>
         </span>
       ))}

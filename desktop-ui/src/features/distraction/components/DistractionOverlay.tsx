@@ -1,7 +1,10 @@
 import { useEvent } from "@shared/hooks/useEvent";
 import { ipc } from "@shared/hooks/useIpc";
+import { useTransparentBackground } from "@shared/hooks/useTransparentBackground";
+import { useWindowAutoResize } from "@shared/hooks/useWindowAutoResize";
+import { ThinkingDots } from "@shared/ui/ThinkingDots";
 import * as tauriWindow from "@tauri-apps/api/window";
-import { useState } from "react";
+import { useRef, useState } from "react";
 
 interface InterventionPayload {
   appName: string;
@@ -20,6 +23,10 @@ export function DistractionOverlay() {
   const [intervention, setIntervention] = useState<InterventionPayload | null>(null);
   const [verdict, setVerdict] = useState<VerdictPayload | null>(null);
   const [loading, setLoading] = useState(false);
+  const contentRef = useRef<HTMLDivElement>(null);
+
+  useTransparentBackground({ nativeVibrancy: true });
+  useWindowAutoResize(contentRef, { width: 340, maxHeight: 300 });
 
   useEvent<InterventionPayload>("distraction:intervention", (payload) => {
     setIntervention(payload);
@@ -34,19 +41,10 @@ export function DistractionOverlay() {
     setLoading(false);
   });
 
-  if (!intervention) {
-    return (
-      <div className="w-screen h-screen flex items-center justify-center">
-        <div className="text-dim text-sm">Waiting\u2026</div>
-      </div>
-    );
-  }
-
-  const titleExcerpt = intervention.windowTitle
-    ? intervention.windowTitle.length > 60
-      ? `${intervention.windowTitle.slice(0, 60)}\u2026`
-      : intervention.windowTitle
-    : null;
+  const titleExcerpt =
+    intervention?.windowTitle && intervention.windowTitle.length > 50
+      ? `${intervention.windowTitle.slice(0, 50)}\u2026`
+      : (intervention?.windowTitle ?? null);
 
   const hideWindow = async () => {
     setIntervention(null);
@@ -59,102 +57,100 @@ export function DistractionOverlay() {
     }
   };
 
-  const pattern = intervention.windowTitle?.toLowerCase() ?? intervention.appName.toLowerCase();
+  const pattern = intervention?.windowTitle?.toLowerCase() ?? intervention?.appName.toLowerCase();
 
   const handleDismiss = async () => {
+    if (!intervention) return;
     await ipc("distraction_dismiss", {
       appName: intervention.appName,
-    }).catch(() => {});
+    }).catch((e) => console.error("Failed to dismiss distraction:", e));
     await hideWindow();
   };
 
   const handleAllowTemp = async () => {
-    await ipc("distraction_allow_temp", { pattern }).catch(() => {});
+    if (!pattern) return;
+    await ipc("distraction_allow_temp", { pattern }).catch((e) =>
+      console.error("Failed to allow temp:", e),
+    );
     await hideWindow();
   };
 
   const handleAllowSession = async () => {
+    if (!intervention) return;
     await ipc("distraction_allow_session", {
       appName: intervention.appName,
       windowTitle: intervention.windowTitle,
       classification: verdict?.classification ?? "work_research",
-    }).catch(() => {});
+    }).catch((e) => console.error("Failed to allow session:", e));
     await hideWindow();
   };
 
+  // Always render the container so useWindowAutoResize observer stays attached.
+  // Content is conditionally shown inside.
   return (
-    <div className="w-screen h-screen flex items-center justify-center p-4">
-      <div
-        className="glass-panel w-full max-w-[400px] overflow-hidden"
-        style={{ animation: "glass-appear 0.2s ease-out" }}
-      >
+    <div
+      ref={contentRef}
+      className="w-full glass-floating overflow-hidden text-foreground"
+      style={{ animation: intervention ? "glass-appear 0.25s ease-out" : undefined }}
+    >
+      {intervention && (
         <div className="rounded-[var(--glass-radius-inner)] overflow-hidden">
-          {/* Red accent top bar — glowing */}
-          <div
-            className="h-[3px]"
-            style={{
-              background: "linear-gradient(90deg, transparent, var(--destructive), transparent)",
-            }}
-          />
-
-          <div className="p-5 flex flex-col gap-4">
+          <div className="px-4 py-3.5 flex flex-col gap-3">
             {/* Header */}
-            <div className="flex items-center gap-2">
-              <span
-                className="w-2 h-2 rounded-full animate-pulse"
-                style={{ background: "var(--destructive)" }}
-              />
-              <span className="text-[13px] font-semibold text-destructive">
-                Focus Session Active
-              </span>
-            </div>
-
-            {/* App info */}
-            <div>
-              <div className="text-[15px] font-medium text-foreground">
-                You switched to {intervention.appName}
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <span
+                  className="w-1.5 h-1.5 rounded-full animate-pulse"
+                  style={{ background: "var(--destructive)" }}
+                />
+                <span className="text-[11px] text-destructive font-medium uppercase tracking-wider">
+                  Focus active
+                </span>
               </div>
-              {titleExcerpt && (
-                <div className="text-[12px] text-muted-foreground mt-1 truncate">
-                  &ldquo;{titleExcerpt}&rdquo;
+              {(loading || verdict) && (
+                <div className="text-2xs text-muted-foreground flex items-center gap-1.5">
+                  {loading && (
+                    <>
+                      <ThinkingDots size="sm" />
+                      Analyzing...
+                    </>
+                  )}
+                  {verdict && !loading && (
+                    <span
+                      className={
+                        verdict.classification === "educational" ||
+                        verdict.classification === "work_research"
+                          ? "text-success"
+                          : "text-destructive"
+                      }
+                    >
+                      {verdict.displayText}
+                    </span>
+                  )}
                 </div>
               )}
             </div>
 
-            {/* LLM verdict */}
-            {(loading || verdict) && (
-              <div className="text-[12px] text-dim flex items-center gap-2">
-                {loading && (
-                  <>
-                    <span className="w-3 h-3 border border-dim border-t-transparent rounded-full animate-spin" />
-                    Analyzing content...
-                  </>
-                )}
-                {verdict && !loading && (
-                  <span
-                    className={
-                      verdict.classification === "educational" ||
-                      verdict.classification === "work_research"
-                        ? "text-success"
-                        : "text-destructive"
-                    }
-                  >
-                    {verdict.displayText}
-                  </span>
-                )}
-              </div>
-            )}
+            {/* Content */}
+            <div className="glass-divider" />
+            <div className="flex flex-col gap-1">
+              <div className="text-[13px] font-medium text-foreground">{intervention.appName}</div>
+              {titleExcerpt && (
+                <div className="text-[11px] font-light text-muted-foreground truncate">
+                  {titleExcerpt}
+                </div>
+              )}
+            </div>
 
-            {/* Action buttons — glass style */}
-            <div className="flex gap-2 mt-1">
+            {/* Actions */}
+            <div className="flex gap-2 pt-0.5">
               <button
                 type="button"
                 onClick={handleDismiss}
-                className="flex-1 px-3 py-2.5 rounded-xl text-[12px] font-medium transition-all"
+                className="flex-1 px-3 py-2 rounded-lg text-[11px] font-medium transition-all text-destructive"
                 style={{
                   background: "var(--glass-tint-destructive)",
-                  border: "1px solid rgba(244, 63, 94, 0.2)",
-                  color: "var(--destructive)",
+                  border: "1px solid rgba(244, 63, 94, 0.15)",
                 }}
               >
                 Back to work
@@ -162,21 +158,21 @@ export function DistractionOverlay() {
               <button
                 type="button"
                 onClick={handleAllowTemp}
-                className="flex-1 px-3 py-2.5 rounded-xl text-[12px] font-medium glass-button text-muted-foreground hover:text-foreground"
+                className="flex-1 px-3 py-2 rounded-lg text-[11px] font-medium glass-button text-muted-foreground hover:text-foreground transition-colors"
               >
-                Allow briefly
+                5 min break
               </button>
               <button
                 type="button"
                 onClick={handleAllowSession}
-                className="flex-1 px-3 py-2.5 rounded-xl text-[12px] font-medium glass-button text-muted-foreground hover:text-foreground"
+                className="flex-1 px-3 py-2 rounded-lg text-[11px] font-medium glass-button text-muted-foreground hover:text-foreground transition-colors"
               >
-                This is work
+                It's work
               </button>
             </div>
           </div>
         </div>
-      </div>
+      )}
     </div>
   );
 }

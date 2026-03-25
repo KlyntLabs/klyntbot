@@ -5,6 +5,7 @@ use std::path::PathBuf;
 use serde_json::Value;
 use tokio::fs;
 
+use super::schema::hot::{HotConfig, HotConfigDiff};
 use super::schema::Config;
 use common::{ConfigError, Result};
 
@@ -29,6 +30,18 @@ pub fn config_dir() -> Result<PathBuf> {
         })
 }
 
+/// Current config schema version. Increment when config format changes.
+const CURRENT_SCHEMA_VERSION: u32 = 1;
+
+/// Migrate a raw config JSON from `from` version to `to` version.
+/// Future migrations will be added as match arms on `from`.
+fn migrate_config(mut raw: Value, _from: u32, to: u32) -> Result<Value> {
+    // No migrations needed yet (version 1 is the initial version).
+    // When adding v2, match on `_from < 2` and apply changes.
+    raw["schemaVersion"] = serde_json::json!(to);
+    Ok(raw)
+}
+
 /// Load configuration from file or return default
 pub async fn load() -> Result<Config> {
     let klyntbot_path = config_path()?;
@@ -38,7 +51,20 @@ pub async fn load() -> Result<Config> {
             .await
             .map_err(ConfigError::Io)?;
 
-        let config: Config = serde_json::from_str(&content)
+        let mut raw: Value = serde_json::from_str(&content)
+            .map_err(|e| ConfigError::Invalid(format!("Failed to parse config: {}", e)))?;
+
+        let file_version = raw["schemaVersion"].as_u64().unwrap_or(1) as u32;
+        if file_version < CURRENT_SCHEMA_VERSION {
+            raw = migrate_config(raw, file_version, CURRENT_SCHEMA_VERSION)?;
+            let config: Config = serde_json::from_value(raw).map_err(|e| {
+                ConfigError::Invalid(format!("Migration produced invalid config: {}", e))
+            })?;
+            save(&config).await?;
+            return Ok(config);
+        }
+
+        let config: Config = serde_json::from_value(raw)
             .map_err(|e| ConfigError::Invalid(format!("Failed to parse config: {}", e)))?;
 
         return Ok(config);
@@ -188,6 +214,44 @@ pub async fn init() -> Result<()> {
     Ok(())
 }
 
+/// Reload config from disk and return (new_config, diff, new_hot) compared to the previous HotConfig.
+///
+/// Uses `last_mtime` to skip re-parsing when the file hasn't been modified.
+/// Returns `None` if the file hasn't changed or can't be parsed (logs a warning).
+pub async fn reload_if_changed(
+    previous_hot: &HotConfig,
+    last_mtime: &mut Option<std::time::SystemTime>,
+) -> Option<(Config, HotConfigDiff, HotConfig)> {
+    // Quick mtime check to avoid unnecessary full parse
+    let path = match config_path() {
+        Ok(p) => p,
+        Err(_) => return None,
+    };
+    let current_mtime = std::fs::metadata(&path)
+        .ok()
+        .and_then(|m| m.modified().ok());
+    if current_mtime.is_some() && current_mtime == *last_mtime {
+        return None; // File hasn't been modified
+    }
+    *last_mtime = current_mtime;
+
+    match load().await {
+        Ok(config) => {
+            let new_hot = HotConfig::from(&config);
+            let diff = previous_hot.diff(&new_hot);
+            if diff.has_changes() {
+                Some((config, diff, new_hot))
+            } else {
+                None
+            }
+        }
+        Err(e) => {
+            tracing::warn!("config reload failed, keeping current config: {e}");
+            None
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -202,7 +266,7 @@ mod tests {
     #[test]
     fn test_default_config() {
         let config = Config::default();
-        assert_eq!(config.agents.defaults.model, "anthropic/claude-opus-4-5");
+        assert_eq!(config.agents.defaults.model, crate::schema::DEFAULT_MODEL);
         assert_eq!(config.agents.defaults.max_tokens, 8192);
     }
 
@@ -257,7 +321,7 @@ mod tests {
     fn test_agent_defaults() {
         let defaults = super::super::schema::AgentDefaults::default();
         assert_eq!(defaults.workspace, "~/.klyntbot/workspace");
-        assert_eq!(defaults.model, "anthropic/claude-opus-4-5");
+        assert_eq!(defaults.model, crate::schema::DEFAULT_MODEL);
         assert_eq!(defaults.max_tokens, 8192);
         assert_eq!(defaults.temperature, 0.7);
         assert_eq!(defaults.max_tool_iterations, 20);
@@ -612,5 +676,31 @@ mod tests {
 
         let diff = diff_json(&actual, &default);
         assert_eq!(diff, serde_json::json!({}));
+    }
+
+    #[test]
+    fn test_reload_if_changed_logic() {
+        use super::super::schema::hot::HotConfig;
+
+        // Simulate: config loaded at startup
+        let mut config_v1 = Config::default();
+        config_v1.agents.defaults.model = "model-v1".to_string();
+        let hot_v1 = HotConfig::from(&config_v1);
+
+        // Simulate: same config reloaded (no changes)
+        let hot_v1b = HotConfig::from(&config_v1);
+        assert!(!hot_v1.diff(&hot_v1b).has_changes(), "no changes expected");
+
+        // Simulate: config changed on disk
+        let mut config_v2 = Config::default();
+        config_v2.agents.defaults.model = "model-v2".to_string();
+        config_v2.agents.defaults.temperature = 0.9;
+        let hot_v2 = HotConfig::from(&config_v2);
+
+        let diff = hot_v1.diff(&hot_v2);
+        assert!(diff.has_changes());
+        assert!(diff.model_changed);
+        assert!(diff.temperature_changed);
+        assert!(!diff.max_tokens_changed);
     }
 }

@@ -15,6 +15,7 @@
 //! - `tools`: ToolsConfig, permissions, exec, web
 
 mod agents;
+mod autotuner;
 mod capture;
 mod channels;
 mod cognitive;
@@ -24,7 +25,9 @@ mod conversation;
 pub(crate) mod core;
 mod finance;
 mod gateway;
+pub mod hot;
 mod integrations;
+mod language;
 mod launcher;
 mod learning;
 mod mcp;
@@ -43,6 +46,7 @@ mod user;
 mod work_context;
 
 pub use self::agents::*;
+pub use self::autotuner::*;
 pub use self::capture::*;
 pub use self::channels::*;
 pub use self::cognitive::*;
@@ -53,6 +57,7 @@ pub use self::core::*;
 pub use self::finance::*;
 pub use self::gateway::*;
 pub use self::integrations::*;
+pub use self::language::*;
 pub use self::launcher::*;
 pub use self::learning::*;
 pub use self::mcp::*;
@@ -78,7 +83,7 @@ mod tests {
     #[test]
     fn test_config_default() {
         let config = Config::default();
-        assert_eq!(config.agents.defaults.model, "anthropic/claude-opus-4-5");
+        assert_eq!(config.agents.defaults.model, DEFAULT_MODEL);
         assert_eq!(config.agents.defaults.max_tokens, 8192);
         assert_eq!(config.agents.defaults.temperature, 0.7);
         assert_eq!(config.agents.defaults.max_tool_iterations, 20);

@@ -260,5 +260,26 @@ fn domain_for_event(event: &bus::DomainEvent) -> &'static str {
         bus::DomainEvent::ToolCallExecuted { .. } => "general",
         bus::DomainEvent::BehavioralPatternDetected { .. } => "learning",
         bus::DomainEvent::ContradictionDetected { .. } => "learning",
+        bus::DomainEvent::AutotunerDecision { .. } => "learning",
+        bus::DomainEvent::KnowledgeAtomCreated { .. }
+        | bus::DomainEvent::KnowledgeAtomAccepted { .. }
+        | bus::DomainEvent::KnowledgeAtomArchived { .. }
+        | bus::DomainEvent::AtomFlashcardReviewed { .. }
+        | bus::DomainEvent::AtomReinforced { .. }
+        | bus::DomainEvent::AtomInteracted { .. }
+        | bus::DomainEvent::RetentionMilestoneReached { .. }
+        | bus::DomainEvent::TranslationCompleted { .. }
+        | bus::DomainEvent::NoteStudied { .. }
+        | bus::DomainEvent::PracticeUnitCompleted { .. }
+        | bus::DomainEvent::PracticeSessionCompleted { .. }
+        | bus::DomainEvent::KnowledgeTransferDetected { .. }
+        | bus::DomainEvent::CoachingLearningDigest { .. }
+        | bus::DomainEvent::FlashcardSessionCompleted { .. } => "learning",
+        bus::DomainEvent::InterventionTriggered { .. } => "productivity",
+        bus::DomainEvent::MemoryPendingConfirmation { .. } => "memory",
+        bus::DomainEvent::SkillRouted { .. } => "agent",
+        bus::DomainEvent::TrialActivated { .. } => "autotuner",
+        bus::DomainEvent::MirrorTrialKilled { .. } => "mirror",
+        bus::DomainEvent::MirrorSnippetCreated { .. } => "mirror",
     }
 }

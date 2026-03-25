@@ -34,6 +34,7 @@ members = [
     "crates/klyntbot-server",
     "crates/feature-learning",
     "crates/platform-macos",
+    "crates/autotuner",
 ]
 
 [workspace.package]
@@ -74,6 +75,7 @@ feature-launcher = { path = "crates/feature-launcher" }
 feature-learning = { path = "crates/feature-learning" }
 klyntbot-server = { path = "crates/klyntbot-server" }
 platform-macos = { path = "crates/platform-macos" }
+autotuner = { path = "crates/autotuner" }
 extism = "1"
 mcp = { path = "crates/mcp" }
 rmcp = { version = "0.17", default-features = false }

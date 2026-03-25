@@ -25,9 +25,9 @@ export function PeriodSelector({
           aria-label="Previous period"
           className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
         >
-          <ChevronLeft className="w-4 h-4" strokeWidth={1.5} />
+          <ChevronLeft className="size-4" strokeWidth={1.5} />
         </button>
-        <span className="text-[14px] font-medium text-foreground min-w-[160px] text-center">
+        <span className="text-sm font-medium text-foreground min-w-[160px] text-center">
           {label}
         </span>
         <button
@@ -36,7 +36,7 @@ export function PeriodSelector({
           aria-label="Next period"
           className="p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
         >
-          <ChevronRight className="w-4 h-4" strokeWidth={1.5} />
+          <ChevronRight className="size-4" strokeWidth={1.5} />
         </button>
       </div>
       <div className="flex gap-1 bg-card rounded-xl p-1 border border-border-subtle" role="tablist">

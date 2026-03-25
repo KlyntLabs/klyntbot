@@ -51,6 +51,6 @@ describe("PMSearchCursor", () => {
     const cursor = new PMSearchCursor("foo123bar", /(\d+)/g, 0);
     cursor.findNext();
     expect(cursor.match).not.toBeNull();
-    expect(cursor.match![1]).toBe("123");
+    expect(cursor.match?.[1]).toBe("123");
   });
 });

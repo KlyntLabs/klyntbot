@@ -36,7 +36,7 @@ function SkeletonLoader() {
       {[1, 2, 3].map((i) => (
         <div key={i} className="glass-card rounded-lg p-3 space-y-2 animate-pulse">
           <div className="flex items-center gap-2">
-            <div className="w-7 h-7 rounded-full bg-card" />
+            <div className="size-7 rounded-full bg-card" />
             <div className="space-y-1">
               <div className="h-3 bg-card rounded w-24" />
               <div className="h-2 bg-card rounded w-16" />
@@ -55,12 +55,12 @@ function DebateRoundView({ round }: { round: DebateState["rounds"][number] }) {
   return (
     <div className="space-y-2">
       <div className="flex items-center gap-2">
-        <span className="text-[10px] font-medium text-muted-foreground">Round {round.round}</span>
+        <span className="text-2xs font-medium text-muted-foreground">Round {round.round}</span>
         <span className="text-[9px] text-dim capitalize">({round.phase})</span>
       </div>
       <div className="space-y-2">
-        {round.personas.map((p, i) => (
-          <div key={`${p.personaId}-${round.round}-${i}`} className="glass-card rounded-lg p-3">
+        {round.personas.map((p) => (
+          <div key={`${p.personaId}-${round.round}`} className="glass-card rounded-lg p-3">
             <div className="flex items-center gap-2 mb-1.5">
               <span className="text-sm">{p.personaIcon}</span>
               <div>
@@ -69,7 +69,7 @@ function DebateRoundView({ round }: { round: DebateState["rounds"][number] }) {
               </div>
             </div>
             {p.challenge && (
-              <div className="text-[10px] text-purple-400/80 italic mb-1.5 pl-2 border-l-2 border-purple-400/30">
+              <div className="text-2xs text-purple-400/80 italic mb-1.5 pl-2 border-l-2 border-purple-400/30">
                 {p.challenge}
               </div>
             )}
@@ -92,8 +92,8 @@ function JudgeDecisionView({ decision }: { decision: DebateState["judgeDecisions
         : "bg-red-400";
 
   return (
-    <div className="glass-panel rounded-lg px-3 py-2 flex items-start gap-2 text-[10px]">
-      <div className={`w-2 h-2 rounded-full mt-0.5 shrink-0 ${dotColor}`} />
+    <div className="glass-panel rounded-lg px-3 py-2 flex items-start gap-2 text-2xs">
+      <div className={`size-2 rounded-full mt-0.5 shrink-0 ${dotColor}`} />
       <div className="flex-1 min-w-0">
         <p className="text-dim italic">{decision.reasoning}</p>
         <p className="text-muted-foreground mt-0.5">
@@ -113,11 +113,11 @@ function DebateView({ debate }: { debate: DebateState }) {
   return (
     <div className="space-y-3 border border-border/30 rounded-xl p-3 bg-white/[0.02]">
       <div className="flex items-center justify-between">
-        <span className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">
+        <span className="text-2xs font-medium text-muted-foreground uppercase tracking-wider">
           Squad Debate
         </span>
         {debate.consensusReached && (
-          <span className="text-[10px] text-green-400">Consensus reached</span>
+          <span className="text-2xs text-green-400">Consensus reached</span>
         )}
       </div>
       {debate.rounds.map((round) => {
@@ -151,10 +151,8 @@ function FallbackSections({
   if (sections.length === 0 && content) {
     return (
       <div className="space-y-4">
-        <div className="text-[10px] text-dim italic">
-          Perspectives (persona details unavailable)
-        </div>
-        <div className="text-[12px] text-muted-foreground leading-relaxed whitespace-pre-wrap">
+        <div className="text-2xs text-dim italic">Perspectives (persona details unavailable)</div>
+        <div className="text-xs text-muted-foreground leading-relaxed whitespace-pre-wrap">
           {content}
         </div>
       </div>
@@ -228,7 +226,7 @@ export function PerspectivesTab({
             type="button"
             onClick={onStartDebate}
             disabled={debateState.active && !debateState.consensusReached}
-            className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[10px] font-medium transition-colors ${
+            className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-2xs font-medium transition-colors ${
               debateState.active && !debateState.consensusReached
                 ? "bg-purple-500/20 text-purple-300 border border-purple-500/30 cursor-wait"
                 : "bg-white/[0.04] text-dim hover:text-purple-300 hover:bg-purple-500/10 border border-transparent hover:border-purple-500/20"
@@ -258,7 +256,7 @@ export function PerspectivesTab({
                       <div className="text-[9px] text-dim">{persona.role}</div>
                     </div>
                   </div>
-                  <div className="text-[10px] text-dim italic">Generating...</div>
+                  <div className="text-2xs text-dim italic">Generating...</div>
                 </div>
               );
             }

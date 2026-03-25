@@ -93,43 +93,38 @@ pub(super) fn spawn_post_core_services(
     shutdown_token: &CancellationToken,
 ) {
     // Start ActivityLogSubscriber for domain event normalization.
+    // The subscriber's background task runs until the shutdown token is cancelled.
+    // We intentionally drop the handle here — the spawned task is self-contained
+    // and will stop when the token fires.
     let _activity_subscriber = activity_log::ActivityLogSubscriber::start(
         domain_event_bus,
         activity_svc,
         shutdown_token.clone(),
     );
 
-    // Spawn daily analytics retention cleanup + semantic fact pruning.
-    {
-        let repos_bg = core.repos.clone();
-        let cog_pool = core.repos.pool().clone();
-        let token = shutdown_token.clone();
-        tokio::spawn(async move {
-            let mut interval = tokio::time::interval(std::time::Duration::from_secs(24 * 60 * 60));
-            interval.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
-            // Skip first tick (don't run immediately on startup).
-            interval.tick().await;
-            loop {
-                tokio::select! {
-                    _ = interval.tick() => {
-                        match repos_bg.cleanup_analytics().await {
-                            Ok(0) => {}
-                            Ok(n) => info!(deleted = n, "analytics retention: cleaned up old records"),
-                            Err(e) => warn!(error = %e, "analytics retention cleanup failed"),
-                        }
+    // Analytics retention cleanup + semantic fact pruning is handled by CronService
+    // (registered in init/cron.rs as __klyntbot_analytics_cleanup).
 
-                        // Prune low-salience semantic facts (confidence < 0.05, untouched for 180+ days).
-                        let fact_repo = cognitive::SemanticFactRepo::new(cog_pool.clone());
-                        match fact_repo.prune_low_salience(0.05, 180).await {
-                            Ok(0) => {}
-                            Ok(n) => info!(pruned = n, "cognitive: pruned low-salience facts"),
-                            Err(e) => warn!(error = %e, "cognitive: fact pruning failed"),
-                        }
-                    }
-                    _ = token.cancelled() => break,
-                }
+    // Start atom extraction service (auto-extract concepts from notes).
+    if let Some(ref provider) = core.cognitive_provider {
+        // try_read() is fine here — config lock is uncontested during init
+        if let Ok(config) = core.config.try_read() {
+            let extraction_config = config.cognitive.atom_extraction.clone();
+            drop(config);
+            if extraction_config.enabled {
+                let pool = core.storage_pool.inner().clone();
+                let bus = Arc::clone(domain_event_bus);
+                let token = shutdown_token.child_token();
+                cognitive::services::atom_extraction::AtomExtractionService::start(
+                    pool,
+                    provider.clone(),
+                    bus,
+                    extraction_config,
+                    token,
+                );
+                info!("atom extraction service started");
             }
-        });
+        }
     }
 
     // Spawn event log persistence — writes domain & pipeline events to DB.

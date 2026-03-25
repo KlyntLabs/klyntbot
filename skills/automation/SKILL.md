@@ -9,6 +9,7 @@ metadata:
   author: klyntbot
   version: "2.0.0"
   klyntbot:
+    summary: Cron job scheduling, reminders, recurring tasks, and time-based automation.
     type: orchestrator
     tools: [cron, spawn, ask_user, memory, productivity]
     mcp_tools: []
@@ -85,6 +86,7 @@ and automated workflows using the cron system.
 | every sunday at 6pm | `cron_expr: "0 18 * * 0"` |
 
 See `references/cron.md` for the complete time expression guide.
+Quick cron expression reference: `scripts/cron_cheatsheet.md`.
 
 ## Handoffs
 

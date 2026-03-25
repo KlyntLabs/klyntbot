@@ -55,6 +55,11 @@ If you know the exact tool and action, call it directly -- it's faster:
 
 Use the agent tool for **complex, multi-step, or ambiguous** requests only.
 
+**Trigger precision:** This skill should ONLY trigger when the request genuinely requires
+multi-tool orchestration or AI reasoning. Single-tool operations should use the specific
+skill directly. If you know the exact tool and action, calling it directly is faster and
+more reliable than routing through the agent.
+
 ## Common Mistakes
 
 1. **Using agent for simple single-tool actions** — If you know the exact tool and action, call it directly. Agent adds latency and cost for simple operations.

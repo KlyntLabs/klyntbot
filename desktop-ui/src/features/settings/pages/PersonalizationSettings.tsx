@@ -1,6 +1,7 @@
 import { SettingsCard } from "@shared/composites";
 import { ipc } from "@shared/hooks/useIpc";
 import { useQuery } from "@shared/hooks/useQuery";
+import { useToastContext } from "@shared/hooks/useToast";
 import { SaveButton, SecretInput, Toggle } from "@shared/ui";
 import { useState } from "react";
 import { ThemeSwitcher } from "../components/ThemeSwitcher";
@@ -62,6 +63,7 @@ interface CognitiveData {
   temperature?: number;
   maxTokens?: number;
   reflectionMaxTokens?: number;
+  atomExtraction?: { enabled?: boolean };
 }
 
 interface LearningData {
@@ -72,9 +74,16 @@ interface LearningData {
   minOutcomesForAdaptation?: number;
 }
 
+interface ProviderManagerData {
+  primary?: string;
+  fallback?: string;
+  classifierModel?: string;
+}
+
 // ── Component ────────────────────────────────────────────────────────
 
 export function PersonalizationSettings() {
+  const toast = useToastContext();
   const { data: providers, refetch: refetchProviders } = useQuery<ProvidersData>(
     "config_get_section",
     { section: "providers" },
@@ -96,6 +105,12 @@ export function PersonalizationSettings() {
   const { data: cognitive, refetch: refetchCognitive } = useQuery<CognitiveData>(
     "config_get_section",
     { section: "cognitive" },
+    {},
+  );
+
+  const { data: providerManager, refetch: refetchProviderManager } = useQuery<ProviderManagerData>(
+    "config_get_section",
+    { section: "providerManager" },
     {},
   );
 
@@ -160,8 +175,8 @@ export function PersonalizationSettings() {
       refetchProviders();
       refetchAgents();
       setProviderEdits({});
-    } catch (e) {
-      console.error("Failed to save provider config:", e);
+    } catch {
+      toast.show("Failed to save provider config");
     } finally {
       setSavingProvider(false);
     }
@@ -189,8 +204,8 @@ export function PersonalizationSettings() {
       });
       refetchLearning();
       setLearningEdits({});
-    } catch (e) {
-      console.error("Failed to save learning config:", e);
+    } catch {
+      toast.show("Failed to save learning config");
     } finally {
       setSavingLearning(false);
     }
@@ -222,13 +237,45 @@ export function PersonalizationSettings() {
       if ("model" in cognitiveEdits) patch.model = cognitiveEdits.model || null;
       if ("temperature" in cognitiveEdits) patch.temperature = cognitiveEdits.temperature;
       if ("maxTokens" in cognitiveEdits) patch.maxTokens = cognitiveEdits.maxTokens;
+      if ("atomExtraction.enabled" in cognitiveEdits) {
+        patch.atomExtraction = { enabled: cognitiveEdits["atomExtraction.enabled"] };
+      }
       await ipc("config_update_section", { section: "cognitive", patch });
       refetchCognitive();
       setCognitiveEdits({});
-    } catch (e) {
-      console.error("Failed to save cognitive config:", e);
+    } catch {
+      toast.show("Failed to save cognitive config");
     } finally {
       setSavingCognitive(false);
+    }
+  };
+
+  // ── Provider Manager state ──────────────────────────────────────
+
+  const [pmEdits, setPmEdits] = useState<Record<string, unknown>>({});
+  const [savingPm, setSavingPm] = useState(false);
+
+  const pmVal = (key: string): string => {
+    if (key in pmEdits) return (pmEdits[key] ?? "") as string;
+    return ((providerManager as Record<string, unknown>)[key] ?? "") as string;
+  };
+
+  const hasPmChanges = Object.keys(pmEdits).length > 0;
+
+  const saveProviderManager = async () => {
+    setSavingPm(true);
+    try {
+      const patch: Record<string, unknown> = {};
+      for (const [k, v] of Object.entries(pmEdits)) {
+        patch[k] = v || null;
+      }
+      await ipc("config_update_section", { section: "providerManager", patch });
+      setPmEdits({});
+      refetchProviderManager();
+    } catch {
+      toast.show("Failed to save provider routing config");
+    } finally {
+      setSavingPm(false);
     }
   };
 
@@ -255,7 +302,7 @@ export function PersonalizationSettings() {
               <select
                 value={editedProvider}
                 onChange={(e) => handleProviderChange(e.target.value)}
-                className="w-full px-3 py-1.5 text-[12px] text-foreground bg-accent border border-border rounded-md focus:outline-none focus:border-brand/50 transition-colors"
+                className="w-full px-3 py-1.5 text-xs text-foreground bg-accent border border-border rounded-md focus:outline-none focus:border-brand/50 transition-colors"
               >
                 <option value="" className="bg-popover">
                   Auto-detect
@@ -292,7 +339,7 @@ export function PersonalizationSettings() {
                       setProviderEdits((prev) => ({ ...prev, apiBase: e.target.value }))
                     }
                     placeholder="Leave blank for default"
-                    className="w-full px-3 py-1.5 text-[12px] text-foreground bg-accent border border-border rounded-md focus:outline-none focus:border-brand/50 transition-colors placeholder:text-dim"
+                    className="w-full px-3 py-1.5 text-xs text-foreground bg-accent border border-border rounded-md focus:outline-none focus:border-brand/50 transition-colors placeholder:text-dim"
                   />
                 </label>
               </>
@@ -305,7 +352,7 @@ export function PersonalizationSettings() {
                 value={editedModel}
                 onChange={(e) => setProviderEdits((prev) => ({ ...prev, model: e.target.value }))}
                 placeholder="e.g. anthropic/claude-opus-4-5"
-                className="w-full px-3 py-1.5 text-[12px] text-foreground bg-accent border border-border rounded-md focus:outline-none focus:border-brand/50 transition-colors placeholder:text-dim"
+                className="w-full px-3 py-1.5 text-xs text-foreground bg-accent border border-border rounded-md focus:outline-none focus:border-brand/50 transition-colors placeholder:text-dim"
               />
             </label>
 
@@ -335,7 +382,7 @@ export function PersonalizationSettings() {
                     model: "",
                   }))
                 }
-                className="w-full px-3 py-1.5 text-[12px] text-foreground bg-accent border border-border rounded-md focus:outline-none focus:border-brand/50 transition-colors"
+                className="w-full px-3 py-1.5 text-xs text-foreground bg-accent border border-border rounded-md focus:outline-none focus:border-brand/50 transition-colors"
               >
                 <option value="" className="bg-popover">
                   Same as main ({PROVIDERS.find((p) => p.value === editedProvider)?.label || "auto"}
@@ -357,7 +404,7 @@ export function PersonalizationSettings() {
                   onChange={(e) =>
                     setCognitiveEdits((prev) => ({ ...prev, model: e.target.value }))
                   }
-                  className="w-full px-3 py-1.5 text-[12px] text-foreground bg-accent border border-border rounded-md focus:outline-none focus:border-brand/50 transition-colors"
+                  className="w-full px-3 py-1.5 text-xs text-foreground bg-accent border border-border rounded-md focus:outline-none focus:border-brand/50 transition-colors"
                 >
                   <option value="" className="bg-popover">
                     Same as main agent model
@@ -377,14 +424,33 @@ export function PersonalizationSettings() {
                     setCognitiveEdits((prev) => ({ ...prev, model: e.target.value }))
                   }
                   placeholder="Leave blank to use main agent model"
-                  className="w-full px-3 py-1.5 text-[12px] text-foreground bg-accent border border-border rounded-md focus:outline-none focus:border-brand/50 transition-colors placeholder:text-dim"
+                  className="w-full px-3 py-1.5 text-xs text-foreground bg-accent border border-border rounded-md focus:outline-none focus:border-brand/50 transition-colors placeholder:text-dim"
                 />
               )}
             </div>
 
+            <div className="flex items-center justify-between pt-1 border-t border-border">
+              <div>
+                <span className="text-xs text-muted-foreground">Auto-extract knowledge atoms</span>
+                <p className="text-[11px] text-dim">
+                  Automatically extract concepts and facts from notes
+                </p>
+              </div>
+              <Toggle
+                checked={
+                  "atomExtraction.enabled" in cognitiveEdits
+                    ? (cognitiveEdits["atomExtraction.enabled"] as boolean)
+                    : (cognitive.atomExtraction?.enabled ?? true)
+                }
+                onChange={(v) =>
+                  setCognitiveEdits((prev) => ({ ...prev, "atomExtraction.enabled": v }))
+                }
+              />
+            </div>
+
             {hasCognitiveChanges && (
               <>
-                <p className="text-[10px] text-warning/80">Changes take effect after restart</p>
+                <p className="text-2xs text-warning/80">Changes take effect after restart</p>
                 <SaveButton onClick={saveCognitive} saving={savingCognitive} />
               </>
             )}
@@ -396,7 +462,7 @@ export function PersonalizationSettings() {
           <div className="space-y-3">
             <div className="flex items-center justify-between">
               <div>
-                <span className="text-[12px] text-muted-foreground">Enable learning</span>
+                <span className="text-xs text-muted-foreground">Enable learning</span>
                 <p className="text-[11px] text-dim">
                   Adaptive confidence thresholds based on outcomes
                 </p>
@@ -422,7 +488,7 @@ export function PersonalizationSettings() {
                 }
                 step="60"
                 min="60"
-                className="w-full px-3 py-1.5 text-[12px] text-foreground bg-accent border border-border rounded-md focus:outline-none focus:border-brand/50 transition-colors"
+                className="w-full px-3 py-1.5 text-xs text-foreground bg-accent border border-border rounded-md focus:outline-none focus:border-brand/50 transition-colors"
               />
             </label>
 
@@ -441,7 +507,7 @@ export function PersonalizationSettings() {
                   step="0.05"
                   min="0"
                   max="1"
-                  className="w-full px-3 py-1.5 text-[12px] text-foreground bg-accent border border-border rounded-md focus:outline-none focus:border-brand/50 transition-colors"
+                  className="w-full px-3 py-1.5 text-xs text-foreground bg-accent border border-border rounded-md focus:outline-none focus:border-brand/50 transition-colors"
                 />
               </label>
               <label className="flex-1">
@@ -458,7 +524,7 @@ export function PersonalizationSettings() {
                   step="0.05"
                   min="0"
                   max="1"
-                  className="w-full px-3 py-1.5 text-[12px] text-foreground bg-accent border border-border rounded-md focus:outline-none focus:border-brand/50 transition-colors"
+                  className="w-full px-3 py-1.5 text-xs text-foreground bg-accent border border-border rounded-md focus:outline-none focus:border-brand/50 transition-colors"
                 />
               </label>
             </div>
@@ -477,11 +543,76 @@ export function PersonalizationSettings() {
                   }))
                 }
                 min="1"
-                className="w-full px-3 py-1.5 text-[12px] text-foreground bg-accent border border-border rounded-md focus:outline-none focus:border-brand/50 transition-colors"
+                className="w-full px-3 py-1.5 text-xs text-foreground bg-accent border border-border rounded-md focus:outline-none focus:border-brand/50 transition-colors"
               />
             </label>
 
             {hasLearningChanges && <SaveButton onClick={saveLearning} saving={savingLearning} />}
+          </div>
+        </SettingsCard>
+
+        {/* ── Provider Routing ──────────────────────────────────── */}
+        <SettingsCard title="Provider routing">
+          <div className="space-y-3">
+            <p className="text-[11px] text-dim">
+              Configure primary and fallback providers for automatic failover
+            </p>
+
+            <label className="block">
+              <span className="block text-[11px] text-muted-foreground mb-1">Primary provider</span>
+              <select
+                value={pmVal("primary")}
+                onChange={(e) => setPmEdits((prev) => ({ ...prev, primary: e.target.value }))}
+                className="w-full px-3 py-1.5 text-xs text-foreground bg-accent border border-border rounded-md focus:outline-none focus:border-brand/50 transition-colors"
+              >
+                <option value="" className="bg-popover">
+                  Auto (use agent default)
+                </option>
+                {PROVIDERS.map((p) => (
+                  <option key={p.value} value={p.value} className="bg-popover">
+                    {p.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+
+            <label className="block">
+              <span className="block text-[11px] text-muted-foreground mb-1">
+                Fallback provider
+              </span>
+              <select
+                value={pmVal("fallback")}
+                onChange={(e) => setPmEdits((prev) => ({ ...prev, fallback: e.target.value }))}
+                className="w-full px-3 py-1.5 text-xs text-foreground bg-accent border border-border rounded-md focus:outline-none focus:border-brand/50 transition-colors"
+              >
+                <option value="" className="bg-popover">
+                  None
+                </option>
+                {PROVIDERS.map((p) => (
+                  <option key={p.value} value={p.value} className="bg-popover">
+                    {p.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+
+            <label className="block">
+              <span className="block text-[11px] text-muted-foreground mb-1">Classifier model</span>
+              <p className="text-[11px] text-dim mb-1">
+                Model used to classify request complexity for routing decisions
+              </p>
+              <input
+                type="text"
+                value={pmVal("classifierModel")}
+                onChange={(e) =>
+                  setPmEdits((prev) => ({ ...prev, classifierModel: e.target.value }))
+                }
+                placeholder="e.g. claude-haiku"
+                className="w-full px-3 py-1.5 text-xs text-foreground bg-accent border border-border rounded-md focus:outline-none focus:border-brand/50 transition-colors placeholder:text-dim"
+              />
+            </label>
+
+            {hasPmChanges && <SaveButton onClick={saveProviderManager} saving={savingPm} />}
           </div>
         </SettingsCard>
       </div>

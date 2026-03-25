@@ -83,6 +83,9 @@ pub struct AgentLoopBuilder {
     pipeline_tx: Option<tokio::sync::broadcast::Sender<cognitive::PipelineEvent>>,
     user_situation: Option<Arc<tokio::sync::Mutex<cognitive::situation::UserSituation>>>,
     activity_svc: Option<Arc<activity_log::ActivityIngestionService>>,
+    autotuner: Option<Arc<crate::autotuner::AutoTunerOrchestrator>>,
+    active_view: Option<Arc<tokio::sync::RwLock<Option<context_engine::ActiveView>>>>,
+    hot_config: Option<Arc<RwLock<config::HotConfig>>>,
 }
 
 impl AgentLoopBuilder {
@@ -101,6 +104,9 @@ impl AgentLoopBuilder {
             pipeline_tx: None,
             user_situation: None,
             activity_svc: None,
+            autotuner: None,
+            active_view: None,
+            hot_config: None,
         }
     }
 
@@ -163,6 +169,27 @@ impl AgentLoopBuilder {
         self
     }
 
+    pub fn with_autotuner(
+        mut self,
+        orchestrator: Arc<crate::autotuner::AutoTunerOrchestrator>,
+    ) -> Self {
+        self.autotuner = Some(orchestrator);
+        self
+    }
+
+    pub fn with_active_view(
+        mut self,
+        view: Arc<tokio::sync::RwLock<Option<context_engine::ActiveView>>>,
+    ) -> Self {
+        self.active_view = Some(view);
+        self
+    }
+
+    pub fn with_hot_config(mut self, hot_config: Arc<RwLock<config::HotConfig>>) -> Self {
+        self.hot_config = Some(hot_config);
+        self
+    }
+
     /// Consume the builder and construct an [`AgentLoop`].
     pub async fn build(mut self) -> Result<AgentLoop> {
         let bus = self.bus;
@@ -179,6 +206,10 @@ impl AgentLoopBuilder {
                 e
             )))
         })?;
+
+        let hot_config = self.hot_config.unwrap_or_else(|| {
+            Arc::new(tokio::sync::RwLock::new(config::HotConfig::from(&config)))
+        });
 
         // ── Create repos from pool (real or in-memory fallback) ──────────
         // Storage-dependent features (todo, finance, sessions) are disabled via
@@ -233,6 +264,25 @@ impl AgentLoopBuilder {
         // Build reference files map for SkillContextSource
         let reference_files = Arc::new(skill_system::discovery::builtin_reference_map());
 
+        // Build skill reference index for progressive loading
+        let skill_reference_index = {
+            let mut skill_bodies = std::collections::HashMap::new();
+            let mut ref_files = std::collections::HashMap::new();
+
+            for pkg in skill_catalog.all_skills() {
+                skill_bodies.insert(pkg.name.clone(), pkg.body.clone());
+            }
+
+            // Re-key reference files from "builtin::skill/references/name.md" to "skill/name"
+            for (key, content) in reference_files.iter() {
+                if let Some((skill_name, ref_name)) = parse_reference_key(key) {
+                    ref_files.insert(format!("{}/{}", skill_name, ref_name), content.clone());
+                }
+            }
+
+            Arc::new(tools::SkillReferenceIndex::new(skill_bodies, ref_files))
+        };
+
         // Shared active profile — written by AgentRuntime, read by SkillContextSource
         let active_profile: Arc<
             tokio::sync::RwLock<Option<Arc<skill_system::types::SkillPackage>>>,
@@ -276,7 +326,7 @@ impl AgentLoopBuilder {
             Box::new(BootstrapSource::new(workspace.clone())),
             Box::new(SessionContextSource::new(repos.clone())),
             Box::new(AreaSource::new(repos.areas.clone())),
-            Box::new(TodoSource::new(repos.actions.clone())),
+            Box::new(TodoSource::new(repos.tasks.clone())),
             Box::new(skill_system::context::SkillContextSource::new(
                 Arc::clone(&active_profile),
                 Arc::clone(&activated_skills),
@@ -491,9 +541,12 @@ impl AgentLoopBuilder {
             provider.clone(),
             config.agents.defaults.model.clone(),
         ));
+        let token_counter = context_engine::token_counter_for_model(
+            &config.agents.defaults.model,
+        );
         let context_engine = context_engine::ContextEngine::new()
             .with_sources(sources)
-            .with_token_counter(context_engine::best_token_counter())
+            .with_token_counter(Arc::clone(&token_counter))
             .with_summary_provider(summary_provider);
 
         // ── Session manager (SQL-backed) ──────────────────────────────────
@@ -566,9 +619,9 @@ impl AgentLoopBuilder {
 
         // Cron tool (optional)
         let cron_handler: Option<Arc<dyn tools::cron_tool::CronHandler>> =
-            if let Some(cron_svc) = self.cron_service {
+            if let Some(ref cron_svc) = self.cron_service {
                 let adapter: Arc<dyn tools::cron_tool::CronHandler> =
-                    Arc::new(CronHandlerAdapter::new(cron_svc));
+                    Arc::new(CronHandlerAdapter::new(Arc::clone(cron_svc)));
                 tool_registry.register(CronTool::with_handler(Arc::clone(&adapter)));
                 Some(adapter)
             } else {
@@ -628,6 +681,7 @@ impl AgentLoopBuilder {
             };
 
         // ── Wire memory retrieval + InsightForge ─────────────────────
+        let mut memory_service_for_shadow: Option<Arc<cognitive::UnifiedMemoryService>> = None;
         let context_engine = if let Some(fact_repo) = cognitive_fact_repo {
             let mut retriever = cognitive::UnifiedMemoryService::new(fact_repo)
                 .with_recall_opt(recall_service.clone())
@@ -638,7 +692,16 @@ impl AgentLoopBuilder {
             if let Some(ref sit) = self.user_situation {
                 retriever = retriever.with_situation(Arc::clone(sit));
             }
-            let retriever: Arc<dyn context_engine::MemoryRetriever> = Arc::new(retriever);
+            // Wire live champion memory params into retrieval
+            if let Some(ref orchestrator) = self.autotuner {
+                if let Some(sink) = orchestrator.memory_param_sink() {
+                    retriever = retriever.with_champion_overrides(sink);
+                }
+            }
+            let memory_service = Arc::new(retriever);
+            memory_service_for_shadow = Some(Arc::clone(&memory_service));
+            let retriever: Arc<dyn context_engine::MemoryRetriever> =
+                memory_service as Arc<dyn context_engine::MemoryRetriever>;
 
             // Create InsightForge with the same retriever
             let forge_config = context_engine::InsightForgeConfig {
@@ -793,6 +856,26 @@ impl AgentLoopBuilder {
         } else {
             context_engine
         };
+
+        // Phase 2: Wire LLM provider + config model for query rewriting fallback
+        let rewriter_provider = self.cognitive_provider.clone();
+        let rewriter_model = config.agents.rewriter_model.clone();
+        let mut query_rewriter = crate::adapters::query_rewriter::ContextualQueryRewriter::new(
+            rewriter_provider,
+            rewriter_model,
+            800, // 800ms hard cap per spec
+        );
+
+        // Phase 3: Wire autotuner champion overrides for rewrite params
+        if let Some(ref orchestrator) = self.autotuner {
+            if let Some(sink) = orchestrator.memory_param_sink() {
+                query_rewriter = query_rewriter.with_champion_overrides(sink);
+            }
+        }
+
+        let query_rewriter: Arc<dyn context_engine::QueryRewriter> = Arc::new(query_rewriter);
+        let context_engine = context_engine.with_query_rewriter(query_rewriter);
+
         let context_engine = Arc::new(context_engine);
 
         // Outputs for MemoryTool — populated inside the pool block if embedding is enabled
@@ -864,7 +947,7 @@ impl AgentLoopBuilder {
                 Arc::new(crate::adapters::progress::ProgressHandlerImpl::new(
                     repos.key_results.clone(),
                     repos.objectives.clone(),
-                    repos.actions.clone(),
+                    repos.tasks.clone(),
                 ));
             task_tool = task_tool.with_progress_handler(Arc::clone(&progress_handler));
 
@@ -950,7 +1033,7 @@ impl AgentLoopBuilder {
         // ── Project tool ────────────────────────────────────────────────
         tool_registry.register(ProjectTool::new(
             repos.projects.clone(),
-            repos.actions.clone(),
+            repos.tasks.clone(),
         ));
         // ── Annotate tool ──────────────────────────────────────────────────
         tool_registry.register(tools::AnnotateTool::new(cognitive::AnnotationRepo::new(
@@ -972,7 +1055,7 @@ impl AgentLoopBuilder {
             if let Some(ref handler) = conversation_recall_handler {
                 let mut memory_tool = tools::MemoryTool::new()
                     .with_conversation_handler(Arc::clone(handler))
-                    .with_todo_repo(repos.actions.clone())
+                    .with_todo_repo(repos.tasks.clone())
                     .with_threshold(config.conversation.search.semantic_threshold)
                     .with_rrf_k(config.todo.search.rrf_k);
 
@@ -1147,7 +1230,9 @@ impl AgentLoopBuilder {
         // ── MCP tools (Model Context Protocol) ──────────────────────────
         let mcp_manager = if config.mcp.has_active_servers() {
             // connect_all logs startup progress internally via tracing
-            let manager = mcp::McpManager::connect_all(&config.mcp, None).await;
+            let manager =
+                mcp::McpManager::connect_all(&config.mcp, None, mcp::McpClientOptions::default())
+                    .await;
             let mcp_tools = manager.tools();
             let tool_count = mcp_tools.len();
             for tool in mcp_tools {
@@ -1164,6 +1249,11 @@ impl AgentLoopBuilder {
         } else {
             None
         };
+
+        // ── Skill reference tool (progressive loading) ───────────────────
+        tool_registry.register(tools::SkillReferenceTool::new(Arc::clone(
+            &skill_reference_index,
+        )));
 
         // ── Confidence evaluator ──────────────────────────────────────────
         let confidence_evaluator = if config.confidence.enabled {
@@ -1187,7 +1277,7 @@ impl AgentLoopBuilder {
         // ── Reminder engine ───────────────────────────────────────────────
         let reminder_engine = if let Some(ref dispatcher) = notification_dispatcher {
             let mut engine = super::super::ReminderEngine::new(
-                repos.actions.clone(),
+                repos.tasks.clone(),
                 Arc::clone(dispatcher),
                 std::time::Duration::from_secs(300),
             );
@@ -1199,7 +1289,7 @@ impl AgentLoopBuilder {
 
         // ── Recurring task spawner ────────────────────────────────────────
         let mut recurring_spawner = super::super::RecurringTaskSpawner::new(
-            repos.actions.clone(),
+            repos.tasks.clone(),
             config.timezone.clone(),
             std::time::Duration::from_secs(60),
         );
@@ -1260,7 +1350,26 @@ impl AgentLoopBuilder {
                 ));
             }
             service.start();
-            Some(Arc::new(RwLock::new(service)))
+            let svc_arc = Arc::new(RwLock::new(service));
+
+            // Register cron handler so the learning analysis shows in the Automations page.
+            // The handler triggers the existing background loop rather than running inline.
+            if let Some(ref cron_svc) = self.cron_service {
+                let svc_for_cron = Arc::clone(&svc_arc);
+                cron_svc.register_handler(
+                    "__klyntbot_learning_analysis",
+                    Arc::new(move |_job: &scheduling::CronJob| {
+                        let svc = Arc::clone(&svc_for_cron);
+                        // Trigger the analysis via the existing Notify mechanism
+                        if let Ok(guard) = svc.try_read() {
+                            guard.trigger_analysis();
+                        }
+                        Ok(Some("Learning analysis triggered".to_string()))
+                    }),
+                );
+            }
+
+            Some(svc_arc)
         } else {
             None
         };
@@ -1277,10 +1386,33 @@ impl AgentLoopBuilder {
             )))
         });
 
+        // ── MCP health check (auto-reconnect downed servers) ─────────────
+        let mcp_manager_arc = Arc::new(tokio::sync::Mutex::new(mcp_manager));
+        let mcp_health_check_token = {
+            let mgr_guard = mcp_manager_arc.lock().await;
+            if mgr_guard.is_some() {
+                drop(mgr_guard);
+                Some(CancellationToken::new())
+            } else {
+                None
+            }
+        };
+
         // ── Agent Runtime ─────────────────────────────────────────────────
         let tool_registry = Arc::new(RwLock::new(tool_registry));
+
+        // Start health check now that tool_registry is wrapped in Arc<RwLock<>>
+        if let Some(ref token) = mcp_health_check_token {
+            let _health_handle = mcp::McpManager::start_health_check(
+                Arc::clone(&mcp_manager_arc),
+                Arc::clone(&tool_registry),
+                token.clone(),
+            );
+        }
+
         let mut execution_core =
-            crate::execution::ExecutionCore::new(provider.clone(), Arc::clone(&tool_registry));
+            crate::execution::ExecutionCore::new(provider.clone(), Arc::clone(&tool_registry))
+                .with_token_counter(Arc::clone(&token_counter));
         if let Some(ref recorder) = outcome_recorder {
             execution_core = execution_core.with_outcome_recorder(Arc::clone(recorder));
         }
@@ -1299,12 +1431,18 @@ impl AgentLoopBuilder {
         let router =
             crate::intent_pipeline::router::ExecutionRouter::new(direct_engine, reactive_engine);
 
-        let analyzer = crate::intent_pipeline::analysis::IntentAnalyzer::new(
+        let mut analyzer = crate::intent_pipeline::analysis::IntentAnalyzer::new(
             provider.clone(),
             &config.agents.defaults.model,
             &config.orchestrator,
         )
-        .with_strategy_repo(repos.strategies.clone());
+        .with_strategy_repo(repos.strategies.clone())
+        .with_shadow_mode();
+
+        // Wire live autotuner reference into IntentAnalyzer for per-message threshold reads
+        if let Some(ref orchestrator) = self.autotuner {
+            analyzer = analyzer.with_autotuner(Arc::clone(orchestrator));
+        }
 
         let cost_tracker = Arc::new(
             crate::output::CostTracker::from_repo(storage::UsageRepo::new(
@@ -1321,6 +1459,7 @@ impl AgentLoopBuilder {
             channel: "unknown".to_string(),
             provider_name: provider.name().to_string(),
             scenario_max_graph_depth: config.scenario.max_graph_depth,
+            pipeline_timeout_secs: config.agents.defaults.pipeline_timeout_secs,
         };
 
         // ── Interaction recorder ──────────────────────────────────────────
@@ -1341,8 +1480,11 @@ impl AgentLoopBuilder {
             cost_tracker,
             runtime_config,
             Arc::clone(&active_profile),
+            Arc::clone(&hot_config),
         )
-        .with_strategy_repo(repos.strategies.clone());
+        .with_strategy_repo(repos.strategies.clone())
+        .with_activated_skills(Arc::clone(&activated_skills))
+        .with_embedding_engine(Arc::clone(&embedding_engine));
 
         if let Some(evaluator) = confidence_evaluator {
             runtime = runtime.with_confidence_evaluator(Arc::new(evaluator));
@@ -1359,6 +1501,57 @@ impl AgentLoopBuilder {
         // Inject tool registry for delegation support
         runtime = runtime.with_tool_registry(Arc::clone(&tool_registry));
 
+        // Inject user situation for RetrievalContext
+        if let Some(ref sit) = self.user_situation {
+            runtime = runtime.with_user_situation(Arc::clone(sit));
+        }
+
+        // Wire task repo for active task context in query rewriting
+        runtime = runtime.with_task_repo(repos.tasks.clone());
+
+        // Inject active view for RetrievalContext
+        if let Some(ref view) = self.active_view {
+            runtime = runtime.with_active_view(Arc::clone(view));
+        }
+
+        // Inject autotuner shadow hook
+        if let Some(ref orchestrator) = self.autotuner {
+            // Build the concrete AutoTunerHook for shadow classification
+            if let Some(ref pool) = self.pool {
+                let trial_repo = storage::TrialRepo::new(pool.clone());
+                let mut hook = crate::autotuner::hooks::AutoTunerHookImpl::new(
+                    Arc::clone(orchestrator),
+                    trial_repo,
+                    provider.clone(),
+                    &config.agents.defaults.model,
+                    &config.orchestrator,
+                );
+
+                // Wire Phase 2 shadow retriever if memory service is available
+                if let Some(ref mem_svc) = memory_service_for_shadow {
+                    let config_defaults = [
+                        config.cognitive.relevance_weight_semantic,
+                        config.cognitive.relevance_weight_retrievability,
+                        config.cognitive.relevance_weight_importance,
+                        config.cognitive.relevance_weight_frequency,
+                        config.cognitive.relevance_weight_situation,
+                        config.cognitive.relevance_weight_temporal,
+                    ];
+                    let shadow_retriever = Arc::new(
+                        crate::autotuner::shadow_retriever::AgentShadowRetriever::new(
+                            Arc::clone(mem_svc),
+                            config_defaults,
+                        ),
+                    );
+                    hook = hook.with_shadow_retriever(
+                        shadow_retriever as Arc<dyn autotuner::ShadowRetriever>,
+                    );
+                }
+
+                runtime = runtime.with_autotuner_hook(Arc::new(hook));
+            }
+        }
+
         // Inject squad execution dependencies (requires pool for SquadRepo)
         if let Some(ref pool) = self.pool {
             let squad_repo = cognitive::SquadRepo::new(pool.clone());
@@ -1373,6 +1566,11 @@ impl AgentLoopBuilder {
                 runtime.with_squad_deps(squad_repo, squad_provider, squad_params, blackboard_repo);
         }
 
+        // Inject domain event bus for SkillRouted event emission
+        if let Some(ref domain_bus) = self.domain_event_bus {
+            runtime = runtime.with_domain_bus(Arc::clone(domain_bus));
+        }
+
         let runtime = Arc::new(runtime);
 
         // Two-phase init: set the self-reference for delegation after Arc wrapping
@@ -1380,37 +1578,9 @@ impl AgentLoopBuilder {
 
         info!("Agent runtime initialized");
 
-        // ── Session cleanup service ───────────────────────────────────────
-        let session_cleanup_token = if self.pool.is_some() {
-            let token = CancellationToken::new();
-            let cleanup_service = crate::services::session_cleanup::SessionCleanupService::new(
-                storage::SessionRepo::new(storage_pool.inner().clone()),
-                config.conversation.session.ttl_days,
-                config.conversation.session.cleanup_interval_hours,
-                token.clone(),
-            );
-            cleanup_service.spawn();
-            Some(token)
-        } else {
-            None
-        };
-
-        // ── Memory maintenance service ────────────────────────────────────
-        let memory_maintenance_token =
-            if let (Some(_), Some(vs)) = (&self.pool, self.vector_store.clone()) {
-                let token = CancellationToken::new();
-                let maintenance_service =
-                    crate::services::memory_maintenance::MemoryMaintenanceService::new(
-                        vs,
-                        config.conversation.memory.max_age_days,
-                        config.conversation.memory.maintenance_interval_hours,
-                        token.clone(),
-                    );
-                maintenance_service.spawn();
-                Some(token)
-            } else {
-                None
-            };
+        // Session cleanup and memory maintenance are handled by CronService
+        // (registered in app-core/init/cron.rs as __klyntbot_session_cleanup
+        // and __klyntbot_memory_maintenance).
 
         // ── Assemble AgentLoop ────────────────────────────────────────────
         let history_limit = config.conversation.session.history_limit;
@@ -1431,15 +1601,25 @@ impl AgentLoopBuilder {
             runtime,
             strategy_repo: Some(repos.strategies.clone()),
             history_limit,
-            _session_cleanup_token: session_cleanup_token,
-            _memory_maintenance_token: memory_maintenance_token,
-            mcp_manager: tokio::sync::Mutex::new(mcp_manager),
-            _domain_event_bus: self.domain_event_bus,
+            _session_cleanup_token: None,
+            _memory_maintenance_token: None,
+            mcp_manager: Arc::clone(&mcp_manager_arc),
+            _mcp_health_check_token: mcp_health_check_token,
+            domain_event_bus: self.domain_event_bus,
+            trial_repo: if self.autotuner.is_some() {
+                self.pool
+                    .as_ref()
+                    .map(|p| storage::TrialRepo::new(p.clone()))
+            } else {
+                None
+            },
             cognitive_bg_service: tokio::sync::Mutex::new(cognitive_bg_service),
             _inference_loop_token,
             activity_svc: self.activity_svc,
             skill_catalog,
             skill_router,
+            embedding_engine,
+            hot_config,
         })
     }
 }
@@ -1453,4 +1633,28 @@ impl AgentLoop {
     ) -> AgentLoopBuilder {
         AgentLoopBuilder::new(bus, provider, config)
     }
+}
+
+/// Parse a reference file key into (skill_name, reference_name).
+fn parse_reference_key(key: &str) -> Option<(String, String)> {
+    // Format: "builtin::{skill}/references/{name}.md"
+    if let Some(rest) = key.strip_prefix("builtin::") {
+        let parts: Vec<&str> = rest.splitn(2, "/references/").collect();
+        if parts.len() == 2 {
+            let name = parts[1].strip_suffix(".md").unwrap_or(parts[1]);
+            return Some((parts[0].to_string(), name.to_string()));
+        }
+    }
+    // Format: "{path}/references/{name}.md"
+    if let Some(idx) = key.find("/references/") {
+        let skill_path = &key[..idx];
+        let skill_name = std::path::Path::new(skill_path)
+            .file_name()
+            .and_then(|n| n.to_str())
+            .unwrap_or(skill_path);
+        let name = &key[idx + "/references/".len()..];
+        let name = name.strip_suffix(".md").unwrap_or(name);
+        return Some((skill_name.to_string(), name.to_string()));
+    }
+    None
 }

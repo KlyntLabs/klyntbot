@@ -110,7 +110,7 @@ export function SelfAssessmentTab({
             <button
               type="button"
               onClick={onRevealAll}
-              className="text-[10px] text-muted-foreground hover:text-foreground transition-colors"
+              className="text-2xs text-muted-foreground hover:text-foreground transition-colors"
             >
               Reveal all answers
             </button>
@@ -125,7 +125,7 @@ export function SelfAssessmentTab({
         return (
           <div key={q.id} className="rounded-lg bg-card border border-border-subtle p-4 space-y-3">
             <div className="flex items-start justify-between gap-2">
-              <span className="text-[12px] text-foreground leading-relaxed">{q.question}</span>
+              <span className="text-xs text-foreground leading-relaxed">{q.question}</span>
               <span className="text-[9px] px-1.5 py-0.5 rounded bg-accent text-dim shrink-0">
                 {q.difficulty}
               </span>
@@ -166,7 +166,7 @@ export function SelfAssessmentTab({
                       onClick={() => onAnswer(q.id, choice)}
                       className={choiceClass}
                     >
-                      <span className="text-[10px] text-dim shrink-0 w-4">{label}</span>
+                      <span className="text-2xs text-dim shrink-0 w-4">{label}</span>
                       <span>{choice}</span>
                     </button>
                   );
@@ -187,7 +187,7 @@ export function SelfAssessmentTab({
               <button
                 type="button"
                 onClick={() => onReveal(q.id)}
-                className="text-[10px] px-3 py-1 rounded-md bg-purple/20 text-purple hover:bg-purple/30 transition-colors"
+                className="text-2xs px-3 py-1 rounded-md bg-purple/20 text-purple hover:bg-purple/30 transition-colors"
               >
                 Check
               </button>
@@ -195,11 +195,11 @@ export function SelfAssessmentTab({
 
             {isRevealed && (
               <div className="pt-2 border-t border-border-subtle">
-                <div className="text-[10px] text-muted-foreground leading-relaxed">
+                <div className="text-2xs text-muted-foreground leading-relaxed">
                   <span className="font-medium text-muted-foreground">Correct: </span>
                   {q.correctAnswer}
                 </div>
-                <div className="text-[10px] text-dim mt-1">{q.explanation}</div>
+                <div className="text-2xs text-dim mt-1">{q.explanation}</div>
               </div>
             )}
           </div>
@@ -216,7 +216,7 @@ export function SelfAssessmentTab({
         >
           {scenarioLoading ? (
             <>
-              <span className="w-3 h-3 border border-brand/40 border-t-brand rounded-full animate-spin" />
+              <span className="size-3 border border-brand/40 border-t-brand rounded-full animate-spin" />
               Generating scenario...
             </>
           ) : (
@@ -228,7 +228,7 @@ export function SelfAssessmentTab({
         </button>
       )}
       {scenarioError && !scenario && (
-        <p className="text-[10px] text-destructive mt-1">Failed to generate scenario. Try again.</p>
+        <p className="text-2xs text-destructive mt-1">Failed to generate scenario. Try again.</p>
       )}
 
       {scenario && <ScenarioChallenge scenario={scenario} />}

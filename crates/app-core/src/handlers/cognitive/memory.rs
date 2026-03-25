@@ -224,6 +224,62 @@ impl AppCore {
         })
     }
 
+    // -- Knowledge Trust ------------------------------------------------------
+
+    pub async fn memory_health(&self) -> Result<MemoryHealthResponse, ApiError> {
+        use agent::autotuner::KNOWLEDGE_TRUST_SNAPSHOT_KEY;
+        use cognitive::DomainHealthRow;
+
+        let fact_repo = SemanticFactRepo::new(self.repos.pool().clone());
+        let domains = fact_repo
+            .fact_health_by_domain(90)
+            .await
+            .map_err(map_cognitive_err)?;
+
+        let overall = DomainHealthRow::average_health(&domains);
+
+        // Single pass: aggregate totals and build DTO entries together
+        let mut total_facts_90d: i64 = 0;
+        let mut fast_failures_90d: i64 = 0;
+        let mut domain_entries = Vec::with_capacity(domains.len());
+        for d in &domains {
+            total_facts_90d += d.total_facts;
+            fast_failures_90d += d.fast_failures;
+            domain_entries.push(DomainHealthEntry {
+                domain: d.domain.clone(),
+                score: d.health_score(),
+                total_facts: d.total_facts,
+                active_facts: d.active_facts,
+                fast_failures: d.fast_failures,
+            });
+        }
+
+        // Read-only: trend is computed from a snapshot persisted by the autotuner cron,
+        // not written here (writing on every UI read would corrupt the delta).
+        let trend_pct = if let Ok(Some(snapshot)) = self
+            .repos
+            .learning_state
+            .get_value(KNOWLEDGE_TRUST_SNAPSHOT_KEY)
+            .await
+        {
+            snapshot
+                .get("score")
+                .and_then(|s| s.as_f64())
+                .map(|prev| overall - prev)
+        } else {
+            None
+        };
+
+        Ok(MemoryHealthResponse {
+            overall,
+            domains: domain_entries,
+            total_facts_90d,
+            fast_failures_90d,
+            trend_pct,
+            computed_at: chrono::Utc::now().to_rfc3339(),
+        })
+    }
+
     // -- System Status --------------------------------------------------------
 
     pub async fn cognitive_system_status(&self) -> Result<SystemStatusResponse, ApiError> {

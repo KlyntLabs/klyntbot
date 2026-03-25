@@ -142,6 +142,9 @@ mod tests {
             tool_duration_ms: None,
             complexity_signals: serde_json::Value::Null,
             execution_mode: None,
+            retrieved_memory_count: None,
+            rewrite_triggered: 0,
+            rewrite_source: None,
         };
         repo.create(&row).await.unwrap();
 
@@ -195,6 +198,9 @@ mod tests {
             tool_duration_ms: Some(50),
             complexity_signals: serde_json::Value::Null,
             execution_mode: None,
+            retrieved_memory_count: None,
+            rewrite_triggered: 0,
+            rewrite_source: None,
         };
         repo.create(&row).await.unwrap();
 

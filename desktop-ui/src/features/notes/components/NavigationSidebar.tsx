@@ -69,6 +69,7 @@ export function NavigationSidebar({
   const notebookCount = notebooks.length;
 
   return (
+    // biome-ignore lint/a11y/noStaticElementInteractions: sidebar disables default context menu
     <div
       className="glass-sidebar flex flex-col min-h-0 h-full"
       onContextMenu={(e) => e.preventDefault()}
@@ -110,7 +111,7 @@ export function NavigationSidebar({
         />
 
         {/* Footer */}
-        <div className="mt-auto shrink-0 px-4 py-2 text-[10px] text-dim flex items-center gap-2">
+        <div className="mt-auto shrink-0 px-4 py-2 text-2xs text-dim flex items-center gap-2">
           <span>
             {noteCount} note{noteCount !== 1 ? "s" : ""}
           </span>

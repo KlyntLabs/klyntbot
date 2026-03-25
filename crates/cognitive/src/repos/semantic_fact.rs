@@ -4,6 +4,34 @@ use sqlx::SqlitePool;
 
 use crate::types::SemanticFact;
 
+/// Per-domain fact health statistics for the Knowledge Trust score.
+#[derive(Debug, Clone)]
+pub struct DomainHealthRow {
+    pub domain: String,
+    pub total_facts: i64,
+    pub active_facts: i64,
+    pub fast_failures: i64,
+}
+
+impl DomainHealthRow {
+    /// Health score: fraction of facts that were not fast failures.
+    /// Returns 1.0 for empty domains (no data = no problems).
+    pub fn health_score(&self) -> f64 {
+        if self.total_facts == 0 {
+            return 1.0;
+        }
+        ((self.total_facts - self.fast_failures) as f64 / self.total_facts as f64).clamp(0.0, 1.0)
+    }
+
+    /// Mean health score across domains. Returns 1.0 when the slice is empty.
+    pub fn average_health(domains: &[Self]) -> f64 {
+        if domains.is_empty() {
+            return 1.0;
+        }
+        domains.iter().map(|d| d.health_score()).sum::<f64>() / domains.len() as f64
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct SemanticFactRepo {
     pool: SqlitePool,
@@ -527,6 +555,85 @@ impl SemanticFactRepo {
 
         Ok(archived)
     }
+
+    /// Find vocabulary facts by exact subject match (CJK-safe, does NOT use FTS5).
+    /// Used for confusable word detection and "is_new" vocabulary checks.
+    pub async fn find_vocabulary_by_subject(
+        &self,
+        word: &str,
+    ) -> Result<Vec<SemanticFact>, sqlx::Error> {
+        sqlx::query_as::<_, SemanticFact>(
+            "SELECT * FROM semantic_facts WHERE domain = 'learning' AND memory_type = 'vocabulary' AND subject = ?1 AND superseded_at IS NULL",
+        )
+        .bind(word)
+        .fetch_all(&self.pool)
+        .await
+    }
+
+    /// Find vocabulary facts with subjects similar to the given word.
+    /// For CJK: matches any fact containing a character from the word.
+    /// For Latin: uses prefix match on the first 3 characters.
+    pub async fn find_similar_vocabulary(
+        &self,
+        word: &str,
+        limit: i64,
+    ) -> Result<Vec<SemanticFact>, sqlx::Error> {
+        let pattern = if word.chars().any(|c| c > '\u{2E80}') {
+            // CJK: search for any fact containing any character from the word
+            if let Some(first_char) = word.chars().next() {
+                format!("%{first_char}%")
+            } else {
+                return Ok(vec![]);
+            }
+        } else {
+            format!("{}%", &word[..word.len().min(3)])
+        };
+
+        sqlx::query_as::<_, SemanticFact>(
+            "SELECT * FROM semantic_facts WHERE domain = 'learning' AND memory_type = 'vocabulary' AND subject LIKE ?1 AND subject != ?2 AND superseded_at IS NULL LIMIT ?3",
+        )
+        .bind(&pattern)
+        .bind(word)
+        .bind(limit)
+        .fetch_all(&self.pool)
+        .await
+    }
+
+    /// Compute fact health per domain within a rolling window.
+    ///
+    /// For each domain, returns the total facts created in the window,
+    /// how many are still active (not superseded), and how many were
+    /// "fast failures" (superseded within 7 days of creation).
+    pub async fn fact_health_by_domain(
+        &self,
+        window_days: i64,
+    ) -> Result<Vec<DomainHealthRow>, sqlx::Error> {
+        let window = format!("-{window_days} days");
+        sqlx::query_as::<_, (String, i64, i64, i64)>(
+            "SELECT domain,
+                    COUNT(*) as total_facts,
+                    SUM(CASE WHEN superseded_at IS NULL THEN 1 ELSE 0 END) as active_facts,
+                    SUM(CASE WHEN superseded_at IS NOT NULL
+                         AND (julianday(superseded_at) - julianday(recorded_at)) < 7
+                         THEN 1 ELSE 0 END) as fast_failures
+             FROM semantic_facts
+             WHERE recorded_at >= datetime('now', ?1)
+             GROUP BY domain",
+        )
+        .bind(&window)
+        .fetch_all(&self.pool)
+        .await
+        .map(|rows| {
+            rows.into_iter()
+                .map(|(domain, total, active, fast)| DomainHealthRow {
+                    domain,
+                    total_facts: total,
+                    active_facts: active,
+                    fast_failures: fast,
+                })
+                .collect()
+        })
+    }
 }
 
 #[cfg(test)]
@@ -875,5 +982,233 @@ mod tests {
         let repo = SemanticFactRepo::new(pool);
         let reinstated = repo.reinstate_archived("nonexistent").await.unwrap();
         assert!(!reinstated);
+    }
+
+    // ── Knowledge Trust: fact_health_by_domain tests ─────────────────
+
+    #[tokio::test]
+    async fn fact_health_empty_returns_empty() {
+        let pool = crate::repos::cognitive_test_pool().await;
+        let repo = SemanticFactRepo::new(pool);
+        let result = repo.fact_health_by_domain(90).await.unwrap();
+        assert!(result.is_empty());
+    }
+
+    #[tokio::test]
+    async fn fact_health_all_active() {
+        let pool = crate::repos::cognitive_test_pool().await;
+        let repo = SemanticFactRepo::new(pool);
+
+        let fact = crate::types::SemanticFact {
+            id: "f1".into(),
+            domain: "work".into(),
+            subject: "user".into(),
+            predicate: "role".into(),
+            object: "engineer".into(),
+            confidence: 0.9,
+            source: "observed".into(),
+            valid_from: "2026-03-01".into(),
+            valid_until: None,
+            recorded_at: chrono::Utc::now().to_rfc3339(),
+            superseded_at: None,
+            superseded_by: None,
+            stability: 1.0,
+            last_accessed: None,
+            access_count: 0,
+            project_id: None,
+            memory_type: crate::types::DEFAULT_MEMORY_TYPE.to_string(),
+            scope_type: "system".to_string(),
+            scope_id: None,
+        };
+        repo.upsert(&fact).await.unwrap();
+
+        let result = repo.fact_health_by_domain(90).await.unwrap();
+        assert_eq!(result.len(), 1);
+        assert_eq!(result[0].domain, "work");
+        assert!((result[0].health_score() - 1.0).abs() < f64::EPSILON);
+    }
+
+    #[tokio::test]
+    async fn fact_health_with_fast_failure() {
+        let pool = crate::repos::cognitive_test_pool().await;
+        let repo = SemanticFactRepo::new(pool);
+
+        // Active fact
+        let f1 = crate::types::SemanticFact {
+            id: "f1".into(),
+            domain: "work".into(),
+            subject: "user".into(),
+            predicate: "role".into(),
+            object: "engineer".into(),
+            confidence: 0.9,
+            source: "observed".into(),
+            valid_from: "2026-03-01".into(),
+            valid_until: None,
+            recorded_at: chrono::Utc::now().to_rfc3339(),
+            superseded_at: None,
+            superseded_by: None,
+            stability: 1.0,
+            last_accessed: None,
+            access_count: 0,
+            project_id: None,
+            memory_type: crate::types::DEFAULT_MEMORY_TYPE.to_string(),
+            scope_type: "system".to_string(),
+            scope_id: None,
+        };
+        repo.upsert(&f1).await.unwrap();
+
+        // Fast failure: superseded 2 days after creation
+        let now = chrono::Utc::now();
+        let f2 = crate::types::SemanticFact {
+            id: "f2".into(),
+            domain: "work".into(),
+            subject: "user".into(),
+            predicate: "team".into(),
+            object: "wrong-team".into(),
+            confidence: 0.6,
+            source: "observed".into(),
+            valid_from: "2026-03-01".into(),
+            valid_until: None,
+            recorded_at: (now - chrono::Duration::days(3)).to_rfc3339(),
+            superseded_at: Some((now - chrono::Duration::days(1)).to_rfc3339()),
+            superseded_by: Some("f3".into()),
+            stability: 1.0,
+            last_accessed: None,
+            access_count: 0,
+            project_id: None,
+            memory_type: crate::types::DEFAULT_MEMORY_TYPE.to_string(),
+            scope_type: "system".to_string(),
+            scope_id: None,
+        };
+        repo.upsert(&f2).await.unwrap();
+
+        let result = repo.fact_health_by_domain(90).await.unwrap();
+        assert_eq!(result.len(), 1);
+        assert_eq!(result[0].total_facts, 2);
+        assert_eq!(result[0].fast_failures, 1);
+        // health = (2 - 1) / 2 = 0.5
+        assert!((result[0].health_score() - 0.5).abs() < f64::EPSILON);
+    }
+
+    #[tokio::test]
+    async fn fact_health_slow_supersession_not_penalized() {
+        let pool = crate::repos::cognitive_test_pool().await;
+        let repo = SemanticFactRepo::new(pool);
+
+        let now = chrono::Utc::now();
+
+        // Fact superseded after 30 days — NOT a fast failure (legitimate real-world change)
+        let f1 = crate::types::SemanticFact {
+            id: "f-slow".into(),
+            domain: "work".into(),
+            subject: "user".into(),
+            predicate: "company".into(),
+            object: "old-corp".into(),
+            confidence: 0.9,
+            source: "observed".into(),
+            valid_from: "2026-01-01".into(),
+            valid_until: None,
+            recorded_at: (now - chrono::Duration::days(60)).to_rfc3339(),
+            superseded_at: Some((now - chrono::Duration::days(20)).to_rfc3339()),
+            superseded_by: Some("f-new".into()),
+            stability: 1.0,
+            last_accessed: None,
+            access_count: 0,
+            project_id: None,
+            memory_type: crate::types::DEFAULT_MEMORY_TYPE.to_string(),
+            scope_type: "system".to_string(),
+            scope_id: None,
+        };
+        repo.upsert(&f1).await.unwrap();
+
+        let result = repo.fact_health_by_domain(90).await.unwrap();
+        assert_eq!(result.len(), 1);
+        assert_eq!(
+            result[0].fast_failures, 0,
+            "Slow supersession should NOT be a fast failure"
+        );
+        // health = (1 - 0) / 1 = 1.0
+        assert!((result[0].health_score() - 1.0).abs() < f64::EPSILON);
+    }
+
+    #[tokio::test]
+    async fn fact_health_per_domain_independent() {
+        let pool = crate::repos::cognitive_test_pool().await;
+        let repo = SemanticFactRepo::new(pool);
+
+        let now = chrono::Utc::now();
+
+        // Work domain: 1 active fact, health = 1.0
+        let f1 = crate::types::SemanticFact {
+            id: "f-work".into(),
+            domain: "work".into(),
+            subject: "user".into(),
+            predicate: "role".into(),
+            object: "engineer".into(),
+            confidence: 0.9,
+            source: "observed".into(),
+            valid_from: "2026-03-01".into(),
+            valid_until: None,
+            recorded_at: now.to_rfc3339(),
+            superseded_at: None,
+            superseded_by: None,
+            stability: 1.0,
+            last_accessed: None,
+            access_count: 0,
+            project_id: None,
+            memory_type: crate::types::DEFAULT_MEMORY_TYPE.to_string(),
+            scope_type: "system".to_string(),
+            scope_id: None,
+        };
+        repo.upsert(&f1).await.unwrap();
+
+        // Finance domain: 1 fast failure, health = 0.0
+        let f2 = crate::types::SemanticFact {
+            id: "f-finance".into(),
+            domain: "finance".into(),
+            subject: "user".into(),
+            predicate: "bank".into(),
+            object: "wrong-bank".into(),
+            confidence: 0.5,
+            source: "observed".into(),
+            valid_from: "2026-03-01".into(),
+            valid_until: None,
+            recorded_at: (now - chrono::Duration::days(3)).to_rfc3339(),
+            superseded_at: Some((now - chrono::Duration::days(1)).to_rfc3339()),
+            superseded_by: Some("f-fix".into()),
+            stability: 1.0,
+            last_accessed: None,
+            access_count: 0,
+            project_id: None,
+            memory_type: crate::types::DEFAULT_MEMORY_TYPE.to_string(),
+            scope_type: "system".to_string(),
+            scope_id: None,
+        };
+        repo.upsert(&f2).await.unwrap();
+
+        let result = repo.fact_health_by_domain(90).await.unwrap();
+        assert_eq!(result.len(), 2);
+
+        let work = result.iter().find(|d| d.domain == "work").unwrap();
+        let finance = result.iter().find(|d| d.domain == "finance").unwrap();
+        assert!(
+            (work.health_score() - 1.0).abs() < f64::EPSILON,
+            "Work should be 100%"
+        );
+        assert!(
+            (finance.health_score() - 0.0).abs() < f64::EPSILON,
+            "Finance should be 0%"
+        );
+    }
+
+    #[test]
+    fn domain_health_row_empty_returns_one() {
+        let row = DomainHealthRow {
+            domain: "test".into(),
+            total_facts: 0,
+            active_facts: 0,
+            fast_failures: 0,
+        };
+        assert!((row.health_score() - 1.0).abs() < f64::EPSILON);
     }
 }

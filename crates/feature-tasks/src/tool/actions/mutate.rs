@@ -68,6 +68,20 @@ impl TaskTool {
             completed: None,
             actual_minutes: None,
             objective_id: p.optional_str("objective_id")?.map(|s| Some(s.to_string())),
+            scheduled_start: p.optional_str("scheduled_start")?.map(|s| {
+                if s.is_empty() || s == "null" {
+                    None
+                } else {
+                    common::parse_datetime(s, &self.timezone)
+                }
+            }),
+            scheduled_end: p.optional_str("scheduled_end")?.map(|s| {
+                if s.is_empty() || s == "null" {
+                    None
+                } else {
+                    common::parse_datetime(s, &self.timezone)
+                }
+            }),
         };
 
         match self.repo.update(&patch).await {
@@ -200,6 +214,7 @@ impl TaskTool {
                                 complexity_score: task.complexity_score,
                                 energy_level: task.energy_level.as_ref().map(|e| e.to_string()),
                                 tags: task.tags.clone(),
+                                project_id: task.project_id.clone(),
                                 completed_at: Utc::now(),
                             };
                             if let Err(e) = self.repo.record_estimation(&estimation).await {

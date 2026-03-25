@@ -37,6 +37,8 @@ pub struct ContextEngine {
     sources: Vec<Box<dyn ContextSource>>,
     /// Optional InsightForge for multi-dimensional retrieval.
     insight_forge: Option<Arc<crate::insight_forge::InsightForge>>,
+    /// Optional query rewriter for contextual query enrichment.
+    query_rewriter: Option<Arc<dyn crate::rewriter::QueryRewriter>>,
 }
 
 impl Default for ContextEngine {
@@ -51,6 +53,7 @@ impl Default for ContextEngine {
             cache: Arc::new(Mutex::new(ContextCache::new(DEFAULT_CACHE_CAPACITY))),
             sources: Vec::new(),
             insight_forge: None,
+            query_rewriter: None,
         }
     }
 }
@@ -72,6 +75,7 @@ impl ContextEngine {
             cache: self.cache,
             sources: self.sources,
             insight_forge: self.insight_forge,
+            query_rewriter: self.query_rewriter,
         }
     }
 
@@ -117,6 +121,16 @@ impl ContextEngine {
     pub fn with_sources(mut self, mut sources: Vec<Box<dyn ContextSource>>) -> Self {
         sources.sort_by_key(|s| std::cmp::Reverse(s.priority()));
         self.sources = sources;
+        self
+    }
+
+    /// Wire a query rewriter for contextual query enrichment.
+    /// Returns `self` for chaining.
+    pub fn with_query_rewriter(
+        mut self,
+        rewriter: Arc<dyn crate::rewriter::QueryRewriter>,
+    ) -> Self {
+        self.query_rewriter = Some(rewriter);
         self
     }
 
@@ -167,7 +181,41 @@ impl ContextEngine {
     }
 
     pub async fn assemble(&self, request: ContextRequest) -> AssembledContext {
-        // Check cache first
+        self.assemble_with_prefetched(request, None).await
+    }
+
+    /// Run the expensive memory retrieval independently, before full context assembly.
+    ///
+    /// This allows callers to overlap memory retrieval with other work (e.g. intent
+    /// classification) and later inject the result via [`assemble_with_prefetched`].
+    pub async fn prefetch_memory(
+        &self,
+        message: &str,
+        session_key: Option<String>,
+        retrieval_context: Option<crate::RetrievalContext>,
+    ) -> Option<(String, usize, bool, Option<String>)> {
+        let request = ContextRequest {
+            message_text: message.to_string(),
+            history: vec![],
+            system_prompt: String::new(),
+            strategy: ExecutionStrategy::ToolAssisted { max_iterations: 5 },
+            tool_definitions: vec![],
+            context_window: 0,
+            session_key,
+            retrieval_context,
+        };
+        self.retrieve_memory(&request).await
+    }
+
+    /// Like [`assemble`] but accepts pre-fetched memory to skip the internal retrieval.
+    ///
+    /// If `prefetched_memory` is `Some`, the assembler uses it directly instead of
+    /// calling `retrieve_memory`. If `None`, falls back to the normal retrieval path.
+    pub async fn assemble_with_prefetched(
+        &self,
+        request: ContextRequest,
+        prefetched_memory: Option<(String, usize, bool, Option<String>)>,
+    ) -> AssembledContext {
         let cache_key = Self::compute_cache_key(&request);
         {
             let cache = self.cache.lock().await;
@@ -176,9 +224,10 @@ impl ContextEngine {
             }
         }
 
-        let result = self.assemble_uncached(&request).await;
+        let result = self
+            .assemble_uncached_with_memory(&request, prefetched_memory)
+            .await;
 
-        // Store in cache
         {
             let mut cache = self.cache.lock().await;
             cache.insert(cache_key, result.clone());
@@ -217,10 +266,26 @@ impl ContextEngine {
         }
         // Hash context window
         hasher.update(request.context_window.to_le_bytes());
+        // Hash retrieval context fields that affect cache identity
+        if let Some(ref ctx) = request.retrieval_context {
+            if let Some(ref skill) = ctx.active_skill {
+                hasher.update(skill.as_bytes());
+            }
+            if let Some(ref task) = ctx.active_task {
+                hasher.update(task.title.as_bytes());
+            }
+            if let Some(ref correction) = ctx.recent_correction {
+                hasher.update(correction.corrected_to.as_bytes());
+            }
+        }
         format!("{:x}", hasher.finalize())
     }
 
-    async fn assemble_uncached(&self, request: &ContextRequest) -> AssembledContext {
+    async fn assemble_uncached_with_memory(
+        &self,
+        request: &ContextRequest,
+        prefetched: Option<(String, usize, bool, Option<String>)>,
+    ) -> AssembledContext {
         let mut allocator = BudgetAllocator::new(BudgetConfig::standard(request.context_window));
 
         // 1. System prompt always gets allocated first
@@ -239,10 +304,20 @@ impl ContextEngine {
         // 3. Retrieve memories and allocate budget (Priority::RetrievedMemory)
         // Skip memory retrieval only for Clarification mode (no RAG needed).
         // DirectResponse still needs retrieval for personalized conversational answers.
-        let memory_content = match &request.strategy {
-            ExecutionStrategy::Clarification { .. } => None,
-            _ => self.retrieve_memory(request).await,
-        };
+        let (memory_content, retrieved_memory_count, rewrite_triggered, rewrite_source) =
+            match &request.strategy {
+                ExecutionStrategy::Clarification { .. } => (None, 0, false, None),
+                _ => {
+                    if let Some((text, count, rw, src)) = prefetched {
+                        (Some(text), count, rw, src)
+                    } else {
+                        match self.retrieve_memory(request).await {
+                            Some((text, count, rw, src)) => (Some(text), count, rw, src),
+                            None => (None, 0, false, None),
+                        }
+                    }
+                }
+            };
         let memory_tokens = memory_content
             .as_deref()
             .map(|c| self.estimate_text(c))
@@ -350,23 +425,102 @@ impl ContextEngine {
             inventory,
             budget_remaining,
             version: 0,
+            retrieved_memory_count,
+            rewrite_triggered,
+            rewrite_source,
         }
     }
 
     /// Retrieve relevant memories for the request via embedding-based retrieval.
-    async fn retrieve_memory(&self, request: &ContextRequest) -> Option<String> {
+    /// Returns (formatted text, entry count, rewrite_triggered, rewrite_source).
+    async fn retrieve_memory(
+        &self,
+        request: &ContextRequest,
+    ) -> Option<(String, usize, bool, Option<String>)> {
         let retriever = self.memory_retriever.as_ref()?;
+
+        // Phase 2: Background race — heuristic immediate, LLM races with InsightForge
+        let (enriched, late_rx) = match (&self.query_rewriter, &request.retrieval_context) {
+            (Some(rewriter), Some(ctx)) => {
+                let (tx, rx) = tokio::sync::oneshot::channel();
+                let result = rewriter
+                    .rewrite_or_spawn(&request.message_text, ctx, Some(tx))
+                    .await;
+                if result.is_some() {
+                    (result, None) // Heuristic hit — no need for background channel
+                } else {
+                    (None, Some(rx)) // LLM may be running in background
+                }
+            }
+            _ => (None, None),
+        };
+
+        // Track rewrite metadata for instrumentation (mut: updated if late LLM arrives)
+        let mut rewrite_triggered = enriched.is_some();
+        let mut rewrite_source = enriched.as_ref().map(|r| match r.source {
+            crate::rewriter::RewriteSource::Heuristic => "heuristic".to_string(),
+            crate::rewriter::RewriteSource::Llm => "llm".to_string(),
+        });
+
+        if let Some(ref e) = enriched {
+            tracing::debug!(
+                enriched_query = e.enriched_query.as_str(),
+                confidence = e.confidence,
+                "🧠 ContextEngine: passing enriched query to InsightForge"
+            );
+        }
 
         // Use InsightForge if available and appropriate
         let entries = if let Some(ref forge) = self.insight_forge {
             if forge.should_activate(&request.strategy, &request.message_text) {
-                forge
-                    .retrieve(
+                let forge_result = forge
+                    .retrieve_with_enrichment(
                         &request.message_text,
+                        enriched.as_ref(),
                         self.memory_retrieval_limit,
                         request.session_key.as_deref(),
                     )
-                    .await
+                    .await;
+
+                // Check if background LLM finished during InsightForge execution
+                if let Some(mut late_rx) = late_rx {
+                    match late_rx.try_recv() {
+                        Ok(llm_result) => {
+                            // Update instrumentation to capture the late LLM rewrite
+                            rewrite_triggered = true;
+                            rewrite_source = Some("llm".to_string());
+                            tracing::debug!(
+                                enriched = llm_result.enriched_query.as_str(),
+                                "🏁 LLM finished during InsightForge — supplementary search"
+                            );
+                            // Quick supplementary retrieval with the LLM-enriched query
+                            let supplement = retriever
+                                .retrieve(
+                                    &llm_result.enriched_query,
+                                    self.memory_retrieval_limit / 2,
+                                )
+                                .await;
+                            let existing_ids: std::collections::HashSet<String> =
+                                forge_result.iter().map(|e| e.id.clone()).collect();
+                            let mut merged = forge_result;
+                            for entry in supplement {
+                                if !existing_ids.contains(&entry.id) {
+                                    merged.push(entry);
+                                }
+                            }
+                            merged.truncate(self.memory_retrieval_limit);
+                            merged
+                        }
+                        Err(_) => {
+                            tracing::debug!(
+                                "⏱️ LLM didn't finish during InsightForge — using original results"
+                            );
+                            forge_result
+                        }
+                    }
+                } else {
+                    forge_result
+                }
             } else {
                 retriever
                     .retrieve(&request.message_text, self.memory_retrieval_limit)
@@ -380,6 +534,8 @@ impl ContextEngine {
         if entries.is_empty() {
             return None;
         }
+
+        let entry_count = entries.len();
 
         let (facts, rest): (Vec<_>, Vec<_>) = entries
             .into_iter()
@@ -420,7 +576,7 @@ impl ContextEngine {
             }
         }
 
-        Some(text)
+        Some((text, entry_count, rewrite_triggered, rewrite_source))
     }
 
     fn estimate_text(&self, text: &str) -> usize {
@@ -544,6 +700,7 @@ mod tests {
             tool_definitions,
             context_window,
             session_key: None,
+            retrieval_context: None,
         }
     }
 
@@ -629,6 +786,7 @@ mod tests {
 
             context_window: 128_000,
             session_key: None,
+            retrieval_context: None,
         };
         let result = engine.assemble(request).await;
         // Should have at least the system message
@@ -685,6 +843,7 @@ mod tests {
 
             context_window: 128_000,
             session_key: None,
+            retrieval_context: None,
         };
         let result = engine.assemble(request).await;
         // ZeroCounter returns 0 for all text → token_count for user + system messages = 0
@@ -715,6 +874,7 @@ mod tests {
 
             context_window: 128_000,
             session_key: None,
+            retrieval_context: None,
         };
 
         let doubled = engine.assemble(make_req()).await;
@@ -770,6 +930,7 @@ mod tests {
 
             context_window: 128_000,
             session_key: None,
+            retrieval_context: None,
         };
 
         let result = engine.assemble(request).await;
@@ -819,6 +980,7 @@ mod tests {
             tool_definitions: vec![],
             context_window: 128_000,
             session_key: None,
+            retrieval_context: None,
         };
 
         let result = engine.assemble(request).await;
@@ -850,12 +1012,14 @@ mod tests {
             tool_definitions: vec![],
             context_window: 128_000,
             session_key: None,
+            retrieval_context: None,
         };
 
         let result = engine.assemble(request).await;
 
         // Clarification mode should NOT include memory
         assert_eq!(result.messages.len(), 1);
+        assert_eq!(result.retrieved_memory_count, 0);
         assert!(result
             .budget_report
             .per_priority
@@ -873,6 +1037,7 @@ mod tests {
             tool_definitions: vec![],
             context_window: 4096,
             session_key: None,
+            retrieval_context: None,
         };
         let key1 = ContextEngine::compute_cache_key(&req);
         let key2 = ContextEngine::compute_cache_key(&req);
@@ -895,6 +1060,7 @@ mod tests {
 
             context_window: 128_000,
             session_key: None,
+            retrieval_context: None,
         };
 
         let result = engine.assemble(request).await;
@@ -930,6 +1096,7 @@ mod tests {
             tool_definitions: vec![],
             context_window: 1000, // very small window — ~850 input budget
             session_key: None,
+            retrieval_context: None,
         };
         let result = engine.assemble(request).await;
 
@@ -1004,6 +1171,7 @@ mod tests {
             // all 20 messages (~70 tokens total).
             context_window: 50,
             session_key: None,
+            retrieval_context: None,
         };
 
         engine.assemble(request).await;
@@ -1060,6 +1228,9 @@ mod tests {
             inventory: ContextInventory::new(),
             budget_remaining: 5000,
             version: 0,
+            retrieved_memory_count: 0,
+            rewrite_triggered: false,
+            rewrite_source: None,
         };
         initial.inventory.upsert(ContextInventoryItem {
             source_name: "deferred_test".into(),
@@ -1097,6 +1268,9 @@ mod tests {
             inventory: ContextInventory::new(),
             budget_remaining: 5000,
             version: 0,
+            retrieved_memory_count: 0,
+            rewrite_triggered: false,
+            rewrite_source: None,
         };
 
         let ctx = test_source_context();
@@ -1130,9 +1304,17 @@ mod tests {
             tool_definitions: vec![],
             context_window: 128_000,
             session_key: None,
+            retrieval_context: None,
         };
 
         let result = engine.assemble(request).await;
+
+        // Verify retrieved_memory_count matches the number of mock entries
+        assert_eq!(
+            result.retrieved_memory_count, 2,
+            "Should report 2 retrieved memory entries"
+        );
+
         if let Message::System { content } = &result.messages[1] {
             assert!(
                 content.contains("## Relevant Facts"),
@@ -1167,10 +1349,70 @@ mod tests {
             inventory: ContextInventory::new(),
             budget_remaining: 5,
             version: 0,
+            retrieved_memory_count: 0,
+            rewrite_triggered: false,
+            rewrite_source: None,
         };
 
         let ctx = test_source_context();
         let result = engine.expand(&initial, "deferred_test", &ctx).await;
         assert!(result.is_err());
+    }
+
+    fn test_request() -> ContextRequest {
+        ContextRequest {
+            message_text: "test query".to_string(),
+            history: vec![Message::user("hello")],
+            system_prompt: "You are helpful.".to_string(),
+            strategy: ExecutionStrategy::DirectResponse,
+            tool_definitions: vec![],
+            context_window: 128_000,
+            session_key: None,
+            retrieval_context: None,
+        }
+    }
+
+    #[test]
+    fn cache_key_varies_by_skill() {
+        let mut req1 = test_request();
+        req1.retrieval_context = Some(crate::rewriter::RetrievalContext {
+            active_skill: Some("finance-management".into()),
+            ..Default::default()
+        });
+        let mut req2 = test_request();
+        req2.retrieval_context = Some(crate::rewriter::RetrievalContext {
+            active_skill: Some("task-management".into()),
+            ..Default::default()
+        });
+        assert_ne!(
+            ContextEngine::compute_cache_key(&req1),
+            ContextEngine::compute_cache_key(&req2),
+        );
+    }
+
+    #[test]
+    fn cache_key_varies_by_task() {
+        let mut req1 = test_request();
+        req1.retrieval_context = Some(crate::rewriter::RetrievalContext {
+            active_task: Some(crate::rewriter::ActiveTaskContext {
+                title: "March budget review".into(),
+                project_name: None,
+                domain: None,
+            }),
+            ..Default::default()
+        });
+        let mut req2 = test_request();
+        req2.retrieval_context = Some(crate::rewriter::RetrievalContext {
+            active_task: Some(crate::rewriter::ActiveTaskContext {
+                title: "API migration".into(),
+                project_name: None,
+                domain: None,
+            }),
+            ..Default::default()
+        });
+        assert_ne!(
+            ContextEngine::compute_cache_key(&req1),
+            ContextEngine::compute_cache_key(&req2),
+        );
     }
 }

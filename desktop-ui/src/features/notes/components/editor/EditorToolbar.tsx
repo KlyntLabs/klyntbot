@@ -5,7 +5,6 @@ import {
   AlignRight,
   Bold,
   Code,
-  Columns,
   Expand,
   GitGraph,
   Heading1,
@@ -15,6 +14,7 @@ import {
   History,
   ImageIcon,
   Italic,
+  Languages,
   Link,
   List,
   ListChecks,
@@ -22,6 +22,7 @@ import {
   Minus,
   Quote,
   Sparkles,
+  StickyNote,
   Strikethrough,
   Table,
   Underline as UnderlineIcon,
@@ -40,11 +41,13 @@ interface EditorToolbarProps {
   onToggleFocusMode?: () => void;
   onToggleGraphMode?: () => void;
   onToggleVersionHistory?: () => void;
-  onToggleSplitMode?: () => void;
+  onTogglePracticeMode?: () => void;
+  onToggleAnnotationPane?: () => void;
+  practiceActive?: boolean;
+  annotationPaneActive?: boolean;
   focusModeActive?: boolean;
   graphModeActive?: boolean;
   versionHistoryActive?: boolean;
-  splitModeActive?: boolean;
 }
 
 interface ToolbarButton {
@@ -232,28 +235,44 @@ export function EditorToolbar({
   onToggleFocusMode,
   onToggleGraphMode,
   onToggleVersionHistory,
-  onToggleSplitMode,
+  onTogglePracticeMode,
+  onToggleAnnotationPane,
+  practiceActive,
+  annotationPaneActive,
   focusModeActive,
   graphModeActive,
   versionHistoryActive,
-  splitModeActive,
 }: EditorToolbarProps) {
   if (!editor) return null;
 
   const modeButtons = (
     <div className="flex items-center gap-0.5 ml-auto">
-      {onToggleSplitMode && (
+      {onTogglePracticeMode && (
         <button
           type="button"
-          onClick={onToggleSplitMode}
-          title="Split-pane editor"
+          onClick={onTogglePracticeMode}
+          title="Practice mode (⇧⌘P)"
           className={`p-1.5 rounded-lg transition-all ${
-            splitModeActive
-              ? "bg-brand/15 text-brand"
+            practiceActive
+              ? "bg-purple/15 text-purple"
               : "text-dim hover:text-muted-foreground hover:bg-card"
           }`}
         >
-          <Columns className="w-3.5 h-3.5" strokeWidth={1.5} />
+          <Languages className="size-3.5" strokeWidth={1.5} />
+        </button>
+      )}
+      {onToggleAnnotationPane && (
+        <button
+          type="button"
+          onClick={onToggleAnnotationPane}
+          title="Annotation pane (⇧⌘A)"
+          className={`p-1.5 rounded-lg transition-all ${
+            annotationPaneActive
+              ? "bg-purple/15 text-purple"
+              : "text-dim hover:text-muted-foreground hover:bg-card"
+          }`}
+        >
+          <StickyNote className="size-3.5" strokeWidth={1.5} />
         </button>
       )}
       {onGenerateCards && (
@@ -268,7 +287,7 @@ export function EditorToolbar({
           title="Generate flashcards from note (or selection)"
           className="p-1.5 rounded-lg transition-all text-dim hover:text-muted-foreground hover:bg-card"
         >
-          <Sparkles className="w-3.5 h-3.5" strokeWidth={1.5} />
+          <Sparkles className="size-3.5" strokeWidth={1.5} />
         </button>
       )}
       {onToggleFocusMode && (
@@ -282,7 +301,7 @@ export function EditorToolbar({
               : "text-dim hover:text-muted-foreground hover:bg-card"
           }`}
         >
-          <Expand className="w-3.5 h-3.5" strokeWidth={1.5} />
+          <Expand className="size-3.5" strokeWidth={1.5} />
         </button>
       )}
       {onToggleGraphMode && (
@@ -296,7 +315,7 @@ export function EditorToolbar({
               : "text-dim hover:text-muted-foreground hover:bg-card"
           }`}
         >
-          <GitGraph className="w-3.5 h-3.5" strokeWidth={1.5} />
+          <GitGraph className="size-3.5" strokeWidth={1.5} />
         </button>
       )}
       {onToggleVersionHistory && (
@@ -310,7 +329,7 @@ export function EditorToolbar({
               : "text-dim hover:text-muted-foreground hover:bg-card"
           }`}
         >
-          <History className="w-3.5 h-3.5" strokeWidth={1.5} />
+          <History className="size-3.5" strokeWidth={1.5} />
         </button>
       )}
     </div>
@@ -332,9 +351,12 @@ export function EditorToolbar({
 
   return (
     <div className="glass-toolbar rounded-lg px-2 py-1 flex items-center gap-0.5 flex-wrap">
-      {groups.map((group, gi) => (
-        <div key={gi} className="flex items-center gap-0.5">
-          {gi > 0 && <div className="w-px h-4 bg-muted mx-1.5" />}
+      {groups.map((group, groupIdx) => (
+        <div
+          key={`toolbar-group-${group[0]?.label ?? groupIdx}`}
+          className="flex items-center gap-0.5"
+        >
+          {groupIdx > 0 && <div className="w-px h-4 bg-muted mx-1.5" />}
           {group.map((btn) => {
             const Icon = btn.icon;
             const active = btn.isActive?.(editor) ?? false;
@@ -344,13 +366,13 @@ export function EditorToolbar({
                 type="button"
                 onClick={() => btn.action(editor)}
                 title={btn.label}
-                className={`w-7 h-7 rounded-lg flex items-center justify-center transition-all ${
+                className={`size-7 rounded-lg flex items-center justify-center transition-all ${
                   active
                     ? "bg-brand/15 text-brand shadow-[0_0_8px_rgba(249,115,22,0.12)]"
                     : "text-muted-foreground hover:text-foreground hover:bg-muted"
                 }`}
               >
-                <Icon className="w-3.5 h-3.5" strokeWidth={1.5} />
+                <Icon className="size-3.5" strokeWidth={1.5} />
               </button>
             );
           })}

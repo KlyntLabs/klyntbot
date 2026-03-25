@@ -21,7 +21,8 @@ impl TaskRepo {
                 task_type, acceptance_criteria, agent_config,
                 execution_state, spawned_execution_id, context_snapshot,
                 energy_level, estimated_focus_blocks, actual_minutes,
-                complexity_score, completed, objective_id
+                complexity_score, completed, objective_id,
+                scheduled_start, scheduled_end
             ) VALUES (
                 ?1, ?2, ?3, ?4, ?5, ?6,
                 ?7, ?8, ?9, ?10, ?11,
@@ -34,7 +35,8 @@ impl TaskRepo {
                 ?29, ?30, ?31,
                 ?32, ?33, ?34,
                 ?35, ?36, ?37,
-                ?38, ?39, ?40
+                ?38, ?39, ?40,
+                ?41, ?42
             )
             RETURNING *
             "#,
@@ -79,6 +81,8 @@ impl TaskRepo {
         .bind(row.complexity_score)
         .bind(row.completed)
         .bind(&row.objective_id)
+        .bind(row.scheduled_start.map(|dt| dt.to_rfc3339()))
+        .bind(row.scheduled_end.map(|dt| dt.to_rfc3339()))
         .fetch_one(&self.pool)
         .await?;
 
@@ -138,6 +142,8 @@ impl TaskRepo {
                 completed          = COALESCE(?43, completed),
                 actual_minutes     = CASE WHEN ?44 THEN ?45 ELSE actual_minutes END,
                 objective_id       = CASE WHEN ?46 THEN ?47 ELSE objective_id END,
+                scheduled_start    = CASE WHEN ?48 THEN ?49 ELSE scheduled_start END,
+                scheduled_end      = CASE WHEN ?50 THEN ?51 ELSE scheduled_end END,
                 updated_at         = datetime('now')
             WHERE id = ?1
             RETURNING *
@@ -200,6 +206,10 @@ impl TaskRepo {
         .bind(patch.actual_minutes.unwrap_or_default()) // ?45
         .bind(patch.objective_id.is_some()) // ?46
         .bind(patch.objective_id.as_ref().and_then(|v| v.as_deref())) // ?47
+        .bind(patch.scheduled_start.is_some()) // ?48
+        .bind(patch.scheduled_start.unwrap_or_default()) // ?49
+        .bind(patch.scheduled_end.is_some()) // ?50
+        .bind(patch.scheduled_end.unwrap_or_default()) // ?51
         .fetch_optional(&self.pool)
         .await?
         .ok_or_not_found(&format!("task {}", patch.id))?;

@@ -1,3 +1,4 @@
+import { ThinkingDots } from "@shared/ui/ThinkingDots";
 import { useCallback, useRef } from "react";
 import { useNavigate } from "react-router";
 import { useConversationRunner } from "../hooks/useConversationRunner";
@@ -28,9 +29,10 @@ function StepDots({
         const isActive = i === current;
         return (
           <div
-            key={i}
+            // biome-ignore lint/suspicious/noArrayIndexKey: static step indicator dots from Array.from
+            key={`step-${i}`}
             className={`rounded-full transition-all duration-300 ${
-              isActive ? "w-6 h-2 bg-brand" : isDone ? "w-2 h-2 bg-brand/60" : "w-2 h-2 bg-muted"
+              isActive ? "w-6 h-2 bg-brand" : isDone ? "size-2 bg-brand/60" : "size-2 bg-muted"
             }`}
           />
         );
@@ -227,7 +229,7 @@ export function ConversationRunner() {
   if (isLoading) {
     return (
       <div className="fixed inset-0 flex items-center justify-center">
-        <div className="w-5 h-5 border-2 border-brand/30 border-t-brand rounded-full animate-spin" />
+        <ThinkingDots />
       </div>
     );
   }
@@ -314,7 +316,7 @@ export function ConversationRunner() {
           {/* Saving */}
           {isSaving && (
             <div className="mt-3 flex items-center gap-2 text-muted-foreground">
-              <div className="w-3 h-3 border-2 border-muted/30 border-t-muted rounded-full animate-spin" />
+              <ThinkingDots size="sm" />
               <span className="text-sm">Saving...</span>
             </div>
           )}
@@ -322,9 +324,9 @@ export function ConversationRunner() {
           {/* Complete state */}
           {isComplete && (
             <div className="text-center py-6" style={{ animation: "fade-in-up 0.4s ease-out" }}>
-              <div className="w-16 h-16 mx-auto mb-5 rounded-full bg-success/10 border border-success/20 flex items-center justify-center">
+              <div className="size-16 mx-auto mb-5 rounded-full bg-success/10 border border-success/20 flex items-center justify-center">
                 <svg
-                  className="w-8 h-8 text-success"
+                  className="size-8 text-success"
                   fill="none"
                   viewBox="0 0 24 24"
                   stroke="currentColor"

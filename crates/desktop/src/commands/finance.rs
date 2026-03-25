@@ -2,18 +2,20 @@ use std::collections::HashMap;
 use std::sync::Arc;
 
 use desktop_shared::commands::{
-    FinanceAccountCreateParams, FinanceAccountUpdateParams, FinanceBudgetCreateParams,
-    FinanceBudgetUpdateParams, FinanceCategoryReportResponse, FinanceDailySpendingResponse,
-    FinanceDateRangeParams, FinanceGoalCreateParams, FinanceGoalUpdateParams,
-    FinanceInvestmentCreateParams, FinanceInvestmentUpdateParams, FinanceLiabilityCreateParams,
-    FinanceLiabilityUpdateParams, FinanceMonthlySummaryResponse, FinanceNetWorthResponse,
-    FinancePeriodSummaryResponse, FinancePortfolioCreateParams, FinancePortfolioResponse,
-    FinanceTransactionCreateParams, FinanceTransactionFilterParams, FinanceTrendPoint,
+    FinanceAccountCreateParams, FinanceAccountUpdateParams, FinanceAllocationTargetUpsertParams,
+    FinanceBudgetCreateParams, FinanceBudgetUpdateParams, FinanceCategoryReportResponse,
+    FinanceDailySpendingResponse, FinanceGoalCreateParams, FinanceGoalUpdateParams,
+    FinanceInvestmentCreateParams, FinanceInvestmentTxCreateParams, FinanceInvestmentUpdateParams,
+    FinanceLiabilityCreateParams, FinanceLiabilityUpdateParams, FinanceMonthlySummaryResponse,
+    FinanceNetWorthResponse, FinancePeriodSummaryResponse, FinancePortfolioCreateParams,
+    FinancePortfolioResponse, FinanceTransactionCreateParams, FinanceTransactionFilterParams,
+    FinanceTrendPoint,
 };
 use desktop_shared::errors::ApiError;
 use storage::rows::finance::{
-    BudgetUsageRow, FinanceAccountRow, FinanceBudgetRow, FinanceGoalRow, FinanceInvestmentRow,
-    FinanceLiabilityRow, FinancePortfolioRow, FinanceTransactionRow,
+    BudgetUsageRow, FinanceAccountRow, FinanceAllocationTargetRow, FinanceBudgetRow,
+    FinanceGoalRow, FinanceInvestmentRow, FinanceInvestmentTxRow, FinanceLiabilityRow,
+    FinancePortfolioRow, FinanceTransactionRow,
 };
 use tauri::State;
 
@@ -290,6 +292,48 @@ pub async fn finance_investment_update(
     Ok(result)
 }
 
+// ── Allocation Targets ──────────────────────────────────────────────────
+
+#[tauri::command]
+pub async fn finance_allocation_target_upsert(
+    state: State<'_, Arc<AppCore>>,
+    app: tauri::AppHandle,
+    params: FinanceAllocationTargetUpsertParams,
+) -> Result<FinanceAllocationTargetRow, ApiError> {
+    let (result, updates) = state.finance_allocation_target_upsert(params).await?;
+    super::emit_updates(&app, &updates);
+    Ok(result)
+}
+
+#[tauri::command(rename_all = "camelCase")]
+pub async fn finance_allocation_targets(
+    state: State<'_, Arc<AppCore>>,
+    portfolio_id: String,
+) -> Result<Vec<FinanceAllocationTargetRow>, ApiError> {
+    state.finance_allocation_targets(portfolio_id).await
+}
+
+// ── Investment Transactions ─────────────────────────────────────────────
+
+#[tauri::command]
+pub async fn finance_investment_tx_create(
+    state: State<'_, Arc<AppCore>>,
+    app: tauri::AppHandle,
+    params: FinanceInvestmentTxCreateParams,
+) -> Result<FinanceInvestmentTxRow, ApiError> {
+    let (result, updates) = state.finance_investment_tx_create(params).await?;
+    super::emit_updates(&app, &updates);
+    Ok(result)
+}
+
+#[tauri::command(rename_all = "camelCase")]
+pub async fn finance_investment_txs(
+    state: State<'_, Arc<AppCore>>,
+    investment_id: String,
+) -> Result<Vec<FinanceInvestmentTxRow>, ApiError> {
+    state.finance_investment_txs(investment_id).await
+}
+
 // ── Reports ─────────────────────────────────────────────────────────────
 
 #[tauri::command(rename_all = "camelCase")]
@@ -376,6 +420,10 @@ pub(crate) const DEV_COMMANDS: &[&str] = &[
     "finance_portfolio_create",
     "finance_investment_create",
     "finance_investment_update",
+    "finance_allocation_target_upsert",
+    "finance_allocation_targets",
+    "finance_investment_tx_create",
+    "finance_investment_txs",
     "finance_report_spending",
     "finance_report_income",
     "finance_report_trends",
@@ -481,6 +529,22 @@ pub(crate) async fn dispatch_dev(
             core.finance_investment_update(try_field!(dev::parse_params(body)))
                 .await,
         ),
+        "finance_allocation_target_upsert" => dev::val_rh(
+            core.finance_allocation_target_upsert(try_field!(dev::parse_params(body)))
+                .await,
+        ),
+        "finance_allocation_targets" => {
+            let portfolio_id = try_field!(dev::get_str(body, "portfolioId"));
+            dev::val(core.finance_allocation_targets(portfolio_id).await)
+        }
+        "finance_investment_tx_create" => dev::val_rh(
+            core.finance_investment_tx_create(try_field!(dev::parse_params(body)))
+                .await,
+        ),
+        "finance_investment_txs" => {
+            let investment_id = try_field!(dev::get_str(body, "investmentId"));
+            dev::val(core.finance_investment_txs(investment_id).await)
+        }
         // Reports
         "finance_report_spending" => dev::val(
             core.finance_report_spending(dev::get(body, "dateFrom"), dev::get(body, "dateTo"))

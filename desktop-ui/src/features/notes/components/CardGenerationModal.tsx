@@ -1,3 +1,4 @@
+import { ThinkingDots } from "@shared/ui/ThinkingDots";
 import { Check, ChevronDown, ChevronUp, Loader2, Sparkles, X } from "lucide-react";
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
@@ -20,13 +21,11 @@ interface CardGenerationModalProps {
 
 function CardPreviewRow({
   card,
-  index,
   isApproved,
   onToggle,
   onEdit,
 }: {
   card: GeneratedCardPreview;
-  index: number;
   isApproved: boolean;
   onToggle: () => void;
   onEdit: (field: "front" | "back", value: string) => void;
@@ -49,7 +48,7 @@ function CardPreviewRow({
         <button
           type="button"
           onClick={onToggle}
-          className={`mt-0.5 w-5 h-5 rounded flex items-center justify-center flex-shrink-0 transition-colors ${
+          className={`mt-0.5 size-5 rounded flex items-center justify-center flex-shrink-0 transition-colors ${
             isApproved ? "bg-brand text-white" : "bg-muted text-muted-foreground hover:bg-accent"
           }`}
         >
@@ -58,9 +57,9 @@ function CardPreviewRow({
 
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 mb-1">
-            <span className={`text-[10px] px-1.5 py-0.5 rounded-md ${typeBg}`}>{typeLabel}</span>
+            <span className={`text-2xs px-1.5 py-0.5 rounded-md ${typeBg}`}>{typeLabel}</span>
             {card.tags.length > 0 && (
-              <span className="text-[10px] text-muted-foreground">{card.tags.join(", ")}</span>
+              <span className="text-2xs text-muted-foreground">{card.tags.join(", ")}</span>
             )}
             <button
               type="button"
@@ -75,24 +74,24 @@ function CardPreviewRow({
 
           {expanded && (
             <div className="mt-2 space-y-2">
-              <div>
-                <label className="text-[10px] text-muted-foreground block mb-0.5">Front</label>
+              <label className="block">
+                <span className="text-2xs text-muted-foreground block mb-0.5">Front</span>
                 <textarea
                   value={card.front}
                   onChange={(e) => onEdit("front", e.target.value)}
                   className="w-full bg-muted/50 rounded-md px-2 py-1.5 text-sm text-foreground resize-none"
                   rows={2}
                 />
-              </div>
-              <div>
-                <label className="text-[10px] text-muted-foreground block mb-0.5">Back</label>
+              </label>
+              <label className="block">
+                <span className="text-2xs text-muted-foreground block mb-0.5">Back</span>
                 <textarea
                   value={card.back}
                   onChange={(e) => onEdit("back", e.target.value)}
                   className="w-full bg-muted/50 rounded-md px-2 py-1.5 text-sm text-foreground resize-none"
                   rows={2}
                 />
-              </div>
+              </label>
               {card.sourceContext && (
                 <p className="text-[11px] text-muted-foreground italic">
                   Source: {card.sourceContext}
@@ -102,7 +101,7 @@ function CardPreviewRow({
           )}
 
           {!expanded && (
-            <p className="text-[12px] text-muted-foreground mt-0.5 truncate">{card.back}</p>
+            <p className="text-xs text-muted-foreground mt-0.5 truncate">{card.back}</p>
           )}
         </div>
       </div>
@@ -148,6 +147,7 @@ export function CardGenerationModal({
 
   return createPortal(
     <div className="fixed inset-0 z-50 flex items-center justify-center">
+      {/* biome-ignore lint/a11y/noStaticElementInteractions: backdrop overlay with role=presentation */}
       <div
         className="absolute inset-0 bg-black/60 backdrop-blur-sm"
         onClick={onClose}
@@ -173,8 +173,8 @@ export function CardGenerationModal({
         <div className="flex-1 overflow-y-auto px-5 py-4 space-y-2">
           {generating && (
             <div className="flex flex-col items-center justify-center py-12 gap-3">
-              <Loader2 size={24} className="text-brand animate-spin" strokeWidth={1.5} />
-              <p className="text-sm text-muted-foreground">Generating cards...</p>
+              <ThinkingDots />
+              <p className="text-sm text-muted-foreground">Generating cards</p>
             </div>
           )}
 
@@ -185,22 +185,21 @@ export function CardGenerationModal({
           )}
 
           {!generating &&
-            previews.map((card, i) => (
+            previews.map((card, cardIndex) => (
               <CardPreviewRow
-                key={i}
+                key={`${card.cardType}-${card.front.slice(0, 40)}-${card.back.slice(0, 20)}`}
                 card={card}
-                index={i}
-                isApproved={approved.has(i)}
-                onToggle={() => onToggleCard(i)}
-                onEdit={(field, value) => onEditCard(i, field, value)}
+                isApproved={approved.has(cardIndex)}
+                onToggle={() => onToggleCard(cardIndex)}
+                onEdit={(field, value) => onEditCard(cardIndex, field, value)}
               />
             ))}
         </div>
 
         {!generating && previews.length > 0 && (
           <div className="px-5 py-4 border-t border-border space-y-3">
-            <div className="flex items-center gap-2">
-              <label className="text-[12px] text-muted-foreground whitespace-nowrap">Deck:</label>
+            <label className="flex items-center gap-2">
+              <span className="text-xs text-muted-foreground whitespace-nowrap">Deck:</span>
               <input
                 type="text"
                 value={deck}
@@ -208,10 +207,10 @@ export function CardGenerationModal({
                 placeholder="Enter deck name..."
                 className="flex-1 bg-muted/50 rounded-lg px-3 py-1.5 text-sm text-foreground placeholder:text-dim"
               />
-            </div>
+            </label>
 
             <div className="flex items-center justify-between">
-              <span className="text-[12px] text-muted-foreground">
+              <span className="text-xs text-muted-foreground">
                 {approvedCount} of {previews.length} cards selected
               </span>
               <button

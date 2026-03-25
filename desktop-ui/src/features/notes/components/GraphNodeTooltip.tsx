@@ -28,7 +28,7 @@ export function GraphNodeTooltip({ node, x, y }: GraphNodeTooltipProps) {
           {node.tags.map((tag) => (
             <span
               key={tag}
-              className="px-1.5 py-0.5 rounded-full text-[10px] font-medium"
+              className="px-1.5 py-0.5 rounded-full text-2xs font-medium"
               style={{
                 color: tagColor(tag),
                 backgroundColor: tagBgColor(tag),
@@ -41,7 +41,7 @@ export function GraphNodeTooltip({ node, x, y }: GraphNodeTooltipProps) {
       )}
 
       {/* Link count */}
-      <div className="text-[10px] text-dim mt-1.5">
+      <div className="text-2xs text-dim mt-1.5">
         {node.linkCount} {node.linkCount === 1 ? "link" : "links"}
       </div>
     </div>,

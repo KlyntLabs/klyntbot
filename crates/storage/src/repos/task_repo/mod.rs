@@ -18,6 +18,7 @@ mod time_entries;
 mod tests;
 
 use chrono::{DateTime, Utc};
+use serde::Serialize;
 use sqlx::SqlitePool;
 
 /// Filter criteria for listing tasks.
@@ -74,6 +75,21 @@ pub struct TaskPatch {
     pub completed: Option<bool>,
     pub actual_minutes: Option<Option<i32>>,
     pub objective_id: Option<Option<String>>,
+    pub scheduled_start: Option<Option<DateTime<Utc>>>,
+    pub scheduled_end: Option<Option<DateTime<Utc>>>,
+}
+
+/// A time entry joined with the parent task's title, for timeline display.
+#[derive(Debug, Clone, sqlx::FromRow, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TimeEntryWithTask {
+    pub id: uuid::Uuid,
+    pub task_id: String,
+    pub task_title: String,
+    pub started_at: DateTime<Utc>,
+    pub ended_at: Option<DateTime<Utc>>,
+    pub duration_secs: Option<i64>,
+    pub note: Option<String>,
 }
 
 /// Repository for task CRUD, hierarchy, focus, dependencies, attachments,

@@ -5,8 +5,6 @@
 //!
 //! Test naming convention: `{repo}_{operation}_{scenario}`
 
-pub mod action_repo_tests;
-
 // Finance module repo tests — TDD skeletons, fail until implementation is added.
 pub mod finance_account_repo_tests;
 pub mod finance_budget_repo_tests;

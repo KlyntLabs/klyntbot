@@ -1,5 +1,5 @@
 import * as CheckboxPrimitive from "@radix-ui/react-checkbox";
-import { cn } from "@shared/lib/cn";
+import { cn } from "@shared/lib/utils";
 import { Check } from "lucide-react";
 
 export interface CheckboxProps {
@@ -16,14 +16,14 @@ export function Checkbox({ checked, onCheckedChange, className, disabled }: Chec
       onCheckedChange={onCheckedChange}
       disabled={disabled}
       className={cn(
-        "h-4 w-4 rounded border border-muted/40 flex items-center justify-center transition-colors",
+        "size-4 rounded border border-muted/40 flex items-center justify-center transition-colors",
         "data-[state=checked]:bg-brand data-[state=checked]:border-brand",
         "disabled:opacity-50 disabled:pointer-events-none",
         className,
       )}
     >
       <CheckboxPrimitive.Indicator>
-        <Check className="h-3 w-3 text-white" strokeWidth={2} />
+        <Check className="size-3 text-primary-foreground" strokeWidth={2} />
       </CheckboxPrimitive.Indicator>
     </CheckboxPrimitive.Root>
   );

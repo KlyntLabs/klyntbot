@@ -25,6 +25,33 @@ const INTERACTIVE_TOOL_TIMEOUT: std::time::Duration = std::time::Duration::from_
 /// Maximum number of tool calls that can execute concurrently within a single cycle.
 const MAX_CONCURRENT_TOOLS: usize = 10;
 
+/// Maximum length for a single tool result (100KB).
+const MAX_TOOL_RESULT_LENGTH: usize = 100_000;
+
+/// Sanitize tool result string before injecting into conversation messages.
+///
+/// - Strips control characters (except `\n`, `\t`, `\r`)
+/// - Truncates to [`MAX_TOOL_RESULT_LENGTH`] with a notice (UTF-8 safe)
+fn sanitize_tool_result(input: &str) -> String {
+    let cleaned: String = input
+        .chars()
+        .filter(|c| !c.is_control() || *c == '\n' || *c == '\t' || *c == '\r')
+        .collect();
+
+    if cleaned.len() > MAX_TOOL_RESULT_LENGTH {
+        // Find a valid UTF-8 char boundary at or before MAX_TOOL_RESULT_LENGTH
+        let mut truncate_at = MAX_TOOL_RESULT_LENGTH;
+        while truncate_at > 0 && !cleaned.is_char_boundary(truncate_at) {
+            truncate_at -= 1;
+        }
+        let mut truncated = cleaned[..truncate_at].to_string();
+        truncated.push_str("\n[truncated - result exceeded 100KB]");
+        truncated
+    } else {
+        cleaned
+    }
+}
+
 /// Hash a `serde_json::Value` without serializing to a string.
 ///
 /// `Value` doesn't implement `Hash` (because of `f64`), so we walk the tree
@@ -151,8 +178,8 @@ struct PartialToolCall {
 /// Consumes the stream and returns an `LlmResponse` equivalent to `provider.chat()`,
 /// but with real-time content chunks sent to the UI as they arrive.
 ///
-/// Token usage is estimated from text length using a model-specific chars-per-token
-/// ratio, since `LlmStreamChunk` does not carry token counts.
+/// Token usage is taken from real provider data when available (via `LlmStreamChunk.usage`).
+/// Falls back to `best_token_counter()` estimation when the provider sends no usage.
 async fn call_provider_streaming(
     provider: &dyn providers::LlmProvider,
     messages: &[Message],
@@ -166,6 +193,8 @@ async fn call_provider_streaming(
     let mut partials: Vec<PartialToolCall> = Vec::with_capacity(4);
     let mut finish_reason = String::new();
     let mut reasoning = String::new();
+    let mut accumulated_usage = Usage::default();
+    let mut has_real_usage = false;
 
     while let Some(result) = stream.next().await {
         let chunk = result?;
@@ -207,6 +236,22 @@ async fn call_provider_streaming(
         if let Some(reason) = chunk.finish_reason {
             finish_reason = reason;
         }
+
+        if let Some(chunk_usage) = chunk.usage {
+            has_real_usage = true;
+            if chunk_usage.prompt_tokens > 0 {
+                accumulated_usage.prompt_tokens = chunk_usage.prompt_tokens;
+            }
+            if chunk_usage.completion_tokens > 0 {
+                accumulated_usage.completion_tokens = chunk_usage.completion_tokens;
+            }
+            if chunk_usage.cache_read_tokens > 0 {
+                accumulated_usage.cache_read_tokens = chunk_usage.cache_read_tokens;
+            }
+            if chunk_usage.cache_write_tokens > 0 {
+                accumulated_usage.cache_write_tokens = chunk_usage.cache_write_tokens;
+            }
+        }
     }
 
     let tool_calls: Vec<providers::ToolCall> = partials
@@ -223,38 +268,48 @@ async fn call_provider_streaming(
         })
         .collect();
 
-    // Estimate token usage since streaming chunks don't carry counts.
-    // Reuses context_engine::CharTokenCounter (4 chars ≈ 1 token) to stay
-    // consistent with the rest of the token estimation pipeline.
-    let counter = context_engine::CharTokenCounter;
-    let estimated_input: u32 = messages
-        .iter()
-        .map(|m| match m {
-            Message::System { content } => counter.estimate_text(content),
-            Message::User { content } => match content {
-                providers::UserContent::Text(t) => counter.estimate_text(t),
-                providers::UserContent::MultiPart(parts) => parts
-                    .iter()
-                    .map(|p| match p {
-                        providers::ContentPart::Text { text } => counter.estimate_text(text),
-                        _ => 0,
-                    })
-                    .sum(),
-            },
-            Message::Assistant {
-                content,
-                reasoning_content,
-                ..
-            } => {
-                content.as_deref().map_or(0, |c| counter.estimate_text(c))
-                    + reasoning_content
-                        .as_deref()
-                        .map_or(0, |r| counter.estimate_text(r))
-            }
-            Message::Tool { content, .. } => counter.estimate_text(content),
-        })
-        .sum::<usize>() as u32;
-    let estimated_output = counter.estimate_text(&content) as u32;
+    // Use real usage from provider when available, fall back to estimation.
+    let usage = if has_real_usage {
+        accumulated_usage.total_tokens =
+            accumulated_usage.prompt_tokens + accumulated_usage.completion_tokens;
+        accumulated_usage
+    } else {
+        // Fallback when provider sends no usage
+        let counter = context_engine::best_token_counter();
+        let est_input: u32 = messages
+            .iter()
+            .map(|m| match m {
+                Message::System { content: c } => counter.estimate_text(c),
+                Message::User { content: c } => match c {
+                    providers::UserContent::Text(t) => counter.estimate_text(t),
+                    providers::UserContent::MultiPart(parts) => parts
+                        .iter()
+                        .map(|p| match p {
+                            providers::ContentPart::Text { text } => counter.estimate_text(text),
+                            _ => 0,
+                        })
+                        .sum(),
+                },
+                Message::Assistant {
+                    content: c,
+                    reasoning_content: r,
+                    ..
+                } => {
+                    c.as_deref().map_or(0, |t| counter.estimate_text(t))
+                        + r.as_deref().map_or(0, |t| counter.estimate_text(t))
+                }
+                Message::Tool { content: c, .. } => counter.estimate_text(c),
+            })
+            .sum::<usize>() as u32;
+        let est_output = counter.estimate_text(&content) as u32;
+        Usage {
+            prompt_tokens: est_input,
+            completion_tokens: est_output,
+            total_tokens: est_input + est_output,
+            cache_read_tokens: 0,
+            cache_write_tokens: 0,
+        }
+    };
 
     Ok(providers::LlmResponse {
         content: if content.is_empty() {
@@ -264,13 +319,7 @@ async fn call_provider_streaming(
         },
         tool_calls,
         finish_reason,
-        usage: Usage {
-            prompt_tokens: estimated_input,
-            completion_tokens: estimated_output,
-            total_tokens: estimated_input + estimated_output,
-            cache_read_tokens: 0,
-            cache_write_tokens: 0,
-        },
+        usage,
         reasoning_content: if reasoning.is_empty() {
             None
         } else {
@@ -289,6 +338,8 @@ pub struct ExecutionCore {
     pub tool_registry: Arc<RwLock<ToolRegistry>>,
     pub outcome_recorder: Option<Arc<crate::learning::recorder::OutcomeRecorder>>,
     pub domain_event_bus: Option<Arc<bus::DomainEventBus>>,
+    pub interceptor_chain: Option<Arc<tools_core::InterceptorChain>>,
+    token_counter: Arc<dyn TokenCounter>,
     tool_semaphore: Arc<Semaphore>,
 }
 
@@ -299,8 +350,20 @@ impl ExecutionCore {
             tool_registry,
             outcome_recorder: None,
             domain_event_bus: None,
+            interceptor_chain: None,
+            token_counter: Arc::new(context_engine::CharTokenCounter),
             tool_semaphore: Arc::new(Semaphore::new(MAX_CONCURRENT_TOOLS)),
         }
+    }
+
+    /// Set the token counter for mid-loop compression.
+    pub fn with_token_counter(mut self, counter: Arc<dyn TokenCounter>) -> Self {
+        self.token_counter = counter;
+        self
+    }
+
+    pub fn token_counter(&self) -> &Arc<dyn TokenCounter> {
+        &self.token_counter
     }
 
     /// Set the domain event bus for publishing tool execution events.
@@ -315,6 +378,16 @@ impl ExecutionCore {
         recorder: Arc<crate::learning::recorder::OutcomeRecorder>,
     ) -> Self {
         self.outcome_recorder = Some(recorder);
+        self
+    }
+
+    /// Set the interceptor chain for pre-execution validation hooks.
+    ///
+    /// Interceptors run after `prepare()` (which releases the registry read lock)
+    /// and before `execute()`. They should validate tool arguments only — not
+    /// rely on registry state, which may change between `prepare()` and `check()`.
+    pub fn with_interceptor_chain(mut self, chain: Arc<tools_core::InterceptorChain>) -> Self {
+        self.interceptor_chain = Some(chain);
         self
     }
 
@@ -456,6 +529,9 @@ impl ExecutionCore {
             // Create entity card channel for this batch of tool calls
             let (entity_tx, mut entity_rx) = tokio::sync::mpsc::channel::<common::EntityCard>(16);
 
+            // Clone once for the entire batch (not per-tool-call inside .map())
+            let interceptor_ref = self.interceptor_chain.clone();
+
             let futures: Vec<_> = response
                 .tool_calls
                 .iter()
@@ -463,6 +539,7 @@ impl ExecutionCore {
                 .map(|(i, tc)| {
                     let registry = self.tool_registry.clone();
                     let semaphore = self.tool_semaphore.clone();
+                    let interceptor_chain = interceptor_ref.clone();
                     let name = tc.name.clone();
                     let args = tc.arguments.clone();
                     let mut ctx = routing_ctx.clone();
@@ -500,6 +577,10 @@ impl ExecutionCore {
                                 let reg = registry.read().await;
                                 reg.prepare(&name, &args, &ctx)?
                             };
+                            // Run interceptor chain before executing (if configured)
+                            if let Some(ref chain) = interceptor_chain {
+                                chain.check(&name, &args, None).await?;
+                            }
                             // Read lock is dropped — safe for tools that re-enter the registry
                             tool.execute(args, &ctx).await
                         })
@@ -609,12 +690,12 @@ impl ExecutionCore {
                 }
             }
 
-            // Append tool result messages
+            // Append tool result messages (sanitized to strip control chars / cap length)
             for r in &results {
                 messages.push(Message::tool(
                     r.tool_call_id.clone(),
                     r.tool_name.clone(),
-                    r.result.clone(),
+                    sanitize_tool_result(&r.result),
                 ));
             }
 
@@ -1092,5 +1173,30 @@ mod tests {
             }
             _ => panic!("Expected Assistant message"),
         }
+    }
+
+    // ── sanitize_tool_result tests ───────────────────────────────
+
+    #[test]
+    fn sanitize_tool_result_strips_control_chars() {
+        let input = "Normal text\x00\x01\x02with control chars\nand newlines";
+        let result = sanitize_tool_result(input);
+        assert!(!result.contains('\x00'));
+        assert!(!result.contains('\x01'));
+        assert!(result.contains('\n'));
+        assert!(result.contains("Normal text"));
+    }
+
+    #[test]
+    fn sanitize_tool_result_caps_length() {
+        let long = "x".repeat(200_000);
+        let result = sanitize_tool_result(&long);
+        assert!(result.len() <= MAX_TOOL_RESULT_LENGTH + 50);
+    }
+
+    #[test]
+    fn sanitize_tool_result_preserves_normal_content() {
+        let input = "Task created: 'Buy groceries' with priority High";
+        assert_eq!(sanitize_tool_result(input), input);
     }
 }

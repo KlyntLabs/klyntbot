@@ -102,7 +102,7 @@ export function EventsTab() {
           onClick={() => setPaused(!paused)}
           className="flex items-center gap-1 text-[11px] text-muted-foreground hover:text-foreground"
         >
-          {paused ? <Play className="w-3 h-3" /> : <Pause className="w-3 h-3" />}
+          {paused ? <Play className="size-3" /> : <Pause className="size-3" />}
           {paused ? "Resume" : "Pause"}
         </button>
         <button
@@ -110,7 +110,7 @@ export function EventsTab() {
           onClick={() => setEvents([])}
           className="flex items-center gap-1 text-[11px] text-muted-foreground hover:text-foreground"
         >
-          <Trash2 className="w-3 h-3" /> Clear
+          <Trash2 className="size-3" /> Clear
         </button>
         <span className="text-[11px] text-muted-foreground">{events.length} events</span>
       </div>
@@ -130,7 +130,7 @@ export function EventsTab() {
               className={`w-full text-left p-2 rounded border-l-2 transition-all ${color} ${border}`}
             >
               <div className="flex items-center gap-2">
-                <span className="text-[10px] text-muted-foreground font-mono w-20 shrink-0">
+                <span className="text-2xs text-muted-foreground font-mono w-20 shrink-0">
                   {new Date(e.timestamp).toLocaleTimeString(undefined, {
                     hour: "2-digit",
                     minute: "2-digit",
@@ -140,10 +140,10 @@ export function EventsTab() {
                 </span>
                 <span className="text-[11px] text-muted-foreground">{e.eventType}</span>
                 <span className={`text-[9px] px-1 py-0.5 rounded ${color}`}>{e.salience}</span>
-                <span className="text-[10px] text-muted-foreground">{e.domain}</span>
+                <span className="text-2xs text-muted-foreground">{e.domain}</span>
               </div>
               {isExpanded && (
-                <pre className="mt-2 text-[10px] text-muted-foreground font-mono whitespace-pre-wrap">
+                <pre className="mt-2 text-2xs text-muted-foreground font-mono whitespace-pre-wrap">
                   {JSON.stringify(e.payload, null, 2)}
                 </pre>
               )}
@@ -151,7 +151,7 @@ export function EventsTab() {
           );
         })}
         {visibleEvents.length === 0 && (
-          <p className="text-[12px] text-muted-foreground text-center py-8">
+          <p className="text-xs text-muted-foreground text-center py-8">
             {paused ? "Stream paused" : "Waiting for domain events..."}
           </p>
         )}

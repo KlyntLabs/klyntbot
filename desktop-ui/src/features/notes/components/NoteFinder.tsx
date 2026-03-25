@@ -102,9 +102,11 @@ export function NoteFinder({ isOpen, onClose, onSelectNote, notes }: NoteFinderP
   const selectedNote = results[selectedIndex] ?? null;
 
   return (
+    // biome-ignore lint/a11y/noStaticElementInteractions: modal overlay handles keyboard navigation
     <div
       className="fixed inset-0 z-50 flex items-start justify-center pt-[10vh]"
       style={{ background: "rgba(0, 0, 0, 0.5)" }}
+      role="presentation"
       onClick={(e) => {
         if (e.target === e.currentTarget) onClose();
       }}
@@ -114,7 +116,7 @@ export function NoteFinder({ isOpen, onClose, onSelectNote, notes }: NoteFinderP
       <div className="glass-floating w-[900px] max-w-[92vw] h-[600px] max-h-[75vh] overflow-hidden flex flex-col">
         {/* Search input */}
         <div className="flex items-center gap-2.5 px-4 py-2.5 border-b border-border">
-          <Search className="w-4 h-4 text-muted-foreground shrink-0" />
+          <Search className="size-4 text-muted-foreground shrink-0" />
           <input
             ref={inputRef}
             type="text"
@@ -123,7 +125,7 @@ export function NoteFinder({ isOpen, onClose, onSelectNote, notes }: NoteFinderP
             placeholder="Search notes..."
             className="flex-1 bg-transparent text-[13px] text-foreground placeholder:text-muted-foreground/50 focus:outline-none"
           />
-          <span className="text-[10px] text-muted-foreground shrink-0">
+          <span className="text-2xs text-muted-foreground shrink-0">
             {results.length}/{notes.length}
           </span>
         </div>
@@ -150,7 +152,7 @@ export function NoteFinder({ isOpen, onClose, onSelectNote, notes }: NoteFinderP
                       : "text-muted-foreground hover:bg-card"
                   }`}
                 >
-                  <FileText className="w-3 h-3 shrink-0 text-muted-foreground/60" />
+                  <FileText className="size-3 shrink-0 text-muted-foreground/60" />
                   <span className="truncate text-[11px] flex-1">{note.title}</span>
                   <span className="text-[9px] text-muted-foreground/40 shrink-0">
                     {note.updatedAt ? formatDate(note.updatedAt.slice(0, 10)) : ""}
@@ -164,7 +166,7 @@ export function NoteFinder({ isOpen, onClose, onSelectNote, notes }: NoteFinderP
           <div className="w-[62%] overflow-y-auto px-5 py-4">
             {selectedNote ? (
               <>
-                <div className="text-[12px] font-medium text-foreground/90 mb-1">
+                <div className="text-xs font-medium text-foreground/90 mb-1">
                   {selectedNote.title}
                 </div>
                 {selectedNote.tags.length > 0 && (

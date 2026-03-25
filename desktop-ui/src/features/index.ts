@@ -6,7 +6,6 @@ export * from "./debug";
 export * from "./distraction";
 export * from "./finance";
 export * from "./notes";
-export * from "./productivity";
 export * from "./settings";
 export * from "./setup";
 export * from "./tasks";

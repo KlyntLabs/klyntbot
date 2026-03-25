@@ -60,9 +60,9 @@ export function QuickCapturePage() {
     <div className="h-screen w-screen flex items-center justify-center p-4" data-tauri-drag-region>
       <div className="w-full glass-panel rounded-xl p-4 flex flex-col gap-3">
         <div className="flex items-center gap-2 text-sm text-muted-foreground">
-          <Inbox className="w-4 h-4 text-brand" />
+          <Inbox className="size-4 text-brand" />
           <span className="font-medium">Quick Capture</span>
-          <span className="ml-auto text-[10px] text-dim">Enter to save · Esc to close</span>
+          <span className="ml-auto text-2xs text-dim">Enter to save · Esc to close</span>
         </div>
 
         {captured ? (

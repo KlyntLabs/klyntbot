@@ -1,5 +1,6 @@
 //! Repository for the `domain_event_log` and `pipeline_event_log` tables.
 
+use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use sqlx::SqlitePool;
 
@@ -159,6 +160,40 @@ impl EventLogRepo {
         .await
     }
 
+    /// Count domain events of a specific type since a given timestamp.
+    pub async fn count_by_event_type(
+        &self,
+        event_type: &str,
+        since: DateTime<Utc>,
+    ) -> Result<i64, sqlx::Error> {
+        sqlx::query_scalar::<_, i64>(
+            "SELECT COUNT(*) FROM domain_event_log
+             WHERE event_type = ?1 AND timestamp >= ?2",
+        )
+        .bind(event_type)
+        .bind(since.to_rfc3339())
+        .fetch_one(&self.pool)
+        .await
+    }
+
+    /// Count domain events where the JSON data contains a specific substring.
+    pub async fn count_by_event_type_and_data(
+        &self,
+        event_type: &str,
+        data_contains: &str,
+        since: DateTime<Utc>,
+    ) -> Result<i64, sqlx::Error> {
+        sqlx::query_scalar::<_, i64>(
+            "SELECT COUNT(*) FROM domain_event_log
+             WHERE event_type = ?1 AND data LIKE ?2 AND timestamp >= ?3",
+        )
+        .bind(event_type)
+        .bind(format!("%{data_contains}%"))
+        .bind(since.to_rfc3339())
+        .fetch_one(&self.pool)
+        .await
+    }
+
     /// Delete events older than the given number of days.
     pub async fn prune_old_events(&self, older_than_days: i64) -> Result<u64, sqlx::Error> {
         let cutoff = format!("-{older_than_days} days");
@@ -303,5 +338,79 @@ mod tests {
         assert_eq!(events.len(), 2);
         assert_eq!(events[0].event_kind, "consolidation"); // newest first
         assert_eq!(events[1].event_kind, "extraction");
+    }
+
+    #[tokio::test]
+    async fn count_by_event_type_filters_correctly() {
+        let pool = setup().await;
+        let repo = EventLogRepo::new(pool);
+
+        // Insert events with different types and timestamps
+        repo.insert_domain_event(
+            "evt-c1",
+            "TaskCreated",
+            "tasks",
+            "extract",
+            r#"{"task_id":"t1"}"#,
+            "2026-03-09T10:00:00Z",
+        )
+        .await
+        .unwrap();
+
+        repo.insert_domain_event(
+            "evt-c2",
+            "TaskCreated",
+            "tasks",
+            "extract",
+            r#"{"task_id":"t2"}"#,
+            "2026-03-09T14:00:00Z",
+        )
+        .await
+        .unwrap();
+
+        repo.insert_domain_event(
+            "evt-c3",
+            "NoteCreated",
+            "notes",
+            "extract",
+            r#"{"note_id":"n1"}"#,
+            "2026-03-09T12:00:00Z",
+        )
+        .await
+        .unwrap();
+
+        // Old event that should be excluded by the since filter
+        repo.insert_domain_event(
+            "evt-c4",
+            "TaskCreated",
+            "tasks",
+            "extract",
+            r#"{"task_id":"t0"}"#,
+            "2026-03-08T09:00:00Z",
+        )
+        .await
+        .unwrap();
+
+        let since = chrono::DateTime::parse_from_rfc3339("2026-03-09T00:00:00Z")
+            .unwrap()
+            .with_timezone(&chrono::Utc);
+
+        // Should count only the two TaskCreated events on March 9
+        let count = repo
+            .count_by_event_type("TaskCreated", since)
+            .await
+            .unwrap();
+        assert_eq!(count, 2);
+
+        // NoteCreated should return 1
+        let count = repo
+            .count_by_event_type("NoteCreated", since)
+            .await
+            .unwrap();
+        assert_eq!(count, 1);
+
+        // Non-existent event type should return 0
+        let count = repo.count_by_event_type("Unknown", since).await.unwrap();
+        assert_eq!(count, 0);
     }
 }

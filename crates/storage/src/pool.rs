@@ -58,6 +58,10 @@ impl StoragePool {
     }
 
     /// Run feature-owned migrations that haven't been applied yet.
+    ///
+    /// Each migration and its tracking INSERT are wrapped in an explicit
+    /// transaction so a crash between them cannot leave the DB in a state
+    /// where the SQL ran but was not recorded.
     pub async fn run_feature_migrations(
         pool: &sqlx::SqlitePool,
         migrations: &[tools_core::FeatureMigration],
@@ -78,15 +82,17 @@ impl StoragePool {
                     description = %m.description,
                     "Running feature migration"
                 );
-                sqlx::query(&m.sql).execute(pool).await?;
+                let mut tx = pool.begin().await?;
+                sqlx::query(&m.sql).execute(&mut *tx).await?;
                 sqlx::query(
                     "INSERT INTO _feature_migrations (feature_name, version, description) VALUES (?1, ?2, ?3)",
                 )
                 .bind(&m.feature_name)
                 .bind(m.version)
                 .bind(&m.description)
-                .execute(pool)
+                .execute(&mut *tx)
                 .await?;
+                tx.commit().await?;
             }
         }
         Ok(())

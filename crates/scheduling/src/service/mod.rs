@@ -86,14 +86,18 @@ fn compute_next_run(schedule: &CronSchedule, now_ms: i64) -> Option<i64> {
 /// Callback type for job execution
 pub type JobCallback = Arc<dyn Fn(&CronJob) -> Result<Option<String>> + Send + Sync>;
 
+/// Thread-safe handler map shared between CronService and its timer loop.
+/// Uses `std::sync::RwLock` so `register_handler` stays synchronous.
+pub(crate) type HandlerMap = Arc<std::sync::RwLock<HashMap<String, JobCallback>>>;
+
 /// Service for managing and executing scheduled jobs (SQL-only via CronRepo).
 pub struct CronService {
     pub(crate) store: Arc<RwLock<CronStore>>,
     /// Fallback callback for job names without a registered handler.
     pub(crate) on_job: Option<JobCallback>,
     /// Named handlers — checked first before falling back to `on_job`.
-    /// Wrapped in `Arc` when the timer loop starts (see `start_timer_loop`).
-    pub(crate) handlers: HashMap<String, JobCallback>,
+    /// Shared with the timer loop so handlers registered after `start()` take effect.
+    pub(crate) handlers: HandlerMap,
     pub(crate) running: Arc<RwLock<bool>>,
     pub(crate) timer_task: Arc<RwLock<Option<JoinHandle<()>>>>,
     /// SQL backend for persistence. Always `Some` in production; `None` only in
@@ -109,7 +113,7 @@ impl CronService {
         Self {
             store: Arc::new(RwLock::new(CronStore::default())),
             on_job: None,
-            handlers: HashMap::new(),
+            handlers: Arc::new(std::sync::RwLock::new(HashMap::new())),
             running: Arc::new(RwLock::new(false)),
             timer_task: Arc::new(RwLock::new(None)),
             repo: Some(repo),
@@ -123,7 +127,7 @@ impl CronService {
         Self {
             store: Arc::new(RwLock::new(CronStore::default())),
             on_job: None,
-            handlers: HashMap::new(),
+            handlers: Arc::new(std::sync::RwLock::new(HashMap::new())),
             running: Arc::new(RwLock::new(false)),
             timer_task: Arc::new(RwLock::new(None)),
             repo: None,
@@ -132,6 +136,8 @@ impl CronService {
     }
 
     /// Set the fallback callback for job names without a named handler.
+    ///
+    /// Must be called before `start()` (the fallback is cloned into the timer loop).
     pub fn set_callback(&mut self, callback: JobCallback) {
         self.on_job = Some(callback);
     }
@@ -141,9 +147,13 @@ impl CronService {
     /// Named handlers are checked first during execution; `set_callback`
     /// provides the fallback for unregistered names.
     ///
-    /// Must be called before `start()` (takes `&mut self`).
-    pub fn register_handler(&mut self, name: impl Into<String>, callback: JobCallback) {
-        self.handlers.insert(name.into(), callback);
+    /// Can be called before or after `start()` — handlers are shared with
+    /// the timer loop via `Arc<RwLock<...>>`.
+    pub fn register_handler(&self, name: impl Into<String>, callback: JobCallback) {
+        self.handlers
+            .write()
+            .expect("handler lock poisoned")
+            .insert(name.into(), callback);
     }
 
     /// Recompute next run times for all enabled jobs
@@ -182,7 +192,7 @@ impl CronService {
         let store = self.store.clone();
         let repo = self.repo.clone();
         let on_job = self.on_job.clone();
-        let handlers = Arc::new(self.handlers.clone());
+        let handlers = Arc::clone(&self.handlers);
         let running = self.running.clone();
         let wake = self.wake.clone();
 
@@ -470,6 +480,19 @@ impl CronService {
             updated_at_ms: row.updated_at_ms,
             delete_after_run: row.delete_after_run,
         }
+    }
+
+    /// Update the origin of a job by name (no-op if not found or already matches).
+    pub async fn set_origin(&self, name: &str, origin: CronOrigin) {
+        let mut store = self.store.write().await;
+        if let Some(job) = store.jobs.iter_mut().find(|j| j.name == name) {
+            if job.origin != origin {
+                job.origin = origin;
+                job.updated_at_ms = now_ms();
+            }
+        }
+        drop(store);
+        let _ = self.save_store().await;
     }
 
     /// Get service status

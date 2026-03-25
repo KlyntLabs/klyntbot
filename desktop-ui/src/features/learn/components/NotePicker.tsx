@@ -88,7 +88,7 @@ export function NotePicker({ onSelect, onCancel }: NotePickerProps) {
       )}
 
       {query.length >= 2 && !loading && results.length === 0 && (
-        <p className="text-[12px] text-muted-foreground text-center py-2">No notes found</p>
+        <p className="text-xs text-muted-foreground text-center py-2">No notes found</p>
       )}
     </div>
   );

@@ -1,4 +1,3 @@
-import { formatTime } from "@shared/lib/dates";
 import type { ContextTimelineBlock } from "@shared/types";
 import { useMemo, useState } from "react";
 import { contextColor } from "../lib/context-colors";
@@ -41,6 +40,8 @@ export function ContextTimeline({
   return (
     <div className="relative w-full" style={{ height: 24 * hourHeight }}>
       {rendered.map(({ block, idx, top, height, color, opacity }) => (
+        // biome-ignore lint/a11y/useKeyWithClickEvents: timeline blocks are supplementary click targets
+        // biome-ignore lint/a11y/noStaticElementInteractions: timeline blocks
         <div
           key={`${block.startTime}-${block.contextId ?? "idle"}`}
           className="absolute left-0 right-0 rounded-md border border-border-subtle cursor-pointer transition-all hover:brightness-125"
@@ -55,7 +56,7 @@ export function ContextTimeline({
           onMouseLeave={() => setHoveredIdx(null)}
         >
           {height > 18 && !block.isIdle && (
-            <span className="block px-1.5 py-0.5 text-[10px] text-white truncate font-medium">
+            <span className="block px-1.5 py-0.5 text-2xs text-white truncate font-medium">
               {block.contextTitle ?? "Unknown"}
             </span>
           )}
@@ -63,7 +64,7 @@ export function ContextTimeline({
           {/* Tooltip */}
           {hoveredIdx === idx && (
             <div className="absolute left-full ml-2 top-0 z-50 glass-dropdown px-3 py-2 min-w-[180px] pointer-events-none">
-              <p className="text-[12px] font-medium text-foreground">
+              <p className="text-xs font-medium text-foreground">
                 {block.isIdle ? "Idle" : (block.contextTitle ?? "Unassigned")}
               </p>
               <p className="text-[11px] text-muted-foreground mt-0.5">

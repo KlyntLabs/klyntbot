@@ -41,7 +41,7 @@ export interface WorkResource {
 export interface WorkContextDetail {
   context: WorkContext;
   resources: WorkResource[];
-  linkedActionIds: string[];
+  linkedTaskIds: string[];
   recentEvents: ActivityEvent[];
 }
 

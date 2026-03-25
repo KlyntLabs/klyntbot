@@ -96,13 +96,48 @@ pub fn evaluate_salience(event: &DomainEvent) -> SalienceVerdict {
         DomainEvent::TaskPriorityChanged { .. } => SalienceVerdict::Accumulate,
         DomainEvent::TaskFieldUpdated { .. } => SalienceVerdict::Accumulate,
 
+        // Autotuner decisions — always extract for cognitive processing
+        DomainEvent::AutotunerDecision { .. } => SalienceVerdict::Extract,
+
         // Contradiction detection — always extract for cognitive processing
         DomainEvent::ContradictionDetected { .. } => SalienceVerdict::Extract,
+
+        // Knowledge Atoms
+        DomainEvent::KnowledgeAtomAccepted { .. } => SalienceVerdict::Extract,
+        DomainEvent::RetentionMilestoneReached { .. } => SalienceVerdict::Extract,
+        DomainEvent::AtomFlashcardReviewed { .. } => SalienceVerdict::Accumulate,
+        DomainEvent::TranslationCompleted { .. } => SalienceVerdict::Accumulate,
+        DomainEvent::AtomReinforced { .. } => SalienceVerdict::Accumulate,
+        DomainEvent::NoteStudied { .. } => SalienceVerdict::Accumulate,
+        DomainEvent::PracticeUnitCompleted { .. } => SalienceVerdict::Accumulate,
+        DomainEvent::PracticeSessionCompleted { .. } => SalienceVerdict::Accumulate,
+        DomainEvent::KnowledgeTransferDetected { .. } => SalienceVerdict::Accumulate,
+        DomainEvent::KnowledgeAtomCreated { .. } => SalienceVerdict::Discard,
+        DomainEvent::KnowledgeAtomArchived { .. } => SalienceVerdict::Discard,
+        DomainEvent::AtomInteracted { .. } => SalienceVerdict::Discard,
+        DomainEvent::CoachingLearningDigest { .. } => SalienceVerdict::Discard,
 
         // BookIndex events — discarded from cognitive extraction (handled by BookIndex updater)
         DomainEvent::NoteContentChanged { .. } => SalienceVerdict::Discard,
         DomainEvent::NoteDeleted { .. } => SalienceVerdict::Discard,
         DomainEvent::TaskHierarchyChanged { .. } => SalienceVerdict::Discard,
+        DomainEvent::FlashcardSessionCompleted { .. } => SalienceVerdict::Accumulate,
+
+        // Productivity interventions — accumulate for pattern detection
+        DomainEvent::InterventionTriggered { .. } => SalienceVerdict::Accumulate,
+
+        // Memory confirmation events — discard from cognitive (handled by UI/pending queue)
+        DomainEvent::MemoryPendingConfirmation { .. } => SalienceVerdict::Discard,
+
+        // Skill routing events — discard from cognitive (consumed by Mirror layer)
+        DomainEvent::SkillRouted { .. } => SalienceVerdict::Discard,
+
+        // Trial activation — discard from cognitive (Mirror handles via TrialPreviewSubscriber)
+        DomainEvent::TrialActivated { .. } => SalienceVerdict::Discard,
+
+        // Mirror events — discard from cognitive (Mirror handles its own storage)
+        DomainEvent::MirrorTrialKilled { .. } => SalienceVerdict::Discard,
+        DomainEvent::MirrorSnippetCreated { .. } => SalienceVerdict::Discard,
     }
 }
 
@@ -124,6 +159,10 @@ mod tests {
         let verdict = evaluate_salience(&DomainEvent::UserCorrectedAI {
             original: "You like afternoon work".into(),
             correction: "No, I prefer mornings".into(),
+            kind: bus::CorrectionKind::Reaction,
+            strength: 1.0,
+            session_key: "test:session".into(),
+            active_skill: None,
         });
         assert_eq!(verdict, SalienceVerdict::Extract);
     }

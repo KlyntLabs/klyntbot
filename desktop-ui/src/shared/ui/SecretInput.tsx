@@ -28,7 +28,7 @@ export function SecretInput({ value, onChange, placeholder, className }: SecretI
         onClick={() => setShow(!show)}
         className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
       >
-        {show ? <EyeOff className="w-3 h-3" /> : <Eye className="w-3 h-3" />}
+        {show ? <EyeOff className="size-3" /> : <Eye className="size-3" />}
       </button>
     </div>
   );

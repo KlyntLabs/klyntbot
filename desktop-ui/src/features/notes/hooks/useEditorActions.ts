@@ -2,7 +2,6 @@ import type { Editor } from "@tiptap/react";
 import { useCallback } from "react";
 import { ulid } from "ulid";
 import type { useAnnotations } from "./useAnnotations";
-import { useCardGeneration } from "./useCardGeneration";
 
 /** Get selected text from whichever editor has the selection, falling back to DOM selection. */
 function getSelectedText(editor: Editor | null): string | null {
@@ -23,9 +22,9 @@ export function useEditorActions(
   editor: Editor | null,
   noteId: string | null,
   createAnnotation: ReturnType<typeof useAnnotations>["createAnnotation"],
+  onGenerateCards?: (selectedText?: string) => void,
+  onAskAI?: (selectedText: string, rect?: { top: number; left: number }) => void,
 ) {
-  const { generateFromText } = useCardGeneration();
-
   const handleAnnotate = useCallback(() => {
     if (!noteId) return;
 
@@ -50,12 +49,17 @@ export function useEditorActions(
   const handleFlashcard = useCallback(() => {
     const selectedText = getSelectedText(editor);
     if (!selectedText) return;
-    generateFromText(selectedText);
-  }, [editor, generateFromText]);
+    onGenerateCards?.(selectedText);
+  }, [editor, onGenerateCards]);
 
-  const handleAskAI = useCallback(() => {
-    // TODO: Open inline AI prompt input
-  }, []);
+  const handleAskAI = useCallback(
+    (selectedText: string, rect?: { top: number; left: number }) => {
+      const text = selectedText || getSelectedText(editor) || "";
+      if (!text.trim()) return;
+      onAskAI?.(text, rect);
+    },
+    [editor, onAskAI],
+  );
 
   return { handleAnnotate, handleFlashcard, handleAskAI };
 }

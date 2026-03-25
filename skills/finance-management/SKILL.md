@@ -10,6 +10,7 @@ metadata:
   author: klyntbot
   version: "2.0.0"
   klyntbot:
+    summary: Expense tracking, budgeting, 6-jar allocation, FIRE analytics, and financial goal management.
     type: orchestrator
     tools: [finance, ask_user, memory, web_search, web_fetch]
     mcp_tools: []
@@ -182,6 +183,8 @@ When a user's request crosses into another domain, hand off cleanly:
 | "tell my partner about the spending report" | `communication` | Formatted report summary |
 
 ## Red Flags
+
+For amount conversion reference, see `scripts/validate_amount.md`.
 
 - **Amounts must be in smallest currency unit** — $50 is 5000, not 50. This is the most common mistake.
 - **Never guess account IDs** — always list accounts first to get real IDs.

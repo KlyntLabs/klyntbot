@@ -4,13 +4,11 @@
 //! and all associated enums and supporting types. Includes conversions from/to
 //! storage row types.
 
-mod active_focus;
 mod entity;
 mod execution;
 mod planning;
 mod suggestion;
 
-pub use active_focus::ActiveTaskFocus;
 pub use entity::*;
 pub use execution::*;
 pub use planning::*;
@@ -97,6 +95,8 @@ mod tests {
             actual_minutes: None,
             complexity_score: Some(3),
             completed: false,
+            scheduled_start: None,
+            scheduled_end: None,
         };
 
         let task = Task::from(row);
@@ -261,6 +261,7 @@ mod tests {
             complexity_score: Some(3),
             energy_level: Some("high".to_string()),
             tags: vec!["dev".to_string()],
+            project_id: Some("proj1".to_string()),
             completed_at: Utc::now(),
         };
         let record = EstimationRecord::from(row);

@@ -35,26 +35,22 @@ export function FinanceBasicsForm({ registerSave, onDirty }: FinanceBasicsFormPr
 
   useEffect(() => {
     registerSave(async () => {
-      try {
-        await ipc("config_update_section", {
-          section: "finance",
-          patch: { defaultCurrency: currency, proactivityLevel: proactivity },
-        });
-      } catch (e) {
-        console.error("Failed to save finance basics:", e);
-      }
+      await ipc("config_update_section", {
+        section: "finance",
+        patch: { defaultCurrency: currency, proactivityLevel: proactivity },
+      });
     });
   }, [currency, proactivity, registerSave]);
 
   return (
     <div>
-      <h3 className="text-[14px] font-medium text-muted-foreground mb-4">Basics</h3>
+      <h3 className="text-sm font-medium text-muted-foreground mb-4">Basics</h3>
 
       <div className="space-y-4">
         <div>
           <label
             htmlFor="fin-currency"
-            className="block text-[12px] font-medium text-muted-foreground mb-1.5"
+            className="block text-xs font-medium text-muted-foreground mb-1.5"
           >
             Default currency
           </label>
@@ -76,7 +72,7 @@ export function FinanceBasicsForm({ registerSave, onDirty }: FinanceBasicsFormPr
         </div>
 
         <div>
-          <span className="block text-[12px] font-medium text-muted-foreground mb-2">
+          <span className="block text-xs font-medium text-muted-foreground mb-2">
             Proactivity level
           </span>
           <div className="space-y-2">

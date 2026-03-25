@@ -13,12 +13,12 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "react-router";
 import { CardGenerationModal } from "../components/CardGenerationModal";
 import { ContextPanel } from "../components/ContextPanel";
-import type { SplitMode } from "../components/editor/SplitEditor";
 import { GraphView } from "../components/GraphView";
 import { NavigationSidebar } from "../components/NavigationSidebar";
 import { NoteCreationDialog } from "../components/NoteCreationDialog";
 import { NoteEditorPanel } from "../components/NoteEditorPanel";
 import { NoteFinder } from "../components/NoteFinder";
+import { ShortcutHelpDialog } from "../components/ShortcutHelpDialog";
 import { VersionHistoryOverlay } from "../components/VersionHistoryOverlay";
 import { useCardGeneration } from "../hooks/useCardGeneration";
 import { useInbox } from "../hooks/useInbox";
@@ -67,12 +67,15 @@ export default function KnowledgeBasePage() {
   const { items: inboxItems, deleteItem: deleteInboxItem } = useInbox();
 
   // ── Core state ────────────────────────────────────────────────────────
-  const [selectedNoteId, setSelectedNoteId] = useState<string | null>(null);
+  const [selectedNoteId, setSelectedNoteId] = useState<string | null>(() =>
+    localStorage.getItem("klynt:lastOpenNoteId"),
+  );
   const [viewMode, setViewMode] = useState<ViewMode>("editor");
   const [layoutMode, setLayoutMode] = useState<LayoutMode>("three-panel");
   const [showCreateDialog, setShowCreateDialog] = useState(false);
   const [showVersionHistory, setShowVersionHistory] = useState(false);
   const [showNoteFinder, setShowNoteFinder] = useState(false);
+  const [showShortcutHelp, setShowShortcutHelp] = useState(false);
   const [searchParams, setSearchParams] = useSearchParams();
 
   // ── Card Generation ──────────────────────────────────────────────────
@@ -86,12 +89,21 @@ export default function KnowledgeBasePage() {
   const insightActionsRef = useRef(insightActions);
   insightActionsRef.current = insightActions;
 
+  // Persist last-opened note for page refresh / navigation
+  useEffect(() => {
+    if (selectedNoteId) {
+      localStorage.setItem("klynt:lastOpenNoteId", selectedNoteId);
+    } else {
+      localStorage.removeItem("klynt:lastOpenNoteId");
+    }
+  }, [selectedNoteId]);
+
   // ── Sync Insight Review panel when switching notes ────────────────────
   useEffect(() => {
     if (insightState.isOpen && selectedNoteId && selectedNoteId !== insightState.noteId) {
       void insightActions.open(selectedNoteId);
     }
-  }, [selectedNoteId]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [selectedNoteId, insightActions.open, insightState.isOpen, insightState.noteId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Sidebar widths (imperatively managed for perf) ────────────────────
   const [leftWidth, setLeftWidth] = useState(220);
@@ -105,9 +117,15 @@ export default function KnowledgeBasePage() {
   // Pre-select note from URL search params (e.g. /notes?noteId=xxx)
   useEffect(() => {
     const noteId = searchParams.get("noteId");
+    const atomId = searchParams.get("atomId");
     if (noteId) {
       setSelectedNoteId(noteId);
-      setSearchParams({}, { replace: true });
+      // Keep atomId in params briefly so KnowledgeAtomsPanel can read it
+      if (atomId) {
+        setSearchParams({ atomId }, { replace: true });
+      } else {
+        setSearchParams({}, { replace: true });
+      }
     }
   }, [searchParams, setSearchParams]);
 
@@ -127,7 +145,7 @@ export default function KnowledgeBasePage() {
     // Leave at least 300px for the editor + left sidebar space
     const available = container.clientWidth - leftWidth - 20;
     return Math.max(360, Math.min(640, available * 0.65));
-  }, [leftWidth, insightOpen]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [leftWidth]); // eslint-disable-line react-hooks/exhaustive-deps
   const effectiveRightWidth = insightOpen ? insightPanelWidth : rightWidth;
 
   // ── Mutations ─────────────────────────────────────────────────────────
@@ -272,14 +290,6 @@ export default function KnowledgeBasePage() {
     [selectedNote, generateFromNote, generateFromText],
   );
 
-  const handleSplitModeChange = useCallback(
-    (mode: SplitMode | null) => {
-      if (!selectedNote) return;
-      updateNote({ id: selectedNote.id, splitMode: mode });
-    },
-    [selectedNote, updateNote],
-  );
-
   // ── Resize logic (left sidebar) ───────────────────────────────────────
   const onLeftResizeStart = useCallback((e: React.PointerEvent) => {
     e.preventDefault();
@@ -354,6 +364,17 @@ export default function KnowledgeBasePage() {
         return;
       }
 
+      // "?" to show shortcut help — only when not typing in an input
+      if (e.key === "?" && !e.metaKey && !e.ctrlKey) {
+        const tag = (e.target as HTMLElement)?.tagName;
+        const editable = (e.target as HTMLElement)?.isContentEditable;
+        if (!editable && tag !== "INPUT" && tag !== "TEXTAREA") {
+          e.preventDefault();
+          setShowShortcutHelp(true);
+          return;
+        }
+      }
+
       const mod = e.metaKey || e.ctrlKey;
       if (!mod) return;
 
@@ -379,6 +400,16 @@ export default function KnowledgeBasePage() {
         // Cmd+Shift+G → toggle view mode
         e.preventDefault();
         setViewMode((prev) => (prev === "editor" ? "graph" : "editor"));
+      } else if ((e.key === "p" || e.key === "P") && e.shiftKey) {
+        // Cmd+Shift+P → toggle practice mode
+        e.preventDefault();
+        window.dispatchEvent(new CustomEvent("editor-mode-toggle", { detail: "toggle-practice" }));
+      } else if ((e.key === "a" || e.key === "A") && e.shiftKey) {
+        // Cmd+Shift+A → toggle annotation pane
+        e.preventDefault();
+        window.dispatchEvent(
+          new CustomEvent("editor-mode-toggle", { detail: "toggle-annotations" }),
+        );
       } else if ((e.key === "i" || e.key === "I") && e.shiftKey) {
         // Cmd+Shift+I → toggle Insight Review
         e.preventDefault();
@@ -501,8 +532,6 @@ export default function KnowledgeBasePage() {
               }
               focusModeActive={isFocusMode}
               onGenerateCards={handleGenerateCards}
-              splitMode={selectedNote?.splitMode as SplitMode | null}
-              onSplitModeChange={handleSplitModeChange}
             />
           </div>
         ) : (
@@ -511,15 +540,15 @@ export default function KnowledgeBasePage() {
               <ViewModeToggle viewMode={viewMode} onChange={setViewMode} />
             </div>
             <div className="flex-1 flex flex-col items-center justify-center gap-3">
-              <div className="w-12 h-12 rounded-2xl bg-card flex items-center justify-center">
-                <FileText className="w-6 h-6 text-dim" strokeWidth={1.5} />
+              <div className="size-12 rounded-2xl bg-card flex items-center justify-center">
+                <FileText className="size-6 text-dim" strokeWidth={1.5} />
               </div>
               <div className="text-center">
                 <div className="text-muted-foreground text-sm">Select a note to view</div>
                 <div className="text-dim text-xs mt-1">
                   or press{" "}
-                  <kbd className="px-1.5 py-0.5 rounded bg-accent text-[10px] font-mono">Cmd+N</kbd>{" "}
-                  to create one
+                  <kbd className="px-1.5 py-0.5 rounded bg-accent text-2xs font-mono">Cmd+N</kbd> to
+                  create one
                 </div>
               </div>
             </div>
@@ -614,6 +643,9 @@ export default function KnowledgeBasePage() {
         }}
         noteId={selectedNote?.id ?? null}
       />
+
+      {/* Shortcut Help Dialog */}
+      <ShortcutHelpDialog open={showShortcutHelp} onClose={() => setShowShortcutHelp(false)} />
     </div>
   );
 }

@@ -22,13 +22,13 @@ export function PlanProgress({ steps, completedSteps, isStreaming }: PlanProgres
     <div className="my-2 rounded-lg border border-border bg-card px-3 py-2.5">
       <div className="flex items-center gap-2 mb-2">
         <span className="text-[11px] font-medium text-muted-foreground">Plan</span>
-        <span className="text-[10px] font-light text-dim">
+        <span className="text-2xs font-light text-dim">
           {doneCount}/{totalCount} steps
         </span>
         {doneCount < totalCount && isStreaming && (
-          <Loader2 className="w-3 h-3 text-brand animate-spin" strokeWidth={2} />
+          <Loader2 className="size-3 text-brand animate-spin" strokeWidth={2} />
         )}
-        {doneCount === totalCount && <Check className="w-3 h-3 text-success" strokeWidth={2} />}
+        {doneCount === totalCount && <Check className="size-3 text-success" strokeWidth={2} />}
       </div>
       <div className="space-y-1">
         {steps.map((step, i) => {
@@ -37,14 +37,14 @@ export function PlanProgress({ steps, completedSteps, isStreaming }: PlanProgres
           return (
             <div key={step} className="flex items-start gap-2">
               {isCompleted ? (
-                <Check className="mt-0.5 w-3 h-3 flex-shrink-0 text-success" strokeWidth={2} />
+                <Check className="mt-0.5 size-3 flex-shrink-0 text-success" strokeWidth={2} />
               ) : isActive ? (
                 <Loader2
-                  className="mt-0.5 w-3 h-3 flex-shrink-0 text-brand animate-spin"
+                  className="mt-0.5 size-3 flex-shrink-0 text-brand animate-spin"
                   strokeWidth={2}
                 />
               ) : (
-                <Circle className="mt-0.5 w-3 h-3 flex-shrink-0 text-dim" strokeWidth={1.5} />
+                <Circle className="mt-0.5 size-3 flex-shrink-0 text-dim" strokeWidth={1.5} />
               )}
               <span
                 className={`text-[11px] font-light leading-snug ${

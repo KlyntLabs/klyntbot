@@ -139,7 +139,7 @@ export class ProseMirrorAdapter {
   // biome-ignore lint/suspicious/noExplicitAny: vim.js reads/writes arbitrary properties on curOp
   curOp: Record<string, any> | null = null;
 
-  private _listeners: Map<string, Set<Function>> = new Map();
+  private _listeners: Map<string, Set<(...args: unknown[]) => void>> = new Map();
   private _lastChange: { from: Pos; to: Pos; text: string[] } | null = null;
   private _inOperation = false;
   private _pendingCursorActivity = false;
@@ -180,13 +180,13 @@ export class ProseMirrorAdapter {
     }
   }
 
-  static on(emitter: unknown, type: string, fn: Function): void {
+  static on(emitter: unknown, type: string, fn: (...args: unknown[]) => void): void {
     if (emitter && typeof emitter === "object" && "on" in emitter) {
       (emitter as ProseMirrorAdapter).on(type, fn);
     }
   }
 
-  static off(emitter: unknown, type: string, fn: Function): void {
+  static off(emitter: unknown, type: string, fn: (...args: unknown[]) => void): void {
     if (emitter && typeof emitter === "object" && "off" in emitter) {
       (emitter as ProseMirrorAdapter).off(type, fn);
     }
@@ -219,12 +219,13 @@ export class ProseMirrorAdapter {
 
   // ── Event system ──────────────────────────────────────────────────
 
-  on(type: string, fn: Function): void {
+  // biome-ignore lint/suspicious/useAdjacentOverloadSignatures: instance on/off/signal are not overloads of static on/off/signal — they have different signatures (CodeMirror compatibility API)
+  on(type: string, fn: (...args: unknown[]) => void): void {
     if (!this._listeners.has(type)) this._listeners.set(type, new Set());
-    this._listeners.get(type)!.add(fn);
+    this._listeners.get(type)?.add(fn);
   }
 
-  off(type: string, fn: Function): void {
+  off(type: string, fn: (...args: unknown[]) => void): void {
     this._listeners.get(type)?.delete(fn);
   }
 
@@ -290,6 +291,7 @@ export class ProseMirrorAdapter {
     const pos = typeof lineOrPos === "number" ? makePos(lineOrPos, ch ?? 0) : lineOrPos;
     const pmPos = this.model.toPMPos(pos.line, pos.ch);
     const tr = this.view.state.tr.setSelection(TextSelection.create(this.view.state.doc, pmPos));
+    tr.scrollIntoView();
     this.view.dispatch(tr);
   }
 
@@ -309,6 +311,7 @@ export class ProseMirrorAdapter {
     const tr = this.view.state.tr.setSelection(
       TextSelection.create(this.view.state.doc, pmAnchor, pmHead),
     );
+    tr.scrollIntoView();
     this.view.dispatch(tr);
   }
 
@@ -399,6 +402,17 @@ export class ProseMirrorAdapter {
 
   // ── Coordinate / scroll methods ───────────────────────────────────
 
+  /** Find the nearest scrollable ancestor (the element with overflow-y: auto/scroll). */
+  private getScrollParent(): HTMLElement {
+    let el = this.view.dom.parentElement;
+    while (el) {
+      const { overflowY } = getComputedStyle(el);
+      if (overflowY === "auto" || overflowY === "scroll") return el;
+      el = el.parentElement;
+    }
+    return this.view.dom;
+  }
+
   charCoords(pos: Pos, _mode?: string): CharCoords {
     const pmPos = this.model.toPMPos(pos.line, pos.ch);
     const coords = this.view.coordsAtPos(pmPos);
@@ -412,7 +426,7 @@ export class ProseMirrorAdapter {
   }
 
   getScrollInfo(): ScrollInfo {
-    const dom = this.view.dom;
+    const dom = this.getScrollParent();
     return {
       left: dom.scrollLeft,
       top: dom.scrollTop,
@@ -425,7 +439,7 @@ export class ProseMirrorAdapter {
 
   scrollTo(_x?: number | null, y?: number | null): void {
     if (y != null) {
-      this.view.dom.scrollTop = y;
+      this.getScrollParent().scrollTop = y;
     }
   }
 
@@ -710,7 +724,7 @@ export class ProseMirrorAdapter {
     return false;
   }
 
-  forEachSelection(fn: Function): void {
+  forEachSelection(fn: (sel: ProseMirrorAdapter) => void): void {
     fn(this);
   }
 

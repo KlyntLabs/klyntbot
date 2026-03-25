@@ -5,6 +5,7 @@ import type {
   PersonaSegment,
   TransparencyData,
 } from "@shared/types";
+import { ThinkingDots } from "@shared/ui/ThinkingDots";
 import { Fragment, useEffect, useRef, useState } from "react";
 import { CollapsedInteraction } from "./CollapsedInteraction";
 import { InteractionCard } from "./InteractionCard";
@@ -21,10 +22,10 @@ interface MessageListProps {
   activeInteraction: ActiveInteraction | null;
   sessionKey: string;
   onInteractionSubmitted: () => void;
-  showTransparency: boolean;
   liveTransparency: TransparencyData | null;
   activeDelegateAgent?: string | null;
   personaMessages?: PersonaSegment[];
+  statusPhase?: string | null;
 }
 
 export function MessageList({
@@ -36,10 +37,10 @@ export function MessageList({
   activeInteraction,
   sessionKey,
   onInteractionSubmitted,
-  showTransparency,
   liveTransparency,
   activeDelegateAgent,
   personaMessages,
+  statusPhase,
 }: MessageListProps) {
   const endRef = useRef<HTMLDivElement>(null);
   const [userScrolledUp, setUserScrolledUp] = useState(false);
@@ -114,15 +115,13 @@ export function MessageList({
               ) : msg.role === "interaction" ? (
                 <CollapsedInteraction content={msg.content} />
               ) : (
-                <div className="max-w-[85%]">
+                <div className="w-full">
                   {msg.segments && msg.segments.length > 0 ? (
                     <SegmentedMessage segments={msg.segments} plan={msg.transparency?.plan} />
                   ) : (
                     <MarkdownContent content={msg.content} />
                   )}
-                  {showTransparency && msg.transparency && (
-                    <TokenBadge transparency={msg.transparency} />
-                  )}
+                  {msg.transparency && <TokenBadge transparency={msg.transparency} />}
                 </div>
               )}
             </div>
@@ -135,7 +134,7 @@ export function MessageList({
                   className="flex justify-start gap-2.5"
                   style={{ animation: "fade-in 0.3s ease-out" }}
                 >
-                  <div className="shrink-0 w-7 h-7 rounded-full bg-purple-500/15 flex items-center justify-center text-sm mt-1">
+                  <div className="shrink-0 size-7 rounded-full bg-purple-500/15 flex items-center justify-center text-sm mt-1">
                     {pm.personaIcon || "🤖"}
                   </div>
                   <div className="max-w-[80%]">
@@ -162,7 +161,7 @@ export function MessageList({
       {/* Streaming segments (live) — includes inline tool spinners + cursor */}
       {(segments.length > 0 || activeTools.length > 0) && (
         <div className="flex justify-start">
-          <div className="max-w-[85%]">
+          <div className="w-full">
             <SegmentedMessage
               segments={segments}
               activeTools={activeTools}
@@ -170,9 +169,7 @@ export function MessageList({
               activeDelegateAgent={activeDelegateAgent}
               plan={liveTransparency?.plan}
             />
-            {showTransparency && liveTransparency && (
-              <TokenBadge transparency={liveTransparency} isStreaming={isStreaming} />
-            )}
+            {liveTransparency && <TokenBadge transparency={liveTransparency} />}
           </div>
         </div>
       )}
@@ -180,19 +177,9 @@ export function MessageList({
       {/* Thinking indicator (streaming but no segments yet and no tools running) */}
       {isStreaming && segments.length === 0 && activeTools.length === 0 && (
         <div className="flex justify-start">
-          <div className="glass-bubble px-4 py-3 flex gap-1.5">
-            <div
-              className="w-1.5 h-1.5 bg-brand/60 rounded-full animate-bounce"
-              style={{ animationDelay: "0ms" }}
-            />
-            <div
-              className="w-1.5 h-1.5 bg-brand/60 rounded-full animate-bounce"
-              style={{ animationDelay: "150ms" }}
-            />
-            <div
-              className="w-1.5 h-1.5 bg-brand/60 rounded-full animate-bounce"
-              style={{ animationDelay: "300ms" }}
-            />
+          <div className="glass-bubble px-4 py-3 flex items-center gap-2">
+            <ThinkingDots size="sm" />
+            {statusPhase && <span className="text-xs text-muted-foreground">{statusPhase}</span>}
           </div>
         </div>
       )}
@@ -207,7 +194,7 @@ export function MessageList({
               border: "1px solid rgba(244, 63, 94, 0.15)",
             }}
           >
-            <p className="text-[12px] font-light text-destructive">{error}</p>
+            <p className="text-xs font-light text-destructive">{error}</p>
           </div>
         </div>
       )}

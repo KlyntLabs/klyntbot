@@ -61,22 +61,12 @@ pub enum CostHint {
     Variable,
 }
 
-/// An example usage of the tool.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ToolExample {
-    pub description: String,
-    pub params: serde_json::Value,
-}
-
 /// Rich metadata for tool discovery and categorization.
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct ToolMetadata {
     pub category: ToolCategory,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub tags: Vec<String>,
-    pub author: String,
-    pub version: String,
     pub source: ToolSource,
-    pub examples: Vec<ToolExample>,
-    pub related_tools: Vec<String>,
     pub cost_hint: CostHint,
 }

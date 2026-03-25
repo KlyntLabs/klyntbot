@@ -8,6 +8,7 @@ import { formatHumanDuration, minutesSinceMidnight } from "@shared/lib/dates";
 import { cn } from "@shared/lib/utils";
 import type { CalendarEvent } from "@shared/types";
 import { useMemo } from "react";
+import { computeOverlapLayout } from "../lib/timeline-utils";
 
 interface CalendarTrackProps {
   date: string;
@@ -35,6 +36,18 @@ export function CalendarTrack({
     });
   }, [events]);
 
+  // Adapt events for overlap layout (needs id + startedAt + durationSecs)
+  const layouts = useMemo(() => {
+    const items = events.map((e) => ({
+      id: e.id,
+      startedAt: e.startedAt,
+      durationSecs: Math.round(
+        (new Date(e.endedAt).getTime() - new Date(e.startedAt).getTime()) / 1000,
+      ),
+    }));
+    return computeOverlapLayout(items);
+  }, [events]);
+
   return (
     <>
       {blocks.map(({ event, startMin, endMin, durationSecs }) => {
@@ -42,19 +55,31 @@ export function CalendarTrack({
         const height = Math.max((endMin - startMin) * pxPerMin, 14);
         const isSelected = selectedEventId === event.id;
         const color = event.color ?? "var(--timeline-focus)";
+        const layout = layouts.get(event.id);
+        const hasOverlap = layout && layout.totalCols > 1;
+
+        const posStyle: React.CSSProperties = hasOverlap
+          ? {
+              top,
+              height,
+              left: `${(layout.colIndex / layout.totalCols) * 100}%`,
+              width: `${(1 / layout.totalCols) * 100}%`,
+              paddingLeft: 4,
+              paddingRight: 2,
+            }
+          : { top, height, left: 4, right: 2 };
 
         return (
           <button
             type="button"
             key={event.id}
             className={cn(
-              "absolute left-1 right-0.5 rounded-sm cursor-pointer overflow-hidden",
+              "absolute rounded-sm cursor-pointer overflow-hidden",
               "border-l-2",
               isSelected && "ring-1 ring-brand",
             )}
             style={{
-              top,
-              height,
+              ...posStyle,
               borderLeftColor: color,
               backgroundColor: `color-mix(in oklch, ${color} 12%, transparent)`,
             }}

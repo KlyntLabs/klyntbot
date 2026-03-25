@@ -23,6 +23,9 @@ use tools::RoutingContext;
 
 use super::AgentEvent;
 
+/// Window (in minutes) to retroactively mark shadow log entries as corrected.
+const CORRECTION_WINDOW_MINUTES: i32 = 15;
+
 /// Handle for consuming streaming agent output.
 pub struct StreamingHandle {
     /// Agent events (content chunks, tool status).
@@ -67,10 +70,14 @@ pub struct AgentLoop {
     /// Cancellation token for the memory maintenance background service.
     pub(crate) _memory_maintenance_token: Option<CancellationToken>,
     /// MCP manager for external server connections (kept alive for the agent's lifetime).
-    /// Wrapped in Mutex so `shutdown(&self)` can take ownership for graceful disconnect.
-    pub(crate) mcp_manager: tokio::sync::Mutex<Option<mcp::McpManager>>,
-    /// Shared DomainEventBus for cross-feature communication (cognitive + coaching).
-    pub(crate) _domain_event_bus: Option<Arc<bus::DomainEventBus>>,
+    /// Wrapped in Arc<Mutex> so the health check background task can share access.
+    pub(crate) mcp_manager: Arc<tokio::sync::Mutex<Option<mcp::McpManager>>>,
+    /// Cancellation token for the MCP health check background service.
+    pub(crate) _mcp_health_check_token: Option<CancellationToken>,
+    /// Shared DomainEventBus for cross-feature communication (cognitive + coaching + autotuner).
+    pub(crate) domain_event_bus: Option<Arc<bus::DomainEventBus>>,
+    /// Trial repo for marking shadow log entries as corrected (autotuner).
+    pub(crate) trial_repo: Option<storage::TrialRepo>,
     /// Background consolidation service for cognitive memory (kept alive for graceful shutdown).
     /// Wrapped in Mutex so `shutdown(&self)` can take ownership for graceful stop.
     pub(crate) cognitive_bg_service:
@@ -83,6 +90,10 @@ pub struct AgentLoop {
     pub(crate) skill_catalog: Arc<RwLock<skill_system::types::SkillCatalog>>,
     /// Shared skill router — rebuilt after reload.
     pub(crate) skill_router: Arc<RwLock<skill_system::router::SkillRouter>>,
+    /// Shared embedding engine — reused for hot-reload embedding recomputation.
+    pub(crate) embedding_engine: Arc<tools::EmbeddingEngine>,
+    /// Shared hot-reloadable config — updated by ConfigWatcherService without restart.
+    pub(crate) hot_config: Arc<RwLock<config::HotConfig>>,
 }
 
 impl AgentLoop {
@@ -90,6 +101,17 @@ impl AgentLoop {
     /// Used by `klyntbot-server` to bridge internal tools to MCP.
     pub fn tool_registry(&self) -> Arc<RwLock<tools::registry::ToolRegistry>> {
         Arc::clone(&self.tool_registry)
+    }
+
+    /// Public accessor for the skill catalog.
+    /// Used by `klyntbot-server` to expose active skills via MCP resources.
+    pub fn skill_catalog(&self) -> Arc<RwLock<skill_system::types::SkillCatalog>> {
+        Arc::clone(&self.skill_catalog)
+    }
+
+    /// Public accessor for the shared hot-reloadable config.
+    pub fn hot_config(&self) -> Arc<RwLock<config::HotConfig>> {
+        Arc::clone(&self.hot_config)
     }
 
     /// Reload skill packages from workspace (hot-reload after UI edits).
@@ -109,7 +131,13 @@ impl AgentLoop {
                 skill_system::types::SkillScope::User,
             ));
         }
-        let new_catalog = skill_system::types::SkillCatalog::discover(&sources).await?;
+        let mut new_catalog = skill_system::types::SkillCatalog::discover(&sources).await?;
+
+        // Recompute embeddings for the new catalog using the shared engine
+        let engine = Arc::clone(&self.embedding_engine);
+        let embed_fn: skill_system::types::EmbedFn = Arc::new(move |text: &str| engine.embed(text));
+        new_catalog.precompute_embeddings(&embed_fn).await;
+
         let new_router = skill_system::router::SkillRouter::new(&new_catalog);
 
         let mut catalog = self.skill_catalog.write().await;
@@ -152,7 +180,71 @@ impl AgentLoop {
             }
         }
 
+        // Emit correction signal for negative reactions
+        if score == 0.0 {
+            // Read last assistant message from session
+            let session_key = msg.session_key();
+            let last_assistant = if let Ok(session_arc) = self
+                .session_manager
+                .get_or_create(session_key.as_str(), None)
+                .await
+            {
+                let session = session_arc.lock().await;
+                session
+                    .messages
+                    .iter()
+                    .rev()
+                    .find(|m| m.role == "assistant")
+                    .map(|m| m.content.clone())
+            } else {
+                None
+            };
+
+            self.emit_correction_signal(
+                msg.chat_id.as_str(),
+                last_assistant.unwrap_or_default(),
+                msg.content.clone(),
+                bus::CorrectionKind::Reaction,
+                1.0,
+                session_key.to_string(),
+                None,
+            )
+            .await;
+        }
+
         Ok(())
+    }
+
+    /// Emit a UserCorrectedAI correction signal and mark shadow log entries.
+    #[allow(clippy::too_many_arguments)]
+    async fn emit_correction_signal(
+        &self,
+        chat_id: &str,
+        original: String,
+        correction: String,
+        kind: bus::CorrectionKind,
+        strength: f64,
+        session_key: String,
+        active_skill: Option<String>,
+    ) {
+        if let Some(ref bus) = self.domain_event_bus {
+            bus.publish(bus::DomainEvent::UserCorrectedAI {
+                original,
+                correction,
+                kind,
+                strength,
+                session_key,
+                active_skill,
+            });
+        }
+        if let Some(ref trial_repo) = self.trial_repo {
+            if let Err(e) = trial_repo
+                .mark_recent_messages_corrected(chat_id, CORRECTION_WINDOW_MINUTES)
+                .await
+            {
+                warn!("Failed to mark shadow log entries as corrected: {}", e);
+            }
+        }
     }
 
     /// Extract the inbound receiver from the agent loop.
@@ -257,6 +349,11 @@ impl AgentLoop {
             token.cancel();
         }
 
+        // Stop the MCP health check background service
+        if let Some(token) = &self._mcp_health_check_token {
+            token.cancel();
+        }
+
         // Stop the cognitive background consolidation service (cancels + awaits JoinHandle)
         if let Some(mut svc) = self.cognitive_bg_service.lock().await.take() {
             svc.stop().await;
@@ -282,7 +379,14 @@ impl AgentLoop {
             Some(m) => m,
             None => {
                 // No MCP manager yet — create one using the agent's actual config
-                *manager_guard = Some(mcp::McpManager::connect_all(&self.config.mcp, None).await);
+                *manager_guard = Some(
+                    mcp::McpManager::connect_all(
+                        &self.config.mcp,
+                        None,
+                        mcp::McpClientOptions::default(),
+                    )
+                    .await,
+                );
                 manager_guard.as_mut().unwrap()
             }
         };
@@ -384,6 +488,10 @@ impl AgentLoop {
             msg.channel, msg.sender_id, preview
         );
 
+        // Detect correction prefix and memory miss BEFORE acquiring session lock
+        let correction_strength = detect_correction_prefix(&msg.content);
+        let is_memory_miss = detect_memory_miss(&msg.content);
+
         // Get or create session — returns per-session Arc<Mutex<Session>>
         let session_key = msg.session_key();
         let session_arc = self
@@ -392,13 +500,27 @@ impl AgentLoop {
             .await?;
 
         // Mutate session and collect data under the per-session lock
-        let (history, embed_msg_id, session_squad_id) = {
+        let (history, embed_msg_id, session_squad_id, last_assistant_content) = {
             let mut session = session_arc.lock().await;
+            // Capture last assistant message if a correction or memory miss was detected
+            let last_assistant = if correction_strength.is_some() || is_memory_miss {
+                session
+                    .messages
+                    .iter()
+                    .rev()
+                    .find(|m| m.role == "assistant")
+                    .map(|m| m.content.clone())
+            } else {
+                None
+            };
+            if session.correction_cooldown > 0 {
+                session.correction_cooldown -= 1;
+            }
             session.add_message("user", &msg.content);
             let msg_id = session.messages.last().map(|m| m.id.clone());
             let history = session.get_history(self.history_limit).to_vec();
             let squad_id = session.squad_id.clone();
-            (history, msg_id, squad_id)
+            (history, msg_id, squad_id, last_assistant)
             // per-session lock released here
         };
 
@@ -410,14 +532,85 @@ impl AgentLoop {
         // Ingest user message into activity log (fire-and-forget)
         self.ingest_chat_message(session_key.as_str(), "user", &msg.content);
 
+        // Keyword-based correction detection — emit signal when user corrects the AI
+        // Rate-limited: max 1 keyword correction per 3 messages per session.
+        if let Some(strength) = correction_strength {
+            if let Some(ref original) = last_assistant_content {
+                let should_emit = {
+                    let mut session = session_arc.lock().await;
+                    if session.correction_cooldown > 0 {
+                        false
+                    } else {
+                        session.correction_cooldown = 3;
+                        true
+                    }
+                };
+
+                if should_emit {
+                    // Use MemoryMiss kind if the message also indicates a memory miss
+                    let kind = if is_memory_miss {
+                        bus::CorrectionKind::MemoryMiss
+                    } else {
+                        bus::CorrectionKind::KeywordPrefix
+                    };
+                    self.emit_correction_signal(
+                        msg.chat_id.as_str(),
+                        original.clone(),
+                        msg.content.clone(),
+                        kind,
+                        strength,
+                        session_key.to_string(),
+                        None,
+                    )
+                    .await;
+                }
+            }
+        } else if is_memory_miss {
+            // Memory miss without a general correction prefix — emit standalone
+            if let Some(ref original) = last_assistant_content {
+                self.emit_correction_signal(
+                    msg.chat_id.as_str(),
+                    original.clone(),
+                    msg.content.clone(),
+                    bus::CorrectionKind::MemoryMiss,
+                    0.8,
+                    session_key.to_string(),
+                    None,
+                )
+                .await;
+            }
+        }
+
+        // Build correction context for query rewriting (if a correction was detected)
+        let correction = if correction_strength.is_some() {
+            last_assistant_content
+                .as_ref()
+                .map(|original| context_engine::CorrectionContext {
+                    rejected_topic: crate::adapters::query_rewriter::extract_key_terms_from(
+                        &original.chars().take(200).collect::<String>(),
+                    ),
+                    corrected_to: msg.content.clone(),
+                })
+        } else {
+            None
+        };
+
         // Run through pipeline
         let mut routing_ctx = RoutingContext::new(msg.channel.clone(), msg.chat_id.clone());
         if let Some(sid) = session_squad_id {
             routing_ctx.squad_id = Some(sid);
         }
         let response_content = self
-            .run_pipeline(&msg.content, history, &routing_ctx, None, None)
+            .run_pipeline(&msg.content, history, &routing_ctx, None, None, correction)
             .await?;
+
+        // Prepend acknowledgement when a keyword correction was detected
+        let response_content = if correction_strength.is_some() && last_assistant_content.is_some()
+        {
+            format!("Noted — adjusting for next time.\n\n{response_content}")
+        } else {
+            response_content
+        };
 
         // Save assistant response to session
         self.save_to_session(session_key.as_str(), &response_content)
@@ -427,7 +620,7 @@ impl AgentLoop {
         self.ingest_chat_message(session_key.as_str(), "assistant", &response_content);
 
         // Publish chat turn to cognitive consolidation pipeline
-        if let Some(bus) = &self._domain_event_bus {
+        if let Some(bus) = &self.domain_event_bus {
             bus.publish(bus::DomainEvent::ChatTurnCompleted {
                 user_message: msg.content.clone(),
                 session_key: session_key.to_string(),
@@ -477,7 +670,7 @@ impl AgentLoop {
             .await?;
         let history = {
             let mut session = session_arc.lock().await;
-            session.add_message("user", &system_msg_content);
+            session.add_message("system", &system_msg_content);
             session.get_history(self.history_limit).to_vec()
             // per-session lock released here
         };
@@ -485,7 +678,7 @@ impl AgentLoop {
         // Run through pipeline
         let routing_ctx = RoutingContext::new(origin_channel.into(), origin_chat_id.into());
         let response_content = self
-            .run_pipeline(&system_msg_content, history, &routing_ctx, None, None)
+            .run_pipeline(&system_msg_content, history, &routing_ctx, None, None, None)
             .await?;
 
         // Save assistant response to session
@@ -557,6 +750,20 @@ impl AgentLoop {
         }
     }
 
+    /// Persist the in-memory session to SQL without adding a new message.
+    /// Used in error paths to ensure the user message is not lost.
+    async fn persist_session(&self, session_key: &str) {
+        if let Ok(session_arc) = self.session_manager.get_or_create(session_key, None).await {
+            let session_clone = {
+                let session = session_arc.lock().await;
+                session.clone()
+            };
+            if let Err(e) = self.session_manager.save(&session_clone).await {
+                warn!("Failed to persist session on error: {}", e);
+            }
+        }
+    }
+
     /// Save assistant response to session and return the persisted message ID.
     async fn save_to_session(&self, session_key: &str, content: &str) -> Option<String> {
         if let Ok(session_arc) = self.session_manager.get_or_create(session_key, None).await {
@@ -615,6 +822,7 @@ impl AgentLoop {
         routing_ctx: &RoutingContext,
         event_tx: Option<tokio::sync::mpsc::Sender<AgentEvent>>,
         cancel_token: Option<CancellationToken>,
+        correction: Option<context_engine::CorrectionContext>,
     ) -> Result<String> {
         let system_prompt = self
             .context_engine
@@ -640,6 +848,7 @@ impl AgentLoop {
                 Some(&system_prompt),
                 event_tx.clone(),
                 cancel_token,
+                correction,
             )
             .await?;
 
@@ -693,7 +902,7 @@ impl AgentLoop {
         // Run through pipeline
         let routing_ctx = RoutingContext::new("cli".into(), session_key.clone().into());
         let response_content = self
-            .run_pipeline(&content, history, &routing_ctx, None, None)
+            .run_pipeline(&content, history, &routing_ctx, None, None, None)
             .await?;
 
         // Save to session
@@ -715,6 +924,88 @@ impl AgentLoop {
         session_key: String,
         squad_mode: Option<String>,
     ) -> Result<StreamingHandle> {
+        // Detect correction prefix and memory miss BEFORE setup_session adds the user message
+        let correction_strength = detect_correction_prefix(&content);
+        let is_memory_miss = detect_memory_miss(&content);
+
+        // Read last assistant message (if correction detected) and tick the cooldown
+        // counter before setup_session mutates the session. Mirrors the two-phase
+        // lock pattern in process_message: first lock decrements cooldown + captures
+        // last assistant; second lock gates the emit.
+        let (last_assistant_content, cooldown_after_decrement) =
+            if let Ok(session_arc) = self.session_manager.get_or_create(&session_key, None).await {
+                let mut session = session_arc.lock().await;
+                let last_asst = if correction_strength.is_some() || is_memory_miss {
+                    session
+                        .messages
+                        .iter()
+                        .rev()
+                        .find(|m| m.role == "assistant")
+                        .map(|m| m.content.clone())
+                } else {
+                    None
+                };
+                if session.correction_cooldown > 0 {
+                    session.correction_cooldown -= 1;
+                }
+                let cd = session.correction_cooldown;
+                (last_asst, cd)
+            } else {
+                (None, 0)
+            };
+
+        // Emit correction signal (rate-limited: max 1 keyword correction per 3 messages)
+        let correction_emitted = if let Some(strength) = correction_strength {
+            if let Some(ref original) = last_assistant_content {
+                if cooldown_after_decrement == 0 {
+                    // Set cooldown under a fresh lock (mirrors process_message's second lock)
+                    if let Ok(session_arc) =
+                        self.session_manager.get_or_create(&session_key, None).await
+                    {
+                        let mut session = session_arc.lock().await;
+                        session.correction_cooldown = 3;
+                    }
+                    let kind = if is_memory_miss {
+                        bus::CorrectionKind::MemoryMiss
+                    } else {
+                        bus::CorrectionKind::KeywordPrefix
+                    };
+                    self.emit_correction_signal(
+                        &session_key,
+                        original.clone(),
+                        content.clone(),
+                        kind,
+                        strength,
+                        session_key.clone(),
+                        None,
+                    )
+                    .await;
+                    true
+                } else {
+                    false
+                }
+            } else {
+                false
+            }
+        } else if is_memory_miss {
+            // Memory miss without a general correction prefix — emit standalone
+            if let Some(ref original) = last_assistant_content {
+                self.emit_correction_signal(
+                    &session_key,
+                    original.clone(),
+                    content.clone(),
+                    bus::CorrectionKind::MemoryMiss,
+                    0.8,
+                    session_key.clone(),
+                    None,
+                )
+                .await;
+            }
+            true
+        } else {
+            false
+        };
+
         let history = self
             .setup_session(&content, &session_key, "streaming direct")
             .await?;
@@ -742,6 +1033,23 @@ impl AgentLoop {
         let cancel_token = CancellationToken::new();
         let cancel_clone = cancel_token.clone();
 
+        // Whether to prepend correction acknowledgement to response
+        let prepend_correction_ack = correction_emitted;
+
+        // Build correction context for query rewriting (if a correction was detected)
+        let correction = if correction_emitted {
+            last_assistant_content
+                .as_ref()
+                .map(|original| context_engine::CorrectionContext {
+                    rejected_topic: crate::adapters::query_rewriter::extract_key_terms_from(
+                        &original.chars().take(200).collect::<String>(),
+                    ),
+                    corrected_to: content.clone(),
+                })
+        } else {
+            None
+        };
+
         // Clone Arcs for the spawned task
         let agent = Arc::clone(self);
         let sk = session_key.clone();
@@ -755,10 +1063,18 @@ impl AgentLoop {
                     &routing_ctx,
                     Some(pipeline_event_tx),
                     Some(cancel_clone),
+                    correction,
                 )
                 .await
             {
                 Ok(response) => {
+                    // Prepend acknowledgement when a keyword correction was detected
+                    let response = if prepend_correction_ack {
+                        format!("Noted — adjusting for next time.\n\n{response}")
+                    } else {
+                        response
+                    };
+
                     // Save to session BEFORE emitting Done so the message ID
                     // is available and the DB row exists when the streaming
                     // relay tries to update metadata.
@@ -772,6 +1088,10 @@ impl AgentLoop {
                     Ok(response)
                 }
                 Err(e) => {
+                    // Persist the session so the user message is saved even on error.
+                    // Without this, the session row exists (created by chat_send)
+                    // but has zero messages — a ghost thread in the sidebar.
+                    agent.persist_session(&sk).await;
                     let _ = event_tx
                         .send(AgentEvent::Error {
                             message: e.to_string(),
@@ -818,6 +1138,127 @@ fn reaction_to_satisfaction(emoji: &str) -> Option<f32> {
         "\u{1F44E}" => Some(0.0),                     // 👎
         "\u{1F615}" => Some(0.0),                     // 😕
         _ => None,
+    }
+}
+
+/// Detects if a user message starts with a correction phrase.
+/// Returns the correction strength (1.0 for strong, 0.8 for soft) or None.
+fn detect_correction_prefix(message: &str) -> Option<f64> {
+    let lower = message.to_lowercase();
+    let check = &lower[..lower.len().min(80)];
+
+    const STRONG: &[&str] = &["no,", "no ", "wrong", "that's not", "incorrect"];
+    const SOFT: &[&str] = &["i meant", "try again", "redo", "not quite", "never mind"];
+
+    for prefix in STRONG {
+        if check.starts_with(prefix) {
+            return Some(1.0);
+        }
+    }
+    for prefix in SOFT {
+        if check.starts_with(prefix) {
+            return Some(0.8);
+        }
+    }
+    None
+}
+
+/// Detects if a user message indicates the AI forgot a previously mentioned fact.
+/// Returns true when the user signals a memory retrieval miss.
+fn detect_memory_miss(message: &str) -> bool {
+    let lower = message.to_lowercase();
+    let check = &lower[..lower.len().min(120)];
+
+    const PHRASES: &[&str] = &[
+        "i already told you",
+        "i mentioned",
+        "as i said",
+        "i said before",
+        "remember when i",
+        "i told you",
+        "you should know",
+        "we talked about",
+        "we discussed",
+        "you forgot",
+        "don't you remember",
+        "i already said",
+    ];
+
+    PHRASES.iter().any(|phrase| check.contains(phrase))
+}
+
+#[cfg(test)]
+mod correction_tests {
+    use super::detect_correction_prefix;
+
+    #[test]
+    fn detects_strong_corrections() {
+        assert_eq!(detect_correction_prefix("No, that's wrong"), Some(1.0));
+        assert_eq!(detect_correction_prefix("wrong answer"), Some(1.0));
+        assert_eq!(detect_correction_prefix("incorrect, I wanted"), Some(1.0));
+    }
+
+    #[test]
+    fn detects_soft_corrections() {
+        assert_eq!(detect_correction_prefix("I meant the other one"), Some(0.8));
+        assert_eq!(detect_correction_prefix("try again please"), Some(0.8));
+    }
+
+    #[test]
+    fn ignores_normal_messages() {
+        assert_eq!(detect_correction_prefix("What's the weather?"), None);
+        assert_eq!(detect_correction_prefix("Hello there"), None);
+    }
+
+    #[test]
+    fn rate_limiter_cooldown_mechanics() {
+        use session::Session;
+
+        // Fresh session: cooldown is 0 (ready to fire)
+        let session = Session::new("test:chat");
+        assert_eq!(session.correction_cooldown, 0);
+
+        // Simulate emission: set cooldown to 3
+        let mut session = session;
+        session.correction_cooldown = 3;
+
+        // Simulate 3 messages decrementing
+        for i in (0..3).rev() {
+            assert!(session.correction_cooldown > 0, "Should be rate-limited");
+            session.correction_cooldown -= 1;
+            assert_eq!(session.correction_cooldown, i as u32);
+        }
+
+        // After 3 messages: ready to fire again
+        assert_eq!(session.correction_cooldown, 0);
+    }
+
+    #[test]
+    fn detects_memory_miss_phrases() {
+        use super::detect_memory_miss;
+        assert!(detect_memory_miss("I already told you about my meeting"));
+        assert!(detect_memory_miss("We discussed this yesterday"));
+        assert!(detect_memory_miss("You forgot that I prefer dark mode"));
+        assert!(detect_memory_miss("Don't you remember my schedule?"));
+        assert!(detect_memory_miss("I mentioned my deadline earlier"));
+        assert!(detect_memory_miss("As I said, the project is due Friday"));
+    }
+
+    #[test]
+    fn memory_miss_ignores_normal_messages() {
+        use super::detect_memory_miss;
+        assert!(!detect_memory_miss("What's the weather?"));
+        assert!(!detect_memory_miss("Help me plan my day"));
+        assert!(!detect_memory_miss("No, that's wrong")); // correction but not memory miss
+        assert!(!detect_memory_miss("Tell me about rust traits"));
+    }
+
+    #[test]
+    fn excluded_phrases_return_none() {
+        assert_eq!(detect_correction_prefix("not sure about that"), None);
+        assert_eq!(detect_correction_prefix("hold on let me think"), None);
+        assert_eq!(detect_correction_prefix("actually that reminds me"), None);
+        assert_eq!(detect_correction_prefix("wait before that"), None);
     }
 }
 
@@ -871,13 +1312,11 @@ mod tests {
         });
 
         // Publish threshold change (what LearningService will do)
-        event_bus
-            .publish(LearningEvent::ThresholdChanged {
-                old_threshold: 0.70,
-                new_threshold: 0.82,
-                reason: "test_subscriber".to_string(),
-            })
-            .await;
+        event_bus.publish(LearningEvent::ThresholdChanged {
+            old_threshold: 0.70,
+            new_threshold: 0.82,
+            reason: "test_subscriber".to_string(),
+        });
 
         tokio::time::sleep(Duration::from_millis(50)).await;
 

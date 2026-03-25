@@ -296,6 +296,7 @@ mod tests {
             message: "test".into(),
             delivered_at: Utc::now(),
             trigger_name: trigger.into(),
+            action_url: None,
         }
     }
 

@@ -9,6 +9,7 @@ metadata:
   author: klyntbot
   version: "2.0.0"
   klyntbot:
+    summary: Cross-platform messaging via Telegram, Discord, Slack, and email.
     type: orchestrator
     tools: [message, ask_user, memory]
     mcp_tools: []
@@ -70,6 +71,7 @@ manage notifications, and coordinate cross-platform communication.
 
 See `references/messaging.md` for channel formatting rules and examples.
 See `references/notification.md` for alert routing and batching.
+Channel-specific message templates are in `assets/templates/`.
 
 ## Channel Formatting
 

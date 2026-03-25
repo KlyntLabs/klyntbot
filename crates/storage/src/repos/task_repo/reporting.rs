@@ -56,6 +56,20 @@ impl TaskRepo {
         Ok(rows)
     }
 
+    /// Count total and completed tasks for a key result.
+    /// Returns `(total, completed)`.
+    pub async fn count_by_kr(&self, kr_id: &str) -> Result<(i64, i64), StorageError> {
+        let row: (i64, i64) = sqlx::query_as(
+            "SELECT COUNT(*), COALESCE(SUM(CASE WHEN completed = 1 THEN 1 ELSE 0 END), 0) \
+             FROM tasks WHERE key_result_id = ?1 AND is_template = FALSE",
+        )
+        .bind(kr_id)
+        .fetch_one(&self.pool)
+        .await?;
+
+        Ok((row.0, row.1))
+    }
+
     /// Build a context string of active tasks for LLM context injection.
     #[allow(clippy::type_complexity)]
     pub async fn to_context_string(&self) -> Result<String, StorageError> {
@@ -70,7 +84,7 @@ impl TaskRepo {
                 SELECT t.title, t.status, t.priority, t.focused_at, ar.name
                 FROM tasks t
                 JOIN areas ar ON t.area_id = ar.id
-                WHERE t.status IN ('todo', 'doing')
+                WHERE t.completed = 0
                   AND t.is_template = FALSE
                 ORDER BY
                     CASE WHEN t.focused_at IS NOT NULL THEN 0 ELSE 1 END,

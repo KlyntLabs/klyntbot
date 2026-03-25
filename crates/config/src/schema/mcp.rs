@@ -186,6 +186,10 @@ fn default_exposed_tools() -> Vec<String> {
         "productivity",
         "work_context",
         "agent",
+        "annotate",
+        "learning",
+        "cron",
+        "mirror",
     ]
     .map(String::from)
     .to_vec()

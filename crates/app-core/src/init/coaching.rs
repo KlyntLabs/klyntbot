@@ -17,6 +17,7 @@ pub(super) struct CoachingResult {
     pub intervention_router: Option<Arc<Mutex<InterventionRouter>>>,
     pub feedback_tracker: Option<Arc<Mutex<FeedbackTracker>>>,
     pub coaching_service: Option<feature_coaching::CoachingService>,
+    pub coaching_intervention_log_repo: Option<storage::CoachingInterventionLogRepo>,
 }
 
 /// Initialize coaching pipeline (desktop mode only).
@@ -42,12 +43,15 @@ pub(super) async fn init_coaching(
         intervention_router,
         feedback_tracker,
         coaching_service,
+        coaching_intervention_log_repo,
     ) = if mode == common::AppMode::Desktop {
         // Initialize coaching engine state.
         let signal_accumulator = Arc::new(Mutex::new(SignalAccumulator::new()));
         let pattern_detector = Arc::new(Mutex::new(PatternDetector::new()));
         let intervention_router = Arc::new(Mutex::new(InterventionRouter::new(Default::default())));
         let coaching_repo = storage::CoachingStrategyRepo::new(storage_pool.inner().clone());
+        let intervention_log_repo =
+            storage::CoachingInterventionLogRepo::new(storage_pool.inner().clone());
         let mut tracker = FeedbackTracker::new().with_repo(coaching_repo);
         tracker.load_from_db().await;
         let feedback_tracker = Arc::new(Mutex::new(tracker));
@@ -85,6 +89,7 @@ pub(super) async fn init_coaching(
             user_situation.clone(),
             coaching_reasoner,
             intervention_tx.clone(),
+            Some(intervention_log_repo.clone()),
             coaching_cancel,
         );
         info!("coaching service started");
@@ -95,12 +100,13 @@ pub(super) async fn init_coaching(
             Some(intervention_router),
             Some(feedback_tracker),
             Some(coaching_service),
+            Some(intervention_log_repo),
         )
     } else {
         // Server mode: drop intervention_tx so intervention_rx.recv() returns None immediately.
         drop(intervention_tx);
         info!("coaching service skipped (server mode)");
-        (None, None, None, None, None)
+        (None, None, None, None, None, None)
     };
 
     CoachingResult {
@@ -110,6 +116,7 @@ pub(super) async fn init_coaching(
         intervention_router,
         feedback_tracker,
         coaching_service,
+        coaching_intervention_log_repo,
     }
 }
 
@@ -164,19 +171,12 @@ pub(super) async fn build_situation_inputs(
         }
 
         // Productive ratio today (productive_secs / total_active_secs)
-        if let Ok(by_cat) = pr.events.aggregate_by_category(&today_start, &now).await {
-            let total: i64 = by_cat.iter().map(|(_, secs)| *secs).sum();
-            if total > 0 {
-                // Categories named "productive" or starting with "coding"/"development" are productive.
-                // For now, just use the ratio of non-idle time vs total, or check daily summary.
-                if let Ok(Some(summary)) = pr.summaries.get(&today_date).await {
-                    let total_work =
-                        summary.productive_secs + summary.distracting_secs + summary.neutral_secs;
-                    if total_work > 0 {
-                        inputs.productive_ratio_today =
-                            summary.productive_secs as f64 / total_work as f64;
-                    }
-                }
+        if let Ok((productive, neutral, distracting)) =
+            pr.events.aggregate_by_type(&today_start, &now).await
+        {
+            let total_work = productive + neutral + distracting;
+            if total_work > 0 {
+                inputs.productive_ratio_today = productive as f64 / total_work as f64;
             }
         }
 
@@ -225,18 +225,18 @@ pub(super) async fn build_situation_inputs(
     }
 
     // Task pressure: overdue tasks
-    if let Ok(overdue) = repos.actions.overdue().await {
+    if let Ok(overdue) = repos.tasks.overdue().await {
         inputs.overdue_task_count = overdue.len() as i32;
     }
 
     // Tasks due within 24h
     let tomorrow = now + Duration::hours(24);
-    let filter = storage::ActionFilter {
+    let filter = storage::TaskFilter {
         due_after: Some(now),
         due_before: Some(tomorrow),
         ..Default::default()
     };
-    if let Ok(upcoming) = repos.actions.list(&filter).await {
+    if let Ok(upcoming) = repos.tasks.list(&filter).await {
         inputs.tasks_due_within_24h = upcoming.len() as i32;
     }
 

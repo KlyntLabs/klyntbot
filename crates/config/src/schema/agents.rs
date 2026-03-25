@@ -19,6 +19,11 @@ pub struct AgentsConfig {
     /// Defaults to `~/.klyntbot/.agents/skills/` if not set.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub skills_dir: Option<String>,
+
+    /// Model to use for query rewriting LLM fallback (Phase 2).
+    /// Defaults to the cheapest/fastest available model. Example: "anthropic/claude-haiku-4-5"
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub rewriter_model: Option<String>,
 }
 
 /// Default agent configuration
@@ -47,6 +52,11 @@ pub struct AgentDefaults {
 
     #[serde(default = "default_max_concurrent_subagents")]
     pub max_concurrent_subagents: usize,
+
+    /// Maximum wall-clock time for a single pipeline execution (seconds).
+    /// Default: 300 (5 minutes). Set to 0 to disable.
+    #[serde(default = "default_pipeline_timeout_secs")]
+    pub pipeline_timeout_secs: u64,
 }
 
 impl Default for AgentDefaults {
@@ -59,16 +69,20 @@ impl Default for AgentDefaults {
             temperature: default_temperature(),
             max_tool_iterations: default_max_iterations(),
             max_concurrent_subagents: default_max_concurrent_subagents(),
+            pipeline_timeout_secs: default_pipeline_timeout_secs(),
         }
     }
 }
+
+/// Default model identifier used when no model is configured.
+pub const DEFAULT_MODEL: &str = "anthropic/claude-opus-4-5";
 
 fn default_workspace() -> String {
     "~/.klyntbot/workspace".to_string()
 }
 
 fn default_model() -> String {
-    "anthropic/claude-opus-4-5".to_string()
+    DEFAULT_MODEL.to_string()
 }
 
 fn default_max_tokens() -> u32 {
@@ -85,6 +99,10 @@ fn default_max_iterations() -> u32 {
 
 fn default_max_concurrent_subagents() -> usize {
     3
+}
+
+fn default_pipeline_timeout_secs() -> u64 {
+    300
 }
 
 /// Configuration for the skill discovery system.

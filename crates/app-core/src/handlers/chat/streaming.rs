@@ -153,8 +153,6 @@ async fn resolve_ancestry(
         "task" => {
             if let Ok(Some(task)) = repos.tasks.get(id).await {
                 (Some(task.area_id.clone()), task.project_id.clone())
-            } else if let Ok(Some(action)) = repos.actions.get(id).await {
-                (Some(action.area_id.clone()), action.project_id.clone())
             } else {
                 (None, None)
             }
@@ -538,7 +536,6 @@ pub async fn relay_chat_stream(
                         );
                         let meta_value = serde_json::Value::Object(meta);
                         if let Some(ref mid) = message_id {
-                            // Targeted update by message ID — no race condition
                             if let Err(e) = repos.sessions.update_assistant_metadata_by_id(
                                 mid, None, Some(&meta_value),
                             ).await {
@@ -615,8 +612,24 @@ pub async fn relay_chat_stream(
                             }
                         );
                     }
-                    AgentEvent::ContextAssembled { duration_ms, .. } => {
+                    AgentEvent::PipelineStarted => {
+                        emit!(
+                            AGENT_PIPELINE_STARTED,
+                            PipelineStartedPayload {
+                                session_key: sk.clone(),
+                            }
+                        );
+                    }
+                    AgentEvent::ContextAssembled { total_tokens, budget: _, duration_ms } => {
                         transparency.timing.get_or_insert_with(Default::default).context_assembly_ms = Some(duration_ms);
+                        emit!(
+                            AGENT_CONTEXT_ASSEMBLED,
+                            ContextAssembledPayload {
+                                session_key: sk.clone(),
+                                total_tokens,
+                                duration_ms,
+                            }
+                        );
                     }
                     AgentEvent::IterationStart { iteration, max } => {
                         if let Some(ref mut exec) = transparency.execution {
@@ -913,6 +926,24 @@ pub async fn relay_chat_stream(
                                 subject,
                                 predicate,
                             }
+                        );
+                    }
+                    // AutoTuner events — forwarded to the UI for toast notifications and panel updates.
+                    AgentEvent::AutoTunerReport(report) => {
+                        emit!(events::AUTOTUNER_REPORT, report);
+                    }
+                    AgentEvent::AutoTunerPromotion(promotion) => {
+                        emit!(events::AUTOTUNER_PROMOTION, promotion);
+                    }
+                    AgentEvent::AutoTunerRollback(rollback) => {
+                        emit!(events::AUTOTUNER_ROLLBACK, rollback);
+                    }
+                    AgentEvent::ContextCompressed { before_tokens, after_tokens, iteration } => {
+                        tracing::info!(
+                            before_tokens,
+                            after_tokens,
+                            iteration,
+                            "mid-loop context compression applied"
                         );
                     }
                 }

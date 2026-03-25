@@ -10,11 +10,13 @@ use crate::context_source::CognitiveRetrievalConfig;
 use crate::conversation_recall::ConversationRecallService;
 use crate::embedder::SemanticFactEmbedder;
 use crate::repos::{SemanticFactRepo, USER_MODEL_DOMAINS};
-use crate::retrieval::{retrieve_relevant_facts, RetrievalParams};
+use crate::retrieval::{retrieve_relevant_facts, RetrievalParams, ScoredFact};
 use crate::situation::UserSituation;
 
 /// RRF constant — same as used in retrieval.rs BM25 merge.
 const RRF_K: f64 = 60.0;
+/// Minimum relevance score for a fact to be included in results.
+const MIN_FACT_SCORE: f64 = 0.3;
 
 /// Unified memory service that merges conversation recall and cognitive facts.
 ///
@@ -26,6 +28,9 @@ pub struct UnifiedMemoryService {
     embedder: Option<Arc<dyn SemanticFactEmbedder>>,
     config: CognitiveRetrievalConfig,
     situation: Option<Arc<Mutex<UserSituation>>>,
+    /// Live champion params from the autotuner. Read on each retrieval to override
+    /// config defaults for vector_top_k, min_similarity, and relevance weights.
+    champion_overrides: Option<Arc<std::sync::RwLock<Option<common::TrialParams>>>>,
 }
 
 impl UnifiedMemoryService {
@@ -36,6 +41,7 @@ impl UnifiedMemoryService {
             embedder: None,
             config: CognitiveRetrievalConfig::default(),
             situation: None,
+            champion_overrides: None,
         }
     }
 
@@ -59,6 +65,14 @@ impl UnifiedMemoryService {
         self
     }
 
+    pub fn with_champion_overrides(
+        mut self,
+        overrides: Arc<std::sync::RwLock<Option<common::TrialParams>>>,
+    ) -> Self {
+        self.champion_overrides = Some(overrides);
+        self
+    }
+
     async fn current_situational_boost(&self) -> f64 {
         let Some(ref s) = self.situation else {
             return 0.0;
@@ -71,14 +85,15 @@ impl UnifiedMemoryService {
             .clamp(0.0, 1.0)
     }
 
-    /// Fetch cognitive facts, returning (id, score, content, predicate) tuples.
-    async fn fetch_facts(&self, query: &str, limit: usize) -> Vec<(String, f64, String, String)> {
-        if !self.config.dynamic_facts_enabled || query.is_empty() {
-            return Vec::new();
-        }
-
-        let situational_boost = self.current_situational_boost().await;
-        let params = RetrievalParams {
+    /// Resolve retrieval params, merging champion overrides with config defaults.
+    fn resolve_retrieval_params(
+        &self,
+        limit: usize,
+        situational_boost: f64,
+        scope_chain: Vec<(String, Option<String>)>,
+    ) -> RetrievalParams {
+        // Build from config defaults, then patch with champion overrides if present.
+        let mut params = RetrievalParams {
             limit,
             vector_top_k: self.config.vector_top_k,
             min_similarity: self.config.min_similarity,
@@ -90,8 +105,48 @@ impl UnifiedMemoryService {
             relevance_weight_frequency: self.config.relevance_weight_frequency,
             relevance_weight_situation: self.config.relevance_weight_situation,
             relevance_weight_temporal: self.config.relevance_weight_temporal,
-            scope_chain: Vec::new(),
+            scope_chain,
         };
+
+        if let Some(champion) = self.read_champion_overrides() {
+            params.vector_top_k = champion.vector_top_k.unwrap_or(params.vector_top_k);
+            params.min_similarity = champion.min_similarity.unwrap_or(params.min_similarity);
+            let defaults = [
+                self.config.relevance_weight_semantic,
+                self.config.relevance_weight_retrievability,
+                self.config.relevance_weight_importance,
+                self.config.relevance_weight_frequency,
+                self.config.relevance_weight_situation,
+                self.config.relevance_weight_temporal,
+            ];
+            let w = champion.resolve_relevance_weights(&defaults);
+            params.relevance_weight_semantic = w[0];
+            params.relevance_weight_retrievability = w[1];
+            params.relevance_weight_importance = w[2];
+            params.relevance_weight_frequency = w[3];
+            params.relevance_weight_situation = w[4];
+            params.relevance_weight_temporal = w[5];
+        }
+
+        params
+    }
+
+    /// Read champion overrides from the shared lock (non-blocking, returns None on
+    /// absent/poisoned lock or no promoted champion).
+    fn read_champion_overrides(&self) -> Option<common::TrialParams> {
+        let lock = self.champion_overrides.as_ref()?;
+        let guard = lock.read().ok()?;
+        guard.clone()
+    }
+
+    /// Fetch cognitive facts, returning (id, score, content, predicate) tuples.
+    async fn fetch_facts(&self, query: &str, limit: usize) -> Vec<(String, f64, String, String)> {
+        if !self.config.dynamic_facts_enabled || query.is_empty() {
+            return Vec::new();
+        }
+
+        let situational_boost = self.current_situational_boost().await;
+        let params = self.resolve_retrieval_params(limit, situational_boost, Vec::new());
 
         match retrieve_relevant_facts(
             &self.fact_repo,
@@ -104,7 +159,7 @@ impl UnifiedMemoryService {
         {
             Ok(facts) => facts
                 .into_iter()
-                .filter(|f| f.score > 0.3)
+                .filter(|f| f.score > MIN_FACT_SCORE)
                 .map(|f| {
                     let content = format!(
                         "{}: {} = {}",
@@ -135,20 +190,7 @@ impl UnifiedMemoryService {
             return Vec::new();
         }
         let situational_boost = self.current_situational_boost().await;
-        let params = RetrievalParams {
-            limit,
-            scope_chain,
-            vector_top_k: self.config.vector_top_k,
-            min_similarity: self.config.min_similarity,
-            situational_boost,
-            max_stability: self.config.max_stability,
-            relevance_weight_semantic: self.config.relevance_weight_semantic,
-            relevance_weight_retrievability: self.config.relevance_weight_retrievability,
-            relevance_weight_importance: self.config.relevance_weight_importance,
-            relevance_weight_frequency: self.config.relevance_weight_frequency,
-            relevance_weight_situation: self.config.relevance_weight_situation,
-            relevance_weight_temporal: self.config.relevance_weight_temporal,
-        };
+        let params = self.resolve_retrieval_params(limit, situational_boost, scope_chain);
         match retrieve_relevant_facts(
             &self.fact_repo,
             self.embedder.as_deref(),
@@ -160,7 +202,7 @@ impl UnifiedMemoryService {
         {
             Ok(facts) => facts
                 .into_iter()
-                .filter(|f| f.score > 0.3)
+                .filter(|f| f.score > MIN_FACT_SCORE)
                 .map(|f| MemoryEntry {
                     id: f.fact.id,
                     content: format!(
@@ -175,6 +217,56 @@ impl UnifiedMemoryService {
             Err(e) => {
                 warn!("Scoped retrieval failed: {e}");
                 Vec::new()
+            }
+        }
+    }
+
+    /// Retrieve scored facts with overridden retrieval parameters (for shadow scoring).
+    /// Returns `ScoredFact` directly (not `MemoryEntry`) so callers can access
+    /// `fact.recorded_at` for age computation.
+    pub async fn retrieve_with_overrides(
+        &self,
+        query: &str,
+        vector_top_k: usize,
+        min_similarity: f64,
+        relevance_weights: [f64; 6],
+    ) -> common::Result<Vec<ScoredFact>> {
+        if !self.config.dynamic_facts_enabled || query.is_empty() {
+            return Ok(Vec::new());
+        }
+
+        let situational_boost = self.current_situational_boost().await;
+        let params = RetrievalParams {
+            limit: vector_top_k,
+            vector_top_k,
+            min_similarity,
+            situational_boost,
+            max_stability: self.config.max_stability,
+            relevance_weight_semantic: relevance_weights[0],
+            relevance_weight_retrievability: relevance_weights[1],
+            relevance_weight_importance: relevance_weights[2],
+            relevance_weight_frequency: relevance_weights[3],
+            relevance_weight_situation: relevance_weights[4],
+            relevance_weight_temporal: relevance_weights[5],
+            scope_chain: Vec::new(),
+        };
+
+        match retrieve_relevant_facts(
+            &self.fact_repo,
+            self.embedder.as_deref(),
+            query,
+            USER_MODEL_DOMAINS,
+            &params,
+        )
+        .await
+        {
+            Ok(facts) => Ok(facts
+                .into_iter()
+                .filter(|f| f.score > MIN_FACT_SCORE)
+                .collect()),
+            Err(e) => {
+                warn!("Shadow retrieval failed: {e}");
+                Ok(Vec::new())
             }
         }
     }

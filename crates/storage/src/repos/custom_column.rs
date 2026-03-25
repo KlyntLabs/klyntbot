@@ -224,6 +224,20 @@ mod tests {
     async fn setup() -> (CustomColumnRepo, sqlx::SqlitePool) {
         let pool = crate::StoragePool::connect_in_memory().await.unwrap();
         let db = pool.inner().clone();
+        // The tasks table lives in the feature-tasks migration, not core migrations.
+        // We need a minimal stub so custom_column_values FK to tasks(id) resolves.
+        sqlx::query(
+            "CREATE TABLE IF NOT EXISTS tasks (
+                id TEXT PRIMARY KEY,
+                title TEXT NOT NULL,
+                area_id TEXT NOT NULL,
+                status TEXT NOT NULL DEFAULT 'todo',
+                position INTEGER NOT NULL DEFAULT 0
+            )",
+        )
+        .execute(&db)
+        .await
+        .unwrap();
         // Create test area and project
         sqlx::query("INSERT INTO areas (id, name, color, status) VALUES ('test-area', 'Test', '#000', 'active')")
             .execute(&db)
@@ -408,7 +422,7 @@ mod tests {
 
         // Create a task
         sqlx::query(
-            "INSERT INTO actions (id, title, area_id, status, position) VALUES ('task-1', 'Test Task', 'test-area', 'todo', 0)",
+            "INSERT INTO tasks (id, title, area_id, status, position) VALUES ('task-1', 'Test Task', 'test-area', 'todo', 0)",
         )
         .execute(&db)
         .await
@@ -453,7 +467,7 @@ mod tests {
 
         for i in 1..=3 {
             sqlx::query(
-                "INSERT INTO actions (id, title, area_id, status, position) VALUES (?1, ?2, 'test-area', 'todo', 0)",
+                "INSERT INTO tasks (id, title, area_id, status, position) VALUES (?1, ?2, 'test-area', 'todo', 0)",
             )
             .bind(format!("bulk-{i}"))
             .bind(format!("Task {i}"))
@@ -494,7 +508,7 @@ mod tests {
         repo.create_column(&col).await.unwrap();
 
         sqlx::query(
-            "INSERT INTO actions (id, title, area_id, status, position) VALUES ('cascade-task', 'Cascade', 'test-area', 'todo', 0)",
+            "INSERT INTO tasks (id, title, area_id, status, position) VALUES ('cascade-task', 'Cascade', 'test-area', 'todo', 0)",
         )
         .execute(&db)
         .await

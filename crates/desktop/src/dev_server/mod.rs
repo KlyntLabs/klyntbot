@@ -210,12 +210,21 @@ mod tests {
             commands::project_memories::DEV_COMMANDS,
             commands::project_conversations::DEV_COMMANDS,
             commands::agents::DEV_COMMANDS,
+            commands::autotuner::DEV_COMMANDS,
             commands::workspace::DEV_COMMANDS,
             commands::integrations::DEV_COMMANDS,
             commands::launcher::DEV_COMMANDS,
             commands::shortcuts::DEV_COMMANDS,
             commands::squads::DEV_COMMANDS,
             commands::annotations::DEV_COMMANDS,
+            commands::language::DEV_COMMANDS,
+            commands::practice::DEV_COMMANDS,
+            commands::atoms::DEV_COMMANDS,
+            commands::knowledge_health::DEV_COMMANDS,
+            commands::mirror::DEV_COMMANDS,
+            commands::morning_briefing::DEV_COMMANDS,
+            commands::retention_history::DEV_COMMANDS,
+            commands::view::DEV_COMMANDS,
         ];
         // chat_send is handled inline in dev_server.rs
         let mut set: BTreeSet<String> = modules

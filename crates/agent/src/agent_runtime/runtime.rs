@@ -5,8 +5,9 @@
 //! ResponseValidator → CostTracker → StrategyRepo
 
 use std::sync::Arc;
-use std::time::Instant;
+use std::time::{Duration, Instant};
 
+use bus::DomainEventBus;
 use common::{helpers::tool_def_name, Result};
 use context_engine::{ContextEngine, ContextRequest, ExecutionStrategy};
 use providers::Message;
@@ -16,6 +17,7 @@ use tools::RoutingContext;
 use tracing::{debug, warn};
 
 use super::scenario;
+use crate::autotuner::hooks::AutoTunerHook;
 use crate::events::AgentEvent;
 
 use crate::execution::ExecutionParams;
@@ -92,9 +94,26 @@ pub struct AgentRuntime {
     current_event_tx: RwLock<Option<tokio::sync::mpsc::Sender<AgentEvent>>>,
     /// Bundled dependencies for squad chat mode — always set together.
     squad_deps: Option<SquadDeps>,
+    /// AutoTuner hook — runs shadow classification and records ground truth.
+    autotuner_hook: Option<Arc<dyn AutoTunerHook>>,
+    /// Shared user situation for building RetrievalContext.
+    user_situation: Option<Arc<tokio::sync::Mutex<cognitive::situation::UserSituation>>>,
+    /// Task repo for querying the focused task (active_task in RetrievalContext).
+    task_repo: Option<storage::TaskRepo>,
+    /// Shared active desktop view for query rewriting context.
+    active_view: Option<Arc<tokio::sync::RwLock<Option<context_engine::ActiveView>>>>,
+    /// Shared activated skills — written per-message, read by SkillContextSource.
+    activated_skills: Option<Arc<tokio::sync::RwLock<Vec<Arc<SkillPackage>>>>>,
+    /// Embedding engine for generating query embeddings (semantic skill routing).
+    embedding_engine: Option<Arc<tools::EmbeddingEngine>>,
+    /// Domain event bus for publishing cross-feature events (e.g. SkillRouted).
+    domain_event_bus: Option<Arc<DomainEventBus>>,
+    /// Shared hot-reloadable config — read per-message for model, temperature, iterations.
+    hot_config: Arc<RwLock<config::HotConfig>>,
 }
 
 impl AgentRuntime {
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         skill_catalog: Arc<RwLock<SkillCatalog>>,
         skill_router: Arc<RwLock<skill_system::router::SkillRouter>>,
@@ -104,6 +123,7 @@ impl AgentRuntime {
         cost_tracker: Arc<CostTracker>,
         config: PipelineConfig,
         active_profile: Arc<RwLock<Option<Arc<SkillPackage>>>>,
+        hot_config: Arc<RwLock<config::HotConfig>>,
     ) -> Self {
         Self {
             skill_catalog,
@@ -123,6 +143,14 @@ impl AgentRuntime {
             delegation_self_ref: std::sync::OnceLock::new(),
             current_event_tx: RwLock::new(None),
             squad_deps: None,
+            autotuner_hook: None,
+            user_situation: None,
+            task_repo: None,
+            active_view: None,
+            activated_skills: None,
+            embedding_engine: None,
+            domain_event_bus: None,
+            hot_config,
         }
     }
 
@@ -178,6 +206,57 @@ impl AgentRuntime {
         self
     }
 
+    /// Set the autotuner hook for shadow classification callbacks.
+    pub fn with_autotuner_hook(mut self, hook: Arc<dyn AutoTunerHook>) -> Self {
+        self.autotuner_hook = Some(hook);
+        self
+    }
+
+    /// Set the shared user situation for building RetrievalContext.
+    pub fn with_user_situation(
+        mut self,
+        sit: Arc<tokio::sync::Mutex<cognitive::situation::UserSituation>>,
+    ) -> Self {
+        self.user_situation = Some(sit);
+        self
+    }
+
+    /// Set the task repo for querying the focused task during query rewriting.
+    pub fn with_task_repo(mut self, repo: storage::TaskRepo) -> Self {
+        self.task_repo = Some(repo);
+        self
+    }
+
+    /// Set the shared active desktop view for RetrievalContext.
+    pub fn with_active_view(
+        mut self,
+        view: Arc<tokio::sync::RwLock<Option<context_engine::ActiveView>>>,
+    ) -> Self {
+        self.active_view = Some(view);
+        self
+    }
+
+    /// Set the shared activated skills for per-message skill activation.
+    pub fn with_activated_skills(
+        mut self,
+        skills: Arc<tokio::sync::RwLock<Vec<Arc<SkillPackage>>>>,
+    ) -> Self {
+        self.activated_skills = Some(skills);
+        self
+    }
+
+    /// Set the embedding engine for semantic skill routing.
+    pub fn with_embedding_engine(mut self, engine: Arc<tools::EmbeddingEngine>) -> Self {
+        self.embedding_engine = Some(engine);
+        self
+    }
+
+    /// Set the domain event bus for publishing SkillRouted and other cross-feature events.
+    pub fn with_domain_bus(mut self, bus: Arc<DomainEventBus>) -> Self {
+        self.domain_event_bus = Some(bus);
+        self
+    }
+
     /// Set the self-reference for delegation support (called after Arc wrapping).
     pub fn set_delegation_self_ref(&self, handler: Arc<dyn tools::DelegationHandler>) {
         let _ = self.delegation_self_ref.set(handler);
@@ -221,14 +300,54 @@ impl AgentRuntime {
         system_prompt: Option<&str>,
         event_tx: Option<tokio::sync::mpsc::Sender<AgentEvent>>,
         cancel_token: Option<tokio_util::sync::CancellationToken>,
+        correction: Option<context_engine::CorrectionContext>,
     ) -> Result<RuntimeResult> {
         let pipeline_start = Instant::now();
+
+        // Read only the hot-reloadable timeout (avoids cloning the full HotConfig with its String fields)
+        let hot_timeout_secs = self.hot_config.read().await.pipeline_timeout_secs;
+
+        // Emit pipeline start immediately for frontend progress indication
+        if let Some(ref tx) = event_tx {
+            let _ = tx.send(AgentEvent::PipelineStarted).await;
+        }
+
+        // Step 0a: AutoTuner hook — shadow classification before live processing.
+        if let Some(ref hook) = self.autotuner_hook {
+            hook.on_message_received(message, ctx.chat_id.as_str())
+                .await;
+        }
+
+        // Step 0b: Generate query embedding for semantic skill routing
+        let query_embedding: Vec<f32> = if let Some(ref engine) = self.embedding_engine {
+            engine
+                .clone()
+                .embed_async(message.to_string())
+                .await
+                .unwrap_or_default()
+        } else {
+            vec![]
+        };
 
         // Step 1: Match message to orchestrator skill via SkillRouter
         let mut profile = {
             let catalog = self.skill_catalog.read().await;
             let router = self.skill_router.read().await;
-            Arc::clone(router.select_orchestrator(message, &catalog))
+            let champion_params = self
+                .autotuner_hook
+                .as_ref()
+                .and_then(|h| h.current_champion_params());
+            let (kw_w, sem_w) = champion_params
+                .as_ref()
+                .map(|p| (p.skill_keyword_weight, p.skill_semantic_weight))
+                .unwrap_or((None, None));
+            Arc::clone(router.select_orchestrator_blended(
+                message,
+                &query_embedding,
+                &catalog,
+                kw_w,
+                sem_w,
+            ))
         };
         let mut agent_name = profile.name.clone();
         debug!("AgentRuntime: matched skill '{}'", agent_name);
@@ -260,9 +379,23 @@ impl AgentRuntime {
             *guard = Some(Arc::clone(&profile));
         }
 
+        // Step 2a: Activate per-message skills (keyword + semantic)
+        if let Some(ref activated_skills) = self.activated_skills {
+            let catalog = self.skill_catalog.read().await;
+            let router = self.skill_router.read().await;
+            let activated = router.activate_skills(message, &query_embedding, &catalog, None);
+            if !activated.is_empty() {
+                let mut lock = activated_skills.write().await;
+                lock.clear();
+                for skill in activated {
+                    lock.push(Arc::clone(skill));
+                }
+            }
+        }
+
         // Step 2b: Squad detection — if a squad_id is set, fan out to personas
         if let (Some(ref squad_id), Some(ref deps)) = (&ctx.squad_id, &self.squad_deps) {
-            return self
+            let result = self
                 .run_squad_execution(
                     message,
                     history,
@@ -273,8 +406,18 @@ impl AgentRuntime {
                     &deps.provider,
                     &deps.chat_params,
                     ctx.squad_mode.as_deref(),
+                    cancel_token.as_ref(),
                 )
                 .await;
+
+            // Write ground truth for shadow classification (Step 0a wrote the shadow log).
+            if let Some(ref hook) = self.autotuner_hook {
+                let elapsed = pipeline_start.elapsed().as_millis() as u64;
+                hook.on_message_completed(ctx.chat_id.as_str(), "squad", "reactive", 0, elapsed)
+                    .await;
+            }
+
+            return result;
         }
 
         // Step 3: Filter MCP tool names to those the matched agent can access
@@ -288,6 +431,27 @@ impl AgentRuntime {
             })
             .copied()
             .collect();
+
+        // Step 3c: Spawn memory pre-fetch concurrently with classification.
+        // Build a preliminary RetrievalContext using the initial profile (pre-orchestration
+        // override). For ~95% of messages this is identical to the final one.
+        let prefetch_retrieval_ctx = self
+            .build_retrieval_context(&profile.name, &history, correction.clone())
+            .await;
+        let prefetch_retrieval_ctx_for_spawn = prefetch_retrieval_ctx.clone();
+        let prefetch_engine = Arc::clone(&self.context_engine);
+        let prefetch_message = message.to_string();
+        let prefetch_session_key =
+            Some(common::SessionKey::new(&ctx.channel, &ctx.chat_id).to_string());
+        let prefetch_handle = tokio::spawn(async move {
+            prefetch_engine
+                .prefetch_memory(
+                    &prefetch_message,
+                    prefetch_session_key,
+                    prefetch_retrieval_ctx_for_spawn,
+                )
+                .await
+        });
 
         // Step 4: Classify intent
         let classify_start = Instant::now();
@@ -350,6 +514,18 @@ impl AgentRuntime {
             }
         }
 
+        // Emit SkillRouted domain event for Mirror self-reflection layer.
+        // Placed after orchestration override so agent_name reflects the final routing.
+        if let Some(ref domain_bus) = self.domain_event_bus {
+            domain_bus.publish(bus::DomainEvent::SkillRouted {
+                skill_name: agent_name.clone(),
+                confidence: analysis.confidence as f64,
+                source: format!("{:?}", analysis.source),
+                trigger_phrases: vec![],
+                session_key: common::SessionKey::new(&ctx.channel, &ctx.chat_id).to_string(),
+            });
+        }
+
         // Step 4: Cap max_iterations from agent profile (skip for orchestrator —
         // the orchestration boost in step 3b must not be clipped by the profile cap)
         if !analysis.needs_orchestration {
@@ -374,7 +550,26 @@ impl AgentRuntime {
             }
         }
 
+        // Step 5.5: Reuse the preliminary retrieval context when the profile didn't change
+        // (no orchestration override). Only rebuild when the profile was swapped.
+        let retrieval_context = if analysis.needs_orchestration {
+            self.build_retrieval_context(&profile.name, &history, correction)
+                .await
+        } else {
+            prefetch_retrieval_ctx
+        };
+
         // Step 6: Assemble context (AgentContextSource injects agent instructions + skills)
+        // Await the pre-fetched memory from the concurrent task spawned in Step 3c.
+        // If orchestration override changed the profile, the prefetch used the
+        // wrong RetrievalContext — discard it and let assemble do a fresh retrieval.
+        let prefetched_memory = if analysis.needs_orchestration {
+            prefetch_handle.abort();
+            None
+        } else {
+            prefetch_handle.await.ok().flatten()
+        };
+
         let prompt = system_prompt.unwrap_or(&self.config.system_prompt);
         let strategy = ExecutionStrategy::from(&analysis.mode);
 
@@ -386,9 +581,13 @@ impl AgentRuntime {
             tool_definitions: tool_definitions.to_vec(),
             context_window: self.config.context_window,
             session_key: Some(common::SessionKey::new(&ctx.channel, &ctx.chat_id).to_string()),
+            retrieval_context,
         };
         let assemble_start = Instant::now();
-        let assembled = self.context_engine.assemble(context_request).await;
+        let assembled = self
+            .context_engine
+            .assemble_with_prefetched(context_request, prefetched_memory)
+            .await;
         let assemble_ms = assemble_start.elapsed().as_millis() as u64;
 
         debug!(
@@ -492,7 +691,8 @@ impl AgentRuntime {
 
         let mut params = ExecutionParams::new(&self.config.execution_model)
             .with_max_iterations(analysis.mode.max_iterations())
-            .with_original_message(message.to_string());
+            .with_original_message(message.to_string())
+            .with_context_window(self.config.context_window);
 
         if let Some(token) = cancel_token {
             params = params.with_cancel_token(token);
@@ -501,17 +701,47 @@ impl AgentRuntime {
             params = params.with_planning_prompt(prompt);
         }
 
-        let router_result = self
-            .router
-            .execute(
-                analysis.mode.clone(),
-                assembled.messages,
-                &filtered_tools,
-                &params,
-                ctx,
-                event_tx.clone(),
-            )
-            .await?;
+        if hot_timeout_secs > 0 {
+            params = params.with_pipeline_timeout(Duration::from_secs(hot_timeout_secs));
+        }
+
+        let retrieved_memory_count = assembled.retrieved_memory_count;
+        let rewrite_triggered = assembled.rewrite_triggered;
+        let rewrite_source = assembled.rewrite_source.clone();
+
+        let pipeline_future = self.router.execute(
+            analysis.mode.clone(),
+            assembled.messages,
+            &filtered_tools,
+            &params,
+            ctx,
+            event_tx.clone(),
+        );
+
+        let router_result = if let Some(timeout_dur) = params.pipeline_timeout {
+            match tokio::time::timeout(timeout_dur, pipeline_future).await {
+                Ok(result) => result?,
+                Err(_) => {
+                    warn!("Pipeline execution timed out after {:?}", timeout_dur);
+                    if let Some(ref tx) = event_tx {
+                        let _ = tx
+                            .send(AgentEvent::Error {
+                                message: format!(
+                                    "Execution timed out after {}s",
+                                    timeout_dur.as_secs()
+                                ),
+                            })
+                            .await;
+                    }
+                    return Err(common::KlyntbotError::Timeout(format!(
+                        "Pipeline execution exceeded {}s limit",
+                        timeout_dur.as_secs()
+                    )));
+                }
+            }
+        } else {
+            pipeline_future.await?
+        };
 
         // Clear event_tx to prevent stale state across calls
         *self.current_event_tx.write().await = None;
@@ -536,8 +766,16 @@ impl AgentRuntime {
             &event_tx,
             pipeline_elapsed_ms,
         );
-        let strategy_fut =
-            self.record_strategy(&analysis, &router_result, &validation, ctx, pipeline_start);
+        let strategy_fut = self.record_strategy(
+            &analysis,
+            &router_result,
+            &validation,
+            ctx,
+            pipeline_start,
+            retrieved_memory_count,
+            rewrite_triggered,
+            rewrite_source,
+        );
         let interaction_fut = async {
             if let Some(ref recorder) = self.interaction_recorder {
                 let tools_used: Vec<&str> =
@@ -554,6 +792,19 @@ impl AgentRuntime {
         };
         tokio::join!(usage_fut, strategy_fut, interaction_fut);
 
+        // Step 11: AutoTuner hook — record ground truth after response delivery.
+        if let Some(ref hook) = self.autotuner_hook {
+            let tokens = router_result.usage.prompt_tokens + router_result.usage.completion_tokens;
+            hook.on_message_completed(
+                ctx.chat_id.as_str(),
+                &agent_name,
+                analysis.mode.short_name(),
+                tokens,
+                pipeline_elapsed_ms,
+            )
+            .await;
+        }
+
         let final_content = std::mem::take(&mut validation.filtered_content);
 
         Ok(RuntimeResult {
@@ -564,6 +815,79 @@ impl AgentRuntime {
             agent_name,
             multi_voice: None,
             persona_responses: None,
+        })
+    }
+
+    /// Build a `RetrievalContext` from the current agent state.
+    ///
+    /// Extracted as a helper so we can build a preliminary context for memory
+    /// pre-fetching (before classification) and the final context (after
+    /// orchestration overrides) without duplicating logic.
+    async fn build_retrieval_context(
+        &self,
+        profile_name: &str,
+        history: &[Message],
+        correction: Option<context_engine::CorrectionContext>,
+    ) -> Option<context_engine::RetrievalContext> {
+        let active_skill = Some(profile_name.to_string());
+
+        let recent_user_messages: Vec<String> = history
+            .iter()
+            .rev()
+            .filter(|m| m.role() == common::MessageRole::User)
+            .take(2)
+            .map(|m| match m {
+                Message::User {
+                    content: providers::UserContent::Text(t),
+                } => t.chars().take(200).collect(),
+                _ => String::new(),
+            })
+            .collect();
+
+        let situation = if let Some(ref sit) = self.user_situation {
+            let s = sit.lock().await;
+            Some(context_engine::UserSituationSnapshot {
+                energy_level: s.energy_level,
+                focus_state: s.focus_state,
+                deadline_pressure: s.deadline_pressure,
+                distraction_risk: s.distraction_risk,
+            })
+        } else {
+            None
+        };
+
+        let active_task = if let Some(ref repo) = self.task_repo {
+            match repo.list_focused().await {
+                Ok(tasks) => tasks
+                    .into_iter()
+                    .next()
+                    .map(|t| context_engine::ActiveTaskContext {
+                        title: t.title,
+                        project_name: t.project_id,
+                        domain: active_skill
+                            .as_deref()
+                            .map(|s| s.replace("-management", "").replace('-', " ")),
+                    }),
+                Err(e) => {
+                    warn!("Failed to query focused task for retrieval context: {e}");
+                    None
+                }
+            }
+        } else {
+            None
+        };
+
+        Some(context_engine::RetrievalContext {
+            active_skill,
+            active_task,
+            recent_user_messages,
+            situation,
+            active_view: if let Some(ref view_lock) = self.active_view {
+                view_lock.read().await.clone()
+            } else {
+                None
+            },
+            recent_correction: correction,
         })
     }
 
@@ -613,7 +937,8 @@ impl AgentRuntime {
         squad_repo: &cognitive::SquadRepo,
         provider: &providers::DynProvider,
         params: &providers::ChatParams,
-        squad_mode_str: Option<&str>,
+        _squad_mode_str: Option<&str>,
+        cancel_token: Option<&tokio_util::sync::CancellationToken>,
     ) -> Result<RuntimeResult> {
         use crate::intent_pipeline::engines;
         use crate::intent_pipeline::engines::squad;
@@ -633,15 +958,15 @@ impl AgentRuntime {
             .to_string()];
         for msg in &history {
             match msg {
-                Message::User { content } => {
-                    if let providers::UserContent::Text(t) = content {
-                        context_parts.push(format!("User: {t}"));
-                    }
+                Message::User {
+                    content: providers::UserContent::Text(t),
+                } => {
+                    context_parts.push(format!("User: {t}"));
                 }
-                Message::Assistant { content, .. } => {
-                    if let Some(c) = content {
-                        context_parts.push(format!("Assistant: {c}"));
-                    }
+                Message::Assistant {
+                    content: Some(c), ..
+                } => {
+                    context_parts.push(format!("Assistant: {c}"));
                 }
                 _ => {}
             }
@@ -658,7 +983,7 @@ impl AgentRuntime {
         let persona_responses = if use_debate {
             let blackboard_repo = blackboard_repo.unwrap();
             let debate_session_key = format!("debate:{}:{}", squad_id, uuid::Uuid::new_v4());
-            let debate_results = engines::debate::run_room_debate(
+            let debate_fut = engines::debate::run_room_debate(
                 provider,
                 &orchestrator_context,
                 message,
@@ -668,8 +993,16 @@ impl AgentRuntime {
                 &debate_session_key,
                 squad_id,
                 event_tx.as_ref(),
-            )
-            .await;
+                cancel_token,
+            );
+            let debate_results =
+                match tokio::time::timeout(std::time::Duration::from_secs(120), debate_fut).await {
+                    Ok(results) => results,
+                    Err(_) => {
+                        tracing::warn!("Squad debate timed out after 120s");
+                        Vec::new()
+                    }
+                };
 
             // Collect responses from the final round for synthesis
             debate_results
@@ -788,6 +1121,9 @@ impl AgentRuntime {
         validation: &ValidationResult,
         ctx: &RoutingContext,
         start: Instant,
+        retrieved_memory_count: usize,
+        rewrite_triggered: bool,
+        rewrite_source: Option<String>,
     ) {
         let Some(ref strategy_repo) = self.strategy_repo else {
             return;
@@ -813,6 +1149,9 @@ impl AgentRuntime {
             tool_duration_ms: result.tool_name.as_ref().map(|_| elapsed_ms),
             complexity_signals: serde_json::to_value(&analysis.signals).unwrap_or_default(),
             execution_mode: Some(result.final_mode.clone()),
+            retrieved_memory_count: Some(retrieved_memory_count as i32),
+            rewrite_triggered: rewrite_triggered as i32,
+            rewrite_source,
         };
 
         if let Err(e) = strategy_repo.create(&record).await {
@@ -1012,6 +1351,7 @@ impl tools::DelegationHandler for AgentRuntime {
             tool_definitions: vec![],
             context_window: self.config.context_window,
             session_key: None, // delegation — no session tracking
+            retrieval_context: None,
         };
         let assembled = self.context_engine.assemble(context_request).await;
 
@@ -1042,7 +1382,8 @@ impl tools::DelegationHandler for AgentRuntime {
         };
         let params = ExecutionParams::new(&self.config.execution_model)
             .with_max_iterations(max_iters)
-            .with_original_message(query.to_string());
+            .with_original_message(query.to_string())
+            .with_context_window(self.config.context_window);
 
         // Build delegated routing context with incremented depth
         let mut delegated_ctx = ctx.clone();
@@ -1232,6 +1573,9 @@ mod tests {
         let active_profile = Arc::new(RwLock::new(None));
         let (skill_catalog, skill_router) = make_skill_catalog_and_router();
 
+        let hot_config = Arc::new(RwLock::new(config::HotConfig::from(
+            &config::Config::default(),
+        )));
         let runtime = AgentRuntime::new(
             skill_catalog,
             skill_router,
@@ -1241,6 +1585,7 @@ mod tests {
             cost_tracker,
             PipelineConfig::default(),
             active_profile,
+            hot_config,
         );
         (runtime, registry)
     }
@@ -1250,7 +1595,7 @@ mod tests {
         let (catalog, router) = make_skill_catalog_and_router();
         let catalog = catalog.read().await;
         let router = router.read().await;
-        let selected = router.select_orchestrator("create a task to review budget", &catalog);
+        let selected = router.select_orchestrator("create a task to review budget", &catalog, None);
         assert_eq!(selected.name, "task-management");
     }
 
@@ -1260,7 +1605,17 @@ mod tests {
         let runtime = make_runtime(provider).await;
 
         let result = runtime
-            .process_message("hello", vec![], &[], &[], &routing_ctx(), None, None, None)
+            .process_message(
+                "hello",
+                vec![],
+                &[],
+                &[],
+                &routing_ctx(),
+                None,
+                None,
+                None,
+                None,
+            )
             .await
             .unwrap();
 
@@ -1280,6 +1635,7 @@ mod tests {
                 &[],
                 &[],
                 &routing_ctx(),
+                None,
                 None,
                 None,
                 None,
@@ -1310,6 +1666,7 @@ mod tests {
                 None,
                 None,
                 None,
+                None,
             )
             .await
             .unwrap();
@@ -1328,7 +1685,17 @@ mod tests {
             .with_confidence_evaluator(Arc::new(crate::confidence::ConfidenceEvaluator::new(0.99)));
 
         let result = runtime
-            .process_message("hello", vec![], &[], &[], &routing_ctx(), None, None, None)
+            .process_message(
+                "hello",
+                vec![],
+                &[],
+                &[],
+                &routing_ctx(),
+                None,
+                None,
+                None,
+                None,
+            )
             .await
             .unwrap();
 
@@ -1381,6 +1748,7 @@ mod tests {
                 None,
                 Some(tx),
                 None,
+                None,
             )
             .await
             .unwrap();
@@ -1418,7 +1786,7 @@ mod tests {
         ctx.delegation_depth = MAX_DELEGATION_DEPTH; // At max depth
 
         let result = runtime
-            .process_message("hello", vec![], &[], &[], &ctx, None, None, None)
+            .process_message("hello", vec![], &[], &[], &ctx, None, None, None, None)
             .await
             .unwrap();
 
@@ -1525,7 +1893,7 @@ mod tests {
                 scope: SkillScope::BuiltIn,
                 location: PathBuf::new(),
                 body: String::new(),
-                manifest: None,
+                summary: String::new(),
                 metadata: SkillMetadata {
                     klyntbot: Some(KlyntbotMeta {
                         tools,

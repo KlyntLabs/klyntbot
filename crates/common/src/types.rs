@@ -182,7 +182,9 @@ impl MessageRole {
             "user" => Ok(MessageRole::User),
             "assistant" => Ok(MessageRole::Assistant),
             "tool" => Ok(MessageRole::Tool),
-            _ => Err(KlyntbotError::Bus(format!("Unknown message role: '{}'", s))),
+            _ => Err(KlyntbotError::Tool(crate::ToolError::InvalidParams(
+                format!("Unknown message role: '{}'", s),
+            ))),
         }
     }
 }

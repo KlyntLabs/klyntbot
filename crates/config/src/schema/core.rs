@@ -5,6 +5,7 @@ use std::fmt;
 use std::path::PathBuf;
 
 use super::agents::{AgentsConfig, SkillConfig};
+use super::autotuner::AutoTunerConfig;
 
 use super::capture::CaptureConfig;
 use super::channels::ChannelsConfig;
@@ -15,6 +16,7 @@ use super::conversation::ConversationConfig;
 use super::finance::FinanceConfig;
 use super::gateway::GatewayConfig;
 use super::integrations::IntegrationsConfig;
+use super::language::LanguageConfig;
 use super::launcher::LauncherConfig;
 use super::learning::LearningConfig;
 use super::mcp::McpConfig;
@@ -32,11 +34,16 @@ use super::tools::ToolsConfig;
 use super::user::UserConfig;
 use super::work_context::WorkContextConfig;
 
-/// Expand a leading `~` in a path to the user's home directory.
+/// Expand a leading `~/` in a path to the user's home directory.
+/// Bare `~` (without slash) expands to home. `~user` is treated as literal.
 pub(crate) fn expand_tilde(path: &str) -> PathBuf {
-    if path.starts_with('~') {
+    if path == "~" || path.starts_with("~/") {
         if let Some(home) = dirs::home_dir() {
-            return home.join(path.trim_start_matches("~/"));
+            return if path == "~" {
+                home
+            } else {
+                home.join(&path[2..])
+            };
         }
     }
     PathBuf::from(path)
@@ -189,6 +196,10 @@ pub struct Config {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub project_root: Option<String>,
 
+    /// Language learning pair settings (source/target language, proficiency).
+    #[serde(default)]
+    pub language: LanguageConfig,
+
     /// Launcher search sources configuration.
     #[serde(default)]
     pub launcher: LauncherConfig,
@@ -204,6 +215,18 @@ pub struct Config {
     /// Whether the first-run setup wizard has been completed.
     #[serde(default)]
     pub setup_completed: bool,
+
+    /// Autotuner self-optimization system configuration.
+    #[serde(default)]
+    pub autotuner: AutoTunerConfig,
+
+    /// Schema version for forward-compatible config migration.
+    #[serde(default = "default_schema_version")]
+    pub schema_version: u32,
+}
+
+fn default_schema_version() -> u32 {
+    1
 }
 
 impl Config {
@@ -226,8 +249,8 @@ impl Config {
     }
 
     /// Return all provider configs keyed by name (detection priority order).
-    fn all_providers(&self) -> [(&str, &super::providers::ProviderConfig); 12] {
-        [
+    pub fn all_providers(&self) -> Vec<(&str, &super::providers::ProviderConfig)> {
+        vec![
             ("anthropic", &self.providers.anthropic),
             ("openai", &self.providers.openai),
             ("openrouter", &self.providers.openrouter),
@@ -272,7 +295,9 @@ impl Config {
     }
 
     /// Set the API key for a provider by name.
-    pub fn set_provider_key(&mut self, provider_name: &str, key: String) {
+    ///
+    /// Returns `false` and logs a warning if the provider name is unknown.
+    pub fn set_provider_key(&mut self, provider_name: &str, key: String) -> bool {
         let secret = Secret::new(key);
         match provider_name {
             "anthropic" => self.providers.anthropic.api_key = secret,
@@ -287,8 +312,15 @@ impl Config {
             "moonshot" => self.providers.moonshot.api_key = secret,
             "minimax" => self.providers.minimax.api_key = secret,
             "aihubmix" => self.providers.aihubmix.api_key = secret,
-            _ => {}
+            _ => {
+                tracing::warn!(
+                    provider = provider_name,
+                    "Unknown provider name in set_provider_key — key not set"
+                );
+                return false;
+            }
         }
+        true
     }
 }
 

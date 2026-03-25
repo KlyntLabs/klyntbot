@@ -1,9 +1,12 @@
 import type { Note, NoteUpdateParams } from "@shared/types";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useLanguageConfig } from "../../hooks/useLanguageConfig";
+import { PracticeMode } from "../practice/PracticeMode";
 import { AnnotationSidebar } from "./AnnotationSidebar";
 import { EditorContentWrapper, useNoteEditor } from "./EditorCore";
+import { LanguageLearningPanel } from "./LanguageLearningPanel";
 
-export type SplitMode = "translation" | "annotation" | "cornell";
+export type SplitMode = "translation" | "annotation" | "cornell" | "practice";
 
 interface PaneContent {
   html: string;
@@ -23,9 +26,21 @@ interface SplitEditorProps {
   note: Note;
   splitMode: SplitMode;
   onSave: (params: NoteUpdateParams) => void;
+  onModeChange?: (mode: "single" | SplitMode) => void;
+  targetLangOverride?: string;
+  sourceTextOverride?: string;
+  onClearSourceOverride?: () => void;
 }
 
 const EMPTY: PaneContent = { html: "", markdown: "" };
+
+/** Modes that persist right-pane content in the note's splitContent JSON */
+type PersistableSplitMode = Exclude<SplitMode, "practice">;
+
+function getStorePane(store: SplitContentStore, mode: SplitMode): PaneContent {
+  if (mode === "practice") return EMPTY;
+  return store[mode as PersistableSplitMode];
+}
 
 function parseSplitStore(note: Note): SplitContentStore {
   const defaultLeft: PaneContent = {
@@ -63,7 +78,15 @@ function parseSplitStore(note: Note): SplitContentStore {
 const NOOP_NAV_NOTE = () => {};
 const NOOP_NAV_ENTITY = () => {};
 
-export function SplitEditor({ note, splitMode, onSave }: SplitEditorProps) {
+export function SplitEditor({
+  note,
+  splitMode,
+  onSave,
+  onModeChange,
+  targetLangOverride,
+  sourceTextOverride,
+  onClearSourceOverride,
+}: SplitEditorProps) {
   const onSaveRef = useRef(onSave);
   onSaveRef.current = onSave;
   const noteIdRef = useRef(note.id);
@@ -80,10 +103,12 @@ export function SplitEditor({ note, splitMode, onSave }: SplitEditorProps) {
 
   // Current content refs (latest values for the active panes)
   const leftContentRef = useRef(storeRef.current.left);
-  const rightContentRef = useRef(storeRef.current[splitMode]);
+  const rightContentRef = useRef(getStorePane(storeRef.current, splitMode));
   const summaryContentRef = useRef(storeRef.current.summary);
 
   const flushSave = useCallback(() => {
+    if (splitModeRef.current === "practice") return; // Practice state lives in practice_sessions table
+
     if (saveTimerRef.current) {
       clearTimeout(saveTimerRef.current);
       saveTimerRef.current = null;
@@ -103,7 +128,7 @@ export function SplitEditor({ note, splitMode, onSave }: SplitEditorProps) {
     }
     if (pendingRightRef.current) {
       rightContentRef.current = pendingRightRef.current;
-      storeRef.current[splitModeRef.current] = pendingRightRef.current;
+      storeRef.current[splitModeRef.current as PersistableSplitMode] = pendingRightRef.current;
       pendingRightRef.current = null;
     }
     if (pendingSummaryRef.current) {
@@ -178,7 +203,9 @@ export function SplitEditor({ note, splitMode, onSave }: SplitEditorProps) {
   });
 
   const rightEditor = useNoteEditor({
-    content: storeRef.current[splitMode].html || storeRef.current[splitMode].markdown,
+    content:
+      getStorePane(storeRef.current, splitMode).html ||
+      getStorePane(storeRef.current, splitMode).markdown,
     onUpdate: handleRightUpdate,
     onNavigateNote: NOOP_NAV_NOTE,
     onNavigateEntity: NOOP_NAV_ENTITY,
@@ -194,7 +221,7 @@ export function SplitEditor({ note, splitMode, onSave }: SplitEditorProps) {
       splitModeRef.current = splitMode;
 
       // Load the new mode's right-pane content
-      const newRight = storeRef.current[splitMode];
+      const newRight = getStorePane(storeRef.current, splitMode);
       rightContentRef.current = newRight;
       rightEditor.commands.setContent(newRight.html || newRight.markdown || "");
     }
@@ -208,16 +235,16 @@ export function SplitEditor({ note, splitMode, onSave }: SplitEditorProps) {
       const newStore = parseSplitStore(note);
       storeRef.current = newStore;
       leftContentRef.current = newStore.left;
-      rightContentRef.current = newStore[splitMode];
+      rightContentRef.current = getStorePane(newStore, splitMode);
       summaryContentRef.current = newStore.summary;
       setSummaryText(newStore.summary.markdown);
       if (leftEditor) leftEditor.commands.setContent(newStore.left.html || newStore.left.markdown);
-      if (rightEditor)
-        rightEditor.commands.setContent(
-          newStore[splitMode].html || newStore[splitMode].markdown || "",
-        );
+      if (rightEditor) {
+        const pane = getStorePane(newStore, splitMode);
+        rightEditor.commands.setContent(pane.html || pane.markdown || "");
+      }
     }
-  }, [note.id, splitMode, leftEditor, rightEditor, flushSave]);
+  }, [note.id, splitMode, leftEditor, rightEditor, flushSave, note]);
 
   // Cmd+S + flush on unmount
   useEffect(() => {
@@ -329,6 +356,11 @@ export function SplitEditor({ note, splitMode, onSave }: SplitEditorProps) {
     }
   }, [splitMode]);
 
+  // ── Language config for translation mode ─────────────
+  const langConfig = useLanguageConfig(note.perspectiveConfig, leftContentRef.current.markdown);
+  const sourceLang = langConfig.sourceLang;
+  const targetLang = targetLangOverride ?? langConfig.targetLang;
+
   // ── Annotation mode: track active annotation ─────────
   const [activeAnnotationId, setActiveAnnotationId] = useState<string | null>(null);
 
@@ -365,6 +397,19 @@ export function SplitEditor({ note, splitMode, onSave }: SplitEditorProps) {
     [leftEditor],
   );
 
+  // ── Practice mode: render PracticeMode instead of split panes ──
+  if (splitMode === "practice") {
+    return (
+      <PracticeMode
+        noteId={note.id}
+        sourceText={leftContentRef.current.markdown || leftContentRef.current.html}
+        sourceLang={sourceLang}
+        targetLang={targetLang}
+        onExit={() => onModeChange?.("single")}
+      />
+    );
+  }
+
   if (!leftEditor || (!rightEditor && splitMode !== "annotation")) return null;
 
   // ── Mode labels ───────────────────────────────────────
@@ -388,7 +433,7 @@ export function SplitEditor({ note, splitMode, onSave }: SplitEditorProps) {
           style={{ width: `${splitRatio * 100}%` }}
           onScroll={() => handleSyncScroll("left")}
         >
-          <div className="px-3 py-1.5 text-[10px] text-muted-foreground uppercase tracking-wider border-b border-border shrink-0">
+          <div className="px-3 py-1.5 text-2xs text-muted-foreground uppercase tracking-wider border-b border-border shrink-0">
             {leftLabel}
           </div>
           <EditorContentWrapper editor={leftEditor} className="flex-1 min-h-0" />
@@ -408,15 +453,32 @@ export function SplitEditor({ note, splitMode, onSave }: SplitEditorProps) {
           style={{ width: `${(1 - splitRatio) * 100}%` }}
           onScroll={() => handleSyncScroll("right")}
         >
-          {splitMode === "annotation" ? (
-            <AnnotationSidebar
+          {splitMode === "translation" ? (
+            <LanguageLearningPanel
               noteId={note.id}
+              noteTitle={note.title}
+              sourceText={
+                sourceTextOverride || leftContentRef.current.markdown || leftContentRef.current.html
+              }
+              sourceLang={sourceLang}
+              targetLang={targetLang}
+              isSelection={!!sourceTextOverride}
+              onClearSelection={onClearSourceOverride}
+              onEnterPractice={() => onModeChange?.("practice")}
+            />
+          ) : splitMode === "annotation" ? (
+            <AnnotationSidebar
+              annotations={[]}
+              updateAnnotation={async () => {}}
+              deleteAnnotation={async () => {}}
               activeAnnotationId={activeAnnotationId}
               onAnnotationClick={handleSidebarAnnotationClick}
+              sourceLang={sourceLang}
+              targetLang={targetLang}
             />
           ) : (
             <>
-              <div className="px-3 py-1.5 text-[10px] text-muted-foreground uppercase tracking-wider border-b border-border shrink-0">
+              <div className="px-3 py-1.5 text-2xs text-muted-foreground uppercase tracking-wider border-b border-border shrink-0">
                 {rightLabel}
               </div>
               <EditorContentWrapper editor={rightEditor} className="flex-1 min-h-0" />
@@ -428,7 +490,7 @@ export function SplitEditor({ note, splitMode, onSave }: SplitEditorProps) {
       {/* Cornell summary footer */}
       {splitMode === "cornell" && (
         <div className="border-t border-border">
-          <div className="px-3 py-1.5 text-[10px] text-muted-foreground uppercase tracking-wider">
+          <div className="px-3 py-1.5 text-2xs text-muted-foreground uppercase tracking-wider">
             Summary
           </div>
           <textarea

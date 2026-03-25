@@ -148,20 +148,20 @@ export function MiniCalendar({
           type="button"
           onClick={prevMonth}
           aria-label="Previous month"
-          className="w-6 h-6 flex items-center justify-center glass-button rounded-lg text-muted-foreground hover:text-foreground transition-colors"
+          className="size-6 flex items-center justify-center glass-button rounded-lg text-muted-foreground hover:text-foreground transition-colors"
         >
-          <ChevronLeft className="w-3.5 h-3.5" strokeWidth={1.5} />
+          <ChevronLeft className="size-3.5" strokeWidth={1.5} />
         </button>
-        <span className="text-[12px] font-medium text-muted-foreground">
+        <span className="text-xs font-medium text-muted-foreground">
           {MONTH_NAMES[viewMonth]} {viewYear}
         </span>
         <button
           type="button"
           onClick={nextMonth}
           aria-label="Next month"
-          className="w-6 h-6 flex items-center justify-center glass-button rounded-lg text-muted-foreground hover:text-foreground transition-colors"
+          className="size-6 flex items-center justify-center glass-button rounded-lg text-muted-foreground hover:text-foreground transition-colors"
         >
-          <ChevronRight className="w-3.5 h-3.5" strokeWidth={1.5} />
+          <ChevronRight className="size-3.5" strokeWidth={1.5} />
         </button>
       </div>
 
@@ -170,7 +170,7 @@ export function MiniCalendar({
         {WEEKDAYS.map((d) => (
           <div
             key={d}
-            className="h-6 flex items-center justify-center text-[10px] font-medium text-muted-foreground"
+            className="h-6 flex items-center justify-center text-2xs font-medium text-muted-foreground"
           >
             {d}
           </div>

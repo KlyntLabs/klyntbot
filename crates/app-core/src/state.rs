@@ -10,12 +10,11 @@ use common::FormResponse;
 use desktop_shared::errors::ApiError;
 use desktop_shared::types::EntityKind;
 use feature_coaching::{FeedbackTracker, InterventionRouter, PatternDetector, SignalAccumulator};
-use feature_notes::repo::NoteRepo;
+use feature_notes::repo::{NoteRepo, PracticeSessionRepo};
 use feature_productivity::repos::ProductivityRepos;
 use feature_productivity::{DailyAggregator, FocusManager, NudgeService, ProductivityEngine};
-use feature_tasks::types::ActiveTaskFocus;
 use scheduling::CronService;
-use storage::{Repos, StoragePool};
+use storage::{Repos, StoragePool, VectorStore};
 use tokio::sync::{broadcast, oneshot, Mutex, RwLock};
 use tokio_util::sync::CancellationToken;
 use tracing::{error, info};
@@ -42,7 +41,9 @@ pub struct AppCore {
     pub agent: Arc<AgentLoop>,
     pub bus: Arc<MessageBus>,
     pub persona_manager: Arc<RwLock<PersonaManager>>,
-    pub config: RwLock<config::Config>,
+    pub config: Arc<RwLock<config::Config>>,
+    /// Shared hot-reloadable config subset — updated by file watcher and settings handlers.
+    pub hot_config: Arc<RwLock<config::HotConfig>>,
 
     pub channel_manager: Arc<Mutex<ChannelManager>>,
     pub cron_service: Arc<CronService>,
@@ -56,6 +57,8 @@ pub struct AppCore {
         Arc<dashmap::DashMap<String, (String, oneshot::Sender<FormResponse>)>>,
     /// Notes repo (always available).
     pub note_repo: NoteRepo,
+    /// Practice session repo (always available — backed by the same DB as notes).
+    pub practice_repo: PracticeSessionRepo,
     pub productivity_repos: Option<ProductivityRepos>,
     pub focus_manager: Option<Arc<FocusManager>>,
     pub productivity_engine: Option<Arc<Mutex<ProductivityEngine>>>,
@@ -69,7 +72,10 @@ pub struct AppCore {
     pub pattern_detector: Option<Arc<Mutex<PatternDetector>>>,
     pub intervention_router: Option<Arc<Mutex<InterventionRouter>>>,
     pub feedback_tracker: Option<Arc<Mutex<FeedbackTracker>>>,
+    pub coaching_intervention_log_repo: Option<storage::CoachingInterventionLogRepo>,
     pub user_situation: Option<Arc<Mutex<UserSituation>>>,
+    /// Shared active desktop view for query rewriting context.
+    pub active_view: Option<Arc<RwLock<Option<context_engine::ActiveView>>>>,
     pub coaching_service: Option<Arc<Mutex<feature_coaching::CoachingService>>>,
     /// Cognitive LLM provider — shared across reflection, cron, and status reporting.
     pub cognitive_provider: Option<providers::DynProvider>,
@@ -82,9 +88,6 @@ pub struct AppCore {
     pub consecutive_coaching_ignores: Arc<AtomicI32>,
     /// Unified activity log ingestion service.
     pub activity_ingestion_service: Option<Arc<activity_log::ActivityIngestionService>>,
-    /// Active task focus session (None when no focus session is active).
-    /// Uses std::sync::Mutex because the lock is never held across await points.
-    pub active_task_focus: Arc<std::sync::Mutex<Option<ActiveTaskFocus>>>,
     /// Transport-agnostic event emitter — set by the desktop adapter (Tauri events)
     /// or left as `NoopEmitter` for CLI / tests. Used by the MCP server to push
     /// entity updates to the frontend after tool mutations.
@@ -92,6 +95,10 @@ pub struct AppCore {
     /// Note embedding handler for semantic search (None when vector store unavailable).
     pub note_embedding_handler:
         Option<Arc<dyn feature_notes::handlers::embedding::NoteEmbeddingHandler>>,
+    /// Embedding engine for on-demand text embedding (shared across embedding tasks).
+    pub embedding_engine: Option<Arc<tools::embedding_engine::EmbeddingEngine>>,
+    /// LanceDB vector store for semantic similarity search (None when unavailable).
+    pub vector_store: Option<VectorStore>,
     /// Launcher search engine (None when launcher feature is disabled).
     pub launcher_engine: Option<Arc<LauncherSearchEngine>>,
     /// Proactive suggestion handler (None when tasks AI is not configured).
@@ -106,10 +113,26 @@ pub struct AppCore {
     pub insight_service: Option<Arc<feature_insights::InsightService>>,
     /// Flashcard repo for FSRS spaced repetition (None when cognitive feature unavailable).
     pub flashcard_repo: Option<cognitive::FlashcardRepo>,
+    /// Knowledge atom repo (None when cognitive feature unavailable).
+    pub knowledge_atom_repo: Option<cognitive::KnowledgeAtomRepo>,
     /// Persona repo for Insight Review personas (None when cognitive feature unavailable).
     pub persona_repo: Option<cognitive::PersonaRepo>,
     /// Squad repo for Insight Review persona squads (None when cognitive feature unavailable).
     pub squad_repo: Option<cognitive::SquadRepo>,
+    /// Review session repo for active recall sessions (None when cognitive feature unavailable).
+    pub review_session_repo: Option<cognitive::ReviewSessionRepo>,
+    /// Deck preference repo for per-deck answer mode settings (None when cognitive feature unavailable).
+    pub deck_preference_repo: Option<cognitive::DeckPreferenceRepo>,
+    /// AutoTuner orchestrator (None when autotuner is disabled).
+    pub autotuner: Option<Arc<agent::autotuner::AutoTunerOrchestrator>>,
+    /// Mirror self-reflection facade (None when cognitive provider is unavailable).
+    pub mirror_facade: Option<Arc<cognitive::mirror::MirrorFacade>>,
+    /// Join handles for MirrorEngine background subscribers — kept alive for app lifetime.
+    pub _mirror_handles: Option<Vec<tokio::task::JoinHandle<()>>>,
+    /// Cancellation token for the MirrorEngine background subscribers.
+    pub _mirror_shutdown: Option<CancellationToken>,
+    /// Cancellation token for the config file watcher background service.
+    pub _config_watcher_token: Option<CancellationToken>,
 }
 
 impl AppCore {
@@ -168,6 +191,12 @@ impl AppCore {
             .ok_or_else(|| ApiError::new("FEATURE_DISABLED", "coaching engine is not available"))
     }
 
+    pub fn coaching_log_repo(&self) -> Result<&storage::CoachingInterventionLogRepo, ApiError> {
+        self.coaching_intervention_log_repo
+            .as_ref()
+            .ok_or_else(|| ApiError::new("FEATURE_DISABLED", "coaching engine is not available"))
+    }
+
     pub fn user_situation(&self) -> Result<&Arc<Mutex<UserSituation>>, ApiError> {
         self.user_situation
             .as_ref()
@@ -194,6 +223,32 @@ impl AppCore {
             .ok_or_else(|| ApiError::new("NOT_AVAILABLE", "Flashcard repo not available"))
     }
 
+    /// Return knowledge atom repo or a "not available" error.
+    pub fn knowledge_atom_repo(&self) -> Result<&cognitive::KnowledgeAtomRepo, ApiError> {
+        self.knowledge_atom_repo
+            .as_ref()
+            .ok_or_else(|| ApiError::new("NOT_AVAILABLE", "Knowledge atom repo not available"))
+    }
+
+    /// Return practice session repo.
+    pub fn practice_repo(&self) -> &PracticeSessionRepo {
+        &self.practice_repo
+    }
+
+    /// Return review session repo or a "not available" error.
+    pub fn review_session_repo(&self) -> Result<&cognitive::ReviewSessionRepo, ApiError> {
+        self.review_session_repo
+            .as_ref()
+            .ok_or_else(|| ApiError::new("NOT_AVAILABLE", "Review session repo not available"))
+    }
+
+    /// Return deck preference repo or a "not available" error.
+    pub fn deck_preference_repo(&self) -> Result<&cognitive::DeckPreferenceRepo, ApiError> {
+        self.deck_preference_repo
+            .as_ref()
+            .ok_or_else(|| ApiError::new("NOT_AVAILABLE", "Deck preference repo not available"))
+    }
+
     /// Return launcher search engine or a "feature disabled" error.
     pub fn launcher_engine(&self) -> Result<&Arc<LauncherSearchEngine>, ApiError> {
         self.launcher_engine
@@ -207,6 +262,18 @@ impl AppCore {
             .as_ref()
             .map(|e| &e.clipboard_repo)
             .ok_or_else(|| ApiError::new("FEATURE_DISABLED", "launcher feature is not enabled"))
+    }
+
+    /// Return autotuner orchestrator or `None` when disabled.
+    pub fn autotuner_orchestrator(&self) -> Option<&agent::autotuner::AutoTunerOrchestrator> {
+        self.autotuner.as_deref()
+    }
+
+    /// Return mirror facade or a "not available" error.
+    pub fn mirror_facade(&self) -> Result<&cognitive::mirror::MirrorFacade, ApiError> {
+        self.mirror_facade
+            .as_deref()
+            .ok_or_else(|| ApiError::new("NOT_AVAILABLE", "Mirror facade not available"))
     }
 
     /// Return proactive handler or a "not initialized" error.

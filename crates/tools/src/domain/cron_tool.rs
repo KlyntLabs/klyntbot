@@ -164,8 +164,30 @@ impl Tool for CronTool {
                         every_ms: every_s * 1000,
                     }
                 } else if let Some(cron_expr) = p.optional_str("cron_expr")? {
+                    // Validate the cron expression before accepting it.
+                    // The `cron` crate uses 6-field format (sec min hr day mon dow),
+                    // but the LLM provides 5-field standard format. Prepend "0 " for seconds.
+                    if cron_expr.split_whitespace().count() != 5 {
+                        return Err(ToolError::InvalidParams(format!(
+                            "Invalid cron expression '{}'. Expected exactly 5 fields: \
+                             'minute hour day month weekday' (e.g. '0 9 * * *' for daily at 9am)",
+                            cron_expr
+                        ))
+                        .into());
+                    }
+                    let full_expr = format!("0 {}", cron_expr);
+                    if cron::Schedule::try_from(full_expr.as_str()).is_err() {
+                        return Err(ToolError::InvalidParams(format!(
+                            "Invalid cron expression '{}'. Expected 5-field format: \
+                             'minute hour day month weekday' (e.g. '0 9 * * *' for daily at 9am)",
+                            cron_expr
+                        ))
+                        .into());
+                    }
+                    // Store the 6-field expression since the scheduling service's
+                    // compute_next_run() uses cron::Schedule::try_from() which requires 6 fields.
                     CronSchedule::Cron {
-                        expr: cron_expr.to_string(),
+                        expr: full_expr,
                         tz: None,
                     }
                 } else {
@@ -251,5 +273,95 @@ impl Tool for CronTool {
             }
             _ => Err(ToolError::InvalidParams(format!("Unknown action: {}", action)).into()),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serde_json::json;
+
+    /// A handler that records calls — lets us verify the tool rejected before reaching the handler.
+    struct RecordingHandler {
+        calls: std::sync::Mutex<Vec<String>>,
+    }
+
+    impl RecordingHandler {
+        fn new() -> Self {
+            Self {
+                calls: std::sync::Mutex::new(Vec::new()),
+            }
+        }
+        fn call_count(&self) -> usize {
+            self.calls.lock().unwrap().len()
+        }
+    }
+
+    #[async_trait]
+    impl CronHandler for RecordingHandler {
+        async fn add_job(&self, params: AddCronJobParams) -> Result<CronJobInfo> {
+            self.calls.lock().unwrap().push(params.name.clone());
+            Ok(CronJobInfo {
+                id: "test-id".into(),
+                name: params.name,
+                next_run_at_ms: Some(9999999999999),
+                last_status: None,
+            })
+        }
+        async fn list_jobs(&self, _include_internal: bool) -> Vec<CronJobInfo> {
+            vec![]
+        }
+        async fn remove_job(&self, _job_id: &str) -> Result<bool> {
+            Ok(true)
+        }
+    }
+
+    fn test_ctx() -> RoutingContext {
+        RoutingContext::new("cli".into(), "test".into())
+    }
+
+    #[tokio::test]
+    async fn rejects_invalid_cron_expression() {
+        let handler = Arc::new(RecordingHandler::new());
+        let tool = CronTool::with_handler(handler.clone());
+        let args = json!({
+            "action": "add",
+            "message": "test",
+            "cron_expr": "not a cron"
+        });
+        let result = tool.execute(args, &test_ctx()).await;
+        assert!(result.is_err(), "Should reject invalid cron expression");
+        assert_eq!(handler.call_count(), 0, "Handler should not be called");
+    }
+
+    #[tokio::test]
+    async fn accepts_valid_cron_expression() {
+        let handler = Arc::new(RecordingHandler::new());
+        let tool = CronTool::with_handler(handler.clone());
+        let args = json!({
+            "action": "add",
+            "message": "standup",
+            "cron_expr": "0 9 * * *"
+        });
+        let result = tool.execute(args, &test_ctx()).await;
+        assert!(result.is_ok(), "Should accept valid 5-field cron");
+        assert_eq!(handler.call_count(), 1);
+    }
+
+    #[tokio::test]
+    async fn accepts_every_seconds() {
+        let handler = Arc::new(RecordingHandler::new());
+        let tool = CronTool::with_handler(handler.clone());
+        let args = json!({
+            "action": "add",
+            "message": "ping",
+            "every_seconds": 300
+        });
+        let result = tool.execute(args, &test_ctx()).await;
+        assert!(
+            result.is_ok(),
+            "every_seconds should bypass cron validation"
+        );
+        assert_eq!(handler.call_count(), 1);
     }
 }

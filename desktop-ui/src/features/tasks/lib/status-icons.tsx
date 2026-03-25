@@ -12,7 +12,7 @@ export interface Status {
 }
 
 export const BacklogIcon: React.FC = () => (
-  <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+  <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true">
     <circle
       cx="7"
       cy="7"
@@ -39,7 +39,7 @@ export const BacklogIcon: React.FC = () => (
 );
 
 export const PausedIcon: React.FC = () => (
-  <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+  <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true">
     <circle cx="7" cy="7" r="6" fill="none" stroke="#0ea5e9" strokeWidth="2" />
     <circle
       cx="7"
@@ -56,7 +56,7 @@ export const PausedIcon: React.FC = () => (
 );
 
 export const ToDoIcon: React.FC = () => (
-  <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+  <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true">
     <circle cx="7" cy="7" r="6" fill="none" stroke="#e2e2e2" strokeWidth="2" />
     <circle
       cx="7"
@@ -73,7 +73,7 @@ export const ToDoIcon: React.FC = () => (
 );
 
 export const InProgressIcon: React.FC = () => (
-  <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+  <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true">
     <circle cx="7" cy="7" r="6" fill="none" stroke="#facc15" strokeWidth="2" />
     <circle
       cx="7"
@@ -90,7 +90,7 @@ export const InProgressIcon: React.FC = () => (
 );
 
 export const TechnicalReviewIcon: React.FC = () => (
-  <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+  <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true">
     <circle cx="7" cy="7" r="6" fill="none" stroke="#22c55e" strokeWidth="2" />
     <circle
       cx="7"
@@ -107,7 +107,7 @@ export const TechnicalReviewIcon: React.FC = () => (
 );
 
 export const CompletedIcon: React.FC = () => (
-  <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+  <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true">
     <circle cx="7" cy="7" r="6" fill="#8b5cf6" stroke="#8b5cf6" strokeWidth="2" />
     <path
       d="M4.5 7L6.5 9L9.5 5"
@@ -156,7 +156,14 @@ export function matchIcon(name: string): React.FC<{ className?: string }> | unde
  */
 export function makeColoredCircle(color: string): React.FC<{ className?: string }> {
   return ({ className }) => (
-    <svg className={className} width="14" height="14" viewBox="0 0 14 14" fill="none">
+    <svg
+      className={className}
+      width="14"
+      height="14"
+      viewBox="0 0 14 14"
+      fill="none"
+      aria-hidden="true"
+    >
       <circle cx="7" cy="7" r="5" stroke={color} strokeWidth="1.5" fill="none" />
       <circle cx="7" cy="7" r="2" fill={color} />
     </svg>

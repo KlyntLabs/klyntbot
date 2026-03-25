@@ -64,7 +64,7 @@ export function DebugDashboardPage() {
                     : "text-muted-foreground hover:text-foreground hover:bg-card"
                 }`}
               >
-                <Icon className="w-3.5 h-3.5" strokeWidth={1.5} />
+                <Icon className="size-3.5" strokeWidth={1.5} />
                 {tab.label}
               </button>
             );

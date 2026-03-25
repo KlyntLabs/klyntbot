@@ -47,6 +47,7 @@ dependencies = [
  "activity-log",
  "aho-corasick",
  "async-trait",
+ "autotuner",
  "base64 0.22.1",
  "bus",
  "chrono",
@@ -66,6 +67,7 @@ dependencies = [
  "mime_guess",
  "plugin-runtime",
  "providers",
+ "rand 0.9.2",
  "regex",
  "scheduling",
  "serde",
@@ -178,7 +180,6 @@ dependencies = [
  "rust_decimal",
  "rust_decimal_macros",
  "serde",
- "serde_json",
 ]
 
 [[package]]
@@ -253,6 +254,7 @@ dependencies = [
  "activity-log",
  "agent",
  "async-trait",
+ "autotuner",
  "base64 0.22.1",
  "bus",
  "channels",
@@ -260,6 +262,7 @@ dependencies = [
  "cognitive",
  "common",
  "config",
+ "context_engine",
  "dashmap",
  "desktop-shared",
  "dirs",
@@ -813,6 +816,24 @@ name = "autocfg"
 version = "1.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c08606f8c3cbf4ce6ec8e28fb0014a2c086708fe954eaa885384a6165172e7e8"
+
+[[package]]
+name = "autotuner"
+version = "0.1.0"
+dependencies = [
+ "async-trait",
+ "bus",
+ "chrono",
+ "common",
+ "config",
+ "serde",
+ "serde_json",
+ "sqlx",
+ "storage",
+ "tokio",
+ "tracing",
+ "uuid",
+]
 
 [[package]]
 name = "av-scenechange"
@@ -1631,10 +1652,14 @@ dependencies = [
  "bus",
  "chrono",
  "common",
+ "config",
  "context_engine",
+ "dashmap",
  "futures-util",
+ "providers",
  "serde",
  "serde_json",
+ "sha2",
  "sqlx",
  "storage",
  "tokio",
@@ -1683,13 +1708,10 @@ dependencies = [
  "async-trait",
  "chrono",
  "chrono-tz",
- "iana-time-zone",
  "reqwest 0.13.2",
  "rust_decimal",
- "rust_decimal_macros",
  "serde",
  "serde_json",
- "tempfile",
  "thiserror 2.0.18",
  "tokio",
  "tracing",
@@ -1748,6 +1770,7 @@ dependencies = [
  "serde_json",
  "tempfile",
  "tokio",
+ "tracing",
 ]
 
 [[package]]
@@ -3065,6 +3088,7 @@ dependencies = [
  "anyhow",
  "app-core",
  "async-trait",
+ "autotuner",
  "axum",
  "base64 0.22.1",
  "bus",
@@ -5716,6 +5740,7 @@ dependencies = [
  "agent",
  "anyhow",
  "app-core",
+ "axum",
  "clap",
  "common",
  "config",
@@ -5724,7 +5749,9 @@ dependencies = [
  "rmcp",
  "serde_json",
  "tokio",
+ "tokio-util",
  "tools-core",
+ "tower-http",
  "tracing",
  "tracing-subscriber",
  "uuid",
@@ -6795,6 +6822,7 @@ dependencies = [
  "async-trait",
  "common",
  "config",
+ "dashmap",
  "futures-util",
  "http",
  "rmcp",
@@ -6802,6 +6830,7 @@ dependencies = [
  "serde_json",
  "tempfile",
  "tokio",
+ "tokio-util",
  "tools-core",
  "tracing",
  "tracing-subscriber",
@@ -11751,6 +11780,7 @@ dependencies = [
  "cognitive",
  "common",
  "config",
+ "cron",
  "fastembed",
  "globset",
  "html2text",

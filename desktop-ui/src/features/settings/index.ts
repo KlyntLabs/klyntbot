@@ -12,5 +12,8 @@ export { EnvironmentsSettings } from "./pages/EnvironmentsSettings";
 export { GeneralSettings } from "./pages/GeneralSettings";
 export { GitSettings } from "./pages/GitSettings";
 export { IntegrationsSettings } from "./pages/IntegrationsSettings";
+export { LauncherSettings } from "./pages/LauncherSettings";
 export { McpServersSettings } from "./pages/McpServersSettings";
 export { PersonalizationSettings } from "./pages/PersonalizationSettings";
+export { TasksSettings } from "./pages/TasksSettings";
+export { WorkContextSettings } from "./pages/WorkContextSettings";

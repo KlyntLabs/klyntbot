@@ -42,6 +42,12 @@ pub struct StrategyRecordRow {
     pub tool_duration_ms: Option<i64>,
     pub complexity_signals: serde_json::Value,
     pub execution_mode: Option<String>,
+    /// Number of memory entries retrieved from the context engine for this message.
+    pub retrieved_memory_count: Option<i32>,
+    /// Whether query rewriting was triggered for this message (0 or 1).
+    pub rewrite_triggered: i32,
+    /// Source of the rewrite: "heuristic" or "llm", or None if not triggered.
+    pub rewrite_source: Option<String>,
 }
 
 /// Row struct for the `enrichment_feedback` table.

@@ -170,7 +170,10 @@ impl Tool for FinanceTool {
                 "type": { "type": "string" },
                 "currency": { "type": "string" },
                 "balance": { "type": "integer" },
-                "amount": { "type": "integer" },
+                "amount": {
+                    "type": "integer",
+                    "description": "Amount in smallest currency unit (e.g. cents for USD, dong for VND). $50.00 = 5000."
+                },
                 "account_id": { "type": "string" },
                 "transfer_to_account_id": { "type": "string" },
                 "category": { "type": "string" },

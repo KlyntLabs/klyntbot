@@ -28,15 +28,7 @@ import { SensitiveDivider } from "../components/SensitiveDivider";
 import { useFinanceCurrency } from "../hooks/useFinanceCurrency";
 import { usePrivacyMode } from "../hooks/usePrivacyMode";
 import { displayAmount, displayHint } from "../lib/displayAmount";
-import {
-  ACCT_ICONS,
-  COLORS,
-  fmtCompact,
-  GOAL_ICONS,
-  LIAB_ICONS,
-  pct,
-  retPct,
-} from "../lib/finance";
+import { ACCT_ICONS, fmtCompact, GOAL_ICONS, LIAB_ICONS, pct, retPct } from "../lib/finance";
 import { computeHealthScore } from "../lib/healthScore";
 import { computeMonthlyPulse } from "../lib/monthlyPulse";
 
@@ -143,7 +135,7 @@ export function Finance() {
           .map((b) => ({ spent: b.spent, amount: b.amount })),
         goals: goals.map((g) => ({ currentAmount: g.currentAmount, targetAmount: g.targetAmount })),
       }),
-    [monthlySummary, accounts, investments, liabilities, budgets, goals],
+    [monthlySummary, budgets, goals, totalAssets, totalDebt],
   );
 
   const pulseRows = useMemo(() => computeMonthlyPulse(monthlySummary), [monthlySummary]);
@@ -172,7 +164,7 @@ export function Finance() {
         onSelectCurrency={setMode}
       >
         <Card className="p-6 text-center">
-          <p className="text-[12px] text-destructive mb-2">{error.message}</p>
+          <p className="text-xs text-destructive mb-2">{error.message}</p>
           <button
             type="button"
             onClick={refetchAll}
@@ -248,12 +240,12 @@ export function Finance() {
           <Card className="overflow-hidden">
             <div className="px-4 pt-4 pb-1">
               <div className="flex items-center justify-between mb-2.5 px-1">
-                <span className="text-[10px] text-muted-foreground uppercase tracking-widest">
+                <span className="text-2xs text-muted-foreground uppercase tracking-widest">
                   Accounts
                 </span>
                 <Link
                   to="/finance/cashflow"
-                  className="text-[10px] text-brand normal-case tracking-normal"
+                  className="text-2xs text-brand normal-case tracking-normal"
                 >
                   View all →
                 </Link>
@@ -276,8 +268,8 @@ export function Finance() {
                     key={acct.id}
                     className="flex items-center gap-3 px-4 py-2.5 hover:bg-accent transition-colors"
                   >
-                    <div className="w-7 h-7 rounded-lg bg-muted flex items-center justify-center flex-shrink-0">
-                      <Icon className="w-3.5 h-3.5 text-muted-foreground" strokeWidth={1.5} />
+                    <div className="size-7 rounded-lg bg-muted flex items-center justify-center flex-shrink-0">
+                      <Icon className="size-3.5 text-muted-foreground" strokeWidth={1.5} />
                     </div>
                     <div className="flex-1 min-w-0">
                       <p className="text-[11px] font-medium text-muted-foreground truncate">
@@ -288,7 +280,7 @@ export function Finance() {
                       </p>
                     </div>
                     <div className="text-right flex-shrink-0">
-                      <p className="text-[12px] font-light text-foreground tabular-nums">
+                      <p className="text-xs font-light text-foreground tabular-nums">
                         {displayAmount({
                           amount: acct.balance,
                           currency: acct.currency,
@@ -311,12 +303,12 @@ export function Finance() {
           <Card className="overflow-hidden">
             <div className="px-4 pt-4 pb-1">
               <div className="flex items-center justify-between mb-2.5 px-1">
-                <span className="text-[10px] text-muted-foreground uppercase tracking-widest">
+                <span className="text-2xs text-muted-foreground uppercase tracking-widest">
                   Goals
                 </span>
                 <Link
                   to="/finance/targets"
-                  className="text-[10px] text-brand normal-case tracking-normal"
+                  className="text-2xs text-brand normal-case tracking-normal"
                 >
                   View all →
                 </Link>
@@ -331,7 +323,7 @@ export function Finance() {
                     <div className="flex items-center gap-2 mb-1.5">
                       <Icon
                         className={cn(
-                          "w-3.5 h-3.5 flex-shrink-0",
+                          "size-3.5 flex-shrink-0",
                           g.goalType === "fire" ? "text-brand" : "text-muted-foreground",
                         )}
                         strokeWidth={1.5}
@@ -342,7 +334,7 @@ export function Finance() {
                       <span className="px-1.5 py-0.5 text-[9px] font-light rounded bg-accent text-dim flex-shrink-0">
                         {g.goalType}
                       </span>
-                      <span className="text-[10px] text-brand font-light flex-shrink-0">{p}%</span>
+                      <span className="text-2xs text-brand font-light flex-shrink-0">{p}%</span>
                     </div>
                     <Progress value={p} />
                     <div className="flex gap-2 mt-1">
@@ -386,12 +378,12 @@ export function Finance() {
           <Card className="overflow-hidden">
             <div className="px-4 pt-4 pb-1">
               <div className="flex items-center justify-between mb-2.5 px-1">
-                <span className="text-[10px] text-muted-foreground uppercase tracking-widest">
+                <span className="text-2xs text-muted-foreground uppercase tracking-widest">
                   Investments
                 </span>
                 <Link
                   to="/finance/investments"
-                  className="text-[10px] text-brand normal-case tracking-normal"
+                  className="text-2xs text-brand normal-case tracking-normal"
                 >
                   View all →
                 </Link>
@@ -433,12 +425,12 @@ export function Finance() {
           <Card className="overflow-hidden">
             <div className="px-4 pt-4 pb-1">
               <div className="flex items-center justify-between mb-2.5 px-1">
-                <span className="text-[10px] text-muted-foreground uppercase tracking-widest">
+                <span className="text-2xs text-muted-foreground uppercase tracking-widest">
                   Liabilities
                 </span>
                 <Link
                   to="/finance/targets"
-                  className="text-[10px] text-brand normal-case tracking-normal"
+                  className="text-2xs text-brand normal-case tracking-normal"
                 >
                   View all →
                 </Link>
@@ -452,7 +444,7 @@ export function Finance() {
                   <div key={l.id} className="px-4 py-3 hover:bg-accent transition-colors">
                     <div className="flex items-center gap-2 mb-1.5">
                       <Icon
-                        className="w-3.5 h-3.5 text-destructive/60 flex-shrink-0"
+                        className="size-3.5 text-destructive/60 flex-shrink-0"
                         strokeWidth={1.5}
                       />
                       <span className="text-[11px] font-medium text-muted-foreground truncate flex-1">
@@ -476,7 +468,7 @@ export function Finance() {
                       </div>
                       <span className="text-[9px] text-dim font-light flex-shrink-0">{paid}%</span>
                     </div>
-                    <span className="text-[12px] font-light text-destructive tabular-nums">
+                    <span className="text-xs font-light text-destructive tabular-nums">
                       {displayAmount({
                         amount: l.remaining,
                         currency: l.currency,
@@ -493,8 +485,8 @@ export function Finance() {
             </div>
             {liabilities.length > 0 && (
               <div className="px-4 py-2.5 border-t border-border bg-card flex justify-between">
-                <span className="text-[10px] font-light text-muted-foreground">Total Debt</span>
-                <span className="text-[10px] font-light text-destructive">
+                <span className="text-2xs font-light text-muted-foreground">Total Debt</span>
+                <span className="text-2xs font-light text-destructive">
                   {fmtCompact(convertTotal(totalDebt), displayCur, hidden)}
                 </span>
               </div>
@@ -507,12 +499,12 @@ export function Finance() {
       <Card className="overflow-hidden mb-3">
         <div className="px-4 pt-4 pb-1">
           <div className="flex items-center justify-between mb-2.5 px-1">
-            <span className="text-[10px] text-muted-foreground uppercase tracking-widest">
+            <span className="text-2xs text-muted-foreground uppercase tracking-widest">
               Recent Transactions
             </span>
             <Link
               to="/finance/cashflow"
-              className="text-[10px] text-brand normal-case tracking-normal"
+              className="text-2xs text-brand normal-case tracking-normal"
             >
               View all →
             </Link>
@@ -544,19 +536,19 @@ export function Finance() {
               key={tx.id}
               className="flex items-center gap-3 px-4 py-2.5 hover:bg-accent transition-colors border-b border-border-subtle last:border-b-0"
             >
-              <span className="text-[10px] text-dim font-light w-10 flex-shrink-0 tabular-nums">
+              <span className="text-2xs text-dim font-light w-10 flex-shrink-0 tabular-nums">
                 {tx.txDate.slice(5)}
               </span>
               <div
                 className={cn(
-                  "w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0",
+                  "size-7 rounded-lg flex items-center justify-center flex-shrink-0",
                   bgCol,
                 )}
               >
-                <TxI className={cn("w-3.5 h-3.5", col)} strokeWidth={1.5} />
+                <TxI className={cn("size-3.5", col)} strokeWidth={1.5} />
               </div>
               <div className="flex-1 min-w-0">
-                <p className="text-[12px] font-light text-muted-foreground truncate">
+                <p className="text-xs font-light text-muted-foreground truncate">
                   {tx.counterparty ?? tx.notes ?? tx.txType}
                 </p>
                 <div className="flex items-center gap-1.5 mt-0.5">
@@ -569,10 +561,7 @@ export function Finance() {
                 </div>
               </div>
               <span
-                className={cn(
-                  "text-[12px] font-light w-24 text-right flex-shrink-0 tabular-nums",
-                  col,
-                )}
+                className={cn("text-xs font-light w-24 text-right flex-shrink-0 tabular-nums", col)}
               >
                 {pre}
                 {displayAmount({

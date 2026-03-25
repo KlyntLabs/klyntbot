@@ -510,17 +510,17 @@
   box-shadow: none;
 }
 
-/* Inputs/textareas inside glass-input get no outline (container handles focus) */
-[data-theme="retro"] .glass-input input:focus-visible,
-[data-theme="retro"] .glass-input textarea:focus-visible {
-  outline: none;
-}
-
 /* Standalone inputs/textareas get a subtle border change instead of outline */
 [data-theme="retro"] input:focus-visible,
 [data-theme="retro"] textarea:focus-visible {
   outline: none;
   border-color: #a3a3a3;
+}
+
+/* Inputs/textareas inside glass-input get no outline (container handles focus) */
+[data-theme="retro"] .glass-input input:focus-visible,
+[data-theme="retro"] .glass-input textarea:focus-visible {
+  outline: none;
 }
 
 /* ── Scrollbar — Minimal, thin ───────────────────────────────────────── */
@@ -555,21 +555,21 @@
 /* Many components use bg-white/[0.04] etc inline — override those to solid */
 [data-theme="retro"] [class*="bg-white/"],
 [data-theme="retro"] [class*="bg-white\\/"] {
-  background-color: var(--surface-base) !important;
+  background-color: var(--surface-base);
 }
 
 /* Fix border colors that use white alpha */
 [data-theme="retro"] [class*="border-white/"],
 [data-theme="retro"] [class*="border-white\\/"] {
-  border-color: var(--border) !important;
+  border-color: var(--border);
 }
 
 /* ═══════════════════════════════════════════════════════════════════════
    PERFORMANCE — Remove expensive blur effects entirely
    ═══════════════════════════════════════════════════════════════════════ */
 [data-theme="retro"] * {
-  -webkit-backdrop-filter: none !important;
-  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
 }
 
 /* ═══════════════════════════════════════════════════════════════════════

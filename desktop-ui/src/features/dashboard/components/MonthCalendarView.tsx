@@ -156,7 +156,7 @@ export function MonthCalendarView() {
           {DAY_LABELS.map((label) => (
             <div
               key={label}
-              className="text-center text-[10px] text-muted-foreground font-medium py-1"
+              className="text-center text-2xs text-muted-foreground font-medium py-1"
             >
               {label}
             </div>

@@ -1,7 +1,9 @@
 pub mod accumulated_observation;
 pub mod annotation;
+pub mod atom_extraction_cache;
 pub mod blackboard;
 pub mod book_tree;
+pub mod deck_preference;
 pub mod entity;
 pub mod episodic_memory;
 pub mod event_log;
@@ -9,17 +11,24 @@ pub mod failed_observation;
 pub mod flashcard;
 pub mod gt_link;
 pub mod insight_cache;
+pub mod knowledge_atom;
 pub mod markdown_parser;
+pub mod pending_memory;
 pub mod persona;
 pub mod persona_accuracy;
 pub mod procedural_rule;
+pub mod retention_history;
+pub mod review_session;
+pub mod review_stats;
 pub mod semantic_fact;
 pub mod squad;
 
 pub use accumulated_observation::AccumulatedObservationRepo;
 pub use annotation::AnnotationRepo;
+pub use atom_extraction_cache::AtomExtractionCache;
 pub use blackboard::{BlackboardEntry, BlackboardRepo, NewBlackboardEntry};
 pub use book_tree::SqliteBookTreeRepo;
+pub use deck_preference::{DeckPreferenceRepo, DeckPreferenceRow};
 pub use entity::{
     EntityRepo, EntityRow, GraphNeighborhood, NewEntity, NewRelationship, RelationshipRow,
 };
@@ -32,10 +41,17 @@ pub use flashcard::{
 pub use gt_link::SqliteGTLinkRepo;
 #[allow(deprecated)]
 pub use insight_cache::{InsightCacheRepo, InsightCacheRow};
+pub use knowledge_atom::{
+    KnowledgeAtomRepo, KnowledgeAtomRow, KnowledgeTopicRow, NewKnowledgeAtom,
+};
 pub use markdown_parser::parse_markdown_to_tree;
+pub use pending_memory::{PendingMemoryRepo, PendingMemoryRow};
 pub use persona::{NewPersona, PersonaRepo, PersonaRow, PersonaUpdate};
 pub use persona_accuracy::{PersonaAccuracy, PersonaAccuracyRepo};
 pub use procedural_rule::ProceduralRuleRepo;
+pub use retention_history::{DailyRetentionPoint, DomainRetentionHistory, RetentionHistoryRepo};
+pub use review_session::{ReviewSessionRepo, ReviewSessionRow};
+pub use review_stats::{DailyReviewStat, DomainRetentionStat, ReviewStatsRepo};
 pub use semantic_fact::SemanticFactRepo;
 pub use squad::{NewSquad, ResolvedSquad, SquadMemberRow, SquadRepo, SquadRow};
 
@@ -66,8 +82,8 @@ pub fn cognitive_migrations() -> Vec<FeatureMigration> {
     vec![
         FeatureMigration {
             feature_name: "cognitive".to_string(),
-            version: 9,
-            description: "Cognitive tables + squads + scope columns + persona skill fields + blackboard + persona accuracy"
+            version: 14,
+            description: "Cognitive tables + squads + scope columns + persona skill fields + blackboard + persona accuracy + coaching intervention log + knowledge atoms + atom extraction cache + action_url on coaching_intervention_log + active recall (deck_preferences, review_sessions, flashcard new columns)"
                 .to_string(),
             sql: include_str!("../../migrations/001_cognitive_tables.sql").to_string(),
         },
@@ -76,6 +92,13 @@ pub fn cognitive_migrations() -> Vec<FeatureMigration> {
             version: 7,
             description: "Add BookIndex tree nodes and GT-Link tables".to_string(),
             sql: include_str!("../../migrations/002_book_index_tables.sql").to_string(),
+        },
+        FeatureMigration {
+            feature_name: "cognitive_mirror".to_string(),
+            version: 4,
+            description: "Mirror Phase 1-4 tables (routing snapshots, trend narratives, snippets, meta_rules, brain_versions, trial_previews)"
+                .to_string(),
+            sql: include_str!("../../migrations/003_mirror_tables.sql").to_string(),
         },
     ]
 }

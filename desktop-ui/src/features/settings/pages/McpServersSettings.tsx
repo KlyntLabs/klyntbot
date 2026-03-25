@@ -1,9 +1,11 @@
 import { useEvent } from "@shared/hooks/useEvent";
 import { useMutation } from "@shared/hooks/useMutation";
 import { useQuery } from "@shared/hooks/useQuery";
+import { useToastContext } from "@shared/hooks/useToast";
 import type {
   McpAddServerParams,
   McpConfigResponse,
+  McpServerConfig,
   McpToggleServerParams,
   OAuthStartParams,
   RecommendedMcpServer,
@@ -15,6 +17,7 @@ import { CustomServerCard, RecommendedServerCard } from "../components/mcp/McpSe
 import { recommendedServers } from "../components/mcp/recommendedServers";
 
 export function McpServersSettings() {
+  const toast = useToastContext();
   const { data: config, refetch } = useQuery<McpConfigResponse>("mcp_get_config", undefined, {
     enabled: true,
     servers: [],
@@ -41,11 +44,17 @@ export function McpServersSettings() {
   );
 
   useEffect(() => {
-    if (oauthError) console.error("[MCP OAuth] Error:", oauthError);
-  }, [oauthError]);
+    if (oauthError) {
+      console.error("[MCP OAuth] Error:", oauthError);
+      toast.show(
+        `OAuth failed: ${oauthError instanceof Error ? oauthError.message : String(oauthError)}`,
+      );
+    }
+  }, [oauthError, toast]);
 
   const [dialogOpen, setDialogOpen] = useState(false);
   const [prefillServer, setPrefillServer] = useState<RecommendedMcpServer | undefined>();
+  const [editingServerName, setEditingServerName] = useState<string | null>(null);
   const [oauthLoadingServer, setOauthLoadingServer] = useState<string | null>(null);
 
   // Listen for OAuth completion/error events from the backend
@@ -54,19 +63,24 @@ export function McpServersSettings() {
     refetch();
   });
 
-  useEvent<{ serverName: string; error: string }>("mcp:oauth_error", () => {
+  useEvent<{ serverName: string; error: string }>("mcp:oauth_error", (payload) => {
     setOauthLoadingServer(null);
+    toast.show(`OAuth error for ${payload.serverName}: ${payload.error}`);
     refetch();
   });
 
   const handleAdd = useCallback(
     async (params: McpAddServerParams) => {
+      if (editingServerName && editingServerName !== params.name) {
+        await removeServer({ name: editingServerName });
+      }
       await addServer(params);
       refetch();
       setDialogOpen(false);
       setPrefillServer(undefined);
+      setEditingServerName(null);
     },
-    [addServer, refetch],
+    [addServer, removeServer, refetch, editingServerName],
   );
 
   const handleToggle = useCallback(
@@ -117,10 +131,8 @@ export function McpServersSettings() {
   const handleOAuthConnect = useCallback(
     async (server: RecommendedMcpServer) => {
       if (!server.oauthProvider) return;
-      console.log("[MCP OAuth] Starting flow for", server.name, server.oauthProvider);
       setOauthLoadingServer(server.name);
-      const result = await startOAuth({ provider: server.oauthProvider, serverName: server.name });
-      console.log("[MCP OAuth] Result:", result);
+      await startOAuth({ provider: server.oauthProvider, serverName: server.name });
     },
     [startOAuth],
   );
@@ -140,8 +152,25 @@ export function McpServersSettings() {
     setDialogOpen(true);
   }, []);
 
+  const handleEditCustom = useCallback((s: McpServerConfig) => {
+    setPrefillServer({
+      name: s.name,
+      author: "",
+      description: "",
+      icon: "",
+      transport: s.transport,
+      command: s.command,
+      args: s.args,
+      envKeys: s.env ? Object.keys(s.env) : [],
+      url: s.url,
+    });
+    setEditingServerName(s.name);
+    setDialogOpen(true);
+  }, []);
+
   const handleOpenAdd = useCallback(() => {
     setPrefillServer(undefined);
+    setEditingServerName(null);
     setDialogOpen(true);
   }, []);
 
@@ -171,16 +200,16 @@ export function McpServersSettings() {
           <button
             type="button"
             onClick={handleOpenAdd}
-            className="flex items-center gap-1.5 text-[12px] text-brand hover:text-brand-hover transition-colors"
+            className="flex items-center gap-1.5 text-xs text-brand hover:text-brand-hover transition-colors"
           >
-            <Plus className="w-3.5 h-3.5" />
+            <Plus className="size-3.5" />
             Add server
           </button>
         </div>
 
         {customServers.length === 0 ? (
           <div className="bg-card rounded-lg border border-border p-8 flex flex-col items-center text-center">
-            <Plug className="w-8 h-8 text-dim mb-3" strokeWidth={1.5} />
+            <Plug className="size-8 text-dim mb-3" strokeWidth={1.5} />
             <p className="text-[13px] text-muted-foreground">No custom MCP servers connected</p>
             <p className="text-[11px] text-dim mt-1">
               Add a server manually or install one from the recommended list below
@@ -194,9 +223,7 @@ export function McpServersSettings() {
                 server={server}
                 onToggle={handleToggle}
                 onRemove={handleRemove}
-                onEdit={() => {
-                  // Edit is a future enhancement — for now, remove + re-add
-                }}
+                onEdit={handleEditCustom}
               />
             ))}
           </div>
@@ -238,6 +265,7 @@ export function McpServersSettings() {
         onClose={() => {
           setDialogOpen(false);
           setPrefillServer(undefined);
+          setEditingServerName(null);
         }}
         onAdd={handleAdd}
         prefill={prefillServer}

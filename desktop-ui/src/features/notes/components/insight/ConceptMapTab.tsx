@@ -1,3 +1,4 @@
+import { useCopyToClipboard } from "@shared/hooks/useCopyToClipboard";
 import { ClipboardCopy } from "lucide-react";
 import { useCallback, useState } from "react";
 import type { TabStatus } from "../../hooks/useInsightReview";
@@ -47,7 +48,7 @@ function CopyButton({
     <button
       type="button"
       onClick={onCopy}
-      className="flex items-center gap-1.5 text-[10px] text-muted-foreground hover:text-foreground transition-colors"
+      className="flex items-center gap-1.5 text-2xs text-muted-foreground hover:text-foreground transition-colors"
     >
       <ClipboardCopy size={10} />
       {copied ? "Copied!" : "Copy Mermaid code"}
@@ -57,13 +58,11 @@ function CopyButton({
 
 export function ConceptMapTab({ status, mermaid: mermaidCode, fallbackText }: ConceptMapTabProps) {
   const [renderFailed, setRenderFailed] = useState(false);
-  const [copied, setCopied] = useState(false);
+  const { copied, copy } = useCopyToClipboard();
 
   const handleCopy = useCallback(async () => {
-    await navigator.clipboard.writeText(mermaidCode);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
-  }, [mermaidCode]);
+    await copy(mermaidCode);
+  }, [mermaidCode, copy]);
 
   const handleRenderError = useCallback(() => {
     setRenderFailed(true);

@@ -64,7 +64,7 @@ impl PromptBuilder {
         if scope_config.include_cognitive {
             let domain = domains.first().map(|s| s.as_str());
 
-            let (facts, memories, rules) = tokio::join!(
+            let (facts, memories, rules, atom_subjects) = tokio::join!(
                 self.cognitive.search_facts(&note.title, domain, 10),
                 self.cognitive.recent_memories(&note.id, 5),
                 async {
@@ -72,7 +72,8 @@ impl PromptBuilder {
                         Some(d) => self.cognitive.domain_rules(d).await,
                         None => Vec::new(),
                     }
-                }
+                },
+                self.cognitive.search_atoms(&note.id),
             );
 
             if !facts.is_empty() {
@@ -88,6 +89,15 @@ impl PromptBuilder {
 
             if !rules.is_empty() {
                 sections.push(format!("## Domain Insights\n\n{}", bullet_list(&rules)));
+            }
+
+            if !atom_subjects.is_empty() {
+                sections.push(format!(
+                    "## Already Learned\nThe user has accepted these concepts as known: {}.\n\
+                     Consider these as established knowledge — don't re-explain them in the synthesis.\n\
+                     Focus gap analysis on what's NOT yet covered.",
+                    atom_subjects.join(", ")
+                ));
             }
         }
 

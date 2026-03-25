@@ -16,7 +16,7 @@ export interface PeriodState {
   selectedDay: string | null;
 }
 
-function todayISO(): string {
+function _todayISO(): string {
   const d = new Date();
   return toISO(d);
 }

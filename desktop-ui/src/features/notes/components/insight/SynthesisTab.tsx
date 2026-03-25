@@ -50,7 +50,7 @@ export function SynthesisTab({ status, content }: SynthesisTabProps) {
 
   // streaming with content, or done
   return (
-    <div className="text-[12px] text-muted-foreground leading-relaxed">
+    <div className="text-xs text-muted-foreground leading-relaxed">
       <MarkdownContent content={content} />
       {status === "streaming" && (
         <span className="inline-block w-1.5 h-3.5 bg-purple animate-pulse ml-0.5 align-text-bottom rounded-sm" />

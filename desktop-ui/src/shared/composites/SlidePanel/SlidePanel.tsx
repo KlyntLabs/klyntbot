@@ -42,6 +42,8 @@ export function SlidePanel({
 
   return createPortal(
     <>
+      {/* biome-ignore lint/a11y/noStaticElementInteractions: backdrop overlay — click to dismiss, keyboard handled by Escape listener */}
+      {/* biome-ignore lint/a11y/useKeyWithClickEvents: keyboard dismiss handled globally via Escape key */}
       <div
         className={`fixed inset-0 z-40 bg-overlay transition-opacity duration-300 ${
           open ? "opacity-100" : "opacity-0 pointer-events-none"
@@ -62,9 +64,9 @@ export function SlidePanel({
               type="button"
               onClick={onClose}
               aria-label="Close panel"
-              className="w-7 h-7 rounded-md flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
+              className="size-7 rounded-md flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
             >
-              <X className="w-4 h-4" />
+              <X className="size-4" />
             </button>
           </div>
 

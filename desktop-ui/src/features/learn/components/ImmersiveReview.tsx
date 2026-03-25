@@ -1,4 +1,5 @@
-import { ArrowLeft, Edit3, ExternalLink, Lightbulb, Loader2 } from "lucide-react";
+import { ThinkingDots } from "@shared/ui/ThinkingDots";
+import { ArrowLeft, Edit3, ExternalLink, Lightbulb } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router";
 import { useReviewSession } from "../hooks/useReviewSession";
@@ -72,7 +73,7 @@ export function ImmersiveReview({ deck, onExit }: ImmersiveReviewProps) {
   if (loading) {
     return (
       <div className="flex-1 flex items-center justify-center">
-        <Loader2 size={24} className="text-muted-foreground animate-spin" strokeWidth={1.5} />
+        <ThinkingDots />
       </div>
     );
   }
@@ -119,14 +120,14 @@ export function ImmersiveReview({ deck, onExit }: ImmersiveReviewProps) {
           className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors"
         >
           <ArrowLeft size={16} strokeWidth={1.5} />
-          <span className="text-[12px]">ESC</span>
+          <span className="text-xs">ESC</span>
         </button>
 
-        <span className="text-[12px] text-muted-foreground tabular-nums">
+        <span className="text-xs text-muted-foreground tabular-nums">
           {currentIndex + 1} / {cards.length}
         </span>
 
-        <span className="text-[12px] text-muted-foreground truncate max-w-[120px]">
+        <span className="text-xs text-muted-foreground truncate max-w-[120px]">
           {current?.deck ?? deck ?? "All decks"}
         </span>
       </div>
@@ -152,7 +153,7 @@ export function ImmersiveReview({ deck, onExit }: ImmersiveReviewProps) {
               className="glass-button px-8 py-2.5 text-sm text-foreground"
             >
               Show Answer
-              <span className="text-[10px] text-muted-foreground ml-2">Space</span>
+              <span className="text-2xs text-muted-foreground ml-2">Space</span>
             </button>
           </div>
         ) : (

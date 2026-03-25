@@ -65,9 +65,21 @@ const SSE_AGENT_EVENTS = [
   "agent:debate_round_completed",
   "agent:debate_judge_decision",
   "agent:consensus_reached",
+  "agent:pipeline_started",
+  "agent:context_assembled",
   "agent:memory_promoted",
   "entity:updated",
 ] as const;
+
+interface PipelineStartedPayload {
+  sessionKey: string;
+}
+
+interface ContextAssembledPayload {
+  sessionKey: string;
+  totalTokens: number;
+  durationMs: number;
+}
 
 // ── Stream state ────────────────────────────────────────────────────────
 
@@ -87,6 +99,8 @@ export interface StreamSnapshot {
   consensusReached: boolean;
   consensusSummary: string | null;
   judgeDecisions: JudgeDecisionEntry[];
+  /** Dynamic status phase shown alongside the loading indicator (e.g. "Thinking", "Using tasks:search"). */
+  statusPhase: string | null;
   /** True when a stream finished while no component was subscribed to consume onDone. */
   needsRefetch: boolean;
 }
@@ -107,6 +121,7 @@ const DEFAULT_SNAPSHOT: StreamSnapshot = Object.freeze({
   consensusReached: false,
   consensusSummary: null,
   judgeDecisions: [],
+  statusPhase: null,
   needsRefetch: false,
 });
 
@@ -147,6 +162,7 @@ class ChatStreamStore {
     this.states.set(sessionKey, {
       ...DEFAULT_SNAPSHOT,
       isStreaming: true,
+      statusPhase: "Thinking",
       needsRefetch: false,
     });
     this.notify();
@@ -304,9 +320,11 @@ class ChatStreamStore {
     on<AgentDonePayload>("agent:done", (p) => this.onDone(p));
     on<AgentErrorPayload>("agent:error", (p) => this.onError(p));
     on<InteractionRequestPayload>("agent:interaction_request", (p) => this.onInteractionRequest(p));
+    on<PipelineStartedPayload>("agent:pipeline_started", (p) => this.onPipelineStarted(p));
     on<ClassificationCompletePayload>("agent:classification_complete", (p) =>
       this.onClassificationComplete(p),
     );
+    on<ContextAssembledPayload>("agent:context_assembled", (p) => this.onContextAssembled(p));
     on<ExecutionStartedPayload>("agent:execution_started", (p) => this.onExecutionStarted(p));
     on<IterationStartPayload>("agent:iteration_start", (p) => this.onIterationStart(p));
     on<UsageReportPayload>("agent:usage_report", (p) => this.onUsageReport(p));
@@ -349,8 +367,12 @@ class ChatStreamStore {
       register<InteractionRequestPayload>("agent:interaction_request", (p) =>
         this.onInteractionRequest(p),
       );
+      register<PipelineStartedPayload>("agent:pipeline_started", (p) => this.onPipelineStarted(p));
       register<ClassificationCompletePayload>("agent:classification_complete", (p) =>
         this.onClassificationComplete(p),
+      );
+      register<ContextAssembledPayload>("agent:context_assembled", (p) =>
+        this.onContextAssembled(p),
       );
       register<ExecutionStartedPayload>("agent:execution_started", (p) =>
         this.onExecutionStarted(p),
@@ -401,6 +423,11 @@ class ChatStreamStore {
     if (!this.isActive(payload.sessionKey)) return;
     const buf = (this.textBuffers.get(payload.sessionKey) || "") + payload.data;
     this.textBuffers.set(payload.sessionKey, buf);
+    // Set "Composing" on first content chunk (when no segments or tools yet)
+    const state = this.states.get(payload.sessionKey);
+    if (state && state.segments.length === 0 && state.activeTools.length === 0) {
+      this.updateState(payload.sessionKey, (s) => ({ ...s, statusPhase: "Composing" }));
+    }
     this.scheduleFlush(payload.sessionKey);
   }
 
@@ -408,9 +435,11 @@ class ChatStreamStore {
     if (!this.isActive(payload.sessionKey)) return;
     this.flushText(payload.sessionKey);
     this.textBuffers.set(payload.sessionKey, "");
+    const toolDisplay = qualifiedToolName(payload.name, payload.action);
     this.updateState(payload.sessionKey, (s) => ({
       ...s,
-      activeTools: [...s.activeTools, qualifiedToolName(payload.name, payload.action)],
+      statusPhase: `Using ${toolDisplay}`,
+      activeTools: [...s.activeTools, toolDisplay],
     }));
   }
 
@@ -469,6 +498,7 @@ class ChatStreamStore {
     this.updateState(payload.sessionKey, (s) => ({
       ...s,
       isStreaming: false,
+      statusPhase: null,
       activeInteraction: null,
       // If no component is listening, mark for deferred refetch
       needsRefetch: !hasCallbacks,
@@ -501,10 +531,19 @@ class ChatStreamStore {
     }));
   }
 
+  private onPipelineStarted(payload: PipelineStartedPayload): void {
+    if (!this.isActive(payload.sessionKey)) return;
+    this.updateState(payload.sessionKey, (s) => ({
+      ...s,
+      statusPhase: "Routing",
+    }));
+  }
+
   private onClassificationComplete(payload: ClassificationCompletePayload): void {
     if (!this.isActive(payload.sessionKey)) return;
     this.updateState(payload.sessionKey, (s) => ({
       ...s,
+      statusPhase: "Analyzing",
       transparency: {
         ...s.transparency,
         classification: {
@@ -516,10 +555,23 @@ class ChatStreamStore {
     }));
   }
 
+  private onContextAssembled(payload: ContextAssembledPayload): void {
+    if (!this.isActive(payload.sessionKey)) return;
+    this.updateState(payload.sessionKey, (s) => ({
+      ...s,
+      statusPhase: "Recalling",
+      transparency: {
+        ...s.transparency,
+        contextTokens: payload.totalTokens,
+      },
+    }));
+  }
+
   private onExecutionStarted(payload: ExecutionStartedPayload): void {
     if (!this.isActive(payload.sessionKey)) return;
     this.updateState(payload.sessionKey, (s) => ({
       ...s,
+      statusPhase: "Preparing",
       transparency: {
         ...s.transparency,
         execution: {
@@ -588,8 +640,10 @@ class ChatStreamStore {
 
   private onSkillLoaded(payload: SkillLoadedPayload): void {
     if (!this.isActive(payload.sessionKey)) return;
+    const skillLabel = payload.name.replace(/-management$/, "").replace(/-/g, " ");
     this.updateState(payload.sessionKey, (s) => ({
       ...s,
+      statusPhase: `Loading ${skillLabel}`,
       transparency: {
         ...s.transparency,
         skills: [
@@ -618,6 +672,7 @@ class ChatStreamStore {
     if (!this.isActive(payload.sessionKey)) return;
     this.updateState(payload.sessionKey, (s) => ({
       ...s,
+      statusPhase: `Consulting ${payload.name}`,
       transparency: {
         ...s.transparency,
         agentSelected: { name: payload.name, description: payload.description },

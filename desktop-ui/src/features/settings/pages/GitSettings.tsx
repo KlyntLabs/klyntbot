@@ -9,7 +9,7 @@ export function GitSettings() {
       </div>
 
       <div className="bg-card rounded-lg border border-border p-8 flex flex-col items-center text-center">
-        <GitBranch className="w-8 h-8 text-dim mb-3" strokeWidth={1.5} />
+        <GitBranch className="size-8 text-dim mb-3" strokeWidth={1.5} />
         <p className="text-[13px] text-muted-foreground">Git integration coming soon</p>
       </div>
     </div>

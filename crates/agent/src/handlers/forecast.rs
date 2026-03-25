@@ -47,9 +47,7 @@ impl LlmForecastHandler {
                 tags: r.tags,
                 energy_level: r.energy_level,
                 complexity_score: r.complexity_score,
-                // project_id not stored in estimation rows; similarity scoring
-                // will skip the project bonus (0.15 weight) for now.
-                project_id: None,
+                project_id: r.project_id,
                 estimated_minutes: r.estimated_minutes,
                 actual_minutes: r.actual_minutes,
                 completed_at: r.completed_at,

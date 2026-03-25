@@ -10,10 +10,23 @@ use std::sync::Arc;
 use std::time::Duration;
 use tracing::{debug, warn};
 
-use common::Result;
+use common::{KlyntbotError, Result};
 use tools_core::{PermissionLevel, RoutingContext, Tool};
 
 use super::sanitize;
+use crate::client::circuit_breaker::McpCircuitBreaker;
+
+/// Classify whether an MCP error is transient (worth retrying) or permanent.
+fn is_transient_mcp_error(err: &KlyntbotError) -> bool {
+    matches!(
+        err,
+        KlyntbotError::Timeout(_)
+            | KlyntbotError::Io(_)
+            | KlyntbotError::Bus(_)
+            | KlyntbotError::BusDisconnected
+            | KlyntbotError::Tool(common::ToolError::ExecutionFailed(_))
+    )
+}
 
 /// An MCP tool adapted to the klyntbot `Tool` trait.
 ///
@@ -34,6 +47,8 @@ pub struct McpTool {
     peer: Arc<rmcp::service::Peer<rmcp::service::RoleClient>>,
     /// Per-server tool call timeout
     tool_timeout: Duration,
+    /// Circuit breaker shared across all tools on the same server
+    circuit_breaker: Arc<McpCircuitBreaker>,
 }
 
 impl McpTool {
@@ -42,6 +57,7 @@ impl McpTool {
         tool_def: &rmcp::model::Tool,
         peer: Arc<rmcp::service::Peer<rmcp::service::RoleClient>>,
         tool_timeout: Duration,
+        circuit_breaker: Arc<McpCircuitBreaker>,
     ) -> Self {
         let original_name = tool_def.name.to_string();
         let namespaced_name = sanitize::build_tool_name(server_name, &original_name);
@@ -61,12 +77,82 @@ impl McpTool {
             server_name: server_name.to_string(),
             peer,
             tool_timeout,
+            circuit_breaker,
         }
     }
 
     /// Get the server name this tool belongs to.
     pub fn server_name(&self) -> &str {
         &self.server_name
+    }
+
+    /// Execute a single MCP tool call (no retry logic).
+    async fn execute_once(&self, args: &Value) -> Result<String> {
+        debug!(
+            server = %self.server_name,
+            tool = %self.original_name,
+            args = %args,
+            "Calling MCP tool"
+        );
+
+        let start = std::time::Instant::now();
+        let result = self
+            .peer
+            .call_tool(rmcp::model::CallToolRequestParams {
+                name: self.original_name.clone().into(),
+                arguments: args.as_object().cloned(),
+                meta: None,
+                task: None,
+            })
+            .await
+            .map_err(|e| {
+                let elapsed = start.elapsed();
+                warn!(
+                    server = %self.server_name,
+                    tool = %self.original_name,
+                    elapsed_ms = elapsed.as_millis() as u64,
+                    error = %e,
+                    "MCP tool call failed"
+                );
+                KlyntbotError::Tool(common::ToolError::ExecutionFailed(format!(
+                    "MCP tool call failed (server={}, tool={}): {e}",
+                    self.server_name, self.original_name
+                )))
+            })?;
+
+        debug!(
+            server = %self.server_name,
+            tool = %self.original_name,
+            elapsed_ms = start.elapsed().as_millis() as u64,
+            content_parts = result.content.len(),
+            is_error = result.is_error.unwrap_or(false),
+            "MCP tool call completed"
+        );
+
+        // Extract text content in a single pass
+        let text_parts: Vec<&str> = result
+            .content
+            .iter()
+            .filter_map(|c| c.as_text().map(|t| t.text.as_ref()))
+            .collect();
+
+        // Check if the server reported an error
+        if result.is_error.unwrap_or(false) {
+            return Err(KlyntbotError::Tool(common::ToolError::ExecutionFailed(
+                format!(
+                    "MCP server error ({}): {}",
+                    self.original_name,
+                    text_parts.join("\n")
+                ),
+            )));
+        }
+
+        if text_parts.is_empty() {
+            // If no text content, serialize the entire result as JSON
+            Ok(serde_json::to_string(&result.content).unwrap_or_else(|_| "OK".to_string()))
+        } else {
+            Ok(text_parts.join("\n"))
+        }
     }
 }
 
@@ -102,77 +188,63 @@ impl Tool for McpTool {
         Some(self.tool_timeout)
     }
 
-    async fn execute(&self, args: Value, _ctx: &RoutingContext) -> Result<String> {
-        debug!(
-            server = %self.server_name,
-            tool = %self.original_name,
-            args = %args,
-            "Calling MCP tool"
-        );
-
-        let start = std::time::Instant::now();
-        let result = self
-            .peer
-            .call_tool(rmcp::model::CallToolRequestParams {
-                name: self.original_name.clone().into(),
-                arguments: args.as_object().cloned(),
-                meta: None,
-                task: None,
-            })
-            .await
-            .map_err(|e| {
-                let elapsed = start.elapsed();
-                warn!(
-                    server = %self.server_name,
-                    tool = %self.original_name,
-                    elapsed_ms = elapsed.as_millis() as u64,
-                    error = %e,
-                    "MCP tool call failed"
-                );
-                common::KlyntbotError::Tool(common::ToolError::ExecutionFailed(format!(
-                    "MCP tool call failed (server={}, tool={}): {e}",
-                    self.server_name, self.original_name
-                )))
-            })?;
-
-        debug!(
-            server = %self.server_name,
-            tool = %self.original_name,
-            elapsed_ms = start.elapsed().as_millis() as u64,
-            content_parts = result.content.len(),
-            is_error = result.is_error.unwrap_or(false),
-            "MCP tool call completed"
-        );
-
-        // Extract text content in a single pass
-        let text_parts: Vec<&str> = result
-            .content
-            .iter()
-            .filter_map(|c| c.as_text().map(|t| t.text.as_ref()))
-            .collect();
-
-        // Check if the server reported an error
-        if result.is_error.unwrap_or(false) {
-            return Err(common::KlyntbotError::Tool(
-                common::ToolError::ExecutionFailed(format!(
-                    "MCP server error ({}): {}",
-                    self.original_name,
-                    text_parts.join("\n")
-                )),
-            ));
+    async fn execute(&self, arguments: Value, _ctx: &RoutingContext) -> Result<String> {
+        if self.circuit_breaker.is_open(&self.server_name) {
+            return Err(KlyntbotError::Tool(common::ToolError::ExecutionFailed(
+                format!(
+                    "MCP server '{}' circuit breaker is open — server appears unavailable",
+                    self.server_name
+                ),
+            )));
         }
 
-        if text_parts.is_empty() {
-            // If no text content, serialize the entire result as JSON
-            Ok(serde_json::to_string(&result.content).unwrap_or_else(|_| "OK".to_string()))
-        } else {
-            Ok(text_parts.join("\n"))
+        let delays = [
+            Duration::from_millis(500),
+            Duration::from_secs(1),
+            Duration::from_secs(2),
+        ];
+        let mut last_err = None;
+
+        for (attempt, delay) in delays.iter().enumerate() {
+            match self.execute_once(&arguments).await {
+                Ok(result) => {
+                    self.circuit_breaker.record_success(&self.server_name);
+                    return Ok(result);
+                }
+                Err(e) if is_transient_mcp_error(&e) => {
+                    warn!(
+                        "MCP tool '{}' on '{}' attempt {}/3 failed: {}",
+                        self.namespaced_name,
+                        self.server_name,
+                        attempt + 1,
+                        e
+                    );
+                    let just_opened = self.circuit_breaker.record_failure(&self.server_name);
+                    if just_opened {
+                        warn!(
+                            "Circuit breaker opened for MCP server '{}'",
+                            self.server_name
+                        );
+                        return Err(e);
+                    }
+                    last_err = Some(e);
+                    if attempt < delays.len() - 1 {
+                        tokio::time::sleep(*delay).await;
+                    }
+                }
+                Err(e) => return Err(e),
+            }
         }
+
+        // Last failure was already recorded inside the loop — don't double-count
+        Err(last_err.unwrap())
     }
 }
 
 #[cfg(test)]
 mod tests {
+    use super::*;
+
     #[test]
     fn test_mcp_tool_naming_convention() {
         // Verify the naming format produces "mcp_{server}_{tool}"
@@ -182,5 +254,32 @@ mod tests {
         // Verify underscores separate the three parts
         let parts: Vec<&str> = name.splitn(3, '_').collect();
         assert_eq!(parts, vec!["mcp", "linear", "list_issues"]);
+    }
+
+    #[test]
+    fn test_is_transient_mcp_error_timeout() {
+        let err = KlyntbotError::Timeout("test".into());
+        assert!(is_transient_mcp_error(&err));
+    }
+
+    #[test]
+    fn test_is_transient_mcp_error_io() {
+        let err = KlyntbotError::Io(std::io::Error::new(
+            std::io::ErrorKind::ConnectionReset,
+            "reset",
+        ));
+        assert!(is_transient_mcp_error(&err));
+    }
+
+    #[test]
+    fn test_is_transient_mcp_error_tool_not_found() {
+        let err = KlyntbotError::Tool(common::ToolError::NotFound("test".into()));
+        assert!(!is_transient_mcp_error(&err));
+    }
+
+    #[test]
+    fn test_is_transient_mcp_error_invalid_params() {
+        let err = KlyntbotError::Tool(common::ToolError::InvalidParams("test".into()));
+        assert!(!is_transient_mcp_error(&err));
     }
 }

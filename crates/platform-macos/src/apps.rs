@@ -63,7 +63,9 @@ pub struct AppIconCache {
 impl AppIconCache {
     /// Create a new icon cache at the given directory. Creates the directory if needed.
     pub fn new(cache_dir: PathBuf) -> Self {
-        let _ = std::fs::create_dir_all(&cache_dir);
+        if let Err(e) = std::fs::create_dir_all(&cache_dir) {
+            tracing::warn!("Failed to create icon cache dir {:?}: {}", cache_dir, e);
+        }
         Self { cache_dir }
     }
 
@@ -132,6 +134,9 @@ impl AppIconCache {
     ///
     /// Reads `Contents/Info.plist` for `CFBundleIconFile`, locates the `.icns`,
     /// and converts to a 32px PNG via `sips`.
+    ///
+    /// **Blocking:** Uses `std::process::Command` for PlistBuddy and sips.
+    /// Callers in async contexts must use `tokio::task::spawn_blocking`.
     #[cfg(target_os = "macos")]
     fn extract_icon(app_path: &Path, tmp_dir: &Path) -> Option<String> {
         use std::process::Command;

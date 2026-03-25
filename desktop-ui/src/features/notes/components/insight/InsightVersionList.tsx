@@ -49,7 +49,7 @@ export function InsightVersionList({ versions, selectedId, currentId, onSelect }
                   />
                 )}
               </div>
-              <div className="flex items-center gap-1 text-[10px] text-dim">
+              <div className="flex items-center gap-1 text-2xs text-dim">
                 <Clock size={9} />
                 <span>
                   {dateStr} {timeStr}

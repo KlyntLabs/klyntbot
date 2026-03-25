@@ -10,7 +10,7 @@ use tempfile::TempDir;
 
 use super::VectorStore;
 use crate::vector_store::cognitive::CognitiveFactParams;
-use crate::vector_store::crud::sanitize_predicate_value;
+use crate::vector_store::crud::{sanitize_predicate_value, validate_predicate};
 
 async fn test_store() -> (VectorStore, TempDir) {
     let dir = TempDir::new().unwrap();
@@ -46,6 +46,33 @@ fn test_sanitize_predicate_value_allows_clean_values() {
     assert!(sanitize_predicate_value("2024-01-01T00:00:00Z").is_ok());
     assert!(sanitize_predicate_value("session-key-123").is_ok());
     assert!(sanitize_predicate_value("identity").is_ok());
+}
+
+// ── validate_predicate ──────────────────────────────────────────
+
+#[test]
+fn test_validate_predicate_allows_properly_escaped() {
+    // Properly escaped quotes from sanitize_predicate_value
+    assert!(validate_predicate("session_key = 'sess-123'").is_ok());
+    assert!(validate_predicate("created_at < '2024-01-01T00:00:00Z'").is_ok());
+    assert!(validate_predicate("name = 'it''s escaped'").is_ok());
+    assert!(validate_predicate("id IS NOT NULL").is_ok());
+}
+
+#[test]
+fn test_validate_predicate_rejects_semicolons() {
+    assert!(validate_predicate("id = '1'; DROP TABLE conv_embeddings").is_err());
+}
+
+#[test]
+fn test_validate_predicate_rejects_comments() {
+    assert!(validate_predicate("id = '1' -- always true").is_err());
+    assert!(validate_predicate("id = '1' /* comment */").is_err());
+}
+
+#[test]
+fn test_validate_predicate_rejects_newlines() {
+    assert!(validate_predicate("id = '1'\nOR 1=1").is_err());
 }
 
 #[tokio::test]

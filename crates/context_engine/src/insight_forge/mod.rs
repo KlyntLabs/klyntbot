@@ -1,3 +1,4 @@
+pub mod audit;
 pub mod bookrag_searcher;
 pub mod circuit_breaker;
 pub mod decomposer;
@@ -107,16 +108,34 @@ impl InsightForge {
 
     /// Retrieve context entries via multi-dimensional search.
     ///
-    /// 1. Checks the circuit breaker — falls back to plain memory retrieval if open.
-    /// 2. Decomposes the query with a timeout — falls back on timeout.
-    /// 3. For each sub-query, searches all sources in parallel (each with a per-source timeout).
-    /// 4. Merges results via RRF, deduplicates, re-normalises scores to 0.0–1.0.
+    /// Delegates to [`retrieve_with_enrichment`](Self::retrieve_with_enrichment)
+    /// without any enriched query.
     pub async fn retrieve(
         &self,
         query: &str,
         total_limit: usize,
         session_key: Option<&str>,
     ) -> Vec<MemoryEntry> {
+        self.retrieve_with_enrichment(query, None, total_limit, session_key)
+            .await
+    }
+
+    /// Retrieve context entries via multi-dimensional search, optionally
+    /// injecting an enriched query from the query rewriter.
+    ///
+    /// 1. Checks the circuit breaker — falls back to plain memory retrieval if open.
+    /// 2. Decomposes the query with a timeout — falls back on timeout.
+    /// 3. If an enriched query is provided, inserts it into the sub-query list.
+    /// 4. For each sub-query, searches all sources in parallel (each with a per-source timeout).
+    /// 5. Merges results via RRF, deduplicates, re-normalises scores to 0.0–1.0.
+    pub async fn retrieve_with_enrichment(
+        &self,
+        query: &str,
+        enriched: Option<&crate::rewriter::RewriteResult>,
+        total_limit: usize,
+        session_key: Option<&str>,
+    ) -> Vec<MemoryEntry> {
+        let start = std::time::Instant::now();
         let limit = total_limit.min(self.config.total_limit);
 
         // 1. Circuit breaker check.
@@ -128,7 +147,7 @@ impl InsightForge {
         }
 
         // 2. Decompose with timeout.
-        let sub_queries = {
+        let mut sub_queries = {
             let decompose_fut = self.decomposer.decompose(query, None);
             let timeout = tokio::time::timeout(
                 std::time::Duration::from_millis(self.config.decomposer_timeout_ms),
@@ -150,7 +169,18 @@ impl InsightForge {
             }
         };
 
+        // 2b. Inject enriched query from the rewriter (if available).
+        if let Some(result) = enriched {
+            sub_queries.insert(1.min(sub_queries.len()), result.enriched_query.clone());
+        }
+
         // 3. Fan-out: for each sub-query, search all sources in parallel.
+        tracing::debug!(
+            sub_query_count = sub_queries.len(),
+            sub_queries = ?sub_queries,
+            has_enrichment = enriched.is_some(),
+            "📡 InsightForge: fan-out sub-queries"
+        );
         let per_source_limit = self.config.per_source_limit;
         let per_source_timeout =
             std::time::Duration::from_millis(self.config.per_source_timeout_ms);
@@ -195,11 +225,26 @@ impl InsightForge {
                 }
             }
 
+            tracing::debug!(
+                sub_query = sub_query.as_str(),
+                result_count = sub_query_results.len(),
+                sources = ?sub_query_results.iter().map(|e| format!("{}:{:.2}", match &e.source {
+                    crate::MemorySource::CognitiveFact => "fact".to_string(),
+                    crate::MemorySource::ConversationRecall => "recall".to_string(),
+                    crate::MemorySource::Domain { name } => name.clone(),
+                }, e.score)).collect::<Vec<_>>(),
+                "📊 InsightForge: sub-query results"
+            );
             all_ranked_lists.push(sub_query_results);
         }
 
         // 4. RRF merge across sub-queries.
         let merged = self.rrf_merge(&all_ranked_lists, limit);
+        tracing::debug!(
+            merged_count = merged.len(),
+            top_entries = ?merged.iter().take(5).map(|e| format!("[{:?}] {}", e.source, &e.content[..e.content.len().min(60)])).collect::<Vec<_>>(),
+            "📋 InsightForge: merged results (top 5)"
+        );
 
         // Budget allocation: ensure no single source provides more than 60% of results.
         let max_per_source = (limit as f64 * 0.6).ceil() as usize;
@@ -226,6 +271,23 @@ impl InsightForge {
         let remaining = limit.saturating_sub(budgeted.len());
         budgeted.extend(overflow.into_iter().take(remaining));
         budgeted.truncate(limit);
+
+        // Audit trail logging (guarded to avoid allocations when debug is off)
+        if tracing::enabled!(tracing::Level::DEBUG) {
+            let elapsed_ms = start.elapsed().as_millis() as u64;
+            let source_names: Vec<String> = source_counts.keys().cloned().collect();
+            let audit = audit::RetrievalAuditEntry {
+                query: query.to_string(),
+                enriched_query: enriched.map(|r| r.enriched_query.clone()),
+                sub_queries,
+                sources_queried: source_names,
+                results_per_source: source_counts,
+                final_results: budgeted.len(),
+                circuit_breaker_fallback: false,
+                total_latency_ms: elapsed_ms,
+            };
+            tracing::debug!(?audit, "Retrieval audit trail");
+        }
 
         budgeted
     }

@@ -35,7 +35,19 @@ impl AppCore {
 
         let interceptor = self.distraction_interceptor()?;
         let mut guard = interceptor.lock().await;
+
+        // Whitelist the specific title key (exact match)
         guard.whitelist_for_session(&key);
+
+        // Also whitelist the page content portion (before the site suffix).
+        // e.g. "Rust Tutorial - YouTube" → whitelist "rust tutorial"
+        // This survives minor title changes while keeping it content-specific
+        // (other YouTube videos won't be whitelisted).
+        if let Some(ref title) = window_title {
+            if let Some(page_title) = extract_page_title(title) {
+                guard.whitelist_for_session(&page_title);
+            }
+        }
         drop(guard);
 
         let repos = self.productivity_repos()?;
@@ -71,4 +83,44 @@ impl AppCore {
         repos.learned_rules.delete(id).await.map_err(map_prod_err)?;
         Ok(())
     }
+}
+
+/// Extract the page content title from a browser window title.
+/// Browser titles are typically "Page Title - SiteName - BrowserName".
+/// Strips the browser suffix first, then takes content before the site name.
+/// e.g. "Rust Tutorial - YouTube - Google Chrome" → "rust tutorial"
+fn extract_page_title(title: &str) -> Option<String> {
+    const BROWSER_SUFFIXES: &[&str] = &[
+        "Google Chrome",
+        "Mozilla Firefox",
+        "Safari",
+        "Arc",
+        "Microsoft Edge",
+        "Brave Browser",
+        "Opera",
+        "Vivaldi",
+    ];
+
+    // Strip browser suffix if present
+    let mut cleaned = title;
+    for suffix in BROWSER_SUFFIXES {
+        for sep in [" - ", " \u{2014} "] {
+            let tail = format!("{sep}{suffix}");
+            if let Some(stripped) = cleaned.strip_suffix(&tail) {
+                cleaned = stripped.trim();
+                break;
+            }
+        }
+    }
+
+    // Now split on the last separator to get page title (before site name)
+    for sep in [" - ", " | ", " \u{2014} "] {
+        if let Some(idx) = cleaned.rfind(sep) {
+            let page = cleaned[..idx].trim().to_lowercase();
+            if page.len() >= 3 {
+                return Some(page);
+            }
+        }
+    }
+    None
 }

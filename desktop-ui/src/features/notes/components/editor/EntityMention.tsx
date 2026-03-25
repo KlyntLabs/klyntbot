@@ -360,7 +360,7 @@ export function EntityMentionMenu({ editor }: EntityMentionMenuProps) {
             }`}
           />
           <span className="truncate">{item.title}</span>
-          <span className="text-[10px] text-dim ml-auto shrink-0">{item.entityType}</span>
+          <span className="text-2xs text-dim ml-auto shrink-0">{item.entityType}</span>
         </button>
       ))}
     </div>,

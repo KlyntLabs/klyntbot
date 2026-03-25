@@ -32,13 +32,13 @@ export function CurrencyToggle({ mode, currencies, onSelect }: CurrencyTogglePro
         className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[11px] font-light transition-all duration-200 border border-border hover:bg-accent"
       >
         {mode === "multi" ? (
-          <ArrowLeftRight className="w-3 h-3 text-muted-foreground" strokeWidth={1.5} />
+          <ArrowLeftRight className="size-3 text-muted-foreground" strokeWidth={1.5} />
         ) : null}
         <span className={mode === "multi" ? "text-muted-foreground" : "text-brand font-medium"}>
           {label}
         </span>
         <ChevronDown
-          className={`w-3 h-3 text-muted-foreground transition-transform ${open ? "rotate-180" : ""}`}
+          className={`size-3 text-muted-foreground transition-transform ${open ? "rotate-180" : ""}`}
           strokeWidth={1.5}
         />
       </button>
@@ -47,7 +47,7 @@ export function CurrencyToggle({ mode, currencies, onSelect }: CurrencyTogglePro
         <div className="absolute right-0 top-full mt-1 z-50 min-w-[120px] py-1 rounded-lg glass-panel border border-border shadow-xl">
           <DropItem
             label="Multi"
-            icon={<ArrowLeftRight className="w-3 h-3" strokeWidth={1.5} />}
+            icon={<ArrowLeftRight className="size-3" strokeWidth={1.5} />}
             active={mode === "multi"}
             onClick={() => {
               onSelect("multi");
@@ -92,7 +92,7 @@ function DropItem({
       }`}
     >
       <span className="w-3 flex-shrink-0">
-        {active ? <Check className="w-3 h-3" strokeWidth={2} /> : (icon ?? null)}
+        {active ? <Check className="size-3" strokeWidth={2} /> : (icon ?? null)}
       </span>
       <span className={active ? "font-medium" : "font-light"}>{label}</span>
     </button>

@@ -88,13 +88,13 @@ impl AppCore {
             };
 
             match EntityKind::parse(other_kind) {
-                Some(EntityKind::Task) => match self.repos.actions.get(other_id).await {
-                    Ok(Some(action)) => {
+                Some(EntityKind::Task) => match self.repos.tasks.get(other_id).await {
+                    Ok(Some(task)) => {
                         tasks.push(ActionSummaryResponse {
-                            id: action.id,
-                            title: action.title,
-                            status: action.status,
-                            priority: priority_label(action.priority),
+                            id: task.id,
+                            title: task.title,
+                            status: task.status,
+                            priority: priority_label(task.priority),
                         });
                     }
                     Err(e) => {

@@ -8,7 +8,7 @@ function getCssVar(name: string): string {
 /** Resolve a CSS variable to a computed hex/rgb color that Cytoscape can understand.
  *  CSS vars may use oklch() or other color spaces that Cytoscape doesn't support.
  *  We create a temporary element, apply the color, and read the computed value. */
-function resolveColor(varName: string, fallback: string): string {
+function _resolveColor(varName: string, fallback: string): string {
   const raw = getCssVar(varName);
   if (!raw) return fallback;
   // If already hex or rgb, return directly
@@ -22,7 +22,7 @@ function resolveColor(varName: string, fallback: string): string {
   return resolved || fallback;
 }
 
-function isLightTheme(): boolean {
+function _isLightTheme(): boolean {
   const bg = getCssVar("--background");
   return bg.startsWith("#f") || bg.startsWith("#e") || bg === "#ffffff";
 }
@@ -47,7 +47,7 @@ export function useCytoscapeTheme(): { stylesheet: Stylesheet[]; isLight: boolea
     const light = themeKey === "retro";
     const textPrimary = light ? "#000000" : "#f0f2f5";
     const textSecondary = light ? "#525252" : "#c8cdd4";
-    const border = light ? "#d4d4d4" : "rgba(255,255,255,0.1)";
+    const _border = light ? "#d4d4d4" : "rgba(255,255,255,0.1)";
     const edgeColor = light ? "#d4d4d4" : "rgba(255,255,255,0.15)";
     const brand = light ? "#ca8a04" : "#f97316";
 

@@ -142,10 +142,10 @@ impl AreaRepo {
         Ok(row.0)
     }
 
-    /// Count actions in an area.
+    /// Count tasks (non-template) in an area.
     pub async fn count_actions(&self, area_id: &str) -> Result<i64, StorageError> {
         let row: (i64,) = sqlx::query_as(
-            "SELECT COUNT(*) FROM actions WHERE area_id = ?1 AND is_template = FALSE",
+            "SELECT COUNT(*) FROM tasks WHERE area_id = ?1 AND is_template = FALSE",
         )
         .bind(area_id)
         .fetch_one(&self.pool)
@@ -160,6 +160,21 @@ mod tests {
 
     async fn setup() -> (AreaRepo, crate::StoragePool) {
         let pool = crate::StoragePool::connect_in_memory().await.unwrap();
+        // The tasks table lives in the feature-tasks migration, not core migrations.
+        // We need a minimal stub so the FK cascade chain (areas → projects →
+        // custom_columns → custom_column_values → tasks) can be resolved.
+        sqlx::query(
+            "CREATE TABLE IF NOT EXISTS tasks (
+                id TEXT PRIMARY KEY,
+                title TEXT NOT NULL,
+                area_id TEXT NOT NULL,
+                status TEXT NOT NULL DEFAULT 'todo',
+                position INTEGER NOT NULL DEFAULT 0
+            )",
+        )
+        .execute(pool.inner())
+        .await
+        .unwrap();
         let repo = AreaRepo::new(pool.inner().clone());
         (repo, pool)
     }

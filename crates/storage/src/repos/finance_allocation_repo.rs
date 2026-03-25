@@ -17,8 +17,10 @@ impl FinanceAllocationRepo {
         Self { pool }
     }
 
-    /// Upsert an allocation target (INSERT OR REPLACE on the UNIQUE(portfolio_id, asset_class) constraint).
-    /// Returns the inserted/replaced row.
+    /// Upsert an allocation target on the UNIQUE(portfolio_id, asset_class) constraint.
+    ///
+    /// Uses ON CONFLICT DO UPDATE instead of INSERT OR REPLACE to preserve
+    /// the existing row's `id` (and any FK references to it) on conflict.
     pub async fn add(
         &self,
         portfolio_id: &str,
@@ -29,9 +31,13 @@ impl FinanceAllocationRepo {
         let id = Uuid::new_v4().to_string();
         let row = sqlx::query_as::<_, FinanceAllocationTargetRow>(
             r#"
-            INSERT OR REPLACE INTO finance_allocation_targets
+            INSERT INTO finance_allocation_targets
                 (id, portfolio_id, asset_class, target_weight, tolerance_band, created_at, updated_at)
-            VALUES (?, ?, ?, ?, ?, strftime('%Y-%m-%dT%H:%M:%SZ', 'now'), strftime('%Y-%m-%dT%H:%M:%SZ', 'now'))
+            VALUES (?1, ?2, ?3, ?4, ?5, strftime('%Y-%m-%dT%H:%M:%SZ', 'now'), strftime('%Y-%m-%dT%H:%M:%SZ', 'now'))
+            ON CONFLICT(portfolio_id, asset_class) DO UPDATE SET
+                target_weight = excluded.target_weight,
+                tolerance_band = excluded.tolerance_band,
+                updated_at = strftime('%Y-%m-%dT%H:%M:%SZ', 'now')
             RETURNING *
             "#,
         )
@@ -90,5 +96,53 @@ impl FinanceAllocationRepo {
             .execute(&self.pool)
             .await?;
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::StoragePool;
+
+    async fn setup() -> FinanceAllocationRepo {
+        let pool = StoragePool::connect_in_memory().await.unwrap();
+        FinanceAllocationRepo::new(pool.inner().clone())
+    }
+
+    /// Insert a portfolio so FK constraints are satisfied.
+    async fn insert_portfolio(pool: &SqlitePool, id: &str) {
+        sqlx::query(
+            "INSERT INTO finance_portfolios (id, name, currency) VALUES (?1, 'Test', 'USD')",
+        )
+        .bind(id)
+        .execute(pool)
+        .await
+        .unwrap();
+    }
+
+    #[tokio::test]
+    async fn test_upsert_preserves_id_on_conflict() {
+        let repo = setup().await;
+        insert_portfolio(&repo.pool, "port-1").await;
+
+        // Insert initial allocation
+        let first = repo.add("port-1", "equity", "0.60", "0.05").await.unwrap();
+        let original_id = first.id.clone();
+        assert_eq!(first.target_weight, "0.60");
+
+        // Upsert same (portfolio_id, asset_class) with new weight
+        let second = repo.add("port-1", "equity", "0.70", "0.10").await.unwrap();
+
+        // ID must be preserved (not a new UUID)
+        assert_eq!(
+            second.id, original_id,
+            "upsert must preserve existing row id"
+        );
+        assert_eq!(second.target_weight, "0.70");
+        assert_eq!(second.tolerance_band, "0.10");
+
+        // Only one row should exist
+        let all = repo.list_by_portfolio("port-1").await.unwrap();
+        assert_eq!(all.len(), 1);
     }
 }

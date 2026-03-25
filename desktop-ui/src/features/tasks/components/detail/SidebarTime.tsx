@@ -1,7 +1,7 @@
 import { formatHumanDuration } from "@shared/lib/dates";
+import { cn } from "@shared/lib/utils";
 import type { TaskForecast } from "../../hooks/useIssueDetail";
 import type { DetailTask, TaskState } from "../../lib/mappers";
-import { cn } from "../../lib/utils";
 import { SectionLabel } from "./SectionLabel";
 
 interface SidebarTimeProps {

@@ -75,6 +75,12 @@ impl AppCore {
 
         *cfg = updated;
 
+        // Propagate hot-reloadable changes to the live pipeline
+        {
+            let mut hot = self.hot_config.write().await;
+            *hot = config::HotConfig::from(&*cfg);
+        }
+
         Ok(section_result)
     }
 

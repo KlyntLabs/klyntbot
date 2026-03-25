@@ -516,7 +516,8 @@ mod tests {
                 execution_state TEXT NOT NULL DEFAULT 'idle',
                 spawned_execution_id TEXT, context_snapshot TEXT,
                 energy_level TEXT DEFAULT 'medium',
-                estimated_focus_blocks INTEGER, complexity_score INTEGER
+                estimated_focus_blocks INTEGER, complexity_score INTEGER,
+                scheduled_start TEXT, scheduled_end TEXT
             )"#,
             r#"CREATE TABLE IF NOT EXISTS task_activity (
                 id TEXT PRIMARY KEY, task_id TEXT NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,

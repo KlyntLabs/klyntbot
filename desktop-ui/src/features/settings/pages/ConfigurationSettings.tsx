@@ -1,6 +1,7 @@
 import { SettingsCard } from "@shared/composites";
 import { ipc } from "@shared/hooks/useIpc";
 import { useQuery } from "@shared/hooks/useQuery";
+import { useToastContext } from "@shared/hooks/useToast";
 import { SaveButton, SecretInput, Toggle } from "@shared/ui";
 import { ChevronDown, ChevronRight } from "lucide-react";
 import { useState } from "react";
@@ -74,6 +75,7 @@ interface GatewayData {
 // ── Component ────────────────────────────────────────────────────────
 
 export function ConfigurationSettings() {
+  const toast = useToastContext();
   const { data: channels, refetch: refetchChannels } = useQuery<ChannelsData>(
     "config_get_section",
     { section: "channels" },
@@ -130,8 +132,8 @@ export function ConfigurationSettings() {
         delete next[channelKey];
         return next;
       });
-    } catch (e) {
-      console.error("Failed to save channel config:", e);
+    } catch {
+      toast.show("Failed to save channel config");
     } finally {
       setSaving(null);
     }
@@ -168,8 +170,8 @@ export function ConfigurationSettings() {
       await ipc("config_update_section", { section: "tools", patch });
       refetchTools();
       setToolEdits({});
-    } catch (e) {
-      console.error("Failed to save tools config:", e);
+    } catch {
+      toast.show("Failed to save tools config");
     } finally {
       setSaving(null);
     }
@@ -184,8 +186,8 @@ export function ConfigurationSettings() {
       await ipc("config_update_section", { section: "gateway", patch: gatewayEdits });
       refetchGateway();
       setGatewayEdits({});
-    } catch (e) {
-      console.error("Failed to save gateway config:", e);
+    } catch {
+      toast.show("Failed to save gateway config");
     } finally {
       setSaving(null);
     }
@@ -221,9 +223,9 @@ export function ConfigurationSettings() {
                       className="text-muted-foreground hover:text-foreground transition-colors"
                     >
                       {isExpanded ? (
-                        <ChevronDown className="w-3.5 h-3.5" />
+                        <ChevronDown className="size-3.5" />
                       ) : (
-                        <ChevronRight className="w-3.5 h-3.5" />
+                        <ChevronRight className="size-3.5" />
                       )}
                     </button>
                     <span className="flex-1 text-[13px] font-medium text-muted-foreground">
@@ -254,7 +256,7 @@ export function ConfigurationSettings() {
                               value={String(getChannelValue(ch.key, field.key) || "")}
                               onChange={(e) => setChannelEdit(ch.key, field.key, e.target.value)}
                               placeholder={field.placeholder}
-                              className="w-full px-3 py-1.5 text-[12px] text-foreground bg-accent border border-border rounded-md focus:outline-none focus:border-brand/50 transition-colors placeholder:text-dim"
+                              className="w-full px-3 py-1.5 text-xs text-foreground bg-accent border border-border rounded-md focus:outline-none focus:border-brand/50 transition-colors placeholder:text-dim"
                             />
                           )}
                         </div>
@@ -280,7 +282,7 @@ export function ConfigurationSettings() {
           <div className="space-y-3">
             <div className="flex items-center justify-between">
               <div>
-                <span className="text-[12px] text-muted-foreground">Restrict to workspace</span>
+                <span className="text-xs text-muted-foreground">Restrict to workspace</span>
                 <p className="text-[11px] text-dim">
                   Limit file operations to the workspace directory
                 </p>
@@ -293,7 +295,7 @@ export function ConfigurationSettings() {
 
             <div className="flex items-center justify-between">
               <div>
-                <span className="text-[12px] text-muted-foreground">Browser automation</span>
+                <span className="text-xs text-muted-foreground">Browser automation</span>
                 <p className="text-[11px] text-dim">Enable the browser tool for web automation</p>
               </div>
               <Toggle
@@ -311,7 +313,7 @@ export function ConfigurationSettings() {
                 onChange={(e) =>
                   setToolEdits((prev) => ({ ...prev, "browser.trustLevel": e.target.value }))
                 }
-                className="w-full px-3 py-1.5 text-[12px] text-foreground bg-accent border border-border rounded-md focus:outline-none focus:border-brand/50 transition-colors"
+                className="w-full px-3 py-1.5 text-xs text-foreground bg-accent border border-border rounded-md focus:outline-none focus:border-brand/50 transition-colors"
               >
                 <option value="strict" className="bg-popover">
                   Strict — confirm every write
@@ -352,7 +354,7 @@ export function ConfigurationSettings() {
                     "host" in gatewayEdits ? gatewayEdits.host : (gateway.host ?? "127.0.0.1"),
                   )}
                   onChange={(e) => setGatewayEdits((prev) => ({ ...prev, host: e.target.value }))}
-                  className="w-full px-3 py-1.5 text-[12px] text-foreground bg-accent border border-border rounded-md focus:outline-none focus:border-brand/50 transition-colors placeholder:text-dim"
+                  className="w-full px-3 py-1.5 text-xs text-foreground bg-accent border border-border rounded-md focus:outline-none focus:border-brand/50 transition-colors placeholder:text-dim"
                 />
               </label>
               <label className="w-28">
@@ -368,7 +370,7 @@ export function ConfigurationSettings() {
                       port: Number.parseInt(e.target.value, 10) || 0,
                     }))
                   }
-                  className="w-full px-3 py-1.5 text-[12px] text-foreground bg-accent border border-border rounded-md focus:outline-none focus:border-brand/50 transition-colors"
+                  className="w-full px-3 py-1.5 text-xs text-foreground bg-accent border border-border rounded-md focus:outline-none focus:border-brand/50 transition-colors"
                 />
               </label>
             </div>

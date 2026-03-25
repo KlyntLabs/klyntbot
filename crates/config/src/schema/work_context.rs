@@ -66,11 +66,11 @@ fn default_max_active_contexts() -> usize {
     50
 }
 fn default_semantic_weight() -> f64 {
-    0.50
+    0.70
 }
 fn default_temporal_weight() -> f64 {
-    0.25
+    0.15
 }
 fn default_resource_weight() -> f64 {
-    0.25
+    0.15
 }

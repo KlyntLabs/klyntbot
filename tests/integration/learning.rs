@@ -827,6 +827,9 @@ async fn strategy_record_round_trips_with_satisfaction_backfill() {
         tool_duration_ms: None,
         complexity_signals: serde_json::Value::Null,
         execution_mode: None,
+        retrieved_memory_count: None,
+        rewrite_triggered: 0,
+        rewrite_source: None,
     };
     repos.strategies.create(&record).await.unwrap();
 
@@ -869,6 +872,9 @@ async fn handler_reads_strategy_records_with_tool_stats() {
         tool_duration_ms: Some(45),
         complexity_signals: serde_json::Value::Null,
         execution_mode: None,
+        retrieved_memory_count: None,
+        rewrite_triggered: 0,
+        rewrite_source: None,
     };
     repos.strategies.create(&row).await.unwrap();
 
@@ -934,6 +940,9 @@ async fn handler_impl_returns_status_with_outcomes() {
         tool_duration_ms: Some(25),
         complexity_signals: serde_json::Value::Null,
         execution_mode: None,
+        retrieved_memory_count: None,
+        rewrite_triggered: 0,
+        rewrite_source: None,
     };
     repo.create(&row).await.unwrap();
 
@@ -989,6 +998,9 @@ async fn handler_impl_analyze_now_with_multi_tool_aggregation() {
             tool_duration_ms: Some(30),
             complexity_signals: serde_json::Value::Null,
             execution_mode: None,
+            retrieved_memory_count: None,
+            rewrite_triggered: 0,
+            rewrite_source: None,
         };
         repo.create(&row).await.unwrap();
     }
@@ -1010,6 +1022,9 @@ async fn handler_impl_analyze_now_with_multi_tool_aggregation() {
         tool_duration_ms: Some(5000),
         complexity_signals: serde_json::Value::Null,
         execution_mode: None,
+        retrieved_memory_count: None,
+        rewrite_triggered: 0,
+        rewrite_source: None,
     };
     repo.create(&shell_row).await.unwrap();
 

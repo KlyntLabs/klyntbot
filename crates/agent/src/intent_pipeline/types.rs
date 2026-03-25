@@ -126,6 +126,8 @@ pub enum AnalysisSource {
     Heuristic,
     LlmClassifier,
     MidExecutionEscalation,
+    /// Shadow mode stopped the cascade before Layer 3 (LLM).
+    ShadowDeferred,
 }
 
 /// Configuration for the execution pipeline (used by `AgentRuntime`).
@@ -144,6 +146,9 @@ pub struct PipelineConfig {
     pub provider_name: String,
     /// Max graph depth for scenario reasoning (from Config.scenario.max_graph_depth).
     pub scenario_max_graph_depth: u32,
+    /// Maximum wall-clock time for a single pipeline execution (seconds).
+    /// 0 means no timeout. Default: 300.
+    pub pipeline_timeout_secs: u64,
 }
 
 impl Default for PipelineConfig {
@@ -156,6 +161,7 @@ impl Default for PipelineConfig {
             channel: "unknown".to_string(),
             provider_name: "unknown".to_string(),
             scenario_max_graph_depth: 2,
+            pipeline_timeout_secs: 300,
         }
     }
 }

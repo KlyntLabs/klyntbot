@@ -4,12 +4,14 @@ import type { SidebarItem } from "@shared/types";
 import {
   CheckSquare,
   Cpu,
+  Eye,
   FileText,
   GraduationCap,
   LayoutDashboard,
   MessageCircle,
   MessageSquare,
   Settings,
+  Sparkles,
   Timer,
   Wallet,
 } from "lucide-react";
@@ -30,6 +32,8 @@ const items: { key: SidebarItem; icon: typeof MessageSquare; path?: string; bott
   { key: "Notes", icon: FileText, path: "/notes" },
   { key: "Learn", icon: GraduationCap, path: "/learn" },
   { key: "Finance", icon: Wallet, path: "/finance" },
+  { key: "Coaching", icon: Sparkles, path: "/coaching" },
+  { key: "Mirror", icon: Eye, path: "/mirror" },
   { key: "Automations", icon: Timer, path: "/automations" },
   { key: "System", icon: Cpu, path: "/system", bottom: true },
   { key: "Settings", icon: Settings, path: "/settings", bottom: true },

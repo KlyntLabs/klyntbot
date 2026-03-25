@@ -143,7 +143,7 @@ impl TaskGroupRepo {
 
     /// Count tasks in a group.
     pub async fn count_tasks(&self, group_id: &str) -> Result<u32, StorageError> {
-        let count: (i64,) = sqlx::query_as("SELECT COUNT(*) FROM actions WHERE group_id = ?1")
+        let count: (i64,) = sqlx::query_as("SELECT COUNT(*) FROM tasks WHERE group_id = ?1")
             .bind(group_id)
             .fetch_one(&self.pool)
             .await?;
@@ -159,7 +159,7 @@ impl TaskGroupRepo {
             return Ok(std::collections::HashMap::new());
         }
         let mut qb = sqlx::QueryBuilder::<sqlx::Sqlite>::new(
-            "SELECT group_id, COUNT(*) as cnt FROM actions WHERE group_id IN (",
+            "SELECT group_id, COUNT(*) as cnt FROM tasks WHERE group_id IN (",
         );
         let mut sep = qb.separated(", ");
         for id in group_ids {

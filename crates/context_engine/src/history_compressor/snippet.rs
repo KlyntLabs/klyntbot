@@ -7,7 +7,7 @@
 ///    Prefer the *last* such boundary to capture as much content as possible.
 /// 3. If no sentence boundary is found, fall back to the last word boundary (space).
 /// 4. If no word boundary either, hard-cut at `max_chars`.
-pub(super) fn first_snippet(text: &str, max_chars: usize) -> String {
+pub fn first_snippet(text: &str, max_chars: usize) -> String {
     let trimmed = text.trim();
     if trimmed.len() <= max_chars {
         return trimmed.to_string();

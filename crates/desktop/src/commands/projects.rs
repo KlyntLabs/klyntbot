@@ -1,4 +1,6 @@
-use desktop_shared::commands::{ProjectCreateParams, ProjectResponse, ProjectUpdateParams};
+use desktop_shared::commands::{
+    ProjectCreateParams, ProjectHealthMetricsResponse, ProjectResponse, ProjectUpdateParams,
+};
 use desktop_shared::errors::ApiError;
 use std::sync::Arc;
 use tauri::State;
@@ -81,6 +83,14 @@ pub async fn project_update_role(
     Ok(result)
 }
 
+#[tauri::command]
+pub async fn project_health_metrics(
+    state: State<'_, Arc<AppCore>>,
+    project_id: String,
+) -> Result<ProjectHealthMetricsResponse, ApiError> {
+    state.project_health_metrics(project_id).await
+}
+
 // ── Dev server dispatch ─────────────────────────────────────────────
 
 #[cfg(test)]
@@ -92,6 +102,7 @@ pub(crate) const DEV_COMMANDS: &[&str] = &[
     "project_archive",
     "project_update_instructions",
     "project_update_role",
+    "project_health_metrics",
 ];
 
 #[cfg(debug_assertions)]
@@ -131,6 +142,10 @@ pub(crate) async fn dispatch_dev(
             let id = try_field!(dev::get_str(body, "id"));
             let role = try_field!(dev::get_str(body, "role"));
             dev::val_rh(core.project_update_role(id, role).await)
+        }
+        "project_health_metrics" => {
+            let project_id = try_field!(dev::get_str(body, "projectId"));
+            dev::val(core.project_health_metrics(project_id).await)
         }
         _ => return None,
     })

@@ -1,6 +1,5 @@
-import { InteractionCard } from "@features/chat/components/InteractionCard";
-import { MarkdownContent } from "@features/chat/components/MarkdownContent";
-import { ActiveToolIndicator } from "@features/chat/components/SegmentedMessage";
+import { MessageList } from "@features/chat/components/MessageList";
+import { useAutoResizeTextarea } from "@shared/hooks/useAutoResizeTextarea";
 import { useChatSession } from "@shared/hooks/useChatSession";
 import { isTauri } from "@shared/lib/utils";
 import { getCurrentWindow } from "@tauri-apps/api/window";
@@ -16,8 +15,7 @@ interface LauncherChatProps {
 
 export function LauncherChat({ sessionKey, initialQuery, onBack, onExpand }: LauncherChatProps) {
   const chat = useChatSession(sessionKey);
-  const endRef = useRef<HTMLDivElement>(null);
-  const inputRef = useRef<HTMLTextAreaElement>(null);
+  const { ref: inputRef, handleInput } = useAutoResizeTextarea(chat.input);
   const sentInitial = useRef(false);
   const needsInitialSend = useRef(false);
 
@@ -38,12 +36,8 @@ export function LauncherChat({ sessionKey, initialQuery, onBack, onExpand }: Lau
     }
   }, [chat.input, chat.send]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Auto-scroll on new content
-  useEffect(() => {
-    endRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, []);
-
   // Focus input after streaming completes
+  // biome-ignore lint/correctness/useExhaustiveDependencies: inputRef is a stable ref object
   useEffect(() => {
     if (!chat.isStreaming && !chat.activeInteraction) {
       inputRef.current?.focus();
@@ -51,6 +45,7 @@ export function LauncherChat({ sessionKey, initialQuery, onBack, onExpand }: Lau
   }, [chat.isStreaming, chat.activeInteraction]);
 
   // Re-focus input when launcher window regains focus (after hide/show)
+  // biome-ignore lint/correctness/useExhaustiveDependencies: inputRef is a stable ref object
   useEffect(() => {
     if (!isTauri) return;
     let unlisten: (() => void) | undefined;
@@ -79,17 +74,20 @@ export function LauncherChat({ sessionKey, initialQuery, onBack, onExpand }: Lau
     [chat.send],
   );
 
-  // Handle Cmd+/ to expand
+  // Handle Escape to go back and Cmd+/ to expand
   useEffect(() => {
-    const handleExpand = (e: KeyboardEvent) => {
-      if ((e.metaKey || e.ctrlKey) && e.key === "/") {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        e.preventDefault();
+        onBack();
+      } else if ((e.metaKey || e.ctrlKey) && e.key === "/") {
         e.preventDefault();
         onExpand();
       }
     };
-    window.addEventListener("keydown", handleExpand);
-    return () => window.removeEventListener("keydown", handleExpand);
-  }, [onExpand]);
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [onBack, onExpand]);
 
   return (
     <div className="flex flex-col" style={{ height: 568 }}>
@@ -98,9 +96,9 @@ export function LauncherChat({ sessionKey, initialQuery, onBack, onExpand }: Lau
         <button
           type="button"
           onClick={onBack}
-          className="flex items-center gap-1.5 text-[12px] font-light text-muted-foreground hover:text-foreground transition-colors"
+          className="flex items-center gap-1.5 text-xs font-light text-muted-foreground hover:text-foreground transition-colors"
         >
-          <ArrowLeft className="w-3.5 h-3.5" strokeWidth={1.5} />
+          <ArrowLeft className="size-3.5" strokeWidth={1.5} />
           Back
         </button>
         <span className="text-[13px] font-light text-foreground">Klynt AI</span>
@@ -109,93 +107,25 @@ export function LauncherChat({ sessionKey, initialQuery, onBack, onExpand }: Lau
           onClick={onExpand}
           className="flex items-center gap-1.5 text-[11px] font-light text-muted-foreground hover:text-foreground transition-colors"
         >
-          <ArrowUpRight className="w-3.5 h-3.5" strokeWidth={1.5} />
+          <ArrowUpRight className="size-3.5" strokeWidth={1.5} />
           Expand
         </button>
       </div>
 
-      {/* Messages */}
-      <div className="flex-1 overflow-y-auto px-4 py-3 space-y-4">
-        {chat.messages.map((msg) => {
-          if (msg.role === "interaction") return null;
-          return (
-            <div key={msg.id}>
-              {msg.role === "user" ? (
-                <div className="flex justify-end">
-                  <div className="max-w-[85%] glass-bubble-user">
-                    <p className="text-[13px] font-light whitespace-pre-wrap leading-relaxed text-foreground">
-                      {msg.content}
-                    </p>
-                  </div>
-                </div>
-              ) : (
-                <div className="max-w-full">
-                  <MarkdownContent content={msg.content} />
-                </div>
-              )}
-            </div>
-          );
-        })}
-
-        {/* Streaming content */}
-        {chat.segments.length > 0 && (
-          <div className="max-w-full">
-            {chat.segments.map((seg, idx) =>
-              seg.type === "text" ? (
-                <div
-                  key={`text-${seg.content.slice(0, 32)}`}
-                  className={
-                    chat.isStreaming && idx === chat.segments.length - 1 ? "streaming-cursor" : ""
-                  }
-                >
-                  <MarkdownContent content={seg.content} />
-                </div>
-              ) : null,
-            )}
-          </div>
-        )}
-
-        {/* Active tool spinners */}
-        {chat.activeTools.map((name) => (
-          <ActiveToolIndicator key={name} name={name} />
-        ))}
-
-        {/* Thinking indicator */}
-        {chat.isStreaming && chat.segments.length === 0 && chat.activeTools.length === 0 && (
-          <div className="flex gap-1">
-            <div
-              className="w-1.5 h-1.5 bg-muted rounded-full animate-bounce"
-              style={{ animationDelay: "0ms" }}
-            />
-            <div
-              className="w-1.5 h-1.5 bg-muted rounded-full animate-bounce"
-              style={{ animationDelay: "150ms" }}
-            />
-            <div
-              className="w-1.5 h-1.5 bg-muted rounded-full animate-bounce"
-              style={{ animationDelay: "300ms" }}
-            />
-          </div>
-        )}
-
-        {/* Error */}
-        {chat.error && (
-          <div className="rounded-xl px-4 py-3 bg-destructive/10 border border-destructive/20">
-            <p className="text-[12px] font-light text-destructive">{chat.error}</p>
-          </div>
-        )}
-
-        {/* Interaction card */}
-        {chat.activeInteraction && (
-          <InteractionCard
-            sessionKey={sessionKey}
-            requestId={chat.activeInteraction.requestId}
-            request={chat.activeInteraction.request}
-            onSubmitted={chat.clearInteraction}
-          />
-        )}
-
-        <div ref={endRef} />
+      <div className="flex-1 overflow-y-auto px-4 py-3">
+        <MessageList
+          messages={chat.messages}
+          segments={chat.segments}
+          isStreaming={chat.isStreaming}
+          activeTools={chat.activeTools}
+          error={chat.error}
+          activeInteraction={chat.activeInteraction}
+          sessionKey={sessionKey}
+          onInteractionSubmitted={chat.clearInteraction}
+          liveTransparency={null}
+          activeDelegateAgent={chat.activeDelegateAgent}
+          statusPhase={chat.statusPhase}
+        />
       </div>
 
       {/* Input */}
@@ -205,11 +135,8 @@ export function LauncherChat({ sessionKey, initialQuery, onBack, onExpand }: Lau
           <textarea
             ref={inputRef}
             value={chat.input}
-            onChange={(e) => {
-              chat.setInput(e.target.value);
-              e.target.style.height = "auto";
-              e.target.style.height = `${Math.min(e.target.scrollHeight, 80)}px`;
-            }}
+            onChange={(e) => chat.setInput(e.target.value)}
+            onInput={handleInput}
             onKeyDown={handleKeyDown}
             placeholder="Follow up\u2026"
             aria-label="Message Klynt"
@@ -222,7 +149,7 @@ export function LauncherChat({ sessionKey, initialQuery, onBack, onExpand }: Lau
             disabled={!chat.input.trim() || chat.isStreaming}
             className="text-brand hover:text-brand/80 disabled:text-muted-foreground transition-colors shrink-0"
           >
-            <Send className="w-4 h-4" strokeWidth={1.5} />
+            <Send className="size-4" strokeWidth={1.5} />
           </button>
         </div>
       </div>

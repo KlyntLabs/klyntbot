@@ -158,6 +158,18 @@ pub struct RouterStatusResponse {
     pub daily_limit: usize,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct InterventionLogResponse {
+    pub id: String,
+    pub intervention_type: String,
+    pub message: String,
+    pub trigger_name: String,
+    pub feedback: Option<String>,
+    pub delivered_at: String,
+    pub feedback_at: Option<String>,
+}
+
 // ── Events DTOs ─────────────────────────────────────────────────────────
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -219,6 +231,29 @@ pub struct RuleCreateParams {
     pub domain: String,
     pub rule_text: String,
     pub confidence: f64,
+}
+
+// ── Knowledge Trust DTOs ────────────────────────────────────────────────
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MemoryHealthResponse {
+    pub overall: f64,
+    pub domains: Vec<DomainHealthEntry>,
+    pub total_facts_90d: i64,
+    pub fast_failures_90d: i64,
+    pub trend_pct: Option<f64>,
+    pub computed_at: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DomainHealthEntry {
+    pub domain: String,
+    pub score: f64,
+    pub total_facts: i64,
+    pub active_facts: i64,
+    pub fast_failures: i64,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

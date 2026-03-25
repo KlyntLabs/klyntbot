@@ -40,12 +40,19 @@ use serde_json::Value;
 use tools_core::{DynTool, FeatureMigration, FeaturePackage, HealthStatus};
 
 /// Feature package for agentic task management.
-pub struct TasksFeature;
+pub struct TasksFeature {
+    pool: Option<storage::StoragePool>,
+}
 
 impl TasksFeature {
     /// Create a new TasksFeature.
     pub fn new() -> Self {
-        Self
+        Self { pool: None }
+    }
+
+    /// Create a TasksFeature with a storage pool for health checking.
+    pub fn with_pool(pool: storage::StoragePool) -> Self {
+        Self { pool: Some(pool) }
     }
 
     /// Migration SQL for this feature (version 1: core tables).
@@ -73,7 +80,7 @@ impl FeaturePackage for TasksFeature {
     fn migrations(&self) -> Vec<FeatureMigration> {
         vec![FeatureMigration {
             feature_name: "tasks".to_string(),
-            version: 1,
+            version: 2,
             description: "Create agentic task tables".to_string(),
             sql: Self::migration_sql().to_string(),
         }]
@@ -88,8 +95,18 @@ impl FeaturePackage for TasksFeature {
     }
 
     async fn health_check(&self) -> Result<HealthStatus> {
-        // No repo reference yet (tool not wired); default to healthy.
-        Ok(HealthStatus::Healthy)
+        let Some(pool) = &self.pool else {
+            return Ok(HealthStatus::Healthy);
+        };
+        match sqlx::query("SELECT 1 FROM tasks LIMIT 1")
+            .execute(pool.inner())
+            .await
+        {
+            Ok(_) => Ok(HealthStatus::Healthy),
+            Err(e) => Ok(HealthStatus::Degraded(format!(
+                "tasks table unreachable: {e}"
+            ))),
+        }
     }
 }
 
@@ -128,7 +145,7 @@ mod tests {
         let migrations = feature.migrations();
         assert_eq!(migrations.len(), 1);
         assert_eq!(migrations[0].feature_name, "tasks");
-        assert_eq!(migrations[0].version, 1);
+        assert_eq!(migrations[0].version, 2);
     }
 
     #[test]

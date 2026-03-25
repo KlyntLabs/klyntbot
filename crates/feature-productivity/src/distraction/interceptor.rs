@@ -66,25 +66,41 @@ impl DistractionInterceptor {
         }
 
         let (key, pattern_type) = Self::make_key(app_name, window_title);
+        let title_lower = window_title.map(|t| t.to_ascii_lowercase());
 
-        // 1. Check session whitelist.
-        if self.session_whitelist.contains(&key) {
+        // 1. Check session whitelist — exact match, then keyword containment.
+        if self.session_whitelist.contains(&key)
+            || (!self.session_whitelist.is_empty()
+                && title_lower.as_deref().is_some_and(|t| {
+                    self.session_whitelist
+                        .iter()
+                        .any(|pattern| t.contains(pattern.as_str()))
+                }))
+        {
             return InterceptDecision::Allow {
                 reason: "session whitelist".into(),
             };
         }
 
-        // 2. Check temp passes (check specific key, prune only if expired).
-        if let Some(expiry) = self.temp_passes.get(&key) {
-            if *expiry > Instant::now() {
+        // 2. Check temp passes — exact match OR keyword containment.
+        {
+            let now = Instant::now();
+            let has_active_pass = self.temp_passes.get(&key).is_some_and(|exp| *exp > now)
+                || (!self.temp_passes.is_empty()
+                    && title_lower.as_deref().is_some_and(|t| {
+                        self.temp_passes
+                            .iter()
+                            .any(|(pattern, exp)| *exp > now && t.contains(pattern.as_str()))
+                    }));
+            if has_active_pass {
                 return InterceptDecision::Allow {
                     reason: "temporary pass active".into(),
                 };
             }
-            // Expired — remove this key and do a lazy prune of others.
-            self.temp_passes.remove(&key);
-            let now = Instant::now();
-            self.temp_passes.retain(|_, exp| *exp > now);
+            // Lazy prune expired entries
+            if !self.temp_passes.is_empty() {
+                self.temp_passes.retain(|_, exp| *exp > now);
+            }
         }
 
         // 3. Run heuristics first (free, no I/O).

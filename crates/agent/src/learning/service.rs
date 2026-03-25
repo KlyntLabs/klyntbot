@@ -166,8 +166,7 @@ impl LearningService {
                         old_threshold,
                         new_threshold,
                         reason: "adaptive_analysis".to_string(),
-                    })
-                    .await;
+                    });
                 }
             }
         }
@@ -181,8 +180,7 @@ impl LearningService {
             bus.publish(bus::LearningEvent::AnalysisCompleted {
                 total_outcomes: analysis.total_outcomes,
                 suggested_threshold: analysis.suggested_threshold,
-            })
-            .await;
+            });
         }
 
         // Run behavioral pattern analysis

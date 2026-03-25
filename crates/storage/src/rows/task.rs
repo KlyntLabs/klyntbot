@@ -51,6 +51,8 @@ pub struct TaskRow {
     pub complexity_score: Option<i32>,
     pub completed: bool,
     pub objective_id: Option<String>,
+    pub scheduled_start: Option<DateTime<Utc>>,
+    pub scheduled_end: Option<DateTime<Utc>>,
 }
 
 /// Row struct for the `task_activity` table.
@@ -135,6 +137,7 @@ pub struct TaskEstimationRow {
     pub energy_level: Option<String>,
     #[sqlx(json)]
     pub tags: Vec<String>,
+    pub project_id: Option<String>,
     pub completed_at: DateTime<Utc>,
 }
 

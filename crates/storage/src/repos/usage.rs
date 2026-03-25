@@ -106,6 +106,17 @@ impl UsageRepo {
         Ok(cost)
     }
 
+    /// Get total tokens (prompt + completion) since a timestamp.
+    pub async fn total_tokens_since(&self, since: DateTime<Utc>) -> Result<i64, StorageError> {
+        Ok(sqlx::query_scalar::<_, i64>(
+            "SELECT COALESCE(SUM(prompt_tokens + completion_tokens), 0)
+             FROM usage_records WHERE timestamp >= ?1",
+        )
+        .bind(since)
+        .fetch_one(&self.pool)
+        .await?)
+    }
+
     /// Get total request count and cost since a timestamp.
     pub async fn totals_since(&self, since: DateTime<Utc>) -> Result<(i64, f64), StorageError> {
         let row: TotalAggregate = sqlx::query_as(
@@ -140,4 +151,71 @@ struct DayAggregate {
 struct TotalAggregate {
     total_requests: Option<i64>,
     total_cost: Option<f64>,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::rows::usage::UsageRecordRow;
+
+    #[tokio::test]
+    async fn total_tokens_since_aggregates_correctly() {
+        let pool = crate::StoragePool::connect_in_memory().await.unwrap();
+        let repo = UsageRepo::new(pool.inner().clone());
+
+        let now = Utc::now();
+        let old = now - chrono::Duration::hours(2);
+        let recent = now - chrono::Duration::minutes(30);
+
+        // Insert an old record (before the "since" cutoff)
+        repo.create(&UsageRecordRow {
+            id: uuid::Uuid::new_v4(),
+            timestamp: old,
+            request_id: "req-old".to_string(),
+            model: "gpt-4o".to_string(),
+            provider: "openai".to_string(),
+            prompt_tokens: 100,
+            completion_tokens: 50,
+            cache_read_tokens: 0,
+            cache_write_tokens: 0,
+            estimated_cost_usd: 0.01,
+            channel: "telegram".to_string(),
+            strategy: "DirectResponse".to_string(),
+        })
+        .await
+        .unwrap();
+
+        // Insert a recent record (after the "since" cutoff)
+        repo.create(&UsageRecordRow {
+            id: uuid::Uuid::new_v4(),
+            timestamp: recent,
+            request_id: "req-recent".to_string(),
+            model: "gpt-4o".to_string(),
+            provider: "openai".to_string(),
+            prompt_tokens: 200,
+            completion_tokens: 100,
+            cache_read_tokens: 0,
+            cache_write_tokens: 0,
+            estimated_cost_usd: 0.02,
+            channel: "telegram".to_string(),
+            strategy: "ToolAssisted".to_string(),
+        })
+        .await
+        .unwrap();
+
+        // Query since 1 hour ago — should only include the recent record
+        let since = now - chrono::Duration::hours(1);
+        let total = repo.total_tokens_since(since).await.unwrap();
+        assert_eq!(total, 300); // 200 + 100
+
+        // Query since 3 hours ago — should include both records
+        let since_all = now - chrono::Duration::hours(3);
+        let total_all = repo.total_tokens_since(since_all).await.unwrap();
+        assert_eq!(total_all, 450); // (100+50) + (200+100)
+
+        // Query since the future — should return 0
+        let future = now + chrono::Duration::hours(1);
+        let total_future = repo.total_tokens_since(future).await.unwrap();
+        assert_eq!(total_future, 0);
+    }
 }

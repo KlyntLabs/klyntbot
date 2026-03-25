@@ -92,13 +92,16 @@ export function LiabilitiesForm({ registerSave, onDirty }: LiabilitiesFormProps)
               (results[i] as PromiseRejectedResult).reason,
             );
         }
+        const failCount = results.filter((r) => r.status === "rejected").length;
+        if (failCount > 0)
+          throw new Error(`Failed to save ${failCount} liabilit${failCount === 1 ? "y" : "ies"}`);
       }
     });
   }, [liabilities, registerSave]);
 
   return (
     <div>
-      <h3 className="text-[14px] font-medium text-muted-foreground mb-1">Liabilities</h3>
+      <h3 className="text-sm font-medium text-muted-foreground mb-1">Liabilities</h3>
       <p className="text-[11px] text-dim mb-4">
         Track debts and loans for accurate net worth. You can add more later.
       </p>
@@ -115,21 +118,21 @@ export function LiabilitiesForm({ registerSave, onDirty }: LiabilitiesFormProps)
                 value={lia.name}
                 onChange={(e) => updateLiability(lia.key, { name: e.target.value })}
                 placeholder="Liability name"
-                className="flex-1 px-3 py-1.5 text-[12px] text-foreground bg-accent border border-border rounded-md focus:outline-none focus:border-brand/50 transition-colors placeholder:text-dim"
+                className="flex-1 px-3 py-1.5 text-xs text-foreground bg-accent border border-border rounded-md focus:outline-none focus:border-brand/50 transition-colors placeholder:text-dim"
               />
               <button
                 type="button"
                 onClick={() => removeLiability(lia.key)}
                 className="p-1 text-dim hover:text-destructive transition-colors"
               >
-                <X className="w-3.5 h-3.5" />
+                <X className="size-3.5" />
               </button>
             </div>
             <div className="flex gap-2">
               <select
                 value={lia.liabilityType}
                 onChange={(e) => updateLiability(lia.key, { liabilityType: e.target.value })}
-                className="flex-1 px-2 py-1.5 text-[12px] text-foreground bg-accent border border-border rounded-md focus:outline-none focus:border-brand/50 transition-colors"
+                className="flex-1 px-2 py-1.5 text-xs text-foreground bg-accent border border-border rounded-md focus:outline-none focus:border-brand/50 transition-colors"
               >
                 {LIABILITY_TYPE_OPTIONS.map((t) => (
                   <option key={t.value} value={t.value} className="bg-popover">
@@ -143,7 +146,7 @@ export function LiabilitiesForm({ registerSave, onDirty }: LiabilitiesFormProps)
                 onChange={(e) => updateLiability(lia.key, { principal: e.target.value })}
                 placeholder="Principal"
                 step="0.01"
-                className="w-28 px-2 py-1.5 text-[12px] text-foreground bg-accent border border-border rounded-md focus:outline-none focus:border-brand/50 transition-colors placeholder:text-dim"
+                className="w-28 px-2 py-1.5 text-xs text-foreground bg-accent border border-border rounded-md focus:outline-none focus:border-brand/50 transition-colors placeholder:text-dim"
               />
             </div>
             <div className="flex gap-2">
@@ -153,7 +156,7 @@ export function LiabilitiesForm({ registerSave, onDirty }: LiabilitiesFormProps)
                 onChange={(e) => updateLiability(lia.key, { interestRate: e.target.value })}
                 placeholder="Interest rate %"
                 step="0.1"
-                className="flex-1 px-2 py-1.5 text-[12px] text-foreground bg-accent border border-border rounded-md focus:outline-none focus:border-brand/50 transition-colors placeholder:text-dim"
+                className="flex-1 px-2 py-1.5 text-xs text-foreground bg-accent border border-border rounded-md focus:outline-none focus:border-brand/50 transition-colors placeholder:text-dim"
               />
               <input
                 type="number"
@@ -161,7 +164,7 @@ export function LiabilitiesForm({ registerSave, onDirty }: LiabilitiesFormProps)
                 onChange={(e) => updateLiability(lia.key, { monthlyPayment: e.target.value })}
                 placeholder="Monthly payment"
                 step="0.01"
-                className="flex-1 px-2 py-1.5 text-[12px] text-foreground bg-accent border border-border rounded-md focus:outline-none focus:border-brand/50 transition-colors placeholder:text-dim"
+                className="flex-1 px-2 py-1.5 text-xs text-foreground bg-accent border border-border rounded-md focus:outline-none focus:border-brand/50 transition-colors placeholder:text-dim"
               />
             </div>
           </div>
@@ -171,9 +174,9 @@ export function LiabilitiesForm({ registerSave, onDirty }: LiabilitiesFormProps)
       <button
         type="button"
         onClick={addLiability}
-        className="flex items-center gap-1.5 mt-3 text-[12px] text-muted-foreground hover:text-foreground transition-colors"
+        className="flex items-center gap-1.5 mt-3 text-xs text-muted-foreground hover:text-foreground transition-colors"
       >
-        <Plus className="w-3.5 h-3.5" />
+        <Plus className="size-3.5" />
         Add liability
       </button>
     </div>

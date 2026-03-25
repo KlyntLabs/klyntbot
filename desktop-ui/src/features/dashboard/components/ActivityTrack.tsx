@@ -12,6 +12,7 @@ import { useQuery } from "@shared/hooks/useQuery";
 import type { MergeableEvent } from "@shared/lib/activity-sessions";
 import { mergeActivitySessions } from "@shared/lib/activity-sessions";
 import { formatHumanDuration, minutesSinceMidnight, TZ_OFFSET_MINS } from "@shared/lib/dates";
+import { purityToOpacity, qualityToColor, resolveActivityColor } from "@shared/lib/productivity";
 import { cn } from "@shared/lib/utils";
 import type {
   ActivityCategory,
@@ -21,7 +22,6 @@ import type {
   TimelineEntry,
 } from "@shared/types";
 import { useMemo, useState } from "react";
-import { purityToOpacity, qualityToColor, resolveActivityColor } from "../productivity/shared";
 
 export interface SessionBlock {
   startMin: number;
@@ -212,14 +212,12 @@ export function ActivityTrack({
               "absolute left-0.5 right-0.5 rounded-sm cursor-pointer transition-opacity overflow-hidden",
               isSelected && "ring-1 ring-brand",
               matched && "shadow-sm",
-              session.duringFocus && "border-l-2",
             )}
             style={{
               top,
               height,
-              backgroundColor: session.color,
+              backgroundColor: session.duringFocus ? "var(--timeline-focus)" : session.color,
               opacity,
-              borderLeftColor: session.duringFocus ? "var(--timeline-focus)" : undefined,
             }}
             onClick={() => onSelectSession(session)}
             onMouseEnter={() => setHoveredIdx(idx)}

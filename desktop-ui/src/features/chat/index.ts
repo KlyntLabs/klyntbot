@@ -16,4 +16,3 @@ export { useChatSession } from "./hooks/useChatSession";
 export { useCoachingNudge } from "./hooks/useCoachingNudge";
 export { useGroupMutations, useGroups } from "./hooks/useGroups";
 export { ChatPage } from "./pages/ChatPage";
-export { LauncherChatPage } from "./pages/LauncherChatPage";

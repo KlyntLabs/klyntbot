@@ -1,7 +1,3 @@
-import { AutoFocusToast } from "@features/productivity/components/AutoFocusToast";
-import { DistractionInterventionBanner } from "@features/productivity/components/DistractionInterventionBanner";
-import { FocusStateIndicator } from "@features/productivity/components/FocusStateIndicator";
-import { FocusTrayIndicator } from "@features/productivity/components/FocusTrayIndicator";
 import { MiniCalendar } from "@shared/components/MiniCalendar";
 import { useClickOutside } from "@shared/hooks/useClickOutside";
 import { todayISO, toLocalISO } from "@shared/lib/dates";
@@ -19,6 +15,9 @@ import {
   useSidebarToggle,
 } from "../lib/layers";
 import { CalendarSync } from "./CalendarSync";
+import { AutoFocusToast } from "./productivity/AutoFocusToast";
+import { FocusStateIndicator } from "./productivity/FocusStateIndicator";
+import { FocusTrayIndicator } from "./productivity/FocusTrayIndicator";
 
 type ViewMode = "day" | "week" | "month" | "year";
 
@@ -188,70 +187,68 @@ export function DashboardLayout({ children }: { children: ReactNode }) {
         </div>
 
         {/* Date-specific controls */}
-        <>
-          {/* Layers toggle */}
+        {/* Layers toggle */}
+        <button
+          ref={layersTriggerRef}
+          type="button"
+          onClick={() => setLayersOpen(!layersOpen)}
+          aria-haspopup="dialog"
+          aria-expanded={layersOpen}
+          className={cn(
+            "p-1.5 rounded-full text-muted-foreground hover:text-foreground hover:bg-muted transition-colors",
+            layersOpen && "bg-muted text-foreground",
+          )}
+          title="Toggle layers"
+        >
+          <Layers className="size-4" />
+        </button>
+
+        <CalendarSync />
+
+        {/* Nav pill group */}
+        <div className="flex items-center rounded-full bg-accent p-0.5 ml-auto">
           <button
-            ref={layersTriggerRef}
             type="button"
-            onClick={() => setLayersOpen(!layersOpen)}
+            onClick={() => navigateBy(-1)}
+            className="p-1.5 rounded-full text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+          >
+            <ChevronLeft className="size-4" />
+          </button>
+          <button
+            ref={calTriggerRef}
+            type="button"
+            onClick={() => setCalOpen(!calOpen)}
             aria-haspopup="dialog"
-            aria-expanded={layersOpen}
+            aria-expanded={calOpen}
             className={cn(
               "p-1.5 rounded-full text-muted-foreground hover:text-foreground hover:bg-muted transition-colors",
-              layersOpen && "bg-muted text-foreground",
+              calOpen && "bg-muted text-foreground",
             )}
-            title="Toggle layers"
+            title="Pick date"
           >
-            <Layers className="w-4 h-4" />
+            <Calendar className="size-4" />
           </button>
-
-          <CalendarSync />
-
-          {/* Nav pill group */}
-          <div className="flex items-center rounded-full bg-accent p-0.5 ml-auto">
-            <button
-              type="button"
-              onClick={() => navigateBy(-1)}
-              className="p-1.5 rounded-full text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
-            >
-              <ChevronLeft className="w-4 h-4" />
-            </button>
-            <button
-              ref={calTriggerRef}
-              type="button"
-              onClick={() => setCalOpen(!calOpen)}
-              aria-haspopup="dialog"
-              aria-expanded={calOpen}
-              className={cn(
-                "p-1.5 rounded-full text-muted-foreground hover:text-foreground hover:bg-muted transition-colors",
-                calOpen && "bg-muted text-foreground",
-              )}
-              title="Pick date"
-            >
-              <Calendar className="w-4 h-4" />
-            </button>
-            <button
-              type="button"
-              onClick={() => navigateBy(1)}
-              className="p-1.5 rounded-full text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
-            >
-              <ChevronRight className="w-4 h-4" />
-            </button>
-          </div>
-
-          {/* Sidebar toggle */}
           <button
             type="button"
-            onClick={toggleSidebar}
-            className={cn(
-              "p-1.5 rounded-full text-muted-foreground hover:text-foreground hover:bg-muted transition-colors",
-              sidebarOpen && "bg-muted text-foreground",
-            )}
-            title={sidebarOpen ? "Hide summary" : "Show summary"}
+            onClick={() => navigateBy(1)}
+            className="p-1.5 rounded-full text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
           >
-            <PanelRight className="w-4 h-4" />
+            <ChevronRight className="size-4" />
           </button>
-        </>
+        </div>
+
+        {/* Sidebar toggle */}
+        <button
+          type="button"
+          onClick={toggleSidebar}
+          className={cn(
+            "p-1.5 rounded-full text-muted-foreground hover:text-foreground hover:bg-muted transition-colors",
+            sidebarOpen && "bg-muted text-foreground",
+          )}
+          title={sidebarOpen ? "Hide summary" : "Show summary"}
+        >
+          <PanelRight className="size-4" />
+        </button>
       </div>
 
       {/* Layers dropdown popover */}
@@ -271,9 +268,9 @@ export function DashboardLayout({ children }: { children: ReactNode }) {
                   type="checkbox"
                   checked={enabled.has(layer.key)}
                   onChange={() => toggle(layer.key)}
-                  className="accent-brand w-3 h-3"
+                  className="accent-brand size-3"
                 />
-                <span className="w-2 h-2 rounded-full" style={{ backgroundColor: layer.color }} />
+                <span className="size-2 rounded-full" style={{ backgroundColor: layer.color }} />
                 {layer.label}
               </label>
             ))}
@@ -308,7 +305,6 @@ export function DashboardLayout({ children }: { children: ReactNode }) {
       {/* Real-time overlays */}
       <FocusStateIndicator />
       <AutoFocusToast />
-      <DistractionInterventionBanner />
 
       {/* Content */}
       <DataModeContext.Provider value="productivity">

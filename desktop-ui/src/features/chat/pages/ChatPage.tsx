@@ -1,17 +1,16 @@
+import { AmbientIndicator, PromotionToast, usePromotionListener } from "@features/autotuner";
 import { ipc } from "@shared/hooks/useIpc";
 import { useQuery } from "@shared/hooks/useQuery";
 import { useSetToggle } from "@shared/hooks/useSetToggle";
 import type { ChatThread, ContextResumeData } from "@shared/types";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useLocation, useSearchParams } from "react-router";
+import { useLocation, useNavigate, useSearchParams } from "react-router";
 import { ChatInput } from "../components/ChatInput";
 import { CoachingNudge } from "../components/CoachingNudge";
 import { DebateView } from "../components/DebateView";
 import { MessageList } from "../components/MessageList";
 import { ThreadContextMenu } from "../components/ThreadContextMenu";
 import { type AreaGroup, featurePrefix, ThreadList } from "../components/ThreadList";
-import { TransparencyPanel } from "../components/TransparencyPanel";
-import { TransparencyToggle } from "../components/TransparencyToggle";
 import type { VoiceMode } from "../components/VoiceToggle";
 import { useChatSession } from "../hooks/useChatSession";
 
@@ -22,6 +21,7 @@ interface GroupedThreads {
 }
 
 export function ChatPage() {
+  const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const [selectedThread, setSelectedThreadState] = useState(
     () => searchParams.get("thread") || `chat:${crypto.randomUUID()}`,
@@ -85,34 +85,16 @@ export function ChatPage() {
       setResumeBanner(resumeContext.contextTitle);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps -- chat ref is unstable; didApplyResume guards double-apply
-  }, [resumeContext]);
+  }, [resumeContext, chat.setInput]);
 
-  const [showTransparency, setShowTransparency] = useState(() => {
-    try {
-      return localStorage.getItem("chat:transparency") === "true";
-    } catch {
-      return false;
-    }
-  });
-  const toggleTransparency = useCallback(() => {
-    setShowTransparency((prev) => {
-      const next = !prev;
-      try {
-        localStorage.setItem("chat:transparency", String(next));
-      } catch {}
-      return next;
-    });
-  }, []);
-
-  const lastAssistantTransparency = useMemo(() => {
-    for (let i = chat.messages.length - 1; i >= 0; i--) {
-      const m = chat.messages[i];
-      if (m.role === "assistant" && m.transparency) return m.transparency;
-    }
-    return null;
-  }, [chat.messages]);
-  const activeTransparency =
-    chat.isStreaming && chat.transparency ? chat.transparency : lastAssistantTransparency;
+  // ── Autotuner promotion toast ──────────────────────────────────────────
+  const [promotionImpact, setPromotionImpact] = useState<string | null>(null);
+  usePromotionListener((impact) => setPromotionImpact(impact));
+  useEffect(() => {
+    if (!promotionImpact) return;
+    const timer = setTimeout(() => setPromotionImpact(null), 15_000);
+    return () => clearTimeout(timer);
+  }, [promotionImpact]);
 
   // Auto-select first thread on initial load (skip if URL already has a thread)
   const didAutoSelect = useRef(!!searchParams.get("thread"));
@@ -296,7 +278,7 @@ export function ChatPage() {
         {/* Toolbar: resume banner, squad header, voice toggle, transparency */}
         <div className="flex items-center justify-between px-4 py-2 border-b border-border-subtle">
           {resumeBanner ? (
-            <div className="flex items-center gap-2 text-[12px]">
+            <div className="flex items-center gap-2 text-xs">
               <span className="text-brand font-medium">Resuming: {resumeBanner}</span>
               <button
                 type="button"
@@ -310,7 +292,7 @@ export function ChatPage() {
             <div />
           )}
           <div className="flex items-center gap-2">
-            <TransparencyToggle enabled={showTransparency} onToggle={toggleTransparency} />
+            <AmbientIndicator onClick={() => navigate("/settings/general")} />
           </div>
         </div>
 
@@ -353,9 +335,9 @@ export function ChatPage() {
                     chat.clearInteraction();
                     refetchThreads();
                   }}
-                  showTransparency={showTransparency}
                   liveTransparency={chat.transparency}
                   activeDelegateAgent={chat.activeDelegateAgent}
+                  statusPhase={chat.statusPhase}
                   personaMessages={showPersonaMessages ? chat.personaMessages : undefined}
                 />
               </>
@@ -364,6 +346,14 @@ export function ChatPage() {
         </div>
 
         <CoachingNudge isStreaming={chat.isStreaming} />
+
+        {promotionImpact && (
+          <div className="px-6 pb-2">
+            <div className="max-w-3xl mx-auto">
+              <PromotionToast impact={promotionImpact} onDismiss={() => setPromotionImpact(null)} />
+            </div>
+          </div>
+        )}
 
         <ChatInput
           input={chat.input}
@@ -376,16 +366,6 @@ export function ChatPage() {
           onSelectDefault={handleNewThread}
           onVoiceModeChange={setVoiceMode}
         />
-
-        {/* Floating transparency overlay */}
-        {showTransparency && activeTransparency && (
-          <div
-            className="absolute top-12 right-3 z-30"
-            style={{ animation: "fade-in 0.15s ease-out" }}
-          >
-            <TransparencyPanel transparency={activeTransparency} />
-          </div>
-        )}
       </div>
     </>
   );

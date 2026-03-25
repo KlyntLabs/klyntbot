@@ -4,9 +4,11 @@ mod inbox;
 mod links;
 mod notebooks;
 mod notes;
+mod practice;
 mod suggestions;
 mod tags;
 
+pub use practice::{PracticeSessionRepo, PracticeSessionRow};
 use sqlx::SqlitePool;
 
 /// Convert a tri-state `Option<Option<&str>>` to a sentinel value for SQL:

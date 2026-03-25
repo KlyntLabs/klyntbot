@@ -210,6 +210,8 @@ mod tests {
             complexity_score: None,
             completed: false,
             objective_id: None,
+            scheduled_start: None,
+            scheduled_end: None,
         }
     }
 }

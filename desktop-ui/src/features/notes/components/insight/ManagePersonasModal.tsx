@@ -109,7 +109,7 @@ export function ManagePersonasModal({
               <span className="text-sm shrink-0">{p.icon}</span>
               <div className="flex-1 min-w-0">
                 <div className="text-[11px] font-medium text-foreground truncate">{p.name}</div>
-                <div className="text-[10px] text-dim truncate">
+                <div className="text-2xs text-dim truncate">
                   {p.role} · {p.tone}
                   {p.source === "builtin" && (
                     <span className="ml-1 text-[9px] px-1 py-px rounded bg-white/[0.06]">
@@ -128,7 +128,7 @@ export function ManagePersonasModal({
                   type="checkbox"
                   checked={p.isActive}
                   onChange={(e) => actions.toggle(p.id, e.target.checked)}
-                  className="w-3 h-3 accent-purple-400"
+                  className="size-3 accent-purple-400"
                 />
                 <span className="text-[9px] text-dim">Active</span>
               </label>
@@ -146,7 +146,7 @@ export function ManagePersonasModal({
                       setPinnedIds(next);
                       if (noteId) actions.setPins(noteId, [...next]);
                     }}
-                    className="w-3 h-3 accent-amber-400"
+                    className="size-3 accent-amber-400"
                   />
                   <span className="text-[9px] text-dim">Pin</span>
                 </label>
@@ -230,7 +230,7 @@ export function ManagePersonasModal({
               <button
                 type="button"
                 onClick={() => setShowCreate(false)}
-                className="text-[10px] px-3 py-1 rounded-md text-muted-foreground hover:text-foreground"
+                className="text-2xs px-3 py-1 rounded-md text-muted-foreground hover:text-foreground"
               >
                 Cancel
               </button>
@@ -238,7 +238,7 @@ export function ManagePersonasModal({
                 type="button"
                 onClick={handleCreate}
                 disabled={creating || !form.name.trim() || !form.role.trim()}
-                className="text-[10px] px-3 py-1 rounded-md bg-purple-400/20 text-purple-300 hover:bg-purple-400/30 disabled:opacity-50"
+                className="text-2xs px-3 py-1 rounded-md bg-purple-400/20 text-purple-300 hover:bg-purple-400/30 disabled:opacity-50"
               >
                 {creating ? "Creating..." : "Create"}
               </button>
@@ -252,7 +252,7 @@ export function ManagePersonasModal({
             <button
               type="button"
               onClick={() => setShowCreate(true)}
-              className="flex items-center gap-1 text-[10px] px-2 py-1 rounded-md bg-white/[0.04] text-muted-foreground hover:text-foreground hover:bg-white/[0.06]"
+              className="flex items-center gap-1 text-2xs px-2 py-1 rounded-md bg-white/[0.04] text-muted-foreground hover:text-foreground hover:bg-white/[0.06]"
             >
               <Plus size={10} />
               Create Persona
@@ -270,7 +270,7 @@ export function ManagePersonasModal({
                   setAutoGenerating(false);
                 }
               }}
-              className="flex items-center gap-1 text-[10px] px-2 py-1 rounded-md bg-purple-400/10 text-purple-300 hover:bg-purple-400/20 disabled:opacity-50"
+              className="flex items-center gap-1 text-2xs px-2 py-1 rounded-md bg-purple-400/10 text-purple-300 hover:bg-purple-400/20 disabled:opacity-50"
             >
               {autoGenerating ? "Generating..." : "Auto-generate"}
             </button>
@@ -279,7 +279,7 @@ export function ManagePersonasModal({
           <button
             type="button"
             onClick={onClose}
-            className="text-[10px] px-3 py-1 rounded-md bg-white/[0.06] text-muted-foreground hover:text-foreground"
+            className="text-2xs px-3 py-1 rounded-md bg-white/[0.06] text-muted-foreground hover:text-foreground"
           >
             Done
           </button>

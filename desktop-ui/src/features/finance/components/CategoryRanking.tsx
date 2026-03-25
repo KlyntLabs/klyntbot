@@ -22,7 +22,7 @@ export function CategoryRanking({
 
   if (breakdown.length === 0) {
     return (
-      <p className="text-[12px] text-dim font-light text-center py-4">
+      <p className="text-xs text-dim font-light text-center py-4">
         No spending data for this period.
       </p>
     );
@@ -36,13 +36,13 @@ export function CategoryRanking({
         return (
           <div key={row.category} className="flex items-center gap-3">
             {/* Color dot */}
-            <div className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: colorHex }} />
+            <div className="size-2 rounded-full shrink-0" style={{ backgroundColor: colorHex }} />
             {/* Category name */}
-            <span className="flex-1 text-[12px] font-light text-muted-foreground truncate capitalize">
+            <span className="flex-1 text-xs font-light text-muted-foreground truncate capitalize">
               {row.category}
             </span>
             {/* Amount */}
-            <span className="text-[12px] font-light text-foreground tabular-nums">
+            <span className="text-xs font-light text-foreground tabular-nums">
               {fmtCompact(convertTotal(row.total), displayCur, hidden)}
             </span>
             {/* Percentage */}

@@ -1,4 +1,5 @@
 mod agent;
+mod atoms;
 mod channels;
 mod coaching;
 mod cognitive;
@@ -74,6 +75,9 @@ impl AppCore {
             provider,
         } = storage::init_storage(config_override).await?;
 
+        // ── Hot-reloadable config subset (shared between agent + AppCore) ──
+        let hot_config = Arc::new(RwLock::new(config::HotConfig::from(&config)));
+
         // ── Shared: Bus + cognitive provider + domain event bus ──────────
         // Created once here in the orchestrator. Both cron and agent receive
         // references to the same instances (matches the original single-fn flow).
@@ -98,6 +102,7 @@ impl AppCore {
             suggestion_applier,
             decomposition_handler,
             forecast_handler,
+            autotuner,
         } = cron::init_cron(
             &config,
             &repos,
@@ -107,6 +112,7 @@ impl AppCore {
             provider.clone(),
             &domain_event_bus,
             feature_tasks::TasksConfig::default(),
+            vector_store.clone(),
         )
         .await?;
 
@@ -124,6 +130,10 @@ impl AppCore {
         } else {
             None
         };
+        // Keep a clone of embedding_engine and vector_store for AppCore fields
+        // (used by flashcard embedding and compute_answer_similarity).
+        let appcore_embedding_engine = Some(Arc::clone(&embedding_engine));
+        let appcore_vector_store = vector_store.clone();
 
         // ── Insight embedder (reuses the same EmbeddingEngine) ──
         let insight_embedder: Arc<dyn feature_insights::InsightEmbedder> =
@@ -143,6 +153,7 @@ impl AppCore {
                 ::cognitive::EpisodicMemoryRepo::new(storage_pool.inner().clone()),
                 ::cognitive::ProceduralRuleRepo::new(storage_pool.inner().clone()),
                 ::cognitive::repos::EntityRepo::new(storage_pool.inner().clone()),
+                ::cognitive::KnowledgeAtomRepo::new(storage_pool.inner().clone()),
             ),
         );
 
@@ -161,6 +172,7 @@ impl AppCore {
             inbound_rx,
             pipeline_broadcast_tx,
             user_situation,
+            active_view,
             activity_svc,
         } = agent::init_agent(
             &config,
@@ -174,6 +186,8 @@ impl AppCore {
             &cron_service,
             &notification_dispatcher,
             &notification_sender,
+            autotuner.as_ref(),
+            Arc::clone(&hot_config),
         )
         .await?;
 
@@ -213,6 +227,7 @@ impl AppCore {
             intervention_router,
             feedback_tracker,
             coaching_service,
+            coaching_intervention_log_repo,
         } = coaching::init_coaching(
             mode,
             &config,
@@ -233,6 +248,97 @@ impl AppCore {
         let launcher::LauncherResult { launcher_engine } =
             launcher::init_launcher(&config, &storage_pool, &shutdown_token).await;
 
+        // ── Phase 9: Mirror self-reflection layer ────────────────────────
+        let (mirror_facade, mirror_handles, mirror_shutdown) = {
+            let mirror_repo = ::cognitive::mirror::MirrorRepo::new(storage_pool.clone());
+            let narrative_handler: Option<Arc<dyn ::cognitive::mirror::NarrativeHandler>> =
+                cognitive_provider.as_ref().map(|cp| {
+                    let model = config
+                        .cognitive
+                        .model
+                        .as_deref()
+                        .unwrap_or(&config.agents.defaults.model)
+                        .to_string();
+                    Arc::new(::agent::mirror_handlers::LlmNarrativeHandler::new(
+                        cp.clone(),
+                        model,
+                    )) as Arc<dyn ::cognitive::mirror::NarrativeHandler>
+                });
+            let autotuner_bridge: Option<Arc<dyn ::cognitive::mirror::AutotunerBridge>> =
+                autotuner.as_ref().map(|orch| {
+                    Arc::new(crate::adapters::autotuner_bridge::AppAutotunerBridge::new(
+                        Arc::clone(orch),
+                    )) as Arc<dyn ::cognitive::mirror::AutotunerBridge>
+                });
+            let episodic_repo = Some(::cognitive::EpisodicMemoryRepo::new(
+                storage_pool.inner().clone(),
+            ));
+            let (facade, handles, shutdown) = ::cognitive::mirror::MirrorEngine::start(
+                mirror_repo,
+                Arc::clone(&domain_event_bus),
+                narrative_handler,
+                autotuner_bridge,
+                episodic_repo,
+            );
+
+            // Bootstrap brain version 1 on first run
+            let bootstrap_repo = ::cognitive::mirror::MirrorRepo::new(storage_pool.clone());
+            let bootstrap_archiver = ::cognitive::mirror::ConfigArchiver::new(bootstrap_repo, None);
+            tokio::spawn(async move {
+                let _ = bootstrap_archiver.bootstrap(serde_json::json!({})).await;
+            });
+
+            info!("mirror self-reflection engine started");
+            (Some(Arc::new(facade)), Some(handles), Some(shutdown))
+        };
+
+        // ── Auto-create note on trial kill (fire-and-forget) ─────────────
+        {
+            let note_repo = note_repo.clone();
+            let mut rx = domain_event_bus.subscribe();
+            tokio::spawn(async move {
+                while let Ok(event) = rx.recv().await {
+                    if let bus::DomainEvent::MirrorTrialKilled { trial_id } = event {
+                        let now = feature_notes::repo::utc_now_str();
+                        let row = feature_notes::models::NoteRow {
+                            id: uuid::Uuid::new_v4().to_string(),
+                            notebook_id: None,
+                            title: format!("Killed experiment: {trial_id}"),
+                            body: "Manually killed this experiment trial from the Mirror."
+                                .to_string(),
+                            body_html: None,
+                            pinned: 0,
+                            archived: 0,
+                            icon: None,
+                            color: None,
+                            embedding_updated_at: None,
+                            split_content: None,
+                            split_mode: None,
+                            perspective_config: None,
+                            last_visited_at: None,
+                            created_at: now.clone(),
+                            updated_at: now,
+                        };
+                        if let Err(e) = note_repo.create_note(&row).await {
+                            tracing::warn!(
+                                "mirror: failed to auto-create note for killed trial {trial_id}: {e}"
+                            );
+                        }
+                    }
+                }
+            });
+        }
+
+        // ── Wrap config for shared ownership ─────────────────────────────
+        let shared_config = Arc::new(RwLock::new(config));
+
+        // ── Config file watcher (hot-reload) ──────────────────────────────
+        let config_watcher_token = crate::infrastructure::config_watcher::start_config_watcher(
+            Arc::clone(&shared_config),
+            Arc::clone(&hot_config),
+            shutdown_token.clone(),
+        );
+
         // ── Assemble AppCore ─────────────────────────────────────────────
         let core = AppCore {
             mode,
@@ -241,13 +347,17 @@ impl AppCore {
             agent: Arc::clone(&agent),
             bus: bus.clone(),
             persona_manager,
-            config: RwLock::new(config),
+            config: Arc::clone(&shared_config),
+            hot_config: Arc::clone(&hot_config),
             channel_manager: channel_manager.clone(),
             cron_service: cron_service.clone(),
             shutdown_token: shutdown_token.clone(),
             active_streams: Arc::new(dashmap::DashMap::new()),
             pending_interactions: Arc::new(dashmap::DashMap::new()),
             note_repo,
+            practice_repo: feature_notes::repo::PracticeSessionRepo::new(
+                storage_pool.inner().clone(),
+            ),
             productivity_repos,
             focus_manager,
             productivity_engine,
@@ -259,16 +369,19 @@ impl AppCore {
             pattern_detector,
             intervention_router,
             feedback_tracker,
+            coaching_intervention_log_repo,
             user_situation: Some(user_situation),
+            active_view: Some(active_view),
             coaching_service: coaching_service.map(|cs| Arc::new(Mutex::new(cs))),
             cognitive_provider,
             pipeline_broadcast: Some(pipeline_broadcast_tx),
             event_log_repo: Some(::cognitive::EventLogRepo::new(storage_pool.inner().clone())),
             consecutive_coaching_ignores: Arc::new(std::sync::atomic::AtomicI32::new(0)),
             activity_ingestion_service: Some(Arc::clone(&activity_svc)),
-            active_task_focus: Arc::new(std::sync::Mutex::new(None)),
             event_emitter: event_emitter.unwrap_or_else(|| Arc::new(NoopEmitter)),
             note_embedding_handler,
+            embedding_engine: appcore_embedding_engine,
+            vector_store: appcore_vector_store,
             launcher_engine,
             proactive_handler,
             suggestion_applier,
@@ -283,7 +396,6 @@ impl AppCore {
                     scope_resolver,
                     feature_insights::SmartMergeEngine::new(insight_repo),
                     feature_insights::PromptBuilder::new(Arc::clone(&cognitive_accessor)),
-                    cognitive_accessor,
                     Arc::new(
                         crate::adapters::flashcard_accessor::FlashcardAccessorImpl::new(
                             storage_pool.inner().clone(),
@@ -296,34 +408,128 @@ impl AppCore {
             flashcard_repo: Some(::cognitive::FlashcardRepo::new(
                 storage_pool.inner().clone(),
             )),
+            knowledge_atom_repo: Some(::cognitive::KnowledgeAtomRepo::new(
+                storage_pool.inner().clone(),
+            )),
             persona_repo: Some(::cognitive::PersonaRepo::new(storage_pool.inner().clone())),
             squad_repo: Some(::cognitive::SquadRepo::new(storage_pool.inner().clone())),
+            review_session_repo: Some(::cognitive::ReviewSessionRepo::new(
+                storage_pool.inner().clone(),
+            )),
+            deck_preference_repo: Some(::cognitive::DeckPreferenceRepo::new(
+                storage_pool.inner().clone(),
+            )),
+            autotuner,
+            mirror_facade,
+            _mirror_handles: mirror_handles,
+            _mirror_shutdown: mirror_shutdown,
+            _config_watcher_token: Some(config_watcher_token),
         };
 
-        // ── Background insight progress refresh (daily) ──────────────────
+        // ── One-time vocab → Knowledge Atoms migration ──────────────────
+        {
+            let pool = storage_pool.inner().clone();
+            tokio::spawn(async move {
+                // Short delay to let the app finish starting
+                tokio::time::sleep(std::time::Duration::from_secs(3)).await;
+                match atoms::migrate_vocab_to_atoms(&pool).await {
+                    Ok(0) => {}
+                    Ok(n) => info!("Migrated {n} vocabulary items to Knowledge Atoms"),
+                    Err(e) => tracing::warn!("Knowledge Atom migration error: {e}"),
+                }
+            });
+        }
+
+        // ── Insight progress refresh (registered post-init — deps available now) ──
         if let Some(ref insight_svc) = core.insight_service {
             let svc = Arc::clone(insight_svc);
             let note_repo_clone = core.note_repo.clone();
-            let token = shutdown_token.clone();
-            tokio::spawn(async move {
-                // Initial delay so the app finishes starting
-                tokio::time::sleep(std::time::Duration::from_secs(60)).await;
-                loop {
-                    if token.is_cancelled() {
-                        break;
-                    }
-                    match cron::refresh_insight_progress(&svc, &note_repo_clone).await {
-                        Ok(Some(msg)) => info!("{msg}"),
-                        Ok(None) => {}
-                        Err(e) => tracing::debug!("insight progress refresh error: {e}"),
-                    }
-                    // Sleep ~24 hours (86400 seconds)
-                    tokio::select! {
-                        _ = tokio::time::sleep(std::time::Duration::from_secs(86400)) => {}
-                        _ = token.cancelled() => break,
-                    }
-                }
-            });
+            let rt = tokio::runtime::Handle::current();
+            cron_service.register_handler(
+                cron::JOB_INSIGHT_REFRESH,
+                Arc::new(move |_job: &scheduling::CronJob| {
+                    let svc = Arc::clone(&svc);
+                    let note_repo_clone = note_repo_clone.clone();
+                    tokio::task::block_in_place(|| {
+                        rt.block_on(async move {
+                            match cron::refresh_insight_progress(&svc, &note_repo_clone).await {
+                                Ok(Some(msg)) => Ok(Some(msg)),
+                                Ok(None) => Ok(Some("No insights to refresh".to_string())),
+                                Err(e) => Ok(Some(format!("Insight refresh failed: {e}"))),
+                            }
+                        })
+                    })
+                }),
+            );
+        }
+
+        // ── Mirror cron jobs (registered post-init — needs mirror_facade) ──
+        if let Some(ref facade) = core.mirror_facade {
+            let rt = tokio::runtime::Handle::current();
+
+            // Weekly narrative generation
+            {
+                let facade = Arc::clone(facade);
+                let rt = rt.clone();
+                cron_service.register_handler(
+                    cron::JOB_MIRROR_WEEKLY_NARRATIVE,
+                    Arc::new(move |_job: &scheduling::CronJob| {
+                        let facade = Arc::clone(&facade);
+                        tokio::task::block_in_place(|| {
+                            rt.block_on(async move {
+                                match facade.generate_weekly_narrative().await {
+                                    Ok(narrative) => {
+                                        info!(
+                                            "Mirror weekly narrative generated: {}",
+                                            narrative.id
+                                        );
+                                        Ok(Some(format!(
+                                            "Mirror narrative generated: {}",
+                                            narrative.id
+                                        )))
+                                    }
+                                    Err(e) => {
+                                        tracing::warn!("Mirror weekly narrative failed: {e}");
+                                        Ok(Some(format!("Mirror narrative failed: {e}")))
+                                    }
+                                }
+                            })
+                        })
+                    }),
+                );
+            }
+
+            // Cleanup old snapshots and snippets (retain 90 days)
+            {
+                let mirror_repo = ::cognitive::mirror::MirrorRepo::new(storage_pool.clone());
+                cron_service.register_handler(
+                    cron::JOB_MIRROR_CLEANUP,
+                    Arc::new(move |_job: &scheduling::CronJob| {
+                        let mirror_repo = mirror_repo.clone();
+                        tokio::task::block_in_place(|| {
+                            rt.block_on(async move {
+                                let snap_count =
+                                    mirror_repo.cleanup_old_snapshots(90).await.unwrap_or(0);
+                                let snip_count =
+                                    mirror_repo.cleanup_old_snippets(90).await.unwrap_or(0);
+                                let preview_count =
+                                    mirror_repo.cleanup_old_trial_previews(90).await.unwrap_or(0);
+                                Ok(Some(format!(
+                                    "Mirror cleanup: deleted {snap_count} snapshots, {snip_count} snippets, {preview_count} trial previews"
+                                )))
+                            })
+                        })
+                    }),
+                );
+            }
+        }
+
+        // ── Register MirrorTool in agent's tool registry (post-init) ──────
+        if let Some(ref facade) = core.mirror_facade {
+            let reg = core.agent.tool_registry();
+            let mut registry = reg.write().await;
+            registry.register(tools::MirrorTool::new(Arc::clone(facade)));
+            info!("Mirror tool registered");
         }
 
         // ── Background note embedding catch-up ────────────────────────────

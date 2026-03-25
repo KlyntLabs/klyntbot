@@ -1,4 +1,5 @@
-import { Clipboard, FileText, Loader2, MessageSquare } from "lucide-react";
+import { ThinkingDots } from "@shared/ui/ThinkingDots";
+import { Clipboard, FileText, MessageSquare } from "lucide-react";
 import { useState } from "react";
 import { NotePicker } from "./NotePicker";
 
@@ -21,8 +22,8 @@ export function QuickGenerate({
   if (generating) {
     return (
       <div className="glass-card p-4 flex items-center justify-center gap-2">
-        <Loader2 size={16} className="text-brand animate-spin" strokeWidth={1.5} />
-        <span className="text-sm text-muted-foreground">Generating cards...</span>
+        <ThinkingDots size="sm" />
+        <span className="text-sm text-muted-foreground">Generating cards</span>
       </div>
     );
   }
@@ -30,7 +31,7 @@ export function QuickGenerate({
   if (mode === "note") {
     return (
       <div className="glass-card p-4">
-        <p className="text-[12px] text-muted-foreground mb-2">Select a note to generate from:</p>
+        <p className="text-xs text-muted-foreground mb-2">Select a note to generate from:</p>
         <NotePicker
           onSelect={(note) => {
             setMode(null);
@@ -45,20 +46,19 @@ export function QuickGenerate({
   if (mode === "clipboard") {
     return (
       <div className="glass-card p-4 space-y-2">
-        <p className="text-[12px] text-muted-foreground">Paste text to generate flashcards:</p>
+        <p className="text-xs text-muted-foreground">Paste text to generate flashcards:</p>
         <textarea
           value={clipboardText}
           onChange={(e) => setClipboardText(e.target.value)}
           placeholder="Paste content here..."
           className="w-full bg-muted/50 rounded-lg px-3 py-2 text-sm text-foreground placeholder:text-dim resize-none"
           rows={4}
-          autoFocus
         />
         <div className="flex items-center justify-between">
           <button
             type="button"
             onClick={() => setMode(null)}
-            className="text-[12px] text-muted-foreground hover:text-foreground"
+            className="text-xs text-muted-foreground hover:text-foreground"
           >
             Cancel
           </button>
@@ -71,7 +71,7 @@ export function QuickGenerate({
               }
             }}
             disabled={!clipboardText.trim()}
-            className="glass-button px-3 py-1.5 text-[12px] text-foreground disabled:opacity-40"
+            className="glass-button px-3 py-1.5 text-xs text-foreground disabled:opacity-40"
           >
             Generate
           </button>
@@ -107,7 +107,7 @@ export function QuickGenerate({
         >
           <MessageSquare size={14} strokeWidth={1.5} />
           From last chat...
-          <span className="ml-auto text-[10px]">Soon</span>
+          <span className="ml-auto text-2xs">Soon</span>
         </button>
       </div>
     </div>

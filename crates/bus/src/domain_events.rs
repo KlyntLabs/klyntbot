@@ -248,6 +248,16 @@ pub enum DomainEvent {
     UserCorrectedAI {
         original: String,
         correction: String,
+        kind: CorrectionKind,
+        strength: f64,
+        session_key: String,
+        active_skill: Option<String>,
+    },
+    AutotunerDecision {
+        trial_id: String,
+        verdict: String,
+        improvement_pct: f64,
+        affected_params: Vec<String>,
     },
 
     // -- Coaching feedback --
@@ -264,6 +274,107 @@ pub enum DomainEvent {
         detail: String,
     },
 
+    // -- Knowledge Atoms --
+    KnowledgeAtomCreated {
+        atom_id: String,
+        atom_type: String,
+        domain: String,
+        source_note_id: Option<String>,
+        personal_importance: f64,
+    },
+    KnowledgeAtomAccepted {
+        atom_id: String,
+        atom_type: String,
+    },
+    KnowledgeAtomArchived {
+        atom_id: String,
+        reason: String,
+    },
+    AtomFlashcardReviewed {
+        atom_id: String,
+        card_id: String,
+        quality: u8,
+        recall_speed_ms: u64,
+        new_retention_pct: f64,
+        source_note_id: Option<String>,
+    },
+    AtomReinforced {
+        atom_id: String,
+        referencing_note_id: String,
+        new_salience: f64,
+    },
+    AtomInteracted {
+        atom_id: String,
+        interaction_type: String,
+        note_id: Option<String>,
+    },
+    RetentionMilestoneReached {
+        atom_id: String,
+        topic_id: Option<String>,
+        new_retention_pct: f64,
+        milestone: String,
+        previous_pct: f64,
+    },
+    TranslationCompleted {
+        note_id: String,
+        source_lang: String,
+        target_lang: String,
+        word_count: usize,
+        is_selection: bool,
+    },
+    NoteStudied {
+        note_id: String,
+        duration_secs: u64,
+        atoms_reviewed: usize,
+        mode: String,
+    },
+    PracticeUnitCompleted {
+        session_id: String,
+        note_id: String,
+        unit_index: u32,
+        grade: String,
+        scores: String,
+        confidence_rating: u8,
+        edited: bool,
+    },
+    PracticeSessionCompleted {
+        session_id: String,
+        note_id: String,
+        units_completed: u32,
+        average_score: f64,
+        source_lang: String,
+        target_lang: String,
+        weak_unit_count: u32,
+    },
+    FlashcardSessionCompleted {
+        session_id: String,
+        cards_reviewed: usize,
+        avg_score: f64,
+        weak_domains: Vec<String>,
+        propagation_count: usize,
+    },
+    KnowledgeTransferDetected {
+        atom_id: String,
+        from_domain: String,
+        to_domain: String,
+        confidence: f64,
+    },
+    CoachingLearningDigest {
+        fading_count: usize,
+        archived_count: usize,
+        streak_days: usize,
+        strongest_topic: Option<String>,
+        weakest_topic: Option<String>,
+    },
+
+    // -- Productivity interventions --
+    InterventionTriggered {
+        intervention_type: String,
+        urgency: String,
+        message: String,
+        suggested_action: String,
+    },
+
     // -- Contradiction detection (Phase 3 prep) --
     ContradictionDetected {
         existing_subject: String,
@@ -272,6 +383,43 @@ pub enum DomainEvent {
         new_object: String,
         confidence: f64,
     },
+
+    /// A memory write is below the confidence threshold and needs user confirmation.
+    MemoryPendingConfirmation {
+        fact_id: String,
+        subject: String,
+        predicate: String,
+        object: String,
+    },
+
+    // -- Agent routing --
+    /// Emitted when AgentRuntime selects an orchestrator skill for a message.
+    SkillRouted {
+        skill_name: String,
+        confidence: f64,
+        source: String,
+        trigger_phrases: Vec<String>,
+        session_key: String,
+    },
+
+    // -- Autotuner trials --
+    /// Emitted when the autotuner creates a new trial for evaluation.
+    TrialActivated {
+        trial_id: String,
+        hypothesis: String,
+        params_summary: String,
+    },
+
+    // -- Mirror self-reflection --
+    /// Emitted when user kills an experiment trial via the Mirror UI.
+    MirrorTrialKilled {
+        trial_id: String,
+    },
+    /// Emitted when the Mirror layer creates a new NarrativeSnippet for the user.
+    MirrorSnippetCreated {
+        snippet_id: String,
+        headline: String,
+    },
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -279,6 +427,15 @@ pub enum FeedbackResponse {
     Helpful,
     Dismissed,
     StopSuggesting,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum CorrectionKind {
+    Reaction,
+    KeywordPrefix,
+    /// User indicated the AI forgot something they previously mentioned.
+    MemoryMiss,
 }
 
 /// Broadcast bus for DomainEvents.
@@ -376,5 +533,70 @@ mod tests {
         let json = serde_json::to_string(&event).unwrap();
         let deserialized: DomainEvent = serde_json::from_str(&json).unwrap();
         assert!(matches!(deserialized, DomainEvent::UserStatedFact { .. }));
+    }
+
+    #[test]
+    fn correction_kind_roundtrip() {
+        let kind = CorrectionKind::Reaction;
+        let json = serde_json::to_string(&kind).unwrap();
+        assert_eq!(json, "\"reaction\"");
+        let parsed: CorrectionKind = serde_json::from_str(&json).unwrap();
+        assert_eq!(parsed, CorrectionKind::Reaction);
+
+        let kind2 = CorrectionKind::KeywordPrefix;
+        let json2 = serde_json::to_string(&kind2).unwrap();
+        assert_eq!(json2, "\"keyword_prefix\"");
+
+        let kind3 = CorrectionKind::MemoryMiss;
+        let json3 = serde_json::to_string(&kind3).unwrap();
+        assert_eq!(json3, "\"memory_miss\"");
+    }
+
+    #[test]
+    fn user_corrected_ai_with_kind_roundtrip() {
+        let event = DomainEvent::UserCorrectedAI {
+            original: "test".into(),
+            correction: "fixed".into(),
+            kind: CorrectionKind::Reaction,
+            strength: 1.0,
+            session_key: "desktop:main".into(),
+            active_skill: Some("general".into()),
+        };
+        let json = serde_json::to_string(&event).unwrap();
+        let parsed: DomainEvent = serde_json::from_str(&json).unwrap();
+        match parsed {
+            DomainEvent::UserCorrectedAI {
+                kind,
+                strength,
+                session_key,
+                active_skill,
+                ..
+            } => {
+                assert_eq!(kind, CorrectionKind::Reaction);
+                assert!((strength - 1.0).abs() < f64::EPSILON);
+                assert_eq!(session_key, "desktop:main");
+                assert_eq!(active_skill, Some("general".to_string()));
+            }
+            _ => panic!("Expected UserCorrectedAI"),
+        }
+    }
+
+    #[test]
+    fn autotuner_decision_roundtrip() {
+        let event = DomainEvent::AutotunerDecision {
+            trial_id: "abc-123".into(),
+            verdict: "promoted".into(),
+            improvement_pct: 12.5,
+            affected_params: vec!["heuristic_confidence_threshold".into()],
+        };
+        let json = serde_json::to_string(&event).unwrap();
+        assert!(json.contains("promoted"));
+        let parsed: DomainEvent = serde_json::from_str(&json).unwrap();
+        match parsed {
+            DomainEvent::AutotunerDecision { verdict, .. } => {
+                assert_eq!(verdict, "promoted");
+            }
+            _ => panic!("Expected AutotunerDecision"),
+        }
     }
 }

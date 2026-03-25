@@ -57,6 +57,7 @@ pub enum ReviewQuality {
 pub struct NewFlashcard {
     pub source_note_id: Option<String>,
     pub source_context: Option<String>,
+    pub atom_id: Option<String>,
     pub deck: String,
     pub front: String,
     pub back: String,
@@ -67,6 +68,8 @@ pub struct NewFlashcard {
     pub tags: Vec<String>,
     pub stability: f64,
     pub difficulty: f64,
+    pub difficulty_estimate: Option<i32>,
+    pub prerequisite_concepts: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow)]
@@ -74,6 +77,7 @@ pub struct FlashcardRow {
     pub id: String,
     pub source_note_id: Option<String>,
     pub source_context: Option<String>,
+    pub atom_id: Option<String>,
     pub deck: String,
     pub front: String,
     pub back: String,
@@ -91,6 +95,11 @@ pub struct FlashcardRow {
     pub state: String,
     pub suspended: i64,
     pub recall_speed_ms: Option<i64>,
+    pub back_embedding_updated_at: Option<String>,
+    pub preferred_mode: Option<String>,
+    pub difficulty_estimate: Option<i32>,
+    pub prerequisite_concepts: Option<String>,
+    pub card_distractors: Option<String>,
     pub created_at: String,
     pub updated_at: String,
 }
@@ -127,6 +136,10 @@ impl FlashcardRepo {
         Self { pool }
     }
 
+    pub fn pool(&self) -> &SqlitePool {
+        &self.pool
+    }
+
     /// Insert a batch of new flashcards. All cards are immediately due.
     pub async fn create_batch(
         &self,
@@ -146,24 +159,29 @@ impl FlashcardRepo {
             sqlx::query(
                 r#"
                 INSERT INTO flashcards
-                    (id, source_note_id, source_context,
+                    (id, source_note_id, source_context, atom_id,
                      deck, front, back, card_type,
                      cloze_data, vocab_data, image_data, tags,
                      stability, difficulty, due_at, last_reviewed_at,
                      review_count, lapses, state, suspended, recall_speed_ms,
+                     back_embedding_updated_at, preferred_mode,
+                     difficulty_estimate, prerequisite_concepts, card_distractors,
                      created_at, updated_at)
                 VALUES
-                    (?1, ?2, ?3,
-                     ?4, ?5, ?6, ?7,
-                     ?8, ?9, ?10, ?11,
-                     ?12, ?13, ?14, NULL,
+                    (?1, ?2, ?3, ?4,
+                     ?5, ?6, ?7, ?8,
+                     ?9, ?10, ?11, ?12,
+                     ?13, ?14, ?15, NULL,
                      0, 0, 'new', 0, NULL,
-                     ?15, ?15)
+                     NULL, NULL,
+                     ?16, ?17, NULL,
+                     ?18, ?18)
                 "#,
             )
             .bind(&id)
             .bind(&card.source_note_id)
             .bind(&card.source_context)
+            .bind(&card.atom_id)
             .bind(&card.deck)
             .bind(&card.front)
             .bind(&card.back)
@@ -175,6 +193,8 @@ impl FlashcardRepo {
             .bind(card.stability)
             .bind(card.difficulty)
             .bind(&now)
+            .bind(card.difficulty_estimate)
+            .bind(&card.prerequisite_concepts)
             .bind(&now)
             .execute(&self.pool)
             .await?;
@@ -188,6 +208,50 @@ impl FlashcardRepo {
         }
 
         Ok(rows)
+    }
+
+    /// Get the next review card for an atom: due card first, fallback to most recent.
+    pub async fn next_for_atom(&self, atom_id: &str) -> Result<Option<FlashcardRow>, sqlx::Error> {
+        let now = Utc::now().to_rfc3339();
+        // Single query: prioritize due cards, then fall back to most recently created
+        sqlx::query_as::<_, FlashcardRow>(
+            r#"
+            SELECT * FROM flashcards
+            WHERE atom_id = ?1
+              AND suspended = 0
+            ORDER BY
+                CASE WHEN due_at IS NULL OR due_at <= ?2 THEN 0 ELSE 1 END,
+                due_at ASC,
+                created_at DESC
+            LIMIT 1
+            "#,
+        )
+        .bind(atom_id)
+        .bind(&now)
+        .fetch_optional(&self.pool)
+        .await
+    }
+
+    /// Find existing card fronts in a deck (for dedup before batch create).
+    pub async fn find_existing_fronts(
+        &self,
+        deck: &str,
+        fronts: &[String],
+    ) -> Result<std::collections::HashSet<String>, sqlx::Error> {
+        if fronts.is_empty() {
+            return Ok(std::collections::HashSet::new());
+        }
+        let placeholders: Vec<String> = (0..fronts.len()).map(|i| format!("?{}", i + 2)).collect();
+        let query = format!(
+            "SELECT DISTINCT front FROM flashcards WHERE front IN ({}) AND deck = ?1",
+            placeholders.join(", ")
+        );
+        let mut q = sqlx::query_as::<_, (String,)>(&query).bind(deck);
+        for f in fronts {
+            q = q.bind(f);
+        }
+        let rows = q.fetch_all(&self.pool).await?;
+        Ok(rows.into_iter().map(|(f,)| f).collect())
     }
 
     /// Fetch cards in `deck` that are due for review.
@@ -382,6 +446,7 @@ impl FlashcardRepo {
     }
 
     /// Update a card's front, back, deck, tags, and type-specific data.
+    #[allow(clippy::too_many_arguments)]
     pub async fn update_card(
         &self,
         id: &str,
@@ -500,6 +565,31 @@ impl FlashcardRepo {
         Ok(row.0)
     }
 
+    /// Persist generated distractors for a card (caching for multiple-choice mode).
+    pub async fn update_distractors(
+        &self,
+        id: &str,
+        distractors_json: &str,
+    ) -> Result<(), sqlx::Error> {
+        sqlx::query("UPDATE flashcards SET card_distractors = ?1 WHERE id = ?2")
+            .bind(distractors_json)
+            .bind(id)
+            .execute(&self.pool)
+            .await?;
+        Ok(())
+    }
+
+    /// Set `back_embedding_updated_at` to now for a card after its back embedding is computed.
+    pub async fn update_embedding_timestamp(&self, id: &str) -> Result<(), sqlx::Error> {
+        let now = Utc::now().to_rfc3339();
+        sqlx::query("UPDATE flashcards SET back_embedding_updated_at = ?1 WHERE id = ?2")
+            .bind(&now)
+            .bind(id)
+            .execute(&self.pool)
+            .await?;
+        Ok(())
+    }
+
     /// Delete all cards in a deck.
     pub async fn delete_deck(&self, deck: &str) -> Result<u64, sqlx::Error> {
         let result = sqlx::query("DELETE FROM flashcards WHERE deck = ?1")
@@ -507,6 +597,28 @@ impl FlashcardRepo {
             .execute(&self.pool)
             .await?;
         Ok(result.rows_affected())
+    }
+
+    /// Count flashcards linked to each atom_id.
+    pub async fn count_by_atom_ids(
+        &self,
+        atom_ids: &[String],
+    ) -> Result<std::collections::HashMap<String, i64>, sqlx::Error> {
+        if atom_ids.is_empty() {
+            return Ok(Default::default());
+        }
+        let placeholders: Vec<String> =
+            (0..atom_ids.len()).map(|i| format!("?{}", i + 1)).collect();
+        let query = format!(
+            "SELECT atom_id, COUNT(*) FROM flashcards WHERE atom_id IN ({}) GROUP BY atom_id",
+            placeholders.join(", ")
+        );
+        let mut q = sqlx::query_as::<_, (String, i64)>(&query);
+        for id in atom_ids {
+            q = q.bind(id);
+        }
+        let rows = q.fetch_all(&self.pool).await?;
+        Ok(rows.into_iter().collect())
     }
 
     /// Load FSRS-5 weights and desired retention.
@@ -531,6 +643,126 @@ impl FlashcardRepo {
             None => Ok((crate::services::fsrs5::DEFAULT_WEIGHTS, 0.9)),
         }
     }
+
+    /// Find flashcards whose `source_note_id` is connected via the `note_links` table
+    /// to the given note. Both directions of the link are followed.
+    /// Limit 20, excludes the reviewed card, skips suspended.
+    pub async fn find_cards_linked_by_notes(
+        &self,
+        source_note_id: &str,
+        exclude_card_id: &str,
+    ) -> Result<Vec<FlashcardRow>, sqlx::Error> {
+        sqlx::query_as::<_, FlashcardRow>(
+            r#"
+            SELECT DISTINCT f.* FROM flashcards f
+            INNER JOIN note_links nl
+                ON (f.source_note_id = nl.target_id OR f.source_note_id = nl.source_id)
+            WHERE (nl.source_id = ?1 OR nl.target_id = ?1)
+              AND f.source_note_id != ?1
+              AND f.id != ?2
+              AND f.suspended = 0
+            LIMIT 20
+            "#,
+        )
+        .bind(source_note_id)
+        .bind(exclude_card_id)
+        .fetch_all(&self.pool)
+        .await
+    }
+
+    /// Find flashcards sharing the same atom domain as the given atom.
+    /// Joins `flashcards` → `knowledge_atoms` on matching domain.
+    /// Limit 20, excludes the reviewed card, skips suspended.
+    pub async fn find_cards_same_domain(
+        &self,
+        atom_id: &str,
+        exclude_card_id: &str,
+    ) -> Result<Vec<FlashcardRow>, sqlx::Error> {
+        sqlx::query_as::<_, FlashcardRow>(
+            r#"
+            SELECT f.* FROM flashcards f
+            INNER JOIN knowledge_atoms ka ON f.atom_id = ka.id
+            WHERE ka.domain = (SELECT domain FROM knowledge_atoms WHERE id = ?1)
+              AND f.id != ?2
+              AND f.suspended = 0
+            LIMIT 20
+            "#,
+        )
+        .bind(atom_id)
+        .bind(exclude_card_id)
+        .fetch_all(&self.pool)
+        .await
+    }
+
+    /// Extend a card's `due_at` by a fraction of its current interval.
+    /// Cap boost at 20% of the interval. Only applies to cards due within 48 hours.
+    pub async fn apply_propagation_boost(
+        &self,
+        card_id: &str,
+        boost_fraction: f64,
+    ) -> Result<(), sqlx::Error> {
+        let capped = boost_fraction.min(0.20);
+        let now = Utc::now().to_rfc3339();
+
+        // Only boost cards that are due within 48 hours from now.
+        // The boost extends due_at by `capped * interval_seconds` where
+        // interval = due_at - last_reviewed_at (or created_at).
+        sqlx::query(
+            r#"
+            UPDATE flashcards
+            SET due_at = datetime(due_at, '+' || CAST(
+                ROUND(?1 * (julianday(due_at) - julianday(COALESCE(last_reviewed_at, created_at))) * 86400)
+                AS INTEGER) || ' seconds'),
+                updated_at = ?3
+            WHERE id = ?2
+              AND suspended = 0
+              AND due_at IS NOT NULL
+              AND due_at <= datetime(?3, '+48 hours')
+              AND last_reviewed_at IS NOT NULL
+            "#,
+        )
+        .bind(capped)
+        .bind(card_id)
+        .bind(&now)
+        .execute(&self.pool)
+        .await?;
+
+        Ok(())
+    }
+
+    /// Reduce a card's `due_at` by a tiny fraction (pull it forward).
+    /// Max penalty is 0.08. Only affects cards due within 72 hours.
+    pub async fn apply_propagation_penalty(
+        &self,
+        card_id: &str,
+        max_penalty: f64,
+    ) -> Result<(), sqlx::Error> {
+        let capped = max_penalty.min(0.08);
+        let now = Utc::now().to_rfc3339();
+
+        // Reduce due_at by `capped * interval_seconds` (pull due date closer).
+        sqlx::query(
+            r#"
+            UPDATE flashcards
+            SET due_at = datetime(due_at, '-' || CAST(
+                ROUND(?1 * (julianday(due_at) - julianday(COALESCE(last_reviewed_at, created_at))) * 86400)
+                AS INTEGER) || ' seconds'),
+                updated_at = ?3
+            WHERE id = ?2
+              AND suspended = 0
+              AND due_at IS NOT NULL
+              AND due_at <= datetime(?3, '+72 hours')
+              AND last_reviewed_at IS NOT NULL
+            "#,
+        )
+        .bind(capped)
+        .bind(card_id)
+        .bind(&now)
+        .execute(&self.pool)
+        .await?;
+
+        Ok(())
+    }
 }
 
 // ── Tests ────────────────────────────────────────────────────────
@@ -549,6 +781,7 @@ mod tests {
         NewFlashcard {
             source_note_id: source_note_id.map(|s| s.to_string()),
             source_context: None,
+            atom_id: None,
             deck: deck.to_string(),
             front: "What is 2 + 2?".to_string(),
             back: "4".to_string(),
@@ -559,6 +792,8 @@ mod tests {
             tags: vec![],
             stability: 1.0,
             difficulty: 5.0,
+            difficulty_estimate: None,
+            prerequisite_concepts: None,
         }
     }
 
@@ -566,6 +801,7 @@ mod tests {
         NewFlashcard {
             source_note_id: Some("note-lang".to_string()),
             source_context: Some("食べてみる is used in casual speech".to_string()),
+            atom_id: None,
             deck: deck.to_string(),
             front: "食べてみる".to_string(),
             back: "to try eating".to_string(),
@@ -582,6 +818,8 @@ mod tests {
             tags: vec!["japanese".to_string(), "n3".to_string()],
             stability: 1.0,
             difficulty: 5.0,
+            difficulty_estimate: None,
+            prerequisite_concepts: None,
         }
     }
 

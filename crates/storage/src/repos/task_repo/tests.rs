@@ -53,7 +53,9 @@ async fn create_test_tables(db: &sqlx::SqlitePool) {
                 context_snapshot     TEXT,
                 energy_level         TEXT DEFAULT 'medium',
                 estimated_focus_blocks INTEGER,
-                complexity_score     INTEGER
+                complexity_score     INTEGER,
+                scheduled_start      TEXT,
+                scheduled_end        TEXT
             )
             "#,
     )
@@ -277,6 +279,8 @@ fn make_task(id: &str, title: &str) -> TaskRow {
         complexity_score: None,
         completed: false,
         objective_id: None,
+        scheduled_start: None,
+        scheduled_end: None,
     }
 }
 
@@ -811,6 +815,7 @@ async fn test_estimation_stats() {
         complexity_score: Some(5),
         energy_level: Some("medium".to_string()),
         tags: vec!["coding".to_string()],
+        project_id: None,
         completed_at: now,
     };
     repo.record_estimation(&est1).await.unwrap();
@@ -824,6 +829,7 @@ async fn test_estimation_stats() {
         complexity_score: Some(3),
         energy_level: Some("low".to_string()),
         tags: vec!["review".to_string()],
+        project_id: None,
         completed_at: now,
     };
     repo.record_estimation(&est2).await.unwrap();

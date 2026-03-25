@@ -1,5 +1,5 @@
 import { ChevronRight } from "lucide-react";
-import { forwardRef, type ReactNode, useEffect, useRef } from "react";
+import { type ReactNode, useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
 
 // ── Menu Root ───────────────────────────────────────────────────────────
@@ -9,12 +9,10 @@ interface ContextMenuProps {
   y: number;
   children: ReactNode;
   onClose: () => void;
+  ref?: React.Ref<HTMLDivElement>;
 }
 
-export const ContextMenu = forwardRef<HTMLDivElement, ContextMenuProps>(function ContextMenu(
-  { x, y, children, onClose },
-  ref,
-) {
+export function ContextMenu({ x, y, children, onClose, ref }: ContextMenuProps) {
   const innerRef = useRef<HTMLDivElement>(null);
   const menuRef = (ref as React.RefObject<HTMLDivElement>) ?? innerRef;
 
@@ -65,7 +63,7 @@ export const ContextMenu = forwardRef<HTMLDivElement, ContextMenuProps>(function
     </div>,
     document.body,
   );
-});
+}
 
 // ── Menu Item ───────────────────────────────────────────────────────────
 
@@ -90,7 +88,7 @@ export function ContextMenuItem({ children, onClick, destructive, icon }: Contex
       }`}
     >
       {icon && (
-        <span className="w-4 h-4 flex items-center justify-center shrink-0 opacity-70">{icon}</span>
+        <span className="size-4 flex items-center justify-center shrink-0 opacity-70">{icon}</span>
       )}
       <span className="flex-1 truncate">{children}</span>
     </button>
@@ -133,12 +131,12 @@ export function ContextMenuSubmenu({
         className="w-[calc(100%-10px)] mx-[5px] px-2.5 py-[5px] text-[13px] font-normal rounded-md flex items-center gap-2.5 text-left text-muted-foreground hover:bg-muted focus:bg-muted hover:text-foreground focus:text-foreground transition-colors outline-none focus-visible:outline-none"
       >
         {icon && (
-          <span className="w-4 h-4 flex items-center justify-center shrink-0 opacity-70">
+          <span className="size-4 flex items-center justify-center shrink-0 opacity-70">
             {icon}
           </span>
         )}
         <span className="flex-1 truncate">{label}</span>
-        <ChevronRight className="w-3 h-3 opacity-40" />
+        <ChevronRight className="size-3 opacity-40" />
       </button>
       {open && (
         <div

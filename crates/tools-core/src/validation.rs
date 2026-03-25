@@ -1,6 +1,33 @@
 //! JSON Schema validation for tool parameters.
 
+use std::collections::HashMap;
+use std::sync::{Mutex, OnceLock};
+
 use serde_json::Value;
+
+/// Global cache for compiled regexes used in JSON Schema `pattern` validation.
+/// Tool schemas define a small, fixed set of patterns that are reused on every
+/// invocation — caching avoids recompiling on each call.
+fn regex_cache() -> &'static Mutex<HashMap<String, regex::Regex>> {
+    static CACHE: OnceLock<Mutex<HashMap<String, regex::Regex>>> = OnceLock::new();
+    CACHE.get_or_init(|| Mutex::new(HashMap::new()))
+}
+
+/// Get or compile a regex pattern, caching the result.
+fn get_or_compile_regex(pattern: &str) -> Option<regex::Regex> {
+    let cache = regex_cache();
+    let mut map = cache.lock().unwrap();
+    if let Some(re) = map.get(pattern) {
+        return Some(re.clone());
+    }
+    match regex::Regex::new(pattern) {
+        Ok(re) => {
+            map.insert(pattern.to_string(), re.clone());
+            Some(re)
+        }
+        Err(_) => None,
+    }
+}
 
 /// Validate a value against a JSON Schema, returning human-readable error messages.
 pub(crate) fn validate_value(val: &Value, schema: &Value, path: &str) -> Vec<String> {
@@ -32,7 +59,7 @@ pub(crate) fn validate_value(val: &Value, schema: &Value, path: &str) -> Vec<Str
                 }
             }
             if let Some(pattern) = schema.get("pattern").and_then(|v| v.as_str()) {
-                if let Ok(re) = regex::Regex::new(pattern) {
+                if let Some(re) = get_or_compile_regex(pattern) {
                     if !re.is_match(s) {
                         errors.push(format!("{} must match pattern {}", label, pattern));
                     }

@@ -16,13 +16,14 @@ export function ConsensusIndicator({
   // Show round progress instead of raw Jaccard score (which is misleading for natural language)
   if (round && totalRounds) {
     return (
-      <div className="flex items-center gap-1.5 text-[10px] text-dim">
+      <div className="flex items-center gap-1.5 text-2xs text-dim">
         <span>
           Round {round}/{totalRounds}
         </span>
         <div className="flex gap-0.5">
           {Array.from({ length: totalRounds }, (_, i) => (
             <div
+              // biome-ignore lint/suspicious/noArrayIndexKey: static indicator dots from Array.from
               key={`round-dot-${i}`}
               className={`w-1.5 h-1.5 rounded-full transition-all ${
                 i < (round ?? 0)
@@ -41,7 +42,7 @@ export function ConsensusIndicator({
 
   // Fallback: simple consensus badge
   if (reached) {
-    return <span className="text-[10px] text-green-400">Consensus reached</span>;
+    return <span className="text-2xs text-green-400">Consensus reached</span>;
   }
 
   return null;

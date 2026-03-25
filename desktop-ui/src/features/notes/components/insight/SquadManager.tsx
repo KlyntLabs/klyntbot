@@ -150,9 +150,11 @@ export function SquadManager({ open, onClose }: SquadManagerProps) {
 
   return createPortal(
     <div className="fixed inset-0 z-50 flex items-center justify-center">
+      {/* biome-ignore lint/a11y/noStaticElementInteractions: backdrop overlay with role=presentation */}
       <div
         className="absolute inset-0 bg-black/60 backdrop-blur-sm"
         onClick={onClose}
+        onKeyDown={() => {}}
         role="presentation"
       />
 
@@ -176,12 +178,10 @@ export function SquadManager({ open, onClose }: SquadManagerProps) {
           <div className="w-[220px] border-r border-border flex flex-col shrink-0">
             <div className="flex-1 overflow-y-auto p-2 space-y-1">
               {loading && (
-                <div className="px-2 py-4 text-[10px] text-dim text-center italic">Loading...</div>
+                <div className="px-2 py-4 text-2xs text-dim text-center italic">Loading...</div>
               )}
               {!loading && squads.length === 0 && !showCreate && (
-                <div className="px-2 py-4 text-[10px] text-dim text-center italic">
-                  No squads yet
-                </div>
+                <div className="px-2 py-4 text-2xs text-dim text-center italic">No squads yet</div>
               )}
               {squads.map((squad) => (
                 <SquadListItem
@@ -205,7 +205,7 @@ export function SquadManager({ open, onClose }: SquadManagerProps) {
                   setShowCreate(true);
                   setSelectedSquadId(null);
                 }}
-                className="flex items-center gap-1 w-full text-[10px] px-2 py-1.5 rounded-md bg-white/[0.04] text-muted-foreground hover:text-foreground hover:bg-white/[0.06] transition-colors"
+                className="flex items-center gap-1 w-full text-2xs px-2 py-1.5 rounded-md bg-white/[0.04] text-muted-foreground hover:text-foreground hover:bg-white/[0.06] transition-colors"
               >
                 <Plus size={10} />
                 New Squad
@@ -257,7 +257,7 @@ export function SquadManager({ open, onClose }: SquadManagerProps) {
           <button
             type="button"
             onClick={onClose}
-            className="text-[10px] px-3 py-1 rounded-md bg-white/[0.06] text-muted-foreground hover:text-foreground"
+            className="text-2xs px-3 py-1 rounded-md bg-white/[0.06] text-muted-foreground hover:text-foreground"
           >
             Done
           </button>
@@ -366,19 +366,19 @@ function SquadDetail({
           <p className="text-[11px] text-muted-foreground leading-relaxed">{squad.description}</p>
         )}
         <div className="flex items-center gap-3 mt-2">
-          <span className="text-[10px] text-dim">
+          <span className="text-2xs text-dim">
             <Settings2 size={9} className="inline mr-0.5" />
             {squad.orchestratorSkill}
           </span>
           {squad.domains.length > 0 && (
-            <span className="text-[10px] text-dim">{squad.domains.join(", ")}</span>
+            <span className="text-2xs text-dim">{squad.domains.join(", ")}</span>
           )}
         </div>
       </div>
 
       {/* Members list */}
       <div>
-        <div className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider mb-2">
+        <div className="text-2xs font-medium text-muted-foreground uppercase tracking-wider mb-2">
           Members ({squad.members.length})
         </div>
         <div className="space-y-1">
@@ -391,7 +391,7 @@ function SquadDetail({
             />
           ))}
           {squad.members.length === 0 && (
-            <div className="text-[10px] text-dim italic py-2">No members yet</div>
+            <div className="text-2xs text-dim italic py-2">No members yet</div>
           )}
         </div>
       </div>
@@ -399,7 +399,7 @@ function SquadDetail({
       {/* Add member (user squads only) */}
       {isUser && (
         <div>
-          <div className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider mb-2">
+          <div className="text-2xs font-medium text-muted-foreground uppercase tracking-wider mb-2">
             Add Member
           </div>
           <div className="flex items-center gap-2">
@@ -430,7 +430,7 @@ function SquadDetail({
               type="button"
               onClick={onAddMember}
               disabled={!addingPersonaId}
-              className="text-[10px] px-2.5 py-1.5 rounded-md bg-purple-400/20 text-purple-300 hover:bg-purple-400/30 disabled:opacity-50 shrink-0"
+              className="text-2xs px-2.5 py-1.5 rounded-md bg-purple-400/20 text-purple-300 hover:bg-purple-400/30 disabled:opacity-50 shrink-0"
             >
               Add
             </button>
@@ -457,7 +457,7 @@ function MemberRow({
       <span className="text-sm shrink-0">{member.personaIcon}</span>
       <div className="flex-1 min-w-0">
         <div className="text-[11px] font-medium text-foreground truncate">{member.personaName}</div>
-        <div className="text-[10px] text-dim truncate">{member.personaRole}</div>
+        <div className="text-2xs text-dim truncate">{member.personaRole}</div>
       </div>
       <span className="flex items-center gap-0.5 text-[9px] text-dim shrink-0">
         {member.roleInSquad === "lead" ? (
@@ -481,7 +481,7 @@ function MemberRow({
       {/* Tooltip on hover (CSS-driven) */}
       <div className="absolute left-full ml-2 top-0 z-10 glass-panel rounded-lg p-2 w-48 shadow-xl pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity">
         <div className="text-[11px] font-medium text-foreground">{member.personaName}</div>
-        <div className="text-[10px] text-muted-foreground mt-0.5">{member.personaRole}</div>
+        <div className="text-2xs text-muted-foreground mt-0.5">{member.personaRole}</div>
         <div className="text-[9px] text-dim mt-1">
           Role in squad: <span className="text-muted-foreground">{member.roleInSquad}</span>
         </div>
@@ -529,7 +529,7 @@ function CreateSquadForm({
 }) {
   return (
     <div className="space-y-3">
-      <div className="text-[12px] font-medium text-foreground">Create New Squad</div>
+      <div className="text-xs font-medium text-foreground">Create New Squad</div>
 
       <div className="grid grid-cols-[1fr_60px] gap-2">
         <input
@@ -559,7 +559,7 @@ function CreateSquadForm({
 
       <div className="grid grid-cols-2 gap-2">
         <label className="block">
-          <span className="text-[10px] text-dim block mb-1">Orchestrator Skill</span>
+          <span className="text-2xs text-dim block mb-1">Orchestrator Skill</span>
           <select
             value={form.orchestratorSkill}
             onChange={(e) =>
@@ -578,7 +578,7 @@ function CreateSquadForm({
           </select>
         </label>
         <label className="block">
-          <span className="text-[10px] text-dim block mb-1">Domains (comma-sep)</span>
+          <span className="text-2xs text-dim block mb-1">Domains (comma-sep)</span>
           <input
             type="text"
             placeholder="e.g. code, devops"
@@ -591,7 +591,7 @@ function CreateSquadForm({
 
       {/* Persona multi-select */}
       <div>
-        <span className="text-[10px] text-dim block mb-1">
+        <span className="text-2xs text-dim block mb-1">
           Members ({selectedMemberIds.length} selected)
         </span>
         <div className="glass-card rounded-md p-2 max-h-[140px] overflow-y-auto space-y-1">
@@ -606,7 +606,7 @@ function CreateSquadForm({
                   type="checkbox"
                   checked={isSelected}
                   onChange={() => onToggleMember(p.id)}
-                  className="w-3 h-3 accent-purple-400"
+                  className="size-3 accent-purple-400"
                 />
                 <span className="text-sm">{p.icon}</span>
                 <span className="text-[11px] text-foreground truncate">{p.name}</span>
@@ -614,7 +614,7 @@ function CreateSquadForm({
             );
           })}
           {allPersonas.length === 0 && (
-            <div className="text-[10px] text-dim italic py-1">No personas available</div>
+            <div className="text-2xs text-dim italic py-1">No personas available</div>
           )}
         </div>
       </div>
@@ -623,7 +623,7 @@ function CreateSquadForm({
         <button
           type="button"
           onClick={onCancel}
-          className="text-[10px] px-3 py-1 rounded-md text-muted-foreground hover:text-foreground"
+          className="text-2xs px-3 py-1 rounded-md text-muted-foreground hover:text-foreground"
         >
           Cancel
         </button>
@@ -631,7 +631,7 @@ function CreateSquadForm({
           type="button"
           onClick={onCreate}
           disabled={creating || !form.name.trim()}
-          className="text-[10px] px-3 py-1.5 rounded-md bg-purple-400/20 text-purple-300 hover:bg-purple-400/30 disabled:opacity-50"
+          className="text-2xs px-3 py-1.5 rounded-md bg-purple-400/20 text-purple-300 hover:bg-purple-400/30 disabled:opacity-50"
         >
           {creating ? "Creating..." : "Create Squad"}
         </button>

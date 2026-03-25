@@ -7,7 +7,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex as StdMutex};
 use tokio::sync::Mutex as TokioMutex;
-use tracing::{debug, warn};
+use tracing::{debug, error, warn};
 use uuid::Uuid;
 
 use common::{KlyntbotError, Result};
@@ -39,6 +39,10 @@ pub struct Session {
     /// Optional squad ID — when set, this session uses multi-persona squad execution.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub squad_id: Option<String>,
+
+    /// Messages remaining before next keyword correction can fire (0 = ready).
+    #[serde(default)]
+    pub correction_cooldown: u32,
 }
 
 impl Session {
@@ -52,6 +56,7 @@ impl Session {
             updated_at: now,
             metadata: HashMap::new(),
             squad_id: None,
+            correction_cooldown: 0,
         }
     }
 
@@ -110,6 +115,52 @@ impl Session {
     pub fn clear(&mut self) {
         self.messages.clear();
         self.updated_at = Utc::now();
+    }
+
+    /// Validate session integrity and auto-repair issues.
+    /// Returns the number of repairs made.
+    pub fn validate_and_repair(&mut self) -> usize {
+        let mut repairs = 0;
+
+        // Remove orphaned tool messages (tool message without preceding assistant tool_calls)
+        let mut i = 0;
+        while i < self.messages.len() {
+            if self.messages[i].role == "tool" {
+                let has_nearby_tool_call = self.messages[..i]
+                    .iter()
+                    .rev()
+                    .take(10)
+                    .any(|m| m.role == "assistant" && m.tool_calls.is_some());
+
+                if !has_nearby_tool_call {
+                    tracing::debug!(
+                        "Removing orphaned tool message at index {} in session {}",
+                        i,
+                        self.key
+                    );
+                    self.messages.remove(i);
+                    repairs += 1;
+                    continue;
+                }
+            }
+            i += 1;
+        }
+
+        // Ensure timestamps are monotonically increasing
+        let mut last_ts = chrono::DateTime::<chrono::Utc>::MIN_UTC;
+        for msg in &mut self.messages {
+            if msg.timestamp < last_ts {
+                msg.timestamp = last_ts + chrono::Duration::milliseconds(1);
+                repairs += 1;
+            }
+            last_ts = msg.timestamp;
+        }
+
+        if repairs > 0 {
+            tracing::info!("Session '{}' repaired: {} fixes applied", self.key, repairs);
+        }
+
+        repairs
     }
 }
 
@@ -205,6 +256,7 @@ impl SessionManager {
             updated_at: row.updated_at,
             metadata,
             squad_id: row.squad_id,
+            correction_cooldown: 0,
         }
     }
 
@@ -239,15 +291,51 @@ impl SessionManager {
 
         // Handle evictions (async, LRU lock already released)
         for old_key in evict_keys {
-            if let Some((_, session_arc)) = self.sessions.remove(&old_key) {
-                let session = session_arc.lock().await;
-                if let Err(e) = self.save(&session).await {
-                    warn!(
-                        "Failed to save evicted session {}: {}. Data may be lost.",
-                        old_key, e
-                    );
+            // Save BEFORE removing from cache to prevent data loss.
+            // Clone the Arc out of the DashMap ref immediately to avoid holding
+            // the shard read lock across async await points.
+            let session_arc = self.sessions.get(&old_key).map(|r| r.value().clone());
+            let save_result = if let Some(session_arc) = session_arc {
+                // Clone session data and release the mutex immediately so concurrent
+                // access to this session is not blocked during retries + sleep.
+                let session_snapshot = session_arc.lock().await.clone();
+                let mut saved = false;
+                for attempt in 1..=3u32 {
+                    match self.save(&session_snapshot).await {
+                        Ok(_) => {
+                            saved = true;
+                            break;
+                        }
+                        Err(e) => {
+                            warn!("Eviction save attempt {}/3 for {}: {}", attempt, old_key, e);
+                            if attempt < 3 {
+                                tokio::time::sleep(std::time::Duration::from_millis(
+                                    100 * attempt as u64,
+                                ))
+                                .await;
+                            }
+                        }
+                    }
                 }
+                saved
+            } else {
+                // Session already removed by another task — nothing to save
+                true
+            };
+
+            if save_result {
+                self.sessions.remove(&old_key);
                 debug!("Evicted session from cache: {}", old_key);
+            } else {
+                // Re-add to LRU to retry eviction next time.
+                // This prevents data loss at the cost of temporarily exceeding max_cache_size.
+                error!(
+                    "Failed to persist evicted session {} after 3 attempts, \
+                     keeping in cache to prevent data loss",
+                    old_key
+                );
+                let mut lru = self.lru_order.lock().unwrap();
+                lru.insert(old_key, ());
             }
         }
 
@@ -260,7 +348,9 @@ impl SessionManager {
         let session = match self.sql_repo.get_session(&key).await {
             Ok(row) => {
                 let msgs = self.sql_repo.get_messages(&key).await?;
-                Self::row_to_session(row, msgs)
+                let mut session = Self::row_to_session(row, msgs);
+                session.validate_and_repair();
+                session
             }
             Err(storage::StorageError::NotFound(_)) => {
                 let metadata = serde_json::Value::Object(serde_json::Map::new());
@@ -423,8 +513,12 @@ impl SessionManager {
 
     /// Delete a session
     pub async fn delete(&self, key: &str) -> Result<bool> {
-        // Remove from cache
+        // Remove from cache and LRU tracking
         self.sessions.remove(key);
+        {
+            let mut lru = self.lru_order.lock().unwrap();
+            lru.shift_remove(key);
+        }
 
         self.sql_repo
             .delete_session(key)
@@ -622,6 +716,41 @@ mod tests {
         );
     }
 
+    #[tokio::test]
+    async fn test_delete_session_removes_from_lru() {
+        let pool = sqlx::SqlitePool::connect(":memory:").await.unwrap();
+        let repo = storage::SessionRepo::new(pool);
+        let manager = SessionManager::from_repo(repo, 1000).await;
+
+        let key = "test:delete-lru";
+
+        // Insert into cache + LRU
+        manager.sessions.insert(
+            key.to_string(),
+            Arc::new(TokioMutex::new(Session::new(key))),
+        );
+        manager
+            .lru_order
+            .lock()
+            .unwrap()
+            .insert(key.to_string(), ());
+
+        assert!(manager.has_session(key));
+        assert!(manager.lru_order.lock().unwrap().contains_key(key));
+
+        // delete should remove from both sessions and lru_order
+        let _ = manager.delete(key).await;
+
+        assert!(
+            !manager.has_session(key),
+            "session should no longer be in cache after delete"
+        );
+        assert!(
+            !manager.lru_order.lock().unwrap().contains_key(key),
+            "session key should be removed from LRU order after delete"
+        );
+    }
+
     #[test]
     fn test_has_session_false_when_not_cached() {
         let key = "any:key";
@@ -703,5 +832,110 @@ mod tests {
         .await;
 
         assert!(result.is_ok(), "tasks deadlocked or timed out");
+    }
+
+    #[test]
+    fn test_validate_removes_orphaned_tool_messages() {
+        let mut session = Session::new("test-validate".to_string());
+        session.add_message("user", "hello");
+        session.add_message("assistant", "hi there");
+        // Add orphaned tool result (no preceding assistant with tool_calls)
+        session.add_structured_message("tool", "result data", None, None, None);
+
+        assert_eq!(session.messages.len(), 3);
+        let repairs = session.validate_and_repair();
+        assert!(repairs > 0);
+        assert_eq!(session.messages.len(), 2);
+    }
+
+    #[test]
+    fn test_validate_preserves_valid_session() {
+        let mut session = Session::new("test-valid".to_string());
+        session.add_message("user", "hello");
+        session.add_message("assistant", "hi");
+        session.add_message("user", "thanks");
+
+        let repairs = session.validate_and_repair();
+        assert_eq!(repairs, 0);
+        assert_eq!(session.messages.len(), 3);
+    }
+
+    #[test]
+    fn test_validate_empty_session() {
+        let mut session = Session::new("test-empty".to_string());
+        let repairs = session.validate_and_repair();
+        assert_eq!(repairs, 0);
+    }
+
+    #[test]
+    fn test_validate_preserves_tool_message_with_tool_calls() {
+        let mut session = Session::new("test-valid-tool".to_string());
+        session.add_message("user", "search for rust");
+        // Assistant with tool_calls
+        session.add_structured_message(
+            "assistant",
+            "",
+            None,
+            Some(serde_json::json!([{"name": "search", "arguments": {"q": "rust"}}])),
+            None,
+        );
+        // Tool response (not orphaned — preceded by assistant with tool_calls)
+        session.add_structured_message("tool", "search results", None, None, None);
+
+        assert_eq!(session.messages.len(), 3);
+        let repairs = session.validate_and_repair();
+        assert_eq!(repairs, 0);
+        assert_eq!(session.messages.len(), 3);
+    }
+
+    #[test]
+    fn test_validate_fixes_out_of_order_timestamps() {
+        let mut session = Session::new("test-timestamps".to_string());
+        session.add_message("user", "first");
+        session.add_message("user", "second");
+        session.add_message("user", "third");
+
+        // Manually set timestamps out of order
+        let base = Utc::now();
+        session.messages[0].timestamp = base;
+        session.messages[1].timestamp = base - chrono::Duration::seconds(10); // out of order
+        session.messages[2].timestamp = base + chrono::Duration::seconds(10);
+
+        let repairs = session.validate_and_repair();
+        assert_eq!(repairs, 1);
+        // The second message should now be after the first
+        assert!(session.messages[1].timestamp >= session.messages[0].timestamp);
+        // All timestamps should be monotonically increasing
+        for i in 1..session.messages.len() {
+            assert!(session.messages[i].timestamp >= session.messages[i - 1].timestamp);
+        }
+    }
+
+    #[tokio::test]
+    async fn test_eviction_preserves_session_on_save_failure() {
+        let pool = storage::StoragePool::connect_in_memory().await.unwrap();
+        let repo = storage::SessionRepo::new(pool.inner().clone());
+        let manager = SessionManager::from_repo(repo, 2).await;
+
+        let _s1 = manager.get_or_create("key-1", None).await.unwrap();
+        let _s2 = manager.get_or_create("key-2", None).await.unwrap();
+
+        {
+            let s1 = manager.get_or_create("key-1", None).await.unwrap();
+            let mut session = s1.lock().await;
+            session.add_message("user", "important data");
+        }
+
+        let _s3 = manager.get_or_create("key-3", None).await.unwrap();
+
+        let s1_reloaded = manager.get_or_create("key-1", None).await.unwrap();
+        let session = s1_reloaded.lock().await;
+        assert!(
+            session
+                .messages
+                .iter()
+                .any(|m| m.role == "user" && m.content.contains("important data")),
+            "Evicted session should be recoverable from DB"
+        );
     }
 }

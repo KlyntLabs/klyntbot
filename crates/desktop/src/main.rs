@@ -146,6 +146,16 @@ fn run_mcp_stdio() {
 }
 
 fn run_desktop_app() {
+    // Initialize tracing so info!/warn!/debug! output to stderr
+    {
+        use tracing_subscriber::EnvFilter;
+        let filter = EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("info"));
+        tracing_subscriber::fmt()
+            .with_env_filter(filter)
+            .with_writer(std::io::stderr)
+            .init();
+    }
+
     tauri::Builder::default()
         .plugin(tauri_plugin_global_shortcut::Builder::new().build())
         .plugin(tauri_plugin_notification::init())
@@ -180,15 +190,92 @@ fn run_desktop_app() {
                         let host = config.mcp.server.host.clone();
                         let port = config.mcp.server.port;
                         let whitelist = config.mcp.server.exposed_tools.clone();
+                        let auth_config = config.mcp.server.auth.clone();
                         drop(config);
+
                         tracing::info!("Starting embedded MCP HTTP server on {host}:{port}");
-                        let handler =
-                            klyntbot_server::KlyntbotServerHandler::new(mcp_core, whitelist);
-                        // TODO: Wire rmcp streamable HTTP server transport
-                        tracing::warn!(
-                            "HTTP transport not yet implemented — MCP server not started"
+
+                        use rmcp::transport::streamable_http_server::{
+                            session::local::LocalSessionManager, StreamableHttpServerConfig,
+                            StreamableHttpService,
+                        };
+                        use tokio_util::sync::CancellationToken;
+
+                        let ct = CancellationToken::new();
+                        let mcp_config = StreamableHttpServerConfig {
+                            cancellation_token: ct.clone(),
+                            ..Default::default()
+                        };
+
+                        let factory_app = mcp_core;
+                        let mcp_service: StreamableHttpService<
+                            klyntbot_server::KlyntbotServerHandler,
+                            LocalSessionManager,
+                        > = StreamableHttpService::new(
+                            move || {
+                                Ok(klyntbot_server::KlyntbotServerHandler::new(
+                                    factory_app.clone(),
+                                    whitelist.clone(),
+                                ))
+                            },
+                            std::sync::Arc::new(LocalSessionManager::default()),
+                            mcp_config,
                         );
-                        let _ = handler;
+
+                        let mut router = axum::Router::new().nest_service("/mcp", mcp_service);
+
+                        // Wire bearer-token auth middleware if configured.
+                        if auth_config.enabled {
+                            if let Some(ref token) = auth_config.token {
+                                let expected = token.expose().clone();
+                                router = router.layer(axum::middleware::from_fn(
+                                    move |req: axum::extract::Request,
+                                          next: axum::middleware::Next| {
+                                        use axum::response::IntoResponse;
+                                        let expected = expected.clone();
+                                        async move {
+                                            let auth_header = req
+                                                .headers()
+                                                .get(axum::http::header::AUTHORIZATION)
+                                                .and_then(|v| v.to_str().ok());
+                                            match auth_header {
+                                                Some(value)
+                                                    if value.strip_prefix("Bearer ")
+                                                        == Some(expected.as_str()) =>
+                                                {
+                                                    Ok(next.run(req).await)
+                                                }
+                                                _ => Err((
+                                                    axum::http::StatusCode::UNAUTHORIZED,
+                                                    "Unauthorized: invalid or missing Bearer token",
+                                                )
+                                                    .into_response()),
+                                            }
+                                        }
+                                    },
+                                ));
+                            }
+                        }
+
+                        let bind_addr = format!("{host}:{port}");
+                        match tokio::net::TcpListener::bind(&bind_addr).await {
+                            Ok(listener) => {
+                                tracing::info!("MCP HTTP server listening on {bind_addr}");
+                                if let Err(e) = axum::serve(listener, router)
+                                    .with_graceful_shutdown(
+                                        async move { ct.cancelled_owned().await },
+                                    )
+                                    .await
+                                {
+                                    tracing::error!("MCP HTTP server error: {e}");
+                                }
+                            }
+                            Err(e) => {
+                                tracing::error!(
+                                    "Failed to bind MCP HTTP server to {bind_addr}: {e}"
+                                );
+                            }
+                        }
                     });
                 }
             }
@@ -286,8 +373,6 @@ fn run_desktop_app() {
             commands::tasks::task_delete,
             commands::tasks::task_toggle_complete,
             commands::tasks::task_list_children,
-            commands::tasks::task_start_focus,
-            commands::tasks::task_end_focus,
             commands::tasks::task_get_suggestions,
             commands::tasks::task_apply_suggestion,
             commands::tasks::task_dismiss_suggestion,
@@ -295,6 +380,12 @@ fn run_desktop_app() {
             commands::tasks::task_apply_decomposition,
             commands::tasks::task_reject_decomposition,
             commands::tasks::task_forecast,
+            commands::tasks::task_add_dependency,
+            commands::tasks::task_list_dependencies,
+            commands::tasks::task_add_attachment,
+            commands::tasks::task_list_attachments,
+            commands::tasks::task_add_time_entry,
+            commands::tasks::task_list_time_entries,
             commands::tasks::project_list,
             commands::tasks::objective_list,
             // Notes
@@ -359,6 +450,13 @@ fn run_desktop_app() {
             commands::notes::flashcard_total_due,
             commands::notes::flashcard_generate,
             commands::notes::flashcard_save_generated,
+            commands::notes::flashcard_submit_answer,
+            commands::notes::flashcard_explain_answer,
+            commands::notes::flashcard_generate_distractors,
+            commands::notes::flashcard_save_mode_preference,
+            commands::notes::flashcard_get_mode_preference,
+            commands::notes::flashcard_get_prerequisites,
+            commands::notes::flashcard_save_session,
             // Annotations
             commands::annotations::annotation_create,
             commands::annotations::annotation_update,
@@ -366,6 +464,36 @@ fn run_desktop_app() {
             commands::annotations::annotation_list_for_note,
             commands::annotations::annotation_get_ai_suggestion,
             commands::annotations::note_get_linked_context,
+            // Language Learning
+            commands::language::language_translate_breakdown,
+            commands::language::language_evaluate_translation,
+            commands::language::language_save_vocabulary,
+            commands::language::language_detect_confusables,
+            commands::language::language_enrich_annotation,
+            commands::language::language_quick_translate,
+            // Practice Mode
+            commands::practice::practice_segment_note,
+            commands::practice::practice_start_session,
+            commands::practice::practice_submit_unit,
+            commands::practice::practice_confirm_unit,
+            commands::practice::practice_get_session,
+            commands::practice::practice_complete_session,
+            commands::practice::practice_list_sessions,
+            // Knowledge Atoms
+            commands::atoms::atoms_for_note,
+            commands::atoms::atom_accept,
+            commands::atoms::atom_dismiss,
+            commands::atoms::atom_restore,
+            commands::atoms::atom_next_card,
+            commands::atoms::atoms_bulk_accept,
+            commands::atoms::atoms_migration_status,
+            // Knowledge Health
+            commands::knowledge_health::knowledge_health_summary,
+            commands::knowledge_health::knowledge_topic_detail,
+            // Morning Briefing
+            commands::morning_briefing::morning_briefing_summary,
+            // Retention History
+            commands::retention_history::retention_history,
             // Areas
             commands::areas::area_list,
             commands::areas::area_create,
@@ -380,6 +508,7 @@ fn run_desktop_app() {
             commands::projects::project_archive,
             commands::projects::project_update_instructions,
             commands::projects::project_update_role,
+            commands::projects::project_health_metrics,
             // Entities (knowledge graph)
             commands::entities::entity_search,
             commands::entities::entity_merge,
@@ -410,6 +539,9 @@ fn run_desktop_app() {
             // Chat
             commands::chat::chat_threads,
             commands::chat::chat_messages,
+            commands::chat::chat_get_session,
+            commands::chat::chat_list_sessions_by_project,
+            commands::chat::chat_delete_stale_sessions,
             commands::chat::chat_send,
             commands::chat::chat_pin_thread,
             commands::chat::chat_rename_thread,
@@ -446,6 +578,10 @@ fn run_desktop_app() {
             commands::finance::finance_portfolio_create,
             commands::finance::finance_investment_create,
             commands::finance::finance_investment_update,
+            commands::finance::finance_allocation_target_upsert,
+            commands::finance::finance_allocation_targets,
+            commands::finance::finance_investment_tx_create,
+            commands::finance::finance_investment_txs,
             // Finance — reports
             commands::finance::finance_report_spending,
             commands::finance::finance_report_income,
@@ -481,6 +617,7 @@ fn run_desktop_app() {
             commands::productivity::productivity_insight_dismiss,
             commands::productivity::productivity_auto_focus_start,
             commands::productivity::productivity_auto_focus_end,
+            commands::productivity::productivity_auto_focus_confirm,
             commands::productivity::distraction_respond,
             commands::productivity::productivity_projects_list,
             commands::productivity::productivity_project_upsert,
@@ -555,6 +692,7 @@ fn run_desktop_app() {
             commands::cognitive::cognitive_episodic_list,
             commands::cognitive::cognitive_rules_list,
             commands::cognitive::cognitive_memory_stats,
+            commands::cognitive::memory_health,
             commands::cognitive::coaching_situation,
             commands::cognitive::coaching_signals,
             commands::cognitive::coaching_patterns,
@@ -571,8 +709,10 @@ fn run_desktop_app() {
             commands::cognitive::cognitive_run_reflection,
             commands::cognitive::coaching_reset_dismissals,
             commands::cognitive::coaching_clear_signals,
+            commands::cognitive::coaching_seed_patterns,
             commands::cognitive::coaching_submit_feedback,
             commands::cognitive::coaching_report_ignored,
+            commands::cognitive::coaching_intervention_log,
             commands::cognitive::cognitive_inject_event,
             commands::cognitive::cognitive_event_log,
             commands::cognitive::cognitive_pipeline_log,
@@ -594,6 +734,32 @@ fn run_desktop_app() {
             commands::cron::cron_update,
             // Status
             commands::status::agent_status,
+            // AutoTuner
+            commands::autotuner::autotuner_status,
+            commands::autotuner::autotuner_history,
+            commands::autotuner::autotuner_revert,
+            commands::autotuner::autotuner_pause,
+            commands::autotuner::autotuner_resume,
+            commands::autotuner::autotuner_set_pace,
+            commands::autotuner::autotuner_get_toast_count,
+            commands::autotuner::autotuner_increment_toast_count,
+            // Mirror
+            commands::mirror::get_mirror_state,
+            commands::mirror::get_routing_history,
+            commands::mirror::get_mirror_narratives,
+            commands::mirror::get_pending_snippets,
+            commands::mirror::submit_mirror_feedback,
+            commands::mirror::generate_mirror_response,
+            commands::mirror::approve_meta_rule,
+            commands::mirror::dismiss_meta_rule,
+            commands::mirror::get_brain_versions,
+            commands::mirror::revert_brain_version,
+            commands::mirror::kill_trial,
+            commands::mirror::continue_trial,
+            // Active View
+            commands::view::view_set_active,
+            commands::view::view_clear_active,
+            commands::view::view_get_active,
             // Window
             // Work Contexts
             commands::work_context::list_work_contexts,
@@ -636,7 +802,6 @@ fn run_desktop_app() {
             commands::launcher::launcher_clipboard_paste,
             commands::launcher::launcher_clipboard_delete,
             commands::launcher::launcher_clipboard_pin,
-            commands::launcher::launcher_window_action,
             commands::launcher::launcher_run_script,
             commands::launcher::launcher_system_command,
             commands::launcher::launcher_open_app,
