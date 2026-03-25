@@ -8,5 +8,5 @@ pub use engine::MirrorEngine;
 pub use facade::MirrorFacade;
 pub use narratives::{snippet_from_alert, NarrativeHandler};
 pub use repo::MirrorRepo;
-pub use subscribers::RoutingMirrorSubscriber;
+pub use subscribers::{MetaRuleDetector, RoutingMirrorSubscriber};
 pub use types::*;
