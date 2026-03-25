@@ -95,8 +95,8 @@ pub fn cognitive_migrations() -> Vec<FeatureMigration> {
         },
         FeatureMigration {
             feature_name: "cognitive_mirror".to_string(),
-            version: 2,
-            description: "Mirror Phase 1 tables (routing snapshots, trend narratives, snippets) + Phase 2 meta_rules table"
+            version: 3,
+            description: "Mirror Phase 1 tables (routing snapshots, trend narratives, snippets) + Phase 2 meta_rules table + Phase 3 brain_versions table"
                 .to_string(),
             sql: include_str!("../../migrations/003_mirror_tables.sql").to_string(),
         },

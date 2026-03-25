@@ -51,3 +51,14 @@ CREATE TABLE IF NOT EXISTS mirror_meta_rules (
     updated_at TEXT NOT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_meta_rules_status ON mirror_meta_rules(status);
+
+CREATE TABLE IF NOT EXISTS mirror_brain_versions (
+    version INTEGER PRIMARY KEY,
+    trial_id TEXT,
+    promoted_at TEXT NOT NULL,
+    params_json TEXT NOT NULL,
+    reason TEXT NOT NULL,
+    parent_version INTEGER,
+    metrics_json TEXT NOT NULL,
+    reverted INTEGER NOT NULL DEFAULT 0
+);
