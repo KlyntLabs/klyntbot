@@ -171,7 +171,7 @@ impl AnthropicNativeProvider {
                 Message::ContextUpdate { reason, content } => {
                     result.push(json!({
                         "role": "user",
-                        "content": [{"type": "text", "text": format!("<context_update reason=\"{reason}\">\n{content}\n</context_update>")}]
+                        "content": [{"type": "text", "text": Message::format_context_update_tag(reason, content)}]
                     }));
                 }
             }

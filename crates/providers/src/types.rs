@@ -462,6 +462,12 @@ impl Message {
         }
     }
 
+    /// Format a `ContextUpdate` as XML-tagged content for LLM APIs.
+    /// Shared by both OpenAI and Anthropic adapters for consistent wire format.
+    pub fn format_context_update_tag(reason: &str, content: &str) -> String {
+        format!("<context_update reason=\"{reason}\">\n{content}\n</context_update>")
+    }
+
     /// Get the role of this message
     pub fn role(&self) -> MessageRole {
         match self {

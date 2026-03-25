@@ -22,6 +22,19 @@ pub enum ContextUpdateReason {
     Custom(String),
 }
 
+impl ContextUpdateReason {
+    pub fn as_str(&self) -> &str {
+        match self {
+            Self::MemoryPromoted => "memory_promoted",
+            Self::FocusSessionStarted => "focus_session_started",
+            Self::FocusSessionEnded => "focus_session_ended",
+            Self::DistractionDetected => "distraction_detected",
+            Self::BudgetThresholdCrossed => "budget_threshold_crossed",
+            Self::Custom(s) => s,
+        }
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize)]
 #[serde(rename_all = "snake_case")]
 pub enum UpdatePriority {
@@ -62,13 +75,13 @@ impl ContextUpdateQueue {
     /// Push an update with 30-second deduplication by (reason, content).
     pub fn push(&self, update: ContextUpdate) {
         let mut queue = self.inner.lock().unwrap();
-        let dominated = queue.iter().any(|existing| {
+        let is_duplicate = queue.iter().any(|existing| {
             existing.reason == update.reason
                 && existing.content == update.content
                 && (update.timestamp - existing.timestamp).abs()
                     < Duration::seconds(DEDUP_WINDOW_SECS)
         });
-        if !dominated {
+        if !is_duplicate {
             queue.push(update);
         }
     }

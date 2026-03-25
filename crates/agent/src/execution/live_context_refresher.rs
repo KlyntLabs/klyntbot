@@ -9,6 +9,12 @@ use providers::Message;
 use serde::Serialize;
 use tracing::info;
 
+/// Standard updates reserve 20% of remaining context for the LLM response.
+const STANDARD_RESPONSE_RESERVE_PCT: usize = 20;
+
+/// High-priority updates reserve only 10%, allowing more aggressive injection.
+const HIGH_PRIORITY_RESPONSE_RESERVE_PCT: usize = 10;
+
 #[derive(Debug, Clone, Serialize)]
 pub struct ContextReassembledUpdate {
     pub reason: String,
@@ -50,26 +56,20 @@ impl LiveContextRefresher {
             .sum();
 
         let remaining = context_window.saturating_sub(current_tokens);
-        // Standard: reserve 20% for LLM response → 80% available
-        // High priority: reserve only 10% → 90% available
-        let standard_budget = remaining * 80 / 100;
-        let high_budget = remaining * 90 / 100;
+        let standard_budget = remaining * (100 - STANDARD_RESPONSE_RESERVE_PCT) / 100;
+        let high_budget = remaining * (100 - HIGH_PRIORITY_RESPONSE_RESERVE_PCT) / 100;
 
         let mut used_tokens = 0;
         let mut injected = Vec::new();
 
         for update in &updates {
+            let reason_str = update.reason.as_str();
             let content = update
                 .content
-                .clone()
-                .unwrap_or_else(|| format!("{:?}", update.reason));
+                .as_deref()
+                .unwrap_or(reason_str);
 
-            let reason_str = serde_json::to_value(&update.reason)
-                .ok()
-                .and_then(|v| v.as_str().map(String::from))
-                .unwrap_or_else(|| format!("{:?}", update.reason).to_lowercase());
-
-            let msg = Message::context_update(&reason_str, &content);
+            let msg = Message::context_update(reason_str, content);
             let tokens = context_engine::estimate_message_tokens(&*self.token_counter, &msg);
 
             let budget = if update.priority == UpdatePriority::High {
@@ -90,8 +90,8 @@ impl LiveContextRefresher {
 
             used_tokens += tokens;
             injected.push(ContextReassembledUpdate {
-                reason: reason_str,
-                summary: content,
+                reason: reason_str.to_string(),
+                summary: content.to_string(),
                 tokens,
             });
             messages.push(msg);
@@ -170,7 +170,7 @@ mod tests {
         push_memory_update(&queue, &"x".repeat(10000));
 
         let mut messages = vec![
-            providers::Message::system(&"y".repeat(10000)),
+            providers::Message::system("y".repeat(10000)),
             providers::Message::user("Hello"),
         ];
         let result = refresher.inject_pending(&mut messages, 100);

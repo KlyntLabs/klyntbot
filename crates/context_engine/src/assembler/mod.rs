@@ -584,22 +584,7 @@ impl ContextEngine {
     }
 
     fn estimate_message_tokens(&self, msg: &Message) -> usize {
-        match msg {
-            Message::System { content } => self.estimate_text(content),
-            Message::User { content } => match content {
-                providers::UserContent::Text(t) => self.estimate_text(t),
-                providers::UserContent::MultiPart(parts) => parts.len() * 10,
-            },
-            Message::Assistant { content, .. } => {
-                content
-                    .as_deref()
-                    .map(|t| self.estimate_text(t))
-                    .unwrap_or(0)
-                    + 20
-            }
-            Message::Tool { content, .. } => self.estimate_text(content) + 10,
-            Message::ContextUpdate { content, .. } => self.estimate_text(content) + 10,
-        }
+        crate::estimate_message_tokens(&*self.token_counter, msg)
     }
 
     fn estimate_tool_tokens(&self, tools: &[serde_json::Value]) -> usize {

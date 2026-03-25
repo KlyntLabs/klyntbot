@@ -187,7 +187,7 @@ impl OpenAiCompatProvider {
                     Message::ContextUpdate { reason, content } => {
                         json!({
                             "role": "system",
-                            "content": format!("<context_update reason=\"{reason}\">\n{content}\n</context_update>")
+                            "content": Message::format_context_update_tag(reason, content)
                         })
                     }
                     other => serde_json::to_value(other).expect("Message serialization"),
