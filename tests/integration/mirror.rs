@@ -4,10 +4,11 @@
 //! → state and history queries via MirrorFacade.
 
 use klyntbot::cognitive::mirror::{
-    MetaRule, MetaRuleAction, MetaRuleSource, MetaRuleStatus, MirrorFacade, MirrorRepo,
-    RoutingSnapshot, SkillRouteStats,
+    BrainVersion, MetaRule, MetaRuleAction, MetaRuleSource, MetaRuleStatus, MirrorFacade,
+    MirrorRepo, RoutingSnapshot, SkillRouteStats,
 };
 use klyntbot::cognitive::repos::cognitive_migrations;
+use klyntbot::storage::StoragePool;
 
 use super::common::test_pool;
 
@@ -132,4 +133,51 @@ async fn test_mirror_meta_rule_lifecycle() {
     repo.increment_meta_rule_signal(rule_id).await.unwrap();
     let (active, _) = facade.get_meta_rules().await.unwrap();
     assert_eq!(active[0].signal_count, 1);
+}
+
+#[tokio::test]
+async fn test_mirror_brain_version_lifecycle() {
+    let pool = test_pool().await;
+    StoragePool::run_feature_migrations(pool.inner(), &cognitive_migrations())
+        .await
+        .unwrap();
+
+    let repo = MirrorRepo::new(pool.clone());
+    let facade = MirrorFacade::new(repo.clone());
+
+    // 1. Insert v1 and v2
+    for i in 1..=2u32 {
+        let v = BrainVersion {
+            version: i,
+            trial_id: None,
+            promoted_at: chrono::Utc::now(),
+            params: serde_json::json!({"version": i}),
+            reason: format!("Version {i}"),
+            parent_version: if i > 1 { Some(i - 1) } else { None },
+            metrics_at_promotion: serde_json::json!({}),
+            reverted: false,
+        };
+        repo.insert_brain_version(&v).await.unwrap();
+    }
+
+    // 2. Verify in state
+    let state = facade.get_state().await.unwrap();
+    assert!(state.latest_brain_version.is_some());
+    assert_eq!(state.latest_brain_version.unwrap().version, 2);
+
+    // 3. Get all versions
+    let versions = facade.get_brain_versions().await.unwrap();
+    assert_eq!(versions.len(), 2);
+
+    // 4. Revert to v1 (DB only)
+    let new_v = facade.revert_to_version_db_only(1).await.unwrap();
+    assert_eq!(new_v.version, 3);
+    assert_eq!(new_v.reason, "Reverted to v1");
+
+    // 5. Verify v2 reverted, v1 and v3 not
+    let versions = facade.get_brain_versions().await.unwrap();
+    assert_eq!(versions.len(), 3);
+    assert!(!versions.iter().find(|v| v.version == 1).unwrap().reverted);
+    assert!(versions.iter().find(|v| v.version == 2).unwrap().reverted);
+    assert!(!versions.iter().find(|v| v.version == 3).unwrap().reverted);
 }

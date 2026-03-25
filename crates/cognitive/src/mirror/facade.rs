@@ -113,7 +113,7 @@ impl MirrorFacade {
     }
 
     /// Revert DB state only — used in tests without autotuner bridge.
-    pub(crate) async fn revert_to_version_db_only(&self, target: u32) -> Result<BrainVersion> {
+    pub async fn revert_to_version_db_only(&self, target: u32) -> Result<BrainVersion> {
         let target_v = self
             .repo
             .get_brain_version(target)
