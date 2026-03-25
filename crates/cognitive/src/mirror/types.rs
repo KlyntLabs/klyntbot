@@ -4,6 +4,7 @@ use std::collections::HashMap;
 use uuid::Uuid;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct MirrorState {
     pub last_routing_snapshot: Option<RoutingSnapshot>,
     pub latest_trend_narrative: Option<TrendNarrative>,
@@ -11,6 +12,7 @@ pub struct MirrorState {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct RoutingSnapshot {
     pub id: Uuid,
     pub captured_at: DateTime<Utc>,
@@ -24,6 +26,7 @@ pub struct RoutingSnapshot {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct SkillRouteStats {
     pub count: u32,
     pub percentage: f64,
@@ -32,6 +35,7 @@ pub struct SkillRouteStats {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct TrendNarrative {
     pub id: Uuid,
     pub generated_at: DateTime<Utc>,
@@ -46,6 +50,7 @@ pub struct TrendNarrative {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct NarrativeSnippet {
     pub id: Uuid,
     pub created_at: DateTime<Utc>,
@@ -58,6 +63,7 @@ pub struct NarrativeSnippet {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct MirrorResponse {
     pub answer: String,
     pub data_sources_used: Vec<String>,

@@ -1,13 +1,15 @@
-interface SkillDistribution {
-  skillName: string;
+interface SkillRouteStats {
   count: number;
   percentage: number;
+  avgConfidence: number;
+  topTriggers: string[];
 }
 
 export interface RoutingSnapshot {
-  skillDistributions: SkillDistribution[];
+  distribution: Record<string, SkillRouteStats>;
   totalMessages: number;
-  avgConfidence: number;
+  avgRoutingConfidence: number;
+  lowConfidenceCount: number;
   capturedAt: string;
 }
 
@@ -16,7 +18,7 @@ interface RoutingDonutProps {
 }
 
 export function RoutingDonut({ snapshot }: RoutingDonutProps) {
-  if (!snapshot || snapshot.skillDistributions.length === 0) {
+  if (!snapshot || Object.keys(snapshot.distribution).length === 0) {
     return (
       <div className="glass-card rounded-xl p-5">
         <h2 className="text-[13px] font-medium text-muted-foreground mb-3">Skill Routing</h2>
@@ -27,28 +29,29 @@ export function RoutingDonut({ snapshot }: RoutingDonutProps) {
     );
   }
 
-  const avgConfidencePct = Math.round(snapshot.avgConfidence * 100);
+  const entries = Object.entries(snapshot.distribution).sort(([, a], [, b]) => b.count - a.count);
+  const avgConfidencePct = Math.round(snapshot.avgRoutingConfidence * 100);
 
   return (
     <div className="glass-card rounded-xl p-5">
       <h2 className="text-[13px] font-medium text-muted-foreground mb-3">Skill Routing</h2>
       <div className="flex flex-col gap-2">
-        {snapshot.skillDistributions.map((skill) => (
-          <div key={skill.skillName} className="flex items-center gap-3">
+        {entries.map(([skillName, stats]) => (
+          <div key={skillName} className="flex items-center gap-3">
             <span
               className="text-[11px] text-muted-foreground w-32 shrink-0 truncate"
-              title={skill.skillName}
+              title={skillName}
             >
-              {skill.skillName}
+              {skillName}
             </span>
             <div className="flex-1 h-1.5 rounded-full bg-accent/40 overflow-hidden">
               <div
                 className="h-full rounded-full bg-brand/70 transition-all duration-500"
-                style={{ width: `${skill.percentage}%` }}
+                style={{ width: `${stats.percentage}%` }}
               />
             </div>
             <span className="text-[11px] text-muted-foreground tabular-nums w-8 text-right shrink-0">
-              {skill.percentage}%
+              {Math.round(stats.percentage)}%
             </span>
           </div>
         ))}

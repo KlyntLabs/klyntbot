@@ -6,7 +6,8 @@ export interface TrendNarrative {
   id: string;
   fullNarrative: string;
   generatedAt: string;
-  weekOf: string;
+  periodStart: string;
+  periodEnd: string;
 }
 
 interface NarrativeCardProps {
@@ -22,9 +23,9 @@ export function NarrativeCard({ narrative }: NarrativeCardProps) {
   const handleFeedback = async (feedback: "helpful" | "not_helpful") => {
     if (!narrative || feedbackSent || loading) return;
     await submitFeedback({
-      item_id: narrative.id,
-      target: "narrative",
-      feedback,
+      itemId: narrative.id,
+      target: "Narrative",
+      feedback: feedback === "helpful" ? "Helpful" : "NotHelpful",
     });
     setFeedbackSent(feedback);
   };
@@ -44,7 +45,9 @@ export function NarrativeCard({ narrative }: NarrativeCardProps) {
     <div className="glass-card rounded-xl p-5">
       <div className="flex items-center justify-between mb-3">
         <h2 className="text-[13px] font-medium text-muted-foreground">Weekly Reflection</h2>
-        <span className="text-2xs text-dim">Week of {narrative.weekOf}</span>
+        <span className="text-2xs text-dim">
+          {new Date(narrative.periodStart).toLocaleDateString()}
+        </span>
       </div>
       <p className="text-[12px] text-foreground leading-relaxed">{narrative.fullNarrative}</p>
       <div className="flex items-center gap-2 mt-4 pt-3 border-t border-border-subtle">
