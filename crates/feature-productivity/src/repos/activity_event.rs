@@ -176,6 +176,45 @@ impl ActivityEventRepo {
             .collect())
     }
 
+    /// Aggregate activity seconds by category type (productive/neutral/distracting).
+    /// JOINs with `activity_categories` to resolve category_id → category_type.
+    /// Returns (productive_secs, neutral_secs, distracting_secs).
+    pub async fn aggregate_by_type(
+        &self,
+        start: &DateTime<Utc>,
+        end: &DateTime<Utc>,
+    ) -> common::Result<(i64, i64, i64)> {
+        #[derive(sqlx::FromRow)]
+        struct Row {
+            category_type: Option<String>,
+            total_secs: i64,
+        }
+        let rows = sqlx::query_as::<_, Row>(
+            r#"SELECT ac.category_type, COALESCE(SUM(ae.duration_secs), 0) as total_secs
+               FROM activity_events ae
+               LEFT JOIN activity_categories ac ON ac.id = ae.category_id
+               WHERE ae.started_at >= ?1 AND ae.started_at < ?2 AND ae.is_idle = FALSE
+               GROUP BY ac.category_type"#,
+        )
+        .bind(start)
+        .bind(end)
+        .fetch_all(&self.pool)
+        .await
+        .map_err(|e| common::KlyntbotError::Storage(e.to_string()))?;
+
+        let mut productive = 0i64;
+        let mut neutral = 0i64;
+        let mut distracting = 0i64;
+        for r in rows {
+            match r.category_type.as_deref() {
+                Some("productive") => productive += r.total_secs,
+                Some("distracting") => distracting += r.total_secs,
+                _ => neutral += r.total_secs,
+            }
+        }
+        Ok((productive, neutral, distracting))
+    }
+
     /// Returns top apps/sites grouped by `COALESCE(site_name, app_name)`.
     /// For browsers this gives site-level granularity (e.g. "YouTube" instead
     /// of "Google Chrome"); for native apps it stays as the app name.

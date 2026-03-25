@@ -261,6 +261,7 @@ mod tests {
             complexity_score: Some(3),
             energy_level: Some("high".to_string()),
             tags: vec!["dev".to_string()],
+            project_id: Some("proj1".to_string()),
             completed_at: Utc::now(),
         };
         let record = EstimationRecord::from(row);

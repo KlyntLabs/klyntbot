@@ -5,6 +5,7 @@ import { useToastContext } from "@shared/hooks/useToast";
 import type {
   McpAddServerParams,
   McpConfigResponse,
+  McpServerConfig,
   McpToggleServerParams,
   OAuthStartParams,
   RecommendedMcpServer,
@@ -53,6 +54,7 @@ export function McpServersSettings() {
 
   const [dialogOpen, setDialogOpen] = useState(false);
   const [prefillServer, setPrefillServer] = useState<RecommendedMcpServer | undefined>();
+  const [editingServerName, setEditingServerName] = useState<string | null>(null);
   const [oauthLoadingServer, setOauthLoadingServer] = useState<string | null>(null);
 
   // Listen for OAuth completion/error events from the backend
@@ -69,12 +71,16 @@ export function McpServersSettings() {
 
   const handleAdd = useCallback(
     async (params: McpAddServerParams) => {
+      if (editingServerName && editingServerName !== params.name) {
+        await removeServer({ name: editingServerName });
+      }
       await addServer(params);
       refetch();
       setDialogOpen(false);
       setPrefillServer(undefined);
+      setEditingServerName(null);
     },
-    [addServer, refetch],
+    [addServer, removeServer, refetch, editingServerName],
   );
 
   const handleToggle = useCallback(
@@ -146,8 +152,25 @@ export function McpServersSettings() {
     setDialogOpen(true);
   }, []);
 
+  const handleEditCustom = useCallback((s: McpServerConfig) => {
+    setPrefillServer({
+      name: s.name,
+      author: "",
+      description: "",
+      icon: "",
+      transport: s.transport,
+      command: s.command,
+      args: s.args,
+      envKeys: s.env ? Object.keys(s.env) : [],
+      url: s.url,
+    });
+    setEditingServerName(s.name);
+    setDialogOpen(true);
+  }, []);
+
   const handleOpenAdd = useCallback(() => {
     setPrefillServer(undefined);
+    setEditingServerName(null);
     setDialogOpen(true);
   }, []);
 
@@ -200,9 +223,7 @@ export function McpServersSettings() {
                 server={server}
                 onToggle={handleToggle}
                 onRemove={handleRemove}
-                onEdit={() => {
-                  // Edit is a future enhancement — for now, remove + re-add
-                }}
+                onEdit={handleEditCustom}
               />
             ))}
           </div>
@@ -244,6 +265,7 @@ export function McpServersSettings() {
         onClose={() => {
           setDialogOpen(false);
           setPrefillServer(undefined);
+          setEditingServerName(null);
         }}
         onAdd={handleAdd}
         prefill={prefillServer}

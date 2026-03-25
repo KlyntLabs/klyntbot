@@ -171,19 +171,12 @@ pub(super) async fn build_situation_inputs(
         }
 
         // Productive ratio today (productive_secs / total_active_secs)
-        if let Ok(by_cat) = pr.events.aggregate_by_category(&today_start, &now).await {
-            let total: i64 = by_cat.iter().map(|(_, secs)| *secs).sum();
-            if total > 0 {
-                // Categories named "productive" or starting with "coding"/"development" are productive.
-                // For now, just use the ratio of non-idle time vs total, or check daily summary.
-                if let Ok(Some(summary)) = pr.summaries.get(&today_date).await {
-                    let total_work =
-                        summary.productive_secs + summary.distracting_secs + summary.neutral_secs;
-                    if total_work > 0 {
-                        inputs.productive_ratio_today =
-                            summary.productive_secs as f64 / total_work as f64;
-                    }
-                }
+        if let Ok((productive, neutral, distracting)) =
+            pr.events.aggregate_by_type(&today_start, &now).await
+        {
+            let total_work = productive + neutral + distracting;
+            if total_work > 0 {
+                inputs.productive_ratio_today = productive as f64 / total_work as f64;
             }
         }
 

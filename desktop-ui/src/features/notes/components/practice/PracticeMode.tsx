@@ -1,3 +1,4 @@
+import { ipc } from "@shared/hooks/useIpc";
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { PracticeEvalResponse } from "../../hooks/usePracticeEvaluation";
 import { usePracticeEvaluation } from "../../hooks/usePracticeEvaluation";
@@ -315,8 +316,15 @@ export function PracticeMode({
       await practiceSession.completeSession(practiceSession.session.id, true);
     };
 
-    const handleSaveAsNote = () => {
-      // Phase 1: no-op (future: create a note from the translation doc)
+    const handleSaveAsNote = async () => {
+      const lines = completeResults.map((r) => `**[${r.grade}]** ${r.finalTranslation}`);
+      const body = `# Practice Translation (${sourceLang} → ${targetLang})\n\n${lines.join("\n\n")}`;
+      const title = `Practice: ${sourceLang}→${targetLang} ${new Date().toLocaleDateString()}`;
+      try {
+        await ipc("note_create", { params: { title, body } });
+      } catch (e) {
+        console.error("Failed to save practice as note:", e);
+      }
     };
 
     return (

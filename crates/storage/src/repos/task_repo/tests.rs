@@ -815,6 +815,7 @@ async fn test_estimation_stats() {
         complexity_score: Some(5),
         energy_level: Some("medium".to_string()),
         tags: vec!["coding".to_string()],
+        project_id: None,
         completed_at: now,
     };
     repo.record_estimation(&est1).await.unwrap();
@@ -828,6 +829,7 @@ async fn test_estimation_stats() {
         complexity_score: Some(3),
         energy_level: Some("low".to_string()),
         tags: vec!["review".to_string()],
+        project_id: None,
         completed_at: now,
     };
     repo.record_estimation(&est2).await.unwrap();

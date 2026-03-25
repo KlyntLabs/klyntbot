@@ -1,29 +1,5 @@
 [
   {
-    "id": "BACK-010",
-    "title": "Live productivity score uses stub DailySummary with all zeros",
-    "description": "dashboard_emitter creates a stub DailySummary with total_focus_secs=0, focus_sessions_count=0, etc. This makes compute_productivity_score() produce degraded results during live emission.",
-    "file": "crates/feature-productivity/src/dashboard_emitter.rs",
-    "line": 81,
-    "severity": "medium",
-    "category": "stub",
-    "effort": "medium",
-    "effortNote": "Query today's focus sessions from DB to populate the DailySummary fields. Repos are available. Need to add ~15-20 lines of data fetching + mapping.",
-    "status": "open"
-  },
-  {
-    "id": "BACK-007",
-    "title": "Forecast project bonus permanently zero",
-    "description": "load_records() always sets project_id: None in estimation records because project_id is not stored in estimation rows. The 15% project similarity weight in forecasting is permanently dead.",
-    "file": "crates/agent/src/handlers/forecast.rs",
-    "line": 51,
-    "severity": "medium",
-    "category": "placeholder",
-    "effort": "medium",
-    "effortNote": "Add project_id column to estimation rows (schema change \u2014 pre-release so just alter in-place), populate on insert, read back in load_records. ~20 lines across 2 files + migration.",
-    "status": "open"
-  },
-  {
     "id": "BACK-006",
     "title": "Semantic skill routing bypassed \u2014 keyword-only",
     "description": "activate_skills() is called with an empty embedding slice (&[]), bypassing the semantic scoring path entirely. Only keyword routing is active despite semantic routing being implemented in SkillRouter.",
@@ -31,8 +7,8 @@
     "line": 330,
     "severity": "medium",
     "category": "not-implemented",
-    "effort": "medium",
-    "effortNote": "Need to generate message embedding via EmbeddingEngine before calling activate_skills. Engine exists, need to pass it to runtime and call embed(). ~15 lines but touches runtime init.",
+    "effort": "large",
+    "effortNote": "AgentRuntime has no EmbeddingEngine. Needs to thread it through the builder + runtime init. Reclassified from medium.",
     "status": "open"
   },
   {
@@ -43,68 +19,8 @@
     "line": 19,
     "severity": "medium",
     "category": "hardcoded",
-    "effort": "medium",
-    "effortNote": "Need backend commands to expose insight freshness + focus quality per project. Frontend change is ~5 lines, but requires new IPC endpoints.",
-    "status": "open"
-  },
-  {
-    "id": "BACK-036",
-    "title": "Year/Month calendar entry detail panel non-functional",
-    "description": "Both YearHeatmapView and MonthCalendarView pass onClose={() => {}} and selectedEntry={null} to SummaryPanel. The entry detail path is never reachable \u2014 clicking a day never shows details.",
-    "file": "desktop-ui/src/features/dashboard/components/YearHeatmapView.tsx",
-    "line": 161,
-    "severity": "medium",
-    "category": "not-implemented",
-    "effort": "medium",
-    "effortNote": "Add useState for selectedEntry, wire onClick on calendar cells, implement onClose. ~20 lines per view \u00d7 2 files. SummaryPanel already handles rendering.",
-    "status": "open"
-  },
-  {
-    "id": "BACK-029",
-    "title": "MCP server Edit button is no-op",
-    "description": "The Edit button on MCP server cards does nothing. Comment: 'Edit is a future enhancement \u2014 for now, remove + re-add'. Users must delete and recreate to change settings.",
-    "file": "desktop-ui/src/features/settings/pages/McpServersSettings.tsx",
-    "line": 196,
-    "severity": "low",
-    "category": "not-implemented",
-    "effort": "medium",
-    "effortNote": "Reuse the existing Add dialog with prefilled values. Wire onEdit to open dialog with server data. ~20 lines.",
-    "status": "open"
-  },
-  {
-    "id": "BACK-001",
-    "title": "Flashcard review_success_rate always returns 0.0",
-    "description": "FlashcardAccessorImpl::review_success_rate() is a stub that always returns 0.0. The old insight_review_id column was removed in the FSRS-5 migration but the replacement source_note_id-based query was never implemented. All insight retention metrics are meaningless.",
-    "file": "crates/app-core/src/adapters/flashcard_accessor.rs",
-    "line": 20,
-    "severity": "high",
-    "category": "stub",
-    "effort": "medium",
-    "effortNote": "Need to design and implement source_note_id-based query in feature-learning. Requires understanding FSRS-5 schema and how insight_review_id mapped to the new model. ~30 lines but needs schema knowledge.",
-    "status": "open"
-  },
-  {
-    "id": "BACK-011",
-    "title": "analyze_spending is a redirect stub",
-    "description": "FinanceHandlerImpl::analyze_spending() returns a static string redirecting to report_spending action instead of computing analysis. Proactive 'analyze spending for period X' agent calls are silently deflected.",
-    "file": "crates/agent/src/adapters/finance.rs",
-    "line": 285,
-    "severity": "medium",
-    "category": "stub",
-    "effort": "medium",
-    "effortNote": "Can delegate to the same logic FinanceTool::report_spending uses. Need to call TransactionRepo queries and format the result. ~30 lines.",
-    "status": "open"
-  },
-  {
-    "id": "BACK-022",
-    "title": "Productive-ratio uses coarse heuristic instead of category data",
-    "description": "Coaching productive-ratio computation falls back to reading a pre-stored DailySummary instead of computing from live category events as intended.",
-    "file": "crates/app-core/src/init/coaching.rs",
-    "line": 178,
-    "severity": "low",
-    "category": "placeholder",
-    "effort": "medium",
-    "effortNote": "Need to query activity events by category, sum productive vs total. Repos available. ~25 lines.",
+    "effort": "large",
+    "effortNote": "Requires new backend IPC endpoints for insight freshness and focus quality per project. Frontend is trivial once backend exists. Reclassified from medium.",
     "status": "open"
   },
   {
@@ -115,8 +31,8 @@
     "line": 256,
     "severity": "low",
     "category": "hardcoded",
-    "effort": "medium",
-    "effortNote": "Need to query semantic facts or activity history to detect actual peak hours. Algorithm design + data access. ~30 lines.",
+    "effort": "large",
+    "effortNote": "Needs algorithm design: query historical activity by hour, compute peak productivity windows. Reclassified from medium.",
     "status": "open"
   },
   {
@@ -259,8 +175,8 @@
     "line": 223,
     "severity": "low",
     "category": "placeholder",
-    "effort": "medium",
-    "effortNote": "Change type from Vec<String> to Vec<SemanticFact>, update all producers/consumers. Depends on SemanticFact being importable from feature-tasks (check dependency direction). ~15 lines + type plumbing.",
+    "effort": "large",
+    "effortNote": "feature-tasks (L4) cannot import cognitive (L5). SemanticFact type needs to be extracted to common or a shared crate. Reclassified from medium.",
     "status": "open"
   },
   {
@@ -319,20 +235,8 @@
     "line": 112,
     "severity": "low",
     "category": "not-implemented",
-    "effort": "medium",
-    "effortNote": "Need IPC call to agent with objective context, then render suggestion. ~30 lines frontend + agent prompt design.",
-    "status": "open"
-  },
-  {
-    "id": "BACK-031",
-    "title": "Practice mode Save as Note is no-op",
-    "description": "handleSaveAsNote in PracticeSessionComplete does nothing. Comment: 'Phase 1: no-op (future: create a note from the translation doc)'.",
-    "file": "desktop-ui/src/features/notes/components/practice/PracticeMode.tsx",
-    "line": 319,
-    "severity": "low",
-    "category": "not-implemented",
-    "effort": "medium",
-    "effortNote": "Call note_create IPC with practice session content formatted as note body. ~15 lines. Need to decide content format.",
+    "effort": "large",
+    "effortNote": "No backend endpoint exists. Needs agent integration. Reclassified from medium to large.",
     "status": "open"
   },
   {

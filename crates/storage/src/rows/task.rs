@@ -137,6 +137,7 @@ pub struct TaskEstimationRow {
     pub energy_level: Option<String>,
     #[sqlx(json)]
     pub tags: Vec<String>,
+    pub project_id: Option<String>,
     pub completed_at: DateTime<Utc>,
 }
 

@@ -281,10 +281,36 @@ impl FinanceHandler for FinanceHandlerImpl {
         }
     }
 
-    async fn analyze_spending(&self, _period: &str) -> Result<String> {
-        // Placeholder: full spending analysis is surfaced through FinanceTool's
-        // report_spending action rather than via the handler.
-        Ok("Spending analysis is available via the `report_spending` action.".to_string())
+    async fn analyze_spending(&self, period: &str) -> Result<String> {
+        let today = chrono::Local::now().date_naive();
+        let (date_from, date_to, label) = match period {
+            "week" => (today - chrono::Duration::days(7), today, "Last 7 days"),
+            "quarter" => (today - chrono::Duration::days(90), today, "Last 90 days"),
+            "year" => (today - chrono::Duration::days(365), today, "Last year"),
+            _ => (today - chrono::Duration::days(30), today, "Last 30 days"),
+        };
+
+        let currency = &self.config.default_currency;
+        let rows = self
+            .repos
+            .finance
+            .transactions
+            .sum_by_category(date_from, date_to, "expense", currency)
+            .await?;
+
+        let total: i64 = rows.iter().map(|(_, amount)| amount).sum();
+        if total == 0 {
+            return Ok(format!("No spending recorded for {label}."));
+        }
+
+        let mut lines = vec![format!("**Spending Summary ({label})**")];
+        lines.push(format!("Total: {} {}", total as f64 / 100.0, currency));
+        lines.push(String::new());
+        for (cat, amount) in &rows {
+            let pct = amount * 100 / total;
+            lines.push(format!("- {cat}: {:.2} {} ({pct}%)", *amount as f64 / 100.0, currency));
+        }
+        Ok(lines.join("\n"))
     }
 
     fn proactivity_level(&self) -> ProactivityLevel {

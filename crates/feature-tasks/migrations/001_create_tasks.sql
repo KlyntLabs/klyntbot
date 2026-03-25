@@ -204,6 +204,7 @@ CREATE TABLE IF NOT EXISTS task_estimation_history (
     complexity_score  INTEGER,
     energy_level      TEXT,
     tags              TEXT NOT NULL DEFAULT '[]',
+    project_id        TEXT,
     completed_at      TEXT NOT NULL
 );
 

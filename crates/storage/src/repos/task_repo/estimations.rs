@@ -14,10 +14,10 @@ impl TaskRepo {
             r#"
             INSERT INTO task_estimation_history (
                 id, task_id, estimated_minutes, actual_minutes, deviation_pct,
-                complexity_score, energy_level, tags, completed_at
+                complexity_score, energy_level, tags, project_id, completed_at
             ) VALUES (
                 ?1, ?2, ?3, ?4, ?5,
-                ?6, ?7, ?8, ?9
+                ?6, ?7, ?8, ?9, ?10
             )
             RETURNING *
             "#,
@@ -30,6 +30,7 @@ impl TaskRepo {
         .bind(row.complexity_score)
         .bind(&row.energy_level)
         .bind(sqlx::types::Json(&row.tags))
+        .bind(&row.project_id)
         .bind(row.completed_at)
         .fetch_one(&self.pool)
         .await?;
