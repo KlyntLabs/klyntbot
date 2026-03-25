@@ -3,7 +3,10 @@
 //! Verifies the end-to-end flow: routing snapshot insertion via MirrorRepo
 //! → state and history queries via MirrorFacade.
 
-use klyntbot::cognitive::mirror::{MirrorFacade, MirrorRepo, RoutingSnapshot, SkillRouteStats};
+use klyntbot::cognitive::mirror::{
+    MetaRule, MetaRuleAction, MetaRuleSource, MetaRuleStatus, MirrorFacade, MirrorRepo,
+    RoutingSnapshot, SkillRouteStats,
+};
 use klyntbot::cognitive::repos::cognitive_migrations;
 
 use super::common::test_pool;
@@ -87,4 +90,46 @@ async fn test_mirror_routing_accumulation_and_facade() {
     // 7. No snippets have been inserted — pending list should be empty.
     let snippets = facade.get_pending_snippets().await.unwrap();
     assert!(snippets.is_empty(), "Expected no pending snippets");
+}
+
+#[tokio::test]
+async fn test_mirror_meta_rule_lifecycle() {
+    // 1. Create in-memory pool with cognitive migrations applied.
+    let pool = mirror_pool().await;
+
+    let repo = MirrorRepo::new(pool.clone());
+    let facade = MirrorFacade::new(repo.clone());
+
+    // 2. Insert a pending meta-rule.
+    let rule_id = Uuid::new_v4();
+    let rule = MetaRule {
+        id: rule_id,
+        trigger_condition: "When corrected twice on finance, clarify first".to_string(),
+        action: MetaRuleAction::ForceClarification,
+        source: MetaRuleSource::CorrectionDerived,
+        effectiveness_score: 0.5,
+        status: MetaRuleStatus::Pending,
+        signal_count: 0,
+        created_at: Utc::now(),
+        updated_at: Utc::now(),
+    };
+    repo.insert_meta_rule(&rule).await.unwrap();
+
+    // 3. Verify it appears in state as pending.
+    let state = facade.get_state().await.unwrap();
+    assert_eq!(state.pending_meta_rules.len(), 1);
+    assert!(state.active_meta_rules.is_empty());
+
+    // 4. Approve the rule.
+    facade.approve_meta_rule(rule_id).await.unwrap();
+
+    // 5. Verify it has moved to active.
+    let state = facade.get_state().await.unwrap();
+    assert!(state.pending_meta_rules.is_empty());
+    assert_eq!(state.active_meta_rules.len(), 1);
+
+    // 6. Signal tracking — increment once and verify.
+    repo.increment_meta_rule_signal(rule_id).await.unwrap();
+    let (active, _) = facade.get_meta_rules().await.unwrap();
+    assert_eq!(active[0].signal_count, 1);
 }
