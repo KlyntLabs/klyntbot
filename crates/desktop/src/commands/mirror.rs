@@ -1,8 +1,8 @@
 use std::sync::Arc;
 
 use cognitive::mirror::{
-    FeedbackTarget, MirrorResponse, MirrorState, NarrativeSnippet, RoutingSnapshot, TrendNarrative,
-    UserFeedback,
+    BrainVersion, FeedbackTarget, MirrorResponse, MirrorState, NarrativeSnippet, RoutingSnapshot,
+    TrendNarrative, UserFeedback,
 };
 use desktop_shared::errors::ApiError;
 use tauri::State;
@@ -20,6 +20,8 @@ pub(crate) const DEV_COMMANDS: &[&str] = &[
     "generate_mirror_response",
     "approve_meta_rule",
     "dismiss_meta_rule",
+    "get_brain_versions",
+    "revert_brain_version",
 ];
 
 #[tauri::command]
@@ -90,6 +92,23 @@ pub async fn dismiss_meta_rule(
 ) -> Result<(), ApiError> {
     let facade = state.mirror_facade()?;
     Ok(facade.dismiss_meta_rule(rule_id).await?)
+}
+
+#[tauri::command]
+pub async fn get_brain_versions(
+    state: State<'_, Arc<AppCore>>,
+) -> Result<Vec<BrainVersion>, ApiError> {
+    let facade = state.mirror_facade()?;
+    Ok(facade.get_brain_versions().await?)
+}
+
+#[tauri::command]
+pub async fn revert_brain_version(
+    state: State<'_, Arc<AppCore>>,
+    version: u32,
+) -> Result<BrainVersion, ApiError> {
+    let facade = state.mirror_facade()?;
+    Ok(facade.revert_to_version(version).await?)
 }
 
 // ── Dev server dispatch ──────────────────────────────────────────────────
@@ -200,6 +219,27 @@ pub(crate) async fn dispatch_dev(
             dev::val(
                 facade
                     .dismiss_meta_rule(rule_id)
+                    .await
+                    .map_err(ApiError::from),
+            )
+        }
+        "get_brain_versions" => {
+            let facade = match core.mirror_facade() {
+                Ok(f) => f,
+                Err(e) => return Some(Err(e)),
+            };
+            dev::val(facade.get_brain_versions().await.map_err(ApiError::from))
+        }
+        "revert_brain_version" => {
+            let facade = match core.mirror_facade() {
+                Ok(f) => f,
+                Err(e) => return Some(Err(e)),
+            };
+            let version: u32 = try_field!(dev::get(body, "version")
+                .ok_or_else(|| ApiError::new("VALIDATION", "missing required field: version")));
+            dev::val(
+                facade
+                    .revert_to_version(version)
                     .await
                     .map_err(ApiError::from),
             )
