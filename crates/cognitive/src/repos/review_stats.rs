@@ -35,7 +35,12 @@ impl ReviewStatsRepo {
     /// Count consecutive days with at least 1 review in `review_log`, walking backwards from today.
     pub async fn current_streak(&self) -> Result<usize, sqlx::Error> {
         let rows: Vec<(String,)> = sqlx::query_as(
-            "SELECT DISTINCT DATE(reviewed_at) as d FROM review_log ORDER BY d DESC LIMIT 60",
+            r#"SELECT DISTINCT d FROM (
+                SELECT DATE(reviewed_at) as d FROM review_log
+                UNION
+                SELECT DATE(updated_at) as d FROM knowledge_atoms
+                  WHERE status = 'active' AND salience >= 0.6
+            ) ORDER BY d DESC LIMIT 60"#,
         )
         .fetch_all(&self.pool)
         .await?;
@@ -156,6 +161,20 @@ impl ReviewStatsRepo {
             Ok(weighted_sum / importance_sum)
         }
     }
+
+    /// Daily atom creation counts for the last N days.
+    pub async fn daily_atoms_created(&self, days: i64) -> Result<Vec<(String, i64)>, sqlx::Error> {
+        let cutoff = (Utc::now() - chrono::Duration::days(days)).to_rfc3339();
+        sqlx::query_as(
+            r#"SELECT DATE(created_at) as d, COUNT(*) as cnt
+               FROM knowledge_atoms
+               WHERE status = 'active' AND created_at > ?1
+               GROUP BY d ORDER BY d DESC"#,
+        )
+        .bind(&cutoff)
+        .fetch_all(&self.pool)
+        .await
+    }
 }
 
 #[cfg(test)]
@@ -231,6 +250,28 @@ mod tests {
         // Expected: (0.8*1.0 + 0.6*0.5) / (1.0 + 0.5) = 1.1 / 1.5 ≈ 0.7333
         let score = repo.knowledge_retention_score().await.unwrap();
         assert!((score - (1.1 / 1.5)).abs() < 0.001);
+    }
+
+    #[tokio::test]
+    async fn test_current_streak_includes_atoms() {
+        let pool = cognitive_test_pool().await;
+        let repo = ReviewStatsRepo::new(pool.clone());
+        let now = Utc::now().to_rfc3339();
+
+        // Insert an active atom created today (no reviews)
+        sqlx::query(
+            r#"INSERT INTO knowledge_atoms
+                (id, subject, atom_type, domain, retention_pct, stability, difficulty,
+                 personal_importance, status, salience, created_at, updated_at)
+            VALUES ('a-streak', 'test', 'concept', 'test', 0.8, 1.0, 5.0, 1.0, 'active', 0.8, ?1, ?1)"#,
+        )
+        .bind(&now)
+        .execute(&pool)
+        .await
+        .unwrap();
+
+        let streak = repo.current_streak().await.unwrap();
+        assert_eq!(streak, 1, "Atom acceptance alone should count as a streak day");
     }
 
     #[tokio::test]
