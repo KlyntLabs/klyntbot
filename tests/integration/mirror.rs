@@ -8,12 +8,12 @@ use klyntbot::cognitive::mirror::{
     MirrorRepo, PreviewRecommendation, RoutingSnapshot, SkillRouteStats, TrendDirection,
     TrialEarlySignals, TrialPreview,
 };
-use klyntbot::cognitive::repos::cognitive_migrations;
+use klyntbot::cognitive::repos::{cognitive_migrations, EpisodicMemoryRepo};
 use klyntbot::storage::StoragePool;
 
 use super::common::test_pool;
 
-use chrono::Utc;
+use chrono::{Duration, Utc};
 use std::collections::HashMap;
 use uuid::Uuid;
 
@@ -214,4 +214,155 @@ async fn test_mirror_trial_preview_lifecycle() {
         PreviewRecommendation::Kill
     );
     assert_eq!(state.recent_trial_previews[0].trial_id, "trial-test-001");
+}
+
+#[tokio::test]
+async fn test_mirror_approve_meta_rule_writes_episodic_memory() {
+    let pool = mirror_pool().await;
+    let repo = MirrorRepo::new(pool.clone());
+    let episodic = EpisodicMemoryRepo::new(pool.inner().clone());
+    let facade = MirrorFacade::new(repo.clone()).with_episodic_repo(episodic.clone());
+
+    // Insert a pending meta-rule.
+    let rule = MetaRule {
+        id: Uuid::new_v4(),
+        trigger_condition: "When corrected on finance, clarify first".to_string(),
+        action: MetaRuleAction::ForceClarification,
+        source: MetaRuleSource::CorrectionDerived,
+        effectiveness_score: 0.5,
+        status: MetaRuleStatus::Pending,
+        signal_count: 0,
+        created_at: Utc::now(),
+        updated_at: Utc::now(),
+    };
+    repo.insert_meta_rule(&rule).await.unwrap();
+
+    // Approve it — this fires a spawned task to write episodic memory.
+    facade.approve_meta_rule(rule.id).await.unwrap();
+
+    // Give the spawned task time to complete.
+    tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+
+    // Verify episodic memory was written with domain "mirror".
+    let memories = episodic.list_by_domain("mirror", 10).await.unwrap();
+    assert!(
+        memories
+            .iter()
+            .any(|m| m.content.contains("Approved meta-rule")),
+        "Expected episodic memory for meta-rule approval, got: {memories:?}"
+    );
+}
+
+#[tokio::test]
+async fn test_mirror_kill_trial_writes_episodic_memory() {
+    let pool = mirror_pool().await;
+    let repo = MirrorRepo::new(pool.clone());
+    let episodic = EpisodicMemoryRepo::new(pool.inner().clone());
+    let facade = MirrorFacade::new(repo.clone()).with_episodic_repo(episodic.clone());
+
+    // Kill a trial — this fires a spawned task to write episodic memory.
+    facade.kill_trial("trial-abc-123").await.unwrap();
+
+    // Give the spawned task time to complete.
+    tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+
+    // Verify episodic memory was written.
+    let memories = episodic.list_by_domain("mirror", 10).await.unwrap();
+    assert!(
+        memories
+            .iter()
+            .any(|m| m.content.contains("Killed experiment")),
+        "Expected episodic memory for trial kill, got: {memories:?}"
+    );
+}
+
+#[tokio::test]
+async fn test_mirror_create_meta_rule_from_text() {
+    let pool = mirror_pool().await;
+    let repo = MirrorRepo::new(pool.clone());
+    let facade = MirrorFacade::new(repo.clone());
+
+    let rule = facade
+        .create_meta_rule_from_text("When user asks about budget, use finance skill".to_string())
+        .await
+        .unwrap();
+
+    assert_eq!(rule.source, MetaRuleSource::UserCreated);
+    assert_eq!(rule.status, MetaRuleStatus::Pending);
+    assert!((rule.effectiveness_score - 0.5).abs() < f64::EPSILON);
+    assert_eq!(
+        rule.trigger_condition,
+        "When user asks about budget, use finance skill"
+    );
+
+    // Verify it was persisted and appears in state as pending.
+    let state = facade.get_state().await.unwrap();
+    assert_eq!(state.pending_meta_rules.len(), 1);
+    assert_eq!(state.pending_meta_rules[0].id, rule.id);
+}
+
+#[tokio::test]
+async fn test_mirror_trial_preview_cleanup() {
+    let pool = mirror_pool().await;
+    let repo = MirrorRepo::new(pool.clone());
+
+    // Insert a recent preview (should survive cleanup).
+    let recent = TrialPreview {
+        id: Uuid::new_v4(),
+        trial_id: "trial-recent".to_string(),
+        started_at: Utc::now() - Duration::hours(4),
+        preview_at: Utc::now(),
+        messages_scored: 10,
+        early_signals: TrialEarlySignals {
+            correction_rate_delta: 0.0,
+            confidence_trend: TrendDirection::Stable,
+            dominant_skill_shift: None,
+        },
+        recommendation: PreviewRecommendation::Continue,
+        narrative: "Looking good".to_string(),
+    };
+    repo.insert_trial_preview(&recent).await.unwrap();
+
+    // Insert a preview with old preview_at (100 days ago) via raw SQL.
+    let old_id = Uuid::new_v4();
+    let old_preview_at = (Utc::now() - Duration::days(100)).to_rfc3339();
+    let old_started_at = (Utc::now() - Duration::days(101)).to_rfc3339();
+    let early_signals_json = serde_json::json!({
+        "correctionRateDelta": -0.1,
+        "confidenceTrend": "Falling",
+        "dominantSkillShift": null
+    })
+    .to_string();
+    sqlx::query(
+        r#"
+        INSERT INTO mirror_trial_previews
+            (id, trial_id, started_at, preview_at, messages_scored,
+             early_signals_json, recommendation, narrative)
+        VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)
+        "#,
+    )
+    .bind(old_id.to_string())
+    .bind("trial-old")
+    .bind(&old_started_at)
+    .bind(&old_preview_at)
+    .bind(5_i64)
+    .bind(&early_signals_json)
+    .bind("Kill")
+    .bind("Stale preview")
+    .execute(pool.inner())
+    .await
+    .unwrap();
+
+    // Verify both exist.
+    let all = repo.get_recent_trial_previews().await.unwrap();
+    assert_eq!(all.len(), 2);
+
+    // Cleanup previews older than 30 days.
+    let deleted = repo.cleanup_old_trial_previews(30).await.unwrap();
+    assert_eq!(deleted, 1);
+
+    // Only the recent one should remain.
+    let remaining = repo.get_recent_trial_previews().await.unwrap();
+    assert_eq!(remaining.len(), 1);
+    assert_eq!(remaining[0].trial_id, "trial-recent");
 }
