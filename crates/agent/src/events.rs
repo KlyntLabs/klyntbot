@@ -281,4 +281,19 @@ pub enum AgentEvent {
     AutoTunerPromotion(::autotuner::AutoTunerPromotion),
     /// AutoTuner auto-reverted after regression.
     AutoTunerRollback(::autotuner::AutoTunerRollback),
+
+    /// The agent detected a repeating tool call pattern (warning level).
+    LoopDetected {
+        iteration: usize,
+        #[serde(rename = "toolsSummary")]
+        tools_summary: String,
+        suggestion: String,
+    },
+
+    /// The agent hit the hard-stop threshold for repeated tool calls.
+    LoopHardStop {
+        iteration: usize,
+        #[serde(rename = "toolsSummary")]
+        tools_summary: String,
+    },
 }

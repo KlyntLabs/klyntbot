@@ -946,6 +946,21 @@ pub async fn relay_chat_stream(
                             "mid-loop context compression applied"
                         );
                     }
+                    AgentEvent::LoopDetected { iteration, tools_summary, suggestion } => {
+                        tracing::info!(
+                            iteration,
+                            tools_summary = %tools_summary,
+                            suggestion = %suggestion,
+                            "loop detected: repeating tool pattern"
+                        );
+                    }
+                    AgentEvent::LoopHardStop { iteration, tools_summary } => {
+                        tracing::warn!(
+                            iteration,
+                            tools_summary = %tools_summary,
+                            "loop hard-stop: forcing synthesis"
+                        );
+                    }
                 }
             }
             else => break,

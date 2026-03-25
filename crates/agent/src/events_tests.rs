@@ -280,6 +280,15 @@ mod tests {
             AgentEvent::Error {
                 message: "err".to_string(),
             },
+            AgentEvent::LoopDetected {
+                iteration: 4,
+                tools_summary: "search, read".to_string(),
+                suggestion: "Try a different approach".to_string(),
+            },
+            AgentEvent::LoopHardStop {
+                iteration: 6,
+                tools_summary: "search, read".to_string(),
+            },
         ]
     }
 
