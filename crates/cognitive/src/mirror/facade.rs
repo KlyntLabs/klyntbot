@@ -11,8 +11,9 @@ use uuid::Uuid;
 use common::Result;
 
 use crate::mirror::{
-    FeedbackTarget, MirrorRepo, MirrorResponse, MirrorState, NarrativeContext, NarrativeHandler,
-    NarrativeSnippet, RoutingSnapshot, TrendNarrative, UserFeedback,
+    FeedbackTarget, MetaRule, MetaRuleStatus, MirrorRepo, MirrorResponse, MirrorState,
+    NarrativeContext, NarrativeHandler, NarrativeSnippet, RoutingSnapshot, TrendNarrative,
+    UserFeedback,
 };
 
 // ---------------------------------------------------------------------------
@@ -52,12 +53,20 @@ impl MirrorFacade {
 
     /// Compose the current [`MirrorState`] from the three primary repo queries.
     pub async fn get_state(&self) -> Result<MirrorState> {
+        let active_meta_rules = self
+            .repo
+            .get_meta_rules_by_status(MetaRuleStatus::Active)
+            .await?;
+        let pending_meta_rules = self
+            .repo
+            .get_meta_rules_by_status(MetaRuleStatus::Pending)
+            .await?;
         Ok(MirrorState {
             last_routing_snapshot: self.repo.get_latest_routing_snapshot().await?,
             latest_trend_narrative: self.repo.get_latest_narrative().await?,
             pending_snippets: self.repo.get_pending_snippets().await?,
-            active_meta_rules: vec![],
-            pending_meta_rules: vec![],
+            active_meta_rules,
+            pending_meta_rules,
         })
     }
 
@@ -74,6 +83,37 @@ impl MirrorFacade {
     /// Return all non-dismissed narrative snippets (up to 20, newest first).
     pub async fn get_pending_snippets(&self) -> Result<Vec<NarrativeSnippet>> {
         self.repo.get_pending_snippets().await
+    }
+
+    // -----------------------------------------------------------------------
+    // Meta-rule management
+    // -----------------------------------------------------------------------
+
+    /// Approve a pending meta-rule, transitioning it to [`MetaRuleStatus::Active`].
+    pub async fn approve_meta_rule(&self, rule_id: Uuid) -> Result<()> {
+        self.repo
+            .update_meta_rule_status(rule_id, MetaRuleStatus::Active)
+            .await
+    }
+
+    /// Dismiss a pending meta-rule, transitioning it to [`MetaRuleStatus::Disabled`].
+    pub async fn dismiss_meta_rule(&self, rule_id: Uuid) -> Result<()> {
+        self.repo
+            .update_meta_rule_status(rule_id, MetaRuleStatus::Disabled)
+            .await
+    }
+
+    /// Return active and pending meta-rules as `(active, pending)`.
+    pub async fn get_meta_rules(&self) -> Result<(Vec<MetaRule>, Vec<MetaRule>)> {
+        let active = self
+            .repo
+            .get_meta_rules_by_status(MetaRuleStatus::Active)
+            .await?;
+        let pending = self
+            .repo
+            .get_meta_rules_by_status(MetaRuleStatus::Pending)
+            .await?;
+        Ok((active, pending))
     }
 
     // -----------------------------------------------------------------------
@@ -229,7 +269,9 @@ mod tests {
     use std::collections::HashMap;
 
     use super::*;
-    use crate::mirror::{MirrorAlertType, SkillRouteStats};
+    use crate::mirror::{
+        MetaRule, MetaRuleAction, MetaRuleSource, MetaRuleStatus, MirrorAlertType, SkillRouteStats,
+    };
     use crate::repos::cognitive_migrations;
 
     async fn setup() -> MirrorFacade {
@@ -346,6 +388,59 @@ mod tests {
         assert!(result.is_err());
         let err = result.unwrap_err().to_string();
         assert!(err.contains("NarrativeHandler not configured"));
+    }
+
+    fn make_meta_rule() -> MetaRule {
+        MetaRule {
+            id: Uuid::new_v4(),
+            trigger_condition: "user corrects finance twice".to_string(),
+            action: MetaRuleAction::ForceClarification,
+            source: MetaRuleSource::CorrectionDerived,
+            effectiveness_score: 0.5,
+            status: MetaRuleStatus::Pending,
+            signal_count: 0,
+            created_at: Utc::now(),
+            updated_at: Utc::now(),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_approve_meta_rule() {
+        let facade = setup().await;
+        let rule = make_meta_rule();
+        facade.repo.insert_meta_rule(&rule).await.unwrap();
+
+        facade.approve_meta_rule(rule.id).await.unwrap();
+
+        let state = facade.get_state().await.unwrap();
+        assert_eq!(state.active_meta_rules.len(), 1);
+        assert_eq!(state.active_meta_rules[0].id, rule.id);
+        assert!(state.pending_meta_rules.is_empty());
+    }
+
+    #[tokio::test]
+    async fn test_dismiss_meta_rule() {
+        let facade = setup().await;
+        let rule = make_meta_rule();
+        facade.repo.insert_meta_rule(&rule).await.unwrap();
+
+        facade.dismiss_meta_rule(rule.id).await.unwrap();
+
+        let state = facade.get_state().await.unwrap();
+        assert!(state.active_meta_rules.is_empty());
+        assert!(state.pending_meta_rules.is_empty());
+    }
+
+    #[tokio::test]
+    async fn test_get_state_includes_meta_rules() {
+        let facade = setup().await;
+        let rule = make_meta_rule();
+        facade.repo.insert_meta_rule(&rule).await.unwrap();
+
+        let state = facade.get_state().await.unwrap();
+        assert_eq!(state.pending_meta_rules.len(), 1);
+        assert_eq!(state.pending_meta_rules[0].id, rule.id);
+        assert!(state.active_meta_rules.is_empty());
     }
 
     #[tokio::test]
