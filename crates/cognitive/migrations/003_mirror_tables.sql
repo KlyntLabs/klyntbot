@@ -62,3 +62,14 @@ CREATE TABLE IF NOT EXISTS mirror_brain_versions (
     metrics_json TEXT NOT NULL,
     reverted INTEGER NOT NULL DEFAULT 0
 );
+
+CREATE TABLE IF NOT EXISTS mirror_trial_previews (
+    id TEXT PRIMARY KEY,
+    trial_id TEXT NOT NULL,
+    started_at TEXT NOT NULL,
+    preview_at TEXT NOT NULL,
+    messages_scored INTEGER NOT NULL,
+    early_signals_json TEXT NOT NULL,
+    recommendation TEXT NOT NULL,
+    narrative TEXT NOT NULL
+);
