@@ -275,7 +275,7 @@ impl AppCore {
             ));
             let (facade, handles, shutdown) = ::cognitive::mirror::MirrorEngine::start(
                 mirror_repo,
-                &domain_event_bus,
+                Arc::clone(&domain_event_bus),
                 narrative_handler,
                 autotuner_bridge,
                 episodic_repo,
@@ -291,6 +291,43 @@ impl AppCore {
             info!("mirror self-reflection engine started");
             (Some(Arc::new(facade)), Some(handles), Some(shutdown))
         };
+
+        // ── Auto-create note on trial kill (fire-and-forget) ─────────────
+        {
+            let note_repo = note_repo.clone();
+            let mut rx = domain_event_bus.subscribe();
+            tokio::spawn(async move {
+                while let Ok(event) = rx.recv().await {
+                    if let bus::DomainEvent::MirrorTrialKilled { trial_id } = event {
+                        let now = feature_notes::repo::utc_now_str();
+                        let row = feature_notes::models::NoteRow {
+                            id: uuid::Uuid::new_v4().to_string(),
+                            notebook_id: None,
+                            title: format!("Killed experiment: {trial_id}"),
+                            body: "Manually killed this experiment trial from the Mirror."
+                                .to_string(),
+                            body_html: None,
+                            pinned: 0,
+                            archived: 0,
+                            icon: None,
+                            color: None,
+                            embedding_updated_at: None,
+                            split_content: None,
+                            split_mode: None,
+                            perspective_config: None,
+                            last_visited_at: None,
+                            created_at: now.clone(),
+                            updated_at: now,
+                        };
+                        if let Err(e) = note_repo.create_note(&row).await {
+                            tracing::warn!(
+                                "mirror: failed to auto-create note for killed trial {trial_id}: {e}"
+                            );
+                        }
+                    }
+                }
+            });
+        }
 
         // ── Wrap config for shared ownership ─────────────────────────────
         let shared_config = Arc::new(RwLock::new(config));

@@ -25,7 +25,7 @@ use crate::repos::EpisodicMemoryRepo;
 /// # Usage
 ///
 /// ```rust,ignore
-/// let (facade, handles, shutdown) = MirrorEngine::start(repo, &bus, Some(handler));
+/// let (facade, handles, shutdown) = MirrorEngine::start(repo, Arc::new(bus), Some(handler));
 /// // Store `handles` to keep subscribers alive; drop or cancel `shutdown` to stop them.
 /// ```
 pub struct MirrorEngine;
@@ -40,7 +40,7 @@ impl MirrorEngine {
     /// will be available. If `None`, those methods return an error.
     pub fn start(
         repo: MirrorRepo,
-        bus: &bus::DomainEventBus,
+        bus: Arc<bus::DomainEventBus>,
         narrative_handler: Option<Arc<dyn NarrativeHandler>>,
         autotuner_bridge: Option<Arc<dyn AutotunerBridge>>,
         episodic_repo: Option<EpisodicMemoryRepo>,
@@ -72,6 +72,7 @@ impl MirrorEngine {
 
         let mut facade = MirrorFacade::new(repo);
         facade = facade.with_active_timers(active_timers);
+        facade = facade.with_domain_event_bus(bus);
         if let Some(handler) = narrative_handler {
             facade = facade.with_narrative_handler(handler);
         }
@@ -97,9 +98,9 @@ mod tests {
     #[tokio::test]
     async fn test_engine_start_no_handler() {
         let repo = crate::mirror::test_mirror_repo().await;
-        let bus = bus::DomainEventBus::new(16);
+        let bus = Arc::new(bus::DomainEventBus::new(16));
 
-        let (facade, handles, shutdown) = MirrorEngine::start(repo, &bus, None, None, None);
+        let (facade, handles, shutdown) = MirrorEngine::start(repo, bus, None, None, None);
 
         // Facade is usable.
         let state = facade.get_state().await.unwrap();
@@ -115,9 +116,10 @@ mod tests {
     #[tokio::test]
     async fn test_engine_start_routes_skill_routed_events() {
         let repo = crate::mirror::test_mirror_repo().await;
-        let bus = bus::DomainEventBus::new(16);
+        let bus = Arc::new(bus::DomainEventBus::new(16));
 
-        let (_facade, handles, shutdown) = MirrorEngine::start(repo, &bus, None, None, None);
+        let (_facade, handles, shutdown) =
+            MirrorEngine::start(repo, Arc::clone(&bus), None, None, None);
 
         // Publish a SkillRouted event — the subscriber should accumulate it.
         bus.publish(bus::DomainEvent::SkillRouted {
@@ -140,10 +142,11 @@ mod tests {
     #[tokio::test]
     async fn test_engine_subscriber_count() {
         let repo = crate::mirror::test_mirror_repo().await;
-        let bus = bus::DomainEventBus::new(16);
+        let bus = Arc::new(bus::DomainEventBus::new(16));
 
         assert_eq!(bus.subscriber_count(), 0);
-        let (_facade, handles, shutdown) = MirrorEngine::start(repo, &bus, None, None, None);
+        let (_facade, handles, shutdown) =
+            MirrorEngine::start(repo, Arc::clone(&bus), None, None, None);
         // Four subscribers (routing + meta_rule + config_archiver + trial_preview).
         assert_eq!(bus.subscriber_count(), 4);
 

@@ -33,6 +33,7 @@ pub struct MirrorFacade {
     autotuner_bridge: Option<Arc<dyn AutotunerBridge>>,
     pub(crate) active_timers: Option<Arc<DashMap<String, JoinHandle<()>>>>,
     episodic_repo: Option<EpisodicMemoryRepo>,
+    domain_event_bus: Option<Arc<bus::DomainEventBus>>,
 }
 
 impl MirrorFacade {
@@ -46,6 +47,7 @@ impl MirrorFacade {
             autotuner_bridge: None,
             active_timers: None,
             episodic_repo: None,
+            domain_event_bus: None,
         }
     }
 
@@ -74,6 +76,13 @@ impl MirrorFacade {
     /// memories. Returns `self` for builder-style chaining.
     pub fn with_episodic_repo(mut self, repo: EpisodicMemoryRepo) -> Self {
         self.episodic_repo = Some(repo);
+        self
+    }
+
+    /// Attach a [`DomainEventBus`] so that key mirror actions (e.g. trial
+    /// kill) emit domain events for cross-feature side-effects.
+    pub fn with_domain_event_bus(mut self, bus: Arc<bus::DomainEventBus>) -> Self {
+        self.domain_event_bus = Some(bus);
         self
     }
 
@@ -243,6 +252,12 @@ impl MirrorFacade {
             None,
             0.7,
         );
+
+        if let Some(ref bus) = self.domain_event_bus {
+            bus.publish(bus::DomainEvent::MirrorTrialKilled {
+                trial_id: trial_id.to_string(),
+            });
+        }
 
         Ok(())
     }
