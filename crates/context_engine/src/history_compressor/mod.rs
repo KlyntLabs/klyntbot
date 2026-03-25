@@ -1,6 +1,7 @@
 mod snippet;
 mod types;
 
+pub use snippet::first_snippet;
 pub use types::{CompressedHistory, CompressorConfig, CompressorMode, HistorySummary};
 
 use std::sync::Arc;
@@ -10,7 +11,6 @@ use providers::{Message, UserContent};
 use crate::summary_provider::SummaryProvider;
 use crate::token_counter::{default_token_counter, TokenCounter};
 
-use snippet::first_snippet;
 use types::DEFAULT_SNIPPET_LENGTH;
 
 /// Compresses conversation history to fit within a token budget.
@@ -268,21 +268,7 @@ impl HistoryCompressor {
     }
 
     fn estimate_message_tokens(&self, msg: &Message) -> usize {
-        match msg {
-            Message::System { content } => self.token_counter.estimate_text(content),
-            Message::User { content } => match content {
-                UserContent::Text(t) => self.token_counter.estimate_text(t),
-                UserContent::MultiPart(parts) => parts.len() * 10,
-            },
-            Message::Assistant { content, .. } => {
-                content
-                    .as_deref()
-                    .map(|t| self.token_counter.estimate_text(t))
-                    .unwrap_or(0)
-                    + 20
-            }
-            Message::Tool { content, .. } => self.token_counter.estimate_text(content) + 10,
-        }
+        crate::token_counter::estimate_message_tokens(&*self.token_counter, msg)
     }
 }
 

@@ -289,7 +289,7 @@ pub struct ExecutionCore {
     pub tool_registry: Arc<RwLock<ToolRegistry>>,
     pub outcome_recorder: Option<Arc<crate::learning::recorder::OutcomeRecorder>>,
     pub domain_event_bus: Option<Arc<bus::DomainEventBus>>,
-    pub token_counter: Arc<dyn TokenCounter>,
+    token_counter: Arc<dyn TokenCounter>,
     tool_semaphore: Arc<Semaphore>,
 }
 
@@ -309,6 +309,10 @@ impl ExecutionCore {
     pub fn with_token_counter(mut self, counter: Arc<dyn TokenCounter>) -> Self {
         self.token_counter = counter;
         self
+    }
+
+    pub fn token_counter(&self) -> &Arc<dyn TokenCounter> {
+        &self.token_counter
     }
 
     /// Set the domain event bus for publishing tool execution events.

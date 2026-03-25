@@ -11,7 +11,7 @@ use context_engine::TokenCounter;
 use providers::Message;
 use tracing::info;
 
-/// Threshold: compress when accumulated tokens exceed this fraction of context_window.
+/// Compress when accumulated tokens exceed this fraction of context_window.
 const COMPRESSION_THRESHOLD: f64 = 0.70;
 
 /// Number of recent messages to always keep verbatim (from the end of the vec).
@@ -20,129 +20,90 @@ const MIN_RECENT_MESSAGES: usize = 8;
 /// Maximum length of a compressed tool result summary (chars).
 const SUMMARY_SNIPPET_LENGTH: usize = 150;
 
+/// Skip compressing tool results shorter than this many tokens.
+const MIN_COMPRESSIBLE_TOKENS: usize = 50;
+
 pub struct MidLoopCompressor {
     token_counter: Arc<dyn TokenCounter>,
-    context_window: usize,
+    threshold: usize,
 }
 
 impl MidLoopCompressor {
     pub fn new(token_counter: Arc<dyn TokenCounter>, context_window: usize) -> Self {
         Self {
             token_counter,
-            context_window,
+            threshold: (context_window as f64 * COMPRESSION_THRESHOLD) as usize,
         }
     }
 
-    /// Estimate the total token count of the message vec.
     fn estimate_tokens(&self, messages: &[Message]) -> usize {
         messages
             .iter()
-            .map(|m| self.estimate_message_tokens(m))
+            .map(|m| context_engine::estimate_message_tokens(&*self.token_counter, m))
             .sum()
-    }
-
-    fn estimate_message_tokens(&self, msg: &Message) -> usize {
-        match msg {
-            Message::System { content } => self.token_counter.estimate_text(content) + 4,
-            Message::User { content } => {
-                let text = match content {
-                    providers::UserContent::Text(t) => t.as_str(),
-                    providers::UserContent::MultiPart(parts) => {
-                        return parts.len() * 10; // flat heuristic for multipart
-                    }
-                };
-                self.token_counter.estimate_text(text) + 4
-            }
-            Message::Assistant { content, .. } => {
-                content
-                    .as_deref()
-                    .map(|c| self.token_counter.estimate_text(c))
-                    .unwrap_or(0)
-                    + 20 // overhead for tool_calls JSON
-            }
-            Message::Tool { content, name, .. } => {
-                self.token_counter.estimate_text(content)
-                    + self.token_counter.estimate_text(name)
-                    + 10
-            }
-        }
     }
 
     /// Compress older tool results if total tokens exceed the threshold.
     ///
-    /// Strategy:
-    /// 1. Count total tokens across all messages
-    /// 2. If under threshold, return without changes
-    /// 3. Split messages into: system prefix + older body + recent tail
-    /// 4. Replace Tool messages in the older body with truncated summaries
-    ///
-    /// Returns `Some((before_tokens, after_tokens))` if compression was applied, `None` otherwise.
-    pub fn compress_if_needed(&self, messages: &mut Vec<Message>) -> Option<(usize, usize)> {
-        let total_tokens = self.estimate_tokens(messages);
-        let threshold = (self.context_window as f64 * COMPRESSION_THRESHOLD) as usize;
+    /// Strategy: count tokens, skip if under threshold, then replace older
+    /// Tool messages (outside the recent window) with extractive summaries.
+    /// Returns `Some((before_tokens, after_tokens))` if applied, `None` otherwise.
+    pub fn compress_if_needed(&self, messages: &mut [Message]) -> Option<(usize, usize)> {
+        // Early exit: not enough messages to have anything outside the recent window
+        if messages.len() <= MIN_RECENT_MESSAGES + 1 {
+            return None;
+        }
 
-        if total_tokens <= threshold {
+        let total_tokens = self.estimate_tokens(messages);
+
+        if total_tokens <= self.threshold {
             return None;
         }
 
         info!(
             total_tokens,
-            threshold,
+            self.threshold,
             message_count = messages.len(),
             "mid-loop compression triggered"
         );
 
-        // Preserve system messages at the front
         let system_count = messages
             .iter()
             .take_while(|m| matches!(m, Message::System { .. }))
             .count();
 
-        // Preserve recent tail verbatim
         let recent_start = messages
             .len()
             .saturating_sub(MIN_RECENT_MESSAGES)
             .max(system_count);
 
-        // Compress tool results in the older body (between system prefix and recent tail)
+        // Accumulate savings inline to avoid a second full scan
+        let mut saved_tokens: usize = 0;
         for msg in messages[system_count..recent_start].iter_mut() {
             if let Message::Tool { content, name, .. } = msg {
                 let original_tokens = self.token_counter.estimate_text(content);
-                if original_tokens > 50 {
-                    *content = Self::summarize_tool_result(name, content);
+                if original_tokens > MIN_COMPRESSIBLE_TOKENS {
+                    let summary = format!(
+                        "{}... [compressed {name} result, originally {} chars]",
+                        context_engine::first_snippet(content, SUMMARY_SNIPPET_LENGTH),
+                        content.len()
+                    );
+                    let new_tokens = self.token_counter.estimate_text(&summary);
+                    saved_tokens += original_tokens.saturating_sub(new_tokens);
+                    *content = summary;
                 }
             }
         }
 
-        let new_tokens = self.estimate_tokens(messages);
+        let new_tokens = total_tokens.saturating_sub(saved_tokens);
         info!(
             before = total_tokens,
             after = new_tokens,
-            saved = total_tokens.saturating_sub(new_tokens),
+            saved = saved_tokens,
             "mid-loop compression complete"
         );
 
         Some((total_tokens, new_tokens))
-    }
-
-    /// Create a short summary of a tool result.
-    fn summarize_tool_result(tool_name: &str, content: &str) -> String {
-        let trimmed = content.trim();
-        if trimmed.len() <= SUMMARY_SNIPPET_LENGTH {
-            return trimmed.to_string();
-        }
-        // Take first SUMMARY_SNIPPET_LENGTH chars, find a clean break point
-        let snippet: String = trimmed.chars().take(SUMMARY_SNIPPET_LENGTH).collect();
-        let break_point = snippet
-            .rfind('\n')
-            .or_else(|| snippet.rfind(". "))
-            .or_else(|| snippet.rfind(' '))
-            .unwrap_or(snippet.len());
-        format!(
-            "{}... [compressed {tool_name} result, originally {} chars]",
-            &snippet[..break_point],
-            trimmed.len()
-        )
     }
 }
 
@@ -223,9 +184,7 @@ mod tests {
         assert!(result.is_some(), "should have triggered compression");
         let (before, after) = result.unwrap();
         assert!(after < before, "after ({after}) should be less than before ({before})");
-        // System prompt should survive
         assert!(matches!(&messages[0], Message::System { .. }));
-        // The older tool result (index 3) should be compressed — content shortened
         if let Message::Tool { content, .. } = &messages[3] {
             assert!(
                 content.contains("[compressed"),
@@ -248,6 +207,13 @@ mod tests {
             user_msg("query"),
             assistant_msg("calling tool"),
             tool_msg("1", "big_tool", &"z".repeat(500)),
+            // Pad to exceed MIN_RECENT_MESSAGES + 1
+            user_msg("q2"),
+            assistant_msg("a2"),
+            tool_msg("2", "t2", &"z".repeat(500)),
+            user_msg("q3"),
+            assistant_msg("a3"),
+            tool_msg("3", "t3", "short"),
         ];
         let _ = compressor.compress_if_needed(&mut messages);
         assert!(
@@ -274,9 +240,22 @@ mod tests {
             tool_msg("3", "t3", "recent result"),
         ];
         let _ = compressor.compress_if_needed(&mut messages);
-        // Most recent tool result should be preserved verbatim
         assert!(messages
             .iter()
             .any(|m| matches!(m, Message::Tool { content, .. } if content == "recent result")));
+    }
+
+    #[test]
+    fn early_exit_on_small_message_count() {
+        // Even with a tiny context window, too few messages should skip compression
+        let compressor = make_compressor(1);
+        let mut messages = vec![
+            system_msg("sys"),
+            user_msg("q"),
+            assistant_msg("a"),
+            tool_msg("1", "t", &"x".repeat(1000)),
+        ];
+        let result = compressor.compress_if_needed(&mut messages);
+        assert!(result.is_none(), "should skip when message count is too small");
     }
 }

@@ -70,7 +70,7 @@ impl ExecutionEngine for ReactiveEngine {
         let mut messages = messages;
         let mut scratchpad = Scratchpad::new();
         let compressor = crate::execution::mid_loop_compressor::MidLoopCompressor::new(
-            Arc::clone(&self.core.token_counter),
+            Arc::clone(self.core.token_counter()),
             params.context_window,
         );
         // Use per-request max_iterations from params, fall back to engine default
