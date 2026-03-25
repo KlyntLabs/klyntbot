@@ -5,6 +5,7 @@ use cognitive::mirror::{
     TrendNarrative, UserFeedback,
 };
 use desktop_shared::errors::ApiError;
+use desktop_shared::types::EntityKind;
 use tauri::State;
 use uuid::Uuid;
 
@@ -61,12 +62,15 @@ pub async fn get_pending_snippets(
 #[tauri::command]
 pub async fn submit_mirror_feedback(
     state: State<'_, Arc<AppCore>>,
+    app: tauri::AppHandle,
     item_id: Uuid,
     target: FeedbackTarget,
     feedback: UserFeedback,
 ) -> Result<(), ApiError> {
     let facade = state.mirror_facade()?;
-    Ok(facade.submit_feedback(item_id, target, feedback).await?)
+    facade.submit_feedback(item_id, target, feedback).await?;
+    super::emit_entity_updated(&app, EntityKind::MirrorSnippet, &item_id.to_string());
+    Ok(())
 }
 
 #[tauri::command]
@@ -81,19 +85,25 @@ pub async fn generate_mirror_response(
 #[tauri::command]
 pub async fn approve_meta_rule(
     state: State<'_, Arc<AppCore>>,
+    app: tauri::AppHandle,
     rule_id: Uuid,
 ) -> Result<(), ApiError> {
     let facade = state.mirror_facade()?;
-    Ok(facade.approve_meta_rule(rule_id).await?)
+    facade.approve_meta_rule(rule_id).await?;
+    super::emit_entity_updated(&app, EntityKind::MirrorSnippet, &rule_id.to_string());
+    Ok(())
 }
 
 #[tauri::command]
 pub async fn dismiss_meta_rule(
     state: State<'_, Arc<AppCore>>,
+    app: tauri::AppHandle,
     rule_id: Uuid,
 ) -> Result<(), ApiError> {
     let facade = state.mirror_facade()?;
-    Ok(facade.dismiss_meta_rule(rule_id).await?)
+    facade.dismiss_meta_rule(rule_id).await?;
+    super::emit_entity_updated(&app, EntityKind::MirrorSnippet, &rule_id.to_string());
+    Ok(())
 }
 
 #[tauri::command]
@@ -107,28 +117,37 @@ pub async fn get_brain_versions(
 #[tauri::command]
 pub async fn revert_brain_version(
     state: State<'_, Arc<AppCore>>,
+    app: tauri::AppHandle,
     version: u32,
 ) -> Result<BrainVersion, ApiError> {
     let facade = state.mirror_facade()?;
-    Ok(facade.revert_to_version(version).await?)
+    let result = facade.revert_to_version(version).await?;
+    super::emit_entity_updated(&app, EntityKind::BrainVersion, &version.to_string());
+    Ok(result)
 }
 
 #[tauri::command]
 pub async fn kill_trial(
     state: State<'_, Arc<AppCore>>,
+    app: tauri::AppHandle,
     trial_id: String,
 ) -> Result<(), ApiError> {
     let facade = state.mirror_facade()?;
-    Ok(facade.kill_trial(&trial_id).await?)
+    facade.kill_trial(&trial_id).await?;
+    super::emit_entity_updated(&app, EntityKind::MirrorSnippet, &trial_id);
+    Ok(())
 }
 
 #[tauri::command]
 pub async fn continue_trial(
     state: State<'_, Arc<AppCore>>,
+    app: tauri::AppHandle,
     trial_id: String,
 ) -> Result<(), ApiError> {
     let facade = state.mirror_facade()?;
-    Ok(facade.continue_trial(&trial_id).await?)
+    facade.continue_trial(&trial_id).await?;
+    super::emit_entity_updated(&app, EntityKind::MirrorSnippet, &trial_id);
+    Ok(())
 }
 
 // ── Dev server dispatch ──────────────────────────────────────────────────
