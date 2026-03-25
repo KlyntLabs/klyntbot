@@ -733,6 +733,20 @@ impl AgentLoop {
     }
 
     /// Save assistant response to session and return the persisted message ID.
+    /// Persist the in-memory session to SQL without adding a new message.
+    /// Used in error paths to ensure the user message is not lost.
+    async fn persist_session(&self, session_key: &str) {
+        if let Ok(session_arc) = self.session_manager.get_or_create(session_key, None).await {
+            let session_clone = {
+                let session = session_arc.lock().await;
+                session.clone()
+            };
+            if let Err(e) = self.session_manager.save(&session_clone).await {
+                warn!("Failed to persist session on error: {}", e);
+            }
+        }
+    }
+
     async fn save_to_session(&self, session_key: &str, content: &str) -> Option<String> {
         if let Ok(session_arc) = self.session_manager.get_or_create(session_key, None).await {
             // Mutate under per-session lock, clone for async save
@@ -1052,6 +1066,10 @@ impl AgentLoop {
                     Ok(response)
                 }
                 Err(e) => {
+                    // Persist the session so the user message is saved even on error.
+                    // Without this, the session row exists (created by chat_send)
+                    // but has zero messages — a ghost thread in the sidebar.
+                    agent.persist_session(&sk).await;
                     let _ = event_tx
                         .send(AgentEvent::Error {
                             message: e.to_string(),
