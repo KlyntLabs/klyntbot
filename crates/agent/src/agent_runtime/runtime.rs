@@ -482,8 +482,13 @@ impl AgentRuntime {
                 .await;
         }
 
-        // Step 3b: Orchestration override — route multi-agent intents to orchestrator
-        if analysis.needs_orchestration {
+        // Step 3b: Orchestration override — route multi-agent intents to orchestrator.
+        // Only redirect to general when the router selected it as fallback.
+        // Domain specialists (task-management, finance-management, etc.) keep their
+        // tools and instructions — they can delegate via DelegationTool when needed.
+        // Overriding a domain specialist to general strips its tools, causing the
+        // LLM to report "tools aren't available" for domain-specific requests.
+        if analysis.needs_orchestration && agent_name == ORCHESTRATOR_AGENT {
             let general = {
                 let catalog = self.skill_catalog.read().await;
                 catalog.get(ORCHESTRATOR_AGENT).cloned()
@@ -521,6 +526,15 @@ impl AgentRuntime {
                         .max(crate::intent_pipeline::analysis::ORCHESTRATION_MIN_ITERATIONS);
                 }
             }
+        } else if analysis.needs_orchestration {
+            // Domain specialist already selected — clear the flag so downstream
+            // tool filtering uses the specialist's tool allowlist, not the
+            // bare orchestrator set (ask_user + memory only).
+            debug!(
+                "Orchestration override skipped: domain specialist '{}' already selected",
+                agent_name
+            );
+            analysis.needs_orchestration = false;
         }
 
         // Emit SkillRouted domain event for Mirror self-reflection layer.

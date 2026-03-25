@@ -1,7 +1,7 @@
 ---
 name: automation
 description: >
-  Automation and scheduling specialist for reminders and recurring tasks.
+  Automation and scheduling specialist for reminders and recurring automations.
   Use when the user mentions cron, schedule, reminder, remind me,
   recurring, every day, every hour, every minute, automate, or automation.
 license: MIT
@@ -9,7 +9,7 @@ metadata:
   author: klyntbot
   version: "2.0.0"
   klyntbot:
-    summary: Cron job scheduling, reminders, recurring tasks, and time-based automation.
+    summary: Cron job scheduling, reminders, recurring automations, and time-based automation.
     type: orchestrator
     tools: [cron, spawn, ask_user, memory, productivity]
     mcp_tools: []

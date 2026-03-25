@@ -1574,7 +1574,10 @@ impl IntentAnalyzer {
                 // accuracy 0.70  → threshold stays at base
                 // accuracy 0.50  → threshold rises by 0.05 (defer more to LLM)
                 let delta = (accuracy - 0.80) * 0.25; // ±0.05 for ±0.20 accuracy swing
-                let adjusted = (base + delta).clamp(0.60, 0.95);
+                // Cap at 0.90: domain heuristics return 0.90 confidence, so a threshold
+                // above 0.90 rejects ALL domain classifications and forces the LLM
+                // classifier, which can incorrectly trigger needs_orchestration.
+                let adjusted = (base + delta).clamp(0.60, 0.90);
                 debug!(
                     base_threshold = base,
                     historical_accuracy = accuracy,

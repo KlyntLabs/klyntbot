@@ -648,7 +648,7 @@ pub async fn run_bootstrap_replay(orch: &AutoTunerOrchestrator) -> common::Resul
             skill_keyword_weight: Some(rng.random_range(0.30..=0.90)),
             skill_semantic_weight: Some(rng.random_range(0.10..=0.70)),
             skill_activation_threshold: Some(rng.random_range(0.20..=0.70)),
-            heuristic_confidence_threshold: Some(rng.random_range(0.60..=0.95)),
+            heuristic_confidence_threshold: Some(rng.random_range(0.60..=0.90)),
             llm_classifier_timeout_ms: None,
             relevance_weight_semantic: Some(rng.random_range(0.10..=0.50)),
             relevance_weight_retrievability: Some(rng.random_range(0.05..=0.40)),

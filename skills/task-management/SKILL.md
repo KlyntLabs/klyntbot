@@ -72,6 +72,11 @@ metadata:
       - productivity
       - what tasks
       - show my tasks
+      - show me all tasks
+      - show tasks
+      - list tasks
+      - all tasks
+      - my tasks
       - to do list
       - todo list
       - check off

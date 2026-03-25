@@ -342,4 +342,34 @@ mod tests {
             "finance report should route to finance-management"
         );
     }
+
+    #[test]
+    fn test_task_messages_never_route_to_automation() {
+        let builtin: Vec<(String, String)> = crate::discovery::BUILTIN_SKILLS
+            .iter()
+            .map(|(n, c)| (n.to_string(), c.to_string()))
+            .collect();
+        let source = SkillSource::BuiltIn(builtin);
+        let catalog = SkillCatalog::discover_sync(&[source]).unwrap();
+        let router = SkillRouter::new(&catalog);
+
+        let task_messages = [
+            "show me all tasks we have",
+            "show my tasks",
+            "list tasks",
+            "what tasks do I have",
+            "all tasks",
+            "my tasks",
+            "create a task",
+            "add todo",
+        ];
+        for msg in &task_messages {
+            let pkg = router.select_orchestrator(msg, &catalog, None);
+            assert_eq!(
+                pkg.name, "task-management",
+                "'{}' should route to task-management, not '{}'",
+                msg, pkg.name
+            );
+        }
+    }
 }
