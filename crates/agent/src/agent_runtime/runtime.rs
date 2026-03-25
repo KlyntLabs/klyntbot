@@ -308,7 +308,11 @@ impl AgentRuntime {
 
         // Step 0b: Generate query embedding for semantic skill routing
         let query_embedding: Vec<f32> = if let Some(ref engine) = self.embedding_engine {
-            engine.clone().embed_async(message.to_string()).await.unwrap_or_default()
+            engine
+                .clone()
+                .embed_async(message.to_string())
+                .await
+                .unwrap_or_default()
         } else {
             vec![]
         };
@@ -325,7 +329,13 @@ impl AgentRuntime {
                 .as_ref()
                 .map(|p| (p.skill_keyword_weight, p.skill_semantic_weight))
                 .unwrap_or((None, None));
-            Arc::clone(router.select_orchestrator_blended(message, &query_embedding, &catalog, kw_w, sem_w))
+            Arc::clone(router.select_orchestrator_blended(
+                message,
+                &query_embedding,
+                &catalog,
+                kw_w,
+                sem_w,
+            ))
         };
         let mut agent_name = profile.name.clone();
         debug!("AgentRuntime: matched skill '{}'", agent_name);
@@ -409,6 +419,20 @@ impl AgentRuntime {
             })
             .copied()
             .collect();
+
+        // Step 3c: Spawn memory pre-fetch concurrently with classification.
+        // Build a preliminary RetrievalContext using the initial profile (pre-orchestration
+        // override). For ~95% of messages this is identical to the final one.
+        let prefetch_retrieval_ctx = self
+            .build_retrieval_context(&profile.name, &history, correction.clone())
+            .await;
+        let prefetch_engine = Arc::clone(&self.context_engine);
+        let prefetch_message = message.to_string();
+        let prefetch_handle = tokio::spawn(async move {
+            prefetch_engine
+                .prefetch_memory(&prefetch_message, prefetch_retrieval_ctx)
+                .await
+        });
 
         // Step 4: Classify intent
         let classify_start = Instant::now();
@@ -507,72 +531,21 @@ impl AgentRuntime {
             }
         }
 
-        // Step 5.5: Build retrieval context for query rewriting
-        let retrieval_context =
-            {
-                let active_skill = Some(profile.name.clone());
-
-                let recent_user_messages: Vec<String> = history
-                    .iter()
-                    .rev()
-                    .filter(|m| m.role() == common::MessageRole::User)
-                    .take(2)
-                    .map(|m| match m {
-                        Message::User {
-                            content: providers::UserContent::Text(t),
-                        } => t.chars().take(200).collect(),
-                        _ => String::new(),
-                    })
-                    .collect();
-
-                let situation = if let Some(ref sit) = self.user_situation {
-                    let s = sit.lock().await;
-                    Some(context_engine::UserSituationSnapshot {
-                        energy_level: s.energy_level,
-                        focus_state: s.focus_state,
-                        deadline_pressure: s.deadline_pressure,
-                        distraction_risk: s.distraction_risk,
-                    })
-                } else {
-                    None
-                };
-
-                let active_task =
-                    if let Some(ref repo) = self.task_repo {
-                        match repo.list_focused().await {
-                            Ok(tasks) => tasks.into_iter().next().map(|t| {
-                                context_engine::ActiveTaskContext {
-                                    title: t.title,
-                                    project_name: t.project_id,
-                                    domain: active_skill
-                                        .as_deref()
-                                        .map(|s| s.replace("-management", "").replace('-', " ")),
-                                }
-                            }),
-                            Err(e) => {
-                                warn!("Failed to query focused task for retrieval context: {e}");
-                                None
-                            }
-                        }
-                    } else {
-                        None
-                    };
-
-                Some(context_engine::RetrievalContext {
-                    active_skill,
-                    active_task,
-                    recent_user_messages,
-                    situation,
-                    active_view: if let Some(ref view_lock) = self.active_view {
-                        view_lock.read().await.clone()
-                    } else {
-                        None
-                    },
-                    recent_correction: correction,
-                })
-            };
+        // Step 5.5: Build retrieval context for query rewriting (uses final profile)
+        let retrieval_context = self
+            .build_retrieval_context(&profile.name, &history, correction)
+            .await;
 
         // Step 6: Assemble context (AgentContextSource injects agent instructions + skills)
+        // Await the pre-fetched memory from the concurrent task spawned in Step 3c.
+        let prefetched_memory = match prefetch_handle.await {
+            Ok(result) => result,
+            Err(e) => {
+                warn!("Memory pre-fetch task failed: {e}");
+                None
+            }
+        };
+
         let prompt = system_prompt.unwrap_or(&self.config.system_prompt);
         let strategy = ExecutionStrategy::from(&analysis.mode);
 
@@ -587,7 +560,10 @@ impl AgentRuntime {
             retrieval_context,
         };
         let assemble_start = Instant::now();
-        let assembled = self.context_engine.assemble(context_request).await;
+        let assembled = self
+            .context_engine
+            .assemble_with_prefetched(context_request, prefetched_memory)
+            .await;
         let assemble_ms = assemble_start.elapsed().as_millis() as u64;
 
         debug!(
@@ -815,6 +791,79 @@ impl AgentRuntime {
             agent_name,
             multi_voice: None,
             persona_responses: None,
+        })
+    }
+
+    /// Build a `RetrievalContext` from the current agent state.
+    ///
+    /// Extracted as a helper so we can build a preliminary context for memory
+    /// pre-fetching (before classification) and the final context (after
+    /// orchestration overrides) without duplicating logic.
+    async fn build_retrieval_context(
+        &self,
+        profile_name: &str,
+        history: &[Message],
+        correction: Option<context_engine::CorrectionContext>,
+    ) -> Option<context_engine::RetrievalContext> {
+        let active_skill = Some(profile_name.to_string());
+
+        let recent_user_messages: Vec<String> = history
+            .iter()
+            .rev()
+            .filter(|m| m.role() == common::MessageRole::User)
+            .take(2)
+            .map(|m| match m {
+                Message::User {
+                    content: providers::UserContent::Text(t),
+                } => t.chars().take(200).collect(),
+                _ => String::new(),
+            })
+            .collect();
+
+        let situation = if let Some(ref sit) = self.user_situation {
+            let s = sit.lock().await;
+            Some(context_engine::UserSituationSnapshot {
+                energy_level: s.energy_level,
+                focus_state: s.focus_state,
+                deadline_pressure: s.deadline_pressure,
+                distraction_risk: s.distraction_risk,
+            })
+        } else {
+            None
+        };
+
+        let active_task = if let Some(ref repo) = self.task_repo {
+            match repo.list_focused().await {
+                Ok(tasks) => tasks
+                    .into_iter()
+                    .next()
+                    .map(|t| context_engine::ActiveTaskContext {
+                        title: t.title,
+                        project_name: t.project_id,
+                        domain: active_skill
+                            .as_deref()
+                            .map(|s| s.replace("-management", "").replace('-', " ")),
+                    }),
+                Err(e) => {
+                    warn!("Failed to query focused task for retrieval context: {e}");
+                    None
+                }
+            }
+        } else {
+            None
+        };
+
+        Some(context_engine::RetrievalContext {
+            active_skill,
+            active_task,
+            recent_user_messages,
+            situation,
+            active_view: if let Some(ref view_lock) = self.active_view {
+                view_lock.read().await.clone()
+            } else {
+                None
+            },
+            recent_correction: correction,
         })
     }
 

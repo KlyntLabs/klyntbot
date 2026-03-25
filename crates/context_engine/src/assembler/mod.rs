@@ -201,6 +201,57 @@ impl ContextEngine {
         result
     }
 
+    /// Run the expensive memory retrieval independently, before full context assembly.
+    ///
+    /// This allows callers to overlap memory retrieval with other work (e.g. intent
+    /// classification) and later inject the result via [`assemble_with_prefetched`].
+    pub async fn prefetch_memory(
+        &self,
+        message: &str,
+        retrieval_context: Option<crate::RetrievalContext>,
+    ) -> Option<(String, usize, bool, Option<String>)> {
+        let request = ContextRequest {
+            message_text: message.to_string(),
+            history: vec![],
+            system_prompt: String::new(),
+            strategy: ExecutionStrategy::ToolAssisted { max_iterations: 5 },
+            tool_definitions: vec![],
+            context_window: 0,
+            session_key: None,
+            retrieval_context,
+        };
+        self.retrieve_memory(&request).await
+    }
+
+    /// Like [`assemble`] but accepts pre-fetched memory to skip the internal retrieval.
+    ///
+    /// If `prefetched_memory` is `Some`, the assembler uses it directly instead of
+    /// calling `retrieve_memory`. If `None`, falls back to the normal retrieval path.
+    pub async fn assemble_with_prefetched(
+        &self,
+        request: ContextRequest,
+        prefetched_memory: Option<(String, usize, bool, Option<String>)>,
+    ) -> AssembledContext {
+        let cache_key = Self::compute_cache_key(&request);
+        {
+            let cache = self.cache.lock().await;
+            if let Some(cached) = cache.get(&cache_key) {
+                return cached.clone();
+            }
+        }
+
+        let result = self
+            .assemble_uncached_with_memory(&request, prefetched_memory)
+            .await;
+
+        {
+            let mut cache = self.cache.lock().await;
+            cache.insert(cache_key, result.clone());
+        }
+
+        result
+    }
+
     /// Compute a stable, deterministic cache key from the request inputs.
     ///
     /// Uses SHA-256 to produce a 64-char hex string that is stable across
@@ -247,6 +298,14 @@ impl ContextEngine {
     }
 
     async fn assemble_uncached(&self, request: &ContextRequest) -> AssembledContext {
+        self.assemble_uncached_with_memory(request, None).await
+    }
+
+    async fn assemble_uncached_with_memory(
+        &self,
+        request: &ContextRequest,
+        prefetched: Option<(String, usize, bool, Option<String>)>,
+    ) -> AssembledContext {
         let mut allocator = BudgetAllocator::new(BudgetConfig::standard(request.context_window));
 
         // 1. System prompt always gets allocated first
@@ -269,12 +328,13 @@ impl ContextEngine {
             match &request.strategy {
                 ExecutionStrategy::Clarification { .. } => (None, 0, false, None),
                 _ => {
-                    let result = self.retrieve_memory(request).await;
-                    match result {
-                        Some((text, count, rw_triggered, rw_source)) => {
-                            (Some(text), count, rw_triggered, rw_source)
+                    if let Some((text, count, rw, src)) = prefetched {
+                        (Some(text), count, rw, src)
+                    } else {
+                        match self.retrieve_memory(request).await {
+                            Some((text, count, rw, src)) => (Some(text), count, rw, src),
+                            None => (None, 0, false, None),
                         }
-                        None => (None, 0, false, None),
                     }
                 }
             };
