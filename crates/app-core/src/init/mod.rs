@@ -268,6 +268,7 @@ impl AppCore {
                 mirror_repo,
                 &domain_event_bus,
                 narrative_handler,
+                None,
             );
             info!("mirror self-reflection engine started");
             Some(Arc::new(facade))

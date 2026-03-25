@@ -10,7 +10,8 @@ use tokio::task::JoinHandle;
 use tokio_util::sync::CancellationToken;
 
 use crate::mirror::{
-    MetaRuleDetector, MirrorFacade, MirrorRepo, NarrativeHandler, RoutingMirrorSubscriber,
+    AutotunerBridge, ConfigArchiver, MetaRuleDetector, MirrorFacade, MirrorRepo, NarrativeHandler,
+    RoutingMirrorSubscriber,
 };
 
 // ---------------------------------------------------------------------------
@@ -39,21 +40,28 @@ impl MirrorEngine {
         repo: MirrorRepo,
         bus: &bus::DomainEventBus,
         narrative_handler: Option<Arc<dyn NarrativeHandler>>,
+        autotuner_bridge: Option<Arc<dyn AutotunerBridge>>,
     ) -> (MirrorFacade, Vec<JoinHandle<()>>, CancellationToken) {
         let shutdown = CancellationToken::new();
 
         let meta_rule_repo = repo.clone();
+        let version_repo = repo.clone();
 
         let routing_sub = Arc::new(RoutingMirrorSubscriber::new(repo.clone()));
         let meta_rule_detector = MetaRuleDetector::new(meta_rule_repo);
+        let config_archiver = ConfigArchiver::new(version_repo, autotuner_bridge.clone());
         let handles = vec![
             tokio::spawn(routing_sub.run(bus.subscribe(), shutdown.clone())),
             tokio::spawn(meta_rule_detector.run(bus.subscribe(), shutdown.clone())),
+            tokio::spawn(config_archiver.run(bus.subscribe(), shutdown.clone())),
         ];
 
         let mut facade = MirrorFacade::new(repo);
         if let Some(handler) = narrative_handler {
             facade = facade.with_narrative_handler(handler);
+        }
+        if let Some(bridge) = autotuner_bridge {
+            facade = facade.with_autotuner_bridge(bridge);
         }
 
         (facade, handles, shutdown)
@@ -73,7 +81,7 @@ mod tests {
         let repo = crate::mirror::test_mirror_repo().await;
         let bus = bus::DomainEventBus::new(16);
 
-        let (facade, handles, shutdown) = MirrorEngine::start(repo, &bus, None);
+        let (facade, handles, shutdown) = MirrorEngine::start(repo, &bus, None, None);
 
         // Facade is usable.
         let state = facade.get_state().await.unwrap();
@@ -91,7 +99,7 @@ mod tests {
         let repo = crate::mirror::test_mirror_repo().await;
         let bus = bus::DomainEventBus::new(16);
 
-        let (_facade, handles, shutdown) = MirrorEngine::start(repo, &bus, None);
+        let (_facade, handles, shutdown) = MirrorEngine::start(repo, &bus, None, None);
 
         // Publish a SkillRouted event — the subscriber should accumulate it.
         bus.publish(bus::DomainEvent::SkillRouted {
@@ -117,9 +125,9 @@ mod tests {
         let bus = bus::DomainEventBus::new(16);
 
         assert_eq!(bus.subscriber_count(), 0);
-        let (_facade, handles, shutdown) = MirrorEngine::start(repo, &bus, None);
-        // Two subscribers registered (routing_sub + meta_rule_detector).
-        assert_eq!(bus.subscriber_count(), 2);
+        let (_facade, handles, shutdown) = MirrorEngine::start(repo, &bus, None, None);
+        // Three subscribers registered (routing_sub + meta_rule_detector + config_archiver).
+        assert_eq!(bus.subscriber_count(), 3);
 
         shutdown.cancel();
         for handle in handles {
