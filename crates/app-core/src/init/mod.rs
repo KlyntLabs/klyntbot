@@ -249,7 +249,7 @@ impl AppCore {
             launcher::init_launcher(&config, &storage_pool, &shutdown_token).await;
 
         // ── Phase 9: Mirror self-reflection layer ────────────────────────
-        let mirror_facade = {
+        let (mirror_facade, mirror_handles, mirror_shutdown) = {
             let mirror_repo = ::cognitive::mirror::MirrorRepo::new(storage_pool.clone());
             let narrative_handler: Option<Arc<dyn ::cognitive::mirror::NarrativeHandler>> =
                 cognitive_provider.as_ref().map(|cp| {
@@ -270,7 +270,7 @@ impl AppCore {
                         Arc::clone(orch),
                     )) as Arc<dyn ::cognitive::mirror::AutotunerBridge>
                 });
-            let (facade, _handles, _mirror_shutdown) = ::cognitive::mirror::MirrorEngine::start(
+            let (facade, handles, shutdown) = ::cognitive::mirror::MirrorEngine::start(
                 mirror_repo,
                 &domain_event_bus,
                 narrative_handler,
@@ -285,7 +285,7 @@ impl AppCore {
             });
 
             info!("mirror self-reflection engine started");
-            Some(Arc::new(facade))
+            (Some(Arc::new(facade)), Some(handles), Some(shutdown))
         };
 
         // ── Wrap config for shared ownership ─────────────────────────────
@@ -380,6 +380,8 @@ impl AppCore {
             )),
             autotuner,
             mirror_facade,
+            _mirror_handles: mirror_handles,
+            _mirror_shutdown: mirror_shutdown,
             _config_watcher_token: Some(config_watcher_token),
         };
 

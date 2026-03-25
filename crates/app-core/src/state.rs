@@ -127,6 +127,10 @@ pub struct AppCore {
     pub autotuner: Option<Arc<agent::autotuner::AutoTunerOrchestrator>>,
     /// Mirror self-reflection facade (None when cognitive provider is unavailable).
     pub mirror_facade: Option<Arc<cognitive::mirror::MirrorFacade>>,
+    /// Join handles for MirrorEngine background subscribers — kept alive for app lifetime.
+    pub _mirror_handles: Option<Vec<tokio::task::JoinHandle<()>>>,
+    /// Cancellation token for the MirrorEngine background subscribers.
+    pub _mirror_shutdown: Option<CancellationToken>,
     /// Cancellation token for the config file watcher background service.
     pub _config_watcher_token: Option<CancellationToken>,
 }
