@@ -449,21 +449,36 @@ Body.
     #[test]
     fn test_parse_summary_from_frontmatter() {
         let md = "---\nname: test-skill\ndescription: A test skill.\nmetadata:\n  klyntbot:\n    summary: Handles task CRUD and project management.\n---\nFull body here.";
-        let pkg = parse_skill_md(md, std::path::PathBuf::from("test"), crate::types::SkillScope::BuiltIn).unwrap();
+        let pkg = parse_skill_md(
+            md,
+            std::path::PathBuf::from("test"),
+            crate::types::SkillScope::BuiltIn,
+        )
+        .unwrap();
         assert_eq!(pkg.summary, "Handles task CRUD and project management.");
     }
 
     #[test]
     fn test_parse_summary_fallback_to_first_sentence() {
         let md = "---\nname: test-skill\ndescription: A test skill.\n---\nThis is the first sentence. This is the second sentence.";
-        let pkg = parse_skill_md(md, std::path::PathBuf::from("test"), crate::types::SkillScope::BuiltIn).unwrap();
+        let pkg = parse_skill_md(
+            md,
+            std::path::PathBuf::from("test"),
+            crate::types::SkillScope::BuiltIn,
+        )
+        .unwrap();
         assert_eq!(pkg.summary, "This is the first sentence.");
     }
 
     #[test]
     fn test_parse_summary_fallback_short_body() {
         let md = "---\nname: test-skill\ndescription: A test skill.\n---\nShort body";
-        let pkg = parse_skill_md(md, std::path::PathBuf::from("test"), crate::types::SkillScope::BuiltIn).unwrap();
+        let pkg = parse_skill_md(
+            md,
+            std::path::PathBuf::from("test"),
+            crate::types::SkillScope::BuiltIn,
+        )
+        .unwrap();
         assert_eq!(pkg.summary, "Short body");
     }
 }

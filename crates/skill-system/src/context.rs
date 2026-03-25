@@ -41,7 +41,11 @@ impl SkillContextSource {
 
     /// Load always_skills reference files from the orchestrator's directory.
     /// Filters multi-token references by relevance to the user message.
-    fn always_skill_content(&self, orchestrator: &SkillPackage, message: Option<&str>) -> Vec<String> {
+    fn always_skill_content(
+        &self,
+        orchestrator: &SkillPackage,
+        message: Option<&str>,
+    ) -> Vec<String> {
         let mut content = Vec::new();
         let msg_lower = message.map(|m| m.to_lowercase());
 
@@ -201,7 +205,9 @@ fn is_reference_relevant(reference_name: &str, message_lower: &str) -> bool {
     if tokens.len() == 1 {
         return true;
     }
-    tokens.iter().any(|t| t.len() > 2 && message_lower.contains(t))
+    tokens
+        .iter()
+        .any(|t| t.len() > 2 && message_lower.contains(t))
 }
 
 #[cfg(test)]
@@ -337,9 +343,18 @@ mod tests {
         };
         let result = source.provide(&ctx).await.unwrap();
 
-        assert!(result.contains("Orchestrator body"), "orchestrator gets full body");
-        assert!(result.contains("Helper does X and Y"), "activated skill shows summary");
-        assert!(!result.contains("very long full body"), "activated skill should NOT show full body");
+        assert!(
+            result.contains("Orchestrator body"),
+            "orchestrator gets full body"
+        );
+        assert!(
+            result.contains("Helper does X and Y"),
+            "activated skill shows summary"
+        );
+        assert!(
+            !result.contains("very long full body"),
+            "activated skill should NOT show full body"
+        );
     }
 
     #[tokio::test]
@@ -375,7 +390,13 @@ mod tests {
         };
         let result = ctx_source.provide(&ctx).await.unwrap();
 
-        assert!(result.contains("Todo Workflow"), "single-token ref should always load");
-        assert!(!result.contains("Daily Planner"), "multi-token ref should be filtered when irrelevant");
+        assert!(
+            result.contains("Todo Workflow"),
+            "single-token ref should always load"
+        );
+        assert!(
+            !result.contains("Daily Planner"),
+            "multi-token ref should be filtered when irrelevant"
+        );
     }
 }
