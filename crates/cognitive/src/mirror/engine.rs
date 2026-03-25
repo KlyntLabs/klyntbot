@@ -6,12 +6,13 @@
 
 use std::sync::Arc;
 
+use dashmap::DashMap;
 use tokio::task::JoinHandle;
 use tokio_util::sync::CancellationToken;
 
 use crate::mirror::{
     AutotunerBridge, ConfigArchiver, MetaRuleDetector, MirrorFacade, MirrorRepo, NarrativeHandler,
-    RoutingMirrorSubscriber,
+    RoutingMirrorSubscriber, TrialPreviewSubscriber,
 };
 
 // ---------------------------------------------------------------------------
@@ -46,17 +47,29 @@ impl MirrorEngine {
 
         let meta_rule_repo = repo.clone();
         let version_repo = repo.clone();
+        let trial_repo = repo.clone();
+
+        // Shared active timers between TrialPreviewSubscriber and MirrorFacade
+        let active_timers: Arc<DashMap<String, JoinHandle<()>>> = Arc::new(DashMap::new());
 
         let routing_sub = Arc::new(RoutingMirrorSubscriber::new(repo.clone()));
         let meta_rule_detector = MetaRuleDetector::new(meta_rule_repo);
         let config_archiver = ConfigArchiver::new(version_repo, autotuner_bridge.clone());
+        let trial_sub = Arc::new(TrialPreviewSubscriber::new(
+            trial_repo,
+            active_timers.clone(),
+            None, // evaluator wired in Phase 5
+        ));
+
         let handles = vec![
             tokio::spawn(routing_sub.run(bus.subscribe(), shutdown.clone())),
             tokio::spawn(meta_rule_detector.run(bus.subscribe(), shutdown.clone())),
             tokio::spawn(config_archiver.run(bus.subscribe(), shutdown.clone())),
+            tokio::spawn(trial_sub.run(bus.subscribe(), shutdown.clone())),
         ];
 
         let mut facade = MirrorFacade::new(repo);
+        facade = facade.with_active_timers(active_timers);
         if let Some(handler) = narrative_handler {
             facade = facade.with_narrative_handler(handler);
         }
@@ -126,8 +139,8 @@ mod tests {
 
         assert_eq!(bus.subscriber_count(), 0);
         let (_facade, handles, shutdown) = MirrorEngine::start(repo, &bus, None, None);
-        // Three subscribers registered (routing_sub + meta_rule_detector + config_archiver).
-        assert_eq!(bus.subscriber_count(), 3);
+        // Four subscribers (routing + meta_rule + config_archiver + trial_preview).
+        assert_eq!(bus.subscriber_count(), 4);
 
         shutdown.cancel();
         for handle in handles {
