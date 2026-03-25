@@ -20,6 +20,7 @@ export function AtomGraph() {
           label: t.name,
           size: Math.max(20, t.atomCount * 4),
           retention: t.avgRetention,
+          color: t.avgRetention >= 0.8 ? "#34d399" : t.avgRetention >= 0.5 ? "#fbbf24" : "#f87171",
         },
       }));
 
@@ -33,10 +34,10 @@ export function AtomGraph() {
               label: "data(label)",
               width: "data(size)",
               height: "data(size)",
-              "background-color": "var(--brand)",
+              "background-color": "data(color)",
               "background-opacity": 0.7,
               "border-width": 2,
-              "border-color": "var(--brand)",
+              "border-color": "data(color)",
               color: "var(--muted)",
               "font-size": "10px",
               "text-valign": "bottom",

@@ -1,9 +1,13 @@
-import { Activity, Focus, GraduationCap, Play, Plus } from "lucide-react";
+import { Activity, Focus, GraduationCap, Network, Play, Plus, TrendingUp } from "lucide-react";
 import { Link } from "react-router";
 import { useLearnDashboard } from "../hooks/useLearnDashboard";
+import { useRetentionHistory } from "../hooks/useRetentionHistory";
 import { useReviewStats } from "../hooks/useReviewStats";
+import { AtomGraph } from "./AtomGraph";
+import { CollapsibleSection } from "./CollapsibleSection";
 import { DeckList } from "./DeckList";
 import { QuickGenerate } from "./QuickGenerate";
+import { RetentionChart } from "./RetentionChart";
 import { StatsBar } from "./StatsBar";
 
 interface DashboardHomeProps {
@@ -23,6 +27,7 @@ export function DashboardHome({
 }: DashboardHomeProps) {
   const { decks, totalDue, loading } = useLearnDashboard();
   const { data: stats } = useReviewStats();
+  const { data: retentionData } = useRetentionHistory(30);
 
   if (loading) {
     return (
@@ -151,6 +156,27 @@ export function DashboardHome({
 
       {/* Deck list */}
       <DeckList decks={decks} onReviewDeck={onStartReview} />
+
+      {/* Charts */}
+      <CollapsibleSection
+        title="Retention Trend"
+        icon={<TrendingUp size={14} strokeWidth={1.5} />}
+        storageKey="learn-retention-open"
+      >
+        <div className="glass-card p-4">
+          <RetentionChart data={retentionData.overall} height={160} />
+        </div>
+      </CollapsibleSection>
+
+      <CollapsibleSection
+        title="Knowledge Graph"
+        icon={<Network size={14} strokeWidth={1.5} />}
+        storageKey="learn-graph-open"
+      >
+        <div className="glass-card p-4">
+          <AtomGraph />
+        </div>
+      </CollapsibleSection>
     </div>
   );
 }
