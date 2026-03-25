@@ -2,7 +2,9 @@
 
 pub mod meta_rule;
 pub mod routing;
+pub mod trial;
 pub mod version;
 pub use meta_rule::MetaRuleDetector;
 pub use routing::RoutingMirrorSubscriber;
+pub use trial::TrialPreviewSubscriber;
 pub use version::ConfigArchiver;
