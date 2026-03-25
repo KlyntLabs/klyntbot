@@ -5,7 +5,8 @@ use common::Result;
 use uuid::Uuid;
 
 use crate::mirror::{
-    FeedbackTarget, NarrativeSnippet, RoutingSnapshot, TrendNarrative, UserFeedback,
+    FeedbackTarget, MetaRule, MetaRuleAction, MetaRuleSource, MetaRuleStatus, NarrativeSnippet,
+    RoutingSnapshot, TrendNarrative, UserFeedback,
 };
 
 // ---------------------------------------------------------------------------
@@ -148,6 +149,48 @@ impl TryFrom<SnippetRow> for NarrativeSnippet {
             suggested_action,
             user_feedback,
             dismissed_at,
+        })
+    }
+}
+
+#[derive(Debug, sqlx::FromRow)]
+struct MetaRuleRow {
+    id: String,
+    trigger_condition: String,
+    action_json: String,
+    source: String,
+    effectiveness_score: f64,
+    status: String,
+    signal_count: i64,
+    created_at: String,
+    updated_at: String,
+}
+
+impl TryFrom<MetaRuleRow> for MetaRule {
+    type Error = common::KlyntbotError;
+
+    fn try_from(row: MetaRuleRow) -> Result<Self> {
+        let parse_dt = |s: &str| {
+            DateTime::parse_from_rfc3339(s)
+                .map(|d| d.with_timezone(&Utc))
+                .map_err(|e| common::KlyntbotError::Storage(format!("bad datetime: {e}")))
+        };
+        let action: MetaRuleAction = serde_json::from_str(&row.action_json)?;
+        let source: MetaRuleSource =
+            serde_json::from_str(&format!("\"{}\"", row.source))?;
+        let status: MetaRuleStatus =
+            serde_json::from_str(&format!("\"{}\"", row.status))?;
+        Ok(MetaRule {
+            id: Uuid::parse_str(&row.id)
+                .map_err(|e| common::KlyntbotError::Storage(format!("bad uuid: {e}")))?,
+            trigger_condition: row.trigger_condition,
+            action,
+            source,
+            effectiveness_score: row.effectiveness_score,
+            status,
+            signal_count: row.signal_count as u32,
+            created_at: parse_dt(&row.created_at)?,
+            updated_at: parse_dt(&row.updated_at)?,
         })
     }
 }
@@ -394,6 +437,98 @@ impl MirrorRepo {
                 .map_err(|e| common::KlyntbotError::Storage(e.to_string()))?;
         Ok(result.rows_affected())
     }
+
+    // -----------------------------------------------------------------------
+    // Meta-rules
+    // -----------------------------------------------------------------------
+
+    pub async fn insert_meta_rule(&self, rule: &MetaRule) -> Result<()> {
+        let action_json = serde_json::to_string(&rule.action)?;
+        let source = serde_json::to_string(&rule.source)?.trim_matches('"').to_string();
+        let status = serde_json::to_string(&rule.status)?.trim_matches('"').to_string();
+        sqlx::query(
+            r#"
+            INSERT INTO mirror_meta_rules
+                (id, trigger_condition, action_json, source, effectiveness_score,
+                 status, signal_count, created_at, updated_at)
+            VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)
+            "#,
+        )
+        .bind(rule.id.to_string())
+        .bind(&rule.trigger_condition)
+        .bind(action_json)
+        .bind(source)
+        .bind(rule.effectiveness_score)
+        .bind(status)
+        .bind(rule.signal_count as i64)
+        .bind(rule.created_at.to_rfc3339())
+        .bind(rule.updated_at.to_rfc3339())
+        .execute(self.db())
+        .await
+        .map_err(|e| common::KlyntbotError::Storage(e.to_string()))?;
+        Ok(())
+    }
+
+    pub async fn get_meta_rules_by_status(
+        &self,
+        status: MetaRuleStatus,
+    ) -> Result<Vec<MetaRule>> {
+        let status_str = serde_json::to_string(&status)?.trim_matches('"').to_string();
+        let rows = sqlx::query_as::<_, MetaRuleRow>(
+            "SELECT * FROM mirror_meta_rules WHERE status = ?1 ORDER BY created_at DESC",
+        )
+        .bind(status_str)
+        .fetch_all(self.db())
+        .await
+        .map_err(|e| common::KlyntbotError::Storage(e.to_string()))?;
+        rows.into_iter().map(MetaRule::try_from).collect()
+    }
+
+    pub async fn update_meta_rule_status(&self, id: Uuid, status: MetaRuleStatus) -> Result<()> {
+        let status_str = serde_json::to_string(&status)?.trim_matches('"').to_string();
+        sqlx::query(
+            "UPDATE mirror_meta_rules SET status = ?1, updated_at = ?2 WHERE id = ?3",
+        )
+        .bind(status_str)
+        .bind(Utc::now().to_rfc3339())
+        .bind(id.to_string())
+        .execute(self.db())
+        .await
+        .map_err(|e| common::KlyntbotError::Storage(e.to_string()))?;
+        Ok(())
+    }
+
+    pub async fn increment_meta_rule_signal(&self, id: Uuid) -> Result<()> {
+        sqlx::query(
+            "UPDATE mirror_meta_rules SET signal_count = signal_count + 1, updated_at = ?1 \
+             WHERE id = ?2",
+        )
+        .bind(Utc::now().to_rfc3339())
+        .bind(id.to_string())
+        .execute(self.db())
+        .await
+        .map_err(|e| common::KlyntbotError::Storage(e.to_string()))?;
+        Ok(())
+    }
+
+    pub async fn decay_meta_rule_effectiveness(
+        &self,
+        id: Uuid,
+        decay_factor: f64,
+    ) -> Result<()> {
+        sqlx::query(
+            "UPDATE mirror_meta_rules \
+             SET effectiveness_score = effectiveness_score * ?1, updated_at = ?2 \
+             WHERE id = ?3",
+        )
+        .bind(decay_factor)
+        .bind(Utc::now().to_rfc3339())
+        .bind(id.to_string())
+        .execute(self.db())
+        .await
+        .map_err(|e| common::KlyntbotError::Storage(e.to_string()))?;
+        Ok(())
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -405,7 +540,7 @@ mod tests {
     use std::collections::HashMap;
 
     use super::*;
-    use crate::mirror::{MirrorAlertType, SkillRouteStats, SuggestedAction};
+    use crate::mirror::{MetaRuleAction, MirrorAlertType, SkillRouteStats, SuggestedAction};
     use crate::repos::cognitive_migrations;
 
     async fn setup() -> MirrorRepo {
@@ -608,5 +743,82 @@ mod tests {
 
         let deleted_snippets = repo.cleanup_old_snippets(30).await.unwrap();
         assert_eq!(deleted_snippets, 1);
+    }
+
+    fn make_meta_rule() -> MetaRule {
+        MetaRule {
+            id: Uuid::new_v4(),
+            trigger_condition: "user corrects finance twice".to_string(),
+            action: MetaRuleAction::ForceClarification,
+            source: MetaRuleSource::CorrectionDerived,
+            effectiveness_score: 0.5,
+            status: MetaRuleStatus::Pending,
+            signal_count: 0,
+            created_at: Utc::now(),
+            updated_at: Utc::now(),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_insert_and_get_meta_rule() {
+        let repo = setup().await;
+        let rule = make_meta_rule();
+        repo.insert_meta_rule(&rule).await.unwrap();
+
+        let rules = repo.get_meta_rules_by_status(MetaRuleStatus::Pending).await.unwrap();
+        assert_eq!(rules.len(), 1);
+        let got = &rules[0];
+        assert_eq!(got.id, rule.id);
+        assert_eq!(got.trigger_condition, "user corrects finance twice");
+        assert_eq!(got.source, MetaRuleSource::CorrectionDerived);
+        assert_eq!(got.status, MetaRuleStatus::Pending);
+        assert_eq!(got.signal_count, 0);
+        assert!((got.effectiveness_score - 0.5).abs() < 1e-9);
+    }
+
+    #[tokio::test]
+    async fn test_approve_meta_rule() {
+        let repo = setup().await;
+        let rule = make_meta_rule();
+        repo.insert_meta_rule(&rule).await.unwrap();
+
+        repo.update_meta_rule_status(rule.id, MetaRuleStatus::Active).await.unwrap();
+
+        let pending = repo.get_meta_rules_by_status(MetaRuleStatus::Pending).await.unwrap();
+        assert!(pending.is_empty());
+
+        let active = repo.get_meta_rules_by_status(MetaRuleStatus::Active).await.unwrap();
+        assert_eq!(active.len(), 1);
+        assert_eq!(active[0].status, MetaRuleStatus::Active);
+    }
+
+    #[tokio::test]
+    async fn test_dismiss_meta_rule() {
+        let repo = setup().await;
+        let rule = make_meta_rule();
+        repo.insert_meta_rule(&rule).await.unwrap();
+
+        repo.update_meta_rule_status(rule.id, MetaRuleStatus::Disabled).await.unwrap();
+
+        let pending = repo.get_meta_rules_by_status(MetaRuleStatus::Pending).await.unwrap();
+        assert!(pending.is_empty());
+
+        let disabled = repo.get_meta_rules_by_status(MetaRuleStatus::Disabled).await.unwrap();
+        assert_eq!(disabled.len(), 1);
+        assert_eq!(disabled[0].status, MetaRuleStatus::Disabled);
+    }
+
+    #[tokio::test]
+    async fn test_increment_signal_count() {
+        let repo = setup().await;
+        let rule = make_meta_rule();
+        repo.insert_meta_rule(&rule).await.unwrap();
+
+        repo.increment_meta_rule_signal(rule.id).await.unwrap();
+        repo.increment_meta_rule_signal(rule.id).await.unwrap();
+
+        let rules = repo.get_meta_rules_by_status(MetaRuleStatus::Pending).await.unwrap();
+        assert_eq!(rules.len(), 1);
+        assert_eq!(rules[0].signal_count, 2);
     }
 }

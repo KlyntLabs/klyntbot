@@ -404,6 +404,7 @@ mod tests {
             MirrorAlert::RoutingDrift { skill, .. } => {
                 assert_eq!(skill, "fallback");
             }
+            other => panic!("Expected RoutingDrift alert, got {other:?}"),
         }
     }
 
