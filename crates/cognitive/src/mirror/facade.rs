@@ -11,9 +11,9 @@ use uuid::Uuid;
 use common::Result;
 
 use crate::mirror::{
-    FeedbackTarget, MetaRule, MetaRuleStatus, MirrorRepo, MirrorResponse, MirrorState,
-    NarrativeContext, NarrativeHandler, NarrativeSnippet, RoutingSnapshot, TrendNarrative,
-    UserFeedback,
+    AutotunerBridge, BrainVersion, FeedbackTarget, MetaRule, MetaRuleStatus, MirrorRepo,
+    MirrorResponse, MirrorState, NarrativeContext, NarrativeHandler, NarrativeSnippet,
+    RoutingSnapshot, TrendNarrative, UserFeedback,
 };
 
 // ---------------------------------------------------------------------------
@@ -27,6 +27,7 @@ use crate::mirror::{
 pub struct MirrorFacade {
     pub(crate) repo: MirrorRepo,
     narrative_handler: Option<Arc<dyn NarrativeHandler>>,
+    autotuner_bridge: Option<Arc<dyn AutotunerBridge>>,
 }
 
 impl MirrorFacade {
@@ -37,6 +38,7 @@ impl MirrorFacade {
         Self {
             repo,
             narrative_handler: None,
+            autotuner_bridge: None,
         }
     }
 
@@ -47,18 +49,33 @@ impl MirrorFacade {
         self
     }
 
+    /// Attach an [`AutotunerBridge`] so that [`revert_to_version`](Self::revert_to_version)
+    /// can apply parameter changes. Returns `self` for builder-style chaining.
+    pub fn with_autotuner_bridge(mut self, bridge: Arc<dyn AutotunerBridge>) -> Self {
+        self.autotuner_bridge = Some(bridge);
+        self
+    }
+
     // -----------------------------------------------------------------------
     // State queries
     // -----------------------------------------------------------------------
 
-    /// Compose the current [`MirrorState`] from the three primary repo queries.
+    /// Compose the current [`MirrorState`] from the primary repo queries.
     pub async fn get_state(&self) -> Result<MirrorState> {
-        let (last_routing_snapshot, latest_trend_narrative, pending_snippets, active_meta_rules, pending_meta_rules) = tokio::try_join!(
+        let (
+            last_routing_snapshot,
+            latest_trend_narrative,
+            pending_snippets,
+            active_meta_rules,
+            pending_meta_rules,
+            latest_brain_version,
+        ) = tokio::try_join!(
             self.repo.get_latest_routing_snapshot(),
             self.repo.get_latest_narrative(),
             self.repo.get_pending_snippets(),
             self.repo.get_meta_rules_by_status(MetaRuleStatus::Active),
             self.repo.get_meta_rules_by_status(MetaRuleStatus::Pending),
+            self.repo.get_latest_brain_version(),
         )?;
 
         Ok(MirrorState {
@@ -67,7 +84,7 @@ impl MirrorFacade {
             pending_snippets,
             active_meta_rules,
             pending_meta_rules,
-            latest_brain_version: None,
+            latest_brain_version,
         })
     }
 
@@ -84,6 +101,53 @@ impl MirrorFacade {
     /// Return all non-dismissed narrative snippets (up to 20, newest first).
     pub async fn get_pending_snippets(&self) -> Result<Vec<NarrativeSnippet>> {
         self.repo.get_pending_snippets().await
+    }
+
+    // -----------------------------------------------------------------------
+    // Brain version queries & revert
+    // -----------------------------------------------------------------------
+
+    /// Return all brain versions, newest first.
+    pub async fn get_brain_versions(&self) -> Result<Vec<BrainVersion>> {
+        self.repo.get_brain_versions().await
+    }
+
+    /// Revert DB state only — used in tests without autotuner bridge.
+    pub(crate) async fn revert_to_version_db_only(&self, target: u32) -> Result<BrainVersion> {
+        let target_v = self
+            .repo
+            .get_brain_version(target)
+            .await?
+            .ok_or_else(|| {
+                common::KlyntbotError::StorageNotFound(format!(
+                    "Brain version {target} not found"
+                ))
+            })?;
+        self.repo.mark_versions_reverted_after(target).await?;
+        let next = self.repo.get_next_version_number().await?;
+        let new_v = BrainVersion {
+            version: next,
+            trial_id: None,
+            promoted_at: Utc::now(),
+            params: target_v.params.clone(),
+            reason: format!("Reverted to v{target}"),
+            parent_version: Some(next - 1),
+            metrics_at_promotion: target_v.metrics_at_promotion.clone(),
+            reverted: false,
+        };
+        self.repo.insert_brain_version(&new_v).await?;
+        Ok(new_v)
+    }
+
+    /// Full revert: updates DB and applies params via [`AutotunerBridge`].
+    pub async fn revert_to_version(&self, target: u32) -> Result<BrainVersion> {
+        let new_v = self.revert_to_version_db_only(target).await?;
+        if let Some(bridge) = &self.autotuner_bridge {
+            bridge
+                .apply_champion(new_v.params.clone(), new_v.reason.clone())
+                .await?;
+        }
+        Ok(new_v)
     }
 
     // -----------------------------------------------------------------------
@@ -457,5 +521,66 @@ mod tests {
         let snippets = facade.get_pending_snippets().await.unwrap();
         assert_eq!(snippets.len(), 1);
         assert_eq!(snippets[0].id, snippet.id);
+    }
+
+    // -- Brain version tests -----------------------------------------------
+
+    fn make_brain_version(version: u32, parent: Option<u32>) -> crate::mirror::BrainVersion {
+        crate::mirror::BrainVersion {
+            version,
+            trial_id: None,
+            promoted_at: Utc::now(),
+            params: serde_json::json!({"temperature": 0.7}),
+            reason: format!("v{version}"),
+            parent_version: parent,
+            metrics_at_promotion: serde_json::json!({}),
+            reverted: false,
+        }
+    }
+
+    #[tokio::test]
+    async fn test_get_brain_versions() {
+        let facade = setup().await;
+        facade.repo.insert_brain_version(&make_brain_version(1, None)).await.unwrap();
+        facade.repo.insert_brain_version(&make_brain_version(2, Some(1))).await.unwrap();
+        facade.repo.insert_brain_version(&make_brain_version(3, Some(2))).await.unwrap();
+
+        let versions = facade.get_brain_versions().await.unwrap();
+        assert_eq!(versions.len(), 3);
+        // DESC order
+        assert_eq!(versions[0].version, 3);
+        assert_eq!(versions[1].version, 2);
+        assert_eq!(versions[2].version, 1);
+    }
+
+    #[tokio::test]
+    async fn test_revert_to_version() {
+        let facade = setup().await;
+        facade.repo.insert_brain_version(&make_brain_version(1, None)).await.unwrap();
+        facade.repo.insert_brain_version(&make_brain_version(2, Some(1))).await.unwrap();
+
+        let new_v = facade.revert_to_version_db_only(1).await.unwrap();
+        assert_eq!(new_v.version, 3);
+        assert_eq!(new_v.params, serde_json::json!({"temperature": 0.7}));
+        assert_eq!(new_v.reason, "Reverted to v1");
+        assert_eq!(new_v.parent_version, Some(2));
+
+        // v2 should be marked reverted
+        let v2 = facade.repo.get_brain_version(2).await.unwrap().unwrap();
+        assert!(v2.reverted);
+
+        // v1 should NOT be marked reverted
+        let v1 = facade.repo.get_brain_version(1).await.unwrap().unwrap();
+        assert!(!v1.reverted);
+    }
+
+    #[tokio::test]
+    async fn test_get_state_includes_brain_version() {
+        let facade = setup().await;
+        facade.repo.insert_brain_version(&make_brain_version(1, None)).await.unwrap();
+
+        let state = facade.get_state().await.unwrap();
+        assert!(state.latest_brain_version.is_some());
+        assert_eq!(state.latest_brain_version.unwrap().version, 1);
     }
 }
