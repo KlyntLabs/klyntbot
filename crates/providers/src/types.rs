@@ -550,4 +550,19 @@ mod tests {
             _ => panic!("Expected JsonSchema variant"),
         }
     }
+
+    #[test]
+    fn context_update_role_is_system() {
+        let msg = Message::context_update("memory_promoted", "User likes coffee");
+        assert_eq!(msg.role(), MessageRole::System);
+    }
+
+    #[test]
+    fn context_update_serde_round_trip() {
+        let msg = Message::context_update("memory_promoted", "User likes coffee");
+        let json = serde_json::to_value(&msg).unwrap();
+        assert_eq!(json["role"], "context_update");
+        assert_eq!(json["reason"], "memory_promoted");
+        assert_eq!(json["content"], "User likes coffee");
+    }
 }
