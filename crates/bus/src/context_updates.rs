@@ -43,6 +43,15 @@ pub struct ContextUpdateQueue {
     inner: Mutex<Vec<ContextUpdate>>,
 }
 
+impl std::fmt::Debug for ContextUpdateQueue {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let len = self.inner.lock().map(|q| q.len()).unwrap_or(0);
+        f.debug_struct("ContextUpdateQueue")
+            .field("pending", &len)
+            .finish()
+    }
+}
+
 impl ContextUpdateQueue {
     pub fn new() -> Self {
         Self {
