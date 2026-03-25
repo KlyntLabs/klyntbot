@@ -399,6 +399,13 @@ pub enum DomainEvent {
         trigger_phrases: Vec<String>,
         session_key: String,
     },
+
+    // -- Mirror self-reflection --
+    /// Emitted when the Mirror layer creates a new NarrativeSnippet for the user.
+    MirrorSnippetCreated {
+        snippet_id: String,
+        headline: String,
+    },
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

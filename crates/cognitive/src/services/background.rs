@@ -1098,6 +1098,7 @@ fn event_type_key(event: &DomainEvent) -> String {
         DomainEvent::InterventionTriggered { .. } => "InterventionTriggered".into(),
         DomainEvent::MemoryPendingConfirmation { .. } => "MemoryPendingConfirmation".into(),
         DomainEvent::SkillRouted { .. } => "SkillRouted".into(),
+        DomainEvent::MirrorSnippetCreated { .. } => "MirrorSnippetCreated".into(),
     }
 }
 

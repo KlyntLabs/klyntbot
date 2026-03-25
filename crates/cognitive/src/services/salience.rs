@@ -131,6 +131,9 @@ pub fn evaluate_salience(event: &DomainEvent) -> SalienceVerdict {
 
         // Skill routing events — discard from cognitive (consumed by Mirror layer)
         DomainEvent::SkillRouted { .. } => SalienceVerdict::Discard,
+
+        // Mirror snippet events — discard from cognitive (Mirror handles its own storage)
+        DomainEvent::MirrorSnippetCreated { .. } => SalienceVerdict::Discard,
     }
 }
 

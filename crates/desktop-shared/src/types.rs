@@ -58,6 +58,7 @@ pub enum EntityKind {
     Finance,
     Source,
     Conversation,
+    MirrorSnippet,
 }
 
 impl EntityKind {
@@ -83,6 +84,7 @@ impl EntityKind {
             | "finance_investment" => Some(Self::Finance),
             "source" => Some(Self::Source),
             "conversation" => Some(Self::Conversation),
+            "mirrorsnippet" | "mirror_snippet" => Some(Self::MirrorSnippet),
             _ => None,
         }
     }
