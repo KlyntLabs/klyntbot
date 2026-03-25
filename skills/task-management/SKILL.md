@@ -12,6 +12,7 @@ metadata:
   author: klyntbot
   version: "2.0.0"
   klyntbot:
+    summary: Task CRUD, project management, OKR tracking, PARA methodology, weekly reviews, and daily planning.
     type: orchestrator
     tools: [task, tasks, area, project, okr, notes, productivity, ask_user, memory, grep, glob, read_file, list_dir]
     mcp_tools: ["google-calendar"]

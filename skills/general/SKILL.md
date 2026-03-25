@@ -9,6 +9,7 @@ metadata:
   author: klyntbot
   version: "2.0.0"
   klyntbot:
+    summary: General conversation, greetings, and fallback orchestrator for uncategorized requests.
     type: orchestrator
     tools: [ask_user, memory, web_search, web_fetch, grep, glob, read_file, list_dir, spawn, learning]
     mcp_tools: ["*"]

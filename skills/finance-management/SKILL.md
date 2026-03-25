@@ -10,6 +10,7 @@ metadata:
   author: klyntbot
   version: "2.0.0"
   klyntbot:
+    summary: Expense tracking, budgeting, 6-jar allocation, FIRE analytics, and financial goal management.
     type: orchestrator
     tools: [finance, ask_user, memory, web_search, web_fetch]
     mcp_tools: []

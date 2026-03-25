@@ -9,6 +9,7 @@ metadata:
   author: klyntbot
   version: "2.0.0"
   klyntbot:
+    summary: Cross-platform messaging via Telegram, Discord, Slack, and email.
     type: orchestrator
     tools: [message, ask_user, memory]
     mcp_tools: []

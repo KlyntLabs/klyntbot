@@ -9,6 +9,7 @@ metadata:
   author: klyntbot
   version: "2.0.0"
   klyntbot:
+    summary: Cron job scheduling, reminders, recurring tasks, and time-based automation.
     type: orchestrator
     tools: [cron, spawn, ask_user, memory, productivity]
     mcp_tools: []
