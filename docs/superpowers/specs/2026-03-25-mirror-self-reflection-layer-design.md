@@ -71,8 +71,8 @@ Four event subscribers accumulate data reactively. A narrative generator synthes
 mirror/
 ├── engine.rs          # MirrorEngine — starts subscribers, owns lifecycle
 ├── subscribers/
-│   ├── routing.rs     # RoutingMirrorSubscriber (ClassificationComplete events)
-│   ├── trial.rs       # TrialPreviewSubscriber (AutotunerDecision + 4h timer)
+│   ├── routing.rs     # RoutingMirrorSubscriber (SkillRouted events)
+│   ├── trial.rs       # TrialPreviewSubscriber (TrialActivated + 4h timer)
 │   ├── meta_rule.rs   # MetaRuleDetector (UserCorrectedAI + correction streaks)
 │   └── version.rs     # ConfigArchiver (AutotunerDecision::Promoted)
 ├── narratives.rs      # TrendNarrativeGenerator + alert snippet templates
@@ -324,7 +324,7 @@ CREATE INDEX idx_snippets_created ON mirror_snippets(created_at);
 **Behavior:**
 - In-memory `DashMap<String, SkillRouteAccum>` accumulates classification events (counts, confidence sums, trigger phrase frequencies)
 - Hourly flush via `tokio::time::interval(3600s)` writes a `RoutingSnapshot` with `window_hours=1`
-- **Daily aggregation:** At midnight flush, also writes a `window_hours=24` aggregate snapshot summarizing the day. Weekly aggregates (`window_hours=168`) are computed by the narrative generator from daily snapshots.
+- **Daily aggregation:** A separate `tokio::time::sleep_until(next_midnight)` task (computed on startup via `chrono::Local` to align to midnight) writes a `window_hours=24` aggregate snapshot summarizing the day, then reschedules for the next midnight. This avoids relying on the hourly interval coinciding with midnight. Weekly aggregates (`window_hours=168`) are computed by the narrative generator from daily snapshots.
 - **Drift detection** on each flush: compares current distribution to rolling 7-day average (from daily aggregates). If any skill's share shifted >15 percentage points or `fallback_rate` exceeds 0.70, emits `MirrorAlert::RoutingDrift`
 - **No cleanup in flush** — retention cleanup is owned exclusively by `JOB_MIRROR_CLEANUP` cron to avoid dual code paths
 
@@ -352,8 +352,8 @@ CREATE INDEX idx_snippets_created ON mirror_snippets(created_at);
 - **Low-confidence streak:** confidence < 0.4 for 3+ consecutive messages → propose "force clarification"
 - **Drift response:** `MirrorAlert::RoutingDrift` → propose routing adjustment rule
 - **Heuristic templates** for common patterns (no LLM needed). LLM fallback via `MetaRuleProposer` trait for novel patterns
-- **All proposed rules start in "pending" state** — surfaced in Mirror tab as "I think I should... Sound good?" with Approve / Tweak / Dismiss
-- Only activates in `procedural_rules` on user Approve
+- **All proposed rules start in "pending" state** in `mirror_meta_rules` — surfaced in Mirror tab as "I think I should... Sound good?" with Approve / Tweak / Dismiss
+- On user Approve, status changes to `active` in `mirror_meta_rules` (NOT `procedural_rules` — meta-rules live exclusively in their dedicated table)
 - **Effectiveness tracking:** starts at confidence=0.5. Pattern recurrence with rule active → signal_count++. Continued corrections despite rule → confidence decays. Rules with confidence < 0.1 after 30 days auto-deactivated.
 
 ### ConfigArchiver (`subscribers/version.rs`)
@@ -365,7 +365,11 @@ CREATE INDEX idx_snippets_created ON mirror_snippets(created_at);
 - `parent_version` is always the current latest version (linear chain)
 - **Bootstrap:** First run creates Version 1 from current config defaults with reason "Initial brain state"
 - **Revert logic** (via facade): marks versions after target as `reverted=true`, creates a NEW version with the target's params (timeline always moves forward). Applies params via `AutotunerBridge` trait.
-- **Reconciliation with existing revert:** `app-core/src/handlers/autotuner.rs` has an existing `autotuner_revert()` that restores from `PREVIOUS_CHAMPION_KEY`. The `AutotunerBridge::apply_champion()` implementation must update both paths — writing to `PREVIOUS_CHAMPION_KEY` AND creating a `BrainVersion`. The existing autotuner revert UI should be deprecated in favor of the Mirror's richer timeline-based revert. During transition, both paths update the same champion state.
+- **Reconciliation with existing revert:** `app-core/src/handlers/autotuner.rs` has an existing `autotuner_revert()` that calls `orch.update_champion(prev_champion)` directly, bypassing any bridge. This must be modified:
+  1. Refactor `autotuner_revert()` to call through `AutotunerBridge::apply_champion()` instead of calling `orch.update_champion()` directly
+  2. `AutotunerBridge::apply_champion()` implementation must both update the champion in the orchestrator AND write a `BrainVersion` to `mirror_brain_versions`
+  3. The existing autotuner revert UI should be deprecated in favor of the Mirror's richer timeline-based revert
+  4. Until deprecated, the refactored `autotuner_revert()` will naturally create `BrainVersion` entries since it goes through the bridge
 
 ### Subscriber Lifecycle
 
@@ -502,7 +506,7 @@ pub struct MirrorResponse {
 }
 ```
 
-**Feedback routing:** `submit_feedback(item_id, item_type, feedback)` uses a `FeedbackTarget` enum to disambiguate which table to update:
+**Feedback routing:** `submit_feedback(item_id, target, feedback)` uses a `FeedbackTarget` enum to disambiguate which table to update:
 
 ```rust
 pub enum FeedbackTarget {
@@ -565,7 +569,14 @@ MirrorPage
     └── on submit → ipc("generate_mirror_response", { query, period })
 ```
 
-**Data fetching:** `useQuery("get_mirror_state")` on mount. Individual sections use targeted queries when expanded. Real-time snippet updates via a new `MirrorEvent` variant on the `DomainEventBus` (not `PipelineEvent`, which is scoped to consolidation debug). The `MirrorEvent::SnippetCreated` event is forwarded to the frontend via the existing SSE entity-update mechanism used by other domain events.
+**Data fetching:** `useQuery("get_mirror_state")` on mount. Individual sections use targeted queries when expanded.
+
+**Real-time updates:** Requires three additions to the existing event infrastructure:
+1. Add `MirrorSnippetCreated { snippet_id: String, headline: String }` and `MirrorBrainVersionCreated { version: u32 }` variants to `DomainEvent` in `crates/bus/src/domain_events.rs`
+2. Add `MirrorSnippet` and `BrainVersion` variants to `EntityKind` in `crates/desktop-shared/src/types.rs`
+3. In `app-core/src/events.rs`, map the new `DomainEvent` variants to `emit_entity_updated(EntityKind::MirrorSnippet, snippet_id)` calls
+
+The frontend subscribes to entity-update SSE events filtered by `EntityKind::MirrorSnippet` to append new snippet cards without page refresh. This follows the same pattern as `TaskUpdated` → `EntityKind::Task` → frontend `useQuery` invalidation.
 
 **Styling:** `glass-panel` for cards, theme tokens for colors, skill-specific donut colors derived from skill name hash.
 
