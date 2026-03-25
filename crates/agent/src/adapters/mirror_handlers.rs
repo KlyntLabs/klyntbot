@@ -5,7 +5,7 @@
 
 use async_trait::async_trait;
 
-use cognitive::mirror::{GeneratedNarrative, NarrativeContext, NarrativeHandler};
+use cognitive::mirror::{GeneratedNarrative, NarrativeContext, NarrativeHandler, UserFeedback};
 use common::Result;
 use providers::{DynProvider, Message};
 
@@ -51,9 +51,10 @@ impl LlmNarrativeHandler {
 impl NarrativeHandler for LlmNarrativeHandler {
     async fn generate_narrative(&self, ctx: NarrativeContext) -> Result<GeneratedNarrative> {
         let user_msg = format_narrative_context(&ctx);
+        let system_prompt = build_narrative_system_prompt(&ctx);
 
         let messages = vec![
-            Message::system(NARRATIVE_SYSTEM_PROMPT),
+            Message::system(system_prompt),
             Message::user(user_msg),
         ];
 
@@ -89,6 +90,40 @@ impl NarrativeHandler for LlmNarrativeHandler {
 // ---------------------------------------------------------------------------
 // Context formatting
 // ---------------------------------------------------------------------------
+
+fn build_narrative_system_prompt(ctx: &NarrativeContext) -> String {
+    let mut prompt = NARRATIVE_SYSTEM_PROMPT.to_string();
+
+    if !ctx.past_narrative_feedback.is_empty() {
+        let not_helpful_count = ctx
+            .past_narrative_feedback
+            .iter()
+            .filter(|f| matches!(f, UserFeedback::NotHelpful))
+            .count();
+        let helpful_count = ctx
+            .past_narrative_feedback
+            .iter()
+            .filter(|f| matches!(f, UserFeedback::Helpful))
+            .count();
+
+        let tone_instruction = if not_helpful_count > helpful_count {
+            "\n\nTone guidance (based on past feedback): Be more concise and direct. \
+Reduce flourishes. Focus on actionable insights."
+        } else if helpful_count > 0 && not_helpful_count == 0 {
+            "\n\nTone guidance (based on past feedback): Maintain your current warm, \
+detailed style — the user appreciates it."
+        } else if helpful_count > 0 {
+            "\n\nTone guidance (based on past feedback): Balance conciseness with warmth. \
+Lead with the most important insight."
+        } else {
+            ""
+        };
+
+        prompt.push_str(tone_instruction);
+    }
+
+    prompt
+}
 
 fn format_narrative_context(ctx: &NarrativeContext) -> String {
     let (start, end) = ctx.period;
