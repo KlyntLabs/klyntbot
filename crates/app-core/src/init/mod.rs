@@ -524,6 +524,14 @@ impl AppCore {
             }
         }
 
+        // ── Register MirrorTool in agent's tool registry (post-init) ──────
+        if let Some(ref facade) = core.mirror_facade {
+            let reg = core.agent.tool_registry();
+            let mut registry = reg.write().await;
+            registry.register(tools::MirrorTool::new(Arc::clone(facade)));
+            info!("Mirror tool registered");
+        }
+
         // ── Background note embedding catch-up ────────────────────────────
         if let Some(ref handler) = core.note_embedding_handler {
             let handler = Arc::clone(handler);
