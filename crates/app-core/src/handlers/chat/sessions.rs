@@ -7,7 +7,7 @@ use storage::Repos;
 use crate::errors::map_storage_err;
 use crate::state::AppCore;
 
-fn extract_title(metadata: &serde_json::Value) -> String {
+pub(crate) fn extract_title(metadata: &serde_json::Value) -> String {
     metadata
         .get("title")
         .and_then(|v| v.as_str())

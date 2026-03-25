@@ -2,6 +2,7 @@ use desktop_shared::commands::RecentLearningSession;
 use desktop_shared::errors::ApiError;
 
 use crate::errors::map_storage_err;
+use crate::handlers::chat::extract_title;
 use crate::state::AppCore;
 
 impl AppCore {
@@ -9,6 +10,8 @@ impl AppCore {
         &self,
         limit: usize,
     ) -> Result<Vec<RecentLearningSession>, ApiError> {
+        // NOTE: list_sessions loads all sessions; acceptable for v1 since session counts
+        // are small. A dedicated `list_recent(limit)` query can optimize later if needed.
         let mut sessions = self
             .repos
             .sessions
@@ -20,36 +23,33 @@ impl AppCore {
         sessions.sort_by(|a, b| b.updated_at.cmp(&a.updated_at));
         sessions.truncate(limit);
 
-        let mut result = Vec::with_capacity(sessions.len());
-        for s in &sessions {
-            let messages = self
-                .repos
-                .sessions
-                .get_recent_messages(&s.key, 10)
-                .await
-                .unwrap_or_default();
+        // Fetch messages concurrently (limit is typically 3)
+        let message_futures: Vec<_> = sessions
+            .iter()
+            .map(|s| self.repos.sessions.get_recent_messages(&s.key, 10))
+            .collect();
+        let all_messages = futures_util::future::join_all(message_futures).await;
 
-            let preview: String = messages
-                .iter()
-                .filter(|m| m.role == "user" || m.role == "assistant")
-                .map(|m| m.content.as_str())
-                .collect::<Vec<_>>()
-                .join(" ");
+        let result = sessions
+            .iter()
+            .zip(all_messages)
+            .map(|(s, messages)| {
+                let messages = messages.unwrap_or_default();
+                let preview: String = messages
+                    .iter()
+                    .filter(|m| m.role == "user" || m.role == "assistant")
+                    .map(|m| m.content.as_str())
+                    .collect::<Vec<_>>()
+                    .join(" ");
 
-            let title = s
-                .metadata
-                .get("title")
-                .and_then(|v| v.as_str())
-                .unwrap_or("Untitled")
-                .to_string();
-
-            result.push(RecentLearningSession {
-                session_key: s.key.clone(),
-                title,
-                updated_at: s.updated_at.to_rfc3339(),
-                preview: preview.chars().take(200).collect(),
-            });
-        }
+                RecentLearningSession {
+                    session_key: s.key.clone(),
+                    title: extract_title(&s.metadata),
+                    updated_at: s.updated_at.to_rfc3339(),
+                    preview: preview.chars().take(200).collect(),
+                }
+            })
+            .collect();
 
         Ok(result)
     }

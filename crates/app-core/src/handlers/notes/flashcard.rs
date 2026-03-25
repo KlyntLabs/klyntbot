@@ -53,6 +53,17 @@ pub(crate) fn flashcard_to_response(r: cognitive::FlashcardRow) -> FlashcardResp
 }
 
 impl AppCore {
+    /// Fire-and-forget: embed flashcard rows in the background for semantic search.
+    fn spawn_embed_if_available(&self, rows: Vec<cognitive::FlashcardRow>) {
+        if let (Some(engine), Some(vs)) = (self.embedding_engine.clone(), self.vector_store.clone())
+        {
+            let repo_opt = self.flashcard_repo.clone();
+            tokio::spawn(async move {
+                embed_flashcard_batch(engine, &vs, &rows, repo_opt.as_ref()).await;
+            });
+        }
+    }
+
     pub async fn flashcard_list_decks(&self) -> Result<Vec<DeckSummaryResponse>, ApiError> {
         let repo = self.flashcard_repo()?;
         let decks = repo
@@ -185,14 +196,7 @@ impl AppCore {
             .map_err(|e| ApiError::new("INTERNAL_ERROR", e.to_string()))?;
 
         // Fire-and-forget: embed the newly created card in the background.
-        if let (Some(engine), Some(vs)) = (self.embedding_engine.clone(), self.vector_store.clone())
-        {
-            let row_for_embed = row.clone();
-            let repo_opt = self.flashcard_repo.clone();
-            tokio::spawn(async move {
-                embed_flashcard_batch(engine, &vs, &[row_for_embed], repo_opt.as_ref()).await;
-            });
-        }
+        self.spawn_embed_if_available(vec![row.clone()]);
 
         Ok(flashcard_to_response(row))
     }
@@ -216,14 +220,7 @@ impl AppCore {
             .map_err(|e| ApiError::new("INTERNAL_ERROR", e.to_string()))?;
 
         // Fire-and-forget: re-embed updated card for semantic grading accuracy.
-        if let (Some(engine), Some(vs)) = (self.embedding_engine.clone(), self.vector_store.clone())
-        {
-            let row_for_embed = row.clone();
-            let repo_opt = self.flashcard_repo.clone();
-            tokio::spawn(async move {
-                embed_flashcard_batch(engine, &vs, &[row_for_embed], repo_opt.as_ref()).await;
-            });
-        }
+        self.spawn_embed_if_available(vec![row.clone()]);
 
         Ok(flashcard_to_response(row))
     }

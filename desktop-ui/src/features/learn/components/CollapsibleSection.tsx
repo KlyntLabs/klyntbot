@@ -1,5 +1,5 @@
 import { ChevronDown } from "lucide-react";
-import { type ReactNode, useCallback, useEffect, useState } from "react";
+import { type ReactNode, useCallback, useEffect, useRef, useState } from "react";
 
 interface CollapsibleSectionProps {
   title: string;
@@ -21,14 +21,19 @@ export function CollapsibleSection({
     return stored !== null ? stored === "true" : defaultOpen;
   });
 
+  const isInitial = useRef(true);
   useEffect(() => {
+    if (isInitial.current) {
+      isInitial.current = false;
+      return;
+    }
     localStorage.setItem(storageKey, String(open));
   }, [storageKey, open]);
 
   const toggle = useCallback(() => setOpen((o) => !o), []);
 
   return (
-    <div className="space-y-0">
+    <div>
       <button
         type="button"
         onClick={toggle}

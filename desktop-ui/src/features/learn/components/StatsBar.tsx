@@ -1,3 +1,4 @@
+import { retentionTextColor } from "@shared/lib/retention";
 import { BarChart3, CheckCircle, Flame, Library } from "lucide-react";
 import { Area, AreaChart, ResponsiveContainer } from "recharts";
 import type { WeeklyStatPoint } from "../hooks/useReviewStats";
@@ -7,12 +8,6 @@ interface StatsBarProps {
   streak: number;
   retention: number;
   weekly: WeeklyStatPoint[];
-}
-
-function retentionColor(r: number): string {
-  if (r >= 0.8) return "text-emerald-400";
-  if (r >= 0.5) return "text-amber-400";
-  return "text-red-400";
 }
 
 function StatCard({
@@ -56,7 +51,7 @@ export function StatsBar({ totalDue, streak, retention, weekly }: StatsBarProps)
         icon={<CheckCircle size={16} strokeWidth={1.5} />}
         label="Retention"
         value={retPct > 0 && retPct < 100 ? `${retPct}%` : "--"}
-        valueClass={retention < 1.0 ? retentionColor(retention) : undefined}
+        valueClass={retention < 1.0 ? retentionTextColor(retention) : undefined}
       />
       <div className="glass-card flex items-center gap-2.5 px-3 py-2.5 flex-1 min-w-0">
         <div className="text-muted-foreground shrink-0">

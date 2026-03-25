@@ -1,7 +1,8 @@
 import { ipc } from "@shared/hooks/useIpc";
+import { useQuery } from "@shared/hooks/useQuery";
 import { ThinkingDots } from "@shared/ui/ThinkingDots";
 import { Clipboard, FileText, MessageSquare } from "lucide-react";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useState } from "react";
 import { NotePicker } from "./NotePicker";
 
 type QuickGenMode = null | "note" | "clipboard" | "conversations";
@@ -13,18 +14,10 @@ function ConversationPicker({
   onSelect: (text: string) => void;
   onCancel: () => void;
 }) {
-  const [sessions, setSessions] = useState<
+  const { data: sessions, loading } = useQuery<
     { sessionKey: string; title: string; updatedAt: string; preview: string }[]
-  >([]);
-  const [loading, setLoading] = useState(true);
+  >("flashcard_recent_learning_sessions", { limit: 3 }, []);
   const [selecting, setSelecting] = useState(false);
-
-  useEffect(() => {
-    ipc<typeof sessions>("flashcard_recent_learning_sessions", { limit: 3 })
-      .then(setSessions)
-      .catch(() => setSessions([]))
-      .finally(() => setLoading(false));
-  }, []);
 
   const handleSelect = useCallback(
     async (sessionKey: string) => {

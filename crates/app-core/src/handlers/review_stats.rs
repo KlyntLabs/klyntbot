@@ -16,7 +16,6 @@ impl AppCore {
         )
         .map_err(map_db)?;
 
-        // Merge sparse date sets into 7-day Vec<WeeklyStatPoint> with zero-fill
         let today = chrono::Utc::now().date_naive();
         let mut weekly = Vec::with_capacity(7);
         for i in (0..7).rev() {
