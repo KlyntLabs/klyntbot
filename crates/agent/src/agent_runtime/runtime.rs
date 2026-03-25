@@ -7,6 +7,7 @@
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
+use bus::DomainEventBus;
 use common::{helpers::tool_def_name, Result};
 use context_engine::{ContextEngine, ContextRequest, ExecutionStrategy};
 use providers::Message;
@@ -105,6 +106,8 @@ pub struct AgentRuntime {
     activated_skills: Option<Arc<tokio::sync::RwLock<Vec<Arc<SkillPackage>>>>>,
     /// Embedding engine for generating query embeddings (semantic skill routing).
     embedding_engine: Option<Arc<tools::EmbeddingEngine>>,
+    /// Domain event bus for publishing cross-feature events (e.g. SkillRouted).
+    domain_event_bus: Option<Arc<DomainEventBus>>,
 }
 
 impl AgentRuntime {
@@ -143,6 +146,7 @@ impl AgentRuntime {
             active_view: None,
             activated_skills: None,
             embedding_engine: None,
+            domain_event_bus: None,
         }
     }
 
@@ -240,6 +244,12 @@ impl AgentRuntime {
     /// Set the embedding engine for semantic skill routing.
     pub fn with_embedding_engine(mut self, engine: Arc<tools::EmbeddingEngine>) -> Self {
         self.embedding_engine = Some(engine);
+        self
+    }
+
+    /// Set the domain event bus for publishing SkillRouted and other cross-feature events.
+    pub fn with_domain_bus(mut self, bus: Arc<DomainEventBus>) -> Self {
+        self.domain_event_bus = Some(bus);
         self
     }
 
@@ -418,6 +428,17 @@ impl AgentRuntime {
                     duration_ms: classify_ms,
                 })
                 .await;
+        }
+
+        // Emit SkillRouted domain event for Mirror self-reflection layer
+        if let Some(ref domain_bus) = self.domain_event_bus {
+            domain_bus.publish(bus::DomainEvent::SkillRouted {
+                skill_name: agent_name.clone(),
+                confidence: analysis.confidence as f64,
+                source: format!("{:?}", analysis.source),
+                trigger_phrases: vec![],
+                session_key: format!("{}:{}", ctx.channel, ctx.chat_id),
+            });
         }
 
         // Step 3b: Orchestration override — route multi-agent intents to orchestrator

@@ -389,6 +389,16 @@ pub enum DomainEvent {
         predicate: String,
         object: String,
     },
+
+    // -- Agent routing --
+    /// Emitted when AgentRuntime selects an orchestrator skill for a message.
+    SkillRouted {
+        skill_name: String,
+        confidence: f64,
+        source: String,
+        trigger_phrases: Vec<String>,
+        session_key: String,
+    },
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

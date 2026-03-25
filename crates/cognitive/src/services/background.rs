@@ -1097,6 +1097,7 @@ fn event_type_key(event: &DomainEvent) -> String {
         DomainEvent::FlashcardSessionCompleted { .. } => "FlashcardSessionCompleted".into(),
         DomainEvent::InterventionTriggered { .. } => "InterventionTriggered".into(),
         DomainEvent::MemoryPendingConfirmation { .. } => "MemoryPendingConfirmation".into(),
+        DomainEvent::SkillRouted { .. } => "SkillRouted".into(),
     }
 }
 

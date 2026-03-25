@@ -1530,6 +1530,11 @@ impl AgentLoopBuilder {
                 runtime.with_squad_deps(squad_repo, squad_provider, squad_params, blackboard_repo);
         }
 
+        // Inject domain event bus for SkillRouted event emission
+        if let Some(ref domain_bus) = self.domain_event_bus {
+            runtime = runtime.with_domain_bus(Arc::clone(domain_bus));
+        }
+
         let runtime = Arc::new(runtime);
 
         // Two-phase init: set the self-reference for delegation after Arc wrapping

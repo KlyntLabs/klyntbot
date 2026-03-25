@@ -128,6 +128,9 @@ pub fn evaluate_salience(event: &DomainEvent) -> SalienceVerdict {
 
         // Memory confirmation events — discard from cognitive (handled by UI/pending queue)
         DomainEvent::MemoryPendingConfirmation { .. } => SalienceVerdict::Discard,
+
+        // Skill routing events — discard from cognitive (consumed by Mirror layer)
+        DomainEvent::SkillRouted { .. } => SalienceVerdict::Discard,
     }
 }
 

@@ -277,5 +277,6 @@ fn domain_for_event(event: &bus::DomainEvent) -> &'static str {
         | bus::DomainEvent::FlashcardSessionCompleted { .. } => "learning",
         bus::DomainEvent::InterventionTriggered { .. } => "productivity",
         bus::DomainEvent::MemoryPendingConfirmation { .. } => "memory",
+        bus::DomainEvent::SkillRouted { .. } => "agent",
     }
 }

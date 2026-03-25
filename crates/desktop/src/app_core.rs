@@ -305,6 +305,7 @@ fn wire_event_channels(core: &AppCore, channels: EventChannels, app_handle: &tau
                             | bus::DomainEvent::FlashcardSessionCompleted { .. } => "learning",
                             bus::DomainEvent::InterventionTriggered { .. } => "productivity",
                             bus::DomainEvent::MemoryPendingConfirmation { .. } => "memory",
+                            bus::DomainEvent::SkillRouted { .. } => "agent",
                         };
                         let salience_str = match salience {
                             cognitive::types::SalienceVerdict::Extract => "extract",
