@@ -1387,7 +1387,7 @@ impl IntentAnalyzer {
                 },
                 None => IntentAnalysis {
                     mode: ExecutionMode::Reactive {
-                        max_iterations: ORCHESTRATION_MIN_ITERATIONS,
+                        max_iterations: 5,
                     },
                     signals: ComplexitySignals {
                         estimated_tool_calls: 1,
@@ -1397,9 +1397,9 @@ impl IntentAnalyzer {
                         requires_retries: false,
                         has_hypothetical: false,
                     },
-                    confidence: 0.0,
+                    confidence: 0.5,
                     source: AnalysisSource::ShadowDeferred,
-                    reasoning: "Shadow mode — Layer 1-2 inconclusive, LLM skipped".to_string(),
+                    reasoning: "Shadow mode — Layer 1-2 inconclusive, using moderate reactive default".to_string(),
                     needs_orchestration: false,
                 },
             };
@@ -2598,5 +2598,28 @@ mod tests {
         assert!(user_msg.contains("<strategy_context>"));
         assert!(user_msg.contains("</strategy_context>"));
         assert!(user_msg.contains("previous strategy data"));
+    }
+
+    #[tokio::test]
+    async fn shadow_deferred_fallback_uses_moderate_iterations() {
+        let analyzer = IntentAnalyzer::new(
+            Arc::new(PanickingProvider),
+            "model",
+            &OrchestratorConfig::default(),
+        )
+        .with_shadow_mode();
+
+        // Completely ambiguous — L1 returns None, L2 has no embedder
+        let result = analyzer.analyze("hmm interesting thought about life", &[]).await;
+        assert_eq!(result.source, AnalysisSource::ShadowDeferred);
+        match result.mode {
+            ExecutionMode::Reactive { max_iterations } => {
+                assert!(
+                    max_iterations <= 5,
+                    "Expected <= 5 iterations for ambiguous fallback, got {max_iterations}"
+                );
+            }
+            ExecutionMode::Direct => panic!("Expected Reactive fallback, got Direct"),
+        }
     }
 }
