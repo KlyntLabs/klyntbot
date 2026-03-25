@@ -38,3 +38,16 @@ CREATE TABLE IF NOT EXISTS mirror_snippets (
     dismissed_at TEXT
 );
 CREATE INDEX IF NOT EXISTS idx_snippets_created ON mirror_snippets(created_at);
+
+CREATE TABLE IF NOT EXISTS mirror_meta_rules (
+    id TEXT PRIMARY KEY,
+    trigger_condition TEXT NOT NULL,
+    action_json TEXT NOT NULL,
+    source TEXT NOT NULL,
+    effectiveness_score REAL NOT NULL DEFAULT 0.5,
+    status TEXT NOT NULL DEFAULT 'pending',
+    signal_count INTEGER NOT NULL DEFAULT 0,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_meta_rules_status ON mirror_meta_rules(status);
