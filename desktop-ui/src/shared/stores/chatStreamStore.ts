@@ -65,9 +65,21 @@ const SSE_AGENT_EVENTS = [
   "agent:debate_round_completed",
   "agent:debate_judge_decision",
   "agent:consensus_reached",
+  "agent:pipeline_started",
+  "agent:context_assembled",
   "agent:memory_promoted",
   "entity:updated",
 ] as const;
+
+interface PipelineStartedPayload {
+  sessionKey: string;
+}
+
+interface ContextAssembledPayload {
+  sessionKey: string;
+  totalTokens: number;
+  durationMs: number;
+}
 
 // ── Stream state ────────────────────────────────────────────────────────
 
@@ -308,9 +320,11 @@ class ChatStreamStore {
     on<AgentDonePayload>("agent:done", (p) => this.onDone(p));
     on<AgentErrorPayload>("agent:error", (p) => this.onError(p));
     on<InteractionRequestPayload>("agent:interaction_request", (p) => this.onInteractionRequest(p));
+    on<PipelineStartedPayload>("agent:pipeline_started", (p) => this.onPipelineStarted(p));
     on<ClassificationCompletePayload>("agent:classification_complete", (p) =>
       this.onClassificationComplete(p),
     );
+    on<ContextAssembledPayload>("agent:context_assembled", (p) => this.onContextAssembled(p));
     on<ExecutionStartedPayload>("agent:execution_started", (p) => this.onExecutionStarted(p));
     on<IterationStartPayload>("agent:iteration_start", (p) => this.onIterationStart(p));
     on<UsageReportPayload>("agent:usage_report", (p) => this.onUsageReport(p));
@@ -353,8 +367,12 @@ class ChatStreamStore {
       register<InteractionRequestPayload>("agent:interaction_request", (p) =>
         this.onInteractionRequest(p),
       );
+      register<PipelineStartedPayload>("agent:pipeline_started", (p) => this.onPipelineStarted(p));
       register<ClassificationCompletePayload>("agent:classification_complete", (p) =>
         this.onClassificationComplete(p),
+      );
+      register<ContextAssembledPayload>("agent:context_assembled", (p) =>
+        this.onContextAssembled(p),
       );
       register<ExecutionStartedPayload>("agent:execution_started", (p) =>
         this.onExecutionStarted(p),
@@ -513,6 +531,14 @@ class ChatStreamStore {
     }));
   }
 
+  private onPipelineStarted(payload: PipelineStartedPayload): void {
+    if (!this.isActive(payload.sessionKey)) return;
+    this.updateState(payload.sessionKey, (s) => ({
+      ...s,
+      statusPhase: "Routing",
+    }));
+  }
+
   private onClassificationComplete(payload: ClassificationCompletePayload): void {
     if (!this.isActive(payload.sessionKey)) return;
     this.updateState(payload.sessionKey, (s) => ({
@@ -525,6 +551,18 @@ class ChatStreamStore {
           confidence: payload.confidence,
           source: payload.source,
         },
+      },
+    }));
+  }
+
+  private onContextAssembled(payload: ContextAssembledPayload): void {
+    if (!this.isActive(payload.sessionKey)) return;
+    this.updateState(payload.sessionKey, (s) => ({
+      ...s,
+      statusPhase: "Recalling",
+      transparency: {
+        ...s.transparency,
+        contextTokens: payload.totalTokens,
       },
     }));
   }
