@@ -239,10 +239,11 @@ impl SkillCatalog {
                 Ok(parsed) => {
                     let pkg = SkillPackage {
                         name: parsed.name.clone(),
-                        description: parsed.description,
+                        description: parsed.description.clone(),
                         skill_type: SkillType::Persona,
                         scope: SkillScope::BuiltIn,
                         location: std::path::PathBuf::from(format!("persona::{name}")),
+                        summary: crate::parser::extract_first_sentence(&parsed.body),
                         body: parsed.body,
                         metadata: SkillMetadata::default(),
                         resources: Vec::new(),

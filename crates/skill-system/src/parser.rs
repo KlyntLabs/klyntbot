@@ -37,6 +37,8 @@ struct RawKlyntbotMeta {
     invokes: Vec<String>,
     #[serde(default)]
     triggers: Vec<String>,
+    #[serde(default)]
+    summary: Option<String>,
 }
 
 pub fn parse_skill_md(
@@ -78,13 +80,19 @@ pub fn parse_skill_md(
         .map(|k| k.skill_type)
         .unwrap_or_default();
 
+    let trimmed_body = body.trim().to_string();
+    let summary = klyntbot_meta
+        .as_ref()
+        .and_then(|k| k.summary.clone())
+        .unwrap_or_else(|| extract_first_sentence(&trimmed_body));
+
     Ok(SkillPackage {
         name: raw.name,
         description: raw.description,
         skill_type,
         scope,
         location,
-        body: body.trim().to_string(),
+        body: trimmed_body,
         metadata: SkillMetadata {
             license: raw.license,
             compatibility: raw.compatibility,
@@ -94,6 +102,7 @@ pub fn parse_skill_md(
         resources: Vec::new(),
         loaded_at: SystemTime::now(),
         trusted: matches!(scope, SkillScope::BuiltIn | SkillScope::User),
+        summary,
     })
 }
 
@@ -207,10 +216,26 @@ fn parse_metadata_block(
             always_skills: raw_km.always_skills,
             invokes: raw_km.invokes,
             triggers: raw_km.triggers,
+            summary: raw_km.summary,
         })
     });
 
     (klyntbot, map)
+}
+
+/// Extract the first sentence from a text body.
+pub(crate) fn extract_first_sentence(body: &str) -> String {
+    let trimmed = body.trim();
+    if let Some(idx) = trimmed.find(". ") {
+        return trimmed[..=idx].to_string();
+    }
+    if let Some(idx) = trimmed.find('\n') {
+        let first_line = trimmed[..idx].trim();
+        if !first_line.is_empty() {
+            return first_line.to_string();
+        }
+    }
+    trimmed.chars().take(200).collect()
 }
 
 pub fn split_frontmatter(content: &str) -> common::Result<(String, String)> {
@@ -419,5 +444,26 @@ Body.
         let pkg = parse_skill_md(content, PathBuf::from("/tmp/test"), SkillScope::BuiltIn).unwrap();
         let meta = pkg.metadata.klyntbot;
         assert!(meta.is_none() || meta.unwrap().triggers.is_empty());
+    }
+
+    #[test]
+    fn test_parse_summary_from_frontmatter() {
+        let md = "---\nname: test-skill\ndescription: A test skill.\nmetadata:\n  klyntbot:\n    summary: Handles task CRUD and project management.\n---\nFull body here.";
+        let pkg = parse_skill_md(md, std::path::PathBuf::from("test"), crate::types::SkillScope::BuiltIn).unwrap();
+        assert_eq!(pkg.summary, "Handles task CRUD and project management.");
+    }
+
+    #[test]
+    fn test_parse_summary_fallback_to_first_sentence() {
+        let md = "---\nname: test-skill\ndescription: A test skill.\n---\nThis is the first sentence. This is the second sentence.";
+        let pkg = parse_skill_md(md, std::path::PathBuf::from("test"), crate::types::SkillScope::BuiltIn).unwrap();
+        assert_eq!(pkg.summary, "This is the first sentence.");
+    }
+
+    #[test]
+    fn test_parse_summary_fallback_short_body() {
+        let md = "---\nname: test-skill\ndescription: A test skill.\n---\nShort body";
+        let pkg = parse_skill_md(md, std::path::PathBuf::from("test"), crate::types::SkillScope::BuiltIn).unwrap();
+        assert_eq!(pkg.summary, "Short body");
     }
 }
