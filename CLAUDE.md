@@ -134,6 +134,8 @@ Klyntbot exposes tools to external AI clients (Claude Code, Cursor, etc.) via MC
 
 `AgentRuntime` → `SkillCatalog` + `SkillRouter` → `IntentAnalyzer` → `ContextEngine` → `ExecutionRouter` → `CostTracker`. Two execution modes: **Direct** (single LLM call, no tools) and **Reactive** (ReAct loop with tool calls, synthesizes at max_iterations). Code in `crates/agent/src/agent_runtime/` and `crates/agent/src/intent_pipeline/`. Skill types in `crates/skill-system/`.
 
+**Mid-loop context compression:** During Reactive execution, the `MidLoopCompressor` checks token usage after each iteration. When accumulated message tokens exceed 70% of the context window, older `Message::Tool` results are replaced with extractive summaries (first 150 chars + metadata). System messages and recent iterations (last 8 messages) are always preserved verbatim. Emits `AgentEvent::ContextCompressed` for UI transparency.
+
 ## Conventions
 
 - Errors: `common::Result<T>` (alias for `Result<T, KlyntbotError>`). Domain errors auto-convert via `From`.

@@ -10,6 +10,7 @@ use futures_util::StreamExt;
 use tokio::sync::{RwLock, Semaphore};
 
 use common::{helpers::tool_def_name, Result};
+use context_engine::TokenCounter;
 use providers::{tool_calls_to_messages, DynProvider, Message};
 use tools::{ask_user::ASK_USER_TOOL_NAME, registry::ToolRegistry, RoutingContext};
 use tracing::debug;
@@ -338,6 +339,7 @@ pub struct ExecutionCore {
     pub outcome_recorder: Option<Arc<crate::learning::recorder::OutcomeRecorder>>,
     pub domain_event_bus: Option<Arc<bus::DomainEventBus>>,
     pub interceptor_chain: Option<Arc<tools_core::InterceptorChain>>,
+    token_counter: Arc<dyn TokenCounter>,
     tool_semaphore: Arc<Semaphore>,
 }
 
@@ -349,8 +351,19 @@ impl ExecutionCore {
             outcome_recorder: None,
             domain_event_bus: None,
             interceptor_chain: None,
+            token_counter: Arc::new(context_engine::CharTokenCounter),
             tool_semaphore: Arc::new(Semaphore::new(MAX_CONCURRENT_TOOLS)),
         }
+    }
+
+    /// Set the token counter for mid-loop compression.
+    pub fn with_token_counter(mut self, counter: Arc<dyn TokenCounter>) -> Self {
+        self.token_counter = counter;
+        self
+    }
+
+    pub fn token_counter(&self) -> &Arc<dyn TokenCounter> {
+        &self.token_counter
     }
 
     /// Set the domain event bus for publishing tool execution events.

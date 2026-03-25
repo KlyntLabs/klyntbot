@@ -69,6 +69,10 @@ impl ExecutionEngine for ReactiveEngine {
     ) -> Result<EngineResult> {
         let mut messages = messages;
         let mut scratchpad = Scratchpad::new();
+        let compressor = crate::execution::mid_loop_compressor::MidLoopCompressor::new(
+            Arc::clone(self.core.token_counter()),
+            params.context_window,
+        );
         // Use per-request max_iterations from params, fall back to engine default
         let max_iterations = if params.max_iterations > 0 {
             params.max_iterations
@@ -333,6 +337,19 @@ impl ExecutionEngine for ReactiveEngine {
                     iteration
                 );
                 break;
+            }
+
+            // Mid-loop compression: compress older tool results if approaching context limit
+            if let Some((before, after)) = compressor.compress_if_needed(&mut messages) {
+                if let Some(ref tx) = event_tx {
+                    let _ = tx
+                        .send(crate::events::AgentEvent::ContextCompressed {
+                            before_tokens: before,
+                            after_tokens: after,
+                            iteration: iteration as usize,
+                        })
+                        .await;
+                }
             }
         }
 

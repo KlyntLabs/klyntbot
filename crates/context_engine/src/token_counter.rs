@@ -68,6 +68,28 @@ pub fn default_token_counter() -> Arc<dyn TokenCounter> {
     Arc::new(CharTokenCounter)
 }
 
+/// Estimate the token count of a single message, including per-role overhead.
+///
+/// Shared by `HistoryCompressor` (assembly-time compression) and
+/// `MidLoopCompressor` (in-loop compression) to keep token budgets consistent.
+pub fn estimate_message_tokens(counter: &dyn TokenCounter, msg: &providers::Message) -> usize {
+    match msg {
+        providers::Message::System { content } => counter.estimate_text(content),
+        providers::Message::User { content } => match content {
+            providers::UserContent::Text(t) => counter.estimate_text(t),
+            providers::UserContent::MultiPart(parts) => parts.len() * 10,
+        },
+        providers::Message::Assistant { content, .. } => {
+            content
+                .as_deref()
+                .map(|t| counter.estimate_text(t))
+                .unwrap_or(0)
+                + 20
+        }
+        providers::Message::Tool { content, .. } => counter.estimate_text(content) + 10,
+    }
+}
+
 /// Construct the best available token counter.
 ///
 /// Tries [`TiktokenCounter`] (BPE, accurate) first; falls back to

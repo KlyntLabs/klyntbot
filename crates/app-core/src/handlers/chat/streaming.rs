@@ -938,6 +938,14 @@ pub async fn relay_chat_stream(
                     AgentEvent::AutoTunerRollback(rollback) => {
                         emit!(events::AUTOTUNER_ROLLBACK, rollback);
                     }
+                    AgentEvent::ContextCompressed { before_tokens, after_tokens, iteration } => {
+                        tracing::info!(
+                            before_tokens,
+                            after_tokens,
+                            iteration,
+                            "mid-loop context compression applied"
+                        );
+                    }
                 }
             }
             else => break,

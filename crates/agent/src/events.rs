@@ -254,6 +254,15 @@ pub enum AgentEvent {
         summary: String,
     },
 
+    /// Mid-loop context compression was triggered during a reactive execution.
+    ContextCompressed {
+        #[serde(rename = "beforeTokens")]
+        before_tokens: usize,
+        #[serde(rename = "afterTokens")]
+        after_tokens: usize,
+        iteration: usize,
+    },
+
     /// A memory was promoted from one scope to a higher scope.
     MemoryPromoted {
         #[serde(rename = "factId")]

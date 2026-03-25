@@ -23,6 +23,8 @@ pub struct ExecutionParams {
     /// Maximum wall-clock time for the entire pipeline execution.
     /// When set, `tokio::time::timeout` wraps the router call.
     pub pipeline_timeout: Option<Duration>,
+    /// Context window size in tokens. Used for mid-loop compression threshold.
+    pub context_window: usize,
 }
 
 impl ExecutionParams {
@@ -36,6 +38,7 @@ impl ExecutionParams {
             original_message: String::new(),
             planning_prompt: None,
             pipeline_timeout: None,
+            context_window: 128_000,
         }
     }
 
@@ -71,6 +74,11 @@ impl ExecutionParams {
 
     pub fn with_pipeline_timeout(mut self, dur: Duration) -> Self {
         self.pipeline_timeout = Some(dur);
+        self
+    }
+
+    pub fn with_context_window(mut self, tokens: usize) -> Self {
+        self.context_window = tokens;
         self
     }
 }
@@ -137,6 +145,13 @@ mod tests {
         assert_eq!(params.max_iterations, 10);
         assert_eq!(params.max_fabrication_retries, 2);
         assert!(params.original_message.is_empty());
+        assert_eq!(params.context_window, 128_000);
+    }
+
+    #[test]
+    fn execution_params_with_context_window() {
+        let params = ExecutionParams::new("mock").with_context_window(200_000);
+        assert_eq!(params.context_window, 200_000);
     }
 
     #[test]
