@@ -7,7 +7,7 @@ use uuid::Uuid;
 use common::Result;
 
 use crate::mirror::{
-    MirrorAlert, MirrorAlertType, NarrativeContext, NarrativeSnippet, SuggestedAction,
+    MetaRule, MirrorAlert, MirrorAlertType, NarrativeContext, NarrativeSnippet, SuggestedAction,
 };
 
 /// Generated components of a narrative output from an LLM call.
@@ -25,6 +25,30 @@ pub trait NarrativeHandler: Send + Sync {
 
     /// Answer a user's direct mirror query with focused context.
     async fn generate_mirror_response(&self, query: &str, ctx: NarrativeContext) -> Result<String>;
+}
+
+// ---------------------------------------------------------------------------
+// MetaRuleProposer trait
+// ---------------------------------------------------------------------------
+
+/// Context provided to a [`MetaRuleProposer`] for proposing new meta-rules.
+#[derive(Debug, Clone)]
+pub struct MetaRuleProposalContext {
+    pub correction_history: Vec<String>,
+    pub affected_skill: Option<String>,
+    pub pattern_description: String,
+}
+
+/// Proposes new meta-rules based on observed correction and routing patterns.
+#[async_trait]
+pub trait MetaRuleProposer: Send + Sync {
+    /// Analyse the provided context and optionally propose a new [`MetaRule`].
+    ///
+    /// Returns `Ok(None)` if no rule is warranted by the current signals.
+    async fn propose_meta_rule(
+        &self,
+        context: MetaRuleProposalContext,
+    ) -> Result<Option<MetaRule>>;
 }
 
 // ---------------------------------------------------------------------------
@@ -88,6 +112,7 @@ pub fn snippet_from_alert(alert: &MirrorAlert) -> NarrativeSnippet {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::mirror::MetaRuleSource;
 
     #[test]
     fn test_snippet_from_routing_drift() {
@@ -119,5 +144,21 @@ mod tests {
         let snippet = snippet_from_alert(&alert);
         assert!(snippet.body.contains("22.3pp"));
         assert!(snippet.body.contains("general"));
+    }
+
+    #[test]
+    fn test_snippet_from_meta_rule_proposed() {
+        let rule_id = Uuid::new_v4();
+        let alert = MirrorAlert::MetaRuleProposed {
+            rule_id,
+            rule_text: "When user corrects me twice about finance, ask for clarification"
+                .to_string(),
+            source: MetaRuleSource::CorrectionDerived,
+        };
+        let snippet = snippet_from_alert(&alert);
+        assert_eq!(snippet.alert_type, MirrorAlertType::MetaRuleProposed);
+        assert!(snippet.headline.contains("learned something"));
+        assert!(snippet.body.contains("finance"));
+        assert!(snippet.suggested_action.is_some());
     }
 }
