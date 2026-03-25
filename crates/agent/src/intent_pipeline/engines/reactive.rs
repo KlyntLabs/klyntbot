@@ -325,7 +325,17 @@ impl ExecutionEngine for ReactiveEngine {
             }
 
             // Mid-loop compression: compress older tool results if approaching context limit
-            compressor.compress_if_needed(&mut messages);
+            if let Some((before, after)) = compressor.compress_if_needed(&mut messages) {
+                if let Some(ref tx) = event_tx {
+                    let _ = tx
+                        .send(crate::events::AgentEvent::ContextCompressed {
+                            before_tokens: before,
+                            after_tokens: after,
+                            iteration: iteration as usize,
+                        })
+                        .await;
+                }
+            }
         }
 
         // Max iterations reached — synthesize a response from completed work
