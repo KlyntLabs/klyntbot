@@ -652,7 +652,7 @@ impl AgentLoop {
             .await?;
         let history = {
             let mut session = session_arc.lock().await;
-            session.add_message("user", &system_msg_content);
+            session.add_message("system", &system_msg_content);
             session.get_history(self.history_limit).to_vec()
             // per-session lock released here
         };
