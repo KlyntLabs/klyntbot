@@ -40,4 +40,12 @@ impl cognitive::mirror::AutotunerBridge for AppAutotunerBridge {
             None => Ok(serde_json::json!({})),
         }
     }
+
+    async fn kill_trial(&self, trial_id: &str) -> common::Result<()> {
+        self.orchestrator
+            .trial_repo()
+            .update_trial_status(trial_id, autotuner::TrialStatus::Reverted.as_str())
+            .await
+            .map_err(|e| common::KlyntbotError::Storage(e.to_string()))
+    }
 }

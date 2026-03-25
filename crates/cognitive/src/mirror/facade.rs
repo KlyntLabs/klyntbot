@@ -241,9 +241,17 @@ impl MirrorFacade {
     // -----------------------------------------------------------------------
 
     pub async fn kill_trial(&self, trial_id: &str) -> Result<()> {
+        // Cancel the 4-hour preview timer if running
         if let Some(timers) = &self.active_timers {
             if let Some((_, handle)) = timers.remove(trial_id) {
                 handle.abort();
+            }
+        }
+
+        // Mark the trial as reverted in the autotuner so the nightly cycle skips it
+        if let Some(ref bridge) = self.autotuner_bridge {
+            if let Err(e) = bridge.kill_trial(trial_id).await {
+                tracing::warn!("mirror: failed to kill trial in autotuner: {e}");
             }
         }
 

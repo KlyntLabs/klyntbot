@@ -32,6 +32,7 @@ pub struct BrainVersion {
 pub trait AutotunerBridge: Send + Sync {
     async fn apply_champion(&self, params: serde_json::Value, reason: String) -> common::Result<()>;
     async fn current_champion_params(&self) -> common::Result<serde_json::Value>;
+    async fn kill_trial(&self, trial_id: &str) -> common::Result<()>;
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
