@@ -281,10 +281,6 @@ impl ContextEngine {
         format!("{:x}", hasher.finalize())
     }
 
-    async fn assemble_uncached(&self, request: &ContextRequest) -> AssembledContext {
-        self.assemble_uncached_with_memory(request, None).await
-    }
-
     async fn assemble_uncached_with_memory(
         &self,
         request: &ContextRequest,

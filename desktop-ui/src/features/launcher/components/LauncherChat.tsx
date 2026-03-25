@@ -122,7 +122,6 @@ export function LauncherChat({ sessionKey, initialQuery, onBack, onExpand }: Lau
           activeInteraction={chat.activeInteraction}
           sessionKey={sessionKey}
           onInteractionSubmitted={chat.clearInteraction}
-          showTransparency={false}
           liveTransparency={null}
           activeDelegateAgent={chat.activeDelegateAgent}
           statusPhase={chat.statusPhase}

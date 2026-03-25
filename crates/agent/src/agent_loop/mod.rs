@@ -732,7 +732,6 @@ impl AgentLoop {
         }
     }
 
-    /// Save assistant response to session and return the persisted message ID.
     /// Persist the in-memory session to SQL without adding a new message.
     /// Used in error paths to ensure the user message is not lost.
     async fn persist_session(&self, session_key: &str) {
@@ -747,6 +746,7 @@ impl AgentLoop {
         }
     }
 
+    /// Save assistant response to session and return the persisted message ID.
     async fn save_to_session(&self, session_key: &str, content: &str) -> Option<String> {
         if let Ok(session_arc) = self.session_manager.get_or_create(session_key, None).await {
             // Mutate under per-session lock, clone for async save
