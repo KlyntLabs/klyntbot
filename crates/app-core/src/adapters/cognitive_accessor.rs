@@ -157,7 +157,6 @@ impl CognitiveAccessor for CognitiveAccessorImpl {
         match self.atom_repo.list_for_note(note_id).await {
             Ok(atoms) => atoms
                 .into_iter()
-                .filter(|a| a.status == "active")
                 .map(|a| AtomWithRetention {
                     subject: a.subject,
                     retention_pct: a.retention_pct,

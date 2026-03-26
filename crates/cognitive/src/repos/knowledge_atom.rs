@@ -80,8 +80,7 @@ impl KnowledgeAtomRepo {
         let id = Uuid::new_v4().to_string();
         let now = Utc::now().to_rfc3339();
 
-        // Only set last_interaction_ts for active atoms (user-intentional).
-        // Suggested atoms have never been interacted with.
+        // Only set last_interaction_ts for active atoms.
         let interaction_ts: Option<&str> = if atom.status == "active" {
             Some(&now)
         } else {
@@ -169,50 +168,19 @@ impl KnowledgeAtomRepo {
             .await
     }
 
-    /// Returns active + suggested atoms for a note, ordered by salience descending.
+    /// Returns non-archived atoms for a note, ordered by salience descending.
     pub async fn list_for_note(&self, note_id: &str) -> Result<Vec<KnowledgeAtomRow>, sqlx::Error> {
         sqlx::query_as::<_, KnowledgeAtomRow>(
             r#"
             SELECT * FROM knowledge_atoms
             WHERE source_note_id = ?1
               AND status != 'archived'
-            ORDER BY
-                CASE status WHEN 'active' THEN 0 ELSE 1 END,
-                salience DESC
+            ORDER BY salience DESC
             "#,
         )
         .bind(note_id)
         .fetch_all(&self.pool)
         .await
-    }
-
-    /// Accept a suggested atom: set status="active", importance, last_interaction_ts.
-    pub async fn accept(
-        &self,
-        id: &str,
-        personal_importance: f64,
-    ) -> Result<KnowledgeAtomRow, sqlx::Error> {
-        let now = Utc::now().to_rfc3339();
-        sqlx::query(
-            r#"
-            UPDATE knowledge_atoms
-            SET status = 'active',
-                personal_importance = ?2,
-                last_interaction_ts = ?3,
-                updated_at = ?3
-            WHERE id = ?1
-            "#,
-        )
-        .bind(id)
-        .bind(personal_importance)
-        .bind(&now)
-        .execute(&self.pool)
-        .await?;
-
-        sqlx::query_as::<_, KnowledgeAtomRow>("SELECT * FROM knowledge_atoms WHERE id = ?1")
-            .bind(id)
-            .fetch_one(&self.pool)
-            .await
     }
 
     /// Dismiss (archive) an atom.
@@ -232,50 +200,6 @@ impl KnowledgeAtomRepo {
         .execute(&self.pool)
         .await?;
         Ok(())
-    }
-
-    /// Restore an archived atom to active status.
-    ///
-    /// Atoms archived more than 7 days ago cannot be restored.
-    pub async fn restore(&self, id: &str) -> Result<KnowledgeAtomRow, sqlx::Error> {
-        // Enforce 7-day restore window
-        let atom =
-            sqlx::query_as::<_, KnowledgeAtomRow>("SELECT * FROM knowledge_atoms WHERE id = ?1")
-                .bind(id)
-                .fetch_one(&self.pool)
-                .await?;
-
-        if let Some(archived_at) = &atom.archived_at {
-            if let Ok(ts) = chrono::DateTime::parse_from_rfc3339(archived_at) {
-                let days = (Utc::now() - ts.with_timezone(&Utc)).num_days();
-                if days > 7 {
-                    return Err(sqlx::Error::Protocol(
-                        "Atom archived more than 7 days ago — cannot restore".to_string(),
-                    ));
-                }
-            }
-        }
-
-        let now = Utc::now().to_rfc3339();
-        sqlx::query(
-            r#"
-            UPDATE knowledge_atoms
-            SET status = 'active',
-                archived_at = NULL,
-                salience = 0.5,
-                updated_at = ?2
-            WHERE id = ?1
-            "#,
-        )
-        .bind(id)
-        .bind(&now)
-        .execute(&self.pool)
-        .await?;
-
-        sqlx::query_as::<_, KnowledgeAtomRow>("SELECT * FROM knowledge_atoms WHERE id = ?1")
-            .bind(id)
-            .fetch_one(&self.pool)
-            .await
     }
 
     /// Update retention metrics after a flashcard review. Also touches last_interaction_ts.
@@ -466,7 +390,7 @@ impl KnowledgeAtomRepo {
         .await
     }
 
-    /// Find existing active atoms matching a subject in other notes (for reinforcement detection).
+    /// Find existing non-archived atoms matching a subject in other notes (for reinforcement detection).
     pub async fn find_by_subject_across_notes(
         &self,
         subject: &str,
@@ -477,7 +401,7 @@ impl KnowledgeAtomRepo {
             SELECT * FROM knowledge_atoms
             WHERE subject = ?1
               AND source_note_id != ?2
-              AND status = 'active'
+              AND status != 'archived'
             "#,
         )
         .bind(subject)
@@ -660,7 +584,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_accept_and_dismiss() {
+    async fn test_dismiss() {
         let pool = cognitive_test_pool().await;
         let repo = KnowledgeAtomRepo::new(pool);
 
@@ -670,46 +594,17 @@ mod tests {
                 atom_type: "vocabulary".to_string(),
                 domain: "language:ja".to_string(),
                 personal_importance: 0.5,
-                status: "suggested".to_string(),
-                ..Default::default()
-            })
-            .await
-            .unwrap();
-        assert_eq!(atom.status, "suggested");
-
-        let accepted = repo.accept(&atom.id, 0.9).await.unwrap();
-        assert_eq!(accepted.status, "active");
-        assert!((accepted.personal_importance - 0.9).abs() < f64::EPSILON);
-        assert!(accepted.last_interaction_ts.is_some());
-
-        repo.dismiss(&atom.id).await.unwrap();
-        let dismissed = repo.get(&atom.id).await.unwrap().unwrap();
-        assert_eq!(dismissed.status, "archived");
-        assert!(dismissed.archived_at.is_some());
-    }
-
-    #[tokio::test]
-    async fn test_restore_archived_atom() {
-        let pool = cognitive_test_pool().await;
-        let repo = KnowledgeAtomRepo::new(pool);
-
-        let atom = repo
-            .create(&NewKnowledgeAtom {
-                subject: "走る".to_string(),
-                atom_type: "vocabulary".to_string(),
-                domain: "language:ja".to_string(),
-                personal_importance: 0.7,
                 status: "active".to_string(),
                 ..Default::default()
             })
             .await
             .unwrap();
+        assert_eq!(atom.status, "active");
 
         repo.dismiss(&atom.id).await.unwrap();
-        let restored = repo.restore(&atom.id).await.unwrap();
-        assert_eq!(restored.status, "active");
-        assert!(restored.archived_at.is_none());
-        assert!((restored.salience - 0.5).abs() < f64::EPSILON);
+        let dismissed = repo.get(&atom.id).await.unwrap().unwrap();
+        assert_eq!(dismissed.status, "archived");
+        assert!(dismissed.archived_at.is_some());
     }
 
     #[tokio::test]

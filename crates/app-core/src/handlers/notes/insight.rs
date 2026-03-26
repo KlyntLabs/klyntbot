@@ -1348,7 +1348,7 @@ async fn create_atoms_from_gaps(
             source_note_id: Some(note_id.to_string()),
             source_context: Some(description.to_string()),
             metadata: Some(metadata.to_string()),
-            status: "suggested".to_string(),
+            status: "active".to_string(),
             ..Default::default()
         };
 

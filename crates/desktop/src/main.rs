@@ -485,11 +485,8 @@ fn run_desktop_app() {
             commands::practice::practice_list_sessions,
             // Knowledge Atoms
             commands::atoms::atoms_for_note,
-            commands::atoms::atom_accept,
             commands::atoms::atom_dismiss,
-            commands::atoms::atom_restore,
             commands::atoms::atom_next_card,
-            commands::atoms::atoms_bulk_accept,
             commands::atoms::atoms_migration_status,
             // Knowledge Health
             commands::knowledge_health::knowledge_health_summary,
