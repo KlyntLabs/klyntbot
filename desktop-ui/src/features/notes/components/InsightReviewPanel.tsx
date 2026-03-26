@@ -26,7 +26,6 @@ import type {
 import { useInsightSSE } from "../hooks/useInsightSSE";
 import { useInsightVersions } from "../hooks/useInsightVersions";
 import { usePersonas } from "../hooks/usePersonas";
-import { AtomsTab } from "./insight/AtomsTab";
 import { ChangesBanner } from "./insight/ChangesBanner";
 import { ConceptMapTab } from "./insight/ConceptMapTab";
 import { FlashcardReview } from "./insight/FlashcardReview";
@@ -38,7 +37,6 @@ import {
   type ScopeConfig,
 } from "./insight/InsightScopePopover";
 import { InsightVersionList } from "./insight/InsightVersionList";
-import { KnowledgeGrowthMetrics } from "./insight/KnowledgeGrowthMetrics";
 import { ManagePersonasModal } from "./insight/ManagePersonasModal";
 import { PerspectivesTab } from "./insight/PerspectivesTab";
 import { PracticeHistoryTab } from "./insight/PracticeHistoryTab";
@@ -61,7 +59,6 @@ interface InsightReviewPanelProps {
 // ---------------------------------------------------------------------------
 
 const TABS: { id: TabId; label: string }[] = [
-  { id: "atoms", label: "Atoms" },
   { id: "synthesis", label: "Synthesis" },
   { id: "gaps", label: "Gap Analysis" },
   { id: "assessment", label: "Self-Assessment" },
@@ -90,8 +87,6 @@ function statusDotClass(status: TabStatus): string {
 
 function tabStatus(state: InsightReviewState, tabId: TabId): TabStatus {
   switch (tabId) {
-    case "atoms":
-      return "done";
     case "synthesis":
       return state.tabs.synthesis.status;
     case "gaps":
@@ -155,8 +150,6 @@ export function InsightReviewPanel({ state, actions }: InsightReviewPanelProps) 
   // Get active tab content as text
   const getActiveContent = useCallback((): string => {
     switch (state.activeTab) {
-      case "atoms":
-        return "";
       case "synthesis":
         return state.tabs.synthesis.content;
       case "gaps":
@@ -258,9 +251,6 @@ export function InsightReviewPanel({ state, actions }: InsightReviewPanelProps) 
       {/* What's Changed banner */}
       {state.changesSummary && <ChangesBanner summary={state.changesSummary} />}
 
-      {/* Knowledge growth metrics */}
-      <KnowledgeGrowthMetrics noteId={state.noteId} />
-
       {/* Tab bar */}
       <div className="flex border-b border-border shrink-0 overflow-x-auto">
         {TABS.map((tab) => {
@@ -318,8 +308,6 @@ export function InsightReviewPanel({ state, actions }: InsightReviewPanelProps) 
       <div className="flex-1 overflow-y-auto p-4 min-h-0">
         {state.activeTab === "practice" ? (
           <PracticeHistoryTab noteId={state.noteId} />
-        ) : state.activeTab === "atoms" ? (
-          <AtomsTab noteId={state.noteId} />
         ) : activeStatus === "idle" || activeStatus === "error" ? (
           <div className="flex flex-col items-center justify-center h-full gap-3">
             <p className="text-[11px] text-dim">

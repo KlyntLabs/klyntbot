@@ -46,7 +46,6 @@ export function useVocabularySave() {
         setState("saved");
         setSavedCount(words.length);
         invalidateQueries("flashcard_");
-        invalidateQueries("atoms_for_note");
         resetAfterDelay();
       } catch (e: unknown) {
         setState("error");

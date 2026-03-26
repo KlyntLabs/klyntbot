@@ -7,7 +7,6 @@ import { useCallback, useRef, useState } from "react";
 // ---------------------------------------------------------------------------
 
 export type TabId =
-  | "atoms"
   | "synthesis"
   | "gaps"
   | "assessment"
@@ -149,7 +148,7 @@ const INITIAL_STATE: InsightReviewState = {
   noteId: null,
   insightReviewId: null,
   contentHash: null,
-  activeTab: "atoms",
+  activeTab: "synthesis",
   tabs: {
     synthesis: { status: "idle", content: "" },
     gaps: { status: "idle", content: "" },
