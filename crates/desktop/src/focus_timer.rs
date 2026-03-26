@@ -84,7 +84,6 @@ pub enum SessionCommand {
     ExtendWork(u64),
     SkipBreak,
     TakeBreak,
-    Stop,
 }
 
 // ── Session state (shared between timer loop and public API) ────────
@@ -214,15 +213,6 @@ impl FocusTimer {
         guard.as_ref().map(|s| s.config.clone())
     }
 
-    pub async fn mark_completed(&self, app: &AppHandle) {
-        let mut guard = self.state.lock().await;
-        if let Some(state) = guard.take() {
-            restore_dnd_state(state.dnd_enabled, state.dnd_was_active_before);
-            clear_tray_title(app);
-            tray_countdown::notify_focus_ended(app);
-        }
-    }
-
     pub async fn preferences(&self) -> (bool, bool) {
         let guard = self.state.lock().await;
         guard
@@ -287,10 +277,6 @@ async fn session_loop(
         // Drain pending commands
         while let Ok(cmd) = cmd_rx.try_recv() {
             match cmd {
-                SessionCommand::Stop => {
-                    // Caller handles cleanup via FocusTimer::stop()
-                    return;
-                }
                 SessionCommand::Pause => {
                     paused = true;
                     update_tray_title(&app, phase.remaining(), true, truncated_title.as_deref());
@@ -576,6 +562,7 @@ fn compute_break_secs(config: &FocusSessionConfig, cycle_position: u32) -> u64 {
     }
 }
 
+#[allow(clippy::manual_is_multiple_of)] // is_multiple_of requires Rust 1.83+, MSRV is 1.75
 fn is_long_break(cycle_position: u32, config: &FocusSessionConfig) -> bool {
     config.long_break_after > 0 && (cycle_position + 1) % config.long_break_after == 0
 }
