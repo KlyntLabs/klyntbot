@@ -458,7 +458,7 @@ CREATE TABLE IF NOT EXISTS knowledge_topics (
 CREATE TABLE IF NOT EXISTS knowledge_atoms (
     id                  TEXT PRIMARY KEY NOT NULL,
     subject             TEXT NOT NULL,
-    atom_type           TEXT NOT NULL CHECK (atom_type IN ('vocabulary', 'concept', 'skill', 'fact')),
+    atom_type           TEXT NOT NULL CHECK (atom_type IN ('vocabulary', 'concept', 'skill', 'fact', 'flashcard_weak_spot', 'socratic_exchange', 'translation_unit')),
     domain              TEXT NOT NULL,
     source_note_id      TEXT,
     source_range        TEXT,
