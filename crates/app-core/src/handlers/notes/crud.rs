@@ -106,6 +106,7 @@ impl AppCore {
         let id = uuid::Uuid::new_v4().to_string();
         let now = utc_now_str();
 
+        let created_at = params.created_at.unwrap_or_else(|| now.clone());
         let row = NoteRow {
             id: id.clone(),
             notebook_id: params.notebook_id,
@@ -114,14 +115,14 @@ impl AppCore {
             body_html: None,
             pinned: 0,
             archived: 0,
-            icon: None,
-            color: None,
+            icon: params.icon,
+            color: params.color,
             embedding_updated_at: None,
             split_content: None,
             split_mode: None,
             perspective_config: None,
             last_visited_at: None,
-            created_at: now.clone(),
+            created_at,
             updated_at: now,
         };
 
