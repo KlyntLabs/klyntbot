@@ -411,6 +411,28 @@ export function NoteEditor({
     return () => flushSave();
   }, [flushSave]);
 
+  // Signal editing finished on unmount (navigating away from note / closing editor)
+  const noteIdRef = useRef(note.id);
+  noteIdRef.current = note.id;
+
+  useEffect(() => {
+    return () => {
+      if (noteIdRef.current) {
+        ipc("note_editing_finished", { params: { noteId: noteIdRef.current } });
+      }
+    };
+  }, []);
+
+  // Signal editing finished when switching between notes within the same editor
+  useEffect(() => {
+    const previousNoteId = noteIdRef.current;
+    noteIdRef.current = note.id;
+
+    if (previousNoteId && previousNoteId !== note.id) {
+      ipc("note_editing_finished", { params: { noteId: previousNoteId } });
+    }
+  }, [note.id]);
+
   // Cmd+Shift+P / Cmd+Shift+A — dispatched from KnowledgeBasePage keyboard handler
   useEffect(() => {
     const handler = (e: Event) => {
