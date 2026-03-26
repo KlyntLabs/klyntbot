@@ -180,6 +180,7 @@ export type {
   Notebook,
   NotebookCreateParams,
   NoteCreateParams,
+  NoteImportResult,
   NoteLink,
   NoteUpdateParams,
   NoteVersion,

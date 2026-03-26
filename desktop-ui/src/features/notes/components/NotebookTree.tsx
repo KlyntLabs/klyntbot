@@ -20,6 +20,7 @@ import {
   Coffee,
   Cpu,
   Database,
+  Download,
   FileCode,
   FileText,
   Flame,
@@ -51,6 +52,7 @@ import {
   Target,
   Trash2,
   Trophy,
+  Upload,
   Users,
   Wrench,
   X,
@@ -97,6 +99,10 @@ interface NotebookTreeProps {
   onMoveNotebook: (id: string, parentId: string | null) => void;
   onUpdateNotebook: (id: string, updates: { icon?: string | null; color?: string | null }) => void;
   onUpdateNote: (id: string, updates: { icon?: string | null; color?: string | null }) => void;
+  onImportFiles?: (paths: string[], notebookId?: string) => void;
+  onImportFromDialog?: (notebookId?: string) => void;
+  onExportNote?: (noteId: string) => void;
+  onExportNotebook?: (notebookId: string) => void;
 }
 
 // Icon registry: name → Lucide component. Stored as string in DB.
@@ -409,6 +415,10 @@ export function NotebookTree({
   onMoveNotebook,
   onUpdateNotebook,
   onUpdateNote,
+  onImportFiles,
+  onImportFromDialog,
+  onExportNote,
+  onExportNotebook,
 }: NotebookTreeProps) {
   const [expandedIds, setExpandedIds] = useState<Set<string>>(
     () => new Set(notebooks.map((n) => n.id)),
@@ -668,6 +678,14 @@ export function NotebookTree({
 
   const handleDragOver = useCallback(
     (e: React.DragEvent, target: TreeItem) => {
+      // Accept external file drops (from Finder/desktop)
+      if (e.dataTransfer.types.includes("Files")) {
+        e.preventDefault();
+        e.dataTransfer.dropEffect = "copy";
+        setDropTargetId(target.id);
+        return;
+      }
+
       if (!dragItem) return;
       // Can't drop on self
       if (dragItem.id === target.id) return;
@@ -706,6 +724,20 @@ export function NotebookTree({
       setDropTargetId(null);
       setDropOnRoot(false);
 
+      // External file drop (from Finder/desktop)
+      if (
+        e.dataTransfer.types.includes("Files") &&
+        !e.dataTransfer.types.includes("application/json")
+      ) {
+        const files = Array.from(e.dataTransfer.files);
+        const paths = files.map((f) => (f as unknown as { path: string }).path).filter(Boolean);
+        if (paths.length > 0 && onImportFiles) {
+          const targetNotebookId = target.type === "notebook" ? target.id : target.notebookId;
+          onImportFiles(paths, targetNotebookId ?? undefined);
+        }
+        return;
+      }
+
       let data: DragData;
       try {
         data = JSON.parse(e.dataTransfer.getData("application/json"));
@@ -740,7 +772,7 @@ export function NotebookTree({
 
       setDragItem(null);
     },
-    [onMoveNote, onMoveNotebook, noteMap, getDescendantIds],
+    [onMoveNote, onMoveNotebook, noteMap, getDescendantIds, onImportFiles],
   );
 
   const handleDragEnd = useCallback(() => {
@@ -752,6 +784,14 @@ export function NotebookTree({
   // Root drop zone: drop onto empty space = move to root/unfiled
   const handleRootDragOver = useCallback(
     (e: React.DragEvent) => {
+      // Accept external file drops
+      if (e.dataTransfer.types.includes("Files")) {
+        e.preventDefault();
+        e.dataTransfer.dropEffect = "copy";
+        setDropOnRoot(true);
+        setDropTargetId(null);
+        return;
+      }
       if (!dragItem) return;
       e.preventDefault();
       e.dataTransfer.dropEffect = "move";
@@ -771,6 +811,19 @@ export function NotebookTree({
       setDropOnRoot(false);
       setDropTargetId(null);
 
+      // External file drop (from Finder/desktop) — no notebook target
+      if (
+        e.dataTransfer.types.includes("Files") &&
+        !e.dataTransfer.types.includes("application/json")
+      ) {
+        const files = Array.from(e.dataTransfer.files);
+        const paths = files.map((f) => (f as unknown as { path: string }).path).filter(Boolean);
+        if (paths.length > 0 && onImportFiles) {
+          onImportFiles(paths); // No notebook = unfiled
+        }
+        return;
+      }
+
       let data: DragData;
       try {
         data = JSON.parse(e.dataTransfer.getData("application/json"));
@@ -788,7 +841,7 @@ export function NotebookTree({
 
       setDragItem(null);
     },
-    [onMoveNote, onMoveNotebook],
+    [onMoveNote, onMoveNotebook, onImportFiles],
   );
 
   // Context menu handlers
@@ -911,6 +964,9 @@ export function NotebookTree({
           onExpandAll={expandAll}
           onCollapseAll={collapseAll}
           onClose={() => setContextMenu(null)}
+          onImportFromDialog={onImportFromDialog}
+          onExportNote={onExportNote}
+          onExportNotebook={onExportNotebook}
         />
       )}
     </div>
@@ -934,6 +990,9 @@ interface TreeContextMenuProps {
   onExpandAll: () => void;
   onCollapseAll: () => void;
   onClose: () => void;
+  onImportFromDialog?: (notebookId?: string) => void;
+  onExportNote?: (noteId: string) => void;
+  onExportNotebook?: (notebookId: string) => void;
 }
 
 function TreeContextMenu({
@@ -951,6 +1010,9 @@ function TreeContextMenu({
   onExpandAll,
   onCollapseAll,
   onClose,
+  onImportFromDialog,
+  onExportNote,
+  onExportNotebook,
   ref,
 }: TreeContextMenuProps & { ref: React.Ref<HTMLDivElement> }) {
   const [openSubmenu, setOpenSubmenu] = useState<string | null>(null);
@@ -1000,6 +1062,16 @@ function TreeContextMenu({
           }}
         >
           New notebook
+        </ContextMenuItem>
+        <ContextMenuSeparator />
+        <ContextMenuItem
+          icon={<Upload className="size-4" />}
+          onClick={() => {
+            onImportFromDialog?.();
+            onClose();
+          }}
+        >
+          Import files...
         </ContextMenuItem>
         <ContextMenuSeparator />
         <ContextMenuItem
@@ -1156,6 +1228,25 @@ function TreeContextMenu({
 
         <ContextMenuSeparator />
         <ContextMenuItem
+          icon={<Upload className="size-4" />}
+          onClick={() => {
+            onImportFromDialog?.(target.notebook.id);
+            onClose();
+          }}
+        >
+          Import files...
+        </ContextMenuItem>
+        <ContextMenuItem
+          icon={<Download className="size-4" />}
+          onClick={() => {
+            onExportNotebook?.(target.notebook.id);
+            onClose();
+          }}
+        >
+          Export as Markdown...
+        </ContextMenuItem>
+        <ContextMenuSeparator />
+        <ContextMenuItem
           icon={<Trash2 className="size-4" />}
           onClick={() => {
             onDeleteNotebook(target.notebook.id);
@@ -1226,6 +1317,16 @@ function TreeContextMenu({
         </ContextMenuSubmenu>
       )}
 
+      <ContextMenuSeparator />
+      <ContextMenuItem
+        icon={<Download className="size-4" />}
+        onClick={() => {
+          onExportNote?.(note.id);
+          onClose();
+        }}
+      >
+        Export as Markdown...
+      </ContextMenuItem>
       <ContextMenuSeparator />
       <ContextMenuItem
         icon={<Trash2 className="size-4" />}

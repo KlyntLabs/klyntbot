@@ -24,6 +24,10 @@ interface NavigationSidebarProps {
   onMoveNotebook: (id: string, parentId: string | null) => void;
   onUpdateNotebook: (id: string, updates: { icon?: string | null; color?: string | null }) => void;
   onUpdateNote: (id: string, updates: { icon?: string | null; color?: string | null }) => void;
+  onImportFiles?: (paths: string[], notebookId?: string) => void;
+  onImportFromDialog?: (notebookId?: string) => void;
+  onExportNote?: (noteId: string) => void;
+  onExportNotebook?: (notebookId: string) => void;
   inboxItems: InboxItem[];
   onInboxCreateAsNote: (content: string) => void;
   onInboxDiscard: (id: string) => void;
@@ -47,6 +51,10 @@ export function NavigationSidebar({
   onMoveNotebook,
   onUpdateNotebook,
   onUpdateNote,
+  onImportFiles,
+  onImportFromDialog,
+  onExportNote,
+  onExportNotebook,
   inboxItems,
   onInboxCreateAsNote,
   onInboxDiscard,
@@ -102,6 +110,10 @@ export function NavigationSidebar({
           onMoveNotebook={onMoveNotebook}
           onUpdateNotebook={onUpdateNotebook}
           onUpdateNote={onUpdateNote}
+          onImportFiles={onImportFiles}
+          onImportFromDialog={onImportFromDialog}
+          onExportNote={onExportNote}
+          onExportNotebook={onExportNotebook}
         />
 
         <InboxSection

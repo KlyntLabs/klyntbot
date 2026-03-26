@@ -6,8 +6,10 @@ import type {
   Notebook,
   NotebookCreateParams,
   NoteCreateParams,
+  NoteImportResult,
   NoteUpdateParams,
 } from "@shared/types";
+import { open, save } from "@tauri-apps/plugin-dialog";
 import { FileText, GitGraph, PenLine } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "react-router";
@@ -150,6 +152,14 @@ export default function KnowledgeBasePage() {
     Notebook,
     { id: string; title?: string; parentId?: string | null }
   >("notebook_update", "params");
+  const { mutate: importFiles } = useMutation<
+    NoteImportResult,
+    { paths: string[]; notebookId?: string }
+  >("note_import_files", "params");
+  const { mutate: exportNotes } = useMutation<
+    void,
+    { noteIds?: string[]; notebookIds?: string[]; destination: string; outputFilename?: string }
+  >("note_export", "params");
 
   // ── Handlers ──────────────────────────────────────────────────────────
   const [autoRenameId, setAutoRenameId] = useState<string | null>(null);
@@ -263,6 +273,65 @@ export default function KnowledgeBasePage() {
       await deleteInboxItem({ id });
     },
     [deleteInboxItem],
+  );
+
+  // ── Import / Export handlers ────────────────────────────────────────
+  const handleImportFiles = useCallback(
+    async (paths: string[], notebookId?: string) => {
+      try {
+        await importFiles({ paths, notebookId });
+      } catch (e) {
+        console.error("Import failed:", e);
+      }
+    },
+    [importFiles],
+  );
+
+  const handleImportFromDialog = useCallback(
+    async (notebookId?: string) => {
+      const selected = await open({
+        multiple: true,
+        filters: [{ name: "Markdown", extensions: ["md"] }],
+      });
+      if (!selected) return;
+      const paths = Array.isArray(selected) ? selected : [selected];
+      handleImportFiles(paths, notebookId);
+    },
+    [handleImportFiles],
+  );
+
+  const handleExportNote = useCallback(
+    async (noteId: string) => {
+      const note = notes.find((n: Note) => n.id === noteId);
+      if (!note) return;
+      const path = await save({
+        defaultPath: `${note.title}.md`,
+        filters: [{ name: "Markdown", extensions: ["md"] }],
+      });
+      if (!path) return;
+      const lastSlash = path.lastIndexOf("/");
+      const dir = path.substring(0, lastSlash);
+      const filename = path.substring(lastSlash + 1);
+      try {
+        await exportNotes({ noteIds: [noteId], destination: dir, outputFilename: filename });
+      } catch (e) {
+        console.error("Export failed:", e);
+      }
+    },
+    [notes, exportNotes],
+  );
+
+  const handleExportNotebook = useCallback(
+    async (notebookId: string) => {
+      const dir = await open({ directory: true });
+      if (!dir) return;
+      try {
+        await exportNotes({ notebookIds: [notebookId], destination: dir as string });
+      } catch (e) {
+        console.error("Export failed:", e);
+      }
+    },
+    [exportNotes],
   );
 
   const { generateFromNote, generateFromText } = cardGen;
@@ -502,6 +571,10 @@ export default function KnowledgeBasePage() {
               onMoveNotebook={handleMoveNotebook}
               onUpdateNotebook={handleUpdateNotebook}
               onUpdateNote={handleUpdateNote}
+              onImportFiles={handleImportFiles}
+              onImportFromDialog={handleImportFromDialog}
+              onExportNote={handleExportNote}
+              onExportNotebook={handleExportNotebook}
               inboxItems={inboxItems}
               onInboxCreateAsNote={handleInboxCreateAsNote}
               onInboxDiscard={handleInboxDiscard}
