@@ -291,6 +291,9 @@ interface EditorContentWrapperProps {
 
 export function EditorContentWrapper({ editor, className }: EditorContentWrapperProps) {
   return (
-    <EditorContent editor={editor} className={className ?? "flex-1 min-h-0 overflow-y-auto"} />
+    <EditorContent
+      editor={editor}
+      className={`tiptap-wrapper ${className ?? "flex-1 min-h-0 overflow-y-auto"}`}
+    />
   );
 }

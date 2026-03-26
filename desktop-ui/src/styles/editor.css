@@ -1,9 +1,23 @@
 /* TipTap editor styles */
 
+/* Ensure the editor fills the full available height so clicking
+   empty space below the content focuses the editor at the end. */
+.tiptap-wrapper {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.tiptap-wrapper > .tiptap {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
 .editor-content {
   padding: 0.75rem 2rem;
   outline: none;
-  min-height: 100%;
+  flex: 1;
   color: var(--color-primary);
   font-size: 0.9375rem;
   line-height: 1.75;
