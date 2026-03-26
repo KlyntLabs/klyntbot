@@ -1,6 +1,6 @@
 import * as PopoverPrimitive from "@radix-ui/react-popover";
 import { cn } from "@shared/lib/utils";
-import { Link, NotebookText, Sliders } from "lucide-react";
+import { Link, NotebookText, Radar, Sliders } from "lucide-react";
 
 export interface ScopeConfig {
   scopeType: "backlinks" | "notebook" | "semantic" | "project" | "manual";
@@ -27,6 +27,12 @@ const SCOPE_TYPES = [
     label: "Linked",
     desc: "Notes that link to this one",
     icon: Link,
+  },
+  {
+    id: "semantic" as const,
+    label: "Similar",
+    desc: "Notes with related content",
+    icon: Radar,
   },
   {
     id: "notebook" as const,

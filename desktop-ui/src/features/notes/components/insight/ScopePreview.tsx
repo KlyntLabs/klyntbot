@@ -7,7 +7,7 @@ import {
   forceSimulation,
   type SimulationNodeDatum,
 } from "d3-force";
-import { Brain, FileText, Link, NotebookText, Zap } from "lucide-react";
+import { Brain, FileText, Link, NotebookText, Radar, Zap } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { ScopeConfig } from "./InsightScopePopover";
 
@@ -59,6 +59,7 @@ interface ScopePreviewProps {
 
 const SCOPE_LABELS: Record<string, { label: string; icon: typeof Link }> = {
   backlinks: { label: "Linked", icon: Link },
+  semantic: { label: "Similar", icon: Radar },
   notebook: { label: "Notebook", icon: NotebookText },
 };
 
