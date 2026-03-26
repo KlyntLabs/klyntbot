@@ -877,6 +877,43 @@ impl AppCore {
             .collect())
     }
 
+    pub async fn note_insight_preview_scope(
+        &self,
+        params: ScopePreviewParams,
+    ) -> Result<ScopePreviewResponse, ApiError> {
+        use feature_insights::ScopeType;
+
+        let mut scope_config = feature_insights::ScopeConfig::default();
+        if let Some(ref st) = params.scope.scope_type {
+            scope_config.scope_type = match st.as_str() {
+                "notebook" => ScopeType::Notebook,
+                "semantic" => ScopeType::Semantic,
+                "project" => ScopeType::Project,
+                "manual" => ScopeType::Manual,
+                _ => ScopeType::Backlinks,
+            };
+        }
+
+        let note_ids = if let Some(ref service) = self.insight_service {
+            service.resolve_scope(&params.note_id, &scope_config).await
+        } else {
+            self.get_related_note_ids(&params.note_id).await
+        };
+
+        let mut notes = Vec::new();
+        for id in &note_ids {
+            if let Ok(Some(note)) = self.note_repo.get_note(id).await {
+                notes.push(ScopePreviewNote {
+                    id: note.id,
+                    title: note.title,
+                    notebook_id: note.notebook_id,
+                });
+            }
+        }
+
+        Ok(ScopePreviewResponse { notes })
+    }
+
     async fn get_related_note_ids(&self, note_id: &str) -> Vec<String> {
         let backlinks = self
             .note_repo

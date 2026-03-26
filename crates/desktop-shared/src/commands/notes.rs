@@ -492,6 +492,30 @@ pub struct DomainCount {
     pub count: usize,
 }
 
+// ── Insight Scope Preview ────────────────────────────────────────
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ScopePreviewResponse {
+    pub notes: Vec<ScopePreviewNote>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ScopePreviewNote {
+    pub id: String,
+    pub title: String,
+    pub notebook_id: Option<String>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ScopePreviewParams {
+    pub note_id: String,
+    #[serde(flatten)]
+    pub scope: InsightScopeConfigParams,
+}
+
 // ── Insight Scope Config ─────────────────────────────────────────
 
 #[derive(Debug, Clone, Deserialize)]

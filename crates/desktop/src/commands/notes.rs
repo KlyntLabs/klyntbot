@@ -13,8 +13,8 @@ use desktop_shared::commands::{
     NoteResponse, NoteRetentionHealthResponse, NoteSuggestionsResponse, NoteUpdateParams,
     NoteVersionResponse, NotebookCreateParams, NotebookResponse, NotebookUpdateParams,
     PersonaChatParams, PersonaChatResponse, PersonaResponse, RatePersonaParams,
-    RecentLearningSession, ScenarioChallengeResponse, SetPersonaPinsParams, StrugglingCardResponse,
-    TabContent, UpdatePersonaParams,
+    RecentLearningSession, ScenarioChallengeResponse, ScopePreviewParams, ScopePreviewResponse,
+    SetPersonaPinsParams, StrugglingCardResponse, TabContent, UpdatePersonaParams,
 };
 use desktop_shared::errors::ApiError;
 use tauri::State;
@@ -469,6 +469,14 @@ pub async fn note_insight_persona_chat(
     state.note_insight_persona_chat(&params).await
 }
 
+#[tauri::command]
+pub async fn note_insight_preview_scope(
+    state: State<'_, Arc<AppCore>>,
+    params: ScopePreviewParams,
+) -> Result<ScopePreviewResponse, ApiError> {
+    state.note_insight_preview_scope(params).await
+}
+
 // ── Flashcard Review commands ───────────────────────────────────
 
 #[tauri::command]
@@ -755,6 +763,7 @@ pub(crate) const DEV_COMMANDS: &[&str] = &[
     "note_insight_rate_persona",
     "note_insight_auto_generate_persona",
     "note_insight_persona_chat",
+    "note_insight_preview_scope",
     "flashcard_list_decks",
     "flashcard_get_due",
     "flashcard_record_review",
@@ -980,6 +989,12 @@ pub(crate) async fn dispatch_dev(
             let params: PersonaChatParams = try_field!(dev::parse_params(body));
             dev::val(core.note_insight_persona_chat(&params).await)
         }
+        "note_insight_preview_scope" => dev::val(
+            core.note_insight_preview_scope(try_field!(dev::parse_params::<
+                desktop_shared::commands::ScopePreviewParams,
+            >(body)))
+                .await,
+        ),
         "flashcard_list_decks" => dev::val(core.flashcard_list_decks().await),
         "flashcard_get_due" => {
             let deck: String = try_field!(dev::get_str(body, "deck"));

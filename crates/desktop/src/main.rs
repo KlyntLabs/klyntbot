@@ -439,6 +439,7 @@ fn run_desktop_app() {
             commands::notes::note_insight_rate_persona,
             commands::notes::note_insight_auto_generate_persona,
             commands::notes::note_insight_persona_chat,
+            commands::notes::note_insight_preview_scope,
             commands::notes::flashcard_list_decks,
             commands::notes::flashcard_get_due,
             commands::notes::flashcard_record_review,
