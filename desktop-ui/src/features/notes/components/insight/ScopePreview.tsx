@@ -161,35 +161,21 @@ export function ScopePreview({
 
       {/* Context summary bar */}
       {!loading && (
-        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 px-3 py-1.5 text-[9px] text-dim">
+        <div className="flex items-center gap-2.5 px-3 py-1.5 text-[9px] text-dim">
           <span className="flex items-center gap-1">
             <FileText size={8} />
             {summary.totalNotes} notes &middot; ~{summary.totalWords.toLocaleString()} words
           </span>
-          {(summary.strongAtoms > 0 || summary.fadingAtoms > 0) && (
-            <span className="flex items-center gap-1">
-              <Brain size={8} />
-              <span className="text-emerald-400">{summary.strongAtoms}</span>
-              {summary.fadingAtoms > 0 && (
-                <>
-                  {" / "}
-                  <span className="text-amber-400">{summary.fadingAtoms} fading</span>
-                </>
-              )}
-            </span>
-          )}
           {summary.includeCognitive && (
             <span className="flex items-center gap-1 text-purple-400">
               <Zap size={8} />
-              {summary.factsCount > 0 || summary.memoriesCount > 0
-                ? `${summary.factsCount} facts · ${summary.memoriesCount} memories`
-                : "cognitive"}
+              cognitive
             </span>
           )}
           {summary.deepDive && (
             <span className="flex items-center gap-1 text-blue-400">
               <Brain size={8} />
-              deep dive{summary.entityCount > 0 ? ` · ${summary.entityCount} entities` : ""}
+              deep dive
             </span>
           )}
         </div>
