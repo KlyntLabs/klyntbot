@@ -1,10 +1,10 @@
 use crate::types::*;
-use ignore::{overrides::OverrideBuilder, WalkBuilder};
+use ignore::WalkBuilder;
 use parking_lot::RwLock;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
-/// Directories to skip during walk (applies to non-git-tracked directories).
+/// Directories to always skip (covers non-git dirs where .gitignore doesn't apply).
 const SKIP_DIRS: &[&str] = &[
     "node_modules",
     "target",
@@ -19,14 +19,10 @@ const SKIP_EXTENSIONS: &[&str] = &["pyc", "pyo", "class", "o", "obj", "dylib", "
 
 #[derive(Debug, Clone)]
 struct FileEntry {
-    /// Filename (used for fuzzy matching).
     name: String,
-    /// Full path to the file or directory.
     path: PathBuf,
-    /// Index of the scan directory this entry came from (for `dir_boost`).
+    /// Which scan_dir this came from — earlier dirs get a mild score boost.
     dir_index: usize,
-    /// Classified kind of the file.
-    kind: FileKind,
 }
 
 #[derive(Clone)]
@@ -43,7 +39,6 @@ impl FileSearchSource {
         }
     }
 
-    /// Walk configured directories with `ignore`-aware traversal and collect file entries.
     fn walk_dirs(dirs: &[String]) -> Vec<FileEntry> {
         let mut entries = Vec::new();
 
@@ -54,71 +49,55 @@ impl FileSearchSource {
                 continue;
             }
 
-            // Build overrides to prevent descending into skip dirs
-            let mut overrides = OverrideBuilder::new(root);
-            for skip in SKIP_DIRS {
-                // Negated glob: ignore everything inside these directories
-                let _ = overrides.add(&format!("!{skip}"));
-                let _ = overrides.add(&format!("!{skip}/**"));
-            }
-            let overrides = overrides.build().ok();
-
-            let mut builder = WalkBuilder::new(root);
-            builder
+            let walker = WalkBuilder::new(root)
                 .hidden(true)
                 .git_ignore(true)
                 .git_global(true)
                 .git_exclude(true)
-                .require_git(false);
-            if let Some(ov) = overrides {
-                builder.overrides(ov);
-            }
-            let walker = builder.build();
+                .require_git(false)
+                .filter_entry(|entry| {
+                    // Prune SKIP_DIRS so the walker doesn't descend into them
+                    if entry.file_type().is_some_and(|ft| ft.is_dir()) {
+                        if let Some(name) = entry.file_name().to_str() {
+                            return !SKIP_DIRS.contains(&name);
+                        }
+                    }
+                    true
+                })
+                .build();
 
             for result in walker {
                 let entry = match result {
                     Ok(e) => e,
                     Err(e) => {
-                        tracing::debug!("file_search walk error: {}", e);
+                        tracing::debug!("file_search walk error: {e}");
                         continue;
                     }
                 };
 
-                let path = entry.path();
-
-                // Skip the root directory itself
-                if path == root {
+                // Skip directories — we only index files
+                if entry.file_type().is_none_or(|ft| ft.is_dir()) {
                     continue;
                 }
+
+                let path = entry.path();
 
                 let file_name = match path.file_name().and_then(|n| n.to_str()) {
                     Some(n) => n,
                     None => continue,
                 };
 
-                // Skip .DS_Store
-                if file_name == ".DS_Store" {
-                    continue;
-                }
-
-                let is_dir = entry.file_type().is_some_and(|ft| ft.is_dir());
-
                 // Skip unwanted extensions
-                if !is_dir {
-                    if let Some(ext) = path.extension().and_then(|e| e.to_str()) {
-                        if SKIP_EXTENSIONS.contains(&ext) {
-                            continue;
-                        }
+                if let Some(ext) = path.extension().and_then(|e| e.to_str()) {
+                    if SKIP_EXTENSIONS.contains(&ext) {
+                        continue;
                     }
                 }
-
-                let kind = Self::classify_extension(path, is_dir);
 
                 entries.push(FileEntry {
                     name: file_name.to_string(),
                     path: path.to_path_buf(),
                     dir_index,
-                    kind,
                 });
             }
         }
@@ -126,10 +105,7 @@ impl FileSearchSource {
         entries
     }
 
-    fn classify_extension(path: &Path, is_dir: bool) -> FileKind {
-        if is_dir {
-            return FileKind::Folder;
-        }
+    fn classify_extension(path: &Path) -> FileKind {
         match path.extension().and_then(|e| e.to_str()) {
             Some("png" | "jpg" | "jpeg" | "gif" | "svg" | "webp" | "ico" | "heic") => {
                 FileKind::Image
@@ -164,15 +140,17 @@ impl super::SearchSource for FileSearchSource {
         scored
             .into_iter()
             .map(|(score, e)| {
+                let path_str = e.path.display().to_string();
+                // Earlier dirs in config get a mild relevance boost, capped at 30%
                 let dir_boost = 1.0 - (e.dir_index as f64 * 0.05).min(0.3);
                 LauncherItem {
-                    id: format!("file:{}", e.path.display()),
+                    id: format!("file:{path_str}"),
                     title: e.name.clone(),
-                    subtitle: Some(e.path.display().to_string()),
+                    subtitle: Some(path_str),
                     icon: Some("file".to_string()),
                     kind: LauncherItemKind::File {
                         path: e.path.clone(),
-                        kind: e.kind.clone(),
+                        kind: Self::classify_extension(&e.path),
                     },
                     score: (score as f64 / 1000.0) * 0.85 * dir_boost,
                 }
@@ -184,7 +162,10 @@ impl super::SearchSource for FileSearchSource {
         let dirs = self.scan_dirs.clone();
         let new_entries = tokio::task::spawn_blocking(move || Self::walk_dirs(&dirs))
             .await
-            .unwrap_or_default();
+            .unwrap_or_else(|e| {
+                tracing::error!("file_search walk task failed: {e}");
+                vec![]
+            });
         tracing::info!("Indexed {} files", new_entries.len());
         *self.entries.write() = new_entries;
     }
