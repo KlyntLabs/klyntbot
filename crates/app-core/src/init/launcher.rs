@@ -105,9 +105,14 @@ pub(super) async fn init_launcher(
         sources.push(source);
     }
 
-    // File search (mdfind) — live query, cached by SourceRegistry
+    // File search (ignore-walk index) — pre-indexed, refreshed by BackgroundRefresher
     if launcher_config.sources.files.enabled {
-        sources.push(Arc::new(feature_launcher::FileSearchSource::new()));
+        let source = Arc::new(feature_launcher::FileSearchSource::new(
+            launcher_config.sources.files.scan_dirs.clone(),
+        ));
+        let s = Arc::clone(&source);
+        tokio::spawn(async move { s.refresh().await });
+        sources.push(source);
     }
 
     // Content grep (rg) — prefix ?, live query, cached by SourceRegistry
