@@ -160,6 +160,8 @@ async fn process_note(
 
     let mut total_created = 0usize;
     let mut total_reinforced = 0usize;
+    let mut topic_cache: HashMap<String, String> = HashMap::new(); // domain → topic_id
+    let mut affected_topic_ids: std::collections::HashSet<String> = std::collections::HashSet::new();
 
     // 3. Extract from each section
     for section in &sections {
@@ -171,7 +173,7 @@ async fn process_note(
             }
         };
 
-        // Validate atom_type from LLM — default to "concept" if unrecognized
+        // Validate atom_type + normalize domain
         let valid_types = [
             "concept",
             "fact",
@@ -185,6 +187,7 @@ async fn process_note(
             if !valid_types.contains(&atom.atom_type.as_str()) {
                 atom.atom_type = "concept".to_string();
             }
+            atom.domain = normalize_domain(&atom.domain);
         }
 
         if extracted.is_empty() {
@@ -260,7 +263,26 @@ async fn process_note(
                 }
             }
 
-            // 7. Create new active atom
+            // 7. Assign to a topic (cached per domain to avoid repeated DB lookups)
+            let topic_id = if let Some(cached) = topic_cache.get(&atom.domain) {
+                Some(cached.clone())
+            } else {
+                match atom_repo
+                    .get_or_create_topic(&atom.domain, &atom.domain)
+                    .await
+                {
+                    Ok(topic) => {
+                        topic_cache.insert(atom.domain.clone(), topic.id.clone());
+                        Some(topic.id)
+                    }
+                    Err(e) => {
+                        warn!(domain = atom.domain, error = %e, "failed to get/create topic");
+                        None
+                    }
+                }
+            };
+
+            // 8. Create new active atom
             let new_atom = NewKnowledgeAtom {
                 subject: atom.subject.clone(),
                 atom_type: atom.atom_type.clone(),
@@ -269,6 +291,7 @@ async fn process_note(
                 source_context: atom.source_context.clone(),
                 personal_importance: SUGGESTED_IMPORTANCE,
                 status: "active".to_string(),
+                topic_id,
                 ..Default::default()
             };
 
@@ -287,6 +310,9 @@ async fn process_note(
                         source_note_id: Some(note_id.to_string()),
                         personal_importance: SUGGESTED_IMPORTANCE,
                     });
+                    if let Some(tid) = &row.topic_id {
+                        affected_topic_ids.insert(tid.clone());
+                    }
                     total_created += 1;
                 }
                 Err(e) => {
@@ -296,7 +322,14 @@ async fn process_note(
         }
     }
 
-    // 8. Update cache after successful processing
+    // 9. Update only affected topic aggregates
+    for tid in &affected_topic_ids {
+        if let Err(e) = atom_repo.update_topic_aggregates(tid).await {
+            warn!(topic_id = tid, error = %e, "failed to update topic aggregates");
+        }
+    }
+
+    // 10. Update cache after successful processing
     cache
         .set(note_id, &content_hash)
         .await
@@ -376,6 +409,132 @@ fn word_count(text: &str) -> usize {
     text.split_whitespace().count()
 }
 
+/// Normalize an LLM-produced domain string into a canonical `parent/child` format.
+///
+/// Handles inconsistent separators, known synonyms, and bare single-segment domains.
+/// This is the single source of truth for domain taxonomy — all atoms pass through here.
+pub fn normalize_domain(raw: &str) -> String {
+    // 1. Lowercase, normalize separators (`:` and `_` → `/`), trim
+    let cleaned = raw.trim().to_lowercase().replace([':', '_'], "/");
+
+    // 2. Remove redundant slashes, split into segments
+    let segments: Vec<&str> = cleaned.split('/').filter(|s| !s.is_empty()).collect();
+    if segments.is_empty() {
+        return "general/uncategorized".to_string();
+    }
+
+    // 3. Check full path against alias map first (e.g. "deep-learning" → "machine-learning/deep-learning")
+    let full = segments.join("/");
+    if let Some(mapped) = DOMAIN_ALIASES.iter().find(|(from, _)| *from == full) {
+        return mapped.1.to_string();
+    }
+
+    // 4. If already two+ segments, check if parent needs remapping
+    if segments.len() >= 2 {
+        let parent = segments[0];
+        let child = segments[1..].join("/");
+
+        // Remap parent if it's an alias (e.g. "programming-languages/rust" → "software-engineering/rust")
+        let canonical_parent = PARENT_ALIASES
+            .iter()
+            .find(|(from, _)| *from == parent)
+            .map(|(_, to)| *to)
+            .unwrap_or(parent);
+
+        return format!("{canonical_parent}/{child}");
+    }
+
+    // 5. Single segment — check if it's a known child that should be nested
+    let single = segments[0];
+    if let Some(mapped) = CHILD_ALIASES.iter().find(|(from, _)| *from == single) {
+        return mapped.1.to_string();
+    }
+
+    // 6. Single segment, unknown — make it `{segment}/general`
+    format!("{single}/general")
+}
+
+/// Full-path aliases: exact match of the entire domain string.
+const DOMAIN_ALIASES: &[(&str, &str)] = &[
+    // ML ecosystem
+    ("deep-learning", "machine-learning/deep-learning"),
+    ("nlp", "machine-learning/nlp"),
+    ("natural-language-processing", "machine-learning/nlp"),
+    ("reinforcement-learning", "machine-learning/reinforcement-learning"),
+    ("machine-learning-systems", "machine-learning/systems"),
+    ("ml-systems", "machine-learning/systems"),
+    ("ml-ops", "machine-learning/ops"),
+    ("computer-vision", "machine-learning/computer-vision"),
+    ("generative-ai", "machine-learning/generative-ai"),
+    ("llm", "machine-learning/llm"),
+    ("llms", "machine-learning/llm"),
+    ("neural-networks", "machine-learning/neural-networks"),
+    ("transformers", "machine-learning/transformers"),
+    // Math ecosystem
+    ("linear-algebra", "mathematics/linear-algebra"),
+    ("statistics", "mathematics/statistics"),
+    ("probability", "mathematics/probability"),
+    ("calculus", "mathematics/calculus"),
+    ("optimization", "mathematics/optimization"),
+    ("statistics/machine-learning", "machine-learning/statistics"),
+    // SE ecosystem
+    ("database-systems", "software-engineering/databases"),
+    ("databases", "software-engineering/databases"),
+    ("distributed-systems", "software-engineering/distributed-systems"),
+    ("system-design", "software-engineering/system-design"),
+    ("devops", "software-engineering/devops"),
+    ("testing", "software-engineering/testing"),
+    ("web-development", "software-engineering/web"),
+    ("backend", "software-engineering/backend"),
+    ("frontend", "software-engineering/frontend"),
+    ("api-design", "software-engineering/api-design"),
+    // CS
+    ("algorithms", "computer-science/algorithms"),
+    ("data-structures", "computer-science/data-structures"),
+    ("operating-systems", "computer-science/operating-systems"),
+    ("networking", "computer-science/networking"),
+    ("compilers", "computer-science/compilers"),
+    ("cryptography", "computer-science/cryptography"),
+    // Misc
+    ("system", "software-engineering/general"),
+    ("general", "general/uncategorized"),
+];
+
+/// Parent segment aliases: when the first segment matches, remap it.
+const PARENT_ALIASES: &[(&str, &str)] = &[
+    ("programming-languages", "software-engineering"),
+    ("programming", "software-engineering"),
+    ("math", "mathematics"),
+    ("maths", "mathematics"),
+    ("stats", "mathematics"),
+    ("ml", "machine-learning"),
+    ("ai", "machine-learning"),
+    ("artificial-intelligence", "machine-learning"),
+    ("cs", "computer-science"),
+    ("se", "software-engineering"),
+    ("infra", "software-engineering"),
+    ("infrastructure", "software-engineering"),
+    ("lang", "language"),
+    ("languages", "language"),
+];
+
+/// Single-segment child aliases: bare terms that should nest under a parent.
+const CHILD_ALIASES: &[(&str, &str)] = &[
+    ("rust", "software-engineering/rust"),
+    ("python", "software-engineering/python"),
+    ("typescript", "software-engineering/typescript"),
+    ("javascript", "software-engineering/javascript"),
+    ("go", "software-engineering/go"),
+    ("java", "software-engineering/java"),
+    ("sql", "software-engineering/databases"),
+    ("postgres", "software-engineering/databases"),
+    ("redis", "software-engineering/databases"),
+    ("docker", "software-engineering/devops"),
+    ("kubernetes", "software-engineering/devops"),
+    ("pytorch", "machine-learning/deep-learning"),
+    ("tensorflow", "machine-learning/deep-learning"),
+];
+
 /// Call the LLM provider with the extraction prompt and parse JSON results.
 async fn call_extraction_llm(
     provider: &DynProvider,
@@ -386,7 +545,16 @@ async fn call_extraction_llm(
         For each item, return:\n\
         - \"subject\": short label (2-5 words)\n\
         - \"atomType\": one of \"concept\", \"fact\", \"procedure\", \"reference\", \"pattern\", \"insight\", \"relation\"\n\
-        - \"domain\": category (e.g. \"software-engineering\", \"finance\", \"language:ja\")\n\
+        - \"domain\": hierarchical category using EXACTLY the format \"parent/child\" (two levels max, lowercase, hyphenated). \
+        Use broad parent categories and specific children. Examples:\n\
+          - \"machine-learning/deep-learning\", \"machine-learning/nlp\", \"machine-learning/reinforcement-learning\"\n\
+          - \"software-engineering/rust\", \"software-engineering/databases\", \"software-engineering/distributed-systems\"\n\
+          - \"mathematics/linear-algebra\", \"mathematics/statistics\", \"mathematics/probability\"\n\
+          - \"computer-science/algorithms\", \"computer-science/data-structures\"\n\
+          - \"finance/investing\", \"finance/budgeting\"\n\
+          - \"language/japanese\", \"language/english\"\n\
+        Always use a parent even for broad topics (e.g. \"machine-learning/general\" not just \"machine-learning\"). \
+        Group related subfields under the same parent — e.g. deep learning, NLP, and reinforcement learning all belong under \"machine-learning\".\n\
         - \"sourceContext\": the relevant sentence or phrase from the text (verbatim)\n\n\
         Return JSON array. Include genuinely learnable concepts, notable facts, procedures, patterns, and insights — skip obvious/trivial content.";
 
@@ -515,5 +683,67 @@ mod tests {
         assert_eq!(word_count(""), 0);
         assert_eq!(word_count("hello world"), 2);
         assert_eq!(word_count("  spaced   out  "), 2);
+    }
+
+    #[test]
+    fn test_normalize_domain_aliases() {
+        // Full-path aliases
+        assert_eq!(normalize_domain("deep-learning"), "machine-learning/deep-learning");
+        assert_eq!(normalize_domain("nlp"), "machine-learning/nlp");
+        assert_eq!(normalize_domain("reinforcement-learning"), "machine-learning/reinforcement-learning");
+        assert_eq!(normalize_domain("linear-algebra"), "mathematics/linear-algebra");
+        assert_eq!(normalize_domain("statistics"), "mathematics/statistics");
+        assert_eq!(normalize_domain("database-systems"), "software-engineering/databases");
+        assert_eq!(normalize_domain("distributed-systems"), "software-engineering/distributed-systems");
+        assert_eq!(normalize_domain("machine-learning-systems"), "machine-learning/systems");
+        assert_eq!(normalize_domain("statistics/machine-learning"), "machine-learning/statistics");
+        assert_eq!(normalize_domain("system"), "software-engineering/general");
+        assert_eq!(normalize_domain("general"), "general/uncategorized");
+    }
+
+    #[test]
+    fn test_normalize_domain_parent_aliases() {
+        // Parent remapping
+        assert_eq!(normalize_domain("programming-languages/rust"), "software-engineering/rust");
+        assert_eq!(normalize_domain("ai/transformers"), "machine-learning/transformers");
+        assert_eq!(normalize_domain("math/calculus"), "mathematics/calculus");
+        assert_eq!(normalize_domain("ml/nlp"), "machine-learning/nlp");
+    }
+
+    #[test]
+    fn test_normalize_domain_child_aliases() {
+        // Bare language/tool names
+        assert_eq!(normalize_domain("rust"), "software-engineering/rust");
+        assert_eq!(normalize_domain("python"), "software-engineering/python");
+        assert_eq!(normalize_domain("pytorch"), "machine-learning/deep-learning");
+    }
+
+    #[test]
+    fn test_normalize_domain_separator_normalization() {
+        // Colon separator (software-engineering:rust → software-engineering/rust)
+        assert_eq!(normalize_domain("software-engineering:rust"), "software-engineering/rust");
+        assert_eq!(normalize_domain("language:ja"), "language/ja");
+    }
+
+    #[test]
+    fn test_normalize_domain_already_canonical() {
+        // Already in parent/child format — pass through
+        assert_eq!(normalize_domain("machine-learning/deep-learning"), "machine-learning/deep-learning");
+        assert_eq!(normalize_domain("software-engineering/databases"), "software-engineering/databases");
+        assert_eq!(normalize_domain("finance/investing"), "finance/investing");
+    }
+
+    #[test]
+    fn test_normalize_domain_unknown_single() {
+        // Unknown single segment → {segment}/general
+        assert_eq!(normalize_domain("biology"), "biology/general");
+        assert_eq!(normalize_domain("philosophy"), "philosophy/general");
+    }
+
+    #[test]
+    fn test_normalize_domain_edge_cases() {
+        assert_eq!(normalize_domain(""), "general/uncategorized");
+        assert_eq!(normalize_domain("  Deep-Learning  "), "machine-learning/deep-learning");
+        assert_eq!(normalize_domain("NLP"), "machine-learning/nlp");
     }
 }

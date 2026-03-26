@@ -53,9 +53,7 @@ export function useReviewSession() {
       setGradeResult(null);
       try {
         const result = await ipc<GradeResult>("flashcard_submit_answer", {
-          cardId: card.id,
-          userAnswer,
-          mode: "typed",
+          params: { cardId: card.id, userAnswer, mode: "typed" },
         });
         setGradeResult(result);
         setRevealed(true);
@@ -74,9 +72,7 @@ export function useReviewSession() {
       if (!card) return;
       const recallSpeedMs = Date.now() - cardShownAt.current;
       await ipc("flashcard_record_review", {
-        cardId: card.id,
-        quality,
-        recallSpeedMs,
+        params: { cardId: card.id, quality, recallSpeedMs },
       });
       setTotalReviewed((n) => n + 1);
       if (quality !== "again") setCorrectCount((n) => n + 1);
@@ -88,9 +84,11 @@ export function useReviewSession() {
         setShowSocratic(true);
         setSocraticLoading(true);
         ipc<{ explanation: string }>("flashcard_explain_answer", {
-          cardId: card.id,
-          userAnswer: `(self-rated as ${quality} after seeing the answer)`,
-          gradeExplanation: `Student self-assessed as '${quality}' — they may not fully understand the concept.`,
+          params: {
+            cardId: card.id,
+            userAnswer: `(self-rated as ${quality} after seeing the answer)`,
+            gradeExplanation: `Student self-assessed as '${quality}' — they may not fully understand the concept.`,
+          },
         })
           .then((r) => setSocraticExplanation(r.explanation))
           .catch(() => setShowSocratic(false))

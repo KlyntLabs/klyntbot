@@ -70,7 +70,7 @@ export function NoteActionBar({ noteId, noteTitle, onInsightGenerated }: NoteAct
 
   const handleFlashcards = useCallback(async () => {
     try {
-      await ipc("flashcard_generate", { noteId });
+      await ipc("flashcard_generate", { params: { noteId } });
     } catch (e) {
       console.warn("Failed to generate flashcards:", e);
     }

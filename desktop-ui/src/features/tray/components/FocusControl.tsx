@@ -149,12 +149,13 @@ function TimerView({ timer, onOpenSettings }: { timer: Timer; onOpenSettings: ()
   const [reviewPromptDismissed, setReviewPromptDismissed] = useState(false);
 
   const handleReviewAccept = async () => {
+    setReviewPromptDismissed(true);
     if (isTauri) {
       const { WebviewWindow } = await import("@tauri-apps/api/webviewWindow");
       const { emit } = await import("@tauri-apps/api/event");
       const mainWindow = await WebviewWindow.getByLabel("main");
       if (mainWindow) {
-        await emit("navigate", { path: "/learn/review" });
+        await emit("navigate", { path: "/learn?review=true" });
         await mainWindow.show();
         await mainWindow.setFocus();
       }

@@ -229,7 +229,7 @@ export function DashboardHome({
       </CollapsibleSection>
 
       <CollapsibleSection
-        title="Knowledge Graph"
+        title="Knowledge Map"
         icon={<Network size={14} strokeWidth={1.5} />}
         storageKey="learn-graph-open"
       >

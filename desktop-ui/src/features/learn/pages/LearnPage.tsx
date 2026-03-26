@@ -1,5 +1,6 @@
 import { invalidateQueries } from "@shared/hooks/useQuery";
 import { useCallback, useEffect, useState } from "react";
+import { useSearchParams } from "react-router";
 import { CardGenerationModal } from "../../notes/components/CardGenerationModal";
 import { useCardGeneration } from "../../notes/hooks/useCardGeneration";
 import { DashboardHome } from "../components/DashboardHome";
@@ -9,12 +10,21 @@ import { QuickAdd } from "../components/QuickAdd";
 type ViewMode = "dashboard" | "review";
 
 export default function LearnPage() {
+  const [searchParams, setSearchParams] = useSearchParams();
   const [mode, setMode] = useState<ViewMode>("dashboard");
   const [reviewDeck, setReviewDeck] = useState<string | undefined>();
   const [quickAddOpen, setQuickAddOpen] = useState(false);
   const cardGen = useCardGeneration();
   const [cardGenOpen, setCardGenOpen] = useState(false);
   const { generateFromNote, generateFromText } = cardGen;
+
+  // Enter review mode when navigated with ?review=true (e.g. from tray)
+  useEffect(() => {
+    if (searchParams.get("review") === "true") {
+      setMode("review");
+      setSearchParams({}, { replace: true });
+    }
+  }, [searchParams, setSearchParams]);
 
   const handleGenerateFromNote = useCallback(
     (noteId: string) => {

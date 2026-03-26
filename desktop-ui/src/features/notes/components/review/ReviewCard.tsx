@@ -49,8 +49,7 @@ export function ReviewCard({
     if (mode !== "multiple_choice" || cardPhase !== "answering") return;
     setDistractors([]);
     ipc<{ distractors: string[]; cached: boolean }>("flashcard_generate_distractors", {
-      cardId: card.id,
-      count: 3,
+      params: { cardId: card.id, count: 3 },
     })
       .then((res) => setDistractors(res.distractors))
       .catch(() => setDistractors([]));

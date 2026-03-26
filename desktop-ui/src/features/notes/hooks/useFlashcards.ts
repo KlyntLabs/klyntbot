@@ -62,9 +62,7 @@ export function useFlashcards() {
       const card = cards[currentIndex];
       if (!card) return;
       await ipc("flashcard_record_review", {
-        cardId: card.id,
-        quality,
-        recallSpeedMs: recallSpeedMs ?? null,
+        params: { cardId: card.id, quality, recallSpeedMs: recallSpeedMs ?? null },
       });
       setRevealed(false);
       setCurrentIndex((i) => i + 1);

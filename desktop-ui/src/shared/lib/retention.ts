@@ -9,3 +9,17 @@ export function retentionBarColor(pct: number): string {
   if (pct >= 0.5) return "bg-amber-500";
   return "bg-red-500";
 }
+
+/** CSS variable value for inline styles (not Tailwind classes). */
+export function retentionCssColor(pct: number): string {
+  if (pct >= 0.8) return "var(--success)";
+  if (pct >= 0.5) return "var(--warning)";
+  return "var(--brand)";
+}
+
+export function retentionLabel(pct: number): string {
+  if (pct >= 0.9) return "Strong";
+  if (pct >= 0.7) return "Good";
+  if (pct >= 0.5) return "Fading";
+  return "Weak";
+}

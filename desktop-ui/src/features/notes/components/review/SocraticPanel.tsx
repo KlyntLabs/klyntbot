@@ -19,9 +19,7 @@ export function SocraticPanel({ cardId, userAnswer, gradeExplanation }: Socratic
     setError(null);
 
     ipc<{ explanation: string }>("flashcard_explain_answer", {
-      cardId,
-      userAnswer,
-      gradeExplanation,
+      params: { cardId, userAnswer, gradeExplanation },
     })
       .then((res) => {
         if (!cancelled) {

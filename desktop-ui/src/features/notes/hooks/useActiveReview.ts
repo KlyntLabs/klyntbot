@@ -197,9 +197,7 @@ export function useActiveReview() {
       patchState({ cardPhase: "grading", error: null });
       try {
         const result = await ipc<GradeResult>("flashcard_submit_answer", {
-          cardId: current.id,
-          userAnswer: text,
-          mode: state.selectedMode,
+          params: { cardId: current.id, userAnswer: text, mode: state.selectedMode },
         });
 
         recordModeScore(state.selectedMode, result.score);
@@ -235,9 +233,7 @@ export function useActiveReview() {
       patchState({ cardPhase: "confirming", error: null });
       try {
         await ipc("flashcard_record_review", {
-          cardId: current.id,
-          quality: effectiveQuality,
-          recallSpeedMs: null,
+          params: { cardId: current.id, quality: effectiveQuality, recallSpeedMs: null },
         });
         advanceQueue();
       } catch (e: unknown) {
@@ -269,9 +265,11 @@ export function useActiveReview() {
     if (!current) return;
     try {
       await ipc("flashcard_record_review", {
-        cardId: current.id,
-        quality: "again" satisfies ReviewQuality,
-        recallSpeedMs: null,
+        params: {
+          cardId: current.id,
+          quality: "again" satisfies ReviewQuality,
+          recallSpeedMs: null,
+        },
       });
     } catch {
       // best-effort — advance regardless

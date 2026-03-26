@@ -15,6 +15,43 @@ interface ImmersiveReviewProps {
   onExit: () => void;
 }
 
+function ProgressSegments({ total, current }: { total: number; current: number }) {
+  if (total <= 1) return null;
+
+  // For many cards, show a continuous bar instead of segments
+  if (total > 20) {
+    const pct = Math.round((current / total) * 100);
+    return (
+      <div className="flex items-center gap-2.5 min-w-0">
+        <div className="flex-1 h-1 rounded-full bg-white/[0.06] overflow-hidden">
+          <div
+            className="h-full rounded-full bg-brand transition-all duration-500 ease-out"
+            style={{ width: `${pct}%` }}
+          />
+        </div>
+        <span className="text-[10px] text-dim tabular-nums shrink-0">{pct}%</span>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex items-center gap-1">
+      {Array.from({ length: total }, (_, i) => (
+        <div
+          key={i}
+          className={`h-1 rounded-full transition-all duration-300 ease-out ${
+            i < current
+              ? "bg-brand w-3"
+              : i === current
+                ? "bg-foreground w-5"
+                : "bg-white/[0.08] w-3"
+          }`}
+        />
+      ))}
+    </div>
+  );
+}
+
 export function ImmersiveReview({ deck, onExit }: ImmersiveReviewProps) {
   const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState(false);
@@ -52,7 +89,15 @@ export function ImmersiveReview({ deck, onExit }: ImmersiveReviewProps) {
   // Keyboard shortcuts
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
-      // Don't capture keys if an input is focused
+      // Tab to toggle mode — must be checked before the input guard
+      // so it works even when the type-mode textarea is focused
+      if (e.key === "Tab" && !revealed) {
+        e.preventDefault();
+        setAnswerMode((m) => (m === "flip" ? "type" : "flip"));
+        return;
+      }
+
+      // Don't capture other keys if an input is focused
       const tag = (e.target as HTMLElement)?.tagName;
       if (tag === "INPUT" || tag === "TEXTAREA") return;
 
@@ -145,26 +190,38 @@ export function ImmersiveReview({ deck, onExit }: ImmersiveReviewProps) {
     );
   }
 
-  const progress = cards.length > 0 ? (currentIndex / cards.length) * 100 : 0;
+  const deckLabel = current?.deck ?? deck ?? "All decks";
 
   return (
     <div className="flex-1 flex flex-col">
-      {/* Top bar */}
-      <div className="flex items-center justify-between px-4 py-3 border-b border-border">
+      {/* ── Top bar ──────────────────────────────────────────────── */}
+      <div className="flex items-center gap-3 px-4 py-3 border-b border-border">
+        {/* Left: back */}
         <button
           type="button"
           onClick={onExit}
-          className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors"
+          className="flex items-center gap-1.5 text-muted-foreground hover:text-foreground transition-colors shrink-0"
         >
-          <ArrowLeft size={16} strokeWidth={1.5} />
-          <span className="text-xs">ESC</span>
+          <ArrowLeft size={15} strokeWidth={1.5} />
+          <span className="text-[11px] hidden sm:inline">ESC</span>
         </button>
 
-        <span className="text-xs text-muted-foreground tabular-nums">
-          {currentIndex + 1} / {cards.length}
-        </span>
+        {/* Center: progress + counter */}
+        <div className="flex-1 flex flex-col items-center gap-1 min-w-0">
+          <ProgressSegments total={cards.length} current={currentIndex} />
+          <div className="flex items-center gap-1.5">
+            <span className="text-[11px] text-muted-foreground truncate max-w-[140px]">
+              {deckLabel}
+            </span>
+            <span className="text-dim">·</span>
+            <span className="text-[11px] text-dim tabular-nums">
+              {currentIndex + 1}/{cards.length}
+            </span>
+          </div>
+        </div>
 
-        <div className="flex items-center gap-1">
+        {/* Right: mode toggle (Tab to switch) */}
+        <div className="flex items-center gap-1 shrink-0" title="Tab to switch">
           <button
             type="button"
             onClick={() => setAnswerMode("flip")}
@@ -174,7 +231,7 @@ export function ImmersiveReview({ deck, onExit }: ImmersiveReviewProps) {
                 : "text-muted-foreground hover:text-foreground"
             }`}
           >
-            <RotateCcw size={12} strokeWidth={1.5} />
+            <RotateCcw size={11} strokeWidth={1.5} />
             Flip
           </button>
           <button
@@ -186,20 +243,17 @@ export function ImmersiveReview({ deck, onExit }: ImmersiveReviewProps) {
                 : "text-muted-foreground hover:text-foreground"
             }`}
           >
-            <Keyboard size={12} strokeWidth={1.5} />
+            <Keyboard size={11} strokeWidth={1.5} />
             Type
           </button>
+          <span className="text-[9px] text-dim ml-0.5">Tab</span>
         </div>
-
-        <span className="text-xs text-muted-foreground truncate max-w-[120px]">
-          {current?.deck ?? deck ?? "All decks"}
-        </span>
       </div>
 
-      {/* Card area */}
-      <div className="flex-1 flex flex-col items-center justify-center px-6 py-8">
+      {/* ── Card area ────────────────────────────────────────────── */}
+      <div className="flex-1 flex flex-col items-center justify-center px-6 py-6 min-h-0">
         {current && (
-          <div className="w-full max-w-lg">
+          <div className="w-full max-w-xl animate-[fade-in-up_0.2s_ease-out]">
             {editing ? (
               <CardEditor
                 card={current}
@@ -210,7 +264,9 @@ export function ImmersiveReview({ deck, onExit }: ImmersiveReviewProps) {
                 onCancel={() => setEditing(false)}
               />
             ) : (
-              <div className="glass-card p-8">
+              <div className="glass-card p-8 sm:p-10 relative">
+                {/* Subtle ambient glow behind the card */}
+                <div className="absolute inset-0 -z-10 rounded-[inherit] bg-white/[0.02] blur-xl scale-105" />
                 <CardRenderer card={current} revealed={revealed} />
               </div>
             )}
@@ -218,9 +274,9 @@ export function ImmersiveReview({ deck, onExit }: ImmersiveReviewProps) {
         )}
       </div>
 
-      {/* Socratic explanation */}
+      {/* ── Socratic explanation ──────────────────────────────────── */}
       {showSocratic && (socraticLoading || socraticExplanation) && (
-        <div className="px-6 animate-[fade-in-up_0.2s_ease-out]">
+        <div className="px-6 max-w-xl mx-auto w-full animate-[fade-in-up_0.2s_ease-out]">
           {socraticLoading ? (
             <div className="flex items-center gap-2 text-xs text-muted-foreground justify-center py-2">
               <Lightbulb size={14} strokeWidth={1.5} className="animate-pulse" />
@@ -250,25 +306,27 @@ export function ImmersiveReview({ deck, onExit }: ImmersiveReviewProps) {
         </div>
       )}
 
-      {/* Grade display (typed mode) */}
+      {/* ── Grade display (typed mode) ───────────────────────────── */}
       {answerMode === "type" && gradeResult && revealed && (
         <div className="px-6 animate-[fade-in-up_0.2s_ease-out]">
           <GradeDisplay result={gradeResult} userAnswer={typedAnswer} />
         </div>
       )}
 
-      {/* Bottom area: Show Answer / Answer Input / Rating buttons */}
-      <div className="px-6 pb-4 space-y-3">
+      {/* ── Bottom controls ──────────────────────────────────────── */}
+      <div className="px-6 pb-5 pt-2 space-y-3">
         {answerMode === "flip" ? (
           !revealed ? (
             <div className="flex justify-center">
               <button
                 type="button"
                 onClick={reveal}
-                className="glass-button px-8 py-2.5 text-sm text-foreground"
+                className="glass-button px-10 py-3 text-sm text-foreground font-medium group"
               >
                 Show Answer
-                <span className="text-2xs text-muted-foreground ml-2">Space</span>
+                <span className="text-[10px] text-dim ml-2 group-hover:text-muted-foreground transition-colors">
+                  Space
+                </span>
               </button>
             </div>
           ) : (
@@ -296,12 +354,12 @@ export function ImmersiveReview({ deck, onExit }: ImmersiveReviewProps) {
             className={`flex items-center gap-1 text-[11px] transition-colors ${
               revealed && current
                 ? "text-muted-foreground hover:text-foreground cursor-pointer"
-                : "text-muted-foreground opacity-50 cursor-not-allowed"
+                : "text-dim cursor-not-allowed"
             }`}
           >
-            <Edit3 size={12} strokeWidth={1.5} />
+            <Edit3 size={11} strokeWidth={1.5} />
             Edit
-            <span className="text-2xs text-muted-foreground ml-0.5">E</span>
+            <span className="text-[10px] text-dim ml-0.5">E</span>
           </button>
           <button
             type="button"
@@ -314,21 +372,13 @@ export function ImmersiveReview({ deck, onExit }: ImmersiveReviewProps) {
             className={`flex items-center gap-1 text-[11px] transition-colors ${
               current?.sourceNoteId
                 ? "text-muted-foreground hover:text-foreground cursor-pointer"
-                : "text-muted-foreground opacity-50 cursor-not-allowed"
+                : "text-dim cursor-not-allowed"
             }`}
           >
-            <ExternalLink size={12} strokeWidth={1.5} />
+            <ExternalLink size={11} strokeWidth={1.5} />
             Source
           </button>
         </div>
-      </div>
-
-      {/* Progress bar */}
-      <div className="h-1 bg-white/[0.04]">
-        <div
-          className="h-full bg-brand transition-all duration-300 ease-out"
-          style={{ width: `${progress}%` }}
-        />
       </div>
     </div>
   );
