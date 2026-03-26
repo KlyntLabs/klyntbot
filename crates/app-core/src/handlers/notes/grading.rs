@@ -119,107 +119,108 @@ impl AppCore {
 
         let expected = &card.back;
 
-        // 2. Try exact match
-        if let Some(score) = grade_exact_match(&params.user_answer, expected) {
-            let mut resp = build_response(
-                score,
-                "exact_match",
-                expected,
-                Some("Exact match!".to_string()),
-                None,
-                None,
-                vec![],
-                vec![],
-            );
-            resp.diff_highlights = vec![DiffSegmentResponse {
-                text: params.user_answer.clone(),
-                status: "match".to_string(),
-            }];
-            return Ok(resp);
-        }
-
-        // 3. Read config thresholds
-        let config = self.config.read().await;
-        let ar = &config.learning.active_recall;
-        let accept_threshold = ar.semantic_auto_accept_threshold;
-        let fail_threshold = ar.semantic_auto_fail_threshold;
-        drop(config);
-
-        // 4. Get cosine similarity
-        let cosine_sim = self
-            .compute_answer_similarity(&params.card_id, &params.user_answer)
-            .await;
-
-        // 5. Try semantic grading
-        if let Some(score) = grade_semantic(cosine_sim, accept_threshold, fail_threshold) {
-            let explanation = if score >= 0.85 {
-                format!(
-                    "Semantically very close (similarity: {:.2}). Auto-accepted.",
-                    cosine_sim
-                )
-            } else {
-                format!(
-                    "Low semantic similarity ({:.2}). The answer may be off-target.",
-                    cosine_sim
-                )
-            };
-
-            return Ok(build_response(
-                score,
-                "semantic",
-                expected,
-                Some(explanation),
-                None,
-                None,
-                vec![],
-                vec![],
-            ));
-        }
-
-        // 6. Borderline — call LLM
-        let (system_prompt, user_prompt) = build_grading_prompt(
-            &card.front,
-            expected,
-            &params.user_answer,
-            card.source_context.as_deref(),
-        );
-
-        let llm_result = self.grade_via_llm(&system_prompt, &user_prompt).await;
-
-        let response = match llm_result {
-            Ok(result) => {
-                let score = result.score.clamp(0.0, 1.0);
-                build_response(
+        // 2. Grade via 3-stage pipeline: exact match → semantic → LLM
+        // All paths produce `response`; weak-spot atom creation happens after.
+        let response = 'grading: {
+            // Stage 1: exact match
+            if let Some(score) = grade_exact_match(&params.user_answer, expected) {
+                let mut resp = build_response(
                     score,
-                    "llm",
+                    "exact_match",
                     expected,
-                    result.explanation,
-                    result.coaching_nudge,
-                    result.socratic_suggestion,
-                    result.key_concepts_present,
-                    result.key_concepts_missing,
-                )
+                    Some("Exact match!".to_string()),
+                    None,
+                    None,
+                    vec![],
+                    vec![],
+                );
+                resp.diff_highlights = vec![DiffSegmentResponse {
+                    text: params.user_answer.clone(),
+                    status: "match".to_string(),
+                }];
+                break 'grading resp;
             }
-            Err(_) => {
-                // 7. LLM failure — fall back to semantic score
-                let fallback_score = 0.85 * cosine_sim; // scale down slightly
-                build_response(
-                    fallback_score,
-                    "semantic_fallback",
-                    expected,
-                    Some(format!(
-                        "AI grading temporarily unavailable. Score based on semantic similarity ({:.2}).",
+
+            // Stage 2: semantic pre-filter
+            let config = self.config.read().await;
+            let ar = &config.learning.active_recall;
+            let accept_threshold = ar.semantic_auto_accept_threshold;
+            let fail_threshold = ar.semantic_auto_fail_threshold;
+            drop(config);
+
+            let cosine_sim = self
+                .compute_answer_similarity(&params.card_id, &params.user_answer)
+                .await;
+
+            if let Some(score) = grade_semantic(cosine_sim, accept_threshold, fail_threshold) {
+                let explanation = if score >= 0.85 {
+                    format!(
+                        "Semantically very close (similarity: {:.2}). Auto-accepted.",
                         cosine_sim
-                    )),
+                    )
+                } else {
+                    format!(
+                        "Low semantic similarity ({:.2}). The answer may be off-target.",
+                        cosine_sim
+                    )
+                };
+
+                break 'grading build_response(
+                    score,
+                    "semantic",
+                    expected,
+                    Some(explanation),
                     None,
                     None,
                     vec![],
                     vec![],
-                )
+                );
+            }
+
+            // Stage 3: LLM grading (borderline zone)
+            let (system_prompt, user_prompt) = build_grading_prompt(
+                &card.front,
+                expected,
+                &params.user_answer,
+                card.source_context.as_deref(),
+            );
+
+            let llm_result = self.grade_via_llm(&system_prompt, &user_prompt).await;
+
+            match llm_result {
+                Ok(result) => {
+                    let score = result.score.clamp(0.0, 1.0);
+                    build_response(
+                        score,
+                        "llm",
+                        expected,
+                        result.explanation,
+                        result.coaching_nudge,
+                        result.socratic_suggestion,
+                        result.key_concepts_present,
+                        result.key_concepts_missing,
+                    )
+                }
+                Err(_) => {
+                    let fallback_score = 0.85 * cosine_sim;
+                    build_response(
+                        fallback_score,
+                        "semantic_fallback",
+                        expected,
+                        Some(format!(
+                            "AI grading temporarily unavailable. Score based on semantic similarity ({:.2}).",
+                            cosine_sim
+                        )),
+                        None,
+                        None,
+                        vec![],
+                        vec![],
+                    )
+                }
             }
         };
 
-        // Persist and publish knowledge atom for low-scoring answers (weak spots).
+        // Persist and publish knowledge atom for ALL low-scoring answers (weak spots).
         if let Some(score) = response.score {
             if score < 0.6 {
                 let mut atom_id = uuid::Uuid::new_v4().to_string();
