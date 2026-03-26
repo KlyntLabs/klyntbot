@@ -22,6 +22,29 @@ impl AtomExtractionCache {
         Ok(row.is_some())
     }
 
+    /// Find note IDs that have never been extracted (no entry in cache).
+    /// Returns Vec of (note_id, body) pairs, limited to avoid overload.
+    pub async fn find_unextracted_notes(
+        &self,
+        limit: i64,
+    ) -> Result<Vec<(String, String)>, sqlx::Error> {
+        sqlx::query_as::<_, (String, String)>(
+            r#"
+            SELECT n.id, n.body
+            FROM notes n
+            LEFT JOIN atom_extraction_cache c ON c.note_id = n.id
+            WHERE n.body != ''
+              AND n.archived = 0
+              AND c.note_id IS NULL
+            ORDER BY n.updated_at DESC
+            LIMIT ?1
+            "#,
+        )
+        .bind(limit)
+        .fetch_all(&self.pool)
+        .await
+    }
+
     /// Update or insert the cache entry for a note.
     pub async fn set(&self, note_id: &str, content_hash: &str) -> Result<(), sqlx::Error> {
         let now = chrono::Utc::now().to_rfc3339();

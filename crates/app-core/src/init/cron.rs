@@ -200,6 +200,7 @@ const JOB_WEEKLY_REPORT: &str = "__klyntbot_weekly_report";
 const JOB_DAILY_PLANNING: &str = "__klyntbot_daily_planning";
 const JOB_FINANCE_DAILY_REVIEW: &str = "__klyntbot_finance_daily_review";
 const JOB_ATOM_DECAY: &str = "__klyntbot_atom_decay_daily";
+const JOB_ATOM_EXTRACTION_CATCHALL: &str = "__klyntbot_atom_extraction_catchall";
 const JOB_FINANCE_BUDGET_CHECK: &str = "__klyntbot_finance_budget_check";
 const JOB_FINANCE_PRICE_REFRESH: &str = "__klyntbot_finance_price_refresh";
 const JOB_FINANCE_HEALTH_CHECK: &str = "__klyntbot_finance_health_check";
@@ -482,6 +483,44 @@ fn register_cron_callbacks(
                             warn!("Atom decay cycle failed: {e}");
                         }
                         Ok(None)
+                    })
+                })
+            }),
+        );
+    }
+
+    // ── atom_extraction_catchall ─────────────────────────────────────
+    {
+        let pool = repos.pool().clone();
+        let bus = Arc::clone(domain_event_bus);
+        let rt = rt.clone();
+        cron_service.register_handler(
+            JOB_ATOM_EXTRACTION_CATCHALL,
+            Arc::new(move |_job: &scheduling::CronJob| {
+                let pool = pool.clone();
+                let bus = Arc::clone(&bus);
+                tokio::task::block_in_place(|| {
+                    rt.block_on(async {
+                        let cache = cognitive::repos::AtomExtractionCache::new(pool);
+                        match cache.find_unextracted_notes(50).await {
+                            Ok(notes) => {
+                                let count = notes.len();
+                                for (note_id, body) in notes {
+                                    bus.publish(bus::DomainEvent::NoteEditingFinished {
+                                        note_id,
+                                        content: body,
+                                    });
+                                }
+                                if count > 0 {
+                                    info!("Atom extraction catchall: queued {count} unextracted notes");
+                                }
+                                Ok(Some(format!("Queued {count} notes for extraction")))
+                            }
+                            Err(e) => {
+                                warn!("Atom extraction catchall failed: {e}");
+                                Ok(None)
+                            }
+                        }
                     })
                 })
             }),
@@ -1027,6 +1066,15 @@ async fn ensure_cron_jobs(
             tz: Some(config.timezone.clone()),
         },
         "Daily knowledge atom decay",
+        system.clone()
+    );
+    ensure_job!(
+        JOB_ATOM_EXTRACTION_CATCHALL,
+        scheduling::CronSchedule::Cron {
+            expr: "0 2 * * *".to_string(),
+            tz: None
+        },
+        "Extract atoms from unprocessed notes",
         system.clone()
     );
     ensure_job!(
