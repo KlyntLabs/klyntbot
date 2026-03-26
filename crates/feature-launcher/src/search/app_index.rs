@@ -50,6 +50,10 @@ impl AppIndex {
         }
     }
 
+    pub fn icon_cache(&self) -> Option<Arc<platform_macos::apps::AppIconCache>> {
+        self.icon_cache.clone()
+    }
+
     pub fn set_apps(&self, apps: Vec<AppEntry>) {
         *self.apps.write() = apps;
     }
