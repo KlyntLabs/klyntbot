@@ -21,6 +21,8 @@ pub enum ScopeType {
     Semantic,
     Project,
     Manual,
+    /// Notebook + all nested child notebooks (recursive).
+    Notebook,
 }
 
 /// Configuration for what context to include in insight generation.

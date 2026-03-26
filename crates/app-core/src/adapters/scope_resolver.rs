@@ -1,10 +1,10 @@
 //! Concrete ScopeResolver — resolves related note IDs for insight context.
 //!
-//! Supports 4 scope types:
-//! - Backlinks: notes that wikilink to the target note
-//! - Semantic: notes with similar embeddings (cosine similarity ≥ radius)
-//! - Project: notes in the same notebook
-//! - Manual: user-specified note IDs
+//! Supports scope types:
+//! - Backlinks (Linked): notes that wikilink to the target note
+//! - Notebook: notes in the same notebook + all nested child notebooks (recursive)
+//! - Project: alias for flat same-notebook (legacy)
+//! - Semantic / Manual: kept for backwards compatibility
 
 use async_trait::async_trait;
 use feature_insights::{ScopeConfig, ScopeResolver, ScopeType};
@@ -39,12 +39,10 @@ impl ScopeResolverImpl {
         let Some(ref vs) = self.vector_store else {
             return Vec::new();
         };
-        // Fetch the note's own embedding vector
         let embedding = match vs.get_embedding("note_embeddings", note_id).await {
             Ok(Some(v)) => v,
             _ => return Vec::new(),
         };
-        // Search for similar notes using cosine similarity
         match vs
             .search_similar("note_embeddings", &embedding, 20, radius)
             .await
@@ -75,6 +73,52 @@ impl ScopeResolverImpl {
             Err(_) => Vec::new(),
         }
     }
+
+    /// Notebook scope: get all notes in the same notebook AND all nested
+    /// child notebooks (recursive). This is the deep version of "project".
+    async fn resolve_notebook(&self, note_id: &str) -> Vec<String> {
+        let note = match self.note_repo.get_note(note_id).await {
+            Ok(Some(n)) => n,
+            _ => return Vec::new(),
+        };
+        let Some(ref root_notebook_id) = note.notebook_id else {
+            return Vec::new();
+        };
+
+        // Collect all notebook IDs in the tree (root + descendants)
+        let all_notebooks = match self.note_repo.list_notebooks().await {
+            Ok(nbs) => nbs,
+            Err(_) => return Vec::new(),
+        };
+
+        let mut notebook_ids = std::collections::HashSet::new();
+        notebook_ids.insert(root_notebook_id.clone());
+
+        // BFS to find all descendant notebooks
+        let mut queue = vec![root_notebook_id.clone()];
+        while let Some(parent) = queue.pop() {
+            for nb in &all_notebooks {
+                if nb.parent_id.as_deref() == Some(&parent) && notebook_ids.insert(nb.id.clone()) {
+                    queue.push(nb.id.clone());
+                }
+            }
+        }
+
+        // Collect notes from all notebooks in the tree
+        let mut note_ids = Vec::new();
+        for nb_id in &notebook_ids {
+            if let Ok(notes) = self.note_repo.list_notes(Some(nb_id)).await {
+                for n in notes {
+                    if n.id != note_id {
+                        note_ids.push(n.id);
+                    }
+                }
+            }
+        }
+        note_ids.sort();
+        note_ids.dedup();
+        note_ids
+    }
 }
 
 #[async_trait]
@@ -85,6 +129,7 @@ impl ScopeResolver for ScopeResolverImpl {
             ScopeType::Semantic => self.resolve_semantic(note_id, config.radius).await,
             ScopeType::Project => self.resolve_project(note_id).await,
             ScopeType::Manual => config.node_ids.clone(),
+            ScopeType::Notebook => self.resolve_notebook(note_id).await,
         }
     }
 }

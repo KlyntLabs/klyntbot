@@ -1,9 +1,9 @@
 import * as PopoverPrimitive from "@radix-ui/react-popover";
 import { cn } from "@shared/lib/utils";
-import { Sliders } from "lucide-react";
+import { Link, NotebookText, Sliders } from "lucide-react";
 
 export interface ScopeConfig {
-  scopeType: "backlinks" | "semantic" | "project" | "manual";
+  scopeType: "backlinks" | "notebook" | "semantic" | "project" | "manual";
   radius: number;
   includeCognitive: boolean;
   deepDive: boolean;
@@ -24,37 +24,40 @@ interface Props {
 const SCOPE_TYPES = [
   {
     id: "backlinks" as const,
-    label: "Backlinks",
-    desc: "Wikilink references",
+    label: "Linked",
+    desc: "Notes that link to this one",
+    icon: Link,
   },
   {
-    id: "semantic" as const,
-    label: "Semantic",
-    desc: "Similar by embedding",
+    id: "notebook" as const,
+    label: "Notebook",
+    desc: "All notes in this notebook tree",
+    icon: NotebookText,
   },
-  { id: "project" as const, label: "Project", desc: "Same notebook" },
-  { id: "manual" as const, label: "Manual", desc: "Selected notes" },
 ];
 
 export function InsightScopePopover({ value, onChange }: Props) {
+  const activeScope = SCOPE_TYPES.find((s) => s.id === value.scopeType) ?? SCOPE_TYPES[0];
+
   return (
     <PopoverPrimitive.Root>
       <PopoverPrimitive.Trigger asChild>
         <button
           type="button"
-          className="p-1 rounded-md text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
+          className="flex items-center gap-1 px-1.5 py-0.5 rounded-md text-2xs text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
           title="Scope Config"
         >
-          <Sliders size={12} />
+          <Sliders size={10} />
+          <span>{activeScope.label}</span>
         </button>
       </PopoverPrimitive.Trigger>
 
       <PopoverPrimitive.Portal>
         <PopoverPrimitive.Content
-          align="end"
+          align="start"
           sideOffset={6}
           className={cn(
-            "z-50 w-64 rounded-lg border border-border bg-popover p-3 text-foreground shadow-lg outline-none",
+            "z-50 w-56 rounded-lg border border-border bg-popover p-3 text-foreground shadow-lg outline-none",
             "data-[state=open]:animate-in data-[state=closed]:animate-out",
             "data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0",
             "data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95",
@@ -65,53 +68,33 @@ export function InsightScopePopover({ value, onChange }: Props) {
             {/* Scope type */}
             <div className="flex flex-col gap-1.5">
               <span className="text-2xs font-medium text-muted-foreground uppercase tracking-wider">
-                Scope
+                Context scope
               </span>
-              <div className="grid grid-cols-2 gap-1">
-                {SCOPE_TYPES.map((st) => (
-                  <button
-                    key={st.id}
-                    type="button"
-                    onClick={() => onChange({ ...value, scopeType: st.id })}
-                    className={cn(
-                      "px-2 py-1.5 rounded-md text-2xs text-left transition-colors border",
-                      value.scopeType === st.id
-                        ? "bg-accent text-foreground border-border"
-                        : "bg-transparent text-muted-foreground hover:bg-accent/50 border-transparent",
-                    )}
-                  >
-                    <div className="font-medium">{st.label}</div>
-                    <div className="text-[9px] text-muted">{st.desc}</div>
-                  </button>
-                ))}
+              <div className="flex flex-col gap-1">
+                {SCOPE_TYPES.map((st) => {
+                  const Icon = st.icon;
+                  return (
+                    <button
+                      key={st.id}
+                      type="button"
+                      onClick={() => onChange({ ...value, scopeType: st.id })}
+                      className={cn(
+                        "flex items-center gap-2.5 px-2.5 py-2 rounded-md text-2xs text-left transition-colors border",
+                        value.scopeType === st.id
+                          ? "bg-accent text-foreground border-border"
+                          : "bg-transparent text-muted-foreground hover:bg-accent/50 border-transparent",
+                      )}
+                    >
+                      <Icon size={14} className="shrink-0 text-muted-foreground" />
+                      <div>
+                        <div className="font-medium">{st.label}</div>
+                        <div className="text-[9px] text-muted">{st.desc}</div>
+                      </div>
+                    </button>
+                  );
+                })}
               </div>
             </div>
-
-            {/* Radius slider (only for semantic) */}
-            {value.scopeType === "semantic" && (
-              <label className="flex flex-col gap-1">
-                <div className="flex items-center justify-between">
-                  <span className="text-2xs font-medium text-muted-foreground">
-                    Similarity Radius
-                  </span>
-                  <span className="text-2xs text-muted">{value.radius.toFixed(2)}</span>
-                </div>
-                <input
-                  type="range"
-                  min={0.5}
-                  max={0.95}
-                  step={0.01}
-                  value={value.radius}
-                  onChange={(e) =>
-                    onChange({
-                      ...value,
-                      radius: Number.parseFloat(e.target.value),
-                    })
-                  }
-                  className="w-full accent-brand h-1"
-                />
-              </label>
-            )}
 
             {/* Toggles */}
             <div className="flex flex-col gap-2 pt-2 border-t border-border">

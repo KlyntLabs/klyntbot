@@ -63,6 +63,7 @@ impl AppCore {
                 let mut s = feature_insights::ScopeConfig::default();
                 if let Some(ref st) = params.scope_type {
                     s.scope_type = match st.as_str() {
+                        "notebook" => feature_insights::ScopeType::Notebook,
                         "semantic" => feature_insights::ScopeType::Semantic,
                         "project" => feature_insights::ScopeType::Project,
                         "manual" => feature_insights::ScopeType::Manual,
