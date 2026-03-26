@@ -901,14 +901,23 @@ impl AppCore {
         };
 
         let mut notes = Vec::new();
+        let mut total_words: u32 = 0;
         for id in &note_ids {
             if let Ok(Some(note)) = self.note_repo.get_note(id).await {
+                let wc = note.body.split_whitespace().count() as u32;
+                total_words += wc;
                 notes.push(ScopePreviewNote {
                     id: note.id,
                     title: note.title,
                     notebook_id: note.notebook_id,
+                    word_count: wc,
                 });
             }
+        }
+
+        // Add current note's word count
+        if let Ok(Some(current)) = self.note_repo.get_note(&params.note_id).await {
+            total_words += current.body.split_whitespace().count() as u32;
         }
 
         // Fetch links between all nodes in scope (current note + scope notes)
@@ -927,7 +936,32 @@ impl AppCore {
             })
             .collect();
 
-        Ok(ScopePreviewResponse { notes, links })
+        // Compute atom summary for the current note
+        let (strong_atoms, fading_atoms) = if let Ok(repo) = self.knowledge_atom_repo() {
+            match repo.list_for_note(&params.note_id).await {
+                Ok(atoms) => {
+                    let strong = atoms.iter().filter(|a| a.retention_pct >= 0.6).count() as u32;
+                    let fading = atoms.iter().filter(|a| a.retention_pct < 0.6).count() as u32;
+                    (strong, fading)
+                }
+                Err(_) => (0, 0),
+            }
+        } else {
+            (0, 0)
+        };
+
+        let context_summary = ContextSummary {
+            total_notes: notes.len() as u32 + 1, // +1 for current note
+            total_words,
+            strong_atoms,
+            fading_atoms,
+        };
+
+        Ok(ScopePreviewResponse {
+            notes,
+            links,
+            context_summary,
+        })
     }
 
     async fn get_related_note_ids(&self, note_id: &str) -> Vec<String> {

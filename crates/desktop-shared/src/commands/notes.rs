@@ -499,6 +499,8 @@ pub struct DomainCount {
 pub struct ScopePreviewResponse {
     pub notes: Vec<ScopePreviewNote>,
     pub links: Vec<ScopePreviewLink>,
+    /// Summary of what context the AI will see.
+    pub context_summary: ContextSummary,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -507,6 +509,17 @@ pub struct ScopePreviewNote {
     pub id: String,
     pub title: String,
     pub notebook_id: Option<String>,
+    /// Approximate word count of the note body (0 = empty).
+    pub word_count: u32,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct ContextSummary {
+    pub total_notes: u32,
+    pub total_words: u32,
+    pub strong_atoms: u32,
+    pub fading_atoms: u32,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
