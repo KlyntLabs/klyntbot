@@ -30,6 +30,9 @@ pub struct NoteCreateParams {
     pub notebook_id: Option<String>,
     pub body: Option<String>,
     pub tags: Option<Vec<String>>,
+    pub created_at: Option<String>,
+    pub icon: Option<String>,
+    pub color: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -693,4 +696,42 @@ pub struct ReviewSessionSaveParams {
     pub session_data: String,
     /// "completed" | "abandoned"
     pub status: String,
+}
+
+// ── Import / Export ──────────────────────────────────────────────────
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct NoteImportParams {
+    pub paths: Vec<String>,
+    pub notebook_id: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct NoteImportResult {
+    pub imported: u32,
+    pub skipped: Vec<SkippedFile>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SkippedFile {
+    pub path: String,
+    pub reason: String,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct NoteExportParams {
+    pub note_ids: Option<Vec<String>>,
+    pub notebook_ids: Option<Vec<String>>,
+    pub destination: String,
+    pub output_filename: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct NoteExportResult {
+    pub exported: u32,
 }
