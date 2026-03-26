@@ -85,23 +85,24 @@ export function CodeBlockView({ node, updateAttributes, deleteNode, editor }: No
   return (
     <NodeViewWrapper className="code-block-wrapper">
       <div className="code-block-header" contentEditable={false}>
-        <select
-          className="code-block-lang-select"
-          value={language ?? ""}
-          onChange={handleLanguageChange}
-          disabled={!isEditable}
-        >
-          <option value="">Auto</option>
-          {Object.entries(LANGUAGE_LABELS)
-            .filter(([key]) => key === key.toLowerCase() && key.length > 2)
-            .sort(([, a], [, b]) => a.localeCompare(b))
-            .map(([value, label]) => (
-              <option key={value} value={value}>
-                {label}
-              </option>
-            ))}
-        </select>
-        <span className="code-block-lang-label">{getLanguageLabel(language)}</span>
+        <div className="code-block-lang-picker">
+          <select
+            className="code-block-lang-select"
+            value={language ?? ""}
+            onChange={handleLanguageChange}
+            disabled={!isEditable}
+          >
+            <option value="">Auto</option>
+            {Object.entries(LANGUAGE_LABELS)
+              .filter(([key]) => key === key.toLowerCase() && key.length > 2)
+              .sort(([, a], [, b]) => a.localeCompare(b))
+              .map(([value, label]) => (
+                <option key={value} value={value}>
+                  {label}
+                </option>
+              ))}
+          </select>
+        </div>
         <div className="code-block-actions">
           {isEditable && (
             <button type="button" className="code-block-btn" onClick={handleDelete} title="Remove">
