@@ -18,6 +18,16 @@ fn default_1000() -> i64 {
 fn default_scripts_dir() -> String {
     "~/.klyntbot/scripts".to_string()
 }
+fn default_file_scan_dirs() -> Vec<String> {
+    vec![
+        "~/Projects".to_string(),
+        "~/Documents".to_string(),
+        "~/Desktop".to_string(),
+    ]
+}
+fn default_120() -> u64 {
+    120
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", default)]
@@ -44,7 +54,7 @@ pub struct LauncherSourcesConfig {
     pub ssh_hosts: SourceToggle,
     pub git_repos: GitReposConfig,
     pub scripts: ScriptsConfig,
-    pub files: SourceToggle,
+    pub files: FileSearchConfig,
     pub content_grep: ContentGrepConfig,
     pub contacts: SourceToggle,
     pub running_apps: SourceToggle,
@@ -97,6 +107,26 @@ impl Default for ScriptsConfig {
         Self {
             enabled: true,
             dir: default_scripts_dir(),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", default)]
+pub struct FileSearchConfig {
+    pub enabled: bool,
+    #[serde(default = "default_file_scan_dirs")]
+    pub scan_dirs: Vec<String>,
+    #[serde(default = "default_120")]
+    pub refresh_interval_secs: u64,
+}
+
+impl Default for FileSearchConfig {
+    fn default() -> Self {
+        Self {
+            enabled: true,
+            scan_dirs: default_file_scan_dirs(),
+            refresh_interval_secs: 120,
         }
     }
 }
