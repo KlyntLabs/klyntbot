@@ -25,7 +25,6 @@ const STROKE = 5;
 const CENTER = RING_SIZE / 2;
 const RADIUS = CENTER - STROKE / 2 - 4;
 const CIRCUMFERENCE = 2 * Math.PI * RADIUS;
-const WARNING_SECS = 30;
 
 type Timer = ReturnType<typeof useFocusTimer>;
 
@@ -132,9 +131,11 @@ function TimerView({ timer, onOpenSettings }: { timer: Timer; onOpenSettings: ()
     remainingSecs,
     totalSecs,
     settings,
-    completedSessions,
-    completed,
+    cyclePosition,
+    longBreakAfter,
     loading,
+    showWarning,
+    dndHint,
   } = timer;
 
   const [editing, setEditing] = useState(false);
@@ -166,11 +167,11 @@ function TimerView({ timer, onOpenSettings }: { timer: Timer; onOpenSettings: ()
 
   // Reset the one-time banner each time a new focus session starts
   useEffect(() => {
-    if (phase === "focus") setLearningBannerDismissed(false);
+    if (phase === "working") setLearningBannerDismissed(false);
   }, [phase]);
 
   const showLearningLine =
-    phase === "focus" &&
+    phase === "working" &&
     autotunerStatus?.enabled &&
     (autotunerStatus.champion?.days_active ?? 0) > 3 &&
     !learningBannerDismissed;
@@ -185,16 +186,10 @@ function TimerView({ timer, onOpenSettings }: { timer: Timer; onOpenSettings: ()
     }
   }, [showLearningLine]);
 
-  const isActive = phase === "focus" || phase === "break";
+  const isActive = phase === "working" || phase === "break";
   const isBreak = phase === "break";
   const isBreakPending = phase === "break_pending";
-  const isFocus = phase === "focus";
-  const showWarning =
-    isActive &&
-    !paused &&
-    remainingSecs != null &&
-    remainingSecs <= WARNING_SECS &&
-    remainingSecs > 0;
+  const isWorking = phase === "working";
 
   // Progress: 0 → 1 as time elapses
   const progress =
@@ -206,27 +201,26 @@ function TimerView({ timer, onOpenSettings }: { timer: Timer; onOpenSettings: ()
     isActive && remainingSecs != null
       ? formatElapsed(remainingSecs)
       : isBreakPending
-        ? formatElapsed((completed?.breakMins ?? settings.shortBreak) * 60)
+        ? formatElapsed(settings.shortBreak * 60)
         : formatElapsed(settings.focusDuration * 60);
 
   // Ring color: brand for focus, info-blue for break, warning pulse at 30s
   const ringColor = showWarning ? "var(--warning)" : isBreak ? "var(--info)" : "var(--brand)";
 
-  // Cycle state
-  const cycleComplete = completedSessions > 0 && completedSessions >= settings.longBreakAfter;
-  const dotsCount = settings.longBreakAfter;
-  const filledDots = cycleComplete ? dotsCount : completedSessions;
+  // Cycle state (from backend)
+  const dotsCount = longBreakAfter;
+  const filledDots = cyclePosition;
 
   // Phase label
   const phaseLabel = (() => {
     if (paused) return "Paused";
     switch (phase) {
-      case "focus":
+      case "working":
         return "Focus";
       case "break":
         return "Break";
       case "break_pending":
-        return cycleComplete ? "Long Break" : "Break";
+        return "Break";
       default:
         return "Focus";
     }
@@ -347,7 +341,7 @@ function TimerView({ timer, onOpenSettings }: { timer: Timer; onOpenSettings: ()
             {phaseLabel}
           </span>
 
-          {timer.actionTitle && phase === "focus" && (
+          {timer.actionTitle && phase === "working" && (
             <p className="text-2xs text-muted-foreground truncate max-w-[120px] mt-0.5">
               {timer.actionTitle}
             </p>
@@ -391,21 +385,21 @@ function TimerView({ timer, onOpenSettings }: { timer: Timer; onOpenSettings: ()
         </div>
       )}
 
-      {/* ── Distraction quick-log (focus only, no warning) ────────── */}
-      {isFocus && !showWarning && <QuickDistractionLog onLog={timer.logDistraction} />}
+      {/* ── Distraction quick-log (working only, no warning) ────────── */}
+      {isWorking && !showWarning && <QuickDistractionLog onLog={timer.logDistraction} />}
 
       {/* ── 30s warning banner ────────────────────────────────────── */}
-      {showWarning && <WarningBanner timer={timer} isFocus={isFocus} />}
+      {showWarning && <WarningBanner timer={timer} isWorking={isWorking} />}
 
       {/* ── Break pending actions ─────────────────────────────────── */}
-      {isBreakPending && <BreakPendingActions timer={timer} cycleComplete={cycleComplete} />}
+      {isBreakPending && <BreakPendingActions timer={timer} />}
 
       {/* ── Coaching debrief (break_pending only) ──────────────────── */}
       {isBreakPending && timer.coaching && (
         <CoachingDebrief message={timer.coaching.message} onDismiss={timer.dismissCoaching} />
       )}
 
-      {/* ── DND toggle (only in idle/focus without warning) ───────── */}
+      {/* ── DND toggle (only in idle/working without warning) ───────── */}
       {!isBreak && !isBreakPending && !showWarning && (
         /* biome-ignore lint/a11y/noLabelWithoutControl: Radix Checkbox renders its own input */
         <label className="flex items-center gap-2 mt-3 cursor-pointer select-none">
@@ -415,6 +409,20 @@ function TimerView({ timer, onOpenSettings }: { timer: Timer; onOpenSettings: ()
           />
           <span className="text-[11px] text-muted-foreground font-light">Do Not Disturb</span>
         </label>
+      )}
+
+      {/* ── DND unavailable hint ──────────────────────────────────── */}
+      {dndHint && (
+        <div className="flex items-center gap-2 mt-2 px-2">
+          <p className="text-[10px] text-warning/70 font-light leading-tight flex-1">{dndHint}</p>
+          <button
+            type="button"
+            onClick={timer.dismissDndHint}
+            className="text-muted-foreground hover:text-foreground shrink-0"
+          >
+            <X className="size-3" />
+          </button>
+        </div>
       )}
 
       {/* ── Bottom controls ───────────────────────────────────────── */}
@@ -441,7 +449,7 @@ function TimerView({ timer, onOpenSettings }: { timer: Timer; onOpenSettings: ()
               </button>
               <SettingsButton onClick={onOpenSettings} />
             </>
-          ) : isFocus ? (
+          ) : isWorking ? (
             <>
               <PauseResumeButton timer={timer} />
               <button
@@ -503,8 +511,8 @@ function CoachingDebrief({ message, onDismiss }: { message: string; onDismiss: (
 
 // ── 30-second warning banner ────────────────────────────────────────
 
-function WarningBanner({ timer, isFocus }: { timer: Timer; isFocus: boolean }) {
-  const extendOptions = isFocus
+function WarningBanner({ timer, isWorking }: { timer: Timer; isWorking: boolean }) {
+  const extendOptions = isWorking
     ? [
         { label: "+5m", secs: 300 },
         { label: "+10m", secs: 600 },
@@ -519,7 +527,7 @@ function WarningBanner({ timer, isFocus }: { timer: Timer; isFocus: boolean }) {
   return (
     <div className="flex flex-col items-center gap-2 mt-3 animate-fade-in">
       <p className="text-[11px] text-warning font-light text-center">
-        {isFocus ? "Focus ending soon" : "Break ending soon"}
+        {isWorking ? "Focus ending soon" : "Break ending soon"}
       </p>
       <div className="flex gap-1.5">
         {extendOptions.map((opt) => (
@@ -548,15 +556,11 @@ function WarningBanner({ timer, isFocus }: { timer: Timer; isFocus: boolean }) {
 
 // ── Break pending (between focus end and break start) ────────────────
 
-function BreakPendingActions({ timer, cycleComplete }: { timer: Timer; cycleComplete: boolean }) {
-  const breakMins = timer.completed?.breakMins ?? timer.settings.shortBreak;
-
+function BreakPendingActions({ timer }: { timer: Timer }) {
   return (
     <div className="flex flex-col items-center gap-2 mt-3 animate-fade-in">
       <p className="text-[11px] text-muted-foreground font-light text-center">
-        {cycleComplete
-          ? `Great cycle! ${breakMins}m break starting soon`
-          : `${breakMins}m break starting soon`}
+        Break starting soon
       </p>
 
       <div className="flex gap-1.5">
