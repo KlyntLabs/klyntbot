@@ -11,7 +11,6 @@ import { GraphMinimap } from "./GraphMinimap";
 import { InsightReviewPanel } from "./InsightReviewPanel";
 
 interface ContextPanelProps {
-  width: number;
   noteId: string | null;
   isGraphMode: boolean;
   note: Note | null;
@@ -205,7 +204,6 @@ function NotePreview({ note, onSelectNote }: { note: Note; onSelectNote: (id: st
 // ── Main component ───────────────────────────────────────────────────────
 
 export function ContextPanel({
-  width,
   noteId,
   isGraphMode,
   note,
@@ -218,16 +216,13 @@ export function ContextPanel({
   onOpenInsight,
 }: ContextPanelProps) {
   if (!noteId || !note) {
-    return <div style={{ width }} className="glass-sidebar flex flex-col flex-shrink-0 h-full" />;
+    return <div className="glass-sidebar flex flex-col flex-shrink-0 h-full w-full" />;
   }
 
   // Graph mode: show note preview instead of context sections
   if (isGraphMode) {
     return (
-      <div
-        style={{ width }}
-        className="glass-sidebar flex flex-col flex-shrink-0 h-full overflow-y-auto"
-      >
+      <div className="glass-sidebar flex flex-col flex-shrink-0 h-full w-full overflow-y-auto">
         <NotePreview note={note} onSelectNote={onSelectNote} />
       </div>
     );
@@ -236,7 +231,7 @@ export function ContextPanel({
   // Editor mode: insight panel takes over when open
   if (insightOpen && insightState && insightActions) {
     return (
-      <div style={{ width }} className="glass-sidebar flex flex-col flex-shrink-0 h-full">
+      <div className="glass-sidebar flex flex-col flex-shrink-0 h-full w-full">
         <InsightReviewPanel state={insightState} actions={insightActions} />
       </div>
     );
@@ -244,10 +239,7 @@ export function ContextPanel({
 
   // Editor mode: show all context sections
   return (
-    <div
-      style={{ width }}
-      className="glass-sidebar flex flex-col flex-shrink-0 h-full overflow-y-auto"
-    >
+    <div className="glass-sidebar flex flex-col flex-shrink-0 h-full w-full overflow-y-auto">
       <AISuggestionsPanel
         noteId={noteId}
         perspectiveConfig={note.perspectiveConfig}

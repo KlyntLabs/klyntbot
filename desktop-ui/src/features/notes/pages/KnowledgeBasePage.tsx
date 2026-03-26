@@ -588,7 +588,6 @@ export default function KnowledgeBasePage() {
       {showRightPanel && (
         <div ref={rightRef} className="h-full" style={{ width: effectiveRightWidth }}>
           <ContextPanel
-            width={effectiveRightWidth}
             noteId={selectedNoteId}
             isGraphMode={isGraphMode}
             note={selectedNote ?? null}
