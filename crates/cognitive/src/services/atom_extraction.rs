@@ -172,7 +172,15 @@ async fn process_note(
         };
 
         // Validate atom_type from LLM — default to "concept" if unrecognized
-        let valid_types = ["concept", "fact", "procedure", "reference", "pattern", "insight", "relation"];
+        let valid_types = [
+            "concept",
+            "fact",
+            "procedure",
+            "reference",
+            "pattern",
+            "insight",
+            "relation",
+        ];
         for atom in &mut extracted {
             if !valid_types.contains(&atom.atom_type.as_str()) {
                 atom.atom_type = "concept".to_string();
