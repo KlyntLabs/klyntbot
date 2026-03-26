@@ -135,6 +135,22 @@ impl NoteRepo {
         Ok(result.is_some())
     }
 
+    /// Find a notebook by parent_id and title. Used for deduplication during import.
+    pub async fn find_notebook_by_parent_and_title(
+        &self,
+        parent_id: Option<&str>,
+        title: &str,
+    ) -> Result<Option<NotebookRow>, StorageError> {
+        let row = sqlx::query_as::<_, NotebookRow>(
+            "SELECT * FROM notebooks WHERE title = ?1 AND (parent_id IS ?2) LIMIT 1",
+        )
+        .bind(title)
+        .bind(parent_id)
+        .fetch_optional(&self.pool)
+        .await?;
+        Ok(row)
+    }
+
     /// Find note IDs by their titles (case-insensitive). Returns (title, id) pairs.
     pub async fn resolve_titles_to_ids(
         &self,

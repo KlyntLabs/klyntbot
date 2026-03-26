@@ -33,6 +33,10 @@ impl NoteRepo {
     pub fn new(pool: SqlitePool) -> Self {
         Self { pool }
     }
+
+    pub fn pool(&self) -> &SqlitePool {
+        &self.pool
+    }
 }
 
 #[cfg(test)]
@@ -529,6 +533,46 @@ mod tests {
             .unwrap();
         assert_eq!(results.len(), 1);
         assert_eq!(results[0].title, "Rust Note");
+    }
+
+    #[tokio::test]
+    async fn test_find_notebook_by_parent_and_title() {
+        let repo = setup().await;
+        let now = utc_now_str();
+
+        let row = NotebookRow {
+            id: "nb1".into(),
+            parent_id: None,
+            title: "Projects".into(),
+            icon: None,
+            color: None,
+            sort_order: 0,
+            created_at: now.clone(),
+            updated_at: now,
+        };
+        repo.create_notebook(&row).await.unwrap();
+
+        // Should find it
+        let found = repo
+            .find_notebook_by_parent_and_title(None, "Projects")
+            .await
+            .unwrap();
+        assert!(found.is_some());
+        assert_eq!(found.unwrap().id, "nb1");
+
+        // Should not find non-existent
+        let not_found = repo
+            .find_notebook_by_parent_and_title(None, "Other")
+            .await
+            .unwrap();
+        assert!(not_found.is_none());
+
+        // Should not match when parent differs
+        let wrong_parent = repo
+            .find_notebook_by_parent_and_title(Some("nb99"), "Projects")
+            .await
+            .unwrap();
+        assert!(wrong_parent.is_none());
     }
 
     #[tokio::test]
