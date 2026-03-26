@@ -1,5 +1,4 @@
 mod agent;
-mod atoms;
 mod channels;
 mod coaching;
 mod cognitive;
@@ -429,20 +428,6 @@ impl AppCore {
             _mirror_shutdown: mirror_shutdown,
             _config_watcher_token: Some(config_watcher_token),
         };
-
-        // ── One-time vocab → Knowledge Atoms migration ──────────────────
-        {
-            let pool = storage_pool.inner().clone();
-            tokio::spawn(async move {
-                // Short delay to let the app finish starting
-                tokio::time::sleep(std::time::Duration::from_secs(3)).await;
-                match atoms::migrate_vocab_to_atoms(&pool).await {
-                    Ok(0) => {}
-                    Ok(n) => info!("Migrated {n} vocabulary items to Knowledge Atoms"),
-                    Err(e) => tracing::warn!("Knowledge Atom migration error: {e}"),
-                }
-            });
-        }
 
         // ── Insight progress refresh (registered post-init — deps available now) ──
         if let Some(ref insight_svc) = core.insight_service {
