@@ -359,9 +359,11 @@ pub async fn calendar_sync_events(
 }
 
 // ── Focus Timer (tray-driven) ──────────────────────────────────────────
+// NOTE: These commands use the old API shape and will be fully rewritten in Task 4.
+// Minimal fixes here to keep the crate compilable after focus_timer rewrite.
 
-use crate::focus_timer::TimerMode;
-use desktop_shared::commands::FocusTimerStatusResponse;
+use crate::focus_timer::{FocusSessionConfig, SessionCommand};
+use desktop_shared::commands::FocusSessionStatusResponse;
 
 #[allow(clippy::too_many_arguments)]
 #[tauri::command(rename_all = "snake_case")]
@@ -369,7 +371,7 @@ pub async fn focus_timer_start(
     state: State<'_, Arc<AppCore>>,
     timer: State<'_, Arc<FocusTimer>>,
     app: tauri::AppHandle,
-    mode: String,
+    _mode: String,
     work_mins: u64,
     break_mins: Option<u64>,
     action_id: Option<String>,
@@ -377,35 +379,26 @@ pub async fn focus_timer_start(
     sound_enabled: Option<bool>,
     notification_enabled: Option<bool>,
 ) -> Result<FocusSessionResponse, ApiError> {
-    let timer_mode = match mode.as_str() {
-        "pomodoro" => TimerMode::Pomodoro,
-        _ => TimerMode::Focus,
-    };
-
     // Start the persistent session first
-    let session = if timer_mode == TimerMode::Pomodoro {
-        state
-            .productivity_pomodoro_start_with_action(
-                action_id,
-                None,
-                Some(work_mins as i64),
-                break_mins.map(|b| b as i64),
-            )
-            .await?
-    } else {
-        state
-            .productivity_focus_start(action_id, None, Some(work_mins as i64))
-            .await?
+    let session = state
+        .productivity_focus_start(action_id.clone(), None, Some(work_mins as i64))
+        .await?;
+
+    let config = FocusSessionConfig {
+        work_secs: work_mins * 60,
+        short_break_secs: break_mins.unwrap_or(5) * 60,
+        long_break_secs: break_mins.unwrap_or(15) * 60,
+        long_break_after: 4,
     };
 
-    // Then start the desktop timer (tray title + countdown)
+    // Then start the desktop timer (phase state machine)
     timer
         .start(
             app,
-            timer_mode,
-            work_mins,
-            break_mins,
+            config,
+            action_id,
             action_title,
+            false,
             sound_enabled.unwrap_or(true),
             notification_enabled.unwrap_or(true),
         )
@@ -436,15 +429,13 @@ pub async fn focus_timer_stop(
 pub async fn focus_timer_status(
     state: State<'_, Arc<AppCore>>,
     timer: State<'_, Arc<FocusTimer>>,
-) -> Result<FocusTimerStatusResponse, ApiError> {
+) -> Result<FocusSessionStatusResponse, ApiError> {
     let session = state.productivity_focus_status().await?;
     let timer_info = timer.status().await;
 
-    Ok(FocusTimerStatusResponse {
+    Ok(FocusSessionStatusResponse {
         active: timer_info.is_some(),
-        mode: timer_info.map(|(m, _)| m.as_str().to_string()),
-        remaining_secs: None, // Remaining is pushed via events, not polled
-        total_secs: timer_info.map(|(_, t)| t),
+        sync: None, // Will be fully implemented in Task 4
         session,
     })
 }
@@ -453,16 +444,13 @@ pub async fn focus_timer_status(
 pub async fn focus_break_start(
     state: State<'_, Arc<AppCore>>,
     timer: State<'_, Arc<FocusTimer>>,
-    app: tauri::AppHandle,
+    _app: tauri::AppHandle,
     break_mins: u64,
 ) -> Result<(), ApiError> {
     // Persist break session to SQLite so it appears in daily summaries
     state.productivity_break_start(break_mins as i64).await?;
-
-    timer
-        .start_break(app, break_mins)
-        .await
-        .map_err(|e| ApiError::new("TIMER_ERROR", e.to_string()))
+    timer.send_command(SessionCommand::StartBreak).await;
+    Ok(())
 }
 
 #[tauri::command(rename_all = "snake_case")]
@@ -470,17 +458,17 @@ pub async fn focus_timer_extend(
     timer: State<'_, Arc<FocusTimer>>,
     extra_secs: u64,
 ) -> Result<bool, ApiError> {
-    Ok(timer.extend(extra_secs).await)
+    Ok(timer.send_command(SessionCommand::Extend(extra_secs)).await)
 }
 
 #[tauri::command]
 pub async fn focus_timer_pause(timer: State<'_, Arc<FocusTimer>>) -> Result<bool, ApiError> {
-    Ok(timer.pause().await)
+    Ok(timer.send_command(SessionCommand::Pause).await)
 }
 
 #[tauri::command]
 pub async fn focus_timer_resume(timer: State<'_, Arc<FocusTimer>>) -> Result<bool, ApiError> {
-    Ok(timer.resume().await)
+    Ok(timer.send_command(SessionCommand::Resume).await)
 }
 
 // ── Patterns & Hourly Breakdown ─────────────────────────────────────

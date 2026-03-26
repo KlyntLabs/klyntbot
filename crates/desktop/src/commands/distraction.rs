@@ -24,7 +24,8 @@ pub async fn distraction_allow_temp(
     pattern: String,
 ) -> Result<(), ApiError> {
     // Pause the focus timer so the user doesn't lose focus time during their break
-    timer.pause().await;
+    use crate::focus_timer::SessionCommand;
+    timer.send_command(SessionCommand::Pause).await;
     state.distraction_allow_temp(pattern).await
 }
 

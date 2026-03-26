@@ -1,63 +1,114 @@
-//! Desktop focus timer — owns a 1-second tokio interval that updates the tray
-//! icon title and emits tick events to the frontend. Supports focus sessions,
-//! break countdowns, pause/resume, and runtime extension via an mpsc command channel.
+//! Desktop focus timer — backend-owned phase state machine with 5-second sync
+//! ticks, macOS DND integration, and automatic cycle progression.
+//!
+//! Phases: Working → BreakPending (5s) → Break → Working (auto-continues).
+//! The backend owns cycle position and break-type decisions.
 
 use std::sync::Arc;
 
-use desktop_shared::commands::FocusSessionResponse;
 use desktop_shared::events::{
-    FocusCompletedPayload, FocusTickPayload, FOCUS_COMPLETED, FOCUS_TICK,
+    FocusDndUnavailablePayload, FocusSyncPayload, FocusWarningPayload, FOCUS_DND_UNAVAILABLE,
+    FOCUS_PHASE_CHANGED, FOCUS_SYNC, FOCUS_WARNING,
 };
+use serde::Deserialize;
 use tauri::{AppHandle, Emitter, Manager};
 use tokio::sync::{mpsc, Mutex};
 use tokio::task::JoinHandle;
+use tracing::warn;
 
 use crate::app_core::AppCore;
 use crate::commands::window::WINDOW_TRAY;
 use crate::tray_countdown;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum TimerMode {
-    Focus,
-    Pomodoro,
-    Break,
+// ── Configuration ────────────────────────────────────────────────────
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct FocusSessionConfig {
+    pub work_secs: u64,
+    pub short_break_secs: u64,
+    pub long_break_secs: u64,
+    pub long_break_after: u32,
 }
 
-impl TimerMode {
-    pub fn as_str(&self) -> &'static str {
+// ── Phase state ──────────────────────────────────────────────────────
+
+#[derive(Debug, Clone)]
+enum Phase {
+    Working { remaining: u64, total: u64 },
+    BreakPending { remaining: u64 },
+    Break { remaining: u64, total: u64 },
+}
+
+impl Phase {
+    fn as_str(&self) -> &'static str {
         match self {
-            Self::Focus => "focus",
-            Self::Pomodoro => "pomodoro",
-            Self::Break => "break",
+            Phase::Working { .. } => "working",
+            Phase::BreakPending { .. } => "break_pending",
+            Phase::Break { .. } => "break",
+        }
+    }
+
+    fn remaining(&self) -> u64 {
+        match self {
+            Phase::Working { remaining, .. }
+            | Phase::BreakPending { remaining }
+            | Phase::Break { remaining, .. } => *remaining,
+        }
+    }
+
+    fn total(&self) -> u64 {
+        match self {
+            Phase::Working { total, .. } | Phase::Break { total, .. } => *total,
+            Phase::BreakPending { remaining } => *remaining,
+        }
+    }
+
+    fn decrement(&mut self) {
+        match self {
+            Phase::Working { remaining, .. }
+            | Phase::BreakPending { remaining }
+            | Phase::Break { remaining, .. } => {
+                *remaining = remaining.saturating_sub(1);
+            }
         }
     }
 }
 
 // ── Commands sent to the running timer loop ─────────────────────────
 
-enum TimerCommand {
-    Extend(u64),
+pub enum SessionCommand {
     Pause,
     Resume,
+    Extend(u64),
+    StartBreak,
+    ExtendWork(u64),
+    SkipBreak,
+    TakeBreak,
+    Stop,
 }
 
-struct TimerState {
-    mode: TimerMode,
-    total_secs: u64,
+// ── Session state (shared between timer loop and public API) ────────
+
+struct SessionState {
+    config: FocusSessionConfig,
     #[allow(dead_code)]
-    break_mins: Option<u64>,
-    #[allow(dead_code)]
-    action_title: Option<String>,
+    cycle_position: u32,
+    dnd_enabled: bool,
+    dnd_was_active_before: bool,
     sound_enabled: bool,
     notification_enabled: bool,
+    #[allow(dead_code)]
+    action_title: Option<String>,
+    #[allow(dead_code)]
+    action_id: Option<String>,
     handle: JoinHandle<()>,
-    cmd_tx: mpsc::Sender<TimerCommand>,
+    cmd_tx: mpsc::Sender<SessionCommand>,
 }
 
 // ── Public API ──────────────────────────────────────────────────────
 
 pub struct FocusTimer {
-    state: Mutex<Option<TimerState>>,
+    state: Mutex<Option<SessionState>>,
 }
 
 impl FocusTimer {
@@ -67,43 +118,66 @@ impl FocusTimer {
         }
     }
 
-    /// Start a focus timer. Caller must start the FocusManager session first.
     #[allow(clippy::too_many_arguments)]
     pub async fn start(
         &self,
         app: AppHandle,
-        mode: TimerMode,
-        work_mins: u64,
-        break_mins: Option<u64>,
+        config: FocusSessionConfig,
+        action_id: Option<String>,
         action_title: Option<String>,
+        dnd_enabled: bool,
         sound_enabled: bool,
         notification_enabled: bool,
     ) -> common::Result<()> {
         let mut guard = self.state.lock().await;
         if guard.is_some() {
-            return Err(common::ToolError::ExecutionFailed("Timer already running".into()).into());
+            return Err(
+                common::ToolError::ExecutionFailed("Session already running".into()).into(),
+            );
         }
 
         tray_countdown::FOCUS_ACTIVE.store(true, std::sync::atomic::Ordering::Relaxed);
 
-        let total_secs = work_mins * 60;
-        let (cmd_tx, cmd_rx) = mpsc::channel(8);
-        let handle = tokio::spawn(timer_loop(
+        // DND: capture and enable
+        let dnd_was_active_before = if dnd_enabled {
+            let was = platform_macos::dnd::is_dnd_active();
+            if !was {
+                if let Err(e) = platform_macos::dnd::toggle_dnd() {
+                    warn!("Failed to enable DND: {e}");
+                    let _ = app.emit(
+                        FOCUS_DND_UNAVAILABLE,
+                        FocusDndUnavailablePayload {
+                            message: format!(
+                                "Could not enable Do Not Disturb: {e}. \
+                                 Create a Shortcut named 'Toggle Do Not Disturb' to enable this."
+                            ),
+                        },
+                    );
+                }
+            }
+            was
+        } else {
+            false
+        };
+
+        let (cmd_tx, cmd_rx) = mpsc::channel(16);
+        let handle = tokio::spawn(session_loop(
             app,
-            mode.as_str().to_string(),
-            total_secs,
-            break_mins,
+            config.clone(),
             action_title.clone(),
+            dnd_enabled,
             cmd_rx,
         ));
 
-        *guard = Some(TimerState {
-            mode,
-            total_secs,
-            break_mins,
-            action_title,
+        *guard = Some(SessionState {
+            config,
+            cycle_position: 0,
+            dnd_enabled,
+            dnd_was_active_before,
             sound_enabled,
             notification_enabled,
+            action_title,
+            action_id,
             handle,
             cmd_tx,
         });
@@ -111,56 +185,7 @@ impl FocusTimer {
         Ok(())
     }
 
-    /// Start a break countdown. No focus session is created in AppCore.
-    pub async fn start_break(&self, app: AppHandle, break_mins: u64) -> common::Result<()> {
-        let mut guard = self.state.lock().await;
-        if guard.is_some() {
-            return Err(common::ToolError::ExecutionFailed("Timer already running".into()).into());
-        }
-
-        tray_countdown::FOCUS_ACTIVE.store(true, std::sync::atomic::Ordering::Relaxed);
-
-        let total_secs = break_mins * 60;
-        let (cmd_tx, cmd_rx) = mpsc::channel(8);
-        let handle = tokio::spawn(timer_loop(
-            app,
-            TimerMode::Break.as_str().to_string(),
-            total_secs,
-            None,
-            None,
-            cmd_rx,
-        ));
-
-        *guard = Some(TimerState {
-            mode: TimerMode::Break,
-            total_secs,
-            break_mins: None,
-            action_title: None,
-            sound_enabled: true,
-            notification_enabled: true,
-            handle,
-            cmd_tx,
-        });
-
-        Ok(())
-    }
-
-    /// Extend the running timer by `extra_secs`.
-    pub async fn extend(&self, extra_secs: u64) -> bool {
-        self.send_command(TimerCommand::Extend(extra_secs)).await
-    }
-
-    /// Pause the running timer.
-    pub async fn pause(&self) -> bool {
-        self.send_command(TimerCommand::Pause).await
-    }
-
-    /// Resume the paused timer.
-    pub async fn resume(&self) -> bool {
-        self.send_command(TimerCommand::Resume).await
-    }
-
-    async fn send_command(&self, cmd: TimerCommand) -> bool {
+    pub async fn send_command(&self, cmd: SessionCommand) -> bool {
         let guard = self.state.lock().await;
         match guard.as_ref() {
             Some(state) => state.cmd_tx.try_send(cmd).is_ok(),
@@ -168,23 +193,36 @@ impl FocusTimer {
         }
     }
 
-    /// Stop the timer early.
     pub async fn stop(&self, app: &AppHandle) -> bool {
         let mut guard = self.state.lock().await;
         if let Some(state) = guard.take() {
+            let dnd_enabled = state.dnd_enabled;
+            let dnd_was_active_before = state.dnd_was_active_before;
             state.handle.abort();
-            // Wait for the task to fully stop — avoids a race where the loop's
-            // `update_tray_title` runs after our `clear_tray_title`.
             let _ = state.handle.await;
             clear_tray_title(app);
             tray_countdown::notify_focus_ended(app);
+            restore_dnd_state(dnd_enabled, dnd_was_active_before);
             true
         } else {
             false
         }
     }
 
-    /// Get sound/notification preferences for the current session.
+    pub async fn status(&self) -> Option<FocusSessionConfig> {
+        let guard = self.state.lock().await;
+        guard.as_ref().map(|s| s.config.clone())
+    }
+
+    pub async fn mark_completed(&self, app: &AppHandle) {
+        let mut guard = self.state.lock().await;
+        if let Some(state) = guard.take() {
+            restore_dnd_state(state.dnd_enabled, state.dnd_was_active_before);
+            clear_tray_title(app);
+            tray_countdown::notify_focus_ended(app);
+        }
+    }
+
     pub async fn preferences(&self) -> (bool, bool) {
         let guard = self.state.lock().await;
         guard
@@ -192,33 +230,29 @@ impl FocusTimer {
             .map(|s| (s.sound_enabled, s.notification_enabled))
             .unwrap_or((true, true))
     }
+}
 
-    /// Get current timer status.
-    pub async fn status(&self) -> Option<(TimerMode, u64)> {
-        let guard = self.state.lock().await;
-        guard.as_ref().map(|s| (s.mode, s.total_secs))
-    }
-
-    /// Called by the timer loop when it finishes naturally.
-    pub async fn mark_completed(&self) {
-        let mut guard = self.state.lock().await;
-        *guard = None;
+fn restore_dnd_state(dnd_enabled: bool, dnd_was_active_before: bool) {
+    if dnd_enabled && !dnd_was_active_before {
+        if let Err(e) = platform_macos::dnd::toggle_dnd() {
+            warn!("Failed to restore DND: {e}");
+        }
     }
 }
 
-// ── Timer loop ──────────────────────────────────────────────────────
+// ── Session loop ─────────────────────────────────────────────────────
 
 const WARNING_SECS: u64 = 30;
+const BREAK_PENDING_SECS: u64 = 5;
+const SYNC_INTERVAL: u64 = 5;
 
-async fn timer_loop(
+async fn session_loop(
     app: AppHandle,
-    mode: String,
-    mut total_secs: u64,
-    break_mins: Option<u64>,
+    config: FocusSessionConfig,
     action_title: Option<String>,
-    mut cmd_rx: mpsc::Receiver<TimerCommand>,
+    dnd_enabled: bool,
+    mut cmd_rx: mpsc::Receiver<SessionCommand>,
 ) {
-    // Pre-truncate once so the hot loop doesn't re-truncate every second
     let truncated_title: Option<String> = action_title.as_deref().and_then(|t| {
         if t.is_empty() {
             None
@@ -226,93 +260,386 @@ async fn timer_loop(
             Some(t.chars().take(20).collect())
         }
     });
-    let mut remaining = total_secs;
+
+    let mut phase = Phase::Working {
+        remaining: config.work_secs,
+        total: config.work_secs,
+    };
+    let mut cycle_position: u32 = 0;
     let mut paused = false;
     let mut warning_shown = false;
+    let mut sync_counter: u64 = 0;
     let mut interval = tokio::time::interval(tokio::time::Duration::from_secs(1));
 
-    update_tray_title(&app, remaining, false, truncated_title.as_deref());
+    // Emit initial phase_changed
+    emit_phase_changed(
+        &app,
+        &phase,
+        cycle_position,
+        &config,
+        paused,
+        truncated_title.as_deref(),
+        dnd_enabled,
+    );
+    update_tray_title(&app, phase.remaining(), paused, truncated_title.as_deref());
 
     loop {
-        // Drain any pending commands (non-blocking)
+        // Drain pending commands
         while let Ok(cmd) = cmd_rx.try_recv() {
             match cmd {
-                TimerCommand::Extend(secs) => {
-                    remaining += secs;
-                    total_secs += secs;
-                    // Reset warning if we extended past the threshold
-                    if remaining > WARNING_SECS {
+                SessionCommand::Stop => {
+                    // Caller handles cleanup via FocusTimer::stop()
+                    return;
+                }
+                SessionCommand::Pause => {
+                    paused = true;
+                    update_tray_title(&app, phase.remaining(), true, truncated_title.as_deref());
+                    emit_phase_changed(
+                        &app,
+                        &phase,
+                        cycle_position,
+                        &config,
+                        true,
+                        truncated_title.as_deref(),
+                        dnd_enabled,
+                    );
+                }
+                SessionCommand::Resume => {
+                    paused = false;
+                    emit_phase_changed(
+                        &app,
+                        &phase,
+                        cycle_position,
+                        &config,
+                        false,
+                        truncated_title.as_deref(),
+                        dnd_enabled,
+                    );
+                }
+                SessionCommand::Extend(secs) => {
+                    if let Phase::Working { remaining, total }
+                    | Phase::Break { remaining, total } = &mut phase
+                    {
+                        *remaining += secs;
+                        *total += secs;
+                        if *remaining > WARNING_SECS {
+                            warning_shown = false;
+                        }
+                    }
+                    emit_phase_changed(
+                        &app,
+                        &phase,
+                        cycle_position,
+                        &config,
+                        paused,
+                        truncated_title.as_deref(),
+                        dnd_enabled,
+                    );
+                }
+                SessionCommand::StartBreak => {
+                    if matches!(phase, Phase::BreakPending { .. }) {
+                        let break_secs = compute_break_secs(&config, cycle_position);
+                        phase = Phase::Break {
+                            remaining: break_secs,
+                            total: break_secs,
+                        };
                         warning_shown = false;
+                        sync_counter = 0;
+                        // Start break session in AppCore
+                        start_break_session(&app, break_secs).await;
+                        emit_phase_changed(
+                            &app,
+                            &phase,
+                            cycle_position,
+                            &config,
+                            paused,
+                            truncated_title.as_deref(),
+                            dnd_enabled,
+                        );
                     }
                 }
-                TimerCommand::Pause => paused = true,
-                TimerCommand::Resume => paused = false,
+                SessionCommand::ExtendWork(secs) => {
+                    if matches!(phase, Phase::BreakPending { .. }) {
+                        phase = Phase::Working {
+                            remaining: secs,
+                            total: secs,
+                        };
+                        warning_shown = false;
+                        sync_counter = 0;
+                        emit_phase_changed(
+                            &app,
+                            &phase,
+                            cycle_position,
+                            &config,
+                            paused,
+                            truncated_title.as_deref(),
+                            dnd_enabled,
+                        );
+                    }
+                }
+                SessionCommand::SkipBreak => {
+                    if matches!(phase, Phase::Break { .. } | Phase::BreakPending { .. }) {
+                        // End break session if in Break
+                        if matches!(phase, Phase::Break { .. }) {
+                            end_break_session(&app).await;
+                        }
+                        // Start next focus cycle
+                        start_focus_session(&app, &config).await;
+                        phase = Phase::Working {
+                            remaining: config.work_secs,
+                            total: config.work_secs,
+                        };
+                        warning_shown = false;
+                        sync_counter = 0;
+                        emit_phase_changed(
+                            &app,
+                            &phase,
+                            cycle_position,
+                            &config,
+                            paused,
+                            truncated_title.as_deref(),
+                            dnd_enabled,
+                        );
+                    }
+                }
+                SessionCommand::TakeBreak => {
+                    if matches!(phase, Phase::Working { .. }) {
+                        // End the current focus session
+                        end_focus_session(&app).await;
+                        // Enter break_pending immediately
+                        phase = Phase::BreakPending {
+                            remaining: BREAK_PENDING_SECS,
+                        };
+                        warning_shown = false;
+                        sync_counter = 0;
+                        open_tray_window(&app);
+                        emit_phase_changed(
+                            &app,
+                            &phase,
+                            cycle_position,
+                            &config,
+                            paused,
+                            truncated_title.as_deref(),
+                            dnd_enabled,
+                        );
+                    }
+                }
             }
         }
 
         interval.tick().await;
 
         if paused {
-            update_tray_title(&app, remaining, true, truncated_title.as_deref());
-            let _ = app.emit(
-                FOCUS_TICK,
-                FocusTickPayload {
-                    remaining_secs: remaining,
-                    total_secs,
-                    mode: mode.clone(),
-                    paused: true,
-                    action_title: action_title.clone(),
-                },
-            );
+            // Don't emit sync while paused — frontend freezes display
+            update_tray_title(&app, phase.remaining(), true, truncated_title.as_deref());
             continue;
         }
 
-        if remaining == 0 {
-            break;
-        }
-        remaining -= 1;
+        if phase.remaining() == 0 {
+            // Phase transition
+            match &phase {
+                Phase::Working { total, .. } => {
+                    // End the AppCore focus session
+                    end_focus_session(&app).await;
 
-        // 30-second warning: pop open the tray window so user sees extend options
-        if remaining == WARNING_SECS && !warning_shown {
+                    // Play sound/notification for work completion
+                    on_work_complete(&app, *total / 60).await;
+
+                    // Enter break_pending
+                    phase = Phase::BreakPending {
+                        remaining: BREAK_PENDING_SECS,
+                    };
+                    warning_shown = false;
+                    sync_counter = 0;
+                    open_tray_window(&app);
+                    emit_phase_changed(
+                        &app,
+                        &phase,
+                        cycle_position,
+                        &config,
+                        paused,
+                        truncated_title.as_deref(),
+                        dnd_enabled,
+                    );
+                }
+                Phase::BreakPending { .. } => {
+                    // Auto-transition to break
+                    let break_secs = compute_break_secs(&config, cycle_position);
+                    start_break_session(&app, break_secs).await;
+                    phase = Phase::Break {
+                        remaining: break_secs,
+                        total: break_secs,
+                    };
+                    warning_shown = false;
+                    sync_counter = 0;
+                    emit_phase_changed(
+                        &app,
+                        &phase,
+                        cycle_position,
+                        &config,
+                        paused,
+                        truncated_title.as_deref(),
+                        dnd_enabled,
+                    );
+                }
+                Phase::Break { .. } => {
+                    // Break complete — end break session in AppCore
+                    end_break_session(&app).await;
+                    on_break_complete(&app).await;
+
+                    // Increment cycle, reset after long break
+                    cycle_position += 1;
+                    let was_long = is_long_break(cycle_position.saturating_sub(1), &config);
+                    if was_long {
+                        cycle_position = 0;
+                    }
+
+                    // Auto-start next focus session
+                    start_focus_session(&app, &config).await;
+                    phase = Phase::Working {
+                        remaining: config.work_secs,
+                        total: config.work_secs,
+                    };
+                    warning_shown = false;
+                    sync_counter = 0;
+                    emit_phase_changed(
+                        &app,
+                        &phase,
+                        cycle_position,
+                        &config,
+                        paused,
+                        truncated_title.as_deref(),
+                        dnd_enabled,
+                    );
+                }
+            }
+            continue;
+        }
+
+        phase.decrement();
+
+        // Warning at 30 seconds remaining (Working and Break phases only)
+        if !warning_shown
+            && phase.remaining() == WARNING_SECS
+            && !matches!(phase, Phase::BreakPending { .. })
+        {
             warning_shown = true;
             open_tray_window(&app);
+            let _ = app.emit(
+                FOCUS_WARNING,
+                FocusWarningPayload {
+                    phase: phase.as_str().to_string(),
+                    remaining_secs: phase.remaining(),
+                },
+            );
         }
 
-        update_tray_title(&app, remaining, false, truncated_title.as_deref());
+        update_tray_title(&app, phase.remaining(), false, truncated_title.as_deref());
 
-        let _ = app.emit(
-            FOCUS_TICK,
-            FocusTickPayload {
-                remaining_secs: remaining,
-                total_secs,
-                mode: mode.clone(),
-                paused: false,
-                action_title: action_title.clone(),
-            },
-        );
-    }
-
-    // Timer complete
-    let is_break = mode == TimerMode::Break.as_str();
-
-    if is_break {
-        on_break_complete(&app).await;
-    } else {
-        // End the AppCore session FIRST (computes quality, emits DomainEvent::FocusSessionEnded)
-        let ended_session = if let Some(core) = app.try_state::<Arc<AppCore>>() {
-            core.productivity_focus_end(None).await.ok().flatten()
-        } else {
-            None
+        // Sync event: every 1s for BreakPending (it's only 5s), every 5s otherwise
+        let should_sync = match &phase {
+            Phase::BreakPending { .. } => true,
+            _ => {
+                sync_counter += 1;
+                if sync_counter >= SYNC_INTERVAL {
+                    sync_counter = 0;
+                    true
+                } else {
+                    false
+                }
+            }
         };
 
-        on_focus_complete(&app, &mode, total_secs, break_mins, ended_session.as_ref()).await;
+        if should_sync {
+            let _ = app.emit(
+                FOCUS_SYNC,
+                build_sync_payload(
+                    &phase,
+                    cycle_position,
+                    &config,
+                    paused,
+                    truncated_title.as_deref(),
+                    dnd_enabled,
+                ),
+            );
+        }
     }
+}
 
-    clear_tray_title(&app);
-    tray_countdown::notify_focus_ended(&app);
+// ── Helpers ──────────────────────────────────────────────────────────
 
-    if let Some(timer) = app.try_state::<Arc<FocusTimer>>() {
-        timer.mark_completed().await;
+fn compute_break_secs(config: &FocusSessionConfig, cycle_position: u32) -> u64 {
+    if is_long_break(cycle_position, config) {
+        config.long_break_secs
+    } else {
+        config.short_break_secs
+    }
+}
+
+fn is_long_break(cycle_position: u32, config: &FocusSessionConfig) -> bool {
+    config.long_break_after > 0 && (cycle_position + 1) % config.long_break_after == 0
+}
+
+fn build_sync_payload(
+    phase: &Phase,
+    cycle_position: u32,
+    config: &FocusSessionConfig,
+    paused: bool,
+    action_title: Option<&str>,
+    dnd_active: bool,
+) -> FocusSyncPayload {
+    FocusSyncPayload {
+        phase: phase.as_str().to_string(),
+        remaining_secs: phase.remaining(),
+        total_secs: phase.total(),
+        cycle_position,
+        long_break_after: config.long_break_after,
+        paused,
+        action_title: action_title.map(|s| s.to_string()),
+        dnd_active,
+    }
+}
+
+fn emit_phase_changed(
+    app: &AppHandle,
+    phase: &Phase,
+    cycle_position: u32,
+    config: &FocusSessionConfig,
+    paused: bool,
+    action_title: Option<&str>,
+    dnd_active: bool,
+) {
+    let _ = app.emit(
+        FOCUS_PHASE_CHANGED,
+        build_sync_payload(phase, cycle_position, config, paused, action_title, dnd_active),
+    );
+}
+
+// ── AppCore delegates ────────────────────────────────────────────────
+
+async fn start_focus_session(app: &AppHandle, config: &FocusSessionConfig) {
+    if let Some(core) = app.try_state::<Arc<AppCore>>() {
+        let _ = core
+            .productivity_focus_start(None, None, Some(config.work_secs as i64 / 60))
+            .await;
+    }
+}
+
+async fn end_focus_session(app: &AppHandle) {
+    if let Some(core) = app.try_state::<Arc<AppCore>>() {
+        let _ = core.productivity_focus_end(None).await;
+    }
+}
+
+async fn start_break_session(app: &AppHandle, break_secs: u64) {
+    if let Some(core) = app.try_state::<Arc<AppCore>>() {
+        let _ = core.productivity_break_start(break_secs as i64 / 60).await;
+    }
+}
+
+async fn end_break_session(app: &AppHandle) {
+    if let Some(core) = app.try_state::<Arc<AppCore>>() {
+        let _ = core.productivity_break_end().await;
     }
 }
 
@@ -327,15 +654,14 @@ fn update_tray_title(
     let mins = remaining_secs / 60;
     let secs = remaining_secs % 60;
     let time = if paused {
-        format!("⏸ {mins:02}:{secs:02}")
+        format!("\u{23F8} {mins:02}:{secs:02}")
     } else {
         format!("{mins:02}:{secs:02}")
     };
     let title = match action_title {
-        Some(t) => format!("{time} · {t}"),
+        Some(t) => format!("{time} \u{00B7} {t}"),
         None => time,
     };
-
     if let Some(tray) = app.tray_by_id("klynt-tray") {
         let _ = tray.set_title(Some(&title));
     }
@@ -347,8 +673,7 @@ fn clear_tray_title(app: &AppHandle) {
     }
 }
 
-/// Read sound/notification preferences from the timer state, defaulting to
-/// `(true, true)` if no timer is registered.
+/// Read sound/notification preferences from the timer state.
 async fn read_preferences(app: &AppHandle) -> (bool, bool) {
     if let Some(timer) = app.try_state::<Arc<FocusTimer>>() {
         timer.preferences().await
@@ -367,9 +692,11 @@ pub fn open_tray_window(app: &AppHandle) {
                     let scale = window.scale_factor().unwrap_or(1.0);
                     let tray_pos = rect.position.to_physical::<f64>(scale);
                     let tray_size = rect.size.to_physical::<f64>(scale);
-                    let x = tray_pos.x + (tray_size.width / 2.0) - (win_size.width as f64 / 2.0);
+                    let x =
+                        tray_pos.x + (tray_size.width / 2.0) - (win_size.width as f64 / 2.0);
                     let y = tray_pos.y + tray_size.height;
-                    let _ = window.set_position(tauri::PhysicalPosition::new(x as i32, y as i32));
+                    let _ =
+                        window.set_position(tauri::PhysicalPosition::new(x as i32, y as i32));
                     true
                 } else {
                     false
@@ -381,8 +708,6 @@ pub fn open_tray_window(app: &AppHandle) {
             false
         };
 
-        // Fallback: if tray rect unavailable (sleep/wake, first launch), position
-        // at top-center of the primary monitor near the menu bar.
         if !positioned {
             if let Ok(Some(monitor)) = window.primary_monitor() {
                 let screen = monitor.size();
@@ -392,7 +717,7 @@ pub fn open_tray_window(app: &AppHandle) {
                     .map(|s| s.width as f64)
                     .unwrap_or(320.0 * scale);
                 let x = (screen.width as f64 / 2.0) - (win_width / 2.0);
-                let y = 28.0 * scale; // Below the macOS menu bar (~28 logical pts)
+                let y = 28.0 * scale;
                 let _ = window.set_position(tauri::PhysicalPosition::new(x as i32, y as i32));
             }
         }
@@ -402,66 +727,26 @@ pub fn open_tray_window(app: &AppHandle) {
     }
 }
 
-async fn on_focus_complete(
-    app: &AppHandle,
-    mode: &str,
-    total_secs: u64,
-    break_mins: Option<u64>,
-    ended_session: Option<&FocusSessionResponse>,
-) {
-    let duration_mins = total_secs / 60;
-    let quality_score = ended_session.and_then(|s| s.quality_score);
-
+async fn on_work_complete(app: &AppHandle, duration_mins: u64) {
     let (sound_enabled, notification_enabled) = read_preferences(app).await;
 
-    // Notification
     if notification_enabled {
-        let body = match (break_mins, quality_score) {
-            (Some(brk), Some(q)) => format!(
-                "{duration_mins}m done (quality {}%). Take a {brk}m break!",
-                (q * 100.0).round() as u32
-            ),
-            (Some(brk), None) => {
-                format!("{duration_mins}m session done. Time for a {brk}m break!")
-            }
-            (None, Some(q)) => format!(
-                "{duration_mins}m session finished. Quality: {}%",
-                (q * 100.0).round() as u32
-            ),
-            (None, None) => format!("{duration_mins}m session finished."),
-        };
+        let body = format!("{duration_mins}m focus session complete. Break time!");
         let _ = crate::notify::TauriNotificationSender::new(app.clone())
             .send_sync("Focus Session Complete", &body);
     }
 
-    // Sound
     #[cfg(target_os = "macos")]
     if sound_enabled {
         let _ = tokio::process::Command::new("afplay")
             .arg("/System/Library/Sounds/Glass.aiff")
             .spawn();
     }
-
-    // Frontend event
-    let _ = app.emit(
-        FOCUS_COMPLETED,
-        FocusCompletedPayload {
-            mode: mode.to_string(),
-            duration_mins,
-            quality_score,
-            break_mins,
-        },
-    );
-
-    open_tray_window(app);
+    #[cfg(not(target_os = "macos"))]
+    let _ = sound_enabled;
 }
 
 async fn on_break_complete(app: &AppHandle) {
-    // End the break session in SQLite
-    if let Some(core) = app.try_state::<Arc<AppCore>>() {
-        let _ = core.productivity_break_end().await;
-    }
-
     let (sound_enabled, notification_enabled) = read_preferences(app).await;
 
     if notification_enabled {
@@ -469,23 +754,14 @@ async fn on_break_complete(app: &AppHandle) {
             .send_sync("Break Over", "Ready for the next focus session!");
     }
 
-    // Softer sound for break end
     #[cfg(target_os = "macos")]
     if sound_enabled {
         let _ = tokio::process::Command::new("afplay")
             .arg("/System/Library/Sounds/Blow.aiff")
             .spawn();
     }
-
-    let _ = app.emit(
-        FOCUS_COMPLETED,
-        FocusCompletedPayload {
-            mode: TimerMode::Break.as_str().to_string(),
-            duration_mins: 0,
-            quality_score: None,
-            break_mins: None,
-        },
-    );
+    #[cfg(not(target_os = "macos"))]
+    let _ = sound_enabled;
 
     open_tray_window(app);
 }
@@ -497,24 +773,115 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_format_tray_title() {
-        assert_eq!(format!("{:02}:{:02}", 25u64, 0u64), "25:00");
-        assert_eq!(format!("{:02}:{:02}", 0u64, 5u64), "00:05");
-        assert_eq!(format!("{:02}:{:02}", 1u64, 30u64), "01:30");
-    }
-
-    #[tokio::test]
-    async fn test_timer_state_machine() {
-        let timer = FocusTimer::new();
-        assert!(timer.status().await.is_none());
-        timer.mark_completed().await;
-        assert!(timer.status().await.is_none());
+    fn phase_as_str() {
+        assert_eq!(
+            Phase::Working {
+                remaining: 10,
+                total: 100
+            }
+            .as_str(),
+            "working"
+        );
+        assert_eq!(Phase::BreakPending { remaining: 5 }.as_str(), "break_pending");
+        assert_eq!(
+            Phase::Break {
+                remaining: 10,
+                total: 60
+            }
+            .as_str(),
+            "break"
+        );
     }
 
     #[test]
-    fn test_timer_mode_as_str() {
-        assert_eq!(TimerMode::Focus.as_str(), "focus");
-        assert_eq!(TimerMode::Pomodoro.as_str(), "pomodoro");
-        assert_eq!(TimerMode::Break.as_str(), "break");
+    fn phase_decrement() {
+        let mut phase = Phase::Working {
+            remaining: 10,
+            total: 100,
+        };
+        phase.decrement();
+        assert_eq!(phase.remaining(), 9);
+        assert_eq!(phase.total(), 100);
+    }
+
+    #[test]
+    fn phase_decrement_saturates_at_zero() {
+        let mut phase = Phase::Working {
+            remaining: 0,
+            total: 100,
+        };
+        phase.decrement();
+        assert_eq!(phase.remaining(), 0);
+    }
+
+    #[test]
+    fn compute_break_short() {
+        let config = FocusSessionConfig {
+            work_secs: 1500,
+            short_break_secs: 300,
+            long_break_secs: 900,
+            long_break_after: 4,
+        };
+        // Positions 0, 1, 2 → short break
+        assert_eq!(compute_break_secs(&config, 0), 300);
+        assert_eq!(compute_break_secs(&config, 1), 300);
+        assert_eq!(compute_break_secs(&config, 2), 300);
+    }
+
+    #[test]
+    fn compute_break_long() {
+        let config = FocusSessionConfig {
+            work_secs: 1500,
+            short_break_secs: 300,
+            long_break_secs: 900,
+            long_break_after: 4,
+        };
+        // Position 3 → long break (3+1=4, 4%4=0)
+        assert_eq!(compute_break_secs(&config, 3), 900);
+    }
+
+    #[test]
+    fn is_long_break_boundary() {
+        let config = FocusSessionConfig {
+            work_secs: 1500,
+            short_break_secs: 300,
+            long_break_secs: 900,
+            long_break_after: 4,
+        };
+        assert!(!is_long_break(0, &config));
+        assert!(!is_long_break(1, &config));
+        assert!(!is_long_break(2, &config));
+        assert!(is_long_break(3, &config));
+        assert!(!is_long_break(4, &config));
+        assert!(is_long_break(7, &config));
+    }
+
+    #[test]
+    fn build_sync_payload_fields() {
+        let config = FocusSessionConfig {
+            work_secs: 1500,
+            short_break_secs: 300,
+            long_break_secs: 900,
+            long_break_after: 4,
+        };
+        let phase = Phase::Working {
+            remaining: 1200,
+            total: 1500,
+        };
+        let payload = build_sync_payload(&phase, 2, &config, false, Some("Deep Work"), true);
+        assert_eq!(payload.phase, "working");
+        assert_eq!(payload.remaining_secs, 1200);
+        assert_eq!(payload.total_secs, 1500);
+        assert_eq!(payload.cycle_position, 2);
+        assert_eq!(payload.long_break_after, 4);
+        assert!(!payload.paused);
+        assert_eq!(payload.action_title.as_deref(), Some("Deep Work"));
+        assert!(payload.dnd_active);
+    }
+
+    #[tokio::test]
+    async fn timer_state_machine() {
+        let timer = FocusTimer::new();
+        assert!(timer.status().await.is_none());
     }
 }
