@@ -198,29 +198,32 @@ export interface InsightCard {
 
 export type InsightPayload = Pick<InsightCard, "id" | "insightType" | "title" | "sentiment">;
 
-// ── Focus Timer ─────────────────────────────────────────────
+// ── Focus Session ─────────────────────────────────────────────
 
-export interface FocusTimerStatus {
-  active: boolean;
-  mode: string | null;
-  remainingSecs: number | null;
-  totalSecs: number | null;
-  session: FocusSession | null;
-}
-
-export interface FocusTickPayload {
+export interface FocusSyncPayload {
+  phase: "working" | "break_pending" | "break" | "paused";
   remainingSecs: number;
   totalSecs: number;
-  mode: string;
+  cyclePosition: number;
+  longBreakAfter: number;
   paused: boolean;
   actionTitle: string | null;
+  dndActive: boolean;
 }
 
-export interface FocusCompletedPayload {
-  mode: string;
-  durationMins: number;
-  qualityScore: number | null;
-  breakMins: number | null;
+export interface FocusWarningPayload {
+  phase: string;
+  remainingSecs: number;
+}
+
+export interface FocusDndUnavailablePayload {
+  message: string;
+}
+
+export interface FocusSessionStatus {
+  active: boolean;
+  sync: FocusSyncPayload | null;
+  session: FocusSession | null;
 }
 
 // ── Intelligence Sessions (backend-scored productivity sessions) ─

@@ -1,7 +1,7 @@
 import { useEvent } from "@shared/hooks/useEvent";
 import { useQuery } from "@shared/hooks/useQuery";
 import { TZ_OFFSET_MINS, todayISO } from "@shared/lib/dates";
-import type { FocusCompletedPayload, ProductivitySummary } from "@shared/types";
+import type { FocusSyncPayload, ProductivitySummary } from "@shared/types";
 import { EMPTY_TIMELINE_RESPONSE } from "@shared/types";
 import { useCallback, useEffect, useMemo } from "react";
 import { useParams } from "react-router";
@@ -67,8 +67,8 @@ export function DayCalendarView() {
     }
   });
 
-  // Real-time: refetch when focus session completes
-  useEvent<FocusCompletedPayload>("focus:completed", () => refetchAll());
+  // Real-time: refetch when focus phase changes (session start/end/break transitions)
+  useEvent<FocusSyncPayload>("focus:phase_changed", () => refetchAll());
 
   // Real-time: refetch when user switches apps (activity data changes)
   useEvent("activity:switch", () => {
