@@ -126,7 +126,7 @@
 .prose-content blockquote {
   border-left: 3px solid var(--color-brand);
   margin: 0.625rem 0;
-  color: var(--color-secondary);
+  color: var(--color-muted-foreground);
   background: linear-gradient(135deg, rgba(249, 115, 22, 0.06) 0%, rgba(249, 115, 22, 0.02) 100%);
   border-radius: 0 0.625rem 0.625rem 0;
   padding: 0.625rem 1rem;
