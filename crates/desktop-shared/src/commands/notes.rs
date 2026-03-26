@@ -34,6 +34,12 @@ pub struct NoteCreateParams {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
+pub struct NoteEditingFinishedParams {
+    pub note_id: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct NoteUpdateParams {
     pub id: String,
     pub title: Option<String>,

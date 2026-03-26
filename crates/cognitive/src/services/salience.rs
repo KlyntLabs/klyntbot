@@ -138,6 +138,9 @@ pub fn evaluate_salience(event: &DomainEvent) -> SalienceVerdict {
         // Mirror events — discard from cognitive (Mirror handles its own storage)
         DomainEvent::MirrorTrialKilled { .. } => SalienceVerdict::Discard,
         DomainEvent::MirrorSnippetCreated { .. } => SalienceVerdict::Discard,
+
+        // Note editing finished — discard from cognitive (handled by atom extraction)
+        DomainEvent::NoteEditingFinished { .. } => SalienceVerdict::Discard,
     }
 }
 

@@ -1,8 +1,8 @@
 use std::sync::Arc;
 
 use desktop_shared::commands::{
-    BacklinkResponse, HybridSearchResponse, NoteCreateParams, NoteLinkResponse, NoteResponse,
-    NoteUpdateParams, NoteVersionResponse,
+    BacklinkResponse, HybridSearchResponse, NoteCreateParams, NoteEditingFinishedParams,
+    NoteLinkResponse, NoteResponse, NoteUpdateParams, NoteVersionResponse,
 };
 use desktop_shared::errors::ApiError;
 use desktop_shared::types::EntityKind;
@@ -516,6 +516,34 @@ impl AppCore {
             });
         }
         Ok(results)
+    }
+
+    // ── Editing finished handler ────────────────────────────────────
+
+    /// Signal that the user has finished editing a note (blur/close/idle).
+    /// Fires NoteEditingFinished so background services can process the final content.
+    pub async fn note_editing_finished(
+        &self,
+        params: NoteEditingFinishedParams,
+    ) -> Result<(), ApiError> {
+        let note = self
+            .note_repo
+            .get_note(&params.note_id)
+            .await
+            .map_err(map_storage_err)?;
+
+        if let Some(note) = note {
+            if let Ok(bus) = self.domain_event_bus() {
+                if !note.body.is_empty() {
+                    bus.publish(bus::DomainEvent::NoteEditingFinished {
+                        note_id: params.note_id,
+                        content: note.body,
+                    });
+                }
+            }
+        }
+
+        Ok(())
     }
 
     // ── Attachment handler ──────────────────────────────────────────

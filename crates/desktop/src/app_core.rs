@@ -309,6 +309,7 @@ fn wire_event_channels(core: &AppCore, channels: EventChannels, app_handle: &tau
                             bus::DomainEvent::TrialActivated { .. } => "autotuner",
                             bus::DomainEvent::MirrorTrialKilled { .. } => "mirror",
                             bus::DomainEvent::MirrorSnippetCreated { .. } => "mirror",
+                            bus::DomainEvent::NoteEditingFinished { .. } => "notes",
                         };
                         let salience_str = match salience {
                             cognitive::types::SalienceVerdict::Extract => "extract",

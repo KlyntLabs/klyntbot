@@ -9,8 +9,9 @@ use desktop_shared::commands::{
     FlashcardUpdateParams, GradeResultResponse, HybridSearchResponse, InboxCreateParams,
     InboxItemResponse, InsightEvolutionResponse, InsightQuizSubmitParams, InsightReviewResponse,
     InsightReviewStarted, InsightSaveFlashcardsParams, InsightVersionResponse,
-    KnowledgeGrowthResponse, NoteCreateParams, NoteLinkResponse, NoteResponse,
-    NoteRetentionHealthResponse, NoteSuggestionsResponse, NoteUpdateParams, NoteVersionResponse,
+    KnowledgeGrowthResponse, NoteCreateParams, NoteEditingFinishedParams, NoteLinkResponse,
+    NoteResponse, NoteRetentionHealthResponse, NoteSuggestionsResponse, NoteUpdateParams,
+    NoteVersionResponse,
     NotebookCreateParams, NotebookResponse, NotebookUpdateParams, PersonaChatParams,
     PersonaChatResponse, PersonaResponse, RatePersonaParams, RecentLearningSession,
     ScenarioChallengeResponse, SetPersonaPinsParams, StrugglingCardResponse, TabContent,
@@ -664,6 +665,16 @@ pub async fn note_retention_health(
     state.note_retention_health(note_id).await
 }
 
+// ── Editing finished command ─────────────────────────────────────────
+
+#[tauri::command]
+pub async fn note_editing_finished(
+    state: State<'_, Arc<AppCore>>,
+    params: NoteEditingFinishedParams,
+) -> Result<(), ApiError> {
+    state.note_editing_finished(params).await
+}
+
 // ── Dev server dispatch ─────────────────────────────────────────────
 
 #[cfg(test)]
@@ -739,6 +750,7 @@ pub(crate) const DEV_COMMANDS: &[&str] = &[
     "flashcard_save_session",
     "flashcard_recent_learning_sessions",
     "note_retention_health",
+    "note_editing_finished",
 ];
 
 #[cfg(debug_assertions)]
@@ -1048,6 +1060,10 @@ pub(crate) async fn dispatch_dev(
             let note_id = try_field!(dev::get_str(body, "noteId"));
             dev::val(core.note_retention_health(note_id).await)
         }
+        "note_editing_finished" => dev::val(
+            core.note_editing_finished(try_field!(dev::parse_params(body)))
+                .await,
+        ),
         _ => return None,
     })
 }
