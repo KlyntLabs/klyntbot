@@ -73,6 +73,8 @@ The `note_create` handler in `app-core` uses these if present, falling back to `
 
 **No schema migration needed** — the `notes` table already has all these columns.
 
+**Design note:** Adding `created_at`/`icon`/`color` to `NoteCreateParams` expands the public API surface — any frontend caller could now supply these on a normal note create (not just import). This is acceptable: these are sensible fields for note creation, and restricting them to import-only would require a separate internal-only params struct for no practical benefit.
+
 ## Section 2: Backend Commands
 
 ### `note_import_files`
@@ -100,14 +102,14 @@ pub struct SkippedFile {
 
 **Handler logic** (in `app-core`):
 
-1. **Validate paths:** All input `paths` must be absolute. Reject any path containing `..` components to prevent path traversal. Canonicalize via `std::fs::canonicalize()` before reading.
+1. **Validate paths:** All input `paths` must be absolute. Reject any path containing `..` components to prevent path traversal. Canonicalize via `std::fs::canonicalize()` before reading. **Broken symlinks:** if `canonicalize()` fails (e.g., symlink target doesn't exist), skip the entry and add to `skipped` with reason "Cannot resolve path" — do not abort the entire import.
 2. **Collect files:** Walk all `paths`. Directories are recursed. Only `.md`/`.MD` files (case-insensitive extension check) are collected; everything else is added to `skipped` with reason "Not a Markdown file". **File size limit:** files over 50 MB are skipped with reason "File too large". **Symlink cycle detection:** track visited inodes in a `HashSet<u64>` during directory walk; skip any directory whose inode has already been visited.
-3. **Create notebook structure:** For directories, create notebooks mirroring the subfolder hierarchy (depth-first). Parent directories become parent notebooks. Notebook names derived from directory names. **Deduplication:** before creating a notebook, look up by `(parent_id, title)` — if a matching notebook already exists, reuse it. This prevents duplicate notebooks on repeated imports.
+3. **Create notebook structure:** For directories, create notebooks mirroring the subfolder hierarchy (depth-first). Parent directories become parent notebooks. Notebook names derived from directory names. **Deduplication:** before creating a notebook, look up by `(parent_id, title)` — if a matching notebook already exists, reuse it. This prevents duplicate notebooks on repeated imports. **New repo method needed:** add `NotebookRepo::find_by_parent_and_title(parent_id: Option<&str>, title: &str) -> Option<NotebookRow>` to support this lookup.
 4. **Parse each `.md` file:**
    - Front matter is **only** parsed when the file begins with `---\n` at byte 0. A `---` appearing elsewhere in the file (e.g., a horizontal rule) is NOT treated as front matter.
-   - Split content at the first `---` / `---` boundary to extract YAML front matter
+   - The closing delimiter is `\n---\n` or `\n---` at EOF. Search starts at byte 4 (after opening `---\n`). This avoids matching YAML document separators within the front matter content.
    - Parse front matter via `serde_yml::from_str::<NoteFrontMatter>()`
-   - Body = everything after the closing `---`
+   - Body = everything after the closing `---` delimiter (trimmed of leading newline)
    - If no front matter or malformed YAML: entire file content is body (add warning to `skipped` for malformed YAML)
    - Title resolution order: `front_matter.title` → filename (sans `.md` extension, case-insensitive strip)
 5. **Bulk insert:** All notes inserted in a **single SQLite transaction**. If any insert fails, the entire import is rolled back.
@@ -118,7 +120,11 @@ pub struct SkippedFile {
 
 ```rust
 #[tauri::command]
-async fn note_import_files(app: AppHandle, params: NoteImportParams) -> Result<NoteImportResult, String>
+async fn note_import_files(
+    state: State<'_, Arc<AppCore>>,
+    app: tauri::AppHandle,
+    params: NoteImportParams,
+) -> Result<NoteImportResult, ApiError>
 ```
 
 **Front matter parsing** lives in `feature-notes` as a reusable module (`front_matter.rs`), shared by both import and export.
@@ -146,7 +152,11 @@ pub struct NoteExportResult {
 
 ```rust
 #[tauri::command]
-async fn note_export(app: AppHandle, params: NoteExportParams) -> Result<NoteExportResult, String>
+async fn note_export(
+    state: State<'_, Arc<AppCore>>,
+    app: tauri::AppHandle,
+    params: NoteExportParams,
+) -> Result<NoteExportResult, ApiError>
 ```
 
 **Handler logic** (in `app-core`):
@@ -156,7 +166,7 @@ async fn note_export(app: AppHandle, params: NoteExportParams) -> Result<NoteExp
 3. **For each note:**
    - Build `NoteFrontMatter` from note metadata (title, tags, created_at, updated_at → `updated`, pinned, icon, color)
    - Serialize: `---\n{yaml}\n---\n\n{body}`
-   - Filename: if `output_filename` is set and this is a single-note export, use it directly (user chose this via save dialog). Otherwise: slugified title (lowercase, spaces → hyphens, strip non-alphanumeric), collision handling with `-1`, `-2`, etc.
+   - Filename: if `output_filename` is set **and** only one note is being exported, use it directly (user chose this via save dialog). If `output_filename` is set but multiple notes are being exported, ignore it and use slug logic. Otherwise: slugified title (lowercase, spaces → hyphens, strip non-alphanumeric), collision handling with `-1`, `-2`, etc.
 4. **Directory structure:** Notebook hierarchy maps to subdirectories. Unfiled notes go directly in `destination`.
 5. **Attachments:** Scan Markdown body for references to `{data_dir}/attachments/` paths. For each found:
    - Copy the file to `{destination}/attachments/{original-filename}`
@@ -164,7 +174,7 @@ async fn note_export(app: AppHandle, params: NoteExportParams) -> Result<NoteExp
 6. **Write files** to `destination`.
 7. **Return** `NoteExportResult` with `exported` count.
 
-**Note on attachment round-trip:** On import, relative `./attachments/` references in Markdown body are left as-is (not rewritten to absolute paths). The frontend resolves them relative to the import source at display time, or the user re-saves to trigger attachment path normalization.
+**Note on attachment round-trip:** On import, if the Markdown body contains relative `./attachments/` references and an `attachments/` directory exists alongside the `.md` file, copy those attachment files to `{data_dir}/attachments/{uuid}.{ext}` and rewrite the relative paths to absolute paths in the imported note body. If the attachment file doesn't exist at the relative path, leave the reference as-is (will display as a broken image until the user re-attaches).
 
 ## Section 3: Frontend — Import UX
 
@@ -189,17 +199,20 @@ Add a new item to two existing context menu variants:
 - **Blank area context menu** (`kind: "blank"`): Add "Import files..." → opens file picker → imports as unfiled
 - **Notebook context menu** (`kind: "folder"`): Add "Import files..." → opens file picker → imports into that notebook
 
-File picker uses `@tauri-apps/plugin-dialog` → `open({ multiple: true, directory: false, filters: [{ name: "Markdown", extensions: ["md"] }] })`. Also allow `directory: true` as a separate "Import folder..." option or combined.
+Two separate menu items per context:
+- **"Import files..."** — `open({ multiple: true, directory: false, filters: [{ name: "Markdown", extensions: ["md"] }] })` — picks individual `.md` files
+- **"Import folder..."** — `open({ multiple: false, directory: true })` — picks an entire folder (Tauri ignores `filters` for directory pickers, so backend `.md` filtering handles it)
 
 ### Shared Handler
 
 ```typescript
+// Use useMutation("note_import_files", "params") which wraps args under { params: ... }
+const importFiles = useMutation("note_import_files", "params");
+
 async function handleImportFiles(paths: string[], notebookId?: string) {
-  const result = await ipc("note_import_files", {
-    params: { paths, notebook_id: notebookId }
-  });
+  const result = await importFiles.mutate({ paths, notebookId });
   // Toast notification: "Imported {n} notes" + skipped count if any
-  // Refetch notes list via invalidateQueries("note")
+  // useMutation auto-dispatches entity:updated → refetch notes list
 }
 ```
 
@@ -230,7 +243,7 @@ Two entry points.
 |----------|----------|
 | Empty `.md` file | Import with empty body, title from filename |
 | `.md` file with only front matter, no body | Import with empty body, metadata from front matter |
-| Malformed YAML front matter | Skip front matter parsing, treat entire content as body, add to `skipped` with warning |
+| Malformed YAML front matter | Skip front matter parsing, treat entire content as body. Note is still imported (counts toward `imported`). Add a warning-level entry to `skipped` with reason "Malformed front matter — imported without metadata" |
 | Duplicate title in same notebook on import | Allowed — notes are ID-based, titles aren't unique |
 | Filename collision on export | Append `-1`, `-2`, etc. to slug |
 | Broken attachment reference on export | Leave the path as-is in Markdown, skip file copy, log warning |
@@ -260,9 +273,10 @@ For file drop events: Tauri 2's built-in `DragDropEvent` (via `app.listen("tauri
 ### Rust (backend)
 - `crates/feature-notes/src/front_matter.rs` — **new** — `NoteFrontMatter` struct, `parse()`, `serialize()` functions
 - `crates/feature-notes/src/lib.rs` — add `pub mod front_matter`
+- `crates/feature-notes/src/repo/notebooks.rs` — add `find_by_parent_and_title()` method for notebook deduplication during import
 - `crates/desktop-shared/src/commands/notes.rs` — add `NoteImportParams`, `NoteImportResult`, `SkippedFile`, `NoteExportParams`, `NoteExportResult`; extend `NoteCreateParams`
 - `crates/app-core/src/handlers/notes/crud.rs` — update `note_create` to accept new fields; add `note_import_files` and `note_export` handlers
-- `crates/desktop/src/commands/notes.rs` — add `note_import_files` and `note_export` Tauri commands; **must** add both to `DEV_COMMANDS` array and `dispatch_dev` match arms (`dev_server_covers_all_tauri_commands` test enforces this)
+- `crates/desktop/src/commands/notes.rs` — add `note_import_files` and `note_export` Tauri commands; **must** add both to `DEV_COMMANDS` array and `dispatch_dev` match arms (`dev_server_covers_all_tauri_commands` test enforces this). **Dev server note:** these commands perform file I/O that browser dev mode cannot meaningfully trigger (no file picker, no file drop). The `dispatch_dev` handlers should return a descriptive error like "Import/export requires the desktop app" rather than attempting to execute.
 - `crates/desktop/Cargo.toml` — add `tauri-plugin-dialog` dependency
 - `crates/desktop/src/lib.rs` — register `tauri_plugin_dialog::init()` plugin
 - `crates/desktop/capabilities/default.json` — add dialog permissions
