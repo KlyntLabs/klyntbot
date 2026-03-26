@@ -219,12 +219,45 @@ impl AppCore {
             }
         };
 
-        // Publish knowledge atom event for low-scoring answers (weak spots).
+        // Persist and publish knowledge atom for low-scoring answers (weak spots).
         if let Some(score) = response.score {
             if score < 0.6 {
+                let mut atom_id = uuid::Uuid::new_v4().to_string();
+
+                if let Some(atom_repo) = &self.knowledge_atom_repo {
+                    let topic_id = atom_repo
+                        .get_or_create_topic(&card.deck, &card.deck)
+                        .await
+                        .ok()
+                        .map(|t| t.id);
+
+                    let new_atom = cognitive::NewKnowledgeAtom {
+                        subject: format!(
+                            "Weak: {}",
+                            card.front.chars().take(80).collect::<String>()
+                        ),
+                        atom_type: "flashcard_weak_spot".to_string(),
+                        domain: card.deck.clone(),
+                        source_note_id: card.source_note_id.clone(),
+                        source_context: Some(format!(
+                            "Score: {:.0}% on: {}",
+                            score * 100.0,
+                            card.front
+                        )),
+                        personal_importance: 0.7,
+                        status: "active".to_string(),
+                        topic_id,
+                        ..Default::default()
+                    };
+
+                    if let Ok(created) = atom_repo.create(&new_atom).await {
+                        atom_id = created.id;
+                    }
+                }
+
                 if let Some(bus) = &self.domain_event_bus {
                     bus.publish(bus::DomainEvent::KnowledgeAtomCreated {
-                        atom_id: uuid::Uuid::new_v4().to_string(),
+                        atom_id,
                         atom_type: "flashcard_weak_spot".to_string(),
                         domain: card.deck.clone(),
                         source_note_id: card.source_note_id.clone(),
@@ -337,15 +370,48 @@ Be concise — 2-4 sentences max."#
             .content
             .ok_or_else(|| ApiError::new("LLM_ERROR", "Empty response from LLM"))?;
 
+        let mut atom_id_for_event = uuid::Uuid::new_v4().to_string();
+        let mut persisted = false;
+
+        if let Some(atom_repo) = &self.knowledge_atom_repo {
+            let topic_id = atom_repo
+                .get_or_create_topic(&card.deck, &card.deck)
+                .await
+                .ok()
+                .map(|t| t.id);
+
+            let new_atom = cognitive::NewKnowledgeAtom {
+                subject: format!(
+                    "Socratic: {}",
+                    card.front.chars().take(80).collect::<String>()
+                ),
+                atom_type: "socratic_exchange".to_string(),
+                domain: card.deck.clone(),
+                source_note_id: card.source_note_id.clone(),
+                source_context: Some(explanation.chars().take(200).collect()),
+                personal_importance: 0.6,
+                status: "active".to_string(),
+                topic_id,
+                ..Default::default()
+            };
+
+            if let Ok(created) = atom_repo.create(&new_atom).await {
+                atom_id_for_event = created.id;
+                persisted = true;
+            }
+        }
+
+        // Always publish bus event (preserves behavior for coaching subscribers
+        // even when atom_repo is None).
         let saved = if let Some(bus) = &self.domain_event_bus {
             bus.publish(bus::DomainEvent::KnowledgeAtomCreated {
-                atom_id: uuid::Uuid::new_v4().to_string(),
+                atom_id: atom_id_for_event,
                 atom_type: "socratic_exchange".to_string(),
                 domain: card.deck.clone(),
                 source_note_id: card.source_note_id.clone(),
                 personal_importance: 0.6,
             });
-            true
+            persisted
         } else {
             false
         };
