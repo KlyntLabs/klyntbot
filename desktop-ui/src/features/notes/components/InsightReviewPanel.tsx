@@ -40,6 +40,7 @@ import { InsightVersionList } from "./insight/InsightVersionList";
 import { ManagePersonasModal } from "./insight/ManagePersonasModal";
 import { PerspectivesTab } from "./insight/PerspectivesTab";
 import { PracticeHistoryTab } from "./insight/PracticeHistoryTab";
+import { ScopePreview } from "./insight/ScopePreview";
 import { SelfAssessmentTab } from "./insight/SelfAssessmentTab";
 import { SquadManager } from "./insight/SquadManager";
 import { SquadPicker } from "./insight/SquadPicker";
@@ -233,19 +234,9 @@ export function InsightReviewPanel({ state, actions }: InsightReviewPanelProps) 
         </button>
       </div>
 
-      {/* Scope coverage hint */}
-      {state.isOpen && (
-        <div className="px-3 py-1.5 border-b border-border text-2xs text-dim flex items-center gap-1">
-          <span>Scope:</span>
-          <span className="text-muted-foreground capitalize">{scopeConfig.scopeType}</span>
-          {scopeConfig.deepDive && <span className="text-purple text-[9px] ml-1">(deep dive)</span>}
-          {evolution.data && (
-            <span className="ml-auto">
-              {evolution.data.versions.length} version
-              {evolution.data.versions.length !== 1 ? "s" : ""}
-            </span>
-          )}
-        </div>
+      {/* Scope preview */}
+      {state.isOpen && state.noteId && (
+        <ScopePreview noteId={state.noteId} scopeConfig={scopeConfig} />
       )}
 
       {/* What's Changed banner */}
