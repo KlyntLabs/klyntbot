@@ -140,7 +140,11 @@ export function ScopePreview({
       {hasContent ? (
         <ScopeGraph nodes={graphNodes} links={graphLinks} />
       ) : !loading && notes.length === 0 ? (
-        <div className="px-3 pb-1.5 text-[9px] text-dim">No related notes found</div>
+        <div className="px-3 pb-1.5 text-[9px] text-dim">
+          {scopeConfig.scopeType === "semantic"
+            ? "No similar notes found — try Linked or Notebook scope"
+            : "No related notes found"}
+        </div>
       ) : null}
 
       {/* Context summary bar */}
