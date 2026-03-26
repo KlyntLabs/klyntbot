@@ -24,15 +24,29 @@ impl ScopeResolverImpl {
         }
     }
 
+    /// Linked scope: notes that link TO this note (backlinks) + notes this
+    /// note links FROM (outgoing). Both directions give a complete picture.
     async fn resolve_backlinks(&self, note_id: &str) -> Vec<String> {
-        let backlinks = self
-            .note_repo
-            .get_backlinks_with_context(note_id)
-            .await
-            .unwrap_or_default();
-        let mut ids: Vec<String> = backlinks.into_iter().map(|(note, _ctx)| note.id).collect();
-        ids.sort();
-        ids
+        let (backlinks, outgoing) = tokio::join!(
+            self.note_repo.get_backlinks_with_context(note_id),
+            self.note_repo.get_links_from(note_id),
+        );
+
+        let mut ids = std::collections::HashSet::new();
+
+        // Incoming: notes that link to this note
+        for (note, _ctx) in backlinks.unwrap_or_default() {
+            ids.insert(note.id);
+        }
+
+        // Outgoing: notes this note links to
+        for link in outgoing.unwrap_or_default() {
+            ids.insert(link.target_id);
+        }
+
+        let mut result: Vec<String> = ids.into_iter().collect();
+        result.sort();
+        result
     }
 
     async fn resolve_semantic(&self, note_id: &str, radius: f64) -> Vec<String> {

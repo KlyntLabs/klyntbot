@@ -24,9 +24,9 @@ const SCOPE_LABELS: Record<string, { label: string; icon: typeof Link }> = {
 };
 
 export function ScopePreview({ noteId, scopeConfig }: ScopePreviewProps) {
-  const { data, isLoading } = useQuery<ScopePreviewResponse>(
+  const { data, loading } = useQuery<ScopePreviewResponse>(
     "note_insight_preview_scope",
-    { noteId, scopeType: scopeConfig.scopeType },
+    { params: { noteId, scopeType: scopeConfig.scopeType } },
     { notes: [] },
   );
 
@@ -41,7 +41,7 @@ export function ScopePreview({ noteId, scopeConfig }: ScopePreviewProps) {
         <Icon size={10} className="shrink-0" />
         <span className="font-medium">{scope.label} scope</span>
         <span className="text-dim">
-          {isLoading ? "..." : `${notes.length} note${notes.length !== 1 ? "s" : ""}`}
+          {loading ? "..." : `${notes.length} note${notes.length !== 1 ? "s" : ""}`}
         </span>
         {scopeConfig.deepDive && <span className="text-purple text-[9px] ml-1">(deep dive)</span>}
       </div>
@@ -65,7 +65,7 @@ export function ScopePreview({ noteId, scopeConfig }: ScopePreviewProps) {
       )}
 
       {/* Empty state */}
-      {!isLoading && notes.length === 0 && (
+      {!loading && notes.length === 0 && (
         <div className="text-[9px] text-dim">No related notes found for this scope</div>
       )}
     </div>
