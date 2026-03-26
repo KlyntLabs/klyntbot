@@ -7,11 +7,9 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate, useSearchParams } from "react-router";
 import { ChatInput } from "../components/ChatInput";
 import { CoachingNudge } from "../components/CoachingNudge";
-import { DebateView } from "../components/DebateView";
 import { MessageList } from "../components/MessageList";
 import { ThreadContextMenu } from "../components/ThreadContextMenu";
 import { type AreaGroup, featurePrefix, ThreadList } from "../components/ThreadList";
-import type { VoiceMode } from "../components/VoiceToggle";
 import { useChatSession } from "../hooks/useChatSession";
 
 interface GroupedThreads {
@@ -61,9 +59,6 @@ export function ChatPage() {
     const match = selectedThread.match(/^squad:([^:]+):/);
     return match?.[1] ?? null;
   }, [currentThread?.squadId, selectedThread]);
-
-  // Voice mode for squad chat
-  const [voiceMode, setVoiceMode] = useState<VoiceMode>("multi");
 
   // Chat session — always use debate mode for squad chats
   const chat = useChatSession(
@@ -163,9 +158,6 @@ export function ChatPage() {
     },
     [setSelectedThread],
   );
-
-  // Whether to show persona messages instead of the normal assistant bubble
-  const showPersonaMessages = squadId && voiceMode === "multi" && chat.personaMessages.length > 0;
 
   // ── Thread actions ─────────────────────────────────────────────────────
   const [contextMenu, setContextMenu] = useState<{
@@ -310,37 +302,25 @@ export function ChatPage() {
                 </p>
               </div>
             ) : (
-              <>
-                {chat.debateRounds.length > 0 && (
-                  <div className="mb-6">
-                    <DebateView
-                      rounds={chat.debateRounds}
-                      totalRounds={chat.totalDebateRounds ?? 6}
-                      currentRound={chat.debateRounds.at(-1)?.round ?? null}
-                      consensusReached={chat.consensusReached}
-                      consensusSummary={chat.consensusSummary}
-                      judgeDecisions={chat.judgeDecisions}
-                    />
-                  </div>
-                )}
-                <MessageList
-                  messages={chat.messages}
-                  segments={chat.segments}
-                  isStreaming={chat.isStreaming}
-                  activeTools={chat.activeTools}
-                  error={chat.error}
-                  activeInteraction={chat.activeInteraction}
-                  sessionKey={selectedThread}
-                  onInteractionSubmitted={() => {
-                    chat.clearInteraction();
-                    refetchThreads();
-                  }}
-                  liveTransparency={chat.transparency}
-                  activeDelegateAgent={chat.activeDelegateAgent}
-                  statusPhase={chat.statusPhase}
-                  personaMessages={showPersonaMessages ? chat.personaMessages : undefined}
-                />
-              </>
+              <MessageList
+                messages={chat.messages}
+                segments={chat.segments}
+                isStreaming={chat.isStreaming}
+                activeTools={chat.activeTools}
+                error={chat.error}
+                activeInteraction={chat.activeInteraction}
+                sessionKey={selectedThread}
+                onInteractionSubmitted={() => {
+                  chat.clearInteraction();
+                  refetchThreads();
+                }}
+                liveTransparency={chat.transparency}
+                activeDelegateAgent={chat.activeDelegateAgent}
+                statusPhase={chat.statusPhase}
+                personaMessages={
+                  squadId && chat.personaMessages.length > 0 ? chat.personaMessages : undefined
+                }
+              />
             )}
           </div>
         </div>
@@ -359,12 +339,10 @@ export function ChatPage() {
           input={chat.input}
           isStreaming={chat.isStreaming}
           squadId={squadId}
-          voiceMode={voiceMode}
           onInputChange={chat.setInput}
           onSend={handleSend}
           onSelectSquad={handleNewSquadThread}
           onSelectDefault={handleNewThread}
-          onVoiceModeChange={setVoiceMode}
         />
       </div>
     </>

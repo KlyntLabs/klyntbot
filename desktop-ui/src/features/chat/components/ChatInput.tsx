@@ -1,33 +1,28 @@
 import { useAutoResizeTextarea } from "@shared/hooks/useAutoResizeTextarea";
 import { useClickOutside } from "@shared/hooks/useClickOutside";
-import { ChevronDown, GitMerge, Mic, Plus, Send, Users } from "lucide-react";
+import { ChevronDown, Mic, Plus, Send, Users } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useSquads } from "../../notes/hooks/useSquads";
-import type { VoiceMode } from "./VoiceToggle";
 
 interface ChatInputProps {
   input: string;
   isStreaming: boolean;
   squadId: string | null;
-  voiceMode: VoiceMode;
   onInputChange: (value: string) => void;
   onSend: () => void;
   onSelectSquad: (squadId: string) => void;
   onSelectDefault: () => void;
-  onVoiceModeChange: (mode: VoiceMode) => void;
 }
 
 export function ChatInput({
   input,
   isStreaming,
   squadId,
-  voiceMode,
   onInputChange,
   onSend,
   onSelectSquad,
   onSelectDefault,
-  onVoiceModeChange,
 }: ChatInputProps) {
   const { ref: textareaRef, handleInput } = useAutoResizeTextarea(input);
   const { squads } = useSquads();
@@ -135,35 +130,6 @@ export function ChatInput({
               strokeWidth={1.5}
             />
           </button>
-          {/* Voice mode toggle — only when squad is active */}
-          {squadId && (
-            <div className="flex items-center gap-0.5 rounded-lg bg-white/[0.04] p-0.5">
-              <button
-                type="button"
-                onClick={() => onVoiceModeChange("multi")}
-                className={`flex items-center gap-1 text-2xs px-2 py-1 rounded-md transition-colors ${
-                  voiceMode === "multi"
-                    ? "bg-purple-500/20 text-purple-300"
-                    : "text-muted-foreground hover:text-foreground"
-                }`}
-              >
-                <Users size={10} />
-                Multi
-              </button>
-              <button
-                type="button"
-                onClick={() => onVoiceModeChange("synthesized")}
-                className={`flex items-center gap-1 text-2xs px-2 py-1 rounded-md transition-colors ${
-                  voiceMode === "synthesized"
-                    ? "bg-purple-500/20 text-purple-300"
-                    : "text-muted-foreground hover:text-foreground"
-                }`}
-              >
-                <GitMerge size={10} />
-                Merged
-              </button>
-            </div>
-          )}
         </div>
       </div>
 
