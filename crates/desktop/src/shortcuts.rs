@@ -7,6 +7,8 @@ use config::ShortcutsConfig;
 use tauri::AppHandle;
 use tauri_plugin_global_shortcut::{GlobalShortcutExt, ShortcutState};
 
+use tauri::Emitter;
+
 use crate::commands::window::{WINDOW_LAUNCHER, WINDOW_QUICK_CAPTURE, WINDOW_TRAY};
 use crate::focus_timer;
 
@@ -66,6 +68,9 @@ pub fn toggle_window(app: &AppHandle, window_label: &str) {
             let _ = window.center();
             let _ = window.show();
             let _ = window.set_focus();
+            // Emit so the frontend can focus the input — onFocusChanged may not
+            // fire on the very first show (macOS has no prior focus state to diff).
+            let _ = window.emit("window-shown", ());
         }
     }
 }

@@ -15,21 +15,28 @@ export function LauncherInput() {
     inputRef.current?.focus();
   }, []);
 
-  // Re-focus when the window becomes visible (global shortcut)
+  // Re-focus when the window becomes visible (global shortcut).
+  // We listen to both onFocusChanged (covers alt-tab, clicking) and our custom
+  // "window-shown" event (covers the very first open where macOS may not emit
+  // a focus-changed event since the window was never focused before).
   useEffect(() => {
     if (!isTauri) return;
-    let unlisten: (() => void) | undefined;
+    const unlisteners: (() => void)[] = [];
+    const focusInput = () => setTimeout(() => inputRef.current?.focus(), 50);
+
     getCurrentWindow()
       .onFocusChanged(({ payload: focused }) => {
-        if (focused) {
-          // Small delay lets the window finish animating before we grab focus
-          setTimeout(() => inputRef.current?.focus(), 50);
-        }
+        if (focused) focusInput();
       })
-      .then((fn) => {
-        unlisten = fn;
-      });
-    return () => unlisten?.();
+      .then((fn) => unlisteners.push(fn));
+
+    getCurrentWindow()
+      .listen("window-shown", () => focusInput())
+      .then((fn) => unlisteners.push(fn));
+
+    return () => {
+      for (const fn of unlisteners) fn();
+    };
   }, []);
 
   return (

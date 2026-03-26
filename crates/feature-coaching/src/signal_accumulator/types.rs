@@ -60,13 +60,8 @@ pub(super) fn default_conditions() -> Vec<TriggerCondition> {
         // overlay handles real-time notifications for distracting apps.
         TriggerCondition::new("budget_warning", 3600),
         TriggerCondition::new("task_avoidance", 1800),
-        TriggerCondition::new("flashcard_reviewed", 0),
-        TriggerCondition::new("retention_drop_important", 3600),
-        TriggerCondition::new("learning_streak_milestone", 86400),
-        TriggerCondition::new("learning_momentum_shift", 3600),
-        TriggerCondition::new("domain_retention_decline", 86400),
-        TriggerCondition::new("knowledge_transfer", 3600),
-        TriggerCondition::new("atom_created", 0),
-        TriggerCondition::new("coaching_learning_digest", 86400),
+        // Learning triggers removed — atom/flashcard data is still tracked for
+        // analytics and the knowledge health dashboard, but no longer triggers
+        // coaching popups. Learning activity works under the hood.
     ]
 }
