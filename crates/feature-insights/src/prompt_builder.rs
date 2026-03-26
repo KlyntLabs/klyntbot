@@ -10,7 +10,7 @@ use std::sync::Arc;
 
 use feature_notes::models::NoteRow;
 
-use crate::traits::CognitiveAccessor;
+use crate::traits::{AtomWithRetention, CognitiveAccessor};
 use crate::types::{InsightContent, InsightReviewRow, ScopeConfig};
 
 /// Assembled context ready for prompt injection.
@@ -64,7 +64,7 @@ impl PromptBuilder {
         if scope_config.include_cognitive {
             let domain = domains.first().map(|s| s.as_str());
 
-            let (facts, memories, rules, atom_subjects) = tokio::join!(
+            let (facts, memories, rules, atoms) = tokio::join!(
                 self.cognitive.search_facts(&note.title, domain, 10),
                 self.cognitive.recent_memories(&note.id, 5),
                 async {
@@ -91,13 +91,8 @@ impl PromptBuilder {
                 sections.push(format!("## Domain Insights\n\n{}", bullet_list(&rules)));
             }
 
-            if !atom_subjects.is_empty() {
-                sections.push(format!(
-                    "## Already Learned\nThe user has accepted these concepts as known: {}.\n\
-                     Consider these as established knowledge — don't re-explain them in the synthesis.\n\
-                     Focus gap analysis on what's NOT yet covered.",
-                    atom_subjects.join(", ")
-                ));
+            if !atoms.is_empty() {
+                sections.push(build_knowledge_state_section(&atoms));
             }
         }
 
@@ -176,6 +171,38 @@ fn bullet_list(items: &[String]) -> String {
         .map(|s| format!("- {s}"))
         .collect::<Vec<_>>()
         .join("\n")
+}
+
+/// Build the "Knowledge State" section, categorizing atoms as strong or fading.
+fn build_knowledge_state_section(atoms: &[AtomWithRetention]) -> String {
+    let mut strong = Vec::new();
+    let mut fading = Vec::new();
+    for a in atoms {
+        if a.retention_pct >= 0.6 {
+            strong.push(a.subject.as_str());
+        } else {
+            fading.push(format!(
+                "{} ({}% retention)",
+                a.subject,
+                (a.retention_pct * 100.0) as u32
+            ));
+        }
+    }
+    let mut section = String::from("## Knowledge State\n");
+    if !strong.is_empty() {
+        section.push_str(&format!(
+            "Strong knowledge (don't re-explain): {}.\n",
+            strong.join(", ")
+        ));
+    }
+    if !fading.is_empty() {
+        section.push_str(&format!(
+            "Fading knowledge (may need reinforcement): {}.\n\
+             Consider these as priority areas for gap analysis.\n",
+            fading.join(", ")
+        ));
+    }
+    section
 }
 
 /// Truncate a string to approximately `max_bytes`, safe for UTF-8.

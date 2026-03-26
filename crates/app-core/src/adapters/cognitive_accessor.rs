@@ -4,7 +4,7 @@
 //! Deep dive (Phase 4): user_model_summary, entity_neighborhood, fact_history.
 
 use async_trait::async_trait;
-use feature_insights::CognitiveAccessor;
+use feature_insights::{AtomWithRetention, CognitiveAccessor};
 
 /// Wraps cognitive repos to provide insight context data.
 pub struct CognitiveAccessorImpl {
@@ -153,12 +153,15 @@ impl CognitiveAccessor for CognitiveAccessorImpl {
         }
     }
 
-    async fn search_atoms(&self, note_id: &str) -> Vec<String> {
+    async fn search_atoms(&self, note_id: &str) -> Vec<AtomWithRetention> {
         match self.atom_repo.list_for_note(note_id).await {
             Ok(atoms) => atoms
                 .into_iter()
                 .filter(|a| a.status == "active")
-                .map(|a| a.subject)
+                .map(|a| AtomWithRetention {
+                    subject: a.subject,
+                    retention_pct: a.retention_pct,
+                })
                 .collect(),
             Err(_) => Vec::new(),
         }

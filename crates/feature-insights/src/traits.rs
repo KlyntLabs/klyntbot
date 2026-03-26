@@ -6,6 +6,13 @@
 
 use async_trait::async_trait;
 
+/// A knowledge atom with its current retention percentage.
+#[derive(Debug, Clone)]
+pub struct AtomWithRetention {
+    pub subject: String,
+    pub retention_pct: f64,
+}
+
 /// Provides cognitive memory data for insight context injection.
 #[async_trait]
 pub trait CognitiveAccessor: Send + Sync {
@@ -21,8 +28,8 @@ pub trait CognitiveAccessor: Send + Sync {
     async fn entity_neighborhood(&self, note_id: &str, depth: u8) -> Vec<String>;
     /// Get temporal fact history (deep dive only).
     async fn fact_history(&self, subject: &str) -> Vec<String>;
-    /// Get accepted knowledge atom subjects for a note.
-    async fn search_atoms(&self, note_id: &str) -> Vec<String>;
+    /// Get accepted knowledge atoms with retention data for a note.
+    async fn search_atoms(&self, note_id: &str) -> Vec<AtomWithRetention>;
 }
 
 /// Provides flashcard review data for learning progress computation.
@@ -64,7 +71,7 @@ impl CognitiveAccessor for NoopCognitiveAccessor {
     async fn fact_history(&self, _: &str) -> Vec<String> {
         Vec::new()
     }
-    async fn search_atoms(&self, _: &str) -> Vec<String> {
+    async fn search_atoms(&self, _: &str) -> Vec<AtomWithRetention> {
         Vec::new()
     }
 }
