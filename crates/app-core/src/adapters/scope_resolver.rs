@@ -51,22 +51,39 @@ impl ScopeResolverImpl {
 
     async fn resolve_semantic(&self, note_id: &str, radius: f64) -> Vec<String> {
         let Some(ref vs) = self.vector_store else {
+            tracing::warn!("semantic scope: vector_store is None");
             return Vec::new();
         };
         let embedding = match vs.get_embedding("note_embeddings", note_id).await {
-            Ok(Some(v)) => v,
-            _ => return Vec::new(),
+            Ok(Some(v)) => {
+                tracing::debug!(note_id, dim = v.len(), "semantic scope: got embedding");
+                v
+            }
+            Ok(None) => {
+                tracing::warn!(note_id, "semantic scope: no embedding found for note");
+                return Vec::new();
+            }
+            Err(e) => {
+                tracing::warn!(note_id, error = %e, "semantic scope: get_embedding failed");
+                return Vec::new();
+            }
         };
         match vs
             .search_similar("note_embeddings", &embedding, 20, radius)
             .await
         {
-            Ok(results) => results
-                .into_iter()
-                .map(|(id, _score)| id)
-                .filter(|id| id != note_id)
-                .collect(),
-            Err(_) => Vec::new(),
+            Ok(results) => {
+                tracing::info!(note_id, count = results.len(), radius, "semantic scope: search results");
+                results
+                    .into_iter()
+                    .map(|(id, _score)| id)
+                    .filter(|id| id != note_id)
+                    .collect()
+            }
+            Err(e) => {
+                tracing::warn!(note_id, error = %e, "semantic scope: search_similar failed");
+                Vec::new()
+            }
         }
     }
 
