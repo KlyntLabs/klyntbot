@@ -594,7 +594,9 @@ mod tests {
             content: "some content".to_string(),
         });
         let event = rx.try_recv().unwrap();
-        assert!(matches!(event, DomainEvent::NoteEditingFinished { note_id, .. } if note_id == "note-1"));
+        assert!(
+            matches!(event, DomainEvent::NoteEditingFinished { note_id, .. } if note_id == "note-1")
+        );
     }
 
     #[test]

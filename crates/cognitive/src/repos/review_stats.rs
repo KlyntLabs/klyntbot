@@ -271,7 +271,10 @@ mod tests {
         .unwrap();
 
         let streak = repo.current_streak().await.unwrap();
-        assert_eq!(streak, 1, "Atom acceptance alone should count as a streak day");
+        assert_eq!(
+            streak, 1,
+            "Atom acceptance alone should count as a streak day"
+        );
     }
 
     #[tokio::test]

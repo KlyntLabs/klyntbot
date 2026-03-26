@@ -80,11 +80,7 @@ impl ConfigArchiver {
         self.repo.insert_brain_version(&v).await
     }
 
-    pub async fn run(
-        self,
-        mut rx: broadcast::Receiver<DomainEvent>,
-        shutdown: CancellationToken,
-    ) {
+    pub async fn run(self, mut rx: broadcast::Receiver<DomainEvent>, shutdown: CancellationToken) {
         loop {
             tokio::select! {
                 _ = shutdown.cancelled() => break,

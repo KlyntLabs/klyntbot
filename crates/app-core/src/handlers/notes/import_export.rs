@@ -8,6 +8,7 @@ use feature_notes::front_matter;
 use feature_notes::models::{NoteRow, NotebookRow};
 use feature_notes::repo::utc_now_str;
 
+use crate::errors::map_storage_err;
 use crate::state::AppCore;
 
 const MAX_FILE_SIZE: u64 = 50 * 1024 * 1024; // 50 MB
@@ -123,7 +124,7 @@ impl AppCore {
                 id: id.clone(),
                 notebook_id: file.notebook_id.clone(),
                 title,
-                body: parsed.body.clone(),
+                body: parsed.body,
                 body_html: None,
                 pinned: fm.pinned.map_or(0, |p| if p { 1 } else { 0 }),
                 archived: 0,
@@ -321,7 +322,7 @@ impl AppCore {
             .await
         {
             Ok(Some(existing)) => existing.id,
-            _ => {
+            Ok(None) => {
                 let now = utc_now_str();
                 let nb = NotebookRow {
                     id: uuid::Uuid::new_v4().to_string(),
@@ -333,10 +334,17 @@ impl AppCore {
                     created_at: now.clone(),
                     updated_at: now,
                 };
-                self.note_repo.create_notebook(&nb).await.map_err(|e| {
-                    ApiError::new("STORAGE_ERROR", format!("failed to create notebook: {e}"))
-                })?;
+                self.note_repo
+                    .create_notebook(&nb)
+                    .await
+                    .map_err(map_storage_err)?;
                 nb.id
+            }
+            Err(e) => {
+                return Err(ApiError::new(
+                    "STORAGE_ERROR",
+                    format!("failed to look up notebook: {e}"),
+                ));
             }
         };
 
@@ -434,21 +442,25 @@ impl AppCore {
 
         if let Some(ids) = &params.note_ids {
             for id in ids {
-                if let Some(row) = self
-                    .note_repo
-                    .get_note(id)
-                    .await
-                    .map_err(|e| ApiError::new("DB_ERROR", e.to_string()))?
-                {
+                if let Some(row) = self.note_repo.get_note(id).await.map_err(map_storage_err)? {
                     notes_with_subdir.push((row, None));
                 }
             }
         }
 
         if let Some(nb_ids) = &params.notebook_ids {
+            let all_notebooks = self
+                .note_repo
+                .list_notebooks()
+                .await
+                .map_err(map_storage_err)?;
             for nb_id in nb_ids {
-                self.collect_notebook_notes_for_export(nb_id, &mut notes_with_subdir)
-                    .await?;
+                self.collect_notebook_notes_for_export(
+                    nb_id,
+                    &all_notebooks,
+                    &mut notes_with_subdir,
+                )
+                .await?;
             }
         }
 
@@ -459,8 +471,18 @@ impl AppCore {
         let attachment_prefix = format!("{}/attachments/", data_dir.display());
         let mut exported = 0u32;
 
+        let note_ids: Vec<String> = notes_with_subdir
+            .iter()
+            .map(|(n, _)| n.id.clone())
+            .collect();
+        let tags_map = self
+            .note_repo
+            .get_tags_batch(&note_ids)
+            .await
+            .map_err(map_storage_err)?;
+
         for (note, subdir) in &notes_with_subdir {
-            let tags = self.note_repo.get_tags(&note.id).await.unwrap_or_default();
+            let tags = tags_map.get(&note.id).cloned().unwrap_or_default();
             let fm = front_matter::NoteFrontMatter {
                 title: Some(note.title.clone()),
                 tags: if tags.is_empty() { None } else { Some(tags) },
@@ -480,8 +502,10 @@ impl AppCore {
                 };
                 let _ = std::fs::create_dir_all(&out_attachments);
                 // Find and replace each attachment reference
-                while let Some(start) = body.find(&attachment_prefix) {
-                    let after = &body[start + attachment_prefix.len()..];
+                let mut search_from = 0;
+                while let Some(start) = body[search_from..].find(&attachment_prefix) {
+                    let abs_start = search_from + start;
+                    let after = &body[abs_start + attachment_prefix.len()..];
                     let end = after.find([')', '"', ' ']).unwrap_or(after.len());
                     let filename = after[..end].to_string();
                     let src = data_dir.join("attachments").join(&filename);
@@ -491,6 +515,7 @@ impl AppCore {
                     let abs_ref = format!("{}{}", attachment_prefix, filename);
                     let rel_ref = format!("./attachments/{}", filename);
                     body = body.replacen(&abs_ref, &rel_ref, 1);
+                    search_from = abs_start + rel_ref.len();
                 }
             }
 
@@ -503,10 +528,9 @@ impl AppCore {
             };
             let _ = std::fs::create_dir_all(&out_dir);
 
-            let filename = if notes_with_subdir.len() == 1 && params.output_filename.is_some() {
-                params.output_filename.clone().unwrap()
-            } else {
-                slugify_filename(&note.title, &out_dir)
+            let filename = match (&params.output_filename, notes_with_subdir.len()) {
+                (Some(name), 1) => name.clone(),
+                _ => slugify_filename(&note.title, &out_dir),
             };
 
             let out_path = out_dir.join(&filename);
@@ -527,15 +551,11 @@ impl AppCore {
     async fn collect_notebook_notes_for_export(
         &self,
         notebook_id: &str,
+        all_notebooks: &[NotebookRow],
         notes: &mut Vec<(NoteRow, Option<String>)>,
     ) -> Result<(), ApiError> {
-        let notebooks = self
-            .note_repo
-            .list_notebooks()
-            .await
-            .map_err(|e| ApiError::new("DB_ERROR", e.to_string()))?;
         let nb_map: std::collections::HashMap<String, &NotebookRow> =
-            notebooks.iter().map(|nb| (nb.id.clone(), nb)).collect();
+            all_notebooks.iter().map(|nb| (nb.id.clone(), nb)).collect();
 
         // Build path from notebook hierarchy using raw titles (not slugified)
         // so that export → import round-trip deduplicates correctly
@@ -562,16 +582,17 @@ impl AppCore {
             .note_repo
             .list_notes(Some(notebook_id))
             .await
-            .map_err(|e| ApiError::new("DB_ERROR", e.to_string()))?;
+            .map_err(map_storage_err)?;
         let subdir = build_path(notebook_id, &nb_map);
         for row in rows {
             notes.push((row, Some(subdir.clone())));
         }
 
         // Recurse into child notebooks
-        for nb in &notebooks {
+        for nb in all_notebooks {
             if nb.parent_id.as_deref() == Some(notebook_id) {
-                Box::pin(self.collect_notebook_notes_for_export(&nb.id, notes)).await?;
+                Box::pin(self.collect_notebook_notes_for_export(&nb.id, all_notebooks, notes))
+                    .await?;
             }
         }
 

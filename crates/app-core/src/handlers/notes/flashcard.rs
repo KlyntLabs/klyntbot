@@ -301,8 +301,7 @@ impl AppCore {
             .await
             .map_err(|e| ApiError::new("INTERNAL_ERROR", e.to_string()))?;
         Ok(result.map(|(avg_stab, total_cards, total_lapses)| {
-            let lapse_penalty =
-                (total_lapses as f64 / total_cards.max(1) as f64).min(1.0) * 0.3;
+            let lapse_penalty = (total_lapses as f64 / total_cards.max(1) as f64).min(1.0) * 0.3;
             let health = (avg_stab / 30.0).min(1.0) * (1.0 - lapse_penalty);
             NoteRetentionHealthResponse {
                 avg_stability: avg_stab,

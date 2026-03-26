@@ -15,8 +15,7 @@ use bus::DomainEvent;
 use chrono::Utc;
 
 use crate::mirror::{
-    snippet_from_alert, MirrorAlert, MirrorRepo, NarrativeSnippet, RoutingSnapshot,
-    SkillRouteStats,
+    snippet_from_alert, MirrorAlert, MirrorRepo, NarrativeSnippet, RoutingSnapshot, SkillRouteStats,
 };
 
 // ---------------------------------------------------------------------------
@@ -407,7 +406,10 @@ mod tests {
         let current = subscriber2.build_snapshot();
 
         let alert = subscriber2.detect_drift(&current, &history);
-        assert!(alert.is_some(), "Expected drift alert for high fallback rate");
+        assert!(
+            alert.is_some(),
+            "Expected drift alert for high fallback rate"
+        );
         match alert.unwrap() {
             MirrorAlert::RoutingDrift { skill, .. } => {
                 assert_eq!(skill, "fallback");

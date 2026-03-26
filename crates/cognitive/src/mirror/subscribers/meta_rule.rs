@@ -136,11 +136,7 @@ impl MetaRuleDetector {
 
     /// Record a low-confidence routing event. Returns a [`MirrorAlert`] if
     /// the streak reaches the threshold, then resets.
-    pub fn record_low_confidence(
-        &mut self,
-        skill: &str,
-        confidence: f64,
-    ) -> Option<MirrorAlert> {
+    pub fn record_low_confidence(&mut self, skill: &str, confidence: f64) -> Option<MirrorAlert> {
         if confidence >= LOW_CONFIDENCE_THRESHOLD {
             return None;
         }
@@ -285,10 +281,15 @@ mod tests {
         assert!(result1.is_none(), "First correction should not trigger");
 
         let result2 = detector.record_correction("session-1", "general");
-        assert!(result2.is_some(), "Second correction in same session should trigger");
+        assert!(
+            result2.is_some(),
+            "Second correction in same session should trigger"
+        );
 
         match result2.unwrap() {
-            MirrorAlert::MetaRuleProposed { rule_text, source, .. } => {
+            MirrorAlert::MetaRuleProposed {
+                rule_text, source, ..
+            } => {
                 assert!(rule_text.contains("2 times"));
                 assert_eq!(source, MetaRuleSource::CorrectionDerived);
             }
@@ -301,7 +302,10 @@ mod tests {
         let mut detector = MetaRuleDetector::new_for_test();
 
         let result = detector.record_correction("session-1", "finance");
-        assert!(result.is_none(), "Single correction should not trigger any alert");
+        assert!(
+            result.is_none(),
+            "Single correction should not trigger any alert"
+        );
     }
 
     #[test]
@@ -315,10 +319,15 @@ mod tests {
         assert!(r2.is_none());
 
         let r3 = detector.record_low_confidence("general", 0.1);
-        assert!(r3.is_some(), "Third consecutive low-confidence should trigger");
+        assert!(
+            r3.is_some(),
+            "Third consecutive low-confidence should trigger"
+        );
 
         match r3.unwrap() {
-            MirrorAlert::MetaRuleProposed { rule_text, source, .. } => {
+            MirrorAlert::MetaRuleProposed {
+                rule_text, source, ..
+            } => {
                 assert!(rule_text.contains("consistently low"));
                 assert_eq!(source, MetaRuleSource::ReflectionGenerated);
             }
@@ -357,10 +366,15 @@ mod tests {
         assert!(r2.is_none());
 
         let r3 = detector.record_correction("session-3", "finance");
-        assert!(r3.is_some(), "Third cross-session correction for same skill should trigger");
+        assert!(
+            r3.is_some(),
+            "Third cross-session correction for same skill should trigger"
+        );
 
         match r3.unwrap() {
-            MirrorAlert::MetaRuleProposed { rule_text, source, .. } => {
+            MirrorAlert::MetaRuleProposed {
+                rule_text, source, ..
+            } => {
                 assert!(rule_text.contains("finance"));
                 assert!(rule_text.contains("3 times across sessions"));
                 assert_eq!(source, MetaRuleSource::CorrectionDerived);

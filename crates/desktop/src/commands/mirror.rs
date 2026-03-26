@@ -166,9 +166,7 @@ pub(crate) async fn dispatch_dev(
     };
 
     Some(match cmd {
-        "get_mirror_state" => {
-            dev::val(facade.get_state().await.map_err(ApiError::from))
-        }
+        "get_mirror_state" => dev::val(facade.get_state().await.map_err(ApiError::from)),
         "get_routing_history" => {
             let days: Option<u32> = dev::get(body, "days");
             dev::val(
@@ -236,9 +234,7 @@ pub(crate) async fn dispatch_dev(
                     .map_err(ApiError::from),
             )
         }
-        "get_brain_versions" => {
-            dev::val(facade.get_brain_versions().await.map_err(ApiError::from))
-        }
+        "get_brain_versions" => dev::val(facade.get_brain_versions().await.map_err(ApiError::from)),
         "revert_brain_version" => {
             let version: u32 = try_field!(dev::get(body, "version")
                 .ok_or_else(|| ApiError::new("VALIDATION", "missing required field: version")));
@@ -253,12 +249,7 @@ pub(crate) async fn dispatch_dev(
             let trial_id: String = try_field!(dev::get(body, "trialId")
                 .or_else(|| dev::get(body, "trial_id"))
                 .ok_or_else(|| ApiError::new("VALIDATION", "missing required field: trialId")));
-            dev::val(
-                facade
-                    .kill_trial(&trial_id)
-                    .await
-                    .map_err(ApiError::from),
-            )
+            dev::val(facade.kill_trial(&trial_id).await.map_err(ApiError::from))
         }
         "continue_trial" => {
             let trial_id: String = try_field!(dev::get(body, "trialId")

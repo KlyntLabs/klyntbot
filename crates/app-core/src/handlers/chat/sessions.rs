@@ -15,7 +15,10 @@ pub(crate) fn extract_title(metadata: &serde_json::Value) -> String {
         .to_string()
 }
 
-fn session_row_to_response(row: &storage::rows::session::SessionRow, message_count: i64) -> ChatSessionResponse {
+fn session_row_to_response(
+    row: &storage::rows::session::SessionRow,
+    message_count: i64,
+) -> ChatSessionResponse {
     ChatSessionResponse {
         session_key: row.key.clone(),
         title: extract_title(&row.metadata),
@@ -54,31 +57,26 @@ pub async fn chat_list_sessions_by_project(
 
     Ok(rows
         .iter()
-        .map(|s| {
-            ChatThreadResponse {
-                session_key: s.key.clone(),
-                title: extract_title(&s.metadata),
-                message_count: s.message_count,
-                updated_at: s.updated_at,
-                context_type: None,
-                entity_kind: None,
-                entity_id: None,
-                area_id: None,
-                area_name: None,
-                project_id: s.project_id.clone(),
-                project_name: None,
-                squad_id: s.squad_id.clone(),
-                squad_name: None,
-                squad_icon: None,
-            }
+        .map(|s| ChatThreadResponse {
+            session_key: s.key.clone(),
+            title: extract_title(&s.metadata),
+            message_count: s.message_count,
+            updated_at: s.updated_at,
+            context_type: None,
+            entity_kind: None,
+            entity_id: None,
+            area_id: None,
+            area_name: None,
+            project_id: s.project_id.clone(),
+            project_name: None,
+            squad_id: s.squad_id.clone(),
+            squad_name: None,
+            squad_icon: None,
         })
         .collect())
 }
 
-pub async fn chat_delete_stale_sessions(
-    repos: &Repos,
-    before_days: u32,
-) -> Result<u64, ApiError> {
+pub async fn chat_delete_stale_sessions(repos: &Repos, before_days: u32) -> Result<u64, ApiError> {
     repos
         .sessions
         .delete_stale_sessions(before_days)
@@ -103,10 +101,7 @@ impl AppCore {
         chat_list_sessions_by_project(&self.repos, project_id).await
     }
 
-    pub async fn chat_delete_stale_sessions(
-        &self,
-        before_days: u32,
-    ) -> Result<u64, ApiError> {
+    pub async fn chat_delete_stale_sessions(&self, before_days: u32) -> Result<u64, ApiError> {
         chat_delete_stale_sessions(&self.repos, before_days).await
     }
 }

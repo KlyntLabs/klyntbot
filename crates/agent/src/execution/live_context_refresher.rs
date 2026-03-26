@@ -64,10 +64,7 @@ impl LiveContextRefresher {
 
         for update in &updates {
             let reason_str = update.reason.as_str();
-            let content = update
-                .content
-                .as_deref()
-                .unwrap_or(reason_str);
+            let content = update.content.as_deref().unwrap_or(reason_str);
 
             let msg = Message::context_update(reason_str, content);
             let tokens = context_engine::estimate_message_tokens(&*self.token_counter, &msg);

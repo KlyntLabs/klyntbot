@@ -284,10 +284,7 @@ impl AppCore {
 
     /// Compute average insight freshness across notes linked to a project.
     /// Freshness = max(0, 1.0 - days_since_review / 7.0), averaged.
-    async fn compute_insight_freshness(
-        &self,
-        project_id: &str,
-    ) -> Result<Option<f64>, ApiError> {
+    async fn compute_insight_freshness(&self, project_id: &str) -> Result<Option<f64>, ApiError> {
         let links = self
             .repos
             .entity_links

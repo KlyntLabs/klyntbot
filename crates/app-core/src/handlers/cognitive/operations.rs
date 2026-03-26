@@ -111,9 +111,7 @@ impl AppCore {
                     .as_str()
                     .unwrap_or("unknown")
                     .to_string(),
-                active_skill: payload["active_skill"]
-                    .as_str()
-                    .map(|s| s.to_string()),
+                active_skill: payload["active_skill"].as_str().map(|s| s.to_string()),
             },
             "BudgetAlert" => bus::DomainEvent::BudgetAlert {
                 category: payload["category"]

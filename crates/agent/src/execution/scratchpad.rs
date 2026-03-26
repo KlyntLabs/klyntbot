@@ -516,5 +516,4 @@ mod tests {
             pad.mark_step_completed_semantic("tasks", &serde_json::json!({"action": "list"}), "");
         assert_eq!(result.map(|r| r.0), Some(0));
     }
-
 }

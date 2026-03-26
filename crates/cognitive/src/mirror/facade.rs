@@ -147,15 +147,9 @@ impl MirrorFacade {
 
     /// Revert DB state only — used in tests without autotuner bridge.
     pub(crate) async fn revert_to_version_db_only(&self, target: u32) -> Result<BrainVersion> {
-        let target_v = self
-            .repo
-            .get_brain_version(target)
-            .await?
-            .ok_or_else(|| {
-                common::KlyntbotError::StorageNotFound(format!(
-                    "Brain version {target} not found"
-                ))
-            })?;
+        let target_v = self.repo.get_brain_version(target).await?.ok_or_else(|| {
+            common::KlyntbotError::StorageNotFound(format!("Brain version {target} not found"))
+        })?;
         self.repo.mark_versions_reverted_after(target).await?;
         let next = self.repo.get_next_version_number().await?;
         let new_v = BrainVersion {
@@ -193,11 +187,7 @@ impl MirrorFacade {
             .update_meta_rule_status(rule_id, MetaRuleStatus::Active)
             .await?;
 
-        self.write_episodic(
-            format!("Approved meta-rule: {rule_id}"),
-            None,
-            0.8,
-        );
+        self.write_episodic(format!("Approved meta-rule: {rule_id}"), None, 0.8);
 
         Ok(())
     }
@@ -224,7 +214,9 @@ impl MirrorFacade {
         let rule = MetaRule {
             id: Uuid::new_v4(),
             trigger_condition: text,
-            action: MetaRuleAction::SurfaceInsight { message: String::new() },
+            action: MetaRuleAction::SurfaceInsight {
+                message: String::new(),
+            },
             source: MetaRuleSource::UserCreated,
             effectiveness_score: 0.5,
             status: MetaRuleStatus::Pending,
@@ -247,11 +239,7 @@ impl MirrorFacade {
             }
         }
 
-        self.write_episodic(
-            format!("Killed experiment trial {trial_id}"),
-            None,
-            0.7,
-        );
+        self.write_episodic(format!("Killed experiment trial {trial_id}"), None, 0.7);
 
         if let Some(ref bus) = self.domain_event_bus {
             bus.publish(bus::DomainEvent::MirrorTrialKilled {
@@ -668,9 +656,21 @@ mod tests {
     #[tokio::test]
     async fn test_get_brain_versions() {
         let facade = setup().await;
-        facade.repo.insert_brain_version(&make_brain_version(1, None)).await.unwrap();
-        facade.repo.insert_brain_version(&make_brain_version(2, Some(1))).await.unwrap();
-        facade.repo.insert_brain_version(&make_brain_version(3, Some(2))).await.unwrap();
+        facade
+            .repo
+            .insert_brain_version(&make_brain_version(1, None))
+            .await
+            .unwrap();
+        facade
+            .repo
+            .insert_brain_version(&make_brain_version(2, Some(1)))
+            .await
+            .unwrap();
+        facade
+            .repo
+            .insert_brain_version(&make_brain_version(3, Some(2)))
+            .await
+            .unwrap();
 
         let versions = facade.get_brain_versions().await.unwrap();
         assert_eq!(versions.len(), 3);
@@ -683,8 +683,16 @@ mod tests {
     #[tokio::test]
     async fn test_revert_to_version() {
         let facade = setup().await;
-        facade.repo.insert_brain_version(&make_brain_version(1, None)).await.unwrap();
-        facade.repo.insert_brain_version(&make_brain_version(2, Some(1))).await.unwrap();
+        facade
+            .repo
+            .insert_brain_version(&make_brain_version(1, None))
+            .await
+            .unwrap();
+        facade
+            .repo
+            .insert_brain_version(&make_brain_version(2, Some(1)))
+            .await
+            .unwrap();
 
         let new_v = facade.revert_to_version_db_only(1).await.unwrap();
         assert_eq!(new_v.version, 3);
@@ -704,7 +712,11 @@ mod tests {
     #[tokio::test]
     async fn test_get_state_includes_brain_version() {
         let facade = setup().await;
-        facade.repo.insert_brain_version(&make_brain_version(1, None)).await.unwrap();
+        facade
+            .repo
+            .insert_brain_version(&make_brain_version(1, None))
+            .await
+            .unwrap();
 
         let state = facade.get_state().await.unwrap();
         assert!(state.latest_brain_version.is_some());

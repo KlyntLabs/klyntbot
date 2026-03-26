@@ -612,7 +612,8 @@ mod tests {
             server: Default::default(),
         };
 
-        let _manager = McpManager::connect_all(&config, Some(tx), McpClientOptions::default()).await;
+        let _manager =
+            McpManager::connect_all(&config, Some(tx), McpClientOptions::default()).await;
 
         let mut events = Vec::new();
         while let Ok(event) = rx.try_recv() {

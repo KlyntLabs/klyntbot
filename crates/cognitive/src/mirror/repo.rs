@@ -144,11 +144,7 @@ impl TryFrom<SnippetRow> for NarrativeSnippet {
             .as_deref()
             .map(serde_json::from_str)
             .transpose()?;
-        let dismissed_at = row
-            .dismissed_at
-            .as_deref()
-            .map(parse_rfc3339)
-            .transpose()?;
+        let dismissed_at = row.dismissed_at.as_deref().map(parse_rfc3339).transpose()?;
         Ok(NarrativeSnippet {
             id: Uuid::parse_str(&row.id)
                 .map_err(|e| common::KlyntbotError::Storage(format!("bad uuid: {e}")))?,
@@ -385,8 +381,7 @@ impl MirrorRepo {
     // -----------------------------------------------------------------------
 
     pub async fn insert_trend_narrative(&self, narrative: &TrendNarrative) -> Result<()> {
-        let improvement_highlights_json =
-            serde_json::to_string(&narrative.improvement_highlights)?;
+        let improvement_highlights_json = serde_json::to_string(&narrative.improvement_highlights)?;
         let meta_rule_updates_json = serde_json::to_string(&narrative.meta_rule_updates)?;
         let user_feedback = narrative
             .user_feedback
@@ -491,12 +486,11 @@ impl MirrorRepo {
 
     pub async fn cleanup_old_snippets(&self, max_age_days: u32) -> Result<u64> {
         let cutoff = Utc::now() - chrono::Duration::days(max_age_days as i64);
-        let result =
-            sqlx::query("DELETE FROM mirror_snippets WHERE created_at < ?1")
-                .bind(cutoff.to_rfc3339())
-                .execute(self.db())
-                .await
-                .map_err(|e| common::KlyntbotError::Storage(e.to_string()))?;
+        let result = sqlx::query("DELETE FROM mirror_snippets WHERE created_at < ?1")
+            .bind(cutoff.to_rfc3339())
+            .execute(self.db())
+            .await
+            .map_err(|e| common::KlyntbotError::Storage(e.to_string()))?;
         Ok(result.rows_affected())
     }
 
@@ -531,10 +525,7 @@ impl MirrorRepo {
         Ok(())
     }
 
-    pub async fn get_meta_rules_by_status(
-        &self,
-        status: MetaRuleStatus,
-    ) -> Result<Vec<MetaRule>> {
+    pub async fn get_meta_rules_by_status(&self, status: MetaRuleStatus) -> Result<Vec<MetaRule>> {
         let status_str = enum_to_str(&status)?;
         let rows = sqlx::query_as::<_, MetaRuleRow>(
             "SELECT * FROM mirror_meta_rules WHERE status = ?1 ORDER BY created_at DESC",
@@ -548,15 +539,13 @@ impl MirrorRepo {
 
     pub async fn update_meta_rule_status(&self, id: Uuid, status: MetaRuleStatus) -> Result<()> {
         let status_str = enum_to_str(&status)?;
-        sqlx::query(
-            "UPDATE mirror_meta_rules SET status = ?1, updated_at = ?2 WHERE id = ?3",
-        )
-        .bind(status_str)
-        .bind(Utc::now().to_rfc3339())
-        .bind(id.to_string())
-        .execute(self.db())
-        .await
-        .map_err(|e| common::KlyntbotError::Storage(e.to_string()))?;
+        sqlx::query("UPDATE mirror_meta_rules SET status = ?1, updated_at = ?2 WHERE id = ?3")
+            .bind(status_str)
+            .bind(Utc::now().to_rfc3339())
+            .bind(id.to_string())
+            .execute(self.db())
+            .await
+            .map_err(|e| common::KlyntbotError::Storage(e.to_string()))?;
         Ok(())
     }
 
@@ -573,11 +562,7 @@ impl MirrorRepo {
         Ok(())
     }
 
-    pub async fn decay_meta_rule_effectiveness(
-        &self,
-        id: Uuid,
-        decay_factor: f64,
-    ) -> Result<()> {
+    pub async fn decay_meta_rule_effectiveness(&self, id: Uuid, decay_factor: f64) -> Result<()> {
         sqlx::query(
             "UPDATE mirror_meta_rules \
              SET effectiveness_score = effectiveness_score * ?1, updated_at = ?2 \
@@ -662,13 +647,11 @@ impl MirrorRepo {
     }
 
     pub async fn mark_versions_reverted_after(&self, target_version: u32) -> Result<()> {
-        sqlx::query(
-            "UPDATE mirror_brain_versions SET reverted = 1 WHERE version > ?1",
-        )
-        .bind(target_version as i64)
-        .execute(self.db())
-        .await
-        .map_err(|e| common::KlyntbotError::Storage(e.to_string()))?;
+        sqlx::query("UPDATE mirror_brain_versions SET reverted = 1 WHERE version > ?1")
+            .bind(target_version as i64)
+            .execute(self.db())
+            .await
+            .map_err(|e| common::KlyntbotError::Storage(e.to_string()))?;
         Ok(())
     }
 
@@ -964,7 +947,10 @@ mod tests {
         let rule = make_meta_rule();
         repo.insert_meta_rule(&rule).await.unwrap();
 
-        let rules = repo.get_meta_rules_by_status(MetaRuleStatus::Pending).await.unwrap();
+        let rules = repo
+            .get_meta_rules_by_status(MetaRuleStatus::Pending)
+            .await
+            .unwrap();
         assert_eq!(rules.len(), 1);
         let got = &rules[0];
         assert_eq!(got.id, rule.id);
@@ -981,12 +967,20 @@ mod tests {
         let rule = make_meta_rule();
         repo.insert_meta_rule(&rule).await.unwrap();
 
-        repo.update_meta_rule_status(rule.id, MetaRuleStatus::Active).await.unwrap();
+        repo.update_meta_rule_status(rule.id, MetaRuleStatus::Active)
+            .await
+            .unwrap();
 
-        let pending = repo.get_meta_rules_by_status(MetaRuleStatus::Pending).await.unwrap();
+        let pending = repo
+            .get_meta_rules_by_status(MetaRuleStatus::Pending)
+            .await
+            .unwrap();
         assert!(pending.is_empty());
 
-        let active = repo.get_meta_rules_by_status(MetaRuleStatus::Active).await.unwrap();
+        let active = repo
+            .get_meta_rules_by_status(MetaRuleStatus::Active)
+            .await
+            .unwrap();
         assert_eq!(active.len(), 1);
         assert_eq!(active[0].status, MetaRuleStatus::Active);
     }
@@ -997,12 +991,20 @@ mod tests {
         let rule = make_meta_rule();
         repo.insert_meta_rule(&rule).await.unwrap();
 
-        repo.update_meta_rule_status(rule.id, MetaRuleStatus::Disabled).await.unwrap();
+        repo.update_meta_rule_status(rule.id, MetaRuleStatus::Disabled)
+            .await
+            .unwrap();
 
-        let pending = repo.get_meta_rules_by_status(MetaRuleStatus::Pending).await.unwrap();
+        let pending = repo
+            .get_meta_rules_by_status(MetaRuleStatus::Pending)
+            .await
+            .unwrap();
         assert!(pending.is_empty());
 
-        let disabled = repo.get_meta_rules_by_status(MetaRuleStatus::Disabled).await.unwrap();
+        let disabled = repo
+            .get_meta_rules_by_status(MetaRuleStatus::Disabled)
+            .await
+            .unwrap();
         assert_eq!(disabled.len(), 1);
         assert_eq!(disabled[0].status, MetaRuleStatus::Disabled);
     }
@@ -1016,7 +1018,10 @@ mod tests {
         repo.increment_meta_rule_signal(rule.id).await.unwrap();
         repo.increment_meta_rule_signal(rule.id).await.unwrap();
 
-        let rules = repo.get_meta_rules_by_status(MetaRuleStatus::Pending).await.unwrap();
+        let rules = repo
+            .get_meta_rules_by_status(MetaRuleStatus::Pending)
+            .await
+            .unwrap();
         assert_eq!(rules.len(), 1);
         assert_eq!(rules[0].signal_count, 2);
     }
@@ -1052,9 +1057,15 @@ mod tests {
     #[tokio::test]
     async fn test_get_brain_versions_ordered() {
         let repo = crate::mirror::test_mirror_repo().await;
-        repo.insert_brain_version(&make_brain_version(1, None)).await.unwrap();
-        repo.insert_brain_version(&make_brain_version(2, Some(1))).await.unwrap();
-        repo.insert_brain_version(&make_brain_version(3, Some(2))).await.unwrap();
+        repo.insert_brain_version(&make_brain_version(1, None))
+            .await
+            .unwrap();
+        repo.insert_brain_version(&make_brain_version(2, Some(1)))
+            .await
+            .unwrap();
+        repo.insert_brain_version(&make_brain_version(3, Some(2)))
+            .await
+            .unwrap();
 
         let versions = repo.get_brain_versions().await.unwrap();
         assert_eq!(versions.len(), 3);
@@ -1073,7 +1084,9 @@ mod tests {
         assert_eq!(next, 1);
 
         // After inserting version 1 → next is 2
-        repo.insert_brain_version(&make_brain_version(1, None)).await.unwrap();
+        repo.insert_brain_version(&make_brain_version(1, None))
+            .await
+            .unwrap();
         let next = repo.get_next_version_number().await.unwrap();
         assert_eq!(next, 2);
     }
@@ -1081,9 +1094,15 @@ mod tests {
     #[tokio::test]
     async fn test_mark_versions_reverted() {
         let repo = crate::mirror::test_mirror_repo().await;
-        repo.insert_brain_version(&make_brain_version(1, None)).await.unwrap();
-        repo.insert_brain_version(&make_brain_version(2, Some(1))).await.unwrap();
-        repo.insert_brain_version(&make_brain_version(3, Some(2))).await.unwrap();
+        repo.insert_brain_version(&make_brain_version(1, None))
+            .await
+            .unwrap();
+        repo.insert_brain_version(&make_brain_version(2, Some(1)))
+            .await
+            .unwrap();
+        repo.insert_brain_version(&make_brain_version(3, Some(2)))
+            .await
+            .unwrap();
 
         repo.mark_versions_reverted_after(1).await.unwrap();
 
@@ -1129,9 +1148,15 @@ mod tests {
         let repo = crate::mirror::test_mirror_repo().await;
         let preview = make_trial_preview("trial-abc", PreviewRecommendation::Kill);
         repo.insert_trial_preview(&preview).await.unwrap();
-        let found = repo.get_trial_preview_by_trial_id("trial-abc").await.unwrap();
+        let found = repo
+            .get_trial_preview_by_trial_id("trial-abc")
+            .await
+            .unwrap();
         assert!(found.is_some());
-        let not_found = repo.get_trial_preview_by_trial_id("trial-xyz").await.unwrap();
+        let not_found = repo
+            .get_trial_preview_by_trial_id("trial-xyz")
+            .await
+            .unwrap();
         assert!(not_found.is_none());
     }
 }

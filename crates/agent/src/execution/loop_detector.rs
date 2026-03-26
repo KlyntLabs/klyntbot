@@ -31,10 +31,7 @@ pub enum LoopStatus {
         tools_summary: String,
     },
     /// A repeating pattern hit the hard-stop threshold — execution should abort.
-    HardStop {
-        count: u32,
-        tools_summary: String,
-    },
+    HardStop { count: u32, tools_summary: String },
 }
 
 /// Detects oscillation in the ReAct loop by tracking iteration hashes.
@@ -58,11 +55,7 @@ impl LoopDetector {
     }
 
     /// Create a detector with custom thresholds.
-    pub fn with_config(
-        window_size: usize,
-        warn_threshold: u32,
-        hard_stop_threshold: u32,
-    ) -> Self {
+    pub fn with_config(window_size: usize, warn_threshold: u32, hard_stop_threshold: u32) -> Self {
         Self {
             history: VecDeque::with_capacity(window_size),
             warned_hashes: HashSet::new(),

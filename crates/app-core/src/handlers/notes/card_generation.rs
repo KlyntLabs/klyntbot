@@ -245,10 +245,7 @@ impl AppCore {
             } else {
                 vec![]
             };
-            let active_atoms: Vec<_> = atoms
-                .into_iter()
-                .filter(|a| a.status == "active")
-                .collect();
+            let active_atoms: Vec<_> = atoms.into_iter().filter(|a| a.status == "active").collect();
 
             for row in &rows {
                 let front_lower = row.front.to_lowercase();

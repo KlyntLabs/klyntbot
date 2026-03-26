@@ -45,10 +45,8 @@ pub trait MetaRuleProposer: Send + Sync {
     /// Analyse the provided context and optionally propose a new [`MetaRule`].
     ///
     /// Returns `Ok(None)` if no rule is warranted by the current signals.
-    async fn propose_meta_rule(
-        &self,
-        context: MetaRuleProposalContext,
-    ) -> Result<Option<MetaRule>>;
+    async fn propose_meta_rule(&self, context: MetaRuleProposalContext)
+        -> Result<Option<MetaRule>>;
 }
 
 // ---------------------------------------------------------------------------

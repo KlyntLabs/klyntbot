@@ -94,6 +94,9 @@ export interface NoteCreateParams {
   notebookId?: string;
   body?: string;
   tags?: string[];
+  createdAt?: string;
+  icon?: string;
+  color?: string;
 }
 
 export interface NoteUpdateParams {
@@ -117,6 +120,34 @@ export interface NotebookCreateParams {
   title: string;
   parentId?: string;
   icon?: string;
+}
+
+// ── Import / Export ──────────────────────────────────────────
+
+export interface NoteImportParams {
+  paths: string[];
+  notebookId?: string;
+}
+
+export interface NoteImportResult {
+  imported: number;
+  skipped: SkippedFile[];
+}
+
+export interface SkippedFile {
+  path: string;
+  reason: string;
+}
+
+export interface NoteExportParams {
+  noteIds?: string[];
+  notebookIds?: string[];
+  destination: string;
+  outputFilename?: string;
+}
+
+export interface NoteExportResult {
+  exported: number;
 }
 
 // ── Workspace Config ──────────────────────────────────────

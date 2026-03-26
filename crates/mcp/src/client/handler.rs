@@ -5,10 +5,10 @@
 
 use std::sync::Arc;
 
-use rmcp::ErrorData as McpError;
 use rmcp::handler::client::ClientHandler;
 use rmcp::model::*;
 use rmcp::service::{NotificationContext, RequestContext, RoleClient};
+use rmcp::ErrorData as McpError;
 use tracing::{debug, info, warn};
 
 /// Trait for delegating sampling (LLM completion) requests.
@@ -77,7 +77,9 @@ impl ClientHandler for KlyntbotClientHandler {
                 ..Default::default()
             },
             capabilities: ClientCapabilities {
-                roots: Some(RootsCapabilities { list_changed: Some(false) }),
+                roots: Some(RootsCapabilities {
+                    list_changed: Some(false),
+                }),
                 sampling: if self.sampling_delegate.is_some() {
                     Some(SamplingCapability::default())
                 } else {

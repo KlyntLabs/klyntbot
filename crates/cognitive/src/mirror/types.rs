@@ -30,7 +30,8 @@ pub struct BrainVersion {
 
 #[async_trait::async_trait]
 pub trait AutotunerBridge: Send + Sync {
-    async fn apply_champion(&self, params: serde_json::Value, reason: String) -> common::Result<()>;
+    async fn apply_champion(&self, params: serde_json::Value, reason: String)
+        -> common::Result<()>;
     async fn current_champion_params(&self) -> common::Result<serde_json::Value>;
 }
 
@@ -116,13 +117,25 @@ pub enum MirrorAlertType {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum SuggestedAction {
-    BoostSkill { skill: String },
+    BoostSkill {
+        skill: String,
+    },
     ViewDetails,
-    ApproveMetaRule { rule_id: Uuid },
-    DismissMetaRule { rule_id: Uuid },
-    KillTrial { trial_id: String },
-    ContinueTrial { trial_id: String },
-    RevertBrainVersion { version: u32 },
+    ApproveMetaRule {
+        rule_id: Uuid,
+    },
+    DismissMetaRule {
+        rule_id: Uuid,
+    },
+    KillTrial {
+        trial_id: String,
+    },
+    ContinueTrial {
+        trial_id: String,
+    },
+    RevertBrainVersion {
+        version: u32,
+    },
     #[serde(other)]
     Unknown,
 }

@@ -53,10 +53,7 @@ impl NarrativeHandler for LlmNarrativeHandler {
         let user_msg = format_narrative_context(&ctx);
         let system_prompt = build_narrative_system_prompt(&ctx);
 
-        let messages = vec![
-            Message::system(system_prompt),
-            Message::user(user_msg),
-        ];
+        let messages = vec![Message::system(system_prompt), Message::user(user_msg)];
 
         let params = providers::ChatParams::new(&self.model)
             .with_response_format(providers::ResponseFormat::JsonObject);

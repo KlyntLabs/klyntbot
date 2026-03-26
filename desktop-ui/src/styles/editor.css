@@ -234,7 +234,7 @@
   border-radius: 0;
   font-size: 0.8125rem;
   line-height: 1.6;
-  color: var(--color-secondary);
+  color: var(--color-foreground);
 }
 
 .code-block-header {
@@ -326,7 +326,7 @@
   border-radius: 0;
   font-size: 0.8125rem;
   line-height: 1.6;
-  color: var(--color-secondary);
+  color: var(--color-foreground);
 }
 
 /* Table */
@@ -553,64 +553,75 @@
   caret-color: var(--brand);
 }
 
-/* ── Syntax highlighting tokens (shared with prose.css) ─────────────── */
+/* ── Syntax highlighting tokens ──────────────────────────────────────
+   Uses theme tokens (oklch) from theme.css for consistent theming.
+   Colors are tuned for readability on the code block's dark background.  */
 
 .editor-content .hljs-comment,
 .editor-content .hljs-quote {
-  color: color-mix(in srgb, var(--color-muted) 80%, transparent);
+  color: var(--color-muted-foreground);
   font-style: italic;
 }
 
 .editor-content .hljs-keyword,
-.editor-content .hljs-selector-tag,
+.editor-content .hljs-selector-tag {
+  color: var(--color-purple);
+  font-weight: 500;
+}
+
 .editor-content .hljs-type {
-  color: var(--color-purple, #c084fc);
+  color: var(--color-info);
+  font-weight: 500;
 }
 
 .editor-content .hljs-string,
 .editor-content .hljs-addition {
-  color: var(--color-success, #4ade80);
+  color: var(--color-success);
 }
 
 .editor-content .hljs-number,
 .editor-content .hljs-literal,
 .editor-content .hljs-symbol,
 .editor-content .hljs-bullet {
-  color: var(--color-brand, #f97316);
+  color: var(--color-brand);
 }
 
 .editor-content .hljs-title,
-.editor-content .hljs-section,
+.editor-content .hljs-section {
+  color: var(--color-info);
+  font-weight: 600;
+}
+
 .editor-content .hljs-built_in {
-  color: var(--color-info, #60a5fa);
+  color: var(--color-info);
 }
 
 .editor-content .hljs-attr,
 .editor-content .hljs-attribute {
-  color: var(--color-brand-hover, #fb923c);
+  color: var(--color-brand-hover);
 }
 
 .editor-content .hljs-name,
 .editor-content .hljs-tag {
-  color: var(--color-info, #60a5fa);
+  color: var(--color-destructive);
 }
 
 .editor-content .hljs-variable,
 .editor-content .hljs-template-variable {
-  color: var(--color-primary);
+  color: var(--color-foreground);
 }
 
 .editor-content .hljs-regexp,
 .editor-content .hljs-link {
-  color: var(--color-brand, #f97316);
+  color: var(--color-brand);
 }
 
 .editor-content .hljs-deletion {
-  color: var(--color-destructive, #f43f5e);
+  color: var(--color-destructive);
 }
 
 .editor-content .hljs-meta {
-  color: var(--color-muted);
+  color: var(--color-muted-foreground);
 }
 
 .editor-content .hljs-emphasis {
@@ -619,6 +630,18 @@
 
 .editor-content .hljs-strong {
   font-weight: 700;
+}
+
+.editor-content .hljs-params {
+  color: var(--color-foreground);
+}
+
+.editor-content .hljs-property {
+  color: var(--color-brand-hover);
+}
+
+.editor-content .hljs-function {
+  color: var(--color-info);
 }
 
 /* Search highlights */

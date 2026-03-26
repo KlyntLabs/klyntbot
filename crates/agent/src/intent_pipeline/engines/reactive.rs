@@ -351,9 +351,7 @@ impl ExecutionEngine for ReactiveEngine {
                     .record_iteration(iteration as usize, &last_tool_calls)
                 {
                     LoopStatus::NoLoop => {}
-                    LoopStatus::Warning {
-                        tools_summary, ..
-                    } => {
+                    LoopStatus::Warning { tools_summary, .. } => {
                         let suggestion = format!(
                             "I'm noticing I've been repeating the same set of tools ({}) \
                              for the last 3 steps without finding new information. Would you \
@@ -377,9 +375,7 @@ impl ExecutionEngine for ReactiveEngine {
                         }
                         messages.push(Message::user(&suggestion));
                     }
-                    LoopStatus::HardStop {
-                        tools_summary, ..
-                    } => {
+                    LoopStatus::HardStop { tools_summary, .. } => {
                         tracing::warn!(
                             iteration,
                             tools_summary = %tools_summary,

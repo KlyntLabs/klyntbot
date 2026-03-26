@@ -182,7 +182,7 @@
   border-radius: 0;
   font-size: 0.8125rem;
   line-height: 1.6;
-  color: var(--color-secondary);
+  color: var(--color-foreground);
 }
 
 /* ── Tables ────────────────────────────────────────────────────────────── */
@@ -281,60 +281,69 @@
 
 .prose-content .hljs-comment,
 .prose-content .hljs-quote {
-  color: color-mix(in srgb, var(--color-muted) 80%, transparent);
+  color: var(--color-muted-foreground);
   font-style: italic;
 }
 
 .prose-content .hljs-keyword,
-.prose-content .hljs-selector-tag,
+.prose-content .hljs-selector-tag {
+  color: var(--color-purple);
+  font-weight: 500;
+}
+
 .prose-content .hljs-type {
-  color: var(--color-purple, #c084fc);
+  color: var(--color-info);
+  font-weight: 500;
 }
 
 .prose-content .hljs-string,
 .prose-content .hljs-addition {
-  color: var(--color-success, #4ade80);
+  color: var(--color-success);
 }
 
 .prose-content .hljs-number,
 .prose-content .hljs-literal,
 .prose-content .hljs-symbol,
 .prose-content .hljs-bullet {
-  color: var(--color-brand, #f97316);
+  color: var(--color-brand);
 }
 
 .prose-content .hljs-title,
-.prose-content .hljs-section,
+.prose-content .hljs-section {
+  color: var(--color-info);
+  font-weight: 600;
+}
+
 .prose-content .hljs-built_in {
-  color: var(--color-info, #60a5fa);
+  color: var(--color-info);
 }
 
 .prose-content .hljs-attr,
 .prose-content .hljs-attribute {
-  color: var(--color-brand-hover, #fb923c);
+  color: var(--color-brand-hover);
 }
 
 .prose-content .hljs-name,
 .prose-content .hljs-tag {
-  color: var(--color-info, #60a5fa);
+  color: var(--color-destructive);
 }
 
 .prose-content .hljs-variable,
 .prose-content .hljs-template-variable {
-  color: var(--color-primary);
+  color: var(--color-foreground);
 }
 
 .prose-content .hljs-regexp,
 .prose-content .hljs-link {
-  color: var(--color-brand, #f97316);
+  color: var(--color-brand);
 }
 
 .prose-content .hljs-deletion {
-  color: var(--color-destructive, #f43f5e);
+  color: var(--color-destructive);
 }
 
 .prose-content .hljs-meta {
-  color: var(--color-muted);
+  color: var(--color-muted-foreground);
 }
 
 .prose-content .hljs-emphasis {
@@ -343,4 +352,16 @@
 
 .prose-content .hljs-strong {
   font-weight: 700;
+}
+
+.prose-content .hljs-params {
+  color: var(--color-foreground);
+}
+
+.prose-content .hljs-property {
+  color: var(--color-brand-hover);
+}
+
+.prose-content .hljs-function {
+  color: var(--color-info);
 }

@@ -183,7 +183,10 @@ mod tests {
         let result = compressor.compress_if_needed(&mut messages);
         assert!(result.is_some(), "should have triggered compression");
         let (before, after) = result.unwrap();
-        assert!(after < before, "after ({after}) should be less than before ({before})");
+        assert!(
+            after < before,
+            "after ({after}) should be less than before ({before})"
+        );
         assert!(matches!(&messages[0], Message::System { .. }));
         if let Message::Tool { content, .. } = &messages[3] {
             assert!(
@@ -256,6 +259,9 @@ mod tests {
             tool_msg("1", "t", &"x".repeat(1000)),
         ];
         let result = compressor.compress_if_needed(&mut messages);
-        assert!(result.is_none(), "should skip when message count is too small");
+        assert!(
+            result.is_none(),
+            "should skip when message count is too small"
+        );
     }
 }

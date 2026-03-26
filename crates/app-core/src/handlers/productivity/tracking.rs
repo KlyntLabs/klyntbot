@@ -326,10 +326,7 @@ impl AppCore {
 
     /// Refresh the in-memory categorizer from DB so the background tracker
     /// picks up category changes immediately.
-    async fn refresh_categorizer(
-        &self,
-        repo: &feature_productivity::repos::ActivityCategoryRepo,
-    ) {
+    async fn refresh_categorizer(&self, repo: &feature_productivity::repos::ActivityCategoryRepo) {
         if let Some(ref engine) = self.productivity_engine {
             let engine = engine.lock().await;
             let mut categorizer = engine.categorizer().write().await;
