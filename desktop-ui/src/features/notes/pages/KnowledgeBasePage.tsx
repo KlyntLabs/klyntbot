@@ -302,23 +302,23 @@ export default function KnowledgeBasePage() {
 
   const handleExportNote = useCallback(
     async (noteId: string) => {
-      const note = notes.find((n: Note) => n.id === noteId);
+      const note = noteMap.get(noteId);
       if (!note) return;
       const path = await save({
         defaultPath: `${note.title}.md`,
         filters: [{ name: "Markdown", extensions: ["md"] }],
       });
       if (!path) return;
-      const lastSlash = path.lastIndexOf("/");
-      const dir = path.substring(0, lastSlash);
-      const filename = path.substring(lastSlash + 1);
+      const lastSep = Math.max(path.lastIndexOf("/"), path.lastIndexOf("\\"));
+      const dir = path.substring(0, lastSep);
+      const filename = path.substring(lastSep + 1);
       try {
         await exportNotes({ noteIds: [noteId], destination: dir, outputFilename: filename });
       } catch (e) {
         console.error("Export failed:", e);
       }
     },
-    [notes, exportNotes],
+    [noteMap, exportNotes],
   );
 
   const handleExportNotebook = useCallback(
