@@ -17,12 +17,13 @@ import { TextStyle } from "@tiptap/extension-text-style";
 import Typography from "@tiptap/extension-typography";
 import Underline from "@tiptap/extension-underline";
 import type { Extensions } from "@tiptap/react";
-import { EditorContent, useEditor } from "@tiptap/react";
+import { EditorContent, ReactNodeViewRenderer, useEditor } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import { common, createLowlight } from "lowlight";
 import { useEffect } from "react";
 import { Markdown } from "tiptap-markdown";
 import { AnnotationMark } from "./AnnotationMark";
+import { CodeBlockView } from "./CodeBlockView";
 import { EntityMentionAutocomplete, EntityMentionMark } from "./EntityMention";
 import { MathBlock, MathInline } from "./MathNode";
 import { SlashCommandsExtension } from "./SlashCommandMenu";
@@ -175,7 +176,11 @@ export function getEditorExtensions(opts: EditorExtensionOptions = {}): Extensio
     Superscript,
     TextStyle,
     Color,
-    CodeBlockLowlight.configure({
+    CodeBlockLowlight.extend({
+      addNodeView() {
+        return ReactNodeViewRenderer(CodeBlockView);
+      },
+    }).configure({
       lowlight,
       defaultLanguage: "text",
     }),
