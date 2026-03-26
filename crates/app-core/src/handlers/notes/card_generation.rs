@@ -238,6 +238,29 @@ impl AppCore {
             .await
             .map_err(|e| ApiError::new("INTERNAL_ERROR", e.to_string()))?;
 
+        // Link flashcards to existing knowledge atoms by subject match
+        if let Ok(atom_repo) = self.knowledge_atom_repo() {
+            let atoms = if let Some(nid) = &params.note_id {
+                atom_repo.list_for_note(nid).await.unwrap_or_default()
+            } else {
+                vec![]
+            };
+            let active_atoms: Vec<_> = atoms
+                .into_iter()
+                .filter(|a| a.status == "active")
+                .collect();
+
+            for row in &rows {
+                let front_lower = row.front.to_lowercase();
+                if let Some(atom) = active_atoms
+                    .iter()
+                    .find(|a| front_lower.contains(&a.subject.to_lowercase()))
+                {
+                    let _ = repo.update_atom_id(&row.id, &atom.id).await;
+                }
+            }
+        }
+
         // Fire-and-forget: embed all saved cards in the background.
         if let (Some(engine), Some(vs)) = (self.embedding_engine.clone(), self.vector_store.clone())
         {

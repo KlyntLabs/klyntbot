@@ -579,6 +579,16 @@ impl FlashcardRepo {
         Ok(())
     }
 
+    /// Link a flashcard to a knowledge atom.
+    pub async fn update_atom_id(&self, card_id: &str, atom_id: &str) -> Result<(), sqlx::Error> {
+        sqlx::query("UPDATE flashcards SET atom_id = ?1 WHERE id = ?2")
+            .bind(atom_id)
+            .bind(card_id)
+            .execute(&self.pool)
+            .await?;
+        Ok(())
+    }
+
     /// Set `back_embedding_updated_at` to now for a card after its back embedding is computed.
     pub async fn update_embedding_timestamp(&self, id: &str) -> Result<(), sqlx::Error> {
         let now = Utc::now().to_rfc3339();
