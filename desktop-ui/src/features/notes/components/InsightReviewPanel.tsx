@@ -319,12 +319,16 @@ export function InsightReviewPanel({ state, actions }: InsightReviewPanelProps) 
               <SynthesisTab
                 status={state.tabs.synthesis.status}
                 content={state.tabs.synthesis.content}
+                noteId={state.noteId}
+                squadId={state.squadId}
               />
             )}
             {state.activeTab === "gaps" && (
               <GapAnalysisTab
                 status={state.tabs.gaps.status}
                 content={state.tabs.gaps.content}
+                noteId={state.noteId}
+                squadId={state.squadId}
                 onCreateNote={handleCreateDeepDiveNote}
               />
             )}
@@ -334,6 +338,7 @@ export function InsightReviewPanel({ state, actions }: InsightReviewPanelProps) 
                 questions={state.tabs.assessment.questions}
                 quizState={state.quizState}
                 noteId={state.noteId}
+                squadId={state.squadId}
                 onAnswer={actions.answerQuestion}
                 onReveal={actions.revealAnswer}
                 onRevealAll={actions.revealAll}
@@ -345,6 +350,8 @@ export function InsightReviewPanel({ state, actions }: InsightReviewPanelProps) 
                 status={state.tabs.conceptMap.status}
                 mermaid={state.tabs.conceptMap.mermaid}
                 fallbackText={state.tabs.conceptMap.fallbackText}
+                noteId={state.noteId}
+                squadId={state.squadId}
               />
             )}
             {state.activeTab === "perspectives" && (

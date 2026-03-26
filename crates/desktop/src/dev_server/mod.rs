@@ -235,6 +235,7 @@ mod tests {
             .flat_map(|m| m.iter().map(|s| s.to_string()))
             .collect();
         set.insert("chat_send".to_string());
+        set.insert("note_insight_tab_chat".to_string());
         set
     }
 

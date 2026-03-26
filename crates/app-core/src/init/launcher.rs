@@ -40,11 +40,13 @@ pub(super) async fn init_launcher(
     let clipboard_repo = ClipboardRepo::new(pool);
 
     let mut sources: Vec<Arc<dyn feature_launcher::SearchSource>> = Vec::new();
+    let mut icon_cache = None;
 
     // Apps source
     if launcher_config.sources.apps.enabled {
         let icon_cache_dir = config.data_dir_path().join("cache").join("app-icons");
         let app_index = Arc::new(AppIndex::with_cache_dir(icon_cache_dir));
+        icon_cache = app_index.icon_cache();
         let idx = Arc::clone(&app_index);
         tokio::spawn(async move { idx.index_applications().await });
         sources.push(app_index);
@@ -105,9 +107,14 @@ pub(super) async fn init_launcher(
         sources.push(source);
     }
 
-    // File search (mdfind) — live query, cached by SourceRegistry
+    // File search (ignore-walk index) — pre-indexed, refreshed by BackgroundRefresher
     if launcher_config.sources.files.enabled {
-        sources.push(Arc::new(feature_launcher::FileSearchSource::new()));
+        let source = Arc::new(feature_launcher::FileSearchSource::new(
+            launcher_config.sources.files.scan_dirs.clone(),
+        ));
+        let s = Arc::clone(&source);
+        tokio::spawn(async move { s.refresh().await });
+        sources.push(source);
     }
 
     // Content grep (rg) — prefix ?, live query, cached by SourceRegistry
@@ -124,7 +131,14 @@ pub(super) async fn init_launcher(
 
     // Running apps — pre-loaded index refreshed by BackgroundRefresher
     if launcher_config.sources.running_apps.enabled {
-        sources.push(Arc::new(feature_launcher::RunningAppsSource::new()));
+        let source = if let Some(ref cache) = icon_cache {
+            Arc::new(feature_launcher::RunningAppsSource::with_icon_cache(
+                Arc::clone(cache),
+            ))
+        } else {
+            Arc::new(feature_launcher::RunningAppsSource::new())
+        };
+        sources.push(source);
     }
 
     // Browser bookmarks — pre-loaded, refreshed by SourceFileWatcher
@@ -184,6 +198,13 @@ pub(super) async fn init_launcher(
         refresh_entries.push(feature_launcher::RefreshEntry {
             source: s,
             interval: std::time::Duration::from_secs(300),
+        });
+    }
+    if let Some(s) = find_source("files") {
+        let interval_secs = launcher_config.sources.files.refresh_interval_secs;
+        refresh_entries.push(feature_launcher::RefreshEntry {
+            source: s,
+            interval: std::time::Duration::from_secs(interval_secs),
         });
     }
 

@@ -95,6 +95,7 @@ export interface InsightReviewActions {
   close: () => void;
   switchTab: (tab: TabId) => void;
   regenerateTab: (tab: TabId) => Promise<void>;
+  clearTabChats: () => Promise<void>;
   saveFlashcards: (deckName: string) => Promise<void>;
   answerQuestion: (questionId: string, answer: string) => void;
   revealAnswer: (questionId: string) => void;
@@ -387,8 +388,22 @@ export function useInsightReview(): [InsightReviewState, InsightReviewActions] {
     setState((prev) => ({ ...prev, activeTab: tab }));
   }, []);
 
+  const clearTabChats = useCallback(async () => {
+    if (!state.noteId) return;
+    try {
+      await ipc("note_insight_clear_tab_chats", { noteId: state.noteId });
+    } catch {
+      // Best effort
+    }
+  }, [state.noteId]);
+
   const regenerateTab = useCallback(
     async (tab: TabId) => {
+      // Clear all tab chat sessions when regenerating content
+      if (state.noteId) {
+        ipc("note_insight_clear_tab_chats", { noteId: state.noteId }).catch(() => {});
+      }
+
       setState((prev) => {
         const tabs = { ...prev.tabs };
 
@@ -658,6 +673,7 @@ export function useInsightReview(): [InsightReviewState, InsightReviewActions] {
     close,
     switchTab,
     regenerateTab,
+    clearTabChats,
     saveFlashcards,
     answerQuestion,
     revealAnswer,

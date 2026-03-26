@@ -7,19 +7,29 @@ use desktop_shared::commands::{
     FlashcardGenerateParams, FlashcardGenerateResponse, FlashcardListParams, FlashcardResponse,
     FlashcardReviewParams, FlashcardSaveGeneratedParams, FlashcardSubmitAnswerParams,
     FlashcardUpdateParams, GradeResultResponse, HybridSearchResponse, InboxCreateParams,
-    InboxItemResponse, InsightEvolutionResponse, InsightQuizSubmitParams, InsightReviewResponse,
-    InsightReviewStarted, InsightSaveFlashcardsParams, InsightVersionResponse,
-    KnowledgeGrowthResponse, NoteCreateParams, NoteEditingFinishedParams, NoteLinkResponse,
-    NoteResponse, NoteRetentionHealthResponse, NoteSuggestionsResponse, NoteUpdateParams,
-    NoteVersionResponse, NotebookCreateParams, NotebookResponse, NotebookUpdateParams,
-    PersonaChatParams, PersonaChatResponse, PersonaResponse, RatePersonaParams,
-    RecentLearningSession, ScenarioChallengeResponse, ScopePreviewParams, ScopePreviewResponse,
-    SetPersonaPinsParams, StrugglingCardResponse, TabContent, UpdatePersonaParams,
+    InboxItemResponse, InsightChatParams, InsightChatStarted, InsightEvolutionResponse,
+    InsightQuizSubmitParams, InsightReviewResponse, InsightReviewStarted,
+    InsightSaveFlashcardsParams, InsightVersionResponse, KnowledgeGrowthResponse, NoteCreateParams,
+    NoteEditingFinishedParams, NoteLinkResponse, NoteResponse, NoteRetentionHealthResponse,
+    NoteSuggestionsResponse, NoteUpdateParams, NoteVersionResponse, NotebookCreateParams,
+    NotebookResponse, NotebookUpdateParams, PersonaChatParams, PersonaChatResponse, PersonaResponse,
+    RatePersonaParams, RecentLearningSession, ScenarioChallengeResponse, ScopePreviewParams,
+    ScopePreviewResponse, SetPersonaPinsParams, StrugglingCardResponse, TabContent,
+    UpdatePersonaParams,
 };
 use desktop_shared::errors::ApiError;
-use tauri::State;
+use tauri::{Emitter, State};
 
 use crate::app_core::AppCore;
+
+/// Bridges `AppEventEmitter` to Tauri's `Emitter` trait (notes-local copy).
+struct TauriEmitter(tauri::AppHandle);
+
+impl ::app_core::events::AppEventEmitter for TauriEmitter {
+    fn emit_event(&self, event_name: &str, payload: serde_json::Value) {
+        let _ = self.0.emit(event_name, payload);
+    }
+}
 
 // ── Note commands ───────────────────────────────────────────────────────
 
@@ -682,6 +692,26 @@ pub async fn note_editing_finished(
     state.note_editing_finished(params).await
 }
 
+// ── Insight Tab Chat commands ─────────────────────────────────────────
+
+#[tauri::command]
+pub async fn note_insight_tab_chat(
+    app: tauri::AppHandle,
+    state: State<'_, Arc<AppCore>>,
+    params: InsightChatParams,
+) -> Result<InsightChatStarted, ApiError> {
+    let emitter: Arc<dyn ::app_core::events::AppEventEmitter> = Arc::new(TauriEmitter(app));
+    state.note_insight_tab_chat(&params, emitter).await
+}
+
+#[tauri::command]
+pub async fn note_insight_clear_tab_chats(
+    state: State<'_, Arc<AppCore>>,
+    note_id: String,
+) -> Result<(), ApiError> {
+    state.note_insight_clear_tab_chats(&note_id).await
+}
+
 // ── Import / Export ──────────────────────────────────────────────
 
 #[tauri::command]
@@ -789,6 +819,8 @@ pub(crate) const DEV_COMMANDS: &[&str] = &[
     "note_editing_finished",
     "note_import_files",
     "note_export",
+    // note_insight_tab_chat handled in dev_server/dispatch.rs (needs SSE channels)
+    "note_insight_clear_tab_chats",
 ];
 
 #[cfg(debug_assertions)]
@@ -1122,6 +1154,11 @@ pub(crate) async fn dispatch_dev(
             "UNSUPPORTED",
             "Export requires the desktop app",
         )),
+        // note_insight_tab_chat is handled inline in dev_server/dispatch.rs (needs SSE channels)
+        "note_insight_clear_tab_chats" => {
+            let note_id = try_field!(dev::get_str(body, "noteId"));
+            dev::val(core.note_insight_clear_tab_chats(&note_id).await)
+        }
         _ => return None,
     })
 }

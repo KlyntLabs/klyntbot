@@ -73,15 +73,7 @@ export function PersonaCard({
             <MessageCircle size={10} />
             {showChat ? "Hide chat" : "Ask this persona"}
           </button>
-          {showChat && (
-            <PersonaChat
-              noteId={noteId}
-              personaId={personaId}
-              personaName={name}
-              personaRole={role}
-              personaTone={tone}
-            />
-          )}
+          {showChat && <PersonaChat noteId={noteId} personaId={personaId} personaName={name} />}
         </>
       )}
     </div>

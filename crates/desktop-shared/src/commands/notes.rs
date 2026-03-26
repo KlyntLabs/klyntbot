@@ -323,6 +323,7 @@ pub struct InsightChatParams {
     pub tab_name: String,
     pub user_message: String,
     pub session_key: String,
+    pub squad_id: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize)]

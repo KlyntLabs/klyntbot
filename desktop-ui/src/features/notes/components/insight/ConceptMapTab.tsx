@@ -1,13 +1,17 @@
+import { useInsightChat } from "@features/notes/hooks/useInsightChat";
 import { useCopyToClipboard } from "@shared/hooks/useCopyToClipboard";
 import { ClipboardCopy } from "lucide-react";
 import { useCallback, useState } from "react";
 import type { TabStatus } from "../../hooks/useInsightReview";
+import { InsightChatInput } from "./InsightChatInput";
 import { MermaidRenderer } from "./MermaidRenderer";
 
 interface ConceptMapTabProps {
   status: TabStatus;
   mermaid: string;
   fallbackText: string;
+  noteId: string | null;
+  squadId?: string | null;
 }
 
 function SkeletonLoader() {
@@ -56,9 +60,22 @@ function CopyButton({
   );
 }
 
-export function ConceptMapTab({ status, mermaid: mermaidCode, fallbackText }: ConceptMapTabProps) {
+export function ConceptMapTab({
+  status,
+  mermaid: mermaidCode,
+  fallbackText,
+  noteId,
+  squadId,
+}: ConceptMapTabProps) {
   const [renderFailed, setRenderFailed] = useState(false);
   const { copied, copy } = useCopyToClipboard();
+  const chat = useInsightChat(
+    noteId,
+    "concept-map",
+    status === "done",
+    squadId,
+    mermaidCode || fallbackText,
+  );
 
   const handleCopy = useCallback(async () => {
     await copy(mermaidCode);
@@ -90,10 +107,15 @@ export function ConceptMapTab({ status, mermaid: mermaidCode, fallbackText }: Co
   if (fallbackText || renderFailed) {
     const displayText = fallbackText || mermaidCode;
     return (
-      <div className="space-y-3">
-        <TextOutline text={displayText} />
-        {mermaidCode && !renderFailed && (
-          <CopyButton mermaidCode={mermaidCode} copied={copied} onCopy={handleCopy} />
+      <div>
+        <div className="space-y-3">
+          <TextOutline text={displayText} />
+          {mermaidCode && !renderFailed && (
+            <CopyButton mermaidCode={mermaidCode} copied={copied} onCopy={handleCopy} />
+          )}
+        </div>
+        {status === "done" && (
+          <InsightChatInput {...chat} placeholder="Ask about this concept map..." />
         )}
       </div>
     );
@@ -102,11 +124,16 @@ export function ConceptMapTab({ status, mermaid: mermaidCode, fallbackText }: Co
   // Mermaid diagram mode
   if (mermaidCode) {
     return (
-      <div className="space-y-3">
-        <div className="rounded-lg bg-card border border-border p-4">
-          <MermaidRenderer code={mermaidCode} onError={handleRenderError} />
+      <div>
+        <div className="space-y-3">
+          <div className="rounded-lg bg-card border border-border p-4">
+            <MermaidRenderer code={mermaidCode} onError={handleRenderError} />
+          </div>
+          <CopyButton mermaidCode={mermaidCode} copied={copied} onCopy={handleCopy} />
         </div>
-        <CopyButton mermaidCode={mermaidCode} copied={copied} onCopy={handleCopy} />
+        {status === "done" && (
+          <InsightChatInput {...chat} placeholder="Ask about this concept map..." />
+        )}
       </div>
     );
   }

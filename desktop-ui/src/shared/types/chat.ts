@@ -25,6 +25,8 @@ export interface ChatMessage {
   timestamp?: string;
   segments?: MessageSegment[];
   transparency?: TransparencyData;
+  personaId?: string;
+  personaName?: string;
 }
 
 // ── Chat Thread ─────────────────────────────────────────────

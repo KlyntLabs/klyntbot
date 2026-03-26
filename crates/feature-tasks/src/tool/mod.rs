@@ -565,6 +565,7 @@ mod tests {
                 estimated_minutes INTEGER NOT NULL, actual_minutes INTEGER NOT NULL,
                 deviation_pct REAL NOT NULL DEFAULT 0.0, complexity_score INTEGER,
                 energy_level TEXT, tags TEXT NOT NULL DEFAULT '[]',
+                project_id TEXT,
                 completed_at TEXT NOT NULL
             )"#,
             r#"CREATE TABLE IF NOT EXISTS task_decompositions (

@@ -175,6 +175,11 @@ pub(super) async fn dispatch(
         return super::streaming::dispatch_chat_send(core, &body, &state.sse_channels).await;
     }
 
+    // ── note_insight_tab_chat (needs SSE channels, handled inline) ──
+    if cmd == "note_insight_tab_chat" {
+        return super::streaming::dispatch_insight_tab_chat(core, &body, &state.sse_channels).await;
+    }
+
     // ── open_url (desktop-like: opens URL in default browser) ───────
     if cmd == "open_url" {
         let url: String = dev::get_str(&body, "url").unwrap_or_default();

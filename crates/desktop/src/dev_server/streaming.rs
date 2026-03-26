@@ -92,6 +92,32 @@ pub(super) async fn sse_handler(
     Sse::new(stream).keep_alive(KeepAlive::default())
 }
 
+/// Handle `note_insight_tab_chat` separately because it needs SSE channel state to relay
+/// streaming LLM events back to the browser via Server-Sent Events.
+pub(super) async fn dispatch_insight_tab_chat(
+    core: &AppCore,
+    body: &Value,
+    sse_channels: &SseChannels,
+) -> ApiResult {
+    let params: desktop_shared::commands::InsightChatParams =
+        match serde_json::from_value(body.get("params").cloned().unwrap_or_default()) {
+            Ok(p) => p,
+            Err(e) => return err(desktop_shared::errors::ApiError::new("INVALID_PARAMS", e.to_string())),
+        };
+
+    let session_key = params.session_key.clone();
+    let tx = sse_channels
+        .entry(session_key.clone())
+        .or_insert_with(|| broadcast::channel(256).0)
+        .clone();
+    let emitter: Arc<dyn AppEventEmitter> = Arc::new(SseEmitter { tx });
+
+    match core.note_insight_tab_chat(&params, emitter).await {
+        Ok(started) => ok(started),
+        Err(e) => err(e),
+    }
+}
+
 /// SSE endpoint — streams insight review events (synthesis chunks, tab-done, etc.).
 ///
 /// The frontend (`useInsightSSE.ts`) connects here in browser dev mode

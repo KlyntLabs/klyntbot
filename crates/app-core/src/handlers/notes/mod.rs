@@ -8,6 +8,7 @@ mod graph_propagation;
 mod import_export;
 mod inbox;
 mod insight;
+pub mod insight_chat;
 mod insight_context;
 mod insight_personas;
 mod insight_prompts;

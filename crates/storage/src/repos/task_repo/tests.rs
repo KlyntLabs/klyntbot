@@ -192,6 +192,7 @@ async fn create_test_tables(db: &sqlx::SqlitePool) {
                 complexity_score  INTEGER,
                 energy_level      TEXT,
                 tags              TEXT NOT NULL DEFAULT '[]',
+                project_id        TEXT,
                 completed_at      TEXT NOT NULL
             )
             "#,

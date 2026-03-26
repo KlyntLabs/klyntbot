@@ -83,9 +83,6 @@ impl SessionRepo {
     }
 
     /// Add a message to a session and touch its `updated_at` timestamp.
-    ///
-    /// Uses a CTE to touch `sessions.updated_at` and insert the message
-    /// in a single atomic statement — no partial writes on crash.
     #[allow(clippy::too_many_arguments)]
     pub async fn add_message(
         &self,
@@ -99,11 +96,17 @@ impl SessionRepo {
         persona_id: Option<&str>,
     ) -> Result<SessionMessageRow, StorageError> {
         let now = Utc::now();
+
+        // Touch session updated_at
+        sqlx::query("UPDATE sessions SET updated_at = ?1 WHERE key = ?2")
+            .bind(now)
+            .bind(session_key)
+            .execute(&self.pool)
+            .await?;
+
+        // Insert the message
         let row = sqlx::query_as::<_, SessionMessageRow>(
-            "WITH touch AS (
-                 UPDATE sessions SET updated_at = ?5 WHERE key = ?2
-             )
-             INSERT INTO session_messages
+            "INSERT INTO session_messages
                  (id, session_key, role, content, timestamp, request_id, tool_calls, metadata, persona_id)
              VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)
              RETURNING *",
@@ -397,6 +400,24 @@ impl SessionRepo {
         .fetch_all(&self.pool)
         .await?;
         Ok(rows)
+    }
+
+    /// Delete all sessions whose key starts with `prefix`.
+    ///
+    /// Returns the number of sessions deleted. Messages are deleted via the
+    /// `session_messages` table first (no FK cascade in SQLite by default).
+    pub async fn delete_sessions_by_prefix(&self, prefix: &str) -> Result<u64, StorageError> {
+        let pattern = format!("{prefix}%");
+        // Delete messages first to avoid orphan rows.
+        sqlx::query("DELETE FROM session_messages WHERE session_key LIKE ?1")
+            .bind(&pattern)
+            .execute(&self.pool)
+            .await?;
+        let result = sqlx::query("DELETE FROM sessions WHERE key LIKE ?1")
+            .bind(&pattern)
+            .execute(&self.pool)
+            .await?;
+        Ok(result.rows_affected())
     }
 
     /// Delete all sessions that have not been updated within the given TTL.

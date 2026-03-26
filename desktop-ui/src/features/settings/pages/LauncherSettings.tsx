@@ -17,7 +17,7 @@ interface LauncherData {
     sshHosts?: { enabled?: boolean };
     gitRepos?: { enabled?: boolean; scanDirs?: string[] };
     scripts?: { enabled?: boolean; dir?: string };
-    files?: { enabled?: boolean };
+    files?: { enabled?: boolean; scanDirs?: string[]; refreshIntervalSecs?: number };
     contentGrep?: { enabled?: boolean; defaultScope?: string };
     contacts?: { enabled?: boolean };
     runningApps?: { enabled?: boolean };
@@ -61,7 +61,19 @@ const SOURCE_DEFS: SourceDef[] = [
       { key: "dir", label: "Scripts directory", type: "text", placeholder: "~/.klyntbot/scripts" },
     ],
   },
-  { key: "files", label: "Files" },
+  {
+    key: "files",
+    label: "Files",
+    extraFields: [
+      {
+        key: "scanDirs",
+        label: "Search directories",
+        type: "dirs",
+        placeholder: "~/Projects, ~/Documents, ~/Desktop",
+      },
+      { key: "refreshIntervalSecs", label: "Refresh interval (seconds)", type: "number" },
+    ],
+  },
   {
     key: "contentGrep",
     label: "Content search (grep)",

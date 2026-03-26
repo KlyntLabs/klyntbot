@@ -1,7 +1,9 @@
+import { useInsightChat } from "@features/notes/hooks/useInsightChat";
 import { ipc } from "@shared/hooks/useIpc";
 import { BookOpen } from "lucide-react";
 import { useCallback, useState } from "react";
 import type { QuizQuestion, TabStatus } from "../../hooks/useInsightReview";
+import { InsightChatInput } from "./InsightChatInput";
 import { ScenarioChallenge, type ScenarioData } from "./ScenarioChallenge";
 
 interface SelfAssessmentTabProps {
@@ -14,6 +16,7 @@ interface SelfAssessmentTabProps {
     total: number;
   };
   noteId: string | null;
+  squadId?: string | null;
   onAnswer: (questionId: string, answer: string) => void;
   onReveal: (questionId: string) => void;
   onRevealAll: () => void;
@@ -41,11 +44,14 @@ export function SelfAssessmentTab({
   questions,
   quizState,
   noteId,
+  squadId,
   onAnswer,
   onReveal,
   onRevealAll,
   onSaveFlashcards,
 }: SelfAssessmentTabProps) {
+  const quizSummary = questions.map((q) => `Q: ${q.question} A: ${q.correctAnswer}`).join("\n");
+  const chat = useInsightChat(noteId, "assessment", status === "done", squadId, quizSummary);
   const [scenario, setScenario] = useState<ScenarioData | null>(null);
   const [scenarioLoading, setScenarioLoading] = useState(false);
   const [scenarioError, setScenarioError] = useState(false);
@@ -242,6 +248,10 @@ export function SelfAssessmentTab({
           <BookOpen size={14} />
           Save as Flashcard Deck
         </button>
+      )}
+
+      {status === "done" && (
+        <InsightChatInput {...chat} placeholder="Ask about this assessment..." />
       )}
     </div>
   );

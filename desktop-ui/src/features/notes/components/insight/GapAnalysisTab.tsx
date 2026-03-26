@@ -1,10 +1,14 @@
 import { MarkdownContent } from "@features/chat/components/MarkdownContent";
+import { useInsightChat } from "@features/notes/hooks/useInsightChat";
 import { FilePlus } from "lucide-react";
 import type { TabStatus } from "../../hooks/useInsightReview";
+import { InsightChatInput } from "./InsightChatInput";
 
 interface GapAnalysisTabProps {
   status: TabStatus;
   content: string;
+  noteId: string | null;
+  squadId?: string | null;
   onCreateNote?: (title: string, body: string) => void;
 }
 
@@ -38,7 +42,14 @@ function SkeletonLoader() {
   );
 }
 
-export function GapAnalysisTab({ status, content, onCreateNote }: GapAnalysisTabProps) {
+export function GapAnalysisTab({
+  status,
+  content,
+  noteId,
+  squadId,
+  onCreateNote,
+}: GapAnalysisTabProps) {
+  const chat = useInsightChat(noteId, "gaps", status === "done", squadId, content);
   if (status === "idle") {
     return (
       <p className="text-[11px] text-dim italic">Start an insight review to see gap analysis</p>
@@ -60,33 +71,38 @@ export function GapAnalysisTab({ status, content, onCreateNote }: GapAnalysisTab
   const { markdown, gaps } = parseGaps(content);
 
   return (
-    <div className="space-y-4">
-      <div className="text-xs text-muted-foreground leading-relaxed">
-        <MarkdownContent content={markdown} />
-      </div>
-
-      {gaps.length > 0 && (
-        <div className="space-y-2 pt-2 border-t border-border">
-          <div className="text-2xs font-medium text-dim uppercase tracking-wider">
-            Knowledge Gaps — Deep Dive
-          </div>
-          {gaps.map((gap) => (
-            <button
-              key={gap.topic}
-              type="button"
-              onClick={() => onCreateNote?.(gap.suggestedTitle, gap.description)}
-              className="w-full flex items-start gap-2 p-2 rounded-lg bg-card hover:bg-accent transition-colors text-left group"
-            >
-              <FilePlus size={12} className="text-dim group-hover:text-brand mt-0.5 shrink-0" />
-              <div>
-                <div className="text-[11px] text-muted-foreground group-hover:text-foreground">
-                  {gap.topic}
-                </div>
-                <div className="text-2xs text-dim mt-0.5 line-clamp-2">{gap.description}</div>
-              </div>
-            </button>
-          ))}
+    <div>
+      <div className="space-y-4">
+        <div className="text-xs text-muted-foreground leading-relaxed">
+          <MarkdownContent content={markdown} />
         </div>
+
+        {gaps.length > 0 && (
+          <div className="space-y-2 pt-2 border-t border-border">
+            <div className="text-2xs font-medium text-dim uppercase tracking-wider">
+              Knowledge Gaps — Deep Dive
+            </div>
+            {gaps.map((gap) => (
+              <button
+                key={gap.topic}
+                type="button"
+                onClick={() => onCreateNote?.(gap.suggestedTitle, gap.description)}
+                className="w-full flex items-start gap-2 p-2 rounded-lg bg-card hover:bg-accent transition-colors text-left group"
+              >
+                <FilePlus size={12} className="text-dim group-hover:text-brand mt-0.5 shrink-0" />
+                <div>
+                  <div className="text-[11px] text-muted-foreground group-hover:text-foreground">
+                    {gap.topic}
+                  </div>
+                  <div className="text-2xs text-dim mt-0.5 line-clamp-2">{gap.description}</div>
+                </div>
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+      {status === "done" && (
+        <InsightChatInput {...chat} placeholder="Ask about these knowledge gaps..." />
       )}
     </div>
   );
