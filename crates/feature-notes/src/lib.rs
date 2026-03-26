@@ -1,5 +1,6 @@
 //! feature-notes: Notes and knowledge management feature package for klyntbot.
 
+pub mod front_matter;
 pub mod handlers;
 pub mod link_parser;
 pub mod models;
