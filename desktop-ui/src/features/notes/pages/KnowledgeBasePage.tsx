@@ -108,10 +108,12 @@ export default function KnowledgeBasePage() {
   // ── Sidebar widths (imperatively managed for perf) ────────────────────
   const [leftWidth, setLeftWidth] = useState(220);
   const [rightWidth, setRightWidth] = useState(260);
+  const [insightWidth, setInsightWidth] = useState(480);
   const leftRef = useRef<HTMLDivElement>(null);
   const rightRef = useRef<HTMLDivElement>(null);
   const leftWidthRef = useRef(leftWidth);
   const rightWidthRef = useRef(rightWidth);
+  const insightWidthRef = useRef(insightWidth);
   const containerRef = useRef<HTMLDivElement>(null);
 
   // Pre-select note from URL search params (e.g. /notes?noteId=xxx)
@@ -133,14 +135,7 @@ export default function KnowledgeBasePage() {
 
   // ── Insight derived state ─────────────────────────────────────────────
   const insightOpen = insightState.isOpen;
-  const insightPanelWidth = useMemo(() => {
-    const container = containerRef.current;
-    if (!container) return 480;
-    // Leave at least 300px for the editor + left sidebar space
-    const available = container.clientWidth - leftWidth - 20;
-    return Math.max(360, Math.min(640, available * 0.65));
-  }, [leftWidth]); // eslint-disable-line react-hooks/exhaustive-deps
-  const effectiveRightWidth = insightOpen ? insightPanelWidth : rightWidth;
+  const effectiveRightWidth = insightOpen ? insightWidth : rightWidth;
 
   // ── Mutations ─────────────────────────────────────────────────────────
   const { mutate: createNote } = useMutation<Note, NoteCreateParams>("note_create", "params");
@@ -333,6 +328,35 @@ export default function KnowledgeBasePage() {
     const onUp = () => {
       cancelAnimationFrame(raf);
       setRightWidth(rightWidthRef.current);
+      containerRef.current?.classList.remove("resizing");
+      document.removeEventListener("pointermove", onMove);
+      document.removeEventListener("pointerup", onUp);
+    };
+    document.addEventListener("pointermove", onMove);
+    document.addEventListener("pointerup", onUp);
+  }, []);
+
+  // ── Resize logic (insight panel) ─────────────────────────────────────
+  const onInsightResizeStart = useCallback((e: React.PointerEvent) => {
+    e.preventDefault();
+    const startX = e.clientX;
+    const startW = insightWidthRef.current;
+    let raf = 0;
+
+    containerRef.current?.classList.add("resizing");
+
+    const onMove = (ev: globalThis.PointerEvent) => {
+      cancelAnimationFrame(raf);
+      raf = requestAnimationFrame(() => {
+        // Dragging left increases width, dragging right decreases
+        const newW = Math.min(900, Math.max(320, startW - (ev.clientX - startX)));
+        insightWidthRef.current = newW;
+        if (rightRef.current) rightRef.current.style.width = `${newW}px`;
+      });
+    };
+    const onUp = () => {
+      cancelAnimationFrame(raf);
+      setInsightWidth(insightWidthRef.current);
       containerRef.current?.classList.remove("resizing");
       document.removeEventListener("pointermove", onMove);
       document.removeEventListener("pointerup", onUp);
@@ -550,10 +574,10 @@ export default function KnowledgeBasePage() {
         )}
       </div>
 
-      {/* Right resize handle — hidden when insight panel is open */}
-      {showRightPanel && !insightOpen && (
+      {/* Right resize handle */}
+      {showRightPanel && (
         <div
-          onPointerDown={onRightResizeStart}
+          onPointerDown={insightOpen ? onInsightResizeStart : onRightResizeStart}
           className="w-1 shrink-0 cursor-col-resize group flex items-center justify-center"
         >
           <div className="w-px h-full group-hover:bg-brand/40 transition-colors" />
@@ -562,11 +586,7 @@ export default function KnowledgeBasePage() {
 
       {/* Right panel — ContextPanel */}
       {showRightPanel && (
-        <div
-          ref={rightRef}
-          className="h-full transition-[width] duration-300 ease-in-out"
-          style={{ width: effectiveRightWidth }}
-        >
+        <div ref={rightRef} className="h-full" style={{ width: effectiveRightWidth }}>
           <ContextPanel
             width={effectiveRightWidth}
             noteId={selectedNoteId}
