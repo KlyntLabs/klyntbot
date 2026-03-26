@@ -76,7 +76,7 @@ Dependencies flow strictly upward. `plugin-sdk` and `tests/fixtures/hello_plugin
 
 ### Storage
 
-`StoragePool` wraps `SqlitePool` (Clone+Send+Sync, no `Arc<RwLock>` needed). Relational data in `{data_dir}/data.db`, vectors in `{data_dir}/lancedb/`. Data dir defaults to `~/.klyntbot`. Access via `Repos::from_pool(&pool)`. Feature crates add migrations via `FeatureMigration`.
+`StoragePool` wraps `SqlitePool` (Clone+Send+Sync, no `Arc<RwLock>` needed). Relational data in `{data_dir}/data.db`, vectors in `{data_dir}/lance/`. Data dir defaults to `~/.klyntbot`. Access via `Repos::from_pool(&pool)`. Feature crates add migrations via `FeatureMigration`.
 
 ### Key patterns
 
@@ -151,6 +151,14 @@ Klyntbot exposes tools to external AI clients (Claude Code, Cursor, etc.) via MC
 **Mid-loop context compression:** During Reactive execution, the `MidLoopCompressor` checks token usage after each iteration. When accumulated message tokens exceed 70% of the context window, older `Message::Tool` results are replaced with extractive summaries (first 150 chars + metadata). System messages and recent iterations (last 8 messages) are always preserved verbatim. Emits `AgentEvent::ContextCompressed` for UI transparency.
 
 **Live context refresh:** During Reactive execution, the `LiveContextRefresher` drains a shared `ContextUpdateQueue` (in the `bus` crate) at each iteration boundary. Context updates (e.g., newly promoted memories) are injected as `Message::ContextUpdate` entries with XML-tagged content. Token budget is respected — standard updates can use up to 80% of remaining context (20% reserved for LLM response); high-priority updates can use 90% (10% reserved). Emits `AgentEvent::ContextReassembled` for transparency. Set `pause_context_updates: true` on `ExecutionParams` for frozen-context mode. Phase 1 producer: cognitive background service pushes on memory promotion.
+
+## Workflow
+
+**Parallel sessions:** This workspace benefits from parallel Claude Code sessions. Use separate terminal tabs for independent crate work. For isolated changes, `git worktree` creates parallel checkouts without branch conflicts.
+
+**Plan-then-execute:** For multi-crate changes, start in Plan mode (`/plan`) to design the approach, then switch to execution. Especially important for cross-layer changes (e.g., adding a new feature package that touches L1–L7).
+
+**Subagents for repeatable work:** Use subagents for PR-shaped tasks: "simplify this diff", "verify all tests pass", "check clippy across workspace". Keep the main agent's context clean for architectural decisions.
 
 ## Conventions
 
