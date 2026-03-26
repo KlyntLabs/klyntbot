@@ -191,6 +191,13 @@ pub(super) async fn init_launcher(
             interval: std::time::Duration::from_secs(300),
         });
     }
+    if let Some(s) = find_source("files") {
+        let interval_secs = launcher_config.sources.files.refresh_interval_secs;
+        refresh_entries.push(feature_launcher::RefreshEntry {
+            source: s,
+            interval: std::time::Duration::from_secs(interval_secs),
+        });
+    }
 
     // File watches
     let mut watches: Vec<(std::path::PathBuf, Arc<dyn feature_launcher::SearchSource>)> =
