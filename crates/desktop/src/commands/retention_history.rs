@@ -8,9 +8,15 @@ use crate::app_core::AppCore;
 #[tauri::command]
 pub async fn retention_history(
     state: State<'_, Arc<AppCore>>,
-    params: RetentionHistoryParams,
+    days: i64,
+    by_domain: Option<bool>,
 ) -> Result<RetentionHistoryResponse, ApiError> {
-    state.retention_history(params).await
+    state
+        .retention_history(RetentionHistoryParams {
+            days,
+            by_domain: by_domain.unwrap_or(false),
+        })
+        .await
 }
 
 // ── Dev server dispatch ─────────────────────────────────────────────
