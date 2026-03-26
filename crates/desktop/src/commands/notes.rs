@@ -11,11 +11,10 @@ use desktop_shared::commands::{
     InsightReviewStarted, InsightSaveFlashcardsParams, InsightVersionResponse,
     KnowledgeGrowthResponse, NoteCreateParams, NoteEditingFinishedParams, NoteLinkResponse,
     NoteResponse, NoteRetentionHealthResponse, NoteSuggestionsResponse, NoteUpdateParams,
-    NoteVersionResponse,
-    NotebookCreateParams, NotebookResponse, NotebookUpdateParams, PersonaChatParams,
-    PersonaChatResponse, PersonaResponse, RatePersonaParams, RecentLearningSession,
-    ScenarioChallengeResponse, SetPersonaPinsParams, StrugglingCardResponse, TabContent,
-    UpdatePersonaParams,
+    NoteVersionResponse, NotebookCreateParams, NotebookResponse, NotebookUpdateParams,
+    PersonaChatParams, PersonaChatResponse, PersonaResponse, RatePersonaParams,
+    RecentLearningSession, ScenarioChallengeResponse, SetPersonaPinsParams, StrugglingCardResponse,
+    TabContent, UpdatePersonaParams,
 };
 use desktop_shared::errors::ApiError;
 use tauri::State;
@@ -675,6 +674,34 @@ pub async fn note_editing_finished(
     state.note_editing_finished(params).await
 }
 
+// ── Import / Export ──────────────────────────────────────────────
+
+#[tauri::command]
+pub async fn note_import_files(
+    state: State<'_, Arc<AppCore>>,
+    app: tauri::AppHandle,
+    params: desktop_shared::commands::NoteImportParams,
+) -> Result<desktop_shared::commands::NoteImportResult, ApiError> {
+    let result = state.note_import_files(params).await?;
+    super::emit_updates(
+        &app,
+        &[::app_core::EntityUpdate {
+            kind: desktop_shared::types::EntityKind::Note,
+            id: "import".into(),
+        }],
+    );
+    Ok(result)
+}
+
+#[tauri::command]
+pub async fn note_export(
+    state: State<'_, Arc<AppCore>>,
+    _app: tauri::AppHandle,
+    params: desktop_shared::commands::NoteExportParams,
+) -> Result<desktop_shared::commands::NoteExportResult, ApiError> {
+    state.note_export(params).await
+}
+
 // ── Dev server dispatch ─────────────────────────────────────────────
 
 #[cfg(test)]
@@ -751,6 +778,8 @@ pub(crate) const DEV_COMMANDS: &[&str] = &[
     "flashcard_recent_learning_sessions",
     "note_retention_health",
     "note_editing_finished",
+    "note_import_files",
+    "note_export",
 ];
 
 #[cfg(debug_assertions)]
@@ -1053,8 +1082,14 @@ pub(crate) async fn dispatch_dev(
                 .await,
         ),
         "flashcard_recent_learning_sessions" => {
-            let limit = body.get("limit").and_then(|v| v.as_u64()).map(|l| l as usize);
-            dev::val(core.flashcard_recent_learning_sessions(limit.unwrap_or(3)).await)
+            let limit = body
+                .get("limit")
+                .and_then(|v| v.as_u64())
+                .map(|l| l as usize);
+            dev::val(
+                core.flashcard_recent_learning_sessions(limit.unwrap_or(3))
+                    .await,
+            )
         }
         "note_retention_health" => {
             let note_id = try_field!(dev::get_str(body, "noteId"));
@@ -1064,6 +1099,14 @@ pub(crate) async fn dispatch_dev(
             core.note_editing_finished(try_field!(dev::parse_params(body)))
                 .await,
         ),
+        "note_import_files" => Err(ApiError::new(
+            "UNSUPPORTED",
+            "Import requires the desktop app",
+        )),
+        "note_export" => Err(ApiError::new(
+            "UNSUPPORTED",
+            "Export requires the desktop app",
+        )),
         _ => return None,
     })
 }
