@@ -30,6 +30,11 @@ interface ContextSummary {
   totalWords: number;
   strongAtoms: number;
   fadingAtoms: number;
+  factsCount: number;
+  memoriesCount: number;
+  entityCount: number;
+  includeCognitive: boolean;
+  deepDive: boolean;
 }
 
 interface ScopePreviewResponse {
@@ -78,7 +83,14 @@ export function ScopePreview({
 }: ScopePreviewProps) {
   const { data, loading } = useQuery<ScopePreviewResponse>(
     "note_insight_preview_scope",
-    { params: { noteId, scopeType: scopeConfig.scopeType } },
+    {
+      params: {
+        noteId,
+        scopeType: scopeConfig.scopeType,
+        includeCognitive: scopeConfig.includeCognitive,
+        deepDive: scopeConfig.deepDive,
+      },
+    },
     EMPTY,
   );
 
@@ -149,7 +161,7 @@ export function ScopePreview({
 
       {/* Context summary bar */}
       {!loading && (
-        <div className="flex items-center gap-3 px-3 py-1.5 text-[9px] text-dim">
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 px-3 py-1.5 text-[9px] text-dim">
           <span className="flex items-center gap-1">
             <FileText size={8} />
             {summary.totalNotes} notes &middot; ~{summary.totalWords.toLocaleString()} words
@@ -166,10 +178,18 @@ export function ScopePreview({
               )}
             </span>
           )}
-          {scopeConfig.includeCognitive && (
+          {summary.includeCognitive && (
             <span className="flex items-center gap-1 text-purple-400">
               <Zap size={8} />
-              cognitive
+              {summary.factsCount > 0 || summary.memoriesCount > 0
+                ? `${summary.factsCount} facts · ${summary.memoriesCount} memories`
+                : "cognitive"}
+            </span>
+          )}
+          {summary.deepDive && (
+            <span className="flex items-center gap-1 text-blue-400">
+              <Brain size={8} />
+              deep dive{summary.entityCount > 0 ? ` · ${summary.entityCount} entities` : ""}
             </span>
           )}
         </div>

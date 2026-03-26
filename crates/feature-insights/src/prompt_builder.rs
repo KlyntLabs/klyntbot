@@ -22,7 +22,7 @@ pub struct InsightContext {
 
 /// Builds the full context for insight prompt injection.
 pub struct PromptBuilder {
-    cognitive: Arc<dyn CognitiveAccessor>,
+    pub(crate) cognitive: Arc<dyn CognitiveAccessor>,
 }
 
 impl PromptBuilder {

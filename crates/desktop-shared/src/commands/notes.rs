@@ -520,6 +520,16 @@ pub struct ContextSummary {
     pub total_words: u32,
     pub strong_atoms: u32,
     pub fading_atoms: u32,
+    /// Number of semantic facts included (when cognitive context is on).
+    pub facts_count: u32,
+    /// Number of episodic memories included (when cognitive context is on).
+    pub memories_count: u32,
+    /// Number of entity connections (when deep dive is on).
+    pub entity_count: u32,
+    /// Whether cognitive context is included.
+    pub include_cognitive: bool,
+    /// Whether deep dive is included.
+    pub deep_dive: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

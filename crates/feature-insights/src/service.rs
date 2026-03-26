@@ -112,6 +112,30 @@ impl InsightService {
         self.scope_resolver.resolve(note_id, config).await
     }
 
+    /// Count cognitive context items (facts, memories) for scope preview.
+    pub async fn cognitive_counts(&self, note_title: &str, note_id: &str) -> (u32, u32) {
+        let facts: Vec<String> = self
+            .prompt_builder
+            .cognitive
+            .search_facts(note_title, None, 10)
+            .await;
+        let memories: Vec<String> = self
+            .prompt_builder
+            .cognitive
+            .recent_memories(note_id, 5)
+            .await;
+        (facts.len() as u32, memories.len() as u32)
+    }
+
+    /// Count entity connections for scope preview (deep dive).
+    pub async fn entity_count(&self, note_id: &str) -> u32 {
+        self.prompt_builder
+            .cognitive
+            .entity_neighborhood(note_id, 2)
+            .await
+            .len() as u32
+    }
+
     /// Check if a fresh insight exists for the given hash. Returns it if found.
     pub async fn check_cache(
         &self,

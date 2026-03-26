@@ -950,11 +950,50 @@ impl AppCore {
             (0, 0)
         };
 
+        let include_cognitive = params.scope.include_cognitive.unwrap_or(true);
+        let deep_dive = params.scope.deep_dive.unwrap_or(false);
+
+        // Compute cognitive context counts when enabled
+        let note_title = self
+            .note_repo
+            .get_note(&params.note_id)
+            .await
+            .ok()
+            .flatten()
+            .map(|n| n.title)
+            .unwrap_or_default();
+
+        let (facts_count, memories_count) = if include_cognitive {
+            if let Some(ref service) = self.insight_service {
+                service.cognitive_counts(&note_title, &params.note_id).await
+            } else {
+                (0, 0)
+            }
+        } else {
+            (0, 0)
+        };
+
+        // Compute entity connections when deep dive is enabled
+        let entity_count = if deep_dive {
+            if let Some(ref service) = self.insight_service {
+                service.entity_count(&params.note_id).await
+            } else {
+                0
+            }
+        } else {
+            0
+        };
+
         let context_summary = ContextSummary {
             total_notes: notes.len() as u32 + 1, // +1 for current note
             total_words,
             strong_atoms,
             fading_atoms,
+            facts_count,
+            memories_count,
+            entity_count,
+            include_cognitive,
+            deep_dive,
         };
 
         Ok(ScopePreviewResponse {
