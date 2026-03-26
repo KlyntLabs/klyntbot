@@ -10,7 +10,7 @@
 /* ── Base ──────────────────────────────────────────────────────────────── */
 
 .prose-content {
-  color: var(--color-primary);
+  color: var(--color-foreground);
   font-size: 0.8125rem; /* 13px — chat-appropriate */
   line-height: 1.75;
 }
@@ -25,7 +25,7 @@
   font-size: 1.25rem;
   font-weight: 700;
   margin: 1.25rem 0 0.5rem;
-  color: var(--color-primary);
+  color: var(--color-foreground);
   letter-spacing: -0.025em;
   padding-bottom: 0.35rem;
   border-bottom: 2px solid transparent;
@@ -43,7 +43,7 @@
   font-weight: 600;
   margin: 1rem 0 0.4rem;
   letter-spacing: -0.02em;
-  background: linear-gradient(135deg, var(--color-primary) 0%, var(--color-info) 100%);
+  background: linear-gradient(135deg, var(--color-foreground) 0%, var(--color-info) 100%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
@@ -54,7 +54,7 @@
   font-weight: 600;
   margin: 0.75rem 0 0.35rem;
   letter-spacing: -0.015em;
-  background: linear-gradient(135deg, var(--color-primary) 0%, var(--color-purple) 100%);
+  background: linear-gradient(135deg, var(--color-foreground) 0%, var(--color-purple) 100%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
@@ -66,14 +66,14 @@
   font-size: 0.875rem;
   font-weight: 600;
   margin: 0.625rem 0 0.25rem;
-  color: var(--color-primary);
+  color: var(--color-foreground);
 }
 
 /* ── Strong & emphasis ─────────────────────────────────────────────────── */
 
 .prose-content strong {
   font-weight: 700;
-  color: var(--color-primary);
+  color: var(--color-foreground);
 }
 
 .prose-content em {
@@ -118,7 +118,7 @@
 }
 
 .prose-content li::marker {
-  color: color-mix(in srgb, var(--brand) 50%, var(--color-muted));
+  color: color-mix(in srgb, var(--brand) 50%, var(--color-muted-foreground));
 }
 
 /* ── Blockquote ────────────────────────────────────────────────────────── */
@@ -252,8 +252,8 @@
 /* ── Strikethrough (GFM) ───────────────────────────────────────────────── */
 
 .prose-content del {
-  color: var(--color-muted);
-  text-decoration-color: var(--color-muted);
+  color: var(--color-muted-foreground);
+  text-decoration-color: var(--color-muted-foreground);
 }
 
 /* ── Images ────────────────────────────────────────────────────────────── */
@@ -272,7 +272,7 @@
   background: linear-gradient(135deg, rgba(249, 115, 22, 0.3) 0%, rgba(251, 146, 60, 0.2) 100%);
   border-radius: 3px;
   padding: 1px 4px;
-  color: var(--color-primary);
+  color: var(--color-foreground);
   box-decoration-break: clone;
   -webkit-box-decoration-break: clone;
 }

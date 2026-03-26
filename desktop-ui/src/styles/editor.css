@@ -18,7 +18,7 @@
   padding: 0.75rem 2rem;
   outline: none;
   flex: 1;
-  color: var(--color-primary);
+  color: var(--color-foreground);
   font-size: 0.9375rem;
   line-height: 1.75;
   caret-color: var(--brand);
@@ -33,7 +33,7 @@
   font-size: 1.75rem;
   font-weight: 700;
   margin: 1.5rem 0 0.75rem;
-  color: var(--color-primary);
+  color: var(--color-foreground);
   letter-spacing: -0.025em;
   padding-bottom: 0.5rem;
   border-bottom: 2px solid transparent;
@@ -50,9 +50,9 @@
   font-size: 1.375rem;
   font-weight: 600;
   margin: 1.25rem 0 0.5rem;
-  color: var(--color-primary);
+  color: var(--color-foreground);
   letter-spacing: -0.02em;
-  background: linear-gradient(135deg, var(--color-primary) 0%, var(--color-info) 100%);
+  background: linear-gradient(135deg, var(--color-foreground) 0%, var(--color-info) 100%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
@@ -62,9 +62,9 @@
   font-size: 1.125rem;
   font-weight: 600;
   margin: 1rem 0 0.5rem;
-  color: var(--color-primary);
+  color: var(--color-foreground);
   letter-spacing: -0.015em;
-  background: linear-gradient(135deg, var(--color-primary) 0%, var(--color-purple) 100%);
+  background: linear-gradient(135deg, var(--color-foreground) 0%, var(--color-purple) 100%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
@@ -73,7 +73,7 @@
 /* Strong & emphasis */
 .editor-content strong {
   font-weight: 700;
-  color: var(--color-primary);
+  color: var(--color-foreground);
 }
 
 .editor-content em {
@@ -111,7 +111,7 @@
 }
 
 .editor-content li::marker {
-  color: color-mix(in srgb, var(--brand) 50%, var(--color-muted));
+  color: color-mix(in srgb, var(--brand) 50%, var(--color-muted-foreground));
 }
 
 /* Task list */
@@ -172,7 +172,7 @@
 .editor-content ul[data-type="taskList"] li[data-checked="true"] > div > p {
   text-decoration: line-through;
   opacity: 0.5;
-  color: var(--color-muted);
+  color: var(--color-muted-foreground);
 }
 
 /* Blockquote */
@@ -435,7 +435,7 @@
   background: linear-gradient(135deg, rgba(249, 115, 22, 0.3) 0%, rgba(251, 146, 60, 0.2) 100%);
   border-radius: 3px;
   padding: 1px 4px;
-  color: var(--color-primary);
+  color: var(--color-foreground);
   box-decoration-break: clone;
   -webkit-box-decoration-break: clone;
 }
@@ -444,7 +444,7 @@
 .editor-content p.is-editor-empty:first-child::before {
   content: attr(data-placeholder);
   float: left;
-  color: var(--color-dim);
+  color: var(--color-muted-foreground);
   pointer-events: none;
   height: 0;
 }
@@ -452,7 +452,7 @@
 .editor-content [data-placeholder]::before {
   content: attr(data-placeholder);
   float: left;
-  color: var(--color-dim);
+  color: var(--color-muted-foreground);
   pointer-events: none;
   height: 0;
 }
@@ -471,19 +471,19 @@
 .wiki-link:hover {
   text-decoration-style: solid;
   text-decoration-color: var(--color-info);
-  color: color-mix(in srgb, var(--color-info) 80%, var(--color-primary));
+  color: color-mix(in srgb, var(--color-info) 80%, var(--color-foreground));
 }
 
 /* Unresolved wiki link — note doesn't exist */
 .wiki-link--unresolved {
-  color: var(--color-muted);
+  color: var(--color-muted-foreground);
   text-decoration-color: rgba(255, 255, 255, 0.12);
   text-decoration-style: dotted;
   opacity: 0.6;
 }
 
 .wiki-link--unresolved:hover {
-  color: var(--color-dim);
+  color: var(--color-muted-foreground);
   opacity: 0.8;
 }
 
@@ -520,7 +520,7 @@
 .entity-mention--unresolved {
   background: rgba(255, 255, 255, 0.06);
   border-color: rgba(255, 255, 255, 0.08);
-  color: var(--color-muted);
+  color: var(--color-muted-foreground);
   text-decoration: line-through;
   text-decoration-color: rgba(255, 255, 255, 0.15);
   opacity: 0.7;
@@ -709,7 +709,7 @@
 .editor-content-compact {
   padding: 0.1rem 0.25rem;
   outline: none;
-  color: var(--color-primary);
+  color: var(--color-foreground);
   font-size: 0.6875rem;
   line-height: 1.45;
   caret-color: var(--brand);
@@ -729,7 +729,7 @@
   font-size: 0.75rem;
   font-weight: 600;
   margin: 0.2rem 0 0.1rem;
-  color: var(--color-primary);
+  color: var(--color-foreground);
 }
 
 .editor-content-compact ul {
@@ -749,7 +749,7 @@
 }
 
 .editor-content-compact li::marker {
-  color: color-mix(in srgb, var(--brand) 50%, var(--color-muted));
+  color: color-mix(in srgb, var(--brand) 50%, var(--color-muted-foreground));
 }
 
 .editor-content-compact strong {
