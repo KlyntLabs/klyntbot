@@ -398,4 +398,220 @@ impl AppCore {
 
         Ok(())
     }
+
+    pub async fn note_export(
+        &self,
+        params: desktop_shared::commands::NoteExportParams,
+    ) -> Result<desktop_shared::commands::NoteExportResult, ApiError> {
+        use desktop_shared::commands::NoteExportResult;
+
+        // Validate
+        let dest = PathBuf::from(&params.destination);
+        if !dest.is_absolute() {
+            return Err(ApiError::new(
+                "VALIDATION",
+                "Destination must be an absolute path",
+            ));
+        }
+        if dest
+            .components()
+            .any(|c| c == std::path::Component::ParentDir)
+        {
+            return Err(ApiError::new("VALIDATION", "Path traversal not allowed"));
+        }
+
+        let has_notes = params.note_ids.as_ref().is_some_and(|v| !v.is_empty());
+        let has_notebooks = params.notebook_ids.as_ref().is_some_and(|v| !v.is_empty());
+        if !has_notes && !has_notebooks {
+            return Err(ApiError::new(
+                "VALIDATION",
+                "At least one of noteIds or notebookIds must be provided",
+            ));
+        }
+
+        // Collect notes: Vec<(NoteRow, Option<String>)> where String is subdirectory path
+        let mut notes_with_subdir: Vec<(NoteRow, Option<String>)> = Vec::new();
+
+        if let Some(ids) = &params.note_ids {
+            for id in ids {
+                if let Some(row) = self
+                    .note_repo
+                    .get_note(id)
+                    .await
+                    .map_err(|e| ApiError::new("DB_ERROR", e.to_string()))?
+                {
+                    notes_with_subdir.push((row, None));
+                }
+            }
+        }
+
+        if let Some(nb_ids) = &params.notebook_ids {
+            for nb_id in nb_ids {
+                self.collect_notebook_notes_for_export(nb_id, &mut notes_with_subdir)
+                    .await?;
+            }
+        }
+
+        // Get data_dir from config (same pattern as note_save_attachment in crud.rs)
+        let config = self.config.read().await;
+        let data_dir = config.data_dir_path();
+        drop(config);
+        let attachment_prefix = format!("{}/attachments/", data_dir.display());
+        let mut exported = 0u32;
+
+        for (note, subdir) in &notes_with_subdir {
+            let tags = self.note_repo.get_tags(&note.id).await.unwrap_or_default();
+            let fm = front_matter::NoteFrontMatter {
+                title: Some(note.title.clone()),
+                tags: if tags.is_empty() { None } else { Some(tags) },
+                created: Some(note.created_at.clone()),
+                updated: Some(note.updated_at.clone()),
+                pinned: if note.pinned != 0 { Some(true) } else { None },
+                icon: note.icon.clone(),
+                color: note.color.clone(),
+            };
+
+            // Handle attachments: rewrite absolute paths to relative
+            let mut body = note.body.clone();
+            if body.contains(&attachment_prefix) {
+                let out_attachments = match subdir {
+                    Some(sd) => dest.join(sd).join("attachments"),
+                    None => dest.join("attachments"),
+                };
+                let _ = std::fs::create_dir_all(&out_attachments);
+                // Find and replace each attachment reference
+                while let Some(start) = body.find(&attachment_prefix) {
+                    let after = &body[start + attachment_prefix.len()..];
+                    let end = after.find([')', '"', ' ']).unwrap_or(after.len());
+                    let filename = after[..end].to_string();
+                    let src = data_dir.join("attachments").join(&filename);
+                    if src.exists() {
+                        let _ = std::fs::copy(&src, out_attachments.join(&filename));
+                    }
+                    let abs_ref = format!("{}{}", attachment_prefix, filename);
+                    let rel_ref = format!("./attachments/{}", filename);
+                    body = body.replacen(&abs_ref, &rel_ref, 1);
+                }
+            }
+
+            let content = front_matter::serialize(&fm, &body);
+
+            // Determine output path
+            let out_dir = match subdir {
+                Some(sd) => dest.join(sd),
+                None => dest.clone(),
+            };
+            let _ = std::fs::create_dir_all(&out_dir);
+
+            let filename = if notes_with_subdir.len() == 1 && params.output_filename.is_some() {
+                params.output_filename.clone().unwrap()
+            } else {
+                slugify_filename(&note.title, &out_dir)
+            };
+
+            let out_path = out_dir.join(&filename);
+            tokio::fs::write(&out_path, content).await.map_err(|e| {
+                ApiError::new(
+                    "IO_ERROR",
+                    format!("Failed to write {}: {e}", out_path.display()),
+                )
+            })?;
+
+            exported += 1;
+        }
+
+        Ok(NoteExportResult { exported })
+    }
+
+    /// Recursively collect notes from a notebook with their subdirectory paths for export.
+    async fn collect_notebook_notes_for_export(
+        &self,
+        notebook_id: &str,
+        notes: &mut Vec<(NoteRow, Option<String>)>,
+    ) -> Result<(), ApiError> {
+        let notebooks = self
+            .note_repo
+            .list_notebooks()
+            .await
+            .map_err(|e| ApiError::new("DB_ERROR", e.to_string()))?;
+        let nb_map: std::collections::HashMap<String, &NotebookRow> =
+            notebooks.iter().map(|nb| (nb.id.clone(), nb)).collect();
+
+        // Build path from notebook hierarchy using raw titles (not slugified)
+        // so that export → import round-trip deduplicates correctly
+        fn build_path(
+            nb_id: &str,
+            nb_map: &std::collections::HashMap<String, &NotebookRow>,
+        ) -> String {
+            let mut parts = vec![];
+            let mut current = Some(nb_id.to_string());
+            while let Some(id) = current {
+                if let Some(nb) = nb_map.get(&id) {
+                    parts.push(nb.title.clone());
+                    current = nb.parent_id.clone();
+                } else {
+                    break;
+                }
+            }
+            parts.reverse();
+            parts.join(std::path::MAIN_SEPARATOR_STR)
+        }
+
+        // Collect notes in this notebook
+        let rows = self
+            .note_repo
+            .list_notes(Some(notebook_id))
+            .await
+            .map_err(|e| ApiError::new("DB_ERROR", e.to_string()))?;
+        let subdir = build_path(notebook_id, &nb_map);
+        for row in rows {
+            notes.push((row, Some(subdir.clone())));
+        }
+
+        // Recurse into child notebooks
+        for nb in &notebooks {
+            if nb.parent_id.as_deref() == Some(notebook_id) {
+                Box::pin(self.collect_notebook_notes_for_export(&nb.id, notes)).await?;
+            }
+        }
+
+        Ok(())
+    }
+}
+
+/// Create a URL-safe filename slug with collision handling.
+fn slugify_filename(title: &str, dir: &Path) -> String {
+    let base = title
+        .to_lowercase()
+        .chars()
+        .map(|c| {
+            if c.is_alphanumeric() || c == '-' {
+                c
+            } else {
+                '-'
+            }
+        })
+        .collect::<String>()
+        .split('-')
+        .filter(|s| !s.is_empty())
+        .collect::<Vec<_>>()
+        .join("-");
+
+    let base = if base.is_empty() {
+        "untitled".to_string()
+    } else {
+        base
+    };
+
+    let candidate = format!("{}.md", base);
+    if !dir.join(&candidate).exists() {
+        return candidate;
+    }
+    for i in 1..1000 {
+        let candidate = format!("{}-{}.md", base, i);
+        if !dir.join(&candidate).exists() {
+            return candidate;
+        }
+    }
+    format!("{}-{}.md", base, uuid::Uuid::new_v4())
 }
