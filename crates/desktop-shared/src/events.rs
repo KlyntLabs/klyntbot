@@ -72,8 +72,10 @@ pub const ACTIVITY_SWITCH: &str = "activity:switch";
 pub const FOCUS_STATE_CHANGED: &str = "focus:state_changed";
 pub const FOCUS_AUTO_DETECTED: &str = "focus:auto_detected";
 pub const FOCUS_AUTO_STARTED: &str = "focus:auto_started";
-pub const FOCUS_TICK: &str = "focus:tick";
-pub const FOCUS_COMPLETED: &str = "focus:completed";
+pub const FOCUS_SYNC: &str = "focus:sync";
+pub const FOCUS_PHASE_CHANGED: &str = "focus:phase_changed";
+pub const FOCUS_WARNING: &str = "focus:warning";
+pub const FOCUS_DND_UNAVAILABLE: &str = "focus:dnd_unavailable";
 pub const DISTRACTION_DETECTED: &str = "distraction:detected";
 pub const SCORE_UPDATED: &str = "score:updated";
 pub const BUCKET_COMPLETED: &str = "bucket:completed";
@@ -633,21 +635,28 @@ pub struct InsightPayload {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct FocusTickPayload {
+pub struct FocusSyncPayload {
+    pub phase: String,
     pub remaining_secs: u64,
     pub total_secs: u64,
-    pub mode: String,
+    pub cycle_position: u32,
+    pub long_break_after: u32,
     pub paused: bool,
     pub action_title: Option<String>,
+    pub dnd_active: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct FocusCompletedPayload {
-    pub mode: String,
-    pub duration_mins: u64,
-    pub quality_score: Option<f64>,
-    pub break_mins: Option<u64>,
+pub struct FocusWarningPayload {
+    pub phase: String,
+    pub remaining_secs: u64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct FocusDndUnavailablePayload {
+    pub message: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

@@ -314,6 +314,24 @@ pub struct StrugglingCardResponse {
     pub source_note_id: Option<String>,
 }
 
+// ── Insight Tab Chat ────────────────────────────────────────────
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct InsightChatParams {
+    pub note_id: String,
+    pub tab_name: String,
+    pub user_message: String,
+    pub session_key: String,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct InsightChatStarted {
+    pub session_key: String,
+    pub message_id: String,
+}
+
 // ── Flashcard Review ──────────────────────────────────────────────
 
 #[derive(Debug, Clone, Serialize)]

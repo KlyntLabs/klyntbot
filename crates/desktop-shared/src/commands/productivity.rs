@@ -1,6 +1,8 @@
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 
+use crate::events::FocusSyncPayload;
+
 // ── Productivity ───────────────────────────────────────────────────────
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -99,11 +101,9 @@ pub struct FocusSessionResponse {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct FocusTimerStatusResponse {
+pub struct FocusSessionStatusResponse {
     pub active: bool,
-    pub mode: Option<String>,
-    pub remaining_secs: Option<u64>,
-    pub total_secs: Option<u64>,
+    pub sync: Option<FocusSyncPayload>,
     pub session: Option<FocusSessionResponse>,
 }
 
