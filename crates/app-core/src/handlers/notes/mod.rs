@@ -5,6 +5,7 @@ pub mod distractors;
 pub(crate) mod flashcard;
 pub mod grading;
 mod graph_propagation;
+mod import_export;
 mod inbox;
 mod insight;
 mod insight_context;
