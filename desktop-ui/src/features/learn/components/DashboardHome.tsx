@@ -1,4 +1,15 @@
-import { Activity, Focus, GraduationCap, Network, Play, Plus, TrendingUp } from "lucide-react";
+import { useQuery } from "@shared/hooks/useQuery";
+import {
+  Activity,
+  AlertTriangle,
+  Focus,
+  GraduationCap,
+  Network,
+  Play,
+  Plus,
+  RefreshCw,
+  TrendingUp,
+} from "lucide-react";
 import { Link } from "react-router";
 import { useLearnDashboard } from "../hooks/useLearnDashboard";
 import { useRetentionHistory } from "../hooks/useRetentionHistory";
@@ -9,6 +20,16 @@ import { DeckList } from "./DeckList";
 import { QuickGenerate } from "./QuickGenerate";
 import { RetentionChart } from "./RetentionChart";
 import { StatsBar } from "./StatsBar";
+
+interface StrugglingCard {
+  id: string;
+  front: string;
+  back: string;
+  deck: string;
+  lapses: number;
+  reviewCount: number;
+  sourceNoteId: string | null;
+}
 
 interface DashboardHomeProps {
   onStartReview: (deck?: string) => void;
@@ -28,6 +49,11 @@ export function DashboardHome({
   const { decks, totalDue, loading } = useLearnDashboard();
   const { data: stats } = useReviewStats();
   const { data: retentionData } = useRetentionHistory(30);
+  const { data: struggling } = useQuery<StrugglingCard[]>(
+    "flashcard_list_struggling",
+    { limit: 5 },
+    [],
+  );
 
   if (loading) {
     return (
@@ -153,6 +179,40 @@ export function DashboardHome({
           <p className="text-xs text-muted-foreground">Track retention across topics</p>
         </div>
       </Link>
+
+      {/* Needs Attention — struggling cards */}
+      {struggling.length > 0 && (
+        <div className="space-y-2">
+          <div className="flex items-center gap-2">
+            <AlertTriangle size={14} className="text-red-400" strokeWidth={1.5} />
+            <span className="text-sm font-medium text-foreground">Needs Attention</span>
+            <span className="text-2xs text-muted-foreground">
+              {struggling.length} card{struggling.length !== 1 ? "s" : ""} struggling
+            </span>
+          </div>
+          <div className="space-y-1.5">
+            {struggling.map((card) => (
+              <div key={card.id} className="glass-card p-3 flex items-center gap-3 group">
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm text-foreground truncate">{card.front}</p>
+                  <div className="flex items-center gap-2 mt-0.5">
+                    <span className="text-2xs text-muted-foreground">{card.deck}</span>
+                    <span className="text-2xs text-red-400 font-medium">{card.lapses} lapses</span>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => onGenerateFromText(`${card.front}\n\nExpected: ${card.back}`)}
+                  className="glass-button px-2.5 py-1 text-2xs text-foreground inline-flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity shrink-0"
+                >
+                  <RefreshCw size={12} strokeWidth={1.5} />
+                  Regenerate
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Deck list */}
       <DeckList decks={decks} onReviewDeck={onStartReview} />

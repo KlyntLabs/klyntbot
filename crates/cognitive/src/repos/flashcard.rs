@@ -550,6 +550,22 @@ impl FlashcardRepo {
         .await
     }
 
+    /// Fetch cards with 3+ lapses that are not suspended — struggling cards.
+    pub async fn list_struggling_cards(
+        &self,
+        limit: i64,
+    ) -> Result<Vec<FlashcardRow>, sqlx::Error> {
+        sqlx::query_as::<_, FlashcardRow>(
+            r#"SELECT * FROM flashcards
+               WHERE lapses >= 3 AND suspended = 0
+               ORDER BY lapses DESC, review_count DESC
+               LIMIT ?1"#,
+        )
+        .bind(limit)
+        .fetch_all(&self.pool)
+        .await
+    }
+
     /// Get total due count across all decks.
     pub async fn total_due_count(&self) -> Result<i64, sqlx::Error> {
         let now = Utc::now().to_rfc3339();

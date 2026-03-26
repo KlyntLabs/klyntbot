@@ -3,7 +3,7 @@ use crate::state::AppCore;
 use cognitive::repos::flashcard::ReviewQuality;
 use desktop_shared::commands::{
     DeckSummaryResponse, FlashcardCreateParams, FlashcardListParams, FlashcardResponse,
-    FlashcardReviewParams, FlashcardUpdateParams,
+    FlashcardReviewParams, FlashcardUpdateParams, StrugglingCardResponse,
 };
 use desktop_shared::errors::ApiError;
 
@@ -265,6 +265,29 @@ impl AppCore {
         repo.total_due_count()
             .await
             .map_err(|e| ApiError::new("INTERNAL_ERROR", e.to_string()))
+    }
+
+    pub async fn flashcard_list_struggling(
+        &self,
+        limit: i64,
+    ) -> Result<Vec<StrugglingCardResponse>, ApiError> {
+        let repo = self.flashcard_repo()?;
+        let cards = repo
+            .list_struggling_cards(limit)
+            .await
+            .map_err(|e| ApiError::new("INTERNAL_ERROR", e.to_string()))?;
+        Ok(cards
+            .into_iter()
+            .map(|c| StrugglingCardResponse {
+                id: c.id,
+                front: c.front,
+                back: c.back,
+                deck: c.deck,
+                lapses: c.lapses,
+                review_count: c.review_count,
+                source_note_id: c.source_note_id,
+            })
+            .collect())
     }
 
     /// Compute cosine similarity between a user's answer and the stored back-side

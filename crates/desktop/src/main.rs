@@ -448,6 +448,7 @@ fn run_desktop_app() {
             commands::notes::flashcard_delete,
             commands::notes::flashcard_get_all_due,
             commands::notes::flashcard_total_due,
+            commands::notes::flashcard_list_struggling,
             commands::notes::flashcard_generate,
             commands::notes::flashcard_save_generated,
             commands::notes::flashcard_submit_answer,

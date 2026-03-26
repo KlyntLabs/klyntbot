@@ -13,7 +13,7 @@ use desktop_shared::commands::{
     NoteSuggestionsResponse, NoteUpdateParams, NoteVersionResponse, NotebookCreateParams,
     NotebookResponse, NotebookUpdateParams, PersonaChatParams, PersonaChatResponse,
     PersonaResponse, RatePersonaParams, RecentLearningSession, ScenarioChallengeResponse,
-    SetPersonaPinsParams, TabContent, UpdatePersonaParams,
+    SetPersonaPinsParams, StrugglingCardResponse, TabContent, UpdatePersonaParams,
 };
 use desktop_shared::errors::ApiError;
 use tauri::State;
@@ -548,6 +548,14 @@ pub async fn flashcard_total_due(state: State<'_, Arc<AppCore>>) -> Result<i64, 
 }
 
 #[tauri::command]
+pub async fn flashcard_list_struggling(
+    state: State<'_, Arc<AppCore>>,
+    limit: Option<i64>,
+) -> Result<Vec<StrugglingCardResponse>, ApiError> {
+    state.flashcard_list_struggling(limit.unwrap_or(5)).await
+}
+
+#[tauri::command]
 pub async fn flashcard_generate(
     state: State<'_, Arc<AppCore>>,
     params: FlashcardGenerateParams,
@@ -708,6 +716,7 @@ pub(crate) const DEV_COMMANDS: &[&str] = &[
     "flashcard_delete",
     "flashcard_get_all_due",
     "flashcard_total_due",
+    "flashcard_list_struggling",
     "flashcard_generate",
     "flashcard_save_generated",
     "flashcard_submit_answer",
@@ -953,6 +962,10 @@ pub(crate) async fn dispatch_dev(
             dev::val(core.flashcard_get_all_due(limit).await)
         }
         "flashcard_total_due" => dev::val(core.flashcard_total_due().await),
+        "flashcard_list_struggling" => {
+            let limit = body.get("limit").and_then(|v| v.as_i64()).unwrap_or(5);
+            dev::val(core.flashcard_list_struggling(limit).await)
+        }
         "flashcard_generate" => dev::val(
             core.flashcard_generate(try_field!(dev::parse_params(body)))
                 .await,

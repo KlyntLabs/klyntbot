@@ -280,6 +280,20 @@ pub struct InsightSaveFlashcardsParams {
     pub questions: Vec<QuizQuestion>,
 }
 
+// ── Struggling Cards ─────────────────────────────────────────────
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct StrugglingCardResponse {
+    pub id: String,
+    pub front: String,
+    pub back: String,
+    pub deck: String,
+    pub lapses: i64,
+    pub review_count: i64,
+    pub source_note_id: Option<String>,
+}
+
 // ── Flashcard Review ──────────────────────────────────────────────
 
 #[derive(Debug, Clone, Serialize)]
