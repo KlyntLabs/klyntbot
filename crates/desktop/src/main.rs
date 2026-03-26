@@ -459,6 +459,7 @@ fn run_desktop_app() {
             commands::notes::flashcard_get_prerequisites,
             commands::notes::flashcard_save_session,
             commands::notes::flashcard_recent_learning_sessions,
+            commands::notes::note_retention_health,
             // Annotations
             commands::annotations::annotation_create,
             commands::annotations::annotation_update,

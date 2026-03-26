@@ -280,6 +280,17 @@ pub struct InsightSaveFlashcardsParams {
     pub questions: Vec<QuizQuestion>,
 }
 
+// ── Note Retention Health ────────────────────────────────────────
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct NoteRetentionHealthResponse {
+    pub avg_stability: f64,
+    pub total_cards: i64,
+    pub total_lapses: i64,
+    pub health_score: f64,
+}
+
 // ── Struggling Cards ─────────────────────────────────────────────
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

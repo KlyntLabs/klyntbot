@@ -789,6 +789,33 @@ impl FlashcardRepo {
 
         Ok(())
     }
+
+    /// Aggregate retention health for all active flashcards linked to a note.
+    ///
+    /// Returns `(avg_stability, total_cards, total_lapses)` or `None` if no cards
+    /// are linked.  Uses COALESCE so that SQLite's NULL-on-empty-set is handled
+    /// via `fetch_one` instead of `fetch_optional`.
+    pub async fn note_retention_health(
+        &self,
+        note_id: &str,
+    ) -> Result<Option<(f64, i64, i64)>, sqlx::Error> {
+        let row: (f64, i64, i64) = sqlx::query_as(
+            r#"SELECT
+                COALESCE(AVG(stability), 0.0) as avg_stability,
+                COUNT(*) as total_cards,
+                COALESCE(SUM(lapses), 0) as total_lapses
+               FROM flashcards
+               WHERE source_note_id = ?1 AND suspended = 0"#,
+        )
+        .bind(note_id)
+        .fetch_one(&self.pool)
+        .await?;
+        if row.1 == 0 {
+            Ok(None)
+        } else {
+            Ok(Some(row))
+        }
+    }
 }
 
 // ── Tests ────────────────────────────────────────────────────────

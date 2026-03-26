@@ -3,7 +3,8 @@ use crate::state::AppCore;
 use cognitive::repos::flashcard::ReviewQuality;
 use desktop_shared::commands::{
     DeckSummaryResponse, FlashcardCreateParams, FlashcardListParams, FlashcardResponse,
-    FlashcardReviewParams, FlashcardUpdateParams, StrugglingCardResponse,
+    FlashcardReviewParams, FlashcardUpdateParams, NoteRetentionHealthResponse,
+    StrugglingCardResponse,
 };
 use desktop_shared::errors::ApiError;
 
@@ -288,6 +289,28 @@ impl AppCore {
                 source_note_id: c.source_note_id,
             })
             .collect())
+    }
+
+    pub async fn note_retention_health(
+        &self,
+        note_id: String,
+    ) -> Result<Option<NoteRetentionHealthResponse>, ApiError> {
+        let repo = self.flashcard_repo()?;
+        let result = repo
+            .note_retention_health(&note_id)
+            .await
+            .map_err(|e| ApiError::new("INTERNAL_ERROR", e.to_string()))?;
+        Ok(result.map(|(avg_stab, total_cards, total_lapses)| {
+            let lapse_penalty =
+                (total_lapses as f64 / total_cards.max(1) as f64).min(1.0) * 0.3;
+            let health = (avg_stab / 30.0).min(1.0) * (1.0 - lapse_penalty);
+            NoteRetentionHealthResponse {
+                avg_stability: avg_stab,
+                total_cards,
+                total_lapses,
+                health_score: health.clamp(0.0, 1.0),
+            }
+        }))
     }
 
     /// Compute cosine similarity between a user's answer and the stored back-side

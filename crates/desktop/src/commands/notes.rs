@@ -10,10 +10,11 @@ use desktop_shared::commands::{
     InboxItemResponse, InsightEvolutionResponse, InsightQuizSubmitParams, InsightReviewResponse,
     InsightReviewStarted, InsightSaveFlashcardsParams, InsightVersionResponse,
     KnowledgeGrowthResponse, NoteCreateParams, NoteLinkResponse, NoteResponse,
-    NoteSuggestionsResponse, NoteUpdateParams, NoteVersionResponse, NotebookCreateParams,
-    NotebookResponse, NotebookUpdateParams, PersonaChatParams, PersonaChatResponse,
-    PersonaResponse, RatePersonaParams, RecentLearningSession, ScenarioChallengeResponse,
-    SetPersonaPinsParams, StrugglingCardResponse, TabContent, UpdatePersonaParams,
+    NoteRetentionHealthResponse, NoteSuggestionsResponse, NoteUpdateParams, NoteVersionResponse,
+    NotebookCreateParams, NotebookResponse, NotebookUpdateParams, PersonaChatParams,
+    PersonaChatResponse, PersonaResponse, RatePersonaParams, RecentLearningSession,
+    ScenarioChallengeResponse, SetPersonaPinsParams, StrugglingCardResponse, TabContent,
+    UpdatePersonaParams,
 };
 use desktop_shared::errors::ApiError;
 use tauri::State;
@@ -653,6 +654,16 @@ pub async fn flashcard_recent_learning_sessions(
         .await
 }
 
+// ── Retention Health ────────────────────────────────────────────────
+
+#[tauri::command]
+pub async fn note_retention_health(
+    state: State<'_, Arc<AppCore>>,
+    note_id: String,
+) -> Result<Option<NoteRetentionHealthResponse>, ApiError> {
+    state.note_retention_health(note_id).await
+}
+
 // ── Dev server dispatch ─────────────────────────────────────────────
 
 #[cfg(test)]
@@ -727,6 +738,7 @@ pub(crate) const DEV_COMMANDS: &[&str] = &[
     "flashcard_get_prerequisites",
     "flashcard_save_session",
     "flashcard_recent_learning_sessions",
+    "note_retention_health",
 ];
 
 #[cfg(debug_assertions)]
@@ -1031,6 +1043,10 @@ pub(crate) async fn dispatch_dev(
         "flashcard_recent_learning_sessions" => {
             let limit = body.get("limit").and_then(|v| v.as_u64()).map(|l| l as usize);
             dev::val(core.flashcard_recent_learning_sessions(limit.unwrap_or(3)).await)
+        }
+        "note_retention_health" => {
+            let note_id = try_field!(dev::get_str(body, "noteId"));
+            dev::val(core.note_retention_health(note_id).await)
         }
         _ => return None,
     })
