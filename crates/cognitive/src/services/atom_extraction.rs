@@ -1,9 +1,9 @@
 //! Background service that extracts knowledge atoms from note content.
 //!
-//! Subscribes to [`DomainEventBus`] for `NoteContentChanged` events, debounces
-//! rapid edits, deduplicates against existing atoms, and creates new `suggested`
-//! atoms via an LLM extraction prompt. Cross-note reinforcement is detected and
-//! boosted rather than duplicated.
+//! Subscribes to [`DomainEventBus`] for `NoteEditingFinished` events (fired when
+//! the user blurs, closes, or idles on a note). Debounces rapid events, deduplicates
+//! against existing atoms, and creates new `active` atoms via an LLM extraction prompt.
+//! Cross-note reinforcement is detected and boosted rather than duplicated.
 
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -78,7 +78,7 @@ impl AtomExtractionService {
                     }
                     result = rx.recv() => {
                         match result {
-                            Ok(DomainEvent::NoteContentChanged { note_id, content }) => {
+                            Ok(DomainEvent::NoteEditingFinished { note_id, content }) => {
                                 // Debounce: skip if we processed this note recently
                                 let now = tokio::time::Instant::now();
                                 if let Some(last) = debounce_map.get(&note_id) {
@@ -172,7 +172,7 @@ async fn process_note(
         };
 
         // Validate atom_type from LLM — default to "concept" if unrecognized
-        let valid_types = ["concept", "fact", "skill"];
+        let valid_types = ["concept", "fact", "procedure", "reference", "pattern", "insight", "relation"];
         for atom in &mut extracted {
             if !valid_types.contains(&atom.atom_type.as_str()) {
                 atom.atom_type = "concept".to_string();
@@ -252,7 +252,7 @@ async fn process_note(
                 }
             }
 
-            // 7. Create new suggested atom
+            // 7. Create new active atom
             let new_atom = NewKnowledgeAtom {
                 subject: atom.subject.clone(),
                 atom_type: atom.atom_type.clone(),
@@ -260,7 +260,7 @@ async fn process_note(
                 source_note_id: Some(note_id.to_string()),
                 source_context: atom.source_context.clone(),
                 personal_importance: SUGGESTED_IMPORTANCE,
-                status: "suggested".to_string(),
+                status: "active".to_string(),
                 ..Default::default()
             };
 
@@ -270,7 +270,7 @@ async fn process_note(
                         atom_id = row.id,
                         subject = row.subject,
                         domain = row.domain,
-                        "created suggested atom"
+                        "created active atom"
                     );
                     bus.publish(DomainEvent::KnowledgeAtomCreated {
                         atom_id: row.id,
@@ -374,13 +374,13 @@ async fn call_extraction_llm(
     section_text: &str,
     max_tokens: u32,
 ) -> common::Result<Vec<ExtractedAtom>> {
-    let system_prompt = "You are a knowledge extraction assistant. Analyze this text and identify 3-8 key concepts, facts, or skills worth remembering.\n\n\
+    let system_prompt = "You are a knowledge extraction assistant. Analyze this text and identify 3-8 key knowledge atoms worth tracking.\n\n\
         For each item, return:\n\
         - \"subject\": short label (2-5 words)\n\
-        - \"atomType\": one of \"concept\", \"fact\", \"skill\"\n\
+        - \"atomType\": one of \"concept\", \"fact\", \"procedure\", \"reference\", \"pattern\", \"insight\", \"relation\"\n\
         - \"domain\": category (e.g. \"software-engineering\", \"finance\", \"language:ja\")\n\
         - \"sourceContext\": the relevant sentence or phrase from the text (verbatim)\n\n\
-        Return JSON array. Only include genuinely learnable items — skip obvious/trivial facts.";
+        Return JSON array. Include genuinely learnable concepts, notable facts, procedures, patterns, and insights — skip obvious/trivial content.";
 
     let user_prompt = format!("Text:\n{section_text}");
 
