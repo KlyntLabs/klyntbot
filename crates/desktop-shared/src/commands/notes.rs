@@ -498,6 +498,7 @@ pub struct DomainCount {
 #[serde(rename_all = "camelCase")]
 pub struct ScopePreviewResponse {
     pub notes: Vec<ScopePreviewNote>,
+    pub links: Vec<ScopePreviewLink>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -506,6 +507,13 @@ pub struct ScopePreviewNote {
     pub id: String,
     pub title: String,
     pub notebook_id: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ScopePreviewLink {
+    pub source_id: String,
+    pub target_id: String,
 }
 
 #[derive(Debug, Clone, Deserialize)]

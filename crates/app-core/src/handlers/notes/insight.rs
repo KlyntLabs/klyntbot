@@ -911,7 +911,23 @@ impl AppCore {
             }
         }
 
-        Ok(ScopePreviewResponse { notes })
+        // Fetch links between all nodes in scope (current note + scope notes)
+        let all_links = self.note_repo.get_all_links().await.unwrap_or_default();
+        let mut scope_set = std::collections::HashSet::new();
+        scope_set.insert(params.note_id.clone());
+        for n in &notes {
+            scope_set.insert(n.id.clone());
+        }
+        let links: Vec<ScopePreviewLink> = all_links
+            .into_iter()
+            .filter(|l| scope_set.contains(&l.source_id) && scope_set.contains(&l.target_id))
+            .map(|l| ScopePreviewLink {
+                source_id: l.source_id,
+                target_id: l.target_id,
+            })
+            .collect();
+
+        Ok(ScopePreviewResponse { notes, links })
     }
 
     async fn get_related_note_ids(&self, note_id: &str) -> Vec<String> {
