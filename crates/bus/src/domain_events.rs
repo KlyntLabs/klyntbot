@@ -217,6 +217,10 @@ pub enum DomainEvent {
         note_id: String,
         content: String,
     },
+    NoteEditingFinished {
+        note_id: String,
+        content: String,
+    },
     NoteDeleted {
         note_id: String,
     },
@@ -579,6 +583,18 @@ mod tests {
             }
             _ => panic!("Expected UserCorrectedAI"),
         }
+    }
+
+    #[test]
+    fn test_note_editing_finished_event() {
+        let bus = DomainEventBus::new(32);
+        let mut rx = bus.subscribe();
+        bus.publish(DomainEvent::NoteEditingFinished {
+            note_id: "note-1".to_string(),
+            content: "some content".to_string(),
+        });
+        let event = rx.try_recv().unwrap();
+        assert!(matches!(event, DomainEvent::NoteEditingFinished { note_id, .. } if note_id == "note-1"));
     }
 
     #[test]
