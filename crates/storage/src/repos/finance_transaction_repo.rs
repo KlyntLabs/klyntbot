@@ -231,6 +231,7 @@ impl FinanceTransactionRepo {
               AND tx_date <= ?
               AND tx_type = ?
               AND base_currency = ?
+              AND transfer_id IS NULL
             GROUP BY cat
             ORDER BY total DESC
             "#,
@@ -263,6 +264,7 @@ impl FinanceTransactionRepo {
             WHERE tx_type = ?
               AND base_currency = ?
               AND tx_date >= date('now', 'localtime', 'start of month', '-' || (? - 1) || ' months')
+              AND transfer_id IS NULL
             GROUP BY period_label
             ORDER BY period_label DESC
             "#,
@@ -294,6 +296,7 @@ impl FinanceTransactionRepo {
               AND tx_date >= ?
               AND tx_date <= ?
               AND base_currency = ?
+              AND transfer_id IS NULL
             GROUP BY tx_date
             ORDER BY tx_date
             "#,
@@ -323,6 +326,7 @@ impl FinanceTransactionRepo {
               AND tx_date >= ?
               AND tx_date <= ?
               AND base_currency = ?
+              AND transfer_id IS NULL
             "#,
         )
         .bind(tx_type)

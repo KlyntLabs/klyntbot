@@ -128,9 +128,11 @@ function DaySummary({
                 <TrendArrow
                   value={
                     ps.activeTimeTrend != null
-                      ? (ps.activeTimeTrend /
-                          Math.max(ps.totalActiveSecs - ps.activeTimeTrend, 1)) *
-                        100
+                      ? (() => {
+                          const baseline = ps.totalActiveSecs - ps.activeTimeTrend;
+                          if (baseline < 60) return null;
+                          return (ps.activeTimeTrend / baseline) * 100;
+                        })()
                       : null
                   }
                 />

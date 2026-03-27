@@ -26,7 +26,7 @@ import { useFinanceCurrency } from "../hooks/useFinanceCurrency";
 import { usePeriodState } from "../hooks/usePeriodState";
 import { usePrivacyMode } from "../hooks/usePrivacyMode";
 import { displayAmount } from "../lib/displayAmount";
-import { ACCT_ICONS, COLORS, fmtCompact, pct } from "../lib/finance";
+import { ACCT_ICONS, COLORS, fmtMoney, pct } from "../lib/finance";
 import { computeHeatmapLevels } from "../lib/heatmapColors";
 
 export function CashFlowPage() {
@@ -192,6 +192,10 @@ export function CashFlowPage() {
   );
 
   const activeAccounts = useMemo(() => accounts.filter((a) => !a.isArchived), [accounts]);
+  const netWorth = useMemo(
+    () => accounts.reduce((s, a) => s + (a.baseBalance ?? 0), 0),
+    [accounts],
+  );
 
   const handleOpenPanel = () => {
     if (activeAccounts.length > 0 && !txAccountId) setTxAccountId(activeAccounts[0].id);
@@ -237,6 +241,7 @@ export function CashFlowPage() {
       <CashFlowStats
         income={periodSummary.income}
         spending={periodSummary.spending}
+        netWorth={netWorth}
         displayCur={displayCur}
         convertTotal={convertTotal}
         hidden={hidden}
@@ -458,11 +463,11 @@ export function CashFlowPage() {
                     </div>
                     <div className="flex items-center gap-2">
                       <span className="text-2xs text-foreground tabular-nums">
-                        {fmtCompact(convertTotal(item.spent), displayCur, hidden)}
+                        {fmtMoney(convertTotal(item.spent), displayCur, hidden)}
                       </span>
                       {hasBudget && (
                         <span className="text-[9px] text-dim tabular-nums">
-                          / {fmtCompact(convertTotal(budgetBase), displayCur, hidden)}
+                          / {fmtMoney(convertTotal(budgetBase), displayCur, hidden)}
                         </span>
                       )}
                       <span

@@ -178,6 +178,8 @@ impl AppCore {
 
         let config = self.config.read().await;
         let params = providers::cognitive_chat_params(&config, 4096);
+        let changes_params = providers::cognitive_chat_params(&config, 512);
+        let response_lang = resolve_response_lang(&config);
         drop(config);
 
         let emitter = emitter_override.unwrap_or_else(|| Arc::clone(&self.event_emitter));
@@ -191,14 +193,13 @@ impl AppCore {
                     let changes_emitter = emitter.clone();
                     let changes_context = context_text.clone();
                     let changes_provider = provider.clone();
-                    let changes_config = self.config.read().await;
-                    let changes_params = providers::cognitive_chat_params(&changes_config, 512);
-                    drop(changes_config);
 
+                    let changes_lang = response_lang.clone();
                     tokio::spawn(async move {
                         let prompt = insight_prompts::changes_summary_prompt(
                             &prev_synthesis,
                             &changes_context,
+                            changes_lang.as_deref(),
                         );
                         let messages = vec![
                             providers::Message::System { content: prompt },
@@ -246,6 +247,7 @@ impl AppCore {
                 scope_config: scope,
                 pool: pipeline_pool,
                 domain_event_bus: pipeline_bus,
+                response_lang,
             })
             .await;
         });
@@ -372,9 +374,14 @@ impl AppCore {
 
         let config = self.config.read().await;
         let params = providers::cognitive_chat_params(&config, 512);
+        let response_lang = resolve_response_lang(&config);
         drop(config);
 
-        let prompt = insight_prompts::changes_summary_prompt(&prev_synthesis, &ctx.text);
+        let prompt = insight_prompts::changes_summary_prompt(
+            &prev_synthesis,
+            &ctx.text,
+            response_lang.as_deref(),
+        );
         let messages = vec![
             providers::Message::System { content: prompt },
             providers::Message::User {
@@ -578,9 +585,11 @@ impl AppCore {
 
         let config = self.config.read().await;
         let params = providers::cognitive_chat_params(&config, 4096);
+        let response_lang = resolve_response_lang(&config);
         drop(config);
 
-        let prompt = insight_prompts::scenario_challenge_prompt(&ctx_text);
+        let prompt =
+            insight_prompts::scenario_challenge_prompt(&ctx_text, response_lang.as_deref());
         let messages = vec![
             providers::Message::System { content: prompt },
             providers::Message::User {
@@ -670,16 +679,18 @@ impl AppCore {
 
         let config = self.config.read().await;
         let params = providers::cognitive_chat_params(&config, 4096);
+        let response_lang = resolve_response_lang(&config);
         drop(config);
 
         // Track persona metadata for perspectives tab (returned alongside content)
         let mut tab_personas: Vec<PersonaMetaResponse> = Vec::new();
 
+        let lang = response_lang.as_deref();
         let prompt = match tab {
-            "synthesis" => insight_prompts::synthesis_prompt(&ctx_text),
-            "gaps" => insight_prompts::gap_analysis_prompt(&ctx_text),
-            "assessment" => insight_prompts::self_assessment_prompt(&ctx_text),
-            "concept-map" => insight_prompts::concept_map_prompt(&ctx_text, &ctx_note_title),
+            "synthesis" => insight_prompts::synthesis_prompt(&ctx_text, lang),
+            "gaps" => insight_prompts::gap_analysis_prompt(&ctx_text, lang),
+            "assessment" => insight_prompts::self_assessment_prompt(&ctx_text, lang),
+            "concept-map" => insight_prompts::concept_map_prompt(&ctx_text, &ctx_note_title, lang),
             "perspectives" => {
                 let personas = self
                     .resolve_squad_for_note(note_id, None, &note_domains)
@@ -707,7 +718,7 @@ impl AppCore {
                     })
                     .collect();
                 let persona_blocks = insight_prompts::format_persona_blocks(&blocks);
-                insight_prompts::perspectives_prompt(&ctx_text, &persona_blocks)
+                insight_prompts::perspectives_prompt(&ctx_text, &persona_blocks, lang)
             }
             _ => return Err(ApiError::new("VALIDATION", "Invalid tab name")),
         };
@@ -1245,6 +1256,7 @@ struct InsightPipelineArgs {
     scope_config: feature_insights::ScopeConfig,
     pool: sqlx::SqlitePool,
     domain_event_bus: Option<Arc<bus::DomainEventBus>>,
+    response_lang: Option<String>,
 }
 
 async fn run_insight_pipeline(args: InsightPipelineArgs) {
@@ -1263,13 +1275,15 @@ async fn run_insight_pipeline(args: InsightPipelineArgs) {
         scope_config,
         pool,
         domain_event_bus,
+        response_lang,
     } = args;
 
-    let synthesis = stream_synthesis(&provider, &emitter, &context, &params).await;
+    let lang = response_lang.as_deref();
+    let synthesis = stream_synthesis(&provider, &emitter, &context, &params, lang).await;
 
-    let gaps_prompt = insight_prompts::gap_analysis_prompt(&context);
-    let assessment_prompt = insight_prompts::self_assessment_prompt(&context);
-    let concept_map_prompt = insight_prompts::concept_map_prompt(&context, &note_title);
+    let gaps_prompt = insight_prompts::gap_analysis_prompt(&context, lang);
+    let assessment_prompt = insight_prompts::self_assessment_prompt(&context, lang);
+    let concept_map_prompt = insight_prompts::concept_map_prompt(&context, &note_title, lang);
 
     let personas_meta: Vec<serde_json::Value> = personas
         .iter()
@@ -1310,6 +1324,7 @@ async fn run_insight_pipeline(args: InsightPipelineArgs) {
                     &expertise,
                     &perspective,
                     &tone,
+                    lang,
                 );
                 let messages = vec![
                     providers::Message::System {
@@ -1513,10 +1528,11 @@ async fn stream_synthesis(
     emitter: &Arc<dyn AppEventEmitter>,
     context: &str,
     params: &providers::ChatParams,
+    response_lang: Option<&str>,
 ) -> Option<String> {
     let messages = vec![
         providers::Message::System {
-            content: insight_prompts::synthesis_prompt(context),
+            content: insight_prompts::synthesis_prompt(context, response_lang),
         },
         providers::Message::User {
             content: providers::UserContent::Text("Generate the synthesis now.".to_string()),
@@ -1557,6 +1573,16 @@ async fn stream_synthesis(
             None
         }
     }
+}
+
+/// Resolve the response language from config.
+/// Returns `source_lang`, falling back to `native_lang`, then `None` (English default).
+fn resolve_response_lang(config: &config::Config) -> Option<String> {
+    config
+        .language
+        .source_lang
+        .clone()
+        .or_else(|| config.language.native_lang.clone())
 }
 
 /// Strip markdown code fences (```json...``` or ```...```) from LLM output.

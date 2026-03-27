@@ -167,8 +167,16 @@ impl DailyAggregator {
                 }
             })
             .collect();
-        let focus_sessions_count = sessions.len() as i64;
-        let total_focus_secs: i64 = sessions.iter().filter_map(|s| s.actual_mins).sum::<i64>() * 60;
+        let focus_sessions_count = sessions
+            .iter()
+            .filter(|s| s.session_type != crate::types::SessionType::Break)
+            .count() as i64;
+        let total_focus_secs: i64 = sessions
+            .iter()
+            .filter(|s| s.session_type != crate::types::SessionType::Break)
+            .filter_map(|s| s.actual_mins)
+            .sum::<i64>()
+            * 60;
         let total_break_secs: i64 = sessions
             .iter()
             .filter(|s| s.session_type == crate::types::SessionType::Break)

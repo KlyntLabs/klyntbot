@@ -1,4 +1,4 @@
-import { fmtCompact } from "../lib/finance";
+import { fmtMoney } from "../lib/finance";
 import { Card } from "./Card";
 
 interface StatCardProps {
@@ -23,12 +23,14 @@ function StatCard({ label, value, accentColor }: StatCardProps) {
 export function CashFlowStats({
   income,
   spending,
+  netWorth,
   displayCur,
   convertTotal,
   hidden,
 }: {
   income: number;
   spending: number;
+  netWorth: number;
   displayCur: string;
   convertTotal: (v: number) => number;
   hidden: boolean;
@@ -40,17 +42,17 @@ export function CashFlowStats({
     <div className="grid grid-cols-4 gap-3">
       <StatCard
         label="Income"
-        value={fmtCompact(convertTotal(income), displayCur, hidden)}
+        value={fmtMoney(convertTotal(income), displayCur, hidden)}
         accentColor="var(--success)"
       />
       <StatCard
         label="Spending"
-        value={fmtCompact(convertTotal(spending), displayCur, hidden)}
+        value={fmtMoney(convertTotal(spending), displayCur, hidden)}
         accentColor="var(--destructive)"
       />
       <StatCard
-        label="Net"
-        value={fmtCompact(convertTotal(net), displayCur, hidden)}
+        label="Net Worth"
+        value={fmtMoney(convertTotal(netWorth), displayCur, hidden)}
         accentColor="var(--info)"
       />
       <StatCard label="Savings Rate" value={`${savingsRate}%`} accentColor="var(--brand)" />

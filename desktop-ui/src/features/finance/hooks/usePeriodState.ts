@@ -162,24 +162,37 @@ function adaptPeriodToMode(
   currentMode: PeriodMode,
   newMode: PeriodMode,
 ): string {
-  // Try to keep the user in the same approximate time when switching modes
+  // Use today as reference if it falls within the current period, otherwise
+  // pick a safe midpoint to avoid edge-case jumps (e.g. month 1st on Sunday
+  // pushing week mode into the previous month).
+  const { dateFrom, dateTo } = computeRange(currentMode, currentPeriod);
+  const today = new Date();
+  const todayISO = toISO(today);
+
   let refDate: Date;
-  switch (currentMode) {
-    case "year":
-      refDate = new Date(Number(currentPeriod), 0, 1);
-      break;
-    case "month": {
-      const [y, m] = currentPeriod.split("-").map(Number);
-      refDate = new Date(y, m - 1, 1);
-      break;
+  if (todayISO >= dateFrom && todayISO <= dateTo) {
+    refDate = today;
+  } else {
+    switch (currentMode) {
+      case "year":
+        refDate = new Date(Number(currentPeriod), 6, 1); // July 1 (mid-year)
+        break;
+      case "month": {
+        const [y, m] = currentPeriod.split("-").map(Number);
+        refDate = new Date(y, m - 1, 15); // 15th (mid-month)
+        break;
+      }
+      case "week":
+        // Wednesday (mid-week) — offset +3 from Monday
+        refDate = parseDateISO(currentPeriod);
+        refDate.setDate(refDate.getDate() + 3);
+        break;
+      case "day":
+        refDate = parseDateISO(currentPeriod);
+        break;
     }
-    case "week":
-      refDate = parseDateISO(currentPeriod);
-      break;
-    case "day":
-      refDate = parseDateISO(currentPeriod);
-      break;
   }
+
   const y = refDate.getFullYear();
   const mo = String(refDate.getMonth() + 1).padStart(2, "0");
   const d = String(refDate.getDate()).padStart(2, "0");

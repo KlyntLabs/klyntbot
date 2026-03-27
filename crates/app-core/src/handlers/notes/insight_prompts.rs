@@ -1,7 +1,87 @@
-//! LLM prompt templates for the 4 Insight Review tabs.
+//! LLM prompt templates for the Insight Review tabs.
+//!
+//! All prompt functions accept an optional `response_lang` parameter (ISO 639-1 code).
+//! When set to a non-English language, a language instruction is appended so the LLM
+//! responds in the user's source language.
+
+/// Resolve a language code to a display name, skipping English and unknown codes.
+fn resolve_lang_name(lang: Option<&str>) -> Option<&str> {
+    let code = match lang {
+        Some(c) if !c.is_empty() && c != "en" => c,
+        _ => return None,
+    };
+    lang_code_to_name(code)
+}
+
+/// Build a language instruction suffix for prompts.
+/// Returns empty string for English or unrecognised codes.
+fn language_instruction(lang: Option<&str>) -> String {
+    match resolve_lang_name(lang) {
+        Some(name) => format!(
+            "\n\nIMPORTANT: Write your entire response in {name}. Do not default to English."
+        ),
+        None => String::new(),
+    }
+}
+
+/// Like `language_instruction` but for JSON-producing prompts where structure must stay English.
+fn language_instruction_json(lang: Option<&str>) -> String {
+    match resolve_lang_name(lang) {
+        Some(name) => format!(
+            "\n\nIMPORTANT: Write all human-readable text (questions, answers, explanations, descriptions, titles) in {name}. Keep JSON keys in English."
+        ),
+        None => String::new(),
+    }
+}
+
+fn lang_code_to_name(code: &str) -> Option<&'static str> {
+    Some(match code {
+        "vi" => "Vietnamese",
+        "zh" => "Chinese",
+        "ja" => "Japanese",
+        "ko" => "Korean",
+        "th" => "Thai",
+        "ar" => "Arabic",
+        "hi" => "Hindi",
+        "ru" => "Russian",
+        "fr" => "French",
+        "de" => "German",
+        "es" => "Spanish",
+        "pt" => "Portuguese",
+        "it" => "Italian",
+        "nl" => "Dutch",
+        "pl" => "Polish",
+        "tr" => "Turkish",
+        "uk" => "Ukrainian",
+        "id" => "Indonesian",
+        "ms" => "Malay",
+        "sv" => "Swedish",
+        "da" => "Danish",
+        "no" | "nb" | "nn" => "Norwegian",
+        "fi" => "Finnish",
+        "cs" => "Czech",
+        "ro" => "Romanian",
+        "hu" => "Hungarian",
+        "el" => "Greek",
+        "he" => "Hebrew",
+        "fa" => "Persian",
+        "bn" => "Bengali",
+        "ta" => "Tamil",
+        "te" => "Telugu",
+        "mr" => "Marathi",
+        "ur" => "Urdu",
+        "sw" => "Swahili",
+        "my" => "Burmese",
+        "km" => "Khmer",
+        "lo" => "Lao",
+        "tl" | "fil" => "Filipino",
+        _ => return None,
+    })
+}
 
 /// Tab 1: Synthesis — streaming markdown response.
-pub fn synthesis_prompt(context: &str) -> String {
+pub fn synthesis_prompt(context: &str, response_lang: Option<&str>) -> String {
+    let lang = language_instruction(response_lang);
     format!(
         r#"You are a research synthesis assistant. Given the user's note and its related notes from their knowledge base, write a deep synthesis that:
 
@@ -12,7 +92,7 @@ pub fn synthesis_prompt(context: &str) -> String {
 
 Format as clean Markdown with ## headings for each theme.
 Keep it focused and insightful — not a summary, but a synthesis.
-Do not repeat content verbatim from the notes.
+Do not repeat content verbatim from the notes.{lang}
 
 --- BEGIN KNOWLEDGE CONTEXT ---
 {context}
@@ -21,7 +101,8 @@ Do not repeat content verbatim from the notes.
 }
 
 /// Tab 2: Gap Analysis — markdown + trailing JSON block.
-pub fn gap_analysis_prompt(context: &str) -> String {
+pub fn gap_analysis_prompt(context: &str, response_lang: Option<&str>) -> String {
+    let lang = language_instruction(response_lang);
     format!(
         r#"You are a knowledge gap analyst. Given the user's note cluster, identify:
 
@@ -35,7 +116,7 @@ Format as Markdown with clear sections. Be specific and actionable.
 For each gap, reference which note(s) it relates to.
 
 ALSO return a machine-readable JSON block at the end, wrapped in ```json fences:
-[{{"topic": "short title", "description": "1-2 sentence description", "suggestedTitle": "New Note: ..."}}]
+[{{"topic": "short title", "description": "1-2 sentence description", "suggestedTitle": "New Note: ..."}}]{lang}
 
 --- BEGIN KNOWLEDGE CONTEXT ---
 {context}
@@ -44,7 +125,8 @@ ALSO return a machine-readable JSON block at the end, wrapped in ```json fences:
 }
 
 /// Tab 3: Self-Assessment — pure JSON response.
-pub fn self_assessment_prompt(context: &str) -> String {
+pub fn self_assessment_prompt(context: &str, response_lang: Option<&str>) -> String {
+    let lang = language_instruction_json(response_lang);
     format!(
         r#"You are an educational assessment designer. Generate a self-assessment quiz based on the user's knowledge network.
 
@@ -64,7 +146,7 @@ For each question, include:
 Questions should test understanding, not memorization. Include questions that require connecting ideas across multiple notes.
 
 Respond ONLY with a JSON array (no markdown fences, no explanation):
-[{{"id": "q1", "type": "multiple_choice", "question": "...", "choices": ["A", "B", "C", "D"], "correctAnswer": "...", "explanation": "...", "sourceNotes": ["note title"], "difficulty": "medium", "difficultyScore": 0.5}}]
+[{{"id": "q1", "type": "multiple_choice", "question": "...", "choices": ["A", "B", "C", "D"], "correctAnswer": "...", "explanation": "...", "sourceNotes": ["note title"], "difficulty": "medium", "difficultyScore": 0.5}}]{lang}
 
 --- BEGIN KNOWLEDGE CONTEXT ---
 {context}
@@ -73,7 +155,8 @@ Respond ONLY with a JSON array (no markdown fences, no explanation):
 }
 
 /// Tab 4: Concept Map — mermaid mindmap syntax.
-pub fn concept_map_prompt(context: &str, root_title: &str) -> String {
+pub fn concept_map_prompt(context: &str, root_title: &str, response_lang: Option<&str>) -> String {
+    let lang = language_instruction(response_lang);
     format!(
         r#"You are a concept mapping specialist. Create a Mermaid mindmap diagram showing how concepts connect across the user's note cluster.
 
@@ -97,7 +180,7 @@ mindmap
     Neural Networks
       Deep Learning
       Transformers
-
+{lang}
 --- BEGIN KNOWLEDGE CONTEXT ---
 {context}
 --- END KNOWLEDGE CONTEXT ---"#
@@ -107,7 +190,12 @@ mindmap
 /// Tab 5: Perspectives — multi-persona analysis.
 ///
 /// `persona_blocks` is pre-formatted from selected PersonaRow entries.
-pub fn perspectives_prompt(context: &str, persona_blocks: &str) -> String {
+pub fn perspectives_prompt(
+    context: &str,
+    persona_blocks: &str,
+    response_lang: Option<&str>,
+) -> String {
+    let lang = language_instruction(response_lang);
     format!(
         r#"You are simulating expert perspectives analyzing a user's knowledge network.
 Each persona has a distinct viewpoint and expertise.
@@ -132,7 +220,7 @@ Format as Markdown. For EACH persona, use exactly this structure:
 
 ---
 
-Repeat for each persona. Separate each persona section with `---`.
+Repeat for each persona. Separate each persona section with `---`.{lang}
 
 --- BEGIN KNOWLEDGE CONTEXT ---
 {context}
@@ -141,7 +229,12 @@ Repeat for each persona. Separate each persona section with `---`.
 }
 
 /// Generate a brief "What's Changed" summary comparing previous insight with current context.
-pub fn changes_summary_prompt(previous_synthesis: &str, current_context: &str) -> String {
+pub fn changes_summary_prompt(
+    previous_synthesis: &str,
+    current_context: &str,
+    response_lang: Option<&str>,
+) -> String {
+    let lang = language_instruction(response_lang);
     format!(
         r#"You are comparing a previous insight analysis with updated knowledge context to identify what's new or different.
 
@@ -159,12 +252,13 @@ Respond with a single concise sentence (max 80 words) summarizing what has chang
 
 If nothing meaningful has changed, respond with exactly: "No significant changes since last review."
 
-Do NOT repeat the synthesis. Just describe what's different."#
+Do NOT repeat the synthesis. Just describe what's different.{lang}"#
     )
 }
 
 /// Generate an applied scenario challenge based on the knowledge context.
-pub fn scenario_challenge_prompt(context: &str) -> String {
+pub fn scenario_challenge_prompt(context: &str, response_lang: Option<&str>) -> String {
+    let lang = language_instruction_json(response_lang);
     format!(
         r#"You are a scenario designer for applied learning. Create a realistic scenario that tests the user's ability to apply concepts from their knowledge network.
 
@@ -175,7 +269,7 @@ Requirements:
 - The best approach should NOT be immediately obvious
 
 Respond ONLY with JSON (no markdown, no explanation):
-{{"title": "Short scenario title (5-10 words)", "situation": "2-3 paragraph setup describing the scenario in detail", "questions": ["Decision question 1", "Decision question 2", "Decision question 3"], "modelAnswer": "3-4 paragraph ideal response explaining the reasoning and how concepts from the notes apply", "sourceNotes": ["note title 1", "note title 2"], "difficultyScore": 0.7}}
+{{"title": "Short scenario title (5-10 words)", "situation": "2-3 paragraph setup describing the scenario in detail", "questions": ["Decision question 1", "Decision question 2", "Decision question 3"], "modelAnswer": "3-4 paragraph ideal response explaining the reasoning and how concepts from the notes apply", "sourceNotes": ["note title 1", "note title 2"], "difficultyScore": 0.7}}{lang}
 
 --- BEGIN KNOWLEDGE CONTEXT ---
 {context}
@@ -191,7 +285,9 @@ pub fn single_persona_prompt(
     persona_expertise: &str,
     persona_perspective: &str,
     persona_tone: &str,
+    response_lang: Option<&str>,
 ) -> String {
+    let lang = language_instruction(response_lang);
     format!(
         r#"You are {persona_name}, a {persona_role}.
 
@@ -204,7 +300,7 @@ Analyze the following knowledge context from your unique perspective. Write 2-3 
 - Identify what's strong and what's weak from your viewpoint
 - Offer specific recommendations or challenges
 
-End with a **Key recommendation:** — one actionable suggestion.
+End with a **Key recommendation:** — one actionable suggestion.{lang}
 
 --- BEGIN KNOWLEDGE CONTEXT ---
 {context}

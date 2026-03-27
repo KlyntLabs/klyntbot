@@ -443,6 +443,57 @@ fn normalize_task(t: storage::TaskRow, start: &str, end: &str) -> Vec<TimelineEn
     out
 }
 
+/// Zero-decimal currencies where stored amount = major unit (no cents).
+const ZERO_DECIMAL_CURRENCIES: &[&str] = &[
+    "VND", "JPY", "KRW", "CLP", "HUF", "ISK", "UGX", "RWF", "PYG", "BIF",
+];
+
+fn format_timeline_amount(amount: i64, currency: &str, is_expense: bool) -> String {
+    let sign = if is_expense { "-" } else { "+" };
+    let is_zero_decimal = ZERO_DECIMAL_CURRENCIES
+        .iter()
+        .any(|z| z.eq_ignore_ascii_case(currency));
+
+    if is_zero_decimal {
+        // VND, JPY, etc.: amount is already in major units, format with thousand separators
+        let abs = amount.unsigned_abs();
+        let formatted = format_with_separators(abs);
+        let symbol = match currency.to_uppercase().as_str() {
+            "VND" => "đ",
+            "JPY" | "KRW" => currency,
+            _ => currency,
+        };
+        if currency.eq_ignore_ascii_case("VND") {
+            format!("{sign}{formatted}{symbol}")
+        } else {
+            format!("{sign}{symbol}{formatted}")
+        }
+    } else {
+        // USD, EUR, etc.: amount is in cents
+        let major = amount.unsigned_abs() as f64 / 100.0;
+        let symbol = match currency.to_uppercase().as_str() {
+            "USD" | "USDT" => "$",
+            "EUR" => "€",
+            "GBP" => "£",
+            "THB" => "฿",
+            _ => currency,
+        };
+        format!("{sign}{symbol}{major:.2}")
+    }
+}
+
+fn format_with_separators(n: u64) -> String {
+    let s = n.to_string();
+    let mut result = String::with_capacity(s.len() + s.len() / 3);
+    for (i, c) in s.chars().enumerate() {
+        if i > 0 && (s.len() - i) % 3 == 0 {
+            result.push('.');
+        }
+        result.push(c);
+    }
+    result
+}
+
 fn normalize_transaction(tx: storage::rows::finance::FinanceTransactionRow) -> TimelineEntry {
     let is_expense = tx.tx_type == "expense";
     let entry_type = if is_expense {
@@ -450,11 +501,7 @@ fn normalize_transaction(tx: storage::rows::finance::FinanceTransactionRow) -> T
     } else {
         TimelineEntryType::IncomeRecorded
     };
-    let amount_display = format!(
-        "{}{:.2}",
-        if is_expense { "-$" } else { "+$" },
-        tx.amount.unsigned_abs() as f64 / 100.0
-    );
+    let amount_display = format_timeline_amount(tx.amount, &tx.currency, is_expense);
     let title = match &tx.category {
         Some(cat) => format!("{} {}", amount_display, cat),
         None => amount_display,
@@ -470,7 +517,7 @@ fn normalize_transaction(tx: storage::rows::finance::FinanceTransactionRow) -> T
         ended_at: None,
         duration_secs: None,
         entity_id: Some(tx.id),
-        entity_route: Some("/finance/transactions".into()),
+        entity_route: Some("/finance".into()),
         color: if is_expense {
             "var(--timeline-finance-expense)".into()
         } else {

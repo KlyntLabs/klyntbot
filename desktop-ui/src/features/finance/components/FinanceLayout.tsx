@@ -13,8 +13,8 @@ interface FinanceLayoutProps {
 }
 
 const subNav = [
-  { label: "Dashboard", path: "/finance" },
-  { label: "Cash Flow", path: "/finance/cashflow" },
+  { label: "Cash Flow", path: "/finance" },
+  { label: "Overview", path: "/finance/overview" },
   { label: "Investments", path: "/finance/investments" },
   { label: "Targets", path: "/finance/targets" },
 ];

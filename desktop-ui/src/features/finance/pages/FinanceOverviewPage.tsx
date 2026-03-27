@@ -243,10 +243,7 @@ export function Finance() {
                 <span className="text-2xs text-muted-foreground uppercase tracking-widest">
                   Accounts
                 </span>
-                <Link
-                  to="/finance/cashflow"
-                  className="text-2xs text-brand normal-case tracking-normal"
-                >
+                <Link to="/finance" className="text-2xs text-brand normal-case tracking-normal">
                   View all →
                 </Link>
               </div>
@@ -502,10 +499,7 @@ export function Finance() {
             <span className="text-2xs text-muted-foreground uppercase tracking-widest">
               Recent Transactions
             </span>
-            <Link
-              to="/finance/cashflow"
-              className="text-2xs text-brand normal-case tracking-normal"
-            >
+            <Link to="/finance" className="text-2xs text-brand normal-case tracking-normal">
               View all →
             </Link>
           </div>
