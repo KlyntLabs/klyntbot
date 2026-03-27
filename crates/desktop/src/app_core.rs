@@ -383,6 +383,39 @@ fn wire_event_channels(core: &AppCore, channels: EventChannels, app_handle: &tau
         });
     }
 
+    // Lifecycle events → focus timer suspend/resume on sleep/wake
+    {
+        let mut lifecycle_rx = channels.domain_event_bus.subscribe();
+        let handle = app_handle.clone();
+        let token = shutdown.clone();
+        tokio::spawn(async move {
+            loop {
+                tokio::select! {
+                    _ = token.cancelled() => break,
+                    msg = lifecycle_rx.recv() => {
+                        match msg {
+                            Ok(bus::DomainEvent::SystemWillSleep) => {
+                                if let Some(timer) = handle.try_state::<Arc<crate::focus_timer::FocusTimer>>() {
+                                    timer.suspend().await;
+                                }
+                            }
+                            Ok(bus::DomainEvent::SystemDidWake { .. }) => {
+                                if let Some(timer) = handle.try_state::<Arc<crate::focus_timer::FocusTimer>>() {
+                                    timer.resume_suspended().await;
+                                }
+                            }
+                            Ok(_) => {}
+                            Err(tokio::sync::broadcast::error::RecvError::Lagged(n)) => {
+                                warn!("lifecycle event forwarder lagged by {n} events");
+                            }
+                            Err(tokio::sync::broadcast::error::RecvError::Closed) => break,
+                        }
+                    }
+                }
+            }
+        });
+    }
+
     // Pipeline events → extraction + consolidation
     {
         let app_handle_clone = app_handle.clone();
