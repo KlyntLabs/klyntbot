@@ -922,7 +922,6 @@ impl AgentLoop {
         self: &Arc<Self>,
         content: String,
         session_key: String,
-        squad_mode: Option<String>,
     ) -> Result<StreamingHandle> {
         // Detect correction prefix and memory miss BEFORE setup_session adds the user message
         let correction_strength = detect_correction_prefix(&content);
@@ -1021,14 +1020,13 @@ impl AgentLoop {
             interaction_tx,
         );
 
-        // Set squad_id and squad_mode from session if this is a squad chat
+        // Set squad_id from session if this is a squad chat
         if let Ok(session_arc) = self.session_manager.get_or_create(&session_key, None).await {
             let session = session_arc.lock().await;
             if let Some(ref sid) = session.squad_id {
                 routing_ctx.squad_id = Some(sid.clone());
             }
         }
-        routing_ctx.squad_mode = squad_mode;
 
         let cancel_token = CancellationToken::new();
         let cancel_clone = cancel_token.clone();

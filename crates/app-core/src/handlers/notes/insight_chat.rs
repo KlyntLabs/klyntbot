@@ -107,119 +107,6 @@ pub(super) async fn relay_insight_stream(
     );
 }
 
-/// Run parallel per-persona LLM calls for squad mode.
-///
-/// Each persona gets their own system prompt grounded in the tab content.
-/// Responses are stored as separate messages with `persona_id` set.
-/// No streaming — parallel blocking calls, results persisted then `agent:done` emitted.
-#[allow(clippy::too_many_arguments)]
-async fn relay_squad_chat(
-    provider: providers::DynProvider,
-    personas: Vec<cognitive::PersonaRow>,
-    history_messages: Vec<providers::Message>,
-    user_message: String,
-    tab_content: String,
-    note_title: String,
-    note_body: String,
-    chat_params: providers::ChatParams,
-    session_key: String,
-    repos: Repos,
-    emitter: Arc<dyn AppEventEmitter>,
-) {
-    use futures_util::future::join_all;
-
-    let body_preview = common::truncate_at_boundary(&note_body, 3000).to_string();
-
-    let futures: Vec<_> = personas
-        .iter()
-        .map(|persona| {
-            let provider = provider.clone();
-            let params = chat_params.clone();
-            let history = history_messages.clone();
-            let user_msg = user_message.clone();
-            let tab = tab_content.clone();
-            let title = note_title.clone();
-            let body = body_preview.clone();
-            let p_name = persona.name.clone();
-            let p_role = persona.role.clone();
-            let p_expertise = persona.expertise.clone();
-            let p_perspective = persona.perspective.clone();
-            let p_tone = persona.tone.clone();
-
-            async move {
-                let system_prompt = format!(
-                    "You are {p_name}, a {p_role}.\n\
-                     Expertise: {p_expertise}\n\
-                     Perspective: {p_perspective}\n\
-                     Tone: {p_tone}\n\n\
-                     You are discussing the note \"{title}\" from your unique perspective.\n\
-                     Stay in character. Be concise (2-4 sentences per response).\n\n\
-                     --- NOTE: {title} ---\n{body}\n--- END NOTE ---\n\n\
-                     --- ANALYSIS ---\n{tab}\n--- END ANALYSIS ---"
-                );
-
-                let mut messages = vec![providers::Message::System {
-                    content: system_prompt,
-                }];
-
-                // Include conversation history so each persona sees context
-                for msg in &history {
-                    messages.push(msg.clone());
-                }
-
-                messages.push(providers::Message::User {
-                    content: providers::UserContent::Text(user_msg),
-                });
-
-                match provider.chat(&messages, None, &params).await {
-                    Ok(response) => Some(response.content.unwrap_or_default()),
-                    Err(e) => {
-                        warn!("squad persona {p_name} failed: {e}");
-                        None
-                    }
-                }
-            }
-        })
-        .collect();
-
-    let results = join_all(futures).await;
-
-    // Persist each persona's response as a separate message
-    for (persona, response) in personas.iter().zip(results.iter()) {
-        if let Some(content) = response {
-            let msg_id = uuid::Uuid::new_v4();
-            if let Err(e) = repos
-                .sessions
-                .add_message(
-                    &session_key,
-                    msg_id,
-                    "assistant",
-                    content,
-                    None,
-                    None,
-                    None,
-                    Some(&persona.id),
-                )
-                .await
-            {
-                warn!(
-                    "insight_chat: failed to persist persona {} message: {e}",
-                    persona.name
-                );
-            }
-        }
-    }
-
-    // Emit done — frontend will refetch messages and see individual persona bubbles
-    emitter.emit_event(
-        AGENT_DONE,
-        serde_json::json!({
-            "sessionKey": session_key,
-            "content": "", // Content is in individual messages, not here
-        }),
-    );
-}
-
 // ── System prompt ────────────────────────────────────────────────────────────
 
 /// Build the system prompt for a tab chat session (non-squad mode).
@@ -394,23 +281,104 @@ impl AppCore {
         let session_key_clone = params.session_key.clone();
 
         if let Some(personas) = squad_personas {
-            // Squad mode: parallel per-persona calls
+            // Squad mode: parallel per-persona calls (inline)
             let repos_clone = self.repos.clone();
             let emitter_clone = Arc::clone(&emitter);
+            let user_msg = params.user_message.clone();
+            let note_title = note.title.clone();
+            let note_body = note.body.clone();
 
-            tokio::spawn(relay_squad_chat(
-                provider,
-                personas,
-                history_messages,
-                params.user_message.clone(),
-                tab_content,
-                note.title.clone(),
-                note.body.clone(),
-                chat_params,
-                session_key_clone,
-                repos_clone,
-                emitter_clone,
-            ));
+            tokio::spawn(async move {
+                use futures_util::future::join_all;
+
+                let body_preview = common::truncate_at_boundary(&note_body, 3000).to_string();
+
+                let futures: Vec<_> = personas
+                    .iter()
+                    .map(|persona| {
+                        let provider = provider.clone();
+                        let params = chat_params.clone();
+                        let history = history_messages.clone();
+                        let user_msg = user_msg.clone();
+                        let tab = tab_content.clone();
+                        let title = note_title.clone();
+                        let body = body_preview.clone();
+                        let p_name = persona.name.clone();
+                        let p_role = persona.role.clone();
+                        let p_expertise = persona.expertise.clone();
+                        let p_perspective = persona.perspective.clone();
+                        let p_tone = persona.tone.clone();
+
+                        async move {
+                            let system_prompt = format!(
+                                "You are {p_name}, a {p_role}.\n\
+                                 Expertise: {p_expertise}\n\
+                                 Perspective: {p_perspective}\n\
+                                 Tone: {p_tone}\n\n\
+                                 You are discussing the note \"{title}\" from your \
+                                 unique perspective.\n\
+                                 Stay in character. Be concise \
+                                 (2-4 sentences per response).\n\n\
+                                 --- NOTE: {title} ---\n{body}\n--- END NOTE ---\n\n\
+                                 --- ANALYSIS ---\n{tab}\n--- END ANALYSIS ---"
+                            );
+
+                            let mut messages = vec![providers::Message::System {
+                                content: system_prompt,
+                            }];
+                            for msg in &history {
+                                messages.push(msg.clone());
+                            }
+                            messages.push(providers::Message::User {
+                                content: providers::UserContent::Text(user_msg),
+                            });
+
+                            match provider.chat(&messages, None, &params).await {
+                                Ok(response) => Some(response.content.unwrap_or_default()),
+                                Err(e) => {
+                                    warn!("squad persona {p_name} failed: {e}");
+                                    None
+                                }
+                            }
+                        }
+                    })
+                    .collect();
+
+                let results = join_all(futures).await;
+
+                for (persona, response) in personas.iter().zip(results.iter()) {
+                    if let Some(content) = response {
+                        let msg_id = uuid::Uuid::new_v4();
+                        if let Err(e) = repos_clone
+                            .sessions
+                            .add_message(
+                                &session_key_clone,
+                                msg_id,
+                                "assistant",
+                                content,
+                                None,
+                                None,
+                                None,
+                                Some(&persona.id),
+                            )
+                            .await
+                        {
+                            warn!(
+                                "insight_chat: failed to persist persona {} message: {e}",
+                                persona.name
+                            );
+                        }
+                    }
+                }
+
+                emitter_clone.emit_event(
+                    AGENT_DONE,
+                    serde_json::json!({
+                        "sessionKey": session_key_clone,
+                        "content": "",
+                    }),
+                );
+            });
         } else {
             // Single mode: streaming LLM response
             let system_prompt = if let Some(persona_id) = params.tab_name.strip_prefix("persona:") {

@@ -8,6 +8,7 @@ pub struct SquadResponse {
     pub description: String,
     pub icon: String,
     pub orchestrator_skill: String,
+    pub default_interaction_mode: String,
     pub source: String,
     pub domains: Vec<String>,
     pub is_active: bool,
@@ -46,6 +47,8 @@ pub struct UpdateSquadParams {
     pub description: Option<String>,
     pub icon: Option<String>,
     pub domains: Option<Vec<String>>,
+    pub orchestrator_skill: Option<String>,
+    pub default_interaction_mode: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]

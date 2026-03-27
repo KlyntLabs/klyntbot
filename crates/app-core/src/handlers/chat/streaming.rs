@@ -3,11 +3,19 @@
 use std::collections::{HashMap, HashSet, VecDeque};
 use std::sync::Arc;
 
+use agent::intent_pipeline::engines::debate;
+use agent::intent_pipeline::engines::debate_types::{
+    DebateConfig, DebateContext, DebateEvent, DebateResult, DefaultInteractionMode,
+    SquadInteractionMode,
+};
+use agent::intent_pipeline::engines::interaction::detect_interaction_mode;
 use agent::AgentEvent;
+use cognitive::{BlackboardRepo, PersonaAccuracyRepo, ResolvedSquad};
 use common::EntityCard;
 use desktop_shared::commands::{ChatMessageResponse, SessionContextInput};
 use desktop_shared::errors::ApiError;
 use desktop_shared::events::{self, *};
+use providers::Message;
 use storage::{Repos, SessionContextParams};
 use tokio::sync::mpsc;
 use tokio_util::sync::CancellationToken;
@@ -185,6 +193,495 @@ async fn resolve_ancestry(
     }
 }
 
+// ── Squad execution ─────────────────────────────────────────────────────
+
+/// Convert session message rows to provider Messages for debate context.
+fn session_rows_to_messages(rows: &[storage::SessionMessageRow]) -> Vec<Message> {
+    rows.iter()
+        .filter_map(|r| match r.role.as_str() {
+            "user" => Some(Message::user(&r.content)),
+            "assistant" => Some(Message::assistant(&r.content)),
+            "system" => Some(Message::system(&r.content)),
+            _ => None,
+        })
+        .collect()
+}
+
+/// Map a `DebateEvent` from the debate engine to an `AgentEvent` for the
+/// existing streaming relay. This bridges the gap between the debate engine's
+/// event channel and the chat streaming infrastructure.
+fn debate_event_to_agent_event(de: DebateEvent) -> Option<AgentEvent> {
+    match de {
+        DebateEvent::RoundStarted {
+            round,
+            phase,
+            persona_order: _,
+            order_reason: _,
+        } => Some(AgentEvent::DebateRoundStarted {
+            round: u32::from(round),
+            total_rounds: 0, // not known at this point, relay ignores it
+            phase: phase.as_str().to_string(),
+        }),
+        DebateEvent::PersonaPerspective {
+            persona_id,
+            name,
+            icon,
+            role,
+            content,
+            round: _,
+            challenge,
+        } => Some(AgentEvent::PersonaPerspective {
+            persona_id,
+            persona_name: name,
+            persona_icon: icon,
+            persona_role: role,
+            content,
+            challenge,
+        }),
+        DebateEvent::JudgeDecision {
+            round,
+            consensus_score,
+            speaking_order,
+            decision,
+        } => Some(AgentEvent::DebateJudgeDecision {
+            round: u32::from(round),
+            consensus_score,
+            decision,
+            speaking_order,
+            reasoning: String::new(),
+        }),
+        DebateEvent::RoundCompleted { round, phase: _ } => Some(AgentEvent::DebateRoundCompleted {
+            round: u32::from(round),
+            consensus_score: 0.0,
+        }),
+        DebateEvent::ConsensusReached { round, score } => Some(AgentEvent::ConsensusReached {
+            round: u32::from(round),
+            consensus_score: score,
+            summary: String::new(),
+        }),
+        DebateEvent::SynthesisChunk { content } => Some(AgentEvent::ContentChunk { data: content }),
+        // BudgetCheck, SynthesisStarted, DebatePartial, Complete — not mapped to AgentEvent
+        _ => None,
+    }
+}
+
+/// Background task for squad message execution. Takes individual pieces instead of
+/// `&AppCore` since this runs in a spawned task.
+#[allow(clippy::too_many_arguments)]
+async fn execute_squad_message_bg(
+    repos: &Repos,
+    storage_pool: &storage::StoragePool,
+    squad_repo: Option<&cognitive::SquadRepo>,
+    cognitive_provider: Option<&providers::DynProvider>,
+    domain_event_bus: Option<&Arc<bus::DomainEventBus>>,
+    agent: &Arc<agent::AgentLoop>,
+    content: &str,
+    session_key: &str,
+    squad_id: &str,
+    event_tx: mpsc::Sender<AgentEvent>,
+) -> Result<(), ApiError> {
+    // 1. Resolve the squad
+    let squad_repo =
+        squad_repo.ok_or_else(|| ApiError::new("NOT_AVAILABLE", "Squad repo not available"))?;
+
+    let resolved = squad_repo
+        .resolve_squad(squad_id)
+        .await
+        .map_err(|e| ApiError::new("STORAGE", format!("Failed to resolve squad: {e}")))?
+        .ok_or_else(|| ApiError::new("NOT_FOUND", format!("Squad '{squad_id}' not found")))?;
+
+    if resolved.personas.len() < 2 {
+        return Err(ApiError::new(
+            "NOT_ENOUGH_PERSONAS",
+            "Need at least 2 personas for a squad interaction",
+        ));
+    }
+
+    // 2. Get provider
+    let provider = cognitive_provider
+        .ok_or_else(|| ApiError::new("NOT_AVAILABLE", "LLM provider not configured"))?;
+
+    // 3. Detect interaction mode
+    let default_mode = DefaultInteractionMode::from_str(&resolved.squad.default_interaction_mode);
+    let mode = detect_interaction_mode(content, &resolved.personas, default_mode);
+
+    // 4. Load orchestrator skill body for domain grounding
+    let skill_prompt = {
+        let catalog_arc = agent.skill_catalog();
+        let catalog = catalog_arc.read().await;
+        catalog
+            .get(&resolved.squad.orchestrator_skill)
+            .map(|pkg| pkg.body.clone())
+            .unwrap_or_default()
+    };
+
+    // 5. Load conversation history
+    let history_rows = repos
+        .sessions
+        .get_recent_messages(session_key, 20)
+        .await
+        .unwrap_or_default();
+    let conversation_history = session_rows_to_messages(&history_rows);
+
+    // 6. Parse squad domains
+    let domains: Vec<String> = serde_json::from_str(&resolved.squad.domains)
+        .unwrap_or_else(|_| vec!["general".to_string()]);
+
+    match mode {
+        SquadInteractionMode::Debate => {
+            execute_squad_debate(
+                repos,
+                storage_pool,
+                domain_event_bus,
+                content,
+                session_key,
+                squad_id,
+                &resolved,
+                provider,
+                &skill_prompt,
+                conversation_history,
+                domains,
+                event_tx,
+            )
+            .await
+        }
+        SquadInteractionMode::DirectAddress { persona_id } => {
+            execute_direct_address(
+                repos,
+                domain_event_bus,
+                content,
+                session_key,
+                squad_id,
+                &resolved,
+                provider,
+                &skill_prompt,
+                conversation_history,
+                &persona_id,
+                "direct",
+                event_tx,
+            )
+            .await
+        }
+        SquadInteractionMode::LeadResponse => {
+            // Find the lead persona (role_in_squad == "lead")
+            let lead_persona_id = resolved
+                .members
+                .iter()
+                .find(|m| m.role_in_squad == "lead")
+                .map(|m| m.persona_id.clone())
+                .unwrap_or_else(|| {
+                    // Fallback to first persona
+                    resolved
+                        .personas
+                        .first()
+                        .map(|p| p.id.clone())
+                        .unwrap_or_default()
+                });
+
+            execute_direct_address(
+                repos,
+                domain_event_bus,
+                content,
+                session_key,
+                squad_id,
+                &resolved,
+                provider,
+                &skill_prompt,
+                conversation_history,
+                &lead_persona_id,
+                "lead",
+                event_tx,
+            )
+            .await
+        }
+    }
+}
+
+/// Run a full debate with the squad and stream events.
+#[allow(clippy::too_many_arguments)]
+async fn execute_squad_debate(
+    repos: &Repos,
+    storage_pool: &storage::StoragePool,
+    domain_event_bus: Option<&Arc<bus::DomainEventBus>>,
+    content: &str,
+    session_key: &str,
+    squad_id: &str,
+    resolved: &ResolvedSquad,
+    provider: &providers::DynProvider,
+    skill_prompt: &str,
+    conversation_history: Vec<Message>,
+    domains: Vec<String>,
+    agent_event_tx: mpsc::Sender<AgentEvent>,
+) -> Result<(), ApiError> {
+    let config = DebateConfig::for_chat();
+    let context = DebateContext {
+        skill_prompt: skill_prompt.to_string(),
+        conversation_history,
+        user_message: content.to_string(),
+        cognitive_context: None,
+        domains,
+    };
+
+    let blackboard_repo = BlackboardRepo::new(storage_pool.inner().clone());
+    let accuracy_repo = PersonaAccuracyRepo::new(storage_pool.inner().clone());
+    let cancel = CancellationToken::new();
+
+    // Create debate event channel
+    let (debate_tx, mut debate_rx) = mpsc::channel::<DebateEvent>(100);
+
+    // Spawn relay: DebateEvent → AgentEvent
+    let relay_agent_tx = agent_event_tx.clone();
+    let relay_handle = tokio::spawn(async move {
+        while let Some(de) = debate_rx.recv().await {
+            if let Some(ae) = debate_event_to_agent_event(de) {
+                if relay_agent_tx.send(ae).await.is_err() {
+                    break;
+                }
+            }
+        }
+    });
+
+    // Run the debate
+    let squad_clone = ResolvedSquad {
+        squad: resolved.squad.clone(),
+        personas: resolved.personas.clone(),
+        members: resolved.members.clone(),
+    };
+    let result = debate::run_debate(
+        config,
+        context,
+        squad_clone,
+        provider,
+        &blackboard_repo,
+        &accuracy_repo,
+        debate_tx,
+        None, // no approval flow for chat
+        cancel,
+    )
+    .await
+    .map_err(|e| ApiError::new("DEBATE_FAILED", e.to_string()))?;
+
+    // Wait for relay to finish
+    let _ = relay_handle.await;
+
+    // Persist synthesis as assistant message
+    let synthesis = &result.synthesis;
+    if !synthesis.is_empty() {
+        let msg_id = uuid::Uuid::new_v4();
+        let metadata = serde_json::json!({
+            "squad_mode": "debate",
+            "squad_id": squad_id,
+            "debate_rounds": result.rounds_completed,
+            "partial": result.partial_reason.is_some(),
+            "consensus_score": result.final_consensus_score,
+        });
+        if let Err(e) = repos
+            .sessions
+            .add_message(
+                session_key,
+                msg_id,
+                "assistant",
+                synthesis,
+                None,
+                None,
+                Some(&metadata),
+                None, // persona_id — synthesis is from the whole squad
+            )
+            .await
+        {
+            tracing::warn!("failed to persist debate synthesis for {session_key}: {e}");
+        }
+
+        // Emit Done with the synthesis content
+        let _ = agent_event_tx
+            .send(AgentEvent::Done {
+                content: synthesis.clone(),
+                message_id: Some(msg_id.to_string()),
+            })
+            .await;
+    } else {
+        // Empty synthesis (e.g. cancelled)
+        let _ = agent_event_tx
+            .send(AgentEvent::Done {
+                content: String::new(),
+                message_id: None,
+            })
+            .await;
+    }
+
+    // Emit domain event
+    emit_debate_completed_event(domain_event_bus, squad_id, session_key, &result);
+
+    // Persist accuracy outcomes
+    persist_accuracy_outcomes(storage_pool, &result).await;
+
+    Ok(())
+}
+
+/// Execute a direct persona address (or lead response) — single persona LLM call.
+#[allow(clippy::too_many_arguments)]
+async fn execute_direct_address(
+    repos: &Repos,
+    domain_event_bus: Option<&Arc<bus::DomainEventBus>>,
+    content: &str,
+    session_key: &str,
+    squad_id: &str,
+    resolved: &ResolvedSquad,
+    provider: &providers::DynProvider,
+    skill_prompt: &str,
+    conversation_history: Vec<Message>,
+    persona_id: &str,
+    mode_label: &str,
+    agent_event_tx: mpsc::Sender<AgentEvent>,
+) -> Result<(), ApiError> {
+    // Find the target persona
+    let persona = resolved
+        .personas
+        .iter()
+        .find(|p| p.id == persona_id)
+        .ok_or_else(|| {
+            ApiError::new(
+                "NOT_FOUND",
+                format!("Persona '{persona_id}' not found in squad"),
+            )
+        })?;
+
+    // Build persona system prompt
+    let system_prompt = debate::build_persona_system_prompt(skill_prompt, persona, None);
+
+    // Build messages: system + history + user
+    let mut messages = vec![Message::system(&system_prompt)];
+    messages.extend(conversation_history);
+    messages.push(Message::user(content));
+
+    // Call provider
+    let params = providers::ChatParams::new(provider.default_model());
+    let response = provider
+        .chat(&messages, None, &params)
+        .await
+        .map_err(|e| ApiError::new("LLM_FAILED", e.to_string()))?;
+
+    let response_content = response.content.unwrap_or_default();
+
+    // Emit PersonaPerspective so the UI knows which persona responded
+    let _ = agent_event_tx
+        .send(AgentEvent::PersonaPerspective {
+            persona_id: persona.id.clone(),
+            persona_name: persona.name.clone(),
+            persona_icon: persona.icon.clone(),
+            persona_role: persona.role.clone(),
+            content: response_content.clone(),
+            challenge: None,
+        })
+        .await;
+
+    // Persist as assistant message with persona_id
+    let msg_id = uuid::Uuid::new_v4();
+    let metadata = serde_json::json!({
+        "squad_mode": mode_label,
+        "squad_id": squad_id,
+        "persona_id": persona.id,
+        "persona_name": persona.name,
+    });
+    if let Err(e) = repos
+        .sessions
+        .add_message(
+            session_key,
+            msg_id,
+            "assistant",
+            &response_content,
+            None,
+            None,
+            Some(&metadata),
+            Some(&persona.id),
+        )
+        .await
+    {
+        tracing::warn!("failed to persist direct address message for {session_key}: {e}");
+    }
+
+    // Emit Done
+    let _ = agent_event_tx
+        .send(AgentEvent::Done {
+            content: response_content,
+            message_id: Some(msg_id.to_string()),
+        })
+        .await;
+
+    // Emit domain event for interaction pattern tracking
+    if let Some(bus) = domain_event_bus {
+        bus.publish(bus::DomainEvent::SquadInteractionPattern {
+            squad_id: squad_id.to_string(),
+            mode: mode_label.to_string(),
+            persona_id: Some(persona.id.clone()),
+            domain_hint: None,
+        });
+    }
+
+    Ok(())
+}
+
+/// Emit `SquadDebateCompleted` domain event after a successful debate.
+fn emit_debate_completed_event(
+    domain_event_bus: Option<&Arc<bus::DomainEventBus>>,
+    squad_id: &str,
+    session_key: &str,
+    result: &DebateResult,
+) {
+    if let Some(bus) = domain_event_bus {
+        let persona_accuracies: Vec<(String, f64)> = result
+            .accuracy_outcomes
+            .iter()
+            .map(|a| (a.persona_id.clone(), a.consensus_alignment))
+            .collect();
+        let avg_score = if persona_accuracies.is_empty() {
+            0.0
+        } else {
+            persona_accuracies.iter().map(|(_, s)| s).sum::<f64>() / persona_accuracies.len() as f64
+        };
+        let top_performer = persona_accuracies
+            .iter()
+            .max_by(|a, b| a.1.partial_cmp(&b.1).unwrap_or(std::cmp::Ordering::Equal))
+            .map(|(id, _)| id.clone());
+
+        bus.publish(bus::DomainEvent::SquadDebateCompleted {
+            squad_id: squad_id.to_string(),
+            session_key: session_key.to_string(),
+            rounds_completed: result.rounds_completed,
+            consensus_score: result.final_consensus_score,
+            persona_accuracies,
+            was_partial: result.partial_reason.is_some(),
+            token_cost: result.token_usage.total,
+            average_consensus_score: avg_score,
+            top_performer_persona_id: top_performer,
+        });
+    }
+}
+
+/// Persist accuracy outcomes from a debate to the PersonaAccuracyRepo.
+async fn persist_accuracy_outcomes(storage_pool: &storage::StoragePool, result: &DebateResult) {
+    if result.accuracy_outcomes.is_empty() {
+        return;
+    }
+    let accuracy_repo = PersonaAccuracyRepo::new(storage_pool.inner().clone());
+    for outcome in &result.accuracy_outcomes {
+        if let Err(e) = accuracy_repo
+            .record_outcome(
+                &outcome.persona_id,
+                &outcome.squad_id,
+                &outcome.domain,
+                outcome.consensus_alignment,
+            )
+            .await
+        {
+            tracing::warn!(
+                "failed to record accuracy for persona {}: {e}",
+                outcome.persona_id
+            );
+        }
+    }
+}
+
 // ── Public free functions ────────────────────────────────────────────────
 
 pub async fn chat_send(
@@ -231,9 +728,8 @@ pub async fn chat_send(
     // 3. Call agent with streaming (agent loop stores user + assistant messages)
     let msg_id = uuid::Uuid::new_v4();
     let now = chrono::Utc::now();
-    let squad_mode = context.as_ref().and_then(|c| c.squad_mode.clone());
     let streaming_handle = agent
-        .process_direct_streaming(content.clone(), session_key.clone(), squad_mode)
+        .process_direct_streaming(content.clone(), session_key.clone())
         .await
         .map_err(ApiError::from)?;
 
@@ -991,6 +1487,29 @@ impl AppCore {
         session_key: String,
         context: Option<SessionContextInput>,
     ) -> Result<(ChatMessageResponse, ChatStreamInfo), ApiError> {
+        // Check if this is a squad session — if so, route to the debate engine
+        // instead of the normal agent pipeline.
+        let squad_id = context.as_ref().and_then(|c| c.squad_id.clone());
+
+        // Also check if the session already has a squad_id (for follow-up messages
+        // that may not re-send the context).
+        let effective_squad_id = if squad_id.is_some() {
+            squad_id
+        } else {
+            self.repos
+                .sessions
+                .get_session(&session_key)
+                .await
+                .ok()
+                .and_then(|s| s.squad_id)
+        };
+
+        if let Some(ref sid) = effective_squad_id {
+            return self
+                .chat_send_squad(content, session_key, context, sid.clone())
+                .await;
+        }
+
         let result = chat_send(
             &self.repos,
             &self.agent,
@@ -1010,6 +1529,143 @@ impl AppCore {
         }
 
         Ok(result)
+    }
+
+    /// Squad-specific chat_send: handles session setup and runs the squad
+    /// execution engine (debate or direct address) instead of the agent pipeline.
+    async fn chat_send_squad(
+        &self,
+        content: String,
+        session_key: String,
+        context: Option<SessionContextInput>,
+        squad_id: String,
+    ) -> Result<(ChatMessageResponse, ChatStreamInfo), ApiError> {
+        // 1. Ensure session exists
+        let title: String = content
+            .chars()
+            .take(60)
+            .collect::<String>()
+            .trim()
+            .to_string();
+        let metadata = serde_json::json!({ "title": title });
+        self.repos
+            .sessions
+            .upsert_session(&session_key, &metadata, Some(&squad_id))
+            .await
+            .map_err(map_storage_err)?;
+
+        // 2. Upsert session_context if provided
+        let has_context = context.is_some();
+        if let Some(ctx) = &context {
+            self.repos
+                .session_context
+                .upsert(SessionContextParams {
+                    session_key: &session_key,
+                    context_type: ctx.context_type.as_deref().unwrap_or("general"),
+                    entity_kind: ctx.entity_kind.as_deref(),
+                    entity_id: ctx.entity_id.as_deref(),
+                    area_id: None,
+                    project_id: None,
+                    is_ephemeral: ctx.is_ephemeral.unwrap_or(false),
+                })
+                .await
+                .map_err(map_storage_err)?;
+        }
+
+        // 3. Persist the user message
+        let msg_id = uuid::Uuid::new_v4();
+        let now = chrono::Utc::now();
+        self.repos
+            .sessions
+            .add_message(
+                &session_key,
+                msg_id,
+                "user",
+                &content,
+                None,
+                None,
+                None,
+                None,
+            )
+            .await
+            .map_err(map_storage_err)?;
+
+        // 4. Create event channels matching the ChatStreamInfo interface
+        let (event_tx, event_rx) = mpsc::channel::<AgentEvent>(64);
+        let (_interaction_tx, interaction_rx) = mpsc::channel::<tools_core::InteractionBundle>(4);
+
+        // 5. Track cancel token
+        let cancel_token = CancellationToken::new();
+        self.active_streams
+            .insert(session_key.clone(), cancel_token.clone());
+
+        // 6. Spawn squad execution in the background
+        let core_repos = self.repos.clone();
+        let core_storage = self.storage_pool.clone();
+        let core_squad_repo = self.squad_repo.clone();
+        let core_cognitive_provider = self.cognitive_provider.clone();
+        let core_domain_event_bus = self.domain_event_bus.clone();
+        let core_agent = Arc::clone(&self.agent);
+        let sk = session_key.clone();
+        let sid = squad_id.clone();
+        let content_clone = content.clone();
+
+        tokio::spawn(async move {
+            // Build a lightweight "core-like" context for the squad execution.
+            // We use a temporary AppCoreRef to avoid cloning the entire AppCore.
+            let result = execute_squad_message_bg(
+                &core_repos,
+                &core_storage,
+                core_squad_repo.as_ref(),
+                core_cognitive_provider.as_ref(),
+                core_domain_event_bus.as_ref(),
+                &core_agent,
+                &content_clone,
+                &sk,
+                &sid,
+                event_tx.clone(),
+            )
+            .await;
+
+            if let Err(e) = result {
+                tracing::error!("squad execution failed for {sk}: {e}");
+                let _ = event_tx
+                    .send(AgentEvent::Error {
+                        message: e.to_string(),
+                    })
+                    .await;
+            }
+        });
+
+        // 7. Build user message response
+        let user_msg = ChatMessageResponse {
+            id: msg_id.to_string(),
+            role: common::MessageRole::User.to_string(),
+            content: content.clone(),
+            timestamp: now,
+            segments: None,
+            transparency: None,
+            persona_id: None,
+            persona_name: None,
+        };
+
+        // 8. Build stream info
+        let stream_info = ChatStreamInfo {
+            session_key: session_key.clone(),
+            event_rx,
+            interaction_rx,
+            has_context,
+        };
+
+        // Publish chat turn to cognitive consolidation pipeline
+        if let Some(bus) = &self.domain_event_bus {
+            bus.publish(bus::DomainEvent::ChatTurnCompleted {
+                user_message: content,
+                session_key,
+            });
+        }
+
+        Ok((user_msg, stream_info))
     }
 
     pub async fn chat_cancel(&self, session_key: String) -> Result<(), ApiError> {

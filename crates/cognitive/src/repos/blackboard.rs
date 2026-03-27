@@ -135,6 +135,17 @@ impl BlackboardRepo {
             .await?;
         Ok(())
     }
+
+    /// Delete all entries whose session_key starts with the given prefix.
+    /// Used for session-lifecycle cleanup: `delete_by_session_prefix("session:{key}:")`
+    pub async fn delete_by_session_prefix(&self, prefix: &str) -> Result<u64, sqlx::Error> {
+        let like_pattern = format!("{}%", prefix);
+        let result = sqlx::query("DELETE FROM blackboard_entries WHERE session_key LIKE ?1")
+            .bind(&like_pattern)
+            .execute(&self.pool)
+            .await?;
+        Ok(result.rows_affected())
+    }
 }
 
 #[cfg(test)]
@@ -359,5 +370,70 @@ mod tests {
             .await
             .unwrap();
         assert_eq!(removed, 0);
+    }
+
+    #[tokio::test]
+    async fn test_delete_by_session_prefix() {
+        let pool = crate::repos::cognitive_test_pool().await;
+        let repo = BlackboardRepo::new(pool);
+
+        // Insert entries with different session key prefixes
+        repo.insert(&NewBlackboardEntry {
+            session_key: "session:abc:squad1",
+            squad_id: "sq1",
+            round: 1,
+            persona_id: "p1",
+            persona_name: "Analyst",
+            entry_type: "observation",
+            content: "Claim 1",
+            confidence: 0.9,
+            references_entry_id: None,
+        })
+        .await
+        .unwrap();
+
+        repo.insert(&NewBlackboardEntry {
+            session_key: "session:abc:squad2",
+            squad_id: "sq2",
+            round: 1,
+            persona_id: "p2",
+            persona_name: "Skeptic",
+            entry_type: "challenge",
+            content: "Challenge 1",
+            confidence: 0.8,
+            references_entry_id: None,
+        })
+        .await
+        .unwrap();
+
+        repo.insert(&NewBlackboardEntry {
+            session_key: "session:xyz:squad1",
+            squad_id: "sq1",
+            round: 1,
+            persona_id: "p1",
+            persona_name: "Analyst",
+            entry_type: "observation",
+            content: "Different session",
+            confidence: 0.85,
+            references_entry_id: None,
+        })
+        .await
+        .unwrap();
+
+        // Delete all entries with prefix "session:abc:"
+        let deleted = repo.delete_by_session_prefix("session:abc:").await.unwrap();
+        assert_eq!(deleted, 2);
+
+        // Verify the deleted entries are gone
+        let remaining_abc1 = repo.list_for_session("session:abc:squad1").await.unwrap();
+        assert!(remaining_abc1.is_empty());
+
+        let remaining_abc2 = repo.list_for_session("session:abc:squad2").await.unwrap();
+        assert!(remaining_abc2.is_empty());
+
+        // Verify the other prefix still exists
+        let remaining_xyz = repo.list_for_session("session:xyz:squad1").await.unwrap();
+        assert_eq!(remaining_xyz.len(), 1);
+        assert_eq!(remaining_xyz[0].session_key, "session:xyz:squad1");
     }
 }

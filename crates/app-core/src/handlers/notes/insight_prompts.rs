@@ -187,47 +187,6 @@ mindmap
     )
 }
 
-/// Tab 5: Perspectives — multi-persona analysis.
-///
-/// `persona_blocks` is pre-formatted from selected PersonaRow entries.
-pub fn perspectives_prompt(
-    context: &str,
-    persona_blocks: &str,
-    response_lang: Option<&str>,
-) -> String {
-    let lang = language_instruction(response_lang);
-    format!(
-        r#"You are simulating expert perspectives analyzing a user's knowledge network.
-Each persona has a distinct viewpoint and expertise.
-
-For each persona below, write a 2-3 paragraph analysis from their perspective.
-They should:
-- Engage directly with the content (not just summarize)
-- Identify what's strong and what's weak from their viewpoint
-- Offer specific recommendations or challenges
-- Disagree with each other where appropriate
-
-{persona_blocks}
-
-Format as Markdown. For EACH persona, use exactly this structure:
-
-## {{Persona Name}} — {{Role}}
-*{{One-line perspective summary}}*
-
-{{2-3 paragraphs of analysis}}
-
-**Key recommendation:** {{one actionable suggestion}}
-
----
-
-Repeat for each persona. Separate each persona section with `---`.{lang}
-
---- BEGIN KNOWLEDGE CONTEXT ---
-{context}
---- END KNOWLEDGE CONTEXT ---"#
-    )
-}
-
 /// Generate a brief "What's Changed" summary comparing previous insight with current context.
 pub fn changes_summary_prompt(
     previous_synthesis: &str,
@@ -275,50 +234,4 @@ Respond ONLY with JSON (no markdown, no explanation):
 {context}
 --- END KNOWLEDGE CONTEXT ---"#
     )
-}
-
-/// Generate a prompt for a single persona to analyze the knowledge context.
-pub fn single_persona_prompt(
-    context: &str,
-    persona_name: &str,
-    persona_role: &str,
-    persona_expertise: &str,
-    persona_perspective: &str,
-    persona_tone: &str,
-    response_lang: Option<&str>,
-) -> String {
-    let lang = language_instruction(response_lang);
-    format!(
-        r#"You are {persona_name}, a {persona_role}.
-
-Your expertise: {persona_expertise}
-Your perspective: {persona_perspective}
-Your tone: {persona_tone}
-
-Analyze the following knowledge context from your unique perspective. Write 2-3 paragraphs:
-- Engage directly with the content (not just summarize)
-- Identify what's strong and what's weak from your viewpoint
-- Offer specific recommendations or challenges
-
-End with a **Key recommendation:** — one actionable suggestion.{lang}
-
---- BEGIN KNOWLEDGE CONTEXT ---
-{context}
---- END KNOWLEDGE CONTEXT ---"#
-    )
-}
-
-/// Format a list of PersonaRow entries into prompt blocks for the perspectives prompt.
-pub fn format_persona_blocks(personas: &[(String, String, String, String, String)]) -> String {
-    personas
-        .iter()
-        .enumerate()
-        .map(|(i, (name, role, expertise, perspective, tone))| {
-            format!(
-                "### Persona {}: {name}\nRole: {role}\nExpertise: {expertise}\nPerspective: {perspective}\nTone: {tone}",
-                i + 1
-            )
-        })
-        .collect::<Vec<_>>()
-        .join("\n\n")
 }

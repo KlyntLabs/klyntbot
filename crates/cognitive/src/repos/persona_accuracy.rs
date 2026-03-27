@@ -58,13 +58,17 @@ impl PersonaAccuracyRepo {
     }
 
     /// Record the outcome of a debate for a persona.
-    /// `in_consensus` = true if this persona's final position aligned with the group consensus.
+    /// `consensus_alignment` is a graduated score (0.0–1.0) from the LLM judge:
+    ///   - >= 0.8 → FSRS rating 4 ("Easy")
+    ///   - >= 0.5 → FSRS rating 3 ("Good")
+    ///   - >= 0.3 → FSRS rating 2 ("Hard")
+    ///   - < 0.3  → FSRS rating 1 ("Again")
     pub async fn record_outcome(
         &self,
         persona_id: &str,
         squad_id: &str,
         domain: &str,
-        in_consensus: bool,
+        consensus_alignment: f64,
     ) -> Result<PersonaAccuracy, sqlx::Error> {
         let existing = self.get(persona_id, squad_id, domain).await?;
 
@@ -73,11 +77,21 @@ impl PersonaAccuracyRepo {
             None => (0, 0, 1.0, 5.0),
         };
 
+        let in_consensus = consensus_alignment >= 0.5;
+        let rating: u8 = if consensus_alignment >= 0.8 {
+            4
+        } else if consensus_alignment >= 0.5 {
+            3
+        } else if consensus_alignment >= 0.3 {
+            2
+        } else {
+            1
+        };
+
         let new_total = total + 1;
         let new_hits = if in_consensus { hits + 1 } else { hits };
 
-        // FSRS update: treat consensus hit as "Good" (3), miss as "Again" (1)
-        let rating = if in_consensus { 3 } else { 1 };
+        // FSRS update using graduated rating (4=Easy, 3=Good, 2=Hard, 1=Again)
         let w = fsrs5::DEFAULT_WEIGHTS;
         let new_stability = if total == 0 {
             fsrs5::initial_stability(rating, &w)
@@ -132,6 +146,29 @@ impl PersonaAccuracyRepo {
         .fetch_all(&self.pool)
         .await
     }
+
+    /// Reset a persona's accuracy record back to initial defaults (for "Reset learning" button).
+    pub async fn reset(
+        &self,
+        persona_id: &str,
+        squad_id: &str,
+        domain: &str,
+    ) -> Result<(), sqlx::Error> {
+        sqlx::query(
+            "UPDATE persona_accuracy SET
+                total_debates = 0, consensus_hits = 0,
+                stability = 1.0, difficulty = 5.0,
+                last_debate_at = NULL,
+                updated_at = datetime('now')
+            WHERE persona_id = ?1 AND squad_id = ?2 AND domain = ?3",
+        )
+        .bind(persona_id)
+        .bind(squad_id)
+        .bind(domain)
+        .execute(&self.pool)
+        .await?;
+        Ok(())
+    }
 }
 
 #[cfg(test)]
@@ -143,12 +180,12 @@ mod tests {
         let pool = crate::repos::cognitive_test_pool().await;
         let repo = PersonaAccuracyRepo::new(pool);
 
-        // Record a successful debate
+        // Record a successful debate (high alignment)
         repo.record_outcome(
             "builtin-deep-analyst",
             "builtin-squad-finance",
             "finance",
-            true,
+            0.9,
         )
         .await
         .unwrap();
@@ -162,12 +199,12 @@ mod tests {
         assert_eq!(acc.consensus_hits, 1);
         assert!(acc.stability > 1.0);
 
-        // Record a miss
+        // Record a miss (low alignment)
         repo.record_outcome(
             "builtin-deep-analyst",
             "builtin-squad-finance",
             "finance",
-            false,
+            0.2,
         )
         .await
         .unwrap();
@@ -178,6 +215,73 @@ mod tests {
             .unwrap();
         assert_eq!(acc.total_debates, 2);
         assert_eq!(acc.consensus_hits, 1);
+    }
+
+    #[tokio::test]
+    async fn test_reset_persona_accuracy() {
+        let pool = crate::repos::cognitive_test_pool().await;
+        let repo = PersonaAccuracyRepo::new(pool);
+
+        // Build up state with a few outcomes
+        repo.record_outcome("p1", "s1", "finance", 0.9)
+            .await
+            .unwrap();
+        repo.record_outcome("p1", "s1", "finance", 0.8)
+            .await
+            .unwrap();
+        repo.record_outcome("p1", "s1", "finance", 0.1)
+            .await
+            .unwrap();
+
+        let acc = repo.get("p1", "s1", "finance").await.unwrap().unwrap();
+        assert_eq!(acc.total_debates, 3);
+        assert_eq!(acc.consensus_hits, 2);
+
+        // Reset learning
+        repo.reset("p1", "s1", "finance").await.unwrap();
+
+        let acc = repo.get("p1", "s1", "finance").await.unwrap().unwrap();
+        assert_eq!(acc.total_debates, 0);
+        assert_eq!(acc.consensus_hits, 0);
+        assert!((acc.stability - 1.0).abs() < f64::EPSILON);
+        assert!((acc.difficulty - 5.0).abs() < f64::EPSILON);
+        assert!(acc.last_debate_at.is_none());
+    }
+
+    #[tokio::test]
+    async fn test_graduated_consensus_scoring() {
+        let pool = crate::repos::cognitive_test_pool().await;
+        let repo = PersonaAccuracyRepo::new(pool);
+
+        // High alignment (0.9) -> counts as consensus hit
+        let result = repo
+            .record_outcome("p1", "s1", "general", 0.9)
+            .await
+            .unwrap();
+        assert_eq!(result.consensus_hits, 1);
+        assert_eq!(result.total_debates, 1);
+
+        // Low alignment (0.2) -> does not count as consensus hit
+        let result = repo
+            .record_outcome("p2", "s1", "general", 0.2)
+            .await
+            .unwrap();
+        assert_eq!(result.consensus_hits, 0);
+        assert_eq!(result.total_debates, 1);
+
+        // Borderline at exactly 0.5 -> counts as consensus hit
+        let result = repo
+            .record_outcome("p3", "s1", "general", 0.5)
+            .await
+            .unwrap();
+        assert_eq!(result.consensus_hits, 1);
+
+        // Just below 0.5 -> does not count
+        let result = repo
+            .record_outcome("p4", "s1", "general", 0.49)
+            .await
+            .unwrap();
+        assert_eq!(result.consensus_hits, 0);
     }
 
     #[test]

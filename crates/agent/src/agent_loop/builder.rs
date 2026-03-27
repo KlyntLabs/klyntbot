@@ -1558,20 +1558,6 @@ impl AgentLoopBuilder {
             }
         }
 
-        // Inject squad execution dependencies (requires pool for SquadRepo)
-        if let Some(ref pool) = self.pool {
-            let squad_repo = cognitive::SquadRepo::new(pool.clone());
-            let squad_provider = self
-                .cognitive_provider
-                .as_ref()
-                .cloned()
-                .unwrap_or_else(|| provider.clone());
-            let squad_params = providers::cognitive_chat_params(&config, 4096);
-            let blackboard_repo = Some(cognitive::BlackboardRepo::new(pool.clone()));
-            runtime =
-                runtime.with_squad_deps(squad_repo, squad_provider, squad_params, blackboard_repo);
-        }
-
         // Inject domain event bus for SkillRouted event emission
         if let Some(ref domain_bus) = self.domain_event_bus {
             runtime = runtime.with_domain_bus(Arc::clone(domain_bus));

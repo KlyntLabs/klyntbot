@@ -427,6 +427,9 @@ CREATE TABLE IF NOT EXISTS squads (
     source              TEXT NOT NULL DEFAULT 'user',
     domains             TEXT NOT NULL DEFAULT '[]',
     is_active           INTEGER NOT NULL DEFAULT 1,
+    default_interaction_mode TEXT NOT NULL DEFAULT 'lead',
+    last_smart_mode     TEXT,
+    last_smart_updated  TEXT,
     created_at          TEXT NOT NULL DEFAULT (datetime('now')),
     updated_at          TEXT NOT NULL DEFAULT (datetime('now'))
 );
@@ -567,6 +570,7 @@ CREATE TABLE IF NOT EXISTS insight_reviews (
     persona_ids         TEXT NOT NULL DEFAULT '[]',
     parent_insight_id   TEXT REFERENCES insight_reviews(id),
     token_cost_usd      REAL,
+    debate_transcript   JSON,
     superseded_at       TEXT,
     UNIQUE(note_id, version)
 );
@@ -607,6 +611,10 @@ CREATE TABLE IF NOT EXISTS blackboard_entries (
 
 CREATE INDEX IF NOT EXISTS idx_blackboard_session ON blackboard_entries(session_key, round);
 CREATE INDEX IF NOT EXISTS idx_blackboard_squad ON blackboard_entries(squad_id);
+CREATE INDEX IF NOT EXISTS idx_blackboard_session_key
+    ON blackboard_entries(session_key);
+CREATE INDEX IF NOT EXISTS idx_blackboard_created_at
+    ON blackboard_entries(created_at);
 
 -- ── Persona Accuracy (Phase 3: FSRS-based persona learning) ─────────
 CREATE TABLE IF NOT EXISTS persona_accuracy (
@@ -625,6 +633,8 @@ CREATE TABLE IF NOT EXISTS persona_accuracy (
 );
 
 CREATE INDEX IF NOT EXISTS idx_persona_accuracy_persona ON persona_accuracy(persona_id);
+CREATE INDEX IF NOT EXISTS idx_persona_accuracy_lookup
+    ON persona_accuracy(persona_id, squad_id, domain);
 
 -- Coaching intervention history (persistent log for dashboard + retroactive feedback)
 CREATE TABLE IF NOT EXISTS coaching_intervention_log (

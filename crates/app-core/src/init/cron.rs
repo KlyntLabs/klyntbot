@@ -683,7 +683,7 @@ fn register_cron_callbacks(
                 tokio::task::block_in_place(|| {
                     rt.block_on(async move {
                         let repo = cognitive::BlackboardRepo::new(pool);
-                        match repo.cleanup_stale(chrono::Duration::hours(24)).await {
+                        match repo.cleanup_stale(chrono::Duration::days(30)).await {
                             Ok(0) => Ok(Some("No stale blackboard entries".to_string())),
                             Ok(n) => {
                                 info!(deleted = n, "Blackboard cleanup: removed stale entries");
@@ -1089,7 +1089,7 @@ async fn ensure_cron_jobs(
     ensure_job!(
         JOB_BLACKBOARD_CLEANUP,
         scheduling::CronSchedule::Cron {
-            expr: "30 3 * * *".to_string(),
+            expr: "0 4 * * 0".to_string(),
             tz: Some(config.timezone.clone()),
         },
         "Clean stale blackboard entries",

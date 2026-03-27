@@ -74,6 +74,8 @@ impl AppCore {
             params.description.as_deref(),
             params.icon.as_deref(),
             domains_ref.as_deref(),
+            params.orchestrator_skill.as_deref(),
+            params.default_interaction_mode.as_deref(),
         )
         .await
         .map_err(|e| ApiError::new("INTERNAL_ERROR", e.to_string()))?
@@ -147,6 +149,7 @@ fn resolved_to_response(resolved: cognitive::ResolvedSquad) -> SquadResponse {
         description: resolved.squad.description,
         icon: resolved.squad.icon,
         orchestrator_skill: resolved.squad.orchestrator_skill,
+        default_interaction_mode: resolved.squad.default_interaction_mode.clone(),
         source: resolved.squad.source,
         domains,
         is_active: resolved.squad.is_active == 1,

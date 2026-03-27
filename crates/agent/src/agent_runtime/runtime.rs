@@ -51,24 +51,12 @@ pub struct RuntimeResult {
     pub validation: ValidationResult,
     /// Name of the agent that handled this message.
     pub agent_name: String,
-    /// Multi-voice formatted output (all personas, markdown). Only set in squad mode.
-    pub multi_voice: Option<String>,
-    /// Raw per-persona responses for structured display. Only set in squad mode.
-    pub persona_responses: Option<Vec<(String, String)>>,
 }
 
 /// Agent-driven runtime that replaces IntentPipeline.
 ///
 /// The key difference: agent selection happens first, and the agent profile
 /// shapes everything downstream (system prompt, tool filtering, iteration budget).
-/// Bundled dependencies for squad chat mode.
-pub(crate) struct SquadDeps {
-    pub repo: cognitive::SquadRepo,
-    pub provider: providers::DynProvider,
-    pub chat_params: providers::ChatParams,
-    pub blackboard_repo: Option<cognitive::BlackboardRepo>,
-}
-
 pub struct AgentRuntime {
     skill_catalog: Arc<RwLock<SkillCatalog>>,
     skill_router: Arc<RwLock<skill_system::router::SkillRouter>>,
@@ -92,8 +80,6 @@ pub struct AgentRuntime {
     delegation_self_ref: std::sync::OnceLock<Arc<dyn tools::DelegationHandler>>,
     /// Event sender for transparency events during delegation (set per-message).
     current_event_tx: RwLock<Option<tokio::sync::mpsc::Sender<AgentEvent>>>,
-    /// Bundled dependencies for squad chat mode — always set together.
-    squad_deps: Option<SquadDeps>,
     /// AutoTuner hook — runs shadow classification and records ground truth.
     autotuner_hook: Option<Arc<dyn AutoTunerHook>>,
     /// Shared user situation for building RetrievalContext.
@@ -144,7 +130,6 @@ impl AgentRuntime {
             tool_registry: None,
             delegation_self_ref: std::sync::OnceLock::new(),
             current_event_tx: RwLock::new(None),
-            squad_deps: None,
             autotuner_hook: None,
             user_situation: None,
             task_repo: None,
@@ -189,23 +174,6 @@ impl AgentRuntime {
         registry: Arc<RwLock<tools::registry::ToolRegistry>>,
     ) -> Self {
         self.tool_registry = Some(registry);
-        self
-    }
-
-    /// Set squad execution dependencies for multi-persona squad mode.
-    pub fn with_squad_deps(
-        mut self,
-        repo: cognitive::SquadRepo,
-        provider: providers::DynProvider,
-        chat_params: providers::ChatParams,
-        blackboard_repo: Option<cognitive::BlackboardRepo>,
-    ) -> Self {
-        self.squad_deps = Some(SquadDeps {
-            repo,
-            provider,
-            chat_params,
-            blackboard_repo,
-        });
         self
     }
 
@@ -400,33 +368,6 @@ impl AgentRuntime {
                     lock.push(Arc::clone(skill));
                 }
             }
-        }
-
-        // Step 2b: Squad detection — if a squad_id is set, fan out to personas
-        if let (Some(ref squad_id), Some(ref deps)) = (&ctx.squad_id, &self.squad_deps) {
-            let result = self
-                .run_squad_execution(
-                    message,
-                    history,
-                    system_prompt,
-                    event_tx,
-                    squad_id,
-                    &deps.repo,
-                    &deps.provider,
-                    &deps.chat_params,
-                    ctx.squad_mode.as_deref(),
-                    cancel_token.as_ref(),
-                )
-                .await;
-
-            // Write ground truth for shadow classification (Step 0a wrote the shadow log).
-            if let Some(ref hook) = self.autotuner_hook {
-                let elapsed = pipeline_start.elapsed().as_millis() as u64;
-                hook.on_message_completed(ctx.chat_id.as_str(), "squad", "reactive", 0, elapsed)
-                    .await;
-            }
-
-            return result;
         }
 
         // Step 3: Filter MCP tool names to those the matched agent can access
@@ -840,8 +781,6 @@ impl AgentRuntime {
             classification: analysis,
             validation,
             agent_name,
-            multi_voice: None,
-            persona_responses: None,
         })
     }
 
@@ -950,145 +889,6 @@ impl AgentRuntime {
                 })
                 .await;
         }
-    }
-
-    /// Execute via multi-persona squad fan-out instead of normal pipeline.
-    #[allow(clippy::too_many_arguments)]
-    async fn run_squad_execution(
-        &self,
-        message: &str,
-        history: Vec<Message>,
-        system_prompt: Option<&str>,
-        event_tx: Option<tokio::sync::mpsc::Sender<AgentEvent>>,
-        squad_id: &str,
-        squad_repo: &cognitive::SquadRepo,
-        provider: &providers::DynProvider,
-        params: &providers::ChatParams,
-        _squad_mode_str: Option<&str>,
-        cancel_token: Option<&tokio_util::sync::CancellationToken>,
-    ) -> Result<RuntimeResult> {
-        use crate::intent_pipeline::engines;
-        use crate::intent_pipeline::engines::squad;
-
-        // 1. Resolve squad
-        let resolved = squad_repo
-            .resolve_squad(squad_id)
-            .await
-            .map_err(|e| common::KlyntbotError::Storage(format!("squad resolve: {e}")))?
-            .ok_or_else(|| {
-                common::KlyntbotError::StorageNotFound(format!("squad '{squad_id}' not found"))
-            })?;
-
-        // 2. Build orchestrator context from system prompt + conversation history
-        let mut context_parts = vec![system_prompt
-            .unwrap_or("You are a helpful AI assistant.")
-            .to_string()];
-        for msg in &history {
-            match msg {
-                Message::User {
-                    content: providers::UserContent::Text(t),
-                } => {
-                    context_parts.push(format!("User: {t}"));
-                }
-                Message::Assistant {
-                    content: Some(c), ..
-                } => {
-                    context_parts.push(format!("Assistant: {c}"));
-                }
-                _ => {}
-            }
-        }
-        let orchestrator_context = context_parts.join("\n\n");
-
-        // 3. Persona fan-out — always use room debate when blackboard is available
-        let blackboard_repo = self
-            .squad_deps
-            .as_ref()
-            .and_then(|d| d.blackboard_repo.as_ref());
-        let use_debate = blackboard_repo.is_some();
-
-        let persona_responses = if use_debate {
-            let blackboard_repo = blackboard_repo.unwrap();
-            let debate_session_key = format!("debate:{}:{}", squad_id, uuid::Uuid::new_v4());
-            let debate_fut = engines::debate::run_room_debate(
-                provider,
-                &orchestrator_context,
-                message,
-                &resolved.personas,
-                params,
-                blackboard_repo,
-                &debate_session_key,
-                squad_id,
-                event_tx.as_ref(),
-                cancel_token,
-            );
-            let debate_results =
-                match tokio::time::timeout(std::time::Duration::from_secs(120), debate_fut).await {
-                    Ok(results) => results,
-                    Err(_) => {
-                        tracing::warn!("Squad debate timed out after 120s");
-                        Vec::new()
-                    }
-                };
-
-            // Collect responses from the final round for synthesis
-            debate_results
-                .last()
-                .map(|(_, responses, _)| responses.clone())
-                .unwrap_or_default()
-        } else {
-            squad::fan_out_personas(
-                provider,
-                &orchestrator_context,
-                message,
-                &resolved.personas,
-                params,
-                event_tx.as_ref(),
-            )
-            .await
-        };
-
-        // 4. Synthesis
-        let synthesis_prompt = squad::build_squad_synthesis_prompt(message, &persona_responses);
-        let synthesis_messages = vec![
-            Message::System {
-                content: synthesis_prompt,
-            },
-            Message::User {
-                content: providers::UserContent::Text("Synthesize now.".to_string()),
-            },
-        ];
-        let synthesis = provider.chat(&synthesis_messages, None, params).await?;
-
-        let multi_voice = squad::format_multi_voice(&persona_responses);
-        let content = synthesis.content.unwrap_or_else(|| multi_voice.clone());
-
-        // Build a minimal classification for the result
-        let classification = IntentAnalysis {
-            mode: crate::intent_pipeline::types::ExecutionMode::Direct,
-            signals: crate::intent_pipeline::types::ComplexitySignals {
-                estimated_tool_calls: 0,
-                has_sequential_deps: false,
-                failure_risk: crate::intent_pipeline::types::FailureRisk::Low,
-                requires_state_tracking: false,
-                requires_retries: false,
-                has_hypothetical: false,
-            },
-            confidence: 1.0,
-            source: crate::intent_pipeline::types::AnalysisSource::Heuristic,
-            reasoning: "Squad multi-persona execution".to_string(),
-            needs_orchestration: false,
-        };
-
-        Ok(RuntimeResult {
-            content: content.clone(),
-            mode_used: "squad".to_string(),
-            classification,
-            validation: self.validator.validate(&content),
-            agent_name: format!("squad:{}", resolved.squad.name),
-            multi_voice: Some(multi_voice),
-            persona_responses: Some(persona_responses),
-        })
     }
 
     async fn record_usage(

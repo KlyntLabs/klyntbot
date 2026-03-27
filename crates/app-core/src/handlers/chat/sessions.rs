@@ -1,5 +1,7 @@
 //! Session CRUD handlers — get, list by project, delete stale.
 
+use std::collections::HashMap;
+
 use desktop_shared::commands::{ChatSessionResponse, ChatThreadResponse};
 use desktop_shared::errors::ApiError;
 use storage::Repos;
@@ -98,7 +100,41 @@ impl AppCore {
         &self,
         project_id: String,
     ) -> Result<Vec<ChatThreadResponse>, ApiError> {
-        chat_list_sessions_by_project(&self.repos, project_id).await
+        let mut threads = chat_list_sessions_by_project(&self.repos, project_id).await?;
+
+        // Enrich squad_name and squad_icon via post-fetch lookup if squad_repo is available.
+        if let Some(squad_repo) = &self.squad_repo {
+            // Collect unique squad IDs that need resolving.
+            let squad_ids: Vec<String> = threads
+                .iter()
+                .filter_map(|t| t.squad_id.clone())
+                .collect::<std::collections::HashSet<_>>()
+                .into_iter()
+                .collect();
+
+            if !squad_ids.is_empty() {
+                // Fetch each squad row (name + icon) and build a lookup map.
+                let mut squad_map: HashMap<String, (String, String)> =
+                    HashMap::with_capacity(squad_ids.len());
+                for id in &squad_ids {
+                    if let Ok(Some(row)) = squad_repo.get(id).await {
+                        squad_map.insert(row.id.clone(), (row.name.clone(), row.icon.clone()));
+                    }
+                }
+
+                // Apply squad_name and squad_icon to each thread.
+                for thread in &mut threads {
+                    if let Some(sid) = &thread.squad_id {
+                        if let Some((name, icon)) = squad_map.get(sid) {
+                            thread.squad_name = Some(name.clone());
+                            thread.squad_icon = Some(icon.clone());
+                        }
+                    }
+                }
+            }
+        }
+
+        Ok(threads)
     }
 
     pub async fn chat_delete_stale_sessions(&self, before_days: u32) -> Result<u64, ApiError> {

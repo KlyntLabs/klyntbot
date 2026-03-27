@@ -96,7 +96,6 @@ impl ToolRegistryBridge {
             entity_tx: None,
             interaction_channel: None,
             squad_id: None,
-            squad_mode: None,
             champion_params: None,
         };
 

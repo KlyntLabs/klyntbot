@@ -467,6 +467,27 @@ pub enum DomainEvent {
         greeting: String,
         away_secs: u64,
     },
+
+    // -- Squad debates --
+    /// Emitted when a squad debate (multi-persona deliberation) completes.
+    SquadDebateCompleted {
+        squad_id: String,
+        session_key: String,
+        rounds_completed: u8,
+        consensus_score: f64,
+        persona_accuracies: Vec<(String, f64)>,
+        was_partial: bool,
+        token_cost: u64,
+        average_consensus_score: f64,
+        top_performer_persona_id: Option<String>,
+    },
+    /// Emitted when a squad interaction pattern is detected or updated.
+    SquadInteractionPattern {
+        squad_id: String,
+        mode: String,
+        persona_id: Option<String>,
+        domain_hint: Option<String>,
+    },
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

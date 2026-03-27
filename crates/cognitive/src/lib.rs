@@ -45,6 +45,7 @@ pub use repos::{InsightCacheRepo, InsightCacheRow};
 pub use repos::{KnowledgeAtomRepo, KnowledgeAtomRow, KnowledgeTopicRow, NewKnowledgeAtom};
 pub use repos::{NewPersona, PersonaRepo, PersonaRow, PersonaUpdate};
 pub use repos::{NewSquad, ResolvedSquad, SquadMemberRow, SquadRepo, SquadRow};
+pub use repos::{PersonaAccuracy, PersonaAccuracyRepo};
 pub use repos::{ReviewSessionRepo, ReviewSessionRow};
 pub use situation::{compute_situation, SituationInputs, UserSituation};
 pub use temporal::{ChangeSummary, FactVersion, TemporalService};

@@ -102,9 +102,7 @@ impl AppCore {
                 "Recovering DND state from interrupted focus session (overridden at {})",
                 dnd_row.overridden_at
             );
-            tracing::warn!(
-                "DND restore not yet implemented — cleared orphaned override record"
-            );
+            tracing::warn!("DND restore not yet implemented — cleared orphaned override record");
             let _ = repos.dnd_override.clear().await;
         }
 

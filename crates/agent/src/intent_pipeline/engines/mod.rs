@@ -10,9 +10,10 @@ use tools::RoutingContext;
 use crate::execution::{ExecutionParams, ReasoningTrace};
 
 pub mod debate;
+pub mod debate_types;
 pub mod direct;
+pub mod interaction;
 pub mod reactive;
-pub mod squad;
 #[cfg(test)]
 pub(crate) mod test_utils;
 

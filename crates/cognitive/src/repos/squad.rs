@@ -21,6 +21,9 @@ pub struct SquadRow {
     pub source: String,
     pub domains: String, // JSON array
     pub is_active: i64,
+    pub default_interaction_mode: String, // "lead" | "debate" | "smart"
+    pub last_smart_mode: Option<String>,
+    pub last_smart_updated: Option<String>,
     pub created_at: String,
     pub updated_at: String,
 }
@@ -142,6 +145,36 @@ struct MemberPersonaJoinRow {
     pub sort_order: i64,
 }
 
+// ── Smart mode helpers ──────────────────────────────────────────
+
+/// Interaction counts used to compute the effective smart-mode default.
+/// Callers supply these counts (e.g. from session message queries) rather than
+/// letting `SquadRepo` query session storage directly.
+#[derive(Debug, Clone)]
+pub struct InteractionCounts {
+    /// Messages delivered directly by the lead persona without multi-voice debate.
+    pub direct_count: u64,
+    /// Messages in lead / single-voice mode.
+    pub lead_count: u64,
+    /// Messages in debate / multi-voice mode.
+    pub debate_count: u64,
+}
+
+/// Returns `true` when `last_smart_updated` is an ISO-8601 / SQLite datetime
+/// string that falls within the last 24 hours.
+fn is_cache_fresh(updated: &str) -> bool {
+    use chrono::{DateTime, Duration, Utc};
+    // Accept both RFC-3339 ("…T…Z") and SQLite datetime ("… ") formats
+    let parsed = updated.parse::<DateTime<Utc>>().or_else(|_| {
+        // SQLite stores datetimes as "YYYY-MM-DD HH:MM:SS"; append " UTC" for parsing
+        format!("{updated} UTC").parse::<DateTime<Utc>>()
+    });
+    match parsed {
+        Ok(dt) => Utc::now() - dt < Duration::days(1),
+        Err(_) => false,
+    }
+}
+
 // ── Repository ──────────────────────────────────────────────────
 
 #[derive(Debug, Clone)]
@@ -164,8 +197,8 @@ impl SquadRepo {
             r#"
             INSERT INTO squads
                 (id, name, description, icon, orchestrator_skill, source, domains,
-                 is_active, created_at, updated_at)
-            VALUES (?1, ?2, ?3, ?4, ?5, 'user', ?6, 1, ?7, ?7)
+                 is_active, default_interaction_mode, created_at, updated_at)
+            VALUES (?1, ?2, ?3, ?4, ?5, 'user', ?6, 1, 'lead', ?7, ?7)
             "#,
         )
         .bind(&id)
@@ -209,6 +242,8 @@ impl SquadRepo {
         description: Option<&str>,
         icon: Option<&str>,
         domains: Option<&[String]>,
+        orchestrator_skill: Option<&str>,
+        default_interaction_mode: Option<&str>,
     ) -> Result<Option<SquadRow>, sqlx::Error> {
         let squad = self.get(id).await?;
         let Some(existing) = squad else {
@@ -227,24 +262,85 @@ impl SquadRepo {
         } else {
             existing.domains.clone()
         };
+        let orchestrator_skill = orchestrator_skill.unwrap_or(&existing.orchestrator_skill);
+        let default_interaction_mode =
+            default_interaction_mode.unwrap_or(&existing.default_interaction_mode);
 
         sqlx::query(
             r#"
             UPDATE squads
-            SET name = ?1, description = ?2, icon = ?3, domains = ?4, updated_at = ?5
-            WHERE id = ?6
+            SET name = ?1, description = ?2, icon = ?3, domains = ?4,
+                orchestrator_skill = ?5, default_interaction_mode = ?6, updated_at = ?7
+            WHERE id = ?8
             "#,
         )
         .bind(name)
         .bind(description)
         .bind(icon)
         .bind(&domains_json)
+        .bind(orchestrator_skill)
+        .bind(default_interaction_mode)
         .bind(&now)
         .bind(id)
         .execute(&self.pool)
         .await?;
 
         self.get(id).await
+    }
+
+    /// Determines the effective interaction mode for a Smart-mode squad.
+    ///
+    /// Uses the cached value in `last_smart_mode` if it was set within the last day.
+    /// Otherwise, computes the mode from the provided interaction counts and caches the result.
+    ///
+    /// If `counts` is `None` or total interactions are fewer than 5, defaults to `"lead"`.
+    pub async fn resolve_smart_mode(
+        &self,
+        squad_id: &str,
+        counts: Option<InteractionCounts>,
+    ) -> Result<String, sqlx::Error> {
+        // 1. Check cache
+        if let Some(squad) = self.get(squad_id).await? {
+            if let (Some(ref cached), Some(ref updated)) =
+                (&squad.last_smart_mode, &squad.last_smart_updated)
+            {
+                if is_cache_fresh(updated) {
+                    return Ok(cached.clone());
+                }
+            }
+        }
+
+        // 2. Compute from counts
+        let mode = match counts {
+            Some(c) => {
+                let total = c.direct_count + c.lead_count + c.debate_count;
+                if total < 5 {
+                    "lead"
+                } else if c.debate_count as f64 / total as f64 > 0.5 {
+                    "debate"
+                } else {
+                    "lead"
+                }
+            }
+            None => "lead",
+        };
+
+        // 3. Cache result
+        self.update_smart_cache(squad_id, mode).await?;
+
+        Ok(mode.to_string())
+    }
+
+    /// Update the smart-mode cache columns for a squad.
+    pub async fn update_smart_cache(&self, squad_id: &str, mode: &str) -> Result<(), sqlx::Error> {
+        sqlx::query(
+            "UPDATE squads SET last_smart_mode = ?2, last_smart_updated = datetime('now'), updated_at = datetime('now') WHERE id = ?1",
+        )
+        .bind(squad_id)
+        .bind(mode)
+        .execute(&self.pool)
+        .await?;
+        Ok(())
     }
 
     /// Delete a squad. Returns error for builtin squads.
@@ -381,8 +477,8 @@ impl SquadRepo {
                 r#"
                 INSERT OR IGNORE INTO squads
                     (id, name, description, icon, orchestrator_skill, source, domains,
-                     is_active, created_at, updated_at)
-                VALUES (?1, ?2, ?3, ?4, ?5, 'builtin', ?6, 1, ?7, ?7)
+                     is_active, default_interaction_mode, created_at, updated_at)
+                VALUES (?1, ?2, ?3, ?4, ?5, 'builtin', ?6, 1, 'lead', ?7, ?7)
                 "#,
             )
             .bind(b.id)
@@ -546,6 +642,51 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn test_squad_default_interaction_mode() {
+        let (repo, _) = setup().await;
+
+        // Create a squad and verify default_interaction_mode is "lead"
+        let squad = repo
+            .create(&NewSquad {
+                name: "Mode Test Squad".into(),
+                description: "Testing interaction modes".into(),
+                icon: "\u{1f9ea}".into(),
+                orchestrator_skill: "general".into(),
+                domains: vec!["testing".into()],
+            })
+            .await
+            .unwrap();
+
+        assert_eq!(squad.default_interaction_mode, "lead");
+        assert!(squad.last_smart_mode.is_none());
+        assert!(squad.last_smart_updated.is_none());
+
+        // Update with new orchestrator_skill and default_interaction_mode
+        let updated = repo
+            .update(
+                &squad.id,
+                None,
+                None,
+                None,
+                None,
+                Some("task-management"),
+                Some("debate"),
+            )
+            .await
+            .unwrap()
+            .unwrap();
+
+        assert_eq!(updated.orchestrator_skill, "task-management");
+        assert_eq!(updated.default_interaction_mode, "debate");
+
+        // Test update_smart_cache
+        repo.update_smart_cache(&squad.id, "debate").await.unwrap();
+        let fetched = repo.get(&squad.id).await.unwrap().unwrap();
+        assert_eq!(fetched.last_smart_mode.as_deref(), Some("debate"));
+        assert!(fetched.last_smart_updated.is_some());
+    }
+
+    #[tokio::test]
     async fn test_persona_in_multiple_squads() {
         let (repo, _) = setup().await;
         repo.seed_builtins().await.unwrap();
@@ -559,5 +700,106 @@ mod tests {
             }
         }
         assert!(skeptic_squads.len() >= 2);
+    }
+
+    // ── Smart mode tests ─────────────────────────────────────────
+
+    async fn create_test_squad(repo: &SquadRepo) -> SquadRow {
+        repo.create(&NewSquad {
+            name: "Smart Mode Squad".into(),
+            description: "Testing smart mode".into(),
+            icon: "\u{1f9e0}".into(),
+            orchestrator_skill: "general".into(),
+            domains: vec!["testing".into()],
+        })
+        .await
+        .unwrap()
+    }
+
+    #[tokio::test]
+    async fn test_resolve_smart_mode_defaults_to_lead() {
+        // No counts provided → "lead"
+        let (repo, _) = setup().await;
+        let squad = create_test_squad(&repo).await;
+
+        let mode = repo.resolve_smart_mode(&squad.id, None).await.unwrap();
+        assert_eq!(mode, "lead");
+
+        // Cache should have been written
+        let fetched = repo.get(&squad.id).await.unwrap().unwrap();
+        assert_eq!(fetched.last_smart_mode.as_deref(), Some("lead"));
+    }
+
+    #[tokio::test]
+    async fn test_resolve_smart_mode_prefers_debate_when_majority() {
+        // debate_count > 50% of total → "debate"
+        let (repo, _) = setup().await;
+        let squad = create_test_squad(&repo).await;
+
+        let counts = InteractionCounts {
+            direct_count: 2,
+            lead_count: 2,
+            debate_count: 6, // 60% of 10 → debate
+        };
+        let mode = repo
+            .resolve_smart_mode(&squad.id, Some(counts))
+            .await
+            .unwrap();
+        assert_eq!(mode, "debate");
+    }
+
+    #[tokio::test]
+    async fn test_resolve_smart_mode_too_few_interactions() {
+        // total < 5 → "lead" regardless of ratios
+        let (repo, _) = setup().await;
+        let squad = create_test_squad(&repo).await;
+
+        let counts = InteractionCounts {
+            direct_count: 0,
+            lead_count: 0,
+            debate_count: 4, // 100% debate but total = 4 < 5
+        };
+        let mode = repo
+            .resolve_smart_mode(&squad.id, Some(counts))
+            .await
+            .unwrap();
+        assert_eq!(mode, "lead");
+    }
+
+    #[tokio::test]
+    async fn test_resolve_smart_mode_lead_wins_when_debate_not_majority() {
+        // debate_count == 50% (not >50%) → "lead"
+        let (repo, _) = setup().await;
+        let squad = create_test_squad(&repo).await;
+
+        let counts = InteractionCounts {
+            direct_count: 3,
+            lead_count: 2,
+            debate_count: 5, // 50% of 10, not strictly >50%
+        };
+        let mode = repo
+            .resolve_smart_mode(&squad.id, Some(counts))
+            .await
+            .unwrap();
+        assert_eq!(mode, "lead");
+    }
+
+    #[tokio::test]
+    async fn test_resolve_smart_mode_uses_cache() {
+        // Set a fresh cache entry, then call resolve without counts.
+        // The cached value should be returned immediately.
+        let (repo, _) = setup().await;
+        let squad = create_test_squad(&repo).await;
+
+        // Pre-populate cache with "debate"
+        repo.update_smart_cache(&squad.id, "debate").await.unwrap();
+
+        // resolve_smart_mode with None counts — cache is fresh so "debate" is returned
+        let mode = repo.resolve_smart_mode(&squad.id, None).await.unwrap();
+        assert_eq!(mode, "debate");
+
+        // DB cache still says "debate"
+        let fetched = repo.get(&squad.id).await.unwrap().unwrap();
+        assert_eq!(fetched.last_smart_mode.as_deref(), Some("debate"));
     }
 }
