@@ -303,24 +303,21 @@ impl AppCore {
                         let tab = tab_content.clone();
                         let title = note_title.clone();
                         let body = body_preview.clone();
-                        let p_name = persona.name.clone();
-                        let p_role = persona.role.clone();
-                        let p_expertise = persona.expertise.clone();
-                        let p_perspective = persona.perspective.clone();
-                        let p_tone = persona.tone.clone();
+                        let persona = persona.clone();
 
                         async move {
-                            let system_prompt = format!(
-                                "You are {p_name}, a {p_role}.\n\
-                                 Expertise: {p_expertise}\n\
-                                 Perspective: {p_perspective}\n\
-                                 Tone: {p_tone}\n\n\
-                                 You are discussing the note \"{title}\" from your \
+                            let base_prompt = format!(
+                                "You are discussing the note \"{title}\" from your \
                                  unique perspective.\n\
                                  Stay in character. Be concise \
                                  (2-4 sentences per response).\n\n\
                                  --- NOTE: {title} ---\n{body}\n--- END NOTE ---\n\n\
                                  --- ANALYSIS ---\n{tab}\n--- END ANALYSIS ---"
+                            );
+                            let system_prompt = agent::intent_pipeline::engines::debate::build_persona_system_prompt(
+                                &base_prompt,
+                                &persona,
+                                None,
                             );
 
                             let mut messages = vec![providers::Message::System {
@@ -336,7 +333,7 @@ impl AppCore {
                             match provider.chat(&messages, None, &params).await {
                                 Ok(response) => Some(response.content.unwrap_or_default()),
                                 Err(e) => {
-                                    warn!("squad persona {p_name} failed: {e}");
+                                    warn!("squad persona {} failed: {e}", persona.name);
                                     None
                                 }
                             }

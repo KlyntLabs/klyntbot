@@ -15,8 +15,8 @@
 use std::collections::HashMap;
 
 use cognitive::{
-    BlackboardEntry, BlackboardRepo, NewBlackboardEntry, PersonaAccuracyRepo, PersonaRow,
-    ResolvedSquad,
+    alignment_to_fsrs_rating, BlackboardEntry, BlackboardRepo, NewBlackboardEntry,
+    PersonaAccuracyRepo, PersonaRow, ResolvedSquad,
 };
 use providers::{ChatParams, DynProvider, Message, UserContent};
 use serde::{Deserialize, Serialize};
@@ -253,7 +253,7 @@ async fn call_judge_v2(
 ) -> (JudgeDecision, u64) {
     let mut response_text = String::new();
     for resp in responses {
-        let truncated: String = resp.content.chars().take(500).collect();
+        let truncated = common::truncate_chars(&resp.content, 500, "");
         response_text.push_str(&format!("**{}**: {truncated}\n\n", resp.persona_name));
     }
 
@@ -428,16 +428,16 @@ async fn debate_sequential_round(
     let mut results = Vec::new();
     let mut total_tokens: u64 = 0;
 
+    // Read blackboard once at the start; we'll append each speaker's entry locally.
+    let mut blackboard = blackboard_repo
+        .list_for_session(session_key)
+        .await
+        .unwrap_or_default();
+
     for persona_id in speaking_order {
         let Some(persona) = personas.iter().find(|p| p.id == *persona_id) else {
             continue;
         };
-
-        // Reload blackboard (includes prior speakers this round)
-        let blackboard = blackboard_repo
-            .list_for_session(session_key)
-            .await
-            .unwrap_or_default();
 
         let challenge = challenges.get(persona_id.as_str()).map(|s| s.as_str());
 
@@ -510,6 +510,21 @@ async fn debate_sequential_round(
             })
             .await;
 
+        // Append to local blackboard vec so the next speaker sees this without a DB read.
+        blackboard.push(BlackboardEntry {
+            id: String::new(),
+            session_key: session_key.to_string(),
+            squad_id: squad_id.to_string(),
+            round: round as i64,
+            persona_id: persona.id.clone(),
+            persona_name: persona.name.clone(),
+            entry_type: phase.as_str().to_string(),
+            content: text.clone(),
+            confidence: 0.8,
+            references_entry_id: None,
+            created_at: String::new(),
+        });
+
         results.push(PersonaResponse {
             persona_id: persona.id.clone(),
             persona_name: persona.name.clone(),
@@ -538,7 +553,7 @@ async fn score_consensus_alignment(
 ) -> (HashMap<String, f64>, u64) {
     let mut response_summaries = String::new();
     for resp in persona_responses {
-        let truncated: String = resp.content.chars().take(300).collect();
+        let truncated = common::truncate_chars(&resp.content, 300, "");
         response_summaries.push_str(&format!(
             "- {id} ({name}): {truncated}\n",
             id = resp.persona_id,
@@ -586,18 +601,7 @@ Output ONLY the JSON object."#
     }
 }
 
-/// Map consensus alignment to FSRS-5 rating.
-fn alignment_to_fsrs_rating(alignment: f64) -> u8 {
-    if alignment >= 0.8 {
-        4
-    } else if alignment >= 0.5 {
-        3
-    } else if alignment >= 0.3 {
-        2
-    } else {
-        1
-    }
-}
+// FSRS rating mapping delegated to `cognitive::alignment_to_fsrs_rating`.
 
 // ── New unified debate engine ──────────────────────────────────────────────
 
@@ -635,6 +639,8 @@ pub async fn run_debate(
         max_tokens: None,
         response_format: None,
     };
+
+    let mut effective_max_rounds = max_rounds;
 
     // ── Step 1: Budget pre-check ───────────────────────────────────────────
     let estimated_cost =
@@ -682,6 +688,10 @@ pub async fn run_debate(
                 // No approval channel provided, cancel
                 return Ok(DebateResult::empty_cancelled());
             }
+        }
+
+        if let BudgetAction::ReducedRounds { to, .. } = action {
+            effective_max_rounds = to;
         }
     }
 
@@ -735,8 +745,6 @@ pub async fn run_debate(
     let mut consensus_reached = false;
     let mut final_consensus_score = 0.0;
     let mut partial_reason: Option<PartialReason> = None;
-
-    let effective_max_rounds = max_rounds;
 
     let debate_result = tokio::time::timeout(
         std::time::Duration::from_secs(config.timeout_seconds),
@@ -796,10 +804,15 @@ pub async fn run_debate(
                 // Execute round
                 let (round_responses, round_tokens) = match phase {
                     DebatePhase::Opening | DebatePhase::Final => {
-                        let blackboard = blackboard_repo
-                            .list_for_session(&debate_session_key)
-                            .await
-                            .unwrap_or_default();
+                        // Round 1 blackboard is guaranteed empty (session just created).
+                        let blackboard = if round > 1 {
+                            blackboard_repo
+                                .list_for_session(&debate_session_key)
+                                .await
+                                .unwrap_or_default()
+                        } else {
+                            Vec::new()
+                        };
 
                         let (responses, tokens) = debate_fan_out(
                             provider,
@@ -1185,7 +1198,7 @@ pub async fn call_judge(
 ) -> LegacyJudgeDecision {
     let mut response_text = String::new();
     for (name, content) in responses {
-        let truncated: String = content.chars().take(500).collect();
+        let truncated = common::truncate_chars(content, 500, "");
         response_text.push_str(&format!("**{name}**: {truncated}\n\n"));
     }
 
@@ -1883,6 +1896,7 @@ mod tests {
 
     #[test]
     fn test_alignment_to_fsrs_rating() {
+        use cognitive::alignment_to_fsrs_rating;
         assert_eq!(alignment_to_fsrs_rating(0.9), 4);
         assert_eq!(alignment_to_fsrs_rating(0.8), 4);
         assert_eq!(alignment_to_fsrs_rating(0.7), 3);

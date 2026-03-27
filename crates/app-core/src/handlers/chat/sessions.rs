@@ -113,11 +113,13 @@ impl AppCore {
                 .collect();
 
             if !squad_ids.is_empty() {
-                // Fetch each squad row (name + icon) and build a lookup map.
+                // Fetch squad rows concurrently and build a lookup map.
+                let futures: Vec<_> = squad_ids.iter().map(|id| squad_repo.get(id)).collect();
+                let results = futures_util::future::join_all(futures).await;
                 let mut squad_map: HashMap<String, (String, String)> =
                     HashMap::with_capacity(squad_ids.len());
-                for id in &squad_ids {
-                    if let Ok(Some(row)) = squad_repo.get(id).await {
+                for result in results {
+                    if let Ok(Some(row)) = result {
                         squad_map.insert(row.id.clone(), (row.name.clone(), row.icon.clone()));
                     }
                 }

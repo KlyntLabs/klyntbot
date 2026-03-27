@@ -414,17 +414,32 @@ async fn execute_squad_debate(
     agent_event_tx: mpsc::Sender<AgentEvent>,
 ) -> Result<(), ApiError> {
     let config = DebateConfig::for_chat();
+    let blackboard_repo = BlackboardRepo::new(storage_pool.inner().clone());
+    let accuracy_repo = PersonaAccuracyRepo::new(storage_pool.inner().clone());
+    let cancel = CancellationToken::new();
+
+    // Load persistent session blackboard (prior direct/lead exchanges in this thread)
+    let persistent_key = format!("session:{session_key}:{squad_id}");
+    let prior_entries = blackboard_repo
+        .list_for_session(&persistent_key)
+        .await
+        .unwrap_or_default();
+    let cognitive_context = if prior_entries.is_empty() {
+        None
+    } else {
+        let prior_context = BlackboardRepo::format_for_prompt(&prior_entries);
+        Some(format!(
+            "--- Prior squad exchanges in this thread ---\n{prior_context}\n---"
+        ))
+    };
+
     let context = DebateContext {
         skill_prompt: skill_prompt.to_string(),
         conversation_history,
         user_message: content.to_string(),
-        cognitive_context: None,
+        cognitive_context,
         domains,
     };
-
-    let blackboard_repo = BlackboardRepo::new(storage_pool.inner().clone());
-    let accuracy_repo = PersonaAccuracyRepo::new(storage_pool.inner().clone());
-    let cancel = CancellationToken::new();
 
     // Create debate event channel
     let (debate_tx, mut debate_rx) = mpsc::channel::<DebateEvent>(100);
@@ -464,17 +479,42 @@ async fn execute_squad_debate(
     // Wait for relay to finish
     let _ = relay_handle.await;
 
+    // Persist each persona's final-round response as a visible message in the thread
+    let final_round = result
+        .rounds
+        .last()
+        .map(|r| r.round)
+        .unwrap_or(0);
+    for resp in &result.persona_responses {
+        if resp.round == final_round {
+            let persona_msg_id = uuid::Uuid::new_v4();
+            let persona_meta = serde_json::json!({
+                "squad_mode": "debate",
+                "squad_id": squad_id,
+                "debate_round": resp.round,
+                "phase": resp.phase.as_str(),
+            });
+            let _ = repos
+                .sessions
+                .add_message(
+                    session_key,
+                    persona_msg_id,
+                    "assistant",
+                    &resp.content,
+                    None,
+                    None,
+                    Some(&persona_meta),
+                    Some(&resp.persona_id),
+                )
+                .await;
+        }
+    }
+
     // Persist synthesis as assistant message
     let synthesis = &result.synthesis;
     if !synthesis.is_empty() {
         let msg_id = uuid::Uuid::new_v4();
-        let metadata = serde_json::json!({
-            "squad_mode": "debate",
-            "squad_id": squad_id,
-            "debate_rounds": result.rounds_completed,
-            "partial": result.partial_reason.is_some(),
-            "consensus_score": result.final_consensus_score,
-        });
+        // Persist the message first (relay will add segments metadata later)
         if let Err(e) = repos
             .sessions
             .add_message(
@@ -484,7 +524,7 @@ async fn execute_squad_debate(
                 synthesis,
                 None,
                 None,
-                Some(&metadata),
+                None,
                 None, // persona_id — synthesis is from the whole squad
             )
             .await
@@ -492,13 +532,62 @@ async fn execute_squad_debate(
             tracing::warn!("failed to persist debate synthesis for {session_key}: {e}");
         }
 
-        // Emit Done with the synthesis content
+        // Emit Done — relay_chat_stream will add segments metadata
         let _ = agent_event_tx
             .send(AgentEvent::Done {
                 content: synthesis.clone(),
                 message_id: Some(msg_id.to_string()),
             })
             .await;
+
+        // Wait briefly for relay to finish persisting segments, then merge debate metadata
+        let debate_meta_repos = repos.clone();
+        let debate_msg_id = msg_id.to_string();
+        let debate_rounds = result.rounds_completed;
+        let is_partial = result.partial_reason.is_some();
+        let consensus = result.final_consensus_score;
+        let transcript_json = serde_json::to_value(&result.rounds).ok();
+        let weights_json = serde_json::to_value(&result.learned_weights_applied).ok();
+        let debate_squad_id = squad_id.to_string();
+        tokio::spawn(async move {
+            // Wait for relay_chat_stream to persist segments metadata first
+            tokio::time::sleep(std::time::Duration::from_millis(500)).await;
+
+            // Read-modify-write: merge debate fields into existing metadata
+            let existing = debate_meta_repos
+                .sessions
+                .get_message_metadata_by_id(&debate_msg_id)
+                .await
+                .ok()
+                .flatten()
+                .unwrap_or_else(|| serde_json::json!({}));
+
+            let mut merged = match existing {
+                serde_json::Value::Object(map) => map,
+                _ => serde_json::Map::new(),
+            };
+
+            merged.insert("squad_mode".into(), serde_json::json!("debate"));
+            merged.insert("squad_id".into(), serde_json::json!(debate_squad_id));
+            merged.insert("debate_rounds".into(), serde_json::json!(debate_rounds));
+            merged.insert("partial".into(), serde_json::json!(is_partial));
+            merged.insert("consensus_score".into(), serde_json::json!(consensus));
+            if let Some(t) = transcript_json {
+                merged.insert("debate_transcript".into(), t);
+            }
+            if let Some(w) = weights_json {
+                merged.insert("learned_weights".into(), w);
+            }
+
+            let merged_value = serde_json::Value::Object(merged);
+            if let Err(e) = debate_meta_repos
+                .sessions
+                .update_assistant_metadata_by_id(&debate_msg_id, None, Some(&merged_value))
+                .await
+            {
+                tracing::warn!("failed to persist debate metadata for {debate_msg_id}: {e}");
+            }
+        });
     } else {
         // Empty synthesis (e.g. cancelled)
         let _ = agent_event_tx
@@ -512,8 +601,8 @@ async fn execute_squad_debate(
     // Emit domain event
     emit_debate_completed_event(domain_event_bus, squad_id, session_key, &result);
 
-    // Persist accuracy outcomes
-    persist_accuracy_outcomes(storage_pool, &result).await;
+    // Note: accuracy outcomes are already persisted by `run_debate` (Step 6).
+    // The `AccuracyOutcome` structs in the result are receipts, not instructions to write.
 
     Ok(())
 }
@@ -600,6 +689,23 @@ async fn execute_direct_address(
         tracing::warn!("failed to persist direct address message for {session_key}: {e}");
     }
 
+    // Write to persistent session blackboard so future debates see this exchange
+    let blackboard_session_key = format!("session:{session_key}:{squad_id}");
+    let blackboard_repo = BlackboardRepo::new(repos.pool().clone());
+    let _ = blackboard_repo
+        .insert(&cognitive::NewBlackboardEntry {
+            session_key: &blackboard_session_key,
+            squad_id,
+            round: 0,
+            persona_id: &persona.id,
+            persona_name: &persona.name,
+            entry_type: mode_label,
+            content: &response_content,
+            confidence: 0.8,
+            references_entry_id: None,
+        })
+        .await;
+
     // Emit Done
     let _ = agent_event_tx
         .send(AgentEvent::Done {
@@ -655,30 +761,6 @@ fn emit_debate_completed_event(
             average_consensus_score: avg_score,
             top_performer_persona_id: top_performer,
         });
-    }
-}
-
-/// Persist accuracy outcomes from a debate to the PersonaAccuracyRepo.
-async fn persist_accuracy_outcomes(storage_pool: &storage::StoragePool, result: &DebateResult) {
-    if result.accuracy_outcomes.is_empty() {
-        return;
-    }
-    let accuracy_repo = PersonaAccuracyRepo::new(storage_pool.inner().clone());
-    for outcome in &result.accuracy_outcomes {
-        if let Err(e) = accuracy_repo
-            .record_outcome(
-                &outcome.persona_id,
-                &outcome.squad_id,
-                &outcome.domain,
-                outcome.consensus_alignment,
-            )
-            .await
-        {
-            tracing::warn!(
-                "failed to record accuracy for persona {}: {e}",
-                outcome.persona_id
-            );
-        }
     }
 }
 

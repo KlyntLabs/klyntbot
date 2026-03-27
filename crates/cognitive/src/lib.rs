@@ -27,6 +27,7 @@ pub use extraction::{BatchExtraction, BatchExtractionResult, ExtractedFact, Extr
 pub use memory_retriever::UnifiedMemoryService;
 pub use reflection::ReflectionHandler;
 pub use repos::event_log::{DomainEventRow, PipelineEventRecord, PipelineEventRow};
+pub use repos::persona_accuracy::alignment_to_fsrs_rating;
 pub use repos::semantic_fact::DomainHealthRow;
 pub use repos::AtomExtractionCache;
 pub use repos::{

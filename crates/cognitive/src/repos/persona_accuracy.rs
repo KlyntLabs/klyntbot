@@ -36,6 +36,24 @@ pub struct PersonaAccuracyRepo {
     pool: SqlitePool,
 }
 
+/// Map consensus alignment (0.0–1.0) to an FSRS-5 rating (1–4).
+///
+///   - >= 0.8 → 4 ("Easy")
+///   - >= 0.5 → 3 ("Good")
+///   - >= 0.3 → 2 ("Hard")
+///   - < 0.3  → 1 ("Again")
+pub fn alignment_to_fsrs_rating(alignment: f64) -> u8 {
+    if alignment >= 0.8 {
+        4
+    } else if alignment >= 0.5 {
+        3
+    } else if alignment >= 0.3 {
+        2
+    } else {
+        1
+    }
+}
+
 impl PersonaAccuracyRepo {
     pub fn new(pool: SqlitePool) -> Self {
         Self { pool }
