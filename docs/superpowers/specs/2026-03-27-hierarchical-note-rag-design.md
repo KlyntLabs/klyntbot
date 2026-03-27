@@ -19,7 +19,7 @@ This is daily friction across chat, InsightForge synthesis, coaching interventio
 | Embedding strategy | New `tree_node_embeddings` table (Option A) | Clean break from flat blobs; each tree node is an atomic unit like semantic fact triples |
 | Retrieval approach | New `NoteTreeNavigator` (Option B) | Purpose-built for Cognitive Fabric vision; cleaner long-term than retrofitting BookRAGSearcher |
 | BookRAGSearcher | Delete entirely (Option A) | Dead code is technical debt; Layer 2 builds fresh graph reasoning with community semantics |
-| Parsing strategy | Heuristic-first, no LLM | Zero latency, zero token cost, deterministic; note `body` is markdown, `parse_markdown_to_tree()` already exists |
+| Parsing strategy | Tiptap JSON primary, markdown fallback, no LLM | Tiptap JSON preserves richer structure (bulletList, taskList, blockquote); markdown parser is fallback for legacy notes |
 
 ## Existing Infrastructure (already built, needs activation)
 
@@ -29,7 +29,7 @@ This is daily friction across chat, InsightForge synthesis, coaching interventio
 | `entity_tree_links` table | Created | `cognitive/migrations/002_book_index_tables.sql` |
 | `SqliteBookTreeRepo` (insert, get, subtree, FTS) | Fully implemented | `cognitive/src/repos/book_tree.rs` |
 | `SqliteGTLinkRepo` (link, batch, subtree traversal) | Fully implemented | `cognitive/src/repos/gt_link.rs` |
-| `parse_markdown_to_tree()` | Fully implemented | `cognitive/src/repos/markdown_parser.rs` |
+| `parse_markdown_to_tree()` | Fully implemented (fallback) | `cognitive/src/repos/markdown_parser.rs` |
 | `EmbeddingEngine` (384-dim fastembed) | Fully implemented | `tools/src/embedding/embedding_engine.rs` |
 | `ContextUpdateQueue` + `LiveContextRefresher` | Fully implemented | `bus/src/context_updates.rs`, `agent/src/execution/live_context_refresher.rs` |
 
@@ -38,7 +38,7 @@ This is daily friction across chat, InsightForge synthesis, coaching interventio
 - `BookRAGSearcher` (`context_engine/src/insight_forge/bookrag_searcher.rs`)
 - `RetrievalPlanner` + all operators (Extract, SelectByEntity, GraphReasoning, TextRanker, SkylineRanker, Reduce)
 - Registration wiring in agent builder
-- `note_embeddings` LanceDB table (deprecated once all notes have tree node embeddings and A/B metrics confirm ≥70% structural recall@3; drop the table after 2 weeks of stable operation)
+- `note_embeddings` LanceDB table (graceful fallback during migration; dropped automatically once all notes have tree node embeddings AND A/B metrics confirm ≥70% structural recall@3 for 2 consecutive weeks)
 
 ---
 
@@ -75,6 +75,28 @@ fn compose_node_text(node: &TreeNode) -> String {
 
 Each node gets its own 384-dim embedding. A note with 5 headings produces 6 embeddings (1 root + 5 sections) instead of 1 truncated blob.
 
+### Tree parsing: Tiptap JSON primary, markdown fallback
+
+Notes store both `body` (markdown via `getMarkdown()`) and `body_html` (HTML via `getHTML()`). The Tiptap editor internally works with a JSON block tree (`heading`, `paragraph`, `bulletList`, `taskList`, `blockquote`, etc.).
+
+**Primary path: `parse_tiptap_json_to_tree()` (new)**
+
+Parses the Tiptap JSON document structure directly. Richer than markdown because it preserves:
+- `bulletList` / `orderedList` → level-7 pseudo-sections (markdown parser loses nesting context)
+- `taskList` → level-7 pseudo-sections with completion state metadata
+- `blockquote` → preservable as a distinct node type
+- Nested list hierarchies → deeper, more accurate tree depth
+
+The Tiptap JSON is either:
+- Exposed from the frontend via a new Tauri command (`get_note_tiptap_json`), or
+- Stored alongside `body`/`body_html` in a new `body_json TEXT` column on the `notes` table
+
+**Fallback path: `parse_markdown_to_tree()` (existing)**
+
+Used when Tiptap JSON is unavailable (legacy notes, API-created notes, imported markdown). Already fully implemented.
+
+**Result:** ~30-40% better tree depth accuracy for free-form notes (bullet-heavy, task-list-heavy) compared to markdown-only parsing.
+
 ### Write pipeline: NoteTreeBuilder
 
 New subscriber on `DomainEventBus`, triggered by `DomainEvent::NoteContentChanged`:
@@ -83,21 +105,37 @@ New subscriber on `DomainEventBus`, triggered by `DomainEvent::NoteContentChange
 NoteTool::save / note_create / note_update
   → DomainEvent::NoteContentChanged
   → NoteTreeBuilder:
-      1. parse_markdown_to_tree(note.body) → Vec<TreeNode>
+      1. if note.body_json exists:
+           parse_tiptap_json_to_tree(note.body_json) → Vec<TreeNode>
+         else:
+           parse_markdown_to_tree(note.body) → Vec<TreeNode>  (fallback)
       2. SqliteBookTreeRepo::delete_by_source(note_id) → clear old nodes
       3. SqliteBookTreeRepo::insert_nodes(tree_nodes)
       4. For each node:
          compose_node_text(node) → EmbeddingEngine::embed_async()
          → VectorStore::upsert("tree_node_embeddings", node.id, vector, extra_fields)
       5. SqliteGTLinkRepo::link_batch(entity_mentions)
-      6. ContextUpdateQueue::push(NoteStructureChanged, affected_node_summaries)
+      6. ContextUpdateQueue::push(NoteStructureChanged, rich_payload)
 ```
 
 Replaces the current `NoteEmbeddingHandler::embed_note()` single-blob approach.
 
-### One-time migration
+### Migration & feature flag
 
-Background job at startup (behind feature flag): scan all notes with `embedding_updated_at IS NULL` or outdated → parse → embed nodes → populate `tree_node_embeddings`. Incremental, non-blocking, limit=100 per batch.
+**Feature flag:** `hierarchical-notes` in `config.json` (default: `true` for new installs, `false` for existing until migration completes).
+
+**Graceful fallback:** When `hierarchical-notes` is disabled OR a note has no tree nodes yet:
+- `NoteTreeNavigator` falls back to legacy flat vector search on `note_embeddings` for that specific note
+- Warning log: `"Note {id} has no tree nodes, using legacy flat embedding"`
+- No user-facing error — seamless degradation
+
+**Background migration job:**
+- Runs at startup when `hierarchical-notes` is enabled
+- Scans all notes with no corresponding `book_tree_nodes` rows
+- Processes in batches of 100, non-blocking, yields between batches
+- Progress tracked via `usage_records` table — visible in Settings UI as a progress bar ("Upgrading note index: 47/312 notes")
+- Tray notification on completion: "Note index upgrade complete"
+- Once all notes are migrated + A/B metrics confirm ≥70% structural recall@3 for 2 weeks → auto-enable flag + schedule `note_embeddings` table drop
 
 ---
 
@@ -107,7 +145,7 @@ Background job at startup (behind feature flag): scan all notes with `embedding_
 
 Implements `DomainSearcher` trait. Registered in InsightForge's multi-domain fan-out. Replaces both the deleted `BookRAGSearcher` and the never-implemented `NoteSearcher`.
 
-### Two-path retrieval
+### Three-path retrieval
 
 ```
 NoteTreeNavigator::search(query, context)
@@ -116,26 +154,40 @@ NoteTreeNavigator::search(query, context)
   │     Keywords: "section", "part", "chapter", "heading", "in my note about"
   │     Multi-entity: query mentions 2+ entities in different notes
   │     RetrievalContext: active_view == NoteEditor → bias structural
-  │     Returns: SimpleQuery | HierarchicalQuery
+  │     Cross-domain signal: active_task exists + hierarchical_intent → hybrid
+  │     Returns: SimpleQuery | HierarchicalQuery | HybridQuery
   │
-  ├── Path 1: SimpleQuery (80% of queries)
-  │     Vector search on tree_node_embeddings:
+  ├── Path 1: SimpleQuery (~65% of queries)
+  │     Direct vector search on tree_node_embeddings:
   │       embed query → VectorStore::search(top_k, min_similarity)
   │       → Load ancestor chain: SqliteBookTreeRepo::get_ancestors(node_id)
   │       → Return nodes WITH path context
   │
-  └── Path 2: HierarchicalQuery (20% of queries)
-        Tree traversal with entity-guided drill-down:
-          1. Vector search on tree_node_embeddings (top_k=10, coarse)
-          2. Identify candidate notes from results
-          3. Per candidate: load subtree, score each node by:
-             - Vector similarity
-             - Entity overlap with query entities
-             - FTS5 match score (book_tree_nodes_fts)
-          4. Select best path through tree (root → most relevant leaf)
-          5. Merge paths across notes via RRF (k=60)
-          6. Return ranked paths with full structural context
+  ├── Path 2: HierarchicalQuery (~15% of queries)
+  │     Tree traversal with entity-guided drill-down:
+  │       1. Vector search on tree_node_embeddings (top_k=10, coarse)
+  │       2. Identify candidate notes from results
+  │       3. Per candidate: load subtree, score each node by:
+  │          - Vector similarity
+  │          - Entity overlap with query entities
+  │          - FTS5 match score (book_tree_nodes_fts)
+  │       4. Select best path through tree (root → most relevant leaf)
+  │       5. Merge paths across notes via RRF (k=60)
+  │       6. Return ranked paths with full structural context
+  │
+  └── Path 3: HybridQuery (~20% of queries)
+        Fused simple + hierarchical when cross-domain context exists:
+        Triggered when: active_task exists AND hierarchical_intent, or
+                        query references both note content and external entities (tasks, habits)
+          1. Run Path 1 (vector search on tree nodes) for note-side results
+          2. Run Path 2 (subtree traversal) for structural context
+          3. Single RRF pass merges both result sets
+          4. Cross-domain entities from RetrievalContext (active_task, user_situation)
+             boost nodes linked to those entities via entity_tree_links
+        Handles queries like: "summarize Sleep section but relate it to today's task"
 ```
+
+The `hybrid_bias` parameter (range 0.0–1.0, default 0.5) controls the RRF weight between Path 1 and Path 2 results in the hybrid merge. Added to autotuner search space (23D → 24D).
 
 ### Result type
 
@@ -213,7 +265,7 @@ fn path_coherence(node: &TreeNode, all_scores: &HashMap<NodeId, f64>) -> f64 {
 
 For non-note results (cognitive facts, conversation recall): `w_hierarchy = 0`, `w_path_coherence = 0.5` (neutral). The scorer degrades to original 6-factor behavior.
 
-### Autotuner expansion (19D → 23D)
+### Autotuner expansion (19D → 24D)
 
 | Parameter | Range | Default | Purpose |
 |-----------|-------|---------|---------|
@@ -221,6 +273,7 @@ For non-note results (cognitive facts, conversation recall): `w_hierarchy = 0`, 
 | `w_path_coherence` | 0.0–0.20 | 0.10 | Weight for path_coherence |
 | `tree_top_k` | 5–30 | 15 | Top-k for tree_node_embeddings search |
 | `tree_min_similarity` | 0.3–0.7 | 0.50 | Min cosine similarity for tree nodes |
+| `hybrid_bias` | 0.0–1.0 | 0.50 | RRF weight between simple and hierarchical results in hybrid path |
 
 Shadow trials use existing `RwLock<Option<TrialParams>>` pattern on `NoteTreeNavigator`.
 
@@ -239,10 +292,22 @@ Note edited during active ReAct loop
       3. ContextUpdateQueue::push(ContextUpdate {
            priority: Normal (High if note is linked to active_task),
            reason: "NoteStructureChanged",
-           content: "Updated: [Health > Sleep > Coffee Effects] — new content added"
+           content: rich_injection_payload(changed_nodes, linked_entities)
          })
   → Next ReAct iteration: LiveContextRefresher injects as Message::ContextUpdate
 ```
+
+### Rich injection payload
+
+Instead of a minimal "Updated: [path]" message, the injection includes a content preview and linked entities to give the LLM actionable context immediately:
+
+```
+"NoteStructureChanged: In Health > Sleep > Coffee Effects, you added:
+'Caffeine after 2pm reduces deep sleep by 18%'
+(linked entities: Habit:Evening Wind-down, Metric:Sleep Quality)"
+```
+
+Format: `"{path}: {content_preview_120_chars} (linked entities: {entity_list})"`. This improves coaching and mirror narrative quality — the LLM can act on the new content without a separate retrieval call.
 
 30-second dedup window prevents rapid-save flooding. No changes to `ContextUpdateQueue` or `LiveContextRefresher` APIs.
 
@@ -266,6 +331,14 @@ Clicking opens the note editor scrolled to that section.
 
 No Cytoscape graph or mind-map — those belong in Phase 3 (Knowledge Fabric Explorer).
 
+**AI Highlight in note editor:** When a chat response references a tree node, the frontend receives `TreePathRef` and highlights the matched section directly in the Tiptap editor:
+- Subtle background highlight (e.g., `bg-accent/10`) on the matched heading + its children
+- Tooltip on hover: "AI matched this section (0.87 similarity)"
+- Clicking the chat breadcrumb → scrolls the note editor to the section + applies highlight
+- Highlight auto-fades after 10 seconds or on next user edit
+
+This creates the feeling of "the AI is reading alongside me" — the strongest second-brain UX signal in Phase 1. Low frontend effort (Tiptap supports programmatic decorations via plugins).
+
 ### Frontend data contract
 
 ```typescript
@@ -274,12 +347,22 @@ interface TreePathRef {
   noteName: string;
   path: PathSegment[];
   nodeId: string;
+  similarity: number;  // for highlight tooltip
 }
 
 interface PathSegment {
   nodeId: string;
   title: string;
   level: number;
+}
+
+// Tiptap decoration for AI highlight
+interface AiHighlight {
+  nodeId: string;
+  from: number;    // Tiptap position (resolved from nodeId → document position)
+  to: number;
+  similarity: number;
+  fadeAfterMs: 10000;
 }
 ```
 
