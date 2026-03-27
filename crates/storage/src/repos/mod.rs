@@ -7,6 +7,7 @@ pub mod coaching_strategy;
 pub mod cron;
 pub mod custom_column;
 pub mod decision_log;
+pub mod dnd_override;
 pub mod entity_link_repo;
 
 pub mod finance_account_repo;
@@ -44,6 +45,7 @@ pub use coaching_strategy::{CoachingStrategyRepo, CoachingStrategyRow, UpsertCoa
 pub use cron::CronRepo;
 pub use custom_column::CustomColumnRepo;
 pub use decision_log::DecisionLogRepo;
+pub use dnd_override::{DndOverrideRepo, DndOverrideRow};
 pub use entity_link_repo::EntityLinkRepo;
 pub use finance_account_repo::FinanceAccountRepo;
 pub use finance_allocation_repo::FinanceAllocationRepo;
@@ -127,6 +129,7 @@ pub struct Repos {
     pub project_sources: ProjectSourceRepo,
     pub tasks: TaskRepo,
     pub tool_usage: ToolUsageRepo,
+    pub dnd_override: DndOverrideRepo,
 }
 
 impl Repos {
@@ -156,6 +159,7 @@ impl Repos {
             project_sources: ProjectSourceRepo::new(db.clone()),
             tasks: TaskRepo::new(db.clone()),
             tool_usage: ToolUsageRepo::new(db.clone()),
+            dnd_override: DndOverrideRepo::new(db.clone()),
             pool: db,
         }
     }

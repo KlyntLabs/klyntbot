@@ -10,10 +10,11 @@ mod oauth;
 mod shortcuts;
 mod tray_countdown;
 
+use std::sync::atomic::Ordering;
 use std::sync::Arc;
 
 use clap::{Parser, Subcommand};
-use commands::window::{WINDOW_LAUNCHER, WINDOW_QUICK_CAPTURE, WINDOW_TRAY};
+use commands::window::{QUIT_REQUESTED, WINDOW_LAUNCHER, WINDOW_QUICK_CAPTURE, WINDOW_TRAY};
 use tauri::image::Image;
 use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
 use tauri::Manager;
@@ -821,7 +822,9 @@ fn run_desktop_app() {
         .expect("error while building Klynt desktop")
         .run(|_app, event| {
             if let tauri::RunEvent::ExitRequested { api, .. } = event {
-                api.prevent_exit();
+                if !QUIT_REQUESTED.load(Ordering::SeqCst) {
+                    api.prevent_exit();
+                }
             }
         });
 }

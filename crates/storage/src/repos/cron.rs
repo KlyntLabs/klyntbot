@@ -21,8 +21,9 @@ impl CronRepo {
         let result = sqlx::query_as::<_, CronJobRow>(
             "INSERT INTO cron_jobs (id, name, enabled, origin, schedule, payload, next_run_at_ms,
                                     last_run_at_ms, last_status, last_error,
-                                    created_at_ms, updated_at_ms, delete_after_run)
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13)
+                                    created_at_ms, updated_at_ms, delete_after_run,
+                                    intent_window, intent_pending_since_ms)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15)
              ON CONFLICT (id) DO UPDATE SET
                  name = EXCLUDED.name,
                  enabled = EXCLUDED.enabled,
@@ -34,7 +35,9 @@ impl CronRepo {
                  last_status = EXCLUDED.last_status,
                  last_error = EXCLUDED.last_error,
                  updated_at_ms = EXCLUDED.updated_at_ms,
-                 delete_after_run = EXCLUDED.delete_after_run
+                 delete_after_run = EXCLUDED.delete_after_run,
+                 intent_window = EXCLUDED.intent_window,
+                 intent_pending_since_ms = EXCLUDED.intent_pending_since_ms
              RETURNING *",
         )
         .bind(&row.id)
@@ -50,6 +53,8 @@ impl CronRepo {
         .bind(row.created_at_ms)
         .bind(row.updated_at_ms)
         .bind(row.delete_after_run)
+        .bind(&row.intent_window)
+        .bind(row.intent_pending_since_ms)
         .fetch_one(&self.pool)
         .await?;
         Ok(result)

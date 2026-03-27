@@ -176,6 +176,7 @@ pub(super) async fn init_cron(
     ensure_cron_jobs(&cron_service, config, &tasks_config)
         .await
         .map_err(|e| format!("cron job registration failed: {e}"))?;
+    set_default_intent_windows(&cron_service).await;
     info!("cron service started");
 
     Ok(CronResult {
@@ -1139,6 +1140,80 @@ async fn ensure_cron_jobs(
     );
 
     Ok(())
+}
+
+/// Set default intent windows on AI-heavy cron jobs.
+/// Called after ensure_cron_jobs to overlay intelligent scheduling.
+async fn set_default_intent_windows(cron_service: &scheduling::CronService) {
+    use scheduling::types::{CatchUpPriority, IntentTrigger, IntentWindow};
+    use std::time::Duration;
+
+    let windows: &[(&str, IntentWindow)] = &[
+        (
+            JOB_WEEKLY_REFLECTION,
+            IntentWindow {
+                trigger: IntentTrigger::FirstActivityAfter {
+                    after_local: chrono::NaiveTime::from_hms_opt(8, 0, 0).unwrap(),
+                },
+                tolerance: Duration::from_secs(7200),
+                catch_up: CatchUpPriority::WhenPresent,
+            },
+        ),
+        (
+            JOB_MIRROR_WEEKLY_NARRATIVE,
+            IntentWindow {
+                trigger: IntentTrigger::FirstActivityAfter {
+                    after_local: chrono::NaiveTime::from_hms_opt(9, 0, 0).unwrap(),
+                },
+                tolerance: Duration::from_secs(10800),
+                catch_up: CatchUpPriority::WhenPresent,
+            },
+        ),
+        (
+            agent::autotuner::JOB_AUTOTUNER_NIGHTLY,
+            IntentWindow {
+                trigger: IntentTrigger::UserIdle { min_idle_secs: 300 },
+                tolerance: Duration::from_secs(14400),
+                catch_up: CatchUpPriority::WhenIdle,
+            },
+        ),
+        (
+            JOB_PROACTIVE_SCAN,
+            IntentWindow {
+                trigger: IntentTrigger::MinActiveMinutes { minutes: 5 },
+                tolerance: Duration::from_secs(3600),
+                catch_up: CatchUpPriority::WhenPresent,
+            },
+        ),
+        (
+            JOB_INSIGHT_REFRESH,
+            IntentWindow {
+                trigger: IntentTrigger::UserIdle { min_idle_secs: 600 },
+                tolerance: Duration::from_secs(21600),
+                catch_up: CatchUpPriority::WhenIdle,
+            },
+        ),
+        (
+            JOB_ATOM_EXTRACTION_CATCHALL,
+            IntentWindow {
+                trigger: IntentTrigger::UserIdle { min_idle_secs: 300 },
+                tolerance: Duration::from_secs(14400),
+                catch_up: CatchUpPriority::WhenIdle,
+            },
+        ),
+        (
+            JOB_WEEKLY_REPORT,
+            IntentWindow {
+                trigger: IntentTrigger::UserPresent,
+                tolerance: Duration::from_secs(7200),
+                catch_up: CatchUpPriority::WhenPresent,
+            },
+        ),
+    ];
+
+    for (name, window) in windows {
+        cron_service.set_intent_window(name, window.clone()).await;
+    }
 }
 
 /// Refresh insight progress snapshots for all notes with insights.

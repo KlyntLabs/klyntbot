@@ -1127,6 +1127,7 @@ fn event_type_key(event: &DomainEvent) -> String {
         DomainEvent::MirrorTrialKilled { .. } => "MirrorTrialKilled".into(),
         DomainEvent::MirrorSnippetCreated { .. } => "MirrorSnippetCreated".into(),
         DomainEvent::NoteEditingFinished { .. } => "NoteEditingFinished".into(),
+        _ => "Unknown".into(),
     }
 }
 

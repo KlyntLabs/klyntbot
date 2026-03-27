@@ -79,7 +79,7 @@ fn wire_event_channels(core: &AppCore, channels: EventChannels, app_handle: &tau
                                         .try_state::<Arc<AppCore>>()
                                         .and_then(|core| {
                                             core.config.try_read().ok().map(|c| {
-                                                c.productivity_config.focus.default_duration_mins
+                                                c.productivity.focus.default_duration_mins
                                             })
                                         })
                                         .unwrap_or(45);

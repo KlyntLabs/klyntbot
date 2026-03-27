@@ -245,7 +245,19 @@ CREATE TABLE cron_jobs (
     last_error       TEXT,
     created_at_ms    INTEGER NOT NULL DEFAULT 0,
     updated_at_ms    INTEGER NOT NULL DEFAULT 0,
-    delete_after_run INTEGER NOT NULL DEFAULT 0
+    delete_after_run INTEGER NOT NULL DEFAULT 0,
+    intent_window    TEXT,
+    intent_pending_since_ms INTEGER
+);
+
+-- ============================================================
+-- DND Override (crash recovery for focus sessions)
+-- ============================================================
+CREATE TABLE dnd_override (
+    id               INTEGER PRIMARY KEY DEFAULT 1,
+    original_state   TEXT NOT NULL,
+    overridden_at    TEXT NOT NULL,
+    session_id       TEXT
 );
 
 -- ============================================================

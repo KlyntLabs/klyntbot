@@ -20,4 +20,6 @@ pub struct CronJobRow {
     pub created_at_ms: i64,
     pub updated_at_ms: i64,
     pub delete_after_run: bool,
+    pub intent_window: Option<String>,
+    pub intent_pending_since_ms: Option<i64>,
 }

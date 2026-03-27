@@ -21,6 +21,9 @@ pub use pool::StoragePool;
 pub use repos::Repos;
 pub use vector_store::{sanitize_predicate_value, CognitiveFactParams, VectorStore};
 
+// ── DND Override ─────────────────────────────────────────────────────
+pub use repos::{DndOverrideRepo, DndOverrideRow};
+
 // ── Actions / Tasks / Projects ──────────────────────────────────────
 pub use repos::{CustomColumnRepo, ItemSummary, TaskGroupRepo};
 pub use repos::{EntityLinkRepo, ProjectSourceRepo};

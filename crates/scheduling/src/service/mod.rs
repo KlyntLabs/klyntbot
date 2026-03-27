@@ -5,7 +5,10 @@
 //! - `store`: Persistence (SQL-only via CronRepo)
 
 mod executor;
+pub(crate) mod intent;
 mod store;
+
+pub use intent::{classify_missed_job, evaluate_trigger, MissedJobClass, PresenceSnapshot};
 
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -105,6 +108,8 @@ pub struct CronService {
     pub(crate) repo: Option<storage::CronRepo>,
     /// Signals the timer loop to re-evaluate when jobs are added/modified/removed.
     pub(crate) wake: Arc<Notify>,
+    /// Timestamp (ms) when the system went to sleep; `None` when awake.
+    pub(crate) sleep_start_ms: Arc<RwLock<Option<i64>>>,
 }
 
 impl CronService {
@@ -118,6 +123,7 @@ impl CronService {
             timer_task: Arc::new(RwLock::new(None)),
             repo: Some(repo),
             wake: Arc::new(Notify::new()),
+            sleep_start_ms: Arc::new(RwLock::new(None)),
         }
     }
 
@@ -132,6 +138,7 @@ impl CronService {
             timer_task: Arc::new(RwLock::new(None)),
             repo: None,
             wake: Arc::new(Notify::new()),
+            sleep_start_ms: Arc::new(RwLock::new(None)),
         }
     }
 
@@ -428,6 +435,11 @@ impl CronService {
             created_at_ms: job.created_at_ms,
             updated_at_ms: job.updated_at_ms,
             delete_after_run: job.delete_after_run,
+            intent_window: job
+                .intent_window
+                .as_ref()
+                .and_then(|w| serde_json::to_string(w).ok()),
+            intent_pending_since_ms: job.intent_pending_since_ms,
         }
     }
 
@@ -479,6 +491,11 @@ impl CronService {
             created_at_ms: row.created_at_ms,
             updated_at_ms: row.updated_at_ms,
             delete_after_run: row.delete_after_run,
+            intent_window: row
+                .intent_window
+                .as_deref()
+                .and_then(|s| serde_json::from_str(s).ok()),
+            intent_pending_since_ms: row.intent_pending_since_ms,
         }
     }
 
@@ -493,6 +510,55 @@ impl CronService {
         }
         drop(store);
         let _ = self.save_store().await;
+    }
+
+    /// Called when system is about to sleep.
+    pub async fn on_system_will_sleep(&self) {
+        *self.sleep_start_ms.write().await = Some(now_ms());
+    }
+
+    /// Called when system wakes. Returns classified missed jobs: (immediate, deferred, expired).
+    pub async fn on_system_did_wake(&self) -> (Vec<CronJob>, Vec<CronJob>, Vec<CronJob>) {
+        let sleep_start = self.sleep_start_ms.write().await.take().unwrap_or(now_ms());
+        let now = now_ms();
+        let store = self.store.read().await;
+
+        let mut immediate = Vec::new();
+        let mut deferred = Vec::new();
+        let mut expired = Vec::new();
+
+        for job in &store.jobs {
+            if !job.enabled {
+                continue;
+            }
+            match intent::classify_missed_job(job, sleep_start, now) {
+                intent::MissedJobClass::NotMissed => {}
+                intent::MissedJobClass::Immediate => immediate.push(job.clone()),
+                intent::MissedJobClass::Deferred => deferred.push(job.clone()),
+                intent::MissedJobClass::Expired => expired.push(job.clone()),
+            }
+        }
+
+        drop(store);
+
+        // Only recompute + persist if any jobs were actually missed
+        if !immediate.is_empty() || !deferred.is_empty() || !expired.is_empty() {
+            self.recompute_next_runs().await;
+            if let Err(e) = self.save_store().await {
+                tracing::error!("Failed to save store after wake: {e}");
+            }
+        }
+        self.wake.notify_one();
+
+        (immediate, deferred, expired)
+    }
+
+    /// Set or update the intent window for a job by name.
+    pub async fn set_intent_window(&self, name: &str, window: crate::types::IntentWindow) {
+        let mut store = self.store.write().await;
+        if let Some(job) = store.jobs.iter_mut().find(|j| j.name == name) {
+            job.intent_window = Some(window);
+        }
     }
 
     /// Get service status

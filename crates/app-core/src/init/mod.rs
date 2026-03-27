@@ -96,6 +96,18 @@ impl AppCore {
         // Context update queue for live context refresher (shared between agent + background services).
         let context_update_queue = Arc::new(bus::ContextUpdateQueue::new());
 
+        // ── Startup recovery — DND crash safety net ──────────────────────
+        if let Ok(Some(dnd_row)) = repos.dnd_override.get().await {
+            tracing::warn!(
+                "Recovering DND state from interrupted focus session (overridden at {})",
+                dnd_row.overridden_at
+            );
+            tracing::warn!(
+                "DND restore not yet implemented — cleared orphaned override record"
+            );
+            let _ = repos.dnd_override.clear().await;
+        }
+
         // ── Phase 2: Cron ────────────────────────────────────────────────
         let cron::CronResult {
             cron_service,
@@ -332,6 +344,9 @@ impl AppCore {
             });
         }
 
+        // ── Snapshot lifecycle config before moving config into Arc ──────
+        let lifecycle_config_snapshot = config.lifecycle.clone();
+
         // ── Wrap config for shared ownership ─────────────────────────────
         let shared_config = Arc::new(RwLock::new(config));
 
@@ -343,7 +358,7 @@ impl AppCore {
         );
 
         // ── Assemble AppCore ─────────────────────────────────────────────
-        let core = AppCore {
+        let mut core = AppCore {
             mode,
             repos,
             storage_pool: storage_pool.clone(),
@@ -427,6 +442,8 @@ impl AppCore {
             _mirror_handles: mirror_handles,
             _mirror_shutdown: mirror_shutdown,
             _config_watcher_token: Some(config_watcher_token),
+            _lifecycle_monitor: None,
+            _wake_orchestrator_handle: None,
         };
 
         // ── Insight progress refresh (registered post-init — deps available now) ──
@@ -511,6 +528,96 @@ impl AppCore {
                     }),
                 );
             }
+        }
+
+        // ── Start lifecycle monitor (macOS only) ─────────────────────────
+        #[cfg(target_os = "macos")]
+        {
+            if let Some(ref bus) = core.domain_event_bus {
+                let lifecycle_config = lifecycle_config_snapshot.clone();
+                let bus_clone = bus.clone();
+                let cron_clone = cron_service.clone();
+
+                let monitor_config = platform_macos::lifecycle::MonitorConfig {
+                    idle_threshold_secs: lifecycle_config.idle_threshold_secs,
+                    presence_threshold_secs: lifecycle_config.presence_threshold_secs,
+                    wake_grace_period_secs: lifecycle_config.wake_grace_period_secs,
+                    active_poll_interval_secs: lifecycle_config.active_poll_interval_secs,
+                    idle_poll_interval_secs: lifecycle_config.idle_poll_interval_secs,
+                };
+
+                let monitor = platform_macos::lifecycle::LifecycleMonitor::start(
+                    monitor_config,
+                    move |event| {
+                        use platform_macos::lifecycle::{LifecycleEvent as LE, WakeType as LWT};
+                        let bus_wt = |wt: LWT| match wt {
+                            LWT::FromSleep => bus::domain_events::WakeType::FromSleep,
+                            LWT::FromIdle => bus::domain_events::WakeType::FromIdle,
+                        };
+                        match event {
+                            LE::SystemWillSleep => {
+                                bus_clone.publish(bus::DomainEvent::SystemWillSleep);
+                                let cron = cron_clone.clone();
+                                tokio::task::block_in_place(|| {
+                                    tokio::runtime::Handle::current()
+                                        .block_on(cron.on_system_will_sleep());
+                                });
+                            }
+                            LE::SystemDidWake {
+                                away_duration,
+                                wake_type,
+                            } => {
+                                let away_secs = away_duration.as_secs();
+                                bus_clone.publish(bus::DomainEvent::SystemDidWake {
+                                    away_secs,
+                                    wake_type: bus_wt(wake_type),
+                                });
+                                // Spawn classification + cheap job execution so the
+                                // callback returns immediately without blocking the
+                                // lifecycle polling thread.
+                                let cron = cron_clone.clone();
+                                let bus2 = bus_clone.clone();
+                                tokio::spawn(async move {
+                                    let (immediate, deferred, expired) =
+                                        cron.on_system_did_wake().await;
+                                    bus2.publish(bus::DomainEvent::CronCatchUpReady {
+                                        immediate_count: immediate.len(),
+                                        deferred_count: deferred.len(),
+                                        expired_count: expired.len(),
+                                    });
+                                    for job in &immediate {
+                                        let _ = cron.run_job(&job.id, false).await;
+                                    }
+                                });
+                            }
+                            LE::UserBecameIdle { idle_secs } => {
+                                bus_clone.publish(bus::DomainEvent::UserBecameIdle { idle_secs });
+                            }
+                            LE::UserReturned {
+                                absence_duration,
+                                wake_type,
+                            } => {
+                                bus_clone.publish(bus::DomainEvent::UserReturned {
+                                    absence_secs: absence_duration.as_secs(),
+                                    wake_type: bus_wt(wake_type),
+                                });
+                            }
+                        }
+                    },
+                );
+                core._lifecycle_monitor = Some(monitor);
+                info!("lifecycle monitor started");
+            }
+        }
+
+        // ── Start wake orchestrator ───────────────────────────────────────
+        if let Some(ref bus) = core.domain_event_bus {
+            let orchestrator = crate::wake_orchestrator::WakeOrchestrator::new(
+                bus.clone(),
+                lifecycle_config_snapshot.wake_delivery.clone(),
+            );
+            core._wake_orchestrator_handle = Some(orchestrator.start());
+            info!("wake orchestrator started");
         }
 
         // ── Register MirrorTool in agent's tool registry (post-init) ──────

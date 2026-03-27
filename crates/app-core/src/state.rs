@@ -133,6 +133,10 @@ pub struct AppCore {
     pub _mirror_shutdown: Option<CancellationToken>,
     /// Cancellation token for the config file watcher background service.
     pub _config_watcher_token: Option<CancellationToken>,
+    /// Lifecycle monitor handle (macOS sleep/wake + idle detection).
+    pub _lifecycle_monitor: Option<platform_macos::lifecycle::LifecycleMonitor>,
+    /// Wake orchestrator background task handle.
+    pub _wake_orchestrator_handle: Option<tokio::task::JoinHandle<()>>,
 }
 
 impl AppCore {

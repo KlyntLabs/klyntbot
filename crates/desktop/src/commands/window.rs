@@ -1,3 +1,4 @@
+use std::sync::atomic::{AtomicBool, Ordering};
 use tauri::Manager;
 
 pub const WINDOW_TRAY: &str = "tray";
@@ -5,6 +6,11 @@ pub const WINDOW_LAUNCHER: &str = "launcher";
 pub const WINDOW_QUICK_CAPTURE: &str = "quick-capture";
 
 const RESIZABLE_WINDOWS: &[&str] = &[WINDOW_LAUNCHER, WINDOW_TRAY];
+
+/// Set to `true` when the user explicitly requests a quit (via `quit_app`).
+/// The `RunEvent::ExitRequested` handler checks this flag to distinguish
+/// real quit intent from close-button presses (which should only hide windows).
+pub static QUIT_REQUESTED: AtomicBool = AtomicBool::new(false);
 
 #[tauri::command]
 pub fn resize_window(app: tauri::AppHandle, label: String, height: f64) {
@@ -42,5 +48,8 @@ pub fn show_dashboard(app: tauri::AppHandle) {
 
 #[tauri::command]
 pub fn quit_app(app: tauri::AppHandle) {
+    QUIT_REQUESTED.store(true, Ordering::SeqCst);
+    // TODO: In a future task, add graceful shutdown sequence here
+    // (stop focus timer, persist lifecycle state, shutdown core)
     app.exit(0);
 }

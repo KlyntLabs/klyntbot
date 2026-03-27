@@ -102,7 +102,12 @@ pub(super) async fn dispatch_insight_tab_chat(
     let params: desktop_shared::commands::InsightChatParams =
         match serde_json::from_value(body.get("params").cloned().unwrap_or_default()) {
             Ok(p) => p,
-            Err(e) => return err(desktop_shared::errors::ApiError::new("INVALID_PARAMS", e.to_string())),
+            Err(e) => {
+                return err(desktop_shared::errors::ApiError::new(
+                    "INVALID_PARAMS",
+                    e.to_string(),
+                ))
+            }
         };
 
     let session_key = params.session_key.clone();
@@ -308,5 +313,6 @@ fn domain_for_event(event: &bus::DomainEvent) -> &'static str {
         bus::DomainEvent::MirrorTrialKilled { .. } => "mirror",
         bus::DomainEvent::MirrorSnippetCreated { .. } => "mirror",
         bus::DomainEvent::NoteEditingFinished { .. } => "notes",
+        _ => "general",
     }
 }

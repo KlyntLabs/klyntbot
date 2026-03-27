@@ -444,16 +444,12 @@ pub async fn focus_session_status(
 }
 
 #[tauri::command]
-pub async fn focus_session_pause(
-    timer: State<'_, Arc<FocusTimer>>,
-) -> Result<bool, ApiError> {
+pub async fn focus_session_pause(timer: State<'_, Arc<FocusTimer>>) -> Result<bool, ApiError> {
     Ok(timer.send_command(SessionCommand::Pause).await)
 }
 
 #[tauri::command]
-pub async fn focus_session_resume(
-    timer: State<'_, Arc<FocusTimer>>,
-) -> Result<bool, ApiError> {
+pub async fn focus_session_resume(timer: State<'_, Arc<FocusTimer>>) -> Result<bool, ApiError> {
     Ok(timer.send_command(SessionCommand::Resume).await)
 }
 
@@ -483,16 +479,12 @@ pub async fn focus_session_extend_work(
 }
 
 #[tauri::command]
-pub async fn focus_session_skip_break(
-    timer: State<'_, Arc<FocusTimer>>,
-) -> Result<bool, ApiError> {
+pub async fn focus_session_skip_break(timer: State<'_, Arc<FocusTimer>>) -> Result<bool, ApiError> {
     Ok(timer.send_command(SessionCommand::SkipBreak).await)
 }
 
 #[tauri::command]
-pub async fn focus_session_take_break(
-    timer: State<'_, Arc<FocusTimer>>,
-) -> Result<bool, ApiError> {
+pub async fn focus_session_take_break(timer: State<'_, Arc<FocusTimer>>) -> Result<bool, ApiError> {
     Ok(timer.send_command(SessionCommand::TakeBreak).await)
 }
 

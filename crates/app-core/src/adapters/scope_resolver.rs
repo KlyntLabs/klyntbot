@@ -73,7 +73,12 @@ impl ScopeResolverImpl {
             .await
         {
             Ok(results) => {
-                tracing::info!(note_id, count = results.len(), radius, "semantic scope: search results");
+                tracing::info!(
+                    note_id,
+                    count = results.len(),
+                    radius,
+                    "semantic scope: search results"
+                );
                 results
                     .into_iter()
                     .map(|(id, _score)| id)

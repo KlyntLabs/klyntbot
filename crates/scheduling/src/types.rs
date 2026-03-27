@@ -95,6 +95,57 @@ pub enum CronOrigin {
     Plugin,
 }
 
+/// Optional intent window — controls when a job actually fires relative to its cron schedule.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct IntentWindow {
+    pub trigger: IntentTrigger,
+    #[serde(rename = "toleranceSecs", with = "duration_secs")]
+    pub tolerance: std::time::Duration,
+    #[serde(rename = "catchUp")]
+    pub catch_up: CatchUpPriority,
+}
+
+/// What must be true for an intent-windowed job to fire.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(tag = "kind", rename_all = "snake_case")]
+pub enum IntentTrigger {
+    UserPresent,
+    FirstActivityAfter {
+        #[serde(rename = "afterLocal")]
+        after_local: chrono::NaiveTime,
+    },
+    MinActiveMinutes {
+        minutes: u32,
+    },
+    UserIdle {
+        #[serde(rename = "minIdleSecs")]
+        min_idle_secs: u64,
+    },
+}
+
+/// Priority for catch-up after sleep/idle.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum CatchUpPriority {
+    Immediate,
+    WhenPresent,
+    WhenIdle,
+}
+
+mod duration_secs {
+    use serde::{Deserialize, Deserializer, Serializer};
+    use std::time::Duration;
+
+    pub fn serialize<S: Serializer>(d: &Duration, s: S) -> Result<S::Ok, S::Error> {
+        s.serialize_u64(d.as_secs())
+    }
+
+    pub fn deserialize<'de, D: Deserializer<'de>>(d: D) -> Result<Duration, D::Error> {
+        Ok(Duration::from_secs(u64::deserialize(d)?))
+    }
+}
+
 /// A scheduled job
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -124,6 +175,12 @@ pub struct CronJob {
 
     #[serde(default)]
     pub delete_after_run: bool,
+
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub intent_window: Option<IntentWindow>,
+
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub intent_pending_since_ms: Option<i64>,
 }
 
 fn default_enabled() -> bool {
@@ -188,6 +245,8 @@ impl CronJob {
             created_at_ms: now_ms,
             updated_at_ms: now_ms,
             delete_after_run: false,
+            intent_window: None,
+            intent_pending_since_ms: None,
         }
     }
 }
@@ -333,5 +392,52 @@ mod tests {
         assert_eq!(json, "ai");
         let deserialized: CronOrigin = serde_json::from_value(json).unwrap();
         assert_eq!(deserialized, CronOrigin::Ai);
+    }
+
+    #[test]
+    fn test_intent_window_serde() {
+        let window = IntentWindow {
+            trigger: IntentTrigger::UserPresent,
+            tolerance: std::time::Duration::from_secs(7200),
+            catch_up: CatchUpPriority::WhenPresent,
+        };
+        let json = serde_json::to_value(&window).unwrap();
+        assert_eq!(json["trigger"]["kind"], "user_present");
+        assert_eq!(json["toleranceSecs"], 7200);
+        assert_eq!(json["catchUp"], "when_present");
+
+        let roundtrip: IntentWindow = serde_json::from_value(json).unwrap();
+        assert_eq!(roundtrip.tolerance.as_secs(), 7200);
+    }
+
+    #[test]
+    fn test_intent_trigger_first_activity_after() {
+        let trigger = IntentTrigger::FirstActivityAfter {
+            after_local: chrono::NaiveTime::from_hms_opt(8, 0, 0).unwrap(),
+        };
+        let json = serde_json::to_value(&trigger).unwrap();
+        assert_eq!(json["kind"], "first_activity_after");
+    }
+
+    #[test]
+    fn test_cron_job_with_intent_window() {
+        let schedule = CronSchedule::Cron {
+            expr: "0 0 9 * * 1".to_string(),
+            tz: None,
+        };
+        let mut job = CronJob::new("j1", "Weekly reflection", schedule, "", CronOrigin::System);
+        job.intent_window = Some(IntentWindow {
+            trigger: IntentTrigger::FirstActivityAfter {
+                after_local: chrono::NaiveTime::from_hms_opt(8, 0, 0).unwrap(),
+            },
+            tolerance: std::time::Duration::from_secs(7200),
+            catch_up: CatchUpPriority::WhenPresent,
+        });
+
+        let json = serde_json::to_value(&job).unwrap();
+        assert!(json["intentWindow"].is_object());
+
+        let roundtrip: CronJob = serde_json::from_value(json).unwrap();
+        assert!(roundtrip.intent_window.is_some());
     }
 }

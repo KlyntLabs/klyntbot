@@ -6,6 +6,14 @@
 use serde::{Deserialize, Serialize};
 use tokio::sync::broadcast;
 
+/// How the user returned — from OS sleep or from idle.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum WakeType {
+    FromSleep,
+    FromIdle,
+}
+
 /// Events emitted by feature crates for cross-domain communication.
 ///
 /// The cognitive layer subscribes to all events to extract facts,
@@ -423,6 +431,41 @@ pub enum DomainEvent {
     MirrorSnippetCreated {
         snippet_id: String,
         headline: String,
+    },
+
+    // -- Lifecycle events --
+    /// macOS is about to sleep.
+    SystemWillSleep,
+    /// macOS woke from sleep.
+    SystemDidWake {
+        away_secs: u64,
+        wake_type: WakeType,
+    },
+    /// User became idle (no input for threshold duration).
+    UserBecameIdle {
+        idle_secs: u64,
+    },
+    /// User returned after being idle or after system sleep.
+    UserReturned {
+        absence_secs: u64,
+        wake_type: WakeType,
+    },
+    // -- Wake orchestrator ready signals --
+    /// Focus timer was suspended due to sleep/idle.
+    FocusSessionSuspended {
+        remaining_secs: u64,
+        phase_name: String,
+    },
+    /// Cron service classified missed jobs for catch-up.
+    CronCatchUpReady {
+        immediate_count: usize,
+        deferred_count: usize,
+        expired_count: usize,
+    },
+    /// Wake panel assembled and ready for UI display.
+    WakePanelReady {
+        greeting: String,
+        away_secs: u64,
     },
 }
 

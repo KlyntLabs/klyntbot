@@ -12,7 +12,11 @@ pub fn is_dnd_active() -> bool {
     use std::process::Command;
 
     let output = Command::new("defaults")
-        .args(["read", "com.apple.controlcenter", "NSStatusItem Visible FocusModes"])
+        .args([
+            "read",
+            "com.apple.controlcenter",
+            "NSStatusItem Visible FocusModes",
+        ])
         .output();
 
     match output {

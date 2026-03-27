@@ -193,6 +193,8 @@ mod tests {
                     created_at_ms: 0,
                     updated_at_ms: 0,
                     delete_after_run: false,
+                    intent_window: None,
+                    intent_pending_since_ms: None,
                 })
                 .unwrap(),
             ),

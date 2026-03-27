@@ -202,7 +202,10 @@ async fn relay_squad_chat(
                 )
                 .await
             {
-                warn!("insight_chat: failed to persist persona {} message: {e}", persona.name);
+                warn!(
+                    "insight_chat: failed to persist persona {} message: {e}",
+                    persona.name
+                );
             }
         }
     }
@@ -296,9 +299,7 @@ impl AppCore {
                 match params.tab_name.as_str() {
                     "synthesis" => content.synthesis.unwrap_or_default(),
                     "gaps" | "gap_analysis" => content.gap_analysis.unwrap_or_default(),
-                    "assessment" | "self_assessment" => {
-                        content.self_assessment.unwrap_or_default()
-                    }
+                    "assessment" | "self_assessment" => content.self_assessment.unwrap_or_default(),
                     "concept-map" | "concept_map" => content.concept_map.unwrap_or_default(),
                     "perspectives" => content.perspectives.unwrap_or_default(),
                     _ => String::new(),
@@ -317,7 +318,11 @@ impl AppCore {
             } else if let Some(ref squad_id) = params.squad_id {
                 if let Some(ref squad_repo) = self.squad_repo {
                     if let Ok(Some(squad)) = squad_repo.resolve_squad(squad_id).await {
-                        if squad.personas.is_empty() { None } else { Some(squad.personas) }
+                        if squad.personas.is_empty() {
+                            None
+                        } else {
+                            Some(squad.personas)
+                        }
                     } else {
                         None
                     }
@@ -408,20 +413,13 @@ impl AppCore {
             ));
         } else {
             // Single mode: streaming LLM response
-            let system_prompt =
-                if let Some(persona_id) = params.tab_name.strip_prefix("persona:") {
-                    build_persona_system_prompt(persona_id, &note.title, &self.persona_repo).await
-                } else {
-                    tab_chat_system_prompt(
-                        &params.tab_name,
-                        &note.title,
-                        &tab_content,
-                        &note.body,
-                    )
-                };
+            let system_prompt = if let Some(persona_id) = params.tab_name.strip_prefix("persona:") {
+                build_persona_system_prompt(persona_id, &note.title, &self.persona_repo).await
+            } else {
+                tab_chat_system_prompt(&params.tab_name, &note.title, &tab_content, &note.body)
+            };
 
-            let mut llm_messages =
-                Vec::with_capacity(history_messages.len() + 2);
+            let mut llm_messages = Vec::with_capacity(history_messages.len() + 2);
             llm_messages.push(providers::Message::System {
                 content: system_prompt,
             });
@@ -539,7 +537,10 @@ mod tests {
             let prompt =
                 tab_chat_system_prompt(tab_name, "Note Title", "Some content.", "Note body.");
             let count = prompt.matches(expected_upper).count();
-            assert_eq!(count, 1, "tab '{tab_name}': expected one '{expected_upper}', found {count}");
+            assert_eq!(
+                count, 1,
+                "tab '{tab_name}': expected one '{expected_upper}', found {count}"
+            );
             assert!(!prompt.contains("ANALYSIS ANALYSIS"));
             assert!(!prompt.contains("MAP MAP"));
         }

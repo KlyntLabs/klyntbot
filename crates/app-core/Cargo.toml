@@ -45,6 +45,7 @@ async-trait = { workspace = true }
 sqlx = { workspace = true }
 notify = { workspace = true }
 notify-debouncer-mini = { workspace = true }
+platform-macos = { workspace = true }
 
 
 [dev-dependencies]

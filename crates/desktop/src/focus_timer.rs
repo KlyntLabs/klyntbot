@@ -34,9 +34,30 @@ pub struct FocusSessionConfig {
 
 #[derive(Debug, Clone)]
 enum Phase {
-    Working { remaining: u64, total: u64 },
-    BreakPending { remaining: u64 },
-    Break { remaining: u64, total: u64 },
+    Working {
+        remaining: u64,
+        total: u64,
+    },
+    BreakPending {
+        remaining: u64,
+    },
+    Break {
+        remaining: u64,
+        total: u64,
+    },
+    Suspended {
+        previous: SuspendedFrom,
+        remaining: u64,
+        total: u64,
+    },
+}
+
+/// What phase was active before suspension (avoids stringly-typed state).
+#[derive(Debug, Clone)]
+enum SuspendedFrom {
+    Working,
+    BreakPending,
+    Break,
 }
 
 impl Phase {
@@ -45,6 +66,7 @@ impl Phase {
             Phase::Working { .. } => "working",
             Phase::BreakPending { .. } => "break_pending",
             Phase::Break { .. } => "break",
+            Phase::Suspended { .. } => "suspended",
         }
     }
 
@@ -52,13 +74,16 @@ impl Phase {
         match self {
             Phase::Working { remaining, .. }
             | Phase::BreakPending { remaining }
-            | Phase::Break { remaining, .. } => *remaining,
+            | Phase::Break { remaining, .. }
+            | Phase::Suspended { remaining, .. } => *remaining,
         }
     }
 
     fn total(&self) -> u64 {
         match self {
-            Phase::Working { total, .. } | Phase::Break { total, .. } => *total,
+            Phase::Working { total, .. }
+            | Phase::Break { total, .. }
+            | Phase::Suspended { total, .. } => *total,
             Phase::BreakPending { remaining } => *remaining,
         }
     }
@@ -70,6 +95,7 @@ impl Phase {
             | Phase::Break { remaining, .. } => {
                 *remaining = remaining.saturating_sub(1);
             }
+            Phase::Suspended { .. } => {} // frozen
         }
     }
 }
@@ -84,6 +110,8 @@ pub enum SessionCommand {
     ExtendWork(u64),
     SkipBreak,
     TakeBreak,
+    Suspend,
+    ResumeSuspended,
 }
 
 // ── Session state (shared between timer loop and public API) ────────
@@ -186,6 +214,18 @@ impl FocusTimer {
         });
 
         Ok(())
+    }
+
+    pub async fn suspend(&self) {
+        if let Some(state) = self.state.lock().await.as_ref() {
+            let _ = state.cmd_tx.send(SessionCommand::Suspend).await;
+        }
+    }
+
+    pub async fn resume_suspended(&self) {
+        if let Some(state) = self.state.lock().await.as_ref() {
+            let _ = state.cmd_tx.send(SessionCommand::ResumeSuspended).await;
+        }
     }
 
     pub async fn send_command(&self, cmd: SessionCommand) -> bool {
@@ -307,8 +347,8 @@ async fn session_loop(
                     );
                 }
                 SessionCommand::Extend(secs) => {
-                    if let Phase::Working { remaining, total }
-                    | Phase::Break { remaining, total } = &mut phase
+                    if let Phase::Working { remaining, total } | Phase::Break { remaining, total } =
+                        &mut phase
                     {
                         *remaining += secs;
                         *total += secs;
@@ -414,6 +454,70 @@ async fn session_loop(
                         );
                     }
                 }
+                SessionCommand::Suspend => {
+                    if !matches!(phase, Phase::Suspended { .. }) {
+                        let previous = match &phase {
+                            Phase::Working { .. } => SuspendedFrom::Working,
+                            Phase::BreakPending { .. } => SuspendedFrom::BreakPending,
+                            Phase::Break { .. } => SuspendedFrom::Break,
+                            Phase::Suspended { .. } => unreachable!(),
+                        };
+                        let remaining = phase.remaining();
+                        let total = phase.total();
+                        phase = Phase::Suspended {
+                            previous,
+                            remaining,
+                            total,
+                        };
+                        update_tray_title(
+                            &app,
+                            phase.remaining(),
+                            paused,
+                            truncated_title.as_deref(),
+                        );
+                        emit_phase_changed(
+                            &app,
+                            &phase,
+                            cycle_position,
+                            &config,
+                            paused,
+                            truncated_title.as_deref(),
+                            dnd_enabled,
+                        );
+                    }
+                }
+                SessionCommand::ResumeSuspended => {
+                    if let Phase::Suspended {
+                        previous,
+                        remaining,
+                        total,
+                    } = &phase
+                    {
+                        let rem = *remaining;
+                        let tot = *total;
+                        phase = match previous {
+                            SuspendedFrom::BreakPending => Phase::BreakPending { remaining: rem },
+                            SuspendedFrom::Break => Phase::Break {
+                                remaining: rem,
+                                total: tot,
+                            },
+                            SuspendedFrom::Working => Phase::Working {
+                                remaining: rem,
+                                total: tot,
+                            },
+                        };
+                        paused = false;
+                        emit_phase_changed(
+                            &app,
+                            &phase,
+                            cycle_position,
+                            &config,
+                            false,
+                            truncated_title.as_deref(),
+                            dnd_enabled,
+                        );
+                    }
+                }
             }
         }
 
@@ -502,6 +606,10 @@ async fn session_loop(
                         dnd_enabled,
                     );
                 }
+                Phase::Suspended { .. } => {
+                    // Suspended phase never decrements — remaining() == 0 here
+                    // means it was suspended at 0s; just wait for ResumeSuspended.
+                }
             }
             continue;
         }
@@ -511,7 +619,7 @@ async fn session_loop(
         // Warning at 30 seconds remaining (Working and Break phases only)
         if !warning_shown
             && phase.remaining() == WARNING_SECS
-            && !matches!(phase, Phase::BreakPending { .. })
+            && !matches!(phase, Phase::BreakPending { .. } | Phase::Suspended { .. })
         {
             warning_shown = true;
             open_tray_window(&app);
@@ -602,7 +710,14 @@ fn emit_phase_changed(
 ) {
     let _ = app.emit(
         FOCUS_PHASE_CHANGED,
-        build_sync_payload(phase, cycle_position, config, paused, action_title, dnd_active),
+        build_sync_payload(
+            phase,
+            cycle_position,
+            config,
+            paused,
+            action_title,
+            dnd_active,
+        ),
     );
 }
 
@@ -683,11 +798,9 @@ pub fn open_tray_window(app: &AppHandle) {
                     let scale = window.scale_factor().unwrap_or(1.0);
                     let tray_pos = rect.position.to_physical::<f64>(scale);
                     let tray_size = rect.size.to_physical::<f64>(scale);
-                    let x =
-                        tray_pos.x + (tray_size.width / 2.0) - (win_size.width as f64 / 2.0);
+                    let x = tray_pos.x + (tray_size.width / 2.0) - (win_size.width as f64 / 2.0);
                     let y = tray_pos.y + tray_size.height;
-                    let _ =
-                        window.set_position(tauri::PhysicalPosition::new(x as i32, y as i32));
+                    let _ = window.set_position(tauri::PhysicalPosition::new(x as i32, y as i32));
                     true
                 } else {
                     false
@@ -773,7 +886,10 @@ mod tests {
             .as_str(),
             "working"
         );
-        assert_eq!(Phase::BreakPending { remaining: 5 }.as_str(), "break_pending");
+        assert_eq!(
+            Phase::BreakPending { remaining: 5 }.as_str(),
+            "break_pending"
+        );
         assert_eq!(
             Phase::Break {
                 remaining: 10,

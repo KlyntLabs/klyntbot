@@ -161,7 +161,8 @@ async fn process_note(
     let mut total_created = 0usize;
     let mut total_reinforced = 0usize;
     let mut topic_cache: HashMap<String, String> = HashMap::new(); // domain → topic_id
-    let mut affected_topic_ids: std::collections::HashSet<String> = std::collections::HashSet::new();
+    let mut affected_topic_ids: std::collections::HashSet<String> =
+        std::collections::HashSet::new();
 
     // 3. Extract from each section
     for section in &sections {
@@ -460,7 +461,10 @@ const DOMAIN_ALIASES: &[(&str, &str)] = &[
     ("deep-learning", "machine-learning/deep-learning"),
     ("nlp", "machine-learning/nlp"),
     ("natural-language-processing", "machine-learning/nlp"),
-    ("reinforcement-learning", "machine-learning/reinforcement-learning"),
+    (
+        "reinforcement-learning",
+        "machine-learning/reinforcement-learning",
+    ),
     ("machine-learning-systems", "machine-learning/systems"),
     ("ml-systems", "machine-learning/systems"),
     ("ml-ops", "machine-learning/ops"),
@@ -480,7 +484,10 @@ const DOMAIN_ALIASES: &[(&str, &str)] = &[
     // SE ecosystem
     ("database-systems", "software-engineering/databases"),
     ("databases", "software-engineering/databases"),
-    ("distributed-systems", "software-engineering/distributed-systems"),
+    (
+        "distributed-systems",
+        "software-engineering/distributed-systems",
+    ),
     ("system-design", "software-engineering/system-design"),
     ("devops", "software-engineering/devops"),
     ("testing", "software-engineering/testing"),
@@ -688,15 +695,36 @@ mod tests {
     #[test]
     fn test_normalize_domain_aliases() {
         // Full-path aliases
-        assert_eq!(normalize_domain("deep-learning"), "machine-learning/deep-learning");
+        assert_eq!(
+            normalize_domain("deep-learning"),
+            "machine-learning/deep-learning"
+        );
         assert_eq!(normalize_domain("nlp"), "machine-learning/nlp");
-        assert_eq!(normalize_domain("reinforcement-learning"), "machine-learning/reinforcement-learning");
-        assert_eq!(normalize_domain("linear-algebra"), "mathematics/linear-algebra");
+        assert_eq!(
+            normalize_domain("reinforcement-learning"),
+            "machine-learning/reinforcement-learning"
+        );
+        assert_eq!(
+            normalize_domain("linear-algebra"),
+            "mathematics/linear-algebra"
+        );
         assert_eq!(normalize_domain("statistics"), "mathematics/statistics");
-        assert_eq!(normalize_domain("database-systems"), "software-engineering/databases");
-        assert_eq!(normalize_domain("distributed-systems"), "software-engineering/distributed-systems");
-        assert_eq!(normalize_domain("machine-learning-systems"), "machine-learning/systems");
-        assert_eq!(normalize_domain("statistics/machine-learning"), "machine-learning/statistics");
+        assert_eq!(
+            normalize_domain("database-systems"),
+            "software-engineering/databases"
+        );
+        assert_eq!(
+            normalize_domain("distributed-systems"),
+            "software-engineering/distributed-systems"
+        );
+        assert_eq!(
+            normalize_domain("machine-learning-systems"),
+            "machine-learning/systems"
+        );
+        assert_eq!(
+            normalize_domain("statistics/machine-learning"),
+            "machine-learning/statistics"
+        );
         assert_eq!(normalize_domain("system"), "software-engineering/general");
         assert_eq!(normalize_domain("general"), "general/uncategorized");
     }
@@ -704,8 +732,14 @@ mod tests {
     #[test]
     fn test_normalize_domain_parent_aliases() {
         // Parent remapping
-        assert_eq!(normalize_domain("programming-languages/rust"), "software-engineering/rust");
-        assert_eq!(normalize_domain("ai/transformers"), "machine-learning/transformers");
+        assert_eq!(
+            normalize_domain("programming-languages/rust"),
+            "software-engineering/rust"
+        );
+        assert_eq!(
+            normalize_domain("ai/transformers"),
+            "machine-learning/transformers"
+        );
         assert_eq!(normalize_domain("math/calculus"), "mathematics/calculus");
         assert_eq!(normalize_domain("ml/nlp"), "machine-learning/nlp");
     }
@@ -715,21 +749,33 @@ mod tests {
         // Bare language/tool names
         assert_eq!(normalize_domain("rust"), "software-engineering/rust");
         assert_eq!(normalize_domain("python"), "software-engineering/python");
-        assert_eq!(normalize_domain("pytorch"), "machine-learning/deep-learning");
+        assert_eq!(
+            normalize_domain("pytorch"),
+            "machine-learning/deep-learning"
+        );
     }
 
     #[test]
     fn test_normalize_domain_separator_normalization() {
         // Colon separator (software-engineering:rust → software-engineering/rust)
-        assert_eq!(normalize_domain("software-engineering:rust"), "software-engineering/rust");
+        assert_eq!(
+            normalize_domain("software-engineering:rust"),
+            "software-engineering/rust"
+        );
         assert_eq!(normalize_domain("language:ja"), "language/ja");
     }
 
     #[test]
     fn test_normalize_domain_already_canonical() {
         // Already in parent/child format — pass through
-        assert_eq!(normalize_domain("machine-learning/deep-learning"), "machine-learning/deep-learning");
-        assert_eq!(normalize_domain("software-engineering/databases"), "software-engineering/databases");
+        assert_eq!(
+            normalize_domain("machine-learning/deep-learning"),
+            "machine-learning/deep-learning"
+        );
+        assert_eq!(
+            normalize_domain("software-engineering/databases"),
+            "software-engineering/databases"
+        );
         assert_eq!(normalize_domain("finance/investing"), "finance/investing");
     }
 
@@ -743,7 +789,10 @@ mod tests {
     #[test]
     fn test_normalize_domain_edge_cases() {
         assert_eq!(normalize_domain(""), "general/uncategorized");
-        assert_eq!(normalize_domain("  Deep-Learning  "), "machine-learning/deep-learning");
+        assert_eq!(
+            normalize_domain("  Deep-Learning  "),
+            "machine-learning/deep-learning"
+        );
         assert_eq!(normalize_domain("NLP"), "machine-learning/nlp");
     }
 }

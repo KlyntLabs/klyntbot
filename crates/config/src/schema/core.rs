@@ -19,6 +19,7 @@ use super::integrations::IntegrationsConfig;
 use super::language::LanguageConfig;
 use super::launcher::LauncherConfig;
 use super::learning::LearningConfig;
+use super::lifecycle::LifecycleConfig;
 use super::mcp::McpConfig;
 use super::notes::NotesConfig;
 use super::orchestrator::OrchestratorConfig;
@@ -223,6 +224,10 @@ pub struct Config {
     /// Schema version for forward-compatible config migration.
     #[serde(default = "default_schema_version")]
     pub schema_version: u32,
+
+    /// Lifecycle monitoring — macOS sleep/wake + user presence detection.
+    #[serde(default)]
+    pub lifecycle: LifecycleConfig,
 }
 
 fn default_schema_version() -> u32 {

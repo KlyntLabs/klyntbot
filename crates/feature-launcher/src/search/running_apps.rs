@@ -73,11 +73,9 @@ impl super::SearchSource for RunningAppsSource {
 
     async fn refresh(&self) {
         let cache = self.icon_cache.clone();
-        let apps = tokio::task::spawn_blocking(move || {
-            Self::get_running_apps(cache.as_deref())
-        })
-        .await
-        .unwrap_or_default();
+        let apps = tokio::task::spawn_blocking(move || Self::get_running_apps(cache.as_deref()))
+            .await
+            .unwrap_or_default();
         tracing::debug!("Refreshed {} running apps", apps.len());
         *self.apps.write() = apps;
     }
@@ -92,7 +90,10 @@ impl super::SearchSource for RunningAppsSource {
                 id: format!("running:{}", app.pid),
                 title: app.name.clone(),
                 subtitle: Some("Running".to_string()),
-                icon: app.icon_data.clone().or_else(|| Some("activity".to_string())),
+                icon: app
+                    .icon_data
+                    .clone()
+                    .or_else(|| Some("activity".to_string())),
                 kind: LauncherItemKind::RunningApp {
                     pid: app.pid,
                     path: app.path.clone(),

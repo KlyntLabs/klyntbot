@@ -12,10 +12,10 @@ use desktop_shared::commands::{
     InsightSaveFlashcardsParams, InsightVersionResponse, KnowledgeGrowthResponse, NoteCreateParams,
     NoteEditingFinishedParams, NoteLinkResponse, NoteResponse, NoteRetentionHealthResponse,
     NoteSuggestionsResponse, NoteUpdateParams, NoteVersionResponse, NotebookCreateParams,
-    NotebookResponse, NotebookUpdateParams, PersonaChatParams, PersonaChatResponse, PersonaResponse,
-    RatePersonaParams, RecentLearningSession, ScenarioChallengeResponse, ScopePreviewParams,
-    ScopePreviewResponse, SetPersonaPinsParams, StrugglingCardResponse, TabContent,
-    UpdatePersonaParams,
+    NotebookResponse, NotebookUpdateParams, PersonaChatParams, PersonaChatResponse,
+    PersonaResponse, RatePersonaParams, RecentLearningSession, ScenarioChallengeResponse,
+    ScopePreviewParams, ScopePreviewResponse, SetPersonaPinsParams, StrugglingCardResponse,
+    TabContent, UpdatePersonaParams,
 };
 use desktop_shared::errors::ApiError;
 use tauri::{Emitter, State};

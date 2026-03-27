@@ -31,10 +31,12 @@ impl ContextInferenceLoop {
 
             let mut inference_interval =
                 tokio::time::interval(Duration::from_secs(interval_mins * 60));
+            inference_interval.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
             // Run archival check every 6 hours, deferring the first tick
             let archival_period = Duration::from_secs(6 * 60 * 60);
             let mut archival_interval =
                 tokio::time::interval_at(Instant::now() + archival_period, archival_period);
+            archival_interval.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
 
             loop {
                 tokio::select! {

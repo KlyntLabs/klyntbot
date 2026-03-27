@@ -141,6 +141,9 @@ pub fn evaluate_salience(event: &DomainEvent) -> SalienceVerdict {
 
         // Note editing finished — discard from cognitive (handled by atom extraction)
         DomainEvent::NoteEditingFinished { .. } => SalienceVerdict::Discard,
+
+        // System/idle/wake events — discard from cognitive (not relevant for memory extraction)
+        _ => SalienceVerdict::Discard,
     }
 }
 
