@@ -129,10 +129,14 @@ impl FocusTimer {
         notification_enabled: bool,
     ) -> common::Result<()> {
         let mut guard = self.state.lock().await;
-        if guard.is_some() {
-            return Err(
-                common::ToolError::ExecutionFailed("Session already running".into()).into(),
-            );
+
+        // Clean up any stale session (e.g. from a previous run or app restart)
+        if let Some(old) = guard.take() {
+            old.handle.abort();
+            let _ = old.handle.await;
+            clear_tray_title(&app);
+            tray_countdown::notify_focus_ended(&app);
+            restore_dnd_state(old.dnd_enabled, old.dnd_was_active_before);
         }
 
         tray_countdown::FOCUS_ACTIVE.store(true, std::sync::atomic::Ordering::Relaxed);

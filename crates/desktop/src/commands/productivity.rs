@@ -386,7 +386,11 @@ pub async fn focus_session_start(
         long_break_after,
     };
 
-    // Start persistent session in AppCore first
+    // Clean up any orphaned DB sessions (from app restart or stale timer)
+    let _ = state.productivity_focus_end(None).await;
+    let _ = state.productivity_break_end().await;
+
+    // Start persistent session in AppCore
     let session = state
         .productivity_focus_start(action_id.clone(), None, Some(work_secs as i64 / 60))
         .await?;
