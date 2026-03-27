@@ -1,4 +1,4 @@
-import { formatDate, formatHumanDuration } from "@shared/lib/dates";
+import { formatDate, formatHumanDuration, formatTime } from "@shared/lib/dates";
 import { cn } from "@shared/lib/utils";
 import { Check } from "lucide-react";
 import { useState } from "react";
@@ -77,7 +77,12 @@ export function SidebarProperties({ task, compact, onUpdate }: SidebarProperties
   const PriorityIcon = task.priority.icon;
 
   const dueDateDisplay = task.dueDate
-    ? formatDate(new Date(task.dueDate).toISOString().slice(0, 10))
+    ? (() => {
+        const d = new Date(task.dueDate);
+        const dateStr = formatDate(d.toISOString().slice(0, 10));
+        const hasTime = d.getHours() !== 0 || d.getMinutes() !== 0;
+        return hasTime ? `${dateStr}, ${formatTime(task.dueDate)}` : dateStr;
+      })()
     : "No due date";
 
   const estimateDisplay =

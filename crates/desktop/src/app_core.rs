@@ -47,43 +47,86 @@ pub async fn init(app_handle: tauri::AppHandle) -> Result<AppCore, String> {
 fn wire_event_channels(core: &AppCore, channels: EventChannels, app_handle: &tauri::AppHandle) {
     let shutdown = &core.shutdown_token;
 
-    // Auto-focus events → Tauri event
-    if let Some(auto_focus_rx) = channels.auto_focus_rx {
-        spawn_channel_forwarder(auto_focus_rx, app_handle, shutdown, |handle, event| {
-            match event {
-                AutoFocusEvent::Started {
-                    started_at,
-                    dominant_app,
-                    dominant_category,
-                } => {
-                    // Focus session started — emit event and call handler to create DB session
-                    let payload = serde_json::json!({
-                        "startedAt": started_at.to_rfc3339(),
-                        "dominantApp": dominant_app,
-                        "dominantCategory": dominant_category,
-                    });
-                    if let Err(e) = handle.emit(events::FOCUS_AUTO_STARTED, payload) {
-                        warn!("failed to emit auto-focus started event: {e}");
-                    }
-                }
-                AutoFocusEvent::Ended {
-                    started_at,
-                    ended_at,
-                    dominant_app,
-                    dominant_category: _,
-                    productive_ratio,
-                    total_secs,
-                } => {
-                    // Focus session ended — emit event and call handler to end DB session
-                    let payload = events::AutoFocusPayload {
-                        started_at: started_at.to_rfc3339(),
-                        ended_at: ended_at.to_rfc3339(),
-                        duration_mins: total_secs / 60,
-                        dominant_app,
-                        productive_ratio,
-                    };
-                    if let Err(e) = handle.emit(events::FOCUS_AUTO_DETECTED, payload) {
-                        warn!("failed to emit auto-focus ended event: {e}");
+    // Auto-focus events → Tauri event + tray timer sync
+    if let Some(mut auto_focus_rx) = channels.auto_focus_rx {
+        let handle = app_handle.clone();
+        let token = shutdown.clone();
+        tokio::spawn(async move {
+            loop {
+                tokio::select! {
+                    _ = token.cancelled() => break,
+                    msg = auto_focus_rx.recv() => {
+                        let Some(event) = msg else { break };
+                        match event {
+                            AutoFocusEvent::Started {
+                                started_at,
+                                dominant_app,
+                                dominant_category,
+                            } => {
+                                let payload = serde_json::json!({
+                                    "startedAt": started_at.to_rfc3339(),
+                                    "dominantApp": dominant_app,
+                                    "dominantCategory": dominant_category,
+                                });
+                                if let Err(e) = handle.emit(events::FOCUS_AUTO_STARTED, payload) {
+                                    warn!("failed to emit auto-focus started event: {e}");
+                                }
+
+                                // Start the tray focus timer so the UI reflects the active session
+                                if let Some(timer) = handle.try_state::<Arc<crate::focus_timer::FocusTimer>>() {
+                                    // Read focus duration from config, fall back to 45 min
+                                    let work_mins = handle
+                                        .try_state::<Arc<AppCore>>()
+                                        .and_then(|core| {
+                                            core.config.try_read().ok().map(|c| {
+                                                c.productivity_config.focus.default_duration_mins
+                                            })
+                                        })
+                                        .unwrap_or(45);
+                                    let config = crate::focus_timer::FocusSessionConfig {
+                                        work_secs: work_mins * 60,
+                                        short_break_secs: 5 * 60,
+                                        long_break_secs: 15 * 60,
+                                        long_break_after: 4,
+                                    };
+                                    let title = if dominant_app.is_empty() {
+                                        None
+                                    } else {
+                                        Some(dominant_app)
+                                    };
+                                    if let Err(e) = timer
+                                        .start(handle.clone(), config, None, title, false, true, true)
+                                        .await
+                                    {
+                                        warn!("failed to start focus timer for auto-focus: {e}");
+                                    }
+                                }
+                            }
+                            AutoFocusEvent::Ended {
+                                started_at,
+                                ended_at,
+                                dominant_app,
+                                dominant_category: _,
+                                productive_ratio,
+                                total_secs,
+                            } => {
+                                // Stop the tray focus timer
+                                if let Some(timer) = handle.try_state::<Arc<crate::focus_timer::FocusTimer>>() {
+                                    timer.stop(&handle).await;
+                                }
+
+                                let payload = events::AutoFocusPayload {
+                                    started_at: started_at.to_rfc3339(),
+                                    ended_at: ended_at.to_rfc3339(),
+                                    duration_mins: total_secs / 60,
+                                    dominant_app,
+                                    productive_ratio,
+                                };
+                                if let Err(e) = handle.emit(events::FOCUS_AUTO_DETECTED, payload) {
+                                    warn!("failed to emit auto-focus ended event: {e}");
+                                }
+                            }
+                        }
                     }
                 }
             }
@@ -310,6 +353,7 @@ fn wire_event_channels(core: &AppCore, channels: EventChannels, app_handle: &tau
                             bus::DomainEvent::MirrorTrialKilled { .. } => "mirror",
                             bus::DomainEvent::MirrorSnippetCreated { .. } => "mirror",
                             bus::DomainEvent::NoteEditingFinished { .. } => "notes",
+                            _ => "general",
                         };
                         let salience_str = match salience {
                             cognitive::types::SalienceVerdict::Extract => "extract",

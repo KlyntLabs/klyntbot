@@ -176,6 +176,7 @@ pub struct TaskDashboard {
     pub title: String,
     pub status: String,
     pub project_name: Option<String>,
+    pub due_date: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

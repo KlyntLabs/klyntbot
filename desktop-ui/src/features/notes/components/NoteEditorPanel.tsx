@@ -32,10 +32,16 @@ export function NoteEditorPanel({
   const editorFocusRef = useRef<() => void>();
   const titleSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Update last known title when note changes
-  if (lastTitleRef.current !== note.title && titleRef.current) {
-    lastTitleRef.current = note.title;
-  }
+  // Set title content on mount and when switching to a different note.
+  // Do NOT update on every note.title change — that resets the cursor during typing.
+  const prevNoteIdRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (prevNoteIdRef.current !== note.id && titleRef.current) {
+      prevNoteIdRef.current = note.id;
+      lastTitleRef.current = note.title;
+      titleRef.current.textContent = note.title;
+    }
+  }, [note.id, note.title]);
 
   // Cleanup debounce timer on unmount
   useEffect(() => {
@@ -108,9 +114,7 @@ export function NoteEditorPanel({
           onKeyDown={handleTitleKeyDown}
           data-placeholder="Untitled"
           className="text-4xl font-bold text-foreground outline-none min-h-[1.5em] empty:before:content-[attr(data-placeholder)] empty:before:text-muted-foreground/50"
-        >
-          {note.title}
-        </div>
+        />
 
         {/* Tags */}
         <div className="mt-2 flex items-center gap-2">

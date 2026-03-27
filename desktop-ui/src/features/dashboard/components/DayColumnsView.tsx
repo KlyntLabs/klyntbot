@@ -71,8 +71,7 @@ const COLUMNS: ColumnDef[] = [
     icon: "☑",
     color: "var(--timeline-todo)",
     flex: 1.8,
-    filter: (e) =>
-      e.entryType === "taskDue" || e.entryType === "taskCreated" || e.entryType === "taskCompleted",
+    filter: (e) => e.entryType === "taskDue",
   },
   {
     key: "transactions",
@@ -255,12 +254,15 @@ export function DayColumnsView({
     const scheduled: TimelineEntry[] = [];
     const tray: TimelineEntry[] = [];
     for (const entry of taskEntries) {
-      if (entry.entryType === "taskDue") {
-        const meta = entry.metadata as Record<string, unknown> | undefined;
-        if (meta?.scheduled === true) scheduled.push(entry);
-        else tray.push(entry);
+      const meta = entry.metadata as Record<string, unknown> | undefined;
+      if (meta?.scheduled === true) {
+        scheduled.push(entry);
       } else {
-        scheduled.push(entry); // taskCreated, taskCompleted
+        // Tasks with a specific due time (non-midnight) show on the timeline;
+        // date-only tasks (midnight) go to the drag-and-drop tray.
+        const dueMin = minutesSinceMidnight(entry.startedAt);
+        if (dueMin > 0) scheduled.push(entry);
+        else tray.push(entry);
       }
     }
     return { scheduledTaskEntries: scheduled, trayTaskEntries: tray };
@@ -459,41 +461,25 @@ export function DayColumnsView({
                       <div className="relative flex-1">
                         {scheduledTaskEntries.map((entry) => {
                           const meta = entry.metadata as Record<string, unknown> | undefined;
-                          const isScheduled = meta?.scheduled === true;
                           const taskId = (meta?.taskId as string) ?? entry.entityId ?? entry.id;
                           const startMin = minutesSinceMidnight(entry.startedAt);
                           const dur = entry.durationSecs ?? 0;
                           const endMin = dur > 0 ? startMin + dur / 60 : startMin + 30;
                           const isThisDragging = isDragging && timelineDrag?.taskId === taskId;
 
-                          if (isScheduled) {
-                            return (
-                              <DraggableTaskBlock
-                                key={entry.id}
-                                entry={entry}
-                                pxPerMin={pxPerMin}
-                                selected={selectedEntry?.id === entry.id}
-                                layout={layouts?.get(entry.id)}
-                                isDragging={isThisDragging}
-                                ghostTopMin={isThisDragging ? ghost?.topMin : undefined}
-                                ghostEndMin={isThisDragging ? ghost?.endMin : undefined}
-                                onMouseDownMove={(e) => startMove(e, taskId, startMin, endMin)}
-                                onMouseDownResize={(e) => startResize(e, taskId, startMin, endMin)}
-                                onClick={() => handleSelectEntry(entry)}
-                              />
-                            );
-                          }
-
-                          // taskCreated, taskCompleted — regular ColumnEntry
                           return (
-                            <ColumnEntry
+                            <DraggableTaskBlock
                               key={entry.id}
                               entry={entry}
-                              column={col}
                               pxPerMin={pxPerMin}
                               selected={selectedEntry?.id === entry.id}
-                              onClick={() => handleSelectEntry(entry)}
                               layout={layouts?.get(entry.id)}
+                              isDragging={isThisDragging}
+                              ghostTopMin={isThisDragging ? ghost?.topMin : undefined}
+                              ghostEndMin={isThisDragging ? ghost?.endMin : undefined}
+                              onMouseDownMove={(e) => startMove(e, taskId, startMin, endMin)}
+                              onMouseDownResize={(e) => startResize(e, taskId, startMin, endMin)}
+                              onClick={() => handleSelectEntry(entry)}
                             />
                           );
                         })}

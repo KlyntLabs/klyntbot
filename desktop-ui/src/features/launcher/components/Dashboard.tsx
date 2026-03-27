@@ -1,3 +1,4 @@
+import { formatTime } from "@shared/lib/dates";
 import { useLauncherStore } from "../stores/launcherStore";
 import type { DashboardData } from "../types";
 
@@ -149,6 +150,11 @@ function TasksWidget({
             <span className="text-[13px] text-foreground/85 truncate flex-1 group-hover:text-foreground transition-colors">
               {task.title}
             </span>
+            {task.dueDate && (
+              <span className="text-2xs text-muted-foreground tabular-nums shrink-0">
+                {formatTime(task.dueDate)}
+              </span>
+            )}
             {task.status === "doing" && (
               <span className="text-2xs text-brand/70 font-medium uppercase tracking-wide shrink-0">
                 Active

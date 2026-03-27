@@ -67,6 +67,7 @@ export interface TaskDashboard {
   title: string;
   status: string;
   projectName: string | null;
+  dueDate: string | null;
 }
 
 export interface ProductivityDashboard {
