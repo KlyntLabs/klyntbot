@@ -27,6 +27,12 @@ export interface GraphSettings {
   idleRotation: boolean;
   /** Show the viewport minimap */
   showMinimap: boolean;
+  /** Show community overlay layer */
+  layerCommunities: boolean;
+  /** Show extracted entity nodes */
+  layerEntities: boolean;
+  /** Show tree structure sub-nodes */
+  layerTree: boolean;
 }
 
 const DEFAULT_SETTINGS: GraphSettings = {
@@ -43,6 +49,9 @@ const DEFAULT_SETTINGS: GraphSettings = {
   clusteringMode: "notebook",
   idleRotation: true,
   showMinimap: true,
+  layerCommunities: false,
+  layerEntities: false,
+  layerTree: false,
 };
 
 const STORAGE_KEY = "klynt-graph-settings";
@@ -65,7 +74,14 @@ function saveSettings(settings: GraphSettings) {
   }
 }
 
-export function useGraphSettings() {
+interface UseGraphSettingsResult {
+  settings: GraphSettings;
+  setSettings: (partial: Partial<GraphSettings>) => void;
+  resetSettings: () => void;
+  defaults: GraphSettings;
+}
+
+export function useGraphSettings(): UseGraphSettingsResult {
   const [settings, setSettingsState] = useState<GraphSettings>(loadSettings);
 
   const setSettings = useCallback((partial: Partial<GraphSettings>) => {

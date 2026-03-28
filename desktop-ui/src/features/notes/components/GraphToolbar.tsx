@@ -1,5 +1,7 @@
-import { Brain, Search } from "lucide-react";
+import { Atom, Brain, Network, Search, TreePine } from "lucide-react";
 import type { SmartView } from "../hooks/useGraphData";
+
+type LayerKey = "communities" | "entities" | "tree";
 
 interface GraphToolbarProps {
   view: SmartView;
@@ -12,6 +14,8 @@ interface GraphToolbarProps {
   onClusteringModeChange: (mode: "notebook" | "semantic") => void;
   renderMode: "2d" | "3d";
   onRenderModeChange: (mode: "2d" | "3d") => void;
+  layerState: Record<LayerKey, boolean>;
+  onLayerToggle: (layer: LayerKey) => void;
 }
 
 const VIEW_OPTIONS: { value: SmartView; label: string }[] = [
@@ -27,6 +31,16 @@ const CLUSTERING_OPTIONS: { value: "notebook" | "semantic"; label: string }[] = 
   { value: "semantic", label: "Semantic" },
 ];
 
+const LAYER_OPTIONS: {
+  key: LayerKey;
+  label: string;
+  Icon: typeof Network;
+}[] = [
+  { key: "communities", label: "Communities", Icon: Network },
+  { key: "entities", label: "Entities", Icon: Atom },
+  { key: "tree", label: "Tree", Icon: TreePine },
+];
+
 export function GraphToolbar({
   view,
   onViewChange,
@@ -38,7 +52,14 @@ export function GraphToolbar({
   onClusteringModeChange,
   renderMode,
   onRenderModeChange,
+  layerState,
+  onLayerToggle,
 }: GraphToolbarProps) {
+  const handleSemanticClick = () => {
+    if (!layerState.communities) onLayerToggle("communities");
+    if (!layerState.entities) onLayerToggle("entities");
+    onClusteringModeChange("semantic");
+  };
   return (
     <div className="flex items-center gap-2 px-3 py-2 shrink-0">
       {/* Smart view pills */}
@@ -88,22 +109,48 @@ export function GraphToolbar({
           <button
             key={opt.value}
             type="button"
-            onClick={() => onClusteringModeChange(opt.value)}
+            onClick={
+              opt.value === "semantic"
+                ? handleSemanticClick
+                : () => onClusteringModeChange(opt.value)
+            }
             className={`px-2 py-1 text-xs rounded-md transition-all ${
               clusteringMode === opt.value
                 ? "bg-brand/20 text-brand font-medium shadow-sm"
                 : "text-muted-foreground hover:text-foreground hover:bg-accent"
-            } ${opt.value === "semantic" ? "opacity-50 cursor-not-allowed" : ""}`}
-            disabled={opt.value === "semantic"}
+            }`}
             title={
               opt.value === "semantic"
-                ? "Coming soon — requires semantic community detection"
+                ? "Switch to semantic clustering with communities and entities"
                 : undefined
             }
           >
             {opt.label}
           </button>
         ))}
+      </div>
+
+      {/* Layer toggles */}
+      <div className="flex items-center gap-1 text-xs text-muted-foreground">
+        <span>Layers:</span>
+        <div className="flex items-center gap-0.5 bg-card rounded-lg p-0.5">
+          {LAYER_OPTIONS.map(({ key, label, Icon }) => (
+            <button
+              key={key}
+              type="button"
+              onClick={() => onLayerToggle(key)}
+              className={`px-2 py-1 text-xs rounded-md transition-all flex items-center gap-1 ${
+                layerState[key]
+                  ? "bg-brand/20 text-brand font-medium shadow-sm"
+                  : "text-muted-foreground hover:text-foreground hover:bg-accent"
+              }`}
+              title={`Toggle ${label} layer`}
+            >
+              <Icon size={12} />
+              {label}
+            </button>
+          ))}
+        </div>
       </div>
 
       {/* Spacer */}

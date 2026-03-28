@@ -1,3 +1,4 @@
+use std::collections::VecDeque;
 use std::convert::Infallible;
 use std::sync::Arc;
 
@@ -154,6 +155,17 @@ pub(super) async fn insight_sse_handler(
     Sse::new(stream).keep_alive(KeepAlive::default())
 }
 
+/// State for the cognitive SSE stream unfold.
+///
+/// We carry a `pending` queue so that when a single domain event produces both
+/// a `cognitive:domain_event` and a `fabric_graph` SSE frame, we can yield
+/// them as two consecutive items without needing separate broadcast channels.
+struct CognitiveSseState {
+    domain_rx: Option<broadcast::Receiver<bus::DomainEvent>>,
+    pipeline_rx: Option<broadcast::Receiver<cognitive::PipelineEvent>>,
+    pending: VecDeque<Event>,
+}
+
 /// SSE endpoint — streams cognitive debug events (domain events + pipeline).
 ///
 /// The frontend (`DebugDashboard.tsx`) connects here in browser dev mode
@@ -175,144 +187,85 @@ pub(super) async fn cognitive_sse_handler(
         .as_ref()
         .map(|tx| tx.subscribe());
 
-    let stream = futures_util::stream::unfold(
-        (domain_rx, pipeline_rx),
-        |(mut domain_rx, mut pipeline_rx)| async move {
-            loop {
-                tokio::select! {
-                    // Domain events
-                    result = async {
-                        match domain_rx.as_mut() {
-                            Some(rx) => rx.recv().await.map_err(|e| matches!(e, broadcast::error::RecvError::Closed)),
-                            None => std::future::pending::<Result<bus::DomainEvent, bool>>().await,
-                        }
-                    } => {
-                        match result {
-                            Ok(event) => {
-                                let salience = cognitive::salience::evaluate_salience(&event);
-                                let domain = domain_for_event(&event);
-                                let salience_str = match salience {
-                                    cognitive::types::SalienceVerdict::Extract => "extract",
-                                    cognitive::types::SalienceVerdict::Accumulate => "accumulate",
-                                    cognitive::types::SalienceVerdict::Discard => "discard",
-                                };
-                                let payload = serde_json::json!({
-                                    "eventType": format!("{:?}", event).split('{').next().unwrap_or("Unknown").trim(),
-                                    "salience": salience_str,
-                                    "domain": domain,
-                                    "timestamp": chrono::Utc::now().to_rfc3339(),
-                                    "payload": serde_json::to_value(&event).unwrap_or_default(),
-                                });
-                                let data = serde_json::to_string(&payload).unwrap_or_default();
-                                let event = Event::default().event("cognitive:domain_event").data(data);
-                                return Some((Ok(event), (domain_rx, pipeline_rx)));
-                            }
-                            Err(true) => return None, // closed
-                            Err(false) => continue, // lagged
-                        }
-                    }
+    let init = CognitiveSseState {
+        domain_rx,
+        pipeline_rx,
+        pending: VecDeque::new(),
+    };
 
-                    // Pipeline events
-                    result = async {
-                        match pipeline_rx.as_mut() {
-                            Some(rx) => rx.recv().await.map_err(|e| matches!(e, broadcast::error::RecvError::Closed)),
-                            None => std::future::pending::<Result<cognitive::PipelineEvent, bool>>().await,
-                        }
-                    } => {
-                        match result {
-                            Ok(pe) => {
-                                let event_name = match &pe {
-                                    cognitive::PipelineEvent::Extraction { .. } => "cognitive:extraction",
-                                    cognitive::PipelineEvent::Consolidation { .. } => "cognitive:consolidation",
-                                    _ => "cognitive:other",
-                                };
-                                let data = serde_json::to_string(&pe).unwrap_or_default();
-                                let event = Event::default().event(event_name).data(data);
-                                return Some((Ok(event), (domain_rx, pipeline_rx)));
+    let stream = futures_util::stream::unfold(init, |mut st| async move {
+        // Drain any pending events queued from a previous iteration before
+        // blocking on the next broadcast message.
+        if let Some(event) = st.pending.pop_front() {
+            return Some((Ok(event), st));
+        }
+
+        loop {
+            tokio::select! {
+                // Domain events
+                result = async {
+                    match st.domain_rx.as_mut() {
+                        Some(rx) => rx.recv().await.map_err(|e| matches!(e, broadcast::error::RecvError::Closed)),
+                        None => std::future::pending::<Result<bus::DomainEvent, bool>>().await,
+                    }
+                } => {
+                    match result {
+                        Ok(event) => {
+                            let salience = cognitive::salience::evaluate_salience(&event);
+                            let salience_str = match salience {
+                                cognitive::types::SalienceVerdict::Extract => "extract",
+                                cognitive::types::SalienceVerdict::Accumulate => "accumulate",
+                                cognitive::types::SalienceVerdict::Discard => "discard",
+                            };
+                            let payload = serde_json::json!({
+                                "eventType": format!("{:?}", event).split('{').next().unwrap_or("Unknown").trim(),
+                                "salience": salience_str,
+                                "domain": event.domain(),
+                                "timestamp": chrono::Utc::now().to_rfc3339(),
+                                "payload": serde_json::to_value(&event).unwrap_or_default(),
+                            });
+                            let cog_data = serde_json::to_string(&payload).unwrap_or_default();
+                            let cog_event = Event::default().event("cognitive:domain_event").data(cog_data);
+
+                            if let Some(fe) = desktop_shared::commands::fabric::FabricGraphEvent::from_domain_event(&event) {
+                                let fabric_data = serde_json::to_string(&fe).unwrap_or_default();
+                                let fabric_event = Event::default().event("fabric_graph").data(fabric_data);
+                                st.pending.push_back(cog_event);
+                                return Some((Ok(fabric_event), st));
                             }
-                            Err(true) => return None,
-                            Err(false) => continue,
+
+                            return Some((Ok(cog_event), st));
                         }
+                        Err(true) => return None, // closed
+                        Err(false) => continue, // lagged
+                    }
+                }
+
+                // Pipeline events
+                result = async {
+                    match st.pipeline_rx.as_mut() {
+                        Some(rx) => rx.recv().await.map_err(|e| matches!(e, broadcast::error::RecvError::Closed)),
+                        None => std::future::pending::<Result<cognitive::PipelineEvent, bool>>().await,
+                    }
+                } => {
+                    match result {
+                        Ok(pe) => {
+                            let event_name = match &pe {
+                                cognitive::PipelineEvent::Extraction { .. } => "cognitive:extraction",
+                                cognitive::PipelineEvent::Consolidation { .. } => "cognitive:consolidation",
+                                _ => "cognitive:other",
+                            };
+                            let data = serde_json::to_string(&pe).unwrap_or_default();
+                            let event = Event::default().event(event_name).data(data);
+                            return Some((Ok(event), st));
+                        }
+                        Err(true) => return None,
+                        Err(false) => continue,
                     }
                 }
             }
-        },
-    );
+        }
+    });
 
     Sse::new(stream).keep_alive(KeepAlive::default())
-}
-
-/// Map a DomainEvent to its domain string.
-fn domain_for_event(event: &bus::DomainEvent) -> &'static str {
-    match event {
-        bus::DomainEvent::TaskCreated { .. }
-        | bus::DomainEvent::TaskCompleted { .. }
-        | bus::DomainEvent::TaskDeferred { .. }
-        | bus::DomainEvent::GoalProgress { .. }
-        | bus::DomainEvent::TaskDecomposed { .. }
-        | bus::DomainEvent::TaskExecutionStarted { .. }
-        | bus::DomainEvent::TaskExecutionCompleted { .. }
-        | bus::DomainEvent::TaskExecutionFailed { .. }
-        | bus::DomainEvent::TaskBlocked { .. }
-        | bus::DomainEvent::TaskUnblocked { .. }
-        | bus::DomainEvent::DayPlanGenerated { .. }
-        | bus::DomainEvent::ProactiveSuggestionCreated { .. }
-        | bus::DomainEvent::TaskFocusStarted { .. }
-        | bus::DomainEvent::TaskFocusEnded { .. }
-        | bus::DomainEvent::EstimationRecorded { .. }
-        | bus::DomainEvent::TaskExecutionProgress { .. }
-        | bus::DomainEvent::TaskStatusChanged { .. }
-        | bus::DomainEvent::TaskPriorityChanged { .. }
-        | bus::DomainEvent::TaskFieldUpdated { .. } => "work",
-        bus::DomainEvent::ActivitySessionCompleted { .. }
-        | bus::DomainEvent::FocusSessionStarted { .. }
-        | bus::DomainEvent::FocusSessionEnded { .. }
-        | bus::DomainEvent::DistractionDetected { .. }
-        | bus::DomainEvent::ProductivityScoreComputed { .. }
-        | bus::DomainEvent::SessionCreated { .. }
-        | bus::DomainEvent::SessionEnded { .. }
-        | bus::DomainEvent::QualityScored { .. }
-        | bus::DomainEvent::PredictiveAlert { .. }
-        | bus::DomainEvent::NarrativeGenerated { .. }
-        | bus::DomainEvent::RuleEvolved { .. }
-        | bus::DomainEvent::VoiceJournalProcessed { .. } => "energy",
-        bus::DomainEvent::TransactionRecorded { .. } | bus::DomainEvent::BudgetAlert { .. } => {
-            "finance"
-        }
-        bus::DomainEvent::UserStatedFact { .. } => "general",
-        bus::DomainEvent::UserCorrectedAI { .. } => "learning",
-        bus::DomainEvent::CoachingFeedback { .. } => "coaching",
-        bus::DomainEvent::ChatTurnCompleted { .. } => "general",
-        bus::DomainEvent::NoteCreated { .. }
-        | bus::DomainEvent::NoteUpdated { .. }
-        | bus::DomainEvent::NoteContentChanged { .. }
-        | bus::DomainEvent::NoteDeleted { .. } => "notes",
-        bus::DomainEvent::TaskHierarchyChanged { .. } => "work",
-        bus::DomainEvent::ToolCallExecuted { .. } => "general",
-        bus::DomainEvent::BehavioralPatternDetected { .. } => "learning",
-        bus::DomainEvent::ContradictionDetected { .. } => "learning",
-        bus::DomainEvent::AutotunerDecision { .. } => "learning",
-        bus::DomainEvent::KnowledgeAtomCreated { .. }
-        | bus::DomainEvent::KnowledgeAtomAccepted { .. }
-        | bus::DomainEvent::KnowledgeAtomArchived { .. }
-        | bus::DomainEvent::AtomFlashcardReviewed { .. }
-        | bus::DomainEvent::AtomReinforced { .. }
-        | bus::DomainEvent::AtomInteracted { .. }
-        | bus::DomainEvent::RetentionMilestoneReached { .. }
-        | bus::DomainEvent::TranslationCompleted { .. }
-        | bus::DomainEvent::NoteStudied { .. }
-        | bus::DomainEvent::PracticeUnitCompleted { .. }
-        | bus::DomainEvent::PracticeSessionCompleted { .. }
-        | bus::DomainEvent::KnowledgeTransferDetected { .. }
-        | bus::DomainEvent::CoachingLearningDigest { .. }
-        | bus::DomainEvent::FlashcardSessionCompleted { .. } => "learning",
-        bus::DomainEvent::InterventionTriggered { .. } => "productivity",
-        bus::DomainEvent::MemoryPendingConfirmation { .. } => "memory",
-        bus::DomainEvent::SkillRouted { .. } => "agent",
-        bus::DomainEvent::TrialActivated { .. } => "autotuner",
-        bus::DomainEvent::MirrorTrialKilled { .. } => "mirror",
-        bus::DomainEvent::MirrorSnippetCreated { .. } => "mirror",
-        bus::DomainEvent::NoteEditingFinished { .. } => "notes",
-        _ => "general",
-    }
 }

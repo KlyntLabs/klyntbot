@@ -205,7 +205,7 @@ JSON-RPC over stdin/stdout (rmcp)
 
 **MessageBus** (`tokio::mpsc`, single-consumer): Inbound messages (channels → AgentLoop) and outbound messages (AgentLoop → ChannelManager). Receivers taken once via `take_inbound_rx()` / `take_outbound_rx()`.
 
-**ContextUpdateQueue** (`Mutex<Vec>`, drain-based): Producers push live context updates (e.g., memory promotions). `LiveContextRefresher` drains at each ReAct iteration boundary. 30s dedup window.
+**ContextUpdateQueue** (`Mutex<Vec>`, drain-based): Producers push live context updates (memory promotions, note structure changes, community updates). `LiveContextRefresher` drains at each ReAct iteration boundary. 30s dedup window.
 
 **LearningEventBus** (`tokio::broadcast`, fan-out): Carries `LearningEvent::AnalysisCompleted` from the learning background analysis loop. Consumer: adaptive confidence threshold adjuster in `feature-learning`.
 
@@ -214,13 +214,15 @@ JSON-RPC over stdin/stdout (rmcp)
 | Producer | Events Published |
 |----------|-----------------|
 | `AgentLoop` | `ChatTurnCompleted`, `UserCorrectedAI` |
-| `AppCore` (chat handler) | `ChatTurnCompleted` (Desktop UI and MCP paths via `chat_send()`) |
+| `AppCore` (chat handler) | `ChatTurnCompleted`, `SquadDebateCompleted`, `SquadInteractionPattern` (Desktop UI and MCP paths via `chat_send()`) |
 | `AgentRuntime` | `SkillRouted` |
 | `TaskTool` | `TaskCreated`, `TaskCompleted`, `TaskUpdated`, `TaskDeleted` |
 | `FinanceTool` | `TransactionRecorded`, `BudgetAlert` |
 | `FocusManager` | `FocusSessionStarted`, `FocusSessionEnded` |
 | `ProductivityEngine` | `ProductivityScoreComputed`, `ActivitySessionCompleted` |
 | `BackgroundConsolidation` | (direct) `ContextUpdateQueue::push(MemoryPromoted)` on memory promotion |
+| `NoteTreeBuilder` | `NoteContentChanged` (re-emitted after tree rebuild) + (direct) `ContextUpdateQueue::push(NoteStructureChanged)` |
+| `CommunityBuilder` | `CommunityDiscovered`, `CommunityUpdated`, `CommunityWeakened` + (direct) `ContextUpdateQueue::push(CommunityUpdated)` |
 | `MirrorFacade` | `MirrorTrialKilled` |
 | `AutoTuner` | `AutotunerDecision`, `TrialActivated` |
 
@@ -230,12 +232,14 @@ JSON-RPC over stdin/stdout (rmcp)
 |----------|----------------|--------|
 | `BackgroundConsolidationService` | All events | Salience → Extract/Accumulate → Memory writes |
 | `ActivityLogSubscriber` | All events | Normalize → Activity ingestion |
+| `NoteTreeBuilder` | `NoteContentChanged` | Parse tree → embed nodes → link entities → push ContextUpdateQueue |
+| `CommunityBuilder` | `NoteContentChanged` (after NoteTreeBuilder) | Louvain detection → community upsert → emit community events → push ContextUpdateQueue |
 | `RoutingMirrorSubscriber` | `SkillRouted` | Hourly snapshots, drift detection |
 | `MetaRuleDetector` | `UserCorrectedAI`, `SkillRouted` | Correction streak → meta-rule proposals |
 | `ConfigArchiver` | `AutotunerDecision` | Brain version archival |
 | `TrialPreviewSubscriber` | `TrialActivated` | 4h early evaluation timer |
 | Tauri event relay | All forwarded events | `tauri::emit()` to frontend |
-| Dev SSE relay | All forwarded events | `broadcast::Sender` → SSE stream |
+| Dev SSE relay | All forwarded events (incl. `CommunityDiscovered/Updated/Weakened` → `FabricGraphEvent`) | `broadcast::Sender` → SSE stream |
 
 ### Key Event Chains
 
@@ -266,6 +270,31 @@ UserCorrectedAI
   → (if ≥3 cross-session or ≥2 same-session corrections)
   → MetaRule written with status="pending"
   → NarrativeSnippet for user visibility
+```
+
+**Note Edit → Tree Index → Community Detection:**
+```
+NoteContentChanged
+  → NoteTreeBuilder:
+      parse tree → delete old nodes → insert new nodes
+      → embed each node → tree_node_embeddings (LanceDB)
+      → link entities → entity_tree_links
+      → ContextUpdateQueue::push(NoteStructureChanged)
+  → CommunityBuilder (debounce 5s):
+      build weighted graph from entity_tree_links
+      → Louvain algorithm → community assignments
+      → diff against previous → upsert communities + members
+      → embed community summaries → community_embeddings (LanceDB)
+      → emit CommunityDiscovered | CommunityUpdated | CommunityWeakened
+      → ContextUpdateQueue::push(CommunityUpdated)
+```
+
+**Squad Debate → Learning:**
+```
+SquadDebateCompleted
+  → BackgroundConsolidation (salience: Extract)
+  → AccuracyOutcome persisted → FSRS-5 stability update
+  → Coaching: budget warnings, persona promotion suggestions
 ```
 
 **Autotuner Promotion → Brain Version:**
@@ -352,8 +381,9 @@ Job triggers:
 | Job | Schedule | Action |
 |-----|----------|--------|
 | Proactive scan | Every N minutes (config) | Analyze overdue/stale tasks → `ProactiveSuggestion` |
-| Mirror weekly narrative | Sunday 10am UTC | LLM narrative generation |
+| Mirror weekly narrative | Sunday 10am UTC | LLM narrative generation (includes Community Evolution section) |
 | Mirror cleanup | Sunday 4am UTC | Delete mirror data > 90 days |
+| Blackboard cleanup | Sunday 4am UTC | Delete blackboard entries older than 30 days |
 
 ## Data Persistence Flows
 

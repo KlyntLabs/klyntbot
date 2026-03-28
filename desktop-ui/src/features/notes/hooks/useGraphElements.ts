@@ -1,6 +1,13 @@
 import type { Notebook } from "@shared/types";
+import type {
+  FabricCommunity,
+  FabricEntity,
+  FabricEntityEdge,
+  FabricTreeNode,
+} from "@shared/types/fabric";
 import { useMemo } from "react";
 import { computeFingerprint } from "../lib/graphFingerprint";
+import { resolveLinkEndpointId } from "../lib/graphUtils";
 import type { GraphLink, GraphNode } from "./useGraphData";
 
 const CLUSTER_PALETTE = [
@@ -25,6 +32,8 @@ export interface ClusterInfo {
   count: number;
 }
 
+export type ForceNodeType = "note" | "community_label" | "entity" | "tree_section" | "tree_text";
+
 export interface ForceNode {
   id: string;
   label: string;
@@ -35,6 +44,9 @@ export interface ForceNode {
   bodyPreview: string;
   notebookId: string | null;
   clusterId: string;
+  nodeType: ForceNodeType;
+  expandable?: boolean;
+  expanded?: boolean;
   x?: number;
   y?: number;
   z?: number;
@@ -63,12 +75,22 @@ function getNodeSize(linkCount: number): number {
   return 18 + normalized * 28;
 }
 
+export interface FabricData {
+  communities: FabricCommunity[];
+  entities: FabricEntity[];
+  entityEdges: FabricEntityEdge[];
+  expandedTrees: Map<string, FabricTreeNode[]>;
+  layerCommunities: boolean;
+  layerEntities: boolean;
+  layerTree: boolean;
+}
+
 interface UseGraphElementsParams {
   nodes: GraphNode[];
   links: GraphLink[];
   notebooks: Notebook[];
   clusteringMode: "notebook" | "semantic";
-  activeNoteId: string | null;
+  fabricData?: FabricData;
 }
 
 export function useGraphElements({
@@ -76,13 +98,23 @@ export function useGraphElements({
   links,
   notebooks,
   clusteringMode,
-  activeNoteId: _activeNoteId,
+  fabricData,
 }: UseGraphElementsParams): GraphElements {
-  // biome-ignore lint/correctness/useExhaustiveDependencies: clusteringMode triggers recompute when semantic clustering is added
   return useMemo(() => {
     const clusterMap = new Map<string, ClusterInfo>();
     const notebookMap = new Map<string, Notebook>();
     for (const nb of notebooks) notebookMap.set(nb.id, nb);
+
+    // Build community lookup when communities layer is active
+    const communityByNoteId = new Map<string, FabricCommunity>();
+    const useCommunities = clusteringMode === "semantic" && fabricData?.layerCommunities;
+    if (useCommunities && fabricData?.communities) {
+      for (const c of fabricData.communities) {
+        for (const noteId of c.memberNoteIds) {
+          communityByNoteId.set(noteId, c);
+        }
+      }
+    }
 
     let colorIndex = 0;
     const getClusterColor = (id: string, notebook?: Notebook): string => {
@@ -95,10 +127,8 @@ export function useGraphElements({
     const nodeClusterMap = new Map<string, string>();
     const hasLinks = new Set<string>();
     for (const link of links) {
-      const sourceId = typeof link.source === "string" ? link.source : link.source.id;
-      const targetId = typeof link.target === "string" ? link.target : link.target.id;
-      hasLinks.add(sourceId);
-      hasLinks.add(targetId);
+      hasLinks.add(resolveLinkEndpointId(link.source));
+      hasLinks.add(resolveLinkEndpointId(link.target));
     }
 
     // Use node.cluster from useGraphData when present (by-tag / by-notebook views),
@@ -106,7 +136,16 @@ export function useGraphElements({
     const hasExplicitClusters = nodes.some((n) => n.cluster != null);
 
     for (const node of nodes) {
-      if (hasExplicitClusters && node.cluster != null) {
+      if (useCommunities) {
+        const community = communityByNoteId.get(node.id);
+        if (community) {
+          nodeClusterMap.set(node.id, `community:${community.id}`);
+        } else if (hasLinks.has(node.id)) {
+          nodeClusterMap.set(node.id, "_floating");
+        } else {
+          nodeClusterMap.set(node.id, "_isolated");
+        }
+      } else if (hasExplicitClusters && node.cluster != null) {
         nodeClusterMap.set(node.id, node.cluster);
       } else if (node.notebookId) {
         nodeClusterMap.set(node.id, `nb:${node.notebookId}`);
@@ -131,6 +170,11 @@ export function useGraphElements({
       } else if (clusterId === "_isolated") {
         label = "Isolated Notes";
         color = "#6B7280";
+      } else if (clusterId.startsWith("community:")) {
+        const communityId = clusterId.replace("community:", "");
+        const community = fabricData?.communities.find((c) => c.id === communityId);
+        label = community?.name || "Unknown Community";
+        color = community?.color || getClusterColor(clusterId);
       } else if (clusterId.startsWith("nb:")) {
         const nbId = clusterId.replace("nb:", "");
         const nb = notebookMap.get(nbId);
@@ -158,6 +202,8 @@ export function useGraphElements({
       const color = cluster?.color || "#6B7280";
       const size = getNodeSize(node.linkCount);
 
+      const isExpanded = fabricData?.expandedTrees.has(node.id) ?? false;
+
       forceNodes.push({
         id: node.id,
         label: node.title,
@@ -168,13 +214,109 @@ export function useGraphElements({
         bodyPreview: node.bodyPreview,
         notebookId: node.notebookId,
         clusterId,
+        nodeType: "note",
+        expandable: fabricData?.layerTree ?? false,
+        expanded: isExpanded,
       });
+    }
+
+    // ── Community label nodes ────────────────────────────────────────
+    if (useCommunities && fabricData?.communities) {
+      for (const community of fabricData.communities) {
+        if (community.memberCount === 0) continue;
+        const clusterId = `community:${community.id}`;
+        const communityColor = clusterMap.get(clusterId)?.color || community.color || "#6B7280";
+        forceNodes.push({
+          id: `community_label:${community.id}`,
+          label: `${community.name} (${community.memberCount})`,
+          color: communityColor,
+          size: 0, // size not used for community labels
+          linkCount: community.memberCount,
+          tags: [],
+          bodyPreview: "",
+          notebookId: null,
+          clusterId,
+          nodeType: "community_label",
+        });
+      }
+    }
+
+    // ── Entity nodes ──────────────────────────────────────────────────
+    const entityLinks: ForceLink[] = [];
+    if (fabricData?.layerEntities && fabricData.entities.length > 0) {
+      const noteIdSet = new Set(forceNodes.map((n) => n.id));
+      for (const entity of fabricData.entities) {
+        forceNodes.push({
+          id: `entity:${entity.id}`,
+          label: entity.name,
+          color: "#f59e0b",
+          size: 12 + Math.min(entity.mentionCount, 10) * 2,
+          linkCount: entity.mentionCount,
+          tags: [entity.entityType],
+          bodyPreview: `${entity.entityType} — ${entity.mentionCount} mentions`,
+          notebookId: null,
+          clusterId: "_entities",
+          nodeType: "entity",
+        });
+      }
+      // Add _entities cluster
+      clusterMap.set("_entities", {
+        id: "_entities",
+        label: "Entities",
+        color: "#f59e0b",
+        count: fabricData.entities.length,
+      });
+      // Entity-to-note links
+      for (const edge of fabricData.entityEdges) {
+        if (noteIdSet.has(edge.noteId)) {
+          entityLinks.push({
+            source: `entity:${edge.entityId}`,
+            target: edge.noteId,
+            weight: edge.weight,
+            color: "#f59e0b40",
+          });
+        }
+      }
+    }
+
+    // ── Tree sub-nodes ───────────────────────────────────────────────
+    const treeLinks: ForceLink[] = [];
+    if (fabricData?.layerTree && fabricData.expandedTrees.size > 0) {
+      for (const [noteId, treeNodes] of fabricData.expandedTrees) {
+        const parentNode = forceNodes.find((n) => n.id === noteId);
+        const parentColor = parentNode?.color || "#6B7280";
+        for (const tn of treeNodes) {
+          const treeNodeId = `tree:${noteId}:${tn.id}`;
+          const treeNodeType: ForceNodeType =
+            tn.nodeType === "section" ? "tree_section" : "tree_text";
+          forceNodes.push({
+            id: treeNodeId,
+            label: tn.title || tn.contentPreview.slice(0, 40),
+            color: `${parentColor}80`,
+            size: treeNodeType === "tree_section" ? 14 : 10,
+            linkCount: 0,
+            tags: [],
+            bodyPreview: tn.contentPreview,
+            notebookId: null,
+            clusterId: parentNode?.clusterId || "_floating",
+            nodeType: treeNodeType,
+          });
+          // Link tree node to its parent (note or parent tree node)
+          const linkTarget = tn.parentId == null ? noteId : `tree:${noteId}:${tn.parentId}`;
+          treeLinks.push({
+            source: treeNodeId,
+            target: linkTarget,
+            weight: 0.5,
+            color: `${parentColor}40`,
+          });
+        }
+      }
     }
 
     const edgeCounts = new Map<string, number>();
     for (const link of links) {
-      const sourceId = typeof link.source === "string" ? link.source : link.source.id;
-      const targetId = typeof link.target === "string" ? link.target : link.target.id;
+      const sourceId = resolveLinkEndpointId(link.source);
+      const targetId = resolveLinkEndpointId(link.target);
       const key = [sourceId, targetId].sort().join(":");
       edgeCounts.set(key, (edgeCounts.get(key) || 0) + 1);
     }
@@ -182,8 +324,8 @@ export function useGraphElements({
     const forceLinks: ForceLink[] = [];
     const seenEdges = new Set<string>();
     for (const link of links) {
-      const sourceId = typeof link.source === "string" ? link.source : link.source.id;
-      const targetId = typeof link.target === "string" ? link.target : link.target.id;
+      const sourceId = resolveLinkEndpointId(link.source);
+      const targetId = resolveLinkEndpointId(link.target);
       const key = [sourceId, targetId].sort().join(":");
       if (seenEdges.has(key)) continue;
       seenEdges.add(key);
@@ -196,12 +338,15 @@ export function useGraphElements({
       forceLinks.push({ source: sourceId, target: targetId, weight, color: sourceColor });
     }
 
+    // Merge entity + tree links into the final link set
+    const allForceLinks = [...forceLinks, ...entityLinks, ...treeLinks];
+
     const clusters = Array.from(clusterMap.values()).filter((c) => c.count > 0);
 
-    const nodeIdList = nodes.map((n) => n.id);
-    const edgePairList: [string, string][] = forceLinks.map((l) => [l.source, l.target]);
+    const nodeIdList = forceNodes.map((n) => n.id);
+    const edgePairList: [string, string][] = allForceLinks.map((l) => [l.source, l.target]);
     const fingerprint = computeFingerprint(nodeIdList, edgePairList);
 
-    return { nodes: forceNodes, links: forceLinks, clusters, fingerprint };
-  }, [nodes, links, notebooks, clusteringMode]);
+    return { nodes: forceNodes, links: allForceLinks, clusters, fingerprint };
+  }, [nodes, links, notebooks, clusteringMode, fabricData]);
 }

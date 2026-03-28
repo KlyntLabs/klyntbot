@@ -379,19 +379,28 @@ evaluate_salience(event)
 | **Accumulate** (buffer) | Routine productivity events, standard task/finance/note operations |
 | **Discard** | Session created, rule evolved, low-value events |
 
-### Relevance Scoring (6-Factor Formula)
+### Relevance Scoring (10-Factor Formula)
+
+Evolved from 6-factor (base) → 8-factor (Phase 1: hierarchy + path_coherence) → 10-factor (Phase 2: community + cross_note):
 
 ```
-relevance = w_semantic * semantic_similarity
-          + w_retrievability * retrievability(elapsed_days, stability)
-          + w_importance * importance
-          + w_frequency * frequency_score
-          + w_situation * situational_boost
-          + w_temporal * temporal_recency
-
-Default weights: semantic=0.30, retrievability=0.20, importance=0.15,
-                 frequency=0.10, situation=0.25, temporal=0.05
+relevance = w_semantic       * semantic_similarity           // 0.20
+          + w_retrievability * retrievability(elapsed, stab)  // 0.10
+          + w_importance     * importance                     // 0.08
+          + w_frequency      * frequency_score                // 0.05
+          + w_situation      * situational_boost               // 0.15
+          + w_temporal       * temporal_recency                // 0.02
+          + w_hierarchy      * hierarchy_score                 // 0.10 (Phase 1)
+          + w_path_coherence * path_coherence                  // 0.05 (Phase 1)
+          + w_community      * community_membership            // 0.15 (Phase 2)
+          + w_cross_note     * cross_note_boost                // 0.10 (Phase 2)
 ```
+
+**Phase 1 factors:** `hierarchy_score` biases retrieval toward the correct tree depth (roots for summaries, leaves for details). `path_coherence` rewards nodes whose siblings also scored well.
+
+**Phase 2 factors:** `community_membership` is `membership_score × community_stability` for tree nodes in matched communities. `cross_note_boost` is `log2(source_note_count)` clamped [0, 1] — communities spanning 4+ notes get maximum boost.
+
+**Backward compatibility:** For non-note results (cognitive facts, conversation recall), hierarchy/path_coherence/community/cross_note factors are neutral (0 or 0.5), degrading to original 6-factor behavior.
 
 ### FSRS-5 Spaced Repetition
 
@@ -436,7 +445,9 @@ DomainEventBus
 
 ## Autotuner (Self-Optimization)
 
-### 19 Tunable Parameters
+### 28 Tunable Parameters
+
+Expanded from 19D (base) → 24D (Phase 1) → 28D (Phase 2):
 
 | Category | Parameters |
 |----------|-----------|
@@ -445,6 +456,8 @@ DomainEventBus
 | Memory retrieval | `relevance_weight_semantic/retrievability/situation/importance/frequency/temporal`, `vector_top_k`, `min_similarity` |
 | FSRS | `fsrs_desired_retention`, `accumulate_promote_threshold`, `accumulate_min_days` |
 | Query rewriting | `rewrite_confidence_threshold`, `rewrite_max_signals`, `rewrite_min_enrichment_length` |
+| Hierarchical notes (Phase 1) | `w_hierarchy`, `w_path_coherence`, `tree_top_k`, `tree_min_similarity`, `hybrid_bias` |
+| Community graph (Phase 2) | `w_community`, `w_cross_note`, `community_top_k`, `community_min_similarity` |
 
 ### Shadow Experiment Flow
 
@@ -536,12 +549,12 @@ The `feature-insights` crate generates multi-tab LLM-powered reviews of notes, d
 
 **InsightService output (5 tabs):**
 - `synthesis` — unified summary
-- `gap_analysis` — knowledge gaps identified
+- `gap_analysis` — knowledge gaps identified (Phase 2: community-level gap detection across notebooks)
 - `self_assessment` — understanding evaluation
 - `concept_map` — key concept relationships
-- `perspectives` — alternative viewpoints
+- `perspectives` — alternative viewpoints (generated via unified debate engine)
 
-**Features:** Versioned insights with evolution timeline, smart merge deduplication, scope resolution (note → notebook → project), persona/squad-based generation, streaming SSE during generation (via `/api/insight/events` endpoint), progress tracking.
+**Features:** Versioned insights with evolution timeline, smart merge deduplication, scope resolution (note → notebook → project), persona/squad-based generation via `run_debate()` (unified debate engine), streaming SSE during generation (via `/api/insight/events` endpoint), progress tracking, debate transcript storage.
 
 ## Distraction Detection Pipeline
 

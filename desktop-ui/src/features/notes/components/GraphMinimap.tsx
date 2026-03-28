@@ -2,6 +2,7 @@ import { Map as MapIcon } from "lucide-react";
 import { useCallback, useEffect, useRef } from "react";
 import type { ViewportBounds } from "../hooks/useForceGraph";
 import type { ForceLink, ForceNode } from "../hooks/useGraphElements";
+import { hexToRgba } from "../lib/graphUtils";
 
 // ── Constants ────────────────────────────────────────────────────────────
 
@@ -20,15 +21,6 @@ interface GraphMinimapProps {
   visible: boolean;
   onToggle: () => void;
   onNavigate: (graphX: number, graphY: number) => void;
-}
-
-// ── Helpers ──────────────────────────────────────────────────────────────
-
-function hexToRgba(hex: string, alpha: number): string {
-  const r = Number.parseInt(hex.slice(1, 3), 16);
-  const g = Number.parseInt(hex.slice(3, 5), 16);
-  const b = Number.parseInt(hex.slice(5, 7), 16);
-  return `rgba(${r},${g},${b},${alpha})`;
 }
 
 function computeGraphBounds(nodes: ForceNode[]): {
@@ -185,7 +177,7 @@ export function GraphMinimap({
       const mx = e.clientX - rect.left;
       const my = e.clientY - rect.top;
 
-      const bounds = graphBoundsRef.current;
+      const bounds = computeGraphBounds(nodesRef.current);
       const graphW = bounds.maxX - bounds.minX || 1;
       const graphH = bounds.maxY - bounds.minY || 1;
       const drawW = CANVAS_WIDTH - PADDING * 2;

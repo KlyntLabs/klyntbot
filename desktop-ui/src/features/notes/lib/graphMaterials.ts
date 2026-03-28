@@ -1,4 +1,13 @@
-import { Color, LineBasicMaterial, MeshStandardMaterial, SphereGeometry } from "three";
+import {
+  CanvasTexture,
+  Color,
+  LineBasicMaterial,
+  MeshStandardMaterial,
+  OctahedronGeometry,
+  SphereGeometry,
+  Sprite,
+  SpriteMaterial,
+} from "three";
 
 export function createNodeMaterial(
   hexColor: string,
@@ -28,4 +37,98 @@ export function createLinkMaterial(hexColor: string, opacity: number): LineBasic
     transparent: true,
     opacity: Math.min(opacity, 1),
   });
+}
+
+/** Entity nodes — amber/gold diamond shape. */
+export function createEntityMaterial(color: string): MeshStandardMaterial {
+  const nodeColor = new Color(color);
+  const emissive = new Color("#f59e0b");
+  return new MeshStandardMaterial({
+    color: nodeColor,
+    emissive,
+    emissiveIntensity: 0.6,
+    transparent: true,
+    opacity: 0.9,
+    roughness: 0.3,
+    metalness: 0.3,
+  });
+}
+
+/** OctahedronGeometry for entity nodes. Radius scales from 4–8 with linkCount. */
+export function createEntityGeometry(linkCount: number): OctahedronGeometry {
+  const normalized = Math.min(linkCount, 20) / 20;
+  const radius = 4 + normalized * 4;
+  return new OctahedronGeometry(radius);
+}
+
+/** Tree section / tree text nodes — semi-transparent sphere in the parent note colour. */
+export function createTreeMaterial(color: string, opacity: number): MeshStandardMaterial {
+  const nodeColor = new Color(color);
+  return new MeshStandardMaterial({
+    color: nodeColor,
+    emissive: nodeColor,
+    emissiveIntensity: 0.2,
+    transparent: true,
+    opacity: Math.max(0, Math.min(1, opacity)),
+    roughness: 0.5,
+    metalness: 0.0,
+  });
+}
+
+/** Community label — a billboard Sprite rendered from a Canvas. */
+export function createLabelSprite(text: string, color: string): Sprite {
+  const canvas = document.createElement("canvas");
+  const ctx = canvas.getContext("2d");
+  if (!ctx) {
+    // Fallback: return an empty sprite
+    return new Sprite(new SpriteMaterial({ transparent: true, opacity: 0 }));
+  }
+
+  const fontSize = 18;
+  const padding = 12;
+
+  ctx.font = `bold ${fontSize}px Inter, system-ui, sans-serif`;
+  const measured = ctx.measureText(text);
+  const textWidth = measured.width;
+
+  canvas.width = textWidth + padding * 2;
+  canvas.height = fontSize + padding * 2;
+
+  // Re-apply font after resize (canvas reset clears it)
+  ctx.font = `bold ${fontSize}px Inter, system-ui, sans-serif`;
+  ctx.textBaseline = "middle";
+
+  // Background pill
+  const bgColor = `${color}33`; // 20% opacity
+  ctx.fillStyle = bgColor;
+  const r = (canvas.height / 2) * 0.9;
+  ctx.beginPath();
+  ctx.roundRect(0, 0, canvas.width, canvas.height, r);
+  ctx.fill();
+
+  // Border
+  ctx.strokeStyle = `${color}99`;
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  ctx.roundRect(0, 0, canvas.width, canvas.height, r);
+  ctx.stroke();
+
+  // Text
+  ctx.fillStyle = color;
+  ctx.fillText(text, padding, canvas.height / 2);
+
+  const texture = new CanvasTexture(canvas);
+  const material = new SpriteMaterial({
+    map: texture,
+    transparent: true,
+    opacity: 0.92,
+    depthWrite: false,
+  });
+
+  const sprite = new Sprite(material);
+  // Scale sprite proportionally — canvas aspect determines width vs height
+  const aspect = canvas.width / canvas.height;
+  sprite.scale.set(aspect * 20, 20, 1);
+
+  return sprite;
 }

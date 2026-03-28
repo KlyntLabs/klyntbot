@@ -1,23 +1,44 @@
 import { useClickOutside } from "@shared/hooks/useClickOutside";
-import type { Note, Notebook } from "@shared/types";
+import type { FabricLayer, Note, Notebook } from "@shared/types";
 import { Maximize2, Minus, Plus, RotateCcw, Settings2 } from "lucide-react";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import ForceGraph2D from "react-force-graph-2d";
-import type { ViewportBounds } from "../hooks/useForceGraph";
+import { useFabricGraph } from "../hooks/useFabricGraph";
+import type { DragCommunityChange, ViewportBounds } from "../hooks/useForceGraph";
 import { useForceGraph } from "../hooks/useForceGraph";
 import type { SmartView } from "../hooks/useGraphData";
 import { useGraphData } from "../hooks/useGraphData";
+import type { FabricData, ForceNode } from "../hooks/useGraphElements";
 import { useGraphElements } from "../hooks/useGraphElements";
 import { useGraphPositionCache } from "../hooks/useGraphPositionCache";
 import { useGraphSettings } from "../hooks/useGraphSettings";
 import { useWaveReveal } from "../hooks/useWaveReveal";
 import { selectHub } from "../lib/graphBfs";
+import { resolveLinkEndpointId } from "../lib/graphUtils";
+import { BatchActionBar, FabricPulseBadge } from "./FabricPulseBadge";
 import { GraphBrainView } from "./GraphBrainView";
+import type { ContextMenuAction } from "./GraphContextMenu";
+import { GraphContextMenu } from "./GraphContextMenu";
 import { GraphLegend } from "./GraphLegend";
 import { GraphMinimap } from "./GraphMinimap";
 import { GraphNodeTooltip } from "./GraphNodeTooltip";
 import { GraphSettingsPopover } from "./GraphSettingsPopover";
 import { GraphToolbar } from "./GraphToolbar";
+import { QuickBridgePopover } from "./QuickBridgePopover";
+
+/** Extract first 2-3 markdown headings from a body preview string. */
+function extractHeadings(bodyPreview: string): string[] {
+  if (!bodyPreview) return [];
+  const headings: string[] = [];
+  for (const line of bodyPreview.split("\n")) {
+    const match = line.match(/^#{1,3}\s+(.+)/);
+    if (match) {
+      headings.push(match[1].trim());
+      if (headings.length >= 3) break;
+    }
+  }
+  return headings;
+}
 
 interface GraphViewProps {
   notes: Note[];
@@ -26,6 +47,13 @@ interface GraphViewProps {
   onSelectNote: (id: string) => void;
   onOpenInEditor?: (id: string) => void;
 }
+
+const LAYER_SETTINGS_KEY: Record<FabricLayer, "layerCommunities" | "layerEntities" | "layerTree"> =
+  {
+    communities: "layerCommunities",
+    entities: "layerEntities",
+    tree: "layerTree",
+  };
 
 export function GraphView({
   notes,
@@ -49,12 +77,68 @@ export function GraphView({
     height: 100,
   });
 
+  // ── Context menu state ──────────────────────────────────────────────
+  const [contextMenu, setContextMenu] = useState<{
+    node: ForceNode;
+    position: { x: number; y: number };
+  } | null>(null);
+
+  // ── Quick bridge state ────────────────────────────────────────────
+  const [bridgeState, setBridgeState] = useState<{
+    sourceName: string;
+    targetName: string;
+  } | null>(null);
+
+  // ── Drag-to-merge toast ───────────────────────────────────────────
+  const [dragMergeToast, setDragMergeToast] = useState<DragCommunityChange | null>(null);
+  const dragMergeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Clean up pending drag-merge timer on unmount
+  useEffect(() => {
+    return () => {
+      if (dragMergeTimerRef.current) clearTimeout(dragMergeTimerRef.current);
+    };
+  }, []);
+
+  // ── Multi-select state ────────────────────────────────────────────
+  const [selectedNodeIds, setSelectedNodeIds] = useState<Set<string>>(new Set());
+
   // Settings popover
   const [settingsOpen, setSettingsOpen] = useState(false);
   const settingsRef = useRef<HTMLDivElement>(null);
   useClickOutside(settingsRef, () => setSettingsOpen(false), settingsOpen);
 
   const { settings, setSettings, resetSettings, defaults } = useGraphSettings();
+
+  // ── Fabric graph ──────────────────────────────────────────────────
+  const anyLayerEnabled = settings.layerCommunities || settings.layerEntities || settings.layerTree;
+  const fabric = useFabricGraph(anyLayerEnabled);
+
+  const handleLayerToggle = useCallback(
+    (layer: FabricLayer) => {
+      const settingsKey = LAYER_SETTINGS_KEY[layer];
+      const currentlyEnabled = settings[settingsKey];
+      setSettings({ [settingsKey]: !currentlyEnabled });
+
+      // When enabling the entities layer, fetch entity data
+      if (!currentlyEnabled && layer === "entities") {
+        fabric.expandLayer("entities");
+      }
+    },
+    [settings, setSettings, fabric],
+  );
+
+  const fabricData: FabricData | undefined = anyLayerEnabled
+    ? {
+        communities: fabric.base?.communities ?? [],
+        entities: fabric.entities,
+        entityEdges: fabric.entityEdges,
+        expandedTrees: fabric.expandedTrees,
+        layerCommunities: settings.layerCommunities,
+        layerEntities: settings.layerEntities,
+        layerTree: settings.layerTree,
+      }
+    : undefined;
 
   // ── Data pipeline ──────────────────────────────────────────────────
 
@@ -77,9 +161,10 @@ export function GraphView({
 
   const filteredNodeIds = new Set(filteredNodes.map((n) => n.id));
   const filteredLinks = rawLinks.filter((l) => {
-    const sId = typeof l.source === "string" ? l.source : l.source.id;
-    const tId = typeof l.target === "string" ? l.target : l.target.id;
-    return filteredNodeIds.has(sId) && filteredNodeIds.has(tId);
+    return (
+      filteredNodeIds.has(resolveLinkEndpointId(l.source)) &&
+      filteredNodeIds.has(resolveLinkEndpointId(l.target))
+    );
   });
 
   // Build force-graph elements from filtered data
@@ -88,26 +173,27 @@ export function GraphView({
     links: filteredLinks,
     notebooks,
     clusteringMode: settings.clusteringMode,
-    activeNoteId,
+    fabricData,
   });
 
   // Apply cluster filtering -- hide nodes belonging to hidden clusters
-  const elements =
-    hiddenClusters.size > 0
-      ? {
-          ...allElements,
-          nodes: allElements.nodes.filter((n) => !hiddenClusters.has(n.clusterId)),
-          links: allElements.links.filter((l) => {
-            const sId = typeof l.source === "string" ? l.source : l.source;
-            const tId = typeof l.target === "string" ? l.target : l.target;
-            // Re-check that both endpoints are still present after node filtering
-            const visibleIds = new Set(
-              allElements.nodes.filter((n) => !hiddenClusters.has(n.clusterId)).map((n) => n.id),
-            );
-            return visibleIds.has(sId) && visibleIds.has(tId);
-          }),
-        }
-      : allElements;
+  const elements = useMemo(() => {
+    if (hiddenClusters.size === 0) return allElements;
+
+    const visibleNodes = allElements.nodes.filter((n) => !hiddenClusters.has(n.clusterId));
+    const visibleIds = new Set(visibleNodes.map((n) => n.id));
+
+    return {
+      ...allElements,
+      nodes: visibleNodes,
+      links: allElements.links.filter((l) => {
+        return (
+          visibleIds.has(resolveLinkEndpointId(l.source)) &&
+          visibleIds.has(resolveLinkEndpointId(l.target))
+        );
+      }),
+    };
+  }, [allElements, hiddenClusters]);
 
   // ── Position cache ─────────────────────────────────────────────────
 
@@ -158,12 +244,94 @@ export function GraphView({
 
   // ── Force graph ────────────────────────────────────────────────────
 
-  const handleSavePositions = useCallback(
-    (positions: Record<string, { x: number; y: number }>) => {
-      savePositions(positions);
+  // ── Tree expansion handlers ────────────────────────────────────────
+
+  const handleTreeExpand = useCallback(
+    (noteId: string) => {
+      fabric.expandLayer("tree", [noteId]);
     },
-    [savePositions],
+    [fabric],
   );
+
+  const handleTreeCollapse = useCallback(
+    (noteId: string) => {
+      fabric.collapseTree(noteId);
+    },
+    [fabric],
+  );
+
+  // ── Node double-click handler (type-aware in useForceGraph) ───────
+
+  const handleNodeDoubleClick = useCallback(
+    (nodeId: string) => {
+      onOpenInEditor?.(nodeId);
+    },
+    [onOpenInEditor],
+  );
+
+  // ── Right-click context menu handler ──────────────────────────────
+
+  const handleNodeRightClick = useCallback(
+    (node: ForceNode, screenPos: { x: number; y: number }) => {
+      setContextMenu({ node, position: screenPos });
+    },
+    [],
+  );
+
+  // ── Drag-to-merge handler ─────────────────────────────────────────
+
+  const handleDragCommunityChange = useCallback(
+    (change: DragCommunityChange) => {
+      // Clear any existing timer
+      if (dragMergeTimerRef.current) clearTimeout(dragMergeTimerRef.current);
+
+      setDragMergeToast(change);
+
+      // Auto-dismiss after 5 seconds and trigger merge
+      dragMergeTimerRef.current = setTimeout(() => {
+        fabric.performAction("suggest_merge", {
+          noteId: change.nodeId,
+          targetCommunityId: change.targetCommunityId,
+        });
+        setDragMergeToast(null);
+      }, 5000);
+    },
+    [fabric],
+  );
+
+  const handleUndoDragMerge = useCallback(() => {
+    if (dragMergeTimerRef.current) {
+      clearTimeout(dragMergeTimerRef.current);
+      dragMergeTimerRef.current = null;
+    }
+    setDragMergeToast(null);
+  }, []);
+
+  // ── Multi-select batch actions ────────────────────────────────────
+
+  const handleExpandAllTrees = useCallback(() => {
+    const noteIds = [...selectedNodeIds].filter((id) => {
+      const node = elements.nodes.find((n) => n.id === id);
+      return node?.nodeType === "note" && node?.expandable;
+    });
+    if (noteIds.length > 0) fabric.expandLayer("tree", noteIds);
+  }, [selectedNodeIds, elements.nodes, fabric]);
+
+  const handleCreateBridgeFromSelection = useCallback(() => {
+    const ids = [...selectedNodeIds];
+    if (ids.length < 2) return;
+    const first = elements.nodes.find((n) => n.id === ids[0]);
+    const second = elements.nodes.find((n) => n.id === ids[1]);
+    if (first && second) {
+      setBridgeState({ sourceName: first.label, targetName: second.label });
+    }
+  }, [selectedNodeIds, elements.nodes]);
+
+  const handleCompareInChat = useCallback(() => {
+    // Select first node as active note for chat context
+    const firstId = [...selectedNodeIds][0];
+    if (firstId) onSelectNote(firstId);
+  }, [selectedNodeIds, onSelectNote]);
 
   const forceGraph = useForceGraph({
     elements,
@@ -174,9 +342,74 @@ export function GraphView({
     revealedNodes: waveReveal.revealedNodes,
     cachedPositions,
     onNodeClick: onSelectNote,
-    onNodeDoubleClick: onOpenInEditor,
-    onSavePositions: handleSavePositions,
+    onNodeDoubleClick: handleNodeDoubleClick,
+    onNodeRightClick: handleNodeRightClick,
+    onSavePositions: savePositions,
+    onTreeExpand: handleTreeExpand,
+    onTreeCollapse: handleTreeCollapse,
+    onDragCommunityChange: handleDragCommunityChange,
   });
+
+  // ── Context menu action handler ─────────────────────────────────────
+
+  const handleContextMenuAction = useCallback(
+    (action: ContextMenuAction, node: ForceNode) => {
+      switch (action) {
+        case "open_in_editor":
+        case "open_at_heading":
+          onOpenInEditor?.(node.nodeType === "tree_section" ? node.id.split(":")[1] : node.id);
+          break;
+        case "expand_tree":
+          fabric.expandLayer("tree", [node.id]);
+          break;
+        case "find_related":
+          onSelectNote(node.id);
+          break;
+        case "quick_bridge": {
+          const selectedLabel =
+            selectedNodeIds.size === 1
+              ? (elements.nodes.find((n) => n.id === [...selectedNodeIds][0])?.label ?? "")
+              : "";
+          setBridgeState({
+            sourceName: node.label,
+            targetName: selectedLabel,
+          });
+          break;
+        }
+        case "focus_community": {
+          const fg = forceGraph.graphRef.current;
+          fg?.zoomToFit(400, 40, ((n: ForceNode) => n.clusterId === node.clusterId) as never);
+          break;
+        }
+        case "pin_to_focus":
+          for (const n of forceGraph.graphData.nodes) {
+            if (n.clusterId === node.clusterId && n.x != null && n.y != null) {
+              n.fx = n.x;
+              n.fy = n.y;
+            }
+          }
+          break;
+        case "view_members":
+          setHighlightedClusterId(node.clusterId);
+          break;
+        case "find_across_notes":
+        case "open_references":
+          onSelectNote(node.id);
+          break;
+        case "hide_from_graph":
+          setHiddenClusters((prev) => {
+            const next = new Set(prev);
+            next.add(node.clusterId);
+            return next;
+          });
+          break;
+        case "create_flashcard":
+          onSelectNote(node.id.split(":")[1] ?? node.id);
+          break;
+      }
+    },
+    [onOpenInEditor, onSelectNote, fabric, selectedNodeIds, elements.nodes, forceGraph],
+  );
 
   // ── Viewport bounds update (for minimap) ───────────────────────────
 
@@ -221,6 +454,118 @@ export function GraphView({
     [forceGraph.graphRef],
   );
 
+  // ── Multi-select via Cmd/Ctrl + Click on canvas ────────────────────
+
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!container) return;
+
+    const handleCanvasClick = (e: MouseEvent) => {
+      if (!(e.metaKey || e.ctrlKey)) return;
+
+      // Find which node was clicked using the force graph
+      const fg = forceGraph.graphRef.current;
+      if (!fg) return;
+
+      const graphCoords = fg.screen2GraphCoords(e.offsetX, e.offsetY);
+      // Find closest node within hit radius
+      let closestNode: ForceNode | null = null;
+      let closestDist = Number.POSITIVE_INFINITY;
+      for (const node of forceGraph.graphData.nodes) {
+        if (node.x == null || node.y == null) continue;
+        const dx = node.x - graphCoords.x;
+        const dy = node.y - graphCoords.y;
+        const dist = Math.sqrt(dx * dx + dy * dy);
+        const hitRadius = (node.size / 2) * settings.nodeScale + 4;
+        if (dist < hitRadius && dist < closestDist) {
+          closestDist = dist;
+          closestNode = node;
+        }
+      }
+
+      if (closestNode) {
+        e.preventDefault();
+        e.stopPropagation();
+        setSelectedNodeIds((prev) => {
+          const next = new Set(prev);
+          if (next.has(closestNode.id)) {
+            next.delete(closestNode.id);
+          } else {
+            next.add(closestNode.id);
+          }
+          return next;
+        });
+      }
+    };
+
+    container.addEventListener("click", handleCanvasClick, true);
+    return () => container.removeEventListener("click", handleCanvasClick, true);
+  }, [forceGraph, settings.nodeScale]);
+
+  // ── Keyboard shortcuts ─────────────────────────────────────────────
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Ignore when typing in an input or textarea
+      const tag = (e.target as HTMLElement)?.tagName;
+      if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return;
+
+      switch (e.key) {
+        case "1":
+          handleLayerToggle("communities");
+          break;
+        case "2":
+          handleLayerToggle("entities");
+          break;
+        case "3":
+          handleLayerToggle("tree");
+          break;
+        case "s":
+        case "S":
+          // Apply semantic preset
+          if (!settings.layerCommunities) handleLayerToggle("communities");
+          if (!settings.layerEntities) handleLayerToggle("entities");
+          setSettings({ clusteringMode: "semantic" });
+          break;
+        case "f":
+        case "F":
+          forceGraph.fitToScreen();
+          break;
+        case " ": {
+          // Spacebar: toggle tree expansion on selected note
+          if (activeNoteId && settings.layerTree) {
+            e.preventDefault();
+            const selectedNode = forceGraph.graphData.nodes.find((n) => n.id === activeNoteId);
+            if (selectedNode?.expandable) {
+              if (selectedNode.expanded) {
+                handleTreeCollapse(activeNoteId);
+              } else {
+                handleTreeExpand(activeNoteId);
+              }
+            }
+          }
+          break;
+        }
+        case "Escape":
+          setContextMenu(null);
+          setSelectedNodeIds(new Set());
+          onSelectNote("");
+          break;
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [
+    handleLayerToggle,
+    settings,
+    setSettings,
+    forceGraph,
+    onSelectNote,
+    activeNoteId,
+    handleTreeExpand,
+    handleTreeCollapse,
+  ]);
+
   // ── Re-layout ──────────────────────────────────────────────────────
 
   const handleRelayout = useCallback(() => {
@@ -235,10 +580,48 @@ export function GraphView({
     if (fg) fg.d3ReheatSimulation();
   }, [clearPositions, forceGraph]);
 
-  // ── Tooltip node map ───────────────────────────────────────────────
-  // GraphNodeTooltip expects GraphNode (title, bodyPreview, tags, linkCount).
-  // Build a lookup from the original filtered GraphNodes.
+  // ── Tooltip ────────────────────────────────────────────────────────
+  // Compute tooltip element outside the JSX tree for clarity.
   const tooltipNodeMap = new Map(filteredNodes.map((n) => [n.id, n]));
+  const tooltipElement = (() => {
+    const hoveredId = forceGraph.hoveredNodeId;
+    if (!hoveredId) return null;
+
+    const fg = forceGraph.graphRef.current;
+    const forceNode = forceGraph.graphData.nodes.find((n) => n.id === hoveredId);
+    if (!fg || !forceNode || forceNode.x == null || forceNode.y == null) return null;
+    const screenPos = fg.graph2ScreenCoords(forceNode.x, forceNode.y);
+
+    // For note nodes, show the rich tooltip with heading breadcrumbs
+    const tooltipNode = tooltipNodeMap.get(hoveredId);
+    if (tooltipNode) {
+      const headings = extractHeadings(tooltipNode.bodyPreview);
+      const augmented =
+        headings.length > 0 ? { ...tooltipNode, bodyPreview: headings.join(" > ") } : tooltipNode;
+      return <GraphNodeTooltip node={augmented} x={screenPos.x} y={screenPos.y} />;
+    }
+
+    // For non-note nodes (except tree_text), build a synthetic tooltip
+    if (forceNode.nodeType !== "tree_text") {
+      return (
+        <GraphNodeTooltip
+          node={{
+            id: forceNode.id,
+            title: forceNode.label,
+            bodyPreview: forceNode.bodyPreview,
+            linkCount: forceNode.linkCount,
+            tags: forceNode.tags,
+            primaryTag: forceNode.tags[0] ?? null,
+            notebookId: forceNode.notebookId,
+          }}
+          x={screenPos.x}
+          y={screenPos.y}
+        />
+      );
+    }
+
+    return null;
+  })();
 
   // ── Empty state ────────────────────────────────────────────────────
 
@@ -266,6 +649,12 @@ export function GraphView({
         onClusteringModeChange={(mode) => setSettings({ clusteringMode: mode })}
         renderMode={settings.renderMode}
         onRenderModeChange={(mode) => setSettings({ renderMode: mode })}
+        layerState={{
+          communities: settings.layerCommunities,
+          entities: settings.layerEntities,
+          tree: settings.layerTree,
+        }}
+        onLayerToggle={handleLayerToggle}
       />
 
       <div
@@ -296,10 +685,13 @@ export function GraphView({
                 linkCanvasObjectMode={forceGraph.linkCanvasObjectMode as never}
                 nodePointerAreaPaint={forceGraph.nodePointerAreaPaint as never}
                 onNodeClick={forceGraph.onNodeClick as never}
+                onNodeRightClick={forceGraph.onNodeRightClick as never}
                 onNodeHover={forceGraph.onNodeHover as never}
+                onNodeDrag={forceGraph.onNodeDrag as never}
                 onNodeDragEnd={forceGraph.onNodeDragEnd as never}
                 onBackgroundClick={forceGraph.onBackgroundClick}
                 onEngineStop={forceGraph.onEngineStop}
+                onRenderFramePost={forceGraph.onRenderFramePost as never}
                 cooldownTicks={settings.livePhysics ? Infinity : 100}
                 enableNodeDrag={true}
                 enableZoomInteraction={true}
@@ -415,20 +807,73 @@ export function GraphView({
         </div>
 
         {/* Tooltip */}
-        {(() => {
-          const hoveredId = forceGraph.hoveredNodeId;
-          if (!hoveredId) return null;
-          const tooltipNode = tooltipNodeMap.get(hoveredId);
-          if (!tooltipNode) return null;
+        {tooltipElement}
 
-          // Get screen position of hovered node from force graph
-          const fg = forceGraph.graphRef.current;
-          const forceNode = forceGraph.graphData.nodes.find((n) => n.id === hoveredId);
-          if (!fg || !forceNode || forceNode.x == null || forceNode.y == null) return null;
-          const screenPos = fg.graph2ScreenCoords(forceNode.x, forceNode.y);
+        {/* Context menu */}
+        {contextMenu && (
+          <GraphContextMenu
+            node={contextMenu.node}
+            position={contextMenu.position}
+            onAction={handleContextMenuAction}
+            onClose={() => setContextMenu(null)}
+          />
+        )}
 
-          return <GraphNodeTooltip node={tooltipNode} x={screenPos.x} y={screenPos.y} />;
-        })()}
+        {/* Quick bridge popover */}
+        {bridgeState && (
+          <QuickBridgePopover
+            sourceName={bridgeState.sourceName}
+            targetName={bridgeState.targetName}
+            onClose={() => setBridgeState(null)}
+            onCreateNote={(title, content) => {
+              fabric.performAction("create_bridge_note", { title, content });
+            }}
+          />
+        )}
+
+        {/* Drag-to-merge toast */}
+        {dragMergeToast && (
+          <div
+            className="absolute top-4 left-1/2 -translate-x-1/2 z-30
+              glass-panel rounded-lg px-4 py-2.5 flex items-center gap-3 shadow-xl"
+          >
+            <span className="text-xs text-foreground">
+              Moved <span className="font-medium">{dragMergeToast.nodeLabel}</span> to{" "}
+              <span className="font-medium">{dragMergeToast.targetCommunityName}</span>.
+            </span>
+            <button
+              type="button"
+              onClick={handleUndoDragMerge}
+              className="text-xs font-medium text-brand hover:text-brand/80 transition-colors"
+            >
+              Undo
+            </button>
+          </div>
+        )}
+
+        {/* Fabric Pulse Badge (bottom-left, above legend) */}
+        {anyLayerEnabled && (
+          <div className="absolute bottom-24 left-4 z-10">
+            <FabricPulseBadge
+              lastActivityTimestamp={fabric.base?.lastActivityTimestamp ?? new Date().toISOString()}
+              livePulseActive={fabric.base?.livePulseActive ?? false}
+              onViewUpdates={() => fabric.refetch()}
+              onSwitchToSemantic={() => {
+                if (!settings.layerCommunities) handleLayerToggle("communities");
+                if (!settings.layerEntities) handleLayerToggle("entities");
+                setSettings({ clusteringMode: "semantic" });
+              }}
+            />
+          </div>
+        )}
+
+        {/* Multi-select batch action bar */}
+        <BatchActionBar
+          selectedCount={selectedNodeIds.size}
+          onExpandAllTrees={handleExpandAllTrees}
+          onCreateBridgeNote={handleCreateBridgeFromSelection}
+          onCompareInChat={handleCompareInChat}
+        />
       </div>
     </div>
   );

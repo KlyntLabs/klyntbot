@@ -158,7 +158,7 @@ fn spawn_event_log_persistence(
                         match result {
                             Ok(event) => {
                                 let salience = cognitive::salience::evaluate_salience(&event);
-                                let domain = domain_for_event(&event);
+                                let domain = event.domain();
                                 let salience_str = match salience {
                                     cognitive::types::SalienceVerdict::Extract => "extract",
                                     cognitive::types::SalienceVerdict::Accumulate => "accumulate",
@@ -263,48 +263,5 @@ fn spawn_event_log_persistence(
                 }
             }
         });
-    }
-}
-
-/// Map a DomainEvent to its domain string (shared with dev_server).
-fn domain_for_event(event: &bus::DomainEvent) -> &'static str {
-    match event {
-        bus::DomainEvent::TaskCreated { .. }
-        | bus::DomainEvent::TaskCompleted { .. }
-        | bus::DomainEvent::TaskDeferred { .. }
-        | bus::DomainEvent::GoalProgress { .. }
-        | bus::DomainEvent::TaskDecomposed { .. }
-        | bus::DomainEvent::TaskExecutionStarted { .. }
-        | bus::DomainEvent::TaskExecutionCompleted { .. }
-        | bus::DomainEvent::TaskExecutionFailed { .. }
-        | bus::DomainEvent::TaskBlocked { .. }
-        | bus::DomainEvent::TaskUnblocked { .. }
-        | bus::DomainEvent::DayPlanGenerated { .. }
-        | bus::DomainEvent::ProactiveSuggestionCreated { .. }
-        | bus::DomainEvent::TaskFocusStarted { .. }
-        | bus::DomainEvent::TaskFocusEnded { .. }
-        | bus::DomainEvent::EstimationRecorded { .. }
-        | bus::DomainEvent::TaskExecutionProgress { .. } => "work",
-        bus::DomainEvent::ActivitySessionCompleted { .. }
-        | bus::DomainEvent::FocusSessionStarted { .. }
-        | bus::DomainEvent::FocusSessionEnded { .. }
-        | bus::DomainEvent::DistractionDetected { .. }
-        | bus::DomainEvent::ProductivityScoreComputed { .. } => "energy",
-        bus::DomainEvent::TransactionRecorded { .. } | bus::DomainEvent::BudgetAlert { .. } => {
-            "finance"
-        }
-        bus::DomainEvent::UserStatedFact { .. } => "general",
-        bus::DomainEvent::UserCorrectedAI { .. } => "learning",
-        bus::DomainEvent::CoachingFeedback { .. } => "coaching",
-        bus::DomainEvent::ChatTurnCompleted { .. } => "general",
-        bus::DomainEvent::NoteCreated { .. } | bus::DomainEvent::NoteUpdated { .. } => "notes",
-        bus::DomainEvent::SessionCreated { .. }
-        | bus::DomainEvent::SessionEnded { .. }
-        | bus::DomainEvent::QualityScored { .. } => "energy",
-        bus::DomainEvent::BehavioralPatternDetected { .. } => "learning",
-        bus::DomainEvent::PredictiveAlert { .. } | bus::DomainEvent::NarrativeGenerated { .. } => {
-            "general"
-        }
-        _ => "general",
     }
 }

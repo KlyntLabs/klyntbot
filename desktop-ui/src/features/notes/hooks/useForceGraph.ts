@@ -1,7 +1,9 @@
 import { forceCollide } from "d3-force";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { ForceGraphMethods } from "react-force-graph-2d";
+import { convexHull, expandHull, pointInPolygon } from "../lib/convexHull";
 import { type PaintContext, paintLink, paintNode } from "../lib/graphPainters";
+import { resolveLinkEndpointId } from "../lib/graphUtils";
 import type { ForceLink, ForceNode, GraphElements } from "./useGraphElements";
 import type { PositionMap } from "./useGraphPositionCache";
 import type { GraphSettings } from "./useGraphSettings";
@@ -24,6 +26,14 @@ export interface GraphNudge {
 
 // ── Hook params ─────────────────────────────────────────────────────────
 
+export interface DragCommunityChange {
+  nodeId: string;
+  nodeLabel: string;
+  sourceCommunityId: string;
+  targetCommunityId: string;
+  targetCommunityName: string;
+}
+
 interface UseForceGraphParams {
   elements: GraphElements;
   settings: GraphSettings;
@@ -34,8 +44,12 @@ interface UseForceGraphParams {
   cachedPositions?: PositionMap | null;
   onNodeClick: (nodeId: string) => void;
   onNodeDoubleClick?: (nodeId: string) => void;
+  onNodeRightClick?: (node: ForceNode, screenPos: { x: number; y: number }) => void;
   onSavePositions: (positions: PositionMap) => void;
   onNudge?: (nudge: GraphNudge) => void;
+  onTreeExpand?: (noteId: string) => void;
+  onTreeCollapse?: (noteId: string) => void;
+  onDragCommunityChange?: (change: DragCommunityChange) => void;
 }
 
 // ── Hook return ─────────────────────────────────────────────────────────
@@ -54,10 +68,13 @@ export interface ForceGraphController {
     globalScale: number,
   ) => void;
   onNodeClick: (node: ForceNode, event: MouseEvent) => void;
+  onNodeRightClick: (node: ForceNode, event: MouseEvent) => void;
   onNodeHover: (node: ForceNode | null) => void;
+  onNodeDrag: (node: ForceNode) => void;
   onNodeDragEnd: (node: ForceNode) => void;
   onBackgroundClick: () => void;
   onEngineStop: () => void;
+  onRenderFramePost: (ctx: CanvasRenderingContext2D, globalScale: number) => void;
   zoomIn: () => void;
   zoomOut: () => void;
   fitToScreen: () => void;
@@ -65,6 +82,7 @@ export interface ForceGraphController {
   snapshotPositions: () => PositionMap;
   configureForces: () => void;
   hoveredNodeId: string | null;
+  highlightedNodeIds: Set<string>;
 }
 
 // ── Constants ───────────────────────────────────────────────────────────
@@ -85,11 +103,16 @@ export function useForceGraph({
   cachedPositions,
   onNodeClick,
   onNodeDoubleClick,
+  onNodeRightClick,
   onSavePositions,
   onNudge,
+  onTreeExpand,
+  onTreeCollapse,
+  onDragCommunityChange,
 }: UseForceGraphParams): ForceGraphController {
   const graphRef = useRef<ForceGraphMethods>(undefined);
   const [hoveredNodeId, setHoveredNodeId] = useState<string | null>(null);
+  const [highlightedNodeIds, setHighlightedNodeIds] = useState<Set<string>>(new Set());
   const neighborSetRef = useRef<Set<string>>(new Set());
   const lastClickRef = useRef<{ nodeId: string; time: number } | null>(null);
 
@@ -98,10 +121,8 @@ export function useForceGraph({
   useEffect(() => {
     const adj = new Map<string, Set<string>>();
     for (const link of elements.links) {
-      const sId =
-        typeof link.source === "string" ? link.source : (link.source as never as ForceNode).id;
-      const tId =
-        typeof link.target === "string" ? link.target : (link.target as never as ForceNode).id;
+      const sId = resolveLinkEndpointId(link.source as string | ForceNode);
+      const tId = resolveLinkEndpointId(link.target as string | ForceNode);
       if (!adj.has(sId)) adj.set(sId, new Set());
       if (!adj.has(tId)) adj.set(tId, new Set());
       adj.get(sId)?.add(tId);
@@ -137,7 +158,7 @@ export function useForceGraph({
     const linkIds = elements.links
       .map(
         (l) =>
-          `${typeof l.source === "string" ? l.source : (l.source as never as ForceNode).id}-${typeof l.target === "string" ? l.target : (l.target as never as ForceNode).id}`,
+          `${resolveLinkEndpointId(l.source as string | ForceNode)}-${resolveLinkEndpointId(l.target as string | ForceNode)}`,
       )
       .sort()
       .join(",");
@@ -151,9 +172,14 @@ export function useForceGraph({
     prevFingerprintRef.current = fingerprint;
 
     // Structure changed — build new graph data, applying cached positions
+    const existingById = new Map<string, ForceNode>();
+    for (const n of graphDataRef.current.nodes) {
+      existingById.set(n.id, n);
+    }
+
     const nodes = elements.nodes.map((node) => {
       // Check if this node already exists in the previous data (preserve simulation state)
-      const existing = graphDataRef.current.nodes.find((n) => n.id === node.id);
+      const existing = existingById.get(node.id);
       if (existing) {
         // Update data fields but keep simulation-managed x/y/vx/vy
         Object.assign(existing, {
@@ -165,6 +191,9 @@ export function useForceGraph({
           bodyPreview: node.bodyPreview,
           notebookId: node.notebookId,
           clusterId: node.clusterId,
+          nodeType: node.nodeType,
+          expandable: node.expandable,
+          expanded: node.expanded,
         });
         return existing;
       }
@@ -215,7 +244,11 @@ export function useForceGraph({
       // Cluster attraction: pull nodes toward cluster centroid
       fg.d3Force("clusterAttraction", clusterAttractionForce(CLUSTER_ATTRACTION) as never);
 
-      if (reheat) fg.d3ReheatSimulation();
+      if (reheat) {
+        simulationActiveRef.current = true;
+        hullCacheRef.current = null;
+        fg.d3ReheatSimulation();
+      }
     },
     [settings.repulsion, settings.centerForce, settings.linkDistance, settings.nodeScale],
   );
@@ -258,57 +291,52 @@ export function useForceGraph({
 
   // ── Canvas painting ─────────────────────────────────────────────────
 
+  // Keep a stable ref to the current paint context so canvas callbacks
+  // can read it without triggering callback identity changes on every
+  // hover / highlight state change. This avoids re-bindng the paint
+  // callbacks to react-force-graph (which triggers a full redraw).
+  const paintCtxRef = useRef<PaintContext>({
+    nodeScale: settings.nodeScale,
+    labelThreshold: settings.labelThreshold,
+    hoveredNodeId: null,
+    neighborSet: new Set(),
+    highlightedClusterId: null,
+    highlightedNodeIds: null,
+  });
+  paintCtxRef.current = {
+    nodeScale: settings.nodeScale,
+    labelThreshold: settings.labelThreshold,
+    hoveredNodeId,
+    neighborSet: neighborSetRef.current,
+    highlightedClusterId,
+    highlightedNodeIds: highlightedNodeIds.size > 0 ? highlightedNodeIds : null,
+  };
+
+  const revealedNodesRef = useRef(revealedNodes);
+  revealedNodesRef.current = revealedNodes;
+
   const nodeCanvasObject = useCallback(
     (node: ForceNode, ctx: CanvasRenderingContext2D, globalScale: number) => {
-      if (revealedNodes.size > 0 && !revealedNodes.has(node.id)) return;
-
-      const paintCtx: PaintContext = {
-        nodeScale: settings.nodeScale,
-        labelThreshold: settings.labelThreshold,
-        hoveredNodeId,
-        neighborSet: neighborSetRef.current,
-        highlightedClusterId,
-      };
-      paintNode(node, ctx, globalScale, paintCtx);
+      const revealed = revealedNodesRef.current;
+      if (revealed.size > 0 && !revealed.has(node.id)) return;
+      paintNode(node, ctx, globalScale, paintCtxRef.current);
     },
-    [
-      settings.nodeScale,
-      settings.labelThreshold,
-      hoveredNodeId,
-      highlightedClusterId,
-      revealedNodes,
-    ],
+    [],
   );
 
   const nodeCanvasObjectMode = useCallback(() => "replace" as const, []);
 
   const linkCanvasObject = useCallback(
     (link: ForceLink, ctx: CanvasRenderingContext2D, globalScale: number) => {
+      const revealed = revealedNodesRef.current;
       const source = link.source as unknown as ForceNode;
       const target = link.target as unknown as ForceNode;
-      if (
-        revealedNodes.size > 0 &&
-        (!revealedNodes.has(source.id) || !revealedNodes.has(target.id))
-      ) {
+      if (revealed.size > 0 && (!revealed.has(source.id) || !revealed.has(target.id))) {
         return;
       }
-
-      const paintCtx: PaintContext = {
-        nodeScale: settings.nodeScale,
-        labelThreshold: settings.labelThreshold,
-        hoveredNodeId,
-        neighborSet: neighborSetRef.current,
-        highlightedClusterId,
-      };
-      paintLink(link, ctx, globalScale, paintCtx);
+      paintLink(link, ctx, globalScale, paintCtxRef.current);
     },
-    [
-      settings.nodeScale,
-      settings.labelThreshold,
-      hoveredNodeId,
-      highlightedClusterId,
-      revealedNodes,
-    ],
+    [],
   );
 
   const linkCanvasObjectMode = useCallback(() => "replace" as const, []);
@@ -318,16 +346,142 @@ export function useForceGraph({
     (node: ForceNode, color: string, ctx: CanvasRenderingContext2D, _globalScale: number) => {
       const x = node.x ?? 0;
       const y = node.y ?? 0;
-      const radius = (node.size / 2) * settings.nodeScale;
       ctx.fillStyle = color;
-      ctx.beginPath();
-      ctx.arc(x, y, radius + 4, 0, Math.PI * 2);
-      ctx.fill();
+
+      if (node.nodeType === "entity") {
+        const half =
+          (Math.min(12 + Math.min(node.linkCount, 10) * 1.2, 24) / 2) * settings.nodeScale + 4;
+        ctx.beginPath();
+        ctx.moveTo(x, y - half);
+        ctx.lineTo(x + half, y);
+        ctx.lineTo(x, y + half);
+        ctx.lineTo(x - half, y);
+        ctx.closePath();
+        ctx.fill();
+      } else if (node.nodeType === "community_label") {
+        // Larger hit area for label nodes
+        const hitW = 60 * settings.nodeScale;
+        const hitH = 20 * settings.nodeScale;
+        ctx.fillRect(x - hitW / 2, y - hitH / 2, hitW, hitH);
+      } else {
+        const radius = (node.size / 2) * settings.nodeScale;
+        ctx.beginPath();
+        ctx.arc(x, y, radius + 4, 0, Math.PI * 2);
+        ctx.fill();
+      }
     },
     [settings.nodeScale],
   );
 
   // ── Interaction handlers ────────────────────────────────────────────
+
+  // ── nodeType-aware click / double-click ───────────────────────────
+
+  const handleSingleClick = useCallback(
+    (node: ForceNode) => {
+      switch (node.nodeType) {
+        case "note": {
+          onNodeClick(node.id);
+          // If communities layer is on, glow same-community siblings
+          if (node.clusterId.startsWith("community:")) {
+            const siblings = new Set<string>();
+            for (const n of elements.nodes) {
+              if (n.clusterId === node.clusterId) siblings.add(n.id);
+            }
+            setHighlightedNodeIds(siblings);
+          } else {
+            setHighlightedNodeIds(new Set());
+          }
+          break;
+        }
+        case "community_label": {
+          // Highlight all nodes with the same clusterId
+          const members = new Set<string>();
+          for (const n of elements.nodes) {
+            if (n.clusterId === node.clusterId) members.add(n.id);
+          }
+          setHighlightedNodeIds(members);
+          break;
+        }
+        case "entity": {
+          // Highlight all connected notes (find entity edges in adjacency)
+          const connected = adjacencyRef.current.get(node.id) ?? new Set<string>();
+          const entityHighlight = new Set<string>(connected);
+          entityHighlight.add(node.id);
+          setHighlightedNodeIds(entityHighlight);
+          break;
+        }
+        case "tree_section": {
+          onNodeClick(node.id);
+          // Highlight parent note + siblings
+          const parentNoteId = node.id.split(":")[1]; // tree:noteId:treeNodeId
+          const siblings = new Set<string>();
+          siblings.add(node.id);
+          if (parentNoteId) siblings.add(parentNoteId);
+          for (const n of elements.nodes) {
+            if (
+              n.nodeType === "tree_section" &&
+              n.id !== node.id &&
+              n.id.startsWith(`tree:${parentNoteId}:`)
+            ) {
+              siblings.add(n.id);
+            }
+          }
+          setHighlightedNodeIds(siblings);
+          break;
+        }
+        case "tree_text":
+          onNodeClick(node.id);
+          break;
+        default:
+          onNodeClick(node.id);
+          setHighlightedNodeIds(new Set());
+          break;
+      }
+    },
+    [onNodeClick, elements.nodes],
+  );
+
+  const handleDoubleClick = useCallback(
+    (node: ForceNode) => {
+      switch (node.nodeType) {
+        case "note": {
+          // Toggle tree expansion if tree layer is on
+          if (node.expandable) {
+            if (node.expanded) {
+              onTreeCollapse?.(node.id);
+            } else {
+              onTreeExpand?.(node.id);
+            }
+          } else {
+            onNodeDoubleClick?.(node.id);
+          }
+          break;
+        }
+        case "community_label": {
+          // Zoom-to-fit all community members
+          const cid = node.clusterId;
+          graphRef.current?.zoomToFit(400, 40, ((n: ForceNode) => n.clusterId === cid) as never);
+          break;
+        }
+        case "entity": {
+          // Select entity — open in editor if handler exists, otherwise just select
+          onNodeDoubleClick?.(node.id);
+          break;
+        }
+        case "tree_section": {
+          // Open the parent note in editor (at that heading)
+          const parentNoteId = node.id.split(":")[1];
+          if (parentNoteId) onNodeDoubleClick?.(parentNoteId);
+          break;
+        }
+        default:
+          onNodeDoubleClick?.(node.id);
+          break;
+      }
+    },
+    [onNodeDoubleClick, onTreeExpand, onTreeCollapse],
+  );
 
   const handleNodeClick = useCallback(
     (node: ForceNode, _event: MouseEvent) => {
@@ -337,14 +491,22 @@ export function useForceGraph({
         lastClickRef.current.nodeId === node.id &&
         now - lastClickRef.current.time < 400
       ) {
-        onNodeDoubleClick?.(node.id);
+        handleDoubleClick(node);
         lastClickRef.current = null;
         return;
       }
       lastClickRef.current = { nodeId: node.id, time: now };
-      onNodeClick(node.id);
+      handleSingleClick(node);
     },
-    [onNodeClick, onNodeDoubleClick],
+    [handleSingleClick, handleDoubleClick],
+  );
+
+  const handleNodeRightClick = useCallback(
+    (node: ForceNode, event: MouseEvent) => {
+      event.preventDefault();
+      onNodeRightClick?.(node, { x: event.clientX, y: event.clientY });
+    },
+    [onNodeRightClick],
   );
 
   const handleNodeHover = useCallback((node: ForceNode | null) => {
@@ -355,6 +517,19 @@ export function useForceGraph({
       setHoveredNodeId(null);
       neighborSetRef.current = new Set();
     }
+  }, []);
+
+  // ── Drag-to-merge community tracking ───────────────────────────────
+
+  const dragStartClusterRef = useRef<string | null>(null);
+
+  const handleNodeDrag = useCallback((node: ForceNode) => {
+    // Record the starting community on first drag movement
+    if (dragStartClusterRef.current === null) {
+      dragStartClusterRef.current = node.clusterId;
+    }
+    // Invalidate hull cache so it recomputes with the dragged position
+    hullCacheRef.current = null;
   }, []);
 
   // ── Position snapshot (must be defined before handleNodeDragEnd) ───
@@ -385,19 +560,67 @@ export function useForceGraph({
         });
       }
 
+      // Drag-to-merge: check if node was dropped in a different community's area
+      const startCluster = dragStartClusterRef.current;
+      dragStartClusterRef.current = null;
+
+      if (
+        onDragCommunityChange &&
+        startCluster &&
+        startCluster.startsWith("community:") &&
+        node.nodeType === "note" &&
+        node.x != null &&
+        node.y != null
+      ) {
+        // Build convex hulls for each community
+        const communityPoints = new Map<string, { x: number; y: number }[]>();
+        for (const n of graphData.nodes) {
+          if (!n.clusterId.startsWith("community:")) continue;
+          if (n.nodeType === "community_label") continue;
+          if (n.x == null || n.y == null) continue;
+          if (n.id === node.id) continue; // exclude dragged node
+          if (!communityPoints.has(n.clusterId)) communityPoints.set(n.clusterId, []);
+          communityPoints.get(n.clusterId)?.push({ x: n.x, y: n.y });
+        }
+
+        for (const [clusterId, points] of communityPoints) {
+          if (clusterId === startCluster) continue;
+          if (points.length < 3) continue;
+          const hull = convexHull(points);
+          if (hull.length < 3) continue;
+          const expanded = expandHull(hull, 30);
+          if (pointInPolygon(node.x, node.y, expanded)) {
+            // Find community name from label node
+            const labelNode = graphData.nodes.find(
+              (n) => n.nodeType === "community_label" && n.clusterId === clusterId,
+            );
+            onDragCommunityChange({
+              nodeId: node.id,
+              nodeLabel: node.label,
+              sourceCommunityId: startCluster,
+              targetCommunityId: clusterId,
+              targetCommunityName: labelNode?.label ?? clusterId.replace("community:", ""),
+            });
+            break;
+          }
+        }
+      }
+
       // Save positions
       const positions = snapshotCurrentPositions();
       onSavePositions(positions);
     },
-    [onNudge, onSavePositions, snapshotCurrentPositions],
+    [onNudge, onSavePositions, snapshotCurrentPositions, onDragCommunityChange, graphData.nodes],
   );
 
   const handleBackgroundClick = useCallback(() => {
     setHoveredNodeId(null);
+    setHighlightedNodeIds(new Set());
     neighborSetRef.current = new Set();
   }, []);
 
   const handleEngineStop = useCallback(() => {
+    simulationActiveRef.current = false;
     if (needsZoomFitRef.current) {
       needsZoomFitRef.current = false;
       graphRef.current?.zoomToFit(400, 60);
@@ -405,6 +628,71 @@ export function useForceGraph({
     // Save positions when simulation settles
     onSavePositions(snapshotCurrentPositions());
   }, [onSavePositions, snapshotCurrentPositions]);
+
+  // ── Community convex hull rendering (post-render) ────────────────────
+
+  // Cache computed hulls so we skip convex hull math when nodes are stationary.
+  // Invalidated by simulation ticks (onEngineStop) and node drags.
+  const hullCacheRef = useRef<Map<
+    string,
+    { hull: { x: number; y: number }[]; color: string }
+  > | null>(null);
+  const simulationActiveRef = useRef(true);
+
+  const onRenderFramePost = useCallback(
+    (ctx: CanvasRenderingContext2D, _globalScale: number) => {
+      // Rebuild hulls only when simulation is active (nodes moving) or cache is empty
+      if (!hullCacheRef.current || simulationActiveRef.current) {
+        const clusterPositions = new Map<string, { x: number; y: number; color: string }[]>();
+
+        for (const node of graphData.nodes) {
+          if (!node.clusterId.startsWith("community:")) continue;
+          if (node.x == null || node.y == null) continue;
+          if (node.nodeType === "community_label") continue;
+
+          if (!clusterPositions.has(node.clusterId)) {
+            clusterPositions.set(node.clusterId, []);
+          }
+          clusterPositions.get(node.clusterId)?.push({
+            x: node.x,
+            y: node.y,
+            color: node.color,
+          });
+        }
+
+        const cache = new Map<string, { hull: { x: number; y: number }[]; color: string }>();
+        for (const [clusterId, points] of clusterPositions) {
+          if (points.length < 3) continue;
+          const hull = convexHull(points);
+          if (hull.length < 3) continue;
+          cache.set(clusterId, {
+            hull: expandHull(hull, 20),
+            color: points[0].color,
+          });
+        }
+        hullCacheRef.current = cache;
+      }
+
+      // Draw cached hulls
+      for (const [, { hull: expanded, color }] of hullCacheRef.current) {
+        ctx.save();
+        ctx.setLineDash([4, 4]);
+        ctx.strokeStyle = color.startsWith("#")
+          ? `${color}26` // ~15% opacity hex
+          : color;
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(expanded[0].x, expanded[0].y);
+        for (let i = 1; i < expanded.length; i++) {
+          ctx.lineTo(expanded[i].x, expanded[i].y);
+        }
+        ctx.closePath();
+        ctx.stroke();
+        ctx.restore();
+      }
+    },
+    [graphData.nodes],
+  );
 
   // ── Zoom/pan controls ───────────────────────────────────────────────
 
@@ -456,10 +744,13 @@ export function useForceGraph({
     linkCanvasObjectMode,
     nodePointerAreaPaint,
     onNodeClick: handleNodeClick,
+    onNodeRightClick: handleNodeRightClick,
     onNodeHover: handleNodeHover,
+    onNodeDrag: handleNodeDrag,
     onNodeDragEnd: handleNodeDragEnd,
     onBackgroundClick: handleBackgroundClick,
     onEngineStop: handleEngineStop,
+    onRenderFramePost,
     zoomIn,
     zoomOut,
     fitToScreen,
@@ -467,6 +758,7 @@ export function useForceGraph({
     snapshotPositions: snapshotCurrentPositions,
     configureForces,
     hoveredNodeId,
+    highlightedNodeIds,
   };
 }
 

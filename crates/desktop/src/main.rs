@@ -468,6 +468,10 @@ fn run_desktop_app() {
             commands::notes::note_export,
             commands::notes::note_insight_tab_chat,
             commands::notes::note_insight_clear_tab_chats,
+            // Fabric Explorer
+            commands::fabric::fabric_graph_base,
+            commands::fabric::fabric_graph_expand,
+            commands::fabric::fabric_graph_action,
             // Annotations
             commands::annotations::annotation_create,
             commands::annotations::annotation_update,

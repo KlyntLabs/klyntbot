@@ -468,6 +468,25 @@ pub enum DomainEvent {
         away_secs: u64,
     },
 
+    // -- Knowledge Fabric communities --
+    /// Emitted when a new community is detected in the note graph.
+    CommunityDiscovered {
+        community_id: String,
+        name: String,
+        member_count: u32,
+    },
+    /// Emitted when an existing community's membership or properties change.
+    CommunityUpdated {
+        community_id: String,
+        member_count: u32,
+        stability: f64,
+    },
+    /// Emitted when a community's cohesion weakens below a threshold.
+    CommunityWeakened {
+        community_id: String,
+        stability: f64,
+    },
+
     // -- Squad debates --
     /// Emitted when a squad debate (multi-persona deliberation) completes.
     SquadDebateCompleted {
@@ -488,6 +507,100 @@ pub enum DomainEvent {
         persona_id: Option<String>,
         domain_hint: Option<String>,
     },
+}
+
+impl DomainEvent {
+    /// Map this event to its domain category string.
+    ///
+    /// Used by the cognitive pipeline, debug dashboard, and SSE streams.
+    pub fn domain(&self) -> &str {
+        match self {
+            Self::TaskCreated { .. }
+            | Self::TaskCompleted { .. }
+            | Self::TaskDeferred { .. }
+            | Self::GoalProgress { .. }
+            | Self::TaskDecomposed { .. }
+            | Self::TaskExecutionStarted { .. }
+            | Self::TaskExecutionCompleted { .. }
+            | Self::TaskExecutionFailed { .. }
+            | Self::TaskBlocked { .. }
+            | Self::TaskUnblocked { .. }
+            | Self::DayPlanGenerated { .. }
+            | Self::ProactiveSuggestionCreated { .. }
+            | Self::TaskFocusStarted { .. }
+            | Self::TaskFocusEnded { .. }
+            | Self::EstimationRecorded { .. }
+            | Self::TaskExecutionProgress { .. }
+            | Self::TaskStatusChanged { .. }
+            | Self::TaskPriorityChanged { .. }
+            | Self::TaskFieldUpdated { .. }
+            | Self::TaskHierarchyChanged { .. } => "work",
+
+            Self::ActivitySessionCompleted { .. }
+            | Self::FocusSessionStarted { .. }
+            | Self::FocusSessionEnded { .. }
+            | Self::DistractionDetected { .. }
+            | Self::ProductivityScoreComputed { .. }
+            | Self::SessionCreated { .. }
+            | Self::SessionEnded { .. }
+            | Self::QualityScored { .. }
+            | Self::PredictiveAlert { .. }
+            | Self::NarrativeGenerated { .. }
+            | Self::RuleEvolved { .. }
+            | Self::VoiceJournalProcessed { .. } => "energy",
+
+            Self::TransactionRecorded { .. } | Self::BudgetAlert { .. } => "finance",
+
+            Self::UserStatedFact { domain, .. } => domain.as_str(),
+            Self::UserCorrectedAI { .. } => "learning",
+            Self::CoachingFeedback { .. } => "coaching",
+            Self::ChatTurnCompleted { .. } | Self::ToolCallExecuted { .. } => "general",
+
+            Self::NoteCreated { .. }
+            | Self::NoteUpdated { .. }
+            | Self::NoteContentChanged { .. }
+            | Self::NoteDeleted { .. }
+            | Self::NoteEditingFinished { .. } => "notes",
+
+            Self::BehavioralPatternDetected { .. }
+            | Self::ContradictionDetected { .. }
+            | Self::AutotunerDecision { .. }
+            | Self::KnowledgeAtomCreated { .. }
+            | Self::KnowledgeAtomAccepted { .. }
+            | Self::KnowledgeAtomArchived { .. }
+            | Self::AtomFlashcardReviewed { .. }
+            | Self::AtomReinforced { .. }
+            | Self::AtomInteracted { .. }
+            | Self::RetentionMilestoneReached { .. }
+            | Self::TranslationCompleted { .. }
+            | Self::NoteStudied { .. }
+            | Self::PracticeUnitCompleted { .. }
+            | Self::PracticeSessionCompleted { .. }
+            | Self::KnowledgeTransferDetected { .. }
+            | Self::CoachingLearningDigest { .. }
+            | Self::FlashcardSessionCompleted { .. } => "learning",
+
+            Self::InterventionTriggered { .. } => "productivity",
+            Self::MemoryPendingConfirmation { .. } => "memory",
+            Self::SkillRouted { .. } => "agent",
+            Self::TrialActivated { .. } => "autotuner",
+            Self::MirrorTrialKilled { .. } | Self::MirrorSnippetCreated { .. } => "mirror",
+
+            Self::CommunityDiscovered { .. }
+            | Self::CommunityUpdated { .. }
+            | Self::CommunityWeakened { .. } => "fabric",
+
+            Self::SquadDebateCompleted { .. } | Self::SquadInteractionPattern { .. } => "agent",
+
+            Self::SystemWillSleep
+            | Self::SystemDidWake { .. }
+            | Self::UserBecameIdle { .. }
+            | Self::UserReturned { .. }
+            | Self::FocusSessionSuspended { .. }
+            | Self::CronCatchUpReady { .. }
+            | Self::WakePanelReady { .. } => "lifecycle",
+        }
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

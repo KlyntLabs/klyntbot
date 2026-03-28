@@ -10,6 +10,7 @@ pub mod cron;
 pub mod distraction;
 pub mod entities;
 pub mod entity_links;
+pub mod fabric;
 pub mod finance;
 pub mod groups;
 pub mod integrations;

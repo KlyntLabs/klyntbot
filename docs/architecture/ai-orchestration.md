@@ -110,9 +110,9 @@ Step 11: AutoTuner ground truth
 
 ## Squad Mode (Multi-Persona Execution)
 
-When `session.squad_id` is set (Step 2b), the pipeline diverts to squad execution instead of the normal Direct/Reactive flow.
+When `session.squad_id` is set (Step 2b), the pipeline diverts to the unified debate engine instead of the normal Direct/Reactive flow.
 
-**What is a squad:** A named group of `InsightPersonas`, each with a `role`, `perspective`, and `tone`. 4 built-in squads:
+**What is a squad:** A named group of `InsightPersonas`, each with a `role`, `perspective`, `tone`, `questioning_style`, `cognitive_bias`, and `analysis_frameworks`. 4 built-in squads:
 
 | Squad | Personas |
 |-------|----------|
@@ -121,32 +121,65 @@ When `session.squad_id` is set (Step 2b), the pipeline diverts to squad executio
 | Finance | Risk Analyst, Optimizer, Long-term Planner |
 | Strategy | Contrarian, Systems Thinker, Pragmatist |
 
-**Execution flow:**
+### Interaction Modes
+
+Message content determines the interaction mode:
+
+| Mode | Detection | Behavior |
+|------|-----------|----------|
+| **Debate** | "everyone", "squad", "team", "all of you" | Full multi-round debate engine |
+| **DirectAddress** | `@PersonaName`, `"PersonaName,"` at start | Single persona response with blackboard context |
+| **LeadResponse** | Fallback (configurable per squad) | Squad lead persona responds alone |
+
+Fallback mode is configured per squad via `default_interaction_mode` (Lead / Debate / Smart). Smart mode learns from interaction patterns over the last 30 days.
+
+### Unified Debate Engine
+
+`run_debate(config, context, squad, provider, ...)` is a pure-function interface used by both chat and notes callers:
 
 ```
-session.squad_id is set
+Step 1: Budget pre-check
+  → Estimate cost, reduce rounds or request approval if over budget
      |
-     v
-run_squad_execution()
+Step 2: Load learned weights (FSRS-5 accuracy blend)
+  → blended_weight = (1 - blend) × relevance_score + blend × accuracy_score
      |
-     v
-fan_out_personas() — parallel LLM calls
+Step 3: Build persona system prompts
+  → skill_prompt (from orchestrator_skill) + persona block + context
      |
-     +--[Persona 1: Skeptic]--> LLM call with persona system prompt
-     +--[Persona 2: Connector]-> LLM call with persona system prompt
-     +--[Persona 3: Student]---> LLM call with persona system prompt
+Step 4: Debate loop (max_rounds, phased)
+  → Opening: parallel fan-out (sorted by blended_weight DESC)
+  → Discussion: sequential (weakest first, reads blackboard)
+  → Final: parallel fan-out
+  → Per-round judge evaluation → consensus score → early exit if threshold met
      |
-     v
-Collect all persona responses
+Step 5: Synthesis
+  → OutputMode::Synthesized (chat) or StructuredPerPersona (notes)
      |
-     v
-Synthesis LLM call — combines perspectives into unified response
+Step 6: Post-synthesis consensus judge
+  → Rate each persona's alignment with final output → FSRS-5 rating
      |
-     v
-RuntimeResult { multi_voice: true, persona_responses: [...] }
+Step 7: Blackboard cleanup
+  → Delete debate-scoped entries (captured in DebateResult.rounds)
 ```
 
-The session's `squad_id` is set by user action (selecting a squad in the UI or via tool). Each persona gets the same context but a different system prompt fragment reflecting its role.
+**Two callers:**
+- **Chat** (`streaming.rs`): `Synthesized` output, 6 max rounds, persists as session messages, records token usage
+- **Notes** (`insight.rs`): `StructuredPerPersona` output, 3 max rounds, stores as `InsightContent.perspectives` with debate transcript
+
+### FSRS-5 Active Feedback Loop
+
+After every debate, a consensus judge rates each persona's alignment (0.0–1.0) with the final synthesis. Mapped to FSRS-5 ratings (4=Easy, 3=Good, 2=Hard, 1=Again). Over ~20 debates, accuracy learning ramps to full influence on persona ordering.
+
+- `relevance_score` is the base weight (short-term, thumbs up/down adjusts ±0.1)
+- `accuracy_score` is FSRS-5 stability (long-term, consensus-based)
+- User overrides (pins, manual reorder, "Reset learning") always win
+
+### Blackboard Lifecycle
+
+- **Debate working memory** (ephemeral): scoped to `"debate:{squad_id}:{uuid}"`, deleted after debate
+- **Thread context** (persistent): `"session:{session_key}:{squad_id}"`, persists for session lifetime
+- **Safety-net cron** (weekly): deletes entries older than 30 days
 
 ## Execution Engines
 

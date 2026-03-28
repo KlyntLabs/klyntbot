@@ -240,3 +240,19 @@ export type {
   WorkContextUpdateParams,
   WorkResource,
 } from "./workContexts";
+
+// ── Fabric Graph Types ────────────────────────────────────
+
+export type {
+  FabricCommunity,
+  FabricCommunityDetail,
+  FabricEntity,
+  FabricEntityEdge,
+  FabricGraphBase,
+  FabricGraphEvent,
+  FabricLayer,
+  FabricLink,
+  FabricMember,
+  FabricNote,
+  FabricTreeNode,
+} from "./fabric";
