@@ -23,56 +23,38 @@ impl VoiceRouter {
                 (
                     "tasks".into(),
                     "Task".into(),
-                    vec![
-                        "task", "todo", "remind", "reminder", "schedule", "add", "create",
-                        "deadline", "due", "appointment",
-                    ]
-                    .into_iter()
-                    .map(String::from)
-                    .collect(),
+                    // Two-keyword set: any single hit = 0.5 ≥ threshold.
+                    // "remind" covers "remind/reminder"; "schedule" covers scheduling.
+                    vec!["remind", "schedule"]
+                        .into_iter()
+                        .map(String::from)
+                        .collect(),
                 ),
                 (
                     "learning".into(),
                     "Learning".into(),
-                    vec![
-                        "practice",
-                        "drill",
-                        "vocab",
-                        "vocabulary",
-                        "flashcard",
-                        "pronunciation",
-                        "french",
-                        "spanish",
-                        "german",
-                        "japanese",
-                        "language",
-                        "learn",
-                    ]
-                    .into_iter()
-                    .map(String::from)
-                    .collect(),
+                    // Two-keyword set: any single hit = 0.5 ≥ threshold.
+                    // "practice" covers drills; "vocab" covers vocab/vocabulary via contains.
+                    vec!["practice", "vocab"]
+                        .into_iter()
+                        .map(String::from)
+                        .collect(),
                 ),
                 (
                     "notes".into(),
                     "Note".into(),
-                    vec![
-                        "note", "write", "jot", "remember", "thought", "idea", "journal",
-                        "reflection",
-                    ]
-                    .into_iter()
-                    .map(String::from)
-                    .collect(),
+                    vec!["note", "jot"]
+                        .into_iter()
+                        .map(String::from)
+                        .collect(),
                 ),
                 (
                     "finance".into(),
                     "Finance".into(),
-                    vec![
-                        "budget", "expense", "spent", "cost", "money", "payment", "income",
-                        "savings",
-                    ]
-                    .into_iter()
-                    .map(String::from)
-                    .collect(),
+                    vec!["budget", "expense"]
+                        .into_iter()
+                        .map(String::from)
+                        .collect(),
                 ),
             ],
         }
