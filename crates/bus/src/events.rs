@@ -15,6 +15,7 @@ pub enum MessageKind {
     #[default]
     Text,
     Reaction,
+    Voice,
 }
 
 /// Message received from a chat channel

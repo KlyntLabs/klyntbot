@@ -90,6 +90,13 @@ pub enum DomainEvent {
         extracted_fact_count: usize,
         sentiment: Option<String>,
     },
+    VoiceCapture {
+        session_id: String,
+        language: String,
+        overall_confidence: f32,
+        duration_secs: f32,
+        engine: String,
+    },
 
     // -- Tasks --
     TaskCreated {
@@ -547,7 +554,8 @@ impl DomainEvent {
             | Self::PredictiveAlert { .. }
             | Self::NarrativeGenerated { .. }
             | Self::RuleEvolved { .. }
-            | Self::VoiceJournalProcessed { .. } => "energy",
+            | Self::VoiceJournalProcessed { .. }
+            | Self::VoiceCapture { .. } => "energy",
 
             Self::TransactionRecorded { .. } | Self::BudgetAlert { .. } => "finance",
 
