@@ -1,7 +1,7 @@
-import { useEffect } from "react";
+import { useCallback, useEffect, useMemo, useRef } from "react";
 import ForceGraph3D from "react-force-graph-3d";
 import { useBrainView } from "../hooks/useBrainView";
-import type { GraphElements } from "../hooks/useGraphElements";
+import type { ForceLink, ForceNode, GraphElements } from "../hooks/useGraphElements";
 import type { GraphSettings } from "../hooks/useGraphSettings";
 
 interface GraphBrainViewProps {
@@ -26,21 +26,87 @@ export function GraphBrainView({
   });
 
   // Set up bloom post-processing once the graph mounts
+  const postProcessingDone = useRef(false);
   useEffect(() => {
-    // Small delay to ensure the renderer is ready
-    const timer = setTimeout(setupPostProcessing, 100);
+    if (postProcessingDone.current) return;
+    const timer = setTimeout(() => {
+      setupPostProcessing();
+      postProcessingDone.current = true;
+    }, 100);
     return () => clearTimeout(timer);
   }, [setupPostProcessing]);
 
-  // Start idle rotation timer on mount
+  // Start idle rotation timer once on mount
+  const idleTimerStarted = useRef(false);
   useEffect(() => {
+    if (idleTimerStarted.current) return;
+    idleTimerStarted.current = true;
     resetIdleTimer();
   }, [resetIdleTimer]);
 
-  const graphData = {
-    nodes: elements.nodes,
-    links: elements.links,
-  };
+  // Stable graphData — same pattern as 2D to prevent simulation restarts
+  const graphDataRef = useRef<{ nodes: ForceNode[]; links: ForceLink[] }>({ nodes: [], links: [] });
+  const prevFingerprintRef = useRef("");
+
+  const graphData = useMemo(() => {
+    const nodeIds = elements.nodes.map((n) => n.id).sort().join(",");
+    const linkIds = elements.links
+      .map(
+        (l) =>
+          `${typeof l.source === "string" ? l.source : (l.source as never as ForceNode).id}-${typeof l.target === "string" ? l.target : (l.target as never as ForceNode).id}`,
+      )
+      .sort()
+      .join(",");
+    const fingerprint = `${nodeIds}|${linkIds}`;
+
+    if (fingerprint === prevFingerprintRef.current) {
+      return graphDataRef.current;
+    }
+    prevFingerprintRef.current = fingerprint;
+
+    const nodes = elements.nodes.map((node) => {
+      const existing = graphDataRef.current.nodes.find((n) => n.id === node.id);
+      if (existing) {
+        Object.assign(existing, {
+          label: node.label,
+          color: node.color,
+          size: node.size,
+          linkCount: node.linkCount,
+          clusterId: node.clusterId,
+        });
+        return existing;
+      }
+      return { ...node };
+    });
+
+    const data = { nodes, links: [...elements.links] };
+    graphDataRef.current = data;
+    return data;
+  }, [elements]);
+
+  // Stable callbacks
+  const handleNodeClick = useCallback(
+    (node: { id?: string }) => {
+      if (node.id && onNodeClick) onNodeClick(String(node.id));
+      resetIdleTimer();
+    },
+    [onNodeClick, resetIdleTimer],
+  );
+
+  const handleNodeHover = useCallback(
+    (node: { id?: string } | null) => {
+      if (onNodeHover) {
+        onNodeHover(node?.id ? String(node.id) : null, 0, 0);
+      }
+    },
+    [onNodeHover],
+  );
+
+  const handleNodeDrag = useCallback(() => {
+    resetIdleTimer();
+  }, [resetIdleTimer]);
+
+  const linkColor = useCallback((link: { color?: string }) => link.color || "#4B5563", []);
 
   return (
     <ForceGraph3D
@@ -51,35 +117,17 @@ export function GraphBrainView({
       backgroundColor="#07070d"
       nodeThreeObject={nodeThreeObject as never}
       nodeThreeObjectExtend={false}
-      linkColor={((link: { color?: string }) => link.color || "#4B5563") as never}
+      linkColor={linkColor as never}
       linkOpacity={0.35}
       linkWidth={0.5}
       linkDirectionalParticles={settings.showArrows ? 2 : 0}
       linkDirectionalParticleSpeed={0.005}
       linkDirectionalParticleWidth={0.8}
       showNavInfo={false}
-      onNodeClick={
-        ((node: { id?: string }) => {
-          if (node.id && onNodeClick) {
-            onNodeClick(String(node.id));
-          }
-          resetIdleTimer();
-        }) as never
-      }
-      onNodeHover={
-        ((node: { id?: string } | null) => {
-          if (onNodeHover) {
-            if (node?.id) {
-              // In 3D mode we pass 0,0 for x,y since tooltip positioning differs
-              onNodeHover(String(node.id), 0, 0);
-            } else {
-              onNodeHover(null, 0, 0);
-            }
-          }
-        }) as never
-      }
-      onNodeDrag={(() => resetIdleTimer()) as never}
-      cooldownTicks={settings.livePhysics ? Infinity : 100}
+      onNodeClick={handleNodeClick as never}
+      onNodeHover={handleNodeHover as never}
+      onNodeDrag={handleNodeDrag as never}
+      cooldownTicks={100}
       enableNodeDrag={true}
       enableNavigationControls={true}
     />
