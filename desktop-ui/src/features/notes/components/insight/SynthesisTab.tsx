@@ -1,13 +1,20 @@
 import { MarkdownContent } from "@features/chat/components/MarkdownContent";
 import { useInsightChat } from "@features/notes/hooks/useInsightChat";
+import type { TreePathRef } from "@shared/types/tree-path";
 import type { TabStatus } from "../../hooks/useInsightReview";
 import { InsightChatInput } from "./InsightChatInput";
+import { StructureTreeView } from "./StructureTreeView";
+
+interface SynthesisResult {
+  treePaths?: TreePathRef[];
+}
 
 interface SynthesisTabProps {
   status: TabStatus;
   content: string;
   noteId: string | null;
   squadId?: string | null;
+  synthesisResult?: SynthesisResult | null;
 }
 
 function SkeletonLoader() {
@@ -20,7 +27,13 @@ function SkeletonLoader() {
   );
 }
 
-export function SynthesisTab({ status, content, noteId, squadId }: SynthesisTabProps) {
+export function SynthesisTab({
+  status,
+  content,
+  noteId,
+  squadId,
+  synthesisResult,
+}: SynthesisTabProps) {
   const chat = useInsightChat(noteId, "synthesis", status === "done", squadId, content);
   if (status === "idle") {
     return <p className="text-[11px] text-dim italic">Start an insight review to see synthesis</p>;
@@ -62,6 +75,9 @@ export function SynthesisTab({ status, content, noteId, squadId }: SynthesisTabP
           <span className="inline-block w-1.5 h-3.5 bg-purple animate-pulse ml-0.5 align-text-bottom rounded-sm" />
         )}
       </div>
+      {status === "done" && synthesisResult?.treePaths && synthesisResult.treePaths.length > 0 && (
+        <StructureTreeView treePaths={synthesisResult.treePaths} />
+      )}
       {status === "done" && (
         <InsightChatInput {...chat} placeholder="Ask about this synthesis..." />
       )}

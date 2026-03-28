@@ -312,6 +312,22 @@ impl NoteRepo {
         Ok(())
     }
 
+    /// List all non-archived notes with pagination (for background backfill jobs).
+    pub async fn list_all_notes_paginated(
+        &self,
+        limit: i64,
+        offset: i64,
+    ) -> Result<Vec<NoteRow>, StorageError> {
+        let rows = sqlx::query_as::<_, NoteRow>(
+            "SELECT * FROM notes WHERE archived = 0 ORDER BY updated_at DESC LIMIT ?1 OFFSET ?2",
+        )
+        .bind(limit)
+        .bind(offset)
+        .fetch_all(&self.pool)
+        .await?;
+        Ok(rows)
+    }
+
     /// List notes that have no embedding yet (for background catch-up).
     pub async fn list_notes_needing_embedding(
         &self,

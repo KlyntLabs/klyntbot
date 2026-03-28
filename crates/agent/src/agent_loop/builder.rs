@@ -794,6 +794,23 @@ impl AgentLoopBuilder {
                             }
                         });
                         info!("NoteTreeBuilder subscriber started");
+
+                        // Background tree node backfill for existing notes
+                        {
+                            let backfill_builder = Arc::clone(&note_tree_builder);
+                            let backfill_note_repo = feature_notes::repo::NoteRepo::new(
+                                storage_pool.inner().clone(),
+                            );
+                            tokio::spawn(async move {
+                                // Delay to let the app finish starting
+                                tokio::time::sleep(std::time::Duration::from_secs(10)).await;
+                                if let Err(e) =
+                                    backfill_tree_nodes(&backfill_note_repo, &backfill_builder).await
+                                {
+                                    warn!("Note tree backfill error: {e}");
+                                }
+                            });
+                        }
                     }
                 }
 
@@ -1630,4 +1647,54 @@ fn parse_reference_key(key: &str) -> Option<(String, String)> {
         return Some((skill_name.to_string(), name.to_string()));
     }
     None
+}
+
+/// Backfill tree nodes for all existing notes that may not have been indexed yet.
+///
+/// Iterates through all non-archived notes in batches, calling
+/// `NoteTreeBuilder::handle_note_changed` for each. The builder is idempotent
+/// (deletes old nodes before inserting), so re-processing already-indexed notes
+/// is safe but wasteful — a cheap cost for correctness during the migration
+/// window.
+async fn backfill_tree_nodes(
+    note_repo: &feature_notes::repo::NoteRepo,
+    tree_builder: &crate::adapters::note_tree_builder::NoteTreeBuilder,
+) -> common::Result<()> {
+    let batch_size: i64 = 50;
+    let mut offset: i64 = 0;
+    let mut processed: usize = 0;
+
+    loop {
+        let notes = note_repo
+            .list_all_notes_paginated(batch_size, offset)
+            .await?;
+
+        if notes.is_empty() {
+            break;
+        }
+
+        for note in &notes {
+            if note.body.is_empty() && note.body_json.is_none() {
+                continue;
+            }
+            // Prefer body_json (Tiptap) for richer tree parsing; fall back to body (markdown).
+            let content = note.body_json.as_deref().unwrap_or(&note.body);
+            if let Err(e) = tree_builder.handle_note_changed(&note.id, content).await {
+                warn!(
+                    note_id = %note.id,
+                    "Tree backfill failed for note: {e}"
+                );
+            }
+        }
+
+        processed += notes.len();
+        offset += batch_size;
+        tracing::debug!("Tree backfill progress: {processed} notes");
+        tokio::task::yield_now().await;
+    }
+
+    if processed > 0 {
+        info!("Note tree backfill complete: {processed} notes processed");
+    }
+    Ok(())
 }

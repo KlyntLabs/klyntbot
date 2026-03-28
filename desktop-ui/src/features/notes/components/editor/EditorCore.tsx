@@ -25,6 +25,7 @@ import { Markdown } from "tiptap-markdown";
 import { AnnotationMark } from "./AnnotationMark";
 import { CodeBlockView } from "./CodeBlockView";
 import { EntityMentionAutocomplete, EntityMentionMark } from "./EntityMention";
+import { AiHighlightExtension } from "./extensions/AiHighlightPlugin";
 import { MathBlock, MathInline } from "./MathNode";
 import { SlashCommandsExtension } from "./SlashCommandMenu";
 import { UniqueID } from "./UniqueID";
@@ -194,6 +195,7 @@ export function getEditorExtensions(opts: EditorExtensionOptions = {}): Extensio
     SlashCommandsExtension,
     AnnotationMark,
     UniqueID,
+    AiHighlightExtension,
     VimModeExtension.configure(vimOptions ?? {}),
     Markdown.configure({
       html: true,

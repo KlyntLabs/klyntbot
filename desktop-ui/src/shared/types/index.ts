@@ -219,6 +219,10 @@ export type {
   SessionSummary,
 } from "./entity-links";
 
+// ── Tree Path Types ──────────────────────────────────────
+
+export type { PathSegment, TreePathRef } from "./tree-path";
+
 // ── Agent Types ───────────────────────────────────────────
 
 export type { CoachingIntervention } from "./agent";

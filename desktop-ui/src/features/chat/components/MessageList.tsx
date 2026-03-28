@@ -5,6 +5,7 @@ import type {
   PersonaSegment,
   TransparencyData,
 } from "@shared/types";
+import type { TreePathRef } from "@shared/types/tree-path";
 import { ThinkingDots } from "@shared/ui/ThinkingDots";
 import { Fragment, useEffect, useRef, useState } from "react";
 import { CollapsedInteraction } from "./CollapsedInteraction";
@@ -12,6 +13,7 @@ import { InteractionCard } from "./InteractionCard";
 import { MarkdownContent } from "./MarkdownContent";
 import { SegmentedMessage } from "./SegmentedMessage";
 import { TokenBadge } from "./TokenBadge";
+import { TreePathBreadcrumb } from "./TreePathBreadcrumb";
 
 interface MessageListProps {
   messages: ChatMessage[];
@@ -121,6 +123,12 @@ export function MessageList({
                   ) : (
                     <MarkdownContent content={msg.content} />
                   )}
+                  {(() => {
+                    const paths = (
+                      msg as ChatMessage & { metadata?: { treePaths?: TreePathRef[] } }
+                    ).metadata?.treePaths;
+                    return paths ? <TreePathBreadcrumb treePaths={paths} /> : null;
+                  })()}
                   {msg.transparency && <TokenBadge transparency={msg.transparency} />}
                 </div>
               )}
