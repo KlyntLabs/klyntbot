@@ -1,5 +1,5 @@
 import { forceCollide } from "d3-force";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { ForceGraphMethods } from "react-force-graph-2d";
 import { type PaintContext, paintLink, paintNode } from "../lib/graphPainters";
 import type { ForceLink, ForceNode, GraphElements } from "./useGraphElements";
@@ -107,60 +107,130 @@ export function useForceGraph({
     adjacencyRef.current = adj;
   }, [elements.links]);
 
-  // Apply cached positions to nodes
-  const graphData = useCallback(() => {
+  // Stable graph data ref — react-force-graph mutates node objects (adds x, y, vx, vy).
+  // We must NOT recreate node objects on re-render or the simulation restarts.
+  // Only update when the set of node/link IDs actually changes.
+  const graphDataRef = useRef<{ nodes: ForceNode[]; links: ForceLink[] }>({ nodes: [], links: [] });
+  const prevFingerprintRef = useRef<string>("");
+
+  const graphData = useMemo(() => {
+    // Build a fingerprint of node IDs + link source/targets to detect structural changes
+    const nodeIds = elements.nodes.map((n) => n.id).sort().join(",");
+    const linkIds = elements.links
+      .map((l) => `${typeof l.source === "string" ? l.source : (l.source as never as ForceNode).id}-${typeof l.target === "string" ? l.target : (l.target as never as ForceNode).id}`)
+      .sort()
+      .join(",");
+    const fingerprint = `${nodeIds}|${linkIds}`;
+
+    if (fingerprint === prevFingerprintRef.current) {
+      // Structure unchanged — return the SAME object ref so ForceGraph2D doesn't restart
+      return graphDataRef.current;
+    }
+
+    prevFingerprintRef.current = fingerprint;
+
+    // Structure changed — build new graph data, applying cached positions
     const nodes = elements.nodes.map((node) => {
+      // Check if this node already exists in the previous data (preserve simulation state)
+      const existing = graphDataRef.current.nodes.find((n) => n.id === node.id);
+      if (existing) {
+        // Update data fields but keep simulation-managed x/y/vx/vy
+        Object.assign(existing, {
+          label: node.label,
+          color: node.color,
+          size: node.size,
+          linkCount: node.linkCount,
+          tags: node.tags,
+          bodyPreview: node.bodyPreview,
+          notebookId: node.notebookId,
+          clusterId: node.clusterId,
+        });
+        return existing;
+      }
+      // New node — apply cached position if available
       const cached = cachedPositions?.[node.id];
       if (cached) {
-        return { ...node, x: cached.x, y: cached.y, fx: undefined, fy: undefined };
+        return { ...node, x: cached.x, y: cached.y };
       }
-      return node;
+      return { ...node };
     });
-    return { nodes, links: [...elements.links] };
-  }, [elements, cachedPositions])();
+
+    const data = { nodes, links: [...elements.links] };
+    graphDataRef.current = data;
+    return data;
+  }, [elements, cachedPositions]);
 
   // ── Force configuration ─────────────────────────────────────────────
 
-  const configureForces = useCallback(() => {
-    const fg = graphRef.current;
-    if (!fg) return;
+  const configureForces = useCallback(
+    (reheat = false) => {
+      const fg = graphRef.current;
+      if (!fg) return;
 
-    // Charge (repulsion)
-    const charge = fg.d3Force("charge");
-    if (charge && "strength" in charge) {
-      (charge as unknown as { strength: (v: number) => void }).strength(-settings.repulsion);
-    }
+      // Charge (repulsion)
+      const charge = fg.d3Force("charge");
+      if (charge && "strength" in charge) {
+        (charge as unknown as { strength: (v: number) => void }).strength(-settings.repulsion);
+      }
 
-    // Center
-    const center = fg.d3Force("center");
-    if (center && "strength" in center) {
-      (center as unknown as { strength: (v: number) => void }).strength(settings.centerForce);
-    }
+      // Center
+      const center = fg.d3Force("center");
+      if (center && "strength" in center) {
+        (center as unknown as { strength: (v: number) => void }).strength(settings.centerForce);
+      }
 
-    // Link distance
-    const link = fg.d3Force("link");
-    if (link && "distance" in link) {
-      (link as unknown as { distance: (v: number) => void }).distance(settings.linkDistance);
-    }
+      // Link distance
+      const link = fg.d3Force("link");
+      if (link && "distance" in link) {
+        (link as unknown as { distance: (v: number) => void }).distance(settings.linkDistance);
+      }
 
-    // Collide
-    fg.d3Force(
-      "collide",
-      forceCollide<ForceNode>((node) => (node.size / 2) * settings.nodeScale + 4) as never,
-    );
+      // Collide
+      fg.d3Force(
+        "collide",
+        forceCollide<ForceNode>((node) => (node.size / 2) * settings.nodeScale + 4) as never,
+      );
 
-    // Cluster attraction: pull nodes toward cluster centroid
-    fg.d3Force("clusterAttraction", clusterAttractionForce(CLUSTER_ATTRACTION) as never);
+      // Cluster attraction: pull nodes toward cluster centroid
+      fg.d3Force("clusterAttraction", clusterAttractionForce(CLUSTER_ATTRACTION) as never);
 
-    fg.d3ReheatSimulation();
-  }, [settings]);
+      if (reheat) fg.d3ReheatSimulation();
+    },
+    [settings.repulsion, settings.centerForce, settings.linkDistance, settings.nodeScale],
+  );
 
-  // Reconfigure forces when settings change
+  // Configure forces once on mount (no reheat)
+  const initializedRef = useRef(false);
   useEffect(() => {
-    // Small delay to ensure the graph ref is populated
-    const timer = setTimeout(configureForces, 50);
+    if (initializedRef.current) return;
+    const timer = setTimeout(() => {
+      configureForces(false);
+      initializedRef.current = true;
+    }, 50);
     return () => clearTimeout(timer);
   }, [configureForces]);
+
+  // Reheat only when physics settings actually change (after initial mount)
+  const prevPhysicsRef = useRef({
+    repulsion: settings.repulsion,
+    centerForce: settings.centerForce,
+    linkDistance: settings.linkDistance,
+  });
+  useEffect(() => {
+    const prev = prevPhysicsRef.current;
+    if (
+      prev.repulsion !== settings.repulsion ||
+      prev.centerForce !== settings.centerForce ||
+      prev.linkDistance !== settings.linkDistance
+    ) {
+      prevPhysicsRef.current = {
+        repulsion: settings.repulsion,
+        centerForce: settings.centerForce,
+        linkDistance: settings.linkDistance,
+      };
+      configureForces(true);
+    }
+  }, [settings.repulsion, settings.centerForce, settings.linkDistance, configureForces]);
 
   // ── Canvas painting ─────────────────────────────────────────────────
 
