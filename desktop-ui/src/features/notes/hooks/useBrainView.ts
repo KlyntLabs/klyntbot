@@ -11,21 +11,18 @@ interface UseBrainViewParams {
 }
 
 export function useBrainView({ settings }: UseBrainViewParams) {
-  const graphRef = useRef<ForceGraphMethods>();
+  const graphRef = useRef<ForceGraphMethods>(undefined);
   const bloomAddedRef = useRef(false);
   const rotationTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const isRotatingRef = useRef(false);
 
   // Build a custom Three.js Mesh for each node
-  const nodeThreeObject = useCallback(
-    (node: ForceNode) => {
-      const emissiveIntensity = Math.min(0.3 + (0.7 * node.linkCount) / 15, 1);
-      const geometry = createNodeGeometry(node.size * 0.3); // scale down for 3D space
-      const material = createNodeMaterial(node.color, emissiveIntensity);
-      return new Mesh(geometry, material);
-    },
-    [],
-  );
+  const nodeThreeObject = useCallback((node: ForceNode) => {
+    const emissiveIntensity = Math.min(0.3 + (0.7 * node.linkCount) / 15, 1);
+    const geometry = createNodeGeometry(node.size * 0.3); // scale down for 3D space
+    const material = createNodeMaterial(node.color, emissiveIntensity);
+    return new Mesh(geometry, material);
+  }, []);
 
   // Add bloom post-processing to the ForceGraph3D instance
   const setupPostProcessing = useCallback(() => {

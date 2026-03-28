@@ -1,7 +1,7 @@
-import { Map } from "lucide-react";
+import { Map as MapIcon } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
-import type { ForceLink, ForceNode } from "../hooks/useGraphElements";
 import type { ViewportBounds } from "../hooks/useForceGraph";
+import type { ForceLink, ForceNode } from "../hooks/useGraphElements";
 
 // ── Constants ────────────────────────────────────────────────────────────
 
@@ -123,9 +123,7 @@ export function GraphMinimap({
       const isRevealed =
         revealedNodes.size === 0 || (revealedNodes.has(source.id) && revealedNodes.has(target.id));
 
-      ctx.strokeStyle = isRevealed
-        ? hexToRgba(link.color, 0.15)
-        : "rgba(255,255,255,0.03)";
+      ctx.strokeStyle = isRevealed ? hexToRgba(link.color, 0.15) : "rgba(255,255,255,0.03)";
       ctx.beginPath();
       ctx.moveTo(toCanvasX(sx), toCanvasY(sy));
       ctx.lineTo(toCanvasX(tx), toCanvasY(ty));
@@ -196,7 +194,7 @@ export function GraphMinimap({
         }`}
         aria-label={visible ? "Hide minimap" : "Show minimap"}
       >
-        <Map size={14} />
+        <MapIcon size={14} />
       </button>
 
       {visible && nodes.length > 0 && (

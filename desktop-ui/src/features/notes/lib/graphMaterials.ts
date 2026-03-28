@@ -1,9 +1,4 @@
-import {
-  Color,
-  LineBasicMaterial,
-  MeshStandardMaterial,
-  SphereGeometry,
-} from "three";
+import { Color, LineBasicMaterial, MeshStandardMaterial, SphereGeometry } from "three";
 
 export function createNodeMaterial(
   hexColor: string,
@@ -27,10 +22,7 @@ export function createNodeGeometry(size: number): SphereGeometry {
   return new SphereGeometry(radius, segments, segments);
 }
 
-export function createLinkMaterial(
-  hexColor: string,
-  opacity: number,
-): LineBasicMaterial {
+export function createLinkMaterial(hexColor: string, opacity: number): LineBasicMaterial {
   return new LineBasicMaterial({
     color: new Color(hexColor),
     transparent: true,

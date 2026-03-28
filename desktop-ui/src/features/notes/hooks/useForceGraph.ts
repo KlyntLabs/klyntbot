@@ -76,7 +76,7 @@ const ZOOM_FACTOR = 1.4;
 export function useForceGraph({
   elements,
   settings,
-  activeNoteId,
+  activeNoteId: _activeNoteId,
   highlightedClusterId,
   revealedNodes,
   cachedPositions,
@@ -85,7 +85,7 @@ export function useForceGraph({
   onSavePositions,
   onNudge,
 }: UseForceGraphParams): ForceGraphController {
-  const graphRef = useRef<ForceGraphMethods>();
+  const graphRef = useRef<ForceGraphMethods>(undefined);
   const [hoveredNodeId, setHoveredNodeId] = useState<string | null>(null);
   const neighborSetRef = useRef<Set<string>>(new Set());
   const lastClickRef = useRef<{ nodeId: string; time: number } | null>(null);
@@ -95,8 +95,10 @@ export function useForceGraph({
   useEffect(() => {
     const adj = new Map<string, Set<string>>();
     for (const link of elements.links) {
-      const sId = typeof link.source === "string" ? link.source : (link.source as never as ForceNode).id;
-      const tId = typeof link.target === "string" ? link.target : (link.target as never as ForceNode).id;
+      const sId =
+        typeof link.source === "string" ? link.source : (link.source as never as ForceNode).id;
+      const tId =
+        typeof link.target === "string" ? link.target : (link.target as never as ForceNode).id;
       if (!adj.has(sId)) adj.set(sId, new Set());
       if (!adj.has(tId)) adj.set(tId, new Set());
       adj.get(sId)?.add(tId);
@@ -126,19 +128,19 @@ export function useForceGraph({
     // Charge (repulsion)
     const charge = fg.d3Force("charge");
     if (charge && "strength" in charge) {
-      (charge as { strength: (v: number) => void }).strength(-settings.repulsion);
+      (charge as unknown as { strength: (v: number) => void }).strength(-settings.repulsion);
     }
 
     // Center
     const center = fg.d3Force("center");
     if (center && "strength" in center) {
-      (center as { strength: (v: number) => void }).strength(settings.centerForce);
+      (center as unknown as { strength: (v: number) => void }).strength(settings.centerForce);
     }
 
     // Link distance
     const link = fg.d3Force("link");
     if (link && "distance" in link) {
-      (link as { distance: (v: number) => typeof link }).distance(settings.linkDistance);
+      (link as unknown as { distance: (v: number) => void }).distance(settings.linkDistance);
     }
 
     // Collide
@@ -175,7 +177,13 @@ export function useForceGraph({
       };
       paintNode(node, ctx, globalScale, paintCtx);
     },
-    [settings.nodeScale, settings.labelThreshold, hoveredNodeId, highlightedClusterId, revealedNodes],
+    [
+      settings.nodeScale,
+      settings.labelThreshold,
+      hoveredNodeId,
+      highlightedClusterId,
+      revealedNodes,
+    ],
   );
 
   const nodeCanvasObjectMode = useCallback(() => "replace" as const, []);
@@ -184,7 +192,10 @@ export function useForceGraph({
     (link: ForceLink, ctx: CanvasRenderingContext2D, globalScale: number) => {
       const source = link.source as unknown as ForceNode;
       const target = link.target as unknown as ForceNode;
-      if (revealedNodes.size > 0 && (!revealedNodes.has(source.id) || !revealedNodes.has(target.id))) {
+      if (
+        revealedNodes.size > 0 &&
+        (!revealedNodes.has(source.id) || !revealedNodes.has(target.id))
+      ) {
         return;
       }
 
@@ -197,7 +208,13 @@ export function useForceGraph({
       };
       paintLink(link, ctx, globalScale, paintCtx);
     },
-    [settings.nodeScale, settings.labelThreshold, hoveredNodeId, highlightedClusterId, revealedNodes],
+    [
+      settings.nodeScale,
+      settings.labelThreshold,
+      hoveredNodeId,
+      highlightedClusterId,
+      revealedNodes,
+    ],
   );
 
   const linkCanvasObjectMode = useCallback(() => "replace" as const, []);
@@ -237,18 +254,27 @@ export function useForceGraph({
     [onNodeClick, onNodeDoubleClick],
   );
 
-  const handleNodeHover = useCallback(
-    (node: ForceNode | null) => {
-      if (node) {
-        setHoveredNodeId(node.id);
-        neighborSetRef.current = adjacencyRef.current.get(node.id) ?? new Set();
-      } else {
-        setHoveredNodeId(null);
-        neighborSetRef.current = new Set();
+  const handleNodeHover = useCallback((node: ForceNode | null) => {
+    if (node) {
+      setHoveredNodeId(node.id);
+      neighborSetRef.current = adjacencyRef.current.get(node.id) ?? new Set();
+    } else {
+      setHoveredNodeId(null);
+      neighborSetRef.current = new Set();
+    }
+  }, []);
+
+  // ── Position snapshot (must be defined before handleNodeDragEnd) ───
+
+  const snapshotCurrentPositions = useCallback((): PositionMap => {
+    const positions: PositionMap = {};
+    for (const node of elements.nodes) {
+      if (node.x != null && node.y != null) {
+        positions[node.id] = { x: node.x, y: node.y };
       }
-    },
-    [],
-  );
+    }
+    return positions;
+  }, [elements.nodes]);
 
   const handleNodeDragEnd = useCallback(
     (node: ForceNode) => {
@@ -270,7 +296,7 @@ export function useForceGraph({
       const positions = snapshotCurrentPositions();
       onSavePositions(positions);
     },
-    [onNudge, onSavePositions],
+    [onNudge, onSavePositions, snapshotCurrentPositions],
   );
 
   const handleBackgroundClick = useCallback(() => {
@@ -320,18 +346,6 @@ export function useForceGraph({
       height: bottomRight.y - topLeft.y,
     };
   }, []);
-
-  // ── Position snapshot ───────────────────────────────────────────────
-
-  const snapshotCurrentPositions = useCallback((): PositionMap => {
-    const positions: PositionMap = {};
-    for (const node of elements.nodes) {
-      if (node.x != null && node.y != null) {
-        positions[node.id] = { x: node.x, y: node.y };
-      }
-    }
-    return positions;
-  }, [elements.nodes]);
 
   return {
     graphRef,

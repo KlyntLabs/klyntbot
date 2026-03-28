@@ -58,22 +58,26 @@ export function GraphBrainView({
       linkDirectionalParticleSpeed={0.005}
       linkDirectionalParticleWidth={0.8}
       showNavInfo={false}
-      onNodeClick={((node: { id?: string }) => {
-        if (node.id && onNodeClick) {
-          onNodeClick(String(node.id));
-        }
-        resetIdleTimer();
-      }) as never}
-      onNodeHover={((node: { id?: string } | null) => {
-        if (onNodeHover) {
-          if (node?.id) {
-            // In 3D mode we pass 0,0 for x,y since tooltip positioning differs
-            onNodeHover(String(node.id), 0, 0);
-          } else {
-            onNodeHover(null, 0, 0);
+      onNodeClick={
+        ((node: { id?: string }) => {
+          if (node.id && onNodeClick) {
+            onNodeClick(String(node.id));
           }
-        }
-      }) as never}
+          resetIdleTimer();
+        }) as never
+      }
+      onNodeHover={
+        ((node: { id?: string } | null) => {
+          if (onNodeHover) {
+            if (node?.id) {
+              // In 3D mode we pass 0,0 for x,y since tooltip positioning differs
+              onNodeHover(String(node.id), 0, 0);
+            } else {
+              onNodeHover(null, 0, 0);
+            }
+          }
+        }) as never
+      }
       onNodeDrag={(() => resetIdleTimer()) as never}
       cooldownTicks={settings.livePhysics ? Infinity : 100}
       enableNodeDrag={true}

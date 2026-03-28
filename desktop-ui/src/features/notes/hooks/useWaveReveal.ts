@@ -1,5 +1,5 @@
 import { useCallback, useRef, useState } from "react";
-import { computeBfsWaves, selectHub } from "../lib/graphBfs";
+import { computeBfsWaves } from "../lib/graphBfs";
 import type { ForceNode, GraphElements } from "./useGraphElements";
 import type { PositionMap } from "./useGraphPositionCache";
 
@@ -45,7 +45,7 @@ export function useWaveReveal(revealSpeed: RevealSpeed): WaveRevealController {
     (
       hubId: string,
       elements: GraphElements,
-      cachedPositions?: PositionMap | null,
+      _cachedPositions?: PositionMap | null,
       waveOrder?: string[][],
     ) => {
       cancelReveal();

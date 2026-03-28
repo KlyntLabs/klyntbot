@@ -121,19 +121,73 @@ export function GraphSettingsPopover({
       </div>
 
       <div className="space-y-0.5">
-        <Slider label="Link Distance" value={settings.linkDistance} min={40} max={300} step={10} unit="px" onChange={(v) => onChange({ linkDistance: v })} />
-        <Slider label="Repulsion" value={settings.repulsion} min={1000} max={30000} step={500} onChange={(v) => onChange({ repulsion: v })} />
-        <Slider label="Center Force" value={settings.centerForce} min={0} max={1} step={0.05} onChange={(v) => onChange({ centerForce: v })} />
-        <Slider label="Node Size" value={settings.nodeScale} min={0.5} max={2} step={0.1} unit="×" onChange={(v) => onChange({ nodeScale: v })} />
-        <Slider label="Label Threshold" value={settings.labelThreshold} min={0.1} max={1.5} step={0.1} unit="×" onChange={(v) => onChange({ labelThreshold: v })} />
+        <Slider
+          label="Link Distance"
+          value={settings.linkDistance}
+          min={40}
+          max={300}
+          step={10}
+          unit="px"
+          onChange={(v) => onChange({ linkDistance: v })}
+        />
+        <Slider
+          label="Repulsion"
+          value={settings.repulsion}
+          min={1000}
+          max={30000}
+          step={500}
+          onChange={(v) => onChange({ repulsion: v })}
+        />
+        <Slider
+          label="Center Force"
+          value={settings.centerForce}
+          min={0}
+          max={1}
+          step={0.05}
+          onChange={(v) => onChange({ centerForce: v })}
+        />
+        <Slider
+          label="Node Size"
+          value={settings.nodeScale}
+          min={0.5}
+          max={2}
+          step={0.1}
+          unit="×"
+          onChange={(v) => onChange({ nodeScale: v })}
+        />
+        <Slider
+          label="Label Threshold"
+          value={settings.labelThreshold}
+          min={0.1}
+          max={1.5}
+          step={0.1}
+          unit="×"
+          onChange={(v) => onChange({ labelThreshold: v })}
+        />
       </div>
 
       <div className="mt-2 pt-2 border-t border-border-subtle space-y-0.5">
-        <Toggle label="Show Arrows" checked={settings.showArrows} onChange={(v) => onChange({ showArrows: v })} />
-        <Toggle label="Show Orphan Nodes" checked={settings.showOrphans} onChange={(v) => onChange({ showOrphans: v })} />
-        <Toggle label="Show Minimap" checked={settings.showMinimap} onChange={(v) => onChange({ showMinimap: v })} />
+        <Toggle
+          label="Show Arrows"
+          checked={settings.showArrows}
+          onChange={(v) => onChange({ showArrows: v })}
+        />
+        <Toggle
+          label="Show Orphan Nodes"
+          checked={settings.showOrphans}
+          onChange={(v) => onChange({ showOrphans: v })}
+        />
+        <Toggle
+          label="Show Minimap"
+          checked={settings.showMinimap}
+          onChange={(v) => onChange({ showMinimap: v })}
+        />
         {settings.renderMode === "3d" && (
-          <Toggle label="Idle Rotation" checked={settings.idleRotation} onChange={(v) => onChange({ idleRotation: v })} />
+          <Toggle
+            label="Idle Rotation"
+            checked={settings.idleRotation}
+            onChange={(v) => onChange({ idleRotation: v })}
+          />
         )}
       </div>
 

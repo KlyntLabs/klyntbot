@@ -38,8 +38,10 @@ export interface ForceNode {
   x?: number;
   y?: number;
   z?: number;
-  fx?: number | null;
-  fy?: number | null;
+  vx?: number;
+  vy?: number;
+  fx?: number;
+  fy?: number;
 }
 
 export interface ForceLink {
@@ -76,6 +78,7 @@ export function useGraphElements({
   clusteringMode,
   activeNoteId: _activeNoteId,
 }: UseGraphElementsParams): GraphElements {
+  // biome-ignore lint/correctness/useExhaustiveDependencies: clusteringMode triggers recompute when semantic clustering is added
   return useMemo(() => {
     const clusterMap = new Map<string, ClusterInfo>();
     const notebookMap = new Map<string, Notebook>();
