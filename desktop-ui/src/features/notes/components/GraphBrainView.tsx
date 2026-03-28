@@ -178,7 +178,7 @@ export function GraphBrainView({
       const tId =
         typeof link.target === "string" ? link.target : (link.target as ForceNode)?.id;
       const isConnected = sId === hovId || tId === hovId;
-      return isConnected ? link.color || "#4B5563" : "rgba(30,30,40,0.15)";
+      return isConnected ? link.color || "#4B5563" : "rgba(50,50,65,0.3)";
     },
     [],
   );
@@ -187,13 +187,13 @@ export function GraphBrainView({
   const linkWidth = useCallback(
     (link: { source?: ForceNode | string; target?: ForceNode | string }) => {
       const hovId = hoveredIdRef.current;
-      if (!hovId) return 0.5;
+      if (!hovId) return 0.8;
 
       const sId =
         typeof link.source === "string" ? link.source : (link.source as ForceNode)?.id;
       const tId =
         typeof link.target === "string" ? link.target : (link.target as ForceNode)?.id;
-      return sId === hovId || tId === hovId ? 1.5 : 0.2;
+      return sId === hovId || tId === hovId ? 1.5 : 0.4;
     },
     [],
   );
@@ -208,7 +208,7 @@ export function GraphBrainView({
       nodeThreeObject={nodeThreeObject as never}
       nodeThreeObjectExtend={false}
       linkColor={linkColor as never}
-      linkOpacity={0.35}
+      linkOpacity={0.55}
       linkWidth={linkWidth as never}
       linkDirectionalParticles={settings.showArrows ? 2 : 0}
       linkDirectionalParticleSpeed={0.005}

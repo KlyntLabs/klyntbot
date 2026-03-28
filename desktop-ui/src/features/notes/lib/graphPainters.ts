@@ -82,20 +82,20 @@ export function paintLink(
   const target = link.target as unknown as ForceNode;
   if (!source.x || !source.y || !target.x || !target.y) return;
 
-  let opacity = 0.35 * link.weight;
+  let opacity = 0.55 * link.weight;
   if (paintCtx.hoveredNodeId) {
     const isConnected =
       source.id === paintCtx.hoveredNodeId || target.id === paintCtx.hoveredNodeId;
-    opacity = isConnected ? 0.7 * link.weight : 0.05;
+    opacity = isConnected ? 0.85 * link.weight : 0.1;
   } else if (paintCtx.highlightedClusterId) {
     const isInCluster =
       source.clusterId === paintCtx.highlightedClusterId ||
       target.clusterId === paintCtx.highlightedClusterId;
-    opacity = isInCluster ? 0.5 * link.weight : 0.05;
+    opacity = isInCluster ? 0.65 * link.weight : 0.1;
   }
 
   ctx.strokeStyle = hexToRgba(link.color, Math.min(opacity, 1));
-  ctx.lineWidth = Math.max(0.5, link.weight * 0.8);
+  ctx.lineWidth = Math.max(0.8, link.weight * 1.2);
   ctx.beginPath();
   ctx.moveTo(source.x, source.y);
   ctx.lineTo(target.x, target.y);
