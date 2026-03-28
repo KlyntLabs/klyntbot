@@ -307,7 +307,7 @@ mod tests {
         assert!(list_node.content.contains("Item A"));
         assert!(list_node.content.contains("Item B"));
         assert_eq!(list_node.parent_id, Some(nodes[0].id.clone()));
-        assert_eq!(list_node.node_type.as_str(), "ListItem");
+        assert_eq!(list_node.node_type.as_str(), "list_item");
     }
 
     #[test]
@@ -346,7 +346,7 @@ mod tests {
         assert_eq!(task_node.level, 7);
         assert!(task_node.content.contains("Buy groceries"));
         assert!(task_node.content.contains("Walk the dog"));
-        assert_eq!(task_node.node_type.as_str(), "Task");
+        assert_eq!(task_node.node_type.as_str(), "task");
         assert_eq!(task_node.parent_id, Some(nodes[0].id.clone()));
     }
 

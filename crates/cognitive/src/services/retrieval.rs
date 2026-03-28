@@ -99,6 +99,8 @@ pub async fn retrieve_relevant_facts(
         temporal: params.relevance_weight_temporal,
         hierarchy: 0.0,
         path_coherence: 0.0,
+        community: 0.0,
+        cross_note: 0.0,
     };
 
     debug!(
@@ -243,6 +245,8 @@ async fn vector_path(
                 temporal,
                 0.0,
                 0.5,
+                0.0,
+                0.0,
                 weights,
             );
             ScoredFact {
@@ -294,6 +298,8 @@ async fn fallback_path(
                 temporal,
                 0.0,
                 0.5,
+                0.0,
+                0.0,
                 weights,
             );
             ScoredFact {

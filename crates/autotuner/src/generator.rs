@@ -191,11 +191,15 @@ below; unsafe suggestions are silently discarded by the evaluator.\n\n",
 | rewrite_confidence_threshold   | 0.30  | 0.95  | 0.05  | Minimum confidence to accept an enrichment |\n\
 | rewrite_max_signals            | 1     | 6     | 1     | Max context signals in heuristic enrichment |\n\
 | rewrite_min_enrichment_length  | 5     | 30    | 5     | Min chars for an enrichment to be accepted |\n\
-| relevance_weight_hierarchy     | 0.00  | 0.25  | 0.01  | hierarchy_score weight in 8-factor model |\n\
-| relevance_weight_path_coherence| 0.00  | 0.20  | 0.01  | path_coherence weight in 8-factor model |\n\
+| relevance_weight_hierarchy     | 0.00  | 0.25  | 0.01  | hierarchy_score weight in 10-factor model |\n\
+| relevance_weight_path_coherence| 0.00  | 0.20  | 0.01  | path_coherence weight in 10-factor model |\n\
 | tree_top_k                     | 5     | 30    | 1     | top-k for tree_node_embeddings search |\n\
 | tree_min_similarity            | 0.30  | 0.70  | 0.05  | min cosine similarity for tree nodes |\n\
-| hybrid_bias                    | 0.00  | 1.00  | 0.05  | RRF weight in hybrid retrieval path |\n\n",
+| hybrid_bias                    | 0.00  | 1.00  | 0.05  | RRF weight in hybrid retrieval path |\n\
+| relevance_weight_community     | 0.00  | 0.30  | 0.01  | community_membership weight in 10-factor model |\n\
+| relevance_weight_cross_note    | 0.00  | 0.20  | 0.01  | cross_note_boost weight |\n\
+| community_top_k                | 3     | 15    | 1     | top-k for community_embeddings search |\n\
+| community_min_similarity       | 0.30  | 0.70  | 0.05  | min cosine similarity for communities |\n\n",
     );
 
     // ---- 9. Promotion constraints ------------------------------------------

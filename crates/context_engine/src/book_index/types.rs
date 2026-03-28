@@ -13,29 +13,30 @@ pub enum TreeNodeType {
 impl TreeNodeType {
     pub fn as_str(&self) -> &str {
         match self {
-            Self::Section => "Section",
-            Self::Text => "Text",
-            Self::Table => "Table",
-            Self::Code => "Code",
-            Self::Task => "Task",
-            Self::ListItem => "ListItem",
+            Self::Section => "section",
+            Self::Text => "text",
+            Self::Table => "table",
+            Self::Code => "code",
+            Self::Task => "task",
+            Self::ListItem => "list_item",
         }
     }
 
     pub fn parse(s: &str) -> Self {
-        match s {
-            "Section" => Self::Section,
-            "Text" => Self::Text,
-            "Table" => Self::Table,
-            "Code" => Self::Code,
-            "Task" => Self::Task,
-            "ListItem" => Self::ListItem,
+        match s.to_ascii_lowercase().as_str() {
+            "section" => Self::Section,
+            "text" => Self::Text,
+            "table" => Self::Table,
+            "code" => Self::Code,
+            "task" => Self::Task,
+            "listitem" | "list_item" => Self::ListItem,
             _ => Self::Text,
         }
     }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
 pub enum SourceType {
     Note,
     Task,
@@ -45,17 +46,17 @@ pub enum SourceType {
 impl SourceType {
     pub fn as_str(&self) -> &str {
         match self {
-            Self::Note => "Note",
-            Self::Task => "Task",
-            Self::Skill => "Skill",
+            Self::Note => "note",
+            Self::Task => "task",
+            Self::Skill => "skill",
         }
     }
 
     pub fn parse(s: &str) -> Self {
-        match s {
-            "Note" => Self::Note,
-            "Task" => Self::Task,
-            "Skill" => Self::Skill,
+        match s.to_ascii_lowercase().as_str() {
+            "note" => Self::Note,
+            "task" => Self::Task,
+            "skill" => Self::Skill,
             _ => Self::Note,
         }
     }

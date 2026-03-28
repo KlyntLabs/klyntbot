@@ -742,15 +742,11 @@ impl AgentLoopBuilder {
             forge.add_searcher(Arc::new(crate::domain_searchers::TaskSearcher::new(
                 repos.clone(),
             )));
-            let entity_repo = cognitive::repos::EntityRepo::new(storage_pool.inner().clone());
-            forge.add_searcher(Arc::new(crate::domain_searchers::GraphSearcher::new(
-                entity_repo.clone(),
-            )));
             forge.add_searcher(Arc::new(crate::domain_searchers::FinanceSearcher::new(
                 repos.clone(),
             )));
 
-            // NoteTreeNavigator (replaces BookRAGSearcher)
+            // NoteTreeNavigator with optional community search (Phase 2)
             if config.cognitive.book_index.enabled {
                 let tree_repo: Arc<dyn context_engine::book_index::BookTreeRepo> = Arc::new(
                     cognitive::repos::SqliteBookTreeRepo::new(storage_pool.inner().clone()),
@@ -767,12 +763,24 @@ impl AgentLoopBuilder {
                             text_embedder.clone(),
                         ),
                     );
+
+                    // Community search adapter (Phase 2)
+                    let community_repo =
+                        cognitive::repos::CommunityRepo::new(storage_pool.inner().clone());
+                    let community_adapter = Arc::new(
+                        crate::adapters::community_search::CommunitySearchAdapter::new(
+                            Arc::new(vs.clone()),
+                            community_repo,
+                        ),
+                    );
+
                     let note_tree_navigator =
                         context_engine::insight_forge::note_tree_navigator::NoteTreeNavigator::new(
                             tree_repo.clone(),
                             tree_node_search,
                             None,
-                        );
+                        )
+                        .with_community_search(community_adapter.clone(), community_adapter);
                     forge.add_searcher(Arc::new(note_tree_navigator));
 
                     // NoteTreeBuilder subscriber (event-driven tree rebuild + LanceDB embed)
@@ -795,17 +803,39 @@ impl AgentLoopBuilder {
                         });
                         info!("NoteTreeBuilder subscriber started");
 
+                        // CommunityBuilder subscriber (Phase 2 — Louvain detection)
+                        let community_repo_for_builder =
+                            cognitive::repos::CommunityRepo::new(storage_pool.inner().clone());
+                        let community_builder =
+                            Arc::new(crate::adapters::community_builder::CommunityBuilder::new(
+                                community_repo_for_builder,
+                                Arc::new(vs.clone()),
+                                text_embedder.clone(),
+                                tree_repo.clone(),
+                                self.context_update_queue.clone(),
+                            ));
+                        let comm_builder_rx = domain_bus.subscribe();
+                        let comm_builder_shutdown = CancellationToken::new();
+                        let _comm_builder_handle = tokio::spawn({
+                            let builder = Arc::clone(&community_builder);
+                            let shutdown = comm_builder_shutdown.clone();
+                            async move {
+                                builder.run(comm_builder_rx, shutdown).await;
+                            }
+                        });
+                        info!("CommunityBuilder subscriber started");
+
                         // Background tree node backfill for existing notes
                         {
                             let backfill_builder = Arc::clone(&note_tree_builder);
-                            let backfill_note_repo = feature_notes::repo::NoteRepo::new(
-                                storage_pool.inner().clone(),
-                            );
+                            let backfill_note_repo =
+                                feature_notes::repo::NoteRepo::new(storage_pool.inner().clone());
                             tokio::spawn(async move {
                                 // Delay to let the app finish starting
                                 tokio::time::sleep(std::time::Duration::from_secs(10)).await;
                                 if let Err(e) =
-                                    backfill_tree_nodes(&backfill_note_repo, &backfill_builder).await
+                                    backfill_tree_nodes(&backfill_note_repo, &backfill_builder)
+                                        .await
                                 {
                                     warn!("Note tree backfill error: {e}");
                                 }
@@ -831,6 +861,7 @@ impl AgentLoopBuilder {
             }
 
             // One-time entity backfill from pre-existing SPO facts (non-blocking)
+            let entity_repo = cognitive::repos::EntityRepo::new(storage_pool.inner().clone());
             tokio::spawn(async move {
                 match entity_repo.backfill_from_facts().await {
                     Ok(0) => {}

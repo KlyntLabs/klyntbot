@@ -234,7 +234,6 @@ fn compose_embedding_text(node: &context_engine::book_index::types::TreeNode) ->
     }
 }
 
-
 #[cfg(test)]
 mod tests {
     use super::*;

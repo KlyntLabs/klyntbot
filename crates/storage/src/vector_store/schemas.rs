@@ -123,3 +123,13 @@ pub(crate) fn tree_node_embedding_schema() -> Schema {
         Field::new("updated_at", DataType::Utf8, false),
     ])
 }
+
+pub(crate) fn community_embedding_schema() -> Schema {
+    Schema::new(vec![
+        Field::new("id", DataType::Utf8, false),
+        vector_field(),
+        Field::new("member_count", DataType::Utf8, false),
+        Field::new("source_note_count", DataType::Utf8, false),
+        Field::new("updated_at", DataType::Utf8, false),
+    ])
+}

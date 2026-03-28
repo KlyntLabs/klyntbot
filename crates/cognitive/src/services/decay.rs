@@ -12,7 +12,7 @@ pub fn retrievability(elapsed_days: f64, stability: f64) -> f64 {
     (0.9_f64.ln() * elapsed_days / stability).exp()
 }
 
-/// Configurable relevance weights for the 8-factor scoring formula.
+/// Configurable relevance weights for the 10-factor scoring formula.
 #[derive(Debug, Clone, Copy)]
 pub struct RelevanceWeights {
     pub semantic: f64,
@@ -23,19 +23,23 @@ pub struct RelevanceWeights {
     pub temporal: f64,
     pub hierarchy: f64,
     pub path_coherence: f64,
+    pub community: f64,
+    pub cross_note: f64,
 }
 
 impl Default for RelevanceWeights {
     fn default() -> Self {
         Self {
-            semantic: 0.25,
-            retrievability: 0.15,
-            importance: 0.10,
+            semantic: 0.20,
+            retrievability: 0.10,
+            importance: 0.08,
             frequency: 0.05,
-            situation: 0.20,
-            temporal: 0.05,
+            situation: 0.15,
+            temporal: 0.02,
             hierarchy: 0.10,
-            path_coherence: 0.10,
+            path_coherence: 0.05,
+            community: 0.15,
+            cross_note: 0.10,
         }
     }
 }
@@ -51,6 +55,8 @@ pub fn relevance_score(
     temporal_recency: f64,
     hierarchy_score: f64,
     path_coherence: f64,
+    community_score: f64,
+    cross_note_boost: f64,
     weights: &RelevanceWeights,
 ) -> f64 {
     (semantic_similarity * weights.semantic
@@ -60,7 +66,9 @@ pub fn relevance_score(
         + situational_boost * weights.situation
         + temporal_recency * weights.temporal
         + hierarchy_score * weights.hierarchy
-        + path_coherence * weights.path_coherence)
+        + path_coherence * weights.path_coherence
+        + community_score * weights.community
+        + cross_note_boost * weights.cross_note)
         .clamp(0.0, 1.0)
 }
 
@@ -115,6 +123,8 @@ mod tests {
         temporal: 0.05,
         hierarchy: 0.0,
         path_coherence: 0.0,
+        community: 0.0,
+        cross_note: 0.0,
     };
     const MAX_S: f64 = 30.0;
 
@@ -153,22 +163,21 @@ mod tests {
 
     #[test]
     fn test_relevance_score_combines_factors() {
-        let score = relevance_score(0.8, 0.9, 0.7, 0.5, 0.6, 0.5, 0.0, 0.5, &W);
+        let score = relevance_score(0.8, 0.9, 0.7, 0.5, 0.6, 0.5, 0.0, 0.5, 0.0, 0.0, &W);
         assert!(score > 0.0 && score <= 1.0);
     }
 
     #[test]
     fn test_relevance_score_clamps() {
-        let score = relevance_score(1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 0.0, 0.5, &W);
+        let score = relevance_score(1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 0.0, 0.5, 0.0, 0.0, &W);
         assert!((score - 1.0).abs() < f64::EPSILON);
 
-        let score = relevance_score(0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.5, &W);
+        let score = relevance_score(0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.5, 0.0, 0.0, &W);
         assert!((score - 0.0).abs() < f64::EPSILON);
     }
 
     #[test]
     fn test_relevance_score_custom_weights() {
-        // All weight on semantic similarity
         let custom = RelevanceWeights {
             semantic: 1.0,
             retrievability: 0.0,
@@ -178,8 +187,10 @@ mod tests {
             temporal: 0.0,
             hierarchy: 0.0,
             path_coherence: 0.0,
+            community: 0.0,
+            cross_note: 0.0,
         };
-        let score = relevance_score(0.8, 0.1, 0.1, 0.1, 0.1, 0.0, 0.0, 0.5, &custom);
+        let score = relevance_score(0.8, 0.1, 0.1, 0.1, 0.1, 0.0, 0.0, 0.5, 0.0, 0.0, &custom);
         assert!((score - 0.8).abs() < f64::EPSILON);
     }
 
@@ -268,8 +279,10 @@ mod tests {
             temporal: 0.05,
             hierarchy: 0.10,
             path_coherence: 0.10,
+            community: 0.0,
+            cross_note: 0.0,
         };
-        let score = relevance_score(0.8, 0.9, 0.7, 0.5, 0.6, 0.4, 1.0, 0.8, &weights);
+        let score = relevance_score(0.8, 0.9, 0.7, 0.5, 0.6, 0.4, 1.0, 0.8, 0.0, 0.0, &weights);
         // 0.25*0.8 + 0.15*0.9 + 0.10*0.7 + 0.05*0.5 + 0.20*0.6 + 0.05*0.4 + 0.10*1.0 + 0.10*0.8 = 0.75
         assert!((score - 0.75).abs() < 0.001);
     }
@@ -277,7 +290,26 @@ mod tests {
     #[test]
     fn test_extended_score_backward_compat_non_note() {
         let weights = RelevanceWeights::default();
-        let score = relevance_score(0.8, 0.9, 0.7, 0.5, 0.6, 0.4, 0.0, 0.5, &weights);
+        let score = relevance_score(0.8, 0.9, 0.7, 0.5, 0.6, 0.4, 0.0, 0.5, 0.0, 0.0, &weights);
         assert!(score > 0.0 && score <= 1.0);
+    }
+
+    #[test]
+    fn test_10_factor_community_and_cross_note() {
+        let weights = RelevanceWeights {
+            semantic: 0.0,
+            retrievability: 0.0,
+            importance: 0.0,
+            frequency: 0.0,
+            situation: 0.0,
+            temporal: 0.0,
+            hierarchy: 0.0,
+            path_coherence: 0.0,
+            community: 0.5,
+            cross_note: 0.5,
+        };
+        let score = relevance_score(0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.8, 0.6, &weights);
+        // 0.5*0.8 + 0.5*0.6 = 0.7
+        assert!((score - 0.7).abs() < 0.001);
     }
 }

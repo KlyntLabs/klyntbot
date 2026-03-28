@@ -57,6 +57,12 @@ pub struct TrialParams {
     pub tree_top_k: Option<usize>,
     pub tree_min_similarity: Option<f64>,
     pub hybrid_bias: Option<f64>,
+
+    // Phase 5: Community graph (4 params)
+    pub relevance_weight_community: Option<f64>,
+    pub relevance_weight_cross_note: Option<f64>,
+    pub community_top_k: Option<usize>,
+    pub community_min_similarity: Option<f64>,
 }
 
 impl TrialParams {

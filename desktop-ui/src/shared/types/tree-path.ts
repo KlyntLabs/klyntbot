@@ -11,3 +11,12 @@ export interface PathSegment {
   title: string;
   level: number;
 }
+
+export interface CommunityCardData {
+  communityId: string;
+  name: string;
+  sourceNoteCount: number;
+  representativePaths: string[];
+  stabilityTrend: number;
+  topEntities: string[];
+}

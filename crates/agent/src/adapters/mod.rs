@@ -8,6 +8,8 @@ pub mod book_index_skill_builder;
 pub mod book_index_task_builder;
 pub mod cognitive_embedder;
 pub mod cognitive_handlers;
+pub mod community_builder;
+pub mod community_search;
 pub mod conversation_recall;
 pub mod cron;
 pub mod finance;

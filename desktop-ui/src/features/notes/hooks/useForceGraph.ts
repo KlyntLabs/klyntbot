@@ -130,9 +130,15 @@ export function useForceGraph({
 
   const graphData = useMemo(() => {
     // Build a fingerprint of node IDs + link source/targets to detect structural changes
-    const nodeIds = elements.nodes.map((n) => n.id).sort().join(",");
+    const nodeIds = elements.nodes
+      .map((n) => n.id)
+      .sort()
+      .join(",");
     const linkIds = elements.links
-      .map((l) => `${typeof l.source === "string" ? l.source : (l.source as never as ForceNode).id}-${typeof l.target === "string" ? l.target : (l.target as never as ForceNode).id}`)
+      .map(
+        (l) =>
+          `${typeof l.source === "string" ? l.source : (l.source as never as ForceNode).id}-${typeof l.target === "string" ? l.target : (l.target as never as ForceNode).id}`,
+      )
       .sort()
       .join(",");
     const fingerprint = `${nodeIds}|${linkIds}`;

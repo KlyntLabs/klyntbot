@@ -14,6 +14,7 @@ pub mod conversation_recall;
 pub mod decay;
 pub mod extraction;
 pub mod fsrs5;
+pub mod louvain;
 pub mod memory_promotion;
 pub mod memory_retriever;
 pub mod reflection;

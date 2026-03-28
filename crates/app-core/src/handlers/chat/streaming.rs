@@ -480,11 +480,7 @@ async fn execute_squad_debate(
     let _ = relay_handle.await;
 
     // Persist each persona's final-round response as a visible message in the thread
-    let final_round = result
-        .rounds
-        .last()
-        .map(|r| r.round)
-        .unwrap_or(0);
+    let final_round = result.rounds.last().map(|r| r.round).unwrap_or(0);
     for resp in &result.persona_responses {
         if resp.round == final_round {
             let persona_msg_id = uuid::Uuid::new_v4();

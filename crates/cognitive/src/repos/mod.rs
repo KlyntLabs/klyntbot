@@ -3,6 +3,7 @@ pub mod annotation;
 pub mod atom_extraction_cache;
 pub mod blackboard;
 pub mod book_tree;
+pub mod community;
 pub mod deck_preference;
 pub mod entity;
 pub mod episodic_memory;
@@ -28,6 +29,7 @@ pub use annotation::AnnotationRepo;
 pub use atom_extraction_cache::AtomExtractionCache;
 pub use blackboard::{BlackboardEntry, BlackboardRepo, NewBlackboardEntry};
 pub use book_tree::SqliteBookTreeRepo;
+pub use community::{CommunityMemberRow, CommunityRepo, CommunityRow};
 pub use deck_preference::{DeckPreferenceRepo, DeckPreferenceRow};
 pub use entity::{
     EntityRepo, EntityRow, GraphNeighborhood, NewEntity, NewRelationship, RelationshipRow,
@@ -92,6 +94,12 @@ pub fn cognitive_migrations() -> Vec<FeatureMigration> {
             version: 7,
             description: "Add BookIndex tree nodes and GT-Link tables".to_string(),
             sql: include_str!("../../migrations/002_book_index_tables.sql").to_string(),
+        },
+        FeatureMigration {
+            feature_name: "cognitive_community".to_string(),
+            version: 1,
+            description: "Community graph tables for Louvain community detection".to_string(),
+            sql: include_str!("../../migrations/004_community_graph.sql").to_string(),
         },
         FeatureMigration {
             feature_name: "cognitive_mirror".to_string(),

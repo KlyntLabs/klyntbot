@@ -39,8 +39,77 @@ pub trait TreeNodeEmbeddingSearch: Send + Sync {
 }
 
 // ---------------------------------------------------------------------------
+// Community search traits (dependency inversion: L3 can't import L5)
+// ---------------------------------------------------------------------------
+
+/// A single vector-search hit against the community_embeddings table.
+#[derive(Debug, Clone)]
+pub struct CommunityHit {
+    pub community_id: String,
+    pub member_count: usize,
+    pub source_note_count: usize,
+    pub score: f64,
+}
+
+/// Trait abstracting embedding operations for communities.
+#[async_trait]
+pub trait CommunityEmbeddingSearch: Send + Sync {
+    async fn search_communities(
+        &self,
+        query_embedding: &[f32],
+        limit: usize,
+        min_similarity: f64,
+    ) -> common::Result<Vec<CommunityHit>>;
+}
+
+/// Metadata about a community, loaded from SQLite.
+#[derive(Debug, Clone)]
+pub struct CommunityInfo {
+    pub id: String,
+    pub name: String,
+    pub summary: String,
+    pub top_entities: Vec<String>,
+    pub representative_paths: Vec<String>,
+    pub source_note_count: usize,
+    pub stability: f64,
+}
+
+/// A community member (tree node + membership score).
+#[derive(Debug, Clone)]
+pub struct CommunityMember {
+    pub tree_node_id: String,
+    pub membership_score: f64,
+}
+
+/// Trait abstracting community data loading from SQLite.
+#[async_trait]
+pub trait CommunityMemberLoader: Send + Sync {
+    async fn get_community_members(
+        &self,
+        community_id: &str,
+    ) -> common::Result<Vec<CommunityMember>>;
+
+    async fn get_community_info(&self, community_id: &str)
+        -> common::Result<Option<CommunityInfo>>;
+}
+
+// ---------------------------------------------------------------------------
 // Query classification
 // ---------------------------------------------------------------------------
+
+const COMMUNITY_KEYWORDS: &[&str] = &[
+    "across my notes",
+    "connect",
+    "related to",
+    "how does",
+    "relate to",
+    "community",
+    "cluster",
+    "summarize my thoughts on",
+    "everything about",
+    "all my notes about",
+    "cross-note",
+];
 
 const HIERARCHICAL_KEYWORDS: &[&str] = &[
     "section",
@@ -64,15 +133,24 @@ pub enum QueryType {
     Hierarchical,
     /// Hierarchical keywords present AND an active task is set.
     Hybrid,
+    /// Cross-note synthesis / community traversal keywords.
+    Community,
 }
 
-/// Classify a query into one of the three retrieval paths.
+/// Classify a query into one of the four retrieval paths.
 ///
 /// `active_task` is an optional description / title of the user's current task
 /// (provided via session context).  When present and keywords match, the
 /// classifier returns `Hybrid` so both simple and hierarchical paths run.
 pub fn classify_query(query: &str, active_task: Option<&str>) -> QueryType {
     let lower = query.to_lowercase();
+
+    // Community keywords take priority (cross-note synthesis intent).
+    let has_community = COMMUNITY_KEYWORDS.iter().any(|kw| lower.contains(kw));
+    if has_community {
+        return QueryType::Community;
+    }
+
     let has_keyword = HIERARCHICAL_KEYWORDS.iter().any(|kw| lower.contains(kw));
 
     if !has_keyword {
@@ -104,6 +182,9 @@ pub struct NoteTreeNavigator {
     embedding_search: Arc<dyn TreeNodeEmbeddingSearch>,
     /// Optional active task description used for query classification.
     active_task: Option<String>,
+    /// When None, community queries fall back to hybrid.
+    community_search: Option<Arc<dyn CommunityEmbeddingSearch>>,
+    community_loader: Option<Arc<dyn CommunityMemberLoader>>,
 }
 
 impl NoteTreeNavigator {
@@ -116,7 +197,20 @@ impl NoteTreeNavigator {
             tree_repo,
             embedding_search,
             active_task,
+            community_search: None,
+            community_loader: None,
         }
+    }
+
+    /// Inject community search capabilities (Phase 2).
+    pub fn with_community_search(
+        mut self,
+        community_search: Arc<dyn CommunityEmbeddingSearch>,
+        community_loader: Arc<dyn CommunityMemberLoader>,
+    ) -> Self {
+        self.community_search = Some(community_search);
+        self.community_loader = Some(community_loader);
+        self
     }
 
     /// Update the active task context (e.g. when the user switches tasks).
@@ -301,6 +395,99 @@ impl NoteTreeNavigator {
     }
 
     // -----------------------------------------------------------------------
+    // Path 4: Community traversal
+    // -----------------------------------------------------------------------
+
+    async fn community_search(&self, query: &str, limit: usize) -> Vec<MemoryEntry> {
+        let (Some(community_search), Some(community_loader)) =
+            (&self.community_search, &self.community_loader)
+        else {
+            // Fall back to hybrid if community search not wired.
+            return self.hybrid_search(query, limit).await;
+        };
+
+        // 1. Embed query
+        let embedding = match self.embedding_search.embed_query(query).await {
+            Ok(e) => e,
+            Err(e) => {
+                tracing::warn!("NoteTreeNavigator: embed_query failed: {e}");
+                return vec![];
+            }
+        };
+
+        // 2. Search community embeddings
+        let community_hits = match community_search
+            .search_communities(&embedding, 5, 0.3)
+            .await
+        {
+            Ok(h) => h,
+            Err(e) => {
+                tracing::warn!("NoteTreeNavigator: community search failed: {e}");
+                return vec![];
+            }
+        };
+
+        if community_hits.is_empty() {
+            // Fall back to hybrid if no communities match.
+            return self.hybrid_search(query, limit).await;
+        }
+
+        // 3. For each community, load members and build entries
+        let mut entries = Vec::new();
+        for hit in &community_hits {
+            let info = match community_loader.get_community_info(&hit.community_id).await {
+                Ok(Some(info)) => info,
+                _ => continue,
+            };
+
+            let members = match community_loader
+                .get_community_members(&hit.community_id)
+                .await
+            {
+                Ok(m) => m,
+                Err(_) => continue,
+            };
+
+            // Add community summary as an entry
+            let paths_str = info.representative_paths.join("; ");
+            let community_content = format!(
+                "[Community: {}] {} — {} notes, paths: {}",
+                info.name, info.summary, info.source_note_count, paths_str
+            );
+
+            entries.push(MemoryEntry {
+                id: format!("community-{}", hit.community_id),
+                content: community_content,
+                score: hit.score,
+                source: MemorySource::Domain {
+                    name: "note_tree".into(),
+                },
+                raw_score: hit.score,
+            });
+
+            // Add top member nodes
+            for member in members.iter().take(3) {
+                if let Some(entry) = self
+                    .hit_to_entry(&TreeNodeHit {
+                        node_id: member.tree_node_id.clone(),
+                        note_id: String::new(), // unused by hit_to_entry
+                        similarity: member.membership_score * hit.score,
+                    })
+                    .await
+                {
+                    entries.push(entry);
+                }
+            }
+        }
+
+        // Dedup and sort
+        entries = dedup_by_node_id(entries);
+        entries.sort_by(|a, b| b.score.total_cmp(&a.score));
+        entries.truncate(limit);
+        entries
+    }
+
+    // -----------------------------------------------------------------------
     // Helpers
     // -----------------------------------------------------------------------
 
@@ -382,6 +569,7 @@ impl DomainSearcher for NoteTreeNavigator {
             QueryType::Simple => self.simple_search(query, limit).await,
             QueryType::Hierarchical => self.hierarchical_search(query, limit).await,
             QueryType::Hybrid => self.hybrid_search(query, limit).await,
+            QueryType::Community => self.community_search(query, limit).await,
         }
     }
 }
@@ -521,6 +709,26 @@ mod tests {
         assert_eq!(
             classify_query("find the section on auth", Some("")),
             QueryType::Hierarchical
+        );
+    }
+
+    #[test]
+    fn test_classify_community_query() {
+        assert_eq!(
+            classify_query("across my notes about AI safety", None),
+            QueryType::Community
+        );
+        assert_eq!(
+            classify_query("how does sleep relate to productivity", None),
+            QueryType::Community
+        );
+        assert_eq!(
+            classify_query("summarize my thoughts on leadership", None),
+            QueryType::Community
+        );
+        assert_eq!(
+            classify_query("everything about Rust patterns", None),
+            QueryType::Community
         );
     }
 

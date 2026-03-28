@@ -15,6 +15,7 @@ use lancedb::Connection;
 use crate::error::StorageError;
 
 mod cognitive;
+mod community;
 mod conv;
 mod crud;
 mod maintenance;
@@ -24,6 +25,7 @@ mod tests;
 mod tree_node;
 
 pub use cognitive::CognitiveFactParams;
+pub use community::CommunitySearchResult;
 pub use crud::sanitize_predicate_value;
 pub use tree_node::TreeNodeSearchResult;
 
@@ -41,6 +43,7 @@ pub use tree_node::TreeNodeSearchResult;
 /// - `work_context_embeddings`      — id, vector(384), updated_at
 /// - `flashcard_embeddings`         — id, vector(384), card_id, side, timestamp
 /// - `tree_node_embeddings`         — id, vector(384), note_id, level, source_type, updated_at
+/// - `community_embeddings`         — id, vector(384), member_count, source_note_count, updated_at
 #[derive(Clone)]
 pub struct VectorStore {
     pub(crate) db: Arc<Connection>,
@@ -109,6 +112,12 @@ impl VectorStore {
             .ensure_table(
                 "tree_node_embeddings",
                 schemas::tree_node_embedding_schema(),
+            )
+            .await?;
+        store
+            .ensure_table(
+                "community_embeddings",
+                schemas::community_embedding_schema(),
             )
             .await?;
         Ok(store)

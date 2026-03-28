@@ -25,3 +25,4 @@ futures-util = { workspace = true }
 providers = { workspace = true }
 config = { workspace = true }
 sha2 = { workspace = true }
+petgraph = "0.7"

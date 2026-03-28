@@ -20,6 +20,9 @@ pub enum ContextUpdateReason {
     DistractionDetected,
     BudgetThresholdCrossed,
     NoteStructureChanged,
+    CommunityDiscovered,
+    CommunityUpdated,
+    CommunityWeakened,
     Custom(String),
 }
 
@@ -32,6 +35,9 @@ impl ContextUpdateReason {
             Self::DistractionDetected => "distraction_detected",
             Self::BudgetThresholdCrossed => "budget_threshold_crossed",
             Self::NoteStructureChanged => "note_structure_changed",
+            Self::CommunityDiscovered => "community_discovered",
+            Self::CommunityUpdated => "community_updated",
+            Self::CommunityWeakened => "community_weakened",
             Self::Custom(s) => s,
         }
     }

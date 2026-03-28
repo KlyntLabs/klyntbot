@@ -114,32 +114,36 @@ export function GraphBrainView({
       const fg = graphRef.current;
       if (!fg) return;
 
-      const neighbors = hoveredId ? adjacencyRef.current.get(hoveredId) ?? new Set<string>() : null;
+      const neighbors = hoveredId
+        ? (adjacencyRef.current.get(hoveredId) ?? new Set<string>())
+        : null;
 
       // Update each node's Three.js material opacity
-      fg.scene().traverse((obj: { userData?: { nodeId?: string }; material?: MeshStandardMaterial }) => {
-        const nodeId = obj.userData?.nodeId;
-        if (!nodeId || !obj.material) return;
+      fg.scene().traverse(
+        (obj: { userData?: { nodeId?: string }; material?: MeshStandardMaterial }) => {
+          const nodeId = obj.userData?.nodeId;
+          if (!nodeId || !obj.material) return;
 
-        const mat = obj.material as MeshStandardMaterial;
-        if (!hoveredId) {
-          // No hover — full brightness
-          mat.opacity = 0.9;
-          mat.emissiveIntensity = mat.userData?.baseEmissive ?? 0.5;
-        } else if (nodeId === hoveredId) {
-          // Hovered node — extra bright
-          mat.opacity = 1;
-          mat.emissiveIntensity = (mat.userData?.baseEmissive ?? 0.5) * 2;
-        } else if (neighbors?.has(nodeId)) {
-          // Neighbor — normal brightness
-          mat.opacity = 0.9;
-          mat.emissiveIntensity = mat.userData?.baseEmissive ?? 0.5;
-        } else {
-          // Non-neighbor — dimmed
-          mat.opacity = 0.1;
-          mat.emissiveIntensity = 0.05;
-        }
-      });
+          const mat = obj.material as MeshStandardMaterial;
+          if (!hoveredId) {
+            // No hover — full brightness
+            mat.opacity = 0.9;
+            mat.emissiveIntensity = mat.userData?.baseEmissive ?? 0.5;
+          } else if (nodeId === hoveredId) {
+            // Hovered node — extra bright
+            mat.opacity = 1;
+            mat.emissiveIntensity = (mat.userData?.baseEmissive ?? 0.5) * 2;
+          } else if (neighbors?.has(nodeId)) {
+            // Neighbor — normal brightness
+            mat.opacity = 0.9;
+            mat.emissiveIntensity = mat.userData?.baseEmissive ?? 0.5;
+          } else {
+            // Non-neighbor — dimmed
+            mat.opacity = 0.1;
+            mat.emissiveIntensity = 0.05;
+          }
+        },
+      );
     },
     [graphRef],
   );
@@ -173,10 +177,8 @@ export function GraphBrainView({
       const hovId = hoveredIdRef.current;
       if (!hovId) return link.color || "#4B5563";
 
-      const sId =
-        typeof link.source === "string" ? link.source : (link.source as ForceNode)?.id;
-      const tId =
-        typeof link.target === "string" ? link.target : (link.target as ForceNode)?.id;
+      const sId = typeof link.source === "string" ? link.source : (link.source as ForceNode)?.id;
+      const tId = typeof link.target === "string" ? link.target : (link.target as ForceNode)?.id;
       const isConnected = sId === hovId || tId === hovId;
       return isConnected ? link.color || "#4B5563" : "rgba(50,50,65,0.3)";
     },
@@ -189,10 +191,8 @@ export function GraphBrainView({
       const hovId = hoveredIdRef.current;
       if (!hovId) return 0.8;
 
-      const sId =
-        typeof link.source === "string" ? link.source : (link.source as ForceNode)?.id;
-      const tId =
-        typeof link.target === "string" ? link.target : (link.target as ForceNode)?.id;
+      const sId = typeof link.source === "string" ? link.source : (link.source as ForceNode)?.id;
+      const tId = typeof link.target === "string" ? link.target : (link.target as ForceNode)?.id;
       return sId === hovId || tId === hovId ? 1.5 : 0.4;
     },
     [],

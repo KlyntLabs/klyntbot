@@ -1,4 +1,4 @@
-//! Tree node embedding operations for hierarchical note RAG.
+//! Community embedding operations for Phase 2 community graph RAG.
 
 use arrow_array::{Float32Array, StringArray};
 use futures_util::TryStreamExt;
@@ -8,65 +8,57 @@ use crate::error::StorageError;
 
 use super::{crud::sanitize_predicate_value, VectorStore};
 
-/// A search result from the `tree_node_embeddings` table.
-pub struct TreeNodeSearchResult {
-    pub node_id: String,
-    pub note_id: String,
-    pub level: String,
+/// A search result from the `community_embeddings` table.
+pub struct CommunitySearchResult {
+    pub community_id: String,
+    pub member_count: String,
+    pub source_note_count: String,
     pub score: f64,
 }
 
 impl VectorStore {
-    /// Upsert a tree node embedding.
-    pub async fn upsert_tree_node_embedding(
+    /// Upsert a community embedding.
+    pub async fn upsert_community_embedding(
         &self,
-        node_id: &str,
+        community_id: &str,
         embedding: &[f32],
-        note_id: &str,
-        level: &str,
-        source_type: &str,
+        member_count: &str,
+        source_note_count: &str,
     ) -> Result<(), StorageError> {
         self.upsert_embedding(
-            "tree_node_embeddings",
-            node_id,
+            "community_embeddings",
+            community_id,
             embedding,
             &[
-                ("note_id", note_id),
-                ("level", level),
-                ("source_type", source_type),
+                ("member_count", member_count),
+                ("source_note_count", source_note_count),
             ],
         )
         .await
     }
 
-    /// Search tree node embeddings by vector similarity with optional note ID filtering.
+    /// Search community embeddings by vector similarity.
     ///
-    /// Returns `TreeNodeSearchResult` entries sorted by similarity desc,
+    /// Returns `CommunitySearchResult` entries sorted by similarity desc,
     /// filtered to `score >= min_similarity`.
-    pub async fn search_tree_node_embeddings(
+    pub async fn search_community_embeddings(
         &self,
         query_vector: &[f32],
         limit: usize,
         min_similarity: f64,
-        note_id_filter: Option<&str>,
-    ) -> Result<Vec<TreeNodeSearchResult>, StorageError> {
+    ) -> Result<Vec<CommunitySearchResult>, StorageError> {
         let tbl = self
             .db
-            .open_table("tree_node_embeddings")
+            .open_table("community_embeddings")
             .execute()
             .await
-            .map_err(|e| StorageError::Vector(format!("Open tree_node_embeddings table: {e}")))?;
+            .map_err(|e| StorageError::Vector(format!("Open community_embeddings table: {e}")))?;
 
-        let mut query = tbl
+        let query = tbl
             .query()
             .nearest_to(query_vector)
             .map_err(|e| StorageError::Vector(format!("Vector search setup: {e}")))?
             .limit(limit);
-
-        if let Some(note_id) = note_id_filter {
-            let safe = sanitize_predicate_value(note_id)?;
-            query = query.only_if(format!("note_id = '{safe}'"));
-        }
 
         let results = query
             .execute()
@@ -83,18 +75,20 @@ impl VectorStore {
             let id_col = batch
                 .column_by_name("id")
                 .and_then(|c| c.as_any().downcast_ref::<StringArray>());
-            let note_id_col = batch
-                .column_by_name("note_id")
+            let member_count_col = batch
+                .column_by_name("member_count")
                 .and_then(|c| c.as_any().downcast_ref::<StringArray>());
-            let level_col = batch
-                .column_by_name("level")
+            let source_note_count_col = batch
+                .column_by_name("source_note_count")
                 .and_then(|c| c.as_any().downcast_ref::<StringArray>());
             let dist_col = batch
                 .column_by_name("_distance")
                 .and_then(|c| c.as_any().downcast_ref::<Float32Array>());
 
-            let (Some(ids), Some(note_ids), Some(levels)) = (id_col, note_id_col, level_col) else {
-                continue; // skip malformed batch
+            let (Some(ids), Some(member_counts), Some(source_note_counts)) =
+                (id_col, member_count_col, source_note_count_col)
+            else {
+                continue;
             };
 
             for i in 0..batch.num_rows() {
@@ -103,10 +97,10 @@ impl VectorStore {
                     None => 1.0,
                 };
                 if score >= min_similarity {
-                    out.push(TreeNodeSearchResult {
-                        node_id: ids.value(i).to_string(),
-                        note_id: note_ids.value(i).to_string(),
-                        level: levels.value(i).to_string(),
+                    out.push(CommunitySearchResult {
+                        community_id: ids.value(i).to_string(),
+                        member_count: member_counts.value(i).to_string(),
+                        source_note_count: source_note_counts.value(i).to_string(),
                         score,
                     });
                 }
@@ -116,13 +110,10 @@ impl VectorStore {
         Ok(out)
     }
 
-    /// Delete all tree node embeddings for a given note.
-    pub async fn delete_tree_node_embeddings_by_note(
-        &self,
-        note_id: &str,
-    ) -> Result<(), StorageError> {
-        let safe = sanitize_predicate_value(note_id)?;
-        self.delete_where("tree_node_embeddings", &format!("note_id = '{safe}'"))
+    /// Delete a community embedding.
+    pub async fn delete_community_embedding(&self, community_id: &str) -> Result<(), StorageError> {
+        let safe = sanitize_predicate_value(community_id)?;
+        self.delete_where("community_embeddings", &format!("id = '{safe}'"))
             .await
     }
 }

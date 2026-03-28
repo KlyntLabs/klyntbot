@@ -388,19 +388,15 @@ impl SessionRepo {
     ) -> Result<Option<serde_json::Value>, StorageError> {
         let parsed = uuid::Uuid::parse_str(message_id);
         let row: Option<(Option<String>,)> = if let Ok(ref uuid) = parsed {
-            sqlx::query_as(
-                "SELECT metadata FROM session_messages WHERE id = ?1",
-            )
-            .bind(uuid)
-            .fetch_optional(&self.pool)
-            .await?
+            sqlx::query_as("SELECT metadata FROM session_messages WHERE id = ?1")
+                .bind(uuid)
+                .fetch_optional(&self.pool)
+                .await?
         } else {
-            sqlx::query_as(
-                "SELECT metadata FROM session_messages WHERE id = ?1",
-            )
-            .bind(message_id)
-            .fetch_optional(&self.pool)
-            .await?
+            sqlx::query_as("SELECT metadata FROM session_messages WHERE id = ?1")
+                .bind(message_id)
+                .fetch_optional(&self.pool)
+                .await?
         };
         Ok(row
             .and_then(|(meta,)| meta)

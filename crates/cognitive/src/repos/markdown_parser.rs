@@ -195,9 +195,9 @@ mod tests {
         let nodes = parse_markdown_to_tree("note-1", md);
         // 3 sections + 3 text blocks = 6
         assert_eq!(nodes.len(), 6);
-        assert_eq!(nodes[0].node_type.as_str(), "Section");
+        assert_eq!(nodes[0].node_type.as_str(), "section");
         assert_eq!(nodes[0].level, 1);
-        assert_eq!(nodes[1].node_type.as_str(), "Text");
+        assert_eq!(nodes[1].node_type.as_str(), "text");
         assert_eq!(nodes[1].parent_id, Some(nodes[0].id.clone()));
     }
 
@@ -228,7 +228,7 @@ mod tests {
         let md = "Just some plain text\nwith multiple lines.";
         let nodes = parse_markdown_to_tree("note-1", md);
         assert_eq!(nodes.len(), 1);
-        assert_eq!(nodes[0].node_type.as_str(), "Text");
+        assert_eq!(nodes[0].node_type.as_str(), "text");
         assert!(nodes[0].parent_id.is_none());
     }
 }

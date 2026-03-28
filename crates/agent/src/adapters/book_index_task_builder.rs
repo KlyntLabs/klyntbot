@@ -150,7 +150,7 @@ mod tests {
             "Expected at least 4 nodes, got {}",
             nodes.len()
         );
-        assert_eq!(nodes[0].node_type.as_str(), "Section");
+        assert_eq!(nodes[0].node_type.as_str(), "section");
         assert_eq!(nodes[0].title.as_deref(), Some("Project Alpha"));
         assert!(matches!(nodes[0].source_type, SourceType::Task));
     }
@@ -159,7 +159,7 @@ mod tests {
     fn empty_tasks_produces_only_root() {
         let nodes = build_task_tree("proj-1", "Empty Project", &[]);
         assert_eq!(nodes.len(), 1);
-        assert_eq!(nodes[0].node_type.as_str(), "Section");
+        assert_eq!(nodes[0].node_type.as_str(), "section");
     }
 
     fn mock_task(

@@ -54,7 +54,7 @@ mod tests {
             "Expected at least 3 nodes, got {}",
             nodes.len()
         );
-        assert_eq!(nodes[0].source_type.as_str(), "Skill");
+        assert_eq!(nodes[0].source_type.as_str(), "skill");
     }
 
     #[test]
