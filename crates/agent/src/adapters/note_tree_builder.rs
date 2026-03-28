@@ -2,8 +2,8 @@
 //! persists them to SQLite, embeds them in LanceDB, and pushes context updates.
 //!
 //! Listens for `DomainEvent::NoteContentChanged` on the domain event bus.
-//! Uses `parse_markdown_to_tree` (and `parse_tiptap_to_tree` when Tiptap JSON
-//! is available via `body_json` field in the future).
+//! Tries `parse_tiptap_to_tree` on the content first (valid Tiptap JSON),
+//! falls back to `parse_markdown_to_tree` if that returns no nodes.
 
 use std::sync::Arc;
 
@@ -13,6 +13,7 @@ use tracing::{debug, info, warn};
 
 use bus::{ContextUpdate, ContextUpdateQueue, ContextUpdateReason, DomainEvent, UpdatePriority};
 use cognitive::TextEmbedder;
+use common::truncate_at_boundary;
 use context_engine::book_index::types::SourceType;
 use context_engine::book_index::BookTreeRepo;
 
@@ -216,7 +217,7 @@ impl NoteTreeBuilder {
 /// - Level 7+: content only (300 chars) — list items, deep nodes
 fn compose_embedding_text(node: &context_engine::book_index::types::TreeNode) -> String {
     let title = node.title.as_deref().unwrap_or("");
-    let content_preview = truncate_to_chars(&node.content, 300);
+    let content_preview = truncate_at_boundary(&node.content, 300);
 
     match node.level {
         0 => title.to_string(),
@@ -233,18 +234,6 @@ fn compose_embedding_text(node: &context_engine::book_index::types::TreeNode) ->
     }
 }
 
-/// Truncate a string to at most `max_chars` characters (char boundary safe).
-fn truncate_to_chars(s: &str, max_chars: usize) -> &str {
-    if s.len() <= max_chars {
-        return s;
-    }
-    // Find the char boundary at or before max_chars.
-    let mut end = max_chars;
-    while end > 0 && !s.is_char_boundary(end) {
-        end -= 1;
-    }
-    &s[..end]
-}
 
 #[cfg(test)]
 mod tests {
@@ -326,11 +315,11 @@ mod tests {
     #[test]
     fn truncate_respects_char_boundary() {
         let s = "hello world";
-        assert_eq!(truncate_to_chars(s, 5), "hello");
+        assert_eq!(truncate_at_boundary(s, 5), "hello");
 
         let unicode = "cafe\u{0301}"; // "cafe" + combining accent = "cafe\u{0301}"
                                       // The combining accent is 2 bytes at position 4..6
-        let result = truncate_to_chars(unicode, 5);
+        let result = truncate_at_boundary(unicode, 5);
         assert!(result.len() <= 5);
         assert!(result.is_char_boundary(result.len()));
     }
@@ -338,6 +327,6 @@ mod tests {
     #[test]
     fn truncate_short_string_unchanged() {
         let s = "short";
-        assert_eq!(truncate_to_chars(s, 300), "short");
+        assert_eq!(truncate_at_boundary(s, 300), "short");
     }
 }

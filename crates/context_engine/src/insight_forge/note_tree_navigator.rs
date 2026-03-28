@@ -275,11 +275,7 @@ impl NoteTreeNavigator {
         scored_entries = dedup_by_node_id(scored_entries);
 
         // Sort by score descending.
-        scored_entries.sort_by(|a, b| {
-            b.score
-                .partial_cmp(&a.score)
-                .unwrap_or(std::cmp::Ordering::Equal)
-        });
+        scored_entries.sort_by(|a, b| b.score.total_cmp(&a.score));
         scored_entries.truncate(limit);
 
         scored_entries
@@ -421,7 +417,7 @@ fn rrf_merge(ranked_lists: &[Vec<MemoryEntry>], limit: usize) -> Vec<MemoryEntry
     }
 
     let mut scored: Vec<(String, f64)> = score_map.into_iter().collect();
-    scored.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
+    scored.sort_by(|a, b| b.1.total_cmp(&a.1));
     scored.truncate(limit);
 
     let max_score = scored.first().map(|(_, s)| *s).unwrap_or(1.0);
@@ -451,21 +447,13 @@ fn dedup_by_node_id(entries: Vec<MemoryEntry>) -> Vec<MemoryEntry> {
             .or_insert(entry);
     }
     let mut result: Vec<MemoryEntry> = seen.into_values().collect();
-    result.sort_by(|a, b| {
-        b.score
-            .partial_cmp(&a.score)
-            .unwrap_or(std::cmp::Ordering::Equal)
-    });
+    result.sort_by(|a, b| b.score.total_cmp(&a.score));
     result
 }
 
 /// Truncate content to `max_chars`, appending "..." if truncated.
 fn truncate_content(s: &str, max_chars: usize) -> String {
-    if s.len() <= max_chars {
-        s.to_string()
-    } else {
-        format!("{}...", &s[..max_chars])
-    }
+    common::truncate_chars(s, max_chars, "...")
 }
 
 // ---------------------------------------------------------------------------

@@ -1685,12 +1685,12 @@ async fn backfill_tree_nodes(
                     "Tree backfill failed for note: {e}"
                 );
             }
+            tokio::task::yield_now().await;
         }
 
         processed += notes.len();
         offset += batch_size;
         tracing::debug!("Tree backfill progress: {processed} notes");
-        tokio::task::yield_now().await;
     }
 
     if processed > 0 {
