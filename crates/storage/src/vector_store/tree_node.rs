@@ -93,8 +93,7 @@ impl VectorStore {
                 .column_by_name("_distance")
                 .and_then(|c| c.as_any().downcast_ref::<Float32Array>());
 
-            let (Some(ids), Some(note_ids), Some(levels)) = (id_col, note_id_col, level_col)
-            else {
+            let (Some(ids), Some(note_ids), Some(levels)) = (id_col, note_id_col, level_col) else {
                 continue; // skip malformed batch
             };
 
@@ -113,7 +112,11 @@ impl VectorStore {
                 }
             }
         }
-        out.sort_by(|a, b| b.score.partial_cmp(&a.score).unwrap_or(std::cmp::Ordering::Equal));
+        out.sort_by(|a, b| {
+            b.score
+                .partial_cmp(&a.score)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
         Ok(out)
     }
 

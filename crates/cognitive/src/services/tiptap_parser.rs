@@ -52,10 +52,7 @@ pub fn parse_tiptap_to_tree(source_id: &str, json_str: &str) -> Vec<TreeNode> {
                 let title = extract_text(block);
 
                 // Pop stack entries with level >= this heading's level to find the correct parent
-                while heading_stack
-                    .last()
-                    .is_some_and(|(lvl, _)| *lvl >= level)
-                {
+                while heading_stack.last().is_some_and(|(lvl, _)| *lvl >= level) {
                     heading_stack.pop();
                 }
                 let parent_id = heading_stack.last().map(|(_, id)| id.clone());
@@ -86,7 +83,12 @@ pub fn parse_tiptap_to_tree(source_id: &str, json_str: &str) -> Vec<TreeNode> {
                         None
                     };
                     push_text_node(
-                        &mut nodes, &heading_stack, source_id, &mut position, text, metadata,
+                        &mut nodes,
+                        &heading_stack,
+                        source_id,
+                        &mut position,
+                        text,
+                        metadata,
                     );
                 }
             }
@@ -109,9 +111,7 @@ pub fn parse_tiptap_to_tree(source_id: &str, json_str: &str) -> Vec<TreeNode> {
                         source_type: SourceType::Note,
                         source_id: source_id.to_string(),
                         position,
-                        metadata: Some(
-                            format!(r#"{{"block_type":"{}"}}"#, block_type),
-                        ),
+                        metadata: Some(format!(r#"{{"block_type":"{}"}}"#, block_type)),
                     });
                     position += 1;
                 }
@@ -120,7 +120,12 @@ pub fn parse_tiptap_to_tree(source_id: &str, json_str: &str) -> Vec<TreeNode> {
                 let text = extract_text(block);
                 if !text.is_empty() {
                     push_text_node(
-                        &mut nodes, &heading_stack, source_id, &mut position, text, None,
+                        &mut nodes,
+                        &heading_stack,
+                        source_id,
+                        &mut position,
+                        text,
+                        None,
                     );
                 }
             }

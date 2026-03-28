@@ -1,9 +1,9 @@
 pub mod audit;
-pub mod bookrag_searcher;
 pub mod circuit_breaker;
 pub mod decomposer;
 pub mod domain_searcher;
 pub mod llm_decomposer;
+pub mod note_tree_navigator;
 
 pub use circuit_breaker::CircuitBreaker;
 pub use decomposer::{FallbackDecomposer, HeuristicDecomposer, QueryDecomposer};

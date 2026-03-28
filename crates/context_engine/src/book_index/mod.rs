@@ -1,7 +1,5 @@
 pub mod entity_resolution;
 pub mod gt_link;
-#[cfg(test)]
-mod tests;
 pub mod tree;
 pub mod types;
 

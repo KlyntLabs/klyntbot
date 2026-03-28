@@ -269,9 +269,7 @@ mod tests {
             hierarchy: 0.10,
             path_coherence: 0.10,
         };
-        let score = relevance_score(
-            0.8, 0.9, 0.7, 0.5, 0.6, 0.4, 1.0, 0.8, &weights,
-        );
+        let score = relevance_score(0.8, 0.9, 0.7, 0.5, 0.6, 0.4, 1.0, 0.8, &weights);
         // 0.25*0.8 + 0.15*0.9 + 0.10*0.7 + 0.05*0.5 + 0.20*0.6 + 0.05*0.4 + 0.10*1.0 + 0.10*0.8 = 0.75
         assert!((score - 0.75).abs() < 0.001);
     }

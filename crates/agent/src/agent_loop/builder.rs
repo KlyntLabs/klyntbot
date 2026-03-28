@@ -750,54 +750,51 @@ impl AgentLoopBuilder {
                 repos.clone(),
             )));
 
-            // BookRAG integration
+            // NoteTreeNavigator (replaces BookRAGSearcher)
             if config.cognitive.book_index.enabled {
-                let book_entity_repo =
-                    cognitive::repos::EntityRepo::new(storage_pool.inner().clone());
-                let tree_repo = Arc::new(cognitive::repos::SqliteBookTreeRepo::new(
-                    storage_pool.inner().clone(),
-                ));
-                let gt_link_repo = Arc::new(cognitive::repos::SqliteGTLinkRepo::new(
-                    storage_pool.inner().clone(),
-                ));
-                let book_index = crate::adapters::book_index_wiring::build_book_index(
-                    tree_repo.clone(),
-                    book_entity_repo,
-                    gt_link_repo.clone(),
-                    embedding_engine.clone(),
-                );
-                let bookrag_searcher = crate::adapters::book_index_wiring::build_bookrag_searcher(
-                    book_index.clone(),
-                    provider.clone(),
-                    &config.cognitive.book_index.retrieval,
-                );
-                forge.add_searcher(bookrag_searcher);
-
-                // Build entity extractor for GT-Link population
-                let entity_extractor = crate::adapters::book_index_wiring::build_entity_extractor(
-                    cognitive::repos::EntityRepo::new(storage_pool.inner().clone()),
-                    gt_link_repo.clone(),
-                    provider.clone(),
-                    &config,
+                let tree_repo: Arc<dyn context_engine::book_index::BookTreeRepo> = Arc::new(
+                    cognitive::repos::SqliteBookTreeRepo::new(storage_pool.inner().clone()),
                 );
 
-                // Start BookIndex updater (listens for NoteContentChanged/NoteDeleted/TaskHierarchyChanged)
-                if let Some(ref domain_bus) = self.domain_event_bus {
-                    let updater_rx = domain_bus.subscribe();
-                    let task_repo_for_updater =
-                        storage::TaskRepo::new(storage_pool.inner().clone());
-                    let project_repo_for_updater =
-                        storage::ProjectRepo::new(storage_pool.inner().clone());
-                    let _updater = crate::adapters::book_index_updater::BookIndexUpdater::start(
-                        updater_rx,
-                        tree_repo.clone(),
-                        book_index.clone(),
-                        CancellationToken::new(),
-                        Some(entity_extractor.clone()),
-                        Some(task_repo_for_updater),
-                        Some(project_repo_for_updater),
+                if let Some(ref vs) = self.vector_store {
+                    let text_embedder: Arc<dyn cognitive::TextEmbedder> =
+                        Arc::new(crate::adapters::cognitive_embedder::TextEmbedderImpl::new(
+                            Arc::clone(&embedding_engine),
+                        ));
+                    let tree_node_search = Arc::new(
+                        crate::adapters::tree_node_search::TreeNodeSearchAdapter::new(
+                            Arc::new(vs.clone()),
+                            text_embedder.clone(),
+                        ),
                     );
-                    info!("BookIndex updater started");
+                    let note_tree_navigator =
+                        context_engine::insight_forge::note_tree_navigator::NoteTreeNavigator::new(
+                            tree_repo.clone(),
+                            tree_node_search,
+                            None,
+                        );
+                    forge.add_searcher(Arc::new(note_tree_navigator));
+
+                    // NoteTreeBuilder subscriber (event-driven tree rebuild + LanceDB embed)
+                    if let Some(ref domain_bus) = self.domain_event_bus {
+                        let note_tree_builder =
+                            Arc::new(crate::adapters::note_tree_builder::NoteTreeBuilder::new(
+                                tree_repo.clone(),
+                                Arc::new(vs.clone()),
+                                text_embedder.clone(),
+                                self.context_update_queue.clone(),
+                            ));
+                        let tree_builder_rx = domain_bus.subscribe();
+                        let tree_builder_shutdown = CancellationToken::new();
+                        let _tree_builder_handle = tokio::spawn({
+                            let builder = Arc::clone(&note_tree_builder);
+                            let shutdown = tree_builder_shutdown.clone();
+                            async move {
+                                builder.run(tree_builder_rx, shutdown).await;
+                            }
+                        });
+                        info!("NoteTreeBuilder subscriber started");
+                    }
                 }
 
                 // Build skill trees at startup (non-blocking)
@@ -812,27 +809,6 @@ impl AgentLoopBuilder {
                             tracing::info!("BookIndex: skill trees built (checksum: {checksum})")
                         }
                         Err(e) => tracing::warn!("BookIndex: skill tree build failed: {e}"),
-                    }
-                });
-
-                // Backfill existing notes (non-blocking)
-                let note_repo_for_backfill =
-                    feature_notes::repo::NoteRepo::new(storage_pool.inner().clone());
-                let tree_repo_for_backfill = tree_repo.clone();
-                let book_index_for_backfill = book_index.clone();
-                let extractor_for_backfill = entity_extractor.clone();
-                tokio::spawn(async move {
-                    match crate::adapters::book_index_backfill::backfill_existing_notes(
-                        &note_repo_for_backfill,
-                        tree_repo_for_backfill.as_ref(),
-                        &book_index_for_backfill,
-                        Some(&extractor_for_backfill),
-                    )
-                    .await
-                    {
-                        Ok(0) => {}
-                        Ok(n) => tracing::info!("BookIndex: backfilled {n} existing notes"),
-                        Err(e) => tracing::warn!("BookIndex backfill failed: {e}"),
                     }
                 });
             }
