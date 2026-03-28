@@ -517,6 +517,9 @@ CREATE TABLE IF NOT EXISTS flashcards (
     difficulty_estimate INTEGER,
     prerequisite_concepts TEXT,
     card_distractors TEXT,
+    audio_ref TEXT,
+    pronunciation_baseline REAL,
+    last_pronunciation_score REAL,
     created_at TEXT NOT NULL,
     updated_at TEXT NOT NULL
 );

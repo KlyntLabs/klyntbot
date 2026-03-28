@@ -100,6 +100,9 @@ pub struct FlashcardRow {
     pub difficulty_estimate: Option<i32>,
     pub prerequisite_concepts: Option<String>,
     pub card_distractors: Option<String>,
+    pub audio_ref: Option<String>,
+    pub pronunciation_baseline: Option<f64>,
+    pub last_pronunciation_score: Option<f64>,
     pub created_at: String,
     pub updated_at: String,
 }
