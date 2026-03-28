@@ -73,12 +73,24 @@ pub(crate) async fn dispatch_dev(
     _body: &serde_json::Value,
 ) -> Option<Result<serde_json::Value, ApiError>> {
     Some(match cmd {
-        "voice_start_capture"
-        | "voice_stop_capture"
-        | "voice_dismiss"
-        | "voice_get_status"
-        | "voice_get_models"
-        | "voice_download_model" => Err(ApiError::new("NOT_IMPLEMENTED", "Voice not yet wired")),
+        "voice_start_capture" => Ok(serde_json::json!({
+            "sessionId": "mock-session-1",
+            "engine": "local",
+            "state": "capturing"
+        })),
+        "voice_stop_capture" => Ok(serde_json::json!(null)),
+        "voice_dismiss" => Ok(serde_json::json!(null)),
+        "voice_get_status" => Ok(serde_json::json!({
+            "state": "idle",
+            "modelState": {"state": "ready", "path": "/mock/models/ggml-small.bin"},
+            "engine": "local",
+            "enabled": true
+        })),
+        "voice_get_models" => Ok(serde_json::json!([
+            {"size": "small", "displayName": "whisper-small (multilingual)", "sizeBytes": 488000000, "available": true},
+            {"size": "medium", "displayName": "whisper-medium (multilingual)", "sizeBytes": 1530000000, "available": false}
+        ])),
+        "voice_download_model" => Ok(serde_json::json!(null)),
         _ => return None,
     })
 }
