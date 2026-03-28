@@ -115,13 +115,16 @@ export function useForceGraph({
   const graphDataRef = useRef<{ nodes: ForceNode[]; links: ForceLink[] }>({ nodes: [], links: [] });
   const prevFingerprintRef = useRef<string>("");
 
-  // Reset stale node refs when switching back from 3D to 2D —
-  // 3D simulation mutates shared node objects with 3D-scale positions
+  // Reset stale node refs when switching render mode —
+  // 3D simulation mutates shared node objects with 3D-scale positions,
+  // and we need to re-initialize forces for the new ForceGraph2D instance
   const prevRenderModeRef = useRef(renderMode);
+  const forceInitializedRef = useRef(false);
   if (prevRenderModeRef.current !== renderMode) {
     prevRenderModeRef.current = renderMode;
     graphDataRef.current = { nodes: [], links: [] };
     prevFingerprintRef.current = "";
+    forceInitializedRef.current = false;
   }
 
   const graphData = useMemo(() => {
@@ -210,16 +213,17 @@ export function useForceGraph({
     [settings.repulsion, settings.centerForce, settings.linkDistance, settings.nodeScale],
   );
 
-  // Configure forces once on mount (no reheat)
-  const initializedRef = useRef(false);
+  // Configure forces on mount or after render mode switch
+  // biome-ignore lint/correctness/useExhaustiveDependencies: renderMode triggers re-init
   useEffect(() => {
-    if (initializedRef.current) return;
+    if (forceInitializedRef.current) return;
     const timer = setTimeout(() => {
-      configureForces(false);
-      initializedRef.current = true;
-    }, 50);
+      // Reheat on re-init after mode switch so 2D simulation spreads nodes properly
+      configureForces(true);
+      forceInitializedRef.current = true;
+    }, 100);
     return () => clearTimeout(timer);
-  }, [configureForces]);
+  }, [configureForces, renderMode]);
 
   // Reheat only when physics settings actually change (after initial mount)
   const prevPhysicsRef = useRef({
