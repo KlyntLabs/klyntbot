@@ -1,7 +1,6 @@
 import { useCallback, useRef } from "react";
-import type { PositionMap } from "../lib/graphUtils";
 
-export type { PositionMap };
+export type PositionMap = Record<string, { x: number; y: number }>;
 
 interface CacheEntry {
   key: string;

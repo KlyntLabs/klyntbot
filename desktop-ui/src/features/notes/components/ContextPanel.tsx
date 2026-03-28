@@ -7,7 +7,6 @@ import type { InsightReviewActions, InsightReviewState } from "../hooks/useInsig
 import { AISuggestionsPanel } from "./AISuggestionsPanel";
 import { BacklinksPanel } from "./BacklinksPanel";
 import { EntityReferencesPanel } from "./EntityReferencesPanel";
-import { GraphMinimap } from "./GraphMinimap";
 import { InsightReviewPanel } from "./InsightReviewPanel";
 
 interface ContextPanelProps {
@@ -248,12 +247,6 @@ export function ContextPanel({
       />
       <BacklinksPanel noteId={noteId} onSelectNote={onSelectNote} />
       <EntityReferencesPanel noteBody={note.body} />
-      <GraphMinimap
-        noteId={noteId}
-        notes={notes}
-        onSelectNote={onSelectNote}
-        onExpandGraph={onExpandGraph}
-      />
       <MoreSection note={note} />
     </div>
   );
