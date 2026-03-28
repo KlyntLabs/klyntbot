@@ -15,10 +15,18 @@ export interface GraphSettings {
   showArrows: boolean;
   /** Show orphan (unlinked) nodes */
   showOrphans: boolean;
-  /** Enable continuous physics simulation (CPU-intensive) */
+  /** Enable continuous physics simulation */
   livePhysics: boolean;
-  /** Skip progressive reveal animation on graph load */
-  instantLoad: boolean;
+  /** Render mode: 2D canvas or 3D WebGL */
+  renderMode: "2d" | "3d";
+  /** Progressive reveal speed */
+  revealSpeed: "instant" | "balanced" | "cinematic";
+  /** Clustering mode for node grouping */
+  clusteringMode: "notebook" | "semantic";
+  /** Auto-rotate in 3D mode when idle */
+  idleRotation: boolean;
+  /** Show the viewport minimap */
+  showMinimap: boolean;
 }
 
 const DEFAULT_SETTINGS: GraphSettings = {
@@ -30,7 +38,11 @@ const DEFAULT_SETTINGS: GraphSettings = {
   showArrows: true,
   showOrphans: true,
   livePhysics: false,
-  instantLoad: false,
+  renderMode: "2d",
+  revealSpeed: "balanced",
+  clusteringMode: "notebook",
+  idleRotation: true,
+  showMinimap: true,
 };
 
 const STORAGE_KEY = "klynt-graph-settings";

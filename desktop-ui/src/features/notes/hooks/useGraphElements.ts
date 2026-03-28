@@ -1,5 +1,4 @@
 import type { Notebook } from "@shared/types";
-import type { ElementDefinition } from "cytoscape";
 import { useMemo } from "react";
 import { computeFingerprint } from "../lib/graphFingerprint";
 import type { GraphLink, GraphNode } from "./useGraphData";
@@ -19,8 +18,6 @@ const CLUSTER_PALETTE = [
   "#fde68a",
 ];
 
-export type ClusterMode = "notebook" | "ai" | "hybrid";
-
 export interface ClusterInfo {
   id: string;
   label: string;
@@ -28,32 +25,61 @@ export interface ClusterInfo {
   count: number;
 }
 
-function getNodeSize(linkCount: number): number {
-  const normalized = Math.min(linkCount, 20) / 20;
-  return 18 + normalized * 28; // 18px (orphan) → 46px (hub)
+export interface ForceNode {
+  id: string;
+  label: string;
+  color: string;
+  size: number;
+  linkCount: number;
+  tags: string[];
+  bodyPreview: string;
+  notebookId: string | null;
+  clusterId: string;
+  x?: number;
+  y?: number;
+  z?: number;
+  vx?: number;
+  vy?: number;
+  fx?: number;
+  fy?: number;
 }
 
-interface UseCytoscapeElementsParams {
+export interface ForceLink {
+  source: string;
+  target: string;
+  weight: number;
+  color: string;
+}
+
+export interface GraphElements {
+  nodes: ForceNode[];
+  links: ForceLink[];
+  clusters: ClusterInfo[];
+  fingerprint: string;
+}
+
+function getNodeSize(linkCount: number): number {
+  const normalized = Math.min(linkCount, 20) / 20;
+  return 18 + normalized * 28;
+}
+
+interface UseGraphElementsParams {
   nodes: GraphNode[];
   links: GraphLink[];
   notebooks: Notebook[];
-  clusterMode: ClusterMode;
+  clusteringMode: "notebook" | "semantic";
   activeNoteId: string | null;
 }
 
-export function useCytoscapeElements({
+export function useGraphElements({
   nodes,
   links,
   notebooks,
-  clusterMode,
+  clusteringMode,
   activeNoteId: _activeNoteId,
-}: UseCytoscapeElementsParams): {
-  elements: ElementDefinition[];
-  clusters: ClusterInfo[];
-  fingerprint: string;
-} {
+}: UseGraphElementsParams): GraphElements {
+  // biome-ignore lint/correctness/useExhaustiveDependencies: clusteringMode triggers recompute when semantic clustering is added
   return useMemo(() => {
-    const elements: ElementDefinition[] = [];
     const clusterMap = new Map<string, ClusterInfo>();
     const notebookMap = new Map<string, Notebook>();
     for (const nb of notebooks) notebookMap.set(nb.id, nb);
@@ -67,22 +93,20 @@ export function useCytoscapeElements({
     };
 
     const nodeClusterMap = new Map<string, string>();
-    if (clusterMode === "notebook") {
-      const hasLinks = new Set<string>();
-      for (const link of links) {
-        const sourceId = typeof link.source === "string" ? link.source : link.source.id;
-        const targetId = typeof link.target === "string" ? link.target : link.target.id;
-        hasLinks.add(sourceId);
-        hasLinks.add(targetId);
-      }
-      for (const node of nodes) {
-        if (node.notebookId) {
-          nodeClusterMap.set(node.id, `nb:${node.notebookId}`);
-        } else if (hasLinks.has(node.id)) {
-          nodeClusterMap.set(node.id, "_floating");
-        } else {
-          nodeClusterMap.set(node.id, "_isolated");
-        }
+    const hasLinks = new Set<string>();
+    for (const link of links) {
+      const sourceId = typeof link.source === "string" ? link.source : link.source.id;
+      const targetId = typeof link.target === "string" ? link.target : link.target.id;
+      hasLinks.add(sourceId);
+      hasLinks.add(targetId);
+    }
+    for (const node of nodes) {
+      if (node.notebookId) {
+        nodeClusterMap.set(node.id, `nb:${node.notebookId}`);
+      } else if (hasLinks.has(node.id)) {
+        nodeClusterMap.set(node.id, "_floating");
+      } else {
+        nodeClusterMap.set(node.id, "_isolated");
       }
     }
 
@@ -93,16 +117,13 @@ export function useCytoscapeElements({
 
       let label: string;
       let color: string;
-      let type = "notebook";
 
       if (clusterId === "_floating") {
         label = "Floating Ideas";
         color = "#9CA3AF";
-        type = "orphan-linked";
       } else if (clusterId === "_isolated") {
         label = "Isolated Notes";
         color = "#6B7280";
-        type = "orphan-isolated";
       } else {
         const nbId = clusterId.replace("nb:", "");
         const nb = notebookMap.get(nbId);
@@ -111,10 +132,9 @@ export function useCytoscapeElements({
       }
 
       clusterMap.set(clusterId, { id: clusterId, label, color, count: 0 });
-      // Invisible compound parent — fCoSE uses it for spatial grouping
-      elements.push({ group: "nodes", data: { id: clusterId, label, color, type } });
     }
 
+    const forceNodes: ForceNode[] = [];
     for (const node of nodes) {
       const clusterId = nodeClusterMap.get(node.id) || "_isolated";
       const cluster = clusterMap.get(clusterId);
@@ -123,30 +143,28 @@ export function useCytoscapeElements({
       const color = cluster?.color || "#6B7280";
       const size = getNodeSize(node.linkCount);
 
-      elements.push({
-        group: "nodes",
-        data: {
-          id: node.id,
-          label: node.title,
-          parent: clusterId,
-          color,
-          size,
-          linkCount: node.linkCount,
-          bodyPreview: node.bodyPreview,
-          tags: node.tags,
-          notebookId: node.notebookId,
-        },
+      forceNodes.push({
+        id: node.id,
+        label: node.title,
+        color,
+        size,
+        linkCount: node.linkCount,
+        tags: node.tags,
+        bodyPreview: node.bodyPreview,
+        notebookId: node.notebookId,
+        clusterId,
       });
     }
 
-    const edgePairs = new Map<string, number>();
+    const edgeCounts = new Map<string, number>();
     for (const link of links) {
       const sourceId = typeof link.source === "string" ? link.source : link.source.id;
       const targetId = typeof link.target === "string" ? link.target : link.target.id;
       const key = [sourceId, targetId].sort().join(":");
-      edgePairs.set(key, (edgePairs.get(key) || 0) + 1);
+      edgeCounts.set(key, (edgeCounts.get(key) || 0) + 1);
     }
 
+    const forceLinks: ForceLink[] = [];
     const seenEdges = new Set<string>();
     for (const link of links) {
       const sourceId = typeof link.source === "string" ? link.source : link.source.id;
@@ -155,27 +173,20 @@ export function useCytoscapeElements({
       if (seenEdges.has(key)) continue;
       seenEdges.add(key);
 
-      const count = edgePairs.get(key) || 1;
+      const count = edgeCounts.get(key) || 1;
       const weight = count === 1 ? 1 : count === 2 ? 1.8 : 2.8;
       const sourceCluster = nodeClusterMap.get(sourceId);
       const sourceColor = clusterMap.get(sourceCluster || "")?.color || "#6B7280";
 
-      elements.push({
-        group: "edges",
-        data: { id: `e:${key}`, source: sourceId, target: targetId, weight, sourceColor },
-      });
+      forceLinks.push({ source: sourceId, target: targetId, weight, color: sourceColor });
     }
 
     const clusters = Array.from(clusterMap.values()).filter((c) => c.count > 0);
 
-    // Compute structural fingerprint for position cache keying
     const nodeIdList = nodes.map((n) => n.id);
-    // Extract edge pairs from the deduplicated edge elements (not from seenEdges keys)
-    const edgePairList: [string, string][] = elements
-      .filter((el) => el.group === "edges")
-      .map((el) => [el.data?.source as string, el.data?.target as string]);
+    const edgePairList: [string, string][] = forceLinks.map((l) => [l.source, l.target]);
     const fingerprint = computeFingerprint(nodeIdList, edgePairList);
 
-    return { elements, clusters, fingerprint };
-  }, [nodes, links, notebooks, clusterMode]);
+    return { nodes: forceNodes, links: forceLinks, clusters, fingerprint };
+  }, [nodes, links, notebooks, clusteringMode]);
 }

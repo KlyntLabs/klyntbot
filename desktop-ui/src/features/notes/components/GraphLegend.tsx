@@ -1,6 +1,6 @@
 import { ChevronDown, ChevronUp, Eye, EyeOff } from "lucide-react";
 import { useState } from "react";
-import type { ClusterInfo } from "../hooks/useCytoscapeElements";
+import type { ClusterInfo } from "../hooks/useGraphElements";
 
 interface GraphLegendProps {
   clusters: ClusterInfo[];

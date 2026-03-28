@@ -1,17 +1,20 @@
 import { useClickOutside } from "@shared/hooks/useClickOutside";
 import type { Note, Notebook } from "@shared/types";
-import { Activity, Maximize2, Minus, Plus, RotateCcw, Settings2 } from "lucide-react";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { type ClusterMode, useCytoscapeElements } from "../hooks/useCytoscapeElements";
-import { useCytoscapeGraph } from "../hooks/useCytoscapeGraph";
-import { useCytoscapeTheme } from "../hooks/useCytoscapeTheme";
+import { Maximize2, Minus, Plus, RotateCcw, Settings2 } from "lucide-react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import ForceGraph2D from "react-force-graph-2d";
+import type { ViewportBounds } from "../hooks/useForceGraph";
+import { useForceGraph } from "../hooks/useForceGraph";
 import type { SmartView } from "../hooks/useGraphData";
 import { useGraphData } from "../hooks/useGraphData";
+import { useGraphElements } from "../hooks/useGraphElements";
 import { useGraphPositionCache } from "../hooks/useGraphPositionCache";
 import { useGraphSettings } from "../hooks/useGraphSettings";
-import { computeBfsWaves, selectHub } from "../lib/graphBfs";
-import type { PositionMap } from "../lib/graphUtils";
+import { useWaveReveal } from "../hooks/useWaveReveal";
+import { selectHub } from "../lib/graphBfs";
+import { GraphBrainView } from "./GraphBrainView";
 import { GraphLegend } from "./GraphLegend";
+import { GraphMinimap } from "./GraphMinimap";
 import { GraphNodeTooltip } from "./GraphNodeTooltip";
 import { GraphSettingsPopover } from "./GraphSettingsPopover";
 import { GraphToolbar } from "./GraphToolbar";
@@ -36,9 +39,15 @@ export function GraphView({
   const [smartView, setSmartView] = useState<SmartView>("full");
   const [hopRadius, setHopRadius] = useState(2);
   const [searchQuery, setSearchQuery] = useState("");
-  const [clusterMode] = useState<ClusterMode>("notebook");
-  const [tooltip, setTooltip] = useState<{ nodeId: string; x: number; y: number } | null>(null);
   const [hiddenClusters, setHiddenClusters] = useState<Set<string>>(new Set());
+  const [highlightedClusterId, setHighlightedClusterId] = useState<string | null>(null);
+  const [minimapVisible, setMinimapVisible] = useState(true);
+  const [viewportBounds, setViewportBounds] = useState<ViewportBounds>({
+    x: 0,
+    y: 0,
+    width: 100,
+    height: 100,
+  });
 
   // Settings popover
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -47,7 +56,8 @@ export function GraphView({
 
   const { settings, setSettings, resetSettings, defaults } = useGraphSettings();
 
-  // Data pipeline
+  // ── Data pipeline ──────────────────────────────────────────────────
+
   const { nodes: rawNodes, links: rawLinks } = useGraphData(
     smartView,
     notes,
@@ -72,34 +82,42 @@ export function GraphView({
     return filteredNodeIds.has(sId) && filteredNodeIds.has(tId);
   });
 
-  const {
-    elements: allElements,
-    clusters,
-    fingerprint,
-  } = useCytoscapeElements({
+  // Build force-graph elements from filtered data
+  const allElements = useGraphElements({
     nodes: filteredNodes,
     links: filteredLinks,
     notebooks,
-    clusterMode,
+    clusteringMode: settings.clusteringMode,
     activeNoteId,
   });
 
-  // Apply cluster filtering — hide elements belonging to hidden clusters
+  // Apply cluster filtering -- hide nodes belonging to hidden clusters
   const elements =
     hiddenClusters.size > 0
-      ? allElements.filter((el) => {
-          if (el.group === "edges") return true; // edges filtered by Cytoscape automatically
-          const parent = el.data?.parent as string | undefined;
-          if (parent && hiddenClusters.has(parent)) return false;
-          // Compound parent nodes
-          if (!parent && el.data?.type && hiddenClusters.has(el.data.id as string)) return false;
-          return true;
-        })
+      ? {
+          ...allElements,
+          nodes: allElements.nodes.filter((n) => !hiddenClusters.has(n.clusterId)),
+          links: allElements.links.filter((l) => {
+            const sId = typeof l.source === "string" ? l.source : l.source;
+            const tId = typeof l.target === "string" ? l.target : l.target;
+            // Re-check that both endpoints are still present after node filtering
+            const visibleIds = new Set(
+              allElements.nodes.filter((n) => !hiddenClusters.has(n.clusterId)).map((n) => n.id),
+            );
+            return visibleIds.has(sId) && visibleIds.has(tId);
+          }),
+        }
       : allElements;
 
-  // Position cache — undefined = not yet loaded, null = cache miss, PositionMap = cache hit
-  const { loadPositions, savePositions } = useGraphPositionCache(smartView, fingerprint);
-  const [cachedPositions, setCachedPositions] = useState<PositionMap | null | undefined>(undefined);
+  // ── Position cache ─────────────────────────────────────────────────
+
+  const { loadPositions, savePositions, clearPositions } = useGraphPositionCache(
+    smartView,
+    allElements.fingerprint,
+  );
+  const [cachedPositions, setCachedPositions] = useState<
+    Record<string, { x: number; y: number }> | null | undefined
+  >(undefined);
   const [cacheReady, setCacheReady] = useState(false);
 
   // Load positions on mount or fingerprint change
@@ -112,80 +130,66 @@ export function GraphView({
     });
   }, [loadPositions]);
 
-  // BFS waves
-  const waves = useMemo(() => {
-    if (filteredNodes.length === 0) return [];
-    const adjacency = new Map<string, Set<string>>();
-    for (const link of filteredLinks) {
-      const sId = typeof link.source === "string" ? link.source : link.source.id;
-      const tId = typeof link.target === "string" ? link.target : link.target.id;
-      if (!adjacency.has(sId)) adjacency.set(sId, new Set());
-      if (!adjacency.has(tId)) adjacency.set(tId, new Set());
-      adjacency.get(sId)?.add(tId);
-      adjacency.get(tId)?.add(sId);
-    }
+  // ── Wave reveal ────────────────────────────────────────────────────
+
+  const waveReveal = useWaveReveal(settings.revealSpeed);
+
+  // Trigger reveal on initial load when cache + elements are ready
+  const hasRevealedRef = useRef(false);
+  useEffect(() => {
+    if (!cacheReady || elements.nodes.length === 0 || hasRevealedRef.current) return;
+    hasRevealedRef.current = true;
+
     const hubId = selectHub(
-      filteredNodes.map((n) => ({ id: n.id, linkCount: n.linkCount, title: n.title })),
+      elements.nodes.map((n) => ({ id: n.id, linkCount: n.linkCount, title: n.label })),
       activeNoteId,
     );
-    return computeBfsWaves(hubId, adjacency, new Set(filteredNodes.map((n) => n.id)));
-  }, [filteredNodes, filteredLinks, activeNoteId]);
+    waveReveal.revealWave(hubId, elements, cachedPositions);
+  }, [cacheReady, elements, activeNoteId, cachedPositions, waveReveal]);
+
+  // Reset reveal flag when view/fingerprint changes — deps are intentional triggers
+  // biome-ignore lint/correctness/useExhaustiveDependencies: deps trigger reset, not read inside
+  useEffect(() => {
+    hasRevealedRef.current = false;
+  }, [smartView, allElements.fingerprint]);
+
+  // ── Force graph ────────────────────────────────────────────────────
 
   const handleSavePositions = useCallback(
-    (positions: PositionMap) => {
+    (positions: Record<string, { x: number; y: number }>) => {
       savePositions(positions);
     },
     [savePositions],
   );
 
-  const { stylesheet } = useCytoscapeTheme();
-  const nodeMap = new Map(filteredNodes.map((n) => [n.id, n]));
-
-  const { cy, runLayout } = useCytoscapeGraph({
-    containerRef,
+  const forceGraph = useForceGraph({
     elements,
-    stylesheet,
     settings,
-    waves,
+    activeNoteId,
+    highlightedClusterId,
+    revealedNodes: waveReveal.revealedNodes,
     cachedPositions,
-    cacheReady,
-    onSavePositions: handleSavePositions,
     onNodeClick: onSelectNote,
     onNodeDoubleClick: onOpenInEditor,
-    onNodeHover: useCallback((id: string | null, x: number, y: number) => {
-      if (id) {
-        setTooltip({ nodeId: id, x, y });
-      } else {
-        setTooltip(null);
-      }
-    }, []),
+    onSavePositions: handleSavePositions,
   });
 
-  // Legend: highlight cluster
-  const handleLegendHighlight = useCallback(
-    (clusterId: string | null) => {
-      const cyInstance = cy.current;
-      if (!cyInstance) return;
+  // ── Viewport bounds update (for minimap) ───────────────────────────
 
-      if (!clusterId) {
-        cyInstance.elements().removeClass("dimmed");
-        return;
-      }
+  useEffect(() => {
+    if (!minimapVisible || !settings.showMinimap) return;
+    const interval = setInterval(() => {
+      setViewportBounds(forceGraph.getViewportBounds());
+    }, 500);
+    return () => clearInterval(interval);
+  }, [minimapVisible, settings.showMinimap, forceGraph.getViewportBounds]);
 
-      const parent = cyInstance.getElementById(clusterId);
-      if (parent.nonempty()) {
-        const children = parent.children();
-        const edges = children.connectedEdges();
-        cyInstance.elements().addClass("dimmed");
-        children.removeClass("dimmed");
-        edges.removeClass("dimmed");
-        parent.removeClass("dimmed");
-      }
-    },
-    [cy],
-  );
+  // ── Legend interactions ────────────────────────────────────────────
 
-  // Legend: toggle cluster visibility
+  const handleLegendHighlight = useCallback((clusterId: string | null) => {
+    setHighlightedClusterId(clusterId);
+  }, []);
+
   const handleToggleCluster = useCallback((clusterId: string) => {
     setHiddenClusters((prev) => {
       const next = new Set(prev);
@@ -202,26 +206,38 @@ export function GraphView({
     setHiddenClusters(new Set());
   }, []);
 
-  // Zoom controls
-  const zoomIn = () =>
-    cy.current?.zoom({
-      level: (cy.current.zoom() || 1) * 1.3,
-      renderedPosition: {
-        x: (containerRef.current?.clientWidth || 0) / 2,
-        y: (containerRef.current?.clientHeight || 0) / 2,
-      },
-    });
-  const zoomOut = () =>
-    cy.current?.zoom({
-      level: (cy.current.zoom() || 1) / 1.3,
-      renderedPosition: {
-        x: (containerRef.current?.clientWidth || 0) / 2,
-        y: (containerRef.current?.clientHeight || 0) / 2,
-      },
-    });
-  const fitScreen = () => cy.current?.animate({ fit: { padding: 40 }, duration: 300 });
+  // ── Minimap navigation ─────────────────────────────────────────────
 
-  // Empty state
+  const handleMinimapNavigate = useCallback(
+    (graphX: number, graphY: number) => {
+      const fg = forceGraph.graphRef.current;
+      if (!fg) return;
+      fg.centerAt(graphX, graphY, 300);
+    },
+    [forceGraph.graphRef],
+  );
+
+  // ── Re-layout ──────────────────────────────────────────────────────
+
+  const handleRelayout = useCallback(() => {
+    clearPositions();
+    forceGraph.configureForces();
+    // Unpin all nodes
+    for (const node of forceGraph.graphData.nodes) {
+      node.fx = undefined;
+      node.fy = undefined;
+    }
+    const fg = forceGraph.graphRef.current;
+    if (fg) fg.d3ReheatSimulation();
+  }, [clearPositions, forceGraph]);
+
+  // ── Tooltip node map ───────────────────────────────────────────────
+  // GraphNodeTooltip expects GraphNode (title, bodyPreview, tags, linkCount).
+  // Build a lookup from the original filtered GraphNodes.
+  const tooltipNodeMap = new Map(filteredNodes.map((n) => [n.id, n]));
+
+  // ── Empty state ────────────────────────────────────────────────────
+
   if (notes.length === 0) {
     return (
       <div className="flex-1 flex flex-col items-center justify-center gap-2 text-muted-foreground">
@@ -230,6 +246,8 @@ export function GraphView({
       </div>
     );
   }
+
+  // ── Render ─────────────────────────────────────────────────────────
 
   return (
     <div className="flex-1 flex flex-col min-h-0">
@@ -240,6 +258,10 @@ export function GraphView({
         onHopRadiusChange={setHopRadius}
         searchQuery={searchQuery}
         onSearchChange={setSearchQuery}
+        clusteringMode={settings.clusteringMode}
+        onClusteringModeChange={(mode) => setSettings({ clusteringMode: mode })}
+        renderMode={settings.renderMode}
+        onRenderModeChange={(mode) => setSettings({ renderMode: mode })}
       />
 
       <div
@@ -249,10 +271,54 @@ export function GraphView({
           backgroundSize: "20px 20px",
         }}
       >
-        <div
-          ref={containerRef}
-          style={{ position: "absolute", inset: 0, width: "100%", height: "100%" }}
-        />
+        {/* 2D Force Graph */}
+        {settings.renderMode === "2d" && (
+          <div
+            ref={containerRef}
+            style={{ position: "absolute", inset: 0, width: "100%", height: "100%" }}
+          >
+            {cacheReady && (
+              <ForceGraph2D
+                // react-force-graph-2d generics don't align with our custom ForceNode/ForceLink
+                // types, but the runtime behavior is correct. Use `as never` to bypass deep
+                // generic variance mismatch.
+                ref={forceGraph.graphRef as never}
+                graphData={forceGraph.graphData as never}
+                width={containerRef.current?.clientWidth}
+                height={containerRef.current?.clientHeight}
+                nodeCanvasObject={forceGraph.nodeCanvasObject as never}
+                nodeCanvasObjectMode={forceGraph.nodeCanvasObjectMode as never}
+                linkCanvasObject={forceGraph.linkCanvasObject as never}
+                linkCanvasObjectMode={forceGraph.linkCanvasObjectMode as never}
+                nodePointerAreaPaint={forceGraph.nodePointerAreaPaint as never}
+                onNodeClick={forceGraph.onNodeClick as never}
+                onNodeHover={forceGraph.onNodeHover as never}
+                onNodeDragEnd={forceGraph.onNodeDragEnd as never}
+                onBackgroundClick={forceGraph.onBackgroundClick}
+                cooldownTicks={settings.livePhysics ? Infinity : 100}
+                enableNodeDrag={true}
+                enableZoomInteraction={true}
+                enablePanInteraction={true}
+              />
+            )}
+          </div>
+        )}
+
+        {/* 3D Brain View */}
+        {settings.renderMode === "3d" && (
+          <div
+            ref={containerRef}
+            style={{ position: "absolute", inset: 0, width: "100%", height: "100%" }}
+          >
+            <GraphBrainView
+              elements={elements}
+              settings={settings}
+              width={containerRef.current?.clientWidth ?? 800}
+              height={containerRef.current?.clientHeight ?? 600}
+              onNodeClick={onSelectNote}
+            />
+          </div>
+        )}
 
         {/* Loading overlay while cache check completes */}
         {!cacheReady && (
@@ -261,9 +327,22 @@ export function GraphView({
           </div>
         )}
 
-        {/* Legend with filter */}
+        {/* Minimap (top-right) */}
+        {settings.showMinimap && settings.renderMode === "2d" && (
+          <GraphMinimap
+            nodes={elements.nodes}
+            links={elements.links}
+            viewportBounds={viewportBounds}
+            revealedNodes={waveReveal.revealedNodes}
+            visible={minimapVisible}
+            onToggle={() => setMinimapVisible((v) => !v)}
+            onNavigate={handleMinimapNavigate}
+          />
+        )}
+
+        {/* Legend with filter (bottom-left) */}
         <GraphLegend
-          clusters={clusters}
+          clusters={allElements.clusters}
           hiddenClusters={hiddenClusters}
           onToggleCluster={handleToggleCluster}
           onShowAll={handleShowAll}
@@ -298,19 +377,7 @@ export function GraphView({
 
           <button
             type="button"
-            onClick={() => setSettings({ livePhysics: !settings.livePhysics })}
-            className={`size-7 glass-button flex items-center justify-center transition-colors ${
-              settings.livePhysics ? "text-brand" : "text-muted-foreground hover:text-foreground"
-            }`}
-            aria-label="Live physics"
-            title={settings.livePhysics ? "Disable live physics" : "Enable live physics"}
-          >
-            <Activity size={14} />
-          </button>
-
-          <button
-            type="button"
-            onClick={zoomIn}
+            onClick={forceGraph.zoomIn}
             className="size-7 glass-button flex items-center justify-center text-muted-foreground hover:text-foreground"
             aria-label="Zoom in"
           >
@@ -318,7 +385,7 @@ export function GraphView({
           </button>
           <button
             type="button"
-            onClick={zoomOut}
+            onClick={forceGraph.zoomOut}
             className="size-7 glass-button flex items-center justify-center text-muted-foreground hover:text-foreground"
             aria-label="Zoom out"
           >
@@ -326,7 +393,7 @@ export function GraphView({
           </button>
           <button
             type="button"
-            onClick={fitScreen}
+            onClick={forceGraph.fitToScreen}
             className="size-7 glass-button flex items-center justify-center text-muted-foreground hover:text-foreground"
             aria-label="Fit to screen"
           >
@@ -334,7 +401,7 @@ export function GraphView({
           </button>
           <button
             type="button"
-            onClick={runLayout}
+            onClick={handleRelayout}
             className="size-7 glass-button flex items-center justify-center text-muted-foreground hover:text-foreground"
             aria-label="Re-layout"
           >
@@ -344,10 +411,18 @@ export function GraphView({
 
         {/* Tooltip */}
         {(() => {
-          if (!tooltip) return null;
-          const tooltipNode = nodeMap.get(tooltip.nodeId);
+          const hoveredId = forceGraph.hoveredNodeId;
+          if (!hoveredId) return null;
+          const tooltipNode = tooltipNodeMap.get(hoveredId);
           if (!tooltipNode) return null;
-          return <GraphNodeTooltip node={tooltipNode} x={tooltip.x} y={tooltip.y} />;
+
+          // Get screen position of hovered node from force graph
+          const fg = forceGraph.graphRef.current;
+          const forceNode = forceGraph.graphData.nodes.find((n) => n.id === hoveredId);
+          if (!fg || !forceNode || forceNode.x == null || forceNode.y == null) return null;
+          const screenPos = fg.graph2ScreenCoords(forceNode.x, forceNode.y);
+
+          return <GraphNodeTooltip node={tooltipNode} x={screenPos.x} y={screenPos.y} />;
         })()}
       </div>
     </div>

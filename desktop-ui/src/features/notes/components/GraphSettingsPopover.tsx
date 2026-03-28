@@ -31,11 +31,9 @@ function Slider({
     <div className="flex items-center gap-3 h-7">
       <span className="text-[11px] text-muted-foreground w-[90px] shrink-0">{label}</span>
       <div className="flex-1 relative flex items-center h-5">
-        {/* Custom track with progress fill */}
         <div className="absolute inset-x-0 top-1/2 -translate-y-1/2 h-[4px] rounded-full bg-muted overflow-hidden">
           <div className="h-full rounded-full bg-brand/50" style={{ width: `${pct}%` }} />
         </div>
-        {/* Native range input (invisible track, visible thumb) */}
         <input
           type="range"
           min={min}
@@ -86,6 +84,12 @@ function Toggle({
   );
 }
 
+const REVEAL_OPTIONS: { value: GraphSettings["revealSpeed"]; label: string }[] = [
+  { value: "instant", label: "Instant" },
+  { value: "balanced", label: "Balanced" },
+  { value: "cinematic", label: "Cinematic" },
+];
+
 export function GraphSettingsPopover({
   settings,
   defaults,
@@ -100,7 +104,6 @@ export function GraphSettingsPopover({
 
   return (
     <div className="w-[280px]">
-      {/* Header */}
       <div className="flex items-center justify-between mb-2">
         <span className="text-2xs font-semibold text-muted-foreground uppercase tracking-wider">
           Settings
@@ -117,7 +120,6 @@ export function GraphSettingsPopover({
         )}
       </div>
 
-      {/* Sliders */}
       <div className="space-y-0.5">
         <Slider
           label="Link Distance"
@@ -164,7 +166,6 @@ export function GraphSettingsPopover({
         />
       </div>
 
-      {/* Toggles */}
       <div className="mt-2 pt-2 border-t border-border-subtle space-y-0.5">
         <Toggle
           label="Show Arrows"
@@ -177,10 +178,39 @@ export function GraphSettingsPopover({
           onChange={(v) => onChange({ showOrphans: v })}
         />
         <Toggle
-          label="Instant Load"
-          checked={settings.instantLoad}
-          onChange={(v) => onChange({ instantLoad: v })}
+          label="Show Minimap"
+          checked={settings.showMinimap}
+          onChange={(v) => onChange({ showMinimap: v })}
         />
+        {settings.renderMode === "3d" && (
+          <Toggle
+            label="Idle Rotation"
+            checked={settings.idleRotation}
+            onChange={(v) => onChange({ idleRotation: v })}
+          />
+        )}
+      </div>
+
+      <div className="mt-2 pt-2 border-t border-border-subtle">
+        <div className="flex items-center gap-3 h-7">
+          <span className="text-[11px] text-muted-foreground w-[90px] shrink-0">Reveal Speed</span>
+          <div className="flex items-center gap-0.5 bg-muted rounded-lg p-0.5">
+            {REVEAL_OPTIONS.map((opt) => (
+              <button
+                key={opt.value}
+                type="button"
+                onClick={() => onChange({ revealSpeed: opt.value })}
+                className={`px-2 py-0.5 text-2xs rounded-md transition-all ${
+                  settings.revealSpeed === opt.value
+                    ? "bg-brand/20 text-brand font-medium"
+                    : "text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                {opt.label}
+              </button>
+            ))}
+          </div>
+        </div>
       </div>
     </div>
   );

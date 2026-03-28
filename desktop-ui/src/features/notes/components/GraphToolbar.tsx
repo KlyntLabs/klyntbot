@@ -1,4 +1,4 @@
-import { Search } from "lucide-react";
+import { Brain, Search } from "lucide-react";
 import type { SmartView } from "../hooks/useGraphData";
 
 interface GraphToolbarProps {
@@ -8,6 +8,10 @@ interface GraphToolbarProps {
   onHopRadiusChange: (r: number) => void;
   searchQuery: string;
   onSearchChange: (q: string) => void;
+  clusteringMode: "notebook" | "semantic";
+  onClusteringModeChange: (mode: "notebook" | "semantic") => void;
+  renderMode: "2d" | "3d";
+  onRenderModeChange: (mode: "2d" | "3d") => void;
 }
 
 const VIEW_OPTIONS: { value: SmartView; label: string }[] = [
@@ -18,6 +22,11 @@ const VIEW_OPTIONS: { value: SmartView; label: string }[] = [
   { value: "orphans", label: "Orphans" },
 ];
 
+const CLUSTERING_OPTIONS: { value: "notebook" | "semantic"; label: string }[] = [
+  { value: "notebook", label: "Notebook" },
+  { value: "semantic", label: "Semantic" },
+];
+
 export function GraphToolbar({
   view,
   onViewChange,
@@ -25,6 +34,10 @@ export function GraphToolbar({
   onHopRadiusChange,
   searchQuery,
   onSearchChange,
+  clusteringMode,
+  onClusteringModeChange,
+  renderMode,
+  onRenderModeChange,
 }: GraphToolbarProps) {
   return (
     <div className="flex items-center gap-2 px-3 py-2 shrink-0">
@@ -69,8 +82,47 @@ export function GraphToolbar({
         </div>
       )}
 
+      {/* Clustering mode switcher */}
+      <div className="flex items-center gap-0.5 bg-card rounded-lg p-0.5">
+        {CLUSTERING_OPTIONS.map((opt) => (
+          <button
+            key={opt.value}
+            type="button"
+            onClick={() => onClusteringModeChange(opt.value)}
+            className={`px-2 py-1 text-xs rounded-md transition-all ${
+              clusteringMode === opt.value
+                ? "bg-brand/20 text-brand font-medium shadow-sm"
+                : "text-muted-foreground hover:text-foreground hover:bg-accent"
+            } ${opt.value === "semantic" ? "opacity-50 cursor-not-allowed" : ""}`}
+            disabled={opt.value === "semantic"}
+            title={
+              opt.value === "semantic"
+                ? "Coming soon — requires semantic community detection"
+                : undefined
+            }
+          >
+            {opt.label}
+          </button>
+        ))}
+      </div>
+
       {/* Spacer */}
       <div className="flex-1" />
+
+      {/* Brain View toggle */}
+      <button
+        type="button"
+        onClick={() => onRenderModeChange(renderMode === "2d" ? "3d" : "2d")}
+        className={`flex items-center gap-1.5 px-2.5 py-1 text-xs rounded-lg transition-all ${
+          renderMode === "3d"
+            ? "bg-brand/20 text-brand font-medium shadow-sm"
+            : "text-muted-foreground hover:text-foreground hover:bg-accent"
+        }`}
+        title={renderMode === "3d" ? "Exit Brain View" : "Enter Brain View"}
+      >
+        <Brain size={14} />
+        {renderMode === "3d" ? "Exit Brain View" : "Brain View"}
+      </button>
 
       {/* Search input */}
       <div className="relative">
