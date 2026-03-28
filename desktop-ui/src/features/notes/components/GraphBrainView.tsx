@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef } from "react";
 import ForceGraph3D from "react-force-graph-3d";
+import type { MeshStandardMaterial } from "three";
 import { useBrainView } from "../hooks/useBrainView";
 import type { ForceLink, ForceNode, GraphElements } from "../hooks/useGraphElements";
 import type { GraphSettings } from "../hooks/useGraphSettings";
@@ -49,7 +50,10 @@ export function GraphBrainView({
   const prevFingerprintRef = useRef("");
 
   const graphData = useMemo(() => {
-    const nodeIds = elements.nodes.map((n) => n.id).sort().join(",");
+    const nodeIds = elements.nodes
+      .map((n) => n.id)
+      .sort()
+      .join(",");
     const linkIds = elements.links
       .map(
         (l) =>
@@ -84,6 +88,62 @@ export function GraphBrainView({
     return data;
   }, [elements]);
 
+  // ── Hover highlight: dim non-neighbors in 3D ──────────────────────
+
+  // Precompute adjacency for neighbor lookup
+  const adjacencyRef = useRef(new Map<string, Set<string>>());
+  useEffect(() => {
+    const adj = new Map<string, Set<string>>();
+    for (const link of elements.links) {
+      const sId =
+        typeof link.source === "string" ? link.source : (link.source as never as ForceNode).id;
+      const tId =
+        typeof link.target === "string" ? link.target : (link.target as never as ForceNode).id;
+      if (!adj.has(sId)) adj.set(sId, new Set());
+      if (!adj.has(tId)) adj.set(tId, new Set());
+      adj.get(sId)?.add(tId);
+      adj.get(tId)?.add(sId);
+    }
+    adjacencyRef.current = adj;
+  }, [elements.links]);
+
+  const hoveredIdRef = useRef<string | null>(null);
+
+  const updateNodeHighlights = useCallback(
+    (hoveredId: string | null) => {
+      const fg = graphRef.current;
+      if (!fg) return;
+
+      const neighbors = hoveredId ? adjacencyRef.current.get(hoveredId) ?? new Set<string>() : null;
+
+      // Update each node's Three.js material opacity
+      fg.scene().traverse((obj: { userData?: { nodeId?: string }; material?: MeshStandardMaterial }) => {
+        const nodeId = obj.userData?.nodeId;
+        if (!nodeId || !obj.material) return;
+
+        const mat = obj.material as MeshStandardMaterial;
+        if (!hoveredId) {
+          // No hover — full brightness
+          mat.opacity = 0.9;
+          mat.emissiveIntensity = mat.userData?.baseEmissive ?? 0.5;
+        } else if (nodeId === hoveredId) {
+          // Hovered node — extra bright
+          mat.opacity = 1;
+          mat.emissiveIntensity = (mat.userData?.baseEmissive ?? 0.5) * 2;
+        } else if (neighbors?.has(nodeId)) {
+          // Neighbor — normal brightness
+          mat.opacity = 0.9;
+          mat.emissiveIntensity = mat.userData?.baseEmissive ?? 0.5;
+        } else {
+          // Non-neighbor — dimmed
+          mat.opacity = 0.1;
+          mat.emissiveIntensity = 0.05;
+        }
+      });
+    },
+    [graphRef],
+  );
+
   // Stable callbacks
   const handleNodeClick = useCallback(
     (node: { id?: string }) => {
@@ -95,18 +155,48 @@ export function GraphBrainView({
 
   const handleNodeHover = useCallback(
     (node: { id?: string } | null) => {
-      if (onNodeHover) {
-        onNodeHover(node?.id ? String(node.id) : null, 0, 0);
-      }
+      const id = node?.id ? String(node.id) : null;
+      hoveredIdRef.current = id;
+      updateNodeHighlights(id);
+      onNodeHover?.(id, 0, 0);
     },
-    [onNodeHover],
+    [onNodeHover, updateNodeHighlights],
   );
 
   const handleNodeDrag = useCallback(() => {
     resetIdleTimer();
   }, [resetIdleTimer]);
 
-  const linkColor = useCallback((link: { color?: string }) => link.color || "#4B5563", []);
+  // Dynamic link color — dim non-neighbor links on hover
+  const linkColor = useCallback(
+    (link: { source?: ForceNode | string; target?: ForceNode | string; color?: string }) => {
+      const hovId = hoveredIdRef.current;
+      if (!hovId) return link.color || "#4B5563";
+
+      const sId =
+        typeof link.source === "string" ? link.source : (link.source as ForceNode)?.id;
+      const tId =
+        typeof link.target === "string" ? link.target : (link.target as ForceNode)?.id;
+      const isConnected = sId === hovId || tId === hovId;
+      return isConnected ? link.color || "#4B5563" : "rgba(30,30,40,0.15)";
+    },
+    [],
+  );
+
+  // Dynamic link width — thicker for hovered connections
+  const linkWidth = useCallback(
+    (link: { source?: ForceNode | string; target?: ForceNode | string }) => {
+      const hovId = hoveredIdRef.current;
+      if (!hovId) return 0.5;
+
+      const sId =
+        typeof link.source === "string" ? link.source : (link.source as ForceNode)?.id;
+      const tId =
+        typeof link.target === "string" ? link.target : (link.target as ForceNode)?.id;
+      return sId === hovId || tId === hovId ? 1.5 : 0.2;
+    },
+    [],
+  );
 
   return (
     <ForceGraph3D
@@ -119,7 +209,7 @@ export function GraphBrainView({
       nodeThreeObjectExtend={false}
       linkColor={linkColor as never}
       linkOpacity={0.35}
-      linkWidth={0.5}
+      linkWidth={linkWidth as never}
       linkDirectionalParticles={settings.showArrows ? 2 : 0}
       linkDirectionalParticleSpeed={0.005}
       linkDirectionalParticleWidth={0.8}

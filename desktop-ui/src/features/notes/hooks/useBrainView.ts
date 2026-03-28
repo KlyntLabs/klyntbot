@@ -21,7 +21,11 @@ export function useBrainView({ settings }: UseBrainViewParams) {
     const emissiveIntensity = Math.min(0.3 + (0.7 * node.linkCount) / 15, 1);
     const geometry = createNodeGeometry(node.size * 0.3); // scale down for 3D space
     const material = createNodeMaterial(node.color, emissiveIntensity);
-    return new Mesh(geometry, material);
+    // Store base emissive so hover highlight can restore it
+    material.userData = { baseEmissive: emissiveIntensity };
+    const mesh = new Mesh(geometry, material);
+    mesh.userData = { nodeId: node.id };
+    return mesh;
   }, []);
 
   // Add bloom post-processing to the ForceGraph3D instance
