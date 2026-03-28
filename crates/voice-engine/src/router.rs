@@ -43,10 +43,7 @@ impl VoiceRouter {
                 (
                     "notes".into(),
                     "Note".into(),
-                    vec!["note", "jot"]
-                        .into_iter()
-                        .map(String::from)
-                        .collect(),
+                    vec!["note", "jot"].into_iter().map(String::from).collect(),
                 ),
                 (
                     "finance".into(),
@@ -61,7 +58,11 @@ impl VoiceRouter {
     }
 
     pub fn detect_intents(&self, text: &str) -> Vec<DetectedIntent> {
-        let words: Vec<String> = text.to_lowercase().split_whitespace().map(String::from).collect();
+        let words: Vec<String> = text
+            .to_lowercase()
+            .split_whitespace()
+            .map(String::from)
+            .collect();
 
         self.skill_keywords
             .iter()
@@ -161,6 +162,8 @@ mod tests {
         let router = VoiceRouter::new();
         let intents = router.detect_intents("remind me to practice french");
         let events = router.to_events(&intents);
-        assert!(events.iter().all(|e| matches!(e, VoiceEvent::RoutingSuggestion { .. })));
+        assert!(events
+            .iter()
+            .all(|e| matches!(e, VoiceEvent::RoutingSuggestion { .. })));
     }
 }

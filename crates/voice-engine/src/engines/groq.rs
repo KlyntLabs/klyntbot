@@ -45,7 +45,9 @@ impl GroqWhisperEngine {
         let client = reqwest::Client::builder()
             .timeout(Duration::from_secs(60))
             .build()
-            .map_err(|e| common::KlyntbotError::Provider(common::ProviderError::Http(e.to_string())))?;
+            .map_err(|e| {
+                common::KlyntbotError::Provider(common::ProviderError::Http(e.to_string()))
+            })?;
 
         Ok(Self {
             client,
@@ -87,7 +89,9 @@ impl TranscriptionEngine for GroqWhisperEngine {
 
         debug!("Transcribing audio file via Groq: {}", path.display());
 
-        let file = tokio::fs::read(path).await.map_err(common::KlyntbotError::Io)?;
+        let file = tokio::fs::read(path)
+            .await
+            .map_err(common::KlyntbotError::Io)?;
 
         let filename = path
             .file_name()

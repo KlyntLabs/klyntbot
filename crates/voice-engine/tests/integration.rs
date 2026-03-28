@@ -27,11 +27,17 @@ fn full_pipeline_capture_to_routing() {
 
     let router = VoiceRouter::new();
     let intents = router.detect_intents(&transcript.text);
-    assert!(intents.len() >= 2, "Should detect task + learning intents, got {}", intents.len());
+    assert!(
+        intents.len() >= 2,
+        "Should detect task + learning intents, got {}",
+        intents.len()
+    );
     assert!(VoiceRouter::is_multi_intent(&intents));
 
     let events = router.to_events(&intents);
-    assert!(events.iter().all(|e| matches!(e, VoiceEvent::RoutingSuggestion { .. })));
+    assert!(events
+        .iter()
+        .all(|e| matches!(e, VoiceEvent::RoutingSuggestion { .. })));
 
     let report = compute_pronunciation_report(&transcript);
     assert!(report.overall_score > 0.85);
@@ -43,11 +49,7 @@ fn pronunciation_report_feeds_voice_metadata() {
     let transcript = Transcript {
         text: "je suis content".to_string(),
         language: Language::new("fr"),
-        segments: vec![
-            seg("je", 0.92),
-            seg("suis", 0.40),
-            seg("content", 0.70),
-        ],
+        segments: vec![seg("je", 0.92), seg("suis", 0.40), seg("content", 0.70)],
         overall_confidence: 0.67,
     };
 

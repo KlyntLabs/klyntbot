@@ -63,7 +63,11 @@ impl ModelManager {
         };
 
         let (state_tx, state_rx) = watch::channel(initial);
-        Self { models_dir, state_tx, state_rx }
+        Self {
+            models_dir,
+            state_tx,
+            state_rx,
+        }
     }
 
     pub fn state(&self) -> ModelState {
@@ -96,7 +100,9 @@ impl ModelManager {
             .await
             .map_err(common::KlyntbotError::Io)?;
 
-        let _ = self.state_tx.send(ModelState::Downloading { progress: 0.0 });
+        let _ = self
+            .state_tx
+            .send(ModelState::Downloading { progress: 0.0 });
 
         warn!(
             "Model download not yet implemented for {}. Place the model file at: {}",

@@ -64,7 +64,11 @@ mod tests {
 
     fn transcript(segments: Vec<TranscriptSegment>) -> Transcript {
         Transcript {
-            text: segments.iter().map(|s| s.text.as_str()).collect::<Vec<_>>().join(" "),
+            text: segments
+                .iter()
+                .map(|s| s.text.as_str())
+                .collect::<Vec<_>>()
+                .join(" "),
             language: Language::new("fr"),
             segments,
             overall_confidence: 0.0,
@@ -87,7 +91,10 @@ mod tests {
         assert!(report.overall_score > 0.9);
         assert_eq!(report.weak_words_count, 0);
         assert!(report.improvement_suggestion.is_none());
-        assert!(report.word_scores.iter().all(|w| w.rating == PronunciationRating::Good));
+        assert!(report
+            .word_scores
+            .iter()
+            .all(|w| w.rating == PronunciationRating::Good));
     }
 
     #[test]
@@ -102,7 +109,10 @@ mod tests {
         assert_eq!(report.word_scores[0].rating, PronunciationRating::Good);
         assert_eq!(report.word_scores[1].rating, PronunciationRating::Poor);
         assert_eq!(report.word_scores[2].rating, PronunciationRating::Fair);
-        assert_eq!(report.improvement_suggestion.as_deref(), Some("Focus on: suis"));
+        assert_eq!(
+            report.improvement_suggestion.as_deref(),
+            Some("Focus on: suis")
+        );
     }
 
     #[test]
@@ -111,16 +121,16 @@ mod tests {
         let report = compute_pronunciation_report(&t);
         assert_eq!(report.overall_score, 0.55);
         assert_eq!(report.weak_words_count, 1);
-        assert!(report.improvement_suggestion.as_ref().unwrap().contains("merci"));
+        assert!(report
+            .improvement_suggestion
+            .as_ref()
+            .unwrap()
+            .contains("merci"));
     }
 
     #[test]
     fn boundary_confidence_values() {
-        let t = transcript(vec![
-            seg("a", 0.85),
-            seg("b", 0.60),
-            seg("c", 0.59),
-        ]);
+        let t = transcript(vec![seg("a", 0.85), seg("b", 0.60), seg("c", 0.59)]);
         let report = compute_pronunciation_report(&t);
         assert_eq!(report.word_scores[0].rating, PronunciationRating::Good);
         assert_eq!(report.word_scores[1].rating, PronunciationRating::Fair);

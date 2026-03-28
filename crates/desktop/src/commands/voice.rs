@@ -13,19 +13,28 @@ pub async fn voice_start_capture(
     state: State<'_, Arc<AppCore>>,
 ) -> Result<VoiceCaptureInfo, ApiError> {
     let _ = state;
-    Err(ApiError::new("NOT_IMPLEMENTED", "Voice capture not yet wired"))
+    Err(ApiError::new(
+        "NOT_IMPLEMENTED",
+        "Voice capture not yet wired",
+    ))
 }
 
 #[tauri::command]
 pub async fn voice_stop_capture(state: State<'_, Arc<AppCore>>) -> Result<(), ApiError> {
     let _ = state;
-    Err(ApiError::new("NOT_IMPLEMENTED", "Voice capture not yet wired"))
+    Err(ApiError::new(
+        "NOT_IMPLEMENTED",
+        "Voice capture not yet wired",
+    ))
 }
 
 #[tauri::command]
 pub async fn voice_dismiss(state: State<'_, Arc<AppCore>>) -> Result<(), ApiError> {
     let _ = state;
-    Err(ApiError::new("NOT_IMPLEMENTED", "Voice capture not yet wired"))
+    Err(ApiError::new(
+        "NOT_IMPLEMENTED",
+        "Voice capture not yet wired",
+    ))
 }
 
 #[tauri::command]
@@ -33,7 +42,10 @@ pub async fn voice_get_status(
     state: State<'_, Arc<AppCore>>,
 ) -> Result<VoiceStatusResponse, ApiError> {
     let _ = state;
-    Err(ApiError::new("NOT_IMPLEMENTED", "Voice status not yet wired"))
+    Err(ApiError::new(
+        "NOT_IMPLEMENTED",
+        "Voice status not yet wired",
+    ))
 }
 
 #[tauri::command]
@@ -41,7 +53,10 @@ pub async fn voice_get_models(
     state: State<'_, Arc<AppCore>>,
 ) -> Result<Vec<VoiceModelInfo>, ApiError> {
     let _ = state;
-    Err(ApiError::new("NOT_IMPLEMENTED", "Voice models not yet wired"))
+    Err(ApiError::new(
+        "NOT_IMPLEMENTED",
+        "Voice models not yet wired",
+    ))
 }
 
 #[tauri::command]
@@ -51,7 +66,10 @@ pub async fn voice_download_model(
 ) -> Result<(), ApiError> {
     let _ = state;
     let _ = request;
-    Err(ApiError::new("NOT_IMPLEMENTED", "Voice download not yet wired"))
+    Err(ApiError::new(
+        "NOT_IMPLEMENTED",
+        "Voice download not yet wired",
+    ))
 }
 
 // ── Dev server dispatch ─────────────────────────────────────────────

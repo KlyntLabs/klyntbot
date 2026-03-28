@@ -49,7 +49,9 @@ mod tests {
 
     #[test]
     fn finalizing_can_proceed_or_cancel() {
-        assert!(VoiceSessionState::Finalizing.can_transition_to(VoiceSessionState::WaitingForResponse));
+        assert!(
+            VoiceSessionState::Finalizing.can_transition_to(VoiceSessionState::WaitingForResponse)
+        );
         assert!(VoiceSessionState::Finalizing.can_transition_to(VoiceSessionState::Idle));
     }
 
