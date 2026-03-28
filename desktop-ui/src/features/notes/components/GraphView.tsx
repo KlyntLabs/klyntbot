@@ -332,8 +332,8 @@ export function GraphView({
         {/* Minimap (top-right) */}
         {settings.showMinimap && settings.renderMode === "2d" && (
           <GraphMinimap
-            nodes={elements.nodes}
-            links={elements.links}
+            nodes={forceGraph.graphData.nodes}
+            links={forceGraph.graphData.links}
             viewportBounds={viewportBounds}
             revealedNodes={waveReveal.revealedNodes}
             visible={minimapVisible}

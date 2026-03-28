@@ -1,5 +1,5 @@
 import { Map as MapIcon } from "lucide-react";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef } from "react";
 import type { ViewportBounds } from "../hooks/useForceGraph";
 import type { ForceLink, ForceNode } from "../hooks/useGraphElements";
 
@@ -73,91 +73,107 @@ export function GraphMinimap({
   onNavigate,
 }: GraphMinimapProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const graphBoundsRef = useRef({ minX: -100, minY: -100, maxX: 100, maxY: 100 });
-  const [, setRenderTick] = useState(0);
+  const nodesRef = useRef(nodes);
+  const linksRef = useRef(links);
+  const viewportBoundsRef = useRef(viewportBounds);
+  const revealedNodesRef = useRef(revealedNodes);
+  nodesRef.current = nodes;
+  linksRef.current = links;
+  viewportBoundsRef.current = viewportBounds;
+  revealedNodesRef.current = revealedNodes;
 
-  // Recompute graph bounds when nodes change positions
+  // Continuous repaint loop — d3-force mutates node positions in-place,
+  // so we can't rely on React re-renders to trigger repaints
   useEffect(() => {
-    graphBoundsRef.current = computeGraphBounds(nodes);
-    setRenderTick((t) => t + 1);
-  }, [nodes]);
+    if (!visible) return;
 
-  // Paint the minimap canvas
-  useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas || !visible) return;
+    let animId: number;
+    let lastPaint = 0;
 
-    const ctx = canvas.getContext("2d");
-    if (!ctx) return;
+    const paint = (time: number) => {
+      animId = requestAnimationFrame(paint);
 
-    const dpr = window.devicePixelRatio || 1;
-    canvas.width = CANVAS_WIDTH * dpr;
-    canvas.height = CANVAS_HEIGHT * dpr;
-    ctx.scale(dpr, dpr);
+      // Throttle to ~15fps
+      if (time - lastPaint < 66) return;
+      lastPaint = time;
 
-    // Clear
-    ctx.clearRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
+      const canvas = canvasRef.current;
+      if (!canvas) return;
+      const ctx = canvas.getContext("2d");
+      if (!ctx) return;
 
-    const bounds = graphBoundsRef.current;
-    const graphW = bounds.maxX - bounds.minX || 1;
-    const graphH = bounds.maxY - bounds.minY || 1;
+      const curNodes = nodesRef.current;
+      const curLinks = linksRef.current;
+      const curViewport = viewportBoundsRef.current;
+      const curRevealed = revealedNodesRef.current;
 
-    // Scale to fit canvas with padding
-    const drawW = CANVAS_WIDTH - PADDING * 2;
-    const drawH = CANVAS_HEIGHT - PADDING * 2;
-    const scale = Math.min(drawW / graphW, drawH / graphH);
+      const dpr = window.devicePixelRatio || 1;
+      canvas.width = CANVAS_WIDTH * dpr;
+      canvas.height = CANVAS_HEIGHT * dpr;
+      ctx.scale(dpr, dpr);
+      ctx.clearRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
 
-    const toCanvasX = (gx: number) => PADDING + (gx - bounds.minX) * scale;
-    const toCanvasY = (gy: number) => PADDING + (gy - bounds.minY) * scale;
+      const bounds = computeGraphBounds(curNodes);
+      const graphW = bounds.maxX - bounds.minX || 1;
+      const graphH = bounds.maxY - bounds.minY || 1;
+      const drawW = CANVAS_WIDTH - PADDING * 2;
+      const drawH = CANVAS_HEIGHT - PADDING * 2;
+      const scale = Math.min(drawW / graphW, drawH / graphH);
 
-    // Draw links
-    ctx.lineWidth = 0.5;
-    for (const link of links) {
-      const source = link.source as unknown as ForceNode;
-      const target = link.target as unknown as ForceNode;
-      const sx = source.x ?? 0;
-      const sy = source.y ?? 0;
-      const tx = target.x ?? 0;
-      const ty = target.y ?? 0;
+      const toCanvasX = (gx: number) => PADDING + (gx - bounds.minX) * scale;
+      const toCanvasY = (gy: number) => PADDING + (gy - bounds.minY) * scale;
 
-      const isRevealed =
-        revealedNodes.size === 0 || (revealedNodes.has(source.id) && revealedNodes.has(target.id));
+      // Draw links
+      ctx.lineWidth = 0.5;
+      for (const link of curLinks) {
+        const source = link.source as unknown as ForceNode;
+        const target = link.target as unknown as ForceNode;
+        const sx = source.x ?? 0;
+        const sy = source.y ?? 0;
+        const tx = target.x ?? 0;
+        const ty = target.y ?? 0;
 
-      ctx.strokeStyle = isRevealed ? hexToRgba(link.color, 0.15) : "rgba(255,255,255,0.03)";
-      ctx.beginPath();
-      ctx.moveTo(toCanvasX(sx), toCanvasY(sy));
-      ctx.lineTo(toCanvasX(tx), toCanvasY(ty));
-      ctx.stroke();
-    }
+        const isRevealed =
+          curRevealed.size === 0 || (curRevealed.has(source.id) && curRevealed.has(target.id));
 
-    // Draw nodes
-    for (const node of nodes) {
-      const x = node.x ?? 0;
-      const y = node.y ?? 0;
-      const isRevealed = revealedNodes.size === 0 || revealedNodes.has(node.id);
+        ctx.strokeStyle = isRevealed ? hexToRgba(link.color, 0.15) : "rgba(255,255,255,0.03)";
+        ctx.beginPath();
+        ctx.moveTo(toCanvasX(sx), toCanvasY(sy));
+        ctx.lineTo(toCanvasX(tx), toCanvasY(ty));
+        ctx.stroke();
+      }
 
-      ctx.fillStyle = isRevealed ? hexToRgba(node.color, 0.7) : "rgba(255,255,255,0.08)";
-      ctx.beginPath();
-      ctx.arc(toCanvasX(x), toCanvasY(y), NODE_RADIUS, 0, Math.PI * 2);
-      ctx.fill();
-    }
+      // Draw nodes
+      for (const node of curNodes) {
+        const x = node.x ?? 0;
+        const y = node.y ?? 0;
+        const isRevealed = curRevealed.size === 0 || curRevealed.has(node.id);
 
-    // Draw viewport rectangle
-    const vx = toCanvasX(viewportBounds.x);
-    const vy = toCanvasY(viewportBounds.y);
-    const vw = viewportBounds.width * scale;
-    const vh = viewportBounds.height * scale;
+        ctx.fillStyle = isRevealed ? hexToRgba(node.color, 0.7) : "rgba(255,255,255,0.08)";
+        ctx.beginPath();
+        ctx.arc(toCanvasX(x), toCanvasY(y), NODE_RADIUS, 0, Math.PI * 2);
+        ctx.fill();
+      }
 
-    ctx.strokeStyle = "rgba(255,255,255,0.5)";
-    ctx.lineWidth = 1;
-    ctx.setLineDash([3, 2]);
-    ctx.strokeRect(vx, vy, vw, vh);
-    ctx.setLineDash([]);
+      // Draw viewport rectangle
+      const vx = toCanvasX(curViewport.x);
+      const vy = toCanvasY(curViewport.y);
+      const vw = curViewport.width * scale;
+      const vh = curViewport.height * scale;
 
-    // Faint fill for the viewport area
-    ctx.fillStyle = "rgba(255,255,255,0.04)";
-    ctx.fillRect(vx, vy, vw, vh);
-  }, [nodes, links, viewportBounds, revealedNodes, visible]);
+      ctx.strokeStyle = "rgba(255,255,255,0.5)";
+      ctx.lineWidth = 1;
+      ctx.setLineDash([3, 2]);
+      ctx.strokeRect(vx, vy, vw, vh);
+      ctx.setLineDash([]);
+
+      ctx.fillStyle = "rgba(255,255,255,0.04)";
+      ctx.fillRect(vx, vy, vw, vh);
+    };
+
+    animId = requestAnimationFrame(paint);
+    return () => cancelAnimationFrame(animId);
+  }, [visible]);
 
   // Click to navigate
   const handleCanvasClick = useCallback(

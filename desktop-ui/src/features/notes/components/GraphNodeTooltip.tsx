@@ -11,20 +11,19 @@ interface GraphNodeTooltipProps {
 export function GraphNodeTooltip({ node, x, y }: GraphNodeTooltipProps) {
   return createPortal(
     <div
-      className="fixed z-[100] glass-panel rounded-xl px-3 py-2 max-w-[240px] pointer-events-none shadow-lg"
-      style={{ left: x + 12, top: y + 12 }}
+      className="fixed z-[100] glass-card rounded-xl px-4 py-3 max-w-[260px] pointer-events-none"
+      style={{ left: x + 14, top: y + 14 }}
     >
-      {/* Title */}
-      <div className="text-sm font-semibold text-foreground truncate">{node.title}</div>
+      <div className="text-[13px] font-semibold text-foreground leading-tight">{node.title}</div>
 
-      {/* Body preview */}
       {node.bodyPreview && (
-        <div className="text-xs text-muted-foreground mt-1 line-clamp-2">{node.bodyPreview}</div>
+        <div className="text-xs text-muted-foreground mt-1.5 leading-relaxed line-clamp-2">
+          {node.bodyPreview}
+        </div>
       )}
 
-      {/* Tags */}
       {node.tags.length > 0 && (
-        <div className="flex flex-wrap gap-1 mt-1.5">
+        <div className="flex flex-wrap gap-1 mt-2">
           {node.tags.map((tag) => (
             <span
               key={tag}
@@ -40,8 +39,7 @@ export function GraphNodeTooltip({ node, x, y }: GraphNodeTooltipProps) {
         </div>
       )}
 
-      {/* Link count */}
-      <div className="text-2xs text-dim mt-1.5">
+      <div className="text-2xs text-dim mt-2">
         {node.linkCount} {node.linkCount === 1 ? "link" : "links"}
       </div>
     </div>,
