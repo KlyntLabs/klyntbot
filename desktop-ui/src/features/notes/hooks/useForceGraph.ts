@@ -213,14 +213,17 @@ export function useForceGraph({
     [settings.repulsion, settings.centerForce, settings.linkDistance, settings.nodeScale],
   );
 
-  // Configure forces on mount or after render mode switch
+  // Configure forces on mount or after render mode switch, then zoom to fit
   // biome-ignore lint/correctness/useExhaustiveDependencies: renderMode triggers re-init
   useEffect(() => {
     if (forceInitializedRef.current) return;
     const timer = setTimeout(() => {
-      // Reheat on re-init after mode switch so 2D simulation spreads nodes properly
       configureForces(true);
       forceInitializedRef.current = true;
+      // Zoom to fit after simulation settles
+      setTimeout(() => {
+        graphRef.current?.zoomToFit(400, 60);
+      }, 2000);
     }, 100);
     return () => clearTimeout(timer);
   }, [configureForces, renderMode]);
