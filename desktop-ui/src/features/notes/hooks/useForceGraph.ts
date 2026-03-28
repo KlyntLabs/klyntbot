@@ -220,10 +220,14 @@ export function useForceGraph({
     const timer = setTimeout(() => {
       configureForces(true);
       forceInitializedRef.current = true;
-      // Zoom to fit after simulation settles
-      setTimeout(() => {
-        graphRef.current?.zoomToFit(400, 60);
-      }, 2000);
+      // Continuously zoom to fit as the simulation runs, so the graph
+      // smoothly expands into view over ~4 seconds
+      let ticks = 0;
+      const fitInterval = setInterval(() => {
+        graphRef.current?.zoomToFit(300, 60);
+        ticks++;
+        if (ticks >= 8) clearInterval(fitInterval);
+      }, 500);
     }, 100);
     return () => clearTimeout(timer);
   }, [configureForces, renderMode]);
