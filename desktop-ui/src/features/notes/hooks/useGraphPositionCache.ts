@@ -1,6 +1,8 @@
 import { useCallback, useRef } from "react";
 import type { PositionMap } from "../lib/graphUtils";
 
+export type { PositionMap };
+
 interface CacheEntry {
   key: string;
   positions: PositionMap;
