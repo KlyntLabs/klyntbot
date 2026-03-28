@@ -8,8 +8,8 @@ impl NoteRepo {
 
     pub async fn create_note(&self, row: &NoteRow) -> Result<NoteRow, StorageError> {
         let result = sqlx::query_as::<_, NoteRow>(
-            "INSERT INTO notes (id, notebook_id, title, body, body_html, pinned, archived, icon, color, embedding_updated_at, split_content, split_mode, perspective_config, last_visited_at, created_at, updated_at)
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16)
+            "INSERT INTO notes (id, notebook_id, title, body, body_html, body_json, pinned, archived, icon, color, embedding_updated_at, split_content, split_mode, perspective_config, last_visited_at, created_at, updated_at)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17)
              RETURNING *",
         )
         .bind(&row.id)
@@ -17,6 +17,7 @@ impl NoteRepo {
         .bind(&row.title)
         .bind(&row.body)
         .bind(&row.body_html)
+        .bind(&row.body_json)
         .bind(row.pinned)
         .bind(row.archived)
         .bind(&row.icon)
@@ -86,6 +87,7 @@ impl NoteRepo {
         title: Option<&str>,
         body: Option<&str>,
         body_html: Option<&str>,
+        body_json: Option<&str>,
         pinned: Option<bool>,
         notebook_id: Option<Option<&str>>,
         icon: Option<Option<&str>>,
@@ -105,36 +107,37 @@ impl NoteRepo {
                 title = COALESCE(?2, title),
                 body = COALESCE(?3, body),
                 body_html = COALESCE(?4, body_html),
-                pinned = COALESCE(?5, pinned),
+                body_json = COALESCE(?5, body_json),
+                pinned = COALESCE(?6, pinned),
                 notebook_id = CASE
-                    WHEN ?6 IS NULL THEN notebook_id
-                    WHEN ?6 = '' THEN NULL
-                    ELSE ?6
-                END,
-                icon = CASE
-                    WHEN ?7 IS NULL THEN icon
+                    WHEN ?7 IS NULL THEN notebook_id
                     WHEN ?7 = '' THEN NULL
                     ELSE ?7
                 END,
-                color = CASE
-                    WHEN ?8 IS NULL THEN color
+                icon = CASE
+                    WHEN ?8 IS NULL THEN icon
                     WHEN ?8 = '' THEN NULL
                     ELSE ?8
                 END,
-                split_content = CASE
-                    WHEN ?9 IS NULL THEN split_content
+                color = CASE
+                    WHEN ?9 IS NULL THEN color
                     WHEN ?9 = '' THEN NULL
                     ELSE ?9
                 END,
-                split_mode = CASE
-                    WHEN ?10 IS NULL THEN split_mode
+                split_content = CASE
+                    WHEN ?10 IS NULL THEN split_content
                     WHEN ?10 = '' THEN NULL
                     ELSE ?10
                 END,
-                perspective_config = CASE
-                    WHEN ?11 IS NULL THEN perspective_config
+                split_mode = CASE
+                    WHEN ?11 IS NULL THEN split_mode
                     WHEN ?11 = '' THEN NULL
                     ELSE ?11
+                END,
+                perspective_config = CASE
+                    WHEN ?12 IS NULL THEN perspective_config
+                    WHEN ?12 = '' THEN NULL
+                    ELSE ?12
                 END,
                 updated_at = strftime('%Y-%m-%dT%H:%M:%SZ', 'now')
              WHERE id = ?1
@@ -144,6 +147,7 @@ impl NoteRepo {
         .bind(title)
         .bind(body)
         .bind(body_html)
+        .bind(body_json)
         .bind(pinned.map(|p| p as i32))
         .bind(nb_sentinel)
         .bind(icon_sentinel)
@@ -270,7 +274,7 @@ impl NoteRepo {
         let pattern = format!("%{escaped}%");
         let rows = sqlx::query_as::<_, NoteRow>(
             "WITH scored AS (
-               SELECT n.id, n.notebook_id, n.title, n.body, n.body_html,
+               SELECT n.id, n.notebook_id, n.title, n.body, n.body_html, n.body_json,
                       n.pinned, n.archived, n.icon, n.color, n.embedding_updated_at,
                       n.split_content, n.split_mode, n.perspective_config, n.last_visited_at,
                       n.created_at, n.updated_at,
@@ -283,7 +287,7 @@ impl NoteRepo {
                FROM notes n
                WHERE n.archived = 0
              )
-             SELECT id, notebook_id, title, body, body_html,
+             SELECT id, notebook_id, title, body, body_html, body_json,
                     pinned, archived, icon, color, embedding_updated_at,
                     split_content, split_mode, perspective_config, last_visited_at,
                     created_at, updated_at
@@ -377,7 +381,7 @@ impl NoteRepo {
     /// Returns results sorted by relevance (highest first).
     pub async fn search_fts(&self, query: &str) -> Result<Vec<NoteSearchResult>, StorageError> {
         let rows = sqlx::query_as::<_, NoteSearchResult>(
-            "SELECT n.id, n.notebook_id, n.title, n.body, n.body_html,
+            "SELECT n.id, n.notebook_id, n.title, n.body, n.body_html, n.body_json,
                     n.pinned, n.archived, n.icon, n.color, n.embedding_updated_at,
                     n.split_content, n.split_mode, n.perspective_config, n.last_visited_at,
                     n.created_at, n.updated_at,

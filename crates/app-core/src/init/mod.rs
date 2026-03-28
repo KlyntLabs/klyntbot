@@ -320,6 +320,7 @@ impl AppCore {
                             body: "Manually killed this experiment trial from the Mirror."
                                 .to_string(),
                             body_html: None,
+                            body_json: None,
                             pinned: 0,
                             archived: 0,
                             icon: None,

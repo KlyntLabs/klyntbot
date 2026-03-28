@@ -29,6 +29,7 @@ pub struct NoteCreateParams {
     pub title: String,
     pub notebook_id: Option<String>,
     pub body: Option<String>,
+    pub body_json: Option<String>,
     pub tags: Option<Vec<String>>,
     pub created_at: Option<String>,
     pub icon: Option<String>,
@@ -48,6 +49,7 @@ pub struct NoteUpdateParams {
     pub title: Option<String>,
     pub body: Option<String>,
     pub body_html: Option<String>,
+    pub body_json: Option<String>,
     pub pinned: Option<bool>,
     /// `None` = don't change, `Some(None)` = move to root, `Some(Some(id))` = move to folder
     #[serde(default, deserialize_with = "deserialize_nullable_field")]

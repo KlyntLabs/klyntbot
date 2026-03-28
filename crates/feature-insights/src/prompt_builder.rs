@@ -222,6 +222,7 @@ mod tests {
             title: title.to_string(),
             body: body.to_string(),
             body_html: None,
+            body_json: None,
             pinned: 0,
             archived: 0,
             icon: None,

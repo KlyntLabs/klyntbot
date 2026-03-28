@@ -63,6 +63,7 @@ mod tests {
             title: title.to_string(),
             body: "hello world".to_string(),
             body_html: None,
+            body_json: None,
             pinned: 0,
             archived: 0,
             icon: None,
@@ -111,6 +112,7 @@ mod tests {
             .update_note(
                 "n1",
                 Some("Updated"),
+                None,
                 None,
                 None,
                 Some(true),

@@ -93,6 +93,7 @@ export interface NoteCreateParams {
   title: string;
   notebookId?: string;
   body?: string;
+  bodyJson?: string;
   tags?: string[];
   createdAt?: string;
   icon?: string;
@@ -104,6 +105,7 @@ export interface NoteUpdateParams {
   title?: string;
   body?: string;
   bodyHtml?: string;
+  bodyJson?: string;
   pinned?: boolean;
   notebookId?: string | null;
   tags?: string[];

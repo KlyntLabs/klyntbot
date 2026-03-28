@@ -70,7 +70,7 @@ export function NoteEditor({
   const navigate = useNavigate();
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastNoteIdRef = useRef(note.id);
-  const pendingRef = useRef<{ html: string; markdown: string } | null>(null);
+  const pendingRef = useRef<{ html: string; markdown: string; json: string } | null>(null);
   const onSaveRef = useRef(onSave);
   onSaveRef.current = onSave;
   const noteContent = note.bodyHtml || note.body || "";
@@ -138,14 +138,15 @@ export function NoteEditor({
         id: noteId,
         body: pending.markdown,
         bodyHtml: pending.html,
+        bodyJson: pending.json,
       });
       maybeCreateVersion(noteId);
     }
   }, [maybeCreateVersion]);
 
   const handleUpdate = useCallback(
-    (html: string, markdown: string) => {
-      pendingRef.current = { html, markdown };
+    (html: string, markdown: string, json: string) => {
+      pendingRef.current = { html, markdown, json };
       if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
       saveTimerRef.current = setTimeout(flushSave, 1000);
     },

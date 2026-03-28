@@ -126,6 +126,7 @@ impl AppCore {
                 title,
                 body: parsed.body,
                 body_html: None,
+                body_json: None,
                 pinned: fm.pinned.map_or(0, |p| if p { 1 } else { 0 }),
                 archived: 0,
                 icon: fm.icon,
@@ -140,14 +141,15 @@ impl AppCore {
             };
 
             sqlx::query(
-                "INSERT INTO notes (id, notebook_id, title, body, body_html, pinned, archived, icon, color, embedding_updated_at, split_content, split_mode, perspective_config, last_visited_at, created_at, updated_at)
-                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16)",
+                "INSERT INTO notes (id, notebook_id, title, body, body_html, body_json, pinned, archived, icon, color, embedding_updated_at, split_content, split_mode, perspective_config, last_visited_at, created_at, updated_at)
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17)",
             )
             .bind(&row.id)
             .bind(&row.notebook_id)
             .bind(&row.title)
             .bind(&row.body)
             .bind(&row.body_html)
+            .bind(&row.body_json)
             .bind(row.pinned)
             .bind(row.archived)
             .bind(&row.icon)

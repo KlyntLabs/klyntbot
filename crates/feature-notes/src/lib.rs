@@ -31,7 +31,7 @@ impl NotesFeature {
         vec![
             FeatureMigration {
                 feature_name: "notes".to_string(),
-                version: 6,
+                version: 7,
                 description:
                     "Create notes core tables (notebooks, notes, tags, links, entity_mentions, versions)"
                         .to_string(),

@@ -18,6 +18,7 @@ CREATE TABLE IF NOT EXISTS notes (
     title       TEXT NOT NULL CHECK(length(trim(title)) > 0),
     body        TEXT NOT NULL DEFAULT '',
     body_html   TEXT,
+    body_json   TEXT,
     pinned      INTEGER NOT NULL DEFAULT 0,
     archived    INTEGER NOT NULL DEFAULT 0,
     icon        TEXT,

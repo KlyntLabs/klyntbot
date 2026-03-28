@@ -206,7 +206,7 @@ export function getEditorExtensions(opts: EditorExtensionOptions = {}): Extensio
 
 interface UseNoteEditorOptions {
   content: string;
-  onUpdate: (html: string, markdown: string) => void;
+  onUpdate: (html: string, markdown: string, json: string) => void;
   extensions?: Extensions;
   onNavigateNote?: (noteId: string) => void;
   onNavigateEntity?: (entityType: string, entityId: string) => void;
@@ -246,7 +246,7 @@ export function useNoteEditor({
     }),
     content,
     onUpdate: ({ editor: ed }) => {
-      onUpdate(ed.getHTML(), ed.storage.markdown.getMarkdown());
+      onUpdate(ed.getHTML(), ed.storage.markdown.getMarkdown(), JSON.stringify(ed.getJSON()));
     },
     editorProps: {
       attributes: { class: editorClass },
