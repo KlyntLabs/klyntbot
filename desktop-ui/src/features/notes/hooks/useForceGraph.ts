@@ -223,6 +223,24 @@ export function useForceGraph({
     }
   }, []);
 
+  // Cancel auto-fit on any direct user interaction with the canvas
+  // (wheel zoom, mouse drag, touch) — these bypass react-force-graph callbacks
+  useEffect(() => {
+    const canvas = graphRef.current?.renderer?.()?.domElement
+      ?? document.querySelector<HTMLCanvasElement>(".force-graph-container canvas, canvas");
+    if (!canvas) return;
+
+    const stop = () => cancelAutoFit();
+    canvas.addEventListener("wheel", stop, { passive: true });
+    canvas.addEventListener("mousedown", stop);
+    canvas.addEventListener("touchstart", stop, { passive: true });
+    return () => {
+      canvas.removeEventListener("wheel", stop);
+      canvas.removeEventListener("mousedown", stop);
+      canvas.removeEventListener("touchstart", stop);
+    };
+  }, [cancelAutoFit, renderMode]);
+
   // biome-ignore lint/correctness/useExhaustiveDependencies: renderMode triggers re-init
   useEffect(() => {
     if (forceInitializedRef.current) return;
