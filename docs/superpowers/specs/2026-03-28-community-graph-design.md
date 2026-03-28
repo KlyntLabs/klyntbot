@@ -229,6 +229,8 @@ When both hierarchical AND community intent detected:
 
 When query mentions one entity but `active_task` or recent notes belong to a known community → automatically trigger Path 4. The user asks "how does caffeine affect me?" while focused on productivity → AI pulls the full Sleep Optimization community without explicit "connect" language.
 
+**Soft confidence threshold:** `community_intent_confidence` score (0.0–1.0) computed by QueryClassifier. Path 4 triggers fully when > 0.65 (autotunable). Below 0.65 but above 0.3: Path 4 runs but results are labeled exploratory — the LLM receives them tagged as `<exploratory_community>` so it can present them as suggestions rather than assertions. Below 0.3: Path 4 skipped. Prevents over-triggering while encouraging user interaction → better autotuner signals.
+
 ### Extended scorer: 8-factor → 10-factor
 
 ```
@@ -292,6 +294,14 @@ Priority escalation: if affected community shares entities with `active_task`, u
 
 **Gap analysis (bonus):** Runs at community level — load communities with `source_note_count > 1`, check pairwise entity overlap, flag thematic communities without shared bridges. Example: "Productivity and Health both reference 'focus' but have no direct entity bridge."
 
+**Suggested bridge note (actionable gap):** When a gap is detected, offer a concrete action:
+```
+Gap detected: Productivity lacks a bridge to Sleep Optimization
+→ [Create suggested note] "How Exercise Improves Focus"
+  (pre-filled with context from both communities)
+```
+Clicking triggers `NoteTool::create_note` with embedded context from both communities' top members. Transforms gap detection from passive insight → immediate action.
+
 ### Coaching integration
 
 Interventions gain community context:
@@ -309,21 +319,25 @@ Sunday cron adds **"Community Evolution"** section:
 
 ### Desktop UI: Community Pulse + Community Card
 
-**Community Pulse badge** (tray + chat header):
-- Small badge showing community update count: "3 communities updated today"
+**Community Pulse badge** (global, across entire app):
+- Tray icon + chat header + sidebar: small badge showing community update count: "3 communities updated today"
 - Subtle pulse animation on `CommunityDiscovered` / `CommunityUpdated`
-- Click → mini Community Overview (list of communities with member counts)
+- Click → mini Community Overview (list of communities with member counts + sparklines)
+- In distraction overlay / focus session end: "During this session, you strengthened Sleep Optimization by 18%"
+- In quick-capture UI: "Add to existing community?" suggestion when note content matches a known community
 
 **Community Card** (inline in chat responses):
 ```
-[Sleep Optimization — 4 notebooks]
+[Sleep Optimization — 4 notebooks ↑0.12]
 Health > Sleep > Caffeine Effects
 Journal > Circadian Rhythm
+▁▂▃▅▆ (7-day stability sparkline)
 → Jump to all sections | Pin to focus
 ```
 - Clickable paths → open note editor scrolled to section
 - "Jump to all sections" → opens note editor with multiple AI highlights
 - "Pin to focus" → links community to current focus session
+- Strength trend sparkline: tiny micro-visual (Recharts, 1-2px height) showing stability over past 7 days. Makes the fabric feel like it's *pulsing over time*.
 
 ### Analytics: community_engagement
 

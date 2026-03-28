@@ -147,11 +147,14 @@ export function GraphView({
     waveReveal.revealWave(hubId, elements, cachedPositions);
   }, [cacheReady, elements, activeNoteId, cachedPositions, waveReveal]);
 
-  // Reset reveal flag when view/fingerprint changes — deps are intentional triggers
-  // biome-ignore lint/correctness/useExhaustiveDependencies: deps trigger reset, not read inside
+  // Reset reveal flag when the actual graph structure changes (nodes/links added/removed).
+  // smartView is intentionally excluded — view-only switches (Full→By Tag) keep the same
+  // nodes visible; re-animating the wave reveal causes nodes to disappear because the
+  // simulation has already cooled down and the canvas won't repaint mid-wave.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: fingerprint triggers reset, not read inside
   useEffect(() => {
     hasRevealedRef.current = false;
-  }, [smartView, allElements.fingerprint]);
+  }, [allElements.fingerprint]);
 
   // ── Force graph ────────────────────────────────────────────────────
 

@@ -100,8 +100,15 @@ export function useGraphElements({
       hasLinks.add(sourceId);
       hasLinks.add(targetId);
     }
+
+    // Use node.cluster from useGraphData when present (by-tag / by-notebook views),
+    // otherwise fall back to notebook-based clustering
+    const hasExplicitClusters = nodes.some((n) => n.cluster != null);
+
     for (const node of nodes) {
-      if (node.notebookId) {
+      if (hasExplicitClusters && node.cluster != null) {
+        nodeClusterMap.set(node.id, node.cluster);
+      } else if (node.notebookId) {
         nodeClusterMap.set(node.id, `nb:${node.notebookId}`);
       } else if (hasLinks.has(node.id)) {
         nodeClusterMap.set(node.id, "_floating");
@@ -124,10 +131,18 @@ export function useGraphElements({
       } else if (clusterId === "_isolated") {
         label = "Isolated Notes";
         color = "#6B7280";
-      } else {
+      } else if (clusterId.startsWith("nb:")) {
         const nbId = clusterId.replace("nb:", "");
         const nb = notebookMap.get(nbId);
         label = nb?.title || "Unknown Notebook";
+        color = getClusterColor(clusterId, nb);
+      } else if (clusterId === "untagged" || clusterId === "no-notebook") {
+        label = clusterId === "untagged" ? "Untagged" : "No Notebook";
+        color = "#6B7280";
+      } else {
+        // Tag-based or other explicit clusters — use cluster string as label
+        const nb = notebookMap.get(clusterId);
+        label = nb?.title || clusterId;
         color = getClusterColor(clusterId, nb);
       }
 
