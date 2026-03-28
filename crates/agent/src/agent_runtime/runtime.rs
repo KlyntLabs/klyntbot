@@ -854,6 +854,7 @@ impl AgentRuntime {
                 None
             },
             recent_correction: correction,
+            hierarchical_intent: None,
         })
     }
 

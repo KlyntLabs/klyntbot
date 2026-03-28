@@ -24,6 +24,19 @@ pub struct UserSituationSnapshot {
     pub distraction_risk: f64,
 }
 
+#[derive(Debug, Clone, PartialEq)]
+pub enum HierarchicalQueryType {
+    Simple,
+    Hierarchical,
+    Hybrid,
+}
+
+#[derive(Debug, Clone)]
+pub struct HierarchicalIntent {
+    pub query_type: HierarchicalQueryType,
+    pub target_note_id: Option<String>,
+}
+
 #[derive(Debug, Clone, Default)]
 pub struct RetrievalContext {
     pub active_skill: Option<String>,
@@ -32,6 +45,7 @@ pub struct RetrievalContext {
     pub situation: Option<UserSituationSnapshot>,
     pub active_view: Option<ActiveView>,
     pub recent_correction: Option<CorrectionContext>,
+    pub hierarchical_intent: Option<HierarchicalIntent>,
 }
 
 #[derive(Debug, Clone)]

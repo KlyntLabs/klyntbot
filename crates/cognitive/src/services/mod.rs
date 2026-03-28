@@ -21,3 +21,4 @@ pub mod retrieval;
 pub mod salience;
 pub mod situation;
 pub mod temporal;
+pub mod tiptap_parser;

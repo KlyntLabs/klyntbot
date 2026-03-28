@@ -97,6 +97,8 @@ pub async fn retrieve_relevant_facts(
         frequency: params.relevance_weight_frequency,
         situation: params.relevance_weight_situation,
         temporal: params.relevance_weight_temporal,
+        hierarchy: 0.0,
+        path_coherence: 0.0,
     };
 
     debug!(
@@ -239,6 +241,8 @@ async fn vector_path(
                 freq,
                 situational_boost,
                 temporal,
+                0.0,
+                0.5,
                 weights,
             );
             ScoredFact {
@@ -288,6 +292,8 @@ async fn fallback_path(
                 freq,
                 situational_boost,
                 temporal,
+                0.0,
+                0.5,
                 weights,
             );
             ScoredFact {

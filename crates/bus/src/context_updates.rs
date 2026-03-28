@@ -19,6 +19,7 @@ pub enum ContextUpdateReason {
     FocusSessionEnded,
     DistractionDetected,
     BudgetThresholdCrossed,
+    NoteStructureChanged,
     Custom(String),
 }
 
@@ -30,6 +31,7 @@ impl ContextUpdateReason {
             Self::FocusSessionEnded => "focus_session_ended",
             Self::DistractionDetected => "distraction_detected",
             Self::BudgetThresholdCrossed => "budget_threshold_crossed",
+            Self::NoteStructureChanged => "note_structure_changed",
             Self::Custom(s) => s,
         }
     }

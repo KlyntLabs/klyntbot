@@ -50,6 +50,13 @@ pub struct TrialParams {
     /// Minimum enriched query length to accept (bounds [5, 30]).
     /// Shorter enrichments are discarded as too vague.
     pub rewrite_min_enrichment_length: Option<usize>,
+
+    // Phase 4: Hierarchical note retrieval (5 params)
+    pub relevance_weight_hierarchy: Option<f64>,
+    pub relevance_weight_path_coherence: Option<f64>,
+    pub tree_top_k: Option<usize>,
+    pub tree_min_similarity: Option<f64>,
+    pub hybrid_bias: Option<f64>,
 }
 
 impl TrialParams {

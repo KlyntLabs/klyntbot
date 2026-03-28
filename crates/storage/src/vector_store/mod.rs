@@ -21,13 +21,15 @@ mod maintenance;
 pub(crate) mod schemas;
 #[cfg(test)]
 mod tests;
+mod tree_node;
 
 pub use cognitive::CognitiveFactParams;
 pub use crud::sanitize_predicate_value;
+pub use tree_node::TreeNodeSearchResult;
 
 /// LanceDB-backed vector store for embedding similarity search.
 ///
-/// Manages eight tables (all share the convention: `id` first, `vector` second,
+/// Manages embedding tables (all share the convention: `id` first, `vector` second,
 /// extra string fields, timestamp last):
 ///
 /// - `todo_embeddings`              — id, vector(384), model, updated_at
@@ -38,6 +40,7 @@ pub use crud::sanitize_predicate_value;
 /// - `activity_embeddings`          — id, vector(384), source, work_context_id, timestamp, updated_at
 /// - `work_context_embeddings`      — id, vector(384), updated_at
 /// - `flashcard_embeddings`         — id, vector(384), card_id, side, timestamp
+/// - `tree_node_embeddings`         — id, vector(384), note_id, level, source_type, updated_at
 #[derive(Clone)]
 pub struct VectorStore {
     pub(crate) db: Arc<Connection>,
@@ -100,6 +103,12 @@ impl VectorStore {
             .ensure_table(
                 "flashcard_embeddings",
                 schemas::flashcard_embedding_schema(),
+            )
+            .await?;
+        store
+            .ensure_table(
+                "tree_node_embeddings",
+                schemas::tree_node_embedding_schema(),
             )
             .await?;
         Ok(store)

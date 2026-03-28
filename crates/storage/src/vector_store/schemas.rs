@@ -112,3 +112,14 @@ pub(crate) fn cognitive_fact_schema() -> Schema {
         Field::new("updated_at", DataType::Utf8, false),
     ])
 }
+
+pub(crate) fn tree_node_embedding_schema() -> Schema {
+    Schema::new(vec![
+        Field::new("id", DataType::Utf8, false),
+        vector_field(),
+        Field::new("note_id", DataType::Utf8, false),
+        Field::new("level", DataType::Utf8, false),
+        Field::new("source_type", DataType::Utf8, false),
+        Field::new("updated_at", DataType::Utf8, false),
+    ])
+}

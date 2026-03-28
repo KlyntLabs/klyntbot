@@ -190,7 +190,12 @@ below; unsafe suggestions are silently discarded by the evaluator.\n\n",
 | relevance_weight_temporal      | 0.01  | 0.20  | 0.01  | Weight for temporal recency in ranking |\n\
 | rewrite_confidence_threshold   | 0.30  | 0.95  | 0.05  | Minimum confidence to accept an enrichment |\n\
 | rewrite_max_signals            | 1     | 6     | 1     | Max context signals in heuristic enrichment |\n\
-| rewrite_min_enrichment_length  | 5     | 30    | 5     | Min chars for an enrichment to be accepted |\n\n",
+| rewrite_min_enrichment_length  | 5     | 30    | 5     | Min chars for an enrichment to be accepted |\n\
+| relevance_weight_hierarchy     | 0.00  | 0.25  | 0.01  | hierarchy_score weight in 8-factor model |\n\
+| relevance_weight_path_coherence| 0.00  | 0.20  | 0.01  | path_coherence weight in 8-factor model |\n\
+| tree_top_k                     | 5     | 30    | 1     | top-k for tree_node_embeddings search |\n\
+| tree_min_similarity            | 0.30  | 0.70  | 0.05  | min cosine similarity for tree nodes |\n\
+| hybrid_bias                    | 0.00  | 1.00  | 0.05  | RRF weight in hybrid retrieval path |\n\n",
     );
 
     // ---- 9. Promotion constraints ------------------------------------------
