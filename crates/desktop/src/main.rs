@@ -472,6 +472,13 @@ fn run_desktop_app() {
             commands::fabric::fabric_graph_base,
             commands::fabric::fabric_graph_expand,
             commands::fabric::fabric_graph_action,
+            // Voice
+            commands::voice::voice_start_capture,
+            commands::voice::voice_stop_capture,
+            commands::voice::voice_dismiss,
+            commands::voice::voice_get_status,
+            commands::voice::voice_get_models,
+            commands::voice::voice_download_model,
             // Annotations
             commands::annotations::annotation_create,
             commands::annotations::annotation_update,

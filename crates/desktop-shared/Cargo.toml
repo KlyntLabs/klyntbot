@@ -7,6 +7,7 @@ edition.workspace = true
 common = { workspace = true }
 bus = { workspace = true }
 activity-log = { workspace = true }
+voice-engine = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 chrono = { workspace = true }

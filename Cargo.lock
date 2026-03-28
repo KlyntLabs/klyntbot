@@ -3149,6 +3149,7 @@ dependencies = [
  "common",
  "serde",
  "serde_json",
+ "voice-engine",
 ]
 
 [[package]]
@@ -12447,8 +12448,10 @@ dependencies = [
  "async-trait",
  "chrono",
  "common",
+ "reqwest 0.13.2",
  "serde",
  "serde_json",
+ "tempfile",
  "tokio",
  "tracing",
 ]

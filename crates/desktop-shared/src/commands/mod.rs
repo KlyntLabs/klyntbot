@@ -24,6 +24,7 @@ mod squads;
 mod tasks;
 mod timeline;
 pub mod view;
+pub mod voice;
 mod work_context;
 mod workspace;
 
@@ -52,5 +53,6 @@ pub use settings::*;
 pub use squads::*;
 pub use tasks::*;
 pub use timeline::*;
+pub use voice::*;
 pub use work_context::*;
 pub use workspace::*;

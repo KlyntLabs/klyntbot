@@ -229,6 +229,7 @@ mod tests {
             commands::review_stats::DEV_COMMANDS,
             commands::view::DEV_COMMANDS,
             commands::fabric::DEV_COMMANDS,
+            commands::voice::DEV_COMMANDS,
         ];
         // chat_send is handled inline in dev_server.rs
         let mut set: BTreeSet<String> = modules
