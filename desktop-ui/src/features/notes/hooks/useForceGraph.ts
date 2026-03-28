@@ -57,6 +57,7 @@ export interface ForceGraphController {
   onNodeHover: (node: ForceNode | null) => void;
   onNodeDragEnd: (node: ForceNode) => void;
   onBackgroundClick: () => void;
+  onEngineStop: () => void;
   zoomIn: () => void;
   zoomOut: () => void;
   fitToScreen: () => void;
@@ -213,33 +214,8 @@ export function useForceGraph({
     [settings.repulsion, settings.centerForce, settings.linkDistance, settings.nodeScale],
   );
 
-  // Configure forces on mount or after render mode switch, then zoom to fit
-  const autoFitIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
-
-  const cancelAutoFit = useCallback(() => {
-    if (autoFitIntervalRef.current) {
-      clearInterval(autoFitIntervalRef.current);
-      autoFitIntervalRef.current = null;
-    }
-  }, []);
-
-  // Cancel auto-fit on any direct user interaction with the canvas
-  // (wheel zoom, mouse drag, touch) — these bypass react-force-graph callbacks
-  useEffect(() => {
-    const canvas = graphRef.current?.renderer?.()?.domElement
-      ?? document.querySelector<HTMLCanvasElement>(".force-graph-container canvas, canvas");
-    if (!canvas) return;
-
-    const stop = () => cancelAutoFit();
-    canvas.addEventListener("wheel", stop, { passive: true });
-    canvas.addEventListener("mousedown", stop);
-    canvas.addEventListener("touchstart", stop, { passive: true });
-    return () => {
-      canvas.removeEventListener("wheel", stop);
-      canvas.removeEventListener("mousedown", stop);
-      canvas.removeEventListener("touchstart", stop);
-    };
-  }, [cancelAutoFit, renderMode]);
+  // Configure forces on mount or after render mode switch
+  const needsZoomFitRef = useRef(true);
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: renderMode triggers re-init
   useEffect(() => {
@@ -247,20 +223,10 @@ export function useForceGraph({
     const timer = setTimeout(() => {
       configureForces(true);
       forceInitializedRef.current = true;
-      // Continuously zoom to fit as the simulation runs
-      // Cancelled immediately on any user interaction (scroll/drag/click)
-      let ticks = 0;
-      autoFitIntervalRef.current = setInterval(() => {
-        graphRef.current?.zoomToFit(300, 60);
-        ticks++;
-        if (ticks >= 8) cancelAutoFit();
-      }, 500);
+      needsZoomFitRef.current = true;
     }, 100);
-    return () => {
-      clearTimeout(timer);
-      cancelAutoFit();
-    };
-  }, [configureForces, renderMode, cancelAutoFit]);
+    return () => clearTimeout(timer);
+  }, [configureForces, renderMode]);
 
   // Reheat only when physics settings actually change (after initial mount)
   const prevPhysicsRef = useRef({
@@ -359,7 +325,6 @@ export function useForceGraph({
 
   const handleNodeClick = useCallback(
     (node: ForceNode, _event: MouseEvent) => {
-      cancelAutoFit();
       const now = Date.now();
       if (
         lastClickRef.current &&
@@ -373,7 +338,7 @@ export function useForceGraph({
       lastClickRef.current = { nodeId: node.id, time: now };
       onNodeClick(node.id);
     },
-    [onNodeClick, onNodeDoubleClick, cancelAutoFit],
+    [onNodeClick, onNodeDoubleClick],
   );
 
   const handleNodeHover = useCallback((node: ForceNode | null) => {
@@ -400,7 +365,6 @@ export function useForceGraph({
 
   const handleNodeDragEnd = useCallback(
     (node: ForceNode) => {
-      cancelAutoFit();
       // Pin node at dragged position
       node.fx = node.x;
       node.fy = node.y;
@@ -419,30 +383,36 @@ export function useForceGraph({
       const positions = snapshotCurrentPositions();
       onSavePositions(positions);
     },
-    [onNudge, onSavePositions, snapshotCurrentPositions, cancelAutoFit],
+    [onNudge, onSavePositions, snapshotCurrentPositions],
   );
 
   const handleBackgroundClick = useCallback(() => {
-    cancelAutoFit();
     setHoveredNodeId(null);
     neighborSetRef.current = new Set();
-  }, [cancelAutoFit]);
+  }, []);
+
+  const handleEngineStop = useCallback(() => {
+    if (needsZoomFitRef.current) {
+      needsZoomFitRef.current = false;
+      graphRef.current?.zoomToFit(400, 60);
+    }
+    // Save positions when simulation settles
+    onSavePositions(snapshotCurrentPositions());
+  }, [onSavePositions, snapshotCurrentPositions]);
 
   // ── Zoom/pan controls ───────────────────────────────────────────────
 
   const zoomIn = useCallback(() => {
-    cancelAutoFit();
     const fg = graphRef.current;
     if (!fg) return;
     fg.zoom(fg.zoom() * ZOOM_FACTOR, ZOOM_DURATION);
-  }, [cancelAutoFit]);
+  }, []);
 
   const zoomOut = useCallback(() => {
-    cancelAutoFit();
     const fg = graphRef.current;
     if (!fg) return;
     fg.zoom(fg.zoom() / ZOOM_FACTOR, ZOOM_DURATION);
-  }, [cancelAutoFit]);
+  }, []);
 
   const fitToScreen = useCallback(() => {
     const fg = graphRef.current;
@@ -483,6 +453,7 @@ export function useForceGraph({
     onNodeHover: handleNodeHover,
     onNodeDragEnd: handleNodeDragEnd,
     onBackgroundClick: handleBackgroundClick,
+    onEngineStop: handleEngineStop,
     zoomIn,
     zoomOut,
     fitToScreen,

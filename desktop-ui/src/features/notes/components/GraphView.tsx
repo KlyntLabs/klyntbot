@@ -296,6 +296,7 @@ export function GraphView({
                 onNodeHover={forceGraph.onNodeHover as never}
                 onNodeDragEnd={forceGraph.onNodeDragEnd as never}
                 onBackgroundClick={forceGraph.onBackgroundClick}
+                onEngineStop={forceGraph.onEngineStop}
                 cooldownTicks={settings.livePhysics ? Infinity : 100}
                 enableNodeDrag={true}
                 enableZoomInteraction={true}
