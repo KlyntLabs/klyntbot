@@ -114,7 +114,7 @@ export function GraphBrainView({
       graphData={graphData as never}
       width={width}
       height={height}
-      backgroundColor="#07070d"
+      backgroundColor="rgba(0,0,0,0)"
       nodeThreeObject={nodeThreeObject as never}
       nodeThreeObjectExtend={false}
       linkColor={linkColor as never}

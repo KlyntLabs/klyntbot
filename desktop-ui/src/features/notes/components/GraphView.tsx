@@ -165,6 +165,7 @@ export function GraphView({
   const forceGraph = useForceGraph({
     elements,
     settings,
+    renderMode: settings.renderMode,
     activeNoteId,
     highlightedClusterId,
     revealedNodes: waveReveal.revealedNodes,

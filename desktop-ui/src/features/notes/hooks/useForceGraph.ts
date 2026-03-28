@@ -27,6 +27,7 @@ export interface GraphNudge {
 interface UseForceGraphParams {
   elements: GraphElements;
   settings: GraphSettings;
+  renderMode: "2d" | "3d";
   activeNoteId: string | null;
   highlightedClusterId: string | null;
   revealedNodes: Set<string>;
@@ -76,6 +77,7 @@ const ZOOM_FACTOR = 1.4;
 export function useForceGraph({
   elements,
   settings,
+  renderMode,
   activeNoteId: _activeNoteId,
   highlightedClusterId,
   revealedNodes,
@@ -112,6 +114,15 @@ export function useForceGraph({
   // Only update when the set of node/link IDs actually changes.
   const graphDataRef = useRef<{ nodes: ForceNode[]; links: ForceLink[] }>({ nodes: [], links: [] });
   const prevFingerprintRef = useRef<string>("");
+
+  // Reset stale node refs when switching back from 3D to 2D —
+  // 3D simulation mutates shared node objects with 3D-scale positions
+  const prevRenderModeRef = useRef(renderMode);
+  if (prevRenderModeRef.current !== renderMode) {
+    prevRenderModeRef.current = renderMode;
+    graphDataRef.current = { nodes: [], links: [] };
+    prevFingerprintRef.current = "";
+  }
 
   const graphData = useMemo(() => {
     // Build a fingerprint of node IDs + link source/targets to detect structural changes
