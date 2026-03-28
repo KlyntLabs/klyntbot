@@ -282,6 +282,7 @@ AgentRuntime and SkillRouter see this as a normal message. Downstream consumers 
 - **Behavior:** No title bar, no resize, click-through on transparent areas
 - **Animation in:** scale 0.9->1.0 + fade, 200ms ease-out
 - **Animation out:** scale 1.0->0.95 + fade, 150ms ease-in
+- **Persistent HUD mode:** Pin icon (top-right of orb). One tap pins the orb as a permanent, semi-transparent HUD (280x160px, reduced opacity). Stays visible during focus sessions and launcher use, showing live audio level + latest memory echo. Respects `VOICE_ACTIVE` and focus-timer priority. Opt-in only — gives power users and language learners the feeling the brain is always present without forcing always-on mic.
 
 ### Three States
 
@@ -478,13 +479,24 @@ The extractor can produce richer facts like "user is practicing French greetings
 Triggered ~500ms after first `PartialTranscript`:
 
 ```rust
-async fn prefetch_memory_echo(&self, partial_text: &str) -> Option<String> {
-    // Try Mirror layer first for meta-insights
+async fn prefetch_memory_echo(&self, partial_text: &str, learning_active: bool) -> Option<String> {
+    // Priority 1: Pronunciation-specific echo when learning context is active
+    // "Your second brain remembers how you *sounded* last time"
+    if learning_active {
+        if let Some(pron_echo) = self.pronunciation_history
+            .get_comparison_for_words(partial_text).await {
+            // e.g., "Last time you said 'dentist' your confidence was 91% — today it's 78%"
+            return Some(pron_echo);
+        }
+    }
+
+    // Priority 2: Mirror layer meta-insights
     if let Some(mirror_snippet) = self.mirror_facade
         .get_recent_voice_relevant_snippet(partial_text).await {
         return Some(format!("Mirror noticed: {}", mirror_snippet));
     }
-    // Fallback to standard conversation recall
+
+    // Priority 3: Standard conversation recall
     let recall = self.context_engine
         .recall_relevant(partial_text, RecallParams {
             max_results: 1,
@@ -496,9 +508,11 @@ async fn prefetch_memory_echo(&self, partial_text: &str) -> Option<String> {
 }
 ```
 
-Examples: "Last week your French consistency dropped on Tuesdays", "You improved 'bonjour' from 67% to 91% since last month."
+**Pronunciation-specific echoes** are the "I remember how you sounded" moment. When the user speaks a word they've practiced before, the orb surfaces the comparison automatically: "Last time 'bonjour' was 67% — now it's 91%. Nice." This uses existing `PronunciationReport` data and Mirror weekly snapshots. Zero new tables — just a query against `last_pronunciation_score` on matching flashcards.
 
-Emitted as `VoiceEvent::MemoryEcho`. Privacy mode `Strict` skips mirror lookup.
+General examples: "Last week your French consistency dropped on Tuesdays", "You improved 'bonjour' from 67% to 91% since last month."
+
+Emitted as `VoiceEvent::MemoryEcho`. Privacy mode `Strict` skips all lookups (mirror + pronunciation).
 
 ### Coaching Integration
 
