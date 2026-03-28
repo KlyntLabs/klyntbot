@@ -1,258 +1,213 @@
-import { useEvent } from "@shared/hooks/useEvent";
-import { useQuery } from "@shared/hooks/useQuery";
-import { tagColor } from "@shared/lib/tagColor";
-import type { Note, NoteLink } from "@shared/types";
-import {
-  forceCenter,
-  forceCollide,
-  forceLink,
-  forceManyBody,
-  forceSimulation,
-  type SimulationNodeDatum,
-} from "d3-force";
-import { ChevronDown, ChevronRight } from "lucide-react";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Map } from "lucide-react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import type { ForceLink, ForceNode } from "../hooks/useGraphElements";
+import type { ViewportBounds } from "../hooks/useForceGraph";
 
-// ── Types ────────────────────────────────────────────────────────────────
+// ── Constants ────────────────────────────────────────────────────────────
 
-interface MiniNode extends SimulationNodeDatum {
-  id: string;
-  title: string;
-  tags: string[];
-  isCurrent: boolean;
-}
+const CANVAS_WIDTH = 180;
+const CANVAS_HEIGHT = 120;
+const NODE_RADIUS = 2;
+const PADDING = 8;
 
-interface MiniLink {
-  source: string | MiniNode;
-  target: string | MiniNode;
-}
+// ── Props ────────────────────────────────────────────────────────────────
 
 interface GraphMinimapProps {
-  noteId: string | null;
-  notes: Note[];
-  onSelectNote: (id: string) => void;
-  onExpandGraph: () => void;
+  nodes: ForceNode[];
+  links: ForceLink[];
+  viewportBounds: ViewportBounds;
+  revealedNodes: Set<string>;
+  visible: boolean;
+  onToggle: () => void;
+  onNavigate: (graphX: number, graphY: number) => void;
 }
 
-// ── BFS to find nodes within N hops ──────────────────────────────────────
+// ── Helpers ──────────────────────────────────────────────────────────────
 
-function getNeighborhood(centerId: string, links: NoteLink[], maxHops: number): Set<string> {
-  const adjacency = new Map<string, string[]>();
-  for (const l of links) {
-    const s = adjacency.get(l.sourceId) ?? [];
-    s.push(l.targetId);
-    adjacency.set(l.sourceId, s);
-    const t = adjacency.get(l.targetId) ?? [];
-    t.push(l.sourceId);
-    adjacency.set(l.targetId, t);
+function hexToRgba(hex: string, alpha: number): string {
+  const r = Number.parseInt(hex.slice(1, 3), 16);
+  const g = Number.parseInt(hex.slice(3, 5), 16);
+  const b = Number.parseInt(hex.slice(5, 7), 16);
+  return `rgba(${r},${g},${b},${alpha})`;
+}
+
+function computeGraphBounds(nodes: ForceNode[]): {
+  minX: number;
+  minY: number;
+  maxX: number;
+  maxY: number;
+} {
+  if (nodes.length === 0) {
+    return { minX: -100, minY: -100, maxX: 100, maxY: 100 };
   }
 
-  const visited = new Set<string>();
-  const queue: Array<{ id: string; depth: number }> = [{ id: centerId, depth: 0 }];
-  visited.add(centerId);
+  let minX = Number.POSITIVE_INFINITY;
+  let minY = Number.POSITIVE_INFINITY;
+  let maxX = Number.NEGATIVE_INFINITY;
+  let maxY = Number.NEGATIVE_INFINITY;
 
-  while (queue.length > 0) {
-    const current = queue.shift();
-    if (!current) break;
-    if (current.depth >= maxHops) continue;
-    for (const neighbor of adjacency.get(current.id) ?? []) {
-      if (!visited.has(neighbor)) {
-        visited.add(neighbor);
-        queue.push({ id: neighbor, depth: current.depth + 1 });
-      }
-    }
+  for (const node of nodes) {
+    const x = node.x ?? 0;
+    const y = node.y ?? 0;
+    if (x < minX) minX = x;
+    if (x > maxX) maxX = x;
+    if (y < minY) minY = y;
+    if (y > maxY) maxY = y;
   }
 
-  return visited;
+  // Add a small buffer so edge nodes aren't clipped
+  const bx = (maxX - minX) * 0.1 || 50;
+  const by = (maxY - minY) * 0.1 || 50;
+  return { minX: minX - bx, minY: minY - by, maxX: maxX + bx, maxY: maxY + by };
 }
 
 // ── Component ────────────────────────────────────────────────────────────
 
-export function GraphMinimap({ noteId, notes, onSelectNote, onExpandGraph }: GraphMinimapProps) {
-  const { data: links, refetch: refetchLinks } = useQuery<NoteLink[]>(
-    "note_links_all",
-    undefined,
-    [],
-  );
-  const [collapsed, setCollapsed] = useState(false);
+export function GraphMinimap({
+  nodes,
+  links,
+  viewportBounds,
+  revealedNodes,
+  visible,
+  onToggle,
+  onNavigate,
+}: GraphMinimapProps) {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const graphBoundsRef = useRef({ minX: -100, minY: -100, maxX: 100, maxY: 100 });
+  const [, setRenderTick] = useState(0);
 
-  // Refetch graph links when any note is mutated
-  useEvent<{ entityKind: string }>("entity:updated", (payload) => {
-    if (payload.entityKind === "note") refetchLinks();
-  });
-  const svgRef = useRef<SVGSVGElement>(null);
-  const [, setTick] = useState(0);
-  const nodesRef = useRef<MiniNode[]>([]);
-  const linksRef = useRef<MiniLink[]>([]);
+  // Recompute graph bounds when nodes change positions
+  useEffect(() => {
+    graphBoundsRef.current = computeGraphBounds(nodes);
+    setRenderTick((t) => t + 1);
+  }, [nodes]);
 
-  // Build neighborhood subgraph
-  const { subNodes, subLinks } = useMemo(() => {
-    if (!noteId) return { subNodes: [], subLinks: [] };
+  // Paint the minimap canvas
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas || !visible) return;
 
-    const neighborhood = getNeighborhood(noteId, links, 2);
-    const noteMap = new Map<string, Note>();
-    for (const n of notes) noteMap.set(n.id, n);
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
 
-    const sn: MiniNode[] = [];
-    for (const id of neighborhood) {
-      const note = noteMap.get(id);
-      if (note) {
-        sn.push({
-          id: note.id,
-          title: note.title,
-          tags: note.tags,
-          isCurrent: id === noteId,
-        });
-      }
+    const dpr = window.devicePixelRatio || 1;
+    canvas.width = CANVAS_WIDTH * dpr;
+    canvas.height = CANVAS_HEIGHT * dpr;
+    ctx.scale(dpr, dpr);
+
+    // Clear
+    ctx.clearRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
+
+    const bounds = graphBoundsRef.current;
+    const graphW = bounds.maxX - bounds.minX || 1;
+    const graphH = bounds.maxY - bounds.minY || 1;
+
+    // Scale to fit canvas with padding
+    const drawW = CANVAS_WIDTH - PADDING * 2;
+    const drawH = CANVAS_HEIGHT - PADDING * 2;
+    const scale = Math.min(drawW / graphW, drawH / graphH);
+
+    const toCanvasX = (gx: number) => PADDING + (gx - bounds.minX) * scale;
+    const toCanvasY = (gy: number) => PADDING + (gy - bounds.minY) * scale;
+
+    // Draw links
+    ctx.lineWidth = 0.5;
+    for (const link of links) {
+      const source = link.source as unknown as ForceNode;
+      const target = link.target as unknown as ForceNode;
+      const sx = source.x ?? 0;
+      const sy = source.y ?? 0;
+      const tx = target.x ?? 0;
+      const ty = target.y ?? 0;
+
+      const isRevealed =
+        revealedNodes.size === 0 || (revealedNodes.has(source.id) && revealedNodes.has(target.id));
+
+      ctx.strokeStyle = isRevealed
+        ? hexToRgba(link.color, 0.15)
+        : "rgba(255,255,255,0.03)";
+      ctx.beginPath();
+      ctx.moveTo(toCanvasX(sx), toCanvasY(sy));
+      ctx.lineTo(toCanvasX(tx), toCanvasY(ty));
+      ctx.stroke();
     }
 
-    const nodeSet = new Set(sn.map((n) => n.id));
-    const sl: MiniLink[] = links
-      .filter((l) => nodeSet.has(l.sourceId) && nodeSet.has(l.targetId))
-      .map((l) => ({ source: l.sourceId, target: l.targetId }));
+    // Draw nodes
+    for (const node of nodes) {
+      const x = node.x ?? 0;
+      const y = node.y ?? 0;
+      const isRevealed = revealedNodes.size === 0 || revealedNodes.has(node.id);
 
-    return { subNodes: sn, subLinks: sl };
-  }, [noteId, notes, links]);
+      ctx.fillStyle = isRevealed ? hexToRgba(node.color, 0.7) : "rgba(255,255,255,0.08)";
+      ctx.beginPath();
+      ctx.arc(toCanvasX(x), toCanvasY(y), NODE_RADIUS, 0, Math.PI * 2);
+      ctx.fill();
+    }
 
-  // Run force simulation
-  useEffect(() => {
-    if (subNodes.length === 0) return;
+    // Draw viewport rectangle
+    const vx = toCanvasX(viewportBounds.x);
+    const vy = toCanvasY(viewportBounds.y);
+    const vw = viewportBounds.width * scale;
+    const vh = viewportBounds.height * scale;
 
-    // Clone nodes to avoid mutating memo
-    const simNodes = subNodes.map((n) => ({ ...n }));
-    const simLinks = subLinks.map((l) => ({ ...l }));
-    nodesRef.current = simNodes;
-    linksRef.current = simLinks;
+    ctx.strokeStyle = "rgba(255,255,255,0.5)";
+    ctx.lineWidth = 1;
+    ctx.setLineDash([3, 2]);
+    ctx.strokeRect(vx, vy, vw, vh);
+    ctx.setLineDash([]);
 
-    const sim = forceSimulation<MiniNode>(simNodes)
-      .force(
-        "link",
-        forceLink<MiniNode, MiniLink>(simLinks)
-          .id((d) => d.id)
-          .distance(40)
-          .strength(0.6),
-      )
-      .force("charge", forceManyBody().strength(-120).distanceMax(200))
-      .force("center", forceCenter(0, 0).strength(0.1))
-      .force(
-        "collide",
-        forceCollide<MiniNode>((d) => (d.isCurrent ? 10 : 7)),
-      )
-      .alphaDecay(0.05)
-      .on("tick", () => setTick((k) => k + 1));
+    // Faint fill for the viewport area
+    ctx.fillStyle = "rgba(255,255,255,0.04)";
+    ctx.fillRect(vx, vy, vw, vh);
+  }, [nodes, links, viewportBounds, revealedNodes, visible]);
 
-    return () => {
-      sim.stop();
-    };
-  }, [subNodes, subLinks]);
+  // Click to navigate
+  const handleCanvasClick = useCallback(
+    (e: React.MouseEvent<HTMLCanvasElement>) => {
+      const canvas = canvasRef.current;
+      if (!canvas) return;
 
-  const handleNodeClick = useCallback(
-    (e: React.MouseEvent, id: string) => {
-      e.stopPropagation();
-      onSelectNote(id);
+      const rect = canvas.getBoundingClientRect();
+      const mx = e.clientX - rect.left;
+      const my = e.clientY - rect.top;
+
+      const bounds = graphBoundsRef.current;
+      const graphW = bounds.maxX - bounds.minX || 1;
+      const graphH = bounds.maxY - bounds.minY || 1;
+      const drawW = CANVAS_WIDTH - PADDING * 2;
+      const drawH = CANVAS_HEIGHT - PADDING * 2;
+      const scale = Math.min(drawW / graphW, drawH / graphH);
+
+      const graphX = (mx - PADDING) / scale + bounds.minX;
+      const graphY = (my - PADDING) / scale + bounds.minY;
+
+      onNavigate(graphX, graphY);
     },
-    [onSelectNote],
+    [onNavigate],
   );
 
-  if (!noteId) return null;
-
-  const nodes = nodesRef.current;
-  const graphLinks = linksRef.current;
-
   return (
-    <div className="border-b border-border">
-      <div className="flex items-center">
-        <button
-          type="button"
-          onClick={() => setCollapsed(!collapsed)}
-          className="flex-1 flex items-center gap-1.5 px-3 py-2 text-2xs font-medium uppercase tracking-wider text-muted-foreground hover:text-foreground transition-colors"
-        >
-          {collapsed ? <ChevronRight size={12} /> : <ChevronDown size={12} />}
-          <span>Local Graph</span>
-        </button>
-        <button
-          type="button"
-          onClick={onExpandGraph}
-          className="text-2xs text-dim hover:text-foreground px-2 py-1 transition-colors"
-        >
-          Expand
-        </button>
-      </div>
+    <div className="absolute top-4 right-4 z-10 flex flex-col items-end gap-1">
+      <button
+        type="button"
+        onClick={onToggle}
+        className={`size-7 glass-button flex items-center justify-center transition-colors ${
+          visible ? "text-brand" : "text-muted-foreground hover:text-foreground"
+        }`}
+        aria-label={visible ? "Hide minimap" : "Show minimap"}
+      >
+        <Map size={14} />
+      </button>
 
-      {!collapsed && (
-        <div className="px-1 pb-2">
-          {nodes.length === 0 ? (
-            <div className="text-2xs text-dim px-2 py-3 text-center">No linked notes</div>
-          ) : (
-            <svg
-              ref={svgRef}
-              width="100%"
-              height="140"
-              viewBox="-100 -70 200 140"
-              className="w-full"
-            >
-              <title>Local graph</title>
-              {/* Edges */}
-              {graphLinks.map((link) => {
-                const s = link.source as MiniNode;
-                const t = link.target as MiniNode;
-                if (s.x == null || t.x == null) return null;
-                return (
-                  <line
-                    key={`${s.id}-${t.id}`}
-                    x1={s.x}
-                    y1={s.y}
-                    x2={t.x}
-                    y2={t.y}
-                    stroke="rgba(255,255,255,0.08)"
-                    strokeWidth={0.75}
-                  />
-                );
-              })}
-
-              {/* Nodes */}
-              {nodes.map((node) => {
-                if (node.x == null || node.y == null) return null;
-                const r = node.isCurrent ? 6 : 3.5;
-                const color = node.isCurrent
-                  ? "var(--color-brand)"
-                  : node.tags.length > 0
-                    ? tagColor(node.tags[0])
-                    : "rgba(255,255,255,0.4)";
-
-                return (
-                  // biome-ignore lint/a11y/noStaticElementInteractions: SVG node click handler
-                  <g
-                    key={node.id}
-                    transform={`translate(${node.x},${node.y})`}
-                    onClick={(e) => handleNodeClick(e, node.id)}
-                    className="cursor-pointer"
-                  >
-                    {/* Glow for current node */}
-                    {node.isCurrent && <circle r={14} fill="var(--color-brand)" opacity={0.12} />}
-                    <circle
-                      r={r}
-                      fill={color}
-                      stroke={node.isCurrent ? "var(--color-brand)" : "none"}
-                      strokeWidth={node.isCurrent ? 1.5 : 0}
-                      opacity={node.isCurrent ? 1 : 0.8}
-                    />
-                    {/* Label for current and nearby nodes */}
-                    <text
-                      y={-(r + 3)}
-                      textAnchor="middle"
-                      fill={node.isCurrent ? "rgba(255,255,255,0.9)" : "rgba(255,255,255,0.45)"}
-                      fontSize={node.isCurrent ? 7 : 5.5}
-                      fontWeight={node.isCurrent ? 600 : 400}
-                      className="select-none pointer-events-none"
-                    >
-                      {node.title.length > 18 ? `${node.title.slice(0, 18)}...` : node.title}
-                    </text>
-                  </g>
-                );
-              })}
-            </svg>
-          )}
+      {visible && nodes.length > 0 && (
+        <div className="glass-panel rounded-lg overflow-hidden shadow-lg">
+          <canvas
+            ref={canvasRef}
+            width={CANVAS_WIDTH}
+            height={CANVAS_HEIGHT}
+            style={{ width: CANVAS_WIDTH, height: CANVAS_HEIGHT, cursor: "crosshair" }}
+            onClick={handleCanvasClick}
+          />
         </div>
       )}
     </div>
