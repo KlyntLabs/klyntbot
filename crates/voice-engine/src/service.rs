@@ -50,6 +50,7 @@ struct SendableCaptureSession(#[allow(dead_code)] CaptureSession);
 // SAFETY: On macOS, CoreAudio streams are safe to move between threads.
 // The `!Send` bound on `cpal::Stream` is a conservative cross-platform
 // restriction for Android AAudio. We only target macOS.
+#[cfg(target_os = "macos")]
 unsafe impl Send for SendableCaptureSession {}
 
 /// Active voice session — all fields are `Send`.
@@ -278,6 +279,7 @@ impl VoiceService {
 
         // Collect transcript partials and the final result.
         let mut final_transcript = None;
+        let mut last_intents = Vec::new();
         while let Some(partial) = rx.recv().await {
             let _ = self
                 .event_tx
@@ -295,21 +297,21 @@ impl VoiceService {
             }
 
             if partial.is_final {
+                last_intents = intents;
                 final_transcript = Some(Transcript {
                     text: partial.text,
                     language: partial.language,
                     segments: partial.segments,
                     overall_confidence: 0.0, // recomputed below
                 });
+            } else {
+                last_intents = intents;
             }
         }
 
         let transcript = match final_transcript {
             Some(mut t) => {
-                if !t.segments.is_empty() {
-                    t.overall_confidence = t.segments.iter().map(|s| s.confidence).sum::<f32>()
-                        / t.segments.len() as f32;
-                }
+                t.recompute_confidence();
                 t
             }
             None => {
@@ -334,9 +336,8 @@ impl VoiceService {
             privacy_mode: self.config.privacy_mode,
         };
 
-        let routed_to = self
-            .router
-            .detect_intents(&transcript.text)
+        // Reuse cached intents from the last partial instead of re-detecting.
+        let routed_to = last_intents
             .first()
             .map(|i| i.skill.clone())
             .unwrap_or_else(|| "general".to_string());
@@ -362,6 +363,10 @@ impl VoiceService {
 
     /// Dismiss the current session (orb closes, processing continues in background).
     pub async fn dismiss(&self) {
+        let mut session_guard = self.active_session.lock().await;
+        if let Some(ref mut session) = *session_guard {
+            session.state = VoiceSessionState::Finalizing;
+        }
         let _ = self.event_tx.send(VoiceEvent::ProcessingInBackground).await;
     }
 

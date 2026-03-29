@@ -62,6 +62,17 @@ pub struct Transcript {
     pub overall_confidence: f32,
 }
 
+impl Transcript {
+    /// Recompute `overall_confidence` from segment averages.
+    pub fn recompute_confidence(&mut self) {
+        self.overall_confidence = if self.segments.is_empty() {
+            0.0
+        } else {
+            self.segments.iter().map(|s| s.confidence).sum::<f32>() / self.segments.len() as f32
+        };
+    }
+}
+
 /// A word-level segment within a transcript.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]

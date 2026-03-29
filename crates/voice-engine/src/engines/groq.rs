@@ -7,7 +7,7 @@ use async_trait::async_trait;
 use tracing::{debug, warn};
 
 use crate::stt::{AudioStream, TranscriptStream, TranscriptionEngine};
-use crate::types::{Language, Transcript, TranscriptSegment};
+use crate::types::{Language, Transcript};
 
 const DEFAULT_GROQ_API_BASE: &str = "https://api.groq.com/openai/v1";
 
@@ -146,22 +146,10 @@ impl TranscriptionEngine for GroqWhisperEngine {
             )))
         })?;
 
-        let words: Vec<&str> = resp.text.split_whitespace().collect();
-        let segments = words
-            .iter()
-            .enumerate()
-            .map(|(i, word)| TranscriptSegment {
-                text: word.to_string(),
-                start: Duration::from_millis(i as u64 * 300),
-                end: Duration::from_millis((i as u64 + 1) * 300),
-                confidence: 0.95,
-            })
-            .collect();
-
         Ok(Transcript {
             text: resp.text,
             language: Language::new("en"),
-            segments,
+            segments: vec![], // Groq doesn't provide word-level timestamps
             overall_confidence: 0.95,
         })
     }

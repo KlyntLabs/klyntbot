@@ -4,7 +4,6 @@ use std::sync::Arc;
 use crate::handlers::launcher::LauncherSearchEngine;
 use agent::{AgentLoop, PersonaManager};
 use bus::{DomainEventBus, MessageBus};
-use voice_engine::VoiceService;
 use channels::ChannelManager;
 use cognitive::situation::UserSituation;
 use common::FormResponse;
@@ -19,6 +18,7 @@ use storage::{Repos, StoragePool, VectorStore};
 use tokio::sync::{broadcast, oneshot, Mutex, RwLock};
 use tokio_util::sync::CancellationToken;
 use tracing::{error, info};
+use voice_engine::VoiceService;
 
 use crate::events::AppEventEmitter;
 

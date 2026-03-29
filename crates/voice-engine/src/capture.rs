@@ -94,7 +94,7 @@ impl AudioCapture {
         // Channels for bridging cpal callback thread -> tokio
         let (audio_tx, audio_rx) = mpsc::channel::<AudioChunk>(64);
         let (rms_tx, rms_rx) = mpsc::channel::<f32>(32);
-        let (silence_tx, silence_rx) = mpsc::channel::<()>(4);
+        let (silence_tx, silence_rx) = mpsc::channel::<()>(1);
 
         let stop_signal = Arc::new(AtomicBool::new(false));
         let stop_signal_cb = stop_signal.clone();
@@ -116,27 +116,22 @@ impl AudioCapture {
                         return;
                     }
 
-                    // Compute RMS
-                    let rms = if data.is_empty() {
-                        0.0
-                    } else {
-                        (data.iter().map(|s| s * s).sum::<f32>() / data.len() as f32).sqrt()
-                    };
+                    let rms = compute_rms(data);
 
-                    // Emit RMS at ~30fps (every ~33ms = ~528 samples at 16kHz)
-                    rms_counter += data.len() as u32;
-                    if rms_counter >= sample_rate / 30 {
-                        let _ = rms_tx.try_send(rms);
-                        rms_counter = 0;
-                    }
-
-                    // Silence detection
+                    // Silence detection on every callback
                     if rms > silence_threshold {
                         last_voice_time = Instant::now();
                         silence_fired = false;
                     } else if !silence_fired && last_voice_time.elapsed() >= silence_duration {
                         let _ = silence_tx.try_send(());
                         silence_fired = true;
+                    }
+
+                    // RMS emission throttled to ~30fps
+                    rms_counter += data.len() as u32;
+                    if rms_counter >= sample_rate / 30 {
+                        let _ = rms_tx.try_send(rms);
+                        rms_counter = 0;
                     }
 
                     // Send audio chunk

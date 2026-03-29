@@ -12,47 +12,53 @@ pub struct DetectedIntent {
     pub trigger_text: String,
 }
 
+struct SkillRoute {
+    skill: String,
+    label: String,
+    keywords: Vec<String>,
+}
+
 pub struct VoiceRouter {
-    skill_keywords: Vec<(String, String, Vec<String>)>,
+    skill_keywords: Vec<SkillRoute>,
 }
 
 impl VoiceRouter {
     pub fn new() -> Self {
         Self {
             skill_keywords: vec![
-                (
-                    "tasks".into(),
-                    "Task".into(),
-                    // Two-keyword set: any single hit = 0.5 ≥ threshold.
+                SkillRoute {
+                    skill: "tasks".into(),
+                    label: "Task".into(),
+                    // Two-keyword set: any single hit = 0.5 >= threshold.
                     // "remind" covers "remind/reminder"; "schedule" covers scheduling.
-                    vec!["remind", "schedule"]
+                    keywords: vec!["remind", "schedule"]
                         .into_iter()
                         .map(String::from)
                         .collect(),
-                ),
-                (
-                    "learning".into(),
-                    "Learning".into(),
-                    // Two-keyword set: any single hit = 0.5 ≥ threshold.
+                },
+                SkillRoute {
+                    skill: "learning".into(),
+                    label: "Learning".into(),
+                    // Two-keyword set: any single hit = 0.5 >= threshold.
                     // "practice" covers drills; "vocab" covers vocab/vocabulary via contains.
-                    vec!["practice", "vocab"]
+                    keywords: vec!["practice", "vocab"]
                         .into_iter()
                         .map(String::from)
                         .collect(),
-                ),
-                (
-                    "notes".into(),
-                    "Note".into(),
-                    vec!["note", "jot"].into_iter().map(String::from).collect(),
-                ),
-                (
-                    "finance".into(),
-                    "Finance".into(),
-                    vec!["budget", "expense"]
+                },
+                SkillRoute {
+                    skill: "notes".into(),
+                    label: "Note".into(),
+                    keywords: vec!["note", "jot"].into_iter().map(String::from).collect(),
+                },
+                SkillRoute {
+                    skill: "finance".into(),
+                    label: "Finance".into(),
+                    keywords: vec!["budget", "expense"]
                         .into_iter()
                         .map(String::from)
                         .collect(),
-                ),
+                },
             ],
         }
     }
@@ -66,8 +72,9 @@ impl VoiceRouter {
 
         self.skill_keywords
             .iter()
-            .filter_map(|(skill, label, keywords)| {
-                let hits = keywords
+            .filter_map(|route| {
+                let hits = route
+                    .keywords
                     .iter()
                     .filter(|kw| words.iter().any(|w| w.contains(kw.as_str())))
                     .count();
@@ -75,12 +82,12 @@ impl VoiceRouter {
                     return None;
                 }
 
-                let score = (hits as f64 / keywords.len().max(1) as f64).min(1.0);
+                let score = (hits as f64 / route.keywords.len().max(1) as f64).min(1.0);
                 if score >= ROUTING_THRESHOLD {
                     Some(DetectedIntent {
-                        skill: skill.clone(),
+                        skill: route.skill.clone(),
                         confidence: score,
-                        label: format!("→ {}", label),
+                        label: format!("→ {}", route.label),
                         trigger_text: text.to_string(),
                     })
                 } else {

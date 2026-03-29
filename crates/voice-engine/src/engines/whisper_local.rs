@@ -17,6 +17,8 @@ use crate::types::{Language, Transcript, TranscriptSegment};
 /// Local Whisper transcription engine.
 pub struct WhisperLocalEngine {
     ctx: WhisperContext,
+    /// Retained for diagnostics/logging; transcription now uses `ctx` directly.
+    #[allow(dead_code)]
     model_path: PathBuf,
 }
 
@@ -117,10 +119,8 @@ impl WhisperLocalEngine {
                 }
 
                 // Token timestamps: use segment start + proportional offset
-                let token_start_cs =
-                    t0 + (j as i64 * (t1 - t0)) / num_tokens.max(1) as i64;
-                let token_end_cs =
-                    t0 + ((j as i64 + 1) * (t1 - t0)) / num_tokens.max(1) as i64;
+                let token_start_cs = t0 + (j as i64 * (t1 - t0)) / num_tokens.max(1) as i64;
+                let token_end_cs = t0 + ((j as i64 + 1) * (t1 - t0)) / num_tokens.max(1) as i64;
 
                 segments.push(TranscriptSegment {
                     text: trimmed.to_string(),
@@ -136,22 +136,17 @@ impl WhisperLocalEngine {
             full_text.push_str(segment_text.trim());
         }
 
-        let overall_confidence = if segments.is_empty() {
-            0.0
-        } else {
-            segments.iter().map(|s| s.confidence).sum::<f32>() / segments.len() as f32
-        };
+        let language = detected_language.map(Language::new).unwrap_or_default();
 
-        let language = detected_language
-            .map(|l| Language::new(l))
-            .unwrap_or_default();
-
-        Ok(Transcript {
+        let mut transcript = Transcript {
             text: full_text,
             language,
             segments,
-            overall_confidence,
-        })
+            overall_confidence: 0.0,
+        };
+        transcript.recompute_confidence();
+
+        Ok(transcript)
     }
 
     /// Read audio from a WAV file and convert to f32 samples at 16kHz.
@@ -216,21 +211,24 @@ impl WhisperLocalEngine {
 
 #[async_trait]
 impl TranscriptionEngine for WhisperLocalEngine {
-    async fn transcribe_stream(
-        &self,
-        mut audio: AudioStream,
-    ) -> common::Result<TranscriptStream> {
+    async fn transcribe_stream(&self, mut audio: AudioStream) -> common::Result<TranscriptStream> {
         let (tx, rx) = mpsc::channel::<PartialTranscript>(32);
 
-        // Collect all audio chunks into a buffer, then transcribe.
-        // For v1, we do a single transcription pass after all audio is received.
-        // True streaming (periodic partial transcriptions) is a v1.5 optimization.
-        let model_path = self.model_path.clone();
+        // Create state from the pre-loaded context (avoids reloading model from disk).
+        // WhisperState is Send+Sync so it can safely move into spawn_blocking.
+        let mut state = self.ctx.create_state().map_err(|e| {
+            common::KlyntbotError::Provider(common::ProviderError::InvalidResponse(format!(
+                "Failed to create Whisper state: {}",
+                e
+            )))
+        })?;
 
         tokio::task::spawn_blocking(move || {
             let rt = tokio::runtime::Handle::current();
 
-            // Collect audio from stream
+            // Collect all audio chunks into a buffer, then transcribe.
+            // For v1, we do a single transcription pass after all audio is received.
+            // True streaming (periodic partial transcriptions) is a v1.5 optimization.
             let mut all_samples: Vec<f32> = Vec::new();
             while let Some(chunk) = rt.block_on(audio.recv()) {
                 all_samples.extend_from_slice(&chunk.samples);
@@ -246,25 +244,6 @@ impl TranscriptionEngine for WhisperLocalEngine {
                 all_samples.len(),
                 all_samples.len() as f32 / 16000.0
             );
-
-            // Load model and transcribe (new context for spawn_blocking since
-            // WhisperContext is Send+Sync but we want isolation)
-            let params = WhisperContextParameters::default();
-            let ctx = match WhisperContext::new_with_params(&model_path, params) {
-                Ok(ctx) => ctx,
-                Err(e) => {
-                    warn!("Failed to load Whisper model for streaming: {}", e);
-                    return;
-                }
-            };
-
-            let mut state = match ctx.create_state() {
-                Ok(s) => s,
-                Err(e) => {
-                    warn!("Failed to create Whisper state: {}", e);
-                    return;
-                }
-            };
 
             let full_params = WhisperLocalEngine::build_params(None);
 
