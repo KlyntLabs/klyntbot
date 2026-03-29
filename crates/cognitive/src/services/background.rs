@@ -290,13 +290,7 @@ impl BackgroundConsolidationService {
                     for event in &batch {
                         match event {
                             DomainEvent::TaskCreated { task_id, .. } => {
-                                upsert_domain_entity(
-                                    &entity_repo,
-                                    task_id,
-                                    "task",
-                                    task_id,
-                                )
-                                .await;
+                                upsert_domain_entity(&entity_repo, task_id, "task", task_id).await;
                             }
                             DomainEvent::TransactionRecorded { category, .. } => {
                                 upsert_domain_entity(
@@ -1566,6 +1560,9 @@ mod tests {
 
         let found = entity_repo.find_by_name("Groceries").await.unwrap();
         assert_eq!(found.len(), 1);
-        assert_eq!(found[0].mention_count, 2, "mention_count should be 2 after two upserts");
+        assert_eq!(
+            found[0].mention_count, 2,
+            "mention_count should be 2 after two upserts"
+        );
     }
 }

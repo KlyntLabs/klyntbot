@@ -379,7 +379,10 @@ mod tests {
     fn stable_community_id_same_members_different_order() {
         let a = stable_community_id(&["node-1", "node-2", "node-3"]);
         let b = stable_community_id(&["node-3", "node-1", "node-2"]);
-        assert_eq!(a, b, "Same members in different order should produce the same ID");
+        assert_eq!(
+            a, b,
+            "Same members in different order should produce the same ID"
+        );
     }
 
     #[test]
@@ -417,7 +420,10 @@ mod tests {
             updated_at: String::new(),
         };
         let s = compute_stability(Some(prev), 7);
-        assert!((s - 0.85).abs() < f64::EPSILON, "Growing community should increase stability");
+        assert!(
+            (s - 0.85).abs() < f64::EPSILON,
+            "Growing community should increase stability"
+        );
     }
 
     #[test]
@@ -436,7 +442,10 @@ mod tests {
             updated_at: String::new(),
         };
         let s = compute_stability(Some(prev), 5);
-        assert!((s - 0.95).abs() < f64::EPSILON, "Same-size community should increase stability");
+        assert!(
+            (s - 0.95).abs() < f64::EPSILON,
+            "Same-size community should increase stability"
+        );
     }
 
     #[test]
@@ -456,7 +465,10 @@ mod tests {
         };
         // Lost 5 out of 10 → loss_ratio = 0.5, decay = 0.8 * (1 - 0.5 * 0.3) = 0.8 * 0.85 = 0.68
         let s = compute_stability(Some(prev), 5);
-        assert!((s - 0.68).abs() < 0.001, "Shrinking community should decay: got {s}");
+        assert!(
+            (s - 0.68).abs() < 0.001,
+            "Shrinking community should decay: got {s}"
+        );
     }
 
     #[test]
@@ -475,7 +487,10 @@ mod tests {
             updated_at: String::new(),
         };
         let s = compute_stability(Some(prev), 10);
-        assert!((s - 1.0).abs() < f64::EPSILON, "Stability should cap at 1.0");
+        assert!(
+            (s - 1.0).abs() < f64::EPSILON,
+            "Stability should cap at 1.0"
+        );
     }
 
     #[test]

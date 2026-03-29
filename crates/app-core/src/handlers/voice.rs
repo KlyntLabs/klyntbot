@@ -22,7 +22,7 @@ impl AppCore {
         })
     }
 
-    /// Stop the current voice capture and finalize.
+    /// Stop the current voice capture, send transcript through agent, relay response to TTS.
     pub async fn voice_stop_capture(&self) -> Result<(), ApiError> {
         let service = self.voice_service()?;
         let result = service
@@ -30,28 +30,37 @@ impl AppCore {
             .await
             .map_err(|e| ApiError::new("VOICE_ERROR", &e.to_string()))?;
 
-        if let Some((transcript, metadata)) = result {
-            // Create InboundMessage and publish to MessageBus
-            let mut msg_metadata = std::collections::HashMap::new();
-            msg_metadata.insert(
-                "voice_metadata".to_string(),
-                serde_json::to_value(&metadata).unwrap_or_default(),
-            );
-
-            let message = bus::InboundMessage {
-                channel: common::ChannelName::new("desktop"),
-                sender_id: "local".to_string(),
-                chat_id: common::ChatId::new("desktop-voice"),
-                content: transcript.text.clone(),
-                timestamp: chrono::Utc::now(),
-                media: vec![],
-                metadata: msg_metadata,
-                kind: bus::MessageKind::Voice,
-            };
-
-            if let Err(e) = self.bus.publish_inbound(message).await {
-                tracing::warn!("Failed to publish voice transcript to bus: {e}");
+        if let Some((transcript, _metadata)) = result {
+            if transcript.text.trim().is_empty() {
+                return Ok(());
             }
+
+            // Send transcript through the agent pipeline and relay response to TTS.
+            let session_key = "desktop-voice".to_string();
+            let voice_svc = self.voice_service()?.clone();
+            let agent = self.agent.clone();
+
+            tokio::spawn(async move {
+                match agent
+                    .process_direct_streaming(transcript.text.clone(), session_key)
+                    .await
+                {
+                    Ok(streaming_handle) => {
+                        let mut event_rx = streaming_handle.event_rx;
+                        while let Some(event) = event_rx.recv().await {
+                            if let agent::AgentEvent::Done { content, .. } = event {
+                                if let Err(e) = voice_svc.handle_response(&content).await {
+                                    tracing::warn!("Voice TTS response failed: {e}");
+                                }
+                                break;
+                            }
+                        }
+                    }
+                    Err(e) => {
+                        tracing::warn!("Agent processing of voice transcript failed: {e}");
+                    }
+                }
+            });
         }
 
         Ok(())
@@ -107,6 +116,20 @@ impl AppCore {
         let service = self.voice_service()?;
         service
             .download_model(request.model_size)
+            .await
+            .map_err(|e| ApiError::new("VOICE_ERROR", &e.to_string()))
+    }
+
+    /// Simulate a VoiceEvent for dev/testing (inject event into the frontend stream).
+    pub async fn voice_simulate_event(
+        &self,
+        event_json: serde_json::Value,
+    ) -> Result<(), ApiError> {
+        let service = self.voice_service()?;
+        let event: voice_engine::VoiceEvent = serde_json::from_value(event_json)
+            .map_err(|e| ApiError::new("VALIDATION", &format!("Invalid VoiceEvent: {e}")))?;
+        service
+            .emit_event(event)
             .await
             .map_err(|e| ApiError::new("VOICE_ERROR", &e.to_string()))
     }

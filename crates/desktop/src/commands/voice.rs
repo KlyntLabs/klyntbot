@@ -53,6 +53,14 @@ pub async fn voice_download_model(
     state.voice_download_model(request).await
 }
 
+#[tauri::command]
+pub async fn voice_simulate_event(
+    state: State<'_, Arc<AppCore>>,
+    event: serde_json::Value,
+) -> Result<(), ApiError> {
+    state.voice_simulate_event(event).await
+}
+
 // ── Dev server dispatch ─────────────────────────────────────────────
 
 #[cfg(test)]
@@ -63,13 +71,14 @@ pub(crate) const DEV_COMMANDS: &[&str] = &[
     "voice_get_status",
     "voice_get_models",
     "voice_download_model",
+    "voice_simulate_event",
 ];
 
 #[cfg(debug_assertions)]
 pub(crate) async fn dispatch_dev(
     cmd: &str,
     core: &AppCore,
-    _body: &serde_json::Value,
+    body: &serde_json::Value,
 ) -> Option<Result<serde_json::Value, ApiError>> {
     use super::dev_helpers as dev;
 
@@ -82,6 +91,13 @@ pub(crate) async fn dispatch_dev(
         "voice_download_model" => {
             // For dev server, return mock success since model download isn't wired yet
             Ok(serde_json::json!(null))
+        }
+        "voice_simulate_event" => {
+            let event = body
+                .get("event")
+                .cloned()
+                .unwrap_or(serde_json::json!(null));
+            dev::val(core.voice_simulate_event(event).await)
         }
         _ => return None,
     })

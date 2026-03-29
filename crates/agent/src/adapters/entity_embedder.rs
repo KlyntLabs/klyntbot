@@ -70,7 +70,11 @@ impl EntityEmbedder {
             }
         }
 
-        debug!(embedded = count, total = total, "EntityEmbedder: backfill complete");
+        debug!(
+            embedded = count,
+            total = total,
+            "EntityEmbedder: backfill complete"
+        );
         Ok(count)
     }
 }

@@ -61,10 +61,7 @@ impl ProductivityTreeBuilder {
     /// Queries the `daily_summaries` table and calls `handle_activity_session`
     /// for each row. Insert errors for already-indexed dates are silently ignored
     /// by the underlying `persist_nodes` logic, so this is safe to run on startup.
-    pub async fn backfill_from_summaries(
-        &self,
-        pool: &sqlx::SqlitePool,
-    ) -> common::Result<usize> {
+    pub async fn backfill_from_summaries(&self, pool: &sqlx::SqlitePool) -> common::Result<usize> {
         let summaries: Vec<(String, i64, i64, i64)> = sqlx::query_as(
             "SELECT date, total_active_secs, productive_secs, distracting_secs \
              FROM daily_summaries ORDER BY date",
@@ -173,7 +170,14 @@ impl ProductivityTreeBuilder {
             "ProductivityTreeBuilder: processing focus session"
         );
 
-        let nodes = build_focus_nodes(&date, &daily_id, &focus_id, duration_secs, quality, interruptions);
+        let nodes = build_focus_nodes(
+            &date,
+            &daily_id,
+            &focus_id,
+            duration_secs,
+            quality,
+            interruptions,
+        );
 
         self.persist_nodes(&nodes, &daily_id).await
     }
@@ -213,11 +217,7 @@ impl ProductivityTreeBuilder {
 
     /// Handle a productivity score computed event: upsert the daily root node
     /// and insert a score leaf node (idempotent by date).
-    pub async fn handle_productivity_score(
-        &self,
-        date: &str,
-        score: f64,
-    ) -> common::Result<()> {
+    pub async fn handle_productivity_score(&self, date: &str, score: f64) -> common::Result<()> {
         let daily_id = format!("productivity-daily-{date}");
         let score_id = format!("productivity-score-{date}");
 
@@ -445,12 +445,7 @@ pub fn build_activity_nodes(
 /// Returns 2 nodes: daily root (level 0, idempotent) and a score leaf
 /// (level 1, idempotent by date). Repeated score events for the same date
 /// are deduplicated by the duplicate-ignore logic in `persist_nodes`.
-pub fn build_score_nodes(
-    date: &str,
-    daily_id: &str,
-    score_id: &str,
-    score: f64,
-) -> Vec<TreeNode> {
+pub fn build_score_nodes(date: &str, daily_id: &str, score_id: &str, score: f64) -> Vec<TreeNode> {
     let score_rounded = score.round() as u64;
     let score_content = format!("Productivity score: {score_rounded}/100");
 
@@ -552,7 +547,7 @@ mod tests {
             "2024-01-15",
             "productivity-daily-2024-01-15",
             "productivity-focus-test-uuid",
-            1800,  // 30 mins
+            1800, // 30 mins
             0.85,
             2,
         );
@@ -579,7 +574,11 @@ mod tests {
         assert!(matches!(leaf.node_type, TreeNodeType::Text));
         assert!(leaf.content.contains("30 min"), "content: {}", leaf.content);
         assert!(leaf.content.contains("85%"), "content: {}", leaf.content);
-        assert!(leaf.content.contains("2 interruptions"), "content: {}", leaf.content);
+        assert!(
+            leaf.content.contains("2 interruptions"),
+            "content: {}",
+            leaf.content
+        );
         assert_eq!(leaf.title, None);
     }
 
@@ -672,8 +671,14 @@ mod tests {
 
     #[test]
     fn activity_nodes_zero_active_secs_no_divide_by_zero() {
-        let nodes =
-            build_activity_nodes("2024-01-15", "productivity-daily-2024-01-15", "productivity-activity-2024-01-15", 0, 0, 0);
+        let nodes = build_activity_nodes(
+            "2024-01-15",
+            "productivity-daily-2024-01-15",
+            "productivity-activity-2024-01-15",
+            0,
+            0,
+            0,
+        );
         let leaf = &nodes[1];
         assert!(leaf.content.contains("0.0h"), "content: {}", leaf.content);
         assert!(leaf.content.contains("0%"), "content: {}", leaf.content);

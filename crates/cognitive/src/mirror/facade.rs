@@ -19,6 +19,17 @@ use crate::mirror::{
 };
 use crate::repos::EpisodicMemoryRepo;
 
+/// Cosine similarity between two f32 embedding vectors.
+fn cosine_similarity_f32(a: &[f32], b: &[f32]) -> f64 {
+    let dot: f32 = a.iter().zip(b.iter()).map(|(x, y)| x * y).sum();
+    let norm_a: f32 = a.iter().map(|x| x * x).sum::<f32>().sqrt();
+    let norm_b: f32 = b.iter().map(|x| x * x).sum::<f32>().sqrt();
+    if norm_a == 0.0 || norm_b == 0.0 {
+        return 0.0;
+    }
+    (dot / (norm_a * norm_b)) as f64
+}
+
 // ---------------------------------------------------------------------------
 // MirrorFacade
 // ---------------------------------------------------------------------------
@@ -34,6 +45,7 @@ pub struct MirrorFacade {
     pub(crate) active_timers: Option<Arc<DashMap<String, JoinHandle<()>>>>,
     episodic_repo: Option<EpisodicMemoryRepo>,
     domain_event_bus: Option<Arc<bus::DomainEventBus>>,
+    text_embedder: Option<Arc<dyn crate::embedder::TextEmbedder>>,
 }
 
 impl MirrorFacade {
@@ -48,6 +60,7 @@ impl MirrorFacade {
             active_timers: None,
             episodic_repo: None,
             domain_event_bus: None,
+            text_embedder: None,
         }
     }
 
@@ -83,6 +96,12 @@ impl MirrorFacade {
     /// kill) emit domain events for cross-feature side-effects.
     pub fn with_domain_event_bus(mut self, bus: Arc<bus::DomainEventBus>) -> Self {
         self.domain_event_bus = Some(bus);
+        self
+    }
+
+    /// Attach a [`TextEmbedder`](crate::embedder::TextEmbedder) for semantic snippet similarity in voice echo.
+    pub fn with_text_embedder(mut self, embedder: Arc<dyn crate::embedder::TextEmbedder>) -> Self {
+        self.text_embedder = Some(embedder);
         self
     }
 
@@ -352,6 +371,45 @@ impl MirrorFacade {
             data_sources_used: vec!["routing_snapshots".to_string()],
             proposed_meta_rule: None,
         })
+    }
+
+    // -----------------------------------------------------------------------
+    // Voice echo — semantic snippet lookup
+    // -----------------------------------------------------------------------
+
+    /// Find the most semantically relevant recent snippet for a voice partial transcript.
+    ///
+    /// Uses on-the-fly embedding similarity (cosine) against recent undismissed snippets.
+    /// Returns `None` if no text embedder is available or no snippet scores above threshold.
+    pub async fn get_recent_voice_relevant_snippet(&self, query: &str) -> Option<String> {
+        let embedder = self.text_embedder.as_ref()?;
+
+        let snippets = self.repo.get_pending_snippets().await.ok()?;
+        if snippets.is_empty() {
+            return None;
+        }
+
+        let query_embedding = embedder.embed(query).await.ok()?;
+
+        let mut best_score = 0.0f64;
+        let mut best_text: Option<String> = None;
+
+        for snippet in &snippets {
+            let snippet_text = format!("{} {}", snippet.headline, snippet.body);
+            if let Ok(snippet_embedding) = embedder.embed(&snippet_text).await {
+                let score = cosine_similarity_f32(&query_embedding, &snippet_embedding);
+                if score > best_score {
+                    best_score = score;
+                    best_text = Some(snippet.headline.clone());
+                }
+            }
+        }
+
+        if best_score >= 0.45 {
+            best_text
+        } else {
+            None
+        }
     }
 
     // -----------------------------------------------------------------------

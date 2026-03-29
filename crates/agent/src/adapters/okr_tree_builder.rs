@@ -114,13 +114,8 @@ impl OkrTreeBuilder {
             "OkrTreeBuilder: processing goal progress"
         );
 
-        let nodes = build_goal_progress_nodes(
-            objective_id,
-            &obj_id,
-            &progress_id,
-            progress,
-            target,
-        );
+        let nodes =
+            build_goal_progress_nodes(objective_id, &obj_id, &progress_id, progress, target);
 
         self.persist_nodes(&nodes, objective_id).await
     }
@@ -362,8 +357,16 @@ mod tests {
             1.0,
         );
         let leaf = &nodes[2];
-        assert!(leaf.content.contains("50%"), "Expected 50% in: {}", leaf.content);
-        assert!(leaf.content.contains("1"), "Expected target in: {}", leaf.content);
+        assert!(
+            leaf.content.contains("50%"),
+            "Expected 50% in: {}",
+            leaf.content
+        );
+        assert!(
+            leaf.content.contains("1"),
+            "Expected target in: {}",
+            leaf.content
+        );
     }
 
     #[test]
@@ -376,7 +379,11 @@ mod tests {
             0.0,
         );
         let leaf = &nodes[2];
-        assert!(leaf.content.contains("0%"), "Expected 0% for zero target: {}", leaf.content);
+        assert!(
+            leaf.content.contains("0%"),
+            "Expected 0% for zero target: {}",
+            leaf.content
+        );
     }
 
     #[test]

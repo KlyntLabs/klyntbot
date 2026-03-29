@@ -92,11 +92,7 @@ mod tests {
         for variant in &variants {
             let s = variant.as_str();
             let parsed = SourceType::parse(s);
-            assert_eq!(
-                parsed.as_str(),
-                s,
-                "Roundtrip failed for variant: {s}"
-            );
+            assert_eq!(parsed.as_str(), s, "Roundtrip failed for variant: {s}");
         }
     }
 }

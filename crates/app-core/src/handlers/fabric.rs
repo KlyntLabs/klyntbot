@@ -105,7 +105,10 @@ impl AppCore {
             let mut member_note_ids: Vec<String> = Vec::new();
             for m in &members {
                 if let Ok(Some(node)) = tree_repo.get_node(&m.tree_node_id).await {
-                    if matches!(node.source_type.as_str(), "note" | "task" | "finance" | "productivity" | "okr" | "learning") {
+                    if matches!(
+                        node.source_type.as_str(),
+                        "note" | "task" | "finance" | "productivity" | "okr" | "learning"
+                    ) {
                         member_note_ids.push(node.source_id.clone());
                     }
                 }
@@ -138,12 +141,10 @@ impl AppCore {
             let project_rows: Vec<(String, String)> = sqlx::query_as(
                 "SELECT id, name FROM projects WHERE id IN (SELECT value FROM json_each(?1))",
             )
-            .bind(serde_json::to_string(
-                &project_ids_in_communities
-                    .iter()
-                    .collect::<Vec<_>>(),
+            .bind(
+                serde_json::to_string(&project_ids_in_communities.iter().collect::<Vec<_>>())
+                    .unwrap_or_default(),
             )
-            .unwrap_or_default())
             .fetch_all(&pool)
             .await
             .map_err(map_cognitive_err)?;
@@ -281,7 +282,10 @@ impl AppCore {
                         .map_err(map_cognitive_err)?;
 
                     for node in &linked_nodes {
-                        if matches!(node.source_type.as_str(), "note" | "task" | "finance" | "productivity" | "okr" | "learning") {
+                        if matches!(
+                            node.source_type.as_str(),
+                            "note" | "task" | "finance" | "productivity" | "okr" | "learning"
+                        ) {
                             let key = (entity.id.clone(), node.source_id.clone());
                             if seen_edges.insert(key) {
                                 edges.push(FabricEntityEdge {
@@ -377,7 +381,10 @@ impl AppCore {
                         let Ok(Some(node)) = tree_repo.get_node(&m.tree_node_id).await else {
                             continue;
                         };
-                        if !matches!(node.source_type.as_str(), "note" | "task" | "finance" | "productivity" | "okr" | "learning") {
+                        if !matches!(
+                            node.source_type.as_str(),
+                            "note" | "task" | "finance" | "productivity" | "okr" | "learning"
+                        ) {
                             continue;
                         }
                         members.push(FabricMember {
