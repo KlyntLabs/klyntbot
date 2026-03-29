@@ -101,6 +101,27 @@
           "state": "active",
           "radius": 16.0
         }
+      },
+      {
+        "label": "voice-orb",
+        "url": "/#/voice-orb",
+        "title": "",
+        "width": 320,
+        "height": 200,
+        "resizable": false,
+        "decorations": false,
+        "visible": false,
+        "transparent": true,
+        "shadow": false,
+        "alwaysOnTop": true,
+        "skipTaskbar": true,
+        "center": true,
+        "focus": false,
+        "windowEffects": {
+          "effects": ["hudWindow"],
+          "state": "active",
+          "radius": 16.0
+        }
       }
     ],
     "macOSPrivateApi": true,

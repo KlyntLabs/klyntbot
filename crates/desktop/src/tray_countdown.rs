@@ -13,6 +13,9 @@ use crate::app_core::AppCore;
 /// Shared flag: when `true`, the focus timer owns the tray title.
 pub static FOCUS_ACTIVE: AtomicBool = AtomicBool::new(false);
 
+/// Shared flag: when `true`, a voice capture session is active.
+pub static VOICE_ACTIVE: AtomicBool = AtomicBool::new(false);
+
 /// Cached "next item" — either a calendar event or a task deadline.
 struct NextItem {
     title: String,
@@ -50,6 +53,15 @@ async fn countdown_loop(app: AppHandle) {
         if FOCUS_ACTIVE.load(Ordering::Relaxed) {
             cached = None;
             poll_counter = 0;
+            continue;
+        }
+
+        // If voice capture is active, show "Listening..." (focus timer takes priority above)
+        if VOICE_ACTIVE.load(Ordering::Relaxed) {
+            if let Some(tray) = app.tray_by_id("klynt-tray") {
+                let _ = tray.set_title(Some("Listening..."));
+            }
+            cached = None;
             continue;
         }
 

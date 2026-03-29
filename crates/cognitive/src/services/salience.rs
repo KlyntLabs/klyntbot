@@ -49,6 +49,7 @@ pub fn evaluate_salience(event: &DomainEvent) -> SalienceVerdict {
         DomainEvent::PredictiveAlert { .. } => SalienceVerdict::Accumulate,
         DomainEvent::RuleEvolved { .. } => SalienceVerdict::Discard,
         DomainEvent::VoiceJournalProcessed { .. } => SalienceVerdict::Extract,
+        DomainEvent::VoiceCapture { .. } => SalienceVerdict::Extract,
 
         // Routine events — accumulated for pattern detection
         DomainEvent::ProductivityScoreComputed { .. } => SalienceVerdict::Accumulate,

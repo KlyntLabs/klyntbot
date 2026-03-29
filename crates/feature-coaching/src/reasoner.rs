@@ -39,6 +39,8 @@ pub enum InterventionType {
     Notification,
     /// Critical — overlay (e.g., distraction block).
     Overlay,
+    /// Spoken coaching nudge delivered via TTS through the Voice Brain orb.
+    SpokenNudge,
     /// No intervention.
     None,
 }
@@ -50,6 +52,7 @@ impl InterventionType {
             Self::ChatMessage => "ChatMessage",
             Self::Notification => "Notification",
             Self::Overlay => "Overlay",
+            Self::SpokenNudge => "SpokenNudge",
             Self::None => "None",
         }
     }

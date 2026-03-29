@@ -35,6 +35,7 @@ pub mod status;
 pub mod tasks;
 pub mod timeline;
 mod view;
+pub mod voice;
 pub mod work_context;
 pub mod workflows;
 pub mod workspace;

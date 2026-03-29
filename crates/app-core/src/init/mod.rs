@@ -15,7 +15,7 @@ use bus::MessageBus;
 use feature_productivity::auto_focus::AutoFocusEvent;
 use tokio::sync::{mpsc, Mutex, RwLock};
 use tokio_util::sync::CancellationToken;
-use tracing::info;
+use tracing::{info, warn};
 
 use crate::events::{AppEventEmitter, NoopEmitter};
 use crate::state::AppCore;
@@ -443,7 +443,90 @@ impl AppCore {
             _config_watcher_token: Some(config_watcher_token),
             _lifecycle_monitor: None,
             _wake_orchestrator_handle: None,
+            voice_service: None,
         };
+
+        // ── Voice service initialization ────────────────────────────────
+        {
+            let config_guard = shared_config.read().await;
+            let voice_config = config_guard.voice.clone();
+            if voice_config.enabled {
+                use voice_engine::*;
+                let data_dir = config_guard.data_dir_path();
+
+                let model_manager = ModelManager::new(&data_dir);
+
+                // Local STT: try to load WhisperLocalEngine if model exists
+                let stt_local: Option<Arc<dyn TranscriptionEngine>> = model_manager
+                    .model_path(WhisperModelSize::Small)
+                    .and_then(|path| {
+                        match engines::WhisperLocalEngine::new(&path) {
+                            Ok(engine) => {
+                                info!("Whisper local engine loaded from {}", path.display());
+                                Some(Arc::new(engine) as Arc<dyn TranscriptionEngine>)
+                            }
+                            Err(e) => {
+                                warn!("Failed to load local Whisper engine: {e}");
+                                None
+                            }
+                        }
+                    });
+
+                // Cloud STT: Groq fallback if API key configured
+                let stt_cloud: Option<Arc<dyn TranscriptionEngine>> = {
+                    let groq_key = config_guard.providers.groq.api_key.expose();
+                    if !groq_key.is_empty() {
+                        match GroqWhisperEngine::new(groq_key) {
+                            Ok(engine) => Some(Arc::new(engine) as Arc<dyn TranscriptionEngine>),
+                            Err(e) => {
+                                warn!("Failed to create Groq engine: {e}");
+                                None
+                            }
+                        }
+                    } else {
+                        None
+                    }
+                };
+
+                // Drop config guard before creating VoiceService (no longer needed)
+                drop(config_guard);
+
+                // TTS: macOS AVSpeech
+                let tts: Option<Arc<dyn voice_engine::TtsEngine>> = Some(Arc::new(
+                    voice_engine::AvSpeechTtsEngine::new(&data_dir),
+                ));
+
+                // Only create VoiceService if at least one engine is available
+                if stt_local.is_some() || stt_cloud.is_some() {
+                    let svc_config = VoiceServiceConfig {
+                        capture: capture::CaptureConfig {
+                            silence_threshold: 0.01,
+                            silence_duration: std::time::Duration::from_secs_f32(
+                                voice_config.input.silence_threshold_secs,
+                            ),
+                            ..Default::default()
+                        },
+                        prefer_local: voice_config.input.prefer_local,
+                        privacy_mode: PrivacyLevel::Standard,
+                        data_dir: data_dir.clone(),
+                    };
+
+                    let service = VoiceService::new(
+                        stt_local,
+                        stt_cloud,
+                        tts,
+                        None, // MemoryEchoProvider — stub, wired later
+                        model_manager,
+                        svc_config,
+                    );
+
+                    core.voice_service = Some(Arc::new(service));
+                    info!("Voice service initialized");
+                } else {
+                    info!("Voice service disabled — no STT engine available (no model file, no Groq key)");
+                }
+            }
+        }
 
         // ── Insight progress refresh (registered post-init — deps available now) ──
         if let Some(ref insight_svc) = core.insight_service {

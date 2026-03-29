@@ -44,6 +44,7 @@ mod shortcuts;
 mod todo;
 mod tools;
 mod user;
+mod voice;
 mod work_context;
 
 pub use self::agents::*;
@@ -75,6 +76,7 @@ pub use self::shortcuts::*;
 pub use self::todo::*;
 pub use self::tools::*;
 pub use self::user::*;
+pub use self::voice::*;
 pub use self::work_context::*;
 
 #[cfg(test)]

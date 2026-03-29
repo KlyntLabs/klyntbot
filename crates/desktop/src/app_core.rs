@@ -378,6 +378,28 @@ fn wire_event_channels(core: &AppCore, channels: EventChannels, app_handle: &tau
             }
         });
     }
+
+    // Voice events → Tauri "voice:event"
+    if let Some(ref voice_service) = core.voice_service {
+        let rt = tokio::runtime::Handle::current();
+        if let Some(mut voice_rx) = rt.block_on(voice_service.take_event_rx()) {
+            let handle = app_handle.clone();
+            let token = shutdown.clone();
+            tokio::spawn(async move {
+                loop {
+                    tokio::select! {
+                        _ = token.cancelled() => break,
+                        msg = voice_rx.recv() => {
+                            let Some(event) = msg else { break };
+                            if let Err(e) = handle.emit(voice_engine::VOICE_EVENT, &event) {
+                                warn!("failed to emit voice event: {e}");
+                            }
+                        }
+                    }
+                }
+            });
+        }
+    }
 }
 
 /// Center a window on the monitor where the cursor is currently located.

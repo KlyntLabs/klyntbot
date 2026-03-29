@@ -33,6 +33,7 @@ use super::shortcuts::ShortcutsConfig;
 use super::todo::TodoConfig;
 use super::tools::ToolsConfig;
 use super::user::UserConfig;
+use super::voice::VoiceConfig;
 use super::work_context::WorkContextConfig;
 
 /// Expand a leading `~/` in a path to the user's home directory.
@@ -228,6 +229,10 @@ pub struct Config {
     /// Lifecycle monitoring — macOS sleep/wake + user presence detection.
     #[serde(default)]
     pub lifecycle: LifecycleConfig,
+
+    /// Voice input/output configuration.
+    #[serde(default)]
+    pub voice: VoiceConfig,
 }
 
 fn default_schema_version() -> u32 {

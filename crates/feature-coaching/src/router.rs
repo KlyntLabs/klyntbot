@@ -71,6 +71,7 @@ impl From<&InterventionType> for InterventionChannel {
             InterventionType::ChatMessage => InterventionChannel::ChatMessage,
             InterventionType::Notification => InterventionChannel::Notification,
             InterventionType::Overlay => InterventionChannel::Overlay,
+            InterventionType::SpokenNudge => InterventionChannel::Notification,
             InterventionType::None => InterventionChannel::DashboardCard,
         }
     }
