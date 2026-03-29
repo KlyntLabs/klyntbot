@@ -4,6 +4,7 @@ import { DetailPanel } from "@features/launcher/components/DetailPanel";
 import { LauncherChat } from "@features/launcher/components/LauncherChat";
 import { LauncherInput } from "@features/launcher/components/LauncherInput";
 import { ResultsList } from "@features/launcher/components/ResultsList";
+import { VoiceRecorder } from "@features/launcher/components/VoiceRecorder";
 import { useDashboardData } from "@features/launcher/hooks/useDashboardData";
 import { executeItem } from "@features/launcher/hooks/useExecuteItem";
 import { useKeyboardNavigation } from "@features/launcher/hooks/useKeyboardNavigation";
@@ -12,9 +13,9 @@ import { useLauncherStore } from "@features/launcher/stores/launcherStore";
 import { useTransparentBackground } from "@shared/hooks/useTransparentBackground";
 import { useWindowAutoResize } from "@shared/hooks/useWindowAutoResize";
 import { isTauri } from "@shared/lib/utils";
-import { emit } from "@tauri-apps/api/event";
+import { emit, listen } from "@tauri-apps/api/event";
 import { getCurrentWindow } from "@tauri-apps/api/window";
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 export function Launcher() {
   const contentRef = useRef<HTMLDivElement>(null);
@@ -50,6 +51,17 @@ export function Launcher() {
     [setMode],
   );
 
+  const handleTranscriptReady = useCallback(
+    (transcript: string) => {
+      enterChat(transcript);
+    },
+    [enterChat],
+  );
+
+  const cancelRecording = useCallback(() => {
+    setMode("dashboard");
+  }, [setMode]);
+
   const navigateToMain = useCallback(
     async (path: string, event?: { name: string; payload: unknown }) => {
       if (!isTauri) return;
@@ -80,6 +92,17 @@ export function Launcher() {
     );
   }, [chatSessionKey, navigateToMain]);
 
+  useEffect(() => {
+    if (!isTauri) return;
+    let unlisten: (() => void) | undefined;
+    listen("voice-recording-start", () => {
+      setMode("recording");
+    }).then((fn) => {
+      unlisten = fn;
+    });
+    return () => unlisten?.();
+  }, [setMode]);
+
   useKeyboardNavigation({
     onEnterChat: enterChat,
     onExpandToMain: expandToMain,
@@ -107,7 +130,9 @@ export function Launcher() {
         className="w-full glass-floating overflow-hidden"
         style={{ animation: "glass-appear 0.25s ease-out" }}
       >
-        {mode === "chat" && chatSessionKey ? (
+        {mode === "recording" ? (
+          <VoiceRecorder onTranscriptReady={handleTranscriptReady} onCancel={cancelRecording} />
+        ) : mode === "chat" && chatSessionKey ? (
           <LauncherChat
             sessionKey={chatSessionKey}
             initialQuery={chatInitialQuery}
