@@ -106,7 +106,8 @@ pub struct VoiceService {
     /// Channel for emitting VoiceEvents to the frontend.
     event_tx: mpsc::Sender<VoiceEvent>,
     /// Receiver side — consumed by the Tauri adapter to relay events.
-    event_rx: Arc<Mutex<Option<mpsc::Receiver<VoiceEvent>>>>,
+    /// Uses std::sync::Mutex (not tokio) because it's taken once at init from a sync context.
+    event_rx: Arc<std::sync::Mutex<Option<mpsc::Receiver<VoiceEvent>>>>,
 }
 
 impl VoiceService {
@@ -135,14 +136,15 @@ impl VoiceService {
             config,
             active_session: Arc::new(Mutex::new(None)),
             event_tx,
-            event_rx: Arc::new(Mutex::new(Some(event_rx))),
+            event_rx: Arc::new(std::sync::Mutex::new(Some(event_rx))),
         }
     }
 
     /// Take the event receiver (can only be called once).
     /// The Tauri adapter consumes this to relay events to the frontend.
-    pub async fn take_event_rx(&self) -> Option<mpsc::Receiver<VoiceEvent>> {
-        self.event_rx.lock().await.take()
+    /// Synchronous — safe to call from non-async init code.
+    pub fn take_event_rx(&self) -> Option<mpsc::Receiver<VoiceEvent>> {
+        self.event_rx.lock().ok()?.take()
     }
 
     /// Get current session state.
@@ -558,9 +560,9 @@ mod tests {
     #[tokio::test]
     async fn take_event_rx_only_once() {
         let (svc, _tmp) = make_service(None);
-        let rx = svc.take_event_rx().await;
+        let rx = svc.take_event_rx();
         assert!(rx.is_some());
-        let rx2 = svc.take_event_rx().await;
+        let rx2 = svc.take_event_rx();
         assert!(rx2.is_none());
     }
 
@@ -589,7 +591,7 @@ mod tests {
     #[tokio::test]
     async fn dismiss_sends_event() {
         let (svc, _tmp) = make_service(None);
-        let mut rx = svc.take_event_rx().await.unwrap();
+        let mut rx = svc.take_event_rx().unwrap();
         svc.dismiss().await;
         let event = rx.recv().await.unwrap();
         assert!(matches!(event, VoiceEvent::ProcessingInBackground));
@@ -603,7 +605,7 @@ mod tests {
             as Arc<dyn TranscriptionEngine>;
         let (svc, _tmp) = make_service(Some(mock_stt));
 
-        let mut event_rx = svc.take_event_rx().await.unwrap();
+        let mut event_rx = svc.take_event_rx().unwrap();
 
         // Manually inject a session with a pre-populated audio_rx channel.
         // This bypasses start_capture (which requires real mic hardware).

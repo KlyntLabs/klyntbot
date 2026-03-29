@@ -381,8 +381,7 @@ fn wire_event_channels(core: &AppCore, channels: EventChannels, app_handle: &tau
 
     // Voice events → Tauri "voice:event"
     if let Some(ref voice_service) = core.voice_service {
-        let rt = tokio::runtime::Handle::current();
-        if let Some(mut voice_rx) = rt.block_on(voice_service.take_event_rx()) {
+        if let Some(mut voice_rx) = voice_service.take_event_rx() {
             let handle = app_handle.clone();
             let token = shutdown.clone();
             tokio::spawn(async move {
