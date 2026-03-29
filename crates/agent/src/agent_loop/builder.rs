@@ -942,8 +942,10 @@ impl AgentLoopBuilder {
                         });
                         info!("LearningTreeBuilder subscriber started");
 
-                        // Background tree node backfill for existing notes + tasks
-                        {
+                        // Background tree node backfill — re-indexes all existing data.
+                        // Gated by KLYNTBOT_BACKFILL=1 env var (default: off).
+                        // Only needed for dev/migration; live events handle ongoing indexing.
+                        if std::env::var("KLYNTBOT_BACKFILL").map_or(false, |v| v == "1" || v == "true") {
                             let backfill_builder = Arc::clone(&note_tree_builder);
                             let backfill_task_tree_builder = Arc::clone(&task_tree_builder);
                             let backfill_learning_tree_builder =
@@ -1011,6 +1013,8 @@ impl AgentLoopBuilder {
                                     Err(e) => warn!("Entity embedding backfill error: {e}"),
                                 }
                             });
+                        } else {
+                            info!("Tree node backfill skipped. Set KLYNTBOT_BACKFILL=1 to re-index all data on startup.");
                         }
                     }
                 }
