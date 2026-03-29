@@ -89,7 +89,8 @@ struct ActiveSession {
 /// Manages the lifecycle of voice capture sessions:
 /// start -> capture audio -> stream to STT -> route intents -> finalize -> TTS response.
 pub struct VoiceService {
-    stt_local: Option<Arc<dyn TranscriptionEngine>>,
+    /// Local STT engine — wrapped in RwLock for hot-swap after background model download.
+    stt_local: std::sync::RwLock<Option<Arc<dyn TranscriptionEngine>>>,
     stt_cloud: Option<Arc<dyn TranscriptionEngine>>,
     /// TTS engine for spoken responses (used in SpeakResponse phase).
     tts: Option<Arc<dyn TtsEngine>>,
@@ -126,7 +127,7 @@ impl VoiceService {
         let (event_tx, event_rx) = mpsc::channel(128);
 
         Self {
-            stt_local,
+            stt_local: std::sync::RwLock::new(stt_local),
             stt_cloud,
             tts,
             memory_echo,
@@ -158,16 +159,27 @@ impl VoiceService {
     }
 
     /// Get the active transcription engine (local preferred, cloud fallback).
-    fn active_engine(&self) -> Option<(&Arc<dyn TranscriptionEngine>, EngineKind)> {
+    fn active_engine(&self) -> Option<(Arc<dyn TranscriptionEngine>, EngineKind)> {
         if self.config.prefer_local {
-            if let Some(ref local) = self.stt_local {
+            if let Some(local) = self.stt_local.read().ok().and_then(|g| g.clone()) {
                 return Some((local, EngineKind::Local));
             }
         }
         if let Some(ref cloud) = self.stt_cloud {
-            return Some((cloud, EngineKind::Cloud));
+            return Some((Arc::clone(cloud), EngineKind::Cloud));
         }
-        self.stt_local.as_ref().map(|l| (l, EngineKind::Local))
+        self.stt_local
+            .read()
+            .ok()
+            .and_then(|g| g.clone())
+            .map(|l| (l, EngineKind::Local))
+    }
+
+    /// Hot-swap the local STT engine (called after background model download completes).
+    pub fn set_local_engine(&self, engine: Arc<dyn TranscriptionEngine>) {
+        if let Ok(mut guard) = self.stt_local.write() {
+            *guard = Some(engine);
+        }
     }
 
     /// Synchronous helper: creates the capture session, wraps the `!Send` cpal

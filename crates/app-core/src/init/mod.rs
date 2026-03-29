@@ -455,6 +455,7 @@ impl AppCore {
                 let data_dir = config_guard.data_dir_path();
 
                 let model_manager = ModelManager::new(&data_dir);
+                let model_needs_download = !model_manager.is_available(WhisperModelSize::Small);
 
                 // Local STT: try to load WhisperLocalEngine if model exists
                 let stt_local: Option<Arc<dyn TranscriptionEngine>> = model_manager
@@ -488,7 +489,6 @@ impl AppCore {
                     }
                 };
 
-                // Drop config guard before creating VoiceService (no longer needed)
                 drop(config_guard);
 
                 // TTS: macOS AVSpeech
@@ -496,34 +496,70 @@ impl AppCore {
                     voice_engine::AvSpeechTtsEngine::new(&data_dir),
                 ));
 
-                // Only create VoiceService if at least one engine is available
-                if stt_local.is_some() || stt_cloud.is_some() {
-                    let svc_config = VoiceServiceConfig {
-                        capture: capture::CaptureConfig {
-                            silence_threshold: 0.01,
-                            silence_duration: std::time::Duration::from_secs_f32(
-                                voice_config.input.silence_threshold_secs,
-                            ),
-                            ..Default::default()
-                        },
-                        prefer_local: voice_config.input.prefer_local,
-                        privacy_mode: PrivacyLevel::Standard,
-                        data_dir: data_dir.clone(),
-                    };
+                // Always create VoiceService — even without engines.
+                // Groq provides instant first-run, background download adds local.
+                let svc_config = VoiceServiceConfig {
+                    capture: capture::CaptureConfig {
+                        silence_threshold: 0.01,
+                        silence_duration: std::time::Duration::from_secs_f32(
+                            voice_config.input.silence_threshold_secs,
+                        ),
+                        ..Default::default()
+                    },
+                    prefer_local: voice_config.input.prefer_local,
+                    privacy_mode: PrivacyLevel::Standard,
+                    data_dir: data_dir.clone(),
+                };
 
-                    let service = VoiceService::new(
-                        stt_local,
-                        stt_cloud,
-                        tts,
-                        None, // MemoryEchoProvider — stub, wired later
-                        model_manager,
-                        svc_config,
-                    );
+                let has_local_engine = stt_local.is_some();
 
-                    core.voice_service = Some(Arc::new(service));
-                    info!("Voice service initialized");
+                let service = VoiceService::new(
+                    stt_local,
+                    stt_cloud,
+                    tts,
+                    None, // MemoryEchoProvider — stub, wired later
+                    model_manager,
+                    svc_config,
+                );
+
+                let service = Arc::new(service);
+                core.voice_service = Some(Arc::clone(&service));
+
+                if !has_local_engine {
+                    if model_needs_download {
+                        // Auto-download whisper-small in background on first run.
+                        // Voice works immediately via Groq cloud fallback (if configured).
+                        // Once download completes, local engine becomes available on next capture.
+                        info!("Whisper model not found — starting background download");
+                        let svc = Arc::clone(&service);
+                        let data_dir = data_dir.clone();
+                        tokio::spawn(async move {
+                            match svc.download_model(WhisperModelSize::Small).await {
+                                Ok(()) => {
+                                    info!("Whisper model downloaded — local voice available on next capture");
+                                    // Hot-load: set local engine so next start_capture uses it.
+                                    let model_path = data_dir
+                                        .join("models")
+                                        .join(WhisperModelSize::Small.filename());
+                                    match engines::WhisperLocalEngine::new(&model_path) {
+                                        Ok(engine) => {
+                                            svc.set_local_engine(Arc::new(engine));
+                                            info!("Local Whisper engine hot-loaded after download");
+                                        }
+                                        Err(e) => {
+                                            warn!("Failed to hot-load Whisper engine after download: {e}");
+                                        }
+                                    }
+                                }
+                                Err(e) => {
+                                    warn!("Background model download failed: {e}");
+                                }
+                            }
+                        });
+                    }
+                    info!("Voice service initialized (cloud-only until model downloads)");
                 } else {
-                    info!("Voice service disabled — no STT engine available (no model file, no Groq key)");
+                    info!("Voice service initialized (local engine ready)");
                 }
             }
         }
