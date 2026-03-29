@@ -82,6 +82,19 @@ export function ChatPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps -- chat ref is unstable; didApplyResume guards double-apply
   }, [resumeContext, chat.setInput]);
 
+  // ── Voice phase indicator ─────────────────────────────────────────────
+  const [voicePhase, setVoicePhase] = useState<string>("idle");
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const detail = (e as CustomEvent).detail;
+      if (detail?.type === "phaseChanged") {
+        setVoicePhase(detail.phase as string);
+      }
+    };
+    window.addEventListener("voice:event", handler);
+    return () => window.removeEventListener("voice:event", handler);
+  }, []);
+
   // ── Autotuner promotion toast ──────────────────────────────────────────
   const [promotionImpact, setPromotionImpact] = useState<string | null>(null);
   usePromotionListener((impact) => setPromotionImpact(impact));
@@ -284,6 +297,18 @@ export function ChatPage() {
             <div />
           )}
           <div className="flex items-center gap-2">
+            {voicePhase !== "idle" && (
+              <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                <span className="h-2 w-2 rounded-full bg-success animate-pulse" />
+                <span>
+                  {voicePhase === "listening"
+                    ? "Listening"
+                    : voicePhase === "reflecting"
+                      ? "Reflecting"
+                      : "Speaking"}
+                </span>
+              </div>
+            )}
             <AmbientIndicator onClick={() => navigate("/settings/general")} />
           </div>
         </div>
