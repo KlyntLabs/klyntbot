@@ -3,17 +3,28 @@
 use std::sync::Arc;
 
 use async_trait::async_trait;
+use context_engine::MemoryRetriever;
 use voice_engine::MemoryEchoProvider;
 
+/// Minimum relevance score for a Tier 3 memory recall result to surface as an echo.
+const MIN_RECALL_SCORE: f64 = 0.4;
+
 /// App-level memory echo provider that tries Mirror snippets first,
-/// then falls back to episodic memory recall.
+/// then falls back to conversation recall via `MemoryRetriever`.
 pub struct AppMemoryEchoProvider {
     mirror: Option<Arc<cognitive::mirror::MirrorFacade>>,
+    memory_retriever: Option<Arc<dyn MemoryRetriever>>,
 }
 
 impl AppMemoryEchoProvider {
-    pub fn new(mirror: Option<Arc<cognitive::mirror::MirrorFacade>>) -> Self {
-        Self { mirror }
+    pub fn new(
+        mirror: Option<Arc<cognitive::mirror::MirrorFacade>>,
+        memory_retriever: Option<Arc<dyn MemoryRetriever>>,
+    ) -> Self {
+        Self {
+            mirror,
+            memory_retriever,
+        }
     }
 }
 
@@ -27,10 +38,16 @@ impl MemoryEchoProvider for AppMemoryEchoProvider {
             }
         }
 
-        // Tier 3: Would use ContextEngine::recall_relevant here.
-        // For now, Tier 2 is the primary echo source. Tier 3 recall
-        // can be added by injecting ContextEngine and calling
-        // memory_retriever.retrieve(partial_text, 1) when available.
+        // Tier 3: Conversation recall via MemoryRetriever (cognitive facts + past messages)
+        if let Some(ref retriever) = self.memory_retriever {
+            let entries = retriever.retrieve(partial_text, 1).await;
+            if let Some(entry) = entries.first() {
+                if entry.score >= MIN_RECALL_SCORE {
+                    return Some(entry.content.clone());
+                }
+            }
+        }
+
         None
     }
 }

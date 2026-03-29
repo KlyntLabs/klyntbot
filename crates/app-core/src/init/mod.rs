@@ -521,6 +521,17 @@ impl AppCore {
 
                 let has_local_engine = stt_local.is_some();
 
+                // Tier 3 memory recall: construct a MemoryRetriever from
+                // cognitive UnifiedMemoryService (facts + conversation recall).
+                let voice_memory_retriever: Option<
+                    Arc<dyn context_engine::MemoryRetriever>,
+                > = {
+                    let fact_repo =
+                        ::cognitive::SemanticFactRepo::new(storage_pool.inner().clone());
+                    let retriever = ::cognitive::UnifiedMemoryService::new(fact_repo);
+                    Some(Arc::new(retriever) as Arc<dyn context_engine::MemoryRetriever>)
+                };
+
                 let service = VoiceService::new(
                     stt_local,
                     stt_cloud,
@@ -528,6 +539,7 @@ impl AppCore {
                     {
                         let echo_provider = crate::handlers::voice_echo::AppMemoryEchoProvider::new(
                             mirror_facade_for_voice,
+                            voice_memory_retriever,
                         );
                         Some(Arc::new(echo_provider) as Arc<dyn voice_engine::MemoryEchoProvider>)
                     },
