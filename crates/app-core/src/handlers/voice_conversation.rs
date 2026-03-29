@@ -1023,11 +1023,26 @@ fn start_monitor_safe(
 mod tests {
     use super::*;
 
+    #[tokio::test]
+    async fn new_session_creates_unique_keys() {
+        let key1 = create_voice_session_key();
+        let key2 = create_voice_session_key();
+        assert_ne!(key1.as_str(), key2.as_str());
+        assert!(key1.as_str().starts_with("desktop:"));
+    }
+
     #[test]
     fn phase_transitions_from_idle() {
         assert!(ConversationPhase::Idle.can_transition_to(&ConversationPhase::Listening));
         assert!(!ConversationPhase::Idle.can_transition_to(&ConversationPhase::Speaking));
         assert!(!ConversationPhase::Idle.can_transition_to(&ConversationPhase::Reflecting));
+    }
+
+    #[test]
+    fn phase_invalid_transitions_rejected() {
+        assert!(!ConversationPhase::Idle.can_transition_to(&ConversationPhase::Speaking));
+        assert!(!ConversationPhase::Idle.can_transition_to(&ConversationPhase::Reflecting));
+        assert!(!ConversationPhase::Listening.can_transition_to(&ConversationPhase::Speaking));
     }
 
     #[test]
