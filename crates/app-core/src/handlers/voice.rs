@@ -25,14 +25,34 @@ impl AppCore {
     /// Stop the current voice capture and finalize.
     pub async fn voice_stop_capture(&self) -> Result<(), ApiError> {
         let service = self.voice_service()?;
-        let _result = service
+        let result = service
             .stop_capture()
             .await
             .map_err(|e| ApiError::new("VOICE_ERROR", &e.to_string()))?;
 
-        // TODO: When result is Some((transcript, metadata)), create InboundMessage
-        // and publish to MessageBus. This will be wired when the full pipeline
-        // connects voice to the agent runtime.
+        if let Some((transcript, metadata)) = result {
+            // Create InboundMessage and publish to MessageBus
+            let mut msg_metadata = std::collections::HashMap::new();
+            msg_metadata.insert(
+                "voice_metadata".to_string(),
+                serde_json::to_value(&metadata).unwrap_or_default(),
+            );
+
+            let message = bus::InboundMessage {
+                channel: common::ChannelName::new("desktop"),
+                sender_id: "local".to_string(),
+                chat_id: common::ChatId::new("desktop-voice"),
+                content: transcript.text.clone(),
+                timestamp: chrono::Utc::now(),
+                media: vec![],
+                metadata: msg_metadata,
+                kind: bus::MessageKind::Voice,
+            };
+
+            if let Err(e) = self.bus.publish_inbound(message).await {
+                tracing::warn!("Failed to publish voice transcript to bus: {e}");
+            }
+        }
 
         Ok(())
     }

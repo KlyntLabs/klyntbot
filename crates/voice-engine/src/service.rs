@@ -151,7 +151,16 @@ impl VoiceService {
     /// Synchronous helper: creates the capture session, wraps the `!Send` cpal
     /// stream on a blocking thread, and returns only `Send`-safe parts. This
     /// keeps `CaptureSession` out of any async generator state.
-    fn begin_capture(&self) -> common::Result<(ActiveSession, String, EngineKind)> {
+    /// Returns `(session, silence_rx, rms_rx, session_id, engine_kind)`.
+    fn begin_capture(
+        &self,
+    ) -> common::Result<(
+        ActiveSession,
+        mpsc::Receiver<()>,
+        mpsc::Receiver<f32>,
+        String,
+        EngineKind,
+    )> {
         let (_, engine_kind) = self.active_engine().ok_or_else(|| {
             common::KlyntbotError::Provider(common::ProviderError::InvalidResponse(
                 "No transcription engine available. Download a model or configure Groq API key."
@@ -168,6 +177,14 @@ impl VoiceService {
         let audio_rx = {
             let (_, dummy_rx) = mpsc::channel(1);
             std::mem::replace(&mut capture_session.audio_rx, dummy_rx)
+        };
+        let silence_rx = {
+            let (_, dummy_rx) = mpsc::channel(1);
+            std::mem::replace(&mut capture_session.silence_rx, dummy_rx)
+        };
+        let rms_rx = {
+            let (_, dummy_rx) = mpsc::channel(1);
+            std::mem::replace(&mut capture_session.rms_rx, dummy_rx)
         };
 
         // Keep the cpal::Stream alive on a blocking thread.
@@ -195,7 +212,7 @@ impl VoiceService {
             state: VoiceSessionState::Capturing,
         };
 
-        Ok((active, session_id, engine_kind))
+        Ok((active, silence_rx, rms_rx, session_id, engine_kind))
     }
 
     /// Start a voice capture session.
@@ -213,7 +230,7 @@ impl VoiceService {
 
         // Create the capture session synchronously so the !Send CaptureSession
         // never exists in the async generator state (keeps this future Send).
-        let (active, session_id, engine_kind) = self.begin_capture()?;
+        let (active, silence_rx, rms_rx, session_id, engine_kind) = self.begin_capture()?;
 
         let _ = self
             .event_tx
@@ -222,6 +239,33 @@ impl VoiceService {
                 engine: engine_kind,
             })
             .await;
+
+        // Spawn silence auto-stop task: sets stop_signal when silence is detected
+        {
+            let stop_signal = active.stop_signal.clone();
+            let event_tx = self.event_tx.clone();
+            let mut silence_rx = silence_rx;
+            tokio::spawn(async move {
+                if silence_rx.recv().await.is_some() {
+                    // Signal that silence was detected — stop the audio stream
+                    stop_signal.store(true, Ordering::Relaxed);
+                    let _ = event_tx
+                        .send(VoiceEvent::CaptureEnded { duration_ms: 0 })
+                        .await;
+                }
+            });
+        }
+
+        // Spawn RMS relay task: forwards RMS values as AudioLevel events
+        {
+            let event_tx = self.event_tx.clone();
+            let mut rms_rx = rms_rx;
+            tokio::spawn(async move {
+                while let Some(rms) = rms_rx.recv().await {
+                    let _ = event_tx.send(VoiceEvent::AudioLevel { rms }).await;
+                }
+            });
+        }
 
         *session_guard = Some(active);
 

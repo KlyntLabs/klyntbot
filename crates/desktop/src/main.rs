@@ -18,6 +18,7 @@ use commands::window::{QUIT_REQUESTED, WINDOW_LAUNCHER, WINDOW_QUICK_CAPTURE, WI
 use tauri::image::Image;
 use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
 use tauri::Manager;
+use tauri_plugin_global_shortcut::GlobalShortcutExt;
 
 #[derive(Parser)]
 #[command(name = "Klynt", about = "Klynt personal AI agent")]
@@ -298,6 +299,82 @@ fn run_desktop_app() {
                     let defaults = config::ShortcutsConfig::default();
                     if let Err(e2) = shortcuts::register_shortcuts(app.handle(), &defaults) {
                         tracing::error!("Failed to register default shortcuts: {e2}");
+                    }
+                }
+            }
+
+            // Register voice hotkey (separate from the 3-shortcut system because
+            // it toggles capture, not a window).
+            {
+                let core_ref = app.state::<Arc<app_core::AppCore>>();
+                let voice_hotkey = tauri::async_runtime::block_on(async {
+                    core_ref.config.read().await.voice.input.hotkey.clone()
+                });
+                let voice_enabled = core_ref.voice_service.is_some();
+                if voice_enabled {
+                    let manager = app.global_shortcut();
+                    match voice_hotkey.parse::<tauri_plugin_global_shortcut::Shortcut>() {
+                        Ok(shortcut) => {
+                            let app_clone = app.handle().clone();
+                            if let Err(e) = manager.on_shortcut(
+                                shortcut,
+                                move |_app, _shortcut, event| {
+                                    if event.state
+                                        != tauri_plugin_global_shortcut::ShortcutState::Pressed
+                                    {
+                                        return;
+                                    }
+                                    let handle = app_clone.clone();
+                                    tauri::async_runtime::spawn(async move {
+                                        use tauri::Manager;
+                                        let Some(core) =
+                                            handle.try_state::<Arc<app_core::AppCore>>()
+                                        else {
+                                            return;
+                                        };
+                                        let is_capturing = core
+                                            .voice_service
+                                            .as_ref()
+                                            .map(|vs| {
+                                                tauri::async_runtime::block_on(vs.session_state())
+                                            })
+                                            .is_some_and(|s| {
+                                                s == voice_engine::VoiceSessionState::Capturing
+                                            });
+                                        if is_capturing {
+                                            let _ = core.voice_stop_capture().await;
+                                            tray_countdown::VOICE_ACTIVE.store(
+                                                false,
+                                                std::sync::atomic::Ordering::Relaxed,
+                                            );
+                                        } else {
+                                            match core.voice_start_capture().await {
+                                                Ok(_) => {
+                                                    tray_countdown::VOICE_ACTIVE.store(
+                                                        true,
+                                                        std::sync::atomic::Ordering::Relaxed,
+                                                    );
+                                                }
+                                                Err(e) => {
+                                                    tracing::warn!(
+                                                        "Voice hotkey: failed to start capture: {e:?}"
+                                                    );
+                                                }
+                                            }
+                                        }
+                                    });
+                                },
+                            ) {
+                                tracing::warn!("Failed to register voice hotkey '{voice_hotkey}': {e}");
+                            } else {
+                                tracing::info!("Voice hotkey registered: {voice_hotkey}");
+                            }
+                        }
+                        Err(e) => {
+                            tracing::warn!(
+                                "Invalid voice hotkey '{voice_hotkey}': {e}"
+                            );
+                        }
                     }
                 }
             }

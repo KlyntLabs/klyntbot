@@ -12,17 +12,23 @@ use crate::app_core::AppCore;
 pub async fn voice_start_capture(
     state: State<'_, Arc<AppCore>>,
 ) -> Result<VoiceCaptureInfo, ApiError> {
-    state.voice_start_capture().await
+    let result = state.voice_start_capture().await?;
+    crate::tray_countdown::VOICE_ACTIVE.store(true, std::sync::atomic::Ordering::Relaxed);
+    Ok(result)
 }
 
 #[tauri::command]
 pub async fn voice_stop_capture(state: State<'_, Arc<AppCore>>) -> Result<(), ApiError> {
-    state.voice_stop_capture().await
+    let result = state.voice_stop_capture().await;
+    crate::tray_countdown::VOICE_ACTIVE.store(false, std::sync::atomic::Ordering::Relaxed);
+    result
 }
 
 #[tauri::command]
 pub async fn voice_dismiss(state: State<'_, Arc<AppCore>>) -> Result<(), ApiError> {
-    state.voice_dismiss().await
+    let result = state.voice_dismiss().await;
+    crate::tray_countdown::VOICE_ACTIVE.store(false, std::sync::atomic::Ordering::Relaxed);
+    result
 }
 
 #[tauri::command]
