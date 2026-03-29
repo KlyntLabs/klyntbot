@@ -184,28 +184,27 @@ export function GraphView({
     }));
   const allRawNodes = projectNodes.length > 0 ? [...rawNodes, ...projectNodes] : rawNodes;
 
-  // Search filter
-  let filteredNodes = searchQuery
-    ? allRawNodes.filter((n) => n.title.toLowerCase().includes(searchQuery.toLowerCase()))
-    : allRawNodes;
-
   // Orphan filter
+  let filteredNodes = allRawNodes;
   if (!settings.showOrphans) {
     filteredNodes = filteredNodes.filter((n) => n.linkCount > 0 || n.tags.includes("project"));
   }
 
-  const filteredNodeIds = new Set(filteredNodes.map((n) => n.id));
-  const filteredLinks = rawLinks.filter((l) => {
-    return (
-      filteredNodeIds.has(resolveLinkEndpointId(l.source)) &&
-      filteredNodeIds.has(resolveLinkEndpointId(l.target))
-    );
-  });
+  // Search highlights matching nodes (dims others) instead of removing them
+  const searchMatchIds = (() => {
+    if (!searchQuery) return null;
+    const q = searchQuery.toLowerCase();
+    const matches = new Set<string>();
+    for (const n of filteredNodes) {
+      if (n.title.toLowerCase().includes(q)) matches.add(n.id);
+    }
+    return matches.size > 0 ? matches : null;
+  })();
 
-  // Build force-graph elements from filtered data
+  // Build force-graph elements with all nodes (search just highlights)
   const allElements = useGraphElements({
     nodes: filteredNodes,
-    links: filteredLinks,
+    links: rawLinks,
     notebooks,
     clusteringMode: settings.clusteringMode,
     fabricData,
@@ -374,6 +373,7 @@ export function GraphView({
     renderMode: settings.renderMode,
     activeNoteId,
     highlightedClusterId,
+    searchMatchIds,
     revealedNodes: waveReveal.revealedNodes,
     cachedPositions,
     onNodeClick: (nodeId: string) => {

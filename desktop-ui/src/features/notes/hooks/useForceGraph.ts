@@ -40,6 +40,7 @@ interface UseForceGraphParams {
   renderMode: "2d" | "3d";
   activeNoteId: string | null;
   highlightedClusterId: string | null;
+  searchMatchIds: Set<string> | null;
   revealedNodes: Set<string>;
   cachedPositions?: PositionMap | null;
   onNodeClick: (nodeId: string) => void;
@@ -99,6 +100,7 @@ export function useForceGraph({
   renderMode,
   activeNoteId,
   highlightedClusterId,
+  searchMatchIds,
   revealedNodes,
   cachedPositions,
   onNodeClick,
@@ -313,7 +315,7 @@ export function useForceGraph({
     hoveredNodeId,
     neighborSet: neighborSetRef.current,
     highlightedClusterId,
-    highlightedNodeIds: highlightedNodeIds.size > 0 ? highlightedNodeIds : null,
+    highlightedNodeIds: searchMatchIds ?? (highlightedNodeIds.size > 0 ? highlightedNodeIds : null),
     linkWidth: settings.linkWidth,
     linkOpacity: settings.linkOpacity,
   };
