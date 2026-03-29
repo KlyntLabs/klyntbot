@@ -7,7 +7,7 @@ import ForceGraph2D from "react-force-graph-2d";
 import { useFabricGraph } from "../hooks/useFabricGraph";
 import type { DragCommunityChange, ViewportBounds } from "../hooks/useForceGraph";
 import { useForceGraph } from "../hooks/useForceGraph";
-import type { GraphNode, SmartView } from "../hooks/useGraphData";
+import type { GraphLink, GraphNode, SmartView } from "../hooks/useGraphData";
 import { useGraphData } from "../hooks/useGraphData";
 import type { FabricData, ForceNode } from "../hooks/useGraphElements";
 import { useGraphElements } from "../hooks/useGraphElements";
@@ -173,25 +173,29 @@ export function GraphView({
     hopRadius,
   );
 
-  // Inject project nodes from fabric base (projects are community members but not in the note list)
+  // Inject domain nodes from fabric base (projects, learning, productivity, okr, finance
+  // are community members / tree roots but not in the note list)
+  const DOMAIN_TAGS = ["project", "learning", "productivity", "okr", "finance"];
   const noteIds = new Set(rawNodes.map((n) => n.id));
-  const projectNodes: GraphNode[] = (fabric.base?.notes ?? [])
-    .filter((fn) => fn.tags.includes("project") && !noteIds.has(fn.id))
+  const domainNodes: GraphNode[] = (fabric.base?.notes ?? [])
+    .filter((fn) => fn.tags.some((t) => DOMAIN_TAGS.includes(t)) && !noteIds.has(fn.id))
     .map((fn) => ({
       id: fn.id,
       title: fn.title,
-      linkCount: 0,
-      primaryTag: "project",
+      linkCount: fn.treeSectionCount,
+      primaryTag: fn.tags.find((t) => DOMAIN_TAGS.includes(t)) ?? fn.tags[0] ?? "",
       notebookId: null,
-      bodyPreview: "",
-      tags: ["project"],
+      bodyPreview: fn.bodyPreview,
+      tags: fn.tags,
     }));
-  const allRawNodes = projectNodes.length > 0 ? [...rawNodes, ...projectNodes] : rawNodes;
+  const allRawNodes = domainNodes.length > 0 ? [...rawNodes, ...domainNodes] : rawNodes;
 
   // Orphan filter
   let filteredNodes = allRawNodes;
   if (!settings.showOrphans) {
-    filteredNodes = filteredNodes.filter((n) => n.linkCount > 0 || n.tags.includes("project"));
+    filteredNodes = filteredNodes.filter(
+      (n) => n.linkCount > 0 || n.tags.some((t) => DOMAIN_TAGS.includes(t)),
+    );
   }
 
   // Search highlights matching nodes (dims others) instead of removing them
@@ -205,10 +209,16 @@ export function GraphView({
     return matches.size > 0 ? matches : null;
   })();
 
+  // Inject fabric links (tree_parent links connecting domain sub-nodes to roots)
+  const fabricLinks: GraphLink[] = (fabric.base?.links ?? [])
+    .filter((fl) => fl.linkType === "tree_parent")
+    .map((fl) => ({ source: fl.sourceId, target: fl.targetId }));
+  const allLinks = fabricLinks.length > 0 ? [...rawLinks, ...fabricLinks] : rawLinks;
+
   // Build force-graph elements with all nodes (search just highlights)
   const allElements = useGraphElements({
     nodes: filteredNodes,
-    links: rawLinks,
+    links: allLinks,
     notebooks,
     clusteringMode: settings.clusteringMode,
     fabricData,

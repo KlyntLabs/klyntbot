@@ -35,7 +35,7 @@ impl AppCore {
             .await
             .map_err(map_storage_err)?;
 
-        let links: Vec<FabricLink> = link_rows
+        let mut links: Vec<FabricLink> = link_rows
             .into_iter()
             .map(|r| FabricLink {
                 source_id: r.source_id,
@@ -158,6 +158,66 @@ impl AppCore {
                     tree_section_count: 0,
                     entity_count: 0,
                 });
+            }
+        }
+
+        // Add domain tree nodes (finance, productivity, okr, learning) as graph entries.
+        // Include both root (level 0) and section (level 1) nodes so users see
+        // meaningful clusters like "concept", "fact", daily productivity entries, etc.
+        let existing_ids: HashSet<String> = fabric_notes.iter().map(|n| n.id.clone()).collect();
+        for source_type in &[
+            SourceType::Finance,
+            SourceType::Productivity,
+            SourceType::Okr,
+            SourceType::Learning,
+        ] {
+            let roots = tree_repo
+                .get_root_sections(source_type)
+                .await
+                .map_err(map_cognitive_err)?;
+            for root in &roots {
+                // Add root node
+                if !existing_ids.contains(&root.id) {
+                    let children = tree_repo
+                        .get_children(&root.id)
+                        .await
+                        .map_err(map_cognitive_err)?;
+                    fabric_notes.push(FabricNote {
+                        id: root.id.clone(),
+                        title: root.title.clone().unwrap_or_else(|| root.content.clone()),
+                        notebook_id: None,
+                        tags: vec![source_type.as_str().to_string()],
+                        body_preview: common::truncate_at_boundary(&root.content, 200).to_string(),
+                        tree_section_count: children.len() as u32,
+                        entity_count: 0,
+                    });
+                    // Add level-1 section children as separate graph nodes
+                    for child in children {
+                        if !existing_ids.contains(&child.id) {
+                            let grandchild_count = tree_repo
+                                .get_children(&child.id)
+                                .await
+                                .map_err(map_cognitive_err)?
+                                .len() as u32;
+                            fabric_notes.push(FabricNote {
+                                id: child.id.clone(),
+                                title: child.title.clone().unwrap_or_else(|| child.content.clone()),
+                                notebook_id: None,
+                                tags: vec![source_type.as_str().to_string()],
+                                body_preview: common::truncate_at_boundary(&child.content, 200)
+                                    .to_string(),
+                                tree_section_count: grandchild_count,
+                                entity_count: 0,
+                            });
+                            // Add link from child to root
+                            links.push(FabricLink {
+                                source_id: child.id.clone(),
+                                target_id: root.id.clone(),
+                                link_type: "tree_parent".to_string(),
+                            });
+                        }
+                    }
+                }
             }
         }
 

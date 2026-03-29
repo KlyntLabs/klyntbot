@@ -89,9 +89,22 @@ function resolveNodeType(tags: string[]): ForceNodeType {
   return "note";
 }
 
-function getNodeSize(linkCount: number): number {
+const DOMAIN_NODE_COLORS: Record<string, string> = {
+  finance: "#22c55e", // green
+  productivity: "#f59e0b", // amber
+  okr: "#ef4444", // red
+  learning: "#a78bfa", // violet
+  project: "#67e8f9", // cyan
+};
+
+function getNodeSize(linkCount: number, nodeType?: ForceNodeType): number {
   const normalized = Math.min(linkCount, 20) / 20;
-  return 18 + normalized * 28;
+  const base = 18 + normalized * 28;
+  // Domain nodes get a minimum size so shapes are visible
+  if (nodeType && nodeType !== "note" && nodeType !== "entity" && nodeType !== "tree_section" && nodeType !== "tree_text") {
+    return Math.max(base, 28);
+  }
+  return base;
 }
 
 export interface FabricData {
@@ -218,8 +231,10 @@ export function useGraphElements({
       const cluster = clusterMap.get(clusterId);
       if (cluster) cluster.count++;
 
-      const color = cluster?.color || "#6B7280";
-      const size = getNodeSize(node.linkCount);
+      const nodeType = resolveNodeType(node.tags);
+      // Domain nodes get their own distinct color; regular nodes use cluster color
+      const color = DOMAIN_NODE_COLORS[nodeType] || cluster?.color || "#6B7280";
+      const size = getNodeSize(node.linkCount, nodeType);
 
       const isExpanded = fabricData?.expandedTrees.has(node.id) ?? false;
 
@@ -233,7 +248,7 @@ export function useGraphElements({
         bodyPreview: node.bodyPreview,
         notebookId: node.notebookId,
         clusterId,
-        nodeType: resolveNodeType(node.tags),
+        nodeType,
         expandable: fabricData?.layerTree ?? false,
         expanded: isExpanded,
       });

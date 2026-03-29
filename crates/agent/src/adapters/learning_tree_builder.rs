@@ -62,8 +62,8 @@ impl LearningTreeBuilder {
     /// each one. Insert errors for already-indexed atoms are silently ignored by
     /// the underlying `persist_nodes` logic, so this is safe to run on startup.
     pub async fn backfill_from_atoms(&self, pool: &sqlx::SqlitePool) -> common::Result<usize> {
-        let atoms: Vec<(String, String)> =
-            sqlx::query_as("SELECT id, atom_type FROM knowledge_atoms WHERE status = 'active'")
+        let atoms: Vec<(String, String, String)> =
+            sqlx::query_as("SELECT id, atom_type, subject FROM knowledge_atoms WHERE status = 'active'")
                 .fetch_all(pool)
                 .await
                 .map_err(|e| {
@@ -71,8 +71,8 @@ impl LearningTreeBuilder {
                 })?;
 
         let mut count = 0;
-        for (atom_id, atom_type) in &atoms {
-            if self.handle_atom_accepted(atom_id, atom_type).await.is_ok() {
+        for (atom_id, atom_type, subject) in &atoms {
+            if self.handle_atom_accepted(atom_id, atom_type, Some(subject.as_str())).await.is_ok() {
                 count += 1;
             }
         }
@@ -97,7 +97,7 @@ impl LearningTreeBuilder {
                 result = rx.recv() => {
                     match result {
                         Ok(DomainEvent::KnowledgeAtomAccepted { atom_id, atom_type }) => {
-                            if let Err(e) = self.handle_atom_accepted(&atom_id, &atom_type).await {
+                            if let Err(e) = self.handle_atom_accepted(&atom_id, &atom_type, None).await {
                                 warn!(
                                     atom_id = %atom_id,
                                     "LearningTreeBuilder: failed to process atom accepted: {e}"
@@ -143,6 +143,7 @@ impl LearningTreeBuilder {
         &self,
         atom_id: &str,
         atom_type: &str,
+        subject: Option<&str>,
     ) -> common::Result<()> {
         let type_node_id = format!("learning-type-{}", slugify(atom_type));
         let atom_node_id = format!("learning-atom-{atom_id}");
@@ -154,7 +155,7 @@ impl LearningTreeBuilder {
             "LearningTreeBuilder: processing atom accepted"
         );
 
-        let nodes = build_atom_accepted_nodes(atom_id, atom_type, &type_node_id, &atom_node_id);
+        let nodes = build_atom_accepted_nodes(atom_id, atom_type, subject, &type_node_id, &atom_node_id);
 
         self.persist_nodes(&nodes, atom_id).await
     }
@@ -302,10 +303,14 @@ impl LearningTreeBuilder {
 pub fn build_atom_accepted_nodes(
     atom_id: &str,
     atom_type: &str,
+    subject: Option<&str>,
     type_node_id: &str,
     atom_node_id: &str,
 ) -> Vec<TreeNode> {
-    let atom_content = format!("Accepted: {atom_type} atom {atom_id}");
+    let atom_content = match subject {
+        Some(s) if !s.is_empty() => format!("{atom_type}: {s}"),
+        _ => format!("Accepted: {atom_type} atom {atom_id}"),
+    };
 
     vec![
         // Level 0 — global learning root
@@ -474,6 +479,7 @@ mod tests {
         let nodes = build_atom_accepted_nodes(
             "atom-abc-123",
             "concept",
+            Some("Gut-brain axis mechanisms"),
             "learning-type-concept",
             "learning-atom-atom-abc-123",
         );
@@ -509,10 +515,11 @@ mod tests {
     }
 
     #[test]
-    fn atom_content_includes_type_and_id() {
+    fn atom_content_includes_subject() {
         let nodes = build_atom_accepted_nodes(
             "atom-xyz",
             "fact",
+            Some("Caffeine reduces deep sleep"),
             "learning-type-fact",
             "learning-atom-atom-xyz",
         );
@@ -523,8 +530,8 @@ mod tests {
             leaf.content
         );
         assert!(
-            leaf.content.contains("atom-xyz"),
-            "Expected atom_id in content: {}",
+            leaf.content.contains("Caffeine reduces deep sleep"),
+            "Expected subject in content: {}",
             leaf.content
         );
     }
@@ -534,6 +541,7 @@ mod tests {
         let nodes = build_atom_accepted_nodes(
             "atom-1",
             "principle",
+            None,
             "learning-type-principle",
             "learning-atom-atom-1",
         );
