@@ -41,6 +41,10 @@ pub enum SourceType {
     Note,
     Task,
     Skill,
+    Finance,
+    Productivity,
+    Okr,
+    Learning,
 }
 
 impl SourceType {
@@ -49,6 +53,10 @@ impl SourceType {
             Self::Note => "note",
             Self::Task => "task",
             Self::Skill => "skill",
+            Self::Finance => "finance",
+            Self::Productivity => "productivity",
+            Self::Okr => "okr",
+            Self::Learning => "learning",
         }
     }
 
@@ -57,7 +65,38 @@ impl SourceType {
             "note" => Self::Note,
             "task" => Self::Task,
             "skill" => Self::Skill,
+            "finance" => Self::Finance,
+            "productivity" => Self::Productivity,
+            "okr" => Self::Okr,
+            "learning" => Self::Learning,
             _ => Self::Note,
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn source_type_roundtrip_all_variants() {
+        let variants = [
+            SourceType::Note,
+            SourceType::Task,
+            SourceType::Skill,
+            SourceType::Finance,
+            SourceType::Productivity,
+            SourceType::Okr,
+            SourceType::Learning,
+        ];
+        for variant in &variants {
+            let s = variant.as_str();
+            let parsed = SourceType::parse(s);
+            assert_eq!(
+                parsed.as_str(),
+                s,
+                "Roundtrip failed for variant: {s}"
+            );
         }
     }
 }
