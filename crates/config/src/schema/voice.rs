@@ -15,6 +15,8 @@ pub struct VoiceConfig {
     pub output: VoiceOutputConfig,
     #[serde(default)]
     pub learning: VoiceLearningConfig,
+    #[serde(default)]
+    pub conversation: VoiceConversationConfig,
 }
 
 impl Default for VoiceConfig {
@@ -24,6 +26,7 @@ impl Default for VoiceConfig {
             input: VoiceInputConfig::default(),
             output: VoiceOutputConfig::default(),
             learning: VoiceLearningConfig::default(),
+            conversation: VoiceConversationConfig::default(),
         }
     }
 }
@@ -100,6 +103,38 @@ impl Default for VoiceLearningConfig {
     }
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct VoiceConversationConfig {
+    /// Minutes before a previous voice session is considered "cold" (default: 15)
+    #[serde(default = "default_warm_session_minutes")]
+    pub warm_session_minutes: u32,
+    /// Minutes before a main chat session is considered "cold" (default: 5)
+    #[serde(default = "default_warm_chat_minutes")]
+    pub warm_chat_minutes: u32,
+    /// Seconds of silence to end a turn (default: 1.5)
+    #[serde(default = "default_silence_threshold")]
+    pub silence_threshold_secs: f32,
+    /// Auto-resume listening after agent response (default: true)
+    #[serde(default = "default_true")]
+    pub auto_resume: bool,
+    /// Variable pause after response based on length (default: true)
+    #[serde(default = "default_true")]
+    pub adaptive_breath: bool,
+}
+
+impl Default for VoiceConversationConfig {
+    fn default() -> Self {
+        Self {
+            warm_session_minutes: 15,
+            warm_chat_minutes: 5,
+            silence_threshold_secs: 1.5,
+            auto_resume: true,
+            adaptive_breath: true,
+        }
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum VoicePrivacyMode {
@@ -107,6 +142,14 @@ pub enum VoicePrivacyMode {
     Standard,
     Strict,
     Off,
+}
+
+fn default_warm_session_minutes() -> u32 {
+    15
+}
+
+fn default_warm_chat_minutes() -> u32 {
+    5
 }
 
 fn default_voice_hotkey() -> String {
