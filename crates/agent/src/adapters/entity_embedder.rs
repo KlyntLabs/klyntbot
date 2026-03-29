@@ -43,14 +43,13 @@ impl EntityEmbedder {
         Ok(())
     }
 
-    /// Backfill embeddings for all entities that have a non-empty description.
+    /// Backfill embeddings for all entities.
     ///
+    /// Entities are embedded by name (+ description if available).
     /// Returns the number of entities successfully embedded.
     pub async fn backfill_all(&self, pool: &sqlx::SqlitePool) -> common::Result<usize> {
         let entities: Vec<(String, String, Option<String>, String)> = sqlx::query_as(
-            "SELECT id, name, description, entity_type \
-             FROM entities \
-             WHERE description IS NOT NULL AND description != ''",
+            "SELECT id, name, description, entity_type FROM entities",
         )
         .fetch_all(pool)
         .await
