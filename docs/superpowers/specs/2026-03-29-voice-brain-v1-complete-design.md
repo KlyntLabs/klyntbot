@@ -232,7 +232,7 @@ User presses ⌘⇧V or taps tray mic for the first time
 
 After the first `Finalized` event (triggered via config flag, never shown again):
 
-> "Welcome to your second brain. I'm listening. Everything you say here becomes memory, learning, and reflection — just like your thoughts."
+> "Welcome to your second brain. I'm listening. Everything you say here becomes memory, learning, and reflection — just like your thoughts. Press ⌘⇧V anytime."
 
 Delivered via the existing `MemoryEcho` event path. Zero new infrastructure.
 
