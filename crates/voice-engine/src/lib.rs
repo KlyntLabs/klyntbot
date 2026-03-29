@@ -17,7 +17,7 @@ pub mod stt;
 pub mod tts;
 pub mod types;
 
-pub use capture::{AudioCapture, CaptureConfig, CaptureSession};
+pub use capture::{AudioCapture, CaptureConfig, CaptureSession, MonitorSession};
 pub use engines::{AvSpeechTtsEngine, GroqWhisperEngine, WhisperLocalEngine};
 pub use events::{VoiceEvent, VOICE_EVENT};
 pub use model_manager::{ModelManager, ModelState, WhisperModelSize};

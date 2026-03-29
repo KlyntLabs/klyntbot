@@ -234,6 +234,96 @@ impl CaptureSession {
     }
 }
 
+/// Lightweight audio session — only RMS levels, no audio buffering.
+/// Used during Speaking phase to detect user speech for interrupt.
+pub struct MonitorSession {
+    /// cpal stream handle -- dropping this stops the audio stream.
+    _stream: cpal::Stream,
+    /// Signal to stop the monitor.
+    pub stop_signal: Arc<AtomicBool>,
+    /// Receiver for RMS levels (~30fps for interrupt detection).
+    pub rms_rx: mpsc::Receiver<f32>,
+}
+
+impl AudioCapture {
+    /// Start a lightweight RMS-only monitor (no audio buffering, no silence detection).
+    /// Used during Speaking phase to detect if the user starts talking.
+    pub fn start_monitor(&self) -> common::Result<MonitorSession> {
+        let host = cpal::default_host();
+        let device = host.default_input_device().ok_or_else(|| {
+            common::KlyntbotError::Channel(common::ChannelError::ConnectionFailed(
+                "No audio input device found".to_string(),
+            ))
+        })?;
+
+        let device_name = device.name().unwrap_or_else(|_| "unknown".to_string());
+        info!("Opening audio monitor: {}", device_name);
+
+        let default_config = device.default_input_config().map_err(|e| {
+            common::KlyntbotError::Channel(common::ChannelError::ConnectionFailed(format!(
+                "Failed to get default input config: {}",
+                e
+            )))
+        })?;
+
+        let native_sample_rate = default_config.sample_rate().0;
+        let native_channels = default_config.channels();
+
+        let stream_config = cpal::StreamConfig {
+            channels: native_channels,
+            sample_rate: default_config.sample_rate(),
+            buffer_size: cpal::BufferSize::Default,
+        };
+
+        let (rms_tx, rms_rx) = mpsc::channel::<f32>(32);
+
+        let stop_signal = Arc::new(AtomicBool::new(false));
+        let stop_signal_cb = stop_signal.clone();
+
+        let mut rms_counter: u32 = 0;
+
+        let stream = device
+            .build_input_stream(
+                &stream_config,
+                move |data: &[f32], _info: &cpal::InputCallbackInfo| {
+                    if stop_signal_cb.load(Ordering::Relaxed) {
+                        return;
+                    }
+
+                    let rms = compute_rms(data);
+
+                    // RMS emission throttled to ~30fps (based on native sample rate)
+                    rms_counter += data.len() as u32;
+                    if rms_counter >= native_sample_rate / 30 {
+                        let _ = rms_tx.try_send(rms);
+                        rms_counter = 0;
+                    }
+                },
+                move |err| {
+                    error!("Audio monitor error: {}", err);
+                },
+                None,
+            )
+            .map_err(|e| {
+                common::KlyntbotError::Channel(common::ChannelError::ConnectionFailed(format!(
+                    "Failed to build audio monitor stream: {}",
+                    e
+                )))
+            })?;
+
+        stream.play().map_err(|e| {
+            common::KlyntbotError::Channel(common::ChannelError::ConnectionFailed(format!(
+                "Failed to start audio monitor stream: {}",
+                e
+            )))
+        })?;
+
+        debug!("Audio monitor started: {}Hz, {} ch", native_sample_rate, native_channels);
+
+        Ok(MonitorSession { _stream: stream, stop_signal, rms_rx })
+    }
+}
+
 /// Compute RMS (root mean square) of an audio buffer.
 pub fn compute_rms(samples: &[f32]) -> f32 {
     if samples.is_empty() {
