@@ -333,8 +333,15 @@ fn run_desktop_app() {
                                     tauri::async_runtime::spawn(async move {
                                         use tauri::{Emitter, Manager};
 
-                                        // Show the launcher window
                                         if let Some(launcher) = handle.get_webview_window("launcher") {
+                                            let is_visible = launcher.is_visible().unwrap_or(false);
+                                            if is_visible {
+                                                // If launcher is visible, hide it and reset
+                                                let _ = launcher.hide();
+                                                let _ = handle.emit("voice-recording-reset", ());
+                                                return;
+                                            }
+                                            // Show the launcher window
                                             let _ = launcher.show();
                                             let _ = launcher.set_focus();
                                         }

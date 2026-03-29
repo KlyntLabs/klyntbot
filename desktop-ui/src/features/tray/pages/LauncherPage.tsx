@@ -94,14 +94,22 @@ export function Launcher() {
 
   useEffect(() => {
     if (!isTauri) return;
-    let unlisten: (() => void) | undefined;
+    const unlisteners: (() => void)[] = [];
+
     listen("voice-recording-start", () => {
+      // Reset any previous state before starting fresh recording
+      reset();
       setMode("recording");
-    }).then((fn) => {
-      unlisten = fn;
-    });
-    return () => unlisten?.();
-  }, [setMode]);
+    }).then((fn) => unlisteners.push(fn));
+
+    listen("voice-recording-reset", () => {
+      reset();
+    }).then((fn) => unlisteners.push(fn));
+
+    return () => {
+      for (const fn of unlisteners) fn();
+    };
+  }, [setMode, reset]);
 
   useKeyboardNavigation({
     onEnterChat: enterChat,
