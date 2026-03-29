@@ -14,6 +14,7 @@ pub mod conversation_recall;
 pub mod cron;
 pub mod entity_tree_linker;
 pub mod finance;
+pub mod finance_tree_builder;
 pub mod learning;
 pub mod llm_summary;
 pub mod mirror_handlers;
