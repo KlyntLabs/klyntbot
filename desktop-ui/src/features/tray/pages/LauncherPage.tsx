@@ -103,6 +103,8 @@ export function Launcher() {
     }).then((fn) => unlisteners.push(fn));
 
     listen("voice-recording-reset", () => {
+      // Cancel any active capture before resetting
+      ipc("voice_dismiss", {}).catch(() => {});
       reset();
     }).then((fn) => unlisteners.push(fn));
 
@@ -140,7 +142,14 @@ export function Launcher() {
       >
         {/* Draggable handle — lets user reposition the launcher window */}
         <div
-          data-tauri-drag-region
+          onMouseDown={async () => {
+            if (!isTauri) return;
+            try {
+              await getCurrentWindow().startDragging();
+            } catch {
+              // Drag not supported or window not ready
+            }
+          }}
           className="h-3 w-full cursor-grab active:cursor-grabbing flex items-center justify-center"
         >
           <div className="w-8 h-[3px] rounded-full bg-border-subtle/40" />

@@ -414,9 +414,17 @@ fn run_desktop_app() {
                 dismiss_on_blur(&tray_window);
             }
 
-            // Launcher window — no native blur, just transparent + dismiss-on-blur
+            // Launcher window — dismiss-on-blur + reset state so next open is fresh
             if let Some(launcher_window) = app.get_webview_window(WINDOW_LAUNCHER) {
-                dismiss_on_blur(&launcher_window);
+                let w = launcher_window.clone();
+                launcher_window.on_window_event(move |event| {
+                    if let tauri::WindowEvent::Focused(false) = event {
+                        let _ = w.hide();
+                        // Reset launcher state so next open (via hotkey) starts fresh
+                        use tauri::Emitter;
+                        let _ = w.emit("voice-recording-reset", ());
+                    }
+                });
             }
 
             // Quick capture window — dismiss-on-blur
