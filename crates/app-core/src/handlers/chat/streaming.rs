@@ -769,6 +769,7 @@ pub async fn chat_send(
     content: String,
     session_key: String,
     context: Option<SessionContextInput>,
+    is_voice: bool,
 ) -> Result<(ChatMessageResponse, ChatStreamInfo), ApiError> {
     // 1. Ensure session exists (title derived from first message, truncated to 60 chars)
     let title: String = content
@@ -777,7 +778,11 @@ pub async fn chat_send(
         .collect::<String>()
         .trim()
         .to_string();
-    let metadata = serde_json::json!({ "title": title });
+    let metadata = if is_voice {
+        serde_json::json!({ "title": title, "is_voice_session": true })
+    } else {
+        serde_json::json!({ "title": title })
+    };
     let squad_id_ref = context.as_ref().and_then(|c| c.squad_id.as_deref());
     repos
         .sessions
@@ -1595,6 +1600,36 @@ impl AppCore {
             content.clone(),
             session_key.clone(),
             context,
+            false,
+        )
+        .await?;
+
+        // Publish chat turn to cognitive consolidation pipeline
+        if let Some(bus) = &self.domain_event_bus {
+            bus.publish(bus::DomainEvent::ChatTurnCompleted {
+                user_message: content,
+                session_key,
+            });
+        }
+
+        Ok(result)
+    }
+
+    /// Voice-specific chat_send: no session context, `is_voice` flag set to true
+    /// so the session metadata includes `"is_voice_session": true`.
+    pub async fn chat_send_voice(
+        &self,
+        content: String,
+        session_key: String,
+    ) -> Result<(ChatMessageResponse, ChatStreamInfo), ApiError> {
+        let result = chat_send(
+            &self.repos,
+            &self.agent,
+            &self.active_streams,
+            content.clone(),
+            session_key.clone(),
+            None,
+            true,
         )
         .await?;
 
