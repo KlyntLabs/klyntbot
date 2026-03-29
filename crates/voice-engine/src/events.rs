@@ -47,6 +47,26 @@ pub enum VoiceEvent {
         message: String,
         recoverable: bool,
     },
+    /// Manager phase changed (for orb UI state)
+    PhaseChanged {
+        phase: String, // "idle", "listening", "reflecting", "speaking"
+        session_title: Option<String>,
+        turn_count: u32,
+    },
+    /// Agent is processing — brain is reflecting
+    Reflecting,
+    /// TTS should fade out over 300ms (soft interrupt)
+    TtsFadeOut,
+    /// User can tap "Continue" to resume interrupted TTS
+    ContinueAvailable {
+        /// How many seconds before the button auto-hides
+        timeout_secs: u8,
+    },
+    /// Voice setup required before conversation can start
+    SetupRequired {
+        needs_model: bool,
+        needs_mic_permission: bool,
+    },
 }
 
 pub const VOICE_EVENT: &str = "voice:event";
