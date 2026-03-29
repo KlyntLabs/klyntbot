@@ -341,7 +341,8 @@ fn run_desktop_app() {
                                                 let _ = handle.emit("voice-recording-reset", ());
                                                 return;
                                             }
-                                            // Show the launcher window
+                                            // Center and show the launcher window
+                                            let _ = launcher.center();
                                             let _ = launcher.show();
                                             let _ = launcher.set_focus();
                                         }

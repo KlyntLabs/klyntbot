@@ -138,6 +138,13 @@ export function Launcher() {
         className="w-full glass-floating overflow-hidden"
         style={{ animation: "glass-appear 0.25s ease-out" }}
       >
+        {/* Draggable handle — lets user reposition the launcher window */}
+        <div
+          data-tauri-drag-region
+          className="h-3 w-full cursor-grab active:cursor-grabbing flex items-center justify-center"
+        >
+          <div className="w-8 h-[3px] rounded-full bg-border-subtle/40" />
+        </div>
         {mode === "recording" ? (
           <VoiceRecorder onTranscriptReady={handleTranscriptReady} onCancel={cancelRecording} />
         ) : mode === "chat" && chatSessionKey ? (
