@@ -1,4 +1,4 @@
-export type LauncherMode = "dashboard" | "search" | "detail" | "chat";
+export type LauncherMode = "dashboard" | "search" | "detail" | "chat" | "recording";
 
 export interface LauncherItem {
   id: string;
