@@ -738,11 +738,6 @@ impl AgentLoopBuilder {
                 context_engine::InsightForge::new(forge_config, decomposer, Arc::clone(&retriever));
 
             // Register domain searchers
-            let note_repo_for_searcher =
-                feature_notes::repo::NoteRepo::new(storage_pool.inner().clone());
-            forge.add_searcher(Arc::new(crate::domain_searchers::NoteSearcher::new(
-                note_repo_for_searcher,
-            )));
             forge.add_searcher(Arc::new(crate::domain_searchers::TaskSearcher::new(
                 repos.clone(),
             )));
@@ -866,6 +861,86 @@ impl AgentLoopBuilder {
                             }
                         });
                         info!("CommunityBuilder subscriber started");
+
+                        // FinanceTreeBuilder subscriber (event-driven finance tree + LanceDB embed)
+                        let finance_tree_builder =
+                            Arc::new(crate::adapters::finance_tree_builder::FinanceTreeBuilder::new(
+                                tree_repo.clone(),
+                                Arc::new(vs.clone()),
+                                text_embedder.clone(),
+                                self.context_update_queue.clone(),
+                                self.domain_event_bus.clone(),
+                            ));
+                        let finance_tree_rx = domain_bus.subscribe();
+                        let finance_tree_shutdown = CancellationToken::new();
+                        let _finance_tree_handle = tokio::spawn({
+                            let builder = Arc::clone(&finance_tree_builder);
+                            let shutdown = finance_tree_shutdown.clone();
+                            async move {
+                                builder.run(finance_tree_rx, shutdown).await;
+                            }
+                        });
+                        info!("FinanceTreeBuilder subscriber started");
+
+                        // ProductivityTreeBuilder subscriber (event-driven productivity tree + LanceDB embed)
+                        let productivity_tree_builder =
+                            Arc::new(crate::adapters::productivity_tree_builder::ProductivityTreeBuilder::new(
+                                tree_repo.clone(),
+                                Arc::new(vs.clone()),
+                                text_embedder.clone(),
+                                self.context_update_queue.clone(),
+                                self.domain_event_bus.clone(),
+                            ));
+                        let productivity_tree_rx = domain_bus.subscribe();
+                        let productivity_tree_shutdown = CancellationToken::new();
+                        let _productivity_tree_handle = tokio::spawn({
+                            let builder = Arc::clone(&productivity_tree_builder);
+                            let shutdown = productivity_tree_shutdown.clone();
+                            async move {
+                                builder.run(productivity_tree_rx, shutdown).await;
+                            }
+                        });
+                        info!("ProductivityTreeBuilder subscriber started");
+
+                        // OkrTreeBuilder subscriber (event-driven OKR tree + LanceDB embed)
+                        let okr_tree_builder =
+                            Arc::new(crate::adapters::okr_tree_builder::OkrTreeBuilder::new(
+                                tree_repo.clone(),
+                                Arc::new(vs.clone()),
+                                text_embedder.clone(),
+                                self.context_update_queue.clone(),
+                                self.domain_event_bus.clone(),
+                            ));
+                        let okr_tree_rx = domain_bus.subscribe();
+                        let okr_tree_shutdown = CancellationToken::new();
+                        let _okr_tree_handle = tokio::spawn({
+                            let builder = Arc::clone(&okr_tree_builder);
+                            let shutdown = okr_tree_shutdown.clone();
+                            async move {
+                                builder.run(okr_tree_rx, shutdown).await;
+                            }
+                        });
+                        info!("OkrTreeBuilder subscriber started");
+
+                        // LearningTreeBuilder subscriber (event-driven learning tree + LanceDB embed)
+                        let learning_tree_builder =
+                            Arc::new(crate::adapters::learning_tree_builder::LearningTreeBuilder::new(
+                                tree_repo.clone(),
+                                Arc::new(vs.clone()),
+                                text_embedder.clone(),
+                                self.context_update_queue.clone(),
+                                self.domain_event_bus.clone(),
+                            ));
+                        let learning_tree_rx = domain_bus.subscribe();
+                        let learning_tree_shutdown = CancellationToken::new();
+                        let _learning_tree_handle = tokio::spawn({
+                            let builder = Arc::clone(&learning_tree_builder);
+                            let shutdown = learning_tree_shutdown.clone();
+                            async move {
+                                builder.run(learning_tree_rx, shutdown).await;
+                            }
+                        });
+                        info!("LearningTreeBuilder subscriber started");
 
                         // Background tree node backfill for existing notes + tasks
                         {
