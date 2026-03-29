@@ -148,6 +148,11 @@ const QuickCapturePage = lazy(() =>
   import("../features/notes").then((m) => ({ default: m.QuickCapturePage })),
 );
 
+// ── Voice Feature ───────────────────────────────────────────────
+const VoiceOrbPage = lazy(() =>
+  import("@features/voice/pages/VoiceOrbPage").then((m) => ({ default: m.VoiceOrbPage })),
+);
+
 // ── Distraction Feature ──────────────────────────────────────────
 const DistractionOverlay = lazy(() =>
   import("../features/distraction").then((m) => ({ default: m.DistractionOverlay })),
@@ -360,6 +365,7 @@ export const router = createHashRouter([
   { path: "/launcher", element: <LauncherPage /> },
   { path: "/tray", element: <SystemTrayPage /> },
   { path: "/quick-capture", element: <QuickCapturePage /> },
+  { path: "/voice-orb", element: <VoiceOrbPage /> },
   { path: "/distraction-overlay", element: <DistractionOverlay /> },
   { path: "*", element: <SetupRedirect /> },
 ]);

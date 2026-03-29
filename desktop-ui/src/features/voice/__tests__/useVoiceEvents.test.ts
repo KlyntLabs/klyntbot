@@ -8,15 +8,36 @@ interface RoutingChip {
   label: string;
 }
 
+interface VoiceState {
+  sessionState: VoiceSessionState;
+  chips: RoutingChip[];
+  transcript: string;
+  segments: Array<{ text: string; confidence: number }>;
+  ttsAudio: { base64: string; sampleRate: number; text: string } | null;
+  memoryEcho: string | null;
+}
+
 function reduceVoiceEvent(
-  state: { sessionState: VoiceSessionState; chips: RoutingChip[]; transcript: string },
+  state: VoiceState,
   event: { type: string; [key: string]: unknown },
-) {
+): VoiceState {
   switch (event.type) {
     case "captureStarted":
-      return { ...state, sessionState: "capturing" as const, transcript: "", chips: [] };
+      return {
+        ...state,
+        sessionState: "capturing" as const,
+        transcript: "",
+        chips: [],
+        segments: [],
+        ttsAudio: null,
+        memoryEcho: null,
+      };
     case "partialTranscript":
-      return { ...state, transcript: event.text as string };
+      return {
+        ...state,
+        transcript: event.text as string,
+        segments: (event.segments as Array<{ text: string; confidence: number }>) ?? [],
+      };
     case "routingSuggestion": {
       const chip = {
         skill: event.skill as string,
@@ -30,13 +51,32 @@ function reduceVoiceEvent(
       return { ...state, sessionState: "processing" as const };
     case "finalized":
       return { ...state, sessionState: "response" as const, transcript: event.text as string };
+    case "speakResponse":
+      return {
+        ...state,
+        sessionState: "response" as const,
+        ttsAudio: {
+          base64: event.audioBase64 as string,
+          sampleRate: event.sampleRate as number,
+          text: event.text as string,
+        },
+      };
+    case "memoryEcho":
+      return { ...state, memoryEcho: event.text as string };
     default:
       return state;
   }
 }
 
 describe("Voice event reducer", () => {
-  const initial = { sessionState: "idle" as const, chips: [], transcript: "" };
+  const initial: VoiceState = {
+    sessionState: "idle" as const,
+    chips: [],
+    transcript: "",
+    segments: [],
+    ttsAudio: null,
+    memoryEcho: null,
+  };
 
   it("transitions idle -> capturing on captureStarted", () => {
     const result = reduceVoiceEvent(initial, {
@@ -100,7 +140,8 @@ describe("Voice event reducer", () => {
   });
 
   it("resets chips on new capture", () => {
-    const withChips = {
+    const withChips: VoiceState = {
+      ...initial,
       sessionState: "response" as const,
       chips: [{ skill: "tasks", confidence: 0.8, label: "Task" }],
       transcript: "old text",
@@ -112,6 +153,54 @@ describe("Voice event reducer", () => {
     });
     expect(result.chips).toHaveLength(0);
     expect(result.transcript).toBe("");
+  });
+
+  it("stores segments from partialTranscript", () => {
+    const capturing: VoiceState = { ...initial, sessionState: "capturing" as const };
+    const result = reduceVoiceEvent(capturing, {
+      type: "partialTranscript",
+      text: "bonjour monde",
+      segments: [
+        { text: "bonjour", confidence: 0.92 },
+        { text: "monde", confidence: 0.71 },
+      ],
+    });
+    expect(result.segments).toHaveLength(2);
+    expect(result.segments[0].confidence).toBe(0.92);
+    expect(result.segments[1].confidence).toBe(0.71);
+  });
+
+  it("stores ttsAudio from speakResponse", () => {
+    const capturing: VoiceState = reduceVoiceEvent(initial, {
+      type: "captureStarted",
+      sessionId: "s1",
+      engine: "local",
+    });
+    const result = reduceVoiceEvent(capturing, {
+      type: "speakResponse",
+      audioBase64: "AAAA",
+      sampleRate: 24000,
+      text: "Hello there",
+    });
+    expect(result.sessionState).toBe("response");
+    expect(result.ttsAudio).toEqual({
+      base64: "AAAA",
+      sampleRate: 24000,
+      text: "Hello there",
+    });
+  });
+
+  it("memory echo stored on memoryEcho event", () => {
+    const capturing: VoiceState = reduceVoiceEvent(initial, {
+      type: "captureStarted",
+      sessionId: "s1",
+      engine: "local",
+    });
+    const result = reduceVoiceEvent(capturing, {
+      type: "memoryEcho",
+      text: "You mentioned learning French last week",
+    });
+    expect(result.memoryEcho).toBe("You mentioned learning French last week");
   });
 });
 
@@ -129,16 +218,26 @@ describe("Pronunciation confidence thresholds", () => {
 });
 
 describe("Launcher recording mode flow", () => {
+  const idle: VoiceState = {
+    sessionState: "idle",
+    chips: [],
+    transcript: "",
+    segments: [],
+    ttsAudio: null,
+    memoryEcho: null,
+  };
+
   it("transitions from idle to capturing on captureStarted", () => {
-    const state = reduceVoiceEvent(
-      { sessionState: "idle" as const, chips: [], transcript: "" },
-      { type: "captureStarted", sessionId: "s1", engine: "local" },
-    );
+    const state = reduceVoiceEvent(idle, {
+      type: "captureStarted",
+      sessionId: "s1",
+      engine: "local",
+    });
     expect(state.sessionState).toBe("capturing");
   });
 
   it("transcript available on finalized for chat handoff", () => {
-    const processing = { sessionState: "processing" as const, chips: [], transcript: "" };
+    const processing: VoiceState = { ...idle, sessionState: "processing" as const };
     const state = reduceVoiceEvent(processing, {
       type: "finalized",
       text: "schedule dentist tomorrow",

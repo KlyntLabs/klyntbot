@@ -1,3 +1,5 @@
+import { playTtsAudio } from "@shared/lib/audio";
+import { useEffect } from "react";
 import { useVoiceEvents } from "../hooks/useVoiceEvents";
 
 function Waveform({ level }: { level: number }) {
@@ -15,6 +17,26 @@ function Waveform({ level }: { level: number }) {
         );
       })}
     </div>
+  );
+}
+
+function WordHighlights({ segments }: { segments: Array<{ text: string; confidence: number }> }) {
+  return (
+    <span>
+      {segments.map((seg, i) => {
+        const cls =
+          seg.confidence >= 0.85
+            ? "text-success"
+            : seg.confidence >= 0.6
+              ? "text-warning"
+              : "text-destructive";
+        return (
+          <span key={i} className={cls}>
+            {seg.text}{" "}
+          </span>
+        );
+      })}
+    </span>
   );
 }
 
@@ -39,8 +61,16 @@ export function VoiceBrainOrb() {
     audioLevel,
     engineKind,
     responseText,
+    segments,
+    ttsAudio,
     dismiss,
   } = useVoiceEvents();
+
+  useEffect(() => {
+    if (ttsAudio) {
+      playTtsAudio(ttsAudio.base64, ttsAudio.sampleRate);
+    }
+  }, [ttsAudio]);
 
   if (sessionState === "idle") return null;
 
@@ -78,6 +108,8 @@ export function VoiceBrainOrb() {
       <div className="text-sm font-mono min-h-[40px] mb-2">
         {sessionState === "response" ? (
           <span className="text-foreground">{responseText}</span>
+        ) : segments.length > 0 ? (
+          <WordHighlights segments={segments} />
         ) : (
           <span className="text-foreground">{transcript || "Listening..."}</span>
         )}
@@ -90,8 +122,29 @@ export function VoiceBrainOrb() {
         </div>
       )}
 
-      {/* Memory echo */}
-      {memoryEcho && <div className="text-xs text-muted opacity-60 italic mb-2">{memoryEcho}</div>}
+      {/* TTS replay */}
+      {sessionState === "response" && ttsAudio && (
+        <div className="mb-2">
+          <button
+            type="button"
+            onClick={() => playTtsAudio(ttsAudio.base64, ttsAudio.sampleRate)}
+            className="text-xs text-muted hover:text-primary transition-colors"
+            aria-label="Replay spoken response"
+          >
+            ↻ Replay
+          </button>
+        </div>
+      )}
+
+      {/* Memory echo with Mirror badge */}
+      {memoryEcho && (
+        <div className="animate-in fade-in duration-300 flex items-center gap-1.5 text-xs text-muted mb-2">
+          <span className="rounded bg-surface-overlay px-1 py-0.5 text-[10px] font-medium text-muted/70">
+            Mirror
+          </span>
+          <span className="italic">{memoryEcho}</span>
+        </div>
+      )}
 
       {/* Hint bar */}
       <div className="text-[10px] text-muted opacity-40 text-center">

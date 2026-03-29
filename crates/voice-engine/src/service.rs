@@ -109,6 +109,9 @@ pub struct VoiceService {
     /// Receiver side — consumed by the Tauri adapter to relay events.
     /// Uses std::sync::Mutex (not tokio) because it's taken once at init from a sync context.
     event_rx: Arc<std::sync::Mutex<Option<mpsc::Receiver<VoiceEvent>>>>,
+
+    /// Track first-ever capture for one-time welcome echo.
+    first_capture_complete: AtomicBool,
 }
 
 impl VoiceService {
@@ -138,6 +141,7 @@ impl VoiceService {
             active_session: Arc::new(Mutex::new(None)),
             event_tx,
             event_rx: Arc::new(std::sync::Mutex::new(Some(event_rx))),
+            first_capture_complete: AtomicBool::new(false),
         }
     }
 
@@ -354,7 +358,10 @@ impl VoiceService {
             ))
         })?;
 
-        info!("Passing audio_rx to transcription engine ({})", engine.display_name());
+        info!(
+            "Passing audio_rx to transcription engine ({})",
+            engine.display_name()
+        );
         let mut rx = engine.transcribe_stream(audio_rx).await?;
         info!("Waiting for transcript partials...");
 
@@ -453,27 +460,19 @@ impl VoiceService {
             })
             .await;
 
-        // TTS read-back if available
-        if let Some(ref tts) = self.tts {
-            let response_text = "Got it."; // Placeholder — real response comes from agent
-            let params = TtsParams::default();
-            match tts.synthesize(response_text, &params).await {
-                Ok(clip) => {
-                    let audio_base64 = base64_encode_audio(&clip);
-                    let _ = self
-                        .event_tx
-                        .send(VoiceEvent::SpeakResponse {
-                            audio_base64,
-                            sample_rate: clip.sample_rate,
-                            text: response_text.to_string(),
-                        })
-                        .await;
-                }
-                Err(e) => {
-                    warn!("TTS synthesis failed: {e}");
-                }
-            }
+        // One-time welcome echo on the very first successful capture
+        if !self.first_capture_complete.swap(true, Ordering::Relaxed) {
+            let _ = self
+                .event_tx
+                .send(VoiceEvent::MemoryEcho {
+                    text: "Welcome to your second brain. I'm listening. Everything you say here becomes memory, learning, and reflection — just like your thoughts. Press ⌘⇧V anytime.".to_string(),
+                })
+                .await;
         }
+
+        // TTS read-back is now handled by handle_response(), called by app-core
+        // after the agent produces its response. This keeps VoiceService decoupled
+        // from the agent pipeline.
 
         info!(
             "Voice transcription complete: \"{}\" (confidence: {:.0}%, routed to: {})",
@@ -503,6 +502,33 @@ impl VoiceService {
         }
     }
 
+    /// Handle the agent's response for the current voice session.
+    ///
+    /// Synthesizes TTS audio and emits a `SpeakResponse` event to the frontend.
+    /// Called by app-core after `AgentRuntime` produces a response for a voice message.
+    pub async fn handle_response(&self, response_text: &str) -> common::Result<()> {
+        if let Some(ref tts) = self.tts {
+            let params = TtsParams::default();
+            match tts.synthesize(response_text, &params).await {
+                Ok(clip) => {
+                    let audio_base64 = base64_encode_audio(&clip);
+                    let _ = self
+                        .event_tx
+                        .send(VoiceEvent::SpeakResponse {
+                            audio_base64,
+                            sample_rate: clip.sample_rate,
+                            text: response_text.to_string(),
+                        })
+                        .await;
+                }
+                Err(e) => {
+                    warn!("TTS synthesis failed for voice response: {e}");
+                }
+            }
+        }
+        Ok(())
+    }
+
     /// Get the current model state from ModelManager.
     pub fn model_state(&self) -> ModelState {
         self.model_manager.state()
@@ -521,6 +547,15 @@ impl VoiceService {
     /// Start downloading a Whisper model via the ModelManager.
     pub async fn download_model(&self, size: WhisperModelSize) -> common::Result<()> {
         self.model_manager.start_download(size).await
+    }
+
+    /// Emit an arbitrary VoiceEvent (for dev/testing simulation).
+    pub async fn emit_event(&self, event: VoiceEvent) -> common::Result<()> {
+        self.event_tx
+            .send(event)
+            .await
+            .map_err(|_| common::KlyntbotError::BusDisconnected)?;
+        Ok(())
     }
 }
 
@@ -732,5 +767,111 @@ mod tests {
             assert_eq!(text, "schedule dentist and practice french");
             assert!(!routed_to.is_empty());
         }
+    }
+
+    #[tokio::test]
+    async fn handle_response_emits_speak_event() {
+        let mock_stt = Arc::new(MockTranscriptionEngine::new("hello world"));
+        let mock_tts = Arc::new(crate::mock::MockTtsEngine);
+        let tmp = TempDir::new().unwrap();
+        let model_manager = ModelManager::new(tmp.path());
+        let svc = VoiceService::new(
+            Some(mock_stt),
+            None,
+            Some(mock_tts),
+            None,
+            model_manager,
+            VoiceServiceConfig::default(),
+        );
+
+        let mut event_rx = svc.take_event_rx().unwrap();
+
+        svc.handle_response("Task created: dentist appointment Thursday")
+            .await
+            .unwrap();
+
+        // Should receive a SpeakResponse event with the TTS audio
+        let event = tokio::time::timeout(std::time::Duration::from_secs(2), event_rx.recv())
+            .await
+            .expect("timeout")
+            .expect("channel closed");
+
+        match event {
+            VoiceEvent::SpeakResponse {
+                text, sample_rate, ..
+            } => {
+                assert_eq!(text, "Task created: dentist appointment Thursday");
+                assert_eq!(sample_rate, 16000); // MockTtsEngine returns 16kHz
+            }
+            other => panic!("Expected SpeakResponse, got {other:?}"),
+        }
+    }
+
+    #[tokio::test]
+    async fn handle_response_without_tts_returns_ok() {
+        let (svc, _tmp) = make_service(None);
+        let _event_rx = svc.take_event_rx().unwrap();
+        // No TTS engine configured — should return Ok without emitting SpeakResponse
+        let result = svc.handle_response("hello").await;
+        assert!(result.is_ok());
+    }
+
+    #[tokio::test]
+    async fn handle_response_with_tts_emits_speak_and_text_matches() {
+        let mock_stt = Arc::new(MockTranscriptionEngine::new("test input"));
+        let mock_tts = Arc::new(crate::mock::MockTtsEngine);
+        let tmp = TempDir::new().unwrap();
+        let model_manager = ModelManager::new(tmp.path());
+        let svc = VoiceService::new(
+            Some(mock_stt),
+            None,
+            Some(mock_tts),
+            None,
+            model_manager,
+            VoiceServiceConfig::default(),
+        );
+
+        let mut event_rx = svc.take_event_rx().unwrap();
+
+        // Simulate the full response path
+        let response = "I've scheduled your dentist appointment for Thursday at 2pm.";
+        svc.handle_response(response).await.unwrap();
+
+        match event_rx.recv().await.unwrap() {
+            VoiceEvent::SpeakResponse {
+                text,
+                sample_rate,
+                audio_base64,
+            } => {
+                assert_eq!(text, response);
+                assert_eq!(sample_rate, 16000);
+                assert!(!audio_base64.is_empty());
+            }
+            other => panic!("Expected SpeakResponse, got {other:?}"),
+        }
+    }
+
+    #[tokio::test]
+    async fn welcome_echo_emitted_only_on_first_capture() {
+        let mock_stt = Arc::new(MockTranscriptionEngine::new("hello"));
+        let tmp = TempDir::new().unwrap();
+        let model_manager = ModelManager::new(tmp.path());
+        let svc = VoiceService::new(
+            Some(mock_stt.clone()),
+            None,
+            None,
+            None,
+            model_manager,
+            VoiceServiceConfig::default(),
+        );
+
+        // First capture flag should be false initially
+        assert!(!svc.first_capture_complete.load(Ordering::Relaxed));
+
+        // After first swap, flag should become true
+        svc.first_capture_complete.store(false, Ordering::Relaxed);
+        assert!(!svc.first_capture_complete.swap(true, Ordering::Relaxed));
+        // Second swap should return true (already set)
+        assert!(svc.first_capture_complete.swap(true, Ordering::Relaxed));
     }
 }

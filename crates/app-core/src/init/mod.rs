@@ -301,6 +301,14 @@ impl AppCore {
                 let _ = bootstrap_archiver.bootstrap(serde_json::json!({})).await;
             });
 
+            // Wire text embedder for voice echo semantic similarity
+            let facade = {
+                let embedding_engine = Arc::new(tools::EmbeddingEngine::new());
+                let text_embedder: Arc<dyn ::cognitive::TextEmbedder> =
+                    Arc::new(::agent::TextEmbedderImpl::new(embedding_engine));
+                facade.with_text_embedder(text_embedder)
+            };
+
             info!("mirror self-reflection engine started");
             (Some(Arc::new(facade)), Some(handles), Some(shutdown))
         };
@@ -355,6 +363,9 @@ impl AppCore {
             Arc::clone(&hot_config),
             shutdown_token.clone(),
         );
+
+        // Clone mirror_facade before move into AppCore (needed for VoiceService echo provider)
+        let mirror_facade_for_voice = mirror_facade.clone();
 
         // ── Assemble AppCore ─────────────────────────────────────────────
         let mut core = AppCore {
@@ -514,7 +525,12 @@ impl AppCore {
                     stt_local,
                     stt_cloud,
                     tts,
-                    None, // MemoryEchoProvider — stub, wired later
+                    {
+                        let echo_provider = crate::handlers::voice_echo::AppMemoryEchoProvider::new(
+                            mirror_facade_for_voice,
+                        );
+                        Some(Arc::new(echo_provider) as Arc<dyn voice_engine::MemoryEchoProvider>)
+                    },
                     model_manager,
                     svc_config,
                 );

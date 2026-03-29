@@ -320,9 +320,8 @@ fn run_desktop_app() {
                     match voice_hotkey.parse::<tauri_plugin_global_shortcut::Shortcut>() {
                         Ok(shortcut) => {
                             let app_clone = app.handle().clone();
-                            if let Err(e) = manager.on_shortcut(
-                                shortcut,
-                                move |_app, _shortcut, event| {
+                            if let Err(e) =
+                                manager.on_shortcut(shortcut, move |_app, _shortcut, event| {
                                     if event.state
                                         != tauri_plugin_global_shortcut::ShortcutState::Pressed
                                     {
@@ -333,36 +332,119 @@ fn run_desktop_app() {
                                     tauri::async_runtime::spawn(async move {
                                         use tauri::{Emitter, Manager};
 
-                                        if let Some(launcher) = handle.get_webview_window("launcher") {
-                                            let is_visible = launcher.is_visible().unwrap_or(false);
-                                            if is_visible {
-                                                // If launcher is visible, hide it and reset
-                                                let _ = launcher.hide();
-                                                let _ = handle.emit("voice-recording-reset", ());
-                                                return;
+                                        // Context-aware: focus session → quick voice journal
+                                        if crate::tray_countdown::FOCUS_ACTIVE
+                                            .load(std::sync::atomic::Ordering::Relaxed)
+                                        {
+                                            let core =
+                                                handle.state::<std::sync::Arc<app_core::AppCore>>();
+                                            // Quick capture without orb — just start, record, stop, spoken confirmation
+                                            match core.voice_start_capture().await {
+                                                Ok(_) => {
+                                                    crate::tray_countdown::VOICE_ACTIVE.store(
+                                                        true,
+                                                        std::sync::atomic::Ordering::Relaxed,
+                                                    );
+                                                    // No orb — voice events still flow for the background pipeline
+                                                }
+                                                Err(e) => {
+                                                    tracing::warn!(
+                                                        "Quick voice journal failed: {e}"
+                                                    );
+                                                }
                                             }
-                                            // Center and show the launcher window
-                                            let _ = launcher.center();
-                                            let _ = launcher.show();
-                                            let _ = launcher.set_focus();
+                                            return;
                                         }
 
-                                        // Tell the frontend to enter recording mode
-                                        if let Err(e) = handle.emit("voice-recording-start", ()) {
-                                            tracing::warn!("Failed to emit voice-recording-start: {e}");
+                                        // Context-aware: launcher open → hands-free search
+                                        if let Some(launcher) =
+                                            handle.get_webview_window("launcher")
+                                        {
+                                            if launcher.is_visible().unwrap_or(false) {
+                                                // Emit voice-recording-start to launcher for hands-free mode
+                                                let _ = handle.emit("voice-recording-start", ());
+                                                return;
+                                            }
+                                        }
+
+                                        // Check if voice-orb is already visible (toggle behavior)
+                                        if let Some(orb_window) =
+                                            handle.get_webview_window("voice-orb")
+                                        {
+                                            let is_visible =
+                                                orb_window.is_visible().unwrap_or(false);
+                                            if is_visible {
+                                                // Second press while capturing → stop capture
+                                                let core = handle
+                                                    .state::<std::sync::Arc<app_core::AppCore>>();
+                                                let _ = core.voice_stop_capture().await;
+                                                crate::tray_countdown::VOICE_ACTIVE.store(
+                                                    false,
+                                                    std::sync::atomic::Ordering::Relaxed,
+                                                );
+                                                let _ = orb_window.hide();
+                                                return;
+                                            }
+                                        }
+
+                                        // First press → open orb and start capture
+                                        if let Some(orb_window) =
+                                            handle.get_webview_window("voice-orb")
+                                        {
+                                            // Position: top-center of active monitor, 80px from top
+                                            if let Ok(Some(monitor)) = orb_window.current_monitor()
+                                            {
+                                                let monitor_pos = monitor.position();
+                                                let monitor_size = monitor.size();
+                                                let x = monitor_pos.x
+                                                    + (monitor_size.width as i32 / 2)
+                                                    - 160; // half of 320px width
+                                                let y = monitor_pos.y + 80;
+                                                let _ = orb_window.set_position(
+                                                    tauri::PhysicalPosition::new(x, y),
+                                                );
+                                            }
+                                            let _ = orb_window.show();
+                                            let _ = orb_window.set_focus();
+                                        }
+
+                                        // Start voice capture
+                                        let core =
+                                            handle.state::<std::sync::Arc<app_core::AppCore>>();
+                                        match core.voice_start_capture().await {
+                                            Ok(_info) => {
+                                                crate::tray_countdown::VOICE_ACTIVE.store(
+                                                    true,
+                                                    std::sync::atomic::Ordering::Relaxed,
+                                                );
+                                            }
+                                            Err(e) => {
+                                                tracing::warn!(
+                                                    "Failed to start voice capture: {e}"
+                                                );
+                                                // Emit error to orb
+                                                let _ = handle.emit(
+                                                    "voice:event",
+                                                    serde_json::json!({
+                                                        "type": "error",
+                                                        "message": e.to_string(),
+                                                        "recoverable": true
+                                                    }),
+                                                );
+                                            }
                                         }
                                     });
-                                },
-                            ) {
-                                tracing::warn!("Failed to register voice hotkey '{voice_hotkey}': {e}");
+                                })
+                            {
+                                tracing::warn!(
+                                    "Failed to register voice hotkey '{voice_hotkey}': {e}"
+                                );
                             } else {
                                 tracing::info!("Voice hotkey registered: {voice_hotkey}");
                             }
                         }
                         Err(e) => {
-                            tracing::warn!(
-                                "Invalid voice hotkey '{voice_hotkey}': {e}"
-                            );
+                            tracing::warn!("Invalid voice hotkey '{voice_hotkey}': {e}");
                         }
                     }
                 }
@@ -553,6 +635,7 @@ fn run_desktop_app() {
             commands::voice::voice_get_status,
             commands::voice::voice_get_models,
             commands::voice::voice_download_model,
+            commands::voice::voice_simulate_event,
             // Annotations
             commands::annotations::annotation_create,
             commands::annotations::annotation_update,

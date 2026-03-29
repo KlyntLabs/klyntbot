@@ -17,6 +17,13 @@ export function useVoiceEvents() {
   const [audioLevel, setAudioLevel] = useState(0);
   const [engineKind, setEngineKind] = useState<"local" | "cloud">("local");
   const [responseText, setResponseText] = useState("");
+  const [segments, setSegments] = useState<Array<{ text: string; confidence: number }>>([]);
+  const [ttsAudio, setTtsAudio] = useState<{
+    base64: string;
+    sampleRate: number;
+    text: string;
+  } | null>(null);
+  const [modelDownloading, setModelDownloading] = useState(false);
 
   useEffect(() => {
     let unlisten: (() => void) | undefined;
@@ -31,6 +38,8 @@ export function useVoiceEvents() {
             setTranscript("");
             setRoutingChips([]);
             setMemoryEcho(null);
+            setSegments([]);
+            setTtsAudio(null);
             setEngineKind((payload.engine as string) === "cloud" ? "cloud" : "local");
             break;
           case "audioLevel":
@@ -38,6 +47,7 @@ export function useVoiceEvents() {
             break;
           case "partialTranscript":
             setTranscript(payload.text as string);
+            setSegments((payload.segments as Array<{ text: string; confidence: number }>) ?? []);
             break;
           case "routingSuggestion":
             setRoutingChips((prev) => {
@@ -64,9 +74,22 @@ export function useVoiceEvents() {
             setTranscript(payload.text as string);
             setResponseText((payload.responsePreview as string) || (payload.text as string));
             break;
-          case "error":
-            console.error("[VoiceBrain]", payload.message);
+          case "speakResponse":
+            setSessionState("response");
+            setTtsAudio({
+              base64: payload.audioBase64 as string,
+              sampleRate: payload.sampleRate as number,
+              text: payload.text as string,
+            });
             break;
+          case "error": {
+            const message = payload.message as string;
+            if (message.includes("No transcription engine") || message.includes("Download")) {
+              setModelDownloading(true);
+            }
+            console.error("[VoiceBrain]", message);
+            break;
+          }
         }
       }).then((fn) => {
         unlisten = fn;
@@ -91,6 +114,9 @@ export function useVoiceEvents() {
     audioLevel,
     engineKind,
     responseText,
+    segments,
+    ttsAudio,
+    modelDownloading,
     dismiss,
   };
 }
