@@ -408,6 +408,11 @@ fn run_desktop_app() {
                                             let _ = orb_window.set_focus();
                                         }
 
+                                        // Brief yield so the voice-orb webview's event listener
+                                        // is ready before CaptureStarted fires.
+                                        tokio::time::sleep(std::time::Duration::from_millis(100))
+                                            .await;
+
                                         // Start voice capture
                                         let core =
                                             handle.state::<std::sync::Arc<app_core::AppCore>>();
