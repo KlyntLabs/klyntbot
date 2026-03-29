@@ -110,7 +110,7 @@ pub enum VoicePrivacyMode {
 }
 
 fn default_voice_hotkey() -> String {
-    "ctrl+shift+v".to_string()
+    "alt+shift+v".to_string()
 }
 
 fn default_silence_threshold() -> f32 {

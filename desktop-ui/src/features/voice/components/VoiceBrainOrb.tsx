@@ -95,7 +95,7 @@ export function VoiceBrainOrb() {
 
       {/* Hint bar */}
       <div className="text-[10px] text-muted opacity-40 text-center">
-        {sessionState === "capturing" && "ctrl+shift+V to finish · tap to close"}
+        {sessionState === "capturing" && "opt+shift+V to finish · tap to close"}
         {sessionState === "processing" && "Cancel & discard"}
         {sessionState === "response" && "tap anywhere to close"}
       </div>

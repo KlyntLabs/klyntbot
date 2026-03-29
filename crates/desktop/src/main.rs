@@ -310,8 +310,12 @@ fn run_desktop_app() {
                 let voice_hotkey = tauri::async_runtime::block_on(async {
                     core_ref.config.read().await.voice.input.hotkey.clone()
                 });
-                let voice_enabled = core_ref.voice_service.is_some();
-                if voice_enabled {
+                tracing::info!(
+                    "Voice hotkey setup: service_available={}, hotkey={voice_hotkey}",
+                    core_ref.voice_service.is_some()
+                );
+                // Always register the hotkey — the handler gracefully errors if voice isn't ready.
+                {
                     let manager = app.global_shortcut();
                     match voice_hotkey.parse::<tauri_plugin_global_shortcut::Shortcut>() {
                         Ok(shortcut) => {
@@ -324,23 +328,23 @@ fn run_desktop_app() {
                                     {
                                         return;
                                     }
+                                    tracing::info!("Voice hotkey pressed");
                                     let handle = app_clone.clone();
                                     tauri::async_runtime::spawn(async move {
                                         use tauri::Manager;
                                         let Some(core) =
                                             handle.try_state::<Arc<app_core::AppCore>>()
                                         else {
+                                            tracing::warn!("Voice hotkey: no AppCore state");
                                             return;
                                         };
-                                        let is_capturing = core
-                                            .voice_service
-                                            .as_ref()
-                                            .map(|vs| {
-                                                tauri::async_runtime::block_on(vs.session_state())
-                                            })
-                                            .is_some_and(|s| {
-                                                s == voice_engine::VoiceSessionState::Capturing
-                                            });
+                                        let is_capturing = match core.voice_service.as_ref() {
+                                            Some(vs) => {
+                                                vs.session_state().await
+                                                    == voice_engine::VoiceSessionState::Capturing
+                                            }
+                                            None => false,
+                                        };
                                         if is_capturing {
                                             let _ = core.voice_stop_capture().await;
                                             tray_countdown::VOICE_ACTIVE.store(
