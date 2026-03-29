@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef } from "react";
 import ForceGraph3D from "react-force-graph-3d";
-import type { MeshStandardMaterial } from "three";
+import { Color, Group, Mesh, MeshStandardMaterial, PointLight, TorusGeometry } from "three";
 import { useBrainView } from "../hooks/useBrainView";
 import type { ForceLink, ForceNode, GraphElements } from "../hooks/useGraphElements";
 import type { GraphSettings } from "../hooks/useGraphSettings";
@@ -8,6 +8,8 @@ import type { GraphSettings } from "../hooks/useGraphSettings";
 interface GraphBrainViewProps {
   elements: GraphElements;
   settings: GraphSettings;
+  highlightedClusterId: string | null;
+  activeNoteId: string | null;
   width: number;
   height: number;
   onNodeClick?: (id: string) => void;
@@ -17,6 +19,8 @@ interface GraphBrainViewProps {
 export function GraphBrainView({
   elements,
   settings,
+  highlightedClusterId,
+  activeNoteId,
   width,
   height,
   onNodeClick,
@@ -108,15 +112,32 @@ export function GraphBrainView({
   }, [elements.links]);
 
   const hoveredIdRef = useRef<string | null>(null);
+  const highlightedClusterIdRef = useRef<string | null>(null);
+  highlightedClusterIdRef.current = highlightedClusterId;
+  const activeNoteIdRef = useRef<string | null>(null);
+  activeNoteIdRef.current = activeNoteId;
+
+  // Build a clusterId lookup from graphData nodes
+  const clusterByNodeIdRef = useRef(new Map<string, string>());
+  useEffect(() => {
+    const map = new Map<string, string>();
+    for (const node of elements.nodes) {
+      map.set(node.id, node.clusterId);
+    }
+    clusterByNodeIdRef.current = map;
+  }, [elements.nodes]);
 
   const updateNodeHighlights = useCallback(
     (hoveredId: string | null) => {
       const fg = graphRef.current;
       if (!fg) return;
 
+      const clusterId = highlightedClusterIdRef.current;
       const neighbors = hoveredId
         ? (adjacencyRef.current.get(hoveredId) ?? new Set<string>())
         : null;
+
+      const activeId = activeNoteIdRef.current;
 
       // Update each node's Three.js material opacity
       fg.scene().traverse(
@@ -125,28 +146,50 @@ export function GraphBrainView({
           if (!nodeId || !obj.material) return;
 
           const mat = obj.material as MeshStandardMaterial;
-          if (!hoveredId) {
-            // No hover — full brightness
-            mat.opacity = 0.9;
-            mat.emissiveIntensity = mat.userData?.baseEmissive ?? 0.5;
-          } else if (nodeId === hoveredId) {
-            // Hovered node — extra bright
+          const nodeCluster = clusterByNodeIdRef.current.get(nodeId);
+          const baseEmissive = mat.userData?.baseEmissive ?? 0.5;
+
+          // Active node is always fully visible
+          if (nodeId === activeId) {
             mat.opacity = 1;
-            mat.emissiveIntensity = (mat.userData?.baseEmissive ?? 0.5) * 2;
-          } else if (neighbors?.has(nodeId)) {
-            // Neighbor — normal brightness
-            mat.opacity = 0.9;
-            mat.emissiveIntensity = mat.userData?.baseEmissive ?? 0.5;
+            mat.emissiveIntensity = baseEmissive * 2.5;
+            return;
+          }
+
+          if (hoveredId) {
+            if (nodeId === hoveredId) {
+              mat.opacity = 1;
+              mat.emissiveIntensity = baseEmissive * 2;
+            } else if (neighbors?.has(nodeId)) {
+              mat.opacity = 0.9;
+              mat.emissiveIntensity = baseEmissive;
+            } else {
+              mat.opacity = 0.1;
+              mat.emissiveIntensity = 0.05;
+            }
+          } else if (clusterId) {
+            if (nodeCluster === clusterId) {
+              mat.opacity = 1;
+              mat.emissiveIntensity = baseEmissive * 1.5;
+            } else {
+              mat.opacity = 0.1;
+              mat.emissiveIntensity = 0.05;
+            }
           } else {
-            // Non-neighbor — dimmed
-            mat.opacity = 0.1;
-            mat.emissiveIntensity = 0.05;
+            mat.opacity = 0.9;
+            mat.emissiveIntensity = baseEmissive;
           }
         },
       );
     },
     [graphRef],
   );
+
+  // React to legend cluster highlight or active note changes
+  // biome-ignore lint/correctness/useExhaustiveDependencies: highlightedClusterId/activeNoteId trigger material update via refs
+  useEffect(() => {
+    updateNodeHighlights(hoveredIdRef.current);
+  }, [highlightedClusterId, activeNoteId, updateNodeHighlights]);
 
   // Stable callbacks
   const handleNodeClick = useCallback(
@@ -171,32 +214,156 @@ export function GraphBrainView({
     resetIdleTimer();
   }, [resetIdleTimer]);
 
-  // Dynamic link color — dim non-neighbor links on hover
+  // Dynamic link color — dim non-neighbor links on hover, dim non-cluster links on cluster highlight
   const linkColor = useCallback(
     (link: { source?: ForceNode | string; target?: ForceNode | string; color?: string }) => {
       const hovId = hoveredIdRef.current;
-      if (!hovId) return link.color || "#4B5563";
-
+      const clusterId = highlightedClusterIdRef.current;
       const sId = typeof link.source === "string" ? link.source : (link.source as ForceNode)?.id;
       const tId = typeof link.target === "string" ? link.target : (link.target as ForceNode)?.id;
-      const isConnected = sId === hovId || tId === hovId;
-      return isConnected ? link.color || "#4B5563" : "rgba(50,50,65,0.3)";
+
+      if (hovId) {
+        const isConnected = sId === hovId || tId === hovId;
+        return isConnected ? link.color || "#4B5563" : "rgba(50,50,65,0.3)";
+      }
+      if (clusterId) {
+        const sCluster = sId ? clusterByNodeIdRef.current.get(sId) : null;
+        const tCluster = tId ? clusterByNodeIdRef.current.get(tId) : null;
+        const isInCluster = sCluster === clusterId || tCluster === clusterId;
+        return isInCluster ? link.color || "#4B5563" : "rgba(50,50,65,0.15)";
+      }
+      return link.color || "#4B5563";
     },
     [],
   );
 
-  // Dynamic link width — thicker for hovered connections
+  // Dynamic link width — thicker for hovered/cluster connections
   const linkWidth = useCallback(
     (link: { source?: ForceNode | string; target?: ForceNode | string }) => {
       const hovId = hoveredIdRef.current;
-      if (!hovId) return 0.8;
-
+      const clusterId = highlightedClusterIdRef.current;
       const sId = typeof link.source === "string" ? link.source : (link.source as ForceNode)?.id;
       const tId = typeof link.target === "string" ? link.target : (link.target as ForceNode)?.id;
-      return sId === hovId || tId === hovId ? 1.5 : 0.4;
+
+      if (hovId) {
+        return sId === hovId || tId === hovId ? 1.5 : 0.4;
+      }
+      if (clusterId) {
+        const sCluster = sId ? clusterByNodeIdRef.current.get(sId) : null;
+        const tCluster = tId ? clusterByNodeIdRef.current.get(tId) : null;
+        return sCluster === clusterId || tCluster === clusterId ? 1.2 : 0.3;
+      }
+      return 0.8;
     },
     [],
   );
+
+  // ── Active node orbiting ring indicator ───────────────────────────
+  const ringRef = useRef<Group | null>(null);
+  const ringFrameRef = useRef<number>(0);
+
+  // biome-ignore lint/correctness/useExhaustiveDependencies: graphRef.current is stable after mount
+  useEffect(() => {
+    const fg = graphRef.current;
+    if (!fg) return;
+
+    // Clean up previous ring
+    if (ringRef.current) {
+      fg.scene().remove(ringRef.current);
+      ringRef.current = null;
+    }
+
+    if (!activeNoteId) {
+      cancelAnimationFrame(ringFrameRef.current);
+      return;
+    }
+
+    const activeNode = graphData.nodes.find((n) => n.id === activeNoteId);
+    const baseColor = new Color(activeNode?.color || "#a78bfa");
+
+    const group = new Group();
+
+    // Three rings at different radii and angles
+    const rings: { mesh: Mesh; mat: MeshStandardMaterial }[] = [];
+    const ringConfigs = [
+      { radius: 10, tube: 0.35, emissive: 3, opacity: 0.8, tilt: 0 },
+      { radius: 14, tube: 0.25, emissive: 2, opacity: 0.5, tilt: Math.PI / 3 },
+      { radius: 18, tube: 0.2, emissive: 1.5, opacity: 0.3, tilt: -Math.PI / 4 },
+    ];
+
+    for (const cfg of ringConfigs) {
+      const geo = new TorusGeometry(cfg.radius, cfg.tube, 8, 64);
+      const mat = new MeshStandardMaterial({
+        color: baseColor,
+        emissive: baseColor,
+        emissiveIntensity: cfg.emissive,
+        transparent: true,
+        opacity: cfg.opacity,
+        depthWrite: false,
+      });
+      const mesh = new Mesh(geo, mat);
+      mesh.rotation.x = cfg.tilt;
+      group.add(mesh);
+      rings.push({ mesh, mat });
+    }
+
+    // PointLight centered on the node — creates a volumetric glow halo
+    const light = new PointLight(baseColor, 8, 60, 1.5);
+    group.add(light);
+
+    fg.scene().add(group);
+    ringRef.current = group;
+
+    // Secondary color for shimmer (complementary hue shift)
+    const hsl = { h: 0, s: 0, l: 0 };
+    baseColor.getHSL(hsl);
+    const accentColor = new Color().setHSL((hsl.h + 0.15) % 1, hsl.s, Math.min(hsl.l + 0.1, 1));
+
+    function animate() {
+      if (!ringRef.current) return;
+      const node = graphData.nodes.find((n) => n.id === activeNoteIdRef.current);
+      if (node?.x != null && node?.y != null) {
+        ringRef.current.position.set(node.x, node.y, (node as never as { z: number }).z ?? 0);
+      }
+
+      const t = Date.now() / 1000;
+      const pulse = (Math.sin(t * 1.5) + 1) / 2;
+
+      // Rotate each ring at different speeds
+      rings[0].mesh.rotation.z = t * 0.6;
+      rings[0].mesh.rotation.y = Math.sin(t * 0.2) * 0.3;
+      rings[1].mesh.rotation.z = -t * 0.4;
+      rings[1].mesh.rotation.x = Math.PI / 3 + Math.sin(t * 0.25) * 0.2;
+      rings[2].mesh.rotation.y = t * 0.3;
+      rings[2].mesh.rotation.x = -Math.PI / 4 + Math.cos(t * 0.15) * 0.15;
+
+      // Pulse opacity and emissive on inner ring
+      rings[0].mat.opacity = 0.6 + pulse * 0.4;
+      rings[0].mat.emissiveIntensity = 2 + pulse * 2;
+
+      // Shimmer: lerp ring colors between base and accent
+      const lerpFactor = (Math.sin(t * 0.8) + 1) / 2;
+      const currentColor = baseColor.clone().lerp(accentColor, lerpFactor * 0.4);
+      for (const r of rings) {
+        r.mat.emissive.copy(currentColor);
+      }
+      light.color.copy(currentColor);
+
+      // Pulse light intensity
+      light.intensity = 5 + pulse * 6;
+
+      ringFrameRef.current = requestAnimationFrame(animate);
+    }
+    ringFrameRef.current = requestAnimationFrame(animate);
+
+    return () => {
+      cancelAnimationFrame(ringFrameRef.current);
+      if (ringRef.current) {
+        fg.scene().remove(ringRef.current);
+        ringRef.current = null;
+      }
+    };
+  }, [activeNoteId, graphData.nodes]);
 
   return (
     <ForceGraph3D

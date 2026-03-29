@@ -27,8 +27,10 @@ export interface GraphSettings {
   idleRotation: boolean;
   /** Show the viewport minimap */
   showMinimap: boolean;
-  /** Show community overlay layer */
-  layerCommunities: boolean;
+  /** Link line width multiplier (1 = default) */
+  linkWidth: number;
+  /** Link opacity (0-1) */
+  linkOpacity: number;
   /** Show extracted entity nodes */
   layerEntities: boolean;
   /** Show tree structure sub-nodes */
@@ -49,7 +51,8 @@ const DEFAULT_SETTINGS: GraphSettings = {
   clusteringMode: "notebook",
   idleRotation: true,
   showMinimap: true,
-  layerCommunities: false,
+  linkWidth: 1,
+  linkOpacity: 0.6,
   layerEntities: false,
   layerTree: false,
 };

@@ -1,7 +1,7 @@
-import { Atom, Brain, Network, Search, TreePine } from "lucide-react";
+import { Atom, Brain, Search, TreePine } from "lucide-react";
 import type { SmartView } from "../hooks/useGraphData";
 
-type LayerKey = "communities" | "entities" | "tree";
+type LayerKey = "entities" | "tree";
 
 interface GraphToolbarProps {
   view: SmartView;
@@ -34,9 +34,8 @@ const CLUSTERING_OPTIONS: { value: "notebook" | "semantic"; label: string }[] = 
 const LAYER_OPTIONS: {
   key: LayerKey;
   label: string;
-  Icon: typeof Network;
+  Icon: typeof Atom;
 }[] = [
-  { key: "communities", label: "Communities", Icon: Network },
   { key: "entities", label: "Entities", Icon: Atom },
   { key: "tree", label: "Tree", Icon: TreePine },
 ];
@@ -56,7 +55,6 @@ export function GraphToolbar({
   onLayerToggle,
 }: GraphToolbarProps) {
   const handleSemanticClick = () => {
-    if (!layerState.communities) onLayerToggle("communities");
     if (!layerState.entities) onLayerToggle("entities");
     onClusteringModeChange("semantic");
   };

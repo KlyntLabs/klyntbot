@@ -164,6 +164,23 @@ export function GraphSettingsPopover({
           unit="×"
           onChange={(v) => onChange({ labelThreshold: v })}
         />
+        <Slider
+          label="Link Width"
+          value={settings.linkWidth}
+          min={0.5}
+          max={4}
+          step={0.5}
+          unit="×"
+          onChange={(v) => onChange({ linkWidth: v })}
+        />
+        <Slider
+          label="Link Opacity"
+          value={settings.linkOpacity}
+          min={0.1}
+          max={1}
+          step={0.1}
+          onChange={(v) => onChange({ linkOpacity: v })}
+        />
       </div>
 
       <div className="mt-2 pt-2 border-t border-border-subtle space-y-0.5">

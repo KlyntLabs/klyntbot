@@ -5,7 +5,6 @@ import { UnrealBloomPass } from "three/examples/jsm/postprocessing/UnrealBloomPa
 import {
   createEntityGeometry,
   createEntityMaterial,
-  createLabelSprite,
   createNodeGeometry,
   createNodeMaterial,
   createTreeMaterial,
@@ -26,13 +25,6 @@ export function useBrainView({ settings }: UseBrainViewParams) {
   // Build a custom Three.js object for each node, branching on nodeType
   const nodeThreeObject = useCallback((node: ForceNode) => {
     const nodeType = node.nodeType ?? "note";
-
-    // ── Community label — billboard Sprite ──────────────────────────
-    if (nodeType === "community_label") {
-      const sprite = createLabelSprite(node.label, node.color);
-      sprite.userData = { nodeId: node.id };
-      return sprite;
-    }
 
     // ── Entity — OctahedronGeometry (diamond) ────────────────────────
     if (nodeType === "entity") {

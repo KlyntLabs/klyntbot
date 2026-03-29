@@ -803,7 +803,23 @@ impl AgentLoopBuilder {
                         });
                         info!("NoteTreeBuilder subscriber started");
 
-                        // CommunityBuilder subscriber (Phase 2 — Louvain detection)
+                        // EntityTreeLinker subscriber (links entities ↔ tree nodes)
+                        let entity_linker =
+                            Arc::new(crate::adapters::entity_tree_linker::EntityTreeLinker::new(
+                                storage_pool.inner().clone(),
+                            ));
+                        let linker_rx = domain_bus.subscribe();
+                        let linker_shutdown = CancellationToken::new();
+                        let _linker_handle = tokio::spawn({
+                            let linker = Arc::clone(&entity_linker);
+                            let shutdown = linker_shutdown.clone();
+                            async move {
+                                linker.run(linker_rx, shutdown).await;
+                            }
+                        });
+                        info!("EntityTreeLinker subscriber started");
+
+                        // CommunityBuilder subscriber (Louvain detection)
                         let community_repo_for_builder =
                             cognitive::repos::CommunityRepo::new(storage_pool.inner().clone());
                         let community_builder =
@@ -830,6 +846,8 @@ impl AgentLoopBuilder {
                             let backfill_builder = Arc::clone(&note_tree_builder);
                             let backfill_note_repo =
                                 feature_notes::repo::NoteRepo::new(storage_pool.inner().clone());
+                            let backfill_linker = Arc::clone(&entity_linker);
+                            let backfill_community_builder = Arc::clone(&community_builder);
                             tokio::spawn(async move {
                                 // Delay to let the app finish starting
                                 tokio::time::sleep(std::time::Duration::from_secs(10)).await;
@@ -838,6 +856,13 @@ impl AgentLoopBuilder {
                                         .await
                                 {
                                     warn!("Note tree backfill error: {e}");
+                                }
+                                // After tree nodes exist, link entities to them
+                                tokio::time::sleep(std::time::Duration::from_secs(3)).await;
+                                backfill_entity_links(&backfill_linker).await;
+                                // After entity links exist, run community detection
+                                if let Err(e) = backfill_community_builder.rebuild_communities().await {
+                                    warn!("Community backfill error: {e}");
                                 }
                             });
                         }
@@ -1728,4 +1753,36 @@ async fn backfill_tree_nodes(
         info!("Note tree backfill complete: {processed} notes processed");
     }
     Ok(())
+}
+
+/// Backfill entity-tree links for all notes that have tree nodes.
+/// Runs after tree node backfill to ensure tree nodes exist first.
+async fn backfill_entity_links(linker: &crate::adapters::entity_tree_linker::EntityTreeLinker) {
+    let pool = linker.pool();
+    let note_ids: Vec<(String,)> = match sqlx::query_as(
+        "SELECT DISTINCT source_id FROM book_tree_nodes WHERE source_type = 'note'",
+    )
+    .fetch_all(pool)
+    .await
+    {
+        Ok(ids) => ids,
+        Err(e) => {
+            warn!("Entity link backfill: failed to query note IDs: {e}");
+            return;
+        }
+    };
+
+    let mut linked = 0usize;
+    for (note_id,) in &note_ids {
+        if let Err(e) = linker.link_entities_for_note(note_id).await {
+            warn!(note_id = %note_id, "Entity link backfill failed: {e}");
+        } else {
+            linked += 1;
+        }
+        tokio::task::yield_now().await;
+    }
+
+    if linked > 0 {
+        info!("Entity link backfill complete: {linked} notes processed");
+    }
 }

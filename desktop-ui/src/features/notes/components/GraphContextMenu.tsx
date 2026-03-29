@@ -4,13 +4,10 @@ import {
   Copy,
   EyeOff,
   FileSearch,
-  Focus,
   GitBranch,
   GraduationCap,
   Link2,
   Network,
-  Pin,
-  Users,
 } from "lucide-react";
 import { useRef } from "react";
 import { createPortal } from "react-dom";
@@ -42,12 +39,6 @@ const MENU_BY_TYPE: Record<ForceNodeType, MenuItem[]> = {
     { action: "expand_tree", label: "Expand tree", icon: <Network size={12} /> },
     { action: "find_related", label: "Find related", icon: <FileSearch size={12} /> },
     { action: "quick_bridge", label: "Quick bridge", icon: <GitBranch size={12} /> },
-  ],
-  community_label: [
-    { action: "focus_community", label: "Focus on community", icon: <Focus size={12} /> },
-    { action: "pin_to_focus", label: "Pin to focus", icon: <Pin size={12} /> },
-    { action: "quick_bridge", label: "Quick bridge", icon: <GitBranch size={12} /> },
-    { action: "view_members", label: "View members", icon: <Users size={12} /> },
   ],
   entity: [
     { action: "find_across_notes", label: "Find across notes", icon: <Copy size={12} /> },

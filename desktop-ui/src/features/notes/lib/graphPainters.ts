@@ -4,14 +4,20 @@ import { hexToRgba } from "./graphUtils";
 export interface PaintContext {
   nodeScale: number;
   labelThreshold: number;
+  activeNoteId: string | null;
   hoveredNodeId: string | null;
   neighborSet: Set<string>;
   highlightedClusterId: string | null;
   highlightedNodeIds: Set<string> | null;
+  linkWidth: number;
+  linkOpacity: number;
 }
 
 /** Compute shared opacity based on hover / cluster / highlight state. */
 function resolveOpacity(node: ForceNode, paintCtx: PaintContext): number {
+  // Active node is always fully visible
+  if (node.id === paintCtx.activeNoteId) return 1;
+
   if (paintCtx.hoveredNodeId) {
     if (node.id === paintCtx.hoveredNodeId) return 1;
     if (paintCtx.neighborSet.has(node.id)) return 0.85;
@@ -62,54 +68,57 @@ function paintNoteNode(
   opacity: number,
 ): void {
   const radius = (node.size / 2) * paintCtx.nodeScale;
+  const isActive = node.id === paintCtx.activeNoteId;
 
-  paintGlow(ctx, x, y, radius * 0.5, radius * 2.5, node.color, 0.2, opacity);
+  // Active node locator — animated pulsing ring
+  if (isActive) {
+    const pulse = (Math.sin(Date.now() / 400) + 1) / 2; // 0-1 oscillation
+    const ringRadius = radius + 6 + pulse * 4;
+    const ringAlpha = 0.3 + pulse * 0.3;
+
+    // Outer glow
+    paintGlow(ctx, x, y, radius, radius * 4, node.color, 0.35, 1);
+
+    // Ring
+    ctx.strokeStyle = hexToRgba(node.color, ringAlpha);
+    ctx.lineWidth = 2;
+    ctx.setLineDash([3, 3]);
+    ctx.beginPath();
+    ctx.arc(x, y, ringRadius, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.setLineDash([]);
+  }
+
+  paintGlow(ctx, x, y, radius * 0.5, radius * 2.5, node.color, isActive ? 0.35 : 0.2, opacity);
 
   // Circle
-  ctx.fillStyle = hexToRgba(node.color, opacity);
+  ctx.fillStyle = hexToRgba(node.color, isActive ? 1 : opacity);
   ctx.beginPath();
   ctx.arc(x, y, radius, 0, Math.PI * 2);
   ctx.fill();
 
-  ctx.strokeStyle = hexToRgba(node.color, opacity * 0.3);
-  ctx.lineWidth = node.id === paintCtx.hoveredNodeId ? 3 : 2;
+  ctx.strokeStyle = hexToRgba(node.color, isActive ? 0.8 : opacity * 0.3);
+  ctx.lineWidth = isActive ? 3 : node.id === paintCtx.hoveredNodeId ? 3 : 2;
   ctx.stroke();
 
-  // Expand indicator (small "+" at right edge when tree layer is on)
-  if (node.expandable) {
-    const indicatorRadius = Math.max(4 / globalScale, 1.5);
-    const ix = x + radius + indicatorRadius + 1 / globalScale;
-    const iy = y;
-
-    ctx.fillStyle = node.expanded
-      ? hexToRgba(node.color, opacity * 0.9)
-      : hexToRgba(node.color, opacity * 0.5);
-    ctx.beginPath();
-    ctx.arc(ix, iy, indicatorRadius, 0, Math.PI * 2);
-    ctx.fill();
-
-    // Draw "+" or "-" inside
-    const symbolSize = indicatorRadius * 0.7;
-    ctx.strokeStyle = `rgba(0,0,0,${opacity * 0.8})`;
-    ctx.lineWidth = Math.max(0.8 / globalScale, 0.3);
-    ctx.beginPath();
-    ctx.moveTo(ix - symbolSize, iy);
-    ctx.lineTo(ix + symbolSize, iy);
-    if (!node.expanded) {
-      ctx.moveTo(ix, iy - symbolSize);
-      ctx.lineTo(ix, iy + symbolSize);
-    }
-    ctx.stroke();
+  // Expand indicator (small "+" or "−" text at right edge when tree layer is on)
+  if (node.expandable && globalScale > paintCtx.labelThreshold * 0.5) {
+    const fontSize = Math.max(10 / globalScale, 4);
+    ctx.font = `700 ${fontSize}px Inter, system-ui, sans-serif`;
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillStyle = hexToRgba(node.color, opacity * 0.8);
+    ctx.fillText(node.expanded ? "−" : "+", x + radius + 6 / globalScale, y);
   }
 
-  // Label
-  if (globalScale > paintCtx.labelThreshold) {
+  // Label — always show for active node regardless of zoom
+  if (isActive || globalScale > paintCtx.labelThreshold) {
     const fontSize = Math.max(10 / globalScale, 3);
-    ctx.font = `500 ${fontSize}px Inter, system-ui, sans-serif`;
+    ctx.font = `${isActive ? 600 : 500} ${fontSize}px Inter, system-ui, sans-serif`;
     ctx.textAlign = "left";
     ctx.textBaseline = "middle";
     ctx.fillStyle =
-      node.id === paintCtx.hoveredNodeId
+      isActive || node.id === paintCtx.hoveredNodeId
         ? `rgba(255,255,255,${opacity})`
         : `rgba(255,255,255,${opacity * 0.7})`;
     const labelX = node.expandable ? x + radius + 12 / globalScale : x + radius + 4 / globalScale;
@@ -214,44 +223,6 @@ function paintTreeTextNode(
   ctx.fill();
 }
 
-// ── Community label node (rounded rect with name + count) ───────────────
-
-function paintCommunityLabelNode(
-  node: ForceNode,
-  ctx: CanvasRenderingContext2D,
-  globalScale: number,
-  _paintCtx: PaintContext,
-  x: number,
-  y: number,
-  opacity: number,
-): void {
-  const fontSize = Math.max(9 / globalScale, 3);
-  ctx.font = `600 ${fontSize}px Inter, system-ui, sans-serif`;
-  const text = node.label;
-  const metrics = ctx.measureText(text);
-  const padX = 6 / globalScale;
-  const padY = 3 / globalScale;
-  const rectW = metrics.width + padX * 2;
-  const rectH = fontSize + padY * 2;
-  const cornerRadius = 3 / globalScale;
-
-  // Rounded rect background
-  ctx.fillStyle = hexToRgba(node.color, 0.2 * opacity);
-  ctx.beginPath();
-  ctx.roundRect(x - rectW / 2, y - rectH / 2, rectW, rectH, cornerRadius);
-  ctx.fill();
-
-  ctx.strokeStyle = hexToRgba(node.color, 0.3 * opacity);
-  ctx.lineWidth = 0.5;
-  ctx.stroke();
-
-  // Text
-  ctx.textAlign = "center";
-  ctx.textBaseline = "middle";
-  ctx.fillStyle = hexToRgba(node.color, 0.9 * opacity);
-  ctx.fillText(text, x, y);
-}
-
 // ── Main paintNode dispatcher ───────────────────────────────────────────
 
 export function paintNode(
@@ -274,9 +245,6 @@ export function paintNode(
     case "tree_text":
       paintTreeTextNode(node, ctx, globalScale, paintCtx, x, y, opacity);
       break;
-    case "community_label":
-      paintCommunityLabelNode(node, ctx, globalScale, paintCtx, x, y, opacity);
-      break;
     default:
       paintNoteNode(node, ctx, globalScale, paintCtx, x, y, opacity);
       break;
@@ -293,20 +261,21 @@ export function paintLink(
   const target = link.target as unknown as ForceNode;
   if (!source.x || !source.y || !target.x || !target.y) return;
 
-  let opacity = 0.55 * link.weight;
+  const baseOpacity = paintCtx.linkOpacity * link.weight;
+  let opacity = baseOpacity;
   if (paintCtx.hoveredNodeId) {
     const isConnected =
       source.id === paintCtx.hoveredNodeId || target.id === paintCtx.hoveredNodeId;
-    opacity = isConnected ? 0.85 * link.weight : 0.1;
+    opacity = isConnected ? Math.min(baseOpacity * 1.5, 1) : 0.1;
   } else if (paintCtx.highlightedClusterId) {
     const isInCluster =
       source.clusterId === paintCtx.highlightedClusterId ||
       target.clusterId === paintCtx.highlightedClusterId;
-    opacity = isInCluster ? 0.65 * link.weight : 0.1;
+    opacity = isInCluster ? Math.min(baseOpacity * 1.2, 1) : 0.1;
   }
 
   ctx.strokeStyle = hexToRgba(link.color, Math.min(opacity, 1));
-  ctx.lineWidth = Math.max(0.8, link.weight * 1.2);
+  ctx.lineWidth = Math.max(0.8, link.weight * paintCtx.linkWidth * 1.2);
   ctx.beginPath();
   ctx.moveTo(source.x, source.y);
   ctx.lineTo(target.x, target.y);

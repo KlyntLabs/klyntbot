@@ -32,7 +32,7 @@ export interface ClusterInfo {
   count: number;
 }
 
-export type ForceNodeType = "note" | "community_label" | "entity" | "tree_section" | "tree_text";
+export type ForceNodeType = "note" | "entity" | "tree_section" | "tree_text";
 
 export interface ForceNode {
   id: string;
@@ -67,6 +67,7 @@ export interface GraphElements {
   nodes: ForceNode[];
   links: ForceLink[];
   clusters: ClusterInfo[];
+  communities: ClusterInfo[];
   fingerprint: string;
 }
 
@@ -80,7 +81,6 @@ export interface FabricData {
   entities: FabricEntity[];
   entityEdges: FabricEntityEdge[];
   expandedTrees: Map<string, FabricTreeNode[]>;
-  layerCommunities: boolean;
   layerEntities: boolean;
   layerTree: boolean;
 }
@@ -105,9 +105,10 @@ export function useGraphElements({
     const notebookMap = new Map<string, Notebook>();
     for (const nb of notebooks) notebookMap.set(nb.id, nb);
 
-    // Build community lookup when communities layer is active
+    // Build community lookup when in semantic clustering mode
     const communityByNoteId = new Map<string, FabricCommunity>();
-    const useCommunities = clusteringMode === "semantic" && fabricData?.layerCommunities;
+    const useCommunities =
+      clusteringMode === "semantic" && (fabricData?.communities?.length ?? 0) > 0;
     if (useCommunities && fabricData?.communities) {
       for (const c of fabricData.communities) {
         for (const noteId of c.memberNoteIds) {
@@ -220,27 +221,6 @@ export function useGraphElements({
       });
     }
 
-    // ── Community label nodes ────────────────────────────────────────
-    if (useCommunities && fabricData?.communities) {
-      for (const community of fabricData.communities) {
-        if (community.memberCount === 0) continue;
-        const clusterId = `community:${community.id}`;
-        const communityColor = clusterMap.get(clusterId)?.color || community.color || "#6B7280";
-        forceNodes.push({
-          id: `community_label:${community.id}`,
-          label: `${community.name} (${community.memberCount})`,
-          color: communityColor,
-          size: 0, // size not used for community labels
-          linkCount: community.memberCount,
-          tags: [],
-          bodyPreview: "",
-          notebookId: null,
-          clusterId,
-          nodeType: "community_label",
-        });
-      }
-    }
-
     // ── Entity nodes ──────────────────────────────────────────────────
     const entityLinks: ForceLink[] = [];
     if (fabricData?.layerEntities && fabricData.entities.length > 0) {
@@ -341,12 +321,14 @@ export function useGraphElements({
     // Merge entity + tree links into the final link set
     const allForceLinks = [...forceLinks, ...entityLinks, ...treeLinks];
 
-    const clusters = Array.from(clusterMap.values()).filter((c) => c.count > 0);
+    const allClusters = Array.from(clusterMap.values()).filter((c) => c.count > 0);
+    const clusters = allClusters.filter((c) => !c.id.startsWith("community:"));
+    const communities = allClusters.filter((c) => c.id.startsWith("community:"));
 
     const nodeIdList = forceNodes.map((n) => n.id);
     const edgePairList: [string, string][] = allForceLinks.map((l) => [l.source, l.target]);
     const fingerprint = computeFingerprint(nodeIdList, edgePairList);
 
-    return { nodes: forceNodes, links: allForceLinks, clusters, fingerprint };
+    return { nodes: forceNodes, links: allForceLinks, clusters, communities, fingerprint };
   }, [nodes, links, notebooks, clusteringMode, fabricData]);
 }

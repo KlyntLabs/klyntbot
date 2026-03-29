@@ -19,8 +19,8 @@ use cognitive::services::louvain;
 use cognitive::TextEmbedder;
 use context_engine::book_index::BookTreeRepo;
 
-const DEBOUNCE_DURATION: Duration = Duration::from_secs(5);
-const MIN_COMMUNITY_SIZE: usize = 3;
+const DEBOUNCE_DURATION: Duration = Duration::from_secs(10);
+const MIN_COMMUNITY_SIZE: usize = 2;
 
 pub struct CommunityBuilder {
     community_repo: CommunityRepo,
@@ -162,17 +162,25 @@ impl CommunityBuilder {
             let top_member_ids: Vec<&str> =
                 members.iter().take(5).map(|(id, _)| id.as_str()).collect();
 
+            let mut name_parts = Vec::new();
             let mut summary_parts = Vec::new();
             let mut source_notes: HashSet<String> = HashSet::new();
             let mut representative_paths = Vec::new();
 
             for node_id in &top_member_ids {
                 if let Ok(Some(node)) = self.tree_repo.get_node(node_id).await {
+                    // Short title for community name
+                    let title = node
+                        .title
+                        .as_deref()
+                        .unwrap_or("Untitled")
+                        .trim();
+                    name_parts.push(common::truncate_at_boundary(title, 30).to_string());
+                    // Longer text for summary
                     let text = node.title.as_deref().unwrap_or(&node.content);
                     summary_parts.push(common::truncate_at_boundary(text, 100).to_string());
                     source_notes.insert(node.source_id.clone());
 
-                    // Build representative path
                     if representative_paths.len() < 3 {
                         if let Ok(ancestors) = self.tree_repo.get_path_to_root(node_id).await {
                             let path: Vec<String> = ancestors
@@ -189,12 +197,12 @@ impl CommunityBuilder {
             }
 
             let summary = summary_parts.join("; ");
-            let name = if summary_parts.len() <= 3 {
-                summary_parts.join(" & ")
+            let name = if name_parts.len() <= 3 {
+                name_parts.join(" & ")
             } else {
                 format!(
                     "{} (+{} more)",
-                    summary_parts[..2].join(" & "),
+                    name_parts[..2].join(" & "),
                     members.len() - 2
                 )
             };

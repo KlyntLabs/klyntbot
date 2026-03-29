@@ -1,5 +1,5 @@
 import { useClickOutside } from "@shared/hooks/useClickOutside";
-import type { FabricLayer, Note, Notebook } from "@shared/types";
+import type { Note, Notebook } from "@shared/types";
 import { Maximize2, Minus, Plus, RotateCcw, Settings2 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import ForceGraph2D from "react-force-graph-2d";
@@ -15,7 +15,7 @@ import { useGraphSettings } from "../hooks/useGraphSettings";
 import { useWaveReveal } from "../hooks/useWaveReveal";
 import { selectHub } from "../lib/graphBfs";
 import { resolveLinkEndpointId } from "../lib/graphUtils";
-import { BatchActionBar, FabricPulseBadge } from "./FabricPulseBadge";
+import { BatchActionBar } from "./FabricPulseBadge";
 import { GraphBrainView } from "./GraphBrainView";
 import type { ContextMenuAction } from "./GraphContextMenu";
 import { GraphContextMenu } from "./GraphContextMenu";
@@ -48,12 +48,10 @@ interface GraphViewProps {
   onOpenInEditor?: (id: string) => void;
 }
 
-const LAYER_SETTINGS_KEY: Record<FabricLayer, "layerCommunities" | "layerEntities" | "layerTree"> =
-  {
-    communities: "layerCommunities",
-    entities: "layerEntities",
-    tree: "layerTree",
-  };
+const LAYER_SETTINGS_KEY: Record<"entities" | "tree", "layerEntities" | "layerTree"> = {
+  entities: "layerEntities",
+  tree: "layerTree",
+};
 
 export function GraphView({
   notes,
@@ -100,6 +98,9 @@ export function GraphView({
     };
   }, []);
 
+  // ── Selected fabric node (entity/tree/community — not a note) ─────
+  const [selectedFabricNode, setSelectedFabricNode] = useState<ForceNode | null>(null);
+
   // ── Multi-select state ────────────────────────────────────────────
   const [selectedNodeIds, setSelectedNodeIds] = useState<Set<string>>(new Set());
 
@@ -111,30 +112,49 @@ export function GraphView({
   const { settings, setSettings, resetSettings, defaults } = useGraphSettings();
 
   // ── Fabric graph ──────────────────────────────────────────────────
-  const anyLayerEnabled = settings.layerCommunities || settings.layerEntities || settings.layerTree;
-  const fabric = useFabricGraph(anyLayerEnabled);
+  const anyLayerEnabled = settings.layerEntities || settings.layerTree;
+  const fabricEnabled = anyLayerEnabled || settings.clusteringMode === "semantic";
+  const fabric = useFabricGraph(fabricEnabled);
 
   const handleLayerToggle = useCallback(
-    (layer: FabricLayer) => {
+    (layer: "entities" | "tree") => {
       const settingsKey = LAYER_SETTINGS_KEY[layer];
       const currentlyEnabled = settings[settingsKey];
       setSettings({ [settingsKey]: !currentlyEnabled });
 
-      // When enabling the entities layer, fetch entity data
-      if (!currentlyEnabled && layer === "entities") {
-        fabric.expandLayer("entities");
+      // When enabling a layer, fetch its data
+      if (!currentlyEnabled) {
+        if (layer === "entities") {
+          fabric.expandLayer("entities");
+        } else if (layer === "tree") {
+          const noteIds = notes.map((n) => n.id);
+          fabric.expandLayer("tree", noteIds);
+        }
       }
     },
-    [settings, setSettings, fabric],
+    [settings, setSettings, fabric, notes],
   );
 
-  const fabricData: FabricData | undefined = anyLayerEnabled
+  // Auto-fetch layer data on mount when layers are already enabled (from saved settings)
+  const initialFetchDone = useRef(false);
+  useEffect(() => {
+    if (initialFetchDone.current || !fabric.base) return;
+    initialFetchDone.current = true;
+    if (settings.layerEntities) fabric.expandLayer("entities");
+    if (settings.layerTree && notes.length > 0) {
+      fabric.expandLayer(
+        "tree",
+        notes.map((n) => n.id),
+      );
+    }
+  }, [fabric.base, settings.layerEntities, settings.layerTree, notes, fabric]);
+
+  const fabricData: FabricData | undefined = fabricEnabled
     ? {
         communities: fabric.base?.communities ?? [],
         entities: fabric.entities,
         entityEdges: fabric.entityEdges,
         expandedTrees: fabric.expandedTrees,
-        layerCommunities: settings.layerCommunities,
         layerEntities: settings.layerEntities,
         layerTree: settings.layerTree,
       }
@@ -341,7 +361,15 @@ export function GraphView({
     highlightedClusterId,
     revealedNodes: waveReveal.revealedNodes,
     cachedPositions,
-    onNodeClick: onSelectNote,
+    onNodeClick: (nodeId: string) => {
+      const node = elements.nodes.find((n) => n.id === nodeId);
+      if (!node || node.nodeType === "note") {
+        setSelectedFabricNode(null);
+        onSelectNote(nodeId);
+      } else {
+        setSelectedFabricNode(node);
+      }
+    },
     onNodeDoubleClick: handleNodeDoubleClick,
     onNodeRightClick: handleNodeRightClick,
     onSavePositions: savePositions,
@@ -512,18 +540,14 @@ export function GraphView({
 
       switch (e.key) {
         case "1":
-          handleLayerToggle("communities");
-          break;
-        case "2":
           handleLayerToggle("entities");
           break;
-        case "3":
+        case "2":
           handleLayerToggle("tree");
           break;
         case "s":
         case "S":
           // Apply semantic preset
-          if (!settings.layerCommunities) handleLayerToggle("communities");
           if (!settings.layerEntities) handleLayerToggle("entities");
           setSettings({ clusteringMode: "semantic" });
           break;
@@ -650,7 +674,6 @@ export function GraphView({
         renderMode={settings.renderMode}
         onRenderModeChange={(mode) => setSettings({ renderMode: mode })}
         layerState={{
-          communities: settings.layerCommunities,
           entities: settings.layerEntities,
           tree: settings.layerTree,
         }}
@@ -696,6 +719,7 @@ export function GraphView({
                 enableNodeDrag={true}
                 enableZoomInteraction={true}
                 enablePanInteraction={true}
+                autoPauseRedraw={false}
               />
             )}
           </div>
@@ -710,9 +734,19 @@ export function GraphView({
             <GraphBrainView
               elements={elements}
               settings={settings}
+              highlightedClusterId={highlightedClusterId}
+              activeNoteId={activeNoteId}
               width={containerRef.current?.clientWidth ?? 800}
               height={containerRef.current?.clientHeight ?? 600}
-              onNodeClick={onSelectNote}
+              onNodeClick={(nodeId: string) => {
+                const node = elements.nodes.find((n) => n.id === nodeId);
+                if (!node || node.nodeType === "note") {
+                  setSelectedFabricNode(null);
+                  onSelectNote(nodeId);
+                } else {
+                  setSelectedFabricNode(node);
+                }
+              }}
             />
           </div>
         )}
@@ -740,6 +774,7 @@ export function GraphView({
         {/* Legend with filter (bottom-left) */}
         <GraphLegend
           clusters={allElements.clusters}
+          communities={allElements.communities}
           hiddenClusters={hiddenClusters}
           onToggleCluster={handleToggleCluster}
           onShowAll={handleShowAll}
@@ -851,22 +886,6 @@ export function GraphView({
           </div>
         )}
 
-        {/* Fabric Pulse Badge (bottom-left, above legend) */}
-        {anyLayerEnabled && (
-          <div className="absolute bottom-24 left-4 z-10">
-            <FabricPulseBadge
-              lastActivityTimestamp={fabric.base?.lastActivityTimestamp ?? new Date().toISOString()}
-              livePulseActive={fabric.base?.livePulseActive ?? false}
-              onViewUpdates={() => fabric.refetch()}
-              onSwitchToSemantic={() => {
-                if (!settings.layerCommunities) handleLayerToggle("communities");
-                if (!settings.layerEntities) handleLayerToggle("entities");
-                setSettings({ clusteringMode: "semantic" });
-              }}
-            />
-          </div>
-        )}
-
         {/* Multi-select batch action bar */}
         <BatchActionBar
           selectedCount={selectedNodeIds.size}
@@ -874,6 +893,66 @@ export function GraphView({
           onCreateBridgeNote={handleCreateBridgeFromSelection}
           onCompareInChat={handleCompareInChat}
         />
+      </div>
+
+      {/* Fabric node detail panel (entity/tree/community) */}
+      {selectedFabricNode && (
+        <FabricNodePanel node={selectedFabricNode} onClose={() => setSelectedFabricNode(null)} />
+      )}
+    </div>
+  );
+}
+
+function FabricNodePanel({ node, onClose }: { node: ForceNode; onClose: () => void }) {
+  const typeLabel =
+    node.nodeType === "entity" ? "Entity" : node.nodeType === "tree_section" ? "Section" : "Node";
+
+  const typeIcon = node.nodeType === "entity" ? "diamond" : "section";
+
+  return (
+    <div className="absolute right-0 top-0 h-full w-[280px] z-20 glass-panel border-l border-border/30 overflow-y-auto">
+      <div className="p-4">
+        <div className="flex items-center justify-between mb-3">
+          <span
+            className="inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-2xs font-medium"
+            style={{ backgroundColor: `${node.color}20`, color: node.color }}
+          >
+            {typeIcon === "diamond" && "◆ "}
+            {typeIcon === "section" && "◎ "}
+            {typeLabel}
+          </span>
+          <button
+            type="button"
+            onClick={onClose}
+            className="text-muted-foreground hover:text-foreground text-xs"
+          >
+            ✕
+          </button>
+        </div>
+
+        <h3 className="text-sm font-semibold text-foreground mb-2">{node.label}</h3>
+
+        {node.bodyPreview && (
+          <p className="text-xs text-muted-foreground leading-relaxed mb-3">{node.bodyPreview}</p>
+        )}
+
+        <div className="space-y-1.5 text-2xs text-muted-foreground">
+          {node.nodeType === "entity" && (
+            <>
+              <div>
+                Connections: <span className="text-foreground">{node.linkCount}</span>
+              </div>
+              <div>
+                Type: <span className="text-foreground">{node.tags[0] || "concept"}</span>
+              </div>
+            </>
+          )}
+          {node.nodeType === "tree_section" && (
+            <div>
+              Level: <span className="text-foreground">{node.size > 12 ? "Section" : "Text"}</span>
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );

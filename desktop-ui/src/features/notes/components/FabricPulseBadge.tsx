@@ -10,7 +10,10 @@ interface FabricPulseBadgeProps {
 }
 
 function formatTimeAgo(timestamp: string): string {
-  const diff = Date.now() - new Date(timestamp).getTime();
+  if (!timestamp) return "no activity yet";
+  const date = new Date(timestamp);
+  if (Number.isNaN(date.getTime())) return "no activity yet";
+  const diff = Date.now() - date.getTime();
   if (diff < 0) return "just now";
   const seconds = Math.floor(diff / 1000);
   if (seconds < 60) return `${seconds}s ago`;

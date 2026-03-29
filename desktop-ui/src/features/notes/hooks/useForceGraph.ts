@@ -97,7 +97,7 @@ export function useForceGraph({
   elements,
   settings,
   renderMode,
-  activeNoteId: _activeNoteId,
+  activeNoteId,
   highlightedClusterId,
   revealedNodes,
   cachedPositions,
@@ -298,18 +298,24 @@ export function useForceGraph({
   const paintCtxRef = useRef<PaintContext>({
     nodeScale: settings.nodeScale,
     labelThreshold: settings.labelThreshold,
+    activeNoteId: null,
     hoveredNodeId: null,
     neighborSet: new Set(),
     highlightedClusterId: null,
     highlightedNodeIds: null,
+    linkWidth: settings.linkWidth,
+    linkOpacity: settings.linkOpacity,
   });
   paintCtxRef.current = {
     nodeScale: settings.nodeScale,
     labelThreshold: settings.labelThreshold,
+    activeNoteId,
     hoveredNodeId,
     neighborSet: neighborSetRef.current,
     highlightedClusterId,
     highlightedNodeIds: highlightedNodeIds.size > 0 ? highlightedNodeIds : null,
+    linkWidth: settings.linkWidth,
+    linkOpacity: settings.linkOpacity,
   };
 
   const revealedNodesRef = useRef(revealedNodes);
@@ -358,11 +364,6 @@ export function useForceGraph({
         ctx.lineTo(x - half, y);
         ctx.closePath();
         ctx.fill();
-      } else if (node.nodeType === "community_label") {
-        // Larger hit area for label nodes
-        const hitW = 60 * settings.nodeScale;
-        const hitH = 20 * settings.nodeScale;
-        ctx.fillRect(x - hitW / 2, y - hitH / 2, hitW, hitH);
       } else {
         const radius = (node.size / 2) * settings.nodeScale;
         ctx.beginPath();
@@ -392,15 +393,6 @@ export function useForceGraph({
           } else {
             setHighlightedNodeIds(new Set());
           }
-          break;
-        }
-        case "community_label": {
-          // Highlight all nodes with the same clusterId
-          const members = new Set<string>();
-          for (const n of elements.nodes) {
-            if (n.clusterId === node.clusterId) members.add(n.id);
-          }
-          setHighlightedNodeIds(members);
           break;
         }
         case "entity": {
@@ -456,12 +448,6 @@ export function useForceGraph({
           } else {
             onNodeDoubleClick?.(node.id);
           }
-          break;
-        }
-        case "community_label": {
-          // Zoom-to-fit all community members
-          const cid = node.clusterId;
-          graphRef.current?.zoomToFit(400, 40, ((n: ForceNode) => n.clusterId === cid) as never);
           break;
         }
         case "entity": {
@@ -576,7 +562,6 @@ export function useForceGraph({
         const communityPoints = new Map<string, { x: number; y: number }[]>();
         for (const n of graphData.nodes) {
           if (!n.clusterId.startsWith("community:")) continue;
-          if (n.nodeType === "community_label") continue;
           if (n.x == null || n.y == null) continue;
           if (n.id === node.id) continue; // exclude dragged node
           if (!communityPoints.has(n.clusterId)) communityPoints.set(n.clusterId, []);
@@ -590,16 +575,12 @@ export function useForceGraph({
           if (hull.length < 3) continue;
           const expanded = expandHull(hull, 30);
           if (pointInPolygon(node.x, node.y, expanded)) {
-            // Find community name from label node
-            const labelNode = graphData.nodes.find(
-              (n) => n.nodeType === "community_label" && n.clusterId === clusterId,
-            );
             onDragCommunityChange({
               nodeId: node.id,
               nodeLabel: node.label,
               sourceCommunityId: startCluster,
               targetCommunityId: clusterId,
-              targetCommunityName: labelNode?.label ?? clusterId.replace("community:", ""),
+              targetCommunityName: clusterId.replace("community:", ""),
             });
             break;
           }
@@ -648,7 +629,6 @@ export function useForceGraph({
         for (const node of graphData.nodes) {
           if (!node.clusterId.startsWith("community:")) continue;
           if (node.x == null || node.y == null) continue;
-          if (node.nodeType === "community_label") continue;
 
           if (!clusterPositions.has(node.clusterId)) {
             clusterPositions.set(node.clusterId, []);
