@@ -42,7 +42,7 @@ pub struct CaptureSession {
     /// cpal stream handle -- dropping this stops the audio stream.
     _stream: cpal::Stream,
     /// Signal to stop the capture.
-    stop_signal: Arc<AtomicBool>,
+    pub(crate) stop_signal: Arc<AtomicBool>,
     /// Receiver for audio chunks (16kHz mono f32).
     pub audio_rx: mpsc::Receiver<AudioChunk>,
     /// Receiver for RMS levels (~30fps for waveform animation).
