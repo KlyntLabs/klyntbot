@@ -245,6 +245,12 @@ pub enum DomainEvent {
         project_id: String,
     },
 
+    /// Emitted after tree nodes have been rebuilt and embedded for a source.
+    TreeNodesRebuilt {
+        source_type: String,
+        source_id: String,
+    },
+
     // -- Chat --
     ChatTurnCompleted {
         user_message: String,
@@ -541,7 +547,8 @@ impl DomainEvent {
             | Self::TaskStatusChanged { .. }
             | Self::TaskPriorityChanged { .. }
             | Self::TaskFieldUpdated { .. }
-            | Self::TaskHierarchyChanged { .. } => "work",
+            | Self::TaskHierarchyChanged { .. }
+            | Self::TreeNodesRebuilt { .. } => "work",
 
             Self::ActivitySessionCompleted { .. }
             | Self::FocusSessionStarted { .. }

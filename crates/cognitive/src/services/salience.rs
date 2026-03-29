@@ -122,6 +122,7 @@ pub fn evaluate_salience(event: &DomainEvent) -> SalienceVerdict {
         DomainEvent::NoteContentChanged { .. } => SalienceVerdict::Discard,
         DomainEvent::NoteDeleted { .. } => SalienceVerdict::Discard,
         DomainEvent::TaskHierarchyChanged { .. } => SalienceVerdict::Discard,
+        DomainEvent::TreeNodesRebuilt { .. } => SalienceVerdict::Discard,
         DomainEvent::FlashcardSessionCompleted { .. } => SalienceVerdict::Accumulate,
 
         // Productivity interventions — accumulate for pattern detection

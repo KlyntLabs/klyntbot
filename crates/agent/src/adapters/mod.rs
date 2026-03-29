@@ -23,4 +23,5 @@ pub mod productivity;
 pub mod progress;
 pub mod query_rewriter;
 pub mod task_embedding;
+pub mod task_tree_builder;
 pub mod tree_node_search;

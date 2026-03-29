@@ -38,11 +38,11 @@ impl EntityTreeLinker {
         &self.pool
     }
 
-    /// Event-driven subscriber loop. Listens for `NoteContentChanged` events
-    /// and links entities to tree nodes for the affected note.
+    /// Event-driven subscriber loop. Listens for `TreeNodesRebuilt` events
+    /// and links entities to tree nodes for the affected source.
     ///
-    /// Should be started AFTER NoteTreeBuilder so tree nodes exist when this runs.
-    /// Uses a small delay (2s) after receiving the event to let NoteTreeBuilder finish.
+    /// `TreeNodesRebuilt` is emitted by NoteTreeBuilder/TaskTreeBuilder AFTER
+    /// tree nodes are persisted, so no delay is needed.
     pub async fn run(
         self: Arc<Self>,
         mut rx: broadcast::Receiver<DomainEvent>,
@@ -58,11 +58,9 @@ impl EntityTreeLinker {
                 }
                 result = rx.recv() => {
                     match result {
-                        Ok(DomainEvent::NoteContentChanged { note_id, .. }) => {
-                            // Small delay to let NoteTreeBuilder finish first
-                            tokio::time::sleep(std::time::Duration::from_secs(2)).await;
-                            if let Err(e) = self.link_entities_for_note(&note_id).await {
-                                warn!(note_id = %note_id, "EntityTreeLinker: failed: {e}");
+                        Ok(DomainEvent::TreeNodesRebuilt { source_type, source_id }) => {
+                            if let Err(e) = self.link_entities_for_source(&source_type, &source_id).await {
+                                warn!(source_type = %source_type, source_id = %source_id, "EntityTreeLinker: failed: {e}");
                             }
                         }
                         Ok(_) => {}
@@ -79,11 +77,17 @@ impl EntityTreeLinker {
         }
     }
 
-    /// Link entities to tree nodes for a specific note.
+    /// Link entities to tree nodes for a specific source (note, task, etc.).
     /// Public for use in backfill jobs.
-    pub async fn link_entities_for_note(&self, note_id: &str) -> common::Result<()> {
-        // 1. Load all tree nodes for this note
-        let tree_nodes = self.get_tree_nodes_for_note(note_id).await?;
+    pub async fn link_entities_for_source(
+        &self,
+        source_type: &str,
+        source_id: &str,
+    ) -> common::Result<()> {
+        // 1. Load all tree nodes for this source
+        let tree_nodes = self
+            .get_tree_nodes_for_source(source_type, source_id)
+            .await?;
         if tree_nodes.is_empty() {
             return Ok(());
         }
@@ -101,7 +105,7 @@ impl EntityTreeLinker {
         }
 
         if all_entities.is_empty() {
-            debug!(note_id = %note_id, "EntityTreeLinker: no entities to match against");
+            debug!(source_type = %source_type, source_id = %source_id, "EntityTreeLinker: no entities to match against");
             return Ok(());
         }
 
@@ -126,7 +130,7 @@ impl EntityTreeLinker {
         }
 
         if links.is_empty() {
-            debug!(note_id = %note_id, "EntityTreeLinker: no entity matches found");
+            debug!(source_type = %source_type, source_id = %source_id, "EntityTreeLinker: no entity matches found");
             return Ok(());
         }
 
@@ -138,7 +142,8 @@ impl EntityTreeLinker {
         gt_link_repo.link_batch(&links).await?;
 
         info!(
-            note_id = %note_id,
+            source_type = %source_type,
+            source_id = %source_id,
             links = links.len(),
             entities = all_entities.len(),
             "EntityTreeLinker: linked entities to tree nodes"
@@ -147,16 +152,23 @@ impl EntityTreeLinker {
         Ok(())
     }
 
-    /// Get all tree nodes for a note: (node_id, content)
-    async fn get_tree_nodes_for_note(
+    /// Backward-compatible wrapper for note-specific linking (used in backfill).
+    pub async fn link_entities_for_note(&self, note_id: &str) -> common::Result<()> {
+        self.link_entities_for_source("note", note_id).await
+    }
+
+    /// Get all tree nodes for a source: (node_id, content)
+    async fn get_tree_nodes_for_source(
         &self,
-        note_id: &str,
+        source_type: &str,
+        source_id: &str,
     ) -> common::Result<Vec<(String, String)>> {
         let rows: Vec<(String, String)> = sqlx::query_as(
             "SELECT id, content FROM book_tree_nodes
-             WHERE source_type = 'note' AND source_id = ?1",
+             WHERE source_type = ?1 AND source_id = ?2",
         )
-        .bind(note_id)
+        .bind(source_type)
+        .bind(source_id)
         .fetch_all(&self.pool)
         .await
         .map_err(|e| common::KlyntbotError::Storage(e.to_string()))?;

@@ -1106,6 +1106,7 @@ fn event_type_key(event: &DomainEvent) -> String {
         DomainEvent::NoteContentChanged { .. } => "NoteContentChanged".into(),
         DomainEvent::NoteDeleted { .. } => "NoteDeleted".into(),
         DomainEvent::TaskHierarchyChanged { .. } => "TaskHierarchyChanged".into(),
+        DomainEvent::TreeNodesRebuilt { .. } => "TreeNodesRebuilt".into(),
         DomainEvent::KnowledgeAtomCreated { .. } => "KnowledgeAtomCreated".into(),
         DomainEvent::KnowledgeAtomAccepted { .. } => "KnowledgeAtomAccepted".into(),
         DomainEvent::KnowledgeAtomArchived { .. } => "KnowledgeAtomArchived".into(),

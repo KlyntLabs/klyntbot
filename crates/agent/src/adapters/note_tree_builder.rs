@@ -11,7 +11,10 @@ use tokio::sync::broadcast;
 use tokio_util::sync::CancellationToken;
 use tracing::{debug, info, warn};
 
-use bus::{ContextUpdate, ContextUpdateQueue, ContextUpdateReason, DomainEvent, UpdatePriority};
+use bus::{
+    ContextUpdate, ContextUpdateQueue, ContextUpdateReason, DomainEvent, DomainEventBus,
+    UpdatePriority,
+};
 use cognitive::TextEmbedder;
 use common::truncate_at_boundary;
 use context_engine::book_index::types::SourceType;
@@ -24,6 +27,7 @@ pub struct NoteTreeBuilder {
     vector_store: Arc<storage::VectorStore>,
     embedder: Arc<dyn TextEmbedder>,
     context_update_queue: Option<Arc<ContextUpdateQueue>>,
+    domain_event_bus: Option<Arc<DomainEventBus>>,
 }
 
 impl NoteTreeBuilder {
@@ -32,12 +36,14 @@ impl NoteTreeBuilder {
         vector_store: Arc<storage::VectorStore>,
         embedder: Arc<dyn TextEmbedder>,
         context_update_queue: Option<Arc<ContextUpdateQueue>>,
+        domain_event_bus: Option<Arc<DomainEventBus>>,
     ) -> Self {
         Self {
             tree_repo,
             vector_store,
             embedder,
             context_update_queue,
+            domain_event_bus,
         }
     }
 
@@ -197,6 +203,14 @@ impl NoteTreeBuilder {
                 })),
                 priority: UpdatePriority::Low,
                 timestamp: chrono::Utc::now(),
+            });
+        }
+
+        // 6. Emit TreeNodesRebuilt so EntityTreeLinker picks it up
+        if let Some(ref bus) = self.domain_event_bus {
+            bus.publish(DomainEvent::TreeNodesRebuilt {
+                source_type: "note".to_string(),
+                source_id: note_id.to_string(),
             });
         }
 

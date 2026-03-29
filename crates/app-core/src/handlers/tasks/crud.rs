@@ -150,7 +150,7 @@ impl AppCore {
             id: id.clone(),
         }];
 
-        // Emit domain event for timeline tracking
+        // Emit domain events for timeline tracking + tree rebuild
         if let Ok(bus) = self.domain_event_bus() {
             bus.publish(bus::DomainEvent::TaskCreated {
                 task_id: id.clone(),
@@ -158,6 +158,11 @@ impl AppCore {
                 estimate_mins: created.estimated_minutes.map(|m| m as i64),
                 task_type: created.task_type.clone(),
             });
+            if let Some(ref project_id) = created.project_id {
+                bus.publish(bus::DomainEvent::TaskHierarchyChanged {
+                    project_id: project_id.clone(),
+                });
+            }
         }
 
         // Newly created task has no subtasks yet; resolve status label for the response
@@ -262,6 +267,22 @@ impl AppCore {
                         });
                     }
                 }
+
+                // Emit TaskHierarchyChanged when title or description changes
+                // (affects the task tree structure)
+                let title_changed = new_title.as_ref().is_some_and(|t| old.title != *t);
+                let desc_changed = patch
+                    .description
+                    .as_ref()
+                    .is_some_and(|new_desc| old.description != *new_desc);
+                let tree_changed = title_changed || desc_changed;
+                if tree_changed {
+                    if let Some(ref project_id) = updated.project_id {
+                        bus.publish(bus::DomainEvent::TaskHierarchyChanged {
+                            project_id: project_id.clone(),
+                        });
+                    }
+                }
             }
         }
 
@@ -270,6 +291,9 @@ impl AppCore {
     }
 
     pub async fn task_delete(&self, id: String) -> HandlerResult<bool> {
+        // Fetch the task before deletion so we can emit hierarchy change
+        let task = self.repos.tasks.get(&id).await.map_err(map_storage_err)?;
+
         let deleted = self
             .repos
             .tasks
@@ -278,6 +302,16 @@ impl AppCore {
             .map_err(map_storage_err)?;
 
         let updates = if deleted {
+            // Emit TaskHierarchyChanged so the task tree is rebuilt
+            if let Some(ref task) = task {
+                if let Some(ref project_id) = task.project_id {
+                    if let Ok(bus) = self.domain_event_bus() {
+                        bus.publish(bus::DomainEvent::TaskHierarchyChanged {
+                            project_id: project_id.clone(),
+                        });
+                    }
+                }
+            }
             vec![EntityUpdate {
                 kind: EntityKind::Task,
                 id,

@@ -55,7 +55,7 @@ impl CommunityBuilder {
     ) {
         info!("CommunityBuilder: subscriber started");
 
-        let mut pending_note_ids: HashSet<String> = HashSet::new();
+        let mut pending_source_ids: HashSet<String> = HashSet::new();
         let mut debounce_deadline: Option<Instant> = None;
 
         loop {
@@ -69,7 +69,11 @@ impl CommunityBuilder {
                 result = rx.recv() => {
                     match result {
                         Ok(DomainEvent::NoteContentChanged { note_id, .. }) => {
-                            pending_note_ids.insert(note_id);
+                            pending_source_ids.insert(note_id);
+                            debounce_deadline = Some(Instant::now() + DEBOUNCE_DURATION);
+                        }
+                        Ok(DomainEvent::TaskHierarchyChanged { project_id }) => {
+                            pending_source_ids.insert(format!("task:{project_id}"));
                             debounce_deadline = Some(Instant::now() + DEBOUNCE_DURATION);
                         }
                         Ok(_) => {}
@@ -83,12 +87,12 @@ impl CommunityBuilder {
                     }
                 }
                 _ = async { timeout.unwrap().await }, if debounce_deadline.is_some() => {
-                    if !pending_note_ids.is_empty() {
-                        let note_ids: Vec<String> = pending_note_ids.drain().collect();
+                    if !pending_source_ids.is_empty() {
+                        let source_ids: Vec<String> = pending_source_ids.drain().collect();
                         debounce_deadline = None;
 
                         debug!(
-                            note_count = note_ids.len(),
+                            source_count = source_ids.len(),
                             "CommunityBuilder: debounce window elapsed, rebuilding communities"
                         );
 
@@ -170,11 +174,7 @@ impl CommunityBuilder {
             for node_id in &top_member_ids {
                 if let Ok(Some(node)) = self.tree_repo.get_node(node_id).await {
                     // Short title for community name
-                    let title = node
-                        .title
-                        .as_deref()
-                        .unwrap_or("Untitled")
-                        .trim();
+                    let title = node.title.as_deref().unwrap_or("Untitled").trim();
                     name_parts.push(common::truncate_at_boundary(title, 30).to_string());
                     // Longer text for summary
                     let text = node.title.as_deref().unwrap_or(&node.content);

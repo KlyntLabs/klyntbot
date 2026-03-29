@@ -791,6 +791,7 @@ impl AgentLoopBuilder {
                                 Arc::new(vs.clone()),
                                 text_embedder.clone(),
                                 self.context_update_queue.clone(),
+                                self.domain_event_bus.clone(),
                             ));
                         let tree_builder_rx = domain_bus.subscribe();
                         let tree_builder_shutdown = CancellationToken::new();
@@ -802,6 +803,27 @@ impl AgentLoopBuilder {
                             }
                         });
                         info!("NoteTreeBuilder subscriber started");
+
+                        // TaskTreeBuilder subscriber (event-driven task tree rebuild + LanceDB embed)
+                        let task_tree_builder =
+                            Arc::new(crate::adapters::task_tree_builder::TaskTreeBuilder::new(
+                                tree_repo.clone(),
+                                Arc::new(vs.clone()),
+                                text_embedder.clone(),
+                                self.context_update_queue.clone(),
+                                self.domain_event_bus.clone(),
+                                storage_pool.inner().clone(),
+                            ));
+                        let task_tree_rx = domain_bus.subscribe();
+                        let task_tree_shutdown = CancellationToken::new();
+                        let _task_tree_handle = tokio::spawn({
+                            let builder = Arc::clone(&task_tree_builder);
+                            let shutdown = task_tree_shutdown.clone();
+                            async move {
+                                builder.run(task_tree_rx, shutdown).await;
+                            }
+                        });
+                        info!("TaskTreeBuilder subscriber started");
 
                         // EntityTreeLinker subscriber (links entities ↔ tree nodes)
                         let entity_linker =
@@ -841,9 +863,10 @@ impl AgentLoopBuilder {
                         });
                         info!("CommunityBuilder subscriber started");
 
-                        // Background tree node backfill for existing notes
+                        // Background tree node backfill for existing notes + tasks
                         {
                             let backfill_builder = Arc::clone(&note_tree_builder);
+                            let backfill_task_tree_builder = Arc::clone(&task_tree_builder);
                             let backfill_note_repo =
                                 feature_notes::repo::NoteRepo::new(storage_pool.inner().clone());
                             let backfill_linker = Arc::clone(&entity_linker);
@@ -857,11 +880,19 @@ impl AgentLoopBuilder {
                                 {
                                     warn!("Note tree backfill error: {e}");
                                 }
+                                // Backfill task trees for existing projects
+                                if let Err(e) =
+                                    backfill_task_trees(&backfill_task_tree_builder).await
+                                {
+                                    warn!("Task tree backfill error: {e}");
+                                }
                                 // After tree nodes exist, link entities to them
                                 tokio::time::sleep(std::time::Duration::from_secs(3)).await;
                                 backfill_entity_links(&backfill_linker).await;
                                 // After entity links exist, run community detection
-                                if let Err(e) = backfill_community_builder.rebuild_communities().await {
+                                if let Err(e) =
+                                    backfill_community_builder.rebuild_communities().await
+                                {
                                     warn!("Community backfill error: {e}");
                                 }
                             });
@@ -1755,27 +1786,30 @@ async fn backfill_tree_nodes(
     Ok(())
 }
 
-/// Backfill entity-tree links for all notes that have tree nodes.
+/// Backfill entity-tree links for all sources that have tree nodes.
 /// Runs after tree node backfill to ensure tree nodes exist first.
 async fn backfill_entity_links(linker: &crate::adapters::entity_tree_linker::EntityTreeLinker) {
     let pool = linker.pool();
-    let note_ids: Vec<(String,)> = match sqlx::query_as(
-        "SELECT DISTINCT source_id FROM book_tree_nodes WHERE source_type = 'note'",
+    let source_rows: Vec<(String, String)> = match sqlx::query_as(
+        "SELECT DISTINCT source_type, source_id FROM book_tree_nodes WHERE source_type IN ('note', 'task')",
     )
     .fetch_all(pool)
     .await
     {
-        Ok(ids) => ids,
+        Ok(rows) => rows,
         Err(e) => {
-            warn!("Entity link backfill: failed to query note IDs: {e}");
+            warn!("Entity link backfill: failed to query source IDs: {e}");
             return;
         }
     };
 
     let mut linked = 0usize;
-    for (note_id,) in &note_ids {
-        if let Err(e) = linker.link_entities_for_note(note_id).await {
-            warn!(note_id = %note_id, "Entity link backfill failed: {e}");
+    for (source_type, source_id) in &source_rows {
+        if let Err(e) = linker
+            .link_entities_for_source(source_type, source_id)
+            .await
+        {
+            warn!(source_type = %source_type, source_id = %source_id, "Entity link backfill failed: {e}");
         } else {
             linked += 1;
         }
@@ -1783,6 +1817,32 @@ async fn backfill_entity_links(linker: &crate::adapters::entity_tree_linker::Ent
     }
 
     if linked > 0 {
-        info!("Entity link backfill complete: {linked} notes processed");
+        info!("Entity link backfill complete: {linked} sources processed");
     }
+}
+
+/// Backfill task trees for all existing projects.
+async fn backfill_task_trees(
+    builder: &crate::adapters::task_tree_builder::TaskTreeBuilder,
+) -> common::Result<()> {
+    let pool = builder.pool();
+    let project_ids: Vec<(String,)> = sqlx::query_as("SELECT DISTINCT id FROM projects")
+        .fetch_all(pool)
+        .await
+        .map_err(|e| common::KlyntbotError::Storage(e.to_string()))?;
+
+    let mut processed = 0usize;
+    for (project_id,) in &project_ids {
+        if let Err(e) = builder.handle_project_changed(project_id).await {
+            warn!(project_id = %project_id, "Task tree backfill failed: {e}");
+        } else {
+            processed += 1;
+        }
+        tokio::task::yield_now().await;
+    }
+
+    if processed > 0 {
+        info!("Task tree backfill complete: {processed} projects processed");
+    }
+    Ok(())
 }
