@@ -4,6 +4,7 @@
 //! concrete implementations (whisper-rs local, Groq cloud, AVSpeech),
 //! the `AudioCapture` subsystem, and the `VoiceService` orchestrator.
 
+pub mod capture;
 pub mod engines;
 pub mod events;
 pub mod mock;
@@ -15,6 +16,7 @@ pub mod stt;
 pub mod tts;
 pub mod types;
 
+pub use capture::{AudioCapture, CaptureConfig, CaptureSession};
 pub use engines::GroqWhisperEngine;
 pub use events::{VoiceEvent, VOICE_EVENT};
 pub use model_manager::{ModelManager, ModelState, WhisperModelSize};
