@@ -2,7 +2,7 @@
 //! in the macOS menu bar with a live countdown (e.g. "« 24:57 · Standup").
 //! Yields to the focus timer when a session is active.
 
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU8, Ordering};
 use std::sync::Arc;
 
 use chrono::{DateTime, Local, Utc};
@@ -15,6 +15,9 @@ pub static FOCUS_ACTIVE: AtomicBool = AtomicBool::new(false);
 
 /// Shared flag: when `true`, a voice capture session is active.
 pub static VOICE_ACTIVE: AtomicBool = AtomicBool::new(false);
+
+/// Current voice conversation phase: 0=idle, 1=listening, 2=reflecting, 3=speaking.
+pub static VOICE_PHASE: AtomicU8 = AtomicU8::new(0);
 
 /// Cached "next item" — either a calendar event or a task deadline.
 struct NextItem {
@@ -56,11 +59,16 @@ async fn countdown_loop(app: AppHandle) {
             continue;
         }
 
-        // If voice capture is active, show "Listening..." (focus timer takes priority above)
+        // If voice capture is active, show phase-specific text (focus timer takes priority above)
         if VOICE_ACTIVE.load(Ordering::Relaxed) {
-            if let Some(tray) = app.tray_by_id("klynt-tray") {
-                let _ = tray.set_title(Some("Listening..."));
-            }
+            let phase = VOICE_PHASE.load(Ordering::Relaxed);
+            let title = match phase {
+                1 => "Listening...",
+                2 => "Reflecting...",
+                3 => "Speaking...",
+                _ => "Voice active",
+            };
+            set_tray_title(&app, title);
             cached = None;
             continue;
         }

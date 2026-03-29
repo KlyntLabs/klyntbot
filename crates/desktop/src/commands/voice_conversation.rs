@@ -14,6 +14,7 @@ pub async fn voice_conversation_start(
 ) -> Result<VoiceConversationStartResponse, ApiError> {
     let result = state.voice_conversation_start().await?;
     crate::tray_countdown::VOICE_ACTIVE.store(true, std::sync::atomic::Ordering::Relaxed);
+    crate::tray_countdown::VOICE_PHASE.store(1, std::sync::atomic::Ordering::Relaxed);
     Ok(result)
 }
 
@@ -21,6 +22,7 @@ pub async fn voice_conversation_start(
 pub async fn voice_conversation_pause(state: State<'_, Arc<AppCore>>) -> Result<(), ApiError> {
     let result = state.voice_conversation_pause().await;
     crate::tray_countdown::VOICE_ACTIVE.store(false, std::sync::atomic::Ordering::Relaxed);
+    crate::tray_countdown::VOICE_PHASE.store(0, std::sync::atomic::Ordering::Relaxed);
     result
 }
 
@@ -28,6 +30,7 @@ pub async fn voice_conversation_pause(state: State<'_, Arc<AppCore>>) -> Result<
 pub async fn voice_conversation_resume(state: State<'_, Arc<AppCore>>) -> Result<(), ApiError> {
     let result = state.voice_conversation_resume().await;
     crate::tray_countdown::VOICE_ACTIVE.store(true, std::sync::atomic::Ordering::Relaxed);
+    crate::tray_countdown::VOICE_PHASE.store(1, std::sync::atomic::Ordering::Relaxed);
     result
 }
 
@@ -54,6 +57,7 @@ pub async fn voice_conversation_new_session(
 pub async fn voice_conversation_end(state: State<'_, Arc<AppCore>>) -> Result<(), ApiError> {
     let result = state.voice_conversation_end().await;
     crate::tray_countdown::VOICE_ACTIVE.store(false, std::sync::atomic::Ordering::Relaxed);
+    crate::tray_countdown::VOICE_PHASE.store(0, std::sync::atomic::Ordering::Relaxed);
     result
 }
 
