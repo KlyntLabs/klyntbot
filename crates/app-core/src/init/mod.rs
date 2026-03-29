@@ -523,9 +523,7 @@ impl AppCore {
 
                 // Tier 3 memory recall: construct a MemoryRetriever from
                 // cognitive UnifiedMemoryService (facts + conversation recall).
-                let voice_memory_retriever: Option<
-                    Arc<dyn context_engine::MemoryRetriever>,
-                > = {
+                let voice_memory_retriever: Option<Arc<dyn context_engine::MemoryRetriever>> = {
                     let fact_repo =
                         ::cognitive::SemanticFactRepo::new(storage_pool.inner().clone());
                     let retriever = ::cognitive::UnifiedMemoryService::new(fact_repo);

@@ -62,17 +62,20 @@ impl LearningTreeBuilder {
     /// each one. Insert errors for already-indexed atoms are silently ignored by
     /// the underlying `persist_nodes` logic, so this is safe to run on startup.
     pub async fn backfill_from_atoms(&self, pool: &sqlx::SqlitePool) -> common::Result<usize> {
-        let atoms: Vec<(String, String, String)> =
-            sqlx::query_as("SELECT id, atom_type, subject FROM knowledge_atoms WHERE status = 'active'")
-                .fetch_all(pool)
-                .await
-                .map_err(|e| {
-                    common::ToolError::ExecutionFailed(format!("learning backfill query: {e}"))
-                })?;
+        let atoms: Vec<(String, String, String)> = sqlx::query_as(
+            "SELECT id, atom_type, subject FROM knowledge_atoms WHERE status = 'active'",
+        )
+        .fetch_all(pool)
+        .await
+        .map_err(|e| common::ToolError::ExecutionFailed(format!("learning backfill query: {e}")))?;
 
         let mut count = 0;
         for (atom_id, atom_type, subject) in &atoms {
-            if self.handle_atom_accepted(atom_id, atom_type, Some(subject.as_str())).await.is_ok() {
+            if self
+                .handle_atom_accepted(atom_id, atom_type, Some(subject.as_str()))
+                .await
+                .is_ok()
+            {
                 count += 1;
             }
         }
@@ -155,7 +158,8 @@ impl LearningTreeBuilder {
             "LearningTreeBuilder: processing atom accepted"
         );
 
-        let nodes = build_atom_accepted_nodes(atom_id, atom_type, subject, &type_node_id, &atom_node_id);
+        let nodes =
+            build_atom_accepted_nodes(atom_id, atom_type, subject, &type_node_id, &atom_node_id);
 
         self.persist_nodes(&nodes, atom_id).await
     }

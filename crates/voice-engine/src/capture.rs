@@ -318,9 +318,16 @@ impl AudioCapture {
             )))
         })?;
 
-        debug!("Audio monitor started: {}Hz, {} ch", native_sample_rate, native_channels);
+        debug!(
+            "Audio monitor started: {}Hz, {} ch",
+            native_sample_rate, native_channels
+        );
 
-        Ok(MonitorSession { _stream: stream, stop_signal, rms_rx })
+        Ok(MonitorSession {
+            _stream: stream,
+            stop_signal,
+            rms_rx,
+        })
     }
 }
 

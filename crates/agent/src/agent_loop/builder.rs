@@ -947,7 +947,9 @@ impl AgentLoopBuilder {
                         // Background tree node backfill — re-indexes all existing data.
                         // Gated by KLYNTBOT_BACKFILL=1 env var (default: off).
                         // Only needed for dev/migration; live events handle ongoing indexing.
-                        if std::env::var("KLYNTBOT_BACKFILL").map_or(false, |v| v == "1" || v == "true") {
+                        if std::env::var("KLYNTBOT_BACKFILL")
+                            .map_or(false, |v| v == "1" || v == "true")
+                        {
                             let backfill_builder = Arc::clone(&note_tree_builder);
                             let backfill_task_tree_builder = Arc::clone(&task_tree_builder);
                             let backfill_learning_tree_builder = Arc::clone(&learning_tree_builder);
