@@ -41,6 +41,7 @@ pub struct TaskResponse {
 #[serde(rename_all = "camelCase")]
 pub struct TaskCreateParams {
     pub title: String,
+    pub description: Option<String>,
     pub area_id: Option<String>,
     pub project_id: Option<String>,
     pub priority: Option<i16>,

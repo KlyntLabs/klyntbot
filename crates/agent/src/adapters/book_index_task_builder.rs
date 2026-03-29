@@ -72,11 +72,17 @@ fn add_task_node(
 ) {
     let node_id = Uuid::new_v4().to_string();
 
+    // Combine title + description for richer entity matching
+    let content = match task.description.as_deref() {
+        Some(desc) if !desc.is_empty() => format!("{}. {}", task.title, desc),
+        _ => task.title.clone(),
+    };
+
     nodes.push(TreeNode {
         id: node_id.clone(),
         parent_id: Some(parent_node_id.to_string()),
         node_type: TreeNodeType::Task,
-        content: task.title.clone(),
+        content,
         title: Some(task.title.clone()),
         level,
         source_type: SourceType::Task,

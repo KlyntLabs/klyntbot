@@ -460,16 +460,14 @@ impl AppCore {
                 // Local STT: try to load WhisperLocalEngine if model exists
                 let stt_local: Option<Arc<dyn TranscriptionEngine>> = model_manager
                     .model_path(WhisperModelSize::Small)
-                    .and_then(|path| {
-                        match engines::WhisperLocalEngine::new(&path) {
-                            Ok(engine) => {
-                                info!("Whisper local engine loaded from {}", path.display());
-                                Some(Arc::new(engine) as Arc<dyn TranscriptionEngine>)
-                            }
-                            Err(e) => {
-                                warn!("Failed to load local Whisper engine: {e}");
-                                None
-                            }
+                    .and_then(|path| match engines::WhisperLocalEngine::new(&path) {
+                        Ok(engine) => {
+                            info!("Whisper local engine loaded from {}", path.display());
+                            Some(Arc::new(engine) as Arc<dyn TranscriptionEngine>)
+                        }
+                        Err(e) => {
+                            warn!("Failed to load local Whisper engine: {e}");
+                            None
                         }
                     });
 
@@ -492,9 +490,8 @@ impl AppCore {
                 drop(config_guard);
 
                 // TTS: macOS AVSpeech
-                let tts: Option<Arc<dyn voice_engine::TtsEngine>> = Some(Arc::new(
-                    voice_engine::AvSpeechTtsEngine::new(&data_dir),
-                ));
+                let tts: Option<Arc<dyn voice_engine::TtsEngine>> =
+                    Some(Arc::new(voice_engine::AvSpeechTtsEngine::new(&data_dir)));
 
                 // Always create VoiceService — even without engines.
                 // Groq provides instant first-run, background download adds local.

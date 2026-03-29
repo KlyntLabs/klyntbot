@@ -85,8 +85,11 @@ impl WhisperLocalEngine {
         let mut full_text = String::new();
         let mut segments = Vec::new();
 
+        debug!("Extracting transcript from {} segments", num_segments);
+
         for i in 0..num_segments {
             let Some(segment) = state.get_segment(i) else {
+                debug!("Segment {i}: no segment returned");
                 continue;
             };
 
@@ -96,6 +99,14 @@ impl WhisperLocalEngine {
                     e
                 )))
             })?;
+
+            debug!(
+                "Segment {i}: text='{}', tokens={}, t0={}, t1={}",
+                segment_text,
+                segment.n_tokens(),
+                segment.start_timestamp(),
+                segment.end_timestamp()
+            );
 
             let t0 = segment.start_timestamp();
             let t1 = segment.end_timestamp();

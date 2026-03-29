@@ -6,7 +6,7 @@ import ForceGraph2D from "react-force-graph-2d";
 import { useFabricGraph } from "../hooks/useFabricGraph";
 import type { DragCommunityChange, ViewportBounds } from "../hooks/useForceGraph";
 import { useForceGraph } from "../hooks/useForceGraph";
-import type { SmartView } from "../hooks/useGraphData";
+import type { GraphNode, SmartView } from "../hooks/useGraphData";
 import { useGraphData } from "../hooks/useGraphData";
 import type { FabricData, ForceNode } from "../hooks/useGraphElements";
 import { useGraphElements } from "../hooks/useGraphElements";
@@ -169,14 +169,29 @@ export function GraphView({
     hopRadius,
   );
 
+  // Inject project nodes from fabric base (projects are community members but not in the note list)
+  const noteIds = new Set(rawNodes.map((n) => n.id));
+  const projectNodes: GraphNode[] = (fabric.base?.notes ?? [])
+    .filter((fn) => fn.tags.includes("project") && !noteIds.has(fn.id))
+    .map((fn) => ({
+      id: fn.id,
+      title: fn.title,
+      linkCount: 0,
+      primaryTag: "project",
+      notebookId: null,
+      bodyPreview: "",
+      tags: ["project"],
+    }));
+  const allRawNodes = projectNodes.length > 0 ? [...rawNodes, ...projectNodes] : rawNodes;
+
   // Search filter
   let filteredNodes = searchQuery
-    ? rawNodes.filter((n) => n.title.toLowerCase().includes(searchQuery.toLowerCase()))
-    : rawNodes;
+    ? allRawNodes.filter((n) => n.title.toLowerCase().includes(searchQuery.toLowerCase()))
+    : allRawNodes;
 
   // Orphan filter
   if (!settings.showOrphans) {
-    filteredNodes = filteredNodes.filter((n) => n.linkCount > 0);
+    filteredNodes = filteredNodes.filter((n) => n.linkCount > 0 || n.tags.includes("project"));
   }
 
   const filteredNodeIds = new Set(filteredNodes.map((n) => n.id));
@@ -573,6 +588,7 @@ export function GraphView({
         case "Escape":
           setContextMenu(null);
           setSelectedNodeIds(new Set());
+          setSelectedFabricNode(null);
           onSelectNote("");
           break;
       }
@@ -712,7 +728,10 @@ export function GraphView({
                 onNodeHover={forceGraph.onNodeHover as never}
                 onNodeDrag={forceGraph.onNodeDrag as never}
                 onNodeDragEnd={forceGraph.onNodeDragEnd as never}
-                onBackgroundClick={forceGraph.onBackgroundClick}
+                onBackgroundClick={() => {
+                  forceGraph.onBackgroundClick();
+                  setSelectedFabricNode(null);
+                }}
                 onEngineStop={forceGraph.onEngineStop}
                 onRenderFramePost={forceGraph.onRenderFramePost as never}
                 cooldownTicks={settings.livePhysics ? Infinity : 100}
@@ -910,7 +929,7 @@ function FabricNodePanel({ node, onClose }: { node: ForceNode; onClose: () => vo
   const typeIcon = node.nodeType === "entity" ? "diamond" : "section";
 
   return (
-    <div className="absolute right-0 top-0 h-full w-[280px] z-20 glass-panel border-l border-border/30 overflow-y-auto">
+    <div className="absolute right-0 top-12 bottom-0 w-[280px] z-20 glass-panel border-l border-border/30 overflow-y-auto">
       <div className="p-4">
         <div className="flex items-center justify-between mb-3">
           <span

@@ -76,7 +76,7 @@ impl AppCore {
         .map(|(id, count)| (id, count as u32))
         .collect();
 
-        let fabric_notes: Vec<FabricNote> = notes
+        let mut fabric_notes: Vec<FabricNote> = notes
             .iter()
             .map(|n| FabricNote {
                 id: n.id.clone(),
@@ -121,6 +121,44 @@ impl AppCore {
                 member_count: member_note_ids.len() as u32,
                 member_note_ids,
             });
+        }
+
+        // Collect project IDs referenced by community members so we can add them as graph nodes
+        let mut project_ids_in_communities: HashSet<String> = HashSet::new();
+        for c in &fabric_communities {
+            for mid in &c.member_note_ids {
+                if !notes.iter().any(|n| n.id == *mid) {
+                    project_ids_in_communities.insert(mid.clone());
+                }
+            }
+        }
+
+        // Add projects as FabricNote entries so they appear in the graph
+        if !project_ids_in_communities.is_empty() {
+            let project_rows: Vec<(String, String)> = sqlx::query_as(
+                "SELECT id, name FROM projects WHERE id IN (SELECT value FROM json_each(?1))",
+            )
+            .bind(serde_json::to_string(
+                &project_ids_in_communities
+                    .iter()
+                    .collect::<Vec<_>>(),
+            )
+            .unwrap_or_default())
+            .fetch_all(&pool)
+            .await
+            .map_err(map_cognitive_err)?;
+
+            for (id, name) in project_rows {
+                fabric_notes.push(FabricNote {
+                    id,
+                    title: name,
+                    notebook_id: None,
+                    tags: vec!["project".to_string()],
+                    body_preview: String::new(),
+                    tree_section_count: 0,
+                    entity_count: 0,
+                });
+            }
         }
 
         let last_activity_timestamp = active_communities

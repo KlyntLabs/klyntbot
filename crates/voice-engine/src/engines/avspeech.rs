@@ -38,9 +38,7 @@ impl TtsEngine for AvSpeechTtsEngine {
             platform_macos::speech::synthesize_to_file(&text, voice.as_deref(), rate, &path)
         })
         .await
-        .map_err(|e| {
-            common::KlyntbotError::Provider(common::ProviderError::Http(e.to_string()))
-        })?
+        .map_err(|e| common::KlyntbotError::Provider(common::ProviderError::Http(e.to_string())))?
         .map_err(|e| common::KlyntbotError::Provider(common::ProviderError::Http(e)))?;
 
         // Read the WAV output
@@ -52,9 +50,10 @@ impl TtsEngine for AvSpeechTtsEngine {
 
         let spec = reader.spec();
         let samples: Vec<f32> = match spec.sample_format {
-            hound::SampleFormat::Float => {
-                reader.into_samples::<f32>().filter_map(|s| s.ok()).collect()
-            }
+            hound::SampleFormat::Float => reader
+                .into_samples::<f32>()
+                .filter_map(|s| s.ok())
+                .collect(),
             hound::SampleFormat::Int => {
                 let max = (1 << (spec.bits_per_sample - 1)) as f32;
                 reader

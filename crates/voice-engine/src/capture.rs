@@ -106,8 +106,10 @@ impl AudioCapture {
             buffer_size: cpal::BufferSize::Default,
         };
 
-        // Channels for bridging cpal callback thread -> tokio
-        let (audio_tx, audio_rx) = mpsc::channel::<AudioChunk>(64);
+        // Channels for bridging cpal callback thread -> tokio.
+        // Large buffer: at 48kHz with ~1024-sample callbacks, 4 seconds = ~188 chunks.
+        // Use 1024 to handle longer captures without dropping audio.
+        let (audio_tx, audio_rx) = mpsc::channel::<AudioChunk>(1024);
         let (rms_tx, rms_rx) = mpsc::channel::<f32>(32);
         let (silence_tx, silence_rx) = mpsc::channel::<()>(1);
 

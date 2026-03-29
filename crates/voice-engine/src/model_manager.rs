@@ -105,8 +105,12 @@ impl ModelManager {
             .send(ModelState::Downloading { progress: 0.0 });
 
         let url = match size {
-            WhisperModelSize::Small => "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-small.bin",
-            WhisperModelSize::Medium => "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-medium.bin",
+            WhisperModelSize::Small => {
+                "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-small.bin"
+            }
+            WhisperModelSize::Medium => {
+                "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-medium.bin"
+            }
         };
 
         let dest = self.models_dir.join(size.filename());

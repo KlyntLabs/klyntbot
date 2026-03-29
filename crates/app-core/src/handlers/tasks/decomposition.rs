@@ -205,6 +205,7 @@ impl AppCore {
             for subtask in planned {
                 let params = TaskCreateParams {
                     title: subtask.title.clone(),
+                    description: subtask.description.clone(),
                     area_id: None,
                     project_id: None,
                     priority: subtask.priority,

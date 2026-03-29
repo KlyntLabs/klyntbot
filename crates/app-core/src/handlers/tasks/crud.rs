@@ -101,7 +101,7 @@ impl AppCore {
         let row = TaskRow {
             id: id.clone(),
             title: params.title,
-            description: None,
+            description: params.description,
             area_id,
             project_id: params.project_id,
             key_result_id: None,
