@@ -101,7 +101,13 @@ function getNodeSize(linkCount: number, nodeType?: ForceNodeType): number {
   const normalized = Math.min(linkCount, 20) / 20;
   const base = 18 + normalized * 28;
   // Domain nodes get a minimum size so shapes are visible
-  if (nodeType && nodeType !== "note" && nodeType !== "entity" && nodeType !== "tree_section" && nodeType !== "tree_text") {
+  if (
+    nodeType &&
+    nodeType !== "note" &&
+    nodeType !== "entity" &&
+    nodeType !== "tree_section" &&
+    nodeType !== "tree_text"
+  ) {
     return Math.max(base, 28);
   }
   return base;

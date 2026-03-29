@@ -1111,10 +1111,10 @@ function TreeContextMenu({
         label="Appearance"
         open={openSubmenu === "appearance"}
         onToggle={() => toggleSubmenu("appearance")}
-        panelClassName="context-menu absolute left-full top-0 ml-1 py-1 w-[280px] animate-[menu-appear_100ms_ease-out]"
+        panelClassName="absolute left-full top-0 ml-1 py-[5px] w-[280px] rounded-[10px] border border-border bg-[rgb(22,22,24)] shadow-xl animate-[menu-appear_100ms_ease-out]"
       >
         {/* Icon grid */}
-        <div className="grid grid-cols-6 gap-1 p-2.5">
+        <div className="grid grid-cols-6 gap-0.5 px-1.5 py-1.5">
           {ICON_NAMES.map((name) => {
             const Icon = ICON_MAP[name];
             const isActive = activeIcon === name;
@@ -1131,8 +1131,10 @@ function TreeContextMenu({
                     onUpdate(entityId, { icon: name });
                   }
                 }}
-                className={`size-8 rounded-md flex items-center justify-center hover:bg-muted transition-colors ${
-                  isActive ? "bg-muted ring-1 ring-brand/40" : ""
+                className={`size-[38px] rounded-md flex items-center justify-center transition-colors ${
+                  isActive
+                    ? "bg-accent ring-1 ring-ring/20"
+                    : "text-muted-foreground hover:bg-muted hover:text-foreground"
                 }`}
                 title={isActive ? `Remove ${name} icon` : name}
               >
@@ -1143,8 +1145,8 @@ function TreeContextMenu({
         </div>
 
         {/* Color row */}
-        <div className="h-px bg-muted mx-2" />
-        <div className="flex items-center gap-1.5 px-2.5 py-2">
+        <div className="h-px bg-border mx-2.5" />
+        <div className="flex items-center gap-1.5 px-2.5 py-2.5">
           {ITEM_COLORS.map((color) => (
             <button
               key={color ?? "none"}
@@ -1174,7 +1176,7 @@ function TreeContextMenu({
         {/* Reset all button */}
         {(activeIcon || activeColor) && (
           <>
-            <div className="h-px bg-muted mx-2" />
+            <div className="h-px bg-border mx-2.5" />
             <button
               type="button"
               onClick={() => {
@@ -1182,7 +1184,7 @@ function TreeContextMenu({
                 setPreviewColor(null);
                 onUpdate(entityId, { icon: null, color: null });
               }}
-              className="w-full px-2.5 py-1.5 text-[11px] text-dim hover:text-foreground text-left hover:bg-card transition-colors"
+              className="w-[calc(100%-10px)] mx-[5px] px-2.5 py-[5px] text-[13px] rounded-md text-muted-foreground hover:text-foreground text-left hover:bg-muted transition-colors"
             >
               Reset all
             </button>

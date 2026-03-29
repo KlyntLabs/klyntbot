@@ -11,7 +11,7 @@ function Waveform({ level }: { level: number }) {
         return (
           <div
             key={i}
-            className="w-0.5 rounded-full bg-accent transition-all duration-75"
+            className="w-0.5 rounded-full bg-primary/60 transition-all duration-75"
             style={{ height: `${height}px` }}
           />
         );
@@ -44,7 +44,10 @@ function RoutingChips({ chips }: { chips: { skill: string; label: string }[] }) 
   return (
     <div className="flex gap-1.5 flex-wrap">
       {chips.map((chip) => (
-        <div key={chip.skill} className="glass-panel px-2 py-0.5 rounded-full text-xs text-muted">
+        <div
+          key={chip.skill}
+          className="bg-accent/60 border border-border/40 px-2.5 py-0.5 rounded-full text-xs text-muted-foreground"
+        >
           {chip.label}
         </div>
       ))}
@@ -76,7 +79,7 @@ export function VoiceBrainOrb() {
 
   return (
     <div
-      className="glass-panel rounded-2xl p-3 w-[320px] select-none animate-in fade-in zoom-in-95 duration-200"
+      className="bg-card border border-border/50 rounded-2xl p-3 w-[320px] shadow-xl select-none animate-in fade-in zoom-in-95 duration-200"
       role={sessionState === "response" ? "button" : undefined}
       tabIndex={sessionState === "response" ? 0 : undefined}
       onClick={sessionState === "response" ? dismiss : undefined}
@@ -92,16 +95,18 @@ export function VoiceBrainOrb() {
       <div className="flex items-center gap-2 mb-2">
         <div
           className={`w-2 h-2 rounded-full ${
-            sessionState === "capturing" ? "bg-red-500 animate-pulse" : "bg-muted"
+            sessionState === "capturing" ? "bg-destructive animate-pulse" : "bg-muted"
           }`}
         />
         {sessionState === "capturing" && <Waveform level={audioLevel} />}
         {sessionState === "processing" && (
-          <span className="text-xs text-muted animate-pulse">Processing...</span>
+          <span className="text-xs text-muted-foreground animate-pulse">Processing...</span>
         )}
-        {sessionState === "response" && <span className="text-xs text-muted">Response</span>}
+        {sessionState === "response" && (
+          <span className="text-xs text-muted-foreground">Response</span>
+        )}
         <div className="flex-1" />
-        {engineKind === "cloud" && <span className="text-xs text-muted opacity-60">cloud</span>}
+        {engineKind === "cloud" && <span className="text-xs text-muted-foreground/60">cloud</span>}
       </div>
 
       {/* Transcript */}
@@ -128,7 +133,7 @@ export function VoiceBrainOrb() {
           <button
             type="button"
             onClick={() => playTtsAudio(ttsAudio.base64, ttsAudio.sampleRate)}
-            className="text-xs text-muted hover:text-primary transition-colors"
+            className="text-xs text-muted-foreground hover:text-primary transition-colors"
             aria-label="Replay spoken response"
           >
             ↻ Replay
@@ -138,8 +143,8 @@ export function VoiceBrainOrb() {
 
       {/* Memory echo with Mirror badge */}
       {memoryEcho && (
-        <div className="animate-in fade-in duration-300 flex items-center gap-1.5 text-xs text-muted mb-2">
-          <span className="rounded bg-surface-overlay px-1 py-0.5 text-[10px] font-medium text-muted/70">
+        <div className="animate-in fade-in duration-300 flex items-center gap-1.5 text-xs text-muted-foreground mb-2">
+          <span className="rounded bg-accent px-1.5 py-0.5 text-[10px] font-medium text-accent-foreground/70">
             Mirror
           </span>
           <span className="italic">{memoryEcho}</span>
@@ -147,7 +152,7 @@ export function VoiceBrainOrb() {
       )}
 
       {/* Hint bar */}
-      <div className="text-[10px] text-muted opacity-40 text-center">
+      <div className="text-[10px] text-muted-foreground/40 text-center">
         {sessionState === "capturing" && "opt+shift+V to finish · tap to close"}
         {sessionState === "processing" && "Cancel & discard"}
         {sessionState === "response" && "tap anywhere to close"}

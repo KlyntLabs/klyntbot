@@ -2,7 +2,8 @@ import type { InboxItem, Note, Notebook } from "@shared/types";
 import { useCallback, useState } from "react";
 import { InboxSection } from "./InboxSection";
 import { NotebookTree } from "./NotebookTree";
-import { TagsExplorer } from "./TagsExplorer";
+
+// import { TagsExplorer } from "./TagsExplorer";
 
 // ── Props ─────────────────────────────────────────────────────────────
 
@@ -83,15 +84,6 @@ export function NavigationSidebar({
       onContextMenu={(e) => e.preventDefault()}
     >
       <div className="flex-1 overflow-y-auto min-h-0 flex flex-col">
-        <TagsExplorer
-          notes={notes}
-          activeTags={activeTags}
-          selectedNoteId={selectedNoteId}
-          onToggleTag={handleToggleTag}
-          onClearTags={handleClearTags}
-          onSelectNote={onSelectNote}
-        />
-
         <NotebookTree
           notebooks={notebooks}
           notes={notes}

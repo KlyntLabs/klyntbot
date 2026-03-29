@@ -142,7 +142,7 @@ export function ContextMenuSubmenu({
         <div
           className={
             panelClassName ??
-            "context-menu absolute left-full top-0 ml-1 py-[5px] min-w-[180px] max-h-52 overflow-y-auto animate-[menu-appear_100ms_ease-out]"
+            "absolute left-full top-0 ml-1 py-[5px] min-w-[180px] max-h-52 overflow-y-auto rounded-[10px] border border-border bg-[rgb(22,22,24)] shadow-xl animate-[menu-appear_100ms_ease-out]"
           }
         >
           {children}

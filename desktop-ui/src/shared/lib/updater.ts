@@ -1,6 +1,6 @@
+import { isTauri } from "@shared/lib/utils";
 import { relaunch } from "@tauri-apps/plugin-process";
 import { check } from "@tauri-apps/plugin-updater";
-import { isTauri } from "@shared/lib/utils";
 
 export async function checkForUpdates(): Promise<void> {
   if (!isTauri) return;
