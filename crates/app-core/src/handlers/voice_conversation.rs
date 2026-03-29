@@ -1,19 +1,32 @@
-//! VoiceConversationManager — core types, state machine, and command channel.
-//!
-//! This module defines the conversation phase state machine, voice session state,
-//! command enum, helper functions, and the manager struct. The actual conversation
-//! loop (listening → reflecting → speaking) is implemented in a later task.
+//! VoiceConversationManager — core types, state machine, command channel,
+//! and the conversation loop (listening -> reflecting -> speaking -> auto-resume).
 
-use chrono::{DateTime, Utc};
+use chrono::{DateTime, Duration, Utc};
 use common::{ChannelName, ChatId, SessionKey};
 use serde::{Deserialize, Serialize};
+use std::sync::atomic::Ordering;
 use std::sync::Arc;
 use tokio::sync::{mpsc, Mutex, RwLock};
+use tracing::{info, warn};
 use uuid::Uuid;
 
 use crate::events::AppEventEmitter;
 use config::schema::VoiceConfig;
-use voice_engine::{MemoryEchoProvider, VoiceService};
+use voice_engine::{
+    MemoryEchoProvider, MonitorSession, VoiceEvent, VoiceService, VoiceSessionState,
+};
+
+/// Wrapper that makes `MonitorSession` moveable to a blocking thread.
+///
+/// `cpal::Stream` is `!Send` for Android AAudio compatibility, but on macOS
+/// (CoreAudio) the underlying types are thread-safe. We only move the monitor
+/// to a blocking thread to keep the audio stream alive.
+struct SendableMonitorSession(#[allow(dead_code)] MonitorSession);
+
+// SAFETY: Same justification as `SendableCaptureSession` in voice-engine.
+// On macOS, CoreAudio streams are safe to move between threads.
+#[cfg(target_os = "macos")]
+unsafe impl Send for SendableMonitorSession {}
 
 // ── Phase ────────────────────────────────────────────────────
 
@@ -36,7 +49,7 @@ impl ConversationPhase {
                 | (Self::Reflecting, Self::Speaking)
                 | (Self::Reflecting, Self::Idle)  // cancel during reflecting
                 | (Self::Speaking, Self::Listening) // auto-resume or interrupt
-                | (Self::Speaking, Self::Idle)     // end during speaking
+                | (Self::Speaking, Self::Idle) // end during speaking
         )
     }
 
@@ -131,15 +144,26 @@ pub fn create_voice_session_key() -> SessionKey {
     )
 }
 
+// ── Start response ──────────────────────────────────────────
+
+/// Result of starting a voice conversation.
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct StartResponse {
+    pub session_key: String,
+    pub session_title: String,
+    pub is_continuing: bool,
+}
+
 // ── Manager ──────────────────────────────────────────────────
 
-#[allow(dead_code)] // Fields used by conversation loop (Task 7)
 pub struct VoiceConversationManager {
     pub(crate) voice_service: Arc<VoiceService>,
     pub(crate) repos: storage::Repos,
     pub(crate) agent: Arc<agent::AgentLoop>,
     pub(crate) emitter: Arc<dyn AppEventEmitter>,
     pub(crate) state: Arc<Mutex<VoiceConversationState>>,
+    #[allow(dead_code)]
     pub(crate) echo_provider: Arc<dyn MemoryEchoProvider>,
     pub(crate) config: Arc<RwLock<VoiceConfig>>,
     pub(crate) cmd_tx: mpsc::Sender<VoiceCommand>,
@@ -180,6 +204,788 @@ impl VoiceConversationManager {
     pub async fn send_command(&self, cmd: VoiceCommand) {
         let _ = self.cmd_tx.send(cmd).await;
     }
+
+    // ── 1. resolve_session ──────────────────────────────────
+
+    /// Smart session attachment: reuse warm sessions, or create a new one.
+    pub async fn resolve_session(&self) -> SessionKey {
+        let config = self.config.read().await;
+        let warm_session_min = config.conversation.warm_session_minutes;
+        let warm_chat_min = config.conversation.warm_chat_minutes;
+        drop(config);
+
+        // 1. If manager already has an active session (phase != Idle), reuse it
+        {
+            let state = self.state.lock().await;
+            if state.phase != ConversationPhase::Idle {
+                if let Some(ref key) = state.session_key {
+                    return key.clone();
+                }
+            }
+
+            // 2. If previous session_key exists and last_activity is warm, reattach
+            if let Some(ref key) = state.session_key {
+                if is_warm_session(state.last_activity, warm_session_min) {
+                    return key.clone();
+                }
+            }
+        }
+
+        // 3. Query DB for most recent "desktop" session — if updated recently, attach
+        if let Ok(sessions) = self
+            .repos
+            .sessions
+            .list_sessions_since(Utc::now() - Duration::minutes(warm_chat_min as i64))
+            .await
+        {
+            if let Some(session) = sessions.iter().find(|s| s.key.starts_with("desktop:")) {
+                let key = SessionKey::from_parts(
+                    "desktop",
+                    session.key.strip_prefix("desktop:").unwrap_or(&session.key),
+                );
+                return key;
+            }
+        }
+
+        // 4. Otherwise create new
+        create_voice_session_key()
+    }
+
+    // ── 2. start ────────────────────────────────────────────
+
+    /// Begin (or resume) a voice conversation.
+    pub async fn start(&self) -> common::Result<StartResponse> {
+        let session_key = self.resolve_session().await;
+
+        // Check if we're continuing an existing session
+        let is_continuing = {
+            let state = self.state.lock().await;
+            state
+                .session_key
+                .as_ref()
+                .is_some_and(|k| k.as_str() == session_key.as_str())
+                && state.turn_count > 0
+        };
+
+        // Determine session title
+        let session_title = if is_continuing {
+            // Try to read the existing title from DB
+            match self.repos.sessions.get_session(session_key.as_str()).await {
+                Ok(row) => row
+                    .metadata
+                    .get("title")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("Voice session")
+                    .to_string(),
+                Err(_) => "Voice session".to_string(),
+            }
+        } else {
+            "New voice session".to_string()
+        };
+
+        // Update state
+        {
+            let mut state = self.state.lock().await;
+            state.session_key = Some(session_key.clone());
+            state.phase = ConversationPhase::Listening;
+            state.paused = false;
+            state.interrupted = false;
+            state.touch();
+        }
+
+        // Upsert session in DB
+        let metadata = serde_json::json!({
+            "title": session_title,
+            "is_voice_session": true,
+        });
+        let _ = self
+            .repos
+            .sessions
+            .upsert_session(session_key.as_str(), &metadata, None)
+            .await;
+
+        // Emit phase changed
+        let turn_count = self.state.lock().await.turn_count;
+        let _ = self
+            .voice_service
+            .emit_event(VoiceEvent::PhaseChanged {
+                phase: "listening".to_string(),
+                session_title: Some(session_title.clone()),
+                turn_count,
+            })
+            .await;
+
+        info!(
+            "Voice conversation started: {} (continuing={})",
+            session_key, is_continuing
+        );
+
+        Ok(StartResponse {
+            session_key: session_key.to_string(),
+            session_title,
+            is_continuing,
+        })
+    }
+
+    // ── 3. spawn_loop ───────────────────────────────────────
+
+    /// Start the conversation loop as a background task.
+    /// Returns a JoinHandle; the loop runs until End command or channel close.
+    pub async fn spawn_loop(self: &Arc<Self>) -> tokio::task::JoinHandle<()> {
+        let cmd_rx = self
+            .cmd_rx
+            .lock()
+            .await
+            .take()
+            .expect("spawn_loop called more than once");
+        let manager = Arc::clone(self);
+        tokio::spawn(async move {
+            manager.conversation_loop(cmd_rx).await;
+        })
+    }
+
+    // ── 4. conversation_loop ────────────────────────────────
+
+    async fn conversation_loop(self: &Arc<Self>, mut cmd_rx: mpsc::Receiver<VoiceCommand>) {
+        info!("Voice conversation loop started");
+        loop {
+            let phase = self.state.lock().await.phase;
+            match phase {
+                ConversationPhase::Idle => {
+                    // Wait for a command
+                    match cmd_rx.recv().await {
+                        Some(cmd) => self.handle_command_while_idle(cmd).await,
+                        None => {
+                            info!("Voice command channel closed, exiting loop");
+                            break;
+                        }
+                    }
+                }
+                ConversationPhase::Listening => {
+                    self.run_listening_phase(&mut cmd_rx).await;
+                }
+                ConversationPhase::Reflecting => {
+                    self.run_reflecting_phase(&mut cmd_rx).await;
+                }
+                ConversationPhase::Speaking => {
+                    self.run_speaking_phase(&mut cmd_rx).await;
+                }
+            }
+        }
+        info!("Voice conversation loop ended");
+    }
+
+    // ── 5. run_listening_phase ──────────────────────────────
+
+    async fn run_listening_phase(&self, cmd_rx: &mut mpsc::Receiver<VoiceCommand>) {
+        info!("Listening phase: starting capture");
+
+        // Start audio capture
+        let capture_result = self.voice_service.start_capture().await;
+        let (_session_id, _engine_kind) = match capture_result {
+            Ok(v) => v,
+            Err(e) => {
+                warn!("Failed to start audio capture: {e}");
+                let _ = self
+                    .voice_service
+                    .emit_event(VoiceEvent::Error {
+                        message: format!("Capture failed: {e}"),
+                        recoverable: true,
+                    })
+                    .await;
+                self.transition_to(ConversationPhase::Idle).await;
+                return;
+            }
+        };
+
+        // Poll for silence detection or commands.
+        // VoiceService emits CaptureEnded when silence is detected, but the
+        // manager can also stop capture via stop_capture(). We poll session_state
+        // periodically and check for commands.
+        let mut silence_detected = false;
+        loop {
+            tokio::select! {
+                biased;
+                Some(cmd) = cmd_rx.recv() => {
+                    match cmd {
+                        VoiceCommand::Pause | VoiceCommand::End => {
+                            info!("Listening phase: {:?} received, stopping capture", if matches!(cmd, VoiceCommand::End) { "End" } else { "Pause" });
+                            let _ = self.voice_service.stop_capture().await;
+                            if matches!(cmd, VoiceCommand::Pause) {
+                                self.state.lock().await.paused = true;
+                            }
+                            self.transition_to(ConversationPhase::Idle).await;
+                            return;
+                        }
+                        VoiceCommand::NewSession => {
+                            info!("Listening phase: NewSession, stopping capture");
+                            let _ = self.voice_service.stop_capture().await;
+                            let new_key = create_voice_session_key();
+                            self.state.lock().await.reset_for_new_session(new_key);
+                            self.transition_to(ConversationPhase::Idle).await;
+                            return;
+                        }
+                        VoiceCommand::Interrupt => {
+                            // During listening, interrupt means stop capture and finalize
+                            silence_detected = true;
+                        }
+                        _ => {} // Resume/Continue ignored during listening
+                    }
+                }
+                _ = tokio::time::sleep(std::time::Duration::from_millis(200)) => {
+                    // Poll voice service session state
+                    let vs_state = self.voice_service.session_state().await;
+                    if vs_state == VoiceSessionState::Idle {
+                        // Capture has ended (silence detection triggered stop)
+                        silence_detected = true;
+                    }
+                }
+            }
+
+            if silence_detected {
+                break;
+            }
+        }
+
+        // Finalize: stop capture and get transcript
+        info!("Listening phase: finalizing capture");
+        match self.voice_service.stop_capture().await {
+            Ok(Some((transcript, _metadata))) => {
+                let text = transcript.text.trim().to_string();
+                if text.is_empty() {
+                    info!("Listening phase: empty transcript, returning to listening");
+                    // Re-enter listening (don't transition to reflecting with empty text)
+                    return;
+                }
+                info!("Listening phase: transcript = \"{}\"", text);
+                self.state.lock().await.pending_transcript = Some(text);
+                self.transition_to(ConversationPhase::Reflecting).await;
+
+                // Emit Reflecting event
+                let _ = self.voice_service.emit_event(VoiceEvent::Reflecting).await;
+            }
+            Ok(None) => {
+                info!("Listening phase: no transcript (session was already stopped)");
+                // Empty capture — stay in listening or go idle
+                // Check if we were in the middle of a conversation
+                let turn_count = self.state.lock().await.turn_count;
+                if turn_count > 0 {
+                    // Re-listen
+                    return;
+                }
+                self.transition_to(ConversationPhase::Idle).await;
+            }
+            Err(e) => {
+                warn!("Listening phase: transcription error: {e}");
+                let _ = self
+                    .voice_service
+                    .emit_event(VoiceEvent::Error {
+                        message: format!("Transcription failed: {e}"),
+                        recoverable: true,
+                    })
+                    .await;
+                self.transition_to(ConversationPhase::Idle).await;
+            }
+        }
+    }
+
+    // ── 6. run_reflecting_phase ─────────────────────────────
+
+    async fn run_reflecting_phase(&self, cmd_rx: &mut mpsc::Receiver<VoiceCommand>) {
+        let (transcript_text, session_key_str) = {
+            let state = self.state.lock().await;
+            let text = state.pending_transcript.clone().unwrap_or_default();
+            let sk = state
+                .session_key
+                .as_ref()
+                .map(|k| k.to_string())
+                .unwrap_or_default();
+            (text, sk)
+        };
+
+        if transcript_text.is_empty() {
+            info!("Reflecting phase: empty transcript, back to listening");
+            self.transition_to(ConversationPhase::Listening).await;
+            return;
+        }
+
+        info!(
+            "Reflecting phase: sending to agent (session={})",
+            session_key_str
+        );
+
+        // Emit PhaseChanged for reflecting
+        let turn_count = self.state.lock().await.turn_count;
+        let session_title = self.current_session_title().await;
+        let _ = self
+            .voice_service
+            .emit_event(VoiceEvent::PhaseChanged {
+                phase: "reflecting".to_string(),
+                session_title: Some(session_title),
+                turn_count,
+            })
+            .await;
+
+        // Call agent
+        let streaming_handle = match self
+            .agent
+            .process_direct_streaming(transcript_text, session_key_str.clone())
+            .await
+        {
+            Ok(handle) => handle,
+            Err(e) => {
+                warn!("Reflecting phase: agent error: {e}");
+                let _ = self
+                    .voice_service
+                    .emit_event(VoiceEvent::Error {
+                        message: format!("Agent processing failed: {e}"),
+                        recoverable: true,
+                    })
+                    .await;
+                self.transition_to(ConversationPhase::Idle).await;
+                return;
+            }
+        };
+
+        let mut event_rx = streaming_handle.event_rx;
+        let cancel_token = streaming_handle.cancel_token;
+        let mut response_content = String::new();
+
+        // Forward agent events to the emitter, collect the final content
+        loop {
+            tokio::select! {
+                biased;
+                Some(cmd) = cmd_rx.recv() => {
+                    if let VoiceCommand::End = cmd {
+                        info!("Reflecting phase: End received, cancelling agent");
+                        cancel_token.cancel();
+                        self.transition_to(ConversationPhase::Idle).await;
+                        return;
+                    }
+                }
+                event = event_rx.recv() => {
+                    match event {
+                        Some(agent::AgentEvent::ContentChunk { data }) => {
+                            // Forward to main chat UI
+                            if let Ok(val) = serde_json::to_value(
+                                &desktop_shared::events::ContentChunkPayload {
+                                    session_key: session_key_str.clone(),
+                                    data: data.clone(),
+                                },
+                            ) {
+                                self.emitter.emit_event(
+                                    desktop_shared::events::AGENT_CONTENT_CHUNK,
+                                    val,
+                                );
+                            }
+                            response_content.push_str(&data);
+                        }
+                        Some(agent::AgentEvent::Done { content, message_id }) => {
+                            response_content = content.clone();
+                            // Forward done event
+                            if let Ok(val) = serde_json::to_value(
+                                &desktop_shared::events::DonePayload {
+                                    session_key: session_key_str.clone(),
+                                    content,
+                                },
+                            ) {
+                                self.emitter.emit_event(
+                                    desktop_shared::events::AGENT_DONE,
+                                    val,
+                                );
+                            }
+                            let _ = message_id; // consumed by DonePayload via session
+                            break;
+                        }
+                        Some(agent::AgentEvent::Error { message }) => {
+                            warn!("Reflecting phase: agent event error: {message}");
+                            if let Ok(val) = serde_json::to_value(
+                                &desktop_shared::events::AgentErrorPayload {
+                                    session_key: session_key_str.clone(),
+                                    message,
+                                },
+                            ) {
+                                self.emitter.emit_event(
+                                    desktop_shared::events::AGENT_ERROR,
+                                    val,
+                                );
+                            }
+                            break;
+                        }
+                        Some(other_event) => {
+                            // Forward other events generically
+                            if let Ok(val) = serde_json::to_value(&other_event) {
+                                self.emitter.emit_event("agent:event", val);
+                            }
+                        }
+                        None => {
+                            // Event channel closed — agent finished
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+
+        // Store response and advance
+        {
+            let mut state = self.state.lock().await;
+            state.pending_response_text = Some(response_content);
+            state.pending_transcript = None;
+            state.turn_count += 1;
+            state.tts_position = 0;
+            state.touch();
+        }
+
+        self.transition_to(ConversationPhase::Speaking).await;
+    }
+
+    // ── 7. run_speaking_phase ───────────────────────────────
+
+    async fn run_speaking_phase(&self, cmd_rx: &mut mpsc::Receiver<VoiceCommand>) {
+        let (response_text, tts_position) = {
+            let state = self.state.lock().await;
+            (
+                state.pending_response_text.clone().unwrap_or_default(),
+                state.tts_position,
+            )
+        };
+
+        if response_text.is_empty() {
+            info!("Speaking phase: no response text, auto-resume or idle");
+            self.auto_resume_or_idle().await;
+            return;
+        }
+
+        // Get the portion to speak (from tts_position if continuing after interrupt)
+        let tts_text = if tts_position > 0 && tts_position < response_text.len() {
+            // Find the next word boundary after tts_position
+            let remaining = &response_text[tts_position..];
+            remaining
+                .find(' ')
+                .map(|i| &remaining[i + 1..])
+                .unwrap_or(remaining)
+                .to_string()
+        } else {
+            response_text.clone()
+        };
+
+        if tts_text.is_empty() {
+            self.auto_resume_or_idle().await;
+            return;
+        }
+
+        info!(
+            "Speaking phase: synthesizing TTS ({} chars)",
+            tts_text.len()
+        );
+
+        // Emit PhaseChanged
+        let turn_count = self.state.lock().await.turn_count;
+        let title = self.current_session_title().await;
+        let _ = self
+            .voice_service
+            .emit_event(VoiceEvent::PhaseChanged {
+                phase: "speaking".to_string(),
+                session_title: Some(title),
+                turn_count,
+            })
+            .await;
+
+        // Call TTS via voice service (emits SpeakResponse event)
+        if let Err(e) = self.voice_service.handle_response(&tts_text).await {
+            warn!("Speaking phase: TTS failed: {e}");
+        }
+
+        // Start audio monitor for interrupt detection.
+        // MonitorSession contains a cpal::Stream which is !Send, so we extract
+        // the Send-safe rms_rx + stop_signal and keep the stream alive on a
+        // blocking thread (same pattern as VoiceService::begin_capture).
+        let (mut monitor_rms_rx, monitor_stop) = start_monitor_safe(&self.voice_service);
+
+        // Estimate TTS duration: ~150ms per word
+        let word_count = tts_text.split_whitespace().count();
+        let estimated_duration_ms = (word_count as u64) * 150;
+        let speak_start = tokio::time::Instant::now();
+        let speak_deadline =
+            speak_start + std::time::Duration::from_millis(estimated_duration_ms.max(1000));
+
+        // Speech interrupt threshold: RMS above 0.02 indicates the user is talking
+        const INTERRUPT_RMS_THRESHOLD: f32 = 0.02;
+        // Require multiple consecutive samples above threshold to avoid false triggers
+        let mut consecutive_speech_samples = 0u32;
+        const SPEECH_SAMPLE_THRESHOLD: u32 = 3;
+
+        let mut interrupted = false;
+
+        loop {
+            tokio::select! {
+                biased;
+                Some(cmd) = cmd_rx.recv() => {
+                    match cmd {
+                        VoiceCommand::End => {
+                            info!("Speaking phase: End received");
+                            if let Some(ref stop) = monitor_stop {
+                                stop.store(true, Ordering::Relaxed);
+                            }
+                            self.transition_to(ConversationPhase::Idle).await;
+                            return;
+                        }
+                        VoiceCommand::Pause => {
+                            info!("Speaking phase: Pause received");
+                            if let Some(ref stop) = monitor_stop {
+                                stop.store(true, Ordering::Relaxed);
+                            }
+                            self.state.lock().await.paused = true;
+                            self.transition_to(ConversationPhase::Idle).await;
+                            return;
+                        }
+                        VoiceCommand::Interrupt => {
+                            interrupted = true;
+                        }
+                        _ => {} // Resume/Continue/NewSession handled elsewhere
+                    }
+                }
+                Some(rms) = monitor_rms_rx.recv() => {
+                    if rms > INTERRUPT_RMS_THRESHOLD {
+                        consecutive_speech_samples += 1;
+                        if consecutive_speech_samples >= SPEECH_SAMPLE_THRESHOLD {
+                            info!("Speaking phase: speech detected (rms={rms:.3}), interrupt");
+                            interrupted = true;
+                        }
+                    } else {
+                        consecutive_speech_samples = 0;
+                    }
+                }
+                _ = tokio::time::sleep_until(speak_deadline) => {
+                    // TTS playback estimated complete
+                    info!("Speaking phase: TTS playback estimated complete");
+                    break;
+                }
+            }
+
+            if interrupted {
+                break;
+            }
+        }
+
+        // Stop monitor
+        if let Some(ref stop) = monitor_stop {
+            stop.store(true, Ordering::Relaxed);
+        }
+
+        if interrupted {
+            // Estimate how far into the text we got
+            let elapsed_ms = speak_start.elapsed().as_millis() as u64;
+            let fraction = if estimated_duration_ms > 0 {
+                (elapsed_ms as f64 / estimated_duration_ms as f64).min(1.0)
+            } else {
+                1.0
+            };
+            let estimated_chars = (tts_text.len() as f64 * fraction) as usize;
+            let new_tts_position = tts_position + estimated_chars;
+
+            {
+                let mut state = self.state.lock().await;
+                state.interrupted = true;
+                state.tts_position = new_tts_position;
+            }
+
+            // Emit TTS fade out and continue available
+            let _ = self.voice_service.emit_event(VoiceEvent::TtsFadeOut).await;
+            let _ = self
+                .voice_service
+                .emit_event(VoiceEvent::ContinueAvailable { timeout_secs: 10 })
+                .await;
+
+            // Go to listening to capture what the user is saying
+            self.transition_to(ConversationPhase::Listening).await;
+        } else {
+            // Completed normally
+            self.state.lock().await.interrupted = false;
+            self.auto_resume_or_idle().await;
+        }
+    }
+
+    // ── 8. auto_resume_or_idle ──────────────────────────────
+
+    async fn auto_resume_or_idle(&self) {
+        let config = self.config.read().await;
+        let auto_resume = config.conversation.auto_resume;
+        let adaptive_breath = config.conversation.adaptive_breath;
+        drop(config);
+
+        let (paused, response_text) = {
+            let state = self.state.lock().await;
+            (
+                state.paused,
+                state.pending_response_text.clone().unwrap_or_default(),
+            )
+        };
+
+        if paused || !auto_resume {
+            info!("Auto-resume disabled or paused, going idle");
+            self.transition_to(ConversationPhase::Idle).await;
+            return;
+        }
+
+        // Adaptive breath pause
+        let breath_ms = if adaptive_breath {
+            compute_breath_ms(&response_text)
+        } else {
+            300 // fixed minimum
+        };
+
+        info!("Auto-resume: breath pause {}ms", breath_ms);
+        tokio::time::sleep(std::time::Duration::from_millis(breath_ms)).await;
+
+        // Transition to listening
+        self.transition_to(ConversationPhase::Listening).await;
+
+        let turn_count = self.state.lock().await.turn_count;
+        let title = self.current_session_title().await;
+        let _ = self
+            .voice_service
+            .emit_event(VoiceEvent::PhaseChanged {
+                phase: "listening".to_string(),
+                session_title: Some(title),
+                turn_count,
+            })
+            .await;
+    }
+
+    // ── 9. handle_command_while_idle ────────────────────────
+
+    async fn handle_command_while_idle(&self, cmd: VoiceCommand) {
+        match cmd {
+            VoiceCommand::Resume => {
+                let paused = self.state.lock().await.paused;
+                if paused {
+                    info!("Idle: Resume received, transitioning to Listening");
+                    self.state.lock().await.paused = false;
+                    self.transition_to(ConversationPhase::Listening).await;
+
+                    let turn_count = self.state.lock().await.turn_count;
+                    let title = self.current_session_title().await;
+                    let _ = self
+                        .voice_service
+                        .emit_event(VoiceEvent::PhaseChanged {
+                            phase: "listening".to_string(),
+                            session_title: Some(title),
+                            turn_count,
+                        })
+                        .await;
+                }
+            }
+            VoiceCommand::Continue => {
+                let (interrupted, has_response) = {
+                    let state = self.state.lock().await;
+                    (state.interrupted, state.pending_response_text.is_some())
+                };
+                if interrupted && has_response {
+                    info!("Idle: Continue received, resuming TTS from position");
+                    self.transition_to(ConversationPhase::Speaking).await;
+                }
+            }
+            VoiceCommand::End => {
+                info!("Idle: End received (already idle, no-op)");
+                // Emit final idle phase change in case UI needs it
+                let _ = self
+                    .voice_service
+                    .emit_event(VoiceEvent::PhaseChanged {
+                        phase: "idle".to_string(),
+                        session_title: None,
+                        turn_count: 0,
+                    })
+                    .await;
+            }
+            _ => {
+                // Pause, Interrupt, NewSession while idle — ignore
+            }
+        }
+    }
+
+    // ── Utilities ───────────────────────────────────────────
+
+    /// Transition to a new phase with logging and event emission.
+    async fn transition_to(&self, next: ConversationPhase) {
+        let mut state = self.state.lock().await;
+        let current = state.phase;
+        if current == next {
+            return;
+        }
+        if !current.can_transition_to(&next) {
+            warn!(
+                "Invalid phase transition: {} -> {}",
+                current.as_str(),
+                next.as_str()
+            );
+            return;
+        }
+        info!(
+            "Phase transition: {} -> {}",
+            current.as_str(),
+            next.as_str()
+        );
+        state.phase = next;
+        state.touch();
+    }
+
+    /// Get the current session title from DB, or a default.
+    async fn current_session_title(&self) -> String {
+        let session_key = self.state.lock().await.session_key.clone();
+        if let Some(ref key) = session_key {
+            if let Ok(row) = self.repos.sessions.get_session(key.as_str()).await {
+                return row
+                    .metadata
+                    .get("title")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("Voice session")
+                    .to_string();
+            }
+        }
+        "Voice session".to_string()
+    }
+}
+
+// ── Monitor helper ──────────────────────────────────────────
+
+/// Start a lightweight audio monitor, extracting Send-safe parts and keeping
+/// the !Send cpal::Stream alive on a blocking thread.
+fn start_monitor_safe(
+    voice_service: &VoiceService,
+) -> (
+    mpsc::Receiver<f32>,
+    Option<Arc<std::sync::atomic::AtomicBool>>,
+) {
+    match voice_service.start_monitor() {
+        Ok(mut session) => {
+            let stop = session.stop_signal.clone();
+
+            // Extract the Send-safe rms_rx before wrapping in SendableMonitorSession.
+            let rms_rx = {
+                let (_, dummy) = mpsc::channel(1);
+                std::mem::replace(&mut session.rms_rx, dummy)
+            };
+
+            // Keep the !Send MonitorSession alive on a blocking thread.
+            let sendable = SendableMonitorSession(session);
+            let keepalive_stop = stop.clone();
+            tokio::task::spawn_blocking(move || {
+                while !keepalive_stop.load(Ordering::Relaxed) {
+                    std::thread::sleep(std::time::Duration::from_millis(50));
+                }
+                drop(sendable);
+            });
+
+            (rms_rx, Some(stop))
+        }
+        Err(e) => {
+            warn!("Failed to start audio monitor: {e}");
+            let (_tx, rx) = mpsc::channel::<f32>(1);
+            (rx, None)
+        }
+    }
 }
 
 // ── Tests ────────────────────────────────────────────────────
@@ -200,7 +1006,8 @@ mod tests {
         assert!(ConversationPhase::Listening.can_transition_to(&ConversationPhase::Reflecting));
         assert!(ConversationPhase::Reflecting.can_transition_to(&ConversationPhase::Speaking));
         assert!(ConversationPhase::Speaking.can_transition_to(&ConversationPhase::Listening)); // auto-resume
-        assert!(ConversationPhase::Speaking.can_transition_to(&ConversationPhase::Idle)); // end
+        assert!(ConversationPhase::Speaking.can_transition_to(&ConversationPhase::Idle));
+        // end
     }
 
     #[test]
@@ -242,10 +1049,10 @@ mod tests {
 
     #[test]
     fn adaptive_breath_duration() {
-        assert_eq!(compute_breath_ms("Hi"), 301); // Short → near minimum (300 + 2/2)
-        assert_eq!(compute_breath_ms(&"A".repeat(1000)), 800); // Long → capped
+        assert_eq!(compute_breath_ms("Hi"), 301); // Short -> near minimum (300 + 2/2)
+        assert_eq!(compute_breath_ms(&"A".repeat(1000)), 800); // Long -> capped
         let medium = "A".repeat(400);
         let ms = compute_breath_ms(&medium);
-        assert!(ms > 300 && ms < 800); // Medium → in between
+        assert!(ms > 300 && ms < 800); // Medium -> in between
     }
 }

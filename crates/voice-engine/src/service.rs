@@ -549,6 +549,14 @@ impl VoiceService {
         self.model_manager.start_download(size).await
     }
 
+    /// Start a lightweight RMS-only audio monitor (no buffering, no silence detection).
+    ///
+    /// Used during Speaking phase to detect user speech for interrupt. Delegates
+    /// to the internal `AudioCapture::start_monitor()`.
+    pub fn start_monitor(&self) -> common::Result<crate::capture::MonitorSession> {
+        self.capture.start_monitor()
+    }
+
     /// Emit an arbitrary VoiceEvent (for dev/testing simulation).
     pub async fn emit_event(&self, event: VoiceEvent) -> common::Result<()> {
         self.event_tx
