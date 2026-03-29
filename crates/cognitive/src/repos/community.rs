@@ -160,6 +160,33 @@ impl CommunityRepo {
             .map_err(map_sqlx)?;
         Ok(())
     }
+
+    /// Get top entity names linked to the given tree node IDs, ordered by frequency.
+    pub async fn get_top_entities_for_members(&self, member_node_ids: &[&str]) -> Vec<String> {
+        if member_node_ids.is_empty() {
+            return Vec::new();
+        }
+        let placeholders: Vec<String> = (1..=member_node_ids.len())
+            .map(|i| format!("?{i}"))
+            .collect();
+        let sql = format!(
+            "SELECT e.name \
+             FROM entity_tree_links etl \
+             JOIN entities e ON etl.entity_id = e.id \
+             WHERE etl.tree_node_id IN ({}) \
+             GROUP BY e.id \
+             ORDER BY COUNT(*) DESC \
+             LIMIT 5",
+            placeholders.join(", ")
+        );
+
+        let mut query = sqlx::query_scalar::<_, String>(&sql);
+        for id in member_node_ids {
+            query = query.bind(*id);
+        }
+
+        query.fetch_all(&self.pool).await.unwrap_or_default()
+    }
 }
 
 #[cfg(test)]

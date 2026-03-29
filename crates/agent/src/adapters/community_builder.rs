@@ -5,6 +5,7 @@
 //! Debounces `NoteContentChanged` events for 5 seconds before processing.
 
 use std::collections::{HashMap, HashSet};
+use std::hash::{Hash, Hasher};
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -154,12 +155,13 @@ impl CommunityBuilder {
         let mut new_community_ids: HashSet<String> = HashSet::new();
 
         // 5. Process each community
-        for (comm_idx, members) in &community_members {
+        for (_comm_idx, members) in &community_members {
             if members.len() < MIN_COMMUNITY_SIZE {
                 continue;
             }
 
-            let community_id = format!("comm-{comm_idx}");
+            let member_node_ids: Vec<&str> = members.iter().map(|(id, _)| id.as_str()).collect();
+            let community_id = stable_community_id(&member_node_ids);
             new_community_ids.insert(community_id.clone());
 
             // Load tree nodes for top members to build summary
@@ -207,7 +209,21 @@ impl CommunityBuilder {
                 )
             };
 
-            let top_entities: Vec<String> = Vec::new();
+            let top_member_node_ids: Vec<&str> =
+                members.iter().map(|(id, _)| id.as_str()).collect();
+            let top_entities: Vec<String> = self
+                .community_repo
+                .get_top_entities_for_members(&top_member_node_ids)
+                .await;
+
+            let stability = compute_stability(
+                self.community_repo
+                    .get_community(&community_id)
+                    .await
+                    .ok()
+                    .flatten(),
+                members.len(),
+            );
 
             let community = CommunityRow {
                 id: community_id.clone(),
@@ -215,7 +231,7 @@ impl CommunityBuilder {
                 summary: common::truncate_at_boundary(&summary, 500).to_string(),
                 member_count: members.len() as i64,
                 modularity_score: Some(assignment.modularity),
-                stability: 1.0,
+                stability,
                 top_entities: Some(serde_json::to_string(&top_entities).unwrap_or_default()),
                 representative_paths: Some(
                     serde_json::to_string(&representative_paths).unwrap_or_default(),
@@ -321,5 +337,163 @@ impl CommunityBuilder {
         );
 
         Ok(())
+    }
+}
+
+/// Generate a stable community ID based on sorted member node IDs.
+/// Uses a content hash so the ID is deterministic regardless of Louvain ordering.
+fn stable_community_id(member_node_ids: &[&str]) -> String {
+    use std::collections::hash_map::DefaultHasher;
+
+    let mut sorted: Vec<&str> = member_node_ids.to_vec();
+    sorted.sort();
+    let mut hasher = DefaultHasher::new();
+    for id in &sorted {
+        id.hash(&mut hasher);
+    }
+    format!("comm-{:016x}", hasher.finish())
+}
+
+/// Compute stability for a community based on its previous state.
+/// New communities start at 0.7. Growing or stable communities increase toward 1.0.
+/// Shrinking communities decay proportionally to member loss.
+fn compute_stability(existing: Option<CommunityRow>, new_member_count: usize) -> f64 {
+    if let Some(prev) = existing {
+        let old_count = prev.member_count as usize;
+        if new_member_count >= old_count {
+            (prev.stability + 0.05).min(1.0)
+        } else {
+            let loss_ratio = (old_count - new_member_count) as f64 / old_count.max(1) as f64;
+            (prev.stability * (1.0 - loss_ratio * 0.3)).max(0.0)
+        }
+    } else {
+        0.7
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn stable_community_id_same_members_different_order() {
+        let a = stable_community_id(&["node-1", "node-2", "node-3"]);
+        let b = stable_community_id(&["node-3", "node-1", "node-2"]);
+        assert_eq!(a, b, "Same members in different order should produce the same ID");
+    }
+
+    #[test]
+    fn stable_community_id_different_members() {
+        let a = stable_community_id(&["node-1", "node-2"]);
+        let b = stable_community_id(&["node-1", "node-3"]);
+        assert_ne!(a, b, "Different members should produce different IDs");
+    }
+
+    #[test]
+    fn stable_community_id_format() {
+        let id = stable_community_id(&["a", "b"]);
+        assert!(id.starts_with("comm-"), "ID should start with 'comm-'");
+        assert_eq!(id.len(), 5 + 16, "ID should be 'comm-' + 16 hex chars");
+    }
+
+    #[test]
+    fn stability_new_community() {
+        assert!((compute_stability(None, 5) - 0.7).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn stability_growing_community() {
+        let prev = CommunityRow {
+            id: "c1".into(),
+            name: "n".into(),
+            summary: "s".into(),
+            member_count: 5,
+            modularity_score: None,
+            stability: 0.8,
+            top_entities: None,
+            representative_paths: None,
+            source_note_count: None,
+            created_at: String::new(),
+            updated_at: String::new(),
+        };
+        let s = compute_stability(Some(prev), 7);
+        assert!((s - 0.85).abs() < f64::EPSILON, "Growing community should increase stability");
+    }
+
+    #[test]
+    fn stability_same_size_community() {
+        let prev = CommunityRow {
+            id: "c1".into(),
+            name: "n".into(),
+            summary: "s".into(),
+            member_count: 5,
+            modularity_score: None,
+            stability: 0.9,
+            top_entities: None,
+            representative_paths: None,
+            source_note_count: None,
+            created_at: String::new(),
+            updated_at: String::new(),
+        };
+        let s = compute_stability(Some(prev), 5);
+        assert!((s - 0.95).abs() < f64::EPSILON, "Same-size community should increase stability");
+    }
+
+    #[test]
+    fn stability_shrinking_community() {
+        let prev = CommunityRow {
+            id: "c1".into(),
+            name: "n".into(),
+            summary: "s".into(),
+            member_count: 10,
+            modularity_score: None,
+            stability: 0.8,
+            top_entities: None,
+            representative_paths: None,
+            source_note_count: None,
+            created_at: String::new(),
+            updated_at: String::new(),
+        };
+        // Lost 5 out of 10 → loss_ratio = 0.5, decay = 0.8 * (1 - 0.5 * 0.3) = 0.8 * 0.85 = 0.68
+        let s = compute_stability(Some(prev), 5);
+        assert!((s - 0.68).abs() < 0.001, "Shrinking community should decay: got {s}");
+    }
+
+    #[test]
+    fn stability_capped_at_1() {
+        let prev = CommunityRow {
+            id: "c1".into(),
+            name: "n".into(),
+            summary: "s".into(),
+            member_count: 5,
+            modularity_score: None,
+            stability: 0.98,
+            top_entities: None,
+            representative_paths: None,
+            source_note_count: None,
+            created_at: String::new(),
+            updated_at: String::new(),
+        };
+        let s = compute_stability(Some(prev), 10);
+        assert!((s - 1.0).abs() < f64::EPSILON, "Stability should cap at 1.0");
+    }
+
+    #[test]
+    fn stability_floored_at_0() {
+        let prev = CommunityRow {
+            id: "c1".into(),
+            name: "n".into(),
+            summary: "s".into(),
+            member_count: 100,
+            modularity_score: None,
+            stability: 0.01,
+            top_entities: None,
+            representative_paths: None,
+            source_note_count: None,
+            created_at: String::new(),
+            updated_at: String::new(),
+        };
+        let s = compute_stability(Some(prev), 0);
+        assert!(s >= 0.0, "Stability should not go below 0.0");
     }
 }
