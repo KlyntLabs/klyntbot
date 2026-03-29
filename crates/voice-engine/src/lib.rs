@@ -18,12 +18,12 @@ pub mod tts;
 pub mod types;
 
 pub use capture::{AudioCapture, CaptureConfig, CaptureSession};
-pub use engines::{GroqWhisperEngine, WhisperLocalEngine};
+pub use engines::{AvSpeechTtsEngine, GroqWhisperEngine, WhisperLocalEngine};
 pub use events::{VoiceEvent, VOICE_EVENT};
 pub use model_manager::{ModelManager, ModelState, WhisperModelSize};
 pub use pronunciation::compute_pronunciation_report;
 pub use router::VoiceRouter;
-pub use service::{VoiceService, VoiceServiceConfig};
+pub use service::{MemoryEchoProvider, VoiceService, VoiceServiceConfig};
 pub use session::VoiceSessionState;
 pub use stt::{PartialTranscript, TranscriptionEngine};
 pub use tts::TtsEngine;

@@ -104,14 +104,10 @@ impl AppCore {
         &self,
         request: VoiceDownloadModelRequest,
     ) -> Result<(), ApiError> {
-        let _service = self.voice_service()?;
-        // TODO: Delegate to ModelManager::start_download
-        Err(ApiError::new(
-            "NOT_IMPLEMENTED",
-            &format!(
-                "Model download for {:?} not yet implemented",
-                request.model_size
-            ),
-        ))
+        let service = self.voice_service()?;
+        service
+            .download_model(request.model_size)
+            .await
+            .map_err(|e| ApiError::new("VOICE_ERROR", &e.to_string()))
     }
 }

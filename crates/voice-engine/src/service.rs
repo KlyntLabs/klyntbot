@@ -4,6 +4,7 @@
 //! the VoiceSessionState machine, streams audio to transcription, runs
 //! routing on partials, and produces VoiceEvents for the frontend orb.
 
+use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::time::Instant;
@@ -13,7 +14,7 @@ use tracing::{info, warn};
 
 use crate::capture::{AudioCapture, CaptureConfig, CaptureSession};
 use crate::events::VoiceEvent;
-use crate::model_manager::{ModelManager, ModelState};
+use crate::model_manager::{ModelManager, ModelState, WhisperModelSize};
 use crate::pronunciation::compute_pronunciation_report;
 use crate::router::VoiceRouter;
 use crate::session::VoiceSessionState;
@@ -21,12 +22,27 @@ use crate::stt::TranscriptionEngine;
 use crate::tts::TtsEngine;
 use crate::types::*;
 
+/// Callback for memory echo lookups (dependency-inverted from higher layers).
+#[async_trait::async_trait]
+pub trait MemoryEchoProvider: Send + Sync {
+    async fn lookup(&self, partial_text: &str, learning_active: bool) -> Option<String>;
+}
+
+/// Base64-encode an `AudioClip`'s raw float samples for transport to the frontend.
+fn base64_encode_audio(clip: &AudioClip) -> String {
+    use base64::Engine;
+    let bytes: Vec<u8> = clip.samples.iter().flat_map(|s| s.to_le_bytes()).collect();
+    base64::engine::general_purpose::STANDARD.encode(&bytes)
+}
+
 /// Configuration for the VoiceService.
 #[derive(Debug, Clone)]
 pub struct VoiceServiceConfig {
     pub capture: CaptureConfig,
     pub prefer_local: bool,
     pub privacy_mode: PrivacyLevel,
+    /// Data directory for saving audio captures and TTS output.
+    pub data_dir: PathBuf,
 }
 
 impl Default for VoiceServiceConfig {
@@ -35,6 +51,7 @@ impl Default for VoiceServiceConfig {
             capture: CaptureConfig::default(),
             prefer_local: true,
             privacy_mode: PrivacyLevel::Standard,
+            data_dir: PathBuf::from("."),
         }
     }
 }
@@ -75,8 +92,9 @@ pub struct VoiceService {
     stt_local: Option<Arc<dyn TranscriptionEngine>>,
     stt_cloud: Option<Arc<dyn TranscriptionEngine>>,
     /// TTS engine for spoken responses (used in SpeakResponse phase).
-    #[allow(dead_code)]
     tts: Option<Arc<dyn TtsEngine>>,
+    /// Memory echo provider for dependency-inverted memory lookups.
+    memory_echo: Option<Arc<dyn MemoryEchoProvider>>,
     capture: AudioCapture,
     model_manager: ModelManager,
     router: VoiceRouter,
@@ -100,6 +118,7 @@ impl VoiceService {
         stt_local: Option<Arc<dyn TranscriptionEngine>>,
         stt_cloud: Option<Arc<dyn TranscriptionEngine>>,
         tts: Option<Arc<dyn TtsEngine>>,
+        memory_echo: Option<Arc<dyn MemoryEchoProvider>>,
         model_manager: ModelManager,
         config: VoiceServiceConfig,
     ) -> Self {
@@ -109,6 +128,7 @@ impl VoiceService {
             stt_local,
             stt_cloud,
             tts,
+            memory_echo,
             capture: AudioCapture::new(config.capture.clone()),
             model_manager,
             router: VoiceRouter::new(),
@@ -334,6 +354,16 @@ impl VoiceService {
                 })
                 .await;
 
+            // Memory echo lookup on each partial
+            if let Some(ref echo_provider) = self.memory_echo {
+                if let Some(echo_text) = echo_provider.lookup(&partial.text, false).await {
+                    let _ = self
+                        .event_tx
+                        .send(VoiceEvent::MemoryEcho { text: echo_text })
+                        .await;
+                }
+            }
+
             // Run routing on each partial.
             let intents = self.router.detect_intents(&partial.text);
             for event in self.router.to_events(&intents) {
@@ -366,6 +396,17 @@ impl VoiceService {
 
         let report = compute_pronunciation_report(&transcript);
 
+        // Generate audio_ref path for FSRS playback.
+        // TODO: tee the audio stream during capture to actually write the WAV file.
+        // For now we prepare the path so downstream consumers can check for it.
+        let audio_ref = {
+            let audio_dir = self.config.data_dir.join("voice_captures");
+            let _ = tokio::fs::create_dir_all(&audio_dir).await;
+            let filename = format!("{}.wav", session.id);
+            let path = audio_dir.join(filename);
+            Some(path.to_string_lossy().to_string())
+        };
+
         let metadata = VoiceMetadata {
             language: transcript.language.clone(),
             overall_confidence: transcript.overall_confidence,
@@ -374,7 +415,7 @@ impl VoiceService {
                 .iter()
                 .map(|w| (w.word.clone(), w.confidence))
                 .collect(),
-            audio_ref: None, // TODO: save audio to file for FSRS playback
+            audio_ref,
             duration,
             engine: engine_kind,
             privacy_mode: self.config.privacy_mode,
@@ -394,6 +435,28 @@ impl VoiceService {
                 response_preview: String::new(),
             })
             .await;
+
+        // TTS read-back if available
+        if let Some(ref tts) = self.tts {
+            let response_text = "Got it."; // Placeholder — real response comes from agent
+            let params = TtsParams::default();
+            match tts.synthesize(response_text, &params).await {
+                Ok(clip) => {
+                    let audio_base64 = base64_encode_audio(&clip);
+                    let _ = self
+                        .event_tx
+                        .send(VoiceEvent::SpeakResponse {
+                            audio_base64,
+                            sample_rate: clip.sample_rate,
+                            text: response_text.to_string(),
+                        })
+                        .await;
+                }
+                Err(e) => {
+                    warn!("TTS synthesis failed: {e}");
+                }
+            }
+        }
 
         info!(
             "Voice transcription complete: \"{}\" (confidence: {:.0}%, routed to: {})",
@@ -437,6 +500,11 @@ impl VoiceService {
     pub fn is_available(&self) -> bool {
         self.active_engine().is_some()
     }
+
+    /// Start downloading a Whisper model via the ModelManager.
+    pub async fn download_model(&self, size: WhisperModelSize) -> common::Result<()> {
+        self.model_manager.start_download(size).await
+    }
 }
 
 #[cfg(test)]
@@ -450,6 +518,7 @@ mod tests {
         let model_manager = ModelManager::new(tmp.path());
         let svc = VoiceService::new(
             stt,
+            None,
             None,
             None,
             model_manager,

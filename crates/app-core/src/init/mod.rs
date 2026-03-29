@@ -491,6 +491,11 @@ impl AppCore {
                 // Drop config guard before creating VoiceService (no longer needed)
                 drop(config_guard);
 
+                // TTS: macOS AVSpeech
+                let tts: Option<Arc<dyn voice_engine::TtsEngine>> = Some(Arc::new(
+                    voice_engine::AvSpeechTtsEngine::new(&data_dir),
+                ));
+
                 // Only create VoiceService if at least one engine is available
                 if stt_local.is_some() || stt_cloud.is_some() {
                     let svc_config = VoiceServiceConfig {
@@ -503,12 +508,14 @@ impl AppCore {
                         },
                         prefer_local: voice_config.input.prefer_local,
                         privacy_mode: PrivacyLevel::Standard,
+                        data_dir: data_dir.clone(),
                     };
 
                     let service = VoiceService::new(
                         stt_local,
                         stt_cloud,
-                        None, // TTS not wired yet
+                        tts,
+                        None, // MemoryEchoProvider — stub, wired later
                         model_manager,
                         svc_config,
                     );

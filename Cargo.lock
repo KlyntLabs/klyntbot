@@ -12621,10 +12621,13 @@ name = "voice-engine"
 version = "0.1.0"
 dependencies = [
  "async-trait",
+ "base64 0.22.1",
  "chrono",
  "common",
  "cpal",
+ "futures-util",
  "hound",
+ "platform-macos",
  "reqwest 0.13.2",
  "serde",
  "serde_json",

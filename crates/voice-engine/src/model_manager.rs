@@ -4,7 +4,7 @@ use std::path::{Path, PathBuf};
 
 use serde::{Deserialize, Serialize};
 use tokio::sync::watch;
-use tracing::{info, warn};
+use tracing::info;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
@@ -104,15 +104,66 @@ impl ModelManager {
             .state_tx
             .send(ModelState::Downloading { progress: 0.0 });
 
-        warn!(
-            "Model download not yet implemented for {}. Place the model file at: {}",
-            size.display_name(),
-            self.models_dir.join(size.filename()).display()
-        );
+        let url = match size {
+            WhisperModelSize::Small => "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-small.bin",
+            WhisperModelSize::Medium => "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-medium.bin",
+        };
 
-        let _ = self.state_tx.send(ModelState::Failed {
-            error: "Download not yet implemented — place model manually".to_string(),
-        });
+        let dest = self.models_dir.join(size.filename());
+        let state_tx = self.state_tx.clone();
+        let expected_size = size.size_bytes();
+
+        info!("Downloading {} from {}", size.display_name(), url);
+
+        let response = reqwest::get(url).await.map_err(|e| {
+            let _ = state_tx.send(ModelState::Failed {
+                error: e.to_string(),
+            });
+            common::KlyntbotError::Provider(common::ProviderError::Http(e.to_string()))
+        })?;
+
+        if !response.status().is_success() {
+            let err = format!("HTTP {}", response.status());
+            let _ = state_tx.send(ModelState::Failed { error: err.clone() });
+            return Err(common::KlyntbotError::Provider(
+                common::ProviderError::Http(err),
+            ));
+        }
+
+        let mut file = tokio::fs::File::create(&dest).await.map_err(|e| {
+            let _ = state_tx.send(ModelState::Failed {
+                error: e.to_string(),
+            });
+            common::KlyntbotError::Io(e)
+        })?;
+
+        let mut downloaded: u64 = 0;
+        let mut stream = response.bytes_stream();
+        use futures_util::StreamExt;
+        use tokio::io::AsyncWriteExt;
+
+        while let Some(chunk) = stream.next().await {
+            let chunk = chunk.map_err(|e| {
+                let _ = state_tx.send(ModelState::Failed {
+                    error: e.to_string(),
+                });
+                common::KlyntbotError::Provider(common::ProviderError::Http(e.to_string()))
+            })?;
+            file.write_all(&chunk).await.map_err(|e| {
+                let _ = state_tx.send(ModelState::Failed {
+                    error: e.to_string(),
+                });
+                common::KlyntbotError::Io(e)
+            })?;
+            downloaded += chunk.len() as u64;
+            let progress = (downloaded as f32 / expected_size as f32).min(1.0);
+            let _ = state_tx.send(ModelState::Downloading { progress });
+        }
+
+        file.flush().await.map_err(common::KlyntbotError::Io)?;
+
+        let _ = state_tx.send(ModelState::Ready { path: dest });
+        info!("Model {} downloaded successfully", size.display_name());
 
         Ok(())
     }
