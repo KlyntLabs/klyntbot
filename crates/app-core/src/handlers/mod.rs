@@ -37,6 +37,7 @@ pub mod timeline;
 mod view;
 pub mod voice;
 pub mod voice_conversation;
+mod voice_conversation_commands;
 pub mod voice_echo;
 pub mod work_context;
 pub mod workflows;

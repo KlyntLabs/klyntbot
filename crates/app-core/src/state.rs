@@ -140,6 +140,9 @@ pub struct AppCore {
     pub _wake_orchestrator_handle: Option<tokio::task::JoinHandle<()>>,
     /// Voice capture service (None when voice feature is disabled).
     pub voice_service: Option<Arc<VoiceService>>,
+    /// Voice conversation manager (None when voice feature is disabled).
+    pub voice_conversation_manager:
+        Option<Arc<crate::handlers::voice_conversation::VoiceConversationManager>>,
 }
 
 impl AppCore {
@@ -288,6 +291,15 @@ impl AppCore {
         self.voice_service
             .as_ref()
             .ok_or_else(|| ApiError::new("FEATURE_DISABLED", "voice feature is not enabled"))
+    }
+
+    /// Return voice conversation manager or a "not available" error.
+    pub fn voice_conversation_manager(
+        &self,
+    ) -> Result<&Arc<crate::handlers::voice_conversation::VoiceConversationManager>, ApiError> {
+        self.voice_conversation_manager.as_ref().ok_or_else(|| {
+            ApiError::new("VOICE_NOT_AVAILABLE", "Voice conversation not initialized")
+        })
     }
 
     /// Return proactive handler or a "not initialized" error.

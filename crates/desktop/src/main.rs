@@ -367,77 +367,140 @@ fn run_desktop_app() {
                                             }
                                         }
 
-                                        // Check if voice-orb is already visible (toggle behavior)
-                                        if let Some(orb_window) =
-                                            handle.get_webview_window("voice-orb")
-                                        {
-                                            let is_visible =
-                                                orb_window.is_visible().unwrap_or(false);
-                                            if is_visible {
-                                                // Second press → stop capture, keep orb visible
-                                                // for Processing → agent response → TTS playback.
-                                                // The orb auto-dismisses via frontend dismiss().
-                                                let core = handle
-                                                    .state::<std::sync::Arc<app_core::AppCore>>();
-                                                let _ = core.voice_stop_capture().await;
+                                        // Voice conversation manager toggle
+                                        let core =
+                                            handle.state::<std::sync::Arc<app_core::AppCore>>();
+                                        if let Ok(manager) = core.voice_conversation_manager() {
+                                            use ::app_core::handlers::voice_conversation::ConversationPhase;
+                                            let phase = manager.phase().await;
+                                            if phase == ConversationPhase::Idle {
+                                                // First press → open orb and start conversation
+                                                if let Some(orb_window) =
+                                                    handle.get_webview_window("voice-orb")
+                                                {
+                                                    // Position: top-center of active monitor, 80px from top
+                                                    if let Ok(Some(monitor)) =
+                                                        orb_window.current_monitor()
+                                                    {
+                                                        let monitor_pos = monitor.position();
+                                                        let monitor_size = monitor.size();
+                                                        let x = monitor_pos.x
+                                                            + (monitor_size.width as i32 / 2)
+                                                            - 160; // half of 320px width
+                                                        let y = monitor_pos.y + 80;
+                                                        let _ = orb_window.set_position(
+                                                            tauri::PhysicalPosition::new(x, y),
+                                                        );
+                                                    }
+                                                    let _ = orb_window.show();
+                                                    let _ = orb_window.set_focus();
+                                                }
+
+                                                // Brief yield so the voice-orb webview's event
+                                                // listener is ready before events fire.
+                                                tokio::time::sleep(
+                                                    std::time::Duration::from_millis(100),
+                                                )
+                                                .await;
+
+                                                match manager.start().await {
+                                                    Ok(_) => {
+                                                        crate::tray_countdown::VOICE_ACTIVE.store(
+                                                            true,
+                                                            std::sync::atomic::Ordering::Relaxed,
+                                                        );
+                                                    }
+                                                    Err(e) => {
+                                                        tracing::warn!(
+                                                            "Failed to start voice conversation: {e}"
+                                                        );
+                                                        let _ = handle.emit(
+                                                            "voice:event",
+                                                            serde_json::json!({
+                                                                "type": "error",
+                                                                "message": e.to_string(),
+                                                                "recoverable": true
+                                                            }),
+                                                        );
+                                                    }
+                                                }
+                                            } else {
+                                                // Active conversation → end it
+                                                use ::app_core::handlers::voice_conversation::VoiceCommand;
+                                                manager
+                                                    .send_command(VoiceCommand::End)
+                                                    .await;
+                                                // Hide the orb
+                                                if let Some(orb_window) =
+                                                    handle.get_webview_window("voice-orb")
+                                                {
+                                                    let _ = orb_window.hide();
+                                                }
                                                 crate::tray_countdown::VOICE_ACTIVE.store(
                                                     false,
                                                     std::sync::atomic::Ordering::Relaxed,
                                                 );
-                                                // Don't hide — orb stays open for response
-                                                return;
                                             }
-                                        }
-
-                                        // First press → open orb and start capture
-                                        if let Some(orb_window) =
-                                            handle.get_webview_window("voice-orb")
-                                        {
-                                            // Position: top-center of active monitor, 80px from top
-                                            if let Ok(Some(monitor)) = orb_window.current_monitor()
+                                        } else {
+                                            // Fallback: no conversation manager, use legacy voice capture
+                                            if let Some(orb_window) =
+                                                handle.get_webview_window("voice-orb")
                                             {
-                                                let monitor_pos = monitor.position();
-                                                let monitor_size = monitor.size();
-                                                let x = monitor_pos.x
-                                                    + (monitor_size.width as i32 / 2)
-                                                    - 160; // half of 320px width
-                                                let y = monitor_pos.y + 80;
-                                                let _ = orb_window.set_position(
-                                                    tauri::PhysicalPosition::new(x, y),
-                                                );
+                                                let is_visible =
+                                                    orb_window.is_visible().unwrap_or(false);
+                                                if is_visible {
+                                                    let _ = core.voice_stop_capture().await;
+                                                    crate::tray_countdown::VOICE_ACTIVE.store(
+                                                        false,
+                                                        std::sync::atomic::Ordering::Relaxed,
+                                                    );
+                                                    return;
+                                                }
                                             }
-                                            let _ = orb_window.show();
-                                            let _ = orb_window.set_focus();
-                                        }
-
-                                        // Brief yield so the voice-orb webview's event listener
-                                        // is ready before CaptureStarted fires.
-                                        tokio::time::sleep(std::time::Duration::from_millis(100))
+                                            // Open orb and start capture
+                                            if let Some(orb_window) =
+                                                handle.get_webview_window("voice-orb")
+                                            {
+                                                if let Ok(Some(monitor)) =
+                                                    orb_window.current_monitor()
+                                                {
+                                                    let monitor_pos = monitor.position();
+                                                    let monitor_size = monitor.size();
+                                                    let x = monitor_pos.x
+                                                        + (monitor_size.width as i32 / 2)
+                                                        - 160;
+                                                    let y = monitor_pos.y + 80;
+                                                    let _ = orb_window.set_position(
+                                                        tauri::PhysicalPosition::new(x, y),
+                                                    );
+                                                }
+                                                let _ = orb_window.show();
+                                                let _ = orb_window.set_focus();
+                                            }
+                                            tokio::time::sleep(
+                                                std::time::Duration::from_millis(100),
+                                            )
                                             .await;
-
-                                        // Start voice capture
-                                        let core =
-                                            handle.state::<std::sync::Arc<app_core::AppCore>>();
-                                        match core.voice_start_capture().await {
-                                            Ok(_info) => {
-                                                crate::tray_countdown::VOICE_ACTIVE.store(
-                                                    true,
-                                                    std::sync::atomic::Ordering::Relaxed,
-                                                );
-                                            }
-                                            Err(e) => {
-                                                tracing::warn!(
-                                                    "Failed to start voice capture: {e}"
-                                                );
-                                                // Emit error to orb
-                                                let _ = handle.emit(
-                                                    "voice:event",
-                                                    serde_json::json!({
-                                                        "type": "error",
-                                                        "message": e.to_string(),
-                                                        "recoverable": true
-                                                    }),
-                                                );
+                                            match core.voice_start_capture().await {
+                                                Ok(_info) => {
+                                                    crate::tray_countdown::VOICE_ACTIVE.store(
+                                                        true,
+                                                        std::sync::atomic::Ordering::Relaxed,
+                                                    );
+                                                }
+                                                Err(e) => {
+                                                    tracing::warn!(
+                                                        "Failed to start voice capture: {e}"
+                                                    );
+                                                    let _ = handle.emit(
+                                                        "voice:event",
+                                                        serde_json::json!({
+                                                            "type": "error",
+                                                            "message": e.to_string(),
+                                                            "recoverable": true
+                                                        }),
+                                                    );
+                                                }
                                             }
                                         }
                                     });
@@ -643,6 +706,15 @@ fn run_desktop_app() {
             commands::voice::voice_get_models,
             commands::voice::voice_download_model,
             commands::voice::voice_simulate_event,
+            // Voice Conversation
+            commands::voice_conversation::voice_conversation_start,
+            commands::voice_conversation::voice_conversation_pause,
+            commands::voice_conversation::voice_conversation_resume,
+            commands::voice_conversation::voice_conversation_interrupt,
+            commands::voice_conversation::voice_conversation_continue,
+            commands::voice_conversation::voice_conversation_new_session,
+            commands::voice_conversation::voice_conversation_end,
+            commands::voice_conversation::voice_conversation_status,
             // Annotations
             commands::annotations::annotation_create,
             commands::annotations::annotation_update,

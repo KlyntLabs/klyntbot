@@ -455,6 +455,7 @@ impl AppCore {
             _lifecycle_monitor: None,
             _wake_orchestrator_handle: None,
             voice_service: None,
+            voice_conversation_manager: None,
         };
 
         // ── Voice service initialization ────────────────────────────────
