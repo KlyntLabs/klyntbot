@@ -17,7 +17,7 @@ pub mod tts;
 pub mod types;
 
 pub use capture::{AudioCapture, CaptureConfig, CaptureSession};
-pub use engines::GroqWhisperEngine;
+pub use engines::{GroqWhisperEngine, WhisperLocalEngine};
 pub use events::{VoiceEvent, VOICE_EVENT};
 pub use model_manager::{ModelManager, ModelState, WhisperModelSize};
 pub use pronunciation::compute_pronunciation_report;
