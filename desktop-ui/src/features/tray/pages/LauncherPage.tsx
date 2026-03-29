@@ -58,9 +58,16 @@ export function Launcher() {
     [enterChat],
   );
 
-  const cancelRecording = useCallback(() => {
-    setMode("dashboard");
-  }, [setMode]);
+  const cancelRecording = useCallback(async () => {
+    reset();
+    if (isTauri) {
+      try {
+        await getCurrentWindow().hide();
+      } catch {
+        // Window hide failed silently
+      }
+    }
+  }, [reset]);
 
   const navigateToMain = useCallback(
     async (path: string, event?: { name: string; payload: unknown }) => {

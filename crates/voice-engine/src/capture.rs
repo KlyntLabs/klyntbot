@@ -122,8 +122,11 @@ impl AudioCapture {
         let downsample_ratio = native_sample_rate / target_sample_rate;
         let num_channels = native_channels;
 
-        // State for silence detection (lives in the audio callback thread)
+        // State for silence detection (lives in the audio callback thread).
+        // `has_heard_voice` ensures we don't fire silence until the user has
+        // actually started speaking — prevents immediate auto-stop on quiet start.
         let mut last_voice_time = Instant::now();
+        let mut has_heard_voice = false;
         let mut silence_fired = false;
         let mut rms_counter: u32 = 0;
 
@@ -137,11 +140,16 @@ impl AudioCapture {
 
                     let rms = compute_rms(data);
 
-                    // Silence detection on every callback
+                    // Silence detection: only fires after user has spoken at least once.
+                    // This prevents auto-stop when the user hasn't started talking yet.
                     if rms > silence_threshold {
                         last_voice_time = Instant::now();
+                        has_heard_voice = true;
                         silence_fired = false;
-                    } else if !silence_fired && last_voice_time.elapsed() >= silence_duration {
+                    } else if has_heard_voice
+                        && !silence_fired
+                        && last_voice_time.elapsed() >= silence_duration
+                    {
                         let _ = silence_tx.try_send(());
                         silence_fired = true;
                     }
