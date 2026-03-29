@@ -9,6 +9,7 @@ interface GraphLegendProps {
   onToggleCluster: (clusterId: string) => void;
   onShowAll: () => void;
   onHighlight: (clusterId: string | null) => void;
+  onCommunityClick?: (communityId: string) => void;
 }
 
 function LegendItem({
@@ -16,17 +17,29 @@ function LegendItem({
   isHidden,
   onHighlight,
   onToggleCluster,
+  onCommunityClick,
 }: {
   cluster: ClusterInfo;
   isHidden: boolean;
   onHighlight: (clusterId: string | null) => void;
   onToggleCluster: (clusterId: string) => void;
+  onCommunityClick?: (communityId: string) => void;
 }) {
+  const isCommunity = cluster.id.startsWith("community:");
+  const communityId = isCommunity ? cluster.id.replace("community:", "") : null;
+
+  const handleClick = () => {
+    onHighlight(cluster.id);
+    if (communityId && onCommunityClick) {
+      onCommunityClick(communityId);
+    }
+  };
+
   return (
     <div className="flex items-center gap-1 group">
       <button
         type="button"
-        onClick={() => onHighlight(cluster.id)}
+        onClick={handleClick}
         onDoubleClick={() => onHighlight(null)}
         onMouseEnter={() => onHighlight(cluster.id)}
         onMouseLeave={() => onHighlight(null)}
@@ -63,6 +76,7 @@ export function GraphLegend({
   onToggleCluster,
   onShowAll,
   onHighlight,
+  onCommunityClick,
 }: GraphLegendProps) {
   const [collapsed, setCollapsed] = useState(false);
 
@@ -111,6 +125,7 @@ export function GraphLegend({
                     isHidden={hiddenClusters.has(c.id)}
                     onHighlight={onHighlight}
                     onToggleCluster={onToggleCluster}
+                    onCommunityClick={onCommunityClick}
                   />
                 ))}
               </div>

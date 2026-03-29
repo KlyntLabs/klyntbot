@@ -80,4 +80,4 @@ export interface FabricGraphEvent {
   intensity: number;
 }
 
-export type FabricLayer = "communities" | "entities" | "tree";
+export type FabricLayer = "communities" | "entities" | "tree" | "community_detail";

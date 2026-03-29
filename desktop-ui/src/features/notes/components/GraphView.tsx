@@ -815,6 +815,7 @@ export function GraphView({
           onToggleCluster={handleToggleCluster}
           onShowAll={handleShowAll}
           onHighlight={handleLegendHighlight}
+          onCommunityClick={handleCommunityClick}
         />
 
         {/* Controls (bottom-right) */}
@@ -929,6 +930,39 @@ export function GraphView({
           onCreateBridgeNote={handleCreateBridgeFromSelection}
           onCompareInChat={handleCompareInChat}
         />
+
+        {/* Community detail panel */}
+        {selectedCommunity && (
+          <div className="absolute right-4 top-4 z-50 w-72 rounded-lg glass-panel p-4 space-y-3">
+            <div className="flex items-center justify-between">
+              <h3 className="font-semibold text-sm truncate">{selectedCommunity.communityId}</h3>
+              <button
+                type="button"
+                onClick={() => setSelectedCommunity(null)}
+                className="text-muted hover:text-foreground text-xs"
+              >
+                ✕
+              </button>
+            </div>
+            {selectedCommunity.representativePaths.length > 0 && (
+              <div className="space-y-1">
+                <div className="text-xs font-medium text-muted">Paths</div>
+                {selectedCommunity.representativePaths.map((p) => (
+                  <div key={p} className="text-xs truncate text-foreground/80">
+                    {p}
+                  </div>
+                ))}
+              </div>
+            )}
+            {selectedCommunity.topEntities.length > 0 && (
+              <div className="text-xs">
+                <span className="font-medium text-muted">Entities: </span>
+                {selectedCommunity.topEntities.join(", ")}
+              </div>
+            )}
+            <div className="text-xs text-muted">{selectedCommunity.members.length} members</div>
+          </div>
+        )}
       </div>
 
       {/* Fabric node detail panel (entity/tree/community) */}
