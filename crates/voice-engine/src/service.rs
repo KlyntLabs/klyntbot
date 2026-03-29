@@ -274,15 +274,16 @@ impl VoiceService {
             })
             .await;
 
-        // Spawn silence auto-stop task: sets stop_signal when silence is detected
+        // Spawn silence notification task: tells the frontend silence was detected.
+        // Does NOT stop the audio stream — the caller (hotkey handler or frontend)
+        // must call stop_capture to trigger transcription. This ensures audio_rx
+        // stays open for the transcription engine to drain.
         {
-            let stop_signal = active.stop_signal.clone();
             let event_tx = self.event_tx.clone();
             let mut silence_rx = silence_rx;
             tokio::spawn(async move {
                 if silence_rx.recv().await.is_some() {
-                    // Signal that silence was detected — stop the audio stream
-                    stop_signal.store(true, Ordering::Relaxed);
+                    info!("Silence detected — notifying frontend");
                     let _ = event_tx
                         .send(VoiceEvent::CaptureEnded { duration_ms: 0 })
                         .await;
@@ -353,7 +354,9 @@ impl VoiceService {
             ))
         })?;
 
+        info!("Passing audio_rx to transcription engine ({})", engine.display_name());
         let mut rx = engine.transcribe_stream(audio_rx).await?;
+        info!("Waiting for transcript partials...");
 
         // Collect transcript partials and the final result.
         let mut final_transcript = None;
@@ -613,8 +616,9 @@ mod tests {
     /// call stop_capture, and verify the full chain fires.
     #[tokio::test]
     async fn end_to_end_pipeline_with_mock_audio() {
-        let mock_stt = Arc::new(MockTranscriptionEngine::new("schedule dentist and practice french"))
-            as Arc<dyn TranscriptionEngine>;
+        let mock_stt = Arc::new(MockTranscriptionEngine::new(
+            "schedule dentist and practice french",
+        )) as Arc<dyn TranscriptionEngine>;
         let (svc, _tmp) = make_service(Some(mock_stt));
 
         let mut event_rx = svc.take_event_rx().unwrap();
@@ -721,7 +725,10 @@ mod tests {
             .iter()
             .find(|e| matches!(e, VoiceEvent::Finalized { .. }))
             .unwrap();
-        if let VoiceEvent::Finalized { routed_to, text, .. } = finalized {
+        if let VoiceEvent::Finalized {
+            routed_to, text, ..
+        } = finalized
+        {
             assert_eq!(text, "schedule dentist and practice french");
             assert!(!routed_to.is_empty());
         }

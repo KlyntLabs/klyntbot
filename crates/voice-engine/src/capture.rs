@@ -85,9 +85,24 @@ impl AudioCapture {
         let device_name = device.name().unwrap_or_else(|_| "unknown".to_string());
         info!("Opening audio input: {}", device_name);
 
+        // Use the device's default config — most macOS mics don't support 16kHz directly.
+        // We capture at the native rate and downsample to 16kHz for Whisper.
+        let default_config = device.default_input_config().map_err(|e| {
+            common::KlyntbotError::Channel(common::ChannelError::ConnectionFailed(
+                format!("Failed to get default input config: {}", e),
+            ))
+        })?;
+
+        let native_sample_rate = default_config.sample_rate().0;
+        let native_channels = default_config.channels();
+        info!(
+            "Device native config: {}Hz, {} ch (target: {}Hz)",
+            native_sample_rate, native_channels, self.config.sample_rate
+        );
+
         let stream_config = cpal::StreamConfig {
-            channels: self.config.channels,
-            sample_rate: cpal::SampleRate(self.config.sample_rate),
+            channels: native_channels,
+            sample_rate: default_config.sample_rate(),
             buffer_size: cpal::BufferSize::Default,
         };
 
@@ -101,7 +116,9 @@ impl AudioCapture {
 
         let silence_threshold = self.config.silence_threshold;
         let silence_duration = self.config.silence_duration;
-        let sample_rate = self.config.sample_rate;
+        let target_sample_rate = self.config.sample_rate;
+        let downsample_ratio = native_sample_rate / target_sample_rate;
+        let num_channels = native_channels;
 
         // State for silence detection (lives in the audio callback thread)
         let mut last_voice_time = Instant::now();
@@ -127,17 +144,36 @@ impl AudioCapture {
                         silence_fired = true;
                     }
 
-                    // RMS emission throttled to ~30fps
+                    // RMS emission throttled to ~30fps (based on native sample rate)
                     rms_counter += data.len() as u32;
-                    if rms_counter >= sample_rate / 30 {
+                    if rms_counter >= native_sample_rate / 30 {
                         let _ = rms_tx.try_send(rms);
                         rms_counter = 0;
                     }
 
-                    // Send audio chunk
+                    // Downsample to 16kHz mono for Whisper:
+                    // 1) Mix to mono (average channels)
+                    // 2) Skip samples to match target rate (simple decimation)
+                    let mono: Vec<f32> = if num_channels > 1 {
+                        data.chunks(num_channels as usize)
+                            .map(|frame| frame.iter().sum::<f32>() / num_channels as f32)
+                            .collect()
+                    } else {
+                        data.to_vec()
+                    };
+
+                    let downsampled: Vec<f32> = if downsample_ratio > 1 {
+                        mono.iter()
+                            .step_by(downsample_ratio as usize)
+                            .copied()
+                            .collect()
+                    } else {
+                        mono
+                    };
+
                     let chunk = AudioChunk {
-                        samples: data.to_vec(),
-                        sample_rate,
+                        samples: downsampled,
+                        sample_rate: target_sample_rate,
                     };
                     let _ = audio_tx.try_send(chunk);
                 },
