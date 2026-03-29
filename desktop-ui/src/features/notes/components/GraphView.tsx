@@ -1,5 +1,6 @@
 import { useClickOutside } from "@shared/hooks/useClickOutside";
 import type { Note, Notebook } from "@shared/types";
+import type { FabricCommunityDetail } from "@shared/types/fabric";
 import { Maximize2, Minus, Plus, RotateCcw, Settings2 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import ForceGraph2D from "react-force-graph-2d";
@@ -100,6 +101,9 @@ export function GraphView({
 
   // ── Selected fabric node (entity/tree/community — not a note) ─────
   const [selectedFabricNode, setSelectedFabricNode] = useState<ForceNode | null>(null);
+
+  // ── Community detail panel ─────────────────────────────────────────
+  const [selectedCommunity, setSelectedCommunity] = useState<FabricCommunityDetail | null>(null);
 
   // ── Multi-select state ────────────────────────────────────────────
   const [selectedNodeIds, setSelectedNodeIds] = useState<Set<string>>(new Set());
@@ -470,6 +474,16 @@ export function GraphView({
     setHighlightedClusterId(clusterId);
   }, []);
 
+  const handleCommunityClick = useCallback(
+    (communityId: string) => {
+      fabric.expandLayer("community_detail", [communityId]).then(() => {
+        const detail = fabric.communityDetails.get(communityId);
+        if (detail) setSelectedCommunity(detail);
+      });
+    },
+    [fabric],
+  );
+
   const handleToggleCluster = useCallback((clusterId: string) => {
     setHiddenClusters((prev) => {
       const next = new Set(prev);
@@ -731,6 +745,7 @@ export function GraphView({
                 onBackgroundClick={() => {
                   forceGraph.onBackgroundClick();
                   setSelectedFabricNode(null);
+                  setSelectedCommunity(null);
                 }}
                 onEngineStop={forceGraph.onEngineStop}
                 onRenderFramePost={forceGraph.onRenderFramePost as never}
@@ -757,6 +772,8 @@ export function GraphView({
               activeNoteId={activeNoteId}
               width={containerRef.current?.clientWidth ?? 800}
               height={containerRef.current?.clientHeight ?? 600}
+              revealedNodes={waveReveal.revealedNodes}
+              isRevealing={waveReveal.isRevealing}
               onNodeClick={(nodeId: string) => {
                 const node = elements.nodes.find((n) => n.id === nodeId);
                 if (!node || node.nodeType === "note") {

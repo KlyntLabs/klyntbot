@@ -14,6 +14,8 @@ interface GraphBrainViewProps {
   height: number;
   onNodeClick?: (id: string) => void;
   onNodeHover?: (id: string | null, x: number, y: number) => void;
+  revealedNodes?: Set<string>;
+  isRevealing?: boolean;
 }
 
 export function GraphBrainView({
@@ -25,6 +27,8 @@ export function GraphBrainView({
   height,
   onNodeClick,
   onNodeHover,
+  revealedNodes,
+  isRevealing,
 }: GraphBrainViewProps) {
   const { graphRef, nodeThreeObject, setupPostProcessing, resetIdleTimer } = useBrainView({
     settings,
@@ -117,6 +121,11 @@ export function GraphBrainView({
   const activeNoteIdRef = useRef<string | null>(null);
   activeNoteIdRef.current = activeNoteId;
 
+  const revealedNodesRef = useRef<Set<string> | undefined>(revealedNodes);
+  revealedNodesRef.current = revealedNodes;
+  const isRevealingRef = useRef<boolean>(isRevealing ?? false);
+  isRevealingRef.current = isRevealing ?? false;
+
   // Build a clusterId lookup from graphData nodes
   const clusterByNodeIdRef = useRef(new Map<string, string>());
   useEffect(() => {
@@ -140,12 +149,24 @@ export function GraphBrainView({
       const activeId = activeNoteIdRef.current;
 
       // Update each node's Three.js material opacity
+      const revealed = revealedNodesRef.current;
+      const revealing = isRevealingRef.current;
+
       fg.scene().traverse(
         (obj: { userData?: { nodeId?: string }; material?: MeshStandardMaterial }) => {
           const nodeId = obj.userData?.nodeId;
           if (!nodeId || !obj.material) return;
 
           const mat = obj.material as MeshStandardMaterial;
+          mat.transparent = true;
+
+          // Wave-reveal gating: hide nodes that haven't been revealed yet
+          if (revealing && revealed && revealed.size > 0 && !revealed.has(nodeId)) {
+            mat.opacity = 0;
+            mat.emissiveIntensity = 0;
+            return;
+          }
+
           const nodeCluster = clusterByNodeIdRef.current.get(nodeId);
           const baseEmissive = mat.userData?.baseEmissive ?? 0.5;
 
@@ -190,6 +211,12 @@ export function GraphBrainView({
   useEffect(() => {
     updateNodeHighlights(hoveredIdRef.current);
   }, [highlightedClusterId, activeNoteId, updateNodeHighlights]);
+
+  // React to wave-reveal changes — update scene when new nodes become revealed
+  // biome-ignore lint/correctness/useExhaustiveDependencies: revealedNodes/isRevealing trigger material update via refs
+  useEffect(() => {
+    updateNodeHighlights(hoveredIdRef.current);
+  }, [revealedNodes, isRevealing, updateNodeHighlights]);
 
   // Stable callbacks
   const handleNodeClick = useCallback(
