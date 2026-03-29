@@ -331,40 +331,17 @@ fn run_desktop_app() {
                                     tracing::info!("Voice hotkey pressed");
                                     let handle = app_clone.clone();
                                     tauri::async_runtime::spawn(async move {
-                                        use tauri::Manager;
-                                        let Some(core) =
-                                            handle.try_state::<Arc<app_core::AppCore>>()
-                                        else {
-                                            tracing::warn!("Voice hotkey: no AppCore state");
-                                            return;
-                                        };
-                                        let is_capturing = match core.voice_service.as_ref() {
-                                            Some(vs) => {
-                                                vs.session_state().await
-                                                    == voice_engine::VoiceSessionState::Capturing
-                                            }
-                                            None => false,
-                                        };
-                                        if is_capturing {
-                                            let _ = core.voice_stop_capture().await;
-                                            tray_countdown::VOICE_ACTIVE.store(
-                                                false,
-                                                std::sync::atomic::Ordering::Relaxed,
-                                            );
-                                        } else {
-                                            match core.voice_start_capture().await {
-                                                Ok(_) => {
-                                                    tray_countdown::VOICE_ACTIVE.store(
-                                                        true,
-                                                        std::sync::atomic::Ordering::Relaxed,
-                                                    );
-                                                }
-                                                Err(e) => {
-                                                    tracing::warn!(
-                                                        "Voice hotkey: failed to start capture: {e:?}"
-                                                    );
-                                                }
-                                            }
+                                        use tauri::{Emitter, Manager};
+
+                                        // Show the launcher window
+                                        if let Some(launcher) = handle.get_webview_window("launcher") {
+                                            let _ = launcher.show();
+                                            let _ = launcher.set_focus();
+                                        }
+
+                                        // Tell the frontend to enter recording mode
+                                        if let Err(e) = handle.emit("voice-recording-start", ()) {
+                                            tracing::warn!("Failed to emit voice-recording-start: {e}");
                                         }
                                     });
                                 },
