@@ -12,51 +12,31 @@ use crate::app_core::AppCore;
 pub async fn voice_start_capture(
     state: State<'_, Arc<AppCore>>,
 ) -> Result<VoiceCaptureInfo, ApiError> {
-    let _ = state;
-    Err(ApiError::new(
-        "NOT_IMPLEMENTED",
-        "Voice capture not yet wired",
-    ))
+    state.voice_start_capture().await
 }
 
 #[tauri::command]
 pub async fn voice_stop_capture(state: State<'_, Arc<AppCore>>) -> Result<(), ApiError> {
-    let _ = state;
-    Err(ApiError::new(
-        "NOT_IMPLEMENTED",
-        "Voice capture not yet wired",
-    ))
+    state.voice_stop_capture().await
 }
 
 #[tauri::command]
 pub async fn voice_dismiss(state: State<'_, Arc<AppCore>>) -> Result<(), ApiError> {
-    let _ = state;
-    Err(ApiError::new(
-        "NOT_IMPLEMENTED",
-        "Voice capture not yet wired",
-    ))
+    state.voice_dismiss().await
 }
 
 #[tauri::command]
 pub async fn voice_get_status(
     state: State<'_, Arc<AppCore>>,
 ) -> Result<VoiceStatusResponse, ApiError> {
-    let _ = state;
-    Err(ApiError::new(
-        "NOT_IMPLEMENTED",
-        "Voice status not yet wired",
-    ))
+    state.voice_get_status().await
 }
 
 #[tauri::command]
 pub async fn voice_get_models(
     state: State<'_, Arc<AppCore>>,
 ) -> Result<Vec<VoiceModelInfo>, ApiError> {
-    let _ = state;
-    Err(ApiError::new(
-        "NOT_IMPLEMENTED",
-        "Voice models not yet wired",
-    ))
+    state.voice_get_models().await
 }
 
 #[tauri::command]
@@ -64,12 +44,7 @@ pub async fn voice_download_model(
     state: State<'_, Arc<AppCore>>,
     request: VoiceDownloadModelRequest,
 ) -> Result<(), ApiError> {
-    let _ = state;
-    let _ = request;
-    Err(ApiError::new(
-        "NOT_IMPLEMENTED",
-        "Voice download not yet wired",
-    ))
+    state.voice_download_model(request).await
 }
 
 // ── Dev server dispatch ─────────────────────────────────────────────
@@ -87,28 +62,21 @@ pub(crate) const DEV_COMMANDS: &[&str] = &[
 #[cfg(debug_assertions)]
 pub(crate) async fn dispatch_dev(
     cmd: &str,
-    _core: &AppCore,
+    core: &AppCore,
     _body: &serde_json::Value,
 ) -> Option<Result<serde_json::Value, ApiError>> {
+    use super::dev_helpers as dev;
+
     Some(match cmd {
-        "voice_start_capture" => Ok(serde_json::json!({
-            "sessionId": "mock-session-1",
-            "engine": "local",
-            "state": "capturing"
-        })),
-        "voice_stop_capture" => Ok(serde_json::json!(null)),
-        "voice_dismiss" => Ok(serde_json::json!(null)),
-        "voice_get_status" => Ok(serde_json::json!({
-            "state": "idle",
-            "modelState": {"state": "ready", "path": "/mock/models/ggml-small.bin"},
-            "engine": "local",
-            "enabled": true
-        })),
-        "voice_get_models" => Ok(serde_json::json!([
-            {"size": "small", "displayName": "whisper-small (multilingual)", "sizeBytes": 488000000, "available": true},
-            {"size": "medium", "displayName": "whisper-medium (multilingual)", "sizeBytes": 1530000000, "available": false}
-        ])),
-        "voice_download_model" => Ok(serde_json::json!(null)),
+        "voice_start_capture" => dev::val(core.voice_start_capture().await),
+        "voice_stop_capture" => dev::val(core.voice_stop_capture().await),
+        "voice_dismiss" => dev::val(core.voice_dismiss().await),
+        "voice_get_status" => dev::val(core.voice_get_status().await),
+        "voice_get_models" => dev::val(core.voice_get_models().await),
+        "voice_download_model" => {
+            // For dev server, return mock success since model download isn't wired yet
+            Ok(serde_json::json!(null))
+        }
         _ => return None,
     })
 }

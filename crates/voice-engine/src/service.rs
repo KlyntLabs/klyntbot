@@ -147,19 +147,10 @@ impl VoiceService {
         self.stt_local.as_ref().map(|l| (l, EngineKind::Local))
     }
 
-    /// Start a voice capture session.
-    ///
-    /// Returns the session ID and engine kind, or an error if capture can't start.
-    pub async fn start_capture(&self) -> common::Result<(String, EngineKind)> {
-        let mut session_guard = self.active_session.lock().await;
-
-        if session_guard.is_some() {
-            return Err(common::ChannelError::ConnectionFailed(
-                "Voice capture already in progress".to_string(),
-            )
-            .into());
-        }
-
+    /// Synchronous helper: creates the capture session, wraps the `!Send` cpal
+    /// stream on a blocking thread, and returns only `Send`-safe parts. This
+    /// keeps `CaptureSession` out of any async generator state.
+    fn begin_capture(&self) -> common::Result<(ActiveSession, String, EngineKind)> {
         let (_, engine_kind) = self.active_engine().ok_or_else(|| {
             common::KlyntbotError::Provider(common::ProviderError::InvalidResponse(
                 "No transcription engine available. Download a model or configure Groq API key."
@@ -194,6 +185,35 @@ impl VoiceService {
             drop(sendable);
         });
 
+        let active = ActiveSession {
+            id: session_id.clone(),
+            stop_signal,
+            audio_rx: Some(audio_rx),
+            stream_keepalive,
+            started_at: Instant::now(),
+            state: VoiceSessionState::Capturing,
+        };
+
+        Ok((active, session_id, engine_kind))
+    }
+
+    /// Start a voice capture session.
+    ///
+    /// Returns the session ID and engine kind, or an error if capture can't start.
+    pub async fn start_capture(&self) -> common::Result<(String, EngineKind)> {
+        let mut session_guard = self.active_session.lock().await;
+
+        if session_guard.is_some() {
+            return Err(common::ChannelError::ConnectionFailed(
+                "Voice capture already in progress".to_string(),
+            )
+            .into());
+        }
+
+        // Create the capture session synchronously so the !Send CaptureSession
+        // never exists in the async generator state (keeps this future Send).
+        let (active, session_id, engine_kind) = self.begin_capture()?;
+
         let _ = self
             .event_tx
             .send(VoiceEvent::CaptureStarted {
@@ -202,14 +222,7 @@ impl VoiceService {
             })
             .await;
 
-        *session_guard = Some(ActiveSession {
-            id: session_id.clone(),
-            stop_signal,
-            audio_rx: Some(audio_rx),
-            stream_keepalive,
-            started_at: Instant::now(),
-            state: VoiceSessionState::Capturing,
-        });
+        *session_guard = Some(active);
 
         info!(
             "Voice capture started: {} (engine: {:?})",

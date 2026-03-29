@@ -316,6 +316,7 @@ dependencies = [
  "tools-core",
  "tracing",
  "uuid",
+ "voice-engine",
 ]
 
 [[package]]

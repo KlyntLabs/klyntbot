@@ -4,6 +4,7 @@ use std::sync::Arc;
 use crate::handlers::launcher::LauncherSearchEngine;
 use agent::{AgentLoop, PersonaManager};
 use bus::{DomainEventBus, MessageBus};
+use voice_engine::VoiceService;
 use channels::ChannelManager;
 use cognitive::situation::UserSituation;
 use common::FormResponse;
@@ -137,6 +138,8 @@ pub struct AppCore {
     pub _lifecycle_monitor: Option<platform_macos::lifecycle::LifecycleMonitor>,
     /// Wake orchestrator background task handle.
     pub _wake_orchestrator_handle: Option<tokio::task::JoinHandle<()>>,
+    /// Voice capture service (None when voice feature is disabled).
+    pub voice_service: Option<Arc<VoiceService>>,
 }
 
 impl AppCore {
@@ -278,6 +281,13 @@ impl AppCore {
         self.mirror_facade
             .as_deref()
             .ok_or_else(|| ApiError::new("NOT_AVAILABLE", "Mirror facade not available"))
+    }
+
+    /// Return voice service or a "feature disabled" error.
+    pub fn voice_service(&self) -> Result<&Arc<VoiceService>, ApiError> {
+        self.voice_service
+            .as_ref()
+            .ok_or_else(|| ApiError::new("FEATURE_DISABLED", "voice feature is not enabled"))
     }
 
     /// Return proactive handler or a "not initialized" error.

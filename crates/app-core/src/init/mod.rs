@@ -443,6 +443,7 @@ impl AppCore {
             _config_watcher_token: Some(config_watcher_token),
             _lifecycle_monitor: None,
             _wake_orchestrator_handle: None,
+            voice_service: None,
         };
 
         // ── Insight progress refresh (registered post-init — deps available now) ──
