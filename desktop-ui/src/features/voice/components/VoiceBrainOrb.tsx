@@ -107,6 +107,35 @@ export function VoiceBrainOrb() {
   const [isContinuing, setIsContinuing] = useState(false);
   // Track whether we're paused (phase stays at current value, but we toggled pause)
   const [paused, setPaused] = useState(false);
+  // Track whether voice setup (model download) is required
+  const [setupRequired, setSetupRequired] = useState(false);
+
+  // Listen for setupRequired event to show download progress screen
+  useEffect(() => {
+    const handleEvent = (payload: Record<string, unknown>) => {
+      if (payload.type === "setupRequired") {
+        setSetupRequired(true);
+      }
+    };
+
+    if (window.__TAURI_INTERNALS__) {
+      let unlisten: (() => void) | null = null;
+      import("@tauri-apps/api/event").then(({ listen }) => {
+        listen<Record<string, unknown>>("voice:event", (event) => {
+          handleEvent(event.payload);
+        }).then((fn) => {
+          unlisten = fn;
+        });
+      });
+      return () => {
+        unlisten?.();
+      };
+    }
+
+    const browserHandler = (e: Event) => handleEvent((e as CustomEvent).detail);
+    window.addEventListener("voice:event", browserHandler);
+    return () => window.removeEventListener("voice:event", browserHandler);
+  }, []);
 
   // Listen for a phaseChanged event that signals continuing — we detect it via
   // sessionInfo changes combined with turnCount > 0 when phase first enters listening
@@ -136,6 +165,21 @@ export function VoiceBrainOrb() {
     setIsContinuing(info.turnCount > 0);
     setPaused(false);
   };
+
+  // Setup required → show model download progress screen
+  if (setupRequired) {
+    return (
+      <div className="bg-card border border-border/50 rounded-2xl p-4 w-[320px] shadow-xl text-center">
+        <div className="text-sm font-medium text-card-foreground mb-2">
+          Waking up your second brain...
+        </div>
+        <div className="text-xs text-muted-foreground mb-3">Local voice model downloading</div>
+        <div className="h-1 bg-accent rounded-full overflow-hidden">
+          <div className="h-full bg-primary rounded-full animate-pulse w-1/2" />
+        </div>
+      </div>
+    );
+  }
 
   // Idle with no session → render nothing
   if (phase === "idle" && !sessionInfo) return null;

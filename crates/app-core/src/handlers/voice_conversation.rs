@@ -255,6 +255,35 @@ impl VoiceConversationManager {
 
     /// Begin (or resume) a voice conversation.
     pub async fn start(&self) -> common::Result<StartResponse> {
+        // Check if voice engine is available before entering the conversation loop.
+        // On first run the local Whisper model may not be downloaded yet.
+        if !self.voice_service.is_available() {
+            // Emit SetupRequired so the orb shows the download progress screen.
+            let _ = self
+                .voice_service
+                .emit_event(VoiceEvent::SetupRequired {
+                    needs_model: true,
+                    needs_mic_permission: false,
+                })
+                .await;
+
+            // Best-effort: trigger model download if not already in progress.
+            let model_state = self.voice_service.model_state();
+            if !matches!(
+                model_state,
+                voice_engine::ModelState::Downloading { .. } | voice_engine::ModelState::Ready { .. }
+            ) {
+                let _ = self
+                    .voice_service
+                    .download_model(voice_engine::WhisperModelSize::Small)
+                    .await;
+            }
+
+            return Err(common::KlyntbotError::Bus(
+                "Voice engine not available — model download required".to_string(),
+            ));
+        }
+
         let session_key = self.resolve_session().await;
 
         // Check if we're continuing an existing session
