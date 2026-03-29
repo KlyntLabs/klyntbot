@@ -531,23 +531,39 @@ impl AppCore {
                     Some(Arc::new(retriever) as Arc<dyn context_engine::MemoryRetriever>)
                 };
 
+                let echo_provider: Arc<dyn voice_engine::MemoryEchoProvider> = Arc::new(
+                    crate::handlers::voice_echo::AppMemoryEchoProvider::new(
+                        mirror_facade_for_voice,
+                        voice_memory_retriever,
+                    ),
+                );
+
                 let service = VoiceService::new(
                     stt_local,
                     stt_cloud,
                     tts,
-                    {
-                        let echo_provider = crate::handlers::voice_echo::AppMemoryEchoProvider::new(
-                            mirror_facade_for_voice,
-                            voice_memory_retriever,
-                        );
-                        Some(Arc::new(echo_provider) as Arc<dyn voice_engine::MemoryEchoProvider>)
-                    },
+                    Some(Arc::clone(&echo_provider)),
                     model_manager,
                     svc_config,
                 );
 
                 let service = Arc::new(service);
                 core.voice_service = Some(Arc::clone(&service));
+
+                // ── Voice conversation manager ──────────────────────────
+                let voice_config_arc = Arc::new(RwLock::new(voice_config.clone()));
+                let voice_conv_manager = Arc::new(
+                    crate::handlers::voice_conversation::VoiceConversationManager::new(
+                        Arc::clone(&service),
+                        core.repos.clone(),
+                        Arc::clone(&core.agent),
+                        Arc::clone(&core.event_emitter),
+                        echo_provider,
+                        voice_config_arc,
+                    ),
+                );
+                let _loop_handle = voice_conv_manager.spawn_loop().await;
+                core.voice_conversation_manager = Some(voice_conv_manager);
 
                 if !has_local_engine {
                     if model_needs_download {
