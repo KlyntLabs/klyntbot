@@ -105,6 +105,10 @@ impl UnifiedMemoryService {
             relevance_weight_frequency: self.config.relevance_weight_frequency,
             relevance_weight_situation: self.config.relevance_weight_situation,
             relevance_weight_temporal: self.config.relevance_weight_temporal,
+            relevance_weight_hierarchy: self.config.relevance_weight_hierarchy,
+            relevance_weight_path_coherence: self.config.relevance_weight_path_coherence,
+            relevance_weight_community: self.config.relevance_weight_community,
+            relevance_weight_cross_note: self.config.relevance_weight_cross_note,
             scope_chain,
         };
 
@@ -118,14 +122,22 @@ impl UnifiedMemoryService {
                 self.config.relevance_weight_frequency,
                 self.config.relevance_weight_situation,
                 self.config.relevance_weight_temporal,
+                self.config.relevance_weight_hierarchy,
+                self.config.relevance_weight_path_coherence,
+                self.config.relevance_weight_community,
+                self.config.relevance_weight_cross_note,
             ];
-            let w = champion.resolve_relevance_weights(&defaults);
+            let w = champion.resolve_full_relevance_weights(&defaults);
             params.relevance_weight_semantic = w[0];
             params.relevance_weight_retrievability = w[1];
             params.relevance_weight_importance = w[2];
             params.relevance_weight_frequency = w[3];
             params.relevance_weight_situation = w[4];
             params.relevance_weight_temporal = w[5];
+            params.relevance_weight_hierarchy = w[6];
+            params.relevance_weight_path_coherence = w[7];
+            params.relevance_weight_community = w[8];
+            params.relevance_weight_cross_note = w[9];
         }
 
         params
@@ -229,7 +241,7 @@ impl UnifiedMemoryService {
         query: &str,
         vector_top_k: usize,
         min_similarity: f64,
-        relevance_weights: [f64; 6],
+        relevance_weights: [f64; 10],
     ) -> common::Result<Vec<ScoredFact>> {
         if !self.config.dynamic_facts_enabled || query.is_empty() {
             return Ok(Vec::new());
@@ -248,6 +260,10 @@ impl UnifiedMemoryService {
             relevance_weight_frequency: relevance_weights[3],
             relevance_weight_situation: relevance_weights[4],
             relevance_weight_temporal: relevance_weights[5],
+            relevance_weight_hierarchy: relevance_weights[6],
+            relevance_weight_path_coherence: relevance_weights[7],
+            relevance_weight_community: relevance_weights[8],
+            relevance_weight_cross_note: relevance_weights[9],
             scope_chain: Vec::new(),
         };
 

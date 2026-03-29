@@ -399,6 +399,10 @@ impl AgentLoopBuilder {
                     relevance_weight_frequency: config.cognitive.relevance_weight_frequency,
                     relevance_weight_situation: config.cognitive.relevance_weight_situation,
                     relevance_weight_temporal: config.cognitive.relevance_weight_temporal,
+                    relevance_weight_hierarchy: 0.10,
+                    relevance_weight_path_coherence: 0.05,
+                    relevance_weight_community: 0.15,
+                    relevance_weight_cross_note: 0.10,
                 };
 
                 // Hoist for UnifiedMemoryService wiring below
@@ -1622,6 +1626,10 @@ impl AgentLoopBuilder {
                         config.cognitive.relevance_weight_frequency,
                         config.cognitive.relevance_weight_situation,
                         config.cognitive.relevance_weight_temporal,
+                        0.10_f64, // relevance_weight_hierarchy
+                        0.05_f64, // relevance_weight_path_coherence
+                        0.15_f64, // relevance_weight_community
+                        0.10_f64, // relevance_weight_cross_note
                     ];
                     let shadow_retriever = Arc::new(
                         crate::autotuner::shadow_retriever::AgentShadowRetriever::new(

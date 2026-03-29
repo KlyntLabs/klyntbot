@@ -87,6 +87,30 @@ impl TrialParams {
         }
     }
 
+    /// Resolve all 10 relevance weights to a normalized array that sums to 1.0.
+    /// Returns [semantic, retrievability, importance, frequency, situation, temporal,
+    ///          hierarchy, path_coherence, community, cross_note].
+    pub fn resolve_full_relevance_weights(&self, defaults: &[f64; 10]) -> [f64; 10] {
+        let raw = [
+            self.relevance_weight_semantic.unwrap_or(defaults[0]),
+            self.relevance_weight_retrievability.unwrap_or(defaults[1]),
+            self.relevance_weight_importance.unwrap_or(defaults[2]),
+            self.relevance_weight_frequency.unwrap_or(defaults[3]),
+            self.relevance_weight_situation.unwrap_or(defaults[4]),
+            self.relevance_weight_temporal.unwrap_or(defaults[5]),
+            self.relevance_weight_hierarchy.unwrap_or(defaults[6]),
+            self.relevance_weight_path_coherence.unwrap_or(defaults[7]),
+            self.relevance_weight_community.unwrap_or(defaults[8]),
+            self.relevance_weight_cross_note.unwrap_or(defaults[9]),
+        ];
+        let sum: f64 = raw.iter().sum();
+        if sum > 0.0 {
+            raw.map(|w| w / sum)
+        } else {
+            *defaults
+        }
+    }
+
     /// Returns `true` if any Phase 3 rewrite-related field is `Some`.
     pub fn has_rewrite_params(&self) -> bool {
         self.rewrite_confidence_threshold.is_some()
@@ -194,6 +218,23 @@ mod tests {
         assert!(
             (sum - 1.0).abs() < 1e-10,
             "Weights must sum to 1.0, got {sum}"
+        );
+    }
+
+    #[test]
+    fn resolve_full_relevance_weights_sums_to_one() {
+        let params = TrialParams {
+            relevance_weight_semantic: Some(0.30),
+            relevance_weight_hierarchy: Some(0.20),
+            relevance_weight_community: Some(0.25),
+            ..Default::default()
+        };
+        let defaults = [0.20, 0.10, 0.08, 0.05, 0.15, 0.02, 0.10, 0.05, 0.15, 0.10];
+        let weights = params.resolve_full_relevance_weights(&defaults);
+        let sum: f64 = weights.iter().sum();
+        assert!(
+            (sum - 1.0).abs() < 1e-10,
+            "All 10 weights must sum to 1.0, got {sum}"
         );
     }
 }

@@ -44,6 +44,10 @@ pub struct RetrievalParams {
     pub relevance_weight_frequency: f64,
     pub relevance_weight_situation: f64,
     pub relevance_weight_temporal: f64,
+    pub relevance_weight_hierarchy: f64,
+    pub relevance_weight_path_coherence: f64,
+    pub relevance_weight_community: f64,
+    pub relevance_weight_cross_note: f64,
     /// Optional scope chain for filtering. When set, only facts matching
     /// these scopes are considered. When empty, all scopes are included (backwards-compatible).
     pub scope_chain: Vec<(String, Option<String>)>,
@@ -63,6 +67,10 @@ impl RetrievalParams {
             relevance_weight_frequency: 0.1,
             relevance_weight_situation: 0.25,
             relevance_weight_temporal: 0.05,
+            relevance_weight_hierarchy: 0.10,
+            relevance_weight_path_coherence: 0.05,
+            relevance_weight_community: 0.15,
+            relevance_weight_cross_note: 0.10,
             scope_chain: Vec::new(),
         }
     }
@@ -97,10 +105,10 @@ pub async fn retrieve_relevant_facts(
         frequency: params.relevance_weight_frequency,
         situation: params.relevance_weight_situation,
         temporal: params.relevance_weight_temporal,
-        hierarchy: 0.0,
-        path_coherence: 0.0,
-        community: 0.0,
-        cross_note: 0.0,
+        hierarchy: params.relevance_weight_hierarchy,
+        path_coherence: params.relevance_weight_path_coherence,
+        community: params.relevance_weight_community,
+        cross_note: params.relevance_weight_cross_note,
     };
 
     debug!(
