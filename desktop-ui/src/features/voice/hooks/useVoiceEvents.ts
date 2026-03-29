@@ -61,6 +61,7 @@ export function useVoiceEvents() {
             break;
           case "finalized":
             setSessionState("response");
+            setTranscript(payload.text as string);
             setResponseText((payload.responsePreview as string) || (payload.text as string));
             break;
           case "error":

@@ -29,7 +29,7 @@ function reduceVoiceEvent(
     case "captureEnded":
       return { ...state, sessionState: "processing" as const };
     case "finalized":
-      return { ...state, sessionState: "response" as const };
+      return { ...state, sessionState: "response" as const, transcript: event.text as string };
     default:
       return state;
   }
@@ -125,5 +125,26 @@ describe("Pronunciation confidence thresholds", () => {
     expect(classify(0.6)).toBe("fair");
     expect(classify(0.59)).toBe("poor");
     expect(classify(0.1)).toBe("poor");
+  });
+});
+
+describe("Launcher recording mode flow", () => {
+  it("transitions from idle to capturing on captureStarted", () => {
+    const state = reduceVoiceEvent(
+      { sessionState: "idle" as const, chips: [], transcript: "" },
+      { type: "captureStarted", sessionId: "s1", engine: "local" },
+    );
+    expect(state.sessionState).toBe("capturing");
+  });
+
+  it("transcript available on finalized for chat handoff", () => {
+    const processing = { sessionState: "processing" as const, chips: [], transcript: "" };
+    const state = reduceVoiceEvent(processing, {
+      type: "finalized",
+      text: "schedule dentist tomorrow",
+      routedTo: "tasks",
+      responsePreview: "",
+    });
+    expect(state.sessionState).toBe("response");
   });
 });
