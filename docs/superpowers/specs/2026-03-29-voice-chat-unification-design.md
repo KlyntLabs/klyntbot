@@ -22,7 +22,7 @@ Voice and chat are not two systems. They are two interfaces to the same second b
 | Interrupt behavior | Soft — 300ms TTS fade + Continue button | Polite and reversible. Full response text always persisted in chat (nothing lost). |
 | Session attachment | Smart default — warm attach if recent, otherwise new | Respects thinking flow. Configurable thresholds. |
 | Channel name | `desktop` (same as text chat) + `is_voice_session` metadata flag | True unification — no parallel "voice channel." Mic badge for visual distinction. |
-| Phase model | 4 phases: Idle / Listening / Thinking / Speaking | Maps 1:1 to what the user sees and feels. Internal transitions stay internal. |
+| Phase model | 4 phases: Idle / Listening / Reflecting / Speaking | Maps 1:1 to what the user sees and feels. "Reflecting" conveys the memory echo + cognitive pulse. |
 | Conversation loop | Spawned Tokio task + command channel | Atomic state changes, no race conditions between frontend and backend. |
 | Scope sequence | Voice-chat unification first → Language config → Practice mode | Foundation first. Learning features layer on top cleanly. |
 
@@ -66,7 +66,7 @@ pub struct VoiceConversationState {
 pub enum ConversationPhase {
     Idle,       // Orb closed or no active conversation
     Listening,  // Mic open, user speaking (waveform pulsing)
-    Thinking,   // Agent processing (gentle pulse in orb)
+    Reflecting, // Agent processing + memory echo (gentle cognitive pulse in orb)
     Speaking,   // TTS playing response (waveform synced to audio)
 }
 ```
@@ -196,7 +196,7 @@ voice_conversation_start called
 │   ├─ Silence detected (configurable, default 1.5s) → auto-stop
 │   │
 │   ▼
-│ THINKING
+│ REFLECTING
 │   ├─ VoiceService.stop_capture() → final Transcript
 │   ├─ Skip if transcript is empty/noise
 │   ├─ chat_send_internal(transcript.text, session_key, is_voice: true)
@@ -205,8 +205,8 @@ voice_conversation_start called
 │   │   ├─ ContentChunk → emit to main chat window (real-time)
 │   │   ├─ ToolStart/ToolEnd → emit to main chat (transparency)
 │   │   └─ Done { content } → store as pending_response_text
-│   ├─ Memory echo visible in orb during Thinking (Mirror badge + cognitive pulse)
-│   ├─ Emit VoiceEvent::Thinking to orb
+│   ├─ Memory echo visible in orb during Reflecting (Mirror badge + cognitive pulse)
+│   ├─ Emit VoiceEvent::Reflecting to orb
 │   │
 │   ▼
 │ SPEAKING
@@ -239,7 +239,7 @@ During the Speaking phase, the manager starts a lightweight audio monitor via `A
 3. Emits `VoiceEvent::TtsFadeOut` → frontend fades audio over 300ms
 4. Stops audio monitor, starts full `start_capture()` → transitions to Listening
 5. User's speech becomes the next turn
-6. Emits `VoiceEvent::ContinueAvailable` → orb shows "Continue" button briefly
+6. Emits `VoiceEvent::ContinueAvailable` → orb shows "Continue" button (auto-hides after 8s with fade animation; disappears immediately if user speaks again)
 7. Full response text already persisted in chat (nothing lost)
 
 **`tts_position` estimation:**
@@ -303,7 +303,7 @@ The orb evolves from one-shot display to persistent conversation surface:
 │                    ⊕ New  ⏸ Pause│  ← Action buttons
 ├─────────────────────────────────┤
 │                                 │
-│   [Waveform / Thinking pulse]   │  ← Central visual (phase-dependent)
+│   [Waveform / Reflecting pulse]  │  ← Central visual (phase-dependent)
 │                                 │
 │   "schedule dentist tomorrow"   │  ← Current turn transcript
 │   → Task  · Mirror: "You        │  ← Routing chip + memory echo
@@ -312,7 +312,7 @@ The orb evolves from one-shot display to persistent conversation surface:
 ├─────────────────────────────────┤
 │   ▸ Continue                    │  ← Only visible after interrupt
 │                                 │
-│   ⌥⇧V to close · tap to pause  │  ← Hint bar
+│   ⌥⇧V close · ⌥⇧D dock · pause │  ← Hint bar
 └─────────────────────────────────┘
 ```
 
@@ -323,11 +323,11 @@ The orb evolves from one-shot display to persistent conversation surface:
 | Phase | Central visual | Title dot color |
 |-------|---------------|-----------------|
 | Listening | Red pulsing waveform (12 bars, RMS-driven) | Red |
-| Thinking | Gentle cognitive pulse + memory echo with Mirror badge | Amber |
+| Reflecting | Gentle cognitive pulse + memory echo with Mirror badge | Amber |
 | Speaking | TTS-synced waveform (blue) | Blue |
 | Idle (paused) | Static muted mic icon | Gray |
 
-**Dockable orb:** A small paperclip icon in the title bar. Click → orb snaps to the right edge of the main chat window (320px wide, full chat height). Stays docked until undocked or closed. Uses existing Tauri window positioning APIs.
+**Dockable orb:** A small paperclip icon in the title bar. Click → orb snaps to the right edge of the main chat window (320px wide, full chat height). Stays docked until undocked or closed. Uses existing Tauri window positioning APIs. Keyboard shortcut: ⌥⇧D to toggle dock. On first use, the icon shows a brief "Dock to chat" tooltip with highlight, then collapses to icon-only for subsequent sessions.
 
 ### `useVoiceConversation` Hook
 
@@ -336,7 +336,7 @@ Replaces `useVoiceEvents` as the orb's primary hook:
 ```typescript
 export function useVoiceConversation() {
   // State from VoiceEvent stream
-  const phase: ConversationPhase;       // "idle" | "listening" | "thinking" | "speaking"
+  const phase: ConversationPhase;       // "idle" | "listening" | "reflecting" | "speaking"
   const transcript: string;              // Current turn's partial/final text
   const segments: TranscriptSegment[];   // Word-level confidence
   const routingChips: RoutingChip[];
@@ -385,7 +385,7 @@ Three tray states coordinated via the existing `VOICE_ACTIVE` flag:
 | State | Tray title | Tray icon | Click action |
 |-------|-----------|-----------|-------------|
 | Idle (voice available, model loaded) | Normal countdown | Normal icon + tooltip "Voice ready — ⌥⇧V" | `voice_conversation_start` |
-| Listening / Thinking | "Listening..." | Filled red mic | Toggle pause |
+| Listening / Reflecting | "Listening..." | Filled red mic | Toggle pause |
 | Speaking | "Speaking..." | Filled blue mic | Toggle pause |
 
 Voice-ready badge: Faint green dot on tray icon when `ModelState::Ready` + phase is `Idle`. Indicates the brain is ready for voice without opening the orb.
