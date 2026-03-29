@@ -88,9 +88,10 @@ impl AudioCapture {
         // Use the device's default config — most macOS mics don't support 16kHz directly.
         // We capture at the native rate and downsample to 16kHz for Whisper.
         let default_config = device.default_input_config().map_err(|e| {
-            common::KlyntbotError::Channel(common::ChannelError::ConnectionFailed(
-                format!("Failed to get default input config: {}", e),
-            ))
+            common::KlyntbotError::Channel(common::ChannelError::ConnectionFailed(format!(
+                "Failed to get default input config: {}",
+                e
+            )))
         })?;
 
         let native_sample_rate = default_config.sample_rate().0;

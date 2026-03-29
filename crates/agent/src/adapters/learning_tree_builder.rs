@@ -139,11 +139,7 @@ impl LearningTreeBuilder {
 
     /// Handle a knowledge atom accepted event: upsert the global learning root
     /// and per-type section node, then insert a unique atom leaf node.
-    pub async fn handle_atom_accepted(
-        &self,
-        atom_id: &str,
-        atom_type: &str,
-    ) -> common::Result<()> {
+    pub async fn handle_atom_accepted(&self, atom_id: &str, atom_type: &str) -> common::Result<()> {
         let type_node_id = format!("learning-type-{}", slugify(atom_type));
         let atom_node_id = format!("learning-atom-{atom_id}");
 
@@ -171,8 +167,7 @@ impl LearningTreeBuilder {
         new_retention_pct: f64,
     ) -> common::Result<()> {
         let type_node_id = "learning-type-milestone".to_string();
-        let milestone_node_id =
-            format!("learning-milestone-{atom_id}-{}", slugify(milestone));
+        let milestone_node_id = format!("learning-milestone-{atom_id}-{}", slugify(milestone));
 
         debug!(
             atom_id = %atom_id,
@@ -363,9 +358,8 @@ pub fn build_milestone_nodes(
     type_node_id: &str,
     milestone_node_id: &str,
 ) -> Vec<TreeNode> {
-    let milestone_content = format!(
-        "Milestone: {milestone} at {new_retention_pct:.0}% retention for atom {atom_id}"
-    );
+    let milestone_content =
+        format!("Milestone: {milestone} at {new_retention_pct:.0}% retention for atom {atom_id}");
 
     vec![
         // Level 0 — global learning root
@@ -590,7 +584,9 @@ mod tests {
             leaf.content
         );
         assert!(
-            leaf.content.contains("86%") || leaf.content.contains("85%") || leaf.content.contains("85."),
+            leaf.content.contains("86%")
+                || leaf.content.contains("85%")
+                || leaf.content.contains("85."),
             "Expected retention pct in content: {}",
             leaf.content
         );
@@ -660,6 +656,9 @@ mod tests {
             position: 2,
             metadata: None,
         };
-        assert_eq!(compose_embedding_text(&node), "Accepted: concept atom abc-123");
+        assert_eq!(
+            compose_embedding_text(&node),
+            "Accepted: concept atom abc-123"
+        );
     }
 }

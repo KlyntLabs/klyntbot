@@ -863,14 +863,15 @@ impl AgentLoopBuilder {
                         info!("CommunityBuilder subscriber started");
 
                         // FinanceTreeBuilder subscriber (event-driven finance tree + LanceDB embed)
-                        let finance_tree_builder =
-                            Arc::new(crate::adapters::finance_tree_builder::FinanceTreeBuilder::new(
+                        let finance_tree_builder = Arc::new(
+                            crate::adapters::finance_tree_builder::FinanceTreeBuilder::new(
                                 tree_repo.clone(),
                                 Arc::new(vs.clone()),
                                 text_embedder.clone(),
                                 self.context_update_queue.clone(),
                                 self.domain_event_bus.clone(),
-                            ));
+                            ),
+                        );
                         let finance_tree_rx = domain_bus.subscribe();
                         let finance_tree_shutdown = CancellationToken::new();
                         let _finance_tree_handle = tokio::spawn({
@@ -923,14 +924,15 @@ impl AgentLoopBuilder {
                         info!("OkrTreeBuilder subscriber started");
 
                         // LearningTreeBuilder subscriber (event-driven learning tree + LanceDB embed)
-                        let learning_tree_builder =
-                            Arc::new(crate::adapters::learning_tree_builder::LearningTreeBuilder::new(
+                        let learning_tree_builder = Arc::new(
+                            crate::adapters::learning_tree_builder::LearningTreeBuilder::new(
                                 tree_repo.clone(),
                                 Arc::new(vs.clone()),
                                 text_embedder.clone(),
                                 self.context_update_queue.clone(),
                                 self.domain_event_bus.clone(),
-                            ));
+                            ),
+                        );
                         let learning_tree_rx = domain_bus.subscribe();
                         let learning_tree_shutdown = CancellationToken::new();
                         let _learning_tree_handle = tokio::spawn({
@@ -946,8 +948,7 @@ impl AgentLoopBuilder {
                         {
                             let backfill_builder = Arc::clone(&note_tree_builder);
                             let backfill_task_tree_builder = Arc::clone(&task_tree_builder);
-                            let backfill_learning_tree_builder =
-                                Arc::clone(&learning_tree_builder);
+                            let backfill_learning_tree_builder = Arc::clone(&learning_tree_builder);
                             let backfill_productivity_tree_builder =
                                 Arc::clone(&productivity_tree_builder);
                             let backfill_note_repo =
@@ -1007,7 +1008,9 @@ impl AgentLoopBuilder {
                                 // Backfill entity embeddings into LanceDB
                                 match backfill_entity_embedder.backfill_all(&backfill_pool).await {
                                     Ok(0) => {}
-                                    Ok(n) => info!("Entity embedding backfill: {n} entities embedded"),
+                                    Ok(n) => {
+                                        info!("Entity embedding backfill: {n} entities embedded")
+                                    }
                                     Err(e) => warn!("Entity embedding backfill error: {e}"),
                                 }
                             });

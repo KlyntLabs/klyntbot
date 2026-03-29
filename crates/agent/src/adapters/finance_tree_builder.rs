@@ -125,7 +125,13 @@ impl FinanceTreeBuilder {
         );
 
         let nodes = build_transaction_nodes(
-            &date, &daily_id, &cat_id, &txn_id, category, amount, is_over_budget,
+            &date,
+            &daily_id,
+            &cat_id,
+            &txn_id,
+            category,
+            amount,
+            is_over_budget,
         );
 
         self.persist_nodes(&nodes, &daily_id).await
@@ -271,7 +277,11 @@ pub fn build_transaction_nodes(
     amount: f64,
     is_over_budget: bool,
 ) -> Vec<TreeNode> {
-    let over_budget_marker = if is_over_budget { " ⚠️ over budget" } else { "" };
+    let over_budget_marker = if is_over_budget {
+        " ⚠️ over budget"
+    } else {
+        ""
+    };
     let txn_content = format!("${amount:.2} in {category}{over_budget_marker}");
 
     vec![
@@ -527,7 +537,10 @@ mod tests {
         // Transaction leaf
         let txn = &nodes[2];
         assert_eq!(txn.id, "finance-txn-test-uuid");
-        assert_eq!(txn.parent_id.as_deref(), Some("finance-cat-2024-01-15-food"));
+        assert_eq!(
+            txn.parent_id.as_deref(),
+            Some("finance-cat-2024-01-15-food")
+        );
         assert_eq!(txn.level, 2);
         assert!(matches!(txn.node_type, TreeNodeType::Text));
         assert_eq!(txn.content, "$45.20 in food");
@@ -546,7 +559,11 @@ mod tests {
             true,
         );
         let leaf = &nodes[2];
-        assert!(leaf.content.contains("over budget"), "Expected over budget marker in: {}", leaf.content);
+        assert!(
+            leaf.content.contains("over budget"),
+            "Expected over budget marker in: {}",
+            leaf.content
+        );
     }
 
     #[test]
@@ -584,10 +601,17 @@ mod tests {
 
         let alert = &nodes[2];
         assert_eq!(alert.id, "finance-alert-2024-01-15-food");
-        assert_eq!(alert.parent_id.as_deref(), Some("finance-cat-2024-01-15-food"));
+        assert_eq!(
+            alert.parent_id.as_deref(),
+            Some("finance-cat-2024-01-15-food")
+        );
         assert_eq!(alert.level, 2);
         assert!(matches!(alert.node_type, TreeNodeType::Text));
-        assert!(alert.content.contains("90%"), "Expected 90% in: {}", alert.content);
+        assert!(
+            alert.content.contains("90%"),
+            "Expected 90% in: {}",
+            alert.content
+        );
         assert!(alert.content.contains("food"));
     }
 
@@ -603,7 +627,11 @@ mod tests {
             0.0,
         );
         let alert = &nodes[2];
-        assert!(alert.content.contains("100%"), "Expected 100% for zero limit: {}", alert.content);
+        assert!(
+            alert.content.contains("100%"),
+            "Expected 100% for zero limit: {}",
+            alert.content
+        );
     }
 
     #[test]
@@ -618,7 +646,15 @@ mod tests {
             100.0,
         );
         let alert = &nodes[2];
-        assert!(alert.content.contains("$75.50"), "content: {}", alert.content);
-        assert!(alert.content.contains("$100.00"), "content: {}", alert.content);
+        assert!(
+            alert.content.contains("$75.50"),
+            "content: {}",
+            alert.content
+        );
+        assert!(
+            alert.content.contains("$100.00"),
+            "content: {}",
+            alert.content
+        );
     }
 }
