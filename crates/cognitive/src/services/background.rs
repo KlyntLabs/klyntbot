@@ -281,6 +281,46 @@ impl BackgroundConsolidationService {
                     continue;
                 }
 
+                // ── Domain entity bridge ──────────────────────────────────
+                // Upsert structured domain objects into the entities table
+                // immediately, before salience filtering (which may delay or
+                // discard these events).
+                {
+                    let entity_repo = crate::repos::EntityRepo::new(repo.pool().clone());
+                    for event in &batch {
+                        match event {
+                            DomainEvent::TaskCreated { task_id, .. } => {
+                                upsert_domain_entity(
+                                    &entity_repo,
+                                    task_id,
+                                    "task",
+                                    task_id,
+                                )
+                                .await;
+                            }
+                            DomainEvent::TransactionRecorded { category, .. } => {
+                                upsert_domain_entity(
+                                    &entity_repo,
+                                    category,
+                                    "finance_category",
+                                    category,
+                                )
+                                .await;
+                            }
+                            DomainEvent::GoalProgress { objective_id, .. } => {
+                                upsert_domain_entity(
+                                    &entity_repo,
+                                    objective_id,
+                                    "objective",
+                                    objective_id,
+                                )
+                                .await;
+                            }
+                            _ => {}
+                        }
+                    }
+                }
+
                 let (mut to_extract, to_accumulate) = classify_batch(batch);
 
                 // Prepend DLQ retries at indices 0..dlq_count, then promotions, then new events
@@ -1145,6 +1185,28 @@ fn is_same_session(recorded_at: &str, session_start: &str) -> bool {
     (recorded - start).num_seconds().abs() < 300
 }
 
+/// Upsert a domain object into the entities table.
+///
+/// Silently swallows errors — this is a best-effort bridge; failures must
+/// not disrupt the main cognitive pipeline.
+async fn upsert_domain_entity(
+    entity_repo: &crate::repos::EntityRepo,
+    name: &str,
+    entity_type: &str,
+    source_id: &str,
+) {
+    let _ = entity_repo
+        .upsert_entity(&crate::repos::NewEntity {
+            name: name.to_string(),
+            entity_type: entity_type.to_string(),
+            description: None,
+            source: "domain_event".to_string(),
+            source_id: Some(source_id.to_string()),
+            metadata: None,
+        })
+        .await;
+}
+
 /// Infer entity type from predicate keywords.
 /// Applied to both subject and object sides — the predicate determines type regardless of position.
 fn infer_entity_type(predicate: &str) -> String {
@@ -1453,5 +1515,57 @@ mod tests {
             }),
             "TaskCompleted"
         );
+    }
+
+    #[tokio::test]
+    async fn domain_event_creates_entity() {
+        let pool = crate::repos::cognitive_test_pool().await;
+        let entity_repo = crate::repos::EntityRepo::new(pool.clone());
+
+        // Task entity
+        upsert_domain_entity(&entity_repo, "task-abc-123", "task", "task-abc-123").await;
+        let found = entity_repo.find_by_name("task-abc-123").await.unwrap();
+        assert_eq!(found.len(), 1);
+        assert_eq!(found[0].entity_type, "task");
+        assert_eq!(found[0].source, "domain_event");
+
+        // Finance category entity
+        upsert_domain_entity(
+            &entity_repo,
+            "Food & Dining",
+            "finance_category",
+            "food-dining",
+        )
+        .await;
+        let found = entity_repo.find_by_name("Food & Dining").await.unwrap();
+        assert_eq!(found.len(), 1);
+        assert_eq!(found[0].entity_type, "finance_category");
+
+        // Objective entity
+        upsert_domain_entity(
+            &entity_repo,
+            "obj-revenue-q1",
+            "objective",
+            "obj-revenue-q1",
+        )
+        .await;
+        let found = entity_repo.find_by_name("obj-revenue-q1").await.unwrap();
+        assert_eq!(found.len(), 1);
+        assert_eq!(found[0].entity_type, "objective");
+    }
+
+    #[tokio::test]
+    async fn domain_event_entity_increments_mention_count() {
+        let pool = crate::repos::cognitive_test_pool().await;
+        let entity_repo = crate::repos::EntityRepo::new(pool.clone());
+
+        // Upsert the same entity twice (simulating two TransactionRecorded events
+        // for the same category)
+        upsert_domain_entity(&entity_repo, "Groceries", "finance_category", "groceries").await;
+        upsert_domain_entity(&entity_repo, "Groceries", "finance_category", "groceries").await;
+
+        let found = entity_repo.find_by_name("Groceries").await.unwrap();
+        assert_eq!(found.len(), 1);
+        assert_eq!(found[0].mention_count, 2, "mention_count should be 2 after two upserts");
     }
 }

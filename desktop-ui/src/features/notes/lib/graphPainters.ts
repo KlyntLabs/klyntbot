@@ -223,6 +223,230 @@ function paintTreeTextNode(
   ctx.fill();
 }
 
+// ── Polygon helpers ──────────────────────────────────────────────────────
+
+function drawPolygon(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  size: number,
+  sides: number,
+  rotationOffset = 0,
+): void {
+  ctx.beginPath();
+  for (let i = 0; i < sides; i++) {
+    const angle = ((Math.PI * 2) / sides) * i + rotationOffset;
+    const px = x + size * Math.cos(angle);
+    const py = y + size * Math.sin(angle);
+    if (i === 0) ctx.moveTo(px, py);
+    else ctx.lineTo(px, py);
+  }
+  ctx.closePath();
+}
+
+// ── Finance node (hexagon) ───────────────────────────────────────────────
+
+function paintFinanceNode(
+  node: ForceNode,
+  ctx: CanvasRenderingContext2D,
+  globalScale: number,
+  paintCtx: PaintContext,
+  x: number,
+  y: number,
+  opacity: number,
+): void {
+  const size = (node.size / 2) * paintCtx.nodeScale;
+  paintGlow(ctx, x, y, size * 0.5, size * 2.5, node.color, 0.2, opacity);
+
+  drawPolygon(ctx, x, y, size, 6, -Math.PI / 2);
+  ctx.fillStyle = hexToRgba(node.color, opacity);
+  ctx.fill();
+  ctx.strokeStyle = hexToRgba(node.color, opacity * 0.4);
+  ctx.lineWidth = node.id === paintCtx.hoveredNodeId ? 2.5 : 1.5;
+  ctx.stroke();
+
+  if (globalScale > paintCtx.labelThreshold) {
+    const fontSize = Math.max(10 / globalScale, 3);
+    ctx.font = `500 ${fontSize}px Inter, system-ui, sans-serif`;
+    ctx.textAlign = "left";
+    ctx.textBaseline = "middle";
+    ctx.fillStyle =
+      node.id === paintCtx.hoveredNodeId
+        ? `rgba(255,255,255,${opacity})`
+        : `rgba(255,255,255,${opacity * 0.7})`;
+    ctx.fillText(node.label, x + size + 4 / globalScale, y);
+  }
+}
+
+// ── Productivity node (ring/donut) ───────────────────────────────────────
+
+function paintProductivityNode(
+  node: ForceNode,
+  ctx: CanvasRenderingContext2D,
+  globalScale: number,
+  paintCtx: PaintContext,
+  x: number,
+  y: number,
+  opacity: number,
+): void {
+  const outerR = (node.size / 2) * paintCtx.nodeScale;
+  const innerR = outerR * 0.45;
+
+  paintGlow(ctx, x, y, outerR * 0.5, outerR * 2.5, node.color, 0.2, opacity);
+
+  // Outer filled circle
+  ctx.fillStyle = hexToRgba(node.color, opacity);
+  ctx.beginPath();
+  ctx.arc(x, y, outerR, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Punch out inner circle (donut hole)
+  ctx.globalCompositeOperation = "destination-out";
+  ctx.fillStyle = "rgba(0,0,0,1)";
+  ctx.beginPath();
+  ctx.arc(x, y, innerR, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.globalCompositeOperation = "source-over";
+
+  ctx.strokeStyle = hexToRgba(node.color, opacity * 0.4);
+  ctx.lineWidth = node.id === paintCtx.hoveredNodeId ? 2.5 : 1.5;
+  ctx.beginPath();
+  ctx.arc(x, y, outerR, 0, Math.PI * 2);
+  ctx.stroke();
+
+  if (globalScale > paintCtx.labelThreshold) {
+    const fontSize = Math.max(10 / globalScale, 3);
+    ctx.font = `500 ${fontSize}px Inter, system-ui, sans-serif`;
+    ctx.textAlign = "left";
+    ctx.textBaseline = "middle";
+    ctx.fillStyle =
+      node.id === paintCtx.hoveredNodeId
+        ? `rgba(255,255,255,${opacity})`
+        : `rgba(255,255,255,${opacity * 0.7})`;
+    ctx.fillText(node.label, x + outerR + 4 / globalScale, y);
+  }
+}
+
+// ── OKR node (bullseye / concentric circles) ─────────────────────────────
+
+function paintOkrNode(
+  node: ForceNode,
+  ctx: CanvasRenderingContext2D,
+  globalScale: number,
+  paintCtx: PaintContext,
+  x: number,
+  y: number,
+  opacity: number,
+): void {
+  const outerR = (node.size / 2) * paintCtx.nodeScale;
+
+  paintGlow(ctx, x, y, outerR * 0.5, outerR * 2.5, node.color, 0.2, opacity);
+
+  // Outer ring
+  ctx.strokeStyle = hexToRgba(node.color, opacity * 0.35);
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  ctx.arc(x, y, outerR, 0, Math.PI * 2);
+  ctx.stroke();
+
+  // Middle ring
+  ctx.strokeStyle = hexToRgba(node.color, opacity * 0.65);
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  ctx.arc(x, y, outerR * 0.65, 0, Math.PI * 2);
+  ctx.stroke();
+
+  // Center filled dot
+  ctx.fillStyle = hexToRgba(node.color, opacity);
+  ctx.beginPath();
+  ctx.arc(x, y, outerR * 0.3, 0, Math.PI * 2);
+  ctx.fill();
+
+  if (globalScale > paintCtx.labelThreshold) {
+    const fontSize = Math.max(10 / globalScale, 3);
+    ctx.font = `500 ${fontSize}px Inter, system-ui, sans-serif`;
+    ctx.textAlign = "left";
+    ctx.textBaseline = "middle";
+    ctx.fillStyle =
+      node.id === paintCtx.hoveredNodeId
+        ? `rgba(255,255,255,${opacity})`
+        : `rgba(255,255,255,${opacity * 0.7})`;
+    ctx.fillText(node.label, x + outerR + 4 / globalScale, y);
+  }
+}
+
+// ── Learning node (rounded square) ──────────────────────────────────────
+
+function paintLearningNode(
+  node: ForceNode,
+  ctx: CanvasRenderingContext2D,
+  globalScale: number,
+  paintCtx: PaintContext,
+  x: number,
+  y: number,
+  opacity: number,
+): void {
+  const half = (node.size / 2) * paintCtx.nodeScale;
+  const radius = half * 0.35;
+
+  paintGlow(ctx, x, y, half * 0.5, half * 2.5, node.color, 0.2, opacity);
+
+  ctx.fillStyle = hexToRgba(node.color, opacity);
+  ctx.beginPath();
+  ctx.roundRect(x - half, y - half, half * 2, half * 2, radius);
+  ctx.fill();
+
+  ctx.strokeStyle = hexToRgba(node.color, opacity * 0.4);
+  ctx.lineWidth = node.id === paintCtx.hoveredNodeId ? 2.5 : 1.5;
+  ctx.stroke();
+
+  if (globalScale > paintCtx.labelThreshold) {
+    const fontSize = Math.max(10 / globalScale, 3);
+    ctx.font = `500 ${fontSize}px Inter, system-ui, sans-serif`;
+    ctx.textAlign = "left";
+    ctx.textBaseline = "middle";
+    ctx.fillStyle =
+      node.id === paintCtx.hoveredNodeId
+        ? `rgba(255,255,255,${opacity})`
+        : `rgba(255,255,255,${opacity * 0.7})`;
+    ctx.fillText(node.label, x + half + 4 / globalScale, y);
+  }
+}
+
+// ── Project node (pentagon) ──────────────────────────────────────────────
+
+function paintProjectNode(
+  node: ForceNode,
+  ctx: CanvasRenderingContext2D,
+  globalScale: number,
+  paintCtx: PaintContext,
+  x: number,
+  y: number,
+  opacity: number,
+): void {
+  const size = (node.size / 2) * paintCtx.nodeScale;
+  paintGlow(ctx, x, y, size * 0.5, size * 2.5, node.color, 0.2, opacity);
+
+  drawPolygon(ctx, x, y, size, 5, -Math.PI / 2);
+  ctx.fillStyle = hexToRgba(node.color, opacity);
+  ctx.fill();
+  ctx.strokeStyle = hexToRgba(node.color, opacity * 0.4);
+  ctx.lineWidth = node.id === paintCtx.hoveredNodeId ? 2.5 : 1.5;
+  ctx.stroke();
+
+  if (globalScale > paintCtx.labelThreshold) {
+    const fontSize = Math.max(10 / globalScale, 3);
+    ctx.font = `500 ${fontSize}px Inter, system-ui, sans-serif`;
+    ctx.textAlign = "left";
+    ctx.textBaseline = "middle";
+    ctx.fillStyle =
+      node.id === paintCtx.hoveredNodeId
+        ? `rgba(255,255,255,${opacity})`
+        : `rgba(255,255,255,${opacity * 0.7})`;
+    ctx.fillText(node.label, x + size + 4 / globalScale, y);
+  }
+}
+
 // ── Main paintNode dispatcher ───────────────────────────────────────────
 
 export function paintNode(
@@ -244,6 +468,21 @@ export function paintNode(
       break;
     case "tree_text":
       paintTreeTextNode(node, ctx, globalScale, paintCtx, x, y, opacity);
+      break;
+    case "finance":
+      paintFinanceNode(node, ctx, globalScale, paintCtx, x, y, opacity);
+      break;
+    case "productivity":
+      paintProductivityNode(node, ctx, globalScale, paintCtx, x, y, opacity);
+      break;
+    case "okr":
+      paintOkrNode(node, ctx, globalScale, paintCtx, x, y, opacity);
+      break;
+    case "learning":
+      paintLearningNode(node, ctx, globalScale, paintCtx, x, y, opacity);
+      break;
+    case "project":
+      paintProjectNode(node, ctx, globalScale, paintCtx, x, y, opacity);
       break;
     default:
       paintNoteNode(node, ctx, globalScale, paintCtx, x, y, opacity);

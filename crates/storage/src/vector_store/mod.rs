@@ -18,6 +18,7 @@ mod cognitive;
 mod community;
 mod conv;
 mod crud;
+mod entity_embedding;
 mod maintenance;
 pub(crate) mod schemas;
 #[cfg(test)]

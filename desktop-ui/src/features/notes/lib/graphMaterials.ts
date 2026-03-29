@@ -1,12 +1,16 @@
 import {
+  BoxGeometry,
   CanvasTexture,
   Color,
+  CylinderGeometry,
+  DodecahedronGeometry,
   LineBasicMaterial,
   MeshStandardMaterial,
   OctahedronGeometry,
   SphereGeometry,
   Sprite,
   SpriteMaterial,
+  TorusGeometry,
 } from "three";
 
 export function createNodeMaterial(
@@ -72,6 +76,101 @@ export function createTreeMaterial(color: string, opacity: number): MeshStandard
     opacity: Math.max(0, Math.min(1, opacity)),
     roughness: 0.5,
     metalness: 0.0,
+  });
+}
+
+/** Finance nodes — DodecahedronGeometry (many-faced, represents value/exchange). */
+export function createFinanceGeometry(size: number): DodecahedronGeometry {
+  const radius = (size / 2) * 0.3;
+  return new DodecahedronGeometry(Math.max(radius, 3));
+}
+
+export function createFinanceMaterial(color: string): MeshStandardMaterial {
+  const nodeColor = new Color(color);
+  return new MeshStandardMaterial({
+    color: nodeColor,
+    emissive: nodeColor,
+    emissiveIntensity: 0.55,
+    transparent: true,
+    opacity: 0.9,
+    roughness: 0.3,
+    metalness: 0.4,
+  });
+}
+
+/** Productivity nodes — TorusGeometry (ring/donut, represents time cycles). */
+export function createProductivityGeometry(size: number): TorusGeometry {
+  const outerRadius = Math.max((size / 2) * 0.3, 4);
+  return new TorusGeometry(outerRadius, outerRadius * 0.35, 8, 32);
+}
+
+export function createProductivityMaterial(color: string): MeshStandardMaterial {
+  const nodeColor = new Color(color);
+  return new MeshStandardMaterial({
+    color: nodeColor,
+    emissive: nodeColor,
+    emissiveIntensity: 0.5,
+    transparent: true,
+    opacity: 0.9,
+    roughness: 0.35,
+    metalness: 0.2,
+  });
+}
+
+/** OKR nodes — nested spheres (bullseye, represents goals). Uses CylinderGeometry as flat disc. */
+export function createOkrGeometry(size: number): CylinderGeometry {
+  const radius = Math.max((size / 2) * 0.3, 4);
+  return new CylinderGeometry(radius, radius, radius * 0.3, 32);
+}
+
+export function createOkrMaterial(color: string): MeshStandardMaterial {
+  const nodeColor = new Color(color);
+  return new MeshStandardMaterial({
+    color: nodeColor,
+    emissive: nodeColor,
+    emissiveIntensity: 0.6,
+    transparent: true,
+    opacity: 0.9,
+    roughness: 0.3,
+    metalness: 0.1,
+  });
+}
+
+/** Learning nodes — BoxGeometry (cube/book shape, represents knowledge). */
+export function createLearningGeometry(size: number): BoxGeometry {
+  const s = Math.max((size / 2) * 0.3, 3);
+  return new BoxGeometry(s * 1.4, s, s * 0.6);
+}
+
+export function createLearningMaterial(color: string): MeshStandardMaterial {
+  const nodeColor = new Color(color);
+  return new MeshStandardMaterial({
+    color: nodeColor,
+    emissive: nodeColor,
+    emissiveIntensity: 0.5,
+    transparent: true,
+    opacity: 0.9,
+    roughness: 0.4,
+    metalness: 0.1,
+  });
+}
+
+/** Project nodes — CylinderGeometry with 5 segments (pentagon prism). */
+export function createProjectGeometry(size: number): CylinderGeometry {
+  const radius = Math.max((size / 2) * 0.3, 4);
+  return new CylinderGeometry(radius, radius, radius * 0.5, 5);
+}
+
+export function createProjectMaterial(color: string): MeshStandardMaterial {
+  const nodeColor = new Color(color);
+  return new MeshStandardMaterial({
+    color: nodeColor,
+    emissive: nodeColor,
+    emissiveIntensity: 0.55,
+    transparent: true,
+    opacity: 0.9,
+    roughness: 0.35,
+    metalness: 0.25,
   });
 }
 

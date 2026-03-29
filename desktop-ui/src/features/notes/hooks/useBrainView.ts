@@ -5,8 +5,18 @@ import { UnrealBloomPass } from "three/examples/jsm/postprocessing/UnrealBloomPa
 import {
   createEntityGeometry,
   createEntityMaterial,
+  createFinanceGeometry,
+  createFinanceMaterial,
+  createLearningGeometry,
+  createLearningMaterial,
   createNodeGeometry,
   createNodeMaterial,
+  createOkrGeometry,
+  createOkrMaterial,
+  createProductivityGeometry,
+  createProductivityMaterial,
+  createProjectGeometry,
+  createProjectMaterial,
   createTreeMaterial,
 } from "../lib/graphMaterials";
 import type { ForceNode } from "./useGraphElements";
@@ -54,6 +64,56 @@ export function useBrainView({ settings }: UseBrainViewParams) {
       const geometry = createNodeGeometry(3); // radius 1.5 → diameter 3
       const material = createTreeMaterial(node.color, 0.3);
       material.userData = { baseEmissive: 0.1 };
+      const mesh = new Mesh(geometry, material);
+      mesh.userData = { nodeId: node.id };
+      return mesh;
+    }
+
+    // ── Finance — DodecahedronGeometry ───────────────────────────────
+    if (nodeType === "finance") {
+      const geometry = createFinanceGeometry(node.size);
+      const material = createFinanceMaterial(node.color);
+      material.userData = { baseEmissive: 0.55 };
+      const mesh = new Mesh(geometry, material);
+      mesh.userData = { nodeId: node.id };
+      return mesh;
+    }
+
+    // ── Productivity — TorusGeometry (ring) ──────────────────────────
+    if (nodeType === "productivity") {
+      const geometry = createProductivityGeometry(node.size);
+      const material = createProductivityMaterial(node.color);
+      material.userData = { baseEmissive: 0.5 };
+      const mesh = new Mesh(geometry, material);
+      mesh.userData = { nodeId: node.id };
+      return mesh;
+    }
+
+    // ── OKR — CylinderGeometry (flat disc / target) ──────────────────
+    if (nodeType === "okr") {
+      const geometry = createOkrGeometry(node.size);
+      const material = createOkrMaterial(node.color);
+      material.userData = { baseEmissive: 0.6 };
+      const mesh = new Mesh(geometry, material);
+      mesh.userData = { nodeId: node.id };
+      return mesh;
+    }
+
+    // ── Learning — BoxGeometry (book shape) ──────────────────────────
+    if (nodeType === "learning") {
+      const geometry = createLearningGeometry(node.size);
+      const material = createLearningMaterial(node.color);
+      material.userData = { baseEmissive: 0.5 };
+      const mesh = new Mesh(geometry, material);
+      mesh.userData = { nodeId: node.id };
+      return mesh;
+    }
+
+    // ── Project — CylinderGeometry (pentagon prism) ──────────────────
+    if (nodeType === "project") {
+      const geometry = createProjectGeometry(node.size);
+      const material = createProjectMaterial(node.color);
+      material.userData = { baseEmissive: 0.55 };
       const mesh = new Mesh(geometry, material);
       mesh.userData = { nodeId: node.id };
       return mesh;

@@ -1,3 +1,4 @@
+import { useEvent } from "@shared/hooks/useEvent";
 import { ipc } from "@shared/hooks/useIpc";
 import { useQuery } from "@shared/hooks/useQuery";
 import type {
@@ -5,6 +6,7 @@ import type {
   FabricEntity,
   FabricEntityEdge,
   FabricGraphBase,
+  FabricGraphEvent,
   FabricLayer,
   FabricTreeNode,
 } from "@shared/types/fabric";
@@ -50,6 +52,12 @@ export function useFabricGraph(enabled: boolean): UseFabricGraphResult {
     loading,
     refetch,
   } = useQuery<FabricGraphBase | undefined>("fabric_graph_base", enabled ? undefined : null);
+
+  // Live graph updates: re-fetch base data whenever the backend emits a fabric_graph event
+  // (e.g. community discovered, updated, or weakened). useEvent handles Tauri vs browser mode.
+  useEvent<FabricGraphEvent>("fabric_graph", () => {
+    refetch();
+  });
 
   const [entities, setEntities] = useState<FabricEntity[]>([]);
   const [entityEdges, setEntityEdges] = useState<FabricEntityEdge[]>([]);

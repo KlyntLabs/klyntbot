@@ -950,6 +950,12 @@ impl AgentLoopBuilder {
                                 feature_notes::repo::NoteRepo::new(storage_pool.inner().clone());
                             let backfill_linker = Arc::clone(&entity_linker);
                             let backfill_community_builder = Arc::clone(&community_builder);
+                            let backfill_entity_embedder =
+                                crate::adapters::entity_embedder::EntityEmbedder::new(
+                                    Arc::new(vs.clone()),
+                                    text_embedder.clone(),
+                                );
+                            let backfill_pool = storage_pool.inner().clone();
                             tokio::spawn(async move {
                                 // Delay to let the app finish starting
                                 tokio::time::sleep(std::time::Duration::from_secs(10)).await;
@@ -973,6 +979,12 @@ impl AgentLoopBuilder {
                                     backfill_community_builder.rebuild_communities().await
                                 {
                                     warn!("Community backfill error: {e}");
+                                }
+                                // Backfill entity embeddings into LanceDB
+                                match backfill_entity_embedder.backfill_all(&backfill_pool).await {
+                                    Ok(0) => {}
+                                    Ok(n) => info!("Entity embedding backfill: {n} entities embedded"),
+                                    Err(e) => warn!("Entity embedding backfill error: {e}"),
                                 }
                             });
                         }

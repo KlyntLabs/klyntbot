@@ -12,6 +12,7 @@ pub mod community_builder;
 pub mod community_search;
 pub mod conversation_recall;
 pub mod cron;
+pub mod entity_embedder;
 pub mod entity_tree_linker;
 pub mod finance;
 pub mod finance_tree_builder;

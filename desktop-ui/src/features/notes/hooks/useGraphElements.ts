@@ -32,7 +32,16 @@ export interface ClusterInfo {
   count: number;
 }
 
-export type ForceNodeType = "note" | "entity" | "tree_section" | "tree_text";
+export type ForceNodeType =
+  | "note"
+  | "entity"
+  | "tree_section"
+  | "tree_text"
+  | "finance"
+  | "productivity"
+  | "okr"
+  | "learning"
+  | "project";
 
 export interface ForceNode {
   id: string;
@@ -69,6 +78,15 @@ export interface GraphElements {
   clusters: ClusterInfo[];
   communities: ClusterInfo[];
   fingerprint: string;
+}
+
+function resolveNodeType(tags: string[]): ForceNodeType {
+  if (tags.includes("project")) return "project";
+  if (tags.includes("finance")) return "finance";
+  if (tags.includes("productivity")) return "productivity";
+  if (tags.includes("okr")) return "okr";
+  if (tags.includes("learning")) return "learning";
+  return "note";
 }
 
 function getNodeSize(linkCount: number): number {
@@ -215,7 +233,7 @@ export function useGraphElements({
         bodyPreview: node.bodyPreview,
         notebookId: node.notebookId,
         clusterId,
-        nodeType: "note",
+        nodeType: resolveNodeType(node.tags),
         expandable: fabricData?.layerTree ?? false,
         expanded: isExpanded,
       });
