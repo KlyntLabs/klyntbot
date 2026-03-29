@@ -1,16 +1,15 @@
 /**
  * Decode base64-encoded PCM float32 samples and play via Web Audio API.
- * Used for TTS playback in the Voice Brain orb.
+ * Uses fetch with a data URL instead of atob() for robust binary decoding.
  */
-export function playTtsAudio(base64: string, sampleRate: number): void {
-  const binaryString = atob(base64);
-  const bytes = new Uint8Array(binaryString.length);
-  for (let i = 0; i < binaryString.length; i++) {
-    bytes[i] = binaryString.charCodeAt(i);
-  }
+export async function playTtsAudio(base64: string, sampleRate: number): Promise<void> {
+  if (!base64) return;
 
-  // PCM data is little-endian float32
-  const float32 = new Float32Array(bytes.buffer);
+  const response = await fetch(`data:application/octet-stream;base64,${base64}`);
+  const arrayBuffer = await response.arrayBuffer();
+  const float32 = new Float32Array(arrayBuffer);
+
+  if (float32.length === 0) return;
 
   const ctx = new AudioContext();
   const buffer = ctx.createBuffer(1, float32.length, sampleRate);

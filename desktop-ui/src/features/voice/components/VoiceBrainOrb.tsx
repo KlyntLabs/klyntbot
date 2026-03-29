@@ -71,7 +71,7 @@ export function VoiceBrainOrb() {
 
   useEffect(() => {
     if (ttsAudio) {
-      playTtsAudio(ttsAudio.base64, ttsAudio.sampleRate);
+      playTtsAudio(ttsAudio.base64, ttsAudio.sampleRate).catch(() => {});
     }
   }, [ttsAudio]);
 

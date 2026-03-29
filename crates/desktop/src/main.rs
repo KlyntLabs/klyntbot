@@ -374,7 +374,9 @@ fn run_desktop_app() {
                                             let is_visible =
                                                 orb_window.is_visible().unwrap_or(false);
                                             if is_visible {
-                                                // Second press while capturing → stop capture
+                                                // Second press → stop capture, keep orb visible
+                                                // for Processing → agent response → TTS playback.
+                                                // The orb auto-dismisses via frontend dismiss().
                                                 let core = handle
                                                     .state::<std::sync::Arc<app_core::AppCore>>();
                                                 let _ = core.voice_stop_capture().await;
@@ -382,7 +384,7 @@ fn run_desktop_app() {
                                                     false,
                                                     std::sync::atomic::Ordering::Relaxed,
                                                 );
-                                                let _ = orb_window.hide();
+                                                // Don't hide — orb stays open for response
                                                 return;
                                             }
                                         }

@@ -116,6 +116,13 @@ export function useVoiceEvents() {
   const dismiss = useCallback(async () => {
     await ipc("voice_dismiss");
     setSessionState("idle");
+    // Hide the voice-orb Tauri window
+    try {
+      const { getCurrentWindow } = await import("@tauri-apps/api/window");
+      await getCurrentWindow().hide();
+    } catch {
+      // Browser-dev mode — no window to hide
+    }
   }, []);
 
   return {
