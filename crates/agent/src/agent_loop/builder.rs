@@ -946,6 +946,10 @@ impl AgentLoopBuilder {
                         {
                             let backfill_builder = Arc::clone(&note_tree_builder);
                             let backfill_task_tree_builder = Arc::clone(&task_tree_builder);
+                            let backfill_learning_tree_builder =
+                                Arc::clone(&learning_tree_builder);
+                            let backfill_productivity_tree_builder =
+                                Arc::clone(&productivity_tree_builder);
                             let backfill_note_repo =
                                 feature_notes::repo::NoteRepo::new(storage_pool.inner().clone());
                             let backfill_linker = Arc::clone(&entity_linker);
@@ -970,6 +974,26 @@ impl AgentLoopBuilder {
                                     backfill_task_trees(&backfill_task_tree_builder).await
                                 {
                                     warn!("Task tree backfill error: {e}");
+                                }
+                                // Backfill learning tree nodes from existing knowledge atoms
+                                match backfill_learning_tree_builder
+                                    .backfill_from_atoms(&backfill_pool)
+                                    .await
+                                {
+                                    Ok(0) => {}
+                                    Ok(n) => info!("Learning tree backfill: {n} atoms indexed"),
+                                    Err(e) => warn!("Learning tree backfill error: {e}"),
+                                }
+                                // Backfill productivity tree nodes from existing daily summaries
+                                match backfill_productivity_tree_builder
+                                    .backfill_from_summaries(&backfill_pool)
+                                    .await
+                                {
+                                    Ok(0) => {}
+                                    Ok(n) => {
+                                        info!("Productivity tree backfill: {n} summaries indexed")
+                                    }
+                                    Err(e) => warn!("Productivity tree backfill error: {e}"),
                                 }
                                 // After tree nodes exist, link entities to them
                                 tokio::time::sleep(std::time::Duration::from_secs(3)).await;

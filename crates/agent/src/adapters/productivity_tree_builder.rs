@@ -56,6 +56,38 @@ impl ProductivityTreeBuilder {
         }
     }
 
+    /// Backfill tree nodes from existing daily productivity summaries.
+    ///
+    /// Queries the `daily_summaries` table and calls `handle_activity_session`
+    /// for each row. Insert errors for already-indexed dates are silently ignored
+    /// by the underlying `persist_nodes` logic, so this is safe to run on startup.
+    pub async fn backfill_from_summaries(
+        &self,
+        pool: &sqlx::SqlitePool,
+    ) -> common::Result<usize> {
+        let summaries: Vec<(String, i64, i64, i64)> = sqlx::query_as(
+            "SELECT date, total_active_secs, productive_secs, distracting_secs \
+             FROM daily_summaries ORDER BY date",
+        )
+        .fetch_all(pool)
+        .await
+        .map_err(|e| {
+            common::ToolError::ExecutionFailed(format!("productivity backfill query: {e}"))
+        })?;
+
+        let mut count = 0;
+        for (date, total_active, productive, distracting) in &summaries {
+            if self
+                .handle_activity_session(date, *total_active, *productive, *distracting)
+                .await
+                .is_ok()
+            {
+                count += 1;
+            }
+        }
+        Ok(count)
+    }
+
     /// Event-driven subscriber loop. Listens for productivity domain events
     /// and appends tree nodes for each.
     pub async fn run(

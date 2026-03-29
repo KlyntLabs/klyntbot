@@ -56,6 +56,29 @@ impl LearningTreeBuilder {
         }
     }
 
+    /// Backfill tree nodes from existing knowledge atoms.
+    ///
+    /// Queries all active atoms from the DB and calls `handle_atom_accepted` for
+    /// each one. Insert errors for already-indexed atoms are silently ignored by
+    /// the underlying `persist_nodes` logic, so this is safe to run on startup.
+    pub async fn backfill_from_atoms(&self, pool: &sqlx::SqlitePool) -> common::Result<usize> {
+        let atoms: Vec<(String, String)> =
+            sqlx::query_as("SELECT id, atom_type FROM knowledge_atoms WHERE status = 'active'")
+                .fetch_all(pool)
+                .await
+                .map_err(|e| {
+                    common::ToolError::ExecutionFailed(format!("learning backfill query: {e}"))
+                })?;
+
+        let mut count = 0;
+        for (atom_id, atom_type) in &atoms {
+            if self.handle_atom_accepted(atom_id, atom_type).await.is_ok() {
+                count += 1;
+            }
+        }
+        Ok(count)
+    }
+
     /// Event-driven subscriber loop. Listens for `KnowledgeAtomAccepted` and
     /// `RetentionMilestoneReached` events and appends tree nodes for each.
     pub async fn run(
