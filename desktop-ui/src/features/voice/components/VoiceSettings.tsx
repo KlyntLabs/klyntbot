@@ -25,7 +25,7 @@ export function VoiceSettings() {
   const [config] = useState<VoiceConfig>({
     enabled: true,
     input: {
-      hotkey: "super+shift+v",
+      hotkey: "ctrl+shift+v",
       silenceThresholdSecs: 1.5,
       privacyMode: "standard",
       preferLocal: true,

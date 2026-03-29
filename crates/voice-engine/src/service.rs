@@ -594,4 +594,122 @@ mod tests {
         let event = rx.recv().await.unwrap();
         assert!(matches!(event, VoiceEvent::ProcessingInBackground));
     }
+
+    /// End-to-end pipeline test: inject mock audio directly into the session,
+    /// call stop_capture, and verify the full chain fires.
+    #[tokio::test]
+    async fn end_to_end_pipeline_with_mock_audio() {
+        let mock_stt = Arc::new(MockTranscriptionEngine::new("schedule dentist and practice french"))
+            as Arc<dyn TranscriptionEngine>;
+        let (svc, _tmp) = make_service(Some(mock_stt));
+
+        let mut event_rx = svc.take_event_rx().await.unwrap();
+
+        // Manually inject a session with a pre-populated audio_rx channel.
+        // This bypasses start_capture (which requires real mic hardware).
+        let (audio_tx, audio_rx) = mpsc::channel::<AudioChunk>(16);
+        let stop_signal = Arc::new(AtomicBool::new(false));
+        let keepalive_stop = stop_signal.clone();
+        let keepalive = tokio::task::spawn_blocking(move || {
+            while !keepalive_stop.load(Ordering::Relaxed) {
+                std::thread::sleep(std::time::Duration::from_millis(10));
+            }
+        });
+
+        {
+            let mut guard = svc.active_session.lock().await;
+            *guard = Some(ActiveSession {
+                id: "test-session-1".to_string(),
+                stop_signal: stop_signal.clone(),
+                audio_rx: Some(audio_rx),
+                stream_keepalive: keepalive,
+                started_at: Instant::now(),
+                state: VoiceSessionState::Capturing,
+            });
+        }
+
+        // Send some fake audio then close the channel (simulating capture end)
+        let chunk = AudioChunk {
+            samples: vec![0.1; 1600], // 100ms of audio
+            sample_rate: 16000,
+        };
+        audio_tx.send(chunk).await.unwrap();
+        drop(audio_tx); // Closes channel, mock STT will finish
+
+        // Call stop_capture — this should: transcribe → route → score → emit events
+        let result = svc.stop_capture().await.unwrap();
+        assert!(result.is_some(), "Should produce a transcript");
+
+        let (transcript, metadata) = result.unwrap();
+
+        // Verify transcript
+        assert_eq!(transcript.text, "schedule dentist and practice french");
+        assert!(!transcript.segments.is_empty());
+
+        // Verify metadata
+        assert_eq!(metadata.language.as_str(), "en");
+        assert!(metadata.overall_confidence > 0.0);
+        assert!(!metadata.pronunciation_scores.is_empty());
+        assert!(metadata.audio_ref.is_some());
+        assert_eq!(metadata.engine, EngineKind::Local);
+
+        // Collect all emitted events
+        let mut events = Vec::new();
+        while let Ok(event) = event_rx.try_recv() {
+            events.push(event);
+        }
+
+        // Should have: CaptureEnded, PartialTranscript, RoutingSuggestion(s), Finalized
+        let event_types: Vec<&str> = events
+            .iter()
+            .map(|e| match e {
+                VoiceEvent::CaptureStarted { .. } => "CaptureStarted",
+                VoiceEvent::CaptureEnded { .. } => "CaptureEnded",
+                VoiceEvent::PartialTranscript { .. } => "PartialTranscript",
+                VoiceEvent::RoutingSuggestion { .. } => "RoutingSuggestion",
+                VoiceEvent::Finalized { .. } => "Finalized",
+                VoiceEvent::AudioLevel { .. } => "AudioLevel",
+                VoiceEvent::MemoryEcho { .. } => "MemoryEcho",
+                VoiceEvent::ProcessingInBackground => "ProcessingInBackground",
+                VoiceEvent::SpeakResponse { .. } => "SpeakResponse",
+                VoiceEvent::Error { .. } => "Error",
+            })
+            .collect();
+
+        assert!(
+            event_types.contains(&"CaptureEnded"),
+            "Missing CaptureEnded event. Got: {:?}",
+            event_types
+        );
+        assert!(
+            event_types.contains(&"PartialTranscript"),
+            "Missing PartialTranscript event. Got: {:?}",
+            event_types
+        );
+        assert!(
+            event_types.contains(&"Finalized"),
+            "Missing Finalized event. Got: {:?}",
+            event_types
+        );
+
+        // Verify routing detected intents (schedule → tasks, french → learning)
+        let routing_events: Vec<_> = events
+            .iter()
+            .filter(|e| matches!(e, VoiceEvent::RoutingSuggestion { .. }))
+            .collect();
+        assert!(
+            !routing_events.is_empty(),
+            "Should detect at least one routing intent"
+        );
+
+        // Verify Finalized event has correct routing
+        let finalized = events
+            .iter()
+            .find(|e| matches!(e, VoiceEvent::Finalized { .. }))
+            .unwrap();
+        if let VoiceEvent::Finalized { routed_to, text, .. } = finalized {
+            assert_eq!(text, "schedule dentist and practice french");
+            assert!(!routed_to.is_empty());
+        }
+    }
 }
