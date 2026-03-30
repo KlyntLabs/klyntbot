@@ -99,8 +99,10 @@ export function VoiceBrainOrb() {
     setupRequired,
     pause,
     resume,
+    interrupt,
     newSession,
     continueTts,
+    start,
     end,
   } = useVoiceConversation();
 
@@ -149,6 +151,17 @@ export function VoiceBrainOrb() {
         <div className="h-1 bg-accent rounded-full overflow-hidden">
           <div className="h-full bg-primary rounded-full animate-pulse w-1/2" />
         </div>
+        <button
+          type="button"
+          onClick={() => {
+            start().catch(() => {
+              // Cloud not available either — stay on setup screen
+            });
+          }}
+          className="mt-3 text-xs text-primary hover:underline"
+        >
+          Speak anyway (cloud)
+        </button>
       </div>
     );
   }
@@ -164,9 +177,15 @@ export function VoiceBrainOrb() {
     <div
       className="bg-card border border-border/50 rounded-2xl w-[320px] shadow-xl select-none
         animate-in fade-in zoom-in-95 duration-200 overflow-hidden"
-      onClick={end}
+      onClick={phase === "speaking" ? interrupt : end}
       onKeyDown={(e) => {
-        if (e.key === "Escape") end();
+        if (e.key === "Escape") {
+          if (phase === "speaking") {
+            interrupt();
+          } else {
+            end();
+          }
+        }
       }}
     >
       {/* ── Title bar ──────────────────────────────────────────────────────── */}
@@ -217,8 +236,21 @@ export function VoiceBrainOrb() {
       </div>
 
       {/* ── Phase visual ───────────────────────────────────────────────────── */}
-      <div className="px-3 pb-2 flex items-center justify-center min-h-[28px]">
+      <div className="px-3 pb-2 flex items-center justify-center gap-2 min-h-[28px]">
         {showWaveform && <Waveform level={audioLevel} colorClass={phaseWaveformColor(phase)} />}
+        {phase === "speaking" && (
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              interrupt();
+            }}
+            className="text-xs text-muted-foreground hover:text-foreground transition-colors"
+            aria-label="Stop speaking"
+          >
+            ■ Stop
+          </button>
+        )}
         {showReflecting && (
           <div className="flex items-center gap-2">
             <div className="w-2.5 h-2.5 rounded-full bg-warning animate-pulse" />
@@ -319,7 +351,7 @@ export function VoiceBrainOrb() {
 
       {/* ── Hint bar ───────────────────────────────────────────────────────── */}
       <div className="text-[10px] text-muted-foreground/40 text-center px-3 pb-3">
-        ⌥⇧V close · tap to pause
+        ⌥⇧V close · Esc {phase === "speaking" ? "stop" : "close"} · tap to pause
       </div>
     </div>
   );

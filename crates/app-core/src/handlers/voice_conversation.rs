@@ -859,7 +859,7 @@ impl VoiceConversationManager {
             let _ = self.voice_service.emit_event(VoiceEvent::TtsFadeOut).await;
             let _ = self
                 .voice_service
-                .emit_event(VoiceEvent::ContinueAvailable { timeout_secs: 10 })
+                .emit_event(VoiceEvent::ContinueAvailable { timeout_secs: 8 })
                 .await;
 
             // Go to listening to capture what the user is saying

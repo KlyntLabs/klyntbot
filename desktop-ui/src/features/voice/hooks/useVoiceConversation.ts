@@ -46,6 +46,10 @@ export function useVoiceConversation() {
       case "phaseChanged": {
         const newPhase = payload.phase as ConversationPhase;
         setPhase(newPhase);
+        // If the conversation started, the engine is available — clear setup screen
+        if (newPhase !== "idle") {
+          setSetupRequired(false);
+        }
         if (payload.sessionTitle || payload.turnCount !== undefined) {
           setSessionInfo((prev) => ({
             key: prev?.key ?? "",
@@ -107,7 +111,8 @@ export function useVoiceConversation() {
         break;
       }
       case "ttsFadeOut":
-        setTtsAudio(null);
+        // Delay clearing so CSS can animate a 300ms fade-out on the speaking visual
+        setTimeout(() => setTtsAudio(null), 300);
         break;
       case "continueAvailable":
         setContinueAvailable(true);
