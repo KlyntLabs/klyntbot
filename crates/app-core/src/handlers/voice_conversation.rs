@@ -274,7 +274,8 @@ impl VoiceConversationManager {
             let model_state = self.voice_service.model_state();
             if !matches!(
                 model_state,
-                voice_engine::ModelState::Downloading { .. } | voice_engine::ModelState::Ready { .. }
+                voice_engine::ModelState::Downloading { .. }
+                    | voice_engine::ModelState::Ready { .. }
             ) {
                 let _ = self
                     .voice_service
@@ -367,10 +368,7 @@ impl VoiceConversationManager {
     /// sleeping before calling `start()`.
     pub async fn new_session(&self) -> common::Result<StartResponse> {
         // Stop any active capture
-        let _ = self
-            .cmd_tx
-            .send(VoiceCommand::End)
-            .await;
+        let _ = self.cmd_tx.send(VoiceCommand::End).await;
 
         // Reset state directly under the lock
         {
@@ -1036,7 +1034,6 @@ impl VoiceConversationManager {
         state.phase = next;
         state.touch();
     }
-
 }
 
 // ── Monitor helper ──────────────────────────────────────────

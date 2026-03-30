@@ -8,6 +8,7 @@ mod refactor_tests;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::time::Duration;
+use tokio::sync::broadcast;
 use tokio::sync::RwLock;
 use tokio::task::JoinHandle;
 use tokio_util::sync::CancellationToken;
@@ -260,25 +261,78 @@ impl AgentLoop {
     /// Takes `&self` (not `&mut self`) so it can be called on `Arc<AgentLoop>` without
     /// any Mutex wrapper. Call `take_inbound_rx()` before wrapping in `Arc`, then pass
     /// the extracted receiver here.
+    ///
+    /// When a `DomainEventBus` is available the loop also listens for
+    /// `FocusSessionStarted` / `FocusSessionEnded` events. While a focus
+    /// session is active, inbound messages are deferred (buffered) and a
+    /// `MessageDeferred` event is emitted. Once the focus session ends the
+    /// deferred messages are drained and processed in order.
     pub async fn run_with_rx(&self, mut inbound_rx: mpsc::Receiver<InboundMessage>) -> Result<()> {
         self.running.store(true, Ordering::SeqCst);
 
         info!("Agent loop started");
 
+        // Subscribe to domain events for focus-session awareness.
+        let mut event_rx = self.domain_event_bus.as_ref().map(|bus| bus.subscribe());
+        let mut focus_active = false;
+        let mut deferred_messages: Vec<InboundMessage> = Vec::new();
+
         while self.running.load(Ordering::SeqCst) {
-            match tokio::time::timeout(Duration::from_secs(1), inbound_rx.recv()).await {
-                Ok(Some(msg)) => {
-                    if let Err(e) = self.process_message(msg).await {
+            tokio::select! {
+                msg = inbound_rx.recv() => {
+                    let Some(msg) = msg else {
+                        // Channel closed — exit loop.
+                        break;
+                    };
+
+                    if focus_active {
+                        info!(
+                            channel = %msg.channel,
+                            sender = %msg.sender_id,
+                            "Deferring message during focus session"
+                        );
+                        if let Some(ref bus) = self.domain_event_bus {
+                            bus.publish(bus::DomainEvent::MessageDeferred {
+                                channel: msg.channel.to_string(),
+                                sender: msg.sender_id.clone(),
+                                preview: msg.content.chars().take(100).collect(),
+                            });
+                        }
+                        deferred_messages.push(msg);
+                    } else if let Err(e) = self.process_message(msg).await {
                         error!("Error processing message: {}", e);
                     }
                 }
-                Ok(None) => {
-                    // Bus closed
-                    break;
-                }
-                Err(_) => {
-                    // Timeout, continue loop
-                    continue;
+                result = async {
+                    match event_rx.as_mut() {
+                        Some(rx) => rx.recv().await.map(Some),
+                        None => std::future::pending::<std::result::Result<Option<bus::DomainEvent>, _>>().await,
+                    }
+                } => {
+                    match result {
+                        Ok(Some(bus::DomainEvent::FocusSessionStarted { .. })) => {
+                            info!("Focus session started — deferring inbound messages");
+                            focus_active = true;
+                        }
+                        Ok(Some(bus::DomainEvent::FocusSessionEnded { .. })) => {
+                            info!(
+                                deferred = deferred_messages.len(),
+                                "Focus session ended — draining deferred messages"
+                            );
+                            focus_active = false;
+                            for deferred in deferred_messages.drain(..) {
+                                if let Err(e) = self.process_message(deferred).await {
+                                    error!("Error processing deferred message: {}", e);
+                                }
+                            }
+                        }
+                        Err(broadcast::error::RecvError::Lagged(n)) => {
+                            warn!("Domain event bus lagged by {n} events");
+                        }
+                        _ => {
+                            // Other domain events — not relevant here.
+                        }
+                    }
                 }
             }
         }

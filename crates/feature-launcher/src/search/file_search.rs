@@ -1,6 +1,7 @@
 use crate::types::*;
 use ignore::WalkBuilder;
 use parking_lot::RwLock;
+use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
@@ -29,6 +30,8 @@ struct FileEntry {
 pub struct FileSearchSource {
     entries: Arc<RwLock<Vec<FileEntry>>>,
     scan_dirs: Vec<String>,
+    /// Extension → base64 PNG data URI for file type icons (resolved via NSWorkspace).
+    ext_icons: Arc<RwLock<HashMap<String, String>>>,
 }
 
 impl FileSearchSource {
@@ -36,6 +39,7 @@ impl FileSearchSource {
         Self {
             entries: Arc::new(RwLock::new(Vec::new())),
             scan_dirs,
+            ext_icons: Arc::new(RwLock::new(HashMap::new())),
         }
     }
 
@@ -105,6 +109,23 @@ impl FileSearchSource {
         entries
     }
 
+    /// Resolve system file type icons for each unique extension in the index.
+    /// Called during refresh inside spawn_blocking (blocking ObjC calls).
+    fn resolve_ext_icons(entries: &[FileEntry]) -> HashMap<String, String> {
+        let unique_exts: std::collections::HashSet<String> = entries
+            .iter()
+            .filter_map(|e| e.path.extension()?.to_str().map(|s| s.to_lowercase()))
+            .collect();
+
+        unique_exts
+            .into_iter()
+            .filter_map(|ext| {
+                let icon = platform_macos::apps::icon_for_file_type(&ext)?;
+                Some((ext, icon))
+            })
+            .collect()
+    }
+
     fn classify_extension(path: &Path) -> FileKind {
         match path.extension().and_then(|e| e.to_str()) {
             Some("png" | "jpg" | "jpeg" | "gif" | "svg" | "webp" | "ico" | "heic") => {
@@ -135,6 +156,7 @@ impl super::SearchSource for FileSearchSource {
         }
 
         let entries = self.entries.read();
+        let ext_icons = self.ext_icons.read();
         let scored = super::fuzzy_match(query, &entries, |e| &e.name, limit);
 
         scored
@@ -143,11 +165,18 @@ impl super::SearchSource for FileSearchSource {
                 let path_str = e.path.display().to_string();
                 // Earlier dirs in config get a mild relevance boost, capped at 30%
                 let dir_boost = 1.0 - (e.dir_index as f64 * 0.05).min(0.3);
+                // Look up file type icon from cache (resolved during refresh)
+                let icon = e
+                    .path
+                    .extension()
+                    .and_then(|ext| ext.to_str())
+                    .and_then(|ext| ext_icons.get(&ext.to_lowercase()).cloned())
+                    .or_else(|| Some("file".to_string()));
                 LauncherItem {
                     id: format!("file:{path_str}"),
                     title: e.name.clone(),
                     subtitle: Some(path_str),
-                    icon: Some("file".to_string()),
+                    icon,
                     kind: LauncherItemKind::File {
                         path: e.path.clone(),
                         kind: Self::classify_extension(&e.path),
@@ -160,14 +189,23 @@ impl super::SearchSource for FileSearchSource {
 
     async fn refresh(&self) {
         let dirs = self.scan_dirs.clone();
-        let new_entries = tokio::task::spawn_blocking(move || Self::walk_dirs(&dirs))
-            .await
-            .unwrap_or_else(|e| {
-                tracing::error!("file_search walk task failed: {e}");
-                vec![]
-            });
-        tracing::info!("Indexed {} files", new_entries.len());
+        let (new_entries, icons) = tokio::task::spawn_blocking(move || {
+            let entries = Self::walk_dirs(&dirs);
+            let icons = Self::resolve_ext_icons(&entries);
+            (entries, icons)
+        })
+        .await
+        .unwrap_or_else(|e| {
+            tracing::error!("file_search walk task failed: {e}");
+            (vec![], HashMap::new())
+        });
+        tracing::info!(
+            "Indexed {} files ({} file type icons)",
+            new_entries.len(),
+            icons.len()
+        );
         *self.entries.write() = new_entries;
+        *self.ext_icons.write() = icons;
     }
 }
 

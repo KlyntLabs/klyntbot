@@ -60,13 +60,13 @@ For all actions and setup workflow, read `references/actions.md`.
 9. **Wrong sensitivity direction** — For `analyze_spending_anomalies`, "low" catches MORE anomalies (lower threshold), "high" catches FEWER (stricter). Think of it as "how anomalous must it be to report."
 10. **Forgetting to set allocation targets before drift check** — `portfolio_drift` requires targets. Use `allocation_target_list` first; if empty, guide the user to set targets with `allocation_target_set`.
 11. **Not chaining FIRE actions** — A complete FIRE analysis chains: calculate variant -> withdrawal simulation -> sensitivity analysis. Don't just run one action in isolation.
-12. **Wrong account type on account_add** — Use `type: "bank"`, not "checking"/"savings". Valid types: bank, credit, cash, investment, crypto, other.
+12. **Wrong account type on account_add** — Valid types: `bank`, `cash`, `ewallet` (or `e_wallet`), `crypto_wallet` (or `cryptowallet`), `brokerage`, `other`. NOT "checking", "savings", "credit", "investment", "deposit", or "loan".
 
 **Parameter name cheat sheet — `type` vs `asset_type`:**
 | Action | Param name | Values |
 |--------|-----------|--------|
 | `tx_add` | `type` | "expense", "income", "transfer" |
-| `account_add` | `type` | "bank", "credit", "cash", "investment", "crypto" |
+| `account_add` | `type` | "bank", "cash", "ewallet", "crypto_wallet", "brokerage", "other" |
 | `investment_add` | `asset_type` | "stock", "crypto", "bond", "real_estate", "commodity" |
 | `liability_add` | `type` | "personal_loan", "student_loan", "credit_card", "mortgage" |
 13. **Ignoring auto-conversion** — When adding a transaction with a `currency` different from the default, `base_amount` is computed automatically. Do NOT manually pass `base_amount`.

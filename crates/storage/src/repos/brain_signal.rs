@@ -105,14 +105,19 @@ mod tests {
         let pool = StoragePool::connect_in_memory().await.unwrap();
         let repo = BrainSignalFeedbackRepo::new(pool.inner().clone());
 
-        repo.record("connection", "alice:bob", "surfaced").await.unwrap();
+        repo.record("connection", "alice:bob", "surfaced")
+            .await
+            .unwrap();
 
         // Same pair — should be true within 24h
         let found = repo.was_surfaced_recently("alice:bob", 24).await.unwrap();
         assert!(found, "should find recently surfaced pair");
 
         // Different pair — should be false
-        let not_found = repo.was_surfaced_recently("charlie:dave", 24).await.unwrap();
+        let not_found = repo
+            .was_surfaced_recently("charlie:dave", 24)
+            .await
+            .unwrap();
         assert!(!not_found, "different pair should not be found");
     }
 
@@ -121,9 +126,15 @@ mod tests {
         let pool = StoragePool::connect_in_memory().await.unwrap();
         let repo = BrainSignalFeedbackRepo::new(pool.inner().clone());
 
-        repo.record("connection", "alice:bob", "dismissed").await.unwrap();
-        repo.record("connection", "bob:charlie", "dismissed").await.unwrap();
-        repo.record("connection", "alice:charlie", "accepted").await.unwrap();
+        repo.record("connection", "alice:bob", "dismissed")
+            .await
+            .unwrap();
+        repo.record("connection", "bob:charlie", "dismissed")
+            .await
+            .unwrap();
+        repo.record("connection", "alice:charlie", "accepted")
+            .await
+            .unwrap();
 
         let count = repo.dismissal_count_since(1).await.unwrap();
         assert_eq!(count, 2, "should count only dismissals");
@@ -134,12 +145,17 @@ mod tests {
         let pool = StoragePool::connect_in_memory().await.unwrap();
         let repo = BrainSignalFeedbackRepo::new(pool.inner().clone());
 
-        repo.record("connection", "alice:bob", "dismissed").await.unwrap();
+        repo.record("connection", "alice:bob", "dismissed")
+            .await
+            .unwrap();
 
         let recently = repo.was_dismissed_recently("alice:bob", 30).await.unwrap();
         assert!(recently, "should detect recent dismissal");
 
         let not_dismissed = repo.was_dismissed_recently("other:pair", 30).await.unwrap();
-        assert!(!not_dismissed, "untouched pair should not be dismissed recently");
+        assert!(
+            !not_dismissed,
+            "untouched pair should not be dismissed recently"
+        );
     }
 }

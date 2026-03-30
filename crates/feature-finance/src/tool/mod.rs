@@ -167,7 +167,11 @@ impl Tool for FinanceTool {
                 },
                 "id": { "type": "string" },
                 "name": { "type": "string" },
-                "type": { "type": "string" },
+                "type": {
+                    "type": "string",
+                    "enum": ["bank", "cash", "ewallet", "crypto_wallet", "brokerage", "other"],
+                    "description": "Account type. Use 'bank' for bank accounts, 'cash' for cash, 'ewallet' for e-wallets, 'crypto_wallet' for crypto wallets, 'brokerage' for investment/brokerage accounts, 'other' for anything else."
+                },
                 "currency": { "type": "string" },
                 "balance": { "type": "integer" },
                 "amount": {

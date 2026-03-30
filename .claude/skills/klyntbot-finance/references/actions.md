@@ -8,14 +8,14 @@ description: Complete reference for all finance tool actions
 ## First-Time Setup
 
 1. `account_list` — check if accounts exist
-2. If none: `account_add` with name, type ("bank"/"cash"/"investment"), currency, balance
+2. If none: `account_add` with name, type ("bank"/"cash"/"ewallet"/"crypto_wallet"/"brokerage"/"other"), currency, balance
 3. `settings_get` — confirm default currency
 
 ## Accounts
 | Action | Params |
 |--------|--------|
 | `account_list` | — |
-| `account_add` | name, type ("bank"/"cash"/"credit"/"investment"/"crypto"), currency, balance |
+| `account_add` | name, type ("bank"/"cash"/"ewallet"/"crypto_wallet"/"brokerage"/"other"), currency, balance |
 | `account_update` | id, name/balance/status |
 
 ## Transactions

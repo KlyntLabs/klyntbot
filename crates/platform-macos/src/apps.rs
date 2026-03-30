@@ -130,15 +130,25 @@ impl AppIconCache {
         Some(mtime.duration_since(std::time::UNIX_EPOCH).ok()?.as_secs())
     }
 
-    /// Extract an app's icon as a base64 data URI using `sips`.
+    /// Extract an app's icon as a base64 data URI.
     ///
-    /// Reads `Contents/Info.plist` for `CFBundleIconFile`, locates the `.icns`,
-    /// and converts to a 32px PNG via `sips`.
+    /// Tries `sips` (fast, works for apps with `.icns` files) first, then
+    /// falls back to `NSWorkspace.iconForFile:` (handles asset catalogs).
     ///
-    /// **Blocking:** Uses `std::process::Command` for PlistBuddy and sips.
-    /// Callers in async contexts must use `tokio::task::spawn_blocking`.
+    /// **Blocking:** Callers in async contexts must use `spawn_blocking`.
     #[cfg(target_os = "macos")]
     fn extract_icon(app_path: &Path, tmp_dir: &Path) -> Option<String> {
+        // Fast path: try sips-based extraction (works for .icns apps)
+        if let Some(icon) = Self::extract_icon_sips(app_path, tmp_dir) {
+            return Some(icon);
+        }
+        // Fallback: NSWorkspace handles all icon types (asset catalogs, etc.)
+        icon_for_path(app_path)
+    }
+
+    /// Extract icon via PlistBuddy + sips (traditional .icns approach).
+    #[cfg(target_os = "macos")]
+    fn extract_icon_sips(app_path: &Path, tmp_dir: &Path) -> Option<String> {
         use std::process::Command;
 
         let plist_path = app_path.join("Contents/Info.plist");
@@ -193,4 +203,103 @@ impl AppIconCache {
         let b64 = base64::engine::general_purpose::STANDARD.encode(&png_bytes);
         Some(format!("data:image/png;base64,{b64}"))
     }
+}
+
+/// Get icon for any file or application path using NSWorkspace.
+///
+/// Uses `NSWorkspace.iconForFile:` which handles all icon types: `.icns`,
+/// asset catalogs, file type associations, etc. Returns a base64 PNG data URI.
+///
+/// **Blocking:** Makes AppKit calls — use inside `spawn_blocking`.
+#[cfg(target_os = "macos")]
+pub fn icon_for_path(path: &Path) -> Option<String> {
+    use objc2::msg_send_id;
+    use objc2::rc::Retained;
+    use objc2::runtime::AnyObject;
+    use objc2_app_kit::NSWorkspace;
+    use objc2_foundation::NSString;
+
+    let path_str = path.to_str()?;
+    let ns_path = NSString::from_str(path_str);
+    let workspace = NSWorkspace::sharedWorkspace();
+
+    // iconForFile: always returns an NSImage (never nil)
+    let image: Retained<AnyObject> =
+        unsafe { msg_send_id![&workspace, iconForFile: &*ns_path] };
+
+    nsimage_to_png_data_uri(&image)
+}
+
+/// Get system icon for a file type/extension using NSWorkspace.
+///
+/// Pass a bare extension like `"rs"`, `"py"`, `"txt"`.
+///
+/// **Blocking:** Makes AppKit calls — use inside `spawn_blocking`.
+#[cfg(target_os = "macos")]
+pub fn icon_for_file_type(extension: &str) -> Option<String> {
+    use objc2::msg_send_id;
+    use objc2::rc::Retained;
+    use objc2::runtime::AnyObject;
+    use objc2_app_kit::NSWorkspace;
+    use objc2_foundation::NSString;
+
+    let ns_ext = NSString::from_str(extension);
+    let workspace = NSWorkspace::sharedWorkspace();
+
+    let image: Retained<AnyObject> =
+        unsafe { msg_send_id![&workspace, iconForFileType: &*ns_ext] };
+
+    nsimage_to_png_data_uri(&image)
+}
+
+#[cfg(not(target_os = "macos"))]
+pub fn icon_for_path(_path: &Path) -> Option<String> {
+    None
+}
+
+#[cfg(not(target_os = "macos"))]
+pub fn icon_for_file_type(_extension: &str) -> Option<String> {
+    None
+}
+
+/// Convert an NSImage (passed as AnyObject) to a base64 PNG data URI.
+///
+/// Uses TIFFRepresentation → NSBitmapImageRep → PNG conversion.
+#[cfg(target_os = "macos")]
+fn nsimage_to_png_data_uri(image: &objc2::runtime::AnyObject) -> Option<String> {
+    use objc2::rc::{Allocated, Retained};
+    use objc2::runtime::{AnyClass, AnyObject};
+    use objc2::{msg_send, msg_send_id};
+
+    // Get TIFF representation (includes all image reps)
+    let tiff: Option<Retained<AnyObject>> =
+        unsafe { msg_send_id![image, TIFFRepresentation] };
+    let tiff = tiff?;
+
+    // Create NSBitmapImageRep from TIFF data
+    let cls = AnyClass::get(c"NSBitmapImageRep")?;
+    let alloc: Allocated<AnyObject> = unsafe { msg_send_id![cls, alloc] };
+    let rep: Option<Retained<AnyObject>> =
+        unsafe { msg_send_id![alloc, initWithData: &*tiff] };
+    let rep = rep?;
+
+    // Convert to PNG — NSBitmapImageFileType::PNG = 4
+    let dict_cls = AnyClass::get(c"NSDictionary")?;
+    let empty: Retained<AnyObject> = unsafe { msg_send_id![dict_cls, new] };
+    let png: Option<Retained<AnyObject>> = unsafe {
+        msg_send_id![&rep, representationUsingType: 4usize, properties: &*empty]
+    };
+    let png = png?;
+
+    // Extract bytes
+    let len: usize = unsafe { msg_send![&png, length] };
+    let ptr: *const u8 = unsafe { msg_send![&png, bytes] };
+    if ptr.is_null() || len == 0 {
+        return None;
+    }
+    let bytes = unsafe { std::slice::from_raw_parts(ptr, len) };
+
+    use base64::Engine;
+    let b64 = base64::engine::general_purpose::STANDARD.encode(bytes);
+    Some(format!("data:image/png;base64,{b64}"))
 }
