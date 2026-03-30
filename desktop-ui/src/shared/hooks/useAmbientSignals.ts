@@ -81,7 +81,7 @@ export function useAmbientSignals(): AmbientSignalState {
     }
   });
 
-  useEvent<FocusStatePayload>("focus:state", (payload) => {
+  useEvent<FocusStatePayload>("focus:state_changed", (payload) => {
     setIsFocusDeferred(payload.active);
   });
 

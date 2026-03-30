@@ -235,6 +235,23 @@ pub async fn task_list_time_entries(
     state.task_list_time_entries(task_id).await
 }
 
+/// Fire-and-forget cross-domain check. Called by frontend when a detail view mounts.
+#[tauri::command]
+pub async fn cross_domain_check(
+    state: State<'_, Arc<AppCore>>,
+    domain: String,
+    id: String,
+    title: String,
+    created_at: Option<String>,
+) -> Result<(), ApiError> {
+    let core = Arc::clone(&*state);
+    tokio::spawn(async move {
+        core.check_cross_domain_str(&domain, &id, &title, created_at.as_deref())
+            .await;
+    });
+    Ok(())
+}
+
 // ── Dev server dispatch ─────────────────────────────────────────────
 
 #[cfg(test)]
@@ -262,6 +279,7 @@ pub(crate) const DEV_COMMANDS: &[&str] = &[
     "task_list_attachments",
     "task_add_time_entry",
     "task_list_time_entries",
+    "cross_domain_check",
 ];
 
 #[cfg(debug_assertions)]
@@ -380,6 +398,14 @@ pub(crate) async fn dispatch_dev(
         "task_list_time_entries" => {
             let task_id = try_field!(dev::get_str(body, "taskId"));
             dev::val(core.task_list_time_entries(task_id).await)
+        }
+        "cross_domain_check" => {
+            let domain = try_field!(dev::get_str(body, "domain"));
+            let id = try_field!(dev::get_str(body, "id"));
+            let title = try_field!(dev::get_str(body, "title"));
+            let created_at: Option<String> = dev::get(body, "createdAt");
+            core.check_cross_domain_str(&domain, &id, &title, created_at.as_deref()).await;
+            dev::val(Ok::<(), ApiError>(()))
         }
         _ => return None,
     })

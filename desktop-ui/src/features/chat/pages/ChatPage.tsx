@@ -7,7 +7,6 @@ import type { ChatThread, ContextResumeData } from "@shared/types";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate, useSearchParams } from "react-router";
 import { ChatInput } from "../components/ChatInput";
-import { CoachingNudge } from "../components/CoachingNudge";
 import { MessageList } from "../components/MessageList";
 import { ThreadContextMenu } from "../components/ThreadContextMenu";
 import { type AreaGroup, featurePrefix, ThreadList } from "../components/ThreadList";
@@ -363,8 +362,6 @@ export function ChatPage() {
             )}
           </div>
         </div>
-
-        <CoachingNudge isStreaming={chat.isStreaming} />
 
         {promotionImpact && (
           <div className="px-6 pb-2">

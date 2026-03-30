@@ -65,7 +65,7 @@ impl Default for BrainVoiceConfig {
         Self {
             max_pulses_per_hour: 2,
             merge_window: Duration::from_secs(30),
-            hold_duration: Duration::from_secs(5),
+            hold_duration: Duration::from_secs(1),
             dampened_max_pulses: 1,
             dampened_merge_window: Duration::from_secs(60),
             dampening_threshold: 2,

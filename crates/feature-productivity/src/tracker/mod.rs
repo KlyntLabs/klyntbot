@@ -290,12 +290,24 @@ impl ActivityTracker {
     }
 }
 
+/// macOS system processes that should never be tracked as user activity.
+const SYSTEM_EXCLUDED_APPS: &[&str] = &[
+    "loginwindow",
+    "ScreenSaverEngine",
+    "SecurityAgent",
+    "ScreenFloatingAgent",
+    "universalAccessAuthWarn",
+];
+
 fn is_excluded(info: &macos::WindowInfo, privacy: &PrivacyConfig) -> bool {
-    privacy.excluded_apps.iter().any(|e| {
-        info.app_name.eq_ignore_ascii_case(e)
-            || info
-                .bundle_id
-                .as_deref()
-                .is_some_and(|b| b.eq_ignore_ascii_case(e))
-    })
+    SYSTEM_EXCLUDED_APPS
+        .iter()
+        .any(|s| info.app_name.eq_ignore_ascii_case(s))
+        || privacy.excluded_apps.iter().any(|e| {
+            info.app_name.eq_ignore_ascii_case(e)
+                || info
+                    .bundle_id
+                    .as_deref()
+                    .is_some_and(|b| b.eq_ignore_ascii_case(e))
+        })
 }

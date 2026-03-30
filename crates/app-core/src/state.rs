@@ -336,6 +336,43 @@ impl AppCore {
             .ok_or_else(|| ApiError::new("INTERNAL", "ForecastHandler not initialized"))
     }
 
+    /// Cross-domain check from string domain name (used by Tauri commands).
+    pub async fn check_cross_domain_str(
+        &self,
+        domain: &str,
+        id: &str,
+        title: &str,
+        created_at_str: Option<&str>,
+    ) {
+        use feature_insights::cross_domain::EntityDomain;
+        let entity_domain = match domain {
+            "task" => EntityDomain::Task,
+            "note" => EntityDomain::Note,
+            "finance" => EntityDomain::Finance,
+            _ => return,
+        };
+        self.check_cross_domain(entity_domain, id, title, created_at_str)
+            .await;
+    }
+
+    /// Fire-and-forget cross-domain check when viewing any entity detail.
+    pub async fn check_cross_domain(
+        &self,
+        domain: feature_insights::cross_domain::EntityDomain,
+        id: &str,
+        title: &str,
+        created_at_str: Option<&str>,
+    ) {
+        if let Some(ref svc) = self.insight_service {
+            let created_at = created_at_str
+                .and_then(|s| chrono::DateTime::parse_from_rfc3339(s).ok())
+                .map(|dt| dt.with_timezone(&chrono::Utc))
+                .unwrap_or_else(chrono::Utc::now);
+            svc.check_cross_domain(domain, id.to_string(), title.to_string(), created_at)
+                .await;
+        }
+    }
+
     /// Graceful shutdown.
     pub async fn shutdown(&self) {
         info!("shutting down app core");

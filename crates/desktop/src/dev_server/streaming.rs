@@ -155,6 +155,39 @@ pub(super) async fn insight_sse_handler(
     Sse::new(stream).keep_alive(KeepAlive::default())
 }
 
+/// SSE endpoint — streams global app events (brain:ambient, provider:degraded, etc.).
+///
+/// The frontend (`BrainEventBridge.tsx`) connects here in browser dev mode
+/// via `new EventSource("/api/brain/events")`. Each SSE frame uses a named event
+/// type so the bridge can dispatch matching `CustomEvent`s on `window`, which
+/// the existing `useEvent` hook picks up transparently.
+pub(super) async fn global_sse_handler(
+    State(state): State<DevState>,
+) -> Sse<impl Stream<Item = Result<Event, Infallible>>> {
+    let rx = state.global_event_tx.subscribe();
+
+    let stream = futures_util::stream::unfold(rx, |mut rx| async move {
+        loop {
+            match rx.recv().await {
+                Ok((event_name, payload)) => {
+                    let data = serde_json::to_string(&payload).unwrap_or_default();
+                    let event = Event::default().event(&event_name).data(data);
+                    return Some((Ok(event), rx));
+                }
+                Err(broadcast::error::RecvError::Lagged(n)) => {
+                    tracing::warn!("global SSE stream lagged by {n} events");
+                    continue;
+                }
+                Err(broadcast::error::RecvError::Closed) => {
+                    return None;
+                }
+            }
+        }
+    });
+
+    Sse::new(stream).keep_alive(KeepAlive::default())
+}
+
 /// State for the cognitive SSE stream unfold.
 ///
 /// We carry a `pending` queue so that when a single domain event produces both

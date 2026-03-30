@@ -61,7 +61,7 @@ INSERT OR IGNORE INTO activity_categories (id, name, category_type, rules, is_sy
      '{"appNames":[],"bundleIds":[],"urlPatterns":["console.aws.amazon.com","portal.azure.com","console.cloud.google.com","vercel.com","netlify.com","railway.app","fly.io","render.com","heroku.com","digitalocean.com","cloudflare.com","supabase.com","planetscale.com","neon.tech","upstash.com","docker.com","grafana.com","datadog.com","sentry.io"]}',
      TRUE),
     ('project_management', 'Project Management', 'productive',
-     '{"appNames":["Linear","Jira","Asana","Trello","ClickUp","Monday","Height","Basecamp"],"bundleIds":["com.linear"],"urlPatterns":["linear.app","jira.atlassian.com","asana.com","trello.com","clickup.com","monday.com","basecamp.com","shortcut.com","height.app","plane.so"]}',
+     '{"appNames":["Klynt","Linear","Jira","Asana","Trello","ClickUp","Monday","Height","Basecamp"],"bundleIds":["com.klynt.app","com.linear"],"urlPatterns":["linear.app","jira.atlassian.com","asana.com","trello.com","clickup.com","monday.com","basecamp.com","shortcut.com","height.app","plane.so"]}',
      TRUE),
     ('shopping', 'Shopping', 'distracting',
      '{"appNames":[],"bundleIds":[],"urlPatterns":["amazon.com","ebay.com","etsy.com","aliexpress.com","wish.com","walmart.com","target.com","bestbuy.com","newegg.com","shopee.com","lazada.com","taobao.com","jd.com"]}',

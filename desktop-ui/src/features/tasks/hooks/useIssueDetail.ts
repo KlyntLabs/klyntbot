@@ -1,3 +1,4 @@
+import { useCrossDomainCheck } from "@shared/hooks/useCrossDomainCheck";
 import { ipc } from "@shared/hooks/useIpc";
 import { useMutation } from "@shared/hooks/useMutation";
 import { useQuery } from "@shared/hooks/useQuery";
@@ -83,6 +84,8 @@ export function useIssueDetail(
   );
 
   const taskState: TaskState = deriveTaskState(task);
+
+  useCrossDomainCheck("task", rawTask?.id, rawTask?.title, rawTask?.createdAt);
 
   // Sub-issues
   const { data: rawChildren } = useQuery<Task[]>("task_list_children", { parentId: issueId }, []);

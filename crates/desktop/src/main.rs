@@ -166,17 +166,17 @@ fn run_desktop_app() {
         .plugin(tauri_plugin_process::init())
         .setup(|app| {
             let handle = app.handle().clone();
-            let core = Arc::new(
+            let (core_inner, global_event_tx) =
                 tauri::async_runtime::block_on(app_core::init(handle))
-                    .expect("failed to initialize app core"),
-            );
+                    .expect("failed to initialize app core");
+            let core = Arc::new(core_inner);
 
             // Start dev HTTP server (debug builds only) so localhost:1420 works in Chrome
             #[cfg(debug_assertions)]
             {
                 let dev_core = Arc::clone(&core);
                 tauri::async_runtime::spawn(async move {
-                    dev_server::start(dev_core).await;
+                    dev_server::start(dev_core, global_event_tx).await;
                 });
             }
 
@@ -674,6 +674,7 @@ fn run_desktop_app() {
             // Tasks
             commands::tasks::today_tasks,
             commands::tasks::task_get,
+            commands::tasks::cross_domain_check,
             commands::tasks::task_list,
             commands::tasks::task_create,
             commands::tasks::task_update,

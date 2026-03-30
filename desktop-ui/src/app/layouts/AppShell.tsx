@@ -1,9 +1,13 @@
+import { BrainEventBridge } from "@app/BrainEventBridge";
 import { BrainOrb } from "@shared/components/BrainOrb";
 import { SidebarChat } from "@shared/components/chat/SidebarChat";
+import { KlyntLogo } from "@shared/components/ui/KlyntLogo";
 import { useActiveView } from "@shared/hooks/useActiveView";
 import { useEvent } from "@shared/hooks/useEvent";
 import { ipc } from "@shared/hooks/useIpc";
+import { useUpdateChecker } from "@shared/hooks/useUpdateChecker";
 import type { AppInfoResponse, SidebarItem } from "@shared/types";
+import { ArrowDownCircle } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Navigate, Outlet, useLocation, useNavigate } from "react-router";
 import { Sidebar } from "./Sidebar";
@@ -14,6 +18,7 @@ export function AppShell() {
   const [isChatOpen, setIsChatOpen] = useState(false);
   const [openSessionKey, setOpenSessionKey] = useState<string | null>(null);
   const [setupState, setSetupState] = useState<"loading" | "needed" | "ready">("loading");
+  const { updateAvailable, version, triggerInstall } = useUpdateChecker();
 
   const isOnChatPage = location.pathname.startsWith("/chat");
 
@@ -99,31 +104,58 @@ export function AppShell() {
   if (setupState === "needed") return <Navigate to="/setup/welcome" replace />;
 
   return (
-    <div className="h-screen w-screen bg-background text-foreground flex gap-2 p-2 overflow-hidden">
-      <Sidebar
-        active={activeSidebarItem}
-        isChatOpen={isChatOpen}
-        onToggleChat={isOnChatPage ? undefined : toggleChat}
-      />
-      <div className="flex-1 flex flex-col overflow-hidden">
-        {/* Global top bar */}
-        <div className="flex items-center justify-end px-3 py-1.5 shrink-0">
-          <BrainOrb />
+    <div className="h-screen w-screen bg-background text-foreground flex flex-col overflow-hidden">
+      {/* Bridge global events (brain:ambient, etc.) from dev server SSE → window CustomEvents */}
+      <BrainEventBridge />
+      {/* ── Custom titlebar (drag region) ────────────────────────────── */}
+      <div className="relative flex items-center shrink-0 h-[36px] px-3" data-tauri-drag-region>
+        {/* macOS traffic light spacer — pointer-events-none so clicks fall through to drag region */}
+        <div className="w-[68px] shrink-0 pointer-events-none" />
+        {/* Center branding */}
+        <div className="absolute inset-0 flex items-center justify-center pointer-events-none select-none">
+          <KlyntLogo className="w-3.5 h-3.5 text-muted-foreground" />
+          <span className="ml-1.5 text-xs font-medium text-muted-foreground tracking-wide">
+            Klynt
+          </span>
         </div>
-        {/* Route content */}
-        <div className="flex-1 overflow-hidden">
-          <Outlet />
+        {/* Right controls — container is pointer-events-none, only buttons are interactive */}
+        <div className="ml-auto flex items-center gap-2 shrink-0 pointer-events-none">
+          {updateAvailable && (
+            <button
+              type="button"
+              onClick={triggerInstall}
+              className="pointer-events-auto flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium
+                bg-brand/15 text-brand hover:bg-brand/25 transition-colors"
+            >
+              <ArrowDownCircle className="w-3 h-3" />
+              <span>v{version}</span>
+            </button>
+          )}
+          <div className="pointer-events-auto">
+            <BrainOrb />
+          </div>
         </div>
       </div>
-      {!isOnChatPage && (
-        <SidebarChat
-          isOpen={isChatOpen}
-          onClose={closeChat}
-          viewContext={viewContext}
-          openSessionKey={openSessionKey}
-          onSessionKeyUsed={clearSessionKey}
+      {/* ── Main content ────────────────────────────────────────────────── */}
+      <div className="flex gap-2 px-2 pb-2 flex-1 overflow-hidden">
+        <Sidebar
+          active={activeSidebarItem}
+          isChatOpen={isChatOpen}
+          onToggleChat={isOnChatPage ? undefined : toggleChat}
         />
-      )}
+        <div className="flex-1 flex overflow-hidden">
+          <Outlet />
+        </div>
+        {!isOnChatPage && (
+          <SidebarChat
+            isOpen={isChatOpen}
+            onClose={closeChat}
+            viewContext={viewContext}
+            openSessionKey={openSessionKey}
+            onSessionKeyUsed={clearSessionKey}
+          />
+        )}
+      </div>
     </div>
   );
 }

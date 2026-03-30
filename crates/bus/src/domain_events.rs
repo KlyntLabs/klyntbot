@@ -167,6 +167,27 @@ pub enum DomainEvent {
         to: String,
         actor: Option<String>,
     },
+
+    /// Emitted when a task's due date is set or changed. Used by DeadlineScheduler.
+    TaskDueDateChanged {
+        task_id: String,
+        /// None means the due date was cleared.
+        due_date: Option<String>,
+    },
+
+    /// Emitted when a task is focused/unfocused with a deadline. Used by DeadlineScheduler.
+    TaskFocusChanged {
+        task_id: String,
+        /// None means unfocused.
+        focus_deadline: Option<String>,
+    },
+
+    /// Emitted when a recurring template's next_instance_date changes.
+    RecurringTemplateAdvanced {
+        template_id: String,
+        next_instance_date: Option<String>,
+    },
+
     DayPlanGenerated {
         task_count: u32,
         total_estimated_mins: u32,
@@ -574,6 +595,9 @@ impl DomainEvent {
             | Self::TaskStatusChanged { .. }
             | Self::TaskPriorityChanged { .. }
             | Self::TaskFieldUpdated { .. }
+            | Self::TaskDueDateChanged { .. }
+            | Self::TaskFocusChanged { .. }
+            | Self::RecurringTemplateAdvanced { .. }
             | Self::TaskHierarchyChanged { .. }
             | Self::TreeNodesRebuilt { .. } => "work",
 

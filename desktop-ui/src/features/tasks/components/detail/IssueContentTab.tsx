@@ -14,6 +14,7 @@ export function IssueContentTab({ detail }: IssueContentTabProps) {
   return (
     <div className="space-y-6">
       <DescriptionEditor
+        key={detail.task.id}
         content={detail.task.description}
         onUpdate={(html) => detail.updateTask("description", html)}
       />

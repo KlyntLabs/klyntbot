@@ -33,6 +33,11 @@ pub(super) struct DevState {
     pub(super) core: Arc<AppCore>,
     pub(super) sse_channels: SseChannels,
     pub(super) insight_tx: broadcast::Sender<(String, Value)>,
+    /// Global event broadcast — carries all `AppEventEmitter::emit_event` calls
+    /// (brain:ambient, provider:degraded, entity:updated, focus:state, etc.).
+    /// The `/api/brain/events` SSE endpoint subscribes to this so browser dev mode
+    /// receives the same events that Tauri webviews get natively.
+    pub(super) global_event_tx: broadcast::Sender<(String, Value)>,
 }
 
 /// Bridges `AppEventEmitter` to a tokio broadcast channel for SSE streaming.
@@ -47,7 +52,15 @@ impl AppEventEmitter for SseEmitter {
 }
 
 /// Start the dev HTTP server on port 3456.
-pub async fn start(core: Arc<AppCore>) {
+///
+/// `global_event_tx` carries a copy of every `AppEventEmitter::emit_event` call
+/// from the `CompoundEmitter` wired during `AppCore::init`. The dev server
+/// subscribes to it at `/api/brain/events` so browser dev mode receives the same
+/// events (brain:ambient, provider:degraded, etc.) that Tauri webviews get natively.
+pub async fn start(
+    core: Arc<AppCore>,
+    global_event_tx: broadcast::Sender<(String, Value)>,
+) {
     let sse_channels: SseChannels = Arc::new(DashMap::new());
     let (insight_tx, _) = broadcast::channel(256);
 
@@ -55,6 +68,7 @@ pub async fn start(core: Arc<AppCore>) {
         core,
         sse_channels,
         insight_tx,
+        global_event_tx,
     };
 
     let app = Router::new()
@@ -69,6 +83,10 @@ pub async fn start(core: Arc<AppCore>) {
         .route(
             "/api/insight/events",
             axum::routing::get(streaming::insight_sse_handler),
+        )
+        .route(
+            "/api/brain/events",
+            axum::routing::get(streaming::global_sse_handler),
         )
         .route("/api/v1/ingest", post(ingest::ingest_handler))
         .route("/api/v1/ingest/batch", post(ingest::ingest_batch_handler))

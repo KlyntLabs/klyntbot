@@ -33,8 +33,11 @@ fn table_for_domain(domain: &EntityDomain) -> Option<&'static str> {
 const SEARCHABLE_DOMAINS: &[EntityDomain] =
     &[EntityDomain::Task, EntityDomain::Note, EntityDomain::Finance];
 
-/// LanceDB similarity threshold for cross-domain search.
-const SEARCH_THRESHOLD: f64 = 0.72;
+/// LanceDB retrieval threshold — intentionally lower than the heuristic's
+/// `min_cosine` (0.72) so we don't discard items that have moderate semantic
+/// overlap but strong temporal/frequency signals. The heuristic does the
+/// precision filtering with its ≥2-layer requirement.
+const SEARCH_THRESHOLD: f64 = 0.65;
 
 /// Maximum hits per target domain table.
 const SEARCH_LIMIT: usize = 3;

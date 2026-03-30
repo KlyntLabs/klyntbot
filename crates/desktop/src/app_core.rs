@@ -5,13 +5,14 @@ pub use ::app_core::AppCore;
 
 use std::sync::Arc;
 
-use ::app_core::events::AppEventEmitter;
+use ::app_core::events::{AppEventEmitter, CompoundEmitter};
 use ::app_core::EventChannels;
 use desktop_shared::events;
 use feature_productivity::auto_focus::AutoFocusEvent;
 use feature_productivity::dashboard_emitter::{DashboardEmitter, DashboardEvent};
+use serde_json::Value;
 use tauri::{Emitter, Manager};
-use tokio::sync::mpsc;
+use tokio::sync::{broadcast, mpsc};
 use tokio_util::sync::CancellationToken;
 use tracing::{debug, info, warn};
 
@@ -29,18 +30,32 @@ impl AppEventEmitter for TauriEventEmitter {
 }
 
 /// Initialize `AppCore` and wire event channels to Tauri emitters.
-pub async fn init(app_handle: tauri::AppHandle) -> Result<AppCore, String> {
+///
+/// Returns `(AppCore, broadcast::Sender)` — the broadcast sender carries a copy
+/// of every `emit_event` call so the dev HTTP server can relay them via SSE to
+/// browsers at localhost:1420 (brain:ambient, provider:degraded, focus:state, etc.).
+pub async fn init(
+    app_handle: tauri::AppHandle,
+) -> Result<(AppCore, broadcast::Sender<(String, Value)>), String> {
     let sender = Arc::new(crate::notify::TauriNotificationSender::new(
         app_handle.clone(),
     ));
-    let emitter: Arc<dyn AppEventEmitter> = Arc::new(TauriEventEmitter {
+
+    // Create a global broadcast channel that mirrors all emit_event calls.
+    // The dev server subscribes to this for its /api/brain/events SSE endpoint.
+    let (global_event_tx, _) = broadcast::channel::<(String, Value)>(256);
+
+    let tauri_emitter = TauriEventEmitter {
         app_handle: app_handle.clone(),
-    });
+    };
+    let emitter: Arc<dyn AppEventEmitter> =
+        Arc::new(CompoundEmitter::new(tauri_emitter, global_event_tx.clone()));
+
     let (core, channels) =
         AppCore::init_with_sender(common::AppMode::Desktop, None, Some(sender), Some(emitter))
             .await?;
     wire_event_channels(&core, channels, &app_handle);
-    Ok(core)
+    Ok((core, global_event_tx))
 }
 
 /// Wire all `EventChannels` receivers to Tauri event emitters.
