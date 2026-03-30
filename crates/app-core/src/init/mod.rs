@@ -313,6 +313,25 @@ impl AppCore {
             (Some(Arc::new(facade)), Some(handles), Some(shutdown))
         };
 
+        // ── Phase 10: BrainVoice signal router ─────────────────────────────
+        let brain_voice = {
+            let feedback_repo =
+                storage::repos::BrainSignalFeedbackRepo::new(storage_pool.inner().clone());
+            let emitter_for_brain: Arc<dyn crate::events::AppEventEmitter> =
+                event_emitter
+                    .clone()
+                    .unwrap_or_else(|| Arc::new(NoopEmitter));
+            let rx = domain_event_bus.subscribe();
+            let bv = crate::brain_voice::BrainVoice::start(
+                rx,
+                feedback_repo,
+                emitter_for_brain,
+                crate::brain_voice::BrainVoiceConfig::default(),
+            );
+            info!("BrainVoice signal router started");
+            Some(bv)
+        };
+
         // ── Auto-create note on trial kill (fire-and-forget) ─────────────
         {
             let note_repo = note_repo.clone();
@@ -456,6 +475,7 @@ impl AppCore {
             _wake_orchestrator_handle: None,
             voice_service: None,
             voice_conversation_manager: None,
+            brain_voice,
         };
 
         // ── Voice service initialization ────────────────────────────────
@@ -531,12 +551,11 @@ impl AppCore {
                     Some(Arc::new(retriever) as Arc<dyn context_engine::MemoryRetriever>)
                 };
 
-                let echo_provider: Arc<dyn voice_engine::MemoryEchoProvider> = Arc::new(
-                    crate::handlers::voice_echo::AppMemoryEchoProvider::new(
+                let echo_provider: Arc<dyn voice_engine::MemoryEchoProvider> =
+                    Arc::new(crate::handlers::voice_echo::AppMemoryEchoProvider::new(
                         mirror_facade_for_voice,
                         voice_memory_retriever,
-                    ),
-                );
+                    ));
 
                 let service = VoiceService::new(
                     stt_local,

@@ -143,6 +143,8 @@ pub struct AppCore {
     /// Voice conversation manager (None when voice feature is disabled).
     pub voice_conversation_manager:
         Option<Arc<crate::handlers::voice_conversation::VoiceConversationManager>>,
+    /// BrainVoice signal router (None when domain event bus is unavailable).
+    pub brain_voice: Option<crate::brain_voice::BrainVoice>,
 }
 
 impl AppCore {
@@ -350,6 +352,10 @@ impl AppCore {
         // Stop coaching service.
         if let Some(ref coaching) = self.coaching_service {
             coaching.lock().await.stop().await;
+        }
+        // Stop BrainVoice signal router.
+        if let Some(ref bv) = self.brain_voice {
+            bv.shutdown();
         }
         if let Err(e) = self.agent.shutdown().await {
             error!("agent shutdown error: {}", e);
