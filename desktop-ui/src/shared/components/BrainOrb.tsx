@@ -1,5 +1,6 @@
 import { FocusDebrief } from "@features/productivity/components/FocusDebrief";
 import { useAmbientSignals } from "@shared/hooks/useAmbientSignals";
+import { useJourney } from "@shared/hooks/useJourney";
 import { Shield } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router";
@@ -13,6 +14,7 @@ import { useNavigate } from "react-router";
 export function BrainOrb() {
   const { current, badgeCount, isPulsing, isFocusDeferred, badgeSignals, acknowledge, clearBadge } =
     useAmbientSignals();
+  const { isComplete, markComplete } = useJourney();
   const navigate = useNavigate();
 
   const [tooltipVisible, setTooltipVisible] = useState(false);
@@ -154,7 +156,7 @@ export function BrainOrb() {
         </span>
       )}
 
-      {/* ── Pulse tooltip / Focus debrief ── */}
+      {/* ── Pulse tooltip / Focus debrief / Guided onboarding ── */}
       {tooltipVisible && current?.mode === "deferred" ? (
         <div className="absolute top-full right-0 mt-2 z-50">
           <FocusDebrief
@@ -165,6 +167,43 @@ export function BrainOrb() {
               acknowledge();
             }}
           />
+        </div>
+      ) : tooltipVisible && isPulsing && current && !isComplete("orb_awakening") ? (
+        // biome-ignore lint/a11y/noStaticElementInteractions: guided tooltip needs hover to stay open
+        <div
+          className="absolute top-full left-1/2 -translate-x-1/2 mt-2 z-50
+            glass-panel rounded-xl w-80 p-4 space-y-3 shadow-xl
+            animate-[fade-in_0.2s_ease-out]"
+          onMouseEnter={handleMouseEnter}
+          onMouseLeave={handleMouseLeave}
+        >
+          <p className="text-sm text-foreground">
+            Hey — I'm your second brain's heartbeat. I only light up when I've connected something
+            worth your attention.
+          </p>
+          <p className="text-xs text-muted-foreground">{current.tooltip}</p>
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={() => {
+                markComplete("orb_awakening");
+                if (current.detailRoute) navigate(current.detailRoute);
+              }}
+              className="text-xs px-3 py-1.5 rounded-md bg-amber-500 text-white hover:bg-amber-400"
+            >
+              Show me →
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                markComplete("orb_awakening");
+                setTooltipVisible(false);
+              }}
+              className="text-xs px-3 py-1.5 rounded-md bg-accent text-foreground hover:bg-accent/80"
+            >
+              Got it — keep whispering
+            </button>
+          </div>
         </div>
       ) : tooltipVisible && isPulsing && current?.tooltip ? (
         // biome-ignore lint/a11y/noStaticElementInteractions: tooltip needs hover to stay open

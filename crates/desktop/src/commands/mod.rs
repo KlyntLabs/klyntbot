@@ -14,6 +14,7 @@ pub mod fabric;
 pub mod finance;
 pub mod groups;
 pub mod integrations;
+pub mod journey;
 pub mod key_results;
 pub mod knowledge_health;
 pub mod language;

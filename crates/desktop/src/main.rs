@@ -1090,6 +1090,9 @@ fn run_desktop_app() {
             commands::mirror::revert_brain_version,
             commands::mirror::kill_trial,
             commands::mirror::continue_trial,
+            // Journey
+            commands::journey::journey_milestones,
+            commands::journey::journey_mark_complete,
             // Active View
             commands::view::view_set_active,
             commands::view::view_clear_active,

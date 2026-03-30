@@ -1,0 +1,73 @@
+use std::sync::Arc;
+
+use app_core::journey::Milestone;
+use desktop_shared::errors::ApiError;
+use tauri::State;
+
+use crate::app_core::AppCore;
+
+#[tauri::command]
+pub async fn journey_milestones(
+    state: State<'_, Arc<AppCore>>,
+) -> Result<Vec<String>, ApiError> {
+    let tracker = state
+        .journey_tracker
+        .as_ref()
+        .ok_or_else(|| ApiError::new("NOT_AVAILABLE", "Journey tracker not available"))?;
+    Ok(tracker.completed_names().await)
+}
+
+#[tauri::command]
+pub async fn journey_mark_complete(
+    state: State<'_, Arc<AppCore>>,
+    milestone: String,
+) -> Result<(), ApiError> {
+    let tracker = state
+        .journey_tracker
+        .as_ref()
+        .ok_or_else(|| ApiError::new("NOT_AVAILABLE", "Journey tracker not available"))?;
+    let m = Milestone::from_name(&milestone).ok_or_else(|| {
+        ApiError::new("VALIDATION", format!("unknown milestone: {milestone}"))
+    })?;
+    tracker.mark_complete(m).await;
+    Ok(())
+}
+
+// ── Dev server dispatch ─────────────────────────────────────────────
+
+#[cfg(test)]
+pub(crate) const DEV_COMMANDS: &[&str] = &["journey_milestones", "journey_mark_complete"];
+
+#[cfg(debug_assertions)]
+pub(crate) async fn dispatch_dev(
+    cmd: &str,
+    core: &AppCore,
+    body: &serde_json::Value,
+) -> Option<Result<serde_json::Value, ApiError>> {
+    use super::dev_helpers::{self as dev, try_field};
+    use app_core::journey::Milestone;
+
+    let tracker = match core.journey_tracker.as_ref() {
+        Some(t) => t,
+        None => {
+            return Some(Err(ApiError::new(
+                "NOT_AVAILABLE",
+                "Journey tracker not available",
+            )))
+        }
+    };
+
+    Some(match cmd {
+        "journey_milestones" => dev::val(Ok(tracker.completed_names().await)),
+        "journey_mark_complete" => {
+            let name: String = try_field!(dev::get_str(body, "milestone"));
+            let m = try_field!(Milestone::from_name(&name).ok_or_else(|| ApiError::new(
+                "VALIDATION",
+                format!("unknown milestone: {name}")
+            )));
+            tracker.mark_complete(m).await;
+            dev::val(Ok(()))
+        }
+        _ => return None,
+    })
+}

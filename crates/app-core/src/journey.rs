@@ -20,6 +20,41 @@ pub enum Milestone {
     HelloPulse = 1 << 8,
 }
 
+/// All milestone variants in declaration order.
+const ALL_MILESTONES: &[Milestone] = &[
+    Milestone::SetupComplete,
+    Milestone::FirstImport,
+    Milestone::FirstChatResponse,
+    Milestone::OrbAwakening,
+    Milestone::FirstFocusDebrief,
+    Milestone::FirstDotAccepted,
+    Milestone::QuietDay,
+    Milestone::FirstBrainReport,
+    Milestone::HelloPulse,
+];
+
+impl Milestone {
+    /// Snake_case name used for frontend serialization.
+    pub fn name(self) -> &'static str {
+        match self {
+            Self::SetupComplete => "setup_complete",
+            Self::FirstImport => "first_import",
+            Self::FirstChatResponse => "first_chat_response",
+            Self::OrbAwakening => "orb_awakening",
+            Self::FirstFocusDebrief => "first_focus_debrief",
+            Self::FirstDotAccepted => "first_dot_accepted",
+            Self::QuietDay => "quiet_day",
+            Self::FirstBrainReport => "first_brain_report",
+            Self::HelloPulse => "hello_pulse",
+        }
+    }
+
+    /// Parse from the snake_case name. Returns `None` for unknown strings.
+    pub fn from_name(s: &str) -> Option<Self> {
+        ALL_MILESTONES.iter().find(|m| m.name() == s).copied()
+    }
+}
+
 /// Tracks which onboarding milestones have been completed.
 ///
 /// State is persisted as a u32 bitfield in the `user_preferences` table.
@@ -38,6 +73,16 @@ impl JourneyTracker {
     pub async fn is_complete(&self, milestone: Milestone) -> bool {
         let bits = self.load_bits().await;
         bits & (milestone as u32) != 0
+    }
+
+    /// Returns the snake_case names of all completed milestones.
+    pub async fn completed_names(&self) -> Vec<String> {
+        let bits = self.load_bits().await;
+        ALL_MILESTONES
+            .iter()
+            .filter(|m| bits & (**m as u32) != 0)
+            .map(|m| m.name().to_string())
+            .collect()
     }
 
     /// ORs the milestone bit into the stored bitfield.
