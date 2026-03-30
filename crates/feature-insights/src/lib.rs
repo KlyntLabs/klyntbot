@@ -1,6 +1,7 @@
 //! Feature crate for versioned Insight Reviews with learning progress tracking.
 
 pub mod cross_domain;
+pub mod nightly_batch;
 pub mod merge;
 pub mod progress;
 pub mod progress_repo;

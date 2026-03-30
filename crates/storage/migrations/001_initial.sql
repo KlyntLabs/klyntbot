@@ -749,3 +749,13 @@ CREATE TABLE IF NOT EXISTS user_preferences (
     updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now'))
 );
 CREATE INDEX IF NOT EXISTS idx_brain_signal_action ON brain_signal_feedback(action, timestamp);
+
+-- Cross-domain insights generated nightly for morning briefing
+CREATE TABLE IF NOT EXISTS cross_domain_insights (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    date        TEXT NOT NULL,
+    insight_text TEXT NOT NULL,
+    dot_refs    TEXT NOT NULL,
+    surfaced    INTEGER NOT NULL DEFAULT 0,
+    created_at  TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now'))
+);
