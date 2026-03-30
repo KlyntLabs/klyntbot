@@ -477,6 +477,7 @@ impl AppCore {
             voice_service: None,
             voice_conversation_manager: None,
             brain_voice,
+            journey_tracker: Some(crate::journey::JourneyTracker::new(storage_pool.clone())),
         };
 
         // ── Voice service initialization ────────────────────────────────

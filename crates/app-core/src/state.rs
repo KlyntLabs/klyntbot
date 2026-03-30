@@ -145,6 +145,8 @@ pub struct AppCore {
         Option<Arc<crate::handlers::voice_conversation::VoiceConversationManager>>,
     /// BrainVoice signal router (None when domain event bus is unavailable).
     pub brain_voice: Option<crate::brain_voice::BrainVoice>,
+    /// Onboarding journey milestone tracker.
+    pub journey_tracker: Option<crate::journey::JourneyTracker>,
 }
 
 impl AppCore {

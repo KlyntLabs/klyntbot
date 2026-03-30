@@ -741,4 +741,11 @@ CREATE TABLE IF NOT EXISTS brain_signal_feedback (
 );
 
 CREATE INDEX IF NOT EXISTS idx_brain_signal_entity_pair ON brain_signal_feedback(entity_pair, timestamp);
+
+-- Generic key-value store for user preferences / small persisted scalars
+CREATE TABLE IF NOT EXISTS user_preferences (
+    key        TEXT PRIMARY KEY,
+    value      TEXT NOT NULL,
+    updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now'))
+);
 CREATE INDEX IF NOT EXISTS idx_brain_signal_action ON brain_signal_feedback(action, timestamp);

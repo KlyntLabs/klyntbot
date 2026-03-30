@@ -5,6 +5,7 @@ pub mod events;
 pub mod handlers;
 pub mod infrastructure;
 pub mod init;
+pub mod journey;
 pub mod state;
 pub mod wake_orchestrator;
 

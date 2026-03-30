@@ -1,0 +1,136 @@
+//! JourneyTracker — persists onboarding milestone completions as a u32 bitfield
+//! in the `user_preferences` table (key = `'journey_milestones'`).
+
+use storage::StoragePool;
+
+const PREF_KEY: &str = "journey_milestones";
+
+/// Onboarding milestones, each mapped to a single bit in a u32 bitfield.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[repr(u32)]
+pub enum Milestone {
+    SetupComplete = 1 << 0,
+    FirstImport = 1 << 1,
+    FirstChatResponse = 1 << 2,
+    OrbAwakening = 1 << 3,
+    FirstFocusDebrief = 1 << 4,
+    FirstDotAccepted = 1 << 5,
+    QuietDay = 1 << 6,
+    FirstBrainReport = 1 << 7,
+    HelloPulse = 1 << 8,
+}
+
+/// Tracks which onboarding milestones have been completed.
+///
+/// State is persisted as a u32 bitfield in the `user_preferences` table.
+/// `StoragePool` is `Clone + Send + Sync`, so no `Arc` wrapping is needed.
+#[derive(Debug, Clone)]
+pub struct JourneyTracker {
+    pool: StoragePool,
+}
+
+impl JourneyTracker {
+    pub fn new(pool: StoragePool) -> Self {
+        Self { pool }
+    }
+
+    /// Returns `true` if the given milestone bit is set.
+    pub async fn is_complete(&self, milestone: Milestone) -> bool {
+        let bits = self.load_bits().await;
+        bits & (milestone as u32) != 0
+    }
+
+    /// ORs the milestone bit into the stored bitfield.
+    pub async fn mark_complete(&self, milestone: Milestone) {
+        let bits = self.load_bits().await;
+        self.save_bits(bits | (milestone as u32)).await;
+    }
+
+    /// Counts total items across tasks + notes + finance transactions.
+    ///
+    /// Used as a guard for the `HelloPulse` milestone (requires >= 3 items).
+    pub async fn total_item_count(&self) -> i64 {
+        let db = self.pool.inner();
+        let tasks: (i64,) = sqlx::query_as("SELECT COUNT(*) FROM tasks")
+            .fetch_one(db)
+            .await
+            .unwrap_or((0,));
+        let notes: (i64,) = sqlx::query_as("SELECT COUNT(*) FROM notes")
+            .fetch_one(db)
+            .await
+            .unwrap_or((0,));
+        let finance: (i64,) = sqlx::query_as("SELECT COUNT(*) FROM finance_transactions")
+            .fetch_one(db)
+            .await
+            .unwrap_or((0,));
+        tasks.0 + notes.0 + finance.0
+    }
+
+    // ── Private helpers ──────────────────────────────────────────────────────
+
+    async fn load_bits(&self) -> u32 {
+        let row: Option<(String,)> =
+            sqlx::query_as("SELECT value FROM user_preferences WHERE key = ?1")
+                .bind(PREF_KEY)
+                .fetch_optional(self.pool.inner())
+                .await
+                .unwrap_or(None);
+
+        row.and_then(|(v,)| v.parse::<u32>().ok()).unwrap_or(0)
+    }
+
+    async fn save_bits(&self, bits: u32) {
+        let now = chrono::Utc::now().to_rfc3339();
+        let _ = sqlx::query(
+            "INSERT INTO user_preferences (key, value, updated_at) VALUES (?1, ?2, ?3)
+             ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at",
+        )
+        .bind(PREF_KEY)
+        .bind(bits.to_string())
+        .bind(&now)
+        .execute(self.pool.inner())
+        .await;
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    async fn make_tracker() -> JourneyTracker {
+        let pool = StoragePool::connect_in_memory().await.unwrap();
+        JourneyTracker::new(pool)
+    }
+
+    #[tokio::test]
+    async fn test_milestone_roundtrip() {
+        let tracker = make_tracker().await;
+
+        // Initially not complete.
+        assert!(!tracker.is_complete(Milestone::SetupComplete).await);
+
+        tracker.mark_complete(Milestone::SetupComplete).await;
+
+        // Now complete.
+        assert!(tracker.is_complete(Milestone::SetupComplete).await);
+
+        // Other milestones are still false.
+        assert!(!tracker.is_complete(Milestone::FirstImport).await);
+        assert!(!tracker.is_complete(Milestone::FirstChatResponse).await);
+        assert!(!tracker.is_complete(Milestone::OrbAwakening).await);
+    }
+
+    #[tokio::test]
+    async fn test_multiple_milestones() {
+        let tracker = make_tracker().await;
+
+        tracker.mark_complete(Milestone::FirstImport).await;
+        tracker.mark_complete(Milestone::OrbAwakening).await;
+
+        assert!(tracker.is_complete(Milestone::FirstImport).await);
+        assert!(tracker.is_complete(Milestone::OrbAwakening).await);
+
+        // Third milestone not marked — must be false.
+        assert!(!tracker.is_complete(Milestone::FirstFocusDebrief).await);
+    }
+}
