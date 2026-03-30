@@ -9,16 +9,22 @@ use crate::types::SemanticFact;
 ///
 /// Creates a new fact in the target scope with a new ID, preserving the content.
 /// The original fact is kept (not superseded) — both scopes retain the knowledge.
+///
+/// If `bus` is provided, a [`bus::DomainEvent::MemoryPromoted`] event is published
+/// after the fact is successfully upserted.
 pub async fn promote_fact(
     repo: &SemanticFactRepo,
     fact_id: &str,
     target_scope_type: &str,
     target_scope_id: Option<&str>,
+    bus: Option<&bus::DomainEventBus>,
 ) -> Result<Option<SemanticFact>, sqlx::Error> {
     let original = repo.get(fact_id).await?;
     let Some(original) = original else {
         return Ok(None);
     };
+
+    let from_scope = original.scope_type.clone();
 
     let promoted = SemanticFact {
         id: Uuid::new_v4().to_string(),
@@ -30,6 +36,16 @@ pub async fn promote_fact(
     };
 
     repo.upsert(&promoted).await?;
+
+    if let Some(bus) = bus {
+        bus.publish(bus::DomainEvent::MemoryPromoted {
+            fact_id: promoted.id.clone(),
+            summary: format!("{} {} {}", promoted.subject, promoted.predicate, promoted.object),
+            from_scope,
+            to_scope: promoted.scope_type.clone(),
+        });
+    }
+
     Ok(Some(promoted))
 }
 
@@ -122,6 +138,7 @@ mod tests {
             "persona-fact-1",
             "squad",
             Some("builtin-squad-finance"),
+            None,
         )
         .await
         .unwrap();
@@ -136,10 +153,104 @@ mod tests {
     async fn test_promote_nonexistent_fact() {
         let pool = crate::repos::cognitive_test_pool().await;
         let repo = SemanticFactRepo::new(pool);
-        let result = promote_fact(&repo, "nonexistent", "squad", None)
+        let result = promote_fact(&repo, "nonexistent", "squad", None, None)
             .await
             .unwrap();
         assert!(result.is_none());
+    }
+
+    #[tokio::test]
+    async fn test_promote_fact_emits_event() {
+        let pool = crate::repos::cognitive_test_pool().await;
+        let repo = SemanticFactRepo::new(pool);
+
+        let fact = SemanticFact {
+            id: "event-test-fact-1".into(),
+            domain: "productivity".into(),
+            subject: "deep work".into(),
+            predicate: "improves".into(),
+            object: "focus".into(),
+            confidence: 0.9,
+            source: "observation".into(),
+            valid_from: chrono::Utc::now().to_rfc3339(),
+            valid_until: None,
+            recorded_at: chrono::Utc::now().to_rfc3339(),
+            superseded_at: None,
+            superseded_by: None,
+            stability: 1.5,
+            last_accessed: None,
+            access_count: 0,
+            project_id: None,
+            memory_type: "observation".into(),
+            scope_type: "session".into(),
+            scope_id: None,
+        };
+        repo.upsert(&fact).await.unwrap();
+
+        let bus = bus::DomainEventBus::new(16);
+        let mut rx = bus.subscribe();
+
+        let promoted = promote_fact(
+            &repo,
+            "event-test-fact-1",
+            "global",
+            None,
+            Some(&bus),
+        )
+        .await
+        .unwrap();
+        assert!(promoted.is_some());
+
+        let event = rx.try_recv().expect("MemoryPromoted event should be emitted");
+        match event {
+            bus::DomainEvent::MemoryPromoted {
+                fact_id,
+                summary,
+                from_scope,
+                to_scope,
+            } => {
+                assert_eq!(fact_id, promoted.unwrap().id);
+                assert!(summary.contains("deep work"));
+                assert_eq!(from_scope, "session");
+                assert_eq!(to_scope, "global");
+            }
+            _ => panic!("Expected MemoryPromoted event, got {event:?}"),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_promote_fact_no_event_without_bus() {
+        let pool = crate::repos::cognitive_test_pool().await;
+        let repo = SemanticFactRepo::new(pool);
+
+        let fact = SemanticFact {
+            id: "no-bus-fact-1".into(),
+            domain: "finance".into(),
+            subject: "bonds".into(),
+            predicate: "risk_level".into(),
+            object: "medium".into(),
+            confidence: 0.8,
+            source: "analysis".into(),
+            valid_from: chrono::Utc::now().to_rfc3339(),
+            valid_until: None,
+            recorded_at: chrono::Utc::now().to_rfc3339(),
+            superseded_at: None,
+            superseded_by: None,
+            stability: 1.0,
+            last_accessed: None,
+            access_count: 0,
+            project_id: None,
+            memory_type: "fact".into(),
+            scope_type: "persona".into(),
+            scope_id: Some("analyst".into()),
+        };
+        repo.upsert(&fact).await.unwrap();
+
+        // Should not panic — bus is None
+        let result = promote_fact(&repo, "no-bus-fact-1", "squad", Some("sq1"), None)
+            .await
+            .unwrap();
+        assert!(result.is_some());
     }
 
     #[tokio::test]
