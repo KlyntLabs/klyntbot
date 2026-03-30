@@ -17,5 +17,6 @@ uuid = { workspace = true }
 cron.workspace = true
 tracing.workspace = true
 thiserror = "2.0"
+tokio-util.workspace = true
 
 [dev-dependencies]

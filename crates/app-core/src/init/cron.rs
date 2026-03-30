@@ -887,41 +887,6 @@ async fn ensure_cron_jobs(
 
     // ── User-editable jobs (notifications, checks, user-facing features) ──
 
-    ensure_job!(
-        JOB_FOCUS_CHECK,
-        scheduling::CronSchedule::Every {
-            every_ms: 30 * 60 * 1000
-        },
-        "Check focus task deadlines",
-        user.clone()
-    );
-    ensure_job!(
-        JOB_DAILY_DIGEST,
-        scheduling::CronSchedule::Cron {
-            expr: "0 9 * * *".to_string(),
-            tz: None
-        },
-        "Daily task summary",
-        user.clone()
-    );
-    ensure_job!(
-        JOB_OVERDUE_CHECK,
-        scheduling::CronSchedule::Every {
-            every_ms: 60 * 60 * 1000
-        },
-        "Check for overdue focus tasks",
-        user.clone()
-    );
-    ensure_job!(
-        JOB_WEEKLY_REPORT,
-        scheduling::CronSchedule::Cron {
-            expr: "0 18 * * 0".to_string(),
-            tz: None
-        },
-        "Generate weekly progress report",
-        user.clone()
-    );
-
     if config.todo.daily_planning.enabled {
         if let Some(cron_expr) = parse_time_to_cron(&config.todo.daily_planning.planning_time) {
             ensure_job!(
@@ -977,25 +942,6 @@ async fn ensure_cron_jobs(
         );
     }
 
-    ensure_job!(
-        JOB_MORNING_BRIEFING,
-        scheduling::CronSchedule::Cron {
-            expr: "0 9 * * *".to_string(),
-            tz: Some(config.timezone.clone()),
-        },
-        "Morning knowledge health briefing",
-        user.clone()
-    );
-    ensure_job!(
-        JOB_WEEKLY_KNOWLEDGE_DIGEST,
-        scheduling::CronSchedule::Cron {
-            expr: "0 18 * * 0".to_string(),
-            tz: Some(config.timezone.clone()),
-        },
-        "Weekly knowledge health digest",
-        user.clone()
-    );
-
     if tasks_config.proactive_suggestions {
         ensure_job!(
             JOB_PROACTIVE_SCAN,
@@ -1008,22 +954,6 @@ async fn ensure_cron_jobs(
         );
     }
 
-    ensure_job!(
-        JOB_REMINDER_CHECK,
-        scheduling::CronSchedule::Every {
-            every_ms: 5 * 60 * 1000
-        },
-        "Check task due dates and send reminders",
-        user.clone()
-    );
-    ensure_job!(
-        JOB_RECURRING_TASKS,
-        scheduling::CronSchedule::Every {
-            every_ms: 60 * 1000
-        },
-        "Spawn recurring task instances from templates",
-        user.clone()
-    );
     ensure_job!(
         JOB_INSIGHT_REFRESH,
         scheduling::CronSchedule::Every {
@@ -1232,6 +1162,40 @@ async fn set_default_intent_windows(cron_service: &scheduling::CronService) {
     for (name, window) in windows {
         cron_service.set_intent_window(name, window.clone()).await;
     }
+}
+
+/// Lazily ensure a user-facing cron job exists. Called when a feature is first used
+/// (e.g., first task created → daily digest, first atom → morning briefing).
+/// No-op if the job already exists.
+pub async fn ensure_lazy_job(
+    cron_service: &Arc<CronService>,
+    name: &str,
+    schedule: scheduling::CronSchedule,
+    description: &str,
+) -> Result<(), common::KlyntbotError> {
+    let existing: std::collections::HashSet<String> = cron_service
+        .list_jobs(true)
+        .await
+        .into_iter()
+        .map(|j| j.name)
+        .collect();
+
+    if !existing.contains(name) {
+        cron_service
+            .add_job(
+                name,
+                schedule,
+                description,
+                false,
+                None,
+                None,
+                false,
+                scheduling::CronOrigin::User,
+            )
+            .await?;
+        tracing::info!("Lazy-created cron job: {name}");
+    }
+    Ok(())
 }
 
 /// Refresh insight progress snapshots for all notes with insights.

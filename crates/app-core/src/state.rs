@@ -126,6 +126,8 @@ pub struct AppCore {
     pub deck_preference_repo: Option<cognitive::DeckPreferenceRepo>,
     /// AutoTuner orchestrator (None when autotuner is disabled).
     pub autotuner: Option<Arc<agent::autotuner::AutoTunerOrchestrator>>,
+    /// Deadline scheduler for event-driven task reminders, focus warnings, and recurring spawns.
+    pub deadline_scheduler: Option<Arc<scheduling::DeadlineScheduler>>,
     /// Mirror self-reflection facade (None when cognitive provider is unavailable).
     pub mirror_facade: Option<Arc<cognitive::mirror::MirrorFacade>>,
     /// Join handles for MirrorEngine background subscribers — kept alive for app lifetime.
@@ -395,6 +397,10 @@ impl AppCore {
         // Stop BrainVoice signal router.
         if let Some(ref bv) = self.brain_voice {
             bv.shutdown();
+        }
+        // Stop deadline scheduler.
+        if let Some(ref scheduler) = self.deadline_scheduler {
+            scheduler.stop().await;
         }
         if let Err(e) = self.agent.shutdown().await {
             error!("agent shutdown error: {}", e);
