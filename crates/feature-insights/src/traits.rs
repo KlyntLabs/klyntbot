@@ -5,6 +5,9 @@
 //! Injected into `InsightService` as `Arc<dyn Trait>` during AppCore init.
 
 use async_trait::async_trait;
+use chrono::{DateTime, Utc};
+
+use crate::cross_domain::{EntityDomain, EntityRef};
 
 /// A knowledge atom with its current retention percentage.
 #[derive(Debug, Clone)]
@@ -94,5 +97,50 @@ impl InsightEmbedder for NoopInsightEmbedder {
     }
     async fn similarity(&self, _: &str, _: &str) -> Option<f64> {
         None
+    }
+}
+
+/// A vector hit from a target domain, ready for the cross-domain heuristic.
+#[derive(Debug, Clone)]
+pub struct CrossDomainVectorHit {
+    pub entity: EntityRef,
+    pub cosine: f64,
+    pub created_at: DateTime<Utc>,
+}
+
+/// Provides cross-domain vector search for the insight heuristic.
+///
+/// Searches LanceDB embedding tables in domains other than the source to
+/// find semantically similar entities. Implemented in `app-core` where
+/// `VectorStore`, `EmbeddingEngine`, and entity repos are available.
+#[async_trait]
+pub trait CrossDomainSearcher: Send + Sync {
+    /// Search embedding tables of other domains for entities similar to the source.
+    ///
+    /// The implementation should:
+    /// 1. Retrieve (or generate) the source entity's embedding vector.
+    /// 2. For each target domain (all domains except `source_domain`), search
+    ///    the corresponding LanceDB table.
+    /// 3. Look up entity metadata (title, created_at) from SQLite.
+    /// 4. Return the combined results.
+    async fn search_other_domains(
+        &self,
+        source_domain: &EntityDomain,
+        source_id: &str,
+        source_title: &str,
+    ) -> Vec<CrossDomainVectorHit>;
+}
+
+pub struct NoopCrossDomainSearcher;
+
+#[async_trait]
+impl CrossDomainSearcher for NoopCrossDomainSearcher {
+    async fn search_other_domains(
+        &self,
+        _source_domain: &EntityDomain,
+        _source_id: &str,
+        _source_title: &str,
+    ) -> Vec<CrossDomainVectorHit> {
+        Vec::new()
     }
 }

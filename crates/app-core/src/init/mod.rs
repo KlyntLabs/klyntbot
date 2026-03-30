@@ -180,6 +180,21 @@ impl AppCore {
                 Arc::new(feature_insights::NoopInsightEmbedder)
             };
 
+        // ── Cross-domain searcher (LanceDB vector search across domains) ──
+        let cross_domain_searcher: Arc<dyn feature_insights::CrossDomainSearcher> =
+            if let Some(ref vs) = vector_store {
+                Arc::new(
+                    crate::adapters::cross_domain_searcher::CrossDomainSearcherImpl::new(
+                        vs.clone(),
+                        Arc::clone(&embedding_engine),
+                        repos.tasks.clone(),
+                        note_repo.clone(),
+                    ),
+                )
+            } else {
+                Arc::new(feature_insights::NoopCrossDomainSearcher)
+            };
+
         // ── Cognitive accessor for insight context injection ──
         let cognitive_accessor: Arc<dyn feature_insights::CognitiveAccessor> = Arc::new(
             crate::adapters::cognitive_accessor::CognitiveAccessorImpl::new(
@@ -471,6 +486,7 @@ impl AppCore {
                         ),
                     ),
                     insight_embedder,
+                    cross_domain_searcher,
                     feature_insights::ProgressWeights::default(),
                     Some(Arc::clone(&domain_event_bus)),
                 )))

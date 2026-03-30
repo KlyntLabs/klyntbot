@@ -17,7 +17,7 @@ use crate::progress_repo::InsightProgressRepo;
 use crate::prompt_builder::{InsightContext, PromptBuilder};
 use crate::repo::InsightReviewRepo;
 use crate::scope::ScopeResolver;
-use crate::traits::{FlashcardAccessor, InsightEmbedder};
+use crate::traits::{CrossDomainSearcher, FlashcardAccessor, InsightEmbedder};
 use crate::types::{
     InsightContent, InsightReviewRow, ProgressSnapshotRow, ProgressWeights, ScopeConfig,
 };
@@ -43,6 +43,7 @@ pub struct InsightService {
     pub(crate) prompt_builder: PromptBuilder,
     pub(crate) flashcards: Arc<dyn FlashcardAccessor>,
     pub(crate) embedder: Arc<dyn InsightEmbedder>,
+    pub(crate) cross_domain_searcher: Arc<dyn CrossDomainSearcher>,
     pub(crate) progress_weights: ProgressWeights,
     pub(crate) domain_bus: Option<Arc<bus::DomainEventBus>>,
 }
@@ -57,6 +58,7 @@ impl InsightService {
         prompt_builder: PromptBuilder,
         flashcards: Arc<dyn FlashcardAccessor>,
         embedder: Arc<dyn InsightEmbedder>,
+        cross_domain_searcher: Arc<dyn CrossDomainSearcher>,
         progress_weights: ProgressWeights,
         domain_bus: Option<Arc<bus::DomainEventBus>>,
     ) -> Self {
@@ -68,6 +70,7 @@ impl InsightService {
             prompt_builder,
             flashcards,
             embedder,
+            cross_domain_searcher,
             progress_weights,
             domain_bus,
         }
@@ -75,10 +78,10 @@ impl InsightService {
 
     /// Check for a cross-domain connection from a newly created/updated entity.
     ///
-    /// Skips entities with titles shorter than 10 characters. Assembles a
-    /// `HeuristicInput` with empty vector/frequency data (real search wired in a
-    /// future task) and publishes `DomainEvent::CrossDomainDotReady` if the
-    /// heuristic finds a connection.
+    /// Skips entities with titles shorter than 10 characters. Uses LanceDB
+    /// vector search to find semantically similar entities in other domains,
+    /// then evaluates the cross-domain heuristic and publishes
+    /// `DomainEvent::CrossDomainDotReady` if a connection is found.
     pub async fn check_cross_domain(
         &self,
         source_domain: EntityDomain,
@@ -91,16 +94,27 @@ impl InsightService {
         }
 
         let source = EntityRef {
-            domain: source_domain,
+            domain: source_domain.clone(),
             id,
             title: title.clone(),
         };
+
+        // Search other domain embedding tables for semantically similar entities.
+        let hits = self
+            .cross_domain_searcher
+            .search_other_domains(&source_domain, &source.id, &source.title)
+            .await;
+
+        let vector_hits: Vec<(EntityRef, f64, DateTime<Utc>)> = hits
+            .into_iter()
+            .map(|h| (h.entity, h.cosine, h.created_at))
+            .collect();
 
         let input = HeuristicInput {
             source_has_content: title.len() >= 10,
             source: source.clone(),
             source_created: created_at,
-            vector_hits: vec![],
+            vector_hits,
             frequency_data: vec![],
         };
 
