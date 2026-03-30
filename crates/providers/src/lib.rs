@@ -17,7 +17,9 @@ pub use adapters::{
 };
 
 // ── Manager ───────────────────────────────────────────────
-pub use manager::{CircuitBreakerConfig, OnCircuitOpen, ProviderManager};
+pub use manager::{
+    CircuitBreakerConfig, DegradationLevel, OnCircuitOpen, OnProviderDegraded, ProviderManager,
+};
 
 // ── Registry ──────────────────────────────────────────────
 pub use registry::{ProviderRegistry, ProviderSpec, PROVIDERS};

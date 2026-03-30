@@ -189,7 +189,7 @@ pub fn extract_signal(event: &DomainEvent) -> Option<(SignalSummary, String, Opt
                     headline: headline.clone(),
                 },
                 tooltip,
-                Some("/mirror".into()),
+                Some("/brain".into()),
             ))
         }
 

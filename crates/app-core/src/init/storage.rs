@@ -12,6 +12,9 @@ pub(super) struct StorageResult {
     pub vector_store: Option<VectorStore>,
     pub note_repo: NoteRepo,
     pub provider: providers::DynProvider,
+    /// The inner [`ProviderManager`] when failover is configured — held so callers
+    /// can attach additional callbacks (e.g. provider-degraded event forwarding).
+    pub provider_manager: Option<std::sync::Arc<providers::ProviderManager>>,
 }
 
 /// Initialize config, storage, migrations, and LLM provider.
@@ -81,42 +84,44 @@ pub(super) async fn init_storage(
     // 3. Create LLM provider (graceful — falls back to noop for setup wizard).
     // Use the "full" variant to get the inner ProviderManager (when a fallback is configured)
     // so we can wire circuit breaker persistence before the manager starts handling calls.
-    let (provider, resolved_model) = match providers::create_provider_with_failover_full(&config) {
-        Ok((p, maybe_manager, m)) => {
-            info!(provider = %p.name(), "provider ready");
+    let (provider, provider_manager, resolved_model) =
+        match providers::create_provider_with_failover_full(&config) {
+            Ok((p, maybe_manager, m)) => {
+                info!(provider = %p.name(), "provider ready");
 
-            if let Some(manager) = maybe_manager {
-                // Ensure the table exists and restore any unexpired breaker state.
-                if let Err(e) = storage::circuit_breaker::ensure_table(&storage_pool).await {
-                    warn!("circuit breaker table init failed (non-fatal): {e}");
-                } else {
-                    if let Ok(Some(dt)) = storage::circuit_breaker::load(&storage_pool).await {
-                        manager.restore_circuit_state(dt).await;
-                    }
+                if let Some(ref manager) = maybe_manager {
+                    // Ensure the table exists and restore any unexpired breaker state.
+                    if let Err(e) = storage::circuit_breaker::ensure_table(&storage_pool).await {
+                        warn!("circuit breaker table init failed (non-fatal): {e}");
+                    } else {
+                        if let Ok(Some(dt)) = storage::circuit_breaker::load(&storage_pool).await {
+                            manager.restore_circuit_state(dt).await;
+                        }
 
-                    // Callback: persist each circuit-open event for future restarts.
-                    let pool = storage_pool.clone();
-                    let cb: providers::OnCircuitOpen = Arc::new(move |open_until| {
-                        let pool = pool.clone();
-                        tokio::spawn(async move {
-                            if let Err(e) = storage::circuit_breaker::save(&pool, open_until).await
-                            {
-                                tracing::warn!("circuit breaker persist failed: {e}");
-                            }
+                        // Callback: persist each circuit-open event for future restarts.
+                        let pool = storage_pool.clone();
+                        let cb: providers::OnCircuitOpen = Arc::new(move |open_until| {
+                            let pool = pool.clone();
+                            tokio::spawn(async move {
+                                if let Err(e) =
+                                    storage::circuit_breaker::save(&pool, open_until).await
+                                {
+                                    tracing::warn!("circuit breaker persist failed: {e}");
+                                }
+                            });
                         });
-                    });
-                    manager.set_circuit_open_callback(cb).await;
+                        manager.set_circuit_open_callback(cb).await;
+                    }
                 }
-            }
 
-            (p, m)
-        }
-        Err(e) => {
-            warn!("No LLM provider configured ({e}), using noop — setup wizard will handle configuration");
-            let noop: providers::DynProvider = Arc::new(providers::NoopProvider);
-            (noop, config.agents.defaults.model.clone())
-        }
-    };
+                (p, maybe_manager, m)
+            }
+            Err(e) => {
+                warn!("No LLM provider configured ({e}), using noop — setup wizard will handle configuration");
+                let noop: providers::DynProvider = Arc::new(providers::NoopProvider);
+                (noop, None, config.agents.defaults.model.clone())
+            }
+        };
     config.agents.defaults.model = resolved_model;
 
     Ok(StorageResult {
@@ -126,5 +131,6 @@ pub(super) async fn init_storage(
         vector_store,
         note_repo,
         provider,
+        provider_manager,
     })
 }

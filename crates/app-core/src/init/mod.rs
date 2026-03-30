@@ -72,7 +72,29 @@ impl AppCore {
             vector_store,
             note_repo,
             provider,
+            provider_manager,
         } = storage::init_storage(config_override).await?;
+
+        // Wire provider-degraded event forwarding to the frontend.
+        // Done here (not inside init_storage) because the emitter isn't available there.
+        if let Some(ref manager) = provider_manager {
+            if let Some(ref emitter) = event_emitter {
+                let emitter_clone = Arc::clone(emitter);
+                let degraded_cb: providers::OnProviderDegraded =
+                    Arc::new(move |level| {
+                        let payload = match level {
+                            providers::DegradationLevel::Fallback => {
+                                serde_json::json!({ "level": "fallback" })
+                            }
+                            providers::DegradationLevel::Offline => {
+                                serde_json::json!({ "level": "offline" })
+                            }
+                        };
+                        emitter_clone.emit_event(crate::events::PROVIDER_DEGRADED, payload);
+                    });
+                manager.set_provider_degraded_callback(degraded_cb).await;
+            }
+        }
 
         // ── Hot-reloadable config subset (shared between agent + AppCore) ──
         let hot_config = Arc::new(RwLock::new(config::HotConfig::from(&config)));

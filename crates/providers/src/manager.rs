@@ -35,6 +35,19 @@ impl Default for CircuitBreakerConfig {
 /// Used by app-core to persist state across restarts.
 pub type OnCircuitOpen = Arc<dyn Fn(DateTime<Utc>) + Send + Sync>;
 
+/// Degradation level emitted by [`OnProviderDegraded`].
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum DegradationLevel {
+    /// Primary circuit opened; requests are being routed to the fallback provider.
+    Fallback,
+    /// All providers have failed; no LLM calls can succeed.
+    Offline,
+}
+
+/// Called when provider degradation is detected.
+/// Used by app-core to forward a `provider:degraded` Tauri event to the frontend.
+pub type OnProviderDegraded = Arc<dyn Fn(DegradationLevel) + Send + Sync>;
+
 /// Manages primary/fallback providers with retry, failover, and circuit breaker logic.
 pub struct ProviderManager {
     primary: DynProvider,
@@ -49,6 +62,9 @@ pub struct ProviderManager {
     /// Optional callback invoked when the circuit opens, for persistence.
     /// Stored behind RwLock so it can be set after Arc construction.
     on_circuit_open: RwLock<Option<OnCircuitOpen>>,
+    /// Optional callback invoked on provider degradation (fallback / offline).
+    /// Stored behind RwLock so it can be set after Arc construction.
+    on_provider_degraded: RwLock<Option<OnProviderDegraded>>,
 }
 
 impl ProviderManager {
@@ -80,6 +96,7 @@ impl ProviderManager {
             circuit_open_until_utc: Arc::new(RwLock::new(None)),
             circuit_config,
             on_circuit_open: RwLock::new(None),
+            on_provider_degraded: RwLock::new(None),
         }
     }
 
@@ -87,6 +104,13 @@ impl ProviderManager {
     /// Can be called after `Arc` construction.
     pub async fn set_circuit_open_callback(&self, callback: OnCircuitOpen) {
         *self.on_circuit_open.write().await = Some(callback);
+    }
+
+    /// Attach a callback invoked when provider degradation is detected.
+    /// Used by app-core to forward `provider:degraded` events to the frontend.
+    /// Can be called after `Arc` construction.
+    pub async fn set_provider_degraded_callback(&self, callback: OnProviderDegraded) {
+        *self.on_provider_degraded.write().await = Some(callback);
     }
 
     /// Restore circuit breaker state from a persisted UTC deadline.
@@ -128,6 +152,11 @@ impl ProviderManager {
 
             if let Some(ref cb) = *self.on_circuit_open.read().await {
                 cb(open_until_utc);
+            }
+
+            // Notify listeners that the primary provider has degraded to fallback.
+            if let Some(ref cb) = *self.on_provider_degraded.read().await {
+                cb(DegradationLevel::Fallback);
             }
         }
     }
@@ -239,6 +268,7 @@ impl ProviderManager {
     /// Route to fallback if available, otherwise return the original error.
     /// Retries the fallback up to 2 times on rate-limit errors without
     /// affecting the primary provider's circuit breaker state.
+    /// Emits [`DegradationLevel::Offline`] when no provider can serve the request.
     async fn try_fallback(
         &self,
         messages: &[Message],
@@ -252,10 +282,22 @@ impl ProviderManager {
         ];
         match &self.fallback {
             Some(fb) => {
-                self.retry_with_backoff_inner(&delays, false, || fb.chat(messages, tools, params))
-                    .await
+                let result = self
+                    .retry_with_backoff_inner(&delays, false, || fb.chat(messages, tools, params))
+                    .await;
+                if result.is_err() {
+                    if let Some(ref cb) = *self.on_provider_degraded.read().await {
+                        cb(DegradationLevel::Offline);
+                    }
+                }
+                result
             }
-            None => Err(primary_err),
+            None => {
+                if let Some(ref cb) = *self.on_provider_degraded.read().await {
+                    cb(DegradationLevel::Offline);
+                }
+                Err(primary_err)
+            }
         }
     }
 }
@@ -300,8 +342,21 @@ impl LlmProvider for ProviderManager {
         {
             Ok(s) => Ok(s),
             Err(e) => match &self.fallback {
-                Some(fb) => fb.chat_stream(messages, tools, params).await,
-                None => Err(e),
+                Some(fb) => {
+                    let result = fb.chat_stream(messages, tools, params).await;
+                    if result.is_err() {
+                        if let Some(ref cb) = *self.on_provider_degraded.read().await {
+                            cb(DegradationLevel::Offline);
+                        }
+                    }
+                    result
+                }
+                None => {
+                    if let Some(ref cb) = *self.on_provider_degraded.read().await {
+                        cb(DegradationLevel::Offline);
+                    }
+                    Err(e)
+                }
             },
         }
     }
