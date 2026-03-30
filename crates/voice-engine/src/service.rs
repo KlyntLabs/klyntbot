@@ -112,6 +112,9 @@ pub struct VoiceService {
 
     /// Track first-ever capture for one-time welcome echo.
     first_capture_complete: AtomicBool,
+
+    /// One-shot guard: memory echo fires at most once per capture session.
+    echo_fired_this_session: AtomicBool,
 }
 
 impl VoiceService {
@@ -142,6 +145,7 @@ impl VoiceService {
             event_tx,
             event_rx: Arc::new(std::sync::Mutex::new(Some(event_rx))),
             first_capture_complete: AtomicBool::new(false),
+            echo_fired_this_session: AtomicBool::new(false),
         }
     }
 
@@ -306,6 +310,9 @@ impl VoiceService {
             });
         }
 
+        // Reset one-shot echo guard for the new capture session.
+        self.echo_fired_this_session.store(false, Ordering::Relaxed);
+
         *session_guard = Some(active);
 
         info!(
@@ -378,13 +385,19 @@ impl VoiceService {
                 })
                 .await;
 
-            // Memory echo lookup on each partial
-            if let Some(ref echo_provider) = self.memory_echo {
-                if let Some(echo_text) = echo_provider.lookup(&partial.text, false).await {
-                    let _ = self
-                        .event_tx
-                        .send(VoiceEvent::MemoryEcho { text: echo_text })
-                        .await;
+            // Memory echo: fire once per turn on the first partial with ≥3 words.
+            // Skip entirely in Strict privacy mode.
+            if self.config.privacy_mode != PrivacyLevel::Strict
+                && partial.text.split_whitespace().count() >= 3
+                && !self.echo_fired_this_session.swap(true, Ordering::Relaxed)
+            {
+                if let Some(ref echo_provider) = self.memory_echo {
+                    if let Some(echo_text) = echo_provider.lookup(&partial.text, false).await {
+                        let _ = self
+                            .event_tx
+                            .send(VoiceEvent::MemoryEcho { text: echo_text })
+                            .await;
+                    }
                 }
             }
 
