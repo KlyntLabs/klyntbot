@@ -5,6 +5,8 @@ use std::sync::Arc;
 
 use async_trait::async_trait;
 use chrono::{DateTime, Utc};
+use cognitive::repos::SqliteBookTreeRepo;
+use context_engine::book_index::BookTreeRepo;
 use feature_insights::cross_domain::{EntityDomain, EntityRef};
 use feature_insights::traits::{CrossDomainSearcher, CrossDomainVectorHit};
 use feature_notes::repo::NoteRepo;
@@ -15,20 +17,21 @@ use tracing::{debug, warn};
 
 /// Maps each `EntityDomain` to its LanceDB embedding table name.
 ///
-/// Returns `None` for domains that don't have a dedicated embedding table yet
-/// (e.g. Finance uses `tree_node_embeddings` which has a different schema).
+/// Returns `None` for domains that use `tree_node_embeddings` with per-domain
+/// filtering (Finance) or are not yet searchable (Productivity).
 fn table_for_domain(domain: &EntityDomain) -> Option<&'static str> {
     match domain {
         EntityDomain::Task => Some("task_embeddings"),
         EntityDomain::Note => Some("note_embeddings"),
-        // Finance tree node embeddings have a different schema (note_id, level,
-        // source_type) and would need special handling. Skipped for now.
+        // Finance uses tree_node_embeddings filtered by source_type="finance".
+        // Handled separately in search_other_domains.
         EntityDomain::Finance | EntityDomain::Productivity => None,
     }
 }
 
 /// All domains we can search as targets.
-const SEARCHABLE_DOMAINS: &[EntityDomain] = &[EntityDomain::Task, EntityDomain::Note];
+const SEARCHABLE_DOMAINS: &[EntityDomain] =
+    &[EntityDomain::Task, EntityDomain::Note, EntityDomain::Finance];
 
 /// LanceDB similarity threshold for cross-domain search.
 const SEARCH_THRESHOLD: f64 = 0.72;
@@ -41,6 +44,7 @@ pub struct CrossDomainSearcherImpl {
     embedding_engine: Arc<EmbeddingEngine>,
     task_repo: TaskRepo,
     note_repo: NoteRepo,
+    tree_repo: SqliteBookTreeRepo,
 }
 
 impl CrossDomainSearcherImpl {
@@ -49,12 +53,14 @@ impl CrossDomainSearcherImpl {
         embedding_engine: Arc<EmbeddingEngine>,
         task_repo: TaskRepo,
         note_repo: NoteRepo,
+        sqlite_pool: sqlx::SqlitePool,
     ) -> Self {
         Self {
             vector_store,
             embedding_engine,
             task_repo,
             note_repo,
+            tree_repo: SqliteBookTreeRepo::new(sqlite_pool),
         }
     }
 
@@ -133,6 +139,33 @@ impl CrossDomainSearcherImpl {
         }
     }
 
+    /// Look up finance tree node metadata by node ID. Returns (title, created_at) if found.
+    ///
+    /// Finance nodes are stored in `book_tree_nodes` with source_type="finance".
+    /// We prefer the `title` column; for leaf nodes (level 2) with no title we
+    /// fall back to `content` (e.g. "$45.20 in food").
+    async fn lookup_finance_node(&self, id: &str) -> Option<(String, DateTime<Utc>)> {
+        match self.tree_repo.get_node(id).await {
+            Ok(Some(node)) => {
+                let label = node
+                    .title
+                    .filter(|t| !t.is_empty())
+                    .unwrap_or(node.content);
+                // Tree nodes don't carry a timestamp — use epoch as a neutral sentinel.
+                // The score (cosine similarity) is the primary ranking signal anyway.
+                Some((label, DateTime::<Utc>::from_timestamp(0, 0).unwrap_or(Utc::now())))
+            }
+            Ok(None) => {
+                debug!(id, "finance tree node not found for cross-domain hit");
+                None
+            }
+            Err(e) => {
+                warn!(id, error = %e, "failed to look up finance tree node for cross-domain hit");
+                None
+            }
+        }
+    }
+
     /// Look up entity metadata for a vector hit in a target domain.
     async fn lookup_entity(
         &self,
@@ -142,6 +175,7 @@ impl CrossDomainSearcherImpl {
         match domain {
             EntityDomain::Task => self.lookup_task(id).await,
             EntityDomain::Note => self.lookup_note(id).await,
+            EntityDomain::Finance => self.lookup_finance_node(id).await,
             _ => None,
         }
     }
@@ -171,20 +205,39 @@ impl CrossDomainSearcher for CrossDomainSearcherImpl {
                 continue;
             }
 
-            let table = match table_for_domain(target_domain) {
-                Some(t) => t,
-                None => continue,
-            };
-
-            let hits = match self
-                .vector_store
-                .search_similar(table, &query_vec, SEARCH_LIMIT, SEARCH_THRESHOLD)
-                .await
-            {
-                Ok(h) => h,
-                Err(e) => {
-                    warn!(table, error = %e, "cross-domain vector search failed");
-                    continue;
+            // Finance nodes live in tree_node_embeddings filtered by source_type.
+            let hits: Vec<(String, f64)> = if *target_domain == EntityDomain::Finance {
+                match self
+                    .vector_store
+                    .search_tree_nodes_by_source_type(
+                        &query_vec,
+                        "finance",
+                        SEARCH_LIMIT,
+                        SEARCH_THRESHOLD,
+                    )
+                    .await
+                {
+                    Ok(h) => h,
+                    Err(e) => {
+                        warn!(error = %e, "cross-domain finance tree node search failed");
+                        continue;
+                    }
+                }
+            } else {
+                let table = match table_for_domain(target_domain) {
+                    Some(t) => t,
+                    None => continue,
+                };
+                match self
+                    .vector_store
+                    .search_similar(table, &query_vec, SEARCH_LIMIT, SEARCH_THRESHOLD)
+                    .await
+                {
+                    Ok(h) => h,
+                    Err(e) => {
+                        warn!(table, error = %e, "cross-domain vector search failed");
+                        continue;
+                    }
                 }
             };
 
@@ -194,8 +247,7 @@ impl CrossDomainSearcher for CrossDomainSearcherImpl {
                     continue;
                 }
 
-                if let Some((title, created_at)) =
-                    self.lookup_entity(target_domain, &hit_id).await
+                if let Some((title, created_at)) = self.lookup_entity(target_domain, &hit_id).await
                 {
                     results.push(CrossDomainVectorHit {
                         entity: EntityRef {

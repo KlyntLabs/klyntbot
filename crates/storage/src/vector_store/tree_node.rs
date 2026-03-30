@@ -116,6 +116,66 @@ impl VectorStore {
         Ok(out)
     }
 
+    /// Search tree node embeddings filtered to a specific `source_type` value.
+    ///
+    /// Returns `(id, score)` pairs where `score >= min_similarity`, sorted by
+    /// similarity descending.  Used by the cross-domain searcher to find
+    /// finance (or other domain) nodes without pulling in un-related source types.
+    pub async fn search_tree_nodes_by_source_type(
+        &self,
+        query_vector: &[f32],
+        source_type: &str,
+        limit: usize,
+        min_similarity: f64,
+    ) -> Result<Vec<(String, f64)>, StorageError> {
+        let tbl = match self.db.open_table("tree_node_embeddings").execute().await {
+            Ok(t) => t,
+            Err(_) => return Ok(Vec::new()), // table doesn't exist yet
+        };
+
+        let safe_source_type = sanitize_predicate_value(source_type)?;
+        let results = tbl
+            .query()
+            .nearest_to(query_vector)
+            .map_err(|e| StorageError::Vector(format!("Vector search setup: {e}")))?
+            .limit(limit)
+            .only_if(format!("source_type = '{safe_source_type}'"))
+            .execute()
+            .await
+            .map_err(|e| StorageError::Vector(format!("Vector search: {e}")))?;
+
+        let batches: Vec<arrow_array::RecordBatch> = results
+            .try_collect()
+            .await
+            .map_err(|e| StorageError::Vector(format!("Collect results: {e}")))?;
+
+        let mut out = Vec::new();
+        for batch in &batches {
+            let id_col = batch
+                .column_by_name("id")
+                .and_then(|c| c.as_any().downcast_ref::<StringArray>());
+            let dist_col = batch
+                .column_by_name("_distance")
+                .and_then(|c| c.as_any().downcast_ref::<Float32Array>());
+
+            let Some(ids) = id_col else {
+                continue;
+            };
+
+            for i in 0..batch.num_rows() {
+                let score = match dist_col {
+                    Some(d) => 1.0 - d.value(i) as f64,
+                    None => 1.0,
+                };
+                if score >= min_similarity {
+                    out.push((ids.value(i).to_string(), score));
+                }
+            }
+        }
+        out.sort_by(|a, b| b.1.total_cmp(&a.1));
+        Ok(out)
+    }
+
     /// Delete all tree node embeddings for a given note.
     pub async fn delete_tree_node_embeddings_by_note(
         &self,
