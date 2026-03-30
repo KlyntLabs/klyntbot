@@ -1,6 +1,7 @@
 //! Repository modules and aggregate struct.
 
 pub mod agent_task;
+pub mod brain_signal;
 pub mod area;
 pub mod coaching_intervention_log;
 pub mod coaching_strategy;
@@ -39,6 +40,7 @@ pub mod trial_repo;
 pub mod usage;
 
 pub use agent_task::AgentTaskRepo;
+pub use brain_signal::{BrainSignalFeedbackRepo, BrainSignalFeedbackRow};
 pub use area::AreaRepo;
 pub use coaching_intervention_log::{CoachingInterventionLogRepo, InterventionLogRow};
 pub use coaching_strategy::{CoachingStrategyRepo, CoachingStrategyRow, UpsertCoachingStrategy};

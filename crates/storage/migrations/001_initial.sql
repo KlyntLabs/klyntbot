@@ -730,3 +730,15 @@ CREATE TABLE IF NOT EXISTS custom_column_values (
     value_json TEXT NOT NULL,
     PRIMARY KEY (task_id, column_id)
 );
+
+-- Brain signal feedback (dedup, dismissal tracking, adaptive dampening)
+CREATE TABLE IF NOT EXISTS brain_signal_feedback (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    signal_type TEXT NOT NULL,
+    entity_pair TEXT NOT NULL,
+    action      TEXT NOT NULL,
+    timestamp   TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now'))
+);
+
+CREATE INDEX IF NOT EXISTS idx_brain_signal_entity_pair ON brain_signal_feedback(entity_pair, timestamp);
+CREATE INDEX IF NOT EXISTS idx_brain_signal_action ON brain_signal_feedback(action, timestamp);
