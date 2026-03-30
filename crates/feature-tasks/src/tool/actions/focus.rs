@@ -35,6 +35,14 @@ impl TaskTool {
                     .await;
             }
 
+            // Notify DeadlineScheduler
+            if let Some(ref bus) = self.domain_bus {
+                bus.publish(bus::DomainEvent::TaskFocusChanged {
+                    task_id: id.to_string(),
+                    focus_deadline: deadline.map(|d| d.to_rfc3339()),
+                });
+            }
+
             Ok(format!("Focused on task: {}", id))
         } else {
             Err(ToolError::ExecutionFailed(format!(
@@ -64,6 +72,15 @@ impl TaskTool {
                     .log_activity(id, "focus_ended", None, None, None, "user", None)
                     .await;
             }
+
+            // Notify DeadlineScheduler
+            if let Some(ref bus) = self.domain_bus {
+                bus.publish(bus::DomainEvent::TaskFocusChanged {
+                    task_id: id.to_string(),
+                    focus_deadline: None,
+                });
+            }
+
             Ok(format!("Unfocused task: {}", id))
         } else {
             Err(ToolError::ExecutionFailed(format!("Task not found: {}", id)).into())

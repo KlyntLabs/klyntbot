@@ -158,6 +158,14 @@ impl AppCore {
                 estimate_mins: created.estimated_minutes.map(|m| m as i64),
                 task_type: created.task_type.clone(),
             });
+
+            // Notify DeadlineScheduler of due date
+            if created.due_date.is_some() {
+                bus.publish(bus::DomainEvent::TaskDueDateChanged {
+                    task_id: id.clone(),
+                    due_date: created.due_date.map(|d| d.to_rfc3339()),
+                });
+            }
         }
 
         // Newly created task has no subtasks yet; resolve status label for the response
@@ -259,6 +267,22 @@ impl AppCore {
                             from: old.title.clone(),
                             to: title.clone(),
                             actor,
+                        });
+                    }
+                }
+
+                // Emit due date change for DeadlineScheduler
+                if let Some(ref new_due) = patch.due_date {
+                    let old_due = old.due_date;
+                    let changed = match (old_due, new_due) {
+                        (None, None) => false,
+                        (Some(_), None) | (None, Some(_)) => true,
+                        (Some(a), Some(b)) => a != *b,
+                    };
+                    if changed {
+                        bus.publish(bus::DomainEvent::TaskDueDateChanged {
+                            task_id: task_id.clone(),
+                            due_date: new_due.map(|d| d.to_rfc3339()),
                         });
                     }
                 }
