@@ -4,6 +4,7 @@ mod channels;
 mod coaching;
 mod cognitive;
 mod cron;
+mod deadline;
 mod launcher;
 mod productivity;
 mod storage;
@@ -195,6 +196,16 @@ impl AppCore {
         let channel_manager = channels::init_channels(&config, &bus)?;
 
         let shutdown_token = CancellationToken::new();
+
+        // ── Deadline scheduler (event-driven timers) ────────────────────
+        let deadline_scheduler = deadline::init_deadline_scheduler(
+            &repos,
+            &notification_dispatcher,
+            &domain_event_bus,
+            &config,
+            &shutdown_token,
+        )
+        .await;
 
         // ── Phase 5: Productivity ────────────────────────────────────────
         let productivity::ProductivityResult {
@@ -420,6 +431,7 @@ impl AppCore {
                 storage_pool.inner().clone(),
             )),
             autotuner,
+            deadline_scheduler: Some(deadline_scheduler),
             mirror_facade,
             _mirror_handles: mirror_handles,
             _mirror_shutdown: mirror_shutdown,

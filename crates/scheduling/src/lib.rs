@@ -8,7 +8,7 @@ pub mod error;
 pub mod service;
 pub mod types;
 
-pub use deadline::DeadlineScheduler;
+pub use deadline::{DeadlineHandler, DeadlineScheduler};
 pub use deadline_actions::DeadlineAction;
 pub use error::CronError;
 pub use service::{CronService, JobCallback};
