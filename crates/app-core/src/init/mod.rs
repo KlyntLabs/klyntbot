@@ -188,6 +188,7 @@ impl AppCore {
                         Arc::clone(&embedding_engine),
                         repos.tasks.clone(),
                         note_repo.clone(),
+                        storage_pool.inner().clone(),
                     ),
                 )
             } else {
@@ -731,17 +732,33 @@ impl AppCore {
             );
         }
 
-        // ── Nightly cross-domain batch (registered post-init — needs storage pool) ──
+        // ── Nightly cross-domain batch (registered post-init — needs storage pool + LLM) ──
         {
             let pool = storage_pool.clone();
+            let nightly_provider = core.cognitive_provider.clone();
+            let nightly_model = {
+                let cfg = core.config.read().await;
+                cfg.cognitive
+                    .model
+                    .clone()
+                    .unwrap_or_else(|| cfg.agents.defaults.model.clone())
+            };
             let rt = tokio::runtime::Handle::current();
             cron_service.register_handler(
                 cron::JOB_CROSS_DOMAIN_NIGHTLY,
                 Arc::new(move |_job: &scheduling::CronJob| {
                     let pool = pool.clone();
+                    let provider = nightly_provider.clone();
+                    let model = nightly_model.clone();
                     tokio::task::block_in_place(|| {
                         rt.block_on(async move {
-                            match cron::run_nightly_batch(&pool).await {
+                            match cron::run_nightly_batch(
+                                &pool,
+                                provider.as_ref(),
+                                &model,
+                            )
+                            .await
+                            {
                                 Ok(Some(msg)) => Ok(Some(msg)),
                                 Ok(None) => Ok(Some("No cross-domain dots today".to_string())),
                                 Err(e) => Ok(Some(format!("Nightly batch failed: {e}"))),

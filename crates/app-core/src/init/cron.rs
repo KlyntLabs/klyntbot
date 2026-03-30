@@ -1265,8 +1265,17 @@ pub async fn refresh_insight_progress(
     }
 }
 
-/// Run the nightly cross-domain batch: collect today's dots and store a summary insight.
-pub async fn run_nightly_batch(pool: &storage::StoragePool) -> Result<Option<String>, String> {
+/// Run the nightly cross-domain batch: collect today's dots and store polished
+/// LLM-generated insight sentences for the next morning briefing.
+///
+/// When `provider` is `Some`, an LLM call generates 1-3 first-person insight
+/// sentences. On LLM failure (or when no provider is available), falls back to
+/// a simple concatenated summary so the user always gets *something*.
+pub async fn run_nightly_batch(
+    pool: &storage::StoragePool,
+    provider: Option<&providers::DynProvider>,
+    model: &str,
+) -> Result<Option<String>, String> {
     let svc = feature_insights::nightly_batch::NightlyBatchService::new(pool.clone());
 
     let dots = svc.get_todays_dots().await.map_err(|e| e.to_string())?;
@@ -1274,27 +1283,98 @@ pub async fn run_nightly_batch(pool: &storage::StoragePool) -> Result<Option<Str
         return Ok(Some("No cross-domain dots today".to_string()));
     }
 
-    // Build a simple concatenated summary from entity pairs (no LLM yet).
     let pairs: Vec<String> = dots.iter().map(|(pair, _)| pair.clone()).collect();
-    let summary = format!("Cross-domain connections detected: {}", pairs.join(", "));
     let dot_refs = pairs.join(";");
 
-    // Store for tomorrow's morning briefing.
+    // Template fallback — always available.
+    let fallback_summary = format!("Cross-domain connections detected: {}", pairs.join(", "));
+
+    // Try LLM-enhanced insight generation.
+    let insights = if let Some(provider) = provider {
+        match generate_insights_via_llm(provider, model, &pairs).await {
+            Ok(sentences) => sentences,
+            Err(e) => {
+                warn!("LLM insight generation failed, using template fallback: {e}");
+                vec![fallback_summary.clone()]
+            }
+        }
+    } else {
+        vec![fallback_summary.clone()]
+    };
+
+    // Store each insight for tomorrow's morning briefing.
     let tomorrow = (chrono::Utc::now() + chrono::Duration::days(1))
         .format("%Y-%m-%d")
         .to_string();
-    svc.store_insight(&tomorrow, &summary, &dot_refs)
-        .await
-        .map_err(|e| e.to_string())?;
+
+    for insight in &insights {
+        svc.store_insight(&tomorrow, insight, &dot_refs)
+            .await
+            .map_err(|e| e.to_string())?;
+    }
 
     info!(
         dots = dots.len(),
-        "nightly cross-domain batch stored insight for {tomorrow}"
+        insights = insights.len(),
+        "nightly cross-domain batch stored insights for {tomorrow}"
     );
     Ok(Some(format!(
-        "Stored cross-domain insight ({} dots) for {tomorrow}",
+        "Stored {} cross-domain insight(s) ({} dots) for {tomorrow}",
+        insights.len(),
         dots.len()
     )))
+}
+
+/// Make a single lightweight LLM call to produce polished insight sentences
+/// from today's cross-domain connections.
+async fn generate_insights_via_llm(
+    provider: &providers::DynProvider,
+    model: &str,
+    pairs: &[String],
+) -> Result<Vec<String>, String> {
+    let dot_list = pairs
+        .iter()
+        .map(|p| format!("- {p}"))
+        .collect::<Vec<_>>()
+        .join("\n");
+
+    let prompt = format!(
+        "You are a personal second brain. Given these cross-domain connections the user \
+         saw today, generate 1-3 polished insight sentences for tomorrow's morning \
+         briefing. Be first-person, sparse, and action-oriented. Max one clause per \
+         insight. Return ONLY the insight sentences, one per line.\n\n\
+         Connections:\n{dot_list}"
+    );
+
+    let params = providers::ChatParams::new(model)
+        .with_temperature(0.4)
+        .with_max_tokens(500);
+
+    let messages = vec![
+        providers::Message::system(
+            "You generate concise personal insight sentences. No preamble, no numbering, \
+             no markdown. One sentence per line.",
+        ),
+        providers::Message::user(prompt),
+    ];
+
+    let response = provider
+        .chat(&messages, None, &params)
+        .await
+        .map_err(|e| e.to_string())?;
+
+    let content = response.content.unwrap_or_default();
+    let sentences: Vec<String> = content
+        .lines()
+        .map(|l| l.trim().to_string())
+        .filter(|l| !l.is_empty())
+        .collect();
+
+    if sentences.is_empty() {
+        return Err("LLM returned empty response".to_string());
+    }
+
+    Ok(sentences)
 }
 
 /// Parse "HH:MM" to cron expression "M H * * *".
