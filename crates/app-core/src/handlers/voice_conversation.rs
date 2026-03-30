@@ -76,6 +76,7 @@ pub struct VoiceConversationState {
     pub pending_transcript: Option<String>,
     pub pending_response_text: Option<String>,
     pub tts_position: usize,
+    pub session_title: String,
 }
 
 impl Default for VoiceConversationState {
@@ -90,6 +91,7 @@ impl Default for VoiceConversationState {
             pending_transcript: None,
             pending_response_text: None,
             tts_position: 0,
+            session_title: "Voice session".to_string(),
         }
     }
 }
@@ -105,6 +107,7 @@ impl VoiceConversationState {
         self.pending_transcript = None;
         self.pending_response_text = None;
         self.tts_position = 0;
+        self.session_title = "New voice session".to_string();
     }
 
     pub fn touch(&mut self) {
@@ -313,14 +316,16 @@ impl VoiceConversationManager {
         };
 
         // Update state
-        {
+        let turn_count = {
             let mut state = self.state.lock().await;
             state.session_key = Some(session_key.clone());
             state.phase = ConversationPhase::Listening;
             state.paused = false;
             state.interrupted = false;
+            state.session_title = session_title.clone();
             state.touch();
-        }
+            state.turn_count
+        };
 
         // Upsert session in DB
         let metadata = serde_json::json!({
@@ -334,11 +339,10 @@ impl VoiceConversationManager {
             .await;
 
         // Emit phase changed
-        let turn_count = self.state.lock().await.turn_count;
         let _ = self
             .voice_service
             .emit_event(VoiceEvent::PhaseChanged {
-                phase: "listening".to_string(),
+                phase: ConversationPhase::Listening.as_str().to_string(),
                 session_title: Some(session_title.clone()),
                 turn_count,
             })
@@ -354,6 +358,29 @@ impl VoiceConversationManager {
             session_title,
             is_continuing,
         })
+    }
+
+    // ── 2b. new_session ─────────────────────────────────────
+
+    /// Atomically end any active capture, reset state, and start a fresh session.
+    /// Avoids the race of sending `NewSession` through the command channel and
+    /// sleeping before calling `start()`.
+    pub async fn new_session(&self) -> common::Result<StartResponse> {
+        // Stop any active capture
+        let _ = self
+            .cmd_tx
+            .send(VoiceCommand::End)
+            .await;
+
+        // Reset state directly under the lock
+        {
+            let mut state = self.state.lock().await;
+            let new_key = create_voice_session_key();
+            state.reset_for_new_session(new_key);
+        }
+
+        // Now start fresh (resolve_session will see the new key)
+        self.start().await
     }
 
     // ── 3. spawn_loop ───────────────────────────────────────
@@ -544,12 +571,14 @@ impl VoiceConversationManager {
         );
 
         // Emit PhaseChanged for reflecting
-        let turn_count = self.state.lock().await.turn_count;
-        let session_title = self.current_session_title().await;
+        let (turn_count, session_title) = {
+            let state = self.state.lock().await;
+            (state.turn_count, state.session_title.clone())
+        };
         let _ = self
             .voice_service
             .emit_event(VoiceEvent::PhaseChanged {
-                phase: "reflecting".to_string(),
+                phase: ConversationPhase::Reflecting.as_str().to_string(),
                 session_title: Some(session_title),
                 turn_count,
             })
@@ -663,6 +692,7 @@ impl VoiceConversationManager {
             state.pending_transcript = None;
             state.turn_count += 1;
             state.tts_position = 0;
+            state.interrupted = false;
             state.touch();
         }
 
@@ -710,12 +740,14 @@ impl VoiceConversationManager {
         );
 
         // Emit PhaseChanged
-        let turn_count = self.state.lock().await.turn_count;
-        let title = self.current_session_title().await;
+        let (turn_count, title) = {
+            let state = self.state.lock().await;
+            (state.turn_count, state.session_title.clone())
+        };
         let _ = self
             .voice_service
             .emit_event(VoiceEvent::PhaseChanged {
-                phase: "speaking".to_string(),
+                phase: ConversationPhase::Speaking.as_str().to_string(),
                 session_title: Some(title),
                 turn_count,
             })
@@ -730,7 +762,7 @@ impl VoiceConversationManager {
         // MonitorSession contains a cpal::Stream which is !Send, so we extract
         // the Send-safe rms_rx + stop_signal and keep the stream alive on a
         // blocking thread (same pattern as VoiceService::begin_capture).
-        let (mut monitor_rms_rx, monitor_stop) = start_monitor_safe(&self.voice_service);
+        let mut monitor = start_monitor_safe(&self.voice_service);
 
         // Estimate TTS duration: ~150ms per word
         let word_count = tts_text.split_whitespace().count();
@@ -754,17 +786,19 @@ impl VoiceConversationManager {
                     match cmd {
                         VoiceCommand::End => {
                             info!("Speaking phase: End received");
-                            if let Some(ref stop) = monitor_stop {
+                            if let Some(ref stop) = monitor.stop_signal {
                                 stop.store(true, Ordering::Relaxed);
                             }
+                            drop(monitor);
                             self.transition_to(ConversationPhase::Idle).await;
                             return;
                         }
                         VoiceCommand::Pause => {
                             info!("Speaking phase: Pause received");
-                            if let Some(ref stop) = monitor_stop {
+                            if let Some(ref stop) = monitor.stop_signal {
                                 stop.store(true, Ordering::Relaxed);
                             }
+                            drop(monitor);
                             self.state.lock().await.paused = true;
                             self.transition_to(ConversationPhase::Idle).await;
                             return;
@@ -775,7 +809,7 @@ impl VoiceConversationManager {
                         _ => {} // Resume/Continue/NewSession handled elsewhere
                     }
                 }
-                Some(rms) = monitor_rms_rx.recv() => {
+                Some(rms) = monitor.rms_rx.recv() => {
                     if rms > INTERRUPT_RMS_THRESHOLD {
                         consecutive_speech_samples += 1;
                         if consecutive_speech_samples >= SPEECH_SAMPLE_THRESHOLD {
@@ -799,9 +833,10 @@ impl VoiceConversationManager {
         }
 
         // Stop monitor
-        if let Some(ref stop) = monitor_stop {
+        if let Some(ref stop) = monitor.stop_signal {
             stop.store(true, Ordering::Relaxed);
         }
+        drop(monitor);
 
         if interrupted {
             // Estimate how far into the text we got
@@ -871,12 +906,14 @@ impl VoiceConversationManager {
         // Transition to listening
         self.transition_to(ConversationPhase::Listening).await;
 
-        let turn_count = self.state.lock().await.turn_count;
-        let title = self.current_session_title().await;
+        let (turn_count, title) = {
+            let state = self.state.lock().await;
+            (state.turn_count, state.session_title.clone())
+        };
         let _ = self
             .voice_service
             .emit_event(VoiceEvent::PhaseChanged {
-                phase: "listening".to_string(),
+                phase: ConversationPhase::Listening.as_str().to_string(),
                 session_title: Some(title),
                 turn_count,
             })
@@ -888,18 +925,23 @@ impl VoiceConversationManager {
     async fn handle_command_while_idle(&self, cmd: VoiceCommand) {
         match cmd {
             VoiceCommand::Resume => {
-                let paused = self.state.lock().await.paused;
-                if paused {
+                let (was_paused, turn_count, title) = {
+                    let mut state = self.state.lock().await;
+                    if state.paused {
+                        state.paused = false;
+                        (true, state.turn_count, state.session_title.clone())
+                    } else {
+                        (false, 0, String::new())
+                    }
+                };
+                if was_paused {
                     info!("Idle: Resume received, transitioning to Listening");
-                    self.state.lock().await.paused = false;
                     self.transition_to(ConversationPhase::Listening).await;
 
-                    let turn_count = self.state.lock().await.turn_count;
-                    let title = self.current_session_title().await;
                     let _ = self
                         .voice_service
                         .emit_event(VoiceEvent::PhaseChanged {
-                            phase: "listening".to_string(),
+                            phase: ConversationPhase::Listening.as_str().to_string(),
                             session_title: Some(title),
                             turn_count,
                         })
@@ -922,7 +964,7 @@ impl VoiceConversationManager {
                 let _ = self
                     .voice_service
                     .emit_event(VoiceEvent::PhaseChanged {
-                        phase: "idle".to_string(),
+                        phase: ConversationPhase::Idle.as_str().to_string(),
                         session_title: None,
                         turn_count: 0,
                     })
@@ -960,33 +1002,22 @@ impl VoiceConversationManager {
         state.touch();
     }
 
-    /// Get the current session title from DB, or a default.
-    async fn current_session_title(&self) -> String {
-        let session_key = self.state.lock().await.session_key.clone();
-        if let Some(ref key) = session_key {
-            if let Ok(row) = self.repos.sessions.get_session(key.as_str()).await {
-                return row
-                    .metadata
-                    .get("title")
-                    .and_then(|v| v.as_str())
-                    .unwrap_or("Voice session")
-                    .to_string();
-            }
-        }
-        "Voice session".to_string()
-    }
 }
 
 // ── Monitor helper ──────────────────────────────────────────
 
+/// Result of starting a monitor: the rms receiver, the stop signal, and a
+/// oneshot sender whose drop will unpark the blocking keepalive thread.
+struct MonitorHandle {
+    rms_rx: mpsc::Receiver<f32>,
+    stop_signal: Option<Arc<std::sync::atomic::AtomicBool>>,
+    /// Drop this to release the blocking keepalive thread (and the cpal stream).
+    _keepalive_tx: Option<tokio::sync::oneshot::Sender<()>>,
+}
+
 /// Start a lightweight audio monitor, extracting Send-safe parts and keeping
 /// the !Send cpal::Stream alive on a blocking thread.
-fn start_monitor_safe(
-    voice_service: &VoiceService,
-) -> (
-    mpsc::Receiver<f32>,
-    Option<Arc<std::sync::atomic::AtomicBool>>,
-) {
+fn start_monitor_safe(voice_service: &VoiceService) -> MonitorHandle {
     match voice_service.start_monitor() {
         Ok(mut session) => {
             let stop = session.stop_signal.clone();
@@ -998,21 +1029,28 @@ fn start_monitor_safe(
             };
 
             // Keep the !Send MonitorSession alive on a blocking thread.
+            // The thread parks until keepalive_tx is dropped (or sends).
             let sendable = SendableMonitorSession(session);
-            let keepalive_stop = stop.clone();
+            let (keepalive_tx, keepalive_rx) = tokio::sync::oneshot::channel::<()>();
             tokio::task::spawn_blocking(move || {
-                while !keepalive_stop.load(Ordering::Relaxed) {
-                    std::thread::sleep(std::time::Duration::from_millis(50));
-                }
+                let _ = keepalive_rx.blocking_recv();
                 drop(sendable);
             });
 
-            (rms_rx, Some(stop))
+            MonitorHandle {
+                rms_rx,
+                stop_signal: Some(stop),
+                _keepalive_tx: Some(keepalive_tx),
+            }
         }
         Err(e) => {
             warn!("Failed to start audio monitor: {e}");
             let (_tx, rx) = mpsc::channel::<f32>(1);
-            (rx, None)
+            MonitorHandle {
+                rms_rx: rx,
+                stop_signal: None,
+                _keepalive_tx: None,
+            }
         }
     }
 }

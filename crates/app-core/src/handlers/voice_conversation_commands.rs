@@ -3,8 +3,18 @@
 use desktop_shared::commands::voice_conversation::*;
 use desktop_shared::errors::ApiError;
 
-use crate::handlers::voice_conversation::ConversationPhase;
+use crate::handlers::voice_conversation::{ConversationPhase, StartResponse};
 use crate::state::AppCore;
+
+impl From<StartResponse> for VoiceConversationStartResponse {
+    fn from(r: StartResponse) -> Self {
+        Self {
+            session_key: r.session_key,
+            session_title: r.session_title,
+            is_continuing: r.is_continuing,
+        }
+    }
+}
 
 impl AppCore {
     /// Start a voice conversation (resolves/creates session).
@@ -16,11 +26,7 @@ impl AppCore {
             .start()
             .await
             .map_err(|e| ApiError::new("VOICE_ERROR", e.to_string()))?;
-        Ok(VoiceConversationStartResponse {
-            session_key: result.session_key,
-            session_title: result.session_title,
-            is_continuing: result.is_continuing,
-        })
+        Ok(result.into())
     }
 
     /// Pause the voice conversation.
@@ -64,20 +70,11 @@ impl AppCore {
         &self,
     ) -> Result<VoiceConversationStartResponse, ApiError> {
         let manager = self.voice_conversation_manager()?;
-        manager
-            .send_command(crate::handlers::voice_conversation::VoiceCommand::NewSession)
-            .await;
-        // Give the loop a moment to reset, then start fresh
-        tokio::time::sleep(std::time::Duration::from_millis(50)).await;
         let result = manager
-            .start()
+            .new_session()
             .await
             .map_err(|e| ApiError::new("VOICE_ERROR", e.to_string()))?;
-        Ok(VoiceConversationStartResponse {
-            session_key: result.session_key,
-            session_title: result.session_title,
-            is_continuing: result.is_continuing,
-        })
+        Ok(result.into())
     }
 
     /// End the voice conversation entirely.

@@ -8,29 +8,31 @@ use tauri::State;
 
 use crate::app_core::AppCore;
 
+fn set_tray_voice(active: bool, phase: u8) {
+    crate::tray_countdown::VOICE_ACTIVE.store(active, std::sync::atomic::Ordering::Relaxed);
+    crate::tray_countdown::VOICE_PHASE.store(phase, std::sync::atomic::Ordering::Relaxed);
+}
+
 #[tauri::command]
 pub async fn voice_conversation_start(
     state: State<'_, Arc<AppCore>>,
 ) -> Result<VoiceConversationStartResponse, ApiError> {
     let result = state.voice_conversation_start().await?;
-    crate::tray_countdown::VOICE_ACTIVE.store(true, std::sync::atomic::Ordering::Relaxed);
-    crate::tray_countdown::VOICE_PHASE.store(1, std::sync::atomic::Ordering::Relaxed);
+    set_tray_voice(true, 1);
     Ok(result)
 }
 
 #[tauri::command]
 pub async fn voice_conversation_pause(state: State<'_, Arc<AppCore>>) -> Result<(), ApiError> {
     let result = state.voice_conversation_pause().await;
-    crate::tray_countdown::VOICE_ACTIVE.store(false, std::sync::atomic::Ordering::Relaxed);
-    crate::tray_countdown::VOICE_PHASE.store(0, std::sync::atomic::Ordering::Relaxed);
+    set_tray_voice(false, 0);
     result
 }
 
 #[tauri::command]
 pub async fn voice_conversation_resume(state: State<'_, Arc<AppCore>>) -> Result<(), ApiError> {
     let result = state.voice_conversation_resume().await;
-    crate::tray_countdown::VOICE_ACTIVE.store(true, std::sync::atomic::Ordering::Relaxed);
-    crate::tray_countdown::VOICE_PHASE.store(1, std::sync::atomic::Ordering::Relaxed);
+    set_tray_voice(true, 1);
     result
 }
 
@@ -49,15 +51,14 @@ pub async fn voice_conversation_new_session(
     state: State<'_, Arc<AppCore>>,
 ) -> Result<VoiceConversationStartResponse, ApiError> {
     let result = state.voice_conversation_new_session().await?;
-    crate::tray_countdown::VOICE_ACTIVE.store(true, std::sync::atomic::Ordering::Relaxed);
+    set_tray_voice(true, 1);
     Ok(result)
 }
 
 #[tauri::command]
 pub async fn voice_conversation_end(state: State<'_, Arc<AppCore>>) -> Result<(), ApiError> {
     let result = state.voice_conversation_end().await;
-    crate::tray_countdown::VOICE_ACTIVE.store(false, std::sync::atomic::Ordering::Relaxed);
-    crate::tray_countdown::VOICE_PHASE.store(0, std::sync::atomic::Ordering::Relaxed);
+    set_tray_voice(false, 0);
     result
 }
 

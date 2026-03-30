@@ -1,6 +1,7 @@
+import { useEvent } from "@shared/hooks/useEvent";
 import { ipc } from "@shared/hooks/useIpc";
 import { playTtsAudio } from "@shared/lib/audio";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 
 export type ConversationPhase = "idle" | "listening" | "reflecting" | "speaking";
 
@@ -33,6 +34,7 @@ export function useVoiceConversation() {
   const [sessionInfo, setSessionInfo] = useState<SessionInfo | null>(null);
   const [continueAvailable, setContinueAvailable] = useState(false);
   const [engineKind, setEngineKind] = useState<"local" | "cloud">("local");
+  const [setupRequired, setSetupRequired] = useState(false);
 
   const continueTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -118,6 +120,9 @@ export function useVoiceConversation() {
       case "captureStarted":
         setEngineKind(payload.engine === "Cloud" ? "cloud" : "local");
         break;
+      case "setupRequired":
+        setSetupRequired(true);
+        break;
       case "error":
         setPhase("idle");
         break;
@@ -125,31 +130,7 @@ export function useVoiceConversation() {
   }, []);
 
   // Listen to Tauri events or browser CustomEvents
-  useEffect(() => {
-    let unlisten: (() => void) | null = null;
-
-    if (window.__TAURI_INTERNALS__) {
-      import("@tauri-apps/api/event").then(({ listen }) => {
-        listen<Record<string, unknown>>("voice:event", (event) => {
-          handleEvent(event.payload);
-        }).then((fn) => {
-          unlisten = fn;
-        });
-      });
-    } else {
-      const handler = (e: Event) => {
-        const detail = (e as CustomEvent).detail;
-        if (detail) handleEvent(detail);
-      };
-      window.addEventListener("voice:event", handler);
-      unlisten = () => window.removeEventListener("voice:event", handler);
-    }
-
-    return () => {
-      unlisten?.();
-      if (continueTimerRef.current) clearTimeout(continueTimerRef.current);
-    };
-  }, [handleEvent]);
+  useEvent<Record<string, unknown>>("voice:event", handleEvent);
 
   // Actions
   const start = useCallback(async (): Promise<SessionInfo> => {
@@ -212,6 +193,7 @@ export function useVoiceConversation() {
     sessionInfo,
     continueAvailable,
     engineKind,
+    setupRequired,
     start,
     pause,
     resume,

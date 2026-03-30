@@ -96,6 +96,7 @@ export function VoiceBrainOrb() {
     sessionInfo,
     continueAvailable,
     engineKind,
+    setupRequired,
     pause,
     resume,
     newSession,
@@ -107,35 +108,6 @@ export function VoiceBrainOrb() {
   const [isContinuing, setIsContinuing] = useState(false);
   // Track whether we're paused (phase stays at current value, but we toggled pause)
   const [paused, setPaused] = useState(false);
-  // Track whether voice setup (model download) is required
-  const [setupRequired, setSetupRequired] = useState(false);
-
-  // Listen for setupRequired event to show download progress screen
-  useEffect(() => {
-    const handleEvent = (payload: Record<string, unknown>) => {
-      if (payload.type === "setupRequired") {
-        setSetupRequired(true);
-      }
-    };
-
-    if (window.__TAURI_INTERNALS__) {
-      let unlisten: (() => void) | null = null;
-      import("@tauri-apps/api/event").then(({ listen }) => {
-        listen<Record<string, unknown>>("voice:event", (event) => {
-          handleEvent(event.payload);
-        }).then((fn) => {
-          unlisten = fn;
-        });
-      });
-      return () => {
-        unlisten?.();
-      };
-    }
-
-    const browserHandler = (e: Event) => handleEvent((e as CustomEvent).detail);
-    window.addEventListener("voice:event", browserHandler);
-    return () => window.removeEventListener("voice:event", browserHandler);
-  }, []);
 
   // Listen for a phaseChanged event that signals continuing — we detect it via
   // sessionInfo changes combined with turnCount > 0 when phase first enters listening

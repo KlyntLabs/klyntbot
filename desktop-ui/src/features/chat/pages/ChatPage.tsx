@@ -84,11 +84,16 @@ export function ChatPage() {
 
   // ── Voice phase indicator ─────────────────────────────────────────────
   const [voicePhase, setVoicePhase] = useState<string>("idle");
+  const voicePhaseRef = useRef(voicePhase);
   useEffect(() => {
     const handler = (e: Event) => {
       const detail = (e as CustomEvent).detail;
       if (detail?.type === "phaseChanged") {
-        setVoicePhase(detail.phase as string);
+        const next = detail.phase as string;
+        if (next !== voicePhaseRef.current) {
+          voicePhaseRef.current = next;
+          setVoicePhase(next);
+        }
       }
     };
     window.addEventListener("voice:event", handler);
