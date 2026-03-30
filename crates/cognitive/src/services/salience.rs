@@ -138,6 +138,14 @@ pub fn evaluate_salience(event: &DomainEvent) -> SalienceVerdict {
         // Mirror events — discard from cognitive (Mirror handles its own storage)
         DomainEvent::MirrorTrialKilled { .. } => SalienceVerdict::Discard,
         DomainEvent::MirrorSnippetCreated { .. } => SalienceVerdict::Discard,
+
+        // DeadlineScheduler events — discard (scheduler handles its own timers)
+        DomainEvent::TaskDueDateChanged { .. } => SalienceVerdict::Discard,
+        DomainEvent::TaskFocusChanged { .. } => SalienceVerdict::Discard,
+        DomainEvent::RecurringTemplateAdvanced { .. } => SalienceVerdict::Discard,
+
+        // Catch-all for new variants not yet classified
+        _ => SalienceVerdict::Accumulate,
     }
 }
 
