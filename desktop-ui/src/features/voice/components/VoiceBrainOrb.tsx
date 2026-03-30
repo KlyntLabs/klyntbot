@@ -366,9 +366,7 @@ export function VoiceBrainOrb() {
 
       {/* ── Hint bar ───────────────────────────────────────────────────────── */}
       <div className="text-[10px] text-muted-foreground/40 text-center px-3 pb-3">
-        {phase === "speaking"
-          ? "Esc stop · ⌥⇧V close"
-          : "Esc close · ⌥⇧V close"}
+        {phase === "speaking" ? "Esc stop · ⌥⇧V close" : "Esc close · ⌥⇧V close"}
       </div>
     </div>
   );
