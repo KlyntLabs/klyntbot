@@ -1,4 +1,5 @@
 import { KlyntLogo } from "@shared/components/ui/KlyntLogo";
+import { useAmbientSignals } from "@shared/hooks/useAmbientSignals";
 import { ipc } from "@shared/hooks/useIpc";
 import type { SidebarItem } from "@shared/types";
 import {
@@ -43,6 +44,7 @@ export function Sidebar({ active, onNavigate, isChatOpen, onToggleChat }: Sideba
   const navigate = useNavigate();
   const [dueCount, setDueCount] = useState(0);
   const dueCountRef = useRef(0);
+  const { badgeCount, isPulsing } = useAmbientSignals();
 
   useEffect(() => {
     const fetchDue = () => {
@@ -89,6 +91,7 @@ export function Sidebar({ active, onNavigate, isChatOpen, onToggleChat }: Sideba
         const Icon = item.icon;
         const isActive = active === item.key;
         const showBadge = item.key === "Learn" && dueCount > 0;
+        const showBrainPulse = item.key === "Brain" && (badgeCount > 0 || isPulsing);
         return (
           <button
             type="button"
@@ -106,6 +109,9 @@ export function Sidebar({ active, onNavigate, isChatOpen, onToggleChat }: Sideba
               <span className="absolute -top-0.5 -right-0.5 min-w-[14px] h-[14px] rounded-full bg-brand text-[8px] text-white flex items-center justify-center font-medium px-0.5">
                 {dueCount > 99 ? "99" : dueCount}
               </span>
+            )}
+            {showBrainPulse && (
+              <div className="absolute top-1 right-1 size-1 rounded-full bg-amber-400" />
             )}
           </button>
         );

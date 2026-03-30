@@ -1,3 +1,4 @@
+import { FocusDebrief } from "@features/productivity/components/FocusDebrief";
 import { useAmbientSignals } from "@shared/hooks/useAmbientSignals";
 import { Shield } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
@@ -41,12 +42,12 @@ export function BrainOrb() {
     }, 8000);
   };
 
-  // Close tooltips when pulse ends
+  // Close pulse tooltip when pulse ends, but keep debrief panel open
   useEffect(() => {
-    if (!isPulsing) {
+    if (!isPulsing && current?.mode !== "deferred") {
       setTooltipVisible(false);
     }
-  }, [isPulsing]);
+  }, [isPulsing, current?.mode]);
 
   // Close badge tooltip when badge is cleared
   useEffect(() => {
@@ -140,8 +141,19 @@ export function BrainOrb() {
         </span>
       )}
 
-      {/* ── Pulse tooltip ── */}
-      {tooltipVisible && isPulsing && current?.tooltip && (
+      {/* ── Pulse tooltip / Focus debrief ── */}
+      {tooltipVisible && current?.mode === "deferred" ? (
+        <div className="absolute top-full right-0 mt-2 z-50">
+          <FocusDebrief
+            signals={current.signals}
+            tooltip={current.tooltip}
+            onClose={() => {
+              setTooltipVisible(false);
+              acknowledge();
+            }}
+          />
+        </div>
+      ) : tooltipVisible && isPulsing && current?.tooltip ? (
         // biome-ignore lint/a11y/noStaticElementInteractions: tooltip needs hover to stay open
         <div
           className="absolute top-full left-1/2 -translate-x-1/2 mt-2 z-50
@@ -161,7 +173,7 @@ export function BrainOrb() {
             </button>
           )}
         </div>
-      )}
+      ) : null}
 
       {/* ── Badge summary tooltip ── */}
       {badgeTooltipVisible && badgeCount > 0 && (
