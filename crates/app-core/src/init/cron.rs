@@ -846,16 +846,6 @@ async fn ensure_cron_jobs(
 
     // ── User-editable jobs (notifications, checks, user-facing features) ──
 
-    ensure_job!(
-        JOB_WEEKLY_REPORT,
-        scheduling::CronSchedule::Cron {
-            expr: "0 18 * * 0".to_string(),
-            tz: None
-        },
-        "Generate weekly progress report",
-        user.clone()
-    );
-
     if config.todo.daily_planning.enabled {
         if let Some(cron_expr) = parse_time_to_cron(&config.todo.daily_planning.planning_time) {
             ensure_job!(
@@ -910,25 +900,6 @@ async fn ensure_cron_jobs(
             user.clone()
         );
     }
-
-    ensure_job!(
-        JOB_MORNING_BRIEFING,
-        scheduling::CronSchedule::Cron {
-            expr: "0 9 * * *".to_string(),
-            tz: Some(config.timezone.clone()),
-        },
-        "Morning knowledge health briefing",
-        user.clone()
-    );
-    ensure_job!(
-        JOB_WEEKLY_KNOWLEDGE_DIGEST,
-        scheduling::CronSchedule::Cron {
-            expr: "0 18 * * 0".to_string(),
-            tz: Some(config.timezone.clone()),
-        },
-        "Weekly knowledge health digest",
-        user.clone()
-    );
 
     if tasks_config.proactive_suggestions {
         ensure_job!(
@@ -1049,6 +1020,40 @@ async fn ensure_cron_jobs(
         system
     );
 
+    Ok(())
+}
+
+/// Lazily ensure a user-facing cron job exists. Called when a feature is first used
+/// (e.g., first task created → daily digest, first atom → morning briefing).
+/// No-op if the job already exists.
+pub async fn ensure_lazy_job(
+    cron_service: &Arc<CronService>,
+    name: &str,
+    schedule: scheduling::CronSchedule,
+    description: &str,
+) -> Result<(), common::KlyntbotError> {
+    let existing: std::collections::HashSet<String> = cron_service
+        .list_jobs(true)
+        .await
+        .into_iter()
+        .map(|j| j.name)
+        .collect();
+
+    if !existing.contains(name) {
+        cron_service
+            .add_job(
+                name,
+                schedule,
+                description,
+                false,
+                None,
+                None,
+                false,
+                scheduling::CronOrigin::User,
+            )
+            .await?;
+        tracing::info!("Lazy-created cron job: {name}");
+    }
     Ok(())
 }
 
