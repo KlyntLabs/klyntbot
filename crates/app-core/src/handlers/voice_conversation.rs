@@ -670,8 +670,43 @@ impl VoiceConversationManager {
                             }
                             break;
                         }
+                        Some(agent::AgentEvent::ToolStart { name, args, agent }) => {
+                            let action = args.get("action").and_then(|v| v.as_str()).map(String::from);
+                            if let Ok(val) = serde_json::to_value(
+                                &desktop_shared::events::ToolStartPayload {
+                                    session_key: session_key_str.clone(),
+                                    name,
+                                    action,
+                                    agent,
+                                },
+                            ) {
+                                self.emitter.emit_event(
+                                    desktop_shared::events::AGENT_TOOL_START,
+                                    val,
+                                );
+                            }
+                        }
+                        Some(agent::AgentEvent::ToolEnd { name, success, duration_ms, result, agent }) => {
+                            if let Ok(val) = serde_json::to_value(
+                                &desktop_shared::events::ToolEndPayload {
+                                    session_key: session_key_str.clone(),
+                                    name,
+                                    action: None,
+                                    success,
+                                    duration_ms,
+                                    result,
+                                    estimated_tokens: None,
+                                    agent,
+                                },
+                            ) {
+                                self.emitter.emit_event(
+                                    desktop_shared::events::AGENT_TOOL_END,
+                                    val,
+                                );
+                            }
+                        }
                         Some(other_event) => {
-                            // Forward other events generically
+                            // Forward remaining events generically
                             if let Ok(val) = serde_json::to_value(&other_event) {
                                 self.emitter.emit_event("agent:event", val);
                             }

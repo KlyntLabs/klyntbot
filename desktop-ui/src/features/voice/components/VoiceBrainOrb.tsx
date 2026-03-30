@@ -202,9 +202,24 @@ export function VoiceBrainOrb() {
         </span>
 
         {isContinuing && (
-          <span className="text-[10px] text-muted-foreground/60 bg-accent/40 px-1.5 py-0.5 rounded-full flex-shrink-0">
-            continuing
-          </span>
+          <button
+            type="button"
+            onClick={async (e) => {
+              e.stopPropagation();
+              if (window.__TAURI_INTERNALS__) {
+                const { WebviewWindow } = await import("@tauri-apps/api/webviewWindow");
+                const mainWindow = WebviewWindow.getByLabel("main");
+                if (mainWindow) {
+                  await mainWindow.setFocus();
+                }
+              }
+            }}
+            className="text-[10px] text-success hover:text-success/80 bg-accent/40 px-1.5 py-0.5
+              rounded-full flex-shrink-0 flex items-center gap-0.5 transition-colors"
+            title="Open in chat"
+          >
+            continuing ↗
+          </button>
         )}
 
         {engineKind === "cloud" && (
@@ -351,7 +366,9 @@ export function VoiceBrainOrb() {
 
       {/* ── Hint bar ───────────────────────────────────────────────────────── */}
       <div className="text-[10px] text-muted-foreground/40 text-center px-3 pb-3">
-        ⌥⇧V close · Esc {phase === "speaking" ? "stop" : "close"} · tap to pause
+        {phase === "speaking"
+          ? "Esc stop · ⌥⇧V close"
+          : "Esc close · ⌥⇧V close"}
       </div>
     </div>
   );

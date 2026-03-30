@@ -69,8 +69,21 @@ async fn countdown_loop(app: AppHandle) {
                 _ => "Voice active",
             };
             set_tray_title(&app, title);
+            // Set tooltip to indicate voice is active
+            set_tray_tooltip(&app, "Voice active — click to pause");
             cached = None;
             continue;
+        }
+
+        // Voice model ready but idle — hint tooltip
+        if VOICE_PHASE.load(Ordering::Relaxed) == 0 {
+            if let Some(core) = app.try_state::<Arc<AppCore>>() {
+                if core.voice_service().is_ok() {
+                    set_tray_tooltip(&app, "Voice ready — ⌥⇧V to think out loud");
+                } else {
+                    set_tray_tooltip(&app, "Klynt");
+                }
+            }
         }
 
         // Re-query DB every POLL_INTERVAL_SECS or when cache is empty
@@ -167,5 +180,11 @@ async fn query_next_item(app: &AppHandle) -> Option<NextItem> {
 fn set_tray_title(app: &AppHandle, title: &str) {
     if let Some(tray) = app.tray_by_id("klynt-tray") {
         let _ = tray.set_title(Some(title));
+    }
+}
+
+fn set_tray_tooltip(app: &AppHandle, tooltip: &str) {
+    if let Some(tray) = app.tray_by_id("klynt-tray") {
+        let _ = tray.set_tooltip(Some(tooltip));
     }
 }

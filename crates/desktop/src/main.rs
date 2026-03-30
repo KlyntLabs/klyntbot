@@ -520,6 +520,65 @@ fn run_desktop_app() {
                 }
             }
 
+            // Custom macOS menu: Cmd+Q hides the dashboard (tray keeps running),
+            // Cmd+W is NOT bound so the frontend can use it for in-app navigation.
+            #[cfg(target_os = "macos")]
+            {
+                use tauri::menu::{Menu, MenuItem, PredefinedMenuItem, Submenu};
+
+                let close_window = MenuItem::with_id(
+                    app,
+                    "close_window",
+                    "Close Window",
+                    true,
+                    Some("CmdOrCtrl+Q"),
+                )?;
+
+                let app_menu = Submenu::with_items(
+                    app,
+                    "Klynt",
+                    true,
+                    &[
+                        &PredefinedMenuItem::about(app, Some("About Klynt"), None)?,
+                        &PredefinedMenuItem::separator(app)?,
+                        &PredefinedMenuItem::hide(app, None)?,
+                        &PredefinedMenuItem::hide_others(app, None)?,
+                        &PredefinedMenuItem::show_all(app, None)?,
+                        &PredefinedMenuItem::separator(app)?,
+                        &close_window,
+                    ],
+                )?;
+
+                let edit_menu = Submenu::with_items(
+                    app,
+                    "Edit",
+                    true,
+                    &[
+                        &PredefinedMenuItem::undo(app, None)?,
+                        &PredefinedMenuItem::redo(app, None)?,
+                        &PredefinedMenuItem::separator(app)?,
+                        &PredefinedMenuItem::cut(app, None)?,
+                        &PredefinedMenuItem::copy(app, None)?,
+                        &PredefinedMenuItem::paste(app, None)?,
+                        &PredefinedMenuItem::select_all(app, None)?,
+                    ],
+                )?;
+
+                let menu = Menu::with_items(app, &[&app_menu, &edit_menu])?;
+                app.set_menu(menu)?;
+
+                let handle = app.handle().clone();
+                app.on_menu_event(move |_app, event| {
+                    if event.id().as_ref() == "close_window" {
+                        if let Some(window) = handle.get_webview_window("main") {
+                            let _ = window.hide();
+                        }
+                        let _ =
+                            handle.set_activation_policy(tauri::ActivationPolicy::Accessory);
+                    }
+                });
+            }
+
             // Show the main window now that init is complete (starts hidden
             // via tauri.conf.json to avoid a blank window during boot).
             if let Some(main_window) = app.get_webview_window("main") {
@@ -556,6 +615,26 @@ fn run_desktop_app() {
                         ..
                     } = event
                     {
+                        // When voice is active, tray click toggles pause/resume
+                        if tray_countdown::VOICE_ACTIVE.load(Ordering::Relaxed) {
+                            let handle = tray.app_handle().clone();
+                            tauri::async_runtime::spawn(async move {
+                                let core =
+                                    handle.state::<std::sync::Arc<app_core::AppCore>>();
+                                if let Ok(manager) = core.voice_conversation_manager() {
+                                    use ::app_core::handlers::voice_conversation::{
+                                        ConversationPhase, VoiceCommand,
+                                    };
+                                    let phase = manager.phase().await;
+                                    if phase == ConversationPhase::Idle {
+                                        manager.send_command(VoiceCommand::Resume).await;
+                                    } else {
+                                        manager.send_command(VoiceCommand::Pause).await;
+                                    }
+                                }
+                            });
+                            return;
+                        }
                         shortcuts::toggle_window(tray.app_handle(), WINDOW_TRAY);
                     }
                 })

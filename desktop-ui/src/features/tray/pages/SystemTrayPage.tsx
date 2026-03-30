@@ -12,7 +12,7 @@ import { isTauri } from "@shared/lib/utils";
 import type { CalendarEvent, TodayTask } from "@shared/types";
 import { Badge, Checkbox } from "@shared/ui";
 import { getCurrentWindow } from "@tauri-apps/api/window";
-import { exit } from "@tauri-apps/plugin-process";
+
 import { Check, Lightbulb, LogOut, Monitor, Settings, X, XCircle } from "lucide-react";
 import { useCallback, useMemo, useRef } from "react";
 import { FocusControl } from "../components/FocusControl";
@@ -97,8 +97,8 @@ export function SystemTray() {
     ipc("open_url", { url: "https://github.com/KlyntLabs/klyntbot" });
   };
 
-  const handleQuit = async () => {
-    await exit(0);
+  const handleQuit = () => {
+    ipc("quit_app");
   };
 
   // Sort: active tasks first, completed (optimistic) at bottom

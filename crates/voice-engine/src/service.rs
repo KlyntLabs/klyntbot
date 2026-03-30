@@ -478,7 +478,7 @@ impl VoiceService {
             let _ = self
                 .event_tx
                 .send(VoiceEvent::MemoryEcho {
-                    text: "Welcome to your second brain. I'm listening. Everything you say here becomes memory, learning, and reflection — just like your thoughts. Press ⌘⇧V anytime.".to_string(),
+                    text: "Welcome to your second brain. I'm listening. Everything you say here becomes memory, learning, and reflection — just like your thoughts. Press ⌥⇧V anytime.".to_string(),
                 })
                 .await;
         }
