@@ -7,7 +7,6 @@ mod refactor_tests;
 
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
-use std::time::Duration;
 use tokio::sync::broadcast;
 use tokio::sync::RwLock;
 use tokio::task::JoinHandle;
@@ -1317,6 +1316,8 @@ mod correction_tests {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::time::Duration;
+
     use bus::{LearningEvent, LearningEventBus};
 
     #[test]
