@@ -80,18 +80,17 @@ impl AppCore {
         if let Some(ref manager) = provider_manager {
             if let Some(ref emitter) = event_emitter {
                 let emitter_clone = Arc::clone(emitter);
-                let degraded_cb: providers::OnProviderDegraded =
-                    Arc::new(move |level| {
-                        let payload = match level {
-                            providers::DegradationLevel::Fallback => {
-                                serde_json::json!({ "level": "fallback" })
-                            }
-                            providers::DegradationLevel::Offline => {
-                                serde_json::json!({ "level": "offline" })
-                            }
-                        };
-                        emitter_clone.emit_event(crate::events::PROVIDER_DEGRADED, payload);
-                    });
+                let degraded_cb: providers::OnProviderDegraded = Arc::new(move |level| {
+                    let payload = match level {
+                        providers::DegradationLevel::Fallback => {
+                            serde_json::json!({ "level": "fallback" })
+                        }
+                        providers::DegradationLevel::Offline => {
+                            serde_json::json!({ "level": "offline" })
+                        }
+                    };
+                    emitter_clone.emit_event(crate::events::PROVIDER_DEGRADED, payload);
+                });
                 manager.set_provider_degraded_callback(degraded_cb).await;
             }
         }
@@ -350,24 +349,70 @@ impl AppCore {
             (Some(Arc::new(facade)), Some(handles), Some(shutdown))
         };
 
+        // ── Journey tracker (needed by BrainVoice) ──────────────────────────
+        let journey_tracker = crate::journey::JourneyTracker::new(storage_pool.clone());
+
         // ── Phase 10: BrainVoice signal router ─────────────────────────────
         let brain_voice = {
             let feedback_repo =
                 ::storage::repos::BrainSignalFeedbackRepo::new(storage_pool.inner().clone());
-            let emitter_for_brain: Arc<dyn crate::events::AppEventEmitter> =
-                event_emitter
-                    .clone()
-                    .unwrap_or_else(|| Arc::new(NoopEmitter));
+            let emitter_for_brain: Arc<dyn crate::events::AppEventEmitter> = event_emitter
+                .clone()
+                .unwrap_or_else(|| Arc::new(NoopEmitter));
             let rx = domain_event_bus.subscribe();
             let bv = crate::brain_voice::BrainVoice::start(
                 rx,
                 feedback_repo,
                 emitter_for_brain,
                 crate::brain_voice::BrainVoiceConfig::default(),
+                Some(journey_tracker.clone()),
             );
             info!("BrainVoice signal router started");
             Some(bv)
         };
+
+        // ── Morning briefing: surface unsurfaced cross-domain insights ───
+        {
+            let pool = storage_pool.clone();
+            let bus = Arc::clone(&domain_event_bus);
+            tokio::spawn(async move {
+                // Small delay to let BrainVoice finish subscribing.
+                tokio::time::sleep(std::time::Duration::from_secs(2)).await;
+
+                let svc = feature_insights::nightly_batch::NightlyBatchService::new(pool);
+                match svc.get_unsurfaced_insights().await {
+                    Ok(insights) if !insights.is_empty() => {
+                        for insight in &insights {
+                            bus.publish(bus::DomainEvent::CrossDomainDotReady {
+                                source_kind: "insight".into(),
+                                source_id: insight.id.to_string(),
+                                source_title: "Cross-domain insight".into(),
+                                target_kind: "briefing".into(),
+                                target_id: insight.date.clone(),
+                                target_title: insight.date.clone(),
+                                confidence: 1.0,
+                                tooltip: insight.insight_text.clone(),
+                                detail_route: None,
+                            });
+                            if let Err(e) = svc.mark_surfaced(insight.id).await {
+                                tracing::warn!(
+                                    "failed to mark insight {} surfaced: {e}",
+                                    insight.id
+                                );
+                            }
+                        }
+                        info!(
+                            count = insights.len(),
+                            "morning briefing: surfaced cross-domain insights"
+                        );
+                    }
+                    Ok(_) => {}
+                    Err(e) => {
+                        tracing::debug!("morning briefing insight check failed: {e}");
+                    }
+                }
+            });
+        }
 
         // ── Auto-create note on trial kill (fire-and-forget) ─────────────
         {
@@ -515,7 +560,7 @@ impl AppCore {
             voice_service: None,
             voice_conversation_manager: None,
             brain_voice,
-            journey_tracker: Some(crate::journey::JourneyTracker::new(storage_pool.clone())),
+            journey_tracker: Some(journey_tracker),
         };
 
         // ── Voice service initialization ────────────────────────────────
@@ -679,6 +724,27 @@ impl AppCore {
                                 Ok(Some(msg)) => Ok(Some(msg)),
                                 Ok(None) => Ok(Some("No insights to refresh".to_string())),
                                 Err(e) => Ok(Some(format!("Insight refresh failed: {e}"))),
+                            }
+                        })
+                    })
+                }),
+            );
+        }
+
+        // ── Nightly cross-domain batch (registered post-init — needs storage pool) ──
+        {
+            let pool = storage_pool.clone();
+            let rt = tokio::runtime::Handle::current();
+            cron_service.register_handler(
+                cron::JOB_CROSS_DOMAIN_NIGHTLY,
+                Arc::new(move |_job: &scheduling::CronJob| {
+                    let pool = pool.clone();
+                    tokio::task::block_in_place(|| {
+                        rt.block_on(async move {
+                            match cron::run_nightly_batch(&pool).await {
+                                Ok(Some(msg)) => Ok(Some(msg)),
+                                Ok(None) => Ok(Some("No cross-domain dots today".to_string())),
+                                Err(e) => Ok(Some(format!("Nightly batch failed: {e}"))),
                             }
                         })
                     })

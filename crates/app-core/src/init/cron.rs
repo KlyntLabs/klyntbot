@@ -219,6 +219,7 @@ pub(super) const JOB_INSIGHT_REFRESH: &str = "__klyntbot_insight_refresh";
 pub(super) const JOB_LEARNING_ANALYSIS: &str = "__klyntbot_learning_analysis";
 pub(super) const JOB_MIRROR_WEEKLY_NARRATIVE: &str = "__klyntbot_mirror_weekly_narrative";
 pub(super) const JOB_MIRROR_CLEANUP: &str = "__klyntbot_mirror_cleanup";
+pub(super) const JOB_CROSS_DOMAIN_NIGHTLY: &str = "__klyntbot_cross_domain_nightly";
 
 /// Register individual cron handlers.
 #[allow(clippy::too_many_arguments)]
@@ -1121,6 +1122,15 @@ async fn ensure_cron_jobs(
         system.clone()
     );
     ensure_job!(
+        JOB_CROSS_DOMAIN_NIGHTLY,
+        scheduling::CronSchedule::Cron {
+            expr: "0 2 * * *".to_string(),
+            tz: None
+        },
+        "Nightly cross-domain insight batch",
+        system.clone()
+    );
+    ensure_job!(
         JOB_MIRROR_WEEKLY_NARRATIVE,
         scheduling::CronSchedule::Cron {
             expr: "0 10 * * 0".to_string(),
@@ -1194,6 +1204,14 @@ async fn set_default_intent_windows(cron_service: &scheduling::CronService) {
             },
         ),
         (
+            JOB_CROSS_DOMAIN_NIGHTLY,
+            IntentWindow {
+                trigger: IntentTrigger::UserIdle { min_idle_secs: 300 },
+                tolerance: Duration::from_secs(14400),
+                catch_up: CatchUpPriority::WhenIdle,
+            },
+        ),
+        (
             JOB_ATOM_EXTRACTION_CATCHALL,
             IntentWindow {
                 trigger: IntentTrigger::UserIdle { min_idle_secs: 300 },
@@ -1245,6 +1263,38 @@ pub async fn refresh_insight_progress(
     } else {
         Ok(None)
     }
+}
+
+/// Run the nightly cross-domain batch: collect today's dots and store a summary insight.
+pub async fn run_nightly_batch(pool: &storage::StoragePool) -> Result<Option<String>, String> {
+    let svc = feature_insights::nightly_batch::NightlyBatchService::new(pool.clone());
+
+    let dots = svc.get_todays_dots().await.map_err(|e| e.to_string())?;
+    if dots.is_empty() {
+        return Ok(Some("No cross-domain dots today".to_string()));
+    }
+
+    // Build a simple concatenated summary from entity pairs (no LLM yet).
+    let pairs: Vec<String> = dots.iter().map(|(pair, _)| pair.clone()).collect();
+    let summary = format!("Cross-domain connections detected: {}", pairs.join(", "));
+    let dot_refs = pairs.join(";");
+
+    // Store for tomorrow's morning briefing.
+    let tomorrow = (chrono::Utc::now() + chrono::Duration::days(1))
+        .format("%Y-%m-%d")
+        .to_string();
+    svc.store_insight(&tomorrow, &summary, &dot_refs)
+        .await
+        .map_err(|e| e.to_string())?;
+
+    info!(
+        dots = dots.len(),
+        "nightly cross-domain batch stored insight for {tomorrow}"
+    );
+    Ok(Some(format!(
+        "Stored cross-domain insight ({} dots) for {tomorrow}",
+        dots.len()
+    )))
 }
 
 /// Parse "HH:MM" to cron expression "M H * * *".
