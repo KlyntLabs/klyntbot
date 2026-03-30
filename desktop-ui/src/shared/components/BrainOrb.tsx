@@ -142,6 +142,7 @@ export function BrainOrb() {
 
       {/* ── Pulse tooltip ── */}
       {tooltipVisible && isPulsing && current?.tooltip && (
+        // biome-ignore lint/a11y/noStaticElementInteractions: tooltip needs hover to stay open
         <div
           className="absolute top-full left-1/2 -translate-x-1/2 mt-2 z-50
             glass-panel rounded-xl p-3 max-w-[320px] w-max shadow-xl
@@ -164,6 +165,7 @@ export function BrainOrb() {
 
       {/* ── Badge summary tooltip ── */}
       {badgeTooltipVisible && badgeCount > 0 && (
+        // biome-ignore lint/a11y/noStaticElementInteractions: tooltip needs hover to stay open
         <div
           className="absolute top-full left-1/2 -translate-x-1/2 mt-2 z-50
             glass-panel rounded-xl p-3 max-w-[320px] w-max shadow-xl
