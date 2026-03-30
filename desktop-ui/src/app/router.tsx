@@ -228,7 +228,7 @@ export const router = createHashRouter([
       { path: "/learn", element: <LearnPage /> },
       { path: "/learn/knowledge", element: <KnowledgeHealthPage /> },
       { path: "/learn/review/:topicId?", element: <FocusedReviewPage /> },
-      { path: "/mirror", element: <MirrorPage /> },
+      { path: "/brain", element: <MirrorPage /> },
       { path: "/automations", element: <AutomationsPage /> },
       { path: "/categories", element: <Navigate to="/system/categories" replace /> },
       { path: "/finance", element: <CashFlowPage /> },

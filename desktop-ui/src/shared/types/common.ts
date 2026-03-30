@@ -63,7 +63,7 @@ export type SidebarItem =
   | "Learn"
   | "Finance"
   | "Coaching"
-  | "Mirror"
+  | "Brain"
   | "Automations"
   | "System"
   | "Settings";

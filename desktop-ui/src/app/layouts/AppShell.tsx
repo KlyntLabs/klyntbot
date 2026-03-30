@@ -1,3 +1,4 @@
+import { BrainOrb } from "@shared/components/BrainOrb";
 import { SidebarChat } from "@shared/components/chat/SidebarChat";
 import { useActiveView } from "@shared/hooks/useActiveView";
 import { useEvent } from "@shared/hooks/useEvent";
@@ -47,7 +48,7 @@ export function AppShell() {
     if (path.startsWith("/learn")) return "Learn";
     if (path.startsWith("/finance")) return "Finance";
     if (path.startsWith("/coaching")) return "Coaching";
-    if (path.startsWith("/mirror")) return "Mirror";
+    if (path.startsWith("/brain")) return "Brain";
     if (path.startsWith("/automations")) return "Automations";
     if (path.startsWith("/system")) return "System";
     if (path.startsWith("/settings")) return "Settings";
@@ -104,7 +105,16 @@ export function AppShell() {
         isChatOpen={isChatOpen}
         onToggleChat={isOnChatPage ? undefined : toggleChat}
       />
-      <Outlet />
+      <div className="flex-1 flex flex-col overflow-hidden">
+        {/* Global top bar */}
+        <div className="flex items-center justify-end px-3 py-1.5 shrink-0">
+          <BrainOrb />
+        </div>
+        {/* Route content */}
+        <div className="flex-1 overflow-hidden">
+          <Outlet />
+        </div>
+      </div>
       {!isOnChatPage && (
         <SidebarChat
           isOpen={isChatOpen}
