@@ -316,7 +316,7 @@ impl AppCore {
         // ── Phase 10: BrainVoice signal router ─────────────────────────────
         let brain_voice = {
             let feedback_repo =
-                storage::repos::BrainSignalFeedbackRepo::new(storage_pool.inner().clone());
+                ::storage::repos::BrainSignalFeedbackRepo::new(storage_pool.inner().clone());
             let emitter_for_brain: Arc<dyn crate::events::AppEventEmitter> =
                 event_emitter
                     .clone()
@@ -450,6 +450,7 @@ impl AppCore {
                     ),
                     insight_embedder,
                     feature_insights::ProgressWeights::default(),
+                    Some(Arc::clone(&domain_event_bus)),
                 )))
             },
             flashcard_repo: Some(::cognitive::FlashcardRepo::new(

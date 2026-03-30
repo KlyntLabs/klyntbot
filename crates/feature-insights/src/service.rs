@@ -7,8 +7,10 @@
 
 use std::sync::Arc;
 
+use chrono::{DateTime, Utc};
 use sha2::{Digest, Sha256};
 
+use crate::cross_domain::{self, EntityDomain, EntityRef, HeuristicConfig, HeuristicInput};
 use crate::merge::SmartMergeEngine;
 use crate::progress::ProgressComputer;
 use crate::progress_repo::InsightProgressRepo;
@@ -42,6 +44,7 @@ pub struct InsightService {
     pub(crate) flashcards: Arc<dyn FlashcardAccessor>,
     pub(crate) embedder: Arc<dyn InsightEmbedder>,
     pub(crate) progress_weights: ProgressWeights,
+    pub(crate) domain_bus: Option<Arc<bus::DomainEventBus>>,
 }
 
 impl InsightService {
@@ -55,6 +58,7 @@ impl InsightService {
         flashcards: Arc<dyn FlashcardAccessor>,
         embedder: Arc<dyn InsightEmbedder>,
         progress_weights: ProgressWeights,
+        domain_bus: Option<Arc<bus::DomainEventBus>>,
     ) -> Self {
         Self {
             repo,
@@ -65,7 +69,59 @@ impl InsightService {
             flashcards,
             embedder,
             progress_weights,
+            domain_bus,
         }
+    }
+
+    /// Check for a cross-domain connection from a newly created/updated entity.
+    ///
+    /// Skips entities with titles shorter than 10 characters. Assembles a
+    /// `HeuristicInput` with empty vector/frequency data (real search wired in a
+    /// future task) and publishes `DomainEvent::CrossDomainDotReady` if the
+    /// heuristic finds a connection.
+    pub async fn check_cross_domain(
+        &self,
+        source_domain: EntityDomain,
+        id: String,
+        title: String,
+        created_at: DateTime<Utc>,
+    ) -> Option<cross_domain::CrossDomainDot> {
+        if title.len() < 10 {
+            return None;
+        }
+
+        let source = EntityRef {
+            domain: source_domain,
+            id,
+            title: title.clone(),
+        };
+
+        let input = HeuristicInput {
+            source_has_content: title.len() >= 10,
+            source: source.clone(),
+            source_created: created_at,
+            vector_hits: vec![],
+            frequency_data: vec![],
+        };
+
+        let dot = cross_domain::evaluate_cross_domain(&input, &HeuristicConfig::default())?;
+
+        if let Some(ref bus) = self.domain_bus {
+            let event = bus::DomainEvent::CrossDomainDotReady {
+                source_kind: cross_domain::domain_str(&dot.source.domain).into(),
+                source_id: dot.source.id.clone(),
+                source_title: dot.source.title.clone(),
+                target_kind: cross_domain::domain_str(&dot.target.domain).into(),
+                target_id: dot.target.id.clone(),
+                target_title: dot.target.title.clone(),
+                confidence: dot.confidence,
+                tooltip: dot.tooltip.clone(),
+                detail_route: Some(dot.detail_route.clone()),
+            };
+            let _ = bus.publish(event);
+        }
+
+        Some(dot)
     }
 
     /// Pre-generation pipeline: check merge → build context.

@@ -3857,6 +3857,7 @@ name = "feature-insights"
 version = "0.1.0"
 dependencies = [
  "async-trait",
+ "bus",
  "chrono",
  "cognitive",
  "common",
