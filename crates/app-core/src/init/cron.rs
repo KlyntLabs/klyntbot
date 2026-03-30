@@ -847,31 +847,6 @@ async fn ensure_cron_jobs(
     // ── User-editable jobs (notifications, checks, user-facing features) ──
 
     ensure_job!(
-        JOB_FOCUS_CHECK,
-        scheduling::CronSchedule::Every {
-            every_ms: 30 * 60 * 1000
-        },
-        "Check focus task deadlines",
-        user.clone()
-    );
-    ensure_job!(
-        JOB_DAILY_DIGEST,
-        scheduling::CronSchedule::Cron {
-            expr: "0 9 * * *".to_string(),
-            tz: None
-        },
-        "Daily task summary",
-        user.clone()
-    );
-    ensure_job!(
-        JOB_OVERDUE_CHECK,
-        scheduling::CronSchedule::Every {
-            every_ms: 60 * 60 * 1000
-        },
-        "Check for overdue focus tasks",
-        user.clone()
-    );
-    ensure_job!(
         JOB_WEEKLY_REPORT,
         scheduling::CronSchedule::Cron {
             expr: "0 18 * * 0".to_string(),
@@ -967,22 +942,6 @@ async fn ensure_cron_jobs(
         );
     }
 
-    ensure_job!(
-        JOB_REMINDER_CHECK,
-        scheduling::CronSchedule::Every {
-            every_ms: 5 * 60 * 1000
-        },
-        "Check task due dates and send reminders",
-        user.clone()
-    );
-    ensure_job!(
-        JOB_RECURRING_TASKS,
-        scheduling::CronSchedule::Every {
-            every_ms: 60 * 1000
-        },
-        "Spawn recurring task instances from templates",
-        user.clone()
-    );
     ensure_job!(
         JOB_INSIGHT_REFRESH,
         scheduling::CronSchedule::Every {
