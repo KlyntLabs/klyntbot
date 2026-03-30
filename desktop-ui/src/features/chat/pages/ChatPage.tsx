@@ -1,4 +1,5 @@
 import { AmbientIndicator, PromotionToast, usePromotionListener } from "@features/autotuner";
+import { useEvent } from "@shared/hooks/useEvent";
 import { ipc } from "@shared/hooks/useIpc";
 import { useQuery } from "@shared/hooks/useQuery";
 import { useSetToggle } from "@shared/hooks/useSetToggle";
@@ -99,6 +100,14 @@ export function ChatPage() {
     window.addEventListener("voice:event", handler);
     return () => window.removeEventListener("voice:event", handler);
   }, []);
+
+  // ── Provider degradation status ───────────────────────────────────────
+  const [providerStatus, setProviderStatus] = useState<"ok" | "fallback" | "offline">("ok");
+  useEvent<{ level: string }>("provider:degraded", (payload) => {
+    setProviderStatus(payload.level as "fallback" | "offline");
+    // Auto-reset after 30s if it was just a blip
+    setTimeout(() => setProviderStatus("ok"), 30_000);
+  });
 
   // ── Autotuner promotion toast ──────────────────────────────────────────
   const [promotionImpact, setPromotionImpact] = useState<string | null>(null);
@@ -361,6 +370,27 @@ export function ChatPage() {
           <div className="px-6 pb-2">
             <div className="max-w-3xl mx-auto">
               <PromotionToast impact={promotionImpact} onDismiss={() => setPromotionImpact(null)} />
+            </div>
+          </div>
+        )}
+
+        {providerStatus === "fallback" && (
+          <div className="px-6 pb-2">
+            <div className="max-w-3xl mx-auto">
+              <div className="px-4 py-2 text-xs text-amber-400 bg-amber-400/5 rounded-lg">
+                Claude is taking a moment. I'm working from what I already know about you — give me
+                a sec.
+              </div>
+            </div>
+          </div>
+        )}
+        {providerStatus === "offline" && (
+          <div className="px-6 pb-2">
+            <div className="max-w-3xl mx-auto">
+              <div className="px-4 py-2 text-xs text-muted-foreground bg-accent rounded-lg">
+                All my cloud connections are down right now. I can still search your tasks, notes,
+                and memory locally — just ask.
+              </div>
             </div>
           </div>
         )}

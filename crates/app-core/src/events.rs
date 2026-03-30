@@ -1,6 +1,10 @@
 use desktop_shared::events::{EntityUpdatedPayload, ENTITY_UPDATED};
 use desktop_shared::types::EntityKind;
 
+/// Emitted when an LLM provider degrades or falls back to a secondary.
+/// Payload: `{ level: "fallback" | "offline" }`.
+pub const PROVIDER_DEGRADED: &str = "provider:degraded";
+
 /// Transport-agnostic event emitter.
 pub trait AppEventEmitter: Send + Sync + 'static {
     fn emit_event(&self, event_name: &str, payload: serde_json::Value);
