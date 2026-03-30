@@ -88,6 +88,19 @@ impl AppCore {
         let mut cfg = self.config.write().await;
         cfg.setup_completed = true;
         config::save(&cfg).await.map_err(map_config_save_err)?;
+
+        // Wire: SetupComplete journey milestone
+        if let Some(ref tracker) = self.journey_tracker {
+            if !tracker
+                .is_complete(crate::journey::Milestone::SetupComplete)
+                .await
+            {
+                tracker
+                    .mark_complete(crate::journey::Milestone::SetupComplete)
+                    .await;
+            }
+        }
+
         Ok(())
     }
 }

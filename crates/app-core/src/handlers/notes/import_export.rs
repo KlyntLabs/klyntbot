@@ -223,6 +223,20 @@ impl AppCore {
             }
         }
 
+        // Wire: FirstImport journey milestone
+        if imported > 0 {
+            if let Some(ref tracker) = self.journey_tracker {
+                if !tracker
+                    .is_complete(crate::journey::Milestone::FirstImport)
+                    .await
+                {
+                    tracker
+                        .mark_complete(crate::journey::Milestone::FirstImport)
+                        .await;
+                }
+            }
+        }
+
         Ok(NoteImportResult { imported, skipped })
     }
 

@@ -77,6 +77,19 @@ export function BrainOrb() {
     }
   }, [current]);
 
+  // Wire: QuietDay journey milestone — fires when orb is idle for 10s after mount
+  useEffect(() => {
+    if (isComplete("quiet_day")) return;
+    const timer = setTimeout(() => {
+      // Orb is idle: no active pulse, no badge, no deferred, no recent signals
+      if (!isPulsing && badgeCount === 0 && !isFocusDeferred && !current) {
+        markComplete("quiet_day");
+      }
+    }, 10_000);
+    return () => clearTimeout(timer);
+    // Only run on mount + when idle conditions change
+  }, [isPulsing, badgeCount, isFocusDeferred, current, isComplete, markComplete]);
+
   const handleClick = () => {
     if (isPulsing && current?.detailRoute) {
       acknowledge();
@@ -98,6 +111,13 @@ export function BrainOrb() {
 
   const handleDetailRouteClick = () => {
     if (current?.detailRoute) {
+      // Wire: FirstDotAccepted journey milestone when user clicks through a cross-domain dot
+      if (
+        !isComplete("first_dot_accepted") &&
+        current.signals.some((s) => s.signalType === "cross_domain_dot")
+      ) {
+        markComplete("first_dot_accepted");
+      }
       acknowledge();
       setTooltipVisible(false);
       navigate(current.detailRoute);

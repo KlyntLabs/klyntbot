@@ -925,6 +925,7 @@ pub async fn relay_chat_stream(
     mut interaction_rx: mpsc::Receiver<tools_core::InteractionBundle>,
     emitter: Arc<dyn crate::events::AppEventEmitter>,
     has_context: bool,
+    journey_tracker: Option<crate::journey::JourneyTracker>,
 ) {
     // Guard ensures active_streams cleanup even on panic
     struct StreamGuard {
@@ -1139,6 +1140,20 @@ pub async fn relay_chat_stream(
                                 Err(e) => tracing::warn!("metadata persist failed for {sk}: {e}"),
                             }
                         }
+                        // Wire: FirstChatResponse journey milestone
+                        if let Some(ref tracker) = journey_tracker {
+                            if !tracker
+                                .is_complete(crate::journey::Milestone::FirstChatResponse)
+                                .await
+                            {
+                                tracker
+                                    .mark_complete(
+                                        crate::journey::Milestone::FirstChatResponse,
+                                    )
+                                    .await;
+                            }
+                        }
+
                         emit!(
                             AGENT_DONE,
                             DonePayload {
@@ -1815,6 +1830,7 @@ impl AppCore {
         let repos = self.repos.clone();
         let active_streams = Arc::clone(&self.active_streams);
         let pending_interactions = Arc::clone(&self.pending_interactions);
+        let journey_tracker = self.journey_tracker.clone();
 
         tokio::spawn(relay_chat_stream(
             repos,
@@ -1825,6 +1841,7 @@ impl AppCore {
             stream_info.interaction_rx,
             emitter,
             stream_info.has_context,
+            journey_tracker,
         ));
     }
 }

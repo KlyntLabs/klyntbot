@@ -89,11 +89,12 @@ impl BrainVoice {
         feedback_repo: BrainSignalFeedbackRepo,
         emitter: Arc<dyn AppEventEmitter>,
         config: BrainVoiceConfig,
+        journey_tracker: Option<crate::journey::JourneyTracker>,
     ) -> Self {
         let cancel = CancellationToken::new();
         let token = cancel.clone();
         let handle = tokio::spawn(async move {
-            run_brain_voice(rx, feedback_repo, emitter, config, token).await;
+            run_brain_voice(rx, feedback_repo, emitter, config, token, journey_tracker).await;
         });
         Self {
             cancel,
@@ -222,6 +223,7 @@ async fn run_brain_voice(
     emitter: Arc<dyn AppEventEmitter>,
     config: BrainVoiceConfig,
     shutdown: CancellationToken,
+    journey_tracker: Option<crate::journey::JourneyTracker>,
 ) {
     let focus_active = AtomicBool::new(false);
     let mut pending_signals: Vec<PendingSignal> = Vec::new();
@@ -297,9 +299,40 @@ async fn run_brain_voice(
                         }
                         deferred_msg_count = 0;
                         focus_start = None;
+
+                        // Wire: FirstFocusDebrief journey milestone
+                        if let Some(ref tracker) = journey_tracker {
+                            if !tracker
+                                .is_complete(crate::journey::Milestone::FirstFocusDebrief)
+                                .await
+                            {
+                                tracker
+                                    .mark_complete(
+                                        crate::journey::Milestone::FirstFocusDebrief,
+                                    )
+                                    .await;
+                            }
+                        }
+
                         debug!("BrainVoice: focus session ended, flushed deferred signals");
                     }
                     Ok(ref event) => {
+                        // Wire: FirstBrainReport journey milestone on MirrorSnippetCreated
+                        if matches!(event, DomainEvent::MirrorSnippetCreated { .. }) {
+                            if let Some(ref tracker) = journey_tracker {
+                                if !tracker
+                                    .is_complete(crate::journey::Milestone::FirstBrainReport)
+                                    .await
+                                {
+                                    tracker
+                                        .mark_complete(
+                                            crate::journey::Milestone::FirstBrainReport,
+                                        )
+                                        .await;
+                                }
+                            }
+                        }
+
                         if let Some((summary, tooltip, detail_route)) = extract_signal(event) {
                             let mut state = SignalState {
                                 pending_signals: &mut pending_signals,
