@@ -520,6 +520,33 @@ pub enum DomainEvent {
         persona_id: Option<String>,
         domain_hint: Option<String>,
     },
+
+    // ── Brain ambient signals ──────────────────────────────────
+    /// Emitted when a memory fact is promoted to a wider scope (e.g. session → long-term).
+    MemoryPromoted {
+        fact_id: String,
+        summary: String,
+        from_scope: String,
+        to_scope: String,
+    },
+    /// Emitted when a cross-domain connection dot is ready for UI display.
+    CrossDomainDotReady {
+        source_kind: String,
+        source_id: String,
+        source_title: String,
+        target_kind: String,
+        target_id: String,
+        target_title: String,
+        confidence: f64,
+        tooltip: String,
+        detail_route: Option<String>,
+    },
+    /// Emitted when an incoming message is deferred rather than processed immediately.
+    MessageDeferred {
+        channel: String,
+        sender: String,
+        preview: String,
+    },
 }
 
 impl DomainEvent {
@@ -606,6 +633,10 @@ impl DomainEvent {
             | Self::CommunityWeakened { .. } => "fabric",
 
             Self::SquadDebateCompleted { .. } | Self::SquadInteractionPattern { .. } => "agent",
+
+            Self::MemoryPromoted { .. } => "memory",
+            Self::CrossDomainDotReady { .. } => "fabric",
+            Self::MessageDeferred { .. } => "general",
 
             Self::SystemWillSleep
             | Self::SystemDidWake { .. }
