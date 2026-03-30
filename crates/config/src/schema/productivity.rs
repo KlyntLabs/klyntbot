@@ -15,6 +15,8 @@ pub struct ProductivityConfig {
     #[serde(default)]
     pub focus: FocusConfig,
     #[serde(default)]
+    pub focus_bubble: FocusBubbleConfig,
+    #[serde(default)]
     pub nudges: NudgeConfig,
     #[serde(default)]
     pub privacy: PrivacyConfig,
@@ -100,6 +102,31 @@ pub struct PrivacyConfig {
     pub excluded_url_patterns: Vec<String>,
 }
 
+/// Auto-reply settings shown to senders during a focus session.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct FocusBubbleConfig {
+    /// Whether to auto-reply to senders during focus. Off by default.
+    #[serde(default)]
+    pub auto_reply_enabled: bool,
+    /// Custom auto-reply text.
+    #[serde(default = "default_focus_auto_reply")]
+    pub auto_reply_text: String,
+}
+
+fn default_focus_auto_reply() -> String {
+    "I'm in a deep focus session right now. I'll get back to you when I'm done.".into()
+}
+
+impl Default for FocusBubbleConfig {
+    fn default() -> Self {
+        Self {
+            auto_reply_enabled: false,
+            auto_reply_text: default_focus_auto_reply(),
+        }
+    }
+}
+
 fn default_poll_interval() -> u64 {
     5
 }
@@ -161,6 +188,7 @@ impl Default for ProductivityConfig {
             enabled: true,
             tracking: TrackingConfig::default(),
             focus: FocusConfig::default(),
+            focus_bubble: FocusBubbleConfig::default(),
             nudges: NudgeConfig::default(),
             privacy: PrivacyConfig::default(),
         }

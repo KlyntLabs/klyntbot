@@ -5,6 +5,7 @@ mod builder;
 #[cfg(test)]
 mod refactor_tests;
 
+use std::collections::HashSet;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use tokio::sync::broadcast;
@@ -275,6 +276,9 @@ impl AgentLoop {
         let mut event_rx = self.domain_event_bus.as_ref().map(|bus| bus.subscribe());
         let mut focus_active = false;
         let mut deferred_messages: Vec<InboundMessage> = Vec::new();
+        // Tracks which (channel, sender) pairs have already received an auto-reply this focus
+        // session so we only send one per sender per focus session.
+        let mut auto_replied_senders: HashSet<(String, String)> = HashSet::new();
 
         while self.running.load(Ordering::SeqCst) {
             tokio::select! {
@@ -297,6 +301,28 @@ impl AgentLoop {
                                 preview: msg.content.chars().take(100).collect(),
                             });
                         }
+
+                        // Auto-reply once per sender per focus session when enabled.
+                        let focus_bubble = &self.config.productivity.focus_bubble;
+                        if focus_bubble.auto_reply_enabled {
+                            let key = (msg.channel.to_string(), msg.sender_id.clone());
+                            if auto_replied_senders.insert(key) {
+                                let reply = OutboundMessage::new(
+                                    msg.channel.clone(),
+                                    msg.chat_id.clone(),
+                                    focus_bubble.auto_reply_text.clone(),
+                                );
+                                if let Err(e) = self.bus.publish_outbound(reply).await {
+                                    warn!("Failed to send focus auto-reply: {}", e);
+                                } else {
+                                    info!(
+                                        sender = %msg.sender_id,
+                                        "Sent focus auto-reply"
+                                    );
+                                }
+                            }
+                        }
+
                         deferred_messages.push(msg);
                     } else if let Err(e) = self.process_message(msg).await {
                         error!("Error processing message: {}", e);
@@ -312,6 +338,8 @@ impl AgentLoop {
                         Ok(Some(bus::DomainEvent::FocusSessionStarted { .. })) => {
                             info!("Focus session started — deferring inbound messages");
                             focus_active = true;
+                            // Reset per-session dedup state on each new focus session.
+                            auto_replied_senders.clear();
                         }
                         Ok(Some(bus::DomainEvent::FocusSessionEnded { .. })) => {
                             info!(
@@ -319,6 +347,7 @@ impl AgentLoop {
                                 "Focus session ended — draining deferred messages"
                             );
                             focus_active = false;
+                            auto_replied_senders.clear();
                             for deferred in deferred_messages.drain(..) {
                                 if let Err(e) = self.process_message(deferred).await {
                                     error!("Error processing deferred message: {}", e);
