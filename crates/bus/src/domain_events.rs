@@ -6,6 +6,14 @@
 use serde::{Deserialize, Serialize};
 use tokio::sync::broadcast;
 
+/// How the user returned — from OS sleep or from idle.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum WakeType {
+    FromSleep,
+    FromIdle,
+}
+
 /// Events emitted by feature crates for cross-domain communication.
 ///
 /// The cognitive layer subscribes to all events to extract facts,
@@ -82,6 +90,13 @@ pub enum DomainEvent {
         extracted_fact_count: usize,
         sentiment: Option<String>,
     },
+    VoiceCapture {
+        session_id: String,
+        language: String,
+        overall_confidence: f32,
+        duration_secs: f32,
+        engine: String,
+    },
 
     // -- Tasks --
     TaskCreated {
@@ -152,6 +167,27 @@ pub enum DomainEvent {
         to: String,
         actor: Option<String>,
     },
+
+    /// Emitted when a task's due date is set or changed. Used by DeadlineScheduler.
+    TaskDueDateChanged {
+        task_id: String,
+        /// None means the due date was cleared.
+        due_date: Option<String>,
+    },
+
+    /// Emitted when a task is focused/unfocused with a deadline. Used by DeadlineScheduler.
+    TaskFocusChanged {
+        task_id: String,
+        /// None means unfocused.
+        focus_deadline: Option<String>,
+    },
+
+    /// Emitted when a recurring template's next_instance_date changes.
+    RecurringTemplateAdvanced {
+        template_id: String,
+        next_instance_date: Option<String>,
+    },
+
     DayPlanGenerated {
         task_count: u32,
         total_estimated_mins: u32,
@@ -217,6 +253,10 @@ pub enum DomainEvent {
         note_id: String,
         content: String,
     },
+    NoteEditingFinished {
+        note_id: String,
+        content: String,
+    },
     NoteDeleted {
         note_id: String,
     },
@@ -224,6 +264,12 @@ pub enum DomainEvent {
     // -- Task hierarchy (BookIndex) --
     TaskHierarchyChanged {
         project_id: String,
+    },
+
+    /// Emitted after tree nodes have been rebuilt and embedded for a source.
+    TreeNodesRebuilt {
+        source_type: String,
+        source_id: String,
     },
 
     // -- Chat --
@@ -420,6 +466,211 @@ pub enum DomainEvent {
         snippet_id: String,
         headline: String,
     },
+
+    // -- Lifecycle events --
+    /// macOS is about to sleep.
+    SystemWillSleep,
+    /// macOS woke from sleep.
+    SystemDidWake {
+        away_secs: u64,
+        wake_type: WakeType,
+    },
+    /// User became idle (no input for threshold duration).
+    UserBecameIdle {
+        idle_secs: u64,
+    },
+    /// User returned after being idle or after system sleep.
+    UserReturned {
+        absence_secs: u64,
+        wake_type: WakeType,
+    },
+    // -- Wake orchestrator ready signals --
+    /// Focus timer was suspended due to sleep/idle.
+    FocusSessionSuspended {
+        remaining_secs: u64,
+        phase_name: String,
+    },
+    /// Cron service classified missed jobs for catch-up.
+    CronCatchUpReady {
+        immediate_count: usize,
+        deferred_count: usize,
+        expired_count: usize,
+    },
+    /// Wake panel assembled and ready for UI display.
+    WakePanelReady {
+        greeting: String,
+        away_secs: u64,
+    },
+
+    // -- Knowledge Fabric communities --
+    /// Emitted when a new community is detected in the note graph.
+    CommunityDiscovered {
+        community_id: String,
+        name: String,
+        member_count: u32,
+    },
+    /// Emitted when an existing community's membership or properties change.
+    CommunityUpdated {
+        community_id: String,
+        member_count: u32,
+        stability: f64,
+    },
+    /// Emitted when a community's cohesion weakens below a threshold.
+    CommunityWeakened {
+        community_id: String,
+        stability: f64,
+    },
+
+    // -- Squad debates --
+    /// Emitted when a squad debate (multi-persona deliberation) completes.
+    SquadDebateCompleted {
+        squad_id: String,
+        session_key: String,
+        rounds_completed: u8,
+        consensus_score: f64,
+        persona_accuracies: Vec<(String, f64)>,
+        was_partial: bool,
+        token_cost: u64,
+        average_consensus_score: f64,
+        top_performer_persona_id: Option<String>,
+    },
+    /// Emitted when a squad interaction pattern is detected or updated.
+    SquadInteractionPattern {
+        squad_id: String,
+        mode: String,
+        persona_id: Option<String>,
+        domain_hint: Option<String>,
+    },
+
+    // ── Brain ambient signals ──────────────────────────────────
+    /// Emitted when a memory fact is promoted to a wider scope (e.g. session → long-term).
+    MemoryPromoted {
+        fact_id: String,
+        summary: String,
+        from_scope: String,
+        to_scope: String,
+    },
+    /// Emitted when a cross-domain connection dot is ready for UI display.
+    CrossDomainDotReady {
+        source_kind: String,
+        source_id: String,
+        source_title: String,
+        target_kind: String,
+        target_id: String,
+        target_title: String,
+        confidence: f64,
+        tooltip: String,
+        detail_route: Option<String>,
+    },
+    /// Emitted when an incoming message is deferred rather than processed immediately.
+    MessageDeferred {
+        channel: String,
+        sender: String,
+        preview: String,
+    },
+}
+
+impl DomainEvent {
+    /// Map this event to its domain category string.
+    ///
+    /// Used by the cognitive pipeline, debug dashboard, and SSE streams.
+    pub fn domain(&self) -> &str {
+        match self {
+            Self::TaskCreated { .. }
+            | Self::TaskCompleted { .. }
+            | Self::TaskDeferred { .. }
+            | Self::GoalProgress { .. }
+            | Self::TaskDecomposed { .. }
+            | Self::TaskExecutionStarted { .. }
+            | Self::TaskExecutionCompleted { .. }
+            | Self::TaskExecutionFailed { .. }
+            | Self::TaskBlocked { .. }
+            | Self::TaskUnblocked { .. }
+            | Self::DayPlanGenerated { .. }
+            | Self::ProactiveSuggestionCreated { .. }
+            | Self::TaskFocusStarted { .. }
+            | Self::TaskFocusEnded { .. }
+            | Self::EstimationRecorded { .. }
+            | Self::TaskExecutionProgress { .. }
+            | Self::TaskStatusChanged { .. }
+            | Self::TaskPriorityChanged { .. }
+            | Self::TaskFieldUpdated { .. }
+            | Self::TaskDueDateChanged { .. }
+            | Self::TaskFocusChanged { .. }
+            | Self::RecurringTemplateAdvanced { .. }
+            | Self::TaskHierarchyChanged { .. }
+            | Self::TreeNodesRebuilt { .. } => "work",
+
+            Self::ActivitySessionCompleted { .. }
+            | Self::FocusSessionStarted { .. }
+            | Self::FocusSessionEnded { .. }
+            | Self::DistractionDetected { .. }
+            | Self::ProductivityScoreComputed { .. }
+            | Self::SessionCreated { .. }
+            | Self::SessionEnded { .. }
+            | Self::QualityScored { .. }
+            | Self::PredictiveAlert { .. }
+            | Self::NarrativeGenerated { .. }
+            | Self::RuleEvolved { .. }
+            | Self::VoiceJournalProcessed { .. }
+            | Self::VoiceCapture { .. } => "energy",
+
+            Self::TransactionRecorded { .. } | Self::BudgetAlert { .. } => "finance",
+
+            Self::UserStatedFact { domain, .. } => domain.as_str(),
+            Self::UserCorrectedAI { .. } => "learning",
+            Self::CoachingFeedback { .. } => "coaching",
+            Self::ChatTurnCompleted { .. } | Self::ToolCallExecuted { .. } => "general",
+
+            Self::NoteCreated { .. }
+            | Self::NoteUpdated { .. }
+            | Self::NoteContentChanged { .. }
+            | Self::NoteDeleted { .. }
+            | Self::NoteEditingFinished { .. } => "notes",
+
+            Self::BehavioralPatternDetected { .. }
+            | Self::ContradictionDetected { .. }
+            | Self::AutotunerDecision { .. }
+            | Self::KnowledgeAtomCreated { .. }
+            | Self::KnowledgeAtomAccepted { .. }
+            | Self::KnowledgeAtomArchived { .. }
+            | Self::AtomFlashcardReviewed { .. }
+            | Self::AtomReinforced { .. }
+            | Self::AtomInteracted { .. }
+            | Self::RetentionMilestoneReached { .. }
+            | Self::TranslationCompleted { .. }
+            | Self::NoteStudied { .. }
+            | Self::PracticeUnitCompleted { .. }
+            | Self::PracticeSessionCompleted { .. }
+            | Self::KnowledgeTransferDetected { .. }
+            | Self::CoachingLearningDigest { .. }
+            | Self::FlashcardSessionCompleted { .. } => "learning",
+
+            Self::InterventionTriggered { .. } => "productivity",
+            Self::MemoryPendingConfirmation { .. } => "memory",
+            Self::SkillRouted { .. } => "agent",
+            Self::TrialActivated { .. } => "autotuner",
+            Self::MirrorTrialKilled { .. } | Self::MirrorSnippetCreated { .. } => "mirror",
+
+            Self::CommunityDiscovered { .. }
+            | Self::CommunityUpdated { .. }
+            | Self::CommunityWeakened { .. } => "fabric",
+
+            Self::SquadDebateCompleted { .. } | Self::SquadInteractionPattern { .. } => "agent",
+
+            Self::MemoryPromoted { .. } => "memory",
+            Self::CrossDomainDotReady { .. } => "fabric",
+            Self::MessageDeferred { .. } => "general",
+
+            Self::SystemWillSleep
+            | Self::SystemDidWake { .. }
+            | Self::UserBecameIdle { .. }
+            | Self::UserReturned { .. }
+            | Self::FocusSessionSuspended { .. }
+            | Self::CronCatchUpReady { .. }
+            | Self::WakePanelReady { .. } => "lifecycle",
+        }
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -579,6 +830,20 @@ mod tests {
             }
             _ => panic!("Expected UserCorrectedAI"),
         }
+    }
+
+    #[test]
+    fn test_note_editing_finished_event() {
+        let bus = DomainEventBus::new(32);
+        let mut rx = bus.subscribe();
+        bus.publish(DomainEvent::NoteEditingFinished {
+            note_id: "note-1".to_string(),
+            content: "some content".to_string(),
+        });
+        let event = rx.try_recv().unwrap();
+        assert!(
+            matches!(event, DomainEvent::NoteEditingFinished { note_id, .. } if note_id == "note-1")
+        );
     }
 
     #[test]
