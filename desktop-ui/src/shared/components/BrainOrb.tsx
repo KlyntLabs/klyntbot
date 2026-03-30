@@ -17,6 +17,7 @@ export function BrainOrb() {
 
   const [tooltipVisible, setTooltipVisible] = useState(false);
   const [badgeTooltipVisible, setBadgeTooltipVisible] = useState(false);
+  const [hasRecentSignals, setHasRecentSignals] = useState(false);
   const hoverTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -65,6 +66,15 @@ export function BrainOrb() {
     };
   }, []);
 
+  // Track whether a signal arrived recently (within 5 minutes) for the idle breathing state
+  useEffect(() => {
+    if (current) {
+      setHasRecentSignals(true);
+      const timer = setTimeout(() => setHasRecentSignals(false), 5 * 60 * 1000);
+      return () => clearTimeout(timer);
+    }
+  }, [current]);
+
   const handleClick = () => {
     if (isPulsing && current?.detailRoute) {
       acknowledge();
@@ -102,8 +112,11 @@ export function BrainOrb() {
     orbClasses = `${orbBase} bg-warning animate-[orb-pulse_600ms_ease-out]`;
   } else if (isFocusDeferred) {
     orbClasses = `${orbBase} bg-muted-foreground/30 animate-[orb-breathe_3s_ease-in-out_infinite]`;
+  } else if (hasRecentSignals && badgeCount === 0) {
+    // Slow, slightly brighter breathing — signals arrived recently but orb is now idle
+    orbClasses = `${orbBase} bg-muted-foreground/50 animate-[orb-breathe_8s_ease-in-out_infinite]`;
   } else {
-    orbClasses = `${orbBase} bg-muted-foreground/30 animate-[orb-breathe_3s_ease-in-out_infinite]`;
+    orbClasses = `${orbBase} bg-muted-foreground/20`;
   }
 
   return (
