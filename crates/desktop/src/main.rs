@@ -1093,6 +1093,7 @@ fn run_desktop_app() {
             // Journey
             commands::journey::journey_milestones,
             commands::journey::journey_mark_complete,
+            commands::journey::journey_item_count,
             // Active View
             commands::view::view_set_active,
             commands::view::view_clear_active,

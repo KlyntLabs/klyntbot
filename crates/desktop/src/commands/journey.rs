@@ -33,10 +33,22 @@ pub async fn journey_mark_complete(
     Ok(())
 }
 
+#[tauri::command]
+pub async fn journey_item_count(
+    state: State<'_, Arc<AppCore>>,
+) -> Result<i64, ApiError> {
+    if let Some(ref tracker) = state.journey_tracker {
+        Ok(tracker.total_item_count().await)
+    } else {
+        Ok(0)
+    }
+}
+
 // ── Dev server dispatch ─────────────────────────────────────────────
 
 #[cfg(test)]
-pub(crate) const DEV_COMMANDS: &[&str] = &["journey_milestones", "journey_mark_complete"];
+pub(crate) const DEV_COMMANDS: &[&str] =
+    &["journey_milestones", "journey_mark_complete", "journey_item_count"];
 
 #[cfg(debug_assertions)]
 pub(crate) async fn dispatch_dev(
@@ -68,6 +80,7 @@ pub(crate) async fn dispatch_dev(
             tracker.mark_complete(m).await;
             dev::val(Ok(()))
         }
+        "journey_item_count" => dev::val(Ok(tracker.total_item_count().await)),
         _ => return None,
     })
 }

@@ -1,6 +1,7 @@
 import { FocusDebrief } from "@features/productivity/components/FocusDebrief";
 import { useAmbientSignals } from "@shared/hooks/useAmbientSignals";
 import { useJourney } from "@shared/hooks/useJourney";
+import { useQuery } from "@shared/hooks/useQuery";
 import { Shield } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router";
@@ -15,6 +16,7 @@ export function BrainOrb() {
   const { current, badgeCount, isPulsing, isFocusDeferred, badgeSignals, acknowledge, clearBadge } =
     useAmbientSignals();
   const { isComplete, markComplete } = useJourney();
+  const { data: itemCount } = useQuery<number>("journey_item_count", {});
   const navigate = useNavigate();
 
   const [tooltipVisible, setTooltipVisible] = useState(false);
@@ -188,7 +190,11 @@ export function BrainOrb() {
             }}
           />
         </div>
-      ) : tooltipVisible && isPulsing && current && !isComplete("orb_awakening") ? (
+      ) : tooltipVisible &&
+        isPulsing &&
+        current &&
+        !isComplete("orb_awakening") &&
+        (itemCount ?? 0) >= 3 ? (
         // biome-ignore lint/a11y/noStaticElementInteractions: guided tooltip needs hover to stay open
         <div
           className="absolute top-full left-1/2 -translate-x-1/2 mt-2 z-50
