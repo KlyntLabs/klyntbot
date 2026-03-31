@@ -5,6 +5,8 @@
 //! the `AudioCapture` subsystem, and the `VoiceService` orchestrator.
 
 pub mod capture;
+pub mod dsp;
+pub mod engine_manager;
 pub mod engines;
 pub mod events;
 pub mod mock;
@@ -16,8 +18,10 @@ pub mod session;
 pub mod stt;
 pub mod tts;
 pub mod types;
+pub mod vad;
 
 pub use capture::{AudioCapture, CaptureConfig, CaptureSession, MonitorSession};
+pub use engine_manager::TtsEngineManager;
 #[cfg(feature = "kokoro")]
 pub use engines::KokoroTtsEngine;
 pub use engines::{AvSpeechTtsEngine, WhisperLocalEngine};

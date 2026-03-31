@@ -21,10 +21,13 @@ tracing.workspace = true
 chrono.workspace = true
 whisper-rs = { version = "0.16", features = ["metal"] }
 kokoro-tts = { version = "0.3", optional = true }
+webrtc-vad = { version = "0.4", optional = true }
+nnnoiseless = { version = "0.5", optional = true }
 
 [features]
-default = ["kokoro"]
+default = ["kokoro", "vad"]
 kokoro = ["dep:kokoro-tts"]
+vad = ["dep:webrtc-vad", "dep:nnnoiseless"]
 
 [dev-dependencies]
 tempfile = "3"

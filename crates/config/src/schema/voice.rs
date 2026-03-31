@@ -69,6 +69,12 @@ pub struct VoiceInputConfig {
     /// STT engine to use.
     #[serde(default)]
     pub stt_engine: SttEngineKind,
+    /// VAD threshold (0.0-1.0). Lower = more sensitive to speech.
+    #[serde(default = "default_vad_threshold")]
+    pub vad_threshold: f32,
+    /// Whether to use neural/WebRTC VAD or simple RMS threshold.
+    #[serde(default)]
+    pub use_neural_vad: bool,
 }
 
 impl Default for VoiceInputConfig {
@@ -79,6 +85,8 @@ impl Default for VoiceInputConfig {
             privacy_mode: VoicePrivacyMode::default(),
             model_size: default_model_size(),
             stt_engine: SttEngineKind::default(),
+            vad_threshold: default_vad_threshold(),
+            use_neural_vad: false,
         }
     }
 }
@@ -195,6 +203,10 @@ fn default_model_size() -> String {
 
 fn default_speaking_rate() -> f32 {
     1.0
+}
+
+fn default_vad_threshold() -> f32 {
+    0.5
 }
 
 #[cfg(test)]

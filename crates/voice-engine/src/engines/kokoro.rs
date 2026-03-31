@@ -101,17 +101,17 @@ impl TtsEngine for KokoroTtsEngine {
         let voice = resolve_voice(params.voice_name.as_deref(), params.speaking_rate);
 
         // Synthesis is serialized: ONNX session is single-threaded per model instance.
-        let (samples, duration) = self
-            .model
-            .lock()
-            .await
-            .synth(text, voice)
-            .await
-            .map_err(|e| {
-                common::KlyntbotError::Provider(common::ProviderError::InvalidResponse(format!(
-                    "Kokoro synthesis failed: {e}"
-                )))
-            })?;
+        let (samples, duration) =
+            self.model
+                .lock()
+                .await
+                .synth(text, voice)
+                .await
+                .map_err(|e| {
+                    common::KlyntbotError::Provider(common::ProviderError::InvalidResponse(
+                        format!("Kokoro synthesis failed: {e}"),
+                    ))
+                })?;
 
         debug!("Kokoro synthesized {}ms of audio", duration.as_millis());
 

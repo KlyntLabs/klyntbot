@@ -8,7 +8,7 @@
 //! period to reclaim memory when voice isn't in active use.
 
 use std::path::{Path, PathBuf};
-use std::sync::Mutex;
+use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
 use async_trait::async_trait;
@@ -27,8 +27,8 @@ const IDLE_UNLOAD_SECS: u64 = 300; // 5 minutes
 /// The model is loaded on first use and unloaded after [`IDLE_UNLOAD_SECS`]
 /// of inactivity to free ~500MB–1.5GB of RAM/VRAM.
 pub struct WhisperLocalEngine {
-    ctx: Mutex<Option<WhisperContext>>,
-    last_used: Mutex<Instant>,
+    ctx: Arc<Mutex<Option<WhisperContext>>>,
+    last_used: Arc<Mutex<Instant>>,
     model_path: PathBuf,
 }
 
@@ -55,17 +55,14 @@ impl WhisperLocalEngine {
         );
 
         Ok(Self {
-            ctx: Mutex::new(None),
-            last_used: Mutex::new(Instant::now()),
+            ctx: Arc::new(Mutex::new(None)),
+            last_used: Arc::new(Mutex::new(Instant::now())),
             model_path,
         })
     }
 
-    /// Ensure the model is loaded and return a state handle for transcription.
-    ///
-    /// If the model isn't loaded yet (or was unloaded after idle), this
-    /// loads it from disk (~1-2s on SSD).
-    fn ensure_loaded(&self) -> common::Result<whisper_rs::WhisperState> {
+    /// Ensure the model is loaded into memory (lazy loading from disk).
+    fn ensure_model_loaded(&self) -> common::Result<()> {
         let mut ctx_guard = self.ctx.lock().unwrap();
         *self.last_used.lock().unwrap() = Instant::now();
 
@@ -82,6 +79,13 @@ impl WhisperLocalEngine {
             *ctx_guard = Some(ctx);
         }
 
+        Ok(())
+    }
+
+    /// Ensure the model is loaded and return a state handle for transcription.
+    fn ensure_loaded(&self) -> common::Result<whisper_rs::WhisperState> {
+        self.ensure_model_loaded()?;
+        let ctx_guard = self.ctx.lock().unwrap();
         ctx_guard.as_ref().unwrap().create_state().map_err(|e| {
             common::KlyntbotError::Provider(common::ProviderError::InvalidResponse(format!(
                 "Failed to create Whisper state: {}",
@@ -278,18 +282,47 @@ impl TranscriptionEngine for WhisperLocalEngine {
     async fn transcribe_stream(&self, mut audio: AudioStream) -> common::Result<TranscriptStream> {
         let (tx, rx) = mpsc::channel::<PartialTranscript>(32);
 
-        // Ensure model is loaded and create a state handle (lightweight, not the model itself).
-        let mut state = self.ensure_loaded()?;
+        let ctx = Arc::clone(&self.ctx);
+        let last_used = Arc::clone(&self.last_used);
+
+        self.ensure_model_loaded()?;
 
         tokio::task::spawn_blocking(move || {
             let rt = tokio::runtime::Handle::current();
 
-            // Collect all audio chunks into a buffer, then transcribe.
-            // For v1, we do a single transcription pass after all audio is received.
-            // True streaming (periodic partial transcriptions) is a v1.5 optimization.
+            // Collect audio chunks, emitting intermediate partials every ~3s
+            let chunk_threshold = 16000 * 3; // 3 seconds of 16kHz audio
             let mut all_samples: Vec<f32> = Vec::new();
+            let mut since_last_partial = 0usize;
+
             while let Some(chunk) = rt.block_on(audio.recv()) {
                 all_samples.extend_from_slice(&chunk.samples);
+                since_last_partial += chunk.samples.len();
+
+                // Emit an intermediate partial every ~3 seconds
+                if since_last_partial >= chunk_threshold && all_samples.len() > 16000 {
+                    since_last_partial = 0;
+                    let ctx_guard = ctx.lock().unwrap();
+                    if let Some(ref whisper_ctx) = *ctx_guard {
+                        if let Ok(mut state) = whisper_ctx.create_state() {
+                            let params = WhisperLocalEngine::build_params(None);
+                            if state.full(params, &all_samples).is_ok() {
+                                if let Ok(transcript) =
+                                    WhisperLocalEngine::extract_transcript(&state, None)
+                                {
+                                    if !transcript.text.trim().is_empty() {
+                                        let _ = rt.block_on(tx.send(PartialTranscript {
+                                            text: transcript.text,
+                                            segments: transcript.segments,
+                                            language: transcript.language,
+                                            is_final: false,
+                                        }));
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
             }
 
             if all_samples.is_empty() {
@@ -303,25 +336,39 @@ impl TranscriptionEngine for WhisperLocalEngine {
                 all_samples.len() as f32 / 16000.0
             );
 
-            let full_params = WhisperLocalEngine::build_params(None);
+            // Final transcription with all audio
+            *last_used.lock().unwrap() = std::time::Instant::now();
+            let ctx_guard = ctx.lock().unwrap();
+            let Some(ref whisper_ctx) = *ctx_guard else {
+                warn!("Whisper model unloaded during transcription");
+                return;
+            };
 
+            let mut state = match whisper_ctx.create_state() {
+                Ok(s) => s,
+                Err(e) => {
+                    warn!("Failed to create Whisper state: {e}");
+                    return;
+                }
+            };
+
+            let full_params = WhisperLocalEngine::build_params(None);
             if let Err(e) = state.full(full_params, &all_samples) {
-                warn!("Whisper transcription failed: {}", e);
+                warn!("Whisper transcription failed: {e}");
                 return;
             }
 
             match WhisperLocalEngine::extract_transcript(&state, None) {
                 Ok(transcript) => {
-                    let partial = PartialTranscript {
-                        text: transcript.text.clone(),
-                        segments: transcript.segments.clone(),
-                        language: transcript.language.clone(),
+                    let _ = rt.block_on(tx.send(PartialTranscript {
+                        text: transcript.text,
+                        segments: transcript.segments,
+                        language: transcript.language,
                         is_final: true,
-                    };
-                    let _ = rt.block_on(tx.send(partial));
+                    }));
                 }
                 Err(e) => {
-                    warn!("Failed to extract transcript: {}", e);
+                    warn!("Failed to extract transcript: {e}");
                 }
             }
         });

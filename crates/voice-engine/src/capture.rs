@@ -120,7 +120,6 @@ impl AudioCapture {
         let silence_threshold = self.config.silence_threshold;
         let silence_duration = self.config.silence_duration;
         let target_sample_rate = self.config.sample_rate;
-        let downsample_ratio = native_sample_rate / target_sample_rate;
         let num_channels = native_channels;
 
         // State for silence detection (lives in the audio callback thread).
@@ -173,11 +172,12 @@ impl AudioCapture {
                         data.to_vec()
                     };
 
-                    let downsampled: Vec<f32> = if downsample_ratio > 1 {
-                        mono.iter()
-                            .step_by(downsample_ratio as usize)
-                            .copied()
-                            .collect()
+                    let downsampled = if native_sample_rate != target_sample_rate {
+                        crate::dsp::downsample_with_filter(
+                            &mono,
+                            native_sample_rate,
+                            target_sample_rate,
+                        )
                     } else {
                         mono
                     };

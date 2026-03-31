@@ -637,42 +637,42 @@ impl AppCore {
 
                 drop(config_guard);
 
-                // TTS: prefer Kokoro (if configured + model available), fall back to macOS AVSpeech
+                // TTS: wrap in engine manager with system fallback when Kokoro is primary
                 let tts: Option<Arc<dyn voice_engine::TtsEngine>> = {
+                    let system_tts = Arc::new(voice_engine::AvSpeechTtsEngine::new(&data_dir));
+
                     #[cfg(feature = "kokoro")]
                     {
-                        match voice_config.output.tts_engine {
-                            config::schema::TtsEngineKind::Kokoro => {
-                                if let Some(kokoro_dir) = model_manager.kokoro_model_dir() {
-                                    match voice_engine::KokoroTtsEngine::new(&kokoro_dir).await {
-                                        Ok(engine) => {
-                                            info!(
-                                                "Kokoro TTS engine loaded from {}",
-                                                kokoro_dir.display()
-                                            );
-                                            Some(Arc::new(engine)
-                                                as Arc<dyn voice_engine::TtsEngine>)
-                                        }
-                                        Err(e) => {
-                                            warn!(
-                                                "Failed to load Kokoro TTS, falling back to system: {e}"
-                                            );
-                                            Some(Arc::new(voice_engine::AvSpeechTtsEngine::new(
-                                                &data_dir,
-                                            )))
-                                        }
+                        if let config::schema::TtsEngineKind::Kokoro =
+                            voice_config.output.tts_engine
+                        {
+                            if let Some(kokoro_dir) = model_manager.kokoro_model_dir() {
+                                match voice_engine::KokoroTtsEngine::new(&kokoro_dir).await {
+                                    Ok(kokoro) => {
+                                        info!("Kokoro TTS loaded — wrapping with system fallback");
+                                        let manager = voice_engine::TtsEngineManager::new(
+                                            Arc::new(kokoro),
+                                            Some(system_tts),
+                                        );
+                                        Some(Arc::new(manager) as Arc<dyn voice_engine::TtsEngine>)
                                     }
-                                } else {
-                                    info!("Kokoro model not found, using system TTS");
-                                    Some(Arc::new(voice_engine::AvSpeechTtsEngine::new(&data_dir)))
+                                    Err(e) => {
+                                        warn!("Kokoro failed, using system TTS: {e}");
+                                        Some(system_tts as Arc<dyn voice_engine::TtsEngine>)
+                                    }
                                 }
+                            } else {
+                                info!("Kokoro model not found, using system TTS");
+                                Some(system_tts as Arc<dyn voice_engine::TtsEngine>)
                             }
-                            _ => Some(Arc::new(voice_engine::AvSpeechTtsEngine::new(&data_dir))),
+                        } else {
+                            Some(system_tts as Arc<dyn voice_engine::TtsEngine>)
                         }
                     }
+
                     #[cfg(not(feature = "kokoro"))]
                     {
-                        Some(Arc::new(voice_engine::AvSpeechTtsEngine::new(&data_dir)))
+                        Some(system_tts as Arc<dyn voice_engine::TtsEngine>)
                     }
                 };
 
