@@ -46,6 +46,31 @@ impl SessionRepo {
         Ok(row)
     }
 
+    /// Upsert a voice session — same as `upsert_session` but also sets
+    /// `conversation_type = 'voice'` on insert and update.
+    pub async fn upsert_voice_session(
+        &self,
+        key: &str,
+        metadata: &serde_json::Value,
+    ) -> Result<SessionRow, StorageError> {
+        let now = Utc::now();
+        let row = sqlx::query_as::<_, SessionRow>(
+            "INSERT INTO sessions (key, metadata, conversation_type, created_at, updated_at)
+             VALUES (?1, ?2, 'voice', ?3, ?4)
+             ON CONFLICT (key) DO UPDATE SET
+               updated_at = ?4,
+               conversation_type = 'voice'
+             RETURNING *",
+        )
+        .bind(key)
+        .bind(metadata)
+        .bind(now)
+        .bind(now)
+        .fetch_one(&self.pool)
+        .await?;
+        Ok(row)
+    }
+
     /// Get a session by key.
     pub async fn get_session(&self, key: &str) -> Result<SessionRow, StorageError> {
         sqlx::query_as::<_, SessionRow>("SELECT * FROM sessions WHERE key = ?1")

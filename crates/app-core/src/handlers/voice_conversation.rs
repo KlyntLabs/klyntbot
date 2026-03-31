@@ -352,7 +352,7 @@ impl VoiceConversationManager {
         let _ = self
             .repos
             .sessions
-            .upsert_session(session_key.as_str(), &metadata, None)
+            .upsert_voice_session(session_key.as_str(), &metadata)
             .await;
 
         // Emit phase changed
