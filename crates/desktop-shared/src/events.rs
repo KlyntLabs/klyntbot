@@ -61,6 +61,9 @@ pub const AUTOTUNER_REPORT: &str = "autotuner:report";
 pub const AUTOTUNER_PROMOTION: &str = "autotuner:promotion";
 pub const AUTOTUNER_ROLLBACK: &str = "autotuner:rollback";
 pub const ENTITY_UPDATED: &str = "entity:updated";
+pub const CHAT_THREAD_CREATED: &str = "chat:thread_created";
+pub const CHAT_THREAD_UPDATED: &str = "chat:thread_updated";
+pub const CHAT_MESSAGE_ADDED: &str = "chat:message_added";
 pub const MCP_OAUTH_COMPLETE: &str = "mcp:oauth_complete";
 pub const MCP_OAUTH_ERROR: &str = "mcp:oauth_error";
 pub const MCP_SERVER_STATUS: &str = "mcp:server_status";
@@ -171,6 +174,20 @@ pub struct EntityCreatedPayload {
 pub struct EntityUpdatedPayload {
     pub entity_kind: EntityKind,
     pub id: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ChatThreadPayload {
+    pub session_key: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ChatMessagePayload {
+    pub session_key: String,
+    /// Source that produced the message (e.g., "chat", "voice", "mcp", "cron").
+    pub source: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

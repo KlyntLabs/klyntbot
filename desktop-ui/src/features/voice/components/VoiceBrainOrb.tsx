@@ -95,7 +95,6 @@ export function VoiceBrainOrb() {
     ttsAudio,
     sessionInfo,
     continueAvailable,
-    engineKind,
     setupRequired,
     pause,
     resume,
@@ -151,17 +150,9 @@ export function VoiceBrainOrb() {
         <div className="h-1 bg-accent rounded-full overflow-hidden">
           <div className="h-full bg-primary rounded-full animate-pulse w-1/2" />
         </div>
-        <button
-          type="button"
-          onClick={() => {
-            start().catch(() => {
-              // Cloud not available either — stay on setup screen
-            });
-          }}
-          className="mt-3 text-xs text-primary hover:underline"
-        >
-          Speak anyway (cloud)
-        </button>
+        <p className="mt-3 text-[10px] text-muted-foreground/60">
+          Voice will start automatically when ready
+        </p>
       </div>
     );
   }
@@ -220,10 +211,6 @@ export function VoiceBrainOrb() {
           >
             continuing ↗
           </button>
-        )}
-
-        {engineKind === "cloud" && (
-          <span className="text-[10px] text-muted-foreground/40 flex-shrink-0">cloud</span>
         )}
 
         <div className="flex items-center gap-1 flex-shrink-0">

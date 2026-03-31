@@ -40,8 +40,6 @@ pub struct VoiceInputConfig {
     pub silence_threshold_secs: f32,
     #[serde(default)]
     pub privacy_mode: VoicePrivacyMode,
-    #[serde(default = "default_true")]
-    pub prefer_local: bool,
     #[serde(default = "default_model_size")]
     pub model_size: String,
 }
@@ -52,7 +50,6 @@ impl Default for VoiceInputConfig {
             hotkey: default_voice_hotkey(),
             silence_threshold_secs: default_silence_threshold(),
             privacy_mode: VoicePrivacyMode::default(),
-            prefer_local: true,
             model_size: default_model_size(),
         }
     }

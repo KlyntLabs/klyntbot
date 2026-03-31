@@ -8,6 +8,9 @@ const GLOBAL_SSE_EVENTS = [
   "provider:degraded",
   "entity:updated",
   "focus:state_changed",
+  "chat:thread_created",
+  "chat:thread_updated",
+  "chat:message_added",
 ] as const;
 
 export function BrainEventBridge() {

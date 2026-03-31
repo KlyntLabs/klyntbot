@@ -37,6 +37,8 @@ pub struct ChatStreamInfo {
     pub event_rx: mpsc::Receiver<AgentEvent>,
     pub interaction_rx: mpsc::Receiver<tools_core::InteractionBundle>,
     pub has_context: bool,
+    /// True when the session was just created (not a follow-up in an existing thread).
+    pub is_new_session: bool,
 }
 
 // ── Helper functions (private) ──────────────────────────────────────────
@@ -784,11 +786,12 @@ pub async fn chat_send(
         serde_json::json!({ "title": title })
     };
     let squad_id_ref = context.as_ref().and_then(|c| c.squad_id.as_deref());
-    repos
+    let session_row = repos
         .sessions
         .upsert_session(&session_key, &metadata, squad_id_ref)
         .await
         .map_err(map_storage_err)?;
+    let is_new_session = session_row.created_at == session_row.updated_at;
 
     // 2. Upsert session_context if provided
     let has_context = context.is_some();
@@ -837,6 +840,7 @@ pub async fn chat_send(
         event_rx: streaming_handle.event_rx,
         interaction_rx: streaming_handle.interaction_rx,
         has_context,
+        is_new_session,
     };
 
     Ok((user_msg, stream_info))
@@ -861,6 +865,7 @@ pub async fn chat_cancel(
 pub async fn chat_respond_interaction(
     repos: &Repos,
     pending_interactions: &PendingInteractions,
+    emitter: &dyn crate::events::AppEventEmitter,
     session_key: String,
     request_id: String,
     response: common::FormResponse,
@@ -903,6 +908,13 @@ pub async fn chat_respond_interaction(
         .await
     {
         tracing::warn!("failed to persist interaction message for {session_key}: {e}");
+    }
+
+    if let Ok(payload) = serde_json::to_value(events::ChatMessagePayload {
+        session_key,
+        source: "chat".to_string(),
+    }) {
+        emitter.emit_event(events::CHAT_MESSAGE_ADDED, payload);
     }
 
     Ok(())
@@ -1159,6 +1171,13 @@ pub async fn relay_chat_stream(
                             DonePayload {
                                 session_key: sk.clone(),
                                 content,
+                            }
+                        );
+                        emit!(
+                            CHAT_MESSAGE_ADDED,
+                            ChatMessagePayload {
+                                session_key: sk.clone(),
+                                source: "chat".to_string(),
                             }
                         );
                         break;
@@ -1619,6 +1638,9 @@ impl AppCore {
         )
         .await?;
 
+        self.event_emitter
+            .emit_chat_thread(result.1.is_new_session, &result.1.session_key);
+
         // Publish chat turn to cognitive consolidation pipeline
         if let Some(bus) = &self.domain_event_bus {
             bus.publish(bus::DomainEvent::ChatTurnCompleted {
@@ -1648,6 +1670,9 @@ impl AppCore {
         )
         .await?;
 
+        self.event_emitter
+            .emit_chat_thread(result.1.is_new_session, &result.1.session_key);
+
         // Publish chat turn to cognitive consolidation pipeline
         if let Some(bus) = &self.domain_event_bus {
             bus.publish(bus::DomainEvent::ChatTurnCompleted {
@@ -1676,11 +1701,17 @@ impl AppCore {
             .trim()
             .to_string();
         let metadata = serde_json::json!({ "title": title });
-        self.repos
+        let session_row = self
+            .repos
             .sessions
             .upsert_session(&session_key, &metadata, Some(&squad_id))
             .await
             .map_err(map_storage_err)?;
+
+        self.event_emitter.emit_chat_thread(
+            session_row.created_at == session_row.updated_at,
+            &session_key,
+        );
 
         // 2. Upsert session_context if provided
         let has_context = context.is_some();
@@ -1778,11 +1809,13 @@ impl AppCore {
         };
 
         // 8. Build stream info
+        let is_new_session = session_row.created_at == session_row.updated_at;
         let stream_info = ChatStreamInfo {
             session_key: session_key.clone(),
             event_rx,
             interaction_rx,
             has_context,
+            is_new_session,
         };
 
         // Publish chat turn to cognitive consolidation pipeline
@@ -1814,6 +1847,7 @@ impl AppCore {
         chat_respond_interaction(
             &self.repos,
             &self.pending_interactions,
+            self.event_emitter.as_ref(),
             session_key,
             request_id,
             response,

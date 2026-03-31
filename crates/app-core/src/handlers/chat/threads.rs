@@ -249,7 +249,9 @@ impl AppCore {
     }
 
     pub async fn chat_pin_thread(&self, session_key: String) -> Result<(), ApiError> {
-        chat_pin_thread(&self.repos, session_key).await
+        chat_pin_thread(&self.repos, session_key.clone()).await?;
+        self.event_emitter.emit_chat_thread(false, &session_key);
+        Ok(())
     }
 
     pub async fn chat_rename_thread(
@@ -257,7 +259,9 @@ impl AppCore {
         session_key: String,
         title: String,
     ) -> Result<(), ApiError> {
-        chat_rename_thread(&self.repos, session_key, title).await
+        chat_rename_thread(&self.repos, session_key.clone(), title).await?;
+        self.event_emitter.emit_chat_thread(false, &session_key);
+        Ok(())
     }
 
     pub async fn chat_delete_thread(&self, session_key: String) -> Result<(), ApiError> {
@@ -265,8 +269,10 @@ impl AppCore {
             &self.repos,
             &self.active_streams,
             &self.pending_interactions,
-            session_key,
+            session_key.clone(),
         )
-        .await
+        .await?;
+        self.event_emitter.emit_chat_thread(false, &session_key);
+        Ok(())
     }
 }

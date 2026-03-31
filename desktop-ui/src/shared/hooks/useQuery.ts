@@ -1,4 +1,6 @@
+import { isTauri } from "@shared/lib/utils";
 import type { ApiError } from "@shared/types";
+import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { parseApiError } from "../lib/errors";
 import { ipc } from "./useIpc";
@@ -8,6 +10,15 @@ interface QueryResult<T> {
   loading: boolean;
   error: ApiError | null;
   refetch: () => void;
+}
+
+interface UseQueryOptions {
+  /** Stale time in ms before auto-refetch. Default 30s. */
+  staleTime?: number;
+  /** Event names that trigger cache invalidation and refetch. */
+  invalidateOn?: string[];
+  /** Only invalidate if the event payload passes this filter. */
+  invalidateFilter?: (payload: unknown) => boolean;
 }
 
 interface CacheEntry {
@@ -28,6 +39,66 @@ function cacheKey(cmd: string, args?: Record<string, unknown> | null): string | 
 }
 
 /**
+ * Listen for multiple events and call handler on any match.
+ * Debounces via requestAnimationFrame to coalesce batch mutations.
+ */
+function useEventInvalidation(events: string[] | undefined, handler: (payload: unknown) => void) {
+  const handlerRef = useRef(handler);
+  handlerRef.current = handler;
+  const rafRef = useRef(0);
+
+  const debouncedHandler = useCallback((payload: unknown) => {
+    cancelAnimationFrame(rafRef.current);
+    rafRef.current = requestAnimationFrame(() => {
+      handlerRef.current(payload);
+    });
+  }, []);
+
+  const eventsRef = useRef(events);
+  eventsRef.current = events;
+  // Re-subscribe when event names actually change (not on every render's new array reference)
+  const eventsKey = events?.join(",") ?? "";
+
+  // biome-ignore lint/correctness/useExhaustiveDependencies: eventsKey tracks content changes; eventsRef avoids array identity churn
+  useEffect(() => {
+    const ev = eventsRef.current;
+    if (!ev || ev.length === 0) return;
+
+    const listeners: (() => void)[] = [];
+
+    if (isTauri) {
+      for (const event of ev) {
+        let cancelled = false;
+        let unlisten: UnlistenFn | undefined;
+        listen(event, (e: { payload: unknown }) => {
+          if (!cancelled) debouncedHandler(e.payload);
+        }).then((fn) => {
+          if (cancelled) fn();
+          else unlisten = fn;
+        });
+        listeners.push(() => {
+          cancelled = true;
+          unlisten?.();
+        });
+      }
+    } else {
+      for (const event of ev) {
+        const onCustom = (e: Event) => {
+          debouncedHandler((e as CustomEvent).detail);
+        };
+        window.addEventListener(event, onCustom);
+        listeners.push(() => window.removeEventListener(event, onCustom));
+      }
+    }
+
+    return () => {
+      cancelAnimationFrame(rafRef.current);
+      for (const cleanup of listeners) cleanup();
+    };
+  }, [debouncedHandler, eventsKey]);
+}
+
+/**
  * Fetches data from a Tauri command with SWR caching and request dedup.
  *
  * Pass `null` for `args` to skip fetching.
@@ -37,8 +108,13 @@ export function useQuery<T>(
   cmd: string,
   args?: Record<string, unknown> | null,
   fallback?: T,
-  staleTime = DEFAULT_STALE_TIME,
+  options?: UseQueryOptions | number,
 ): QueryResult<T> {
+  // Normalize options — number = legacy staleTime parameter
+  const opts: UseQueryOptions =
+    typeof options === "number" ? { staleTime: options } : (options ?? {});
+  const staleTime = opts.staleTime ?? DEFAULT_STALE_TIME;
+
   const key = cacheKey(cmd, args);
   const cached = key ? cache.get(key) : undefined;
 
@@ -121,6 +197,15 @@ export function useQuery<T>(
       invalidationListeners.delete(listener);
     };
   }, [cmd, doFetch]);
+
+  // Event-driven invalidation — refetch when specified events fire
+  const invalidateFilterRef = useRef(opts.invalidateFilter);
+  invalidateFilterRef.current = opts.invalidateFilter;
+
+  useEventInvalidation(opts.invalidateOn, (payload: unknown) => {
+    if (invalidateFilterRef.current && !invalidateFilterRef.current(payload)) return;
+    doFetch(true);
+  });
 
   return { data, loading, error, refetch };
 }

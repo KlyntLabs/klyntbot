@@ -1,4 +1,7 @@
-use desktop_shared::events::{EntityUpdatedPayload, ENTITY_UPDATED};
+use desktop_shared::events::{
+    ChatThreadPayload, EntityUpdatedPayload, CHAT_THREAD_CREATED, CHAT_THREAD_UPDATED,
+    ENTITY_UPDATED,
+};
 use desktop_shared::types::EntityKind;
 
 /// Emitted when an LLM provider degrades or falls back to a secondary.
@@ -17,6 +20,20 @@ pub trait AppEventEmitter: Send + Sync + 'static {
         };
         if let Ok(value) = serde_json::to_value(&payload) {
             self.emit_event(ENTITY_UPDATED, value);
+        }
+    }
+
+    /// Emit a chat thread event (`chat:thread_created` or `chat:thread_updated`).
+    fn emit_chat_thread(&self, is_new: bool, session_key: &str) {
+        let event = if is_new {
+            CHAT_THREAD_CREATED
+        } else {
+            CHAT_THREAD_UPDATED
+        };
+        if let Ok(value) = serde_json::to_value(ChatThreadPayload {
+            session_key: session_key.to_string(),
+        }) {
+            self.emit_event(event, value);
         }
     }
 }

@@ -39,7 +39,6 @@ fn base64_encode_audio(clip: &AudioClip) -> String {
 #[derive(Debug, Clone)]
 pub struct VoiceServiceConfig {
     pub capture: CaptureConfig,
-    pub prefer_local: bool,
     pub privacy_mode: PrivacyLevel,
     /// Data directory for saving audio captures and TTS output.
     pub data_dir: PathBuf,
@@ -49,7 +48,6 @@ impl Default for VoiceServiceConfig {
     fn default() -> Self {
         Self {
             capture: CaptureConfig::default(),
-            prefer_local: true,
             privacy_mode: PrivacyLevel::Standard,
             data_dir: PathBuf::from("."),
         }
@@ -91,7 +89,6 @@ struct ActiveSession {
 pub struct VoiceService {
     /// Local STT engine — wrapped in RwLock for hot-swap after background model download.
     stt_local: std::sync::RwLock<Option<Arc<dyn TranscriptionEngine>>>,
-    stt_cloud: Option<Arc<dyn TranscriptionEngine>>,
     /// TTS engine for spoken responses (used in SpeakResponse phase).
     tts: Option<Arc<dyn TtsEngine>>,
     /// Memory echo provider for dependency-inverted memory lookups.
@@ -124,7 +121,6 @@ impl VoiceService {
     /// while the model is downloading).
     pub fn new(
         stt_local: Option<Arc<dyn TranscriptionEngine>>,
-        stt_cloud: Option<Arc<dyn TranscriptionEngine>>,
         tts: Option<Arc<dyn TtsEngine>>,
         memory_echo: Option<Arc<dyn MemoryEchoProvider>>,
         model_manager: ModelManager,
@@ -134,7 +130,6 @@ impl VoiceService {
 
         Self {
             stt_local: std::sync::RwLock::new(stt_local),
-            stt_cloud,
             tts,
             memory_echo,
             capture: AudioCapture::new(config.capture.clone()),
@@ -166,16 +161,8 @@ impl VoiceService {
             .unwrap_or(VoiceSessionState::Idle)
     }
 
-    /// Get the active transcription engine (local preferred, cloud fallback).
+    /// Get the local transcription engine if available.
     fn active_engine(&self) -> Option<(Arc<dyn TranscriptionEngine>, EngineKind)> {
-        if self.config.prefer_local {
-            if let Some(local) = self.stt_local.read().ok().and_then(|g| g.clone()) {
-                return Some((local, EngineKind::Local));
-            }
-        }
-        if let Some(ref cloud) = self.stt_cloud {
-            return Some((Arc::clone(cloud), EngineKind::Cloud));
-        }
         self.stt_local
             .read()
             .ok()
@@ -205,7 +192,7 @@ impl VoiceService {
     )> {
         let (_, engine_kind) = self.active_engine().ok_or_else(|| {
             common::KlyntbotError::Provider(common::ProviderError::InvalidResponse(
-                "No transcription engine available. Download a model or configure Groq API key."
+                "No transcription engine available. Waiting for model download."
                     .to_string(),
             ))
         })?;
@@ -593,7 +580,6 @@ mod tests {
             stt,
             None,
             None,
-            None,
             model_manager,
             VoiceServiceConfig::default(),
         );
@@ -603,7 +589,6 @@ mod tests {
     #[test]
     fn default_config() {
         let config = VoiceServiceConfig::default();
-        assert!(config.prefer_local);
         assert_eq!(config.privacy_mode, PrivacyLevel::Standard);
     }
 
@@ -747,6 +732,7 @@ mod tests {
                 VoiceEvent::ProcessingInBackground => "ProcessingInBackground",
                 VoiceEvent::SpeakResponse { .. } => "SpeakResponse",
                 VoiceEvent::Error { .. } => "Error",
+                _ => "Other",
             })
             .collect();
 
@@ -798,7 +784,6 @@ mod tests {
         let model_manager = ModelManager::new(tmp.path());
         let svc = VoiceService::new(
             Some(mock_stt),
-            None,
             Some(mock_tts),
             None,
             model_manager,
@@ -845,7 +830,6 @@ mod tests {
         let model_manager = ModelManager::new(tmp.path());
         let svc = VoiceService::new(
             Some(mock_stt),
-            None,
             Some(mock_tts),
             None,
             model_manager,
@@ -879,7 +863,6 @@ mod tests {
         let model_manager = ModelManager::new(tmp.path());
         let svc = VoiceService::new(
             Some(mock_stt.clone()),
-            None,
             None,
             None,
             model_manager,

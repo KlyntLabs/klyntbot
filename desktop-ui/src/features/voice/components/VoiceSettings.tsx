@@ -6,7 +6,6 @@ interface VoiceConfig {
     hotkey: string;
     silenceThresholdSecs: number;
     privacyMode: "standard" | "strict" | "off";
-    preferLocal: boolean;
     modelSize: "small" | "medium";
   };
   output: {
@@ -28,7 +27,6 @@ export function VoiceSettings() {
       hotkey: "alt+shift+v",
       silenceThresholdSecs: 1.5,
       privacyMode: "standard",
-      preferLocal: true,
       modelSize: "small",
     },
     output: {
@@ -65,14 +63,9 @@ export function VoiceSettings() {
           <span className="text-sm">Privacy mode</span>
           <span className="text-xs text-muted capitalize">{config.input.privacyMode}</span>
         </div>
-        <div className="space-y-1">
+        <div className="flex items-center justify-between">
           <span className="text-sm">Transcription engine</span>
-          <div className="pl-4 space-y-1 text-xs text-muted">
-            <div>
-              {config.input.preferLocal ? "●" : "○"} Local (whisper-{config.input.modelSize})
-            </div>
-            <div>{!config.input.preferLocal ? "●" : "○"} Cloud (Groq)</div>
-          </div>
+          <span className="text-xs text-muted">Local (whisper-{config.input.modelSize})</span>
         </div>
       </section>
 

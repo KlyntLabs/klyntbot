@@ -58,6 +58,11 @@ export function useChatSession(
     "chat_messages",
     sessionKey ? { sessionKey } : null,
     [],
+    {
+      invalidateOn: ["chat:message_added"],
+      invalidateFilter: (payload) =>
+        (payload as { sessionKey?: string })?.sessionKey === sessionKey,
+    },
   );
   const [input, setInput] = useState("");
   const [pendingUserMsg, setPendingUserMsg] = useState<string | null>(null);

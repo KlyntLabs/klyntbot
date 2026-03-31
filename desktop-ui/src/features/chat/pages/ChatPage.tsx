@@ -45,6 +45,9 @@ export function ChatPage() {
     "chat_threads",
     undefined,
     [],
+    {
+      invalidateOn: ["chat:thread_created", "chat:thread_updated"],
+    },
   );
 
   // Detect squad chat from the currently selected thread

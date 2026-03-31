@@ -601,30 +601,14 @@ impl AppCore {
                         }
                     });
 
-                // Cloud STT: Groq fallback if API key configured
-                let stt_cloud: Option<Arc<dyn TranscriptionEngine>> = {
-                    let groq_key = config_guard.providers.groq.api_key.expose();
-                    if !groq_key.is_empty() {
-                        match GroqWhisperEngine::new(groq_key) {
-                            Ok(engine) => Some(Arc::new(engine) as Arc<dyn TranscriptionEngine>),
-                            Err(e) => {
-                                warn!("Failed to create Groq engine: {e}");
-                                None
-                            }
-                        }
-                    } else {
-                        None
-                    }
-                };
-
                 drop(config_guard);
 
                 // TTS: macOS AVSpeech
                 let tts: Option<Arc<dyn voice_engine::TtsEngine>> =
                     Some(Arc::new(voice_engine::AvSpeechTtsEngine::new(&data_dir)));
 
-                // Always create VoiceService — even without engines.
-                // Groq provides instant first-run, background download adds local.
+                // Always create VoiceService — even without a local engine yet.
+                // If the model is still downloading, voice_conversation_start will wait.
                 let svc_config = VoiceServiceConfig {
                     capture: capture::CaptureConfig {
                         silence_threshold: 0.01,
@@ -633,7 +617,6 @@ impl AppCore {
                         ),
                         ..Default::default()
                     },
-                    prefer_local: voice_config.input.prefer_local,
                     privacy_mode: PrivacyLevel::Standard,
                     data_dir: data_dir.clone(),
                 };
@@ -657,7 +640,6 @@ impl AppCore {
 
                 let service = VoiceService::new(
                     stt_local,
-                    stt_cloud,
                     tts,
                     Some(Arc::clone(&echo_provider)),
                     model_manager,
@@ -685,8 +667,8 @@ impl AppCore {
                 if !has_local_engine {
                     if model_needs_download {
                         // Auto-download whisper-small in background on first run.
-                        // Voice works immediately via Groq cloud fallback (if configured).
-                        // Once download completes, local engine becomes available on next capture.
+                        // Voice will wait for download on first use.
+                        // Once download completes, local engine becomes available.
                         info!("Whisper model not found — starting background download");
                         let svc = Arc::clone(&service);
                         let data_dir = data_dir.clone();
@@ -714,7 +696,7 @@ impl AppCore {
                             }
                         });
                     }
-                    info!("Voice service initialized (cloud-only until model downloads)");
+                    info!("Voice service initialized (waiting for model download)");
                 } else {
                     info!("Voice service initialized (local engine ready)");
                 }

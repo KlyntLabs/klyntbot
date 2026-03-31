@@ -257,9 +257,9 @@ impl VoiceConversationManager {
     // ── 2. start ────────────────────────────────────────────
 
     /// Begin (or resume) a voice conversation.
+    /// If the local Whisper model isn't downloaded yet, waits for it (up to 10 min).
     pub async fn start(&self) -> common::Result<StartResponse> {
-        // Check if voice engine is available before entering the conversation loop.
-        // On first run the local Whisper model may not be downloaded yet.
+        // If local engine isn't available, wait for model download.
         if !self.voice_service.is_available() {
             // Emit SetupRequired so the orb shows the download progress screen.
             let _ = self
@@ -270,22 +270,36 @@ impl VoiceConversationManager {
                 })
                 .await;
 
-            // Best-effort: trigger model download if not already in progress.
+            // Trigger model download if not already in progress.
             let model_state = self.voice_service.model_state();
             if !matches!(
                 model_state,
                 voice_engine::ModelState::Downloading { .. }
                     | voice_engine::ModelState::Ready { .. }
             ) {
-                let _ = self
-                    .voice_service
-                    .download_model(voice_engine::WhisperModelSize::Small)
-                    .await;
+                let svc = Arc::clone(&self.voice_service);
+                tokio::spawn(async move {
+                    let _ = svc
+                        .download_model(voice_engine::WhisperModelSize::Small)
+                        .await;
+                });
             }
 
-            return Err(common::KlyntbotError::Bus(
-                "Voice engine not available — model download required".to_string(),
-            ));
+            // Poll until the engine becomes available (model downloaded + hot-loaded).
+            let deadline =
+                tokio::time::Instant::now() + std::time::Duration::from_secs(10 * 60);
+            loop {
+                tokio::time::sleep(std::time::Duration::from_secs(2)).await;
+                if self.voice_service.is_available() {
+                    info!("Local voice engine now available after download");
+                    break;
+                }
+                if tokio::time::Instant::now() >= deadline {
+                    return Err(common::KlyntbotError::Bus(
+                        "Voice model download timed out after 10 minutes".to_string(),
+                    ));
+                }
+            }
         }
 
         let session_key = self.resolve_session().await;
