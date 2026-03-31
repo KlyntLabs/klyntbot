@@ -145,6 +145,8 @@ pub struct AppCore {
     /// Voice conversation manager (None when voice feature is disabled).
     pub voice_conversation_manager:
         Option<Arc<crate::handlers::voice_conversation::VoiceConversationManager>>,
+    /// Background task handle for the voice conversation loop.
+    pub voice_loop_handle: Option<tokio::task::JoinHandle<()>>,
     /// BrainVoice signal router (None when domain event bus is unavailable).
     pub brain_voice: Option<crate::brain_voice::BrainVoice>,
     /// Onboarding journey milestone tracker.

@@ -572,6 +572,7 @@ impl AppCore {
             _wake_orchestrator_handle: None,
             voice_service: None,
             voice_conversation_manager: None,
+            voice_loop_handle: None,
             brain_voice,
             journey_tracker: Some(journey_tracker),
         };
@@ -661,7 +662,8 @@ impl AppCore {
                         voice_config_arc,
                     ),
                 );
-                let _loop_handle = voice_conv_manager.spawn_loop().await;
+                let loop_handle = voice_conv_manager.spawn_loop().await;
+                core.voice_loop_handle = Some(loop_handle);
                 core.voice_conversation_manager = Some(voice_conv_manager);
 
                 if !has_local_engine {
