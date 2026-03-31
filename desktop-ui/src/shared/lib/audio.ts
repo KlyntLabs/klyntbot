@@ -6,6 +6,9 @@
  */
 let sharedCtx: AudioContext | null = null;
 
+/** Tracks the currently playing TTS source so it can be stopped on interrupt. */
+let activeSource: AudioBufferSourceNode | null = null;
+
 function getAudioContext(): AudioContext {
   if (!sharedCtx || sharedCtx.state === "closed") {
     sharedCtx = new AudioContext();
@@ -14,11 +17,29 @@ function getAudioContext(): AudioContext {
 }
 
 /**
+ * Stop any currently playing TTS audio immediately.
+ * Safe to call when nothing is playing.
+ */
+export function stopTtsAudio(): void {
+  if (activeSource) {
+    try {
+      activeSource.stop();
+    } catch {
+      // Already stopped — ignore
+    }
+    activeSource = null;
+  }
+}
+
+/**
  * Decode base64-encoded PCM float32 samples and play via Web Audio API.
  * Uses fetch with a data URL instead of atob() for robust binary decoding.
  */
 export async function playTtsAudio(base64: string, sampleRate: number): Promise<void> {
   if (!base64) return;
+
+  // Stop any previous playback before starting new audio
+  stopTtsAudio();
 
   const response = await fetch(`data:application/octet-stream;base64,${base64}`);
   const arrayBuffer = await response.arrayBuffer();
@@ -33,7 +54,9 @@ export async function playTtsAudio(base64: string, sampleRate: number): Promise<
     await ctx.resume();
   }
 
-  console.log(`[TTS] Playing ${float32.length} samples at ${sampleRate}Hz (ctx.state=${ctx.state})`);
+  console.log(
+    `[TTS] Playing ${float32.length} samples at ${sampleRate}Hz (ctx.state=${ctx.state})`,
+  );
 
   const buffer = ctx.createBuffer(1, float32.length, sampleRate);
   buffer.copyToChannel(float32, 0);
@@ -41,5 +64,11 @@ export async function playTtsAudio(base64: string, sampleRate: number): Promise<
   const source = ctx.createBufferSource();
   source.buffer = buffer;
   source.connect(ctx.destination);
+  source.onended = () => {
+    if (activeSource === source) {
+      activeSource = null;
+    }
+  };
+  activeSource = source;
   source.start();
 }

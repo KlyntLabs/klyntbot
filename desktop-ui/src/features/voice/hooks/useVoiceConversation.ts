@@ -1,6 +1,6 @@
 import { useEvent } from "@shared/hooks/useEvent";
 import { ipc } from "@shared/hooks/useIpc";
-import { playTtsAudio } from "@shared/lib/audio";
+import { playTtsAudio, stopTtsAudio } from "@shared/lib/audio";
 import { useCallback, useRef, useState } from "react";
 
 export type ConversationPhase = "idle" | "listening" | "reflecting" | "speaking";
@@ -111,6 +111,7 @@ export function useVoiceConversation() {
         break;
       }
       case "ttsFadeOut":
+        stopTtsAudio();
         // Delay clearing so CSS can animate a 300ms fade-out on the speaking visual
         setTimeout(() => setTtsAudio(null), 300);
         break;
@@ -178,6 +179,7 @@ export function useVoiceConversation() {
   }, []);
 
   const end = useCallback(async () => {
+    stopTtsAudio();
     await ipc("voice_conversation_end");
     setPhase("idle");
     // Hide orb window if in Tauri
