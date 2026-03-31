@@ -173,7 +173,7 @@ pub(super) async fn init_cron(
     };
 
     let cron_service = Arc::new(cron_service);
-    ensure_cron_jobs(&cron_service, config, &tasks_config)
+    ensure_cron_jobs(&cron_service, config)
         .await
         .map_err(|e| format!("cron job registration failed: {e}"))?;
     set_default_intent_windows(&cron_service).await;
@@ -860,7 +860,6 @@ fn register_cron_callbacks(
 async fn ensure_cron_jobs(
     cron_service: &Arc<CronService>,
     config: &config::Config,
-    tasks_config: &TasksConfig,
 ) -> Result<(), common::KlyntbotError> {
     let existing: std::collections::HashSet<String> = cron_service
         .list_jobs(true)
@@ -882,88 +881,26 @@ async fn ensure_cron_jobs(
             }
         };
     }
-    let user = scheduling::CronOrigin::User;
     let system = scheduling::CronOrigin::System;
 
-    // ── User-editable jobs (notifications, checks, user-facing features) ──
-
-    if config.todo.daily_planning.enabled {
-        if let Some(cron_expr) = parse_time_to_cron(&config.todo.daily_planning.planning_time) {
-            ensure_job!(
-                JOB_DAILY_PLANNING,
-                scheduling::CronSchedule::Cron {
-                    expr: cron_expr,
-                    tz: None
-                },
-                "Generate daily planning notification",
-                user.clone()
-            );
-        }
-    }
-
-    if config.finance.enabled && config.finance.proactivity_level != "reactive" {
-        if let Some(cron_expr) = parse_time_to_cron(&config.finance.scheduling.daily_review_time) {
-            ensure_job!(
-                JOB_FINANCE_DAILY_REVIEW,
-                scheduling::CronSchedule::Cron {
-                    expr: cron_expr,
-                    tz: None
-                },
-                "Daily financial review",
-                user.clone()
-            );
-        }
-        ensure_job!(
-            JOB_FINANCE_BUDGET_CHECK,
-            scheduling::CronSchedule::Every {
-                every_ms: 6 * 60 * 60 * 1000
-            },
-            "Check budget thresholds",
-            user.clone()
-        );
-        if config.finance.price_refresh.enabled {
-            ensure_job!(
-                JOB_FINANCE_PRICE_REFRESH,
-                scheduling::CronSchedule::Every {
-                    every_ms: config.finance.price_refresh.interval_hours as u64 * 60 * 60 * 1000,
-                },
-                "Refresh investment prices",
-                user.clone()
-            );
-        }
-        ensure_job!(
-            JOB_FINANCE_HEALTH_CHECK,
-            scheduling::CronSchedule::Cron {
-                expr: "0 0 * * *".to_string(),
-                tz: None
-            },
-            "Finance data health check",
-            user.clone()
-        );
-    }
-
-    if tasks_config.proactive_suggestions {
-        ensure_job!(
-            JOB_PROACTIVE_SCAN,
-            scheduling::CronSchedule::Cron {
-                expr: "0 */4 * * *".to_string(),
-                tz: None
-            },
-            "Proactive task suggestion scan",
-            user.clone()
-        );
-    }
-
-    ensure_job!(
-        JOB_INSIGHT_REFRESH,
-        scheduling::CronSchedule::Every {
-            every_ms: 24 * 60 * 60 * 1000
-        },
-        "Refresh insight progress snapshots",
-        user.clone()
-    );
+    // ── User-editable jobs ────────────────────────────────────────────────
+    // All user jobs are now lazy-created via `ensure_lazy_job()` when
+    // the feature is first used, or manually from the Automations page.
+    // This keeps a fresh install clean.
 
     // ── Protected system jobs (AI background work, infrastructure) ────────
+
+    // Finance price refresh (system — must run automatically when enabled)
+    if config.finance.enabled && config.finance.price_refresh.enabled {
+        ensure_job!(
+            JOB_FINANCE_PRICE_REFRESH,
+            scheduling::CronSchedule::Every {
+                every_ms: config.finance.price_refresh.interval_hours as u64 * 60 * 60 * 1000,
+            },
+            "Refresh investment prices",
+            system.clone()
+        );
+    }
 
     // Weekly cognitive reflection
     {

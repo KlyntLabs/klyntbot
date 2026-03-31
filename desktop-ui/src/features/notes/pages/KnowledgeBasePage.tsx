@@ -1,3 +1,4 @@
+import { useCrossDomainCheck } from "@shared/hooks/useCrossDomainCheck";
 import { useEvent } from "@shared/hooks/useEvent";
 import { useMutation } from "@shared/hooks/useMutation";
 import { invalidateQueries, useQuery } from "@shared/hooks/useQuery";
@@ -134,6 +135,8 @@ export default function KnowledgeBasePage() {
   }, [notes]);
 
   const selectedNote = selectedNoteId ? noteMap.get(selectedNoteId) : undefined;
+
+  useCrossDomainCheck("note", selectedNote?.id, selectedNote?.title, selectedNote?.createdAt);
 
   // ── Insight derived state ─────────────────────────────────────────────
   const insightOpen = insightState.isOpen;
