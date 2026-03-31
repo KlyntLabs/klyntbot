@@ -1,4 +1,3 @@
-import { useEvent } from "@shared/hooks/useEvent";
 import { useMutation } from "@shared/hooks/useMutation";
 import { useQuery } from "@shared/hooks/useQuery";
 import type { ApiError } from "@shared/types";
@@ -34,13 +33,32 @@ export function useTasks(): UseTasksResult {
     loading: tasksLoading,
     error: tasksError,
     refetch: refetchTasks,
-  } = useQuery<Task[]>("task_list", undefined, []);
+  } = useQuery<Task[]>("task_list", undefined, [], {
+    invalidateOn: ["entity:updated"],
+    invalidateFilter: (p) => {
+      const kind = (p as { entityKind?: string })?.entityKind;
+      return !kind || kind === "task" || kind === "area";
+    },
+  });
   const { data: projects, refetch: refetchProjects } = useQuery<Project[]>(
     "project_list",
     undefined,
     [],
+    {
+      invalidateOn: ["entity:updated"],
+      invalidateFilter: (p) => {
+        const kind = (p as { entityKind?: string })?.entityKind;
+        return !kind || kind === "project";
+      },
+    },
   );
-  const { data: areas, refetch: refetchAreas } = useQuery<Area[]>("area_list", undefined, []);
+  const { data: areas, refetch: refetchAreas } = useQuery<Area[]>("area_list", undefined, [], {
+    invalidateOn: ["entity:updated"],
+    invalidateFilter: (p) => {
+      const kind = (p as { entityKind?: string })?.entityKind;
+      return !kind || kind === "area";
+    },
+  });
 
   const projectMap = useMemo(
     () => new Map(projects.map((p) => [p.id, projectToDisplayProject(p)])),
@@ -63,20 +81,6 @@ export function useTasks(): UseTasksResult {
     refetchProjects();
     refetchAreas();
   }, [refetchTasks, refetchProjects, refetchAreas]);
-
-  // Auto-refresh when relevant entities change
-  useEvent<{ entityKind: string; id: string }>("entity:updated", (payload) => {
-    const kind = payload?.entityKind;
-    if (!kind) {
-      refetchTasks();
-      refetchProjects();
-      refetchAreas();
-      return;
-    }
-    if (kind === "task" || kind === "area") refetchTasks();
-    if (kind === "project") refetchProjects();
-    if (kind === "area") refetchAreas();
-  });
 
   return {
     issues,

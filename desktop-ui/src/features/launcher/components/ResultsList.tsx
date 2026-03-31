@@ -12,8 +12,11 @@ export function ResultsList({ onExecute }: ResultsListProps) {
   const isSearching = useLauncherStore((s) => s.isSearching);
   const listRef = useRef<HTMLDivElement>(null);
   // Prevent hover selection when results render under a stationary cursor.
-  // Only allow mouse-based selection after the mouse physically moves.
+  // Only allow mouse-based selection after the mouse physically moves (>3px).
+  // Typing-induced hand vibration fires mousemove events with sub-pixel
+  // changes — tracking coordinates avoids those false positives.
   const mouseMovedRef = useRef(false);
+  const lastMousePosRef = useRef<{ x: number; y: number } | null>(null);
 
   // Reset mouse-moved flag when results change — use first item ID as a
   // stable identity signal (length alone can't distinguish different result sets).
@@ -21,6 +24,7 @@ export function ResultsList({ onExecute }: ResultsListProps) {
   // biome-ignore lint/correctness/useExhaustiveDependencies: intentionally reacting to result identity change
   useEffect(() => {
     mouseMovedRef.current = false;
+    lastMousePosRef.current = null;
   }, [resultsKey]);
 
   // Scroll selected item into view
@@ -62,8 +66,12 @@ export function ResultsList({ onExecute }: ResultsListProps) {
       ref={listRef}
       role="listbox"
       className="max-h-[500px] overflow-y-auto py-1"
-      onMouseMove={() => {
-        mouseMovedRef.current = true;
+      onMouseMove={(e) => {
+        const last = lastMousePosRef.current;
+        if (last && (Math.abs(e.clientX - last.x) > 3 || Math.abs(e.clientY - last.y) > 3)) {
+          mouseMovedRef.current = true;
+        }
+        lastMousePosRef.current = { x: e.clientX, y: e.clientY };
       }}
     >
       {results.map((item, index) => (
@@ -103,7 +111,7 @@ function ResultRow({
       tabIndex={-1}
       aria-selected={isSelected}
       className={`flex items-center gap-3 px-4 py-2 cursor-pointer transition-colors duration-100 animate-[result-in_0.15s_ease-out_both] ${
-        isSelected ? "bg-muted" : "hover:bg-muted/50"
+        isSelected ? "bg-muted" : ""
       }`}
       style={{ animationDelay: `${Math.min(index * 20, 200)}ms` }}
       onClick={onClick}

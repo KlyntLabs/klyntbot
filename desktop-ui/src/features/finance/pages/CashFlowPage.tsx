@@ -1,4 +1,3 @@
-import { useEvent } from "@shared/hooks/useEvent";
 import { useMutation } from "@shared/hooks/useMutation";
 import { useQuery } from "@shared/hooks/useQuery";
 import { todayISO } from "@shared/lib/dates";
@@ -35,23 +34,31 @@ export function CashFlowPage() {
   const { mode, setMode, baseCurrency, rates, currencies, displayCur, convertTotal } =
     useFinanceCurrency();
 
+  const financeInvalidate = {
+    invalidateOn: ["entity:updated"],
+    invalidateFilter: (p: unknown) => (p as { entityKind?: string })?.entityKind === "finance",
+  };
+
   // ── Period-scoped queries ──────────────────────────────────────
   const { data: periodSummary, refetch: rPS } = useQuery<FinancePeriodSummary>(
     "finance_period_summary",
     { dateFrom: period.dateFrom, dateTo: period.dateTo },
     { income: 0, spending: 0 },
+    financeInvalidate,
   );
 
   const { data: dailySpendingResp, refetch: rDS } = useQuery<FinanceDailySpendingResponse>(
     "finance_daily_spending",
     { dateFrom: period.dateFrom, dateTo: period.dateTo },
     { days: [] },
+    financeInvalidate,
   );
 
   const { data: spendingReport, refetch: rSR } = useQuery<FinanceCategoryReport>(
     "finance_report_spending",
     { dateFrom: period.dateFrom, dateTo: period.dateTo },
     { total: 0, breakdown: [] },
+    financeInvalidate,
   );
 
   // ── Transaction filter state ───────────────────────────────────
@@ -81,6 +88,7 @@ export function CashFlowPage() {
       },
     },
     [],
+    financeInvalidate,
   );
 
   // ── Non-period-scoped queries ─────────────────────────────────
@@ -88,11 +96,13 @@ export function CashFlowPage() {
     "finance_accounts",
     undefined,
     [],
+    financeInvalidate,
   );
   const { data: budgets, refetch: rB } = useQuery<FinanceBudgetUsage[]>(
     "finance_budget_usage",
     undefined,
     [],
+    financeInvalidate,
   );
 
   const refetchAll = useCallback(() => {
@@ -103,8 +113,6 @@ export function CashFlowPage() {
     rA();
     rB();
   }, [rPS, rDS, rSR, rTX, rA, rB]);
-
-  useEvent<{ entityKind: string }>("entity:updated", refetchAll);
 
   // ── Computed heatmap data ─────────────────────────────────────
   const { heatmapLevels, dailyCounts } = useMemo(() => {

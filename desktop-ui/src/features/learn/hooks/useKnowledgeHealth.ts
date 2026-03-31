@@ -16,10 +16,15 @@ export interface KnowledgeHealthSummary {
 }
 
 export function useKnowledgeHealth() {
-  return useQuery<KnowledgeHealthSummary>("knowledge_health_summary", undefined, {
-    totalAtoms: 0,
-    activeAtoms: 0,
-    avgRetention: 0,
-    topics: [],
-  });
+  return useQuery<KnowledgeHealthSummary>(
+    "knowledge_health_summary",
+    undefined,
+    {
+      totalAtoms: 0,
+      activeAtoms: 0,
+      avgRetention: 0,
+      topics: [],
+    },
+    { invalidateOn: ["entity:updated"] },
+  );
 }

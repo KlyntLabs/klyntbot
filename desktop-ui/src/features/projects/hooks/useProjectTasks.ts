@@ -2,5 +2,8 @@ import { useQuery } from "@shared/hooks/useQuery";
 import type { Task } from "@shared/types";
 
 export function useProjectTasks(projectId: string) {
-  return useQuery<Task[]>("task_list", { projectId }, []);
+  return useQuery<Task[]>("task_list", { projectId }, [], {
+    invalidateOn: ["entity:updated"],
+    invalidateFilter: (p) => (p as { entityKind?: string })?.entityKind === "task",
+  });
 }

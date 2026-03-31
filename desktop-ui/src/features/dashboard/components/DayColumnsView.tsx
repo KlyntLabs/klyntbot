@@ -1,9 +1,7 @@
-import { useEvent } from "@shared/hooks/useEvent";
 import { useQuery } from "@shared/hooks/useQuery";
 import { formatHumanDuration, minutesSinceMidnight, TZ_OFFSET_MINS } from "@shared/lib/dates";
 import { cn } from "@shared/lib/utils";
 import type {
-  ActivitySwitchPayload,
   ActivityTimeline,
   ProductivitySummary,
   TimelineEntry,
@@ -112,15 +110,18 @@ export function DayColumnsView({
   productivitySummary,
 }: DayColumnsViewProps) {
   // Centralized activity timeline fetch — passed to ActivityTrack to avoid duplicate IPC
-  const { data: activityTimeline, refetch: refetchTimeline } = useQuery<ActivityTimeline[]>(
+  const { data: activityTimeline } = useQuery<ActivityTimeline[]>(
     "productivity_timeline",
     { date, tzOffsetMins: TZ_OFFSET_MINS },
     [],
+    {
+      invalidateOn: ["entity:updated", "activity:switch"],
+      invalidateFilter: (p) => {
+        const kind = (p as { entityKind?: string })?.entityKind;
+        return !kind || kind === "productivity";
+      },
+    },
   );
-  useEvent<ActivitySwitchPayload>("activity:switch", () => refetchTimeline());
-  useEvent<{ entityKind: string }>("entity:updated", (payload) => {
-    if (payload?.entityKind === "productivity") refetchTimeline();
-  });
 
   const { enabled } = useEnabledLayers();
   const sidebarOpen = useSidebarOpen();

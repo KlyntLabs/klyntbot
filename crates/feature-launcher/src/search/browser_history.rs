@@ -29,7 +29,7 @@ impl BrowserHistorySource {
         }
     }
 
-    fn history_db_path(browser: &str) -> Option<PathBuf> {
+    pub fn history_db_path(browser: &str) -> Option<PathBuf> {
         super::chromium_profile_dir(browser).map(|d| d.join("History"))
     }
 
@@ -126,7 +126,7 @@ impl super::SearchSource for BrowserHistorySource {
     async fn refresh(&self) {
         match Self::load_history(&self.browser, self.max_days).await {
             Ok(entries) => {
-                tracing::info!("Loaded {} browser history entries", entries.len());
+                tracing::debug!("Loaded {} browser history entries", entries.len());
                 *self.entries.write() = entries;
             }
             Err(e) => {

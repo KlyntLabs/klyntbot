@@ -13,9 +13,14 @@ export interface ReviewStatsSummary {
 }
 
 export function useReviewStats() {
-  return useQuery<ReviewStatsSummary>("review_stats_summary", undefined, {
-    streak: 0,
-    retention: 1.0,
-    weekly: [],
-  });
+  return useQuery<ReviewStatsSummary>(
+    "review_stats_summary",
+    undefined,
+    {
+      streak: 0,
+      retention: 1.0,
+      weekly: [],
+    },
+    { invalidateOn: ["entity:updated"] },
+  );
 }

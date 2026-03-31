@@ -60,7 +60,10 @@ export function useGraphData(
   noteId: string | null,
   hopRadius: number,
 ): GraphData {
-  const { data: links } = useQuery<NoteLink[]>("note_links_all", undefined, []);
+  const { data: links } = useQuery<NoteLink[]>("note_links_all", undefined, [], {
+    invalidateOn: ["entity:updated"],
+    invalidateFilter: (p) => (p as { entityKind?: string })?.entityKind === "note",
+  });
 
   return useMemo(() => {
     // Build adjacency map and link count map

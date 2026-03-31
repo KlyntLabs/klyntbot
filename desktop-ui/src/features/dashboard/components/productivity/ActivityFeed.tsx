@@ -1,8 +1,7 @@
-import { useEvent } from "@shared/hooks/useEvent";
 import { useQuery } from "@shared/hooks/useQuery";
 import { formatTime } from "@shared/lib/dates";
 import { AppIcon, getAppColor } from "@shared/lib/productivity";
-import type { ActivitySwitchPayload, ActivityTimeline } from "@shared/types";
+import type { ActivityTimeline } from "@shared/types";
 import { useEffect, useRef, useState } from "react";
 
 const BROWSER_RE =
@@ -39,10 +38,17 @@ function relativeTag(secs: number): string | null {
 }
 
 export function ActivityFeed() {
-  const { data: events, refetch } = useQuery<ActivityTimeline[]>(
+  const { data: events } = useQuery<ActivityTimeline[]>(
     "productivity_activity_feed",
     { limit: 30 },
     [],
+    {
+      invalidateOn: ["entity:updated", "activity:switch"],
+      invalidateFilter: (p) => {
+        const kind = (p as { entityKind?: string })?.entityKind;
+        return !kind || kind === "productivity";
+      },
+    },
   );
 
   // Track which keys are "new" for animation
@@ -50,13 +56,6 @@ export function ActivityFeed() {
   const [newKeys, setNewKeys] = useState<Set<string>>(new Set());
 
   const scrollRef = useRef<HTMLDivElement>(null);
-
-  // Refetch on context switch events (replaces polling)
-  useEvent<ActivitySwitchPayload>("activity:switch", () => refetch());
-
-  useEvent<{ entityKind: string }>("entity:updated", (payload) => {
-    if (payload?.entityKind === "productivity") refetch();
-  });
 
   // Refresh relative time labels periodically (no data fetch, just re-render)
   const [, setTick] = useState(0);

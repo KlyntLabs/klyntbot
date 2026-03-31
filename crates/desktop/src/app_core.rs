@@ -54,12 +54,17 @@ pub async fn init(
     let (core, channels) =
         AppCore::init_with_sender(common::AppMode::Desktop, None, Some(sender), Some(emitter))
             .await?;
-    wire_event_channels(&core, channels, &app_handle);
+    wire_event_channels(&core, channels, &app_handle, &global_event_tx);
     Ok((core, global_event_tx))
 }
 
 /// Wire all `EventChannels` receivers to Tauri event emitters.
-fn wire_event_channels(core: &AppCore, channels: EventChannels, app_handle: &tauri::AppHandle) {
+fn wire_event_channels(
+    core: &AppCore,
+    channels: EventChannels,
+    app_handle: &tauri::AppHandle,
+    global_event_tx: &broadcast::Sender<(String, Value)>,
+) {
     let shutdown = &core.shutdown_token;
 
     // Auto-focus events → Tauri event + tray timer sync
@@ -394,10 +399,11 @@ fn wire_event_channels(core: &AppCore, channels: EventChannels, app_handle: &tau
         });
     }
 
-    // Voice events → Tauri "voice:event"
+    // Voice events → Tauri "voice:event" + global SSE broadcast
     if let Some(ref voice_service) = core.voice_service {
         if let Some(mut voice_rx) = voice_service.take_event_rx() {
             let handle = app_handle.clone();
+            let global_tx = global_event_tx.clone();
             let token = shutdown.clone();
             tokio::spawn(async move {
                 loop {
@@ -407,6 +413,10 @@ fn wire_event_channels(core: &AppCore, channels: EventChannels, app_handle: &tau
                             let Some(event) = msg else { break };
                             if let Err(e) = handle.emit(voice_engine::VOICE_EVENT, &event) {
                                 warn!("failed to emit voice event: {e}");
+                            }
+                            // Also broadcast for dev-server SSE (browser dev mode)
+                            if let Ok(payload) = serde_json::to_value(&event) {
+                                let _ = global_tx.send((voice_engine::VOICE_EVENT.to_string(), payload));
                             }
                         }
                     }

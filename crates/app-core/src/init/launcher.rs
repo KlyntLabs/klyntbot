@@ -151,7 +151,7 @@ pub(super) async fn init_launcher(
         sources.push(source);
     }
 
-    // Browser history — pre-loaded, refreshed by BackgroundRefresher
+    // Browser history — pre-loaded, refreshed by SourceFileWatcher (FSEvents)
     if launcher_config.sources.browser_history.enabled {
         let source = Arc::new(feature_launcher::BrowserHistorySource::new(
             launcher_config.sources.browser_history.browser.clone(),
@@ -182,12 +182,6 @@ pub(super) async fn init_launcher(
             interval: std::time::Duration::from_secs(30),
         });
     }
-    if let Some(s) = find_source("browser_history") {
-        refresh_entries.push(feature_launcher::RefreshEntry {
-            source: s,
-            interval: std::time::Duration::from_secs(120),
-        });
-    }
     if let Some(s) = find_source("brew") {
         refresh_entries.push(feature_launcher::RefreshEntry {
             source: s,
@@ -208,28 +202,50 @@ pub(super) async fn init_launcher(
         });
     }
 
-    // File watches
-    let mut watches: Vec<(std::path::PathBuf, Arc<dyn feature_launcher::SearchSource>)> =
-        Vec::new();
+    // File watches (FSEvents via notify)
+    let mut watches: Vec<feature_launcher::WatchEntry> = Vec::new();
 
     if let Some(path) = feature_launcher::BookmarksSource::browser_bookmarks_path(
         &launcher_config.sources.bookmarks.browser,
     ) {
         if let Some(s) = find_source("bookmarks") {
-            watches.push((path, s));
+            watches.push(feature_launcher::WatchEntry {
+                path,
+                source: s,
+                min_interval: None,
+            });
+        }
+    }
+    if let Some(path) = feature_launcher::BrowserHistorySource::history_db_path(
+        &launcher_config.sources.browser_history.browser,
+    ) {
+        if let Some(s) = find_source("browser_history") {
+            watches.push(feature_launcher::WatchEntry {
+                path,
+                source: s,
+                min_interval: Some(std::time::Duration::from_secs(10)),
+            });
         }
     }
     if launcher_config.sources.ssh_hosts.enabled {
         let home = std::env::var("HOME").unwrap_or_default();
         let ssh_config = std::path::PathBuf::from(&home).join(".ssh/config");
         if let Some(s) = find_source("ssh_hosts") {
-            watches.push((ssh_config, s));
+            watches.push(feature_launcher::WatchEntry {
+                path: ssh_config,
+                source: s,
+                min_interval: None,
+            });
         }
     }
     if launcher_config.sources.scripts.enabled {
         let scripts_dir = shellexpand::tilde(&launcher_config.sources.scripts.dir).to_string();
         if let Some(s) = find_source("scripts") {
-            watches.push((std::path::PathBuf::from(&scripts_dir), s));
+            watches.push(feature_launcher::WatchEntry {
+                path: std::path::PathBuf::from(&scripts_dir),
+                source: s,
+                min_interval: None,
+            });
         }
     }
 

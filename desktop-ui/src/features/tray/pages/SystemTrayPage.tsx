@@ -1,5 +1,4 @@
 import { useCoachingNudge } from "@shared/hooks/useCoachingNudge";
-import { useEvent } from "@shared/hooks/useEvent";
 import { useFocusTimer } from "@shared/hooks/useFocusTimer";
 import { ipc } from "@shared/hooks/useIpc";
 import { useMutation } from "@shared/hooks/useMutation";
@@ -27,11 +26,9 @@ function taskIndicatorClass(task: TodayTask, isCompleted: boolean): string {
 }
 
 export function SystemTray() {
-  const { data: todayTasks, refetch: refetchTasks } = useQuery<TodayTask[]>(
-    "today_tasks",
-    undefined,
-    [],
-  );
+  const { data: todayTasks } = useQuery<TodayTask[]>("today_tasks", undefined, [], {
+    invalidateOn: ["entity:updated"],
+  });
   const { data: calendarEvents } = useQuery<CalendarEvent[]>(
     "productivity_calendar_events",
     { date: todayISO() },
@@ -45,11 +42,6 @@ export function SystemTray() {
 
   const toggleComplete = useMutation<TodayTask, { id: string }>("task_toggle_complete");
   const [completedIds, toggleCompletedId] = useSetToggle();
-
-  // Auto-refresh when entities change
-  useEvent<{ entityKind: string; id: string }>("entity:updated", () => {
-    refetchTasks();
-  });
 
   const focusTimer = useFocusTimer();
 

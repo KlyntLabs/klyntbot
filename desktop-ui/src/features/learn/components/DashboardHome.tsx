@@ -53,6 +53,7 @@ export function DashboardHome({
     "flashcard_list_struggling",
     { limit: 5 },
     [],
+    { invalidateOn: ["entity:updated"] },
   );
 
   if (loading) {

@@ -24,5 +24,6 @@ export function useRetentionHistory(days: number = 30) {
       overall: [],
       domains: [],
     },
+    { invalidateOn: ["entity:updated"] },
   );
 }

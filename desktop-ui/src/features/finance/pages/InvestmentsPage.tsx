@@ -1,4 +1,3 @@
-import { useEvent } from "@shared/hooks/useEvent";
 import { useMutation } from "@shared/hooks/useMutation";
 import { useQuery } from "@shared/hooks/useQuery";
 import { cn } from "@shared/lib/utils";
@@ -26,38 +25,39 @@ export function FinanceInvestments() {
   const { mode, setMode, baseCurrency, rates, currencies, displayCur, convertTotal } =
     useFinanceCurrency();
   const { hidden, toggle } = usePrivacyMode();
+  const financeInvalidate = {
+    invalidateOn: ["entity:updated"],
+    invalidateFilter: (p: unknown) => (p as { entityKind?: string })?.entityKind === "finance",
+  };
+
   const {
     data: portfolios,
     loading,
     error,
-    refetch: rP,
-  } = useQuery<FinancePortfolio[]>("finance_portfolios", undefined, []);
-  const { data: investments, refetch: rI } = useQuery<FinanceInvestment[]>(
+    refetch: refetchPortfolios,
+  } = useQuery<FinancePortfolio[]>("finance_portfolios", undefined, [], financeInvalidate);
+  const { data: investments, refetch: refetchInvestments } = useQuery<FinanceInvestment[]>(
     "finance_investments",
     undefined,
     [],
+    financeInvalidate,
   );
 
   const [selectedPortfolio, setSelectedPortfolio] = useState<string | null>(null);
   const [expandedInvestment, setExpandedInvestment] = useState<string | null>(null);
 
-  const { data: allocationTargets, refetch: rA } = useQuery<FinanceAllocationTarget[]>(
+  const { data: allocationTargets } = useQuery<FinanceAllocationTarget[]>(
     "finance_allocation_targets",
     selectedPortfolio ? { portfolioId: selectedPortfolio } : null,
     [],
+    financeInvalidate,
   );
   const { data: investmentTxs } = useQuery<FinanceInvestmentTx[]>(
     "finance_investment_txs",
     expandedInvestment ? { investmentId: expandedInvestment } : null,
     [],
+    financeInvalidate,
   );
-
-  const refetchAll = () => {
-    rP();
-    rI();
-    if (selectedPortfolio) rA();
-  };
-  useEvent<{ entityKind: string }>("entity:updated", refetchAll);
 
   const totalValue = useMemo(
     () => investments.reduce((s, i) => s + (i.baseCurrentValue ?? 0), 0),
@@ -115,7 +115,7 @@ export function FinanceInvestments() {
     setPortfolioModalOpen(false);
     setPfName("");
     setPfDescription("");
-    refetchAll();
+    refetchPortfolios();
   };
 
   // ── Add Investment modal ──
@@ -146,7 +146,7 @@ export function FinanceInvestments() {
     setInvName("");
     setInvQuantity("");
     setInvCostBasis("");
-    refetchAll();
+    refetchInvestments();
   };
 
   if (loading && portfolios.length === 0) {
@@ -172,13 +172,9 @@ export function FinanceInvestments() {
         currencies={currencies}
         onSelectCurrency={setMode}
       >
-        <Card className="p-6 text-center">
-          <p className="text-xs text-destructive mb-2">{error.message}</p>
-          <button
-            type="button"
-            onClick={refetchAll}
-            className="text-[11px] text-brand hover:text-brand-hover transition-colors"
-          >
+        <Card className="p-6 text-center space-y-2">
+          <p className="text-xs text-destructive">{error.message}</p>
+          <button type="button" onClick={refetchPortfolios} className="text-xs text-primary hover:underline">
             Retry
           </button>
         </Card>

@@ -1,4 +1,3 @@
-import { useEvent } from "@shared/hooks/useEvent";
 import { useMutation } from "@shared/hooks/useMutation";
 import { useQuery } from "@shared/hooks/useQuery";
 import { cn } from "@shared/lib/utils";
@@ -28,21 +27,21 @@ export function FinanceTargets() {
     useFinanceCurrency();
   const { hidden, toggle } = usePrivacyMode();
 
+  const financeInvalidate = {
+    invalidateOn: ["entity:updated"],
+    invalidateFilter: (p: unknown) => (p as { entityKind?: string })?.entityKind === "finance",
+  };
+
   const {
     data: goals,
     loading: goalsLoading,
     refetch: rG,
-  } = useQuery<FinanceGoal[]>("finance_goals", undefined, []);
+  } = useQuery<FinanceGoal[]>("finance_goals", undefined, [], financeInvalidate);
   const {
     data: liabilities,
     loading: liabLoading,
     refetch: rL,
-  } = useQuery<FinanceLiability[]>("finance_liabilities", undefined, []);
-
-  useEvent<{ entityKind: string }>("entity:updated", () => {
-    rG();
-    rL();
-  });
+  } = useQuery<FinanceLiability[]>("finance_liabilities", undefined, [], financeInvalidate);
 
   // ── Goal tab state ───────────────────────────────────────────────
   const [goalTab, setGoalTab] = useState<GoalTab>("active");

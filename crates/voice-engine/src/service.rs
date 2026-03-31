@@ -112,6 +112,13 @@ pub struct VoiceService {
 
     /// One-shot guard: memory echo fires at most once per capture session.
     echo_fired_this_session: AtomicBool,
+
+    /// Set by the silence notification task when silence is detected.
+    /// Polled by VoiceConversationManager to trigger automatic finalization.
+    silence_detected: Arc<AtomicBool>,
+
+    /// PID of the currently playing afplay process, for interrupt/stop.
+    tts_playback_pid: Mutex<Option<u32>>,
 }
 
 impl VoiceService {
@@ -141,6 +148,8 @@ impl VoiceService {
             event_rx: Arc::new(std::sync::Mutex::new(Some(event_rx))),
             first_capture_complete: AtomicBool::new(false),
             echo_fired_this_session: AtomicBool::new(false),
+            silence_detected: Arc::new(AtomicBool::new(false)),
+            tts_playback_pid: Mutex::new(None),
         }
     }
 
@@ -244,10 +253,25 @@ impl VoiceService {
         Ok((active, silence_rx, rms_rx, session_id, engine_kind))
     }
 
+    /// Kill any running afplay TTS playback process.
+    pub async fn stop_tts_playback(&self) {
+        if let Some(pid) = self.tts_playback_pid.lock().await.take() {
+            let _ = std::process::Command::new("kill")
+                .arg(pid.to_string())
+                .status();
+        }
+    }
+
+    /// Whether silence has been detected since the last capture started.
+    pub fn is_silence_detected(&self) -> bool {
+        self.silence_detected.load(Ordering::Relaxed)
+    }
+
     /// Start a voice capture session.
     ///
     /// Returns the session ID and engine kind, or an error if capture can't start.
     pub async fn start_capture(&self) -> common::Result<(String, EngineKind)> {
+        self.silence_detected.store(false, Ordering::Relaxed);
         let mut session_guard = self.active_session.lock().await;
 
         if session_guard.is_some() {
@@ -269,16 +293,16 @@ impl VoiceService {
             })
             .await;
 
-        // Spawn silence notification task: tells the frontend silence was detected.
-        // Does NOT stop the audio stream — the caller (hotkey handler or frontend)
-        // must call stop_capture to trigger transcription. This ensures audio_rx
-        // stays open for the transcription engine to drain.
+        // Spawn silence notification task: tells the frontend silence was detected
+        // and sets the silence_detected flag for the conversation manager to poll.
         {
             let event_tx = self.event_tx.clone();
+            let silence_flag = Arc::clone(&self.silence_detected);
             let mut silence_rx = silence_rx;
             tokio::spawn(async move {
                 if silence_rx.recv().await.is_some() {
                     info!("Silence detected — notifying frontend");
+                    silence_flag.store(true, Ordering::Relaxed);
                     let _ = event_tx
                         .send(VoiceEvent::CaptureEnded { duration_ms: 0 })
                         .await;
@@ -520,6 +544,21 @@ impl VoiceService {
                             text: response_text.to_string(),
                         })
                         .await;
+
+                    // Play audio natively via macOS afplay — the WebView's
+                    // AudioContext may be suspended due to autoplay policy
+                    // (the orb window is opened programmatically, not by user gesture).
+                    let wav_path = self.config.data_dir.join("tts_output.wav");
+                    let child = std::process::Command::new("afplay")
+                        .arg(&wav_path)
+                        .spawn();
+                    if let Ok(child) = child {
+                        *self.tts_playback_pid.lock().await = Some(child.id());
+                        tokio::task::spawn_blocking(move || {
+                            let mut child = child;
+                            let _ = child.wait();
+                        });
+                    }
                 }
                 Err(e) => {
                     warn!("TTS synthesis failed for voice response: {e}");

@@ -11,6 +11,7 @@ const GLOBAL_SSE_EVENTS = [
   "chat:thread_created",
   "chat:thread_updated",
   "chat:message_added",
+  "voice:event",
 ] as const;
 
 export function BrainEventBridge() {

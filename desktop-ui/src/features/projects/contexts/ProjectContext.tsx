@@ -1,4 +1,3 @@
-import { useEvent } from "@shared/hooks/useEvent";
 import type { Objective, Project, Task } from "@shared/types";
 import { createContext, type ReactNode, useContext, useEffect, useRef } from "react";
 import { useProject } from "../hooks/useProject";
@@ -39,13 +38,6 @@ export function ProjectProvider({
       prevProjectId.current = projectId;
       useProjectDetailStore.getState().reset();
     }
-  });
-
-  useEvent<{ entityKind: string }>("entity:updated", (payload) => {
-    const kind = payload?.entityKind;
-    if (kind === "project") refetchProject();
-    if (kind === "objective" || kind === "key_result") refetchObjectives();
-    if (kind === "task") refetchTasks();
   });
 
   return (

@@ -1,4 +1,3 @@
-import { useEvent } from "@shared/hooks/useEvent";
 import { useQuery } from "@shared/hooks/useQuery";
 import { cn } from "@shared/lib/utils";
 import type {
@@ -15,7 +14,7 @@ import type {
 } from "@shared/types";
 import { Progress } from "@shared/ui";
 import { ArrowDownRight, ArrowLeftRight, ArrowUpRight, Target, Wallet } from "lucide-react";
-import { useCallback, useMemo } from "react";
+import { useMemo } from "react";
 import { Link } from "react-router";
 import { BudgetStrip } from "../components/BudgetStrip";
 import { Card } from "../components/Card";
@@ -37,65 +36,66 @@ export function Finance() {
     useFinanceCurrency();
   const { hidden, toggle } = usePrivacyMode();
 
+  const financeInvalidate = {
+    invalidateOn: ["entity:updated"],
+    invalidateFilter: (p: unknown) => (p as { entityKind?: string })?.entityKind === "finance",
+  };
+
   const {
     data: accounts,
     loading,
     error,
-    refetch: rA,
-  } = useQuery<FinanceAccount[]>("finance_accounts", undefined, []);
-  const { data: transactions, refetch: rT } = useQuery<FinanceTransaction[]>(
+    refetch: refetchAccounts,
+  } = useQuery<FinanceAccount[]>("finance_accounts", undefined, [], financeInvalidate);
+  const { data: transactions } = useQuery<FinanceTransaction[]>(
     "finance_transactions",
     { limit: 8 },
     [],
+    financeInvalidate,
   );
-  const { data: budgets, refetch: rB } = useQuery<FinanceBudgetUsage[]>(
+  const { data: budgets } = useQuery<FinanceBudgetUsage[]>(
     "finance_budget_usage",
     undefined,
     [],
+    financeInvalidate,
   );
-  const { data: portfolios, refetch: rP } = useQuery<FinancePortfolio[]>(
+  const { data: portfolios } = useQuery<FinancePortfolio[]>(
     "finance_portfolios",
     undefined,
     [],
+    financeInvalidate,
   );
-  const { data: investments, refetch: rI } = useQuery<FinanceInvestment[]>(
+  const { data: investments } = useQuery<FinanceInvestment[]>(
     "finance_investments",
     undefined,
     [],
+    financeInvalidate,
   );
-  const { data: goals, refetch: rG } = useQuery<FinanceGoal[]>("finance_goals", undefined, []);
-  const { data: liabilities, refetch: rL } = useQuery<FinanceLiability[]>(
+  const { data: goals } = useQuery<FinanceGoal[]>("finance_goals", undefined, [], financeInvalidate);
+  const { data: liabilities } = useQuery<FinanceLiability[]>(
     "finance_liabilities",
     undefined,
     [],
+    financeInvalidate,
   );
-  const { data: netWorth, refetch: rN } = useQuery<FinanceNetWorth>(
+  const { data: netWorth } = useQuery<FinanceNetWorth>(
     "finance_net_worth",
     undefined,
     { totalsByCurrency: [] },
+    financeInvalidate,
   );
   const { data: _spendingReport } = useQuery<FinanceCategoryReport>(
     "finance_report_spending",
     undefined,
     { total: 0, breakdown: [] },
+    financeInvalidate,
   );
   const { data: monthlySummary } = useQuery<FinanceMonthlySummary>(
     "finance_monthly_summary",
     undefined,
     { currentIncome: 0, currentSpending: 0, previousIncome: 0, previousSpending: 0 },
+    financeInvalidate,
   );
-
-  const refetchAll = useCallback(() => {
-    rA();
-    rT();
-    rB();
-    rP();
-    rI();
-    rG();
-    rL();
-    rN();
-  }, [rA, rT, rB, rP, rI, rG, rL, rN]);
-  useEvent<{ entityKind: string }>("entity:updated", refetchAll);
 
   const totalNet = useMemo(
     () =>
@@ -163,13 +163,9 @@ export function Finance() {
         currencies={currencies}
         onSelectCurrency={setMode}
       >
-        <Card className="p-6 text-center">
-          <p className="text-xs text-destructive mb-2">{error.message}</p>
-          <button
-            type="button"
-            onClick={refetchAll}
-            className="text-[11px] text-brand hover:text-brand-hover transition-colors"
-          >
+        <Card className="p-6 text-center space-y-2">
+          <p className="text-xs text-destructive">{error.message}</p>
+          <button type="button" onClick={refetchAccounts} className="text-xs text-primary hover:underline">
             Retry
           </button>
         </Card>

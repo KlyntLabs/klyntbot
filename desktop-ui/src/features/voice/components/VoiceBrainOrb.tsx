@@ -1,6 +1,7 @@
 import type { ConversationPhase } from "@features/voice/hooks/useVoiceConversation";
 import { useVoiceConversation } from "@features/voice/hooks/useVoiceConversation";
 import { playTtsAudio } from "@shared/lib/audio";
+import { isTauri } from "@shared/lib/utils";
 import { useEffect, useRef, useState } from "react";
 
 // ─── Sub-components ──────────────────────────────────────────────────────────
@@ -104,6 +105,16 @@ export function VoiceBrainOrb() {
     start,
     end,
   } = useVoiceConversation();
+
+  // In browser dev mode, auto-start a conversation on mount since there's
+  // no Tauri shortcut / main.rs to call voice_conversation_start from Rust.
+  const startedRef = useRef(false);
+  useEffect(() => {
+    if (!isTauri && !startedRef.current && phase === "idle" && !sessionInfo) {
+      startedRef.current = true;
+      start().catch(() => {});
+    }
+  }, [phase, sessionInfo, start]);
 
   // Track whether the session was warm-reattached
   const [isContinuing, setIsContinuing] = useState(false);

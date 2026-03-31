@@ -30,6 +30,10 @@ export function useNoteSuggestions(noteId: string | null) {
     "note_suggestions",
     noteId ? { id: noteId } : null,
     EMPTY,
+    {
+      invalidateOn: ["entity:updated"],
+      invalidateFilter: (p) => (p as { entityKind?: string })?.entityKind === "note",
+    },
   );
 
   return {

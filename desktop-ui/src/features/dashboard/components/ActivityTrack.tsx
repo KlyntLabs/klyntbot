@@ -7,7 +7,6 @@
  * and purity-based opacity for effective-period intensity.
  */
 
-import { useEvent } from "@shared/hooks/useEvent";
 import { useQuery } from "@shared/hooks/useQuery";
 import type { MergeableEvent } from "@shared/lib/activity-sessions";
 import { mergeActivitySessions } from "@shared/lib/activity-sessions";
@@ -16,7 +15,6 @@ import { purityToOpacity, qualityToColor, resolveActivityColor } from "@shared/l
 import { cn } from "@shared/lib/utils";
 import type {
   ActivityCategory,
-  ActivitySwitchPayload,
   ActivityTimeline,
   IntelligenceSession,
   TimelineEntry,
@@ -97,10 +95,21 @@ export function ActivityTrack({
   const parentOwnsData = timelineEntries != null;
 
   // Fallback fetch — only used when parent doesn't provide timeline data.
-  const { data: fetchedEvents, refetch: refetchEvents } = useQuery<ActivityTimeline[]>(
+  const prodInvalidate = parentOwnsData
+    ? {}
+    : {
+        invalidateOn: ["entity:updated", "activity:switch"],
+        invalidateFilter: (p: unknown) => {
+          const kind = (p as { entityKind?: string })?.entityKind;
+          return !kind || kind === "productivity";
+        },
+      };
+
+  const { data: fetchedEvents } = useQuery<ActivityTimeline[]>(
     "productivity_timeline",
     parentOwnsData ? null : { date, tzOffsetMins: TZ_OFFSET_MINS },
     [],
+    prodInvalidate,
   );
   const { data: categories } = useQuery<ActivityCategory[]>(
     "productivity_categories",
@@ -108,21 +117,12 @@ export function ActivityTrack({
     [],
   );
 
-  // Fetch intelligence sessions for quality/title overlay
-  // Skip when parent owns data (parent handles refetching)
   const { data: intellSessions } = useQuery<IntelligenceSession[]>(
     "productivity_intelligence_sessions",
     parentOwnsData ? null : { date, tzOffsetMins: TZ_OFFSET_MINS },
     [],
+    prodInvalidate,
   );
-
-  // Real-time: refetch on app switch and productivity entity changes.
-  useEvent<ActivitySwitchPayload>("activity:switch", () => {
-    if (!parentOwnsData) refetchEvents();
-  });
-  useEvent<{ entityKind: string }>("entity:updated", (payload) => {
-    if (!parentOwnsData && payload?.entityKind === "productivity") refetchEvents();
-  });
 
   const events = parentOwnsData ? timelineEntries : fetchedEvents;
 

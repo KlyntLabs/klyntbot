@@ -1,7 +1,6 @@
 import { useCrossDomainCheck } from "@shared/hooks/useCrossDomainCheck";
-import { useEvent } from "@shared/hooks/useEvent";
 import { useMutation } from "@shared/hooks/useMutation";
-import { invalidateQueries, useQuery } from "@shared/hooks/useQuery";
+import { useQuery } from "@shared/hooks/useQuery";
 import type {
   Note,
   Notebook,
@@ -61,12 +60,20 @@ function ViewModeToggle({
 
 export default function KnowledgeBasePage() {
   // ── Data fetching ─────────────────────────────────────────────────────
-  const { data: notebooks, refetch: refetchNotebooks } = useQuery<Notebook[]>(
-    "notebook_list",
-    undefined,
-    [],
-  );
-  const { data: notes, refetch: refetchNotes } = useQuery<Note[]>("note_list", undefined, []);
+  const { data: notebooks } = useQuery<Notebook[]>("notebook_list", undefined, [], {
+    invalidateOn: ["entity:updated"],
+    invalidateFilter: (p) => {
+      const kind = (p as { entityKind?: string })?.entityKind;
+      return kind === "notebook" || kind === "note";
+    },
+  });
+  const { data: notes, refetch: refetchNotes } = useQuery<Note[]>("note_list", undefined, [], {
+    invalidateOn: ["entity:updated"],
+    invalidateFilter: (p) => {
+      const kind = (p as { entityKind?: string })?.entityKind;
+      return kind === "note" || kind === "notebook";
+    },
+  });
   const { items: inboxItems, deleteItem: deleteInboxItem } = useInbox();
 
   // ── Core state ────────────────────────────────────────────────────────
@@ -521,23 +528,6 @@ export default function KnowledgeBasePage() {
     document.addEventListener("keydown", handler);
     return () => document.removeEventListener("keydown", handler);
   }, []);
-
-  // ── Event refresh ─────────────────────────────────────────────────────
-  useEvent<{ entityKind: string }>("entity:updated", (payload) => {
-    if (payload.entityKind === "note") {
-      refetchNotes();
-      invalidateQueries("note_backlinks");
-      invalidateQueries("note_links_all");
-      invalidateQueries("note_suggestions");
-    }
-    if (payload.entityKind === "notebook") {
-      refetchNotebooks();
-      refetchNotes();
-    }
-    if (payload.entityKind === "inbox") {
-      invalidateQueries("inbox_list");
-    }
-  });
 
   // ── Derived layout flags ──────────────────────────────────────────────
   const isFocusMode = layoutMode === "focus";

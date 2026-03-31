@@ -1,21 +1,33 @@
 use super::SearchSource;
+use dashmap::DashMap;
 use notify_debouncer_mini::{new_debouncer, DebouncedEventKind};
-use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::Arc;
-use std::time::Duration;
+use std::time::{Duration, Instant};
+
+/// A file path to watch, the source to refresh on change, and an optional
+/// minimum interval between refreshes (cooldown). Sources like browser history
+/// sit on high-churn files — the cooldown prevents redundant work even when the
+/// underlying file changes many times per minute.
+pub struct WatchEntry {
+    pub path: PathBuf,
+    pub source: Arc<dyn SearchSource>,
+    /// When `Some`, refreshes are skipped if the previous refresh was less than
+    /// this duration ago. `None` means refresh on every debounced event.
+    pub min_interval: Option<Duration>,
+}
 
 pub struct SourceFileWatcher {
     _debouncer: notify_debouncer_mini::Debouncer<notify::RecommendedWatcher>,
 }
 
 impl SourceFileWatcher {
-    pub fn start(watches: Vec<(PathBuf, Arc<dyn SearchSource>)>) -> Result<Self, notify::Error> {
-        let source_map: Arc<HashMap<PathBuf, Arc<dyn SearchSource>>> = Arc::new(
+    pub fn start(watches: Vec<WatchEntry>) -> Result<Self, notify::Error> {
+        let source_map: Arc<Vec<(PathBuf, Arc<dyn SearchSource>, Option<Duration>)>> = Arc::new(
             watches
-                .iter()
-                .filter(|(path, _)| path.exists())
-                .map(|(path, source)| (path.clone(), Arc::clone(source)))
+                .into_iter()
+                .filter(|w| w.path.exists())
+                .map(|w| (w.path, w.source, w.min_interval))
                 .collect(),
         );
 
@@ -23,7 +35,12 @@ impl SourceFileWatcher {
             tracing::debug!("SourceFileWatcher: no valid paths to watch");
         }
 
+        // Per-source cooldown tracking — shared with the callback closure.
+        let last_refreshed: Arc<DashMap<&'static str, Instant>> = Arc::new(DashMap::new());
+
         let map_clone = Arc::clone(&source_map);
+        let cooldowns = Arc::clone(&last_refreshed);
+
         let mut debouncer = new_debouncer(
             Duration::from_millis(500),
             move |events: Result<Vec<notify_debouncer_mini::DebouncedEvent>, notify::Error>| {
@@ -40,10 +57,26 @@ impl SourceFileWatcher {
                         continue;
                     }
                     let changed = &event.path;
-                    for (watched_path, source) in map_clone.iter() {
+                    for (watched_path, source, min_interval) in map_clone.iter() {
                         if changed.starts_with(watched_path) || changed == watched_path {
+                            // Enforce per-source cooldown
+                            if let Some(interval) = min_interval {
+                                let name = source.name();
+                                if let Some(last) = cooldowns.get(name) {
+                                    if last.elapsed() < *interval {
+                                        tracing::debug!(
+                                            "Skipping refresh for {} (cooldown {:.0?} remaining)",
+                                            name,
+                                            *interval - last.elapsed(),
+                                        );
+                                        break;
+                                    }
+                                }
+                                cooldowns.insert(name, Instant::now());
+                            }
+
                             let source = Arc::clone(source);
-                            tracing::info!(
+                            tracing::debug!(
                                 "File change detected for {}, refreshing {}",
                                 watched_path.display(),
                                 source.name()
@@ -60,7 +93,7 @@ impl SourceFileWatcher {
             },
         )?;
 
-        for (path, source) in &*source_map {
+        for (path, source, _) in &*source_map {
             if let Err(e) = debouncer
                 .watcher()
                 .watch(path, notify::RecursiveMode::NonRecursive)
@@ -71,7 +104,7 @@ impl SourceFileWatcher {
                     source.name()
                 );
             } else {
-                tracing::info!("Watching {} for {} changes", path.display(), source.name());
+                tracing::debug!("Watching {} for {} changes", path.display(), source.name());
             }
         }
 

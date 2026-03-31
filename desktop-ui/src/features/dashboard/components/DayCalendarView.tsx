@@ -1,7 +1,6 @@
-import { useEvent } from "@shared/hooks/useEvent";
 import { useQuery } from "@shared/hooks/useQuery";
 import { TZ_OFFSET_MINS, todayISO } from "@shared/lib/dates";
-import type { FocusSyncPayload, ProductivitySummary } from "@shared/types";
+import type { ProductivitySummary } from "@shared/types";
 import { EMPTY_TIMELINE_RESPONSE } from "@shared/types";
 import { useCallback, useEffect, useMemo } from "react";
 import { useParams } from "react-router";
@@ -24,17 +23,32 @@ export function DayCalendarView() {
     [dateStr, enabledSources],
   );
 
+  const dayInvalidate = {
+    invalidateOn: ["entity:updated", "focus:phase_changed", "activity:switch"],
+    invalidateFilter: (p: unknown) => {
+      const kind = (p as { entityKind?: string })?.entityKind;
+      return (
+        !kind ||
+        kind === "focus_session" ||
+        kind === "task" ||
+        kind === "note" ||
+        kind === "transaction" ||
+        kind === "productivity"
+      );
+    },
+  };
+
   const {
     data,
     loading,
     refetch: refetchTimeline,
-  } = useQuery("timeline_query", queryArgs, EMPTY_TIMELINE_RESPONSE);
+  } = useQuery("timeline_query", queryArgs, EMPTY_TIMELINE_RESPONSE, dayInvalidate);
 
-  // Fetch productivity summary for the day
   const { data: todaySummary, refetch: refetchProdToday } = useQuery<ProductivitySummary | null>(
     "productivity_today",
     isToday ? undefined : null,
     null,
+    dayInvalidate,
   );
   const rangeArgs = useMemo(
     () => (isToday ? null : { start_date: dateStr, end_date: dateStr }),
@@ -44,6 +58,7 @@ export function DayCalendarView() {
     "productivity_summary_range",
     rangeArgs,
     [],
+    dayInvalidate,
   );
   const productivitySummary = isToday ? todaySummary : (rangeSummaries[0] ?? null);
 
@@ -52,28 +67,6 @@ export function DayCalendarView() {
     if (isToday) refetchProdToday();
     else refetchProdRange();
   }, [refetchTimeline, refetchProdToday, refetchProdRange, isToday]);
-
-  // Real-time: refetch when entities change (tasks, notes, finance, focus sessions)
-  useEvent<{ entityKind: string }>("entity:updated", (payload) => {
-    const k = payload?.entityKind;
-    if (
-      k === "focus_session" ||
-      k === "task" ||
-      k === "note" ||
-      k === "transaction" ||
-      k === "productivity"
-    ) {
-      refetchAll();
-    }
-  });
-
-  // Real-time: refetch when focus phase changes (session start/end/break transitions)
-  useEvent<FocusSyncPayload>("focus:phase_changed", () => refetchAll());
-
-  // Real-time: refetch when user switches apps (activity data changes)
-  useEvent("activity:switch", () => {
-    if (isToday) refetchProdToday();
-  });
 
   // Periodic polling for today — catches accumulated activity data every 30s
   useEffect(() => {

@@ -13,7 +13,7 @@ use uuid::Uuid;
 use crate::events::AppEventEmitter;
 use config::schema::VoiceConfig;
 use voice_engine::{
-    MemoryEchoProvider, MonitorSession, VoiceEvent, VoiceService, VoiceSessionState,
+    MemoryEchoProvider, MonitorSession, VoiceEvent, VoiceService,
 };
 
 /// Wrapper that makes `MonitorSession` moveable to a blocking thread.
@@ -119,6 +119,8 @@ impl VoiceConversationState {
 
 #[derive(Debug)]
 pub enum VoiceCommand {
+    /// Wake up the conversation loop after start() sets phase to Listening.
+    Start,
     Pause,
     Resume,
     Interrupt,
@@ -368,6 +370,11 @@ impl VoiceConversationManager {
             session_key, is_continuing
         );
 
+        // Wake up the conversation loop — it's blocked on cmd_rx.recv()
+        // while idle. The Start command unblocks it so it re-checks the
+        // phase (now Listening) and enters run_listening_phase.
+        let _ = self.cmd_tx.send(VoiceCommand::Start).await;
+
         Ok(StartResponse {
             session_key: session_key.to_string(),
             session_title,
@@ -476,14 +483,21 @@ impl VoiceConversationManager {
                 biased;
                 Some(cmd) = cmd_rx.recv() => {
                     match cmd {
-                        VoiceCommand::Pause | VoiceCommand::End => {
-                            info!("Listening phase: {:?} received, stopping capture", if matches!(cmd, VoiceCommand::End) { "End" } else { "Pause" });
+                        VoiceCommand::Pause => {
+                            info!("Listening phase: Pause received, stopping capture");
                             let _ = self.voice_service.stop_capture().await;
-                            if matches!(cmd, VoiceCommand::Pause) {
-                                self.state.lock().await.paused = true;
-                            }
+                            self.state.lock().await.paused = true;
                             self.transition_to(ConversationPhase::Idle).await;
                             return;
+                        }
+                        VoiceCommand::End => {
+                            // End during listening: finalize the transcript so
+                            // the captured audio is processed by the agent.
+                            // Mark paused so auto_resume_or_idle goes idle
+                            // instead of re-entering listening after speaking.
+                            info!("Listening phase: End received, finalizing capture");
+                            self.state.lock().await.paused = true;
+                            silence_detected = true;
                         }
                         VoiceCommand::NewSession => {
                             info!("Listening phase: NewSession, stopping capture");
@@ -501,10 +515,8 @@ impl VoiceConversationManager {
                     }
                 }
                 _ = tokio::time::sleep(std::time::Duration::from_millis(200)) => {
-                    // Poll voice service session state
-                    let vs_state = self.voice_service.session_state().await;
-                    if vs_state == VoiceSessionState::Idle {
-                        // Capture has ended (silence detection triggered stop)
+                    // Check if the capture module detected silence
+                    if self.voice_service.is_silence_detected() {
                         silence_detected = true;
                     }
                 }
@@ -833,6 +845,7 @@ impl VoiceConversationManager {
                     match cmd {
                         VoiceCommand::End => {
                             info!("Speaking phase: End received");
+                            self.voice_service.stop_tts_playback().await;
                             if let Some(ref stop) = monitor.stop_signal {
                                 stop.store(true, Ordering::Relaxed);
                             }
@@ -842,6 +855,7 @@ impl VoiceConversationManager {
                         }
                         VoiceCommand::Pause => {
                             info!("Speaking phase: Pause received");
+                            self.voice_service.stop_tts_playback().await;
                             if let Some(ref stop) = monitor.stop_signal {
                                 stop.store(true, Ordering::Relaxed);
                             }
@@ -851,6 +865,7 @@ impl VoiceConversationManager {
                             return;
                         }
                         VoiceCommand::Interrupt => {
+                            self.voice_service.stop_tts_playback().await;
                             interrupted = true;
                         }
                         _ => {} // Resume/Continue/NewSession handled elsewhere
@@ -861,6 +876,7 @@ impl VoiceConversationManager {
                         consecutive_speech_samples += 1;
                         if consecutive_speech_samples >= SPEECH_SAMPLE_THRESHOLD {
                             info!("Speaking phase: speech detected (rms={rms:.3}), interrupt");
+                            self.voice_service.stop_tts_playback().await;
                             interrupted = true;
                         }
                     } else {
@@ -971,6 +987,11 @@ impl VoiceConversationManager {
 
     async fn handle_command_while_idle(&self, cmd: VoiceCommand) {
         match cmd {
+            VoiceCommand::Start => {
+                // start() already set phase to Listening — the loop will
+                // pick it up on the next iteration. Nothing else needed.
+                info!("Idle: Start received, entering listening");
+            }
             VoiceCommand::Resume => {
                 let (was_paused, turn_count, title) = {
                     let mut state = self.state.lock().await;

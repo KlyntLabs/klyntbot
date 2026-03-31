@@ -1,4 +1,3 @@
-import { useEvent } from "@shared/hooks/useEvent";
 import { useMutation } from "@shared/hooks/useMutation";
 import { useQuery } from "@shared/hooks/useQuery";
 import type { GoalProgress } from "@shared/types";
@@ -30,17 +29,16 @@ function formatValue(metric: string, value: number): string {
 }
 
 export function GoalsProgress() {
-  const { data: goals, refetch } = useQuery<GoalProgress[]>("productivity_goals", undefined, []);
+  const { data: goals, refetch } = useQuery<GoalProgress[]>("productivity_goals", undefined, [], {
+    invalidateOn: ["entity:updated"],
+    invalidateFilter: (p) => (p as { entityKind?: string })?.entityKind === "productivity",
+  });
   const [showAdd, setShowAdd] = useState(false);
   const { mutate: createGoal } = useMutation<
     void,
     { goal_type: string; metric: string; target_value: number }
   >("productivity_goal_create");
   const { mutate: deleteGoal } = useMutation<void, { id: number }>("productivity_goal_delete");
-
-  useEvent<{ entityKind: string }>("entity:updated", (payload) => {
-    if (payload?.entityKind === "productivity") refetch();
-  });
 
   const handleAdd = async (params: { goal_type: string; metric: string; target_value: number }) => {
     await createGoal(params);
