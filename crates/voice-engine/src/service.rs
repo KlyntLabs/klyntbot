@@ -393,6 +393,14 @@ impl VoiceService {
                     text: partial.text.clone(),
                     language: partial.language.as_str().to_string(),
                     is_final: partial.is_final,
+                    segments: partial
+                        .segments
+                        .iter()
+                        .map(|s| crate::events::TranscriptSegmentEvent {
+                            text: s.text.clone(),
+                            confidence: s.confidence,
+                        })
+                        .collect(),
                 })
                 .await;
 

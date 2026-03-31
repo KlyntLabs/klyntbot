@@ -4,6 +4,13 @@ use serde::{Deserialize, Serialize};
 
 use crate::types::EngineKind;
 
+/// Lightweight segment data for frontend word-level confidence display.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TranscriptSegmentEvent {
+    pub text: String,
+    pub confidence: f32,
+}
+
 /// Events streamed from VoiceService to the frontend Voice Brain orb.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "camelCase")]
@@ -19,6 +26,8 @@ pub enum VoiceEvent {
         text: String,
         language: String,
         is_final: bool,
+        #[serde(skip_serializing_if = "Vec::is_empty")]
+        segments: Vec<TranscriptSegmentEvent>,
     },
     RoutingSuggestion {
         skill: String,
