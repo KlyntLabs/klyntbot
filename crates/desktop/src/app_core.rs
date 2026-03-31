@@ -310,13 +310,12 @@ fn wire_event_channels(
                             cognitive::types::SalienceVerdict::Accumulate => "accumulate",
                             cognitive::types::SalienceVerdict::Discard => "discard",
                         };
+                        // Use the domain event's variant name only — avoid Debug-formatting
+                        // the entire event, which would clone large payloads like full note
+                        // content into a temporary String (never returned to OS by mimalloc).
+                        let event_type = event.variant_name().to_string();
                         let payload = desktop_shared::cognitive_commands::DomainEventPayload {
-                            event_type: format!("{:?}", event)
-                                .split('{')
-                                .next()
-                                .unwrap_or("Unknown")
-                                .trim()
-                                .to_string(),
+                            event_type,
                             salience: salience_str.to_string(),
                             domain: event.domain().to_string(),
                             timestamp: chrono::Utc::now().to_rfc3339(),

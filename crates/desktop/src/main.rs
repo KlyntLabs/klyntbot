@@ -3,6 +3,14 @@
 #[global_allocator]
 static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;
 
+// FFI binding for mimalloc's aggressive collection. The symbol is always
+// present when mimalloc is the global allocator — no extra crate needed.
+unsafe extern "C" {
+    /// Force mimalloc to return freed pages to the OS.
+    /// `force = true` aggressively collects across all thread-local heaps.
+    fn mi_collect(force: bool);
+}
+
 mod app_core;
 mod commands;
 #[cfg(debug_assertions)]
@@ -664,6 +672,29 @@ fn run_desktop_app() {
             // Quick capture window — dismiss-on-blur
             if let Some(capture_window) = app.get_webview_window(WINDOW_QUICK_CAPTURE) {
                 dismiss_on_blur(&capture_window);
+            }
+
+            // Periodic mimalloc memory compaction — force the allocator to
+            // return freed pages to the OS. Without this, mimalloc retains all
+            // freed thread-local pages indefinitely, causing RSS to grow
+            // monotonically in long-running sessions (macOS Activity Monitor
+            // shows RSS, not actual live allocations).
+            {
+                let shutdown = app.state::<Arc<app_core::AppCore>>().shutdown_token.clone();
+                tauri::async_runtime::spawn(async move {
+                    let mut interval =
+                        tokio::time::interval(std::time::Duration::from_secs(60));
+                    loop {
+                        tokio::select! {
+                            _ = shutdown.cancelled() => break,
+                            _ = interval.tick() => {
+                                // SAFETY: mi_collect is thread-safe and idempotent.
+                                // `true` = force aggressive collection across all threads.
+                                unsafe { mi_collect(true); }
+                            }
+                        }
+                    }
+                });
             }
 
             // Start the tray countdown (next upcoming event in menu bar)
