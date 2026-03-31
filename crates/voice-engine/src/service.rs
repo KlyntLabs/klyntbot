@@ -191,6 +191,17 @@ impl VoiceService {
         }
     }
 
+    /// Try to unload the STT model if it has been idle.
+    ///
+    /// Called periodically by a maintenance timer to reclaim memory.
+    pub fn try_unload_idle_stt(&self) {
+        if let Ok(guard) = self.stt_local.read() {
+            if let Some(ref engine) = *guard {
+                engine.unload_if_idle();
+            }
+        }
+    }
+
     /// Synchronous helper: creates the capture session, wraps the `!Send` cpal
     /// stream on a blocking thread, and returns only `Send`-safe parts. This
     /// keeps `CaptureSession` out of any async generator state.

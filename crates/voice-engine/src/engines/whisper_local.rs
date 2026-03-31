@@ -2,9 +2,14 @@
 //!
 //! Metal-accelerated on Apple Silicon. Supports both file transcription
 //! and streaming via buffered chunking.
+//!
+//! The GGML model weights (~500MB for small, ~1.5GB for medium) are loaded
+//! lazily on first transcription and automatically unloaded after an idle
+//! period to reclaim memory when voice isn't in active use.
 
 use std::path::{Path, PathBuf};
-use std::time::Duration;
+use std::sync::Mutex;
+use std::time::{Duration, Instant};
 
 use async_trait::async_trait;
 use tokio::sync::mpsc;
@@ -14,19 +19,24 @@ use whisper_rs::{FullParams, SamplingStrategy, WhisperContext, WhisperContextPar
 use crate::stt::{AudioStream, PartialTranscript, TranscriptStream, TranscriptionEngine};
 use crate::types::{Language, Transcript, TranscriptSegment};
 
-/// Local Whisper transcription engine.
+/// Idle timeout before the model is unloaded from memory.
+const IDLE_UNLOAD_SECS: u64 = 300; // 5 minutes
+
+/// Local Whisper transcription engine with lazy model loading.
+///
+/// The model is loaded on first use and unloaded after [`IDLE_UNLOAD_SECS`]
+/// of inactivity to free ~500MB–1.5GB of RAM/VRAM.
 pub struct WhisperLocalEngine {
-    ctx: WhisperContext,
-    /// Retained for diagnostics/logging; transcription now uses `ctx` directly.
-    #[allow(dead_code)]
+    ctx: Mutex<Option<WhisperContext>>,
+    last_used: Mutex<Instant>,
     model_path: PathBuf,
 }
 
 impl WhisperLocalEngine {
-    /// Create a new engine by loading a GGML model file.
+    /// Create a new engine pointing at a GGML model file.
     ///
-    /// The model file should be a whisper.cpp GGML model (e.g., `ggml-small.bin`).
-    /// Metal acceleration is automatic on Apple Silicon when compiled with the `metal` feature.
+    /// The model is NOT loaded into memory yet — it will be loaded lazily
+    /// on the first transcription call. This keeps startup memory low.
     pub fn new(model_path: impl Into<PathBuf>) -> common::Result<Self> {
         let model_path = model_path.into();
 
@@ -39,19 +49,62 @@ impl WhisperLocalEngine {
             ));
         }
 
-        info!("Loading Whisper model from: {}", model_path.display());
+        info!(
+            "Whisper engine created (lazy) for model: {}",
+            model_path.display()
+        );
 
-        let params = WhisperContextParameters::default();
-        let ctx = WhisperContext::new_with_params(&model_path, params).map_err(|e| {
+        Ok(Self {
+            ctx: Mutex::new(None),
+            last_used: Mutex::new(Instant::now()),
+            model_path,
+        })
+    }
+
+    /// Ensure the model is loaded and return a state handle for transcription.
+    ///
+    /// If the model isn't loaded yet (or was unloaded after idle), this
+    /// loads it from disk (~1-2s on SSD).
+    fn ensure_loaded(&self) -> common::Result<whisper_rs::WhisperState> {
+        let mut ctx_guard = self.ctx.lock().unwrap();
+        *self.last_used.lock().unwrap() = Instant::now();
+
+        if ctx_guard.is_none() {
+            info!("Loading Whisper model from: {}", self.model_path.display());
+            let params = WhisperContextParameters::default();
+            let ctx =
+                WhisperContext::new_with_params(&self.model_path, params).map_err(|e| {
+                    common::KlyntbotError::Provider(common::ProviderError::InvalidResponse(
+                        format!("Failed to load Whisper model: {}", e),
+                    ))
+                })?;
+            info!("Whisper model loaded successfully");
+            *ctx_guard = Some(ctx);
+        }
+
+        ctx_guard.as_ref().unwrap().create_state().map_err(|e| {
             common::KlyntbotError::Provider(common::ProviderError::InvalidResponse(format!(
-                "Failed to load Whisper model: {}",
+                "Failed to create Whisper state: {}",
                 e
             )))
-        })?;
+        })
+    }
 
-        info!("Whisper model loaded successfully");
-
-        Ok(Self { ctx, model_path })
+    /// Unload the model from memory if it has been idle.
+    ///
+    /// Call this periodically (e.g., from a maintenance timer) to reclaim
+    /// memory when voice is not in active use.
+    pub fn unload_if_idle(&self) -> bool {
+        let last = *self.last_used.lock().unwrap();
+        if last.elapsed() >= Duration::from_secs(IDLE_UNLOAD_SECS) {
+            let mut ctx_guard = self.ctx.lock().unwrap();
+            if ctx_guard.is_some() {
+                *ctx_guard = None;
+                info!("Whisper model unloaded after idle timeout");
+                return true;
+            }
+        }
+        false
     }
 
     /// Build FullParams for transcription.
@@ -225,14 +278,8 @@ impl TranscriptionEngine for WhisperLocalEngine {
     async fn transcribe_stream(&self, mut audio: AudioStream) -> common::Result<TranscriptStream> {
         let (tx, rx) = mpsc::channel::<PartialTranscript>(32);
 
-        // Create state from the pre-loaded context (avoids reloading model from disk).
-        // WhisperState is Send+Sync so it can safely move into spawn_blocking.
-        let mut state = self.ctx.create_state().map_err(|e| {
-            common::KlyntbotError::Provider(common::ProviderError::InvalidResponse(format!(
-                "Failed to create Whisper state: {}",
-                e
-            )))
-        })?;
+        // Ensure model is loaded and create a state handle (lightweight, not the model itself).
+        let mut state = self.ensure_loaded()?;
 
         tokio::task::spawn_blocking(move || {
             let rt = tokio::runtime::Handle::current();
@@ -304,12 +351,7 @@ impl TranscriptionEngine for WhisperLocalEngine {
             audio.len() as f32 / 16000.0
         );
 
-        let mut state = self.ctx.create_state().map_err(|e| {
-            common::KlyntbotError::Provider(common::ProviderError::InvalidResponse(format!(
-                "Failed to create Whisper state: {}",
-                e
-            )))
-        })?;
+        let mut state = self.ensure_loaded()?;
 
         let params = Self::build_params(lang_hint);
 
@@ -325,5 +367,9 @@ impl TranscriptionEngine for WhisperLocalEngine {
 
     fn display_name(&self) -> &str {
         "Local (Whisper)"
+    }
+
+    fn unload_if_idle(&self) -> bool {
+        Self::unload_if_idle(self)
     }
 }

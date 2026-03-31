@@ -29,6 +29,27 @@ interface CacheEntry {
 
 const cache = new Map<string, CacheEntry>();
 const DEFAULT_STALE_TIME = 30_000;
+const MAX_CACHE_ENTRIES = 200;
+const CACHE_TTL = 5 * 60_000; // 5 minutes
+
+/** Evict stale/excess entries. Only does work when cache is over the high-water mark. */
+function evictCache() {
+  if (cache.size <= MAX_CACHE_ENTRIES) return;
+
+  const now = Date.now();
+  for (const [key, entry] of cache) {
+    if (now - entry.timestamp > CACHE_TTL) cache.delete(key);
+  }
+  if (cache.size <= MAX_CACHE_ENTRIES) return;
+
+  // Still over limit — evict oldest down to 75% capacity to avoid sorting on every insert
+  const target = Math.floor(MAX_CACHE_ENTRIES * 0.75);
+  const sorted = [...cache.entries()].sort((a, b) => a[1].timestamp - b[1].timestamp);
+  const toRemove = cache.size - target;
+  for (let i = 0; i < toRemove; i++) {
+    cache.delete(sorted[i][0]);
+  }
+}
 
 // Listener set for cache invalidation — hooks subscribe to get notified when their cache entry is cleared.
 const invalidationListeners = new Set<(prefix: string) => void>();
@@ -155,6 +176,7 @@ export function useQuery<T>(
       promise
         .then((result) => {
           cache.set(k, { data: result, timestamp: Date.now() });
+          evictCache();
           setData(result);
         })
         .catch((e) => {

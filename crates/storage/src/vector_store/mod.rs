@@ -14,6 +14,9 @@ use lancedb::Connection;
 
 use crate::error::StorageError;
 
+const LANCE_INDEX_CACHE_BYTES: usize = 64 * 1024 * 1024;
+const LANCE_METADATA_CACHE_BYTES: usize = 64 * 1024 * 1024;
+
 mod cognitive;
 mod community;
 mod conv;
@@ -65,7 +68,14 @@ impl VectorStore {
         let path_str = lance_dir
             .to_str()
             .ok_or_else(|| StorageError::Vector("lance dir path is not valid UTF-8".to_string()))?;
+        // Default lance caches are 6GB+1GB — far too large for a single-user app.
+        let session = Arc::new(lance::session::Session::new(
+            LANCE_INDEX_CACHE_BYTES,
+            LANCE_METADATA_CACHE_BYTES,
+            Arc::new(lance_io::object_store::ObjectStoreRegistry::default()),
+        ));
         let db = lancedb::connect(path_str)
+            .session(session)
             .execute()
             .await
             .map_err(|e| StorageError::Vector(format!("LanceDB connect failed: {e}")))?;

@@ -44,7 +44,7 @@ impl NoteEmbeddingHandler for NoteEmbeddingAdapter {
 
         let embedding = self.engine.clone().embed_async(text).await?;
 
-        let model_name = "paraphrase-multilingual-MiniLM-L12-v2";
+        let model_name = self.engine.model_name();
         self.store
             .upsert_embedding(
                 "note_embeddings",

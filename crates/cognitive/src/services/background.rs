@@ -60,6 +60,12 @@ pub enum PipelineEvent {
     },
 }
 
+/// Maximum observations kept per accumulator key. Once reached, the oldest
+/// observations are dropped (FIFO). This prevents a single high-frequency
+/// event type (e.g. `NoteContentChanged`) from consuming unbounded memory
+/// between promotion cycles.
+const MAX_OBSERVATIONS_PER_KEY: usize = 50;
+
 /// Tracks accumulated events for pattern promotion.
 #[derive(Debug, Clone)]
 struct AccumulatedEntry {
@@ -79,6 +85,11 @@ impl AccumulatedEntry {
         let day = obs.timestamp.format("%Y-%m-%d").to_string();
         self.days_seen.insert(day);
         self.observations.push(obs);
+        // Cap per-key observations to prevent unbounded growth
+        if self.observations.len() > MAX_OBSERVATIONS_PER_KEY {
+            self.observations
+                .drain(..self.observations.len() - MAX_OBSERVATIONS_PER_KEY);
+        }
     }
 
     fn should_promote(&self, promote_threshold: usize, min_days: usize) -> bool {

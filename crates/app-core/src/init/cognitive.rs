@@ -15,6 +15,7 @@ pub(super) async fn init_cognitive(
     storage_pool: &StoragePool,
     activity_svc: &Arc<activity_log::ActivityIngestionService>,
     shutdown_token: &CancellationToken,
+    embedding_engine: Arc<tools::EmbeddingEngine>,
 ) {
     // Seed builtin personas (idempotent, safe on every startup)
     let persona_repo = cognitive::repos::PersonaRepo::new(storage_pool.inner().clone());
@@ -65,8 +66,7 @@ pub(super) async fn init_cognitive(
             activity_log::inference::ContextInferenceConfig::from_work_context_config(
                 &config.work_context,
             );
-        let embedding_engine = Arc::new(tools::EmbeddingEngine::new());
-        let text_embedder = Arc::new(agent::TextEmbedderImpl::new(embedding_engine));
+        let text_embedder = Arc::new(agent::TextEmbedderImpl::new(embedding_engine.clone()));
         let inference_engine = Arc::new(activity_log::inference::ContextInferenceEngine::new(
             storage_pool.clone(),
             text_embedder,

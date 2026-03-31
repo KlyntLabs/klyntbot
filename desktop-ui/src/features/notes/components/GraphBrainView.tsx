@@ -392,6 +392,23 @@ export function GraphBrainView({
     };
   }, [activeNoteId, graphData.nodes]);
 
+  // Dispose Three.js renderer and WebGL context on unmount
+  useEffect(() => {
+    return () => {
+      const fg = graphRef.current;
+      if (!fg) return;
+      try {
+        const renderer = fg.renderer();
+        if (renderer) {
+          renderer.dispose();
+          renderer.forceContextLoss();
+        }
+      } catch {
+        // Renderer may already be disposed
+      }
+    };
+  }, [graphRef]);
+
   return (
     <ForceGraph3D
       ref={graphRef as never}

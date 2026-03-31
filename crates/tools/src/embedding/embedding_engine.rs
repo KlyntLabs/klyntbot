@@ -9,23 +9,32 @@ use chrono::Utc;
 #[cfg(feature = "semantic-search")]
 use fastembed::{EmbeddingModel, InitOptions, TextEmbedding};
 use std::sync::{Arc, Mutex};
+use std::time::Instant;
 use tracing::{debug, info};
 
 use crate::embedding_store::EmbeddingRecord;
 use crate::todo_types::Todo;
 use common::Result;
 
-/// Expected embedding dimensionality for paraphrase-multilingual-MiniLM-L12-v2.
+/// Expected embedding dimensionality for all-MiniLM-L6-v2-Q.
 pub const EMBEDDING_DIM: usize = 384;
+
+/// Idle timeout before the ONNX model is unloaded from memory (2 minutes).
+/// The quantized model (~23MB) reloads from disk cache in <500ms.
+const EMBEDDING_IDLE_SECS: u64 = 120;
 
 /// Core embedding engine wrapping fastembed with lazy model initialization.
 ///
 /// The model (~420MB) is downloaded on first use, not at construction time.
+/// It is automatically unloaded after [`EMBEDDING_IDLE_SECS`] of inactivity
+/// to reclaim ~500MB of RAM.
+///
 /// When compiled without the `semantic-search` feature, `embed()` always
 /// returns an error — the struct still exists for API compatibility.
 pub struct EmbeddingEngine {
     #[cfg(feature = "semantic-search")]
     model: Mutex<Option<TextEmbedding>>,
+    last_used: Mutex<Instant>,
     #[cfg(not(feature = "semantic-search"))]
     _phantom: (),
 }
@@ -42,6 +51,7 @@ impl EmbeddingEngine {
         Self {
             #[cfg(feature = "semantic-search")]
             model: Mutex::new(None),
+            last_used: Mutex::new(Instant::now()),
             #[cfg(not(feature = "semantic-search"))]
             _phantom: (),
         }
@@ -53,11 +63,12 @@ impl EmbeddingEngine {
         let mut guard = self.model.lock().map_err(|e| {
             common::ToolError::ExecutionFailed(format!("Embedding model lock poisoned: {}", e))
         })?;
+        *self.last_used.lock().unwrap() = Instant::now();
 
         if guard.is_none() {
-            info!("Initializing embedding model (first use — may download ~420MB)...");
+            info!("Initializing embedding model (first use)...");
             let model = TextEmbedding::try_new(
-                InitOptions::new(EmbeddingModel::ParaphraseMLMiniLML12V2)
+                InitOptions::new(EmbeddingModel::AllMiniLML6V2Q)
                     .with_show_download_progress(true),
             )
             .map_err(|e| {
@@ -71,6 +82,30 @@ impl EmbeddingEngine {
         }
 
         Ok(())
+    }
+
+    /// Unload the ONNX model if it has been idle for [`EMBEDDING_IDLE_SECS`].
+    ///
+    /// Returns `true` if the model was unloaded. Call periodically from a
+    /// maintenance timer.
+    #[cfg(feature = "semantic-search")]
+    pub fn unload_if_idle(&self) -> bool {
+        let last = *self.last_used.lock().unwrap();
+        if last.elapsed() >= std::time::Duration::from_secs(EMBEDDING_IDLE_SECS) {
+            let mut guard = self.model.lock().unwrap();
+            if guard.is_some() {
+                *guard = None;
+                info!("Embedding model unloaded after idle timeout");
+                return true;
+            }
+        }
+        false
+    }
+
+    /// Stub when `semantic-search` feature is disabled.
+    #[cfg(not(feature = "semantic-search"))]
+    pub fn unload_if_idle(&self) -> bool {
+        false
     }
 
     /// Generate embedding for a single text. Returns `Vec<f32>` of `EMBEDDING_DIM` length.
@@ -167,7 +202,7 @@ impl EmbeddingEngine {
 
     /// Get the name of the embedding model being used.
     pub fn model_name(&self) -> &str {
-        "paraphrase-multilingual-MiniLM-L12-v2"
+        "all-MiniLM-L6-v2-Q"
     }
 
     /// Cosine similarity between two vectors.
@@ -237,7 +272,7 @@ impl EmbeddingHandler for EmbeddingEngineImpl {
             "Embedding generated for todo"
         );
 
-        let model_name = "paraphrase-multilingual-MiniLM-L12-v2";
+        let model_name = self.engine.model_name();
 
         self.store
             .upsert_embedding(

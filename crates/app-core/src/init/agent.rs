@@ -40,6 +40,7 @@ pub(super) async fn init_agent(
     autotuner: Option<&Arc<agent::autotuner::AutoTunerOrchestrator>>,
     hot_config: Arc<RwLock<config::HotConfig>>,
     context_update_queue: Option<Arc<bus::ContextUpdateQueue>>,
+    embedding_engine: Option<Arc<tools::EmbeddingEngine>>,
 ) -> Result<AgentResult, String> {
     // 7. Load personas
     let data_dir = config.data_dir_path();
@@ -79,6 +80,10 @@ pub(super) async fn init_agent(
         .with_pool(storage_pool.inner().clone())
         .with_cron_service(cron_service.clone())
         .with_notification_handle(notification_dispatcher.last_active_handle());
+
+    if let Some(engine) = embedding_engine {
+        builder = builder.with_embedding_engine(engine);
+    }
 
     // Thread the custom notification sender (if provided) to the agent's ReminderEngine
     if let Some(ref sender) = notification_sender {

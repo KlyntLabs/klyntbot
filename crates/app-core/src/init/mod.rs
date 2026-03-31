@@ -21,6 +21,24 @@ use tracing::{info, warn};
 use crate::events::{AppEventEmitter, NoopEmitter};
 use crate::state::AppCore;
 
+/// Spawn a periodic timer that calls `f` every `interval_secs` until `token` is cancelled.
+fn spawn_periodic_timer(
+    token: &CancellationToken,
+    interval_secs: u64,
+    f: impl Fn() + Send + 'static,
+) {
+    let token = token.child_token();
+    tokio::spawn(async move {
+        let mut interval = tokio::time::interval(std::time::Duration::from_secs(interval_secs));
+        loop {
+            tokio::select! {
+                _ = token.cancelled() => break,
+                _ = interval.tick() => f(),
+            }
+        }
+    });
+}
+
 /// Bundle of receiver channels that callers wire to their transport (Tauri, SSE, etc.).
 pub struct EventChannels {
     pub intervention_rx: mpsc::Receiver<feature_coaching::router::DeliveredIntervention>,
@@ -239,6 +257,7 @@ impl AppCore {
             autotuner.as_ref(),
             Arc::clone(&hot_config),
             Some(Arc::clone(&context_update_queue)),
+            appcore_embedding_engine.clone(),
         )
         .await?;
 
@@ -246,6 +265,12 @@ impl AppCore {
         let channel_manager = channels::init_channels(&config, &bus)?;
 
         let shutdown_token = CancellationToken::new();
+
+        // Idle-unload for the ONNX embedding model (interval matches EMBEDDING_IDLE_SECS)
+        {
+            let engine = Arc::clone(&embedding_engine);
+            spawn_periodic_timer(&shutdown_token, 120, move || { engine.unload_if_idle(); });
+        }
 
         // ── Deadline scheduler (event-driven timers) ────────────────────
         let deadline_scheduler = deadline::init_deadline_scheduler(
@@ -303,7 +328,14 @@ impl AppCore {
         .await;
 
         // ── Phase 7: Cognitive (capture, file watcher, work context) ─────
-        cognitive::init_cognitive(&mut config, &storage_pool, &activity_svc, &shutdown_token).await;
+        cognitive::init_cognitive(
+            &mut config,
+            &storage_pool,
+            &activity_svc,
+            &shutdown_token,
+            Arc::clone(&embedding_engine),
+        )
+        .await;
 
         // ── Phase 8: Launcher ─────────────────────────────────────────────
         let launcher::LauncherResult { launcher_engine } =
@@ -349,11 +381,9 @@ impl AppCore {
                 let _ = bootstrap_archiver.bootstrap(serde_json::json!({})).await;
             });
 
-            // Wire text embedder for voice echo semantic similarity
             let facade = {
-                let embedding_engine = Arc::new(tools::EmbeddingEngine::new());
                 let text_embedder: Arc<dyn ::cognitive::TextEmbedder> =
-                    Arc::new(::agent::TextEmbedderImpl::new(embedding_engine));
+                    Arc::new(::agent::TextEmbedderImpl::new(Arc::clone(&embedding_engine)));
                 facade.with_text_embedder(text_embedder)
             };
 
@@ -669,6 +699,11 @@ impl AppCore {
                 let loop_handle = voice_conv_manager.spawn_supervised_loop().await;
                 core.voice_loop_handle = Some(loop_handle);
                 core.voice_conversation_manager = Some(voice_conv_manager);
+
+                {
+                    let svc = Arc::clone(&service);
+                    spawn_periodic_timer(&shutdown_token, 300, move || svc.try_unload_idle_stt());
+                }
 
                 if !has_local_engine {
                     if model_needs_download {

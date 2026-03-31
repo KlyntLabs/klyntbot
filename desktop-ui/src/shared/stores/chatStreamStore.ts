@@ -130,6 +130,7 @@ type Listener = () => void;
 // ── Store ───────────────────────────────────────────────────────────────
 
 class ChatStreamStore {
+  private static MAX_IDLE_SESSIONS = 20;
   private states = new Map<string, StreamSnapshot>();
   private listeners = new Set<Listener>();
   private eventSources = new Map<string, EventSource>();
@@ -507,6 +508,30 @@ class ChatStreamStore {
     if (cbs && hasCallbacks) {
       for (const cb of cbs) cb();
     }
+
+    this.evictIdleSessions();
+  }
+
+  private evictIdleSessions(): void {
+    if (this.states.size <= ChatStreamStore.MAX_IDLE_SESSIONS) return;
+
+    const idle: string[] = [];
+    for (const [key, state] of this.states) {
+      if (!state.isStreaming) idle.push(key);
+    }
+    if (idle.length <= ChatStreamStore.MAX_IDLE_SESSIONS) return;
+
+    const toRemove = idle.length - ChatStreamStore.MAX_IDLE_SESSIONS;
+    for (let i = 0; i < toRemove; i++) {
+      this.deleteSessionState(idle[i]);
+    }
+  }
+
+  private deleteSessionState(key: string): void {
+    this.states.delete(key);
+    this.textBuffers.delete(key);
+    this.rafIds.delete(key);
+    this.onDoneCallbacks.delete(key);
   }
 
   private onError(payload: AgentErrorPayload): void {

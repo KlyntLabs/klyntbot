@@ -39,10 +39,14 @@ pub(super) async fn init_storage(
         .map_err(|e| format!("storage connect failed: {e}"))?;
     let repos = Repos::from_pool(&storage_pool);
     let vector_store = VectorStore::connect(&data_dir).await.ok();
-    // Create ANN indexes in the background (requires 256+ rows to train).
+    // Create ANN indexes + compact fragment files in the background.
     if let Some(vs) = &vector_store {
         let vs_bg = vs.clone();
         tokio::spawn(async move {
+            // Compact first to merge small fragments and reclaim memory
+            if let Err(e) = vs_bg.optimize_all_tables().await {
+                warn!("LanceDB startup compaction failed (non-fatal): {e}");
+            }
             if let Err(e) = vs_bg.ensure_indexes(256).await {
                 warn!("ANN index creation failed (non-fatal): {e}");
             }

@@ -1,14 +1,31 @@
-//! Index management and deduplication for LanceDB tables.
+//! Index management, compaction, and deduplication for LanceDB tables.
 
 use arrow_array::StringArray;
 use futures_util::TryStreamExt;
 use lancedb::index::vector::IvfPqIndexBuilder;
 use lancedb::index::Index;
 use lancedb::query::{ExecutableQuery, QueryBase, Select};
+use lancedb::table::OptimizeAction;
 
 use crate::error::StorageError;
 
 use super::{crud::sanitize_predicate_value, VectorStore};
+
+/// All embedding tables managed by VectorStore.
+const ALL_TABLES: &[&str] = &[
+    "todo_embeddings",
+    "task_embeddings",
+    "note_embeddings",
+    "conv_embeddings",
+    "cognitive_fact_embeddings",
+    "activity_embeddings",
+    "work_context_embeddings",
+    "flashcard_embeddings",
+    "tree_node_embeddings",
+    "community_embeddings",
+    "insight_embeddings",
+    "entity_embeddings",
+];
 
 impl VectorStore {
     /// Create IVF-PQ vector indexes on all tables that have enough rows.
@@ -17,15 +34,7 @@ impl VectorStore {
     /// `min_rows` rows (IVF-PQ needs data to train on). Safe to call
     /// repeatedly — it is a no-op if indexes already exist.
     pub async fn ensure_indexes(&self, min_rows: usize) -> Result<(), StorageError> {
-        let tables = [
-            "todo_embeddings",
-            "conv_embeddings",
-            "cognitive_fact_embeddings",
-            "activity_embeddings",
-            "work_context_embeddings",
-            "insight_embeddings",
-        ];
-        for table_name in tables {
+        for &table_name in ALL_TABLES {
             let tbl = match self.db.open_table(table_name).execute().await {
                 Ok(t) => t,
                 Err(_) => continue,
@@ -135,5 +144,39 @@ impl VectorStore {
         }
 
         Ok(duplicate_ids.len())
+    }
+
+    /// Compact all vector tables to reclaim memory and disk space.
+    ///
+    /// LanceDB uses copy-on-write storage — every upsert/delete creates new
+    /// fragment files. Without periodic compaction these accumulate and get
+    /// memory-mapped, causing RSS to grow unboundedly.
+    ///
+    /// Runs `OptimizeAction::All` on each table which:
+    /// - Merges small fragment files into larger ones (compaction)
+    /// - Prunes old versions older than 7 days
+    /// - Re-optimizes indices for unindexed data
+    pub async fn optimize_all_tables(&self) -> Result<(), StorageError> {
+        for &table_name in ALL_TABLES {
+            let tbl = match self.db.open_table(table_name).execute().await {
+                Ok(t) => t,
+                Err(_) => continue,
+            };
+
+            match tbl.optimize(OptimizeAction::All).await {
+                Ok(stats) => {
+                    tracing::debug!(
+                        "Optimized {table_name}: compaction={:?}, prune={:?}",
+                        stats.compaction,
+                        stats.prune,
+                    );
+                }
+                Err(e) => {
+                    tracing::warn!("Failed to optimize {table_name}: {e}");
+                }
+            }
+        }
+
+        Ok(())
     }
 }

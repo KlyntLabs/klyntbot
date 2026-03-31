@@ -145,7 +145,7 @@ fn default_semantic_threshold() -> f64 {
 }
 
 fn default_embedding_model() -> String {
-    "paraphrase-multilingual-MiniLM-L12-v2".to_string()
+    "all-MiniLM-L6-v2-Q".to_string()
 }
 
 fn default_rrf_k() -> u32 {

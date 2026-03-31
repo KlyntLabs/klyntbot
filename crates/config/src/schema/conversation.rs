@@ -38,7 +38,7 @@ fn default_history_limit() -> usize {
 }
 
 fn default_max_cache_size() -> usize {
-    1000
+    50
 }
 
 fn default_ttl_days() -> u32 {

@@ -743,6 +743,11 @@ fn register_cron_callbacks(
                             }
                         }
 
+                        // Compact Lance fragment files to reclaim memory
+                        if let Err(e) = vs.optimize_all_tables().await {
+                            warn!(error = %e, "Memory maintenance: LanceDB compaction failed");
+                        }
+
                         if deleted > 0 {
                             info!(
                                 deleted,

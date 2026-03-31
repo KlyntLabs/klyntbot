@@ -87,6 +87,7 @@ pub struct AgentLoopBuilder {
     active_view: Option<Arc<tokio::sync::RwLock<Option<context_engine::ActiveView>>>>,
     hot_config: Option<Arc<RwLock<config::HotConfig>>>,
     context_update_queue: Option<Arc<bus::ContextUpdateQueue>>,
+    embedding_engine: Option<Arc<tools::EmbeddingEngine>>,
 }
 
 impl AgentLoopBuilder {
@@ -109,7 +110,12 @@ impl AgentLoopBuilder {
             active_view: None,
             hot_config: None,
             context_update_queue: None,
+            embedding_engine: None,
         }
+    }
+    pub fn with_embedding_engine(mut self, engine: Arc<tools::EmbeddingEngine>) -> Self {
+        self.embedding_engine = Some(engine);
+        self
     }
 
     pub fn with_pool(mut self, pool: sqlx::SqlitePool) -> Self {
@@ -300,8 +306,10 @@ impl AgentLoopBuilder {
             tokio::sync::RwLock<Vec<Arc<skill_system::types::SkillPackage>>>,
         > = Arc::new(tokio::sync::RwLock::new(vec![]));
 
-        // ── Shared embedding engine ──
-        let embedding_engine = Arc::new(tools::EmbeddingEngine::new());
+        // ── Shared embedding engine (reuse injected instance or create new) ──
+        let embedding_engine = self
+            .embedding_engine
+            .unwrap_or_else(|| Arc::new(tools::EmbeddingEngine::new()));
 
         // Precompute skill description embeddings for semantic matching
         {

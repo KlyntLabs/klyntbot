@@ -28,4 +28,11 @@ pub trait TranscriptionEngine: Send + Sync {
         lang_hint: Option<&Language>,
     ) -> common::Result<Transcript>;
     fn display_name(&self) -> &str;
+
+    /// Unload the model from memory if it has been idle.
+    ///
+    /// Returns `true` if the model was unloaded. Default: no-op (always returns `false`).
+    fn unload_if_idle(&self) -> bool {
+        false
+    }
 }

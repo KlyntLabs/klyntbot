@@ -28,6 +28,10 @@ impl StoragePool {
         sqlx::query("PRAGMA busy_timeout = 5000;")
             .execute(&pool)
             .await?;
+        // ~2MB per connection instead of default ~8MB (single-user app).
+        sqlx::query("PRAGMA cache_size = -2000;")
+            .execute(&pool)
+            .await?;
         sqlx::migrate!("./migrations").run(&pool).await?;
         Ok(Self(pool))
     }
