@@ -100,8 +100,9 @@ pub fn evaluate_salience(event: &DomainEvent) -> SalienceVerdict {
         // Autotuner decisions — always extract for cognitive processing
         DomainEvent::AutotunerDecision { .. } => SalienceVerdict::Extract,
 
-        // Contradiction detection — always extract for cognitive processing
-        DomainEvent::ContradictionDetected { .. } => SalienceVerdict::Extract,
+        // Contradiction detection — discard from cognitive processing to prevent
+        // feedback loops (the background service itself publishes these events)
+        DomainEvent::ContradictionDetected { .. } => SalienceVerdict::Discard,
 
         // Knowledge Atoms
         DomainEvent::KnowledgeAtomAccepted { .. } => SalienceVerdict::Extract,

@@ -671,6 +671,25 @@ impl BackgroundConsolidationService {
                     }
                 }
 
+                // Prevent unbounded accumulator growth — evict oldest entries
+                const MAX_ACCUMULATOR_ENTRIES: usize = 500;
+                if accumulator.len() > MAX_ACCUMULATOR_ENTRIES {
+                    // Keep entries with the most observations (most interesting patterns)
+                    let mut entries: Vec<(String, usize)> = accumulator
+                        .iter()
+                        .map(|(k, v)| (k.clone(), v.observations.len()))
+                        .collect();
+                    entries.sort_by(|a, b| a.1.cmp(&b.1)); // ascending by count
+                    let to_remove = accumulator.len() - MAX_ACCUMULATOR_ENTRIES;
+                    for (key, _) in entries.into_iter().take(to_remove) {
+                        accumulator.remove(&key);
+                        if let Some(ref ar) = accum_repo {
+                            ar.delete_by_key(&key).await;
+                        }
+                    }
+                    info!("Accumulator pruned: removed {to_remove} low-count entries");
+                }
+
                 batch_count += 1;
                 if batch_count % 100 == 0 {
                     if let Some(ref dlq) = failed_obs_repo {
@@ -1076,10 +1095,21 @@ fn event_to_observation(event: &DomainEvent) -> Option<Observation> {
             source_event: "TaskExecutionStarted".into(),
             timestamp: now,
         }),
+        // Events produced by this service or its downstream — ignore to prevent echo loops
+        DomainEvent::ContradictionDetected { .. }
+        | DomainEvent::MemoryPromoted { .. }
+        | DomainEvent::CrossDomainDotReady { .. }
+        | DomainEvent::MemoryPendingConfirmation { .. } => None,
         _ => {
             // TaskCreated, TaskDeferred, GoalProgress, ActivitySessionCompleted,
-            // and lower-priority agentic events (Accumulate-level)
-            let content = format!("{event:?}");
+            // and lower-priority agentic events (Accumulate-level).
+            // Cap the Debug output to avoid huge allocations from large event payloads.
+            let raw = format!("{event:?}");
+            let content = if raw.len() > 500 {
+                format!("{}…", &raw[..500])
+            } else {
+                raw
+            };
             Some(Observation {
                 domain: "general".into(),
                 content,

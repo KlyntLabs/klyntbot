@@ -40,7 +40,10 @@ pub async fn promote_fact(
     if let Some(bus) = bus {
         bus.publish(bus::DomainEvent::MemoryPromoted {
             fact_id: promoted.id.clone(),
-            summary: format!("{} {} {}", promoted.subject, promoted.predicate, promoted.object),
+            summary: format!(
+                "{} {} {}",
+                promoted.subject, promoted.predicate, promoted.object
+            ),
             from_scope,
             to_scope: promoted.scope_type.clone(),
         });
@@ -190,18 +193,14 @@ mod tests {
         let bus = bus::DomainEventBus::new(16);
         let mut rx = bus.subscribe();
 
-        let promoted = promote_fact(
-            &repo,
-            "event-test-fact-1",
-            "global",
-            None,
-            Some(&bus),
-        )
-        .await
-        .unwrap();
+        let promoted = promote_fact(&repo, "event-test-fact-1", "global", None, Some(&bus))
+            .await
+            .unwrap();
         assert!(promoted.is_some());
 
-        let event = rx.try_recv().expect("MemoryPromoted event should be emitted");
+        let event = rx
+            .try_recv()
+            .expect("MemoryPromoted event should be emitted");
         match event {
             bus::DomainEvent::MemoryPromoted {
                 fact_id,

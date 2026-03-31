@@ -30,8 +30,11 @@ fn table_for_domain(domain: &EntityDomain) -> Option<&'static str> {
 }
 
 /// All domains we can search as targets.
-const SEARCHABLE_DOMAINS: &[EntityDomain] =
-    &[EntityDomain::Task, EntityDomain::Note, EntityDomain::Finance];
+const SEARCHABLE_DOMAINS: &[EntityDomain] = &[
+    EntityDomain::Task,
+    EntityDomain::Note,
+    EntityDomain::Finance,
+];
 
 /// LanceDB retrieval threshold — intentionally lower than the heuristic's
 /// `min_cosine` (0.72) so we don't discard items that have moderate semantic
@@ -150,13 +153,13 @@ impl CrossDomainSearcherImpl {
     async fn lookup_finance_node(&self, id: &str) -> Option<(String, DateTime<Utc>)> {
         match self.tree_repo.get_node(id).await {
             Ok(Some(node)) => {
-                let label = node
-                    .title
-                    .filter(|t| !t.is_empty())
-                    .unwrap_or(node.content);
+                let label = node.title.filter(|t| !t.is_empty()).unwrap_or(node.content);
                 // Tree nodes don't carry a timestamp — use epoch as a neutral sentinel.
                 // The score (cosine similarity) is the primary ranking signal anyway.
-                Some((label, DateTime::<Utc>::from_timestamp(0, 0).unwrap_or(Utc::now())))
+                Some((
+                    label,
+                    DateTime::<Utc>::from_timestamp(0, 0).unwrap_or(Utc::now()),
+                ))
             }
             Ok(None) => {
                 debug!(id, "finance tree node not found for cross-domain hit");

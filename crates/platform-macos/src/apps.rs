@@ -224,8 +224,7 @@ pub fn icon_for_path(path: &Path) -> Option<String> {
     let workspace = NSWorkspace::sharedWorkspace();
 
     // iconForFile: always returns an NSImage (never nil)
-    let image: Retained<AnyObject> =
-        unsafe { msg_send_id![&workspace, iconForFile: &*ns_path] };
+    let image: Retained<AnyObject> = unsafe { msg_send_id![&workspace, iconForFile: &*ns_path] };
 
     nsimage_to_png_data_uri(&image)
 }
@@ -246,8 +245,7 @@ pub fn icon_for_file_type(extension: &str) -> Option<String> {
     let ns_ext = NSString::from_str(extension);
     let workspace = NSWorkspace::sharedWorkspace();
 
-    let image: Retained<AnyObject> =
-        unsafe { msg_send_id![&workspace, iconForFileType: &*ns_ext] };
+    let image: Retained<AnyObject> = unsafe { msg_send_id![&workspace, iconForFileType: &*ns_ext] };
 
     nsimage_to_png_data_uri(&image)
 }
@@ -272,23 +270,20 @@ fn nsimage_to_png_data_uri(image: &objc2::runtime::AnyObject) -> Option<String> 
     use objc2::{msg_send, msg_send_id};
 
     // Get TIFF representation (includes all image reps)
-    let tiff: Option<Retained<AnyObject>> =
-        unsafe { msg_send_id![image, TIFFRepresentation] };
+    let tiff: Option<Retained<AnyObject>> = unsafe { msg_send_id![image, TIFFRepresentation] };
     let tiff = tiff?;
 
     // Create NSBitmapImageRep from TIFF data
     let cls = AnyClass::get(c"NSBitmapImageRep")?;
     let alloc: Allocated<AnyObject> = unsafe { msg_send_id![cls, alloc] };
-    let rep: Option<Retained<AnyObject>> =
-        unsafe { msg_send_id![alloc, initWithData: &*tiff] };
+    let rep: Option<Retained<AnyObject>> = unsafe { msg_send_id![alloc, initWithData: &*tiff] };
     let rep = rep?;
 
     // Convert to PNG — NSBitmapImageFileType::PNG = 4
     let dict_cls = AnyClass::get(c"NSDictionary")?;
     let empty: Retained<AnyObject> = unsafe { msg_send_id![dict_cls, new] };
-    let png: Option<Retained<AnyObject>> = unsafe {
-        msg_send_id![&rep, representationUsingType: 4usize, properties: &*empty]
-    };
+    let png: Option<Retained<AnyObject>> =
+        unsafe { msg_send_id![&rep, representationUsingType: 4usize, properties: &*empty] };
     let png = png?;
 
     // Extract bytes

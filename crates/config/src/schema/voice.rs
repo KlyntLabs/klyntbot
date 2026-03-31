@@ -4,6 +4,30 @@ use serde::{Deserialize, Serialize};
 
 use super::core::default_true;
 
+/// STT engine selection.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum SttEngineKind {
+    /// Local whisper.cpp via whisper-rs (default).
+    #[default]
+    WhisperLocal,
+    /// Placeholder for future cloud STT (Deepgram, etc.)
+    Cloud,
+}
+
+/// TTS engine selection.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum TtsEngineKind {
+    /// macOS system TTS via AVSpeechSynthesizer (default).
+    #[default]
+    System,
+    /// Kokoro-82M via ONNX Runtime.
+    Kokoro,
+    /// Piper VITS via ONNX Runtime.
+    Piper,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct VoiceConfig {
@@ -42,6 +66,9 @@ pub struct VoiceInputConfig {
     pub privacy_mode: VoicePrivacyMode,
     #[serde(default = "default_model_size")]
     pub model_size: String,
+    /// STT engine to use.
+    #[serde(default)]
+    pub stt_engine: SttEngineKind,
 }
 
 impl Default for VoiceInputConfig {
@@ -51,6 +78,7 @@ impl Default for VoiceInputConfig {
             silence_threshold_secs: default_silence_threshold(),
             privacy_mode: VoicePrivacyMode::default(),
             model_size: default_model_size(),
+            stt_engine: SttEngineKind::default(),
         }
     }
 }
@@ -66,6 +94,9 @@ pub struct VoiceOutputConfig {
     pub speaking_rate: f32,
     #[serde(default)]
     pub speak_during_focus: bool,
+    /// TTS engine to use.
+    #[serde(default)]
+    pub tts_engine: TtsEngineKind,
 }
 
 impl Default for VoiceOutputConfig {
@@ -75,6 +106,7 @@ impl Default for VoiceOutputConfig {
             voice_preferences: std::collections::HashMap::new(),
             speaking_rate: 1.0,
             speak_during_focus: false,
+            tts_engine: TtsEngineKind::default(),
         }
     }
 }
@@ -163,4 +195,32 @@ fn default_model_size() -> String {
 
 fn default_speaking_rate() -> f32 {
     1.0
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn default_engine_kinds() {
+        let input = VoiceInputConfig::default();
+        assert_eq!(input.stt_engine, SttEngineKind::WhisperLocal);
+
+        let output = VoiceOutputConfig::default();
+        assert_eq!(output.tts_engine, TtsEngineKind::System);
+    }
+
+    #[test]
+    fn deserialize_kokoro_engine() {
+        let json = r#"{"ttsEngine": "kokoro"}"#;
+        let output: VoiceOutputConfig = serde_json::from_str(json).unwrap();
+        assert_eq!(output.tts_engine, TtsEngineKind::Kokoro);
+    }
+
+    #[test]
+    fn deserialize_unknown_engine_rejects() {
+        let json = r#"{"sttEngine": "nonexistent"}"#;
+        let result: Result<VoiceInputConfig, _> = serde_json::from_str(json);
+        assert!(result.is_err());
+    }
 }

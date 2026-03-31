@@ -95,9 +95,13 @@ mod tests {
         let pool = StoragePool::connect_in_memory().await.unwrap();
         let svc = NightlyBatchService::new(pool);
 
-        svc.store_insight("2026-03-30", "Finance stress clusters around month-end sprints.", "finance:tasks")
-            .await
-            .unwrap();
+        svc.store_insight(
+            "2026-03-30",
+            "Finance stress clusters around month-end sprints.",
+            "finance:tasks",
+        )
+        .await
+        .unwrap();
 
         let unsurfaced = svc.get_unsurfaced_insights().await.unwrap();
         assert_eq!(unsurfaced.len(), 1);
@@ -115,9 +119,13 @@ mod tests {
         let pool = StoragePool::connect_in_memory().await.unwrap();
         let svc = NightlyBatchService::new(pool);
 
-        svc.store_insight("2026-03-30", "Learning sessions spike before deadlines.", "learning:tasks")
-            .await
-            .unwrap();
+        svc.store_insight(
+            "2026-03-30",
+            "Learning sessions spike before deadlines.",
+            "learning:tasks",
+        )
+        .await
+        .unwrap();
 
         let unsurfaced = svc.get_unsurfaced_insights().await.unwrap();
         assert_eq!(unsurfaced.len(), 1);
@@ -126,6 +134,9 @@ mod tests {
         svc.mark_surfaced(id).await.unwrap();
 
         let after = svc.get_unsurfaced_insights().await.unwrap();
-        assert!(after.is_empty(), "surfaced insight should not appear in unsurfaced list");
+        assert!(
+            after.is_empty(),
+            "surfaced insight should not appear in unsurfaced list"
+        );
     }
 }

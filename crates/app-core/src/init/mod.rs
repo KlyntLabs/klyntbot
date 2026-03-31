@@ -666,7 +666,7 @@ impl AppCore {
                         voice_config_arc,
                     ),
                 );
-                let loop_handle = voice_conv_manager.spawn_loop().await;
+                let loop_handle = voice_conv_manager.spawn_supervised_loop().await;
                 core.voice_loop_handle = Some(loop_handle);
                 core.voice_conversation_manager = Some(voice_conv_manager);
 
@@ -752,13 +752,7 @@ impl AppCore {
                     let model = nightly_model.clone();
                     tokio::task::block_in_place(|| {
                         rt.block_on(async move {
-                            match cron::run_nightly_batch(
-                                &pool,
-                                provider.as_ref(),
-                                &model,
-                            )
-                            .await
-                            {
+                            match cron::run_nightly_batch(&pool, provider.as_ref(), &model).await {
                                 Ok(Some(msg)) => Ok(Some(msg)),
                                 Ok(None) => Ok(Some("No cross-domain dots today".to_string())),
                                 Err(e) => Ok(Some(format!("Nightly batch failed: {e}"))),

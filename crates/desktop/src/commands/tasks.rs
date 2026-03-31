@@ -404,7 +404,8 @@ pub(crate) async fn dispatch_dev(
             let id = try_field!(dev::get_str(body, "id"));
             let title = try_field!(dev::get_str(body, "title"));
             let created_at: Option<String> = dev::get(body, "createdAt");
-            core.check_cross_domain_str(&domain, &id, &title, created_at.as_deref()).await;
+            core.check_cross_domain_str(&domain, &id, &title, created_at.as_deref())
+                .await;
             dev::val(Ok::<(), ApiError>(()))
         }
         _ => return None,

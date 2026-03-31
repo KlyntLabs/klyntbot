@@ -140,9 +140,7 @@ pub fn evaluate_cross_domain(
         layers.push(Layer::SemanticOverlap { cosine: *cosine });
 
         // Layer 2 — temporal proximity.
-        let days_apart = (input.source_created - *target_created)
-            .num_days()
-            .abs();
+        let days_apart = (input.source_created - *target_created).num_days().abs();
         if days_apart <= config.max_temporal_days {
             layers.push(Layer::TemporalProximity { days_apart });
         }
@@ -176,11 +174,7 @@ pub fn evaluate_cross_domain(
 
         if should_replace {
             let tooltip = build_tooltip(&input.source, target);
-            let detail_route = format!(
-                "/{}/{}",
-                domain_str(&target.domain),
-                target.id
-            );
+            let detail_route = format!("/{}/{}", domain_str(&target.domain), target.id);
             best = Some(CrossDomainDot {
                 source: input.source.clone(),
                 target: target.clone(),
@@ -318,8 +312,14 @@ mod tests {
         assert!(result.is_some(), "expected a dot with two layers");
         let dot = result.unwrap();
         assert_eq!(dot.layers_matched.len(), 2);
-        assert!(matches!(dot.layers_matched[0], Layer::SemanticOverlap { .. }));
-        assert!(matches!(dot.layers_matched[1], Layer::TemporalProximity { .. }));
+        assert!(matches!(
+            dot.layers_matched[0],
+            Layer::SemanticOverlap { .. }
+        ));
+        assert!(matches!(
+            dot.layers_matched[1],
+            Layer::TemporalProximity { .. }
+        ));
     }
 
     // Test 2: only one layer (semantic only, temporal too far, no frequency) → returns None
@@ -394,7 +394,10 @@ mod tests {
         assert!(result.is_some(), "all three layers should produce a dot");
         let dot = result.unwrap();
         assert_eq!(dot.layers_matched.len(), 3);
-        assert!(matches!(dot.layers_matched[2], Layer::FrequencySignal { .. }));
+        assert!(matches!(
+            dot.layers_matched[2],
+            Layer::FrequencySignal { .. }
+        ));
         // Three-layer confidence should exceed two-layer
         assert!(dot.confidence > 0.88 + 0.05);
     }

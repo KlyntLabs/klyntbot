@@ -7,14 +7,12 @@ use serde::{Deserialize, Serialize};
 use std::sync::atomic::Ordering;
 use std::sync::Arc;
 use tokio::sync::{mpsc, Mutex, RwLock};
-use tracing::{info, warn};
+use tracing::{error, info, warn};
 use uuid::Uuid;
 
 use crate::events::AppEventEmitter;
 use config::schema::VoiceConfig;
-use voice_engine::{
-    MemoryEchoProvider, MonitorSession, VoiceEvent, VoiceService,
-};
+use voice_engine::{MemoryEchoProvider, MonitorSession, VoiceEvent, VoiceService};
 
 /// Wrapper that makes `MonitorSession` moveable to a blocking thread.
 ///
@@ -288,8 +286,7 @@ impl VoiceConversationManager {
             }
 
             // Poll until the engine becomes available (model downloaded + hot-loaded).
-            let deadline =
-                tokio::time::Instant::now() + std::time::Duration::from_secs(10 * 60);
+            let deadline = tokio::time::Instant::now() + std::time::Duration::from_secs(10 * 60);
             loop {
                 tokio::time::sleep(std::time::Duration::from_secs(2)).await;
                 if self.voice_service.is_available() {
@@ -402,20 +399,38 @@ impl VoiceConversationManager {
         self.start().await
     }
 
-    // ── 3. spawn_loop ───────────────────────────────────────
+    // ── 3. spawn_supervised_loop ──────────────────────────────
 
-    /// Start the conversation loop as a background task.
-    /// Returns a JoinHandle; the loop runs until End command or channel close.
-    pub async fn spawn_loop(self: &Arc<Self>) -> tokio::task::JoinHandle<()> {
+    /// Spawn the conversation loop with automatic panic detection.
+    ///
+    /// If the inner loop panics, the error is logged clearly instead of being
+    /// silently dropped. A full auto-restart would require a recreatable command
+    /// channel — deferred to a future task.
+    pub async fn spawn_supervised_loop(self: &Arc<Self>) -> tokio::task::JoinHandle<()> {
         let cmd_rx = self
             .cmd_rx
             .lock()
             .await
             .take()
-            .expect("spawn_loop called more than once");
+            .expect("spawn_supervised_loop called more than once");
         let manager = Arc::clone(self);
         tokio::spawn(async move {
-            manager.conversation_loop(cmd_rx).await;
+            let result = tokio::spawn(async move {
+                manager.conversation_loop(cmd_rx).await;
+            })
+            .await;
+
+            match result {
+                Ok(()) => {
+                    info!("Voice conversation loop exited normally");
+                }
+                Err(e) => {
+                    error!(
+                        "Voice conversation loop panicked: {e}. \
+                         Voice will not work until app restart."
+                    );
+                }
+            }
         })
     }
 
@@ -830,7 +845,11 @@ impl VoiceConversationManager {
                 ..Default::default()
             }
         };
-        if let Err(e) = self.voice_service.handle_response(&tts_text, &tts_params).await {
+        if let Err(e) = self
+            .voice_service
+            .handle_response(&tts_text, &tts_params)
+            .await
+        {
             warn!("Speaking phase: TTS failed: {e}");
         }
 

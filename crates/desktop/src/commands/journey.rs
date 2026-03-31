@@ -7,9 +7,7 @@ use tauri::State;
 use crate::app_core::AppCore;
 
 #[tauri::command]
-pub async fn journey_milestones(
-    state: State<'_, Arc<AppCore>>,
-) -> Result<Vec<String>, ApiError> {
+pub async fn journey_milestones(state: State<'_, Arc<AppCore>>) -> Result<Vec<String>, ApiError> {
     let tracker = state
         .journey_tracker
         .as_ref()
@@ -26,17 +24,14 @@ pub async fn journey_mark_complete(
         .journey_tracker
         .as_ref()
         .ok_or_else(|| ApiError::new("NOT_AVAILABLE", "Journey tracker not available"))?;
-    let m = Milestone::from_name(&milestone).ok_or_else(|| {
-        ApiError::new("VALIDATION", format!("unknown milestone: {milestone}"))
-    })?;
+    let m = Milestone::from_name(&milestone)
+        .ok_or_else(|| ApiError::new("VALIDATION", format!("unknown milestone: {milestone}")))?;
     tracker.mark_complete(m).await;
     Ok(())
 }
 
 #[tauri::command]
-pub async fn journey_item_count(
-    state: State<'_, Arc<AppCore>>,
-) -> Result<i64, ApiError> {
+pub async fn journey_item_count(state: State<'_, Arc<AppCore>>) -> Result<i64, ApiError> {
     if let Some(ref tracker) = state.journey_tracker {
         Ok(tracker.total_item_count().await)
     } else {
@@ -47,8 +42,11 @@ pub async fn journey_item_count(
 // ── Dev server dispatch ─────────────────────────────────────────────
 
 #[cfg(test)]
-pub(crate) const DEV_COMMANDS: &[&str] =
-    &["journey_milestones", "journey_mark_complete", "journey_item_count"];
+pub(crate) const DEV_COMMANDS: &[&str] = &[
+    "journey_milestones",
+    "journey_mark_complete",
+    "journey_item_count",
+];
 
 #[cfg(debug_assertions)]
 pub(crate) async fn dispatch_dev(
@@ -73,10 +71,8 @@ pub(crate) async fn dispatch_dev(
         "journey_milestones" => dev::val(Ok(tracker.completed_names().await)),
         "journey_mark_complete" => {
             let name: String = try_field!(dev::get_str(body, "milestone"));
-            let m = try_field!(Milestone::from_name(&name).ok_or_else(|| ApiError::new(
-                "VALIDATION",
-                format!("unknown milestone: {name}")
-            )));
+            let m = try_field!(Milestone::from_name(&name)
+                .ok_or_else(|| ApiError::new("VALIDATION", format!("unknown milestone: {name}"))));
             tracker.mark_complete(m).await;
             dev::val(Ok(()))
         }

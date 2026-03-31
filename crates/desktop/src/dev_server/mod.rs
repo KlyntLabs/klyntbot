@@ -57,10 +57,7 @@ impl AppEventEmitter for SseEmitter {
 /// from the `CompoundEmitter` wired during `AppCore::init`. The dev server
 /// subscribes to it at `/api/brain/events` so browser dev mode receives the same
 /// events (brain:ambient, provider:degraded, etc.) that Tauri webviews get natively.
-pub async fn start(
-    core: Arc<AppCore>,
-    global_event_tx: broadcast::Sender<(String, Value)>,
-) {
+pub async fn start(core: Arc<AppCore>, global_event_tx: broadcast::Sender<(String, Value)>) {
     let sse_channels: SseChannels = Arc::new(DashMap::new());
     let (insight_tx, _) = broadcast::channel(256);
 

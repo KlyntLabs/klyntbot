@@ -244,11 +244,7 @@ impl DeadlineScheduler {
     // -----------------------------------------------------------------------
 
     /// The core executor loop.  Runs until `inner.running` becomes `false`.
-    async fn executor_loop(
-        inner: Arc<RwLock<Inner>>,
-        wake: Arc<Notify>,
-        handler: DeadlineHandler,
-    ) {
+    async fn executor_loop(inner: Arc<RwLock<Inner>>, wake: Arc<Notify>, handler: DeadlineHandler) {
         loop {
             // Exit check.
             if !inner.read().await.running {
@@ -312,10 +308,7 @@ impl DeadlineScheduler {
                     handler(entry.action.clone());
                 }));
                 if let Err(e) = result {
-                    warn!(
-                        "DeadlineScheduler: handler panicked for '{key}': {:?}",
-                        e
-                    );
+                    warn!("DeadlineScheduler: handler panicked for '{key}': {:?}", e);
                 }
             }
         }

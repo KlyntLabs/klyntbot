@@ -80,6 +80,9 @@ impl ContextUpdateQueue {
         }
     }
 
+    /// Maximum pending updates before oldest are dropped.
+    const MAX_PENDING: usize = 200;
+
     /// Push an update with 30-second deduplication by (reason, content).
     pub fn push(&self, update: ContextUpdate) {
         let mut queue = self.inner.lock().unwrap();
@@ -90,6 +93,10 @@ impl ContextUpdateQueue {
                     < Duration::seconds(DEDUP_WINDOW_SECS)
         });
         if !is_duplicate {
+            // Drop oldest entries if queue is too large (prevents unbounded growth)
+            while queue.len() >= Self::MAX_PENDING {
+                queue.remove(0);
+            }
             queue.push(update);
         }
     }

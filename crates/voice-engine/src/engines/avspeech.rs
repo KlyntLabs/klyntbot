@@ -22,10 +22,10 @@ impl AvSpeechTtsEngine {
 #[async_trait]
 impl TtsEngine for AvSpeechTtsEngine {
     async fn synthesize(&self, text: &str, params: &TtsParams) -> common::Result<AudioClip> {
-        let output_path = params
-            .output_path
-            .clone()
-            .unwrap_or_else(|| self.data_dir.join("tts_output.wav"));
+        // Create a unique temp WAV path inside data_dir (managed internally).
+        let output_path = self
+            .data_dir
+            .join(format!("tts_{}.wav", chrono::Utc::now().timestamp_millis()));
 
         let voice = params.voice_name.clone();
         let rate = if (params.speaking_rate - 1.0).abs() < 0.01 {
@@ -66,6 +66,9 @@ impl TtsEngine for AvSpeechTtsEngine {
                     .collect()
             }
         };
+
+        // Clean up the temp WAV file now that we've read it into memory.
+        let _ = std::fs::remove_file(&output_path);
 
         Ok(AudioClip {
             samples,

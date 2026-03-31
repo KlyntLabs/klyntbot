@@ -89,8 +89,8 @@ struct ActiveSession {
 pub struct VoiceService {
     /// Local STT engine — wrapped in RwLock for hot-swap after background model download.
     stt_local: std::sync::RwLock<Option<Arc<dyn TranscriptionEngine>>>,
-    /// TTS engine for spoken responses (used in SpeakResponse phase).
-    tts: Option<Arc<dyn TtsEngine>>,
+    /// TTS engine — wrapped in RwLock for hot-swap (same pattern as stt_local).
+    tts: std::sync::RwLock<Option<Arc<dyn TtsEngine>>>,
     /// Memory echo provider for dependency-inverted memory lookups.
     memory_echo: Option<Arc<dyn MemoryEchoProvider>>,
     capture: AudioCapture,
@@ -116,9 +116,6 @@ pub struct VoiceService {
     /// Set by the silence notification task when silence is detected.
     /// Polled by VoiceConversationManager to trigger automatic finalization.
     silence_detected: Arc<AtomicBool>,
-
-    /// PID of the currently playing afplay process, for interrupt/stop.
-    tts_playback_pid: Mutex<Option<u32>>,
 }
 
 impl VoiceService {
@@ -137,7 +134,7 @@ impl VoiceService {
 
         Self {
             stt_local: std::sync::RwLock::new(stt_local),
-            tts,
+            tts: std::sync::RwLock::new(tts),
             memory_echo,
             capture: AudioCapture::new(config.capture.clone()),
             model_manager,
@@ -149,7 +146,6 @@ impl VoiceService {
             first_capture_complete: AtomicBool::new(false),
             echo_fired_this_session: AtomicBool::new(false),
             silence_detected: Arc::new(AtomicBool::new(false)),
-            tts_playback_pid: Mutex::new(None),
         }
     }
 
@@ -181,8 +177,17 @@ impl VoiceService {
 
     /// Hot-swap the local STT engine (called after background model download completes).
     pub fn set_local_engine(&self, engine: Arc<dyn TranscriptionEngine>) {
-        if let Ok(mut guard) = self.stt_local.write() {
-            *guard = Some(engine);
+        match self.stt_local.write() {
+            Ok(mut guard) => *guard = Some(engine),
+            Err(e) => warn!("STT engine lock poisoned, cannot swap: {e}"),
+        }
+    }
+
+    /// Hot-swap the TTS engine at runtime (e.g. after Kokoro model download).
+    pub fn set_tts_engine(&self, engine: Arc<dyn TtsEngine>) {
+        match self.tts.write() {
+            Ok(mut guard) => *guard = Some(engine),
+            Err(e) => warn!("TTS engine lock poisoned, cannot swap: {e}"),
         }
     }
 
@@ -201,8 +206,7 @@ impl VoiceService {
     )> {
         let (_, engine_kind) = self.active_engine().ok_or_else(|| {
             common::KlyntbotError::Provider(common::ProviderError::InvalidResponse(
-                "No transcription engine available. Waiting for model download."
-                    .to_string(),
+                "No transcription engine available. Waiting for model download.".to_string(),
             ))
         })?;
 
@@ -253,13 +257,9 @@ impl VoiceService {
         Ok((active, silence_rx, rms_rx, session_id, engine_kind))
     }
 
-    /// Kill any running afplay TTS playback process.
+    /// Signal the frontend to fade out TTS playback via Web Audio API.
     pub async fn stop_tts_playback(&self) {
-        if let Some(pid) = self.tts_playback_pid.lock().await.take() {
-            let _ = std::process::Command::new("kill")
-                .arg(pid.to_string())
-                .status();
-        }
+        let _ = self.event_tx.send(VoiceEvent::TtsFadeOut).await;
     }
 
     /// Whether silence has been detected since the last capture started.
@@ -543,18 +543,9 @@ impl VoiceService {
         response_text: &str,
         tts_params: &TtsParams,
     ) -> common::Result<()> {
-        if let Some(ref tts) = self.tts {
-            let wav_path = self.config.data_dir.join(format!(
-                "tts_{}.wav",
-                chrono::Utc::now().timestamp_millis()
-            ));
-            let params = TtsParams {
-                output_path: Some(wav_path.clone()),
-                speaking_rate: tts_params.speaking_rate,
-                voice_name: tts_params.voice_name.clone(),
-                ..TtsParams::default()
-            };
-            match tts.synthesize(response_text, &params).await {
+        let tts = self.tts.read().ok().and_then(|g| g.clone());
+        if let Some(tts) = tts {
+            match tts.synthesize(response_text, tts_params).await {
                 Ok(clip) => {
                     let audio_base64 = base64_encode_audio(&clip);
                     let _ = self
@@ -565,22 +556,6 @@ impl VoiceService {
                             text: response_text.to_string(),
                         })
                         .await;
-
-                    // Play audio natively via macOS afplay — the WebView's
-                    // AudioContext may be suspended due to autoplay policy
-                    // (the orb window is opened programmatically, not by user gesture).
-                    let child = std::process::Command::new("afplay")
-                        .arg(&wav_path)
-                        .spawn();
-                    if let Ok(child) = child {
-                        *self.tts_playback_pid.lock().await = Some(child.id());
-                        tokio::task::spawn_blocking(move || {
-                            let mut child = child;
-                            let _ = child.wait();
-                            // Clean up the temp WAV file after playback
-                            let _ = std::fs::remove_file(&wav_path);
-                        });
-                    }
                 }
                 Err(e) => {
                     warn!("TTS synthesis failed for voice response: {e}");
@@ -853,9 +828,12 @@ mod tests {
 
         let mut event_rx = svc.take_event_rx().unwrap();
 
-        svc.handle_response("Task created: dentist appointment Thursday", &TtsParams::default())
-            .await
-            .unwrap();
+        svc.handle_response(
+            "Task created: dentist appointment Thursday",
+            &TtsParams::default(),
+        )
+        .await
+        .unwrap();
 
         // Should receive a SpeakResponse event with the TTS audio
         let event = tokio::time::timeout(std::time::Duration::from_secs(2), event_rx.recv())
@@ -901,7 +879,9 @@ mod tests {
 
         // Simulate the full response path
         let response = "I've scheduled your dentist appointment for Thursday at 2pm.";
-        svc.handle_response(response, &TtsParams::default()).await.unwrap();
+        svc.handle_response(response, &TtsParams::default())
+            .await
+            .unwrap();
 
         match event_rx.recv().await.unwrap() {
             VoiceEvent::SpeakResponse {
@@ -912,6 +892,39 @@ mod tests {
                 assert_eq!(text, response);
                 assert_eq!(sample_rate, 16000);
                 assert!(!audio_base64.is_empty());
+            }
+            other => panic!("Expected SpeakResponse, got {other:?}"),
+        }
+    }
+
+    #[tokio::test]
+    async fn set_tts_engine_hot_swaps() {
+        let (svc, _tmp) = make_service(None);
+        let mut event_rx = svc.take_event_rx().unwrap();
+
+        // Initially no TTS engine
+        svc.handle_response("hello", &TtsParams::default())
+            .await
+            .unwrap();
+        // No SpeakResponse event should be emitted
+        assert!(event_rx.try_recv().is_err());
+
+        // Hot-swap a TTS engine
+        let mock_tts = Arc::new(crate::mock::MockTtsEngine);
+        svc.set_tts_engine(mock_tts);
+
+        // Now TTS should work
+        svc.handle_response("hello after swap", &TtsParams::default())
+            .await
+            .unwrap();
+        let event = tokio::time::timeout(std::time::Duration::from_secs(2), event_rx.recv())
+            .await
+            .expect("timeout")
+            .expect("channel closed");
+
+        match event {
+            VoiceEvent::SpeakResponse { text, .. } => {
+                assert_eq!(text, "hello after swap");
             }
             other => panic!("Expected SpeakResponse, got {other:?}"),
         }
