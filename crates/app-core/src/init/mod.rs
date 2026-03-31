@@ -618,7 +618,11 @@ impl AppCore {
                         ),
                         ..Default::default()
                     },
-                    privacy_mode: PrivacyLevel::Standard,
+                    privacy_mode: match voice_config.input.privacy_mode {
+                        config::schema::VoicePrivacyMode::Standard => PrivacyLevel::Standard,
+                        config::schema::VoicePrivacyMode::Strict => PrivacyLevel::Strict,
+                        config::schema::VoicePrivacyMode::Off => PrivacyLevel::Off,
+                    },
                     data_dir: data_dir.clone(),
                 };
 

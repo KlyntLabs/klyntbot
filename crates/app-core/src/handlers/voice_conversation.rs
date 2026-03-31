@@ -822,7 +822,15 @@ impl VoiceConversationManager {
             .await;
 
         // Call TTS via voice service (emits SpeakResponse event)
-        if let Err(e) = self.voice_service.handle_response(&tts_text).await {
+        let tts_params = {
+            let config = self.config.read().await;
+            voice_engine::TtsParams {
+                speaking_rate: config.output.speaking_rate,
+                voice_name: config.output.voice_preferences.get("default").cloned(),
+                ..Default::default()
+            }
+        };
+        if let Err(e) = self.voice_service.handle_response(&tts_text, &tts_params).await {
             warn!("Speaking phase: TTS failed: {e}");
         }
 

@@ -538,7 +538,11 @@ impl VoiceService {
     ///
     /// Synthesizes TTS audio and emits a `SpeakResponse` event to the frontend.
     /// Called by app-core after `AgentRuntime` produces a response for a voice message.
-    pub async fn handle_response(&self, response_text: &str) -> common::Result<()> {
+    pub async fn handle_response(
+        &self,
+        response_text: &str,
+        tts_params: &TtsParams,
+    ) -> common::Result<()> {
         if let Some(ref tts) = self.tts {
             let wav_path = self.config.data_dir.join(format!(
                 "tts_{}.wav",
@@ -546,6 +550,8 @@ impl VoiceService {
             ));
             let params = TtsParams {
                 output_path: Some(wav_path.clone()),
+                speaking_rate: tts_params.speaking_rate,
+                voice_name: tts_params.voice_name.clone(),
                 ..TtsParams::default()
             };
             match tts.synthesize(response_text, &params).await {
@@ -847,7 +853,7 @@ mod tests {
 
         let mut event_rx = svc.take_event_rx().unwrap();
 
-        svc.handle_response("Task created: dentist appointment Thursday")
+        svc.handle_response("Task created: dentist appointment Thursday", &TtsParams::default())
             .await
             .unwrap();
 
@@ -873,7 +879,7 @@ mod tests {
         let (svc, _tmp) = make_service(None);
         let _event_rx = svc.take_event_rx().unwrap();
         // No TTS engine configured — should return Ok without emitting SpeakResponse
-        let result = svc.handle_response("hello").await;
+        let result = svc.handle_response("hello", &TtsParams::default()).await;
         assert!(result.is_ok());
     }
 
@@ -895,7 +901,7 @@ mod tests {
 
         // Simulate the full response path
         let response = "I've scheduled your dentist appointment for Thursday at 2pm.";
-        svc.handle_response(response).await.unwrap();
+        svc.handle_response(response, &TtsParams::default()).await.unwrap();
 
         match event_rx.recv().await.unwrap() {
             VoiceEvent::SpeakResponse {

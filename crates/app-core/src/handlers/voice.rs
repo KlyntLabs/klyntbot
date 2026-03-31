@@ -49,7 +49,7 @@ impl AppCore {
                         let mut event_rx = streaming_handle.event_rx;
                         while let Some(event) = event_rx.recv().await {
                             if let agent::AgentEvent::Done { content, .. } = event {
-                                if let Err(e) = voice_svc.handle_response(&content).await {
+                                if let Err(e) = voice_svc.handle_response(&content, &voice_engine::TtsParams::default()).await {
                                     tracing::warn!("Voice TTS response failed: {e}");
                                 }
                                 break;
