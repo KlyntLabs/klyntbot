@@ -22,7 +22,10 @@ impl AvSpeechTtsEngine {
 #[async_trait]
 impl TtsEngine for AvSpeechTtsEngine {
     async fn synthesize(&self, text: &str, params: &TtsParams) -> common::Result<AudioClip> {
-        let output_path = self.data_dir.join("tts_output.wav");
+        let output_path = params
+            .output_path
+            .clone()
+            .unwrap_or_else(|| self.data_dir.join("tts_output.wav"));
 
         let voice = params.voice_name.clone();
         let rate = if (params.speaking_rate - 1.0).abs() < 0.01 {

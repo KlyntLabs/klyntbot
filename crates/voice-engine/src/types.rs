@@ -118,6 +118,9 @@ pub struct TtsParams {
     pub voice_name: Option<String>,
     #[serde(default = "default_speaking_rate")]
     pub speaking_rate: f32,
+    /// Output file path for WAV synthesis (used by file-based TTS engines).
+    #[serde(skip)]
+    pub output_path: Option<std::path::PathBuf>,
 }
 
 fn default_speaking_rate() -> f32 {
@@ -130,6 +133,7 @@ impl Default for TtsParams {
             language: Language::default(),
             voice_name: None,
             speaking_rate: default_speaking_rate(),
+            output_path: None,
         }
     }
 }

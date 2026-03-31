@@ -540,7 +540,14 @@ impl VoiceService {
     /// Called by app-core after `AgentRuntime` produces a response for a voice message.
     pub async fn handle_response(&self, response_text: &str) -> common::Result<()> {
         if let Some(ref tts) = self.tts {
-            let params = TtsParams::default();
+            let wav_path = self.config.data_dir.join(format!(
+                "tts_{}.wav",
+                chrono::Utc::now().timestamp_millis()
+            ));
+            let params = TtsParams {
+                output_path: Some(wav_path.clone()),
+                ..TtsParams::default()
+            };
             match tts.synthesize(response_text, &params).await {
                 Ok(clip) => {
                     let audio_base64 = base64_encode_audio(&clip);
@@ -556,7 +563,6 @@ impl VoiceService {
                     // Play audio natively via macOS afplay — the WebView's
                     // AudioContext may be suspended due to autoplay policy
                     // (the orb window is opened programmatically, not by user gesture).
-                    let wav_path = self.config.data_dir.join("tts_output.wav");
                     let child = std::process::Command::new("afplay")
                         .arg(&wav_path)
                         .spawn();
@@ -565,6 +571,8 @@ impl VoiceService {
                         tokio::task::spawn_blocking(move || {
                             let mut child = child;
                             let _ = child.wait();
+                            // Clean up the temp WAV file after playback
+                            let _ = std::fs::remove_file(&wav_path);
                         });
                     }
                 }
