@@ -755,6 +755,15 @@ impl VoiceConversationManager {
             state.touch();
         }
 
+        // Emit chat thread event so the sidebar auto-refreshes
+        {
+            let state = self.state.lock().await;
+            if let Some(ref sk) = state.session_key {
+                let is_new = state.turn_count == 1;
+                self.emitter.emit_chat_thread(is_new, sk.as_str());
+            }
+        }
+
         self.transition_to(ConversationPhase::Speaking).await;
     }
 
