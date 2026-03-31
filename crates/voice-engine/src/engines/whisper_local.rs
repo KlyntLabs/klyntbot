@@ -72,12 +72,12 @@ impl WhisperLocalEngine {
         if ctx_guard.is_none() {
             info!("Loading Whisper model from: {}", self.model_path.display());
             let params = WhisperContextParameters::default();
-            let ctx =
-                WhisperContext::new_with_params(&self.model_path, params).map_err(|e| {
-                    common::KlyntbotError::Provider(common::ProviderError::InvalidResponse(
-                        format!("Failed to load Whisper model: {}", e),
-                    ))
-                })?;
+            let ctx = WhisperContext::new_with_params(&self.model_path, params).map_err(|e| {
+                common::KlyntbotError::Provider(common::ProviderError::InvalidResponse(format!(
+                    "Failed to load Whisper model: {}",
+                    e
+                )))
+            })?;
             info!("Whisper model loaded successfully");
             *ctx_guard = Some(ctx);
         }

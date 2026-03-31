@@ -269,7 +269,9 @@ impl AppCore {
         // Idle-unload for the ONNX embedding model (interval matches EMBEDDING_IDLE_SECS)
         {
             let engine = Arc::clone(&embedding_engine);
-            spawn_periodic_timer(&shutdown_token, 120, move || { engine.unload_if_idle(); });
+            spawn_periodic_timer(&shutdown_token, 120, move || {
+                engine.unload_if_idle();
+            });
         }
 
         // ── Deadline scheduler (event-driven timers) ────────────────────
@@ -382,8 +384,9 @@ impl AppCore {
             });
 
             let facade = {
-                let text_embedder: Arc<dyn ::cognitive::TextEmbedder> =
-                    Arc::new(::agent::TextEmbedderImpl::new(Arc::clone(&embedding_engine)));
+                let text_embedder: Arc<dyn ::cognitive::TextEmbedder> = Arc::new(
+                    ::agent::TextEmbedderImpl::new(Arc::clone(&embedding_engine)),
+                );
                 facade.with_text_embedder(text_embedder)
             };
 
@@ -634,9 +637,44 @@ impl AppCore {
 
                 drop(config_guard);
 
-                // TTS: macOS AVSpeech
-                let tts: Option<Arc<dyn voice_engine::TtsEngine>> =
-                    Some(Arc::new(voice_engine::AvSpeechTtsEngine::new(&data_dir)));
+                // TTS: prefer Kokoro (if configured + model available), fall back to macOS AVSpeech
+                let tts: Option<Arc<dyn voice_engine::TtsEngine>> = {
+                    #[cfg(feature = "kokoro")]
+                    {
+                        match voice_config.output.tts_engine {
+                            config::schema::TtsEngineKind::Kokoro => {
+                                if let Some(kokoro_dir) = model_manager.kokoro_model_dir() {
+                                    match voice_engine::KokoroTtsEngine::new(&kokoro_dir).await {
+                                        Ok(engine) => {
+                                            info!(
+                                                "Kokoro TTS engine loaded from {}",
+                                                kokoro_dir.display()
+                                            );
+                                            Some(Arc::new(engine)
+                                                as Arc<dyn voice_engine::TtsEngine>)
+                                        }
+                                        Err(e) => {
+                                            warn!(
+                                                "Failed to load Kokoro TTS, falling back to system: {e}"
+                                            );
+                                            Some(Arc::new(voice_engine::AvSpeechTtsEngine::new(
+                                                &data_dir,
+                                            )))
+                                        }
+                                    }
+                                } else {
+                                    info!("Kokoro model not found, using system TTS");
+                                    Some(Arc::new(voice_engine::AvSpeechTtsEngine::new(&data_dir)))
+                                }
+                            }
+                            _ => Some(Arc::new(voice_engine::AvSpeechTtsEngine::new(&data_dir))),
+                        }
+                    }
+                    #[cfg(not(feature = "kokoro"))]
+                    {
+                        Some(Arc::new(voice_engine::AvSpeechTtsEngine::new(&data_dir)))
+                    }
+                };
 
                 // Always create VoiceService — even without a local engine yet.
                 // If the model is still downloading, voice_conversation_start will wait.

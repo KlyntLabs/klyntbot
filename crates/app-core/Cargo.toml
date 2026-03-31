@@ -48,6 +48,9 @@ notify-debouncer-mini = { workspace = true }
 platform-macos = { workspace = true }
 voice-engine = { workspace = true }
 
+[features]
+default = ["kokoro"]
+kokoro = ["voice-engine/kokoro"]
 
 [dev-dependencies]
 tempfile = { workspace = true }

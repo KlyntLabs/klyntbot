@@ -18,6 +18,8 @@ pub mod tts;
 pub mod types;
 
 pub use capture::{AudioCapture, CaptureConfig, CaptureSession, MonitorSession};
+#[cfg(feature = "kokoro")]
+pub use engines::KokoroTtsEngine;
 pub use engines::{AvSpeechTtsEngine, WhisperLocalEngine};
 pub use events::{VoiceEvent, VOICE_EVENT};
 pub use model_manager::{ModelManager, ModelState, WhisperModelSize};

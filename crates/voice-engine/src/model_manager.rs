@@ -87,6 +87,17 @@ impl ModelManager {
         self.models_dir.join(size.filename()).exists()
     }
 
+    /// Check if a Kokoro model exists in `models/kokoro/`.
+    /// Returns the directory path if `kokoro.onnx` is present.
+    pub fn kokoro_model_dir(&self) -> Option<PathBuf> {
+        let kokoro_dir = self.models_dir.join("kokoro");
+        if kokoro_dir.join("kokoro.onnx").exists() {
+            Some(kokoro_dir)
+        } else {
+            None
+        }
+    }
+
     pub async fn start_download(&self, size: WhisperModelSize) -> common::Result<()> {
         if self.is_available(size) {
             info!("Model {} already available", size.display_name());
@@ -204,6 +215,24 @@ mod tests {
         let tmp = TempDir::new().unwrap();
         let mgr = ModelManager::new(tmp.path());
         assert!(mgr.model_path(WhisperModelSize::Small).is_none());
+    }
+
+    #[test]
+    fn kokoro_model_detected_when_present() {
+        let tmp = TempDir::new().unwrap();
+        let models_dir = tmp.path().join("models").join("kokoro");
+        std::fs::create_dir_all(&models_dir).unwrap();
+        std::fs::write(models_dir.join("kokoro.onnx"), b"fake").unwrap();
+
+        let mm = ModelManager::new(tmp.path());
+        assert!(mm.kokoro_model_dir().is_some());
+    }
+
+    #[test]
+    fn kokoro_model_not_detected_when_absent() {
+        let tmp = TempDir::new().unwrap();
+        let mm = ModelManager::new(tmp.path());
+        assert!(mm.kokoro_model_dir().is_none());
     }
 
     #[test]

@@ -20,6 +20,11 @@ tokio = { workspace = true, features = ["sync", "time", "rt", "fs"] }
 tracing.workspace = true
 chrono.workspace = true
 whisper-rs = { version = "0.16", features = ["metal"] }
+kokoro-tts = { version = "0.3", optional = true }
+
+[features]
+default = ["kokoro"]
+kokoro = ["dep:kokoro-tts"]
 
 [dev-dependencies]
 tempfile = "3"

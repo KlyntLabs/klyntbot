@@ -68,8 +68,7 @@ impl EmbeddingEngine {
         if guard.is_none() {
             info!("Initializing embedding model (first use)...");
             let model = TextEmbedding::try_new(
-                InitOptions::new(EmbeddingModel::AllMiniLML6V2Q)
-                    .with_show_download_progress(true),
+                InitOptions::new(EmbeddingModel::AllMiniLML6V2Q).with_show_download_progress(true),
             )
             .map_err(|e| {
                 common::ToolError::ExecutionFailed(format!(
