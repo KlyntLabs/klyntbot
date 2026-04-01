@@ -129,8 +129,7 @@ async fn smoke_test_7_day_simulation() {
 
 #[tokio::test]
 async fn scenario_12mo_parses() {
-    let toml_content =
-        include_str!("scenarios/software_engineer_12mo.toml");
+    let toml_content = include_str!("scenarios/software_engineer_12mo.toml");
     let scenario = Scenario::from_toml(toml_content).unwrap();
 
     assert_eq!(scenario.persona.name, "software_engineer_vn");

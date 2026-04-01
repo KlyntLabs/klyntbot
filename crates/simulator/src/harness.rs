@@ -292,7 +292,12 @@ impl SimulationHarness {
         let observation = cognitive::Observation {
             domain: msg.topic.clone(),
             content: msg.content.clone(),
-            importance: if msg.ground_truth.as_ref().and_then(|gt| gt.introduces_fact.as_ref()).is_some() {
+            importance: if msg
+                .ground_truth
+                .as_ref()
+                .and_then(|gt| gt.introduces_fact.as_ref())
+                .is_some()
+            {
                 0.9
             } else {
                 0.5
@@ -302,7 +307,11 @@ impl SimulationHarness {
         };
 
         // Extract facts from the observation.
-        let extraction_result = match self.extraction_handler.extract_facts_batch(&[observation.clone()]).await {
+        let extraction_result = match self
+            .extraction_handler
+            .extract_facts_batch(std::slice::from_ref(&observation))
+            .await
+        {
             Ok(result) => result,
             Err(e) => {
                 debug!(error = %e, "Extraction failed for message");
@@ -333,7 +342,11 @@ impl SimulationHarness {
                 };
 
                 // Run consolidation for this single candidate.
-                match self.consolidation_handler.decide_batch(&[candidate.clone()]).await {
+                match self
+                    .consolidation_handler
+                    .decide_batch(std::slice::from_ref(&candidate))
+                    .await
+                {
                     Ok(ops) => {
                         cognitive::execute_memory_ops(&ops, &[candidate], &self.fact_repo, None)
                             .await;
@@ -356,7 +369,11 @@ impl SimulationHarness {
     ///
     /// For Phase 1, most crons are stubs with debug logging. AtomDecay
     /// attempts to run the actual decay cycle if available.
-    async fn execute_cron(&self, trigger: &CronTrigger, simulated_now: chrono::DateTime<chrono::Utc>) {
+    async fn execute_cron(
+        &self,
+        trigger: &CronTrigger,
+        simulated_now: chrono::DateTime<chrono::Utc>,
+    ) {
         match trigger {
             CronTrigger::AtomDecay => {
                 debug!(trigger = "AtomDecay", %simulated_now, "Executing cron");
