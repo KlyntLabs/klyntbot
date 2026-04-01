@@ -19,6 +19,7 @@ pub struct TranscriptSegmentEvent {
 #[serde(tag = "type", rename_all = "camelCase")]
 pub enum VoiceEvent {
     CaptureStarted {
+        #[serde(rename = "sessionId")]
         session_id: String,
         engine: EngineKind,
     },
@@ -28,6 +29,7 @@ pub enum VoiceEvent {
     PartialTranscript {
         text: String,
         language: String,
+        #[serde(rename = "isFinal")]
         is_final: bool,
         #[serde(skip_serializing_if = "Vec::is_empty")]
         segments: Vec<TranscriptSegmentEvent>,
@@ -47,11 +49,15 @@ pub enum VoiceEvent {
     ProcessingInBackground,
     Finalized {
         text: String,
+        #[serde(rename = "routedTo")]
         routed_to: String,
+        #[serde(rename = "responsePreview")]
         response_preview: String,
     },
     SpeakResponse {
+        #[serde(rename = "audioBase64")]
         audio_base64: String,
+        #[serde(rename = "sampleRate")]
         sample_rate: u32,
         text: String,
     },
@@ -62,7 +68,9 @@ pub enum VoiceEvent {
     /// Manager phase changed (for orb UI state)
     PhaseChanged {
         phase: String, // "idle", "listening", "reflecting", "speaking"
+        #[serde(rename = "sessionTitle")]
         session_title: Option<String>,
+        #[serde(rename = "turnCount")]
         turn_count: u32,
     },
     /// Agent is processing — brain is reflecting
@@ -72,24 +80,33 @@ pub enum VoiceEvent {
     /// User can tap "Continue" to resume interrupted TTS
     ContinueAvailable {
         /// How many seconds before the button auto-hides
+        #[serde(rename = "timeoutSecs")]
         timeout_secs: u8,
     },
     /// Voice setup required before conversation can start
     SetupRequired {
+        #[serde(rename = "needsModel")]
         needs_model: bool,
+        #[serde(rename = "needsMicPermission")]
         needs_mic_permission: bool,
     },
     /// Detailed pronunciation report after a scored turn.
     PronunciationReport {
+        #[serde(rename = "overallScore")]
         overall_score: f32,
+        #[serde(rename = "phonemeScores")]
         phoneme_scores: Vec<PhonemeScore>,
+        #[serde(rename = "toneScores")]
         tone_scores: Vec<SyllableTone>,
+        #[serde(rename = "feedbackLevel")]
         feedback_level: FeedbackLevel,
     },
     /// Adaptive feedback level escalated for a phoneme.
     FeedbackEscalated {
         phoneme: String,
+        #[serde(rename = "fromLevel")]
         from_level: FeedbackLevel,
+        #[serde(rename = "toLevel")]
         to_level: FeedbackLevel,
     },
     /// Chinese tone contour data for visualization.
@@ -107,3 +124,27 @@ pub enum VoiceEvent {
 }
 
 pub const VOICE_EVENT: &str = "voice:event";
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn speak_response_serialization() {
+        let event = VoiceEvent::SpeakResponse {
+            audio_base64: "dGVzdA==".to_string(),
+            sample_rate: 16000,
+            text: "hello".to_string(),
+        };
+        let json = serde_json::to_string(&event).unwrap();
+        println!("Serialized: {json}");
+        assert!(
+            json.contains("\"audioBase64\""),
+            "Expected audioBase64 in: {json}"
+        );
+        assert!(
+            json.contains("\"sampleRate\""),
+            "Expected sampleRate in: {json}"
+        );
+    }
+}

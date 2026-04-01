@@ -59,3 +59,7 @@ clap = { version = "4", features = ["derive"] }
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 rmcp = { workspace = true, features = ["server", "transport-io", "transport-streamable-http-server"] }
 mimalloc = { workspace = true }
+
+[features]
+default = ["qwen3"]
+qwen3 = ["app-core/qwen3"]

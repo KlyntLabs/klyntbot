@@ -1,5 +1,6 @@
 import type { ConversationPhase } from "@features/voice/hooks/useVoiceConversation";
 import { useVoiceConversation } from "@features/voice/hooks/useVoiceConversation";
+import { useEvent } from "@shared/hooks/useEvent";
 import { playTtsAudio, unlockAudioContext } from "@shared/lib/audio";
 import { isTauri } from "@shared/lib/utils";
 import { useEffect, useRef, useState } from "react";
@@ -113,6 +114,11 @@ export function VoiceBrainOrb() {
   useEffect(() => {
     unlockAudioContext();
   }, []);
+
+  // Listen for the Rust-side audio unlock signal (emitted after hotkey + focus).
+  // This provides a second unlock attempt after the native window has focus,
+  // which helps WKWebView accept the AudioContext.resume() call.
+  useEvent("voice:unlock-audio", unlockAudioContext);
 
   // In browser dev mode, auto-start a conversation on mount since there's
   // no Tauri shortcut / main.rs to call voice_conversation_start from Rust.

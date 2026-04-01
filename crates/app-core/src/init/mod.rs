@@ -647,10 +647,11 @@ impl AppCore {
 
                 drop(config_guard);
 
-                // TTS: config-driven with engine manager wrapping primary + system fallback
+                // TTS: config-driven with engine manager wrapping primary + system fallback.
+                // Keep a reference to the Qwen3 engine for preloading and idle unload.
+                let mut qwen3_tts_ref: Option<Arc<voice_engine::Qwen3TtsEngine>> = None;
+                let system_tts = Arc::new(voice_engine::AvSpeechTtsEngine::new(&data_dir));
                 let tts: Option<Arc<dyn voice_engine::TtsEngine>> = {
-                    let system_tts = Arc::new(voice_engine::AvSpeechTtsEngine::new(&data_dir));
-
                     match voice_config.output.deployment {
                         config::schema::EngineDeployment::Cloud {
                             ref api_url,
@@ -660,8 +661,10 @@ impl AppCore {
                                 api_url.clone(),
                                 api_key.expose().to_string(),
                             ));
-                            let manager =
-                                voice_engine::TtsEngineManager::new(cloud, Some(system_tts));
+                            let manager = voice_engine::TtsEngineManager::new(
+                                cloud,
+                                Some(Arc::clone(&system_tts) as Arc<dyn voice_engine::TtsEngine>),
+                            );
                             Some(Arc::new(manager) as Arc<dyn voice_engine::TtsEngine>)
                         }
                         config::schema::EngineDeployment::Local => {
@@ -674,23 +677,27 @@ impl AppCore {
                                             info!(
                                                 "Qwen3-TTS loaded — wrapping with system fallback"
                                             );
+                                            let engine = Arc::new(engine);
+                                            qwen3_tts_ref = Some(Arc::clone(&engine));
                                             let manager = voice_engine::TtsEngineManager::new(
-                                                Arc::new(engine),
-                                                Some(system_tts),
+                                                engine,
+                                                Some(Arc::clone(&system_tts)
+                                                    as Arc<dyn voice_engine::TtsEngine>),
                                             );
                                             Some(Arc::new(manager)
                                                 as Arc<dyn voice_engine::TtsEngine>)
                                         }
                                         Err(e) => {
                                             warn!("Qwen3-TTS failed, using system TTS: {e}");
-                                            Some(system_tts as Arc<dyn voice_engine::TtsEngine>)
+                                            Some(Arc::clone(&system_tts)
+                                                as Arc<dyn voice_engine::TtsEngine>)
                                         }
                                     }
                                 } else {
-                                    Some(system_tts as Arc<dyn voice_engine::TtsEngine>)
+                                    Some(Arc::clone(&system_tts) as Arc<dyn voice_engine::TtsEngine>)
                                 }
                             } else {
-                                Some(system_tts as Arc<dyn voice_engine::TtsEngine>)
+                                Some(Arc::clone(&system_tts) as Arc<dyn voice_engine::TtsEngine>)
                             }
                         }
                     }
@@ -756,7 +763,7 @@ impl AppCore {
                 let service = Arc::new(service);
                 core.voice_service = Some(Arc::clone(&service));
 
-                // Eagerly preload STT model in background so it's ready before first voice use.
+                // Eagerly preload STT and TTS models in background so they're ready before first voice use.
                 if has_local_engine {
                     let svc = Arc::clone(&service);
                     tokio::spawn(async move {
@@ -775,6 +782,31 @@ impl AppCore {
                             }
                             Err(e) => {
                                 warn!("Background STT preload failed: {e}");
+                            }
+                        }
+                    });
+                }
+
+                // Preload TTS model in background (separate from STT preload).
+                if let Some(ref tts_engine) = qwen3_tts_ref {
+                    let tts_engine = Arc::clone(tts_engine);
+                    let svc = Arc::clone(&service);
+                    tokio::spawn(async move {
+                        let _ = svc
+                            .emit_event(voice_engine::VoiceEvent::ModelLoading {
+                                engine: "Qwen3-TTS".to_string(),
+                            })
+                            .await;
+                        match tts_engine.preload().await {
+                            Ok(()) => {
+                                let _ = svc
+                                    .emit_event(voice_engine::VoiceEvent::ModelReady {
+                                        engine: "Qwen3-TTS".to_string(),
+                                    })
+                                    .await;
+                            }
+                            Err(e) => {
+                                warn!("Background TTS preload failed: {e}");
                             }
                         }
                     });
@@ -801,15 +833,26 @@ impl AppCore {
                     spawn_periodic_timer(&shutdown_token, 300, move || svc.try_unload_idle_stt());
                 }
 
+                // Periodic idle unload for Qwen3-TTS model (reclaim GPU memory).
+                if let Some(tts_engine) = qwen3_tts_ref {
+                    spawn_periodic_timer(&shutdown_token, 300, move || {
+                        tts_engine.unload_if_idle();
+                    });
+                }
+
                 if has_local_engine {
                     info!("Voice service initialized (local engine ready)");
                 } else {
                     // Auto-download Qwen3 models in background on first launch.
+                    // After download, hot-swap engines into the live VoiceService.
                     if matches!(
                         voice_config.input.deployment,
                         config::schema::EngineDeployment::Local
                     ) {
                         let mm_dir = data_dir.clone();
+                        let svc_for_swap = Arc::clone(&service);
+                        let system_tts_for_swap =
+                            Arc::clone(&system_tts) as Arc<dyn voice_engine::TtsEngine>;
                         tokio::spawn(async move {
                             let mm = voice_engine::ModelManager::new(&mm_dir);
                             use voice_engine::model_manager::Qwen3Model;
@@ -817,11 +860,41 @@ impl AppCore {
                                 mm.download_model(Qwen3Model::Asr),
                                 mm.download_model(Qwen3Model::Tts),
                             );
-                            if let Err(e) = asr {
+                            if let Err(e) = &asr {
                                 warn!("Qwen3-ASR download: {e}");
                             }
-                            if let Err(e) = tts {
+                            if let Err(e) = &tts {
                                 warn!("Qwen3-TTS download: {e}");
+                            }
+
+                            // Hot-swap STT engine after successful download
+                            if asr.is_ok() {
+                                if let Ok(engine) =
+                                    voice_engine::Qwen3AsrEngine::new(mm.models_dir())
+                                {
+                                    svc_for_swap.set_local_engine(Arc::new(engine)
+                                        as Arc<dyn voice_engine::TranscriptionEngine>);
+                                    info!("Hot-swapped Qwen3-ASR into live VoiceService");
+                                }
+                            }
+
+                            // Hot-swap TTS engine after successful download
+                            if let Ok(ref dir) = tts {
+                                match voice_engine::Qwen3TtsEngine::new(dir).await {
+                                    Ok(engine) => {
+                                        let manager = voice_engine::TtsEngineManager::new(
+                                            Arc::new(engine),
+                                            Some(system_tts_for_swap),
+                                        );
+                                        svc_for_swap
+                                            .set_tts_engine(Arc::new(manager)
+                                                as Arc<dyn voice_engine::TtsEngine>);
+                                        info!("Hot-swapped Qwen3-TTS into live VoiceService");
+                                    }
+                                    Err(e) => warn!(
+                                        "Qwen3-TTS engine creation after download failed: {e}"
+                                    ),
+                                }
                             }
                         });
                     }

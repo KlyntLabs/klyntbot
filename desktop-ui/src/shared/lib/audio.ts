@@ -17,14 +17,16 @@ function getAudioContext(): AudioContext {
 }
 
 /**
- * Unlock the AudioContext by playing a silent buffer.
- * Call this on a user gesture (click, mount after hotkey) to prime the context
- * before TTS audio needs to play. Safe to call multiple times.
+ * Unlock the AudioContext by playing a silent buffer and calling resume().
+ * In Tauri, the voice orb opens via a global hotkey — the Rust side calls
+ * set_focus() which grants native window focus, allowing ctx.resume() to
+ * succeed even without a DOM-level user gesture.
+ *
+ * Safe to call multiple times.
  */
 export async function unlockAudioContext(): Promise<void> {
   const ctx = getAudioContext();
   if (ctx.state === "suspended") {
-    // Create and play a tiny silent buffer to satisfy the autoplay policy
     const buffer = ctx.createBuffer(1, 1, 22050);
     const source = ctx.createBufferSource();
     source.buffer = buffer;
@@ -73,20 +75,12 @@ export async function playTtsAudio(base64: string, sampleRate: number): Promise<
 
   // Resume if suspended (autoplay policy blocks audio without user gesture)
   if (ctx.state === "suspended") {
-    try {
-      await ctx.resume();
-    } catch (e) {
-      console.error("[TTS] AudioContext.resume() failed:", e);
-    }
+    await unlockAudioContext();
     if (ctx.state !== "running") {
-      console.error("[TTS] AudioContext still suspended after resume, state:", ctx.state);
+      console.error("[TTS] AudioContext still suspended after unlock, state:", ctx.state);
       return;
     }
   }
-
-  console.log(
-    `[TTS] Playing ${float32.length} samples at ${sampleRate}Hz (ctx.state=${ctx.state})`,
-  );
 
   const buffer = ctx.createBuffer(1, float32.length, sampleRate);
   buffer.copyToChannel(float32, 0);

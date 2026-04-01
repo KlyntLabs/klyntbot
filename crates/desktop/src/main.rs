@@ -414,6 +414,16 @@ fn run_desktop_app() {
                                                 )
                                                 .await;
 
+                                                // Emit a Tauri event that the frontend uses to
+                                                // unlock AudioContext with a synthetic gesture.
+                                                // Global hotkeys bypass WebKit's DOM gesture
+                                                // requirement, so we signal the WebView to
+                                                // dispatch a click + resume the AudioContext.
+                                                {
+                                                    use tauri::Emitter;
+                                                    let _ = handle.emit("voice:unlock-audio", ());
+                                                }
+
                                                 match manager.start().await {
                                                     Ok(_) => {
                                                         crate::tray_countdown::VOICE_ACTIVE.store(

@@ -1,0 +1,27 @@
+{
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Write|Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node ~/.claude/hooks/fmt-accumulator.js"
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node ~/.claude/hooks/stop-batch-fmt.js",
+            "timeout": 60
+          }
+        ]
+      }
+    ]
+  }
+}
