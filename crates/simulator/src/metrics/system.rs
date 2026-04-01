@@ -27,6 +27,35 @@ pub async fn count_brain_versions_since(pool: &sqlx::SqlitePool, since: &str) ->
     result.map(|(n,)| n as u32).unwrap_or(0)
 }
 
+/// Measure autotuner trial success as the ratio of promoted trials to all
+/// terminal trials (promoted + reverted).
+///
+/// Returns `0.0` if no terminal trials exist or the `autotuner_trials` table
+/// does not exist.
+pub async fn measure_autotuner_success(pool: &sqlx::SqlitePool) -> f64 {
+    let promoted: Result<(i64,), _> = sqlx::query_as(
+        "SELECT COUNT(*) FROM autotuner_trials WHERE status = 'promoted'",
+    )
+    .fetch_one(pool)
+    .await;
+
+    let reverted: Result<(i64,), _> = sqlx::query_as(
+        "SELECT COUNT(*) FROM autotuner_trials WHERE status = 'reverted'",
+    )
+    .fetch_one(pool)
+    .await;
+
+    let promoted = promoted.map(|(n,)| n).unwrap_or(0);
+    let reverted = reverted.map(|(n,)| n).unwrap_or(0);
+    let total = promoted + reverted;
+
+    if total == 0 {
+        0.0
+    } else {
+        promoted as f64 / total as f64
+    }
+}
+
 // ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
@@ -46,5 +75,43 @@ mod tests {
 
         let count = count_brain_versions_since(&pool, "2026-01-01T00:00:00Z").await;
         assert_eq!(count, 0);
+
+        let autotuner = measure_autotuner_success(&pool).await;
+        assert!((autotuner - 0.0).abs() < 1e-9);
+    }
+
+    #[tokio::test]
+    async fn autotuner_success_with_trials() {
+        let pool = sqlx::SqlitePool::connect("sqlite::memory:").await.unwrap();
+        sqlx::query(storage::repos::trial_repo::MIGRATION_SQL)
+            .execute(&pool)
+            .await
+            .unwrap();
+
+        // Insert an experiment first (FK constraint).
+        sqlx::query(
+            "INSERT INTO autotuner_experiments (id, hypothesis, trend_analysis, recommendation_for_next)
+             VALUES ('exp-1', 'h', 't', 'r')",
+        )
+        .execute(&pool)
+        .await
+        .unwrap();
+
+        // Insert 2 promoted and 1 reverted trial.
+        for (id, status) in [("t1", "promoted"), ("t2", "promoted"), ("t3", "reverted")] {
+            sqlx::query(
+                "INSERT INTO autotuner_trials (id, experiment_id, params, generation_reasoning, status)
+                 VALUES (?1, 'exp-1', '{}', 'test', ?2)",
+            )
+            .bind(id)
+            .bind(status)
+            .execute(&pool)
+            .await
+            .unwrap();
+        }
+
+        let success = measure_autotuner_success(&pool).await;
+        // 2 promoted / (2 promoted + 1 reverted) = 0.666...
+        assert!((success - 2.0 / 3.0).abs() < 1e-9);
     }
 }
