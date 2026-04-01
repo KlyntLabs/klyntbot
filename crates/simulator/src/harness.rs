@@ -38,6 +38,18 @@ pub struct SimulationHarness {
     retriever: FtsMemoryRetriever,
     extraction_handler: Arc<dyn cognitive::ExtractionHandler>,
     consolidation_handler: Arc<dyn cognitive::ConsolidationHandler>,
+    /// Used by Phase 2 reflection cycle.
+    #[allow(dead_code)]
+    rule_repo: cognitive::ProceduralRuleRepo,
+    /// Used by Phase 2 mirror narrative generation and cleanup.
+    #[allow(dead_code)]
+    mirror_repo: cognitive::mirror::MirrorRepo,
+    /// Used by Phase 2 weekly reflection cron.
+    #[allow(dead_code)]
+    reflection_handler: Arc<dyn cognitive::ReflectionHandler>,
+    /// Used by Phase 2 mirror weekly narrative cron.
+    #[allow(dead_code)]
+    narrative_handler: Arc<dyn cognitive::mirror::NarrativeHandler>,
 }
 
 impl SimulationHarness {
@@ -49,6 +61,8 @@ impl SimulationHarness {
         scenario: Scenario,
         extraction_handler: Arc<dyn cognitive::ExtractionHandler>,
         consolidation_handler: Arc<dyn cognitive::ConsolidationHandler>,
+        reflection_handler: Arc<dyn cognitive::ReflectionHandler>,
+        narrative_handler: Arc<dyn cognitive::mirror::NarrativeHandler>,
     ) -> common::Result<Self> {
         // 1. Create in-memory storage pool with base migrations.
         let pool = storage::StoragePool::connect_in_memory().await?;
@@ -73,6 +87,10 @@ impl SimulationHarness {
         let retriever =
             FtsMemoryRetriever::new(cognitive::SemanticFactRepo::new(inner_pool.clone()));
 
+        // 6. Create repos for reflection and mirror subsystems.
+        let rule_repo = cognitive::ProceduralRuleRepo::new(inner_pool.clone());
+        let mirror_repo = cognitive::mirror::MirrorRepo::new(pool.clone());
+
         Ok(Self {
             scenario,
             pool,
@@ -84,6 +102,10 @@ impl SimulationHarness {
             retriever,
             extraction_handler,
             consolidation_handler,
+            rule_repo,
+            mirror_repo,
+            reflection_handler,
+            narrative_handler,
         })
     }
 
