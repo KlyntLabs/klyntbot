@@ -70,7 +70,8 @@ impl SimulationHarness {
         let episodic_repo = cognitive::EpisodicMemoryRepo::new(inner_pool.clone());
 
         // 5. Create FTS-based memory retriever for retrieval precision/recall.
-        let retriever = FtsMemoryRetriever::new(cognitive::SemanticFactRepo::new(inner_pool.clone()));
+        let retriever =
+            FtsMemoryRetriever::new(cognitive::SemanticFactRepo::new(inner_pool.clone()));
 
         Ok(Self {
             scenario,
@@ -177,8 +178,7 @@ impl SimulationHarness {
 
                 // Step 3d: Drive retrieval for precision/recall metrics.
                 let retrieved = self.retriever.retrieve(&msg.content, 10).await;
-                let retrieved_ids: Vec<String> =
-                    retrieved.iter().map(|e| e.id.clone()).collect();
+                let retrieved_ids: Vec<String> = retrieved.iter().map(|e| e.id.clone()).collect();
 
                 if let Some(ref gt) = msg.ground_truth {
                     if !gt.relevant_facts.is_empty() {
