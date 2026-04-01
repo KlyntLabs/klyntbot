@@ -17,6 +17,28 @@ function getAudioContext(): AudioContext {
 }
 
 /**
+ * Unlock the AudioContext by playing a silent buffer.
+ * Call this on a user gesture (click, mount after hotkey) to prime the context
+ * before TTS audio needs to play. Safe to call multiple times.
+ */
+export async function unlockAudioContext(): Promise<void> {
+  const ctx = getAudioContext();
+  if (ctx.state === "suspended") {
+    // Create and play a tiny silent buffer to satisfy the autoplay policy
+    const buffer = ctx.createBuffer(1, 1, 22050);
+    const source = ctx.createBufferSource();
+    source.buffer = buffer;
+    source.connect(ctx.destination);
+    source.start();
+    try {
+      await ctx.resume();
+    } catch {
+      // Best-effort — some environments block resume entirely
+    }
+  }
+}
+
+/**
  * Stop any currently playing TTS audio immediately.
  * Safe to call when nothing is playing.
  */
@@ -48,10 +70,18 @@ export async function playTtsAudio(base64: string, sampleRate: number): Promise<
   if (float32.length === 0) return;
 
   const ctx = getAudioContext();
+
   // Resume if suspended (autoplay policy blocks audio without user gesture)
   if (ctx.state === "suspended") {
-    console.log("[TTS] AudioContext suspended, resuming...");
-    await ctx.resume();
+    try {
+      await ctx.resume();
+    } catch (e) {
+      console.error("[TTS] AudioContext.resume() failed:", e);
+    }
+    if (ctx.state !== "running") {
+      console.error("[TTS] AudioContext still suspended after resume, state:", ctx.state);
+      return;
+    }
   }
 
   console.log(

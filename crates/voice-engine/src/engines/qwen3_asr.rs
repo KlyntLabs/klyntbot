@@ -210,6 +210,37 @@ impl TranscriptionEngine for Qwen3AsrEngine {
         }
         false
     }
+
+    async fn preload(&self) -> common::Result<()> {
+        let state = self.state.clone();
+        let models_dir = self.models_dir.clone();
+        tokio::task::spawn_blocking(move || {
+            // Check if already loaded without holding the lock during load_model.
+            {
+                let guard = state.lock().unwrap();
+                if guard.model.is_some() {
+                    return Ok::<(), common::KlyntbotError>(());
+                }
+            }
+            info!("Preloading Qwen3-ASR from {}...", models_dir.display());
+            let start = Instant::now();
+            let model = Qwen3AsrEngine::load_model(&models_dir).map_err(|e| {
+                common::KlyntbotError::Provider(common::ProviderError::InvalidResponse(e))
+            })?;
+            info!(
+                "Qwen3-ASR preloaded in {:.1}s",
+                start.elapsed().as_secs_f32()
+            );
+            let mut guard = state.lock().unwrap();
+            guard.model = Some(model);
+            Ok(())
+        })
+        .await
+        .map_err(|e| {
+            common::KlyntbotError::Provider(common::ProviderError::InvalidResponse(e.to_string()))
+        })??;
+        Ok(())
+    }
 }
 
 #[cfg(test)]

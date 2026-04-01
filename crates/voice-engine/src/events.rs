@@ -96,6 +96,14 @@ pub enum VoiceEvent {
     ToneContour {
         syllables: Vec<SyllableTone>,
     },
+    /// Speech model is loading (downloading or initializing).
+    ModelLoading {
+        engine: String,
+    },
+    /// Speech model is ready for use.
+    ModelReady {
+        engine: String,
+    },
 }
 
 pub const VOICE_EVENT: &str = "voice:event";

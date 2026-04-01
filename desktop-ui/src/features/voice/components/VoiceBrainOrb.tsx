@@ -1,6 +1,6 @@
 import type { ConversationPhase } from "@features/voice/hooks/useVoiceConversation";
 import { useVoiceConversation } from "@features/voice/hooks/useVoiceConversation";
-import { playTtsAudio } from "@shared/lib/audio";
+import { playTtsAudio, unlockAudioContext } from "@shared/lib/audio";
 import { isTauri } from "@shared/lib/utils";
 import { useEffect, useRef, useState } from "react";
 
@@ -97,6 +97,7 @@ export function VoiceBrainOrb() {
     sessionInfo,
     continueAvailable,
     setupRequired,
+    modelLoading,
     pause,
     resume,
     interrupt,
@@ -105,6 +106,13 @@ export function VoiceBrainOrb() {
     start,
     end,
   } = useVoiceConversation();
+
+  // Unlock AudioContext on mount so TTS audio can play when the orb is shown.
+  // The orb is opened via a global hotkey (not a click inside the WebView),
+  // so the AudioContext may be suspended without this.
+  useEffect(() => {
+    unlockAudioContext();
+  }, []);
 
   // In browser dev mode, auto-start a conversation on mount since there's
   // no Tauri shortcut / main.rs to call voice_conversation_start from Rust.
@@ -292,7 +300,9 @@ export function VoiceBrainOrb() {
         ) : transcript ? (
           <span className="text-foreground">{transcript}</span>
         ) : phase === "listening" ? (
-          <span className="text-muted-foreground">Listening...</span>
+          <span className="text-muted-foreground">
+            {modelLoading ? "Loading speech model..." : "Listening..."}
+          </span>
         ) : null}
       </div>
 

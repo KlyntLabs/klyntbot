@@ -35,4 +35,10 @@ pub trait TranscriptionEngine: Send + Sync {
     fn unload_if_idle(&self) -> bool {
         false
     }
+
+    /// Eagerly load the model so it's ready for the first transcription.
+    /// Default: no-op. Engines with lazy loading should override this.
+    async fn preload(&self) -> common::Result<()> {
+        Ok(())
+    }
 }

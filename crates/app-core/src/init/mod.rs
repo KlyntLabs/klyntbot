@@ -756,6 +756,30 @@ impl AppCore {
                 let service = Arc::new(service);
                 core.voice_service = Some(Arc::clone(&service));
 
+                // Eagerly preload STT model in background so it's ready before first voice use.
+                if has_local_engine {
+                    let svc = Arc::clone(&service);
+                    tokio::spawn(async move {
+                        let _ = svc
+                            .emit_event(voice_engine::VoiceEvent::ModelLoading {
+                                engine: "Qwen3-ASR".to_string(),
+                            })
+                            .await;
+                        match svc.preload_stt().await {
+                            Ok(()) => {
+                                let _ = svc
+                                    .emit_event(voice_engine::VoiceEvent::ModelReady {
+                                        engine: "Qwen3-ASR".to_string(),
+                                    })
+                                    .await;
+                            }
+                            Err(e) => {
+                                warn!("Background STT preload failed: {e}");
+                            }
+                        }
+                    });
+                }
+
                 // ── Voice conversation manager ──────────────────────────
                 let voice_config_arc = Arc::new(RwLock::new(voice_config.clone()));
                 let voice_conv_manager = Arc::new(

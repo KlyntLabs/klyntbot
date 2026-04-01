@@ -174,7 +174,11 @@ export function FinanceInvestments() {
       >
         <Card className="p-6 text-center space-y-2">
           <p className="text-xs text-destructive">{error.message}</p>
-          <button type="button" onClick={refetchPortfolios} className="text-xs text-primary hover:underline">
+          <button
+            type="button"
+            onClick={refetchPortfolios}
+            className="text-xs text-primary hover:underline"
+          >
             Retry
           </button>
         </Card>

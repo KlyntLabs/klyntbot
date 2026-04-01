@@ -35,6 +35,7 @@ export function useVoiceConversation() {
   const [continueAvailable, setContinueAvailable] = useState(false);
   const [engineKind, setEngineKind] = useState<"local" | "cloud">("local");
   const [setupRequired, setSetupRequired] = useState(false);
+  const [modelLoading, setModelLoading] = useState(false);
 
   const continueTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -129,6 +130,12 @@ export function useVoiceConversation() {
       case "setupRequired":
         setSetupRequired(true);
         break;
+      case "modelLoading":
+        setModelLoading(true);
+        break;
+      case "modelReady":
+        setModelLoading(false);
+        break;
       case "error":
         setPhase("idle");
         break;
@@ -201,6 +208,7 @@ export function useVoiceConversation() {
     continueAvailable,
     engineKind,
     setupRequired,
+    modelLoading,
     start,
     pause,
     resume,

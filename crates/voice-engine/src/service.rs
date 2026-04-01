@@ -216,6 +216,15 @@ impl VoiceService {
         }
     }
 
+    /// Eagerly preload the STT model so it's ready before first voice use.
+    pub async fn preload_stt(&self) -> common::Result<()> {
+        let engine = self.stt_local.read().ok().and_then(|g| g.clone());
+        if let Some(engine) = engine {
+            engine.preload().await?;
+        }
+        Ok(())
+    }
+
     /// Synchronous helper: creates the capture session, wraps the `!Send` cpal
     /// stream on a blocking thread, and returns only `Send`-safe parts. This
     /// keeps `CaptureSession` out of any async generator state.
@@ -579,22 +588,40 @@ impl VoiceService {
         tts_params: &TtsParams,
     ) -> common::Result<()> {
         let tts = self.tts.read().ok().and_then(|g| g.clone());
-        if let Some(tts) = tts {
-            match tts.synthesize(response_text, tts_params).await {
-                Ok(clip) => {
-                    let audio_base64 = base64_encode_audio(&clip);
-                    let _ = self
-                        .event_tx
-                        .send(VoiceEvent::SpeakResponse {
-                            audio_base64,
-                            sample_rate: clip.sample_rate,
-                            text: response_text.to_string(),
-                        })
-                        .await;
+        match tts {
+            Some(tts) => {
+                info!(
+                    "TTS: synthesizing {} chars via {}",
+                    response_text.len(),
+                    tts.display_name()
+                );
+                match tts.synthesize(response_text, tts_params).await {
+                    Ok(clip) if clip.samples.is_empty() => {
+                        warn!("TTS: synthesized clip is empty (0 samples), skipping playback");
+                    }
+                    Ok(clip) => {
+                        info!(
+                            "TTS: {} samples at {}Hz, emitting SpeakResponse",
+                            clip.samples.len(),
+                            clip.sample_rate
+                        );
+                        let audio_base64 = base64_encode_audio(&clip);
+                        let _ = self
+                            .event_tx
+                            .send(VoiceEvent::SpeakResponse {
+                                audio_base64,
+                                sample_rate: clip.sample_rate,
+                                text: response_text.to_string(),
+                            })
+                            .await;
+                    }
+                    Err(e) => {
+                        warn!("TTS synthesis failed: {e}");
+                    }
                 }
-                Err(e) => {
-                    warn!("TTS synthesis failed for voice response: {e}");
-                }
+            }
+            None => {
+                warn!("TTS: no engine available, cannot speak response");
             }
         }
         Ok(())

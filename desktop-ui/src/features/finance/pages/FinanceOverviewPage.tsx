@@ -71,7 +71,12 @@ export function Finance() {
     [],
     financeInvalidate,
   );
-  const { data: goals } = useQuery<FinanceGoal[]>("finance_goals", undefined, [], financeInvalidate);
+  const { data: goals } = useQuery<FinanceGoal[]>(
+    "finance_goals",
+    undefined,
+    [],
+    financeInvalidate,
+  );
   const { data: liabilities } = useQuery<FinanceLiability[]>(
     "finance_liabilities",
     undefined,
@@ -165,7 +170,11 @@ export function Finance() {
       >
         <Card className="p-6 text-center space-y-2">
           <p className="text-xs text-destructive">{error.message}</p>
-          <button type="button" onClick={refetchAccounts} className="text-xs text-primary hover:underline">
+          <button
+            type="button"
+            onClick={refetchAccounts}
+            className="text-xs text-primary hover:underline"
+          >
             Retry
           </button>
         </Card>

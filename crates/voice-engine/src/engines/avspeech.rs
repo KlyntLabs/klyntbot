@@ -13,16 +13,16 @@ pub struct AvSpeechTtsEngine {
 
 impl AvSpeechTtsEngine {
     pub fn new(data_dir: impl Into<PathBuf>) -> Self {
-        Self {
-            data_dir: data_dir.into(),
-        }
+        let data_dir = data_dir.into();
+        // Ensure data_dir exists at construction time (sync is fine during init).
+        let _ = std::fs::create_dir_all(&data_dir);
+        Self { data_dir }
     }
 }
 
 #[async_trait]
 impl TtsEngine for AvSpeechTtsEngine {
     async fn synthesize(&self, text: &str, params: &TtsParams) -> common::Result<AudioClip> {
-        // Create a unique temp WAV path inside data_dir (managed internally).
         let output_path = self
             .data_dir
             .join(format!("tts_{}.wav", chrono::Utc::now().timestamp_millis()));
