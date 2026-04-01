@@ -319,20 +319,23 @@ impl SimulationHarness {
         metrics: &mut MetricCollector,
     ) {
         // Create an Observation from the message.
+        // Use "UserStatedFact" for messages that introduce facts (heuristic handler
+        // extracts these at confidence 1.0), "ChatTurnCompleted" for regular messages
+        // (heuristic handler extracts these at confidence 0.8 if > 10 chars and not a question).
+        let introduces_fact = msg
+            .ground_truth
+            .as_ref()
+            .and_then(|gt| gt.introduces_fact.as_ref());
+        let (source_event, importance) = if introduces_fact.is_some() {
+            ("UserStatedFact".to_string(), 0.9)
+        } else {
+            ("ChatTurnCompleted".to_string(), 0.5)
+        };
         let observation = cognitive::Observation {
             domain: msg.topic.clone(),
             content: msg.content.clone(),
-            importance: if msg
-                .ground_truth
-                .as_ref()
-                .and_then(|gt| gt.introduces_fact.as_ref())
-                .is_some()
-            {
-                0.9
-            } else {
-                0.5
-            },
-            source_event: format!("SimulatedMessage:{}", msg.phase),
+            importance,
+            source_event,
             timestamp: msg.simulated_at,
         };
 

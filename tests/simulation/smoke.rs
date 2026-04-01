@@ -1,44 +1,11 @@
 use std::sync::Arc;
 
-use async_trait::async_trait;
-use cognitive::services::consolidation::ConsolidationCandidate;
-use cognitive::services::extraction::BatchExtractionResult;
-use cognitive::types::{MemoryOp, Observation};
 use cognitive::{ConsolidationHandler, ExtractionHandler};
+use klyntbot::agent::cognitive_handlers::{
+    HeuristicConsolidationHandler, HeuristicExtractionHandler,
+};
 use simulator::harness::SimulationHarness;
 use simulator::scenario::Scenario;
-
-// ── Mock handlers ────────────────────────────────────────────────────
-
-/// Mock extraction handler that returns empty results (no facts extracted).
-/// This keeps the smoke test fast and free of LLM dependencies.
-struct MockExtractionHandler;
-
-#[async_trait]
-impl ExtractionHandler for MockExtractionHandler {
-    async fn extract_facts_batch(
-        &self,
-        _observations: &[Observation],
-    ) -> common::Result<BatchExtractionResult> {
-        Ok(BatchExtractionResult {
-            extractions: vec![],
-            fallback_indices: vec![],
-        })
-    }
-}
-
-/// Mock consolidation handler that returns Noop for every candidate.
-struct MockConsolidationHandler;
-
-#[async_trait]
-impl ConsolidationHandler for MockConsolidationHandler {
-    async fn decide_batch(
-        &self,
-        candidates: &[ConsolidationCandidate],
-    ) -> common::Result<Vec<MemoryOp>> {
-        Ok(candidates.iter().map(|_| MemoryOp::Noop).collect())
-    }
-}
 
 // ── Smoke test scenario (7 days) ────────────────────────────────────
 
@@ -102,8 +69,8 @@ async fn smoke_test_7_day_simulation() {
     let scenario = Scenario::from_toml(SMOKE_SCENARIO_TOML).unwrap();
     assert_eq!(scenario.total_days(), 7);
 
-    let extraction: Arc<dyn ExtractionHandler> = Arc::new(MockExtractionHandler);
-    let consolidation: Arc<dyn ConsolidationHandler> = Arc::new(MockConsolidationHandler);
+    let extraction: Arc<dyn ExtractionHandler> = Arc::new(HeuristicExtractionHandler);
+    let consolidation: Arc<dyn ConsolidationHandler> = Arc::new(HeuristicConsolidationHandler);
 
     let harness = SimulationHarness::new(scenario, extraction, consolidation)
         .await
@@ -143,8 +110,8 @@ async fn run_software_engineer_12mo() {
     let toml_content = include_str!("scenarios/software_engineer_12mo.toml");
     let scenario = Scenario::from_toml(toml_content).unwrap();
 
-    let extraction: Arc<dyn ExtractionHandler> = Arc::new(MockExtractionHandler);
-    let consolidation: Arc<dyn ConsolidationHandler> = Arc::new(MockConsolidationHandler);
+    let extraction: Arc<dyn ExtractionHandler> = Arc::new(HeuristicExtractionHandler);
+    let consolidation: Arc<dyn ConsolidationHandler> = Arc::new(HeuristicConsolidationHandler);
 
     let harness = SimulationHarness::new(scenario, extraction, consolidation)
         .await

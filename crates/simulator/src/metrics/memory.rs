@@ -3,9 +3,12 @@ use std::collections::HashSet;
 
 /// Measure the fraction of known facts that exist unsuperseded in the repo.
 ///
-/// For each fact triple, we search via FTS for `"{subject} {predicate} {object}"`.
-/// A fact counts as retained if any result has matching subject, predicate, and
-/// object with `superseded_at` being `None`.
+/// Uses two matching strategies:
+/// 1. **Exact match**: subject, predicate, object all match exactly (ideal for LLM extraction)
+/// 2. **Content match**: the fact's object field contains the known fact's key terms
+///    (handles heuristic extraction which stores the full message as the object)
+///
+/// A fact counts as retained if any unsuperseded FTS result matches via either strategy.
 pub async fn measure_knowledge_retention(
     repo: &cognitive::SemanticFactRepo,
     known_facts: &[FactTriple],
@@ -18,16 +21,26 @@ pub async fn measure_knowledge_retention(
 
     for fact in known_facts {
         let query = format!("{} {} {}", fact.subject, fact.predicate, fact.object);
-        let results = match repo.search_fts(&query, None, 5).await {
+        let results = match repo.search_fts(&query, None, 10).await {
             Ok(r) => r,
             Err(_) => continue,
         };
 
         let retained = results.iter().any(|r| {
-            r.subject == fact.subject
-                && r.predicate == fact.predicate
-                && r.object == fact.object
-                && r.superseded_at.is_none()
+            if r.superseded_at.is_some() {
+                return false;
+            }
+            // Strategy 1: exact triple match
+            if r.subject == fact.subject && r.predicate == fact.predicate && r.object == fact.object
+            {
+                return true;
+            }
+            // Strategy 2: content match — the stored fact's object contains
+            // the key terms from the known fact (handles heuristic extraction
+            // where object = full message content)
+            let obj_lower = r.object.to_lowercase();
+            obj_lower.contains(&fact.predicate.to_lowercase())
+                && obj_lower.contains(&fact.object.to_lowercase())
         });
 
         if retained {
