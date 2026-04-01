@@ -12,11 +12,12 @@ use crate::persona::types::SimulatedToolAction;
 /// Converts simulated tool actions into domain events and publishes them.
 pub struct ActionExecutor {
     bus: Arc<DomainEventBus>,
+    pool: sqlx::SqlitePool,
 }
 
 impl ActionExecutor {
-    pub fn new(bus: Arc<DomainEventBus>) -> Self {
-        Self { bus }
+    pub fn new(bus: Arc<DomainEventBus>, pool: sqlx::SqlitePool) -> Self {
+        Self { bus, pool }
     }
 
     /// Execute a single simulated tool action by publishing the corresponding
@@ -63,9 +64,20 @@ impl ActionExecutor {
                     title: title.clone(),
                 });
                 self.bus.publish(DomainEvent::NoteContentChanged {
-                    note_id,
+                    note_id: note_id.clone(),
                     content: content.clone(),
                 });
+                let _ = sqlx::query(
+                    "INSERT OR REPLACE INTO book_tree_nodes \
+                     (id, parent_id, node_type, content, title, level, source_type, source_id, position) \
+                     VALUES (?, NULL, 'Section', ?, ?, 0, 'Note', ?, 0)",
+                )
+                .bind(&note_id)
+                .bind(content)
+                .bind(title)
+                .bind(&note_id)
+                .execute(&self.pool)
+                .await;
             }
 
             SimulatedToolAction::UpdateNote {
@@ -77,6 +89,17 @@ impl ActionExecutor {
                     note_id: note_ref.clone(),
                     content: new_content.clone(),
                 });
+                let _ = sqlx::query(
+                    "INSERT OR REPLACE INTO book_tree_nodes \
+                     (id, parent_id, node_type, content, title, level, source_type, source_id, position) \
+                     VALUES (?, NULL, 'Section', ?, ?, 0, 'Note', ?, 0)",
+                )
+                .bind(note_ref)
+                .bind(new_content)
+                .bind(note_ref)
+                .bind(note_ref)
+                .execute(&self.pool)
+                .await;
             }
 
             SimulatedToolAction::RecordTransaction {
@@ -146,11 +169,25 @@ impl ActionExecutor {
 mod tests {
     use super::*;
 
+    async fn test_pool() -> sqlx::SqlitePool {
+        let pool = storage::StoragePool::connect_in_memory()
+            .await
+            .expect("in-memory pool");
+        let inner = pool.inner().clone();
+        storage::StoragePool::run_feature_migrations(&inner, &cognitive::cognitive_migrations())
+            .await
+            .expect("cognitive migrations");
+        // Keep the StoragePool alive by leaking it (tests are short-lived).
+        std::mem::forget(pool);
+        inner
+    }
+
     #[tokio::test]
     async fn create_task_publishes_event() {
         let bus = Arc::new(DomainEventBus::new(32));
         let mut rx = bus.subscribe();
-        let executor = ActionExecutor::new(Arc::clone(&bus));
+        let pool = test_pool().await;
+        let executor = ActionExecutor::new(Arc::clone(&bus), pool);
 
         let action = SimulatedToolAction::CreateTask {
             title: "Buy groceries".into(),
@@ -173,7 +210,8 @@ mod tests {
     async fn create_note_publishes_two_events() {
         let bus = Arc::new(DomainEventBus::new(32));
         let mut rx = bus.subscribe();
-        let executor = ActionExecutor::new(Arc::clone(&bus));
+        let pool = test_pool().await;
+        let executor = ActionExecutor::new(Arc::clone(&bus), pool);
 
         let action = SimulatedToolAction::CreateNote {
             title: "Meeting notes".into(),
@@ -196,7 +234,8 @@ mod tests {
     async fn complete_task_publishes_event() {
         let bus = Arc::new(DomainEventBus::new(32));
         let mut rx = bus.subscribe();
-        let executor = ActionExecutor::new(Arc::clone(&bus));
+        let pool = test_pool().await;
+        let executor = ActionExecutor::new(Arc::clone(&bus), pool);
 
         let action = SimulatedToolAction::CompleteTask {
             task_ref: "task-abc".into(),
@@ -217,7 +256,8 @@ mod tests {
     async fn record_transaction_publishes_event() {
         let bus = Arc::new(DomainEventBus::new(32));
         let mut rx = bus.subscribe();
-        let executor = ActionExecutor::new(Arc::clone(&bus));
+        let pool = test_pool().await;
+        let executor = ActionExecutor::new(Arc::clone(&bus), pool);
 
         let action = SimulatedToolAction::RecordTransaction {
             amount: 42.50,
@@ -241,7 +281,8 @@ mod tests {
     async fn start_focus_publishes_event() {
         let bus = Arc::new(DomainEventBus::new(32));
         let mut rx = bus.subscribe();
-        let executor = ActionExecutor::new(Arc::clone(&bus));
+        let pool = test_pool().await;
+        let executor = ActionExecutor::new(Arc::clone(&bus), pool);
 
         let action = SimulatedToolAction::StartFocus {
             task_ref: None,
