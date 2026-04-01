@@ -33,45 +33,24 @@ impl MetricSource for SimMetricSource {
         trial_id: Option<Uuid>,
     ) -> common::Result<MetricSnapshot> {
         let since_str = since.format("%Y-%m-%d %H:%M:%S").to_string();
+        let tid_str = trial_id.map(|t| t.to_string());
 
         // ── Shadow log stats (classification) ──────────────────────────
-        let (total_msgs, corrected, agreed) = match trial_id {
-            Some(tid) => {
-                let tid_str = tid.to_string();
-                let row: (i64, i64, i64) = sqlx::query_as(
-                    "SELECT
-                         COUNT(*) AS total,
-                         COALESCE(SUM(CASE WHEN user_corrected = 1 THEN 1 ELSE 0 END), 0),
-                         COALESCE(SUM(CASE WHEN predicted_mode = control_mode THEN 1 ELSE 0 END), 0)
-                     FROM autotuner_shadow_log
-                     WHERE trial_id = ?1
-                       AND control_mode != 'pending'
-                       AND created_at >= ?2",
-                )
-                .bind(&tid_str)
-                .bind(&since_str)
-                .fetch_one(&self.pool)
-                .await
-                .unwrap_or((0, 0, 0));
-                row
-            }
-            None => {
-                let row: (i64, i64, i64) = sqlx::query_as(
-                    "SELECT
-                         COUNT(*) AS total,
-                         COALESCE(SUM(CASE WHEN user_corrected = 1 THEN 1 ELSE 0 END), 0),
-                         COALESCE(SUM(CASE WHEN predicted_mode = control_mode THEN 1 ELSE 0 END), 0)
-                     FROM autotuner_shadow_log
-                     WHERE control_mode != 'pending'
-                       AND created_at >= ?1",
-                )
-                .bind(&since_str)
-                .fetch_one(&self.pool)
-                .await
-                .unwrap_or((0, 0, 0));
-                row
-            }
-        };
+        let (total_msgs, corrected, agreed): (i64, i64, i64) = sqlx::query_as(
+            "SELECT
+                 COUNT(*) AS total,
+                 COALESCE(SUM(CASE WHEN user_corrected = 1 THEN 1 ELSE 0 END), 0),
+                 COALESCE(SUM(CASE WHEN predicted_mode = control_mode THEN 1 ELSE 0 END), 0)
+             FROM autotuner_shadow_log
+             WHERE (?1 IS NULL OR trial_id = ?1)
+               AND control_mode != 'pending'
+               AND created_at >= ?2",
+        )
+        .bind(&tid_str)
+        .bind(&since_str)
+        .fetch_one(&self.pool)
+        .await
+        .unwrap_or((0, 0, 0));
 
         let total = total_msgs.max(1) as f64;
 
@@ -79,42 +58,21 @@ impl MetricSource for SimMetricSource {
         let classification_accuracy = agreed as f64 / total;
 
         // ── Shadow retrieval log stats (memory) ────────────────────────
-        let (retrieval_precision, memory_freshness) = match trial_id {
-            Some(tid) => {
-                let tid_str = tid.to_string();
-                let row: (f64, f64) = sqlx::query_as(
-                    "SELECT
-                         COALESCE(AVG(CASE WHEN variant_retrieved_count > 0
-                             THEN CAST(overlap_count AS REAL) / variant_retrieved_count
-                             ELSE 0.0 END), 0.0),
-                         COALESCE(AVG(variant_avg_age_days), 0.0)
-                     FROM autotuner_shadow_retrieval_log
-                     WHERE trial_id = ?1 AND created_at >= ?2",
-                )
-                .bind(&tid_str)
-                .bind(&since_str)
-                .fetch_one(&self.pool)
-                .await
-                .unwrap_or((0.0, 0.0));
-                row
-            }
-            None => {
-                let row: (f64, f64) = sqlx::query_as(
-                    "SELECT
-                         COALESCE(AVG(CASE WHEN variant_retrieved_count > 0
-                             THEN CAST(overlap_count AS REAL) / variant_retrieved_count
-                             ELSE 0.0 END), 0.0),
-                         COALESCE(AVG(variant_avg_age_days), 0.0)
-                     FROM autotuner_shadow_retrieval_log
-                     WHERE created_at >= ?1",
-                )
-                .bind(&since_str)
-                .fetch_one(&self.pool)
-                .await
-                .unwrap_or((0.0, 0.0));
-                row
-            }
-        };
+        let (retrieval_precision, memory_freshness): (f64, f64) = sqlx::query_as(
+            "SELECT
+                 COALESCE(AVG(CASE WHEN variant_retrieved_count > 0
+                     THEN CAST(overlap_count AS REAL) / variant_retrieved_count
+                     ELSE 0.0 END), 0.0),
+                 COALESCE(AVG(variant_avg_age_days), 0.0)
+             FROM autotuner_shadow_retrieval_log
+             WHERE (?1 IS NULL OR trial_id = ?1)
+               AND created_at >= ?2",
+        )
+        .bind(&tid_str)
+        .bind(&since_str)
+        .fetch_one(&self.pool)
+        .await
+        .unwrap_or((0.0, 0.0));
 
         Ok(MetricSnapshot {
             correction_rate,

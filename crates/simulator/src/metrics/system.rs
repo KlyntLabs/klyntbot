@@ -27,30 +27,40 @@ pub async fn count_brain_versions_since(pool: &sqlx::SqlitePool, since: &str) ->
     result.map(|(n,)| n as u32).unwrap_or(0)
 }
 
+/// Counts of promoted and reverted autotuner trials.
+pub struct AutotunerStats {
+    pub success_rate: f64,
+    pub promoted: u32,
+    pub reverted: u32,
+}
+
 /// Measure autotuner trial success as the ratio of promoted trials to all
-/// terminal trials (promoted + reverted).
+/// terminal trials (promoted + reverted), along with raw counts.
 ///
-/// Returns `0.0` if no terminal trials exist or the `autotuner_trials` table
-/// does not exist.
-pub async fn measure_autotuner_success(pool: &sqlx::SqlitePool) -> f64 {
-    let promoted: Result<(i64,), _> =
-        sqlx::query_as("SELECT COUNT(*) FROM autotuner_trials WHERE status = 'promoted'")
-            .fetch_one(pool)
-            .await;
+/// Returns zero stats if no terminal trials exist or the `autotuner_trials`
+/// table does not exist.
+pub async fn measure_autotuner_success(pool: &sqlx::SqlitePool) -> AutotunerStats {
+    let row: Result<(i64, i64), _> = sqlx::query_as(
+        "SELECT \
+             COALESCE(SUM(CASE WHEN status = 'promoted' THEN 1 ELSE 0 END), 0), \
+             COALESCE(SUM(CASE WHEN status = 'reverted' THEN 1 ELSE 0 END), 0) \
+         FROM autotuner_trials \
+         WHERE status IN ('promoted', 'reverted')",
+    )
+    .fetch_one(pool)
+    .await;
 
-    let reverted: Result<(i64,), _> =
-        sqlx::query_as("SELECT COUNT(*) FROM autotuner_trials WHERE status = 'reverted'")
-            .fetch_one(pool)
-            .await;
-
-    let promoted = promoted.map(|(n,)| n).unwrap_or(0);
-    let reverted = reverted.map(|(n,)| n).unwrap_or(0);
+    let (promoted, reverted) = row.unwrap_or((0, 0));
     let total = promoted + reverted;
 
-    if total == 0 {
-        0.0
-    } else {
-        promoted as f64 / total as f64
+    AutotunerStats {
+        success_rate: if total == 0 {
+            0.0
+        } else {
+            promoted as f64 / total as f64
+        },
+        promoted: promoted as u32,
+        reverted: reverted as u32,
     }
 }
 
@@ -75,7 +85,9 @@ mod tests {
         assert_eq!(count, 0);
 
         let autotuner = measure_autotuner_success(&pool).await;
-        assert!((autotuner - 0.0).abs() < 1e-9);
+        assert!((autotuner.success_rate - 0.0).abs() < 1e-9);
+        assert_eq!(autotuner.promoted, 0);
+        assert_eq!(autotuner.reverted, 0);
     }
 
     #[tokio::test]
@@ -108,8 +120,10 @@ mod tests {
             .unwrap();
         }
 
-        let success = measure_autotuner_success(&pool).await;
+        let stats = measure_autotuner_success(&pool).await;
         // 2 promoted / (2 promoted + 1 reverted) = 0.666...
-        assert!((success - 2.0 / 3.0).abs() < 1e-9);
+        assert!((stats.success_rate - 2.0 / 3.0).abs() < 1e-9);
+        assert_eq!(stats.promoted, 2);
+        assert_eq!(stats.reverted, 1);
     }
 }

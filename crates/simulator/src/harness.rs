@@ -59,30 +59,22 @@ impl SimulationHarness {
         reflection_handler: Arc<dyn cognitive::ReflectionHandler>,
         narrative_handler: Arc<dyn cognitive::mirror::NarrativeHandler>,
     ) -> common::Result<Self> {
-        // 1. Create in-memory storage pool with base migrations.
         let pool = storage::StoragePool::connect_in_memory().await?;
         let inner_pool = pool.inner().clone();
 
-        // 2. Apply cognitive feature migrations.
         storage::StoragePool::run_feature_migrations(
             &inner_pool,
             &cognitive::cognitive_migrations(),
         )
         .await?;
 
-        // 3. Create bus and context queue.
         let bus = Arc::new(DomainEventBus::new(512));
         let context_queue = Arc::new(ContextUpdateQueue::new());
 
-        // 4. Create repos.
         let fact_repo = cognitive::SemanticFactRepo::new(inner_pool.clone());
         let episodic_repo = cognitive::EpisodicMemoryRepo::new(inner_pool.clone());
-
-        // 5. Create FTS-based memory retriever for retrieval precision/recall.
         let retriever =
             FtsMemoryRetriever::new(cognitive::SemanticFactRepo::new(inner_pool.clone()));
-
-        // 6. Create repos for reflection and mirror subsystems.
         let rule_repo = cognitive::ProceduralRuleRepo::new(inner_pool.clone());
         let mirror_repo = cognitive::mirror::MirrorRepo::new(pool.clone());
 
@@ -145,6 +137,8 @@ impl SimulationHarness {
         let mut day_counter: u32 = 0;
         let mut total_messages: u32 = 0;
         let mut total_facts_extracted: u32 = 0;
+        let mut total_autotuner_promotions: u32 = 0;
+        let mut total_autotuner_reverts: u32 = 0;
 
         info!(
             persona = %self.scenario.persona.name,
@@ -157,12 +151,12 @@ impl SimulationHarness {
             let epoch_start = Instant::now();
             day_counter = plan.day_of_simulation;
 
-            // Phase 2: PRE-MESSAGE CRONS
+            // PRE-MESSAGE CRONS
             for trigger in &plan.cron_pre_message {
                 self.execute_cron(trigger, plan.simulated_now).await;
             }
 
-            // Phase 3: MESSAGE PHASE
+            // MESSAGE PHASE
             let mut messages = persona_runner.generate_day(plan.simulated_now);
 
             // Backfill retrieval annotations: for each message, annotate with
@@ -222,27 +216,14 @@ impl SimulationHarness {
                 }
 
                 // Drive cognitive pipeline: extract facts from message.
-                self.run_cognitive_pipeline(msg, &mut metrics).await;
+                let extracted_ids = self.run_cognitive_pipeline(msg, &mut metrics).await;
 
                 // Record extracted fact IDs for future retrieval annotation backfill.
-                if msg
-                    .ground_truth
-                    .as_ref()
-                    .and_then(|gt| gt.introduces_fact.as_ref())
-                    .is_some()
-                {
-                    if let Ok(facts) = self
-                        .fact_repo
-                        .search_fts(&msg.content, Some(&msg.topic), 1)
-                        .await
-                    {
-                        for fact in facts {
-                            persona_runner.record_extracted_fact(&msg.topic, &fact.id);
-                        }
-                    }
+                for id in &extracted_ids {
+                    persona_runner.record_extracted_fact(&msg.topic, id);
                 }
 
-                // Step 3d: Drive retrieval for precision/recall metrics.
+                // Drive retrieval for precision/recall metrics.
                 let retrieved = self.retriever.retrieve(&msg.content, 10).await;
                 let retrieved_ids: Vec<String> = retrieved.iter().map(|e| e.id.clone()).collect();
 
@@ -302,15 +283,15 @@ impl SimulationHarness {
                 .await;
             }
 
-            // Phase 3.5: CONTEXT UPDATE DRAIN
+            // CONTEXT UPDATE DRAIN
             let _ = self.context_queue.drain();
 
-            // Phase 4: POST-MESSAGE CRONS
+            // POST-MESSAGE CRONS
             for trigger in &plan.cron_post_message {
                 self.execute_cron(trigger, plan.simulated_now).await;
             }
 
-            // Phase 5: CHECKPOINTS
+            // CHECKPOINTS
             for checkpoint in &self.scenario.checkpoints {
                 if checkpoint.at_day == plan.day_of_simulation {
                     let latest = metrics.timeline.last().cloned().unwrap_or_default();
@@ -330,14 +311,17 @@ impl SimulationHarness {
                 }
             }
 
-            // Phase 6: METRIC SNAPSHOT
+            // METRIC SNAPSHOT
             let knowledge_retention =
                 measure_knowledge_retention(&self.fact_repo, &known_facts).await;
             let community_stability = measure_community_stability(&self.inner_pool).await;
             let brain_versions =
                 count_brain_versions_since(&self.inner_pool, &plan.previous.to_rfc3339()).await;
-            let autotuner_success = measure_autotuner_success(&self.inner_pool).await;
+            let autotuner_stats = measure_autotuner_success(&self.inner_pool).await;
             let wall_time_ms = epoch_start.elapsed().as_secs_f64() * 1000.0;
+
+            total_autotuner_promotions += autotuner_stats.promoted;
+            total_autotuner_reverts += autotuner_stats.reverted;
 
             // Capture accumulator totals before snapshot resets them.
             total_facts_extracted += metrics.accumulator_mut().facts_extracted;
@@ -346,10 +330,10 @@ impl SimulationHarness {
                 plan.simulated_now,
                 plan.day_of_simulation,
                 knowledge_retention,
-                autotuner_success,
+                autotuner_stats.success_rate,
                 community_stability,
                 brain_versions,
-                0.0, // insight_usefulness (stub for Phase 1)
+                0.0, // insight_usefulness — not yet measured in simulation
                 wall_time_ms,
             );
 
@@ -394,8 +378,8 @@ impl SimulationHarness {
                 .iter()
                 .map(|s| s.brain_version_velocity)
                 .sum(),
-            total_autotuner_promotions: 0,
-            total_autotuner_reverts: 0,
+            total_autotuner_promotions,
+            total_autotuner_reverts,
             final_metrics,
             baseline_metrics: metrics.baselines.clone(),
             improvement_pct,
@@ -404,7 +388,7 @@ impl SimulationHarness {
         };
 
         let report = SimulationReport {
-            scenario: self.scenario.persona.name.clone(),
+            scenario: format!("{}_{}", self.scenario.persona.name, self.scenario.total_days()),
             persona: self.scenario.persona.name.clone(),
             simulated_days: day_counter,
             wall_time_secs,
@@ -425,15 +409,14 @@ impl SimulationHarness {
     }
 
     /// Run the cognitive extraction and consolidation pipeline for a single message.
+    ///
+    /// Returns the IDs of facts that were successfully stored, so the caller
+    /// can track them without a redundant FTS query.
     async fn run_cognitive_pipeline(
         &self,
         msg: &crate::persona::types::AnnotatedMessage,
         metrics: &mut MetricCollector,
-    ) {
-        // Create an Observation from the message.
-        // Use "UserStatedFact" for messages that introduce facts (heuristic handler
-        // extracts these at confidence 1.0), "ChatTurnCompleted" for regular messages
-        // (heuristic handler extracts these at confidence 0.8 if > 10 chars and not a question).
+    ) -> Vec<String> {
         let introduces_fact = msg
             .ground_truth
             .as_ref()
@@ -451,7 +434,6 @@ impl SimulationHarness {
             timestamp: msg.simulated_at,
         };
 
-        // Extract facts from the observation.
         let extraction_result = match self
             .extraction_handler
             .extract_facts_batch(std::slice::from_ref(&observation))
@@ -460,45 +442,45 @@ impl SimulationHarness {
             Ok(result) => result,
             Err(e) => {
                 debug!(error = %e, "Extraction failed for message");
-                return;
+                return Vec::new();
             }
         };
 
-        // Collect all extracted facts and build consolidation candidates.
+        // Build ALL consolidation candidates first (find_similar stays per-fact
+        // since it needs the predicate), then call decide_batch once.
+        let mut candidates: Vec<cognitive::ConsolidationCandidate> = Vec::new();
+        let mut fact_ids: Vec<String> = Vec::new();
         let mut total_extracted = 0u32;
+
         for batch in &extraction_result.extractions {
             for extracted_fact in &batch.facts {
                 total_extracted += 1;
 
-                // Convert ExtractedFact to SemanticFact.
                 let semantic_fact =
                     cognitive::extraction::to_semantic_fact(extracted_fact, &observation);
+                fact_ids.push(semantic_fact.id.clone());
 
-                // Look up existing similar facts for consolidation.
                 let existing = self
                     .fact_repo
                     .find_similar(&semantic_fact.subject, &semantic_fact.predicate)
                     .await
                     .unwrap_or_default();
 
-                let candidate = cognitive::ConsolidationCandidate {
+                candidates.push(cognitive::ConsolidationCandidate {
                     candidate: semantic_fact,
                     existing,
-                };
+                });
+            }
+        }
 
-                // Run consolidation for this single candidate.
-                match self
-                    .consolidation_handler
-                    .decide_batch(std::slice::from_ref(&candidate))
-                    .await
-                {
-                    Ok(ops) => {
-                        cognitive::execute_memory_ops(&ops, &[candidate], &self.fact_repo, None)
-                            .await;
-                    }
-                    Err(e) => {
-                        debug!(error = %e, "Consolidation failed, falling back to direct add");
-                        // Fallback: just upsert the fact directly.
+        if !candidates.is_empty() {
+            match self.consolidation_handler.decide_batch(&candidates).await {
+                Ok(ops) => {
+                    cognitive::execute_memory_ops(&ops, &candidates, &self.fact_repo, None).await;
+                }
+                Err(e) => {
+                    debug!(error = %e, "Consolidation failed, falling back to direct add");
+                    for candidate in &candidates {
                         if let Err(e) = self.fact_repo.upsert(&candidate.candidate).await {
                             warn!(error = %e, "Failed to upsert fact in fallback path");
                         }
@@ -529,13 +511,11 @@ impl SimulationHarness {
             };
             let _ = self.episodic_repo.insert(&episode).await;
         }
+
+        fact_ids
     }
 
     /// Execute a simulated cron trigger.
-    ///
-    /// All 8 triggers are wired to real production functions where possible.
-    /// Stubs remain only for triggers that depend on components built in later
-    /// tasks (AutotunerNightly → Task 8, MemoryMaintenance → Task 9).
     async fn execute_cron(
         &self,
         trigger: &CronTrigger,
