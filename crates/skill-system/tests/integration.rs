@@ -12,8 +12,8 @@ fn test_full_pipeline_builtin_skills() {
     );
     let catalog = SkillCatalog::discover_sync(&[source]).unwrap();
 
-    // All 5 orchestrators loaded
-    assert_eq!(catalog.orchestrators().len(), 5);
+    // All 6 orchestrators loaded (general, task-management, finance-management, automation, communication, language-learning)
+    assert_eq!(catalog.orchestrators().len(), 6);
 
     // Router can select orchestrators
     let router = SkillRouter::new(&catalog);
@@ -71,7 +71,7 @@ fn test_builtin_reference_files_loaded() {
 #[test]
 fn test_builtin_skills_info_for_ui() {
     let info = skill_system::discovery::builtin_skills_info();
-    assert_eq!(info.len(), 5);
+    assert_eq!(info.len(), 6);
 
     let general = info.iter().find(|s| s.name == "general").unwrap();
     assert_eq!(general.references.len(), 5); // search, skill-creator, browser, memory, summarize

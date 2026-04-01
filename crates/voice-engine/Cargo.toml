@@ -22,14 +22,14 @@ tracing.workspace = true
 chrono.workspace = true
 webrtc-vad = { version = "0.4", optional = true }
 nnnoiseless = { version = "0.5", optional = true }
+qwen3-asr = { version = "0.2", default-features = false, features = ["metal", "hub"] }
 qwen3-tts-rs = { version = "0.2", optional = true, default-features = false, features = ["mlx"] }
-qwen3-asr = { version = "0.2", optional = true, default-features = false, features = ["metal"] }
 pitch-detection = { version = "0.3", optional = true }
 
 [features]
 default = ["vad"]
 vad = ["dep:webrtc-vad", "dep:nnnoiseless"]
-qwen3 = ["dep:qwen3-tts-rs", "dep:qwen3-asr", "dep:pitch-detection"]
+qwen3 = ["dep:qwen3-tts-rs", "dep:pitch-detection"]
 
 [dev-dependencies]
 tempfile = "3"

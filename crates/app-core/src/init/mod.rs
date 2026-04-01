@@ -624,24 +624,15 @@ impl AppCore {
                 let stt_local: Option<Arc<dyn TranscriptionEngine>> = {
                     match voice_config.input.deployment {
                         config::schema::EngineDeployment::Local => {
-                            #[cfg(feature = "qwen3")]
-                            {
-                                model_manager.qwen3_asr_model_dir().and_then(|dir| {
-                                    match voice_engine::Qwen3AsrEngine::new(&dir) {
-                                        Ok(engine) => {
-                                            info!("Qwen3-ASR loaded from {}", dir.display());
-                                            Some(Arc::new(engine) as Arc<dyn TranscriptionEngine>)
-                                        }
-                                        Err(e) => {
-                                            warn!("Failed to load Qwen3-ASR: {e}");
-                                            None
-                                        }
-                                    }
-                                })
-                            }
-                            #[cfg(not(feature = "qwen3"))]
-                            {
-                                None
+                            match voice_engine::Qwen3AsrEngine::new(model_manager.models_dir()) {
+                                Ok(engine) => {
+                                    info!("Qwen3-ASR engine ready (lazy-load on first use)");
+                                    Some(Arc::new(engine) as Arc<dyn TranscriptionEngine>)
+                                }
+                                Err(e) => {
+                                    warn!("Failed to create Qwen3-ASR: {e}");
+                                    None
+                                }
                             }
                         }
                         config::schema::EngineDeployment::Cloud {
@@ -674,36 +665,31 @@ impl AppCore {
                             Some(Arc::new(manager) as Arc<dyn voice_engine::TtsEngine>)
                         }
                         config::schema::EngineDeployment::Local => {
-                            #[cfg(feature = "qwen3")]
+                            if let config::schema::TtsEngineKind::Qwen3 =
+                                voice_config.output.tts_engine
                             {
-                                if let config::schema::TtsEngineKind::Qwen3 =
-                                    voice_config.output.tts_engine
-                                {
-                                    if let Some(dir) = model_manager.qwen3_tts_model_dir() {
-                                        match voice_engine::Qwen3TtsEngine::new(&dir).await {
-                                            Ok(engine) => {
-                                                info!("Qwen3-TTS loaded — wrapping with system fallback");
-                                                let manager = voice_engine::TtsEngineManager::new(
-                                                    Arc::new(engine),
-                                                    Some(system_tts),
-                                                );
-                                                Some(Arc::new(manager)
-                                                    as Arc<dyn voice_engine::TtsEngine>)
-                                            }
-                                            Err(e) => {
-                                                warn!("Qwen3-TTS failed, using system TTS: {e}");
-                                                Some(system_tts as Arc<dyn voice_engine::TtsEngine>)
-                                            }
+                                if let Some(dir) = model_manager.qwen3_tts_model_dir() {
+                                    match voice_engine::Qwen3TtsEngine::new(&dir).await {
+                                        Ok(engine) => {
+                                            info!(
+                                                "Qwen3-TTS loaded — wrapping with system fallback"
+                                            );
+                                            let manager = voice_engine::TtsEngineManager::new(
+                                                Arc::new(engine),
+                                                Some(system_tts),
+                                            );
+                                            Some(Arc::new(manager)
+                                                as Arc<dyn voice_engine::TtsEngine>)
                                         }
-                                    } else {
-                                        Some(system_tts as Arc<dyn voice_engine::TtsEngine>)
+                                        Err(e) => {
+                                            warn!("Qwen3-TTS failed, using system TTS: {e}");
+                                            Some(system_tts as Arc<dyn voice_engine::TtsEngine>)
+                                        }
                                     }
                                 } else {
                                     Some(system_tts as Arc<dyn voice_engine::TtsEngine>)
                                 }
-                            }
-                            #[cfg(not(feature = "qwen3"))]
-                            {
+                            } else {
                                 Some(system_tts as Arc<dyn voice_engine::TtsEngine>)
                             }
                         }
@@ -745,11 +731,24 @@ impl AppCore {
                         voice_memory_retriever,
                     ));
 
+                let pronunciation_provider: Option<Arc<dyn voice_engine::PronunciationProvider>> = {
+                    let ll_config = shared_config.read().await;
+                    if ll_config.language_learning.enabled {
+                        info!("Language learning enabled — wiring pronunciation provider");
+                        Some(
+                            Arc::new(feature_language_learning::AppPronunciationProvider::new())
+                                as Arc<dyn voice_engine::PronunciationProvider>,
+                        )
+                    } else {
+                        None
+                    }
+                };
+
                 let service = VoiceService::new(
                     stt_local,
                     tts,
                     Some(Arc::clone(&echo_provider)),
-                    None, // pronunciation provider — wired when feature-language-learning is enabled
+                    pronunciation_provider,
                     model_manager,
                     svc_config,
                 );

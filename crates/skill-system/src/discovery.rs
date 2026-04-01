@@ -23,6 +23,7 @@ pub const BUILTIN_SKILLS: &[(&str, &str)] = &[
     include_skill!("finance-management"),
     include_skill!("automation"),
     include_skill!("communication"),
+    include_skill!("language-learning"),
 ];
 
 macro_rules! include_skill_reference {

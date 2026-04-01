@@ -2,7 +2,10 @@
 //! and exam tracking for English and Chinese language learning.
 
 pub mod practice_tool;
+pub mod pronunciation_provider;
 pub mod types;
+
+pub use pronunciation_provider::AppPronunciationProvider;
 
 use std::sync::Arc;
 

@@ -1339,6 +1339,13 @@ impl AgentLoopBuilder {
             info!("Notes tool registered");
         }
 
+        // ── Language learning tool ─────────────────────────────────────
+        if config.language_learning.enabled {
+            tool_registry
+                .register(feature_language_learning::practice_tool::LanguagePracticeTool::new());
+            info!("Language practice tool registered");
+        }
+
         // ── Work context tool (requires real pool + enabled) ─────────────
         if config.work_context.enabled && self.pool.is_some() {
             tool_registry.register(activity_log::WorkContextTool::new(storage_pool.clone()));

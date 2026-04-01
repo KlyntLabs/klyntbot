@@ -17,6 +17,7 @@ feature-coaching = { workspace = true }
 feature-finance = { workspace = true }
 feature-insights = { workspace = true }
 feature-learning = { workspace = true }
+feature-language-learning = { workspace = true }
 feature-launcher = { workspace = true }
 feature-notes = { workspace = true }
 feature-productivity = { workspace = true }

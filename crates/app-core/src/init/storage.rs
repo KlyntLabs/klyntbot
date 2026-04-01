@@ -77,6 +77,14 @@ pub(super) async fn init_storage(
     .await
     .map_err(|e| format!("tasks migration failed: {e}"))?;
 
+    // Run language-learning feature migrations.
+    StoragePool::run_feature_migrations(
+        storage_pool.inner(),
+        &feature_language_learning::LanguageLearningFeature::migrations_static(),
+    )
+    .await
+    .map_err(|e| format!("language-learning migration failed: {e}"))?;
+
     // Run finance feature migrations.
     StoragePool::run_feature_migrations(
         storage_pool.inner(),

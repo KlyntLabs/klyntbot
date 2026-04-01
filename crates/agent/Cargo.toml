@@ -21,6 +21,7 @@ feature-tasks.workspace = true
 feature-finance.workspace = true
 feature-productivity.workspace = true
 feature-coaching.workspace = true
+feature-language-learning.workspace = true
 feature-notes.workspace = true
 plugin-runtime.workspace = true
 mcp.workspace = true

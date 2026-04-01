@@ -89,7 +89,7 @@ mod tests {
 
     #[test]
     fn voices_list_not_empty() {
-        assert!(!super::QWEN3_VOICES.is_empty());
+        assert!(!crate::engines::QWEN3_VOICES.is_empty());
     }
 
     #[test]

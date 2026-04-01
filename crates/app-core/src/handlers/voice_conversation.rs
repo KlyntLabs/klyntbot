@@ -519,8 +519,13 @@ impl VoiceConversationManager {
             Ok(Some((transcript, _metadata))) => {
                 let text = transcript.text.trim().to_string();
                 if text.is_empty() {
+                    let paused = self.state.lock().await.paused;
+                    if paused {
+                        info!("Listening phase: empty transcript + End requested, going idle");
+                        self.transition_to(ConversationPhase::Idle).await;
+                        return;
+                    }
                     info!("Listening phase: empty transcript, returning to listening");
-                    // Re-enter listening (don't transition to reflecting with empty text)
                     return;
                 }
                 info!("Listening phase: transcript = \"{}\"", text);

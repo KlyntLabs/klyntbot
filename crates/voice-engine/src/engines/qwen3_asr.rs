@@ -1,7 +1,7 @@
 //! Qwen3-ASR speech recognition engine.
 //!
-//! Replaces Whisper as the universal STT engine. Supports 52 languages
-//! with built-in language detection and word-level timestamps.
+//! Uses the `qwen3-asr` crate with Metal (Apple Silicon) backend for
+//! local speech-to-text. Supports 52 languages with auto-detection.
 
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
@@ -16,53 +16,55 @@ use crate::types::{Language, Transcript};
 
 const IDLE_UNLOAD_SECS: u64 = 300;
 pub(crate) const QWEN3_ASR_SAMPLE_RATE: u32 = 16_000;
-/// Pre-allocate for ~30s of audio at 16kHz.
 const EXPECTED_SAMPLES: usize = QWEN3_ASR_SAMPLE_RATE as usize * 30;
 
-struct ModelState {
+struct InnerState {
     last_used: Instant,
-    loaded: bool,
+    model: Option<qwen3_asr::AsrInference>,
 }
 
 pub struct Qwen3AsrEngine {
-    _model_dir: PathBuf,
-    state: Arc<Mutex<ModelState>>,
+    /// Parent models directory (e.g., `~/.klyntbot/models/`).
+    /// `from_pretrained` will create `{models_dir}/Qwen--Qwen3-ASR-0.6B/` inside.
+    models_dir: PathBuf,
+    state: Arc<Mutex<InnerState>>,
 }
 
 impl Qwen3AsrEngine {
-    pub fn new(model_dir: impl Into<PathBuf>) -> common::Result<Self> {
-        let model_dir = model_dir.into();
-        if !model_dir.exists() {
-            return Err(common::KlyntbotError::Config(
-                common::ConfigError::NotFound(format!(
-                    "Qwen3-ASR model not found: {}",
-                    model_dir.display()
-                )),
-            ));
-        }
-
+    /// Create a new Qwen3-ASR engine. `models_dir` is the parent models directory
+    /// (e.g., `~/.klyntbot/models/`). The model will be auto-downloaded on first use
+    /// via `from_pretrained` if not already cached.
+    pub fn new(models_dir: impl Into<PathBuf>) -> common::Result<Self> {
+        let models_dir = models_dir.into();
         info!(
-            "Qwen3-ASR engine created (lazy) for: {}",
-            model_dir.display()
+            "Qwen3-ASR engine created for cache: {}",
+            models_dir.display()
         );
-
         Ok(Self {
-            _model_dir: model_dir,
-            state: Arc::new(Mutex::new(ModelState {
+            models_dir,
+            state: Arc::new(Mutex::new(InnerState {
                 last_used: Instant::now(),
-                loaded: false,
+                model: None,
             })),
         })
+    }
+
+    /// Load model via `from_pretrained` which handles tokenizer reconstruction
+    /// and model download if needed.
+    fn load_model(models_dir: &std::path::Path) -> Result<qwen3_asr::AsrInference, String> {
+        let device = qwen3_asr::best_device();
+        qwen3_asr::AsrInference::from_pretrained("Qwen/Qwen3-ASR-0.6B", models_dir, device)
+            .map_err(|e| format!("{e}"))
     }
 }
 
 #[async_trait]
 impl TranscriptionEngine for Qwen3AsrEngine {
     async fn transcribe_stream(&self, mut audio: AudioStream) -> common::Result<TranscriptStream> {
-        self.state.lock().unwrap().last_used = Instant::now();
         let (tx, rx) = mpsc::channel::<PartialTranscript>(32);
 
         let state = self.state.clone();
+        let models_dir = self.models_dir.clone();
 
         tokio::spawn(async move {
             let mut all_samples: Vec<f32> = Vec::with_capacity(EXPECTED_SAMPLES);
@@ -75,23 +77,72 @@ impl TranscriptionEngine for Qwen3AsrEngine {
                 return;
             }
 
-            state.lock().unwrap().loaded = true;
-
             debug!(
                 "Qwen3-ASR transcribing {} samples ({:.1}s)",
                 all_samples.len(),
                 all_samples.len() as f32 / QWEN3_ASR_SAMPLE_RATE as f32
             );
 
-            // TODO: Integrate qwen3_asr crate API when available.
-            let _ = tx
-                .send(PartialTranscript {
-                    text: String::new(),
-                    segments: vec![],
-                    language: Language::default(),
-                    is_final: true,
+            // Run inference in a blocking thread (CPU/GPU-bound).
+            // AsrInference holds Metal tensors which may not be Send,
+            // so we load + infer within the same spawn_blocking call.
+            let result =
+                tokio::task::spawn_blocking(move || -> Result<(String, String), String> {
+                    let mut guard = state.lock().unwrap();
+                    if guard.model.is_none() {
+                        info!("Lazy-loading Qwen3-ASR from {}...", models_dir.display());
+                        let start = Instant::now();
+                        let model = Qwen3AsrEngine::load_model(&models_dir)?;
+                        info!("Qwen3-ASR loaded in {:.1}s", start.elapsed().as_secs_f32());
+                        guard.model = Some(model);
+                    }
+                    guard.last_used = Instant::now();
+                    let model = guard.model.as_ref().ok_or("Model not loaded")?;
+                    let opts = qwen3_asr::TranscribeOptions::default();
+                    let result = model
+                        .transcribe_samples(&all_samples, opts)
+                        .map_err(|e| format!("Inference failed: {e}"))?;
+                    Ok((result.text, result.language))
                 })
                 .await;
+
+            match result {
+                Ok(Ok((text, lang))) => {
+                    let text = text.trim().to_string();
+                    let lang = if lang.is_empty() {
+                        "en".to_string()
+                    } else {
+                        lang
+                    };
+                    debug!(
+                        "Qwen3-ASR result: '{}' (lang={})",
+                        &text[..text.len().min(80)],
+                        lang
+                    );
+                    let _ = tx
+                        .send(PartialTranscript {
+                            text,
+                            segments: vec![],
+                            language: Language::new(lang),
+                            is_final: true,
+                        })
+                        .await;
+                }
+                Ok(Err(e)) => {
+                    warn!("Qwen3-ASR inference error: {e}");
+                    let _ = tx
+                        .send(PartialTranscript {
+                            text: String::new(),
+                            segments: vec![],
+                            language: Language::default(),
+                            is_final: true,
+                        })
+                        .await;
+                }
+                Err(e) => {
+                    warn!("Qwen3-ASR inference task failed: {e}");
+                }
+            }
         });
 
         Ok(rx)
@@ -100,25 +151,50 @@ impl TranscriptionEngine for Qwen3AsrEngine {
     async fn transcribe_file(
         &self,
         path: &std::path::Path,
-        lang_hint: Option<&Language>,
+        _lang_hint: Option<&Language>,
     ) -> common::Result<Transcript> {
-        self.state.lock().unwrap().last_used = Instant::now();
+        let path_str = path.to_string_lossy().to_string();
+        let state = self.state.clone();
+        let models_dir = self.models_dir.clone();
 
-        if !path.exists() {
-            return Err(common::KlyntbotError::Provider(
-                common::ProviderError::InvalidResponse(format!(
-                    "Audio file not found: {}",
-                    path.display()
-                )),
-            ));
-        }
-
-        Ok(Transcript {
-            text: String::new(),
-            language: lang_hint.cloned().unwrap_or_default(),
-            segments: vec![],
-            overall_confidence: 0.0,
+        let result = tokio::task::spawn_blocking(move || -> Result<(String, String), String> {
+            let mut guard = state.lock().unwrap();
+            if guard.model.is_none() {
+                let model = Qwen3AsrEngine::load_model(&models_dir)?;
+                guard.model = Some(model);
+            }
+            guard.last_used = Instant::now();
+            let model = guard.model.as_ref().ok_or("Model not loaded")?;
+            let opts = qwen3_asr::TranscribeOptions::default();
+            let r = model
+                .transcribe(&path_str, opts)
+                .map_err(|e| format!("{e}"))?;
+            Ok((r.text, r.language))
         })
+        .await
+        .map_err(|e| {
+            common::KlyntbotError::Provider(common::ProviderError::InvalidResponse(format!(
+                "Qwen3-ASR file transcription failed: {e}"
+            )))
+        })?;
+
+        match result {
+            Ok((text, lang)) => Ok(Transcript {
+                text: text.trim().to_string(),
+                language: Language::new(if lang.is_empty() { "en" } else { &lang }),
+                segments: vec![],
+                overall_confidence: 0.9,
+            }),
+            Err(e) => {
+                warn!("Qwen3-ASR file transcription error: {e}");
+                Ok(Transcript {
+                    text: String::new(),
+                    language: Language::default(),
+                    segments: vec![],
+                    overall_confidence: 0.0,
+                })
+            }
+        }
     }
 
     fn display_name(&self) -> &str {
@@ -127,8 +203,8 @@ impl TranscriptionEngine for Qwen3AsrEngine {
 
     fn unload_if_idle(&self) -> bool {
         let mut state = self.state.lock().unwrap();
-        if state.last_used.elapsed().as_secs() >= IDLE_UNLOAD_SECS && state.loaded {
-            state.loaded = false;
+        if state.last_used.elapsed().as_secs() >= IDLE_UNLOAD_SECS && state.model.is_some() {
+            state.model = None;
             info!("Qwen3-ASR model unloaded after idle");
             return true;
         }
