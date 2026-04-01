@@ -108,7 +108,7 @@
         "label": "voice-orb",
         "url": "/#/voice-orb",
         "title": "",
-        "width": 320,
+        "width": 200,
         "height": 200,
         "resizable": false,
         "decorations": false,
@@ -117,12 +117,12 @@
         "shadow": false,
         "alwaysOnTop": true,
         "skipTaskbar": true,
-        "center": true,
+        "center": false,
         "focus": false,
         "windowEffects": {
           "effects": ["hudWindow"],
           "state": "active",
-          "radius": 16.0
+          "radius": 100.0
         }
       }
     ],

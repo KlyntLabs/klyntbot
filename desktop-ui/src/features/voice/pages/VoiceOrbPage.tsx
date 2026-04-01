@@ -1,17 +1,12 @@
-import { VoiceBrainOrb } from "@features/voice";
+import { VoiceBrainOrb } from "@features/voice/components/VoiceBrainOrb";
 import { useTransparentBackground } from "@shared/hooks/useTransparentBackground";
-import { useWindowAutoResize } from "@shared/hooks/useWindowAutoResize";
-import { DEV_SSE_BASE, isTauri } from "@shared/lib/utils";
-import { useEffect, useRef } from "react";
+import { useEffect } from "react";
 
-/**
- * Bridge voice SSE events in browser dev mode.
- * VoiceOrbPage lives outside AppShell so BrainEventBridge isn't mounted.
- */
+const DEV_SSE_BASE = "http://localhost:3456";
+
 function VoiceEventBridge() {
   useEffect(() => {
-    if (isTauri) return;
-
+    if (window.__TAURI_INTERNALS__) return;
     const source = new EventSource(`${DEV_SSE_BASE}/api/brain/events`);
     source.addEventListener("voice:event", (e: MessageEvent) => {
       try {
@@ -21,21 +16,16 @@ function VoiceEventBridge() {
         // Ignore malformed SSE frames
       }
     });
-
     return () => source.close();
   }, []);
-
   return null;
 }
 
-export function VoiceOrbPage() {
-  const contentRef = useRef<HTMLDivElement>(null);
-
-  useTransparentBackground({ nativeVibrancy: true });
-  useWindowAutoResize(contentRef, { width: 320, maxHeight: 400 });
+export default function VoiceOrbPage() {
+  useTransparentBackground();
 
   return (
-    <div ref={contentRef}>
+    <div style={{ width: "100vw", height: "100vh", overflow: "hidden" }}>
       <VoiceEventBridge />
       <VoiceBrainOrb />
     </div>
