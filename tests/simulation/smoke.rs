@@ -137,3 +137,73 @@ async fn scenario_12mo_parses() {
     assert_eq!(scenario.checkpoints.len(), 4);
     assert_eq!(scenario.persona.profile.known_facts.len(), 6);
 }
+
+#[tokio::test]
+async fn run_software_engineer_12mo() {
+    let toml_content = include_str!("scenarios/software_engineer_12mo.toml");
+    let scenario = Scenario::from_toml(toml_content).unwrap();
+
+    let extraction: Arc<dyn ExtractionHandler> = Arc::new(MockExtractionHandler);
+    let consolidation: Arc<dyn ConsolidationHandler> = Arc::new(MockConsolidationHandler);
+
+    let harness = SimulationHarness::new(scenario, extraction, consolidation)
+        .await
+        .unwrap();
+
+    let report = harness.run().await.unwrap();
+
+    // Write JSON report
+    let output_dir = std::env::var("SIMULATION_OUTPUT_DIR")
+        .map(std::path::PathBuf::from)
+        .unwrap_or_else(|_| std::path::PathBuf::from("target/simulation"));
+    let report_path = report.write_json(&output_dir).unwrap();
+
+    // Print summary
+    eprintln!("\n============================================================");
+    eprintln!("  SIMULATION REPORT: {}", report.persona);
+    eprintln!("============================================================");
+    eprintln!("  Simulated days:     {}", report.simulated_days);
+    eprintln!("  Wall time:          {:.2}s", report.wall_time_secs);
+    eprintln!("  Total messages:     {}", report.summary.total_messages);
+    eprintln!("  Facts extracted:    {}", report.summary.total_facts_extracted);
+    eprintln!("  Brain versions:     {}", report.summary.total_brain_versions);
+    eprintln!("  Checkpoints:        {}/{} passed",
+        report.checkpoints.iter().filter(|c| c.all_passed).count(),
+        report.checkpoints.len());
+    eprintln!("  Pass rate:          {:.0}%", report.summary.checkpoint_pass_rate * 100.0);
+    eprintln!("  Regressions:        {}", report.summary.regression_alerts.len());
+    eprintln!();
+
+    // Print metric evolution (first, middle, last)
+    let timeline = &report.metric_timeline;
+    if let (Some(first), Some(last)) = (timeline.first(), timeline.last()) {
+        eprintln!("  Metric Evolution (day 1 → day {}):", report.simulated_days);
+        eprintln!("  ─────────────────────────────────────────────");
+        eprintln!("  Knowledge retention:   {:.3} → {:.3}", first.knowledge_retention, last.knowledge_retention);
+        eprintln!("  Retrieval precision:   {:.3} → {:.3}", first.retrieval_precision, last.retrieval_precision);
+        eprintln!("  Correction rate:       {:.3} → {:.3}", first.correction_rate, last.correction_rate);
+        eprintln!("  Personalization score: {:.3} → {:.3}", first.personalization_score, last.personalization_score);
+        eprintln!("  Token efficiency:      {:.0} → {:.0}", first.token_efficiency, last.token_efficiency);
+        eprintln!("  Community stability:   {:.3} → {:.3}", first.community_stability, last.community_stability);
+        eprintln!("  Brain version velocity:{} → {}", first.brain_version_velocity, last.brain_version_velocity);
+    }
+
+    // Print checkpoint details
+    eprintln!();
+    for cp in &report.checkpoints {
+        let status = if cp.all_passed { "PASS" } else { "FAIL" };
+        eprintln!("  Checkpoint day {}: {}", cp.at_day, status);
+        for a in &cp.assertions {
+            let mark = if a.passed { "  [x]" } else { "  [ ]" };
+            eprintln!("    {} {} (actual: {:?}, expected: {})",
+                mark, a.description, a.actual_value, a.expected);
+        }
+    }
+
+    eprintln!();
+    eprintln!("  Report written to: {}", report_path.display());
+    eprintln!("  Verdict: {}", if report.passed() { "PASSED" } else { "FAILED" });
+
+    assert!(report.summary.total_messages > 0);
+    assert!(report.passed(), "Simulation failed — see report above");
+}
