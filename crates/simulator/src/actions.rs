@@ -254,8 +254,12 @@ mod tests {
             .expect("execute should succeed");
 
         let event = rx.try_recv().expect("should receive FocusSessionStarted");
-        assert!(
-            matches!(event, DomainEvent::FocusSessionStarted { target_mins: 25, .. })
-        );
+        assert!(matches!(
+            event,
+            DomainEvent::FocusSessionStarted {
+                target_mins: 25,
+                ..
+            }
+        ));
     }
 }
