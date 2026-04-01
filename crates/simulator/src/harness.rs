@@ -35,8 +35,6 @@ pub struct SimulationHarness {
     bus: Arc<DomainEventBus>,
     context_queue: Arc<ContextUpdateQueue>,
     fact_repo: cognitive::SemanticFactRepo,
-    /// Available for Phase 2 episodic memory integration.
-    #[allow(dead_code)]
     episodic_repo: cognitive::EpisodicMemoryRepo,
     retriever: FtsMemoryRetriever,
     extraction_handler: Arc<dyn cognitive::ExtractionHandler>,
@@ -276,6 +274,40 @@ impl SimulationHarness {
             // Read contradiction events detected during this epoch's message processing.
             let contradictions = contradiction_count.swap(0, Ordering::Relaxed);
             metrics.accumulator_mut().contradictions_detected += contradictions;
+
+            // Seed a routing snapshot for the day's messages.
+            if !messages.is_empty() {
+                let mut topic_counts: HashMap<String, u32> = HashMap::new();
+                for m in &messages {
+                    *topic_counts.entry(m.topic.clone()).or_default() += 1;
+                }
+                let total = messages.len() as f64;
+                let distribution: HashMap<String, f64> = topic_counts
+                    .iter()
+                    .map(|(k, &v)| (k.clone(), v as f64 / total))
+                    .collect();
+                let distribution_json =
+                    serde_json::to_string(&distribution).unwrap_or_default();
+                let snapshot_id = Uuid::new_v4().to_string();
+                let captured_at = plan.simulated_now.to_rfc3339();
+                let total_msgs = messages.len() as i64;
+                let _ = sqlx::query(
+                    r#"INSERT INTO mirror_routing_snapshots
+                       (id, captured_at, window_hours, total_messages, distribution_json,
+                        fallback_rate, avg_routing_confidence, low_confidence_count)
+                       VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)"#,
+                )
+                .bind(&snapshot_id)
+                .bind(&captured_at)
+                .bind(24_i64)
+                .bind(total_msgs)
+                .bind(&distribution_json)
+                .bind(0.0_f64) // fallback_rate -- no fallbacks in simulation
+                .bind(0.85_f64) // avg_routing_confidence -- simulated default
+                .bind(0_i64) // low_confidence_count
+                .execute(&self.inner_pool)
+                .await;
+            }
 
             // Phase 3.5: CONTEXT UPDATE DRAIN
             let _ = self.context_queue.drain();
