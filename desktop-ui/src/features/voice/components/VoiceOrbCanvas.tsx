@@ -130,8 +130,8 @@ void main() {
   float breath = 0.02 * sin(t * breathSpeed) * mix(1.0, 0.4, smoothstep(0.0, 1.0, ph));
 
   // ── Base sphere radius with audio reactivity ──
-  float baseRadius = 0.45 + breath;
-  float audioPulse = rms * 0.12 * smoothstep(0.5, 1.5, abs(ph - 0.5) + abs(ph - 2.5));
+  float baseRadius = 0.30 + breath;
+  float audioPulse = rms * 0.06 * smoothstep(0.5, 1.5, abs(ph - 0.5) + abs(ph - 2.5));
   baseRadius += audioPulse;
 
   // ── Phase weights (used for noise, color, and effect blending) ──
@@ -172,12 +172,11 @@ void main() {
   float sphere = 1.0 - smoothstep(-0.03, 0.03, sphereDist);
 
   // ── Inner glow (exponential falloff from center) ──
-  float innerGlow = exp(-dist * 3.0) * 0.6;
+  float innerGlow = exp(-dist * 4.0) * 0.5;
 
-  // ── Outer halo (exponential falloff from sphere edge) ──
-  float outerHalo = exp(-max(0.0, sphereDist) * 6.0) * 0.35;
-  // Strengthen halo during listening/speaking with RMS
-  outerHalo += exp(-max(0.0, sphereDist) * 4.0) * rms * 0.2
+  // ── Outer halo (tighter falloff to stay within window bounds) ──
+  float outerHalo = exp(-max(0.0, sphereDist) * 10.0) * 0.3;
+  outerHalo += exp(-max(0.0, sphereDist) * 7.0) * rms * 0.15
     * (w1 + w3) / max(w1 + w3 + 0.01, 1.0);
 
   // ── Speaking: concentric wave rings ──
@@ -188,7 +187,7 @@ void main() {
       float ringDist = dist - baseRadius;
       float wave = sin(ringDist * 18.0 - t * 3.5 + ringOffset);
       wave = smoothstep(0.7, 1.0, wave);
-      float ringFade = exp(-max(0.0, ringDist) * 3.0);
+      float ringFade = exp(-max(0.0, ringDist) * 6.0);
       waveRings += wave * ringFade * 0.15 * (1.0 + rms * 0.5);
     }
     waveRings *= w3 / wSum;
@@ -207,8 +206,8 @@ void main() {
   vec3 col = phaseColor(ph, t, blendedNoise);
   float alpha = sphere * 0.85 + innerGlow + outerHalo + waveRings + spiralPattern;
 
-  // ── Vignette ──
-  float vignette = 1.0 - smoothstep(0.6, 1.2, dist);
+  // ── Vignette (fade to 0 before window edge to prevent clipping) ──
+  float vignette = 1.0 - smoothstep(0.45, 0.85, dist);
   alpha *= vignette;
 
   alpha = clamp(alpha, 0.0, 1.0);
