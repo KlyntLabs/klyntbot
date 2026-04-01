@@ -17,7 +17,9 @@ use crate::actions::ActionExecutor;
 use crate::epoch::{CronTrigger, EpochStep, SimulatedEpoch};
 use crate::metrics::ground_truth::{CheckpointResult, GroundTruthVerifier};
 use crate::metrics::memory::{measure_knowledge_retention, measure_retrieval_quality};
-use crate::metrics::system::{count_brain_versions_since, measure_community_stability};
+use crate::metrics::system::{
+    count_brain_versions_since, measure_autotuner_success, measure_community_stability,
+};
 use crate::metrics::MetricCollector;
 use crate::persona::types::SimulatedToolAction;
 use crate::persona::PersonaRunner;
@@ -278,8 +280,7 @@ impl SimulationHarness {
                     .iter()
                     .map(|(k, &v)| (k.clone(), v as f64 / total))
                     .collect();
-                let distribution_json =
-                    serde_json::to_string(&distribution).unwrap_or_default();
+                let distribution_json = serde_json::to_string(&distribution).unwrap_or_default();
                 let snapshot_id = Uuid::new_v4().to_string();
                 let captured_at = plan.simulated_now.to_rfc3339();
                 let total_msgs = messages.len() as i64;
@@ -335,6 +336,7 @@ impl SimulationHarness {
             let community_stability = measure_community_stability(&self.inner_pool).await;
             let brain_versions =
                 count_brain_versions_since(&self.inner_pool, &plan.previous.to_rfc3339()).await;
+            let autotuner_success = measure_autotuner_success(&self.inner_pool).await;
             let wall_time_ms = epoch_start.elapsed().as_secs_f64() * 1000.0;
 
             // Capture accumulator totals before snapshot resets them.
@@ -344,7 +346,7 @@ impl SimulationHarness {
                 plan.simulated_now,
                 plan.day_of_simulation,
                 knowledge_retention,
-                0.0, // autotuner_promotion_success (stub for Phase 1)
+                autotuner_success,
                 community_stability,
                 brain_versions,
                 0.0, // insight_usefulness (stub for Phase 1)
@@ -542,18 +544,36 @@ impl SimulationHarness {
         match trigger {
             CronTrigger::AtomDecay => {
                 debug!(trigger = "AtomDecay", %simulated_now, "Executing cron");
-                if let Err(e) = cognitive::services::atom_decay::run_decay_cycle(
-                    &self.inner_pool,
-                    &self.bus,
-                )
-                .await
+                if let Err(e) =
+                    cognitive::services::atom_decay::run_decay_cycle(&self.inner_pool, &self.bus)
+                        .await
                 {
                     debug!(error = %e, "AtomDecay cron failed");
                 }
             }
             CronTrigger::AutotunerNightly => {
-                // Awaiting SimMetricSource (wired in Task 8).
-                debug!(trigger = "AutotunerNightly", %simulated_now, "Awaiting SimMetricSource");
+                debug!(trigger = "AutotunerNightly", %simulated_now, "Executing cron");
+                let metric_source: Arc<dyn autotuner::traits::MetricSource> =
+                    Arc::new(crate::providers::SimMetricSource::new(self.inner_pool.clone()));
+                let trial_repo = storage::TrialRepo::new(self.inner_pool.clone());
+                let cycle = autotuner::NightlyCycle::new(
+                    config::AutoTunerConfig::default(),
+                    trial_repo,
+                    metric_source,
+                );
+                let champion = autotuner::Champion::default();
+                match cycle.run_evaluation_and_promotion(&champion).await {
+                    Ok(result) => {
+                        debug!(
+                            promoted = result.promotion.is_some(),
+                            regression = result.regression,
+                            "AutotunerNightly completed"
+                        );
+                    }
+                    Err(e) => {
+                        debug!(error = %e, "AutotunerNightly failed (non-fatal)");
+                    }
+                }
             }
             CronTrigger::CognitiveReflection => {
                 debug!(trigger = "CognitiveReflection", %simulated_now, "Executing cron");
@@ -687,7 +707,10 @@ impl SimulationHarness {
                     .bind(node_count.0)
                     .execute(&self.inner_pool)
                     .await;
-                    debug!(nodes = node_count.0, stability, "Community stability updated");
+                    debug!(
+                        nodes = node_count.0,
+                        stability, "Community stability updated"
+                    );
                 }
             }
         }

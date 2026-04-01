@@ -33,17 +33,15 @@ pub async fn count_brain_versions_since(pool: &sqlx::SqlitePool, since: &str) ->
 /// Returns `0.0` if no terminal trials exist or the `autotuner_trials` table
 /// does not exist.
 pub async fn measure_autotuner_success(pool: &sqlx::SqlitePool) -> f64 {
-    let promoted: Result<(i64,), _> = sqlx::query_as(
-        "SELECT COUNT(*) FROM autotuner_trials WHERE status = 'promoted'",
-    )
-    .fetch_one(pool)
-    .await;
+    let promoted: Result<(i64,), _> =
+        sqlx::query_as("SELECT COUNT(*) FROM autotuner_trials WHERE status = 'promoted'")
+            .fetch_one(pool)
+            .await;
 
-    let reverted: Result<(i64,), _> = sqlx::query_as(
-        "SELECT COUNT(*) FROM autotuner_trials WHERE status = 'reverted'",
-    )
-    .fetch_one(pool)
-    .await;
+    let reverted: Result<(i64,), _> =
+        sqlx::query_as("SELECT COUNT(*) FROM autotuner_trials WHERE status = 'reverted'")
+            .fetch_one(pool)
+            .await;
 
     let promoted = promoted.map(|(n,)| n).unwrap_or(0);
     let reverted = reverted.map(|(n,)| n).unwrap_or(0);
