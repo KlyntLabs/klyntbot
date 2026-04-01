@@ -1,0 +1,78 @@
+[persona]
+name = "software_engineer_vn"
+timezone = "Asia/Ho_Chi_Minh"
+language = "en"
+seed = 42
+
+[persona.messages_per_day]
+onboarding = 8
+routine = 5
+power_user = 7
+shift = 4
+
+[persona.profile]
+known_facts = [
+    { subject = "user", predicate = "works_as", object = "software engineer" },
+    { subject = "user", predicate = "prefers_language", object = "Rust" },
+    { subject = "user", predicate = "manages_project", object = "Klynt API rewrite" },
+    { subject = "user", predicate = "tracks_currency", object = "VND" },
+    { subject = "user", predicate = "works_at", object = "startup" },
+    { subject = "user", predicate = "location", object = "Ho Chi Minh City" },
+]
+
+[persona.phases.onboarding]
+duration_days = 14
+correction_rate = 0.25
+topic_weights = { tasks = 0.4, notes = 0.3, finance = 0.1, chat = 0.2 }
+new_fact_introduction_rate = 0.6
+tool_action_rate = 0.5
+
+[persona.phases.routine]
+duration_days = 75
+correction_rate = 0.10
+topic_weights = { tasks = 0.3, notes = 0.2, finance = 0.2, productivity = 0.2, chat = 0.1 }
+new_fact_introduction_rate = 0.15
+tool_action_rate = 0.7
+
+[persona.phases.power_user]
+duration_days = 90
+correction_rate = 0.05
+topic_weights = { tasks = 0.2, notes = 0.15, finance = 0.15, productivity = 0.15, automation = 0.15, insights = 0.1, chat = 0.1 }
+new_fact_introduction_rate = 0.05
+tool_action_rate = 0.8
+
+[persona.phases.behavior_shift]
+duration_days = 90
+correction_rate = 0.12
+shift_description = "User switches from backend to ML focus"
+new_facts = [
+    { subject = "user", predicate = "learning", object = "PyTorch" },
+    { subject = "user", predicate = "project_focus", object = "ML pipeline" },
+]
+topic_weights = { tasks = 0.2, notes = 0.3, finance = 0.1, learning = 0.25, chat = 0.15 }
+new_fact_introduction_rate = 0.4
+tool_action_rate = 0.6
+
+[[checkpoints]]
+at_day = 14
+assertions = [
+    { type = "metric_above", metric = "knowledge_retention", threshold = 0.0 },
+]
+
+[[checkpoints]]
+at_day = 90
+assertions = [
+    { type = "metric_above", metric = "knowledge_retention", threshold = 0.0 },
+]
+
+[[checkpoints]]
+at_day = 180
+assertions = [
+    { type = "metric_above", metric = "personalization_score", threshold = 0.0 },
+]
+
+[[checkpoints]]
+at_day = 269
+assertions = [
+    { type = "metric_above", metric = "knowledge_retention", threshold = 0.0 },
+]

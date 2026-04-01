@@ -207,6 +207,7 @@ feature-finance.workspace = true
 plugin-runtime.workspace = true
 tools-core.workspace = true
 extism.workspace = true
+simulator.workspace = true
 
 [profile.release]
 opt-level = 3

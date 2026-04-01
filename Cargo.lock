@@ -7048,6 +7048,7 @@ dependencies = [
  "scheduling",
  "serde_json",
  "session",
+ "simulator",
  "sqlx",
  "storage",
  "tempfile",
