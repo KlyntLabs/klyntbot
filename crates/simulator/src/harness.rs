@@ -127,6 +127,7 @@ impl SimulationHarness {
 
             // Phase 3: MESSAGE PHASE
             let messages = persona_runner.generate_day(plan.simulated_now);
+            total_messages += messages.len() as u32;
             for msg in &messages {
                 // Track accumulator metrics.
                 metrics.accumulator_mut().messages_processed += 1;
@@ -207,6 +208,9 @@ impl SimulationHarness {
                 count_brain_versions_since(&self.inner_pool, &plan.previous.to_rfc3339()).await;
             let wall_time_ms = epoch_start.elapsed().as_secs_f64() * 1000.0;
 
+            // Capture accumulator totals before snapshot resets them.
+            total_facts_extracted += metrics.accumulator_mut().facts_extracted;
+
             metrics.snapshot(
                 plan.simulated_now,
                 plan.day_of_simulation,
@@ -240,12 +244,6 @@ impl SimulationHarness {
             .map(|bl| compute_improvements(bl, &final_metrics))
             .unwrap_or_default();
 
-        // Estimate total messages from the known generation pattern.
-        // The accumulator resets each snapshot, so we approximate from config.
-        let total_messages = (0..total_days)
-            .map(|_| self.scenario.persona.messages_per_day.routine)
-            .sum::<u32>();
-
         let checkpoint_pass_count = checkpoint_results.iter().filter(|c| c.all_passed).count();
         let checkpoint_pass_rate = if checkpoint_results.is_empty() {
             1.0
@@ -255,7 +253,7 @@ impl SimulationHarness {
 
         let summary = ReportSummary {
             total_messages,
-            total_facts_extracted: final_metrics.fact_extraction_accuracy as u32, // approximation
+            total_facts_extracted,
             total_facts_superseded: 0,
             total_brain_versions: metrics
                 .timeline
