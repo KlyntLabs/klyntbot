@@ -29,9 +29,9 @@ tracing.workspace = true
 tokio = { workspace = true }
 rand = { workspace = true }
 rand_chacha = { workspace = true }
+sqlx = { workspace = true }
 toml = "0.8"
 
 [dev-dependencies]
-sqlx = { workspace = true }
 tokio = { workspace = true, features = ["macros", "test-util"] }
 tempfile.workspace = true
