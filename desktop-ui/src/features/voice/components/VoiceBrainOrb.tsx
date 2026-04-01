@@ -13,8 +13,21 @@ export function VoiceBrainOrb() {
   const prevPhaseRef = useRef(phase);
 
   // Unlock AudioContext on mount (orb opens via global hotkey, not a click).
+  // Also register a one-shot click/keydown listener: WebKit requires a user gesture
+  // for AudioContext.resume(), so we unlock on the first interaction in the window.
   useEffect(() => {
     unlockAudioContext();
+    const handler = () => {
+      unlockAudioContext();
+      document.removeEventListener("click", handler);
+      document.removeEventListener("keydown", handler);
+    };
+    document.addEventListener("click", handler);
+    document.addEventListener("keydown", handler);
+    return () => {
+      document.removeEventListener("click", handler);
+      document.removeEventListener("keydown", handler);
+    };
   }, []);
 
   // Second unlock attempt after Rust-side set_focus().
@@ -54,8 +67,9 @@ export function VoiceBrainOrb() {
     return () => window.removeEventListener("keydown", onKey);
   }, [end]);
 
-  // Enable dragging in Tauri.
+  // Unlock audio + enable dragging on any user interaction.
   const onMouseDown = async () => {
+    unlockAudioContext();
     if (window.__TAURI_INTERNALS__) {
       const { getCurrentWindow } = await import("@tauri-apps/api/window");
       getCurrentWindow().startDragging();

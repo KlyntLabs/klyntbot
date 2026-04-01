@@ -135,13 +135,16 @@ impl TtsEngine for Qwen3TtsEngine {
         {
             let voice = params.voice_name.as_deref().unwrap_or("alloy");
             let lang = map_language(&params.language);
+            let temperature = params.temperature.unwrap_or(0.9) as f64;
+            let instruct = params.instruct.clone();
 
             debug!(
-                "Qwen3-TTS synthesizing '{}' ({} chars, voice={}, lang={})",
+                "Qwen3-TTS synthesizing '{}' ({} chars, voice={}, lang={}, instruct={})",
                 &text[..text.len().min(50)],
                 text.len(),
                 voice,
-                lang
+                lang,
+                instruct.is_some()
             );
 
             let text_owned = text.to_string();
@@ -173,9 +176,31 @@ impl TtsEngine for Qwen3TtsEngine {
                         &chunk[..chunk.len().min(40)],
                         chunk.len()
                     );
-                    let (samples, _sr) = model
-                        .generate_with_params(chunk, &voice_owned, &lang, 0.9, 50, 2048)
-                        .map_err(|e| format!("Qwen3-TTS generation failed: {e}"))?;
+
+                    let (samples, _sr) = if let Some(ref desc) = instruct {
+                        model
+                            .generate_with_instruct(
+                                chunk,
+                                &voice_owned,
+                                &lang,
+                                desc,
+                                temperature,
+                                50,
+                                2048,
+                            )
+                            .map_err(|e| format!("Qwen3-TTS instruct failed: {e}"))?
+                    } else {
+                        model
+                            .generate_with_params(
+                                chunk,
+                                &voice_owned,
+                                &lang,
+                                temperature,
+                                50,
+                                2048,
+                            )
+                            .map_err(|e| format!("Qwen3-TTS generation failed: {e}"))?
+                    };
                     all_samples.extend(samples);
                 }
 

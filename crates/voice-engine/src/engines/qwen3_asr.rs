@@ -28,17 +28,37 @@ pub struct Qwen3AsrEngine {
     /// `from_pretrained` will create `{models_dir}/Qwen--Qwen3-ASR-0.6B/` inside.
     models_dir: PathBuf,
     state: Arc<Mutex<InnerState>>,
+    allowed_languages: Vec<String>,
+}
+
+/// Map model-returned language names to ISO 639-1 codes.
+fn normalize_language(lang: &str) -> &str {
+    match lang.to_lowercase().as_str() {
+        "english" | "en" => "en",
+        "chinese" | "mandarin chinese" | "zh" => "zh",
+        "vietnamese" | "vi" => "vi",
+        "japanese" | "ja" => "ja",
+        "korean" | "ko" => "ko",
+        "french" | "fr" => "fr",
+        "german" | "de" => "de",
+        "spanish" | "es" => "es",
+        _ => lang.split_whitespace().next().unwrap_or("en"),
+    }
 }
 
 impl Qwen3AsrEngine {
     /// Create a new Qwen3-ASR engine. `models_dir` is the parent models directory
     /// (e.g., `~/.klyntbot/models/`). The model will be auto-downloaded on first use
     /// via `from_pretrained` if not already cached.
-    pub fn new(models_dir: impl Into<PathBuf>) -> common::Result<Self> {
+    pub fn new(
+        models_dir: impl Into<PathBuf>,
+        allowed_languages: Vec<String>,
+    ) -> common::Result<Self> {
         let models_dir = models_dir.into();
         info!(
-            "Qwen3-ASR engine created for cache: {}",
-            models_dir.display()
+            "Qwen3-ASR engine created for cache: {} (languages: {:?})",
+            models_dir.display(),
+            allowed_languages
         );
         Ok(Self {
             models_dir,
@@ -46,6 +66,7 @@ impl Qwen3AsrEngine {
                 last_used: Instant::now(),
                 model: None,
             })),
+            allowed_languages,
         })
     }
 
@@ -65,6 +86,7 @@ impl TranscriptionEngine for Qwen3AsrEngine {
 
         let state = self.state.clone();
         let models_dir = self.models_dir.clone();
+        let allowed_languages = self.allowed_languages.clone();
 
         tokio::spawn(async move {
             let mut all_samples: Vec<f32> = Vec::with_capacity(EXPECTED_SAMPLES);
@@ -109,10 +131,14 @@ impl TranscriptionEngine for Qwen3AsrEngine {
             match result {
                 Ok(Ok((text, lang))) => {
                     let text = text.trim().to_string();
-                    let lang = if lang.is_empty() {
+                    let normalized = normalize_language(&lang);
+                    let lang = if lang.is_empty()
+                        || (!allowed_languages.is_empty()
+                            && !allowed_languages.iter().any(|a| a == normalized))
+                    {
                         "en".to_string()
                     } else {
-                        lang
+                        normalized.to_string()
                     };
                     debug!(
                         "Qwen3-ASR result: '{}' (lang={})",
@@ -156,6 +182,7 @@ impl TranscriptionEngine for Qwen3AsrEngine {
         let path_str = path.to_string_lossy().to_string();
         let state = self.state.clone();
         let models_dir = self.models_dir.clone();
+        let allowed_languages = self.allowed_languages.clone();
 
         let result = tokio::task::spawn_blocking(move || -> Result<(String, String), String> {
             let mut guard = state.lock().unwrap();
@@ -179,12 +206,23 @@ impl TranscriptionEngine for Qwen3AsrEngine {
         })?;
 
         match result {
-            Ok((text, lang)) => Ok(Transcript {
-                text: text.trim().to_string(),
-                language: Language::new(if lang.is_empty() { "en" } else { &lang }),
-                segments: vec![],
-                overall_confidence: 0.9,
-            }),
+            Ok((text, lang)) => {
+                let normalized = normalize_language(&lang);
+                let final_lang = if lang.is_empty()
+                    || (!allowed_languages.is_empty()
+                        && !allowed_languages.iter().any(|a| a == normalized))
+                {
+                    "en"
+                } else {
+                    normalized
+                };
+                Ok(Transcript {
+                    text: text.trim().to_string(),
+                    language: Language::new(final_lang),
+                    segments: vec![],
+                    overall_confidence: 0.9,
+                })
+            }
             Err(e) => {
                 warn!("Qwen3-ASR file transcription error: {e}");
                 Ok(Transcript {

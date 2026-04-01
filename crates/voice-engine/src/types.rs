@@ -118,6 +118,13 @@ pub struct TtsParams {
     pub voice_name: Option<String>,
     #[serde(default = "default_speaking_rate")]
     pub speaking_rate: f32,
+    /// Natural language voice description for instruct-mode TTS (1.7B model).
+    /// When set, the engine uses `generate_with_instruct` instead of `generate_with_params`.
+    #[serde(default)]
+    pub instruct: Option<String>,
+    /// Override generation temperature (0.1–1.0). None uses the engine default (0.9).
+    #[serde(default)]
+    pub temperature: Option<f32>,
 }
 
 fn default_speaking_rate() -> f32 {
@@ -130,6 +137,8 @@ impl Default for TtsParams {
             language: Language::default(),
             voice_name: None,
             speaking_rate: default_speaking_rate(),
+            instruct: None,
+            temperature: None,
         }
     }
 }
