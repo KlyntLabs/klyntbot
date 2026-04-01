@@ -1,4 +1,5 @@
 pub mod behavioral;
+pub mod ground_truth;
 pub mod memory;
 pub mod system;
 
