@@ -21,7 +21,7 @@ jobs:
         uses: swatinem/rust-cache@v2
 
       - name: Install system dependencies
-        run: brew install protobuf
+        run: brew install protobuf opus autoconf automake
 
       - name: Install Bun
         uses: oven-sh/setup-bun@v2
