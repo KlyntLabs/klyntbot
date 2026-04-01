@@ -873,9 +873,10 @@ impl AppCore {
 
                             // Hot-swap STT engine after successful download
                             if asr.is_ok() {
-                                if let Ok(engine) =
-                                    voice_engine::Qwen3AsrEngine::new(mm.models_dir(), allowed_langs)
-                                {
+                                if let Ok(engine) = voice_engine::Qwen3AsrEngine::new(
+                                    mm.models_dir(),
+                                    allowed_langs,
+                                ) {
                                     svc_for_swap.set_local_engine(Arc::new(engine)
                                         as Arc<dyn voice_engine::TranscriptionEngine>);
                                     info!("Hot-swapped Qwen3-ASR into live VoiceService");

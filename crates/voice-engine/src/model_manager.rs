@@ -332,7 +332,10 @@ mod tests {
 
     #[test]
     fn tts_instruct_model_metadata() {
-        assert_eq!(Qwen3Model::TtsInstruct.dir_name(), "qwen3-tts-1.7b-instruct");
+        assert_eq!(
+            Qwen3Model::TtsInstruct.dir_name(),
+            "qwen3-tts-1.7b-instruct"
+        );
         assert_eq!(
             Qwen3Model::TtsInstruct.repo_id(),
             "Qwen/Qwen3-TTS-12Hz-1.7B-CustomVoice"

@@ -396,8 +396,7 @@ mod tests {
 
     #[test]
     fn deserialize_custom_persona() {
-        let json =
-            r#"{"type": "custom", "description": "deep calm voice", "speed": 0.9, "temperature": 0.7}"#;
+        let json = r#"{"type": "custom", "description": "deep calm voice", "speed": 0.9, "temperature": 0.7}"#;
         let persona: VoicePersona = serde_json::from_str(json).unwrap();
         match persona {
             VoicePersona::Custom { description, .. } => {

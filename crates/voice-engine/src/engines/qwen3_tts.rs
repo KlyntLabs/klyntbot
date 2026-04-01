@@ -191,14 +191,7 @@ impl TtsEngine for Qwen3TtsEngine {
                             .map_err(|e| format!("Qwen3-TTS instruct failed: {e}"))?
                     } else {
                         model
-                            .generate_with_params(
-                                chunk,
-                                &voice_owned,
-                                &lang,
-                                temperature,
-                                50,
-                                2048,
-                            )
+                            .generate_with_params(chunk, &voice_owned, &lang, temperature, 50, 2048)
                             .map_err(|e| format!("Qwen3-TTS generation failed: {e}"))?
                     };
                     all_samples.extend(samples);

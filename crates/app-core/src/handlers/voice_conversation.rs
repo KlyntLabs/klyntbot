@@ -815,10 +815,7 @@ impl VoiceConversationManager {
         // Call TTS via voice service (emits SpeakResponse event)
         let tts_params = {
             let config = self.config.read().await;
-            let persona = config
-                .output
-                .personas
-                .get(&config.output.default_persona);
+            let persona = config.output.personas.get(&config.output.default_persona);
             match persona {
                 Some(config::schema::VoicePersona::Preset {
                     speaker,

@@ -111,8 +111,7 @@ fn play_audio_native(samples: Vec<f32>, sample_rate: u32) {
 
         // Wait for playback to finish
         let total_duration_ms = (samples.len() as u64 * 1000) / sample_rate as u64;
-        let deadline =
-            Instant::now() + std::time::Duration::from_millis(total_duration_ms + 500);
+        let deadline = Instant::now() + std::time::Duration::from_millis(total_duration_ms + 500);
         while !done.load(std::sync::atomic::Ordering::Relaxed) && Instant::now() < deadline {
             std::thread::sleep(std::time::Duration::from_millis(50));
         }
