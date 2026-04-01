@@ -60,11 +60,12 @@ enum McpCommands {
 /// Position the voice orb at the bottom-right of the window's current monitor.
 fn position_orb_bottom_right(window: &tauri::WebviewWindow) {
     if let Ok(Some(monitor)) = window.current_monitor() {
-        let pos = monitor.position();
-        let size = monitor.size();
-        let x = pos.x + size.width as i32 - 200 - 24;
-        let y = pos.y + size.height as i32 - 200 - 24;
-        let _ = window.set_position(tauri::PhysicalPosition::new(x, y));
+        let scale = monitor.scale_factor();
+        let pos: tauri::LogicalPosition<f64> = monitor.position().to_logical(scale);
+        let size: tauri::LogicalSize<f64> = monitor.size().to_logical(scale);
+        let x = pos.x + size.width - 200.0 - 24.0;
+        let y = pos.y + size.height - 200.0 - 24.0;
+        let _ = window.set_position(tauri::LogicalPosition::new(x, y));
     }
 }
 

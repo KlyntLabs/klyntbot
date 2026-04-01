@@ -118,12 +118,7 @@
         "alwaysOnTop": true,
         "skipTaskbar": true,
         "center": false,
-        "focus": false,
-        "windowEffects": {
-          "effects": ["hudWindow"],
-          "state": "active",
-          "radius": 100.0
-        }
+        "focus": false
       }
     ],
     "macOSPrivateApi": true,
