@@ -7,16 +7,18 @@ use std::time::Instant;
 
 use bus::{ContextUpdateQueue, CorrectionKind, DomainEvent, DomainEventBus};
 use chrono::{Duration, TimeZone, Utc};
+use context_engine::MemoryRetriever;
 use tracing::{debug, info, warn};
 
 use crate::actions::ActionExecutor;
 use crate::epoch::{CronTrigger, EpochStep, SimulatedEpoch};
 use crate::metrics::ground_truth::{CheckpointResult, GroundTruthVerifier};
-use crate::metrics::memory::measure_knowledge_retention;
+use crate::metrics::memory::{measure_knowledge_retention, measure_retrieval_quality};
 use crate::metrics::system::{count_brain_versions_since, measure_community_stability};
 use crate::metrics::MetricCollector;
 use crate::persona::types::SimulatedToolAction;
 use crate::persona::PersonaRunner;
+use crate::providers::FtsMemoryRetriever;
 use crate::report::{compute_improvements, ReportSummary, SimulationReport};
 use crate::scenario::Scenario;
 
@@ -33,6 +35,7 @@ pub struct SimulationHarness {
     /// Available for Phase 2 episodic memory integration.
     #[allow(dead_code)]
     episodic_repo: cognitive::EpisodicMemoryRepo,
+    retriever: FtsMemoryRetriever,
     extraction_handler: Arc<dyn cognitive::ExtractionHandler>,
     consolidation_handler: Arc<dyn cognitive::ConsolidationHandler>,
 }
@@ -66,6 +69,9 @@ impl SimulationHarness {
         let fact_repo = cognitive::SemanticFactRepo::new(inner_pool.clone());
         let episodic_repo = cognitive::EpisodicMemoryRepo::new(inner_pool.clone());
 
+        // 5. Create FTS-based memory retriever for retrieval precision/recall.
+        let retriever = FtsMemoryRetriever::new(cognitive::SemanticFactRepo::new(inner_pool.clone()));
+
         Ok(Self {
             scenario,
             pool,
@@ -74,6 +80,7 @@ impl SimulationHarness {
             context_queue,
             fact_repo,
             episodic_repo,
+            retriever,
             extraction_handler,
             consolidation_handler,
         })
@@ -167,6 +174,21 @@ impl SimulationHarness {
 
                 // Drive cognitive pipeline: extract facts from message.
                 self.run_cognitive_pipeline(msg, &mut metrics).await;
+
+                // Step 3d: Drive retrieval for precision/recall metrics.
+                let retrieved = self.retriever.retrieve(&msg.content, 10).await;
+                let retrieved_ids: Vec<String> =
+                    retrieved.iter().map(|e| e.id.clone()).collect();
+
+                if let Some(ref gt) = msg.ground_truth {
+                    if !gt.relevant_facts.is_empty() {
+                        let (precision, recall) =
+                            measure_retrieval_quality(&retrieved_ids, &gt.relevant_facts);
+                        metrics.accumulator_mut().retrieval_precision_sum += precision;
+                        metrics.accumulator_mut().retrieval_recall_sum += recall;
+                        metrics.accumulator_mut().retrieval_count += 1;
+                    }
+                }
 
                 // Token tracking (150 per scripted call).
                 metrics.accumulator_mut().total_tokens += 150;
