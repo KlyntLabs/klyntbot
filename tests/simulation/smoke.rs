@@ -165,27 +165,65 @@ async fn run_software_engineer_12mo() {
     eprintln!("  Simulated days:     {}", report.simulated_days);
     eprintln!("  Wall time:          {:.2}s", report.wall_time_secs);
     eprintln!("  Total messages:     {}", report.summary.total_messages);
-    eprintln!("  Facts extracted:    {}", report.summary.total_facts_extracted);
-    eprintln!("  Brain versions:     {}", report.summary.total_brain_versions);
-    eprintln!("  Checkpoints:        {}/{} passed",
+    eprintln!(
+        "  Facts extracted:    {}",
+        report.summary.total_facts_extracted
+    );
+    eprintln!(
+        "  Brain versions:     {}",
+        report.summary.total_brain_versions
+    );
+    eprintln!(
+        "  Checkpoints:        {}/{} passed",
         report.checkpoints.iter().filter(|c| c.all_passed).count(),
-        report.checkpoints.len());
-    eprintln!("  Pass rate:          {:.0}%", report.summary.checkpoint_pass_rate * 100.0);
-    eprintln!("  Regressions:        {}", report.summary.regression_alerts.len());
+        report.checkpoints.len()
+    );
+    eprintln!(
+        "  Pass rate:          {:.0}%",
+        report.summary.checkpoint_pass_rate * 100.0
+    );
+    eprintln!(
+        "  Regressions:        {}",
+        report.summary.regression_alerts.len()
+    );
     eprintln!();
 
     // Print metric evolution (first, middle, last)
     let timeline = &report.metric_timeline;
     if let (Some(first), Some(last)) = (timeline.first(), timeline.last()) {
-        eprintln!("  Metric Evolution (day 1 → day {}):", report.simulated_days);
+        eprintln!(
+            "  Metric Evolution (day 1 → day {}):",
+            report.simulated_days
+        );
         eprintln!("  ─────────────────────────────────────────────");
-        eprintln!("  Knowledge retention:   {:.3} → {:.3}", first.knowledge_retention, last.knowledge_retention);
-        eprintln!("  Retrieval precision:   {:.3} → {:.3}", first.retrieval_precision, last.retrieval_precision);
-        eprintln!("  Correction rate:       {:.3} → {:.3}", first.correction_rate, last.correction_rate);
-        eprintln!("  Personalization score: {:.3} → {:.3}", first.personalization_score, last.personalization_score);
-        eprintln!("  Token efficiency:      {:.0} → {:.0}", first.token_efficiency, last.token_efficiency);
-        eprintln!("  Community stability:   {:.3} → {:.3}", first.community_stability, last.community_stability);
-        eprintln!("  Brain version velocity:{} → {}", first.brain_version_velocity, last.brain_version_velocity);
+        eprintln!(
+            "  Knowledge retention:   {:.3} → {:.3}",
+            first.knowledge_retention, last.knowledge_retention
+        );
+        eprintln!(
+            "  Retrieval precision:   {:.3} → {:.3}",
+            first.retrieval_precision, last.retrieval_precision
+        );
+        eprintln!(
+            "  Correction rate:       {:.3} → {:.3}",
+            first.correction_rate, last.correction_rate
+        );
+        eprintln!(
+            "  Personalization score: {:.3} → {:.3}",
+            first.personalization_score, last.personalization_score
+        );
+        eprintln!(
+            "  Token efficiency:      {:.0} → {:.0}",
+            first.token_efficiency, last.token_efficiency
+        );
+        eprintln!(
+            "  Community stability:   {:.3} → {:.3}",
+            first.community_stability, last.community_stability
+        );
+        eprintln!(
+            "  Brain version velocity:{} → {}",
+            first.brain_version_velocity, last.brain_version_velocity
+        );
     }
 
     // Print checkpoint details
@@ -195,14 +233,19 @@ async fn run_software_engineer_12mo() {
         eprintln!("  Checkpoint day {}: {}", cp.at_day, status);
         for a in &cp.assertions {
             let mark = if a.passed { "  [x]" } else { "  [ ]" };
-            eprintln!("    {} {} (actual: {:?}, expected: {})",
-                mark, a.description, a.actual_value, a.expected);
+            eprintln!(
+                "    {} {} (actual: {:?}, expected: {})",
+                mark, a.description, a.actual_value, a.expected
+            );
         }
     }
 
     eprintln!();
     eprintln!("  Report written to: {}", report_path.display());
-    eprintln!("  Verdict: {}", if report.passed() { "PASSED" } else { "FAILED" });
+    eprintln!(
+        "  Verdict: {}",
+        if report.passed() { "PASSED" } else { "FAILED" }
+    );
 
     assert!(report.summary.total_messages > 0);
     assert!(report.passed(), "Simulation failed — see report above");
