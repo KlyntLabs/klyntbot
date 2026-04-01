@@ -1,6 +1,7 @@
 import { useEvent } from "@shared/hooks/useEvent";
 import { ipc } from "@shared/hooks/useIpc";
 import { playTtsAudio, stopTtsAudio } from "@shared/lib/audio";
+import { isTauri } from "@shared/lib/utils";
 import { useCallback, useRef, useState } from "react";
 
 export type ConversationPhase = "idle" | "listening" | "reflecting" | "speaking";
@@ -108,7 +109,11 @@ export function useVoiceConversation() {
           text: payload.text as string,
         };
         setTtsAudio(audio);
-        playTtsAudio(audio.base64, audio.sampleRate);
+        // In Tauri, audio plays natively from Rust via cpal — skip WebView playback
+        // to avoid double audio. In browser dev mode, play via Web Audio API.
+        if (!isTauri) {
+          playTtsAudio(audio.base64, audio.sampleRate);
+        }
         break;
       }
       case "ttsFadeOut":

@@ -45,6 +45,81 @@ fn base64_encode_audio(clip: &AudioClip) -> String {
     base64::engine::general_purpose::STANDARD.encode(&bytes)
 }
 
+/// Play audio samples directly through the system default output device.
+/// Runs in a blocking thread since cpal::Stream is !Send.
+fn play_audio_native(samples: Vec<f32>, sample_rate: u32) {
+    std::thread::spawn(move || {
+        use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
+
+        let host = cpal::default_host();
+        let device = match host.default_output_device() {
+            Some(d) => d,
+            None => {
+                warn!("No default audio output device found");
+                return;
+            }
+        };
+
+        let config = cpal::StreamConfig {
+            channels: 1,
+            sample_rate: cpal::SampleRate(sample_rate),
+            buffer_size: cpal::BufferSize::Default,
+        };
+
+        let samples = Arc::new(samples);
+        let pos = Arc::new(std::sync::atomic::AtomicUsize::new(0));
+        let done = Arc::new(std::sync::atomic::AtomicBool::new(false));
+        let done_clone = done.clone();
+
+        let samples_ref = samples.clone();
+        let pos_ref = pos.clone();
+
+        let stream = match device.build_output_stream(
+            &config,
+            move |data: &mut [f32], _: &cpal::OutputCallbackInfo| {
+                let current = pos_ref.load(std::sync::atomic::Ordering::Relaxed);
+                let remaining = samples_ref.len().saturating_sub(current);
+                let to_copy = data.len().min(remaining);
+                if to_copy > 0 {
+                    data[..to_copy].copy_from_slice(&samples_ref[current..current + to_copy]);
+                    pos_ref.store(current + to_copy, std::sync::atomic::Ordering::Relaxed);
+                }
+                // Silence any remaining buffer
+                for sample in data[to_copy..].iter_mut() {
+                    *sample = 0.0;
+                }
+                if to_copy == 0 {
+                    done_clone.store(true, std::sync::atomic::Ordering::Relaxed);
+                }
+            },
+            move |err| {
+                warn!("Audio output stream error: {err}");
+            },
+            None,
+        ) {
+            Ok(s) => s,
+            Err(e) => {
+                warn!("Failed to build audio output stream: {e}");
+                return;
+            }
+        };
+
+        if let Err(e) = stream.play() {
+            warn!("Failed to play audio stream: {e}");
+            return;
+        }
+
+        // Wait for playback to finish
+        let total_duration_ms = (samples.len() as u64 * 1000) / sample_rate as u64;
+        let deadline =
+            Instant::now() + std::time::Duration::from_millis(total_duration_ms + 500);
+        while !done.load(std::sync::atomic::Ordering::Relaxed) && Instant::now() < deadline {
+            std::thread::sleep(std::time::Duration::from_millis(50));
+        }
+        // Stream drops here, stopping playback
+    });
+}
+
 /// Configuration for the VoiceService.
 #[derive(Debug, Clone)]
 pub struct VoiceServiceConfig {
@@ -601,10 +676,12 @@ impl VoiceService {
                     }
                     Ok(clip) => {
                         info!(
-                            "TTS: {} samples at {}Hz, emitting SpeakResponse",
+                            "TTS: {} samples at {}Hz, playing natively + emitting SpeakResponse",
                             clip.samples.len(),
                             clip.sample_rate
                         );
+                        // Play directly through system audio output (bypasses WebView AudioContext)
+                        play_audio_native(clip.samples.clone(), clip.sample_rate);
                         let audio_base64 = base64_encode_audio(&clip);
                         let _ = self
                             .event_tx
