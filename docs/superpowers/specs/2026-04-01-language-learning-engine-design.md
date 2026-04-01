@@ -2,7 +2,7 @@
 
 > **Status:** Approved
 > **Date:** 2026-04-01
-> **Goal:** Transform the voice system into an ELSA-competitive language learning platform with phoneme-level pronunciation scoring, Mandarin tone analysis, and adaptive feedback — all running locally on Apple Silicon.
+> **Goal:** Transform the voice system into an ELSA-competitive language learning platform with phoneme-level pronunciation scoring, Mandarin tone analysis, and adaptive feedback — running locally on Apple Silicon with optional cloud API fallback.
 
 ---
 
@@ -13,38 +13,40 @@
 | Pronunciation depth | Phoneme-level + Chinese tone analysis | Word-level confidence (current) is too coarse for learning |
 | Learning modes | A (conversation) → B (drills) → C (exam), progressive | Ship fast with A, layer B and C incrementally |
 | TTS engine | Qwen3-TTS primary, AVSpeech fallback | Rust-native (`qwen3_tts` crate, MLX backend), drops into `TtsEngine` trait |
-| STT engine | Qwen3-ASR primary, Whisper fallback | Rust-native (`qwen3_asr_rs`), 52-language support, outperforms Whisper on ZH |
+| STT engine | Qwen3-ASR (replaces Whisper everywhere) | Better multilingual, same size, unified Qwen3 family |
 | Alignment | Qwen3-ForcedAligner (0.6B) | Phoneme-level timestamps for 11 languages, same model family |
 | Feedback UX | Adaptive (D) — Summary → Overlay → Silent | FSRS stability drives escalation; respects conversational flow |
 | Target languages | English + Chinese (Phase 1) | Both well-supported by Qwen3 ecosystem |
+| Deployment | Local-first, cloud toggle per engine | Generic OpenAI-compatible API, DashScope as reference |
+| Whisper | Removed entirely | Qwen3-ASR is same size, better quality, no reason to keep both |
 | CosyVoice | Deferred to Phase 4 | No Rust crate; Python sidecar breaks single-binary philosophy |
 
 ---
 
 ## 2. Model Stack
 
-All models from the Qwen3 family. Unified model management via `ModelManager`.
+All models from the Qwen3 family. Whisper is fully removed — Qwen3-ASR replaces it for all voice features (conversation, chat, routing, language learning).
 
 | Model | Purpose | Size | Rust crate | Backend |
 |-------|---------|------|-----------|---------|
 | Qwen3-TTS-0.6B | Text-to-speech (10 languages, voice cloning) | ~600MB | `qwen3_tts` | MLX (Apple Silicon) |
 | Qwen3-ASR-0.6B | Speech recognition (52 languages, timestamps) | ~600MB | `qwen3_asr_rs` | MLX |
 | Qwen3-ForcedAligner-0.6B | Phoneme/word alignment (11 languages) | ~600MB | via `qwen3_asr_rs` | MLX |
-| Whisper-small (existing) | STT fallback | ~500MB | `whisper-rs` | Metal |
+
+**Whisper removal scope:** Remove `whisper-rs` dependency from `voice-engine/Cargo.toml`, delete `engines/whisper_local.rs`, remove `WhisperModelSize` from `ModelManager`, update all call sites in `service.rs` and `init/mod.rs` to use `Qwen3AsrEngine`. Existing Whisper model files on disk can be ignored (not auto-deleted).
 
 **Lifecycle:**
 - **Auto-download** on first app launch (background, progress bar, ~1.8GB total)
 - **Lazy-load** into memory on first engine call (~2s from SSD)
 - **Idle-unload** after 5 minutes of inactivity (frees ~1.8GB RAM)
-- Peak memory when all active: ~2.4GB
+- Peak memory when all active: ~1.8GB (down from ~2.4GB without Whisper)
 
 **Model directory:**
 ```
 ~/.klyntbot/models/voice/
 ├── qwen3-tts-0.6b/       # safetensors + config
 ├── qwen3-asr-0.6b/       # safetensors + config
-├── qwen3-aligner-0.6b/   # safetensors + config
-└── whisper/ggml-small.bin # existing
+└── qwen3-aligner-0.6b/   # safetensors + config
 ```
 
 ---
@@ -55,33 +57,79 @@ All models from the Qwen3 family. Unified model management via `ModelManager`.
 
 ```
 voice-engine/src/engines/
-├── qwen3_tts.rs      — TtsEngine impl via qwen3_tts crate (MLX)
-├── qwen3_asr.rs      — TranscriptionEngine impl via qwen3_asr_rs
-└── qwen3_aligner.rs  — PronunciationAnalyzer (new trait)
+├── qwen3_tts.rs          — TtsEngine impl via qwen3_tts crate (MLX, local)
+├── qwen3_asr.rs          — TranscriptionEngine impl via qwen3_asr_rs (local)
+├── qwen3_aligner.rs      — PronunciationAnalyzer (new trait, local only)
+├── cloud_tts.rs          — TtsEngine impl via OpenAI-compatible API
+├── cloud_asr.rs          — TranscriptionEngine impl via OpenAI-compatible API
+├── avspeech.rs           — macOS system TTS (existing, kept as lightweight fallback)
+└── kokoro.rs             — Kokoro TTS (existing, kept)
 ```
 
-**Config-driven engine selection:**
-- `voice.output.ttsEngine: "qwen3"` → Qwen3-TTS primary, AVSpeech fallback (via TtsEngineManager)
-- `voice.input.sttEngine: "qwen3"` → Qwen3-ASR primary, Whisper fallback (new SttEngineManager)
-- ForcedAligner always uses Qwen3 (graceful degrade to word-level if unavailable)
+**Whisper removal:** `whisper_local.rs` is deleted. `WhisperLocalEngine` and `WhisperModelSize` are removed. All STT call sites now use `Qwen3AsrEngine` (local) or `CloudAsrEngine` (cloud).
 
-**Config enum additions:**
+**Config-driven engine + deployment selection:**
 ```rust
 pub enum SttEngineKind {
-    WhisperLocal,
-    Qwen3,       // NEW
-    Cloud,
+    #[default]
+    Qwen3,       // Local Qwen3-ASR (replaces WhisperLocal)
 }
 
 pub enum TtsEngineKind {
-    System,
-    Kokoro,
-    Qwen3,       // NEW
-    Piper,
+    #[default]
+    Qwen3,       // Local Qwen3-TTS
+    System,      // macOS AVSpeech (lightweight fallback)
+    Kokoro,      // Kokoro-82M ONNX (existing)
+}
+
+/// Deployment mode for each engine — local model or cloud API.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(tag = "mode", rename_all = "camelCase")]
+pub enum EngineDeployment {
+    /// Run model locally on device (MLX/Metal).
+    #[default]
+    Local,
+    /// Call a cloud API (OpenAI-compatible endpoint).
+    Cloud {
+        api_url: String,
+        api_key: Secret<String>,
+    },
 }
 ```
 
-### 3.2 New Trait: PronunciationAnalyzer
+**Config example (config.json):**
+```json
+{
+  "voice": {
+    "input": {
+      "sttEngine": "qwen3",
+      "deployment": "local"
+    },
+    "output": {
+      "ttsEngine": "qwen3",
+      "deployment": {
+        "mode": "cloud",
+        "apiUrl": "https://dashscope.aliyuncs.com/compatible-mode/v1",
+        "apiKey": "sk-..."
+      }
+    }
+  }
+}
+```
+
+Users can mix local and cloud per engine — e.g., local ASR (privacy) + cloud TTS (faster).
+
+### 3.2 Cloud Engine Implementation
+
+`CloudTtsEngine` and `CloudAsrEngine` use the OpenAI-compatible audio API format:
+- **TTS:** `POST /audio/speech` with `{ model, input, voice }` → returns audio bytes
+- **ASR:** `POST /audio/transcriptions` with multipart form (file + model + language) → returns transcript JSON
+
+DashScope (Alibaba Cloud) is the reference provider since it hosts Qwen3 models natively. Any OpenAI-compatible endpoint works (Groq, Together, self-hosted vLLM).
+
+Cloud engines skip model download/loading entirely. Circuit breaker applies normally.
+
+### 3.3 New Trait: PronunciationAnalyzer
 
 ```rust
 #[async_trait]
@@ -347,6 +395,10 @@ Each weak phoneme/tone creates a review card in `phoneme_mastery`.
 
 ### Phase 1 (ship first): Free Conversation + Pronunciation Core
 - Qwen3-TTS + Qwen3-ASR engines (implementing existing traits)
+- Remove Whisper entirely (delete `whisper_local.rs`, remove `whisper-rs` dep)
+- Qwen3-ASR replaces Whisper for ALL voice features (conversation, chat, routing)
+- Cloud engine implementations (OpenAI-compatible API, DashScope reference)
+- Local/cloud deployment toggle in config per engine
 - Qwen3-ForcedAligner + ToneContourAnalyzer
 - PronunciationPipeline (4 components)
 - Adaptive feedback (Summary default, Overlay on persistent errors)
@@ -377,10 +429,19 @@ Each weak phoneme/tone creates a review card in `phoneme_mastery`.
 
 ## 10. Performance & Safety
 
-- **Total disk:** ~2.3GB for all Qwen3 models (auto-downloaded once)
-- **Peak RAM:** ~2.4GB when all engines active, 0 when idle-unloaded
+**Local mode:**
+- **Total disk:** ~1.8GB for all Qwen3 models (auto-downloaded once, no Whisper)
+- **Peak RAM:** ~1.8GB when all engines active, 0 when idle-unloaded
 - **Latency:** TTS <200ms, ASR <100ms TTFT, alignment <500ms (Apple Silicon M-series)
+- **No cloud dependency by default:** Everything runs locally, zero data leaves the device
+
+**Cloud mode:**
+- **Zero disk / RAM for models** — all inference is server-side
+- **Latency:** depends on network + provider (~200-500ms typical)
+- **API key required** — stored in `Secret<String>`, never logged
+- **Privacy trade-off:** audio is sent to the cloud provider (user's explicit choice in settings)
+
+**Shared:**
 - **Circuit breaker:** Per engine (ASR/TTS/Aligner), reuses existing pattern
 - **Alignment timeout:** 3-5s max for long utterances
-- **No cloud dependency:** Everything runs locally, zero data leaves the device
-- **Graceful degradation:** If Qwen3 model unavailable → Whisper + word-level scoring (current behavior)
+- **Graceful degradation:** If local model unavailable and cloud not configured → AVSpeech TTS only (no pronunciation scoring)
