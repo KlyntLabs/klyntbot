@@ -17,6 +17,7 @@ use super::finance::FinanceConfig;
 use super::gateway::GatewayConfig;
 use super::integrations::IntegrationsConfig;
 use super::language::LanguageConfig;
+use super::language_learning::LanguageLearningConfig;
 use super::launcher::LauncherConfig;
 use super::learning::LearningConfig;
 use super::lifecycle::LifecycleConfig;
@@ -233,6 +234,10 @@ pub struct Config {
     /// Voice input/output configuration.
     #[serde(default)]
     pub voice: VoiceConfig,
+
+    /// Language learning engine configuration (pronunciation feedback, FSRS).
+    #[serde(default)]
+    pub language_learning: LanguageLearningConfig,
 }
 
 fn default_schema_version() -> u32 {

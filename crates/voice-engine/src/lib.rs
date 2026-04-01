@@ -1,7 +1,7 @@
 //! Voice Engine — core audio capture, transcription, and synthesis for Klyntbot.
 //!
 //! This crate provides the `TranscriptionEngine` and `TtsEngine` traits,
-//! concrete implementations (whisper-rs local, AVSpeech TTS),
+//! concrete implementations (AVSpeech TTS, Qwen3 planned),
 //! the `AudioCapture` subsystem, and the `VoiceService` orchestrator.
 
 pub mod capture;
@@ -22,11 +22,9 @@ pub mod vad;
 
 pub use capture::{AudioCapture, CaptureConfig, CaptureSession, MonitorSession};
 pub use engine_manager::TtsEngineManager;
-#[cfg(feature = "kokoro")]
-pub use engines::KokoroTtsEngine;
-pub use engines::{AvSpeechTtsEngine, WhisperLocalEngine};
+pub use engines::AvSpeechTtsEngine;
 pub use events::{VoiceEvent, VOICE_EVENT};
-pub use model_manager::{ModelManager, ModelState, WhisperModelSize};
+pub use model_manager::ModelManager;
 pub use pronunciation::compute_pronunciation_report;
 pub use router::VoiceRouter;
 pub use service::{MemoryEchoProvider, VoiceService, VoiceServiceConfig};

@@ -619,62 +619,15 @@ impl AppCore {
                 let data_dir = config_guard.data_dir_path();
 
                 let model_manager = ModelManager::new(&data_dir);
-                let model_needs_download = !model_manager.is_available(WhisperModelSize::Small);
 
-                // Local STT: try to load WhisperLocalEngine if model exists
-                let stt_local: Option<Arc<dyn TranscriptionEngine>> = model_manager
-                    .model_path(WhisperModelSize::Small)
-                    .and_then(|path| match engines::WhisperLocalEngine::new(&path) {
-                        Ok(engine) => {
-                            info!("Whisper local engine loaded from {}", path.display());
-                            Some(Arc::new(engine) as Arc<dyn TranscriptionEngine>)
-                        }
-                        Err(e) => {
-                            warn!("Failed to load local Whisper engine: {e}");
-                            None
-                        }
-                    });
+                // STT: will be replaced by Qwen3-ASR in a later task
+                let stt_local: Option<Arc<dyn TranscriptionEngine>> = None;
 
                 drop(config_guard);
 
-                // TTS: wrap in engine manager with system fallback when Kokoro is primary
-                let tts: Option<Arc<dyn voice_engine::TtsEngine>> = {
-                    let system_tts = Arc::new(voice_engine::AvSpeechTtsEngine::new(&data_dir));
-
-                    #[cfg(feature = "kokoro")]
-                    {
-                        if let config::schema::TtsEngineKind::Kokoro =
-                            voice_config.output.tts_engine
-                        {
-                            if let Some(kokoro_dir) = model_manager.kokoro_model_dir() {
-                                match voice_engine::KokoroTtsEngine::new(&kokoro_dir).await {
-                                    Ok(kokoro) => {
-                                        info!("Kokoro TTS loaded — wrapping with system fallback");
-                                        let manager = voice_engine::TtsEngineManager::new(
-                                            Arc::new(kokoro),
-                                            Some(system_tts),
-                                        );
-                                        Some(Arc::new(manager) as Arc<dyn voice_engine::TtsEngine>)
-                                    }
-                                    Err(e) => {
-                                        warn!("Kokoro failed, using system TTS: {e}");
-                                        Some(system_tts as Arc<dyn voice_engine::TtsEngine>)
-                                    }
-                                }
-                            } else {
-                                info!("Kokoro model not found, using system TTS");
-                                Some(system_tts as Arc<dyn voice_engine::TtsEngine>)
-                            }
-                        } else {
-                            Some(system_tts as Arc<dyn voice_engine::TtsEngine>)
-                        }
-                    }
-
-                    #[cfg(not(feature = "kokoro"))]
-                    {
-                        Some(system_tts as Arc<dyn voice_engine::TtsEngine>)
-                    }
-                };
+                // TTS: system TTS fallback, Qwen3-TTS will be wired later
+                let tts: Option<Arc<dyn voice_engine::TtsEngine>> =
+                    Some(Arc::new(voice_engine::AvSpeechTtsEngine::new(&data_dir)));
 
                 // Always create VoiceService — even without a local engine yet.
                 // If the model is still downloading, voice_conversation_start will wait.
@@ -743,41 +696,10 @@ impl AppCore {
                     spawn_periodic_timer(&shutdown_token, 300, move || svc.try_unload_idle_stt());
                 }
 
-                if !has_local_engine {
-                    if model_needs_download {
-                        // Auto-download whisper-small in background on first run.
-                        // Voice will wait for download on first use.
-                        // Once download completes, local engine becomes available.
-                        info!("Whisper model not found — starting background download");
-                        let svc = Arc::clone(&service);
-                        let data_dir = data_dir.clone();
-                        tokio::spawn(async move {
-                            match svc.download_model(WhisperModelSize::Small).await {
-                                Ok(()) => {
-                                    info!("Whisper model downloaded — local voice available on next capture");
-                                    // Hot-load: set local engine so next start_capture uses it.
-                                    let model_path = data_dir
-                                        .join("models")
-                                        .join(WhisperModelSize::Small.filename());
-                                    match engines::WhisperLocalEngine::new(&model_path) {
-                                        Ok(engine) => {
-                                            svc.set_local_engine(Arc::new(engine));
-                                            info!("Local Whisper engine hot-loaded after download");
-                                        }
-                                        Err(e) => {
-                                            warn!("Failed to hot-load Whisper engine after download: {e}");
-                                        }
-                                    }
-                                }
-                                Err(e) => {
-                                    warn!("Background model download failed: {e}");
-                                }
-                            }
-                        });
-                    }
-                    info!("Voice service initialized (waiting for model download)");
-                } else {
+                if has_local_engine {
                     info!("Voice service initialized (local engine ready)");
+                } else {
+                    info!("Voice service initialized (no local STT — Qwen3 engines pending)");
                 }
             }
         }

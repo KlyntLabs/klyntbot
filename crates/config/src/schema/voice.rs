@@ -2,30 +2,47 @@
 
 use serde::{Deserialize, Serialize};
 
-use super::core::default_true;
+use super::core::{default_true, Secret};
 
 /// STT engine selection.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub enum SttEngineKind {
-    /// Local whisper.cpp via whisper-rs (default).
+    /// Qwen3-ASR local or cloud (default, replaces Whisper).
     #[default]
-    WhisperLocal,
-    /// Placeholder for future cloud STT (Deepgram, etc.)
-    Cloud,
+    Qwen3,
 }
 
 /// TTS engine selection.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub enum TtsEngineKind {
-    /// macOS system TTS via AVSpeechSynthesizer (default).
+    /// Qwen3-TTS local or cloud (default).
     #[default]
+    Qwen3,
+    /// macOS system TTS via AVSpeechSynthesizer.
     System,
-    /// Kokoro-82M via ONNX Runtime.
-    Kokoro,
-    /// Piper VITS via ONNX Runtime.
-    Piper,
+}
+
+/// Deployment mode — local model or cloud API.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(tag = "mode", rename_all = "camelCase")]
+pub enum EngineDeployment {
+    /// Run model locally on device (MLX/Metal).
+    Local,
+    /// Call a cloud API (OpenAI-compatible endpoint).
+    Cloud {
+        #[serde(rename = "apiUrl")]
+        api_url: String,
+        #[serde(rename = "apiKey")]
+        api_key: Secret<String>,
+    },
+}
+
+impl Default for EngineDeployment {
+    fn default() -> Self {
+        Self::Local
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -64,8 +81,6 @@ pub struct VoiceInputConfig {
     pub silence_threshold_secs: f32,
     #[serde(default)]
     pub privacy_mode: VoicePrivacyMode,
-    #[serde(default = "default_model_size")]
-    pub model_size: String,
     /// STT engine to use.
     #[serde(default)]
     pub stt_engine: SttEngineKind,
@@ -75,6 +90,9 @@ pub struct VoiceInputConfig {
     /// Whether to use neural/WebRTC VAD or simple RMS threshold.
     #[serde(default)]
     pub use_neural_vad: bool,
+    /// Deployment mode: local model or cloud API.
+    #[serde(default)]
+    pub deployment: EngineDeployment,
 }
 
 impl Default for VoiceInputConfig {
@@ -83,10 +101,10 @@ impl Default for VoiceInputConfig {
             hotkey: default_voice_hotkey(),
             silence_threshold_secs: default_silence_threshold(),
             privacy_mode: VoicePrivacyMode::default(),
-            model_size: default_model_size(),
             stt_engine: SttEngineKind::default(),
             vad_threshold: default_vad_threshold(),
             use_neural_vad: false,
+            deployment: EngineDeployment::default(),
         }
     }
 }
@@ -105,6 +123,9 @@ pub struct VoiceOutputConfig {
     /// TTS engine to use.
     #[serde(default)]
     pub tts_engine: TtsEngineKind,
+    /// Deployment mode: local model or cloud API.
+    #[serde(default)]
+    pub deployment: EngineDeployment,
 }
 
 impl Default for VoiceOutputConfig {
@@ -115,6 +136,7 @@ impl Default for VoiceOutputConfig {
             speaking_rate: 1.0,
             speak_during_focus: false,
             tts_engine: TtsEngineKind::default(),
+            deployment: EngineDeployment::default(),
         }
     }
 }
@@ -197,10 +219,6 @@ fn default_silence_threshold() -> f32 {
     1.5
 }
 
-fn default_model_size() -> String {
-    "small".to_string()
-}
-
 fn default_speaking_rate() -> f32 {
     1.0
 }
@@ -214,19 +232,40 @@ mod tests {
     use super::*;
 
     #[test]
-    fn default_engine_kinds() {
+    fn default_engine_is_qwen3() {
         let input = VoiceInputConfig::default();
-        assert_eq!(input.stt_engine, SttEngineKind::WhisperLocal);
+        assert_eq!(input.stt_engine, SttEngineKind::Qwen3);
 
         let output = VoiceOutputConfig::default();
-        assert_eq!(output.tts_engine, TtsEngineKind::System);
+        assert_eq!(output.tts_engine, TtsEngineKind::Qwen3);
     }
 
     #[test]
-    fn deserialize_kokoro_engine() {
-        let json = r#"{"ttsEngine": "kokoro"}"#;
+    fn deserialize_cloud_deployment() {
+        let json =
+            r#"{"mode": "cloud", "apiUrl": "https://api.example.com/v1", "apiKey": "sk-test"}"#;
+        let deployment: EngineDeployment = serde_json::from_str(json).unwrap();
+        match deployment {
+            EngineDeployment::Cloud { api_url, api_key } => {
+                assert_eq!(api_url, "https://api.example.com/v1");
+                assert_eq!(api_key.expose(), "sk-test");
+            }
+            _ => panic!("Expected Cloud deployment"),
+        }
+    }
+
+    #[test]
+    fn default_deployment_is_local() {
+        let json = r#"{}"#;
+        let input: VoiceInputConfig = serde_json::from_str(json).unwrap();
+        assert!(matches!(input.deployment, EngineDeployment::Local));
+    }
+
+    #[test]
+    fn deserialize_system_engine() {
+        let json = r#"{"ttsEngine": "system"}"#;
         let output: VoiceOutputConfig = serde_json::from_str(json).unwrap();
-        assert_eq!(output.tts_engine, TtsEngineKind::Kokoro);
+        assert_eq!(output.tts_engine, TtsEngineKind::System);
     }
 
     #[test]

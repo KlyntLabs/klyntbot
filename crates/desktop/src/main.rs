@@ -817,8 +817,6 @@ fn run_desktop_app() {
             commands::voice::voice_stop_capture,
             commands::voice::voice_dismiss,
             commands::voice::voice_get_status,
-            commands::voice::voice_get_models,
-            commands::voice::voice_download_model,
             commands::voice::voice_simulate_event,
             // Voice Conversation
             commands::voice_conversation::voice_conversation_start,

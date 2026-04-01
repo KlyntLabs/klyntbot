@@ -49,8 +49,7 @@ platform-macos = { workspace = true }
 voice-engine = { workspace = true }
 
 [features]
-default = ["kokoro"]
-kokoro = ["voice-engine/kokoro"]
+default = []
 
 [dev-dependencies]
 tempfile = { workspace = true }

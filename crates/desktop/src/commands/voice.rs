@@ -39,21 +39,6 @@ pub async fn voice_get_status(
 }
 
 #[tauri::command]
-pub async fn voice_get_models(
-    state: State<'_, Arc<AppCore>>,
-) -> Result<Vec<VoiceModelInfo>, ApiError> {
-    state.voice_get_models().await
-}
-
-#[tauri::command]
-pub async fn voice_download_model(
-    state: State<'_, Arc<AppCore>>,
-    request: VoiceDownloadModelRequest,
-) -> Result<(), ApiError> {
-    state.voice_download_model(request).await
-}
-
-#[tauri::command]
 pub async fn voice_simulate_event(
     state: State<'_, Arc<AppCore>>,
     event: serde_json::Value,
@@ -69,8 +54,6 @@ pub(crate) const DEV_COMMANDS: &[&str] = &[
     "voice_stop_capture",
     "voice_dismiss",
     "voice_get_status",
-    "voice_get_models",
-    "voice_download_model",
     "voice_simulate_event",
 ];
 
@@ -87,11 +70,6 @@ pub(crate) async fn dispatch_dev(
         "voice_stop_capture" => dev::val(core.voice_stop_capture().await),
         "voice_dismiss" => dev::val(core.voice_dismiss().await),
         "voice_get_status" => dev::val(core.voice_get_status().await),
-        "voice_get_models" => dev::val(core.voice_get_models().await),
-        "voice_download_model" => {
-            // For dev server, return mock success since model download isn't wired yet
-            Ok(serde_json::json!(null))
-        }
         "voice_simulate_event" => {
             let event = body
                 .get("event")

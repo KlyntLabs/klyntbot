@@ -14,7 +14,7 @@ use tracing::{info, warn};
 
 use crate::capture::{AudioCapture, CaptureConfig, CaptureSession};
 use crate::events::VoiceEvent;
-use crate::model_manager::{ModelManager, ModelState, WhisperModelSize};
+use crate::model_manager::ModelManager;
 use crate::pronunciation::compute_pronunciation_report;
 use crate::router::VoiceRouter;
 use crate::session::VoiceSessionState;
@@ -183,7 +183,7 @@ impl VoiceService {
         }
     }
 
-    /// Hot-swap the TTS engine at runtime (e.g. after Kokoro model download).
+    /// Hot-swap the TTS engine at runtime (e.g. after model download).
     pub fn set_tts_engine(&self, engine: Arc<dyn TtsEngine>) {
         match self.tts.write() {
             Ok(mut guard) => *guard = Some(engine),
@@ -576,11 +576,6 @@ impl VoiceService {
         Ok(())
     }
 
-    /// Get the current model state from ModelManager.
-    pub fn model_state(&self) -> ModelState {
-        self.model_manager.state()
-    }
-
     /// Get the active engine kind (Local or Cloud).
     pub fn engine_kind(&self) -> Option<EngineKind> {
         self.active_engine().map(|(_, k)| k)
@@ -589,11 +584,6 @@ impl VoiceService {
     /// Check if voice capture is available (at least one engine configured).
     pub fn is_available(&self) -> bool {
         self.active_engine().is_some()
-    }
-
-    /// Start downloading a Whisper model via the ModelManager.
-    pub async fn download_model(&self, size: WhisperModelSize) -> common::Result<()> {
-        self.model_manager.start_download(size).await
     }
 
     /// Start a lightweight RMS-only audio monitor (no buffering, no silence detection).
