@@ -57,6 +57,17 @@ enum McpCommands {
     },
 }
 
+/// Position the voice orb at the bottom-right of the window's current monitor.
+fn position_orb_bottom_right(window: &tauri::WebviewWindow) {
+    if let Ok(Some(monitor)) = window.current_monitor() {
+        let pos = monitor.position();
+        let size = monitor.size();
+        let x = pos.x + size.width as i32 - 200 - 24;
+        let y = pos.y + size.height as i32 - 200 - 24;
+        let _ = window.set_position(tauri::PhysicalPosition::new(x, y));
+    }
+}
+
 /// Register a dismiss-on-blur handler that hides the window when it loses focus.
 fn dismiss_on_blur(window: &tauri::WebviewWindow) {
     let w = window.clone();
@@ -389,20 +400,7 @@ fn run_desktop_app() {
                                                 if let Some(orb_window) =
                                                     handle.get_webview_window("voice-orb")
                                                 {
-                                                    // Position: top-center of active monitor, 80px from top
-                                                    if let Ok(Some(monitor)) =
-                                                        orb_window.current_monitor()
-                                                    {
-                                                        let monitor_pos = monitor.position();
-                                                        let monitor_size = monitor.size();
-                                                        let x = monitor_pos.x
-                                                            + (monitor_size.width as i32 / 2)
-                                                            - 160; // half of 320px width
-                                                        let y = monitor_pos.y + 80;
-                                                        let _ = orb_window.set_position(
-                                                            tauri::PhysicalPosition::new(x, y),
-                                                        );
-                                                    }
+                                                    position_orb_bottom_right(&orb_window);
                                                     let _ = orb_window.show();
                                                     let _ = orb_window.set_focus();
                                                 }
@@ -482,19 +480,7 @@ fn run_desktop_app() {
                                             if let Some(orb_window) =
                                                 handle.get_webview_window("voice-orb")
                                             {
-                                                if let Ok(Some(monitor)) =
-                                                    orb_window.current_monitor()
-                                                {
-                                                    let monitor_pos = monitor.position();
-                                                    let monitor_size = monitor.size();
-                                                    let x = monitor_pos.x
-                                                        + (monitor_size.width as i32 / 2)
-                                                        - 160;
-                                                    let y = monitor_pos.y + 80;
-                                                    let _ = orb_window.set_position(
-                                                        tauri::PhysicalPosition::new(x, y),
-                                                    );
-                                                }
+                                                position_orb_bottom_right(&orb_window);
                                                 let _ = orb_window.show();
                                                 let _ = orb_window.set_focus();
                                             }

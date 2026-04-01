@@ -93,6 +93,9 @@ pub struct VoiceInputConfig {
     /// Deployment mode: local model or cloud API.
     #[serde(default)]
     pub deployment: EngineDeployment,
+    /// Restrict ASR language detection to these languages only.
+    #[serde(default = "default_allowed_languages")]
+    pub allowed_languages: Vec<String>,
 }
 
 impl Default for VoiceInputConfig {
@@ -105,8 +108,29 @@ impl Default for VoiceInputConfig {
             vad_threshold: default_vad_threshold(),
             use_neural_vad: false,
             deployment: EngineDeployment::default(),
+            allowed_languages: default_allowed_languages(),
         }
     }
+}
+
+/// A named voice persona for TTS synthesis.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(tag = "type", rename_all = "camelCase")]
+pub enum VoicePersona {
+    Preset {
+        speaker: String,
+        #[serde(default = "default_speaking_rate")]
+        speed: f32,
+        #[serde(default = "default_temperature")]
+        temperature: f32,
+    },
+    Custom {
+        description: String,
+        #[serde(default = "default_speaking_rate")]
+        speed: f32,
+        #[serde(default = "default_temperature")]
+        temperature: f32,
+    },
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -126,6 +150,12 @@ pub struct VoiceOutputConfig {
     /// Deployment mode: local model or cloud API.
     #[serde(default)]
     pub deployment: EngineDeployment,
+    /// Active voice persona key.
+    #[serde(default = "default_persona_name")]
+    pub default_persona: String,
+    /// Named voice persona configurations.
+    #[serde(default = "default_personas")]
+    pub personas: std::collections::HashMap<String, VoicePersona>,
 }
 
 impl Default for VoiceOutputConfig {
@@ -137,6 +167,8 @@ impl Default for VoiceOutputConfig {
             speak_during_focus: false,
             tts_engine: TtsEngineKind::default(),
             deployment: EngineDeployment::default(),
+            default_persona: default_persona_name(),
+            personas: default_personas(),
         }
     }
 }
@@ -227,6 +259,71 @@ fn default_vad_threshold() -> f32 {
     0.5
 }
 
+fn default_temperature() -> f32 {
+    0.9
+}
+
+fn default_personas() -> std::collections::HashMap<String, VoicePersona> {
+    let mut m = std::collections::HashMap::new();
+    m.insert(
+        "professional".into(),
+        VoicePersona::Preset {
+            speaker: "onyx".into(),
+            speed: 0.95,
+            temperature: 0.8,
+        },
+    );
+    m.insert(
+        "friendly".into(),
+        VoicePersona::Preset {
+            speaker: "nova".into(),
+            speed: 1.0,
+            temperature: 0.9,
+        },
+    );
+    m.insert(
+        "calm".into(),
+        VoicePersona::Preset {
+            speaker: "shimmer".into(),
+            speed: 0.9,
+            temperature: 0.7,
+        },
+    );
+    m.insert(
+        "energetic".into(),
+        VoicePersona::Preset {
+            speaker: "echo".into(),
+            speed: 1.1,
+            temperature: 0.95,
+        },
+    );
+    m.insert(
+        "neutral".into(),
+        VoicePersona::Preset {
+            speaker: "alloy".into(),
+            speed: 1.0,
+            temperature: 0.85,
+        },
+    );
+    m.insert(
+        "storyteller".into(),
+        VoicePersona::Preset {
+            speaker: "fable".into(),
+            speed: 0.92,
+            temperature: 0.8,
+        },
+    );
+    m
+}
+
+fn default_persona_name() -> String {
+    "neutral".into()
+}
+
+fn default_allowed_languages() -> Vec<String> {
+    vec!["en".into(), "zh".into(), "vi".into()]
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -273,5 +370,44 @@ mod tests {
         let json = r#"{"sttEngine": "nonexistent"}"#;
         let result: Result<VoiceInputConfig, _> = serde_json::from_str(json);
         assert!(result.is_err());
+    }
+
+    #[test]
+    fn default_persona_is_neutral() {
+        let config = VoiceOutputConfig::default();
+        assert_eq!(config.default_persona, "neutral");
+        assert!(!config.personas.is_empty());
+        assert!(config.personas.contains_key("neutral"));
+    }
+
+    #[test]
+    fn deserialize_preset_persona() {
+        let json = r#"{"type": "preset", "speaker": "onyx", "speed": 0.95, "temperature": 0.8}"#;
+        let persona: VoicePersona = serde_json::from_str(json).unwrap();
+        match persona {
+            VoicePersona::Preset { speaker, speed, .. } => {
+                assert_eq!(speaker, "onyx");
+                assert!((speed - 0.95).abs() < f32::EPSILON);
+            }
+            _ => panic!("Expected Preset"),
+        }
+    }
+
+    #[test]
+    fn deserialize_custom_persona() {
+        let json = r#"{"type": "custom", "description": "deep calm voice", "speed": 0.9, "temperature": 0.7}"#;
+        let persona: VoicePersona = serde_json::from_str(json).unwrap();
+        match persona {
+            VoicePersona::Custom { description, .. } => {
+                assert_eq!(description, "deep calm voice");
+            }
+            _ => panic!("Expected Custom"),
+        }
+    }
+
+    #[test]
+    fn default_allowed_languages() {
+        let config = VoiceInputConfig::default();
+        assert_eq!(config.allowed_languages, vec!["en", "zh", "vi"]);
     }
 }

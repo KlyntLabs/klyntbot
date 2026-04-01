@@ -118,6 +118,12 @@ pub struct TtsParams {
     pub voice_name: Option<String>,
     #[serde(default = "default_speaking_rate")]
     pub speaking_rate: f32,
+    /// Natural language voice description for instruct-mode TTS (1.7B model).
+    #[serde(default)]
+    pub instruct: Option<String>,
+    /// Override generation temperature (0.1-1.0). None uses engine default (0.9).
+    #[serde(default)]
+    pub temperature: Option<f32>,
 }
 
 fn default_speaking_rate() -> f32 {
@@ -130,6 +136,8 @@ impl Default for TtsParams {
             language: Language::default(),
             voice_name: None,
             speaking_rate: default_speaking_rate(),
+            instruct: None,
+            temperature: None,
         }
     }
 }
@@ -169,6 +177,30 @@ pub struct PronunciationReport {
     pub word_scores: Vec<WordScore>,
     pub weak_words_count: usize,
     pub improvement_suggestion: Option<String>,
+}
+
+#[cfg(test)]
+mod tts_params_tests {
+    use super::*;
+
+    #[test]
+    fn default_tts_params_has_no_instruct() {
+        let params = TtsParams::default();
+        assert!(params.instruct.is_none());
+        assert!(params.temperature.is_none());
+        assert!((params.speaking_rate - 1.0).abs() < f32::EPSILON);
+    }
+
+    #[test]
+    fn tts_params_with_instruct() {
+        let params = TtsParams {
+            instruct: Some("deep calm male voice".into()),
+            temperature: Some(0.75),
+            ..Default::default()
+        };
+        assert_eq!(params.instruct.as_deref(), Some("deep calm male voice"));
+        assert_eq!(params.temperature, Some(0.75));
+    }
 }
 
 /// Serde helper for Duration as milliseconds.

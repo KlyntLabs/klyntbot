@@ -23,6 +23,7 @@ pub enum ModelState {
 #[derive(Debug, Clone, Copy)]
 pub enum Qwen3Model {
     Tts,
+    TtsInstruct,
     Asr,
 }
 
@@ -30,6 +31,7 @@ impl Qwen3Model {
     pub fn dir_name(self) -> &'static str {
         match self {
             Self::Tts => "qwen3-tts-0.6b",
+            Self::TtsInstruct => "qwen3-tts-1.7b-instruct",
             Self::Asr => "qwen3-asr-0.6b",
         }
     }
@@ -37,6 +39,7 @@ impl Qwen3Model {
     pub fn repo_id(self) -> &'static str {
         match self {
             Self::Tts => "Qwen/Qwen3-TTS-12Hz-0.6B-Base",
+            Self::TtsInstruct => "Qwen/Qwen3-TTS-12Hz-1.7B-CustomVoice",
             Self::Asr => "Qwen/Qwen3-ASR-0.6B",
         }
     }
@@ -44,6 +47,7 @@ impl Qwen3Model {
     pub fn display_name(self) -> &'static str {
         match self {
             Self::Tts => "Qwen3-TTS-12Hz-0.6B",
+            Self::TtsInstruct => "Qwen3-TTS-12Hz-1.7B-CustomVoice",
             Self::Asr => "Qwen3-ASR-0.6B",
         }
     }
@@ -81,6 +85,11 @@ impl ModelManager {
     /// Check if Qwen3-ASR model exists.
     pub fn qwen3_asr_model_dir(&self) -> Option<PathBuf> {
         self.model_dir(Qwen3Model::Asr)
+    }
+
+    /// Check if Qwen3-TTS 1.7B instruct model exists.
+    pub fn qwen3_tts_instruct_model_dir(&self) -> Option<PathBuf> {
+        self.model_dir(Qwen3Model::TtsInstruct)
     }
 
     /// Check if a model directory exists and has a completion marker.
@@ -319,5 +328,24 @@ mod tests {
         assert_eq!(Qwen3Model::Tts.dir_name(), "qwen3-tts-0.6b");
         assert_eq!(Qwen3Model::Asr.dir_name(), "qwen3-asr-0.6b");
         assert!(!Qwen3Model::Tts.repo_id().is_empty());
+    }
+
+    #[test]
+    fn tts_instruct_model_metadata() {
+        assert_eq!(
+            Qwen3Model::TtsInstruct.dir_name(),
+            "qwen3-tts-1.7b-instruct"
+        );
+        assert_eq!(
+            Qwen3Model::TtsInstruct.repo_id(),
+            "Qwen/Qwen3-TTS-12Hz-1.7B-CustomVoice"
+        );
+    }
+
+    #[test]
+    fn tts_instruct_model_dir_returns_none_when_missing() {
+        let tmp = TempDir::new().unwrap();
+        let mgr = ModelManager::new(tmp.path());
+        assert!(mgr.qwen3_tts_instruct_model_dir().is_none());
     }
 }

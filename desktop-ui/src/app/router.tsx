@@ -149,9 +149,7 @@ const QuickCapturePage = lazy(() =>
 );
 
 // ── Voice Feature ───────────────────────────────────────────────
-const VoiceOrbPage = lazy(() =>
-  import("@features/voice/pages/VoiceOrbPage").then((m) => ({ default: m.VoiceOrbPage })),
-);
+const VoiceOrbPage = lazy(() => import("@features/voice/pages/VoiceOrbPage"));
 
 // ── Distraction Feature ──────────────────────────────────────────
 const DistractionOverlay = lazy(() =>

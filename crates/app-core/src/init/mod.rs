@@ -624,7 +624,10 @@ impl AppCore {
                 let stt_local: Option<Arc<dyn TranscriptionEngine>> = {
                     match voice_config.input.deployment {
                         config::schema::EngineDeployment::Local => {
-                            match voice_engine::Qwen3AsrEngine::new(model_manager.models_dir()) {
+                            match voice_engine::Qwen3AsrEngine::new(
+                                model_manager.models_dir(),
+                                voice_config.input.allowed_languages.clone(),
+                            ) {
                                 Ok(engine) => {
                                     info!("Qwen3-ASR engine ready (lazy-load on first use)");
                                     Some(Arc::new(engine) as Arc<dyn TranscriptionEngine>)
@@ -853,6 +856,7 @@ impl AppCore {
                         let svc_for_swap = Arc::clone(&service);
                         let system_tts_for_swap =
                             Arc::clone(&system_tts) as Arc<dyn voice_engine::TtsEngine>;
+                        let allowed_langs = voice_config.input.allowed_languages.clone();
                         tokio::spawn(async move {
                             let mm = voice_engine::ModelManager::new(&mm_dir);
                             use voice_engine::model_manager::Qwen3Model;
@@ -869,9 +873,10 @@ impl AppCore {
 
                             // Hot-swap STT engine after successful download
                             if asr.is_ok() {
-                                if let Ok(engine) =
-                                    voice_engine::Qwen3AsrEngine::new(mm.models_dir())
-                                {
+                                if let Ok(engine) = voice_engine::Qwen3AsrEngine::new(
+                                    mm.models_dir(),
+                                    allowed_langs,
+                                ) {
                                     svc_for_swap.set_local_engine(Arc::new(engine)
                                         as Arc<dyn voice_engine::TranscriptionEngine>);
                                     info!("Hot-swapped Qwen3-ASR into live VoiceService");

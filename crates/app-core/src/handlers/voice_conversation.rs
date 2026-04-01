@@ -815,10 +815,35 @@ impl VoiceConversationManager {
         // Call TTS via voice service (emits SpeakResponse event)
         let tts_params = {
             let config = self.config.read().await;
-            voice_engine::TtsParams {
-                speaking_rate: config.output.speaking_rate,
-                voice_name: config.output.voice_preferences.get("default").cloned(),
-                ..Default::default()
+            let persona = config.output.personas.get(&config.output.default_persona);
+            match persona {
+                Some(config::schema::VoicePersona::Preset {
+                    speaker,
+                    speed,
+                    temperature,
+                }) => voice_engine::TtsParams {
+                    voice_name: Some(speaker.clone()),
+                    speaking_rate: *speed,
+                    temperature: Some(*temperature),
+                    instruct: None,
+                    ..Default::default()
+                },
+                Some(config::schema::VoicePersona::Custom {
+                    description,
+                    speed,
+                    temperature,
+                }) => voice_engine::TtsParams {
+                    voice_name: None,
+                    speaking_rate: *speed,
+                    temperature: Some(*temperature),
+                    instruct: Some(description.clone()),
+                    ..Default::default()
+                },
+                None => voice_engine::TtsParams {
+                    speaking_rate: config.output.speaking_rate,
+                    voice_name: config.output.voice_preferences.get("default").cloned(),
+                    ..Default::default()
+                },
             }
         };
         if let Err(e) = self
