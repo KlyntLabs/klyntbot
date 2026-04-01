@@ -36,6 +36,7 @@ members = [
     "crates/platform-macos",
     "crates/autotuner",
     "crates/voice-engine",
+    "crates/feature-language-learning",
 ]
 
 [workspace.package]
@@ -78,6 +79,7 @@ klyntbot-server = { path = "crates/klyntbot-server" }
 platform-macos = { path = "crates/platform-macos" }
 autotuner = { path = "crates/autotuner" }
 voice-engine = { path = "crates/voice-engine" }
+feature-language-learning = { path = "crates/feature-language-learning" }
 extism = "1"
 mcp = { path = "crates/mcp" }
 rmcp = { version = "0.17", default-features = false }

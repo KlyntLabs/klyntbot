@@ -620,14 +620,102 @@ impl AppCore {
 
                 let model_manager = ModelManager::new(&data_dir);
 
-                // STT: will be replaced by Qwen3-ASR in a later task
-                let stt_local: Option<Arc<dyn TranscriptionEngine>> = None;
+                // STT: config-driven engine selection with deployment mode
+                let stt_local: Option<Arc<dyn TranscriptionEngine>> = {
+                    match voice_config.input.deployment {
+                        config::schema::EngineDeployment::Local => {
+                            #[cfg(feature = "qwen3")]
+                            {
+                                model_manager.qwen3_asr_model_dir().and_then(|dir| {
+                                    match voice_engine::Qwen3AsrEngine::new(&dir) {
+                                        Ok(engine) => {
+                                            info!("Qwen3-ASR loaded from {}", dir.display());
+                                            Some(
+                                                Arc::new(engine) as Arc<dyn TranscriptionEngine>
+                                            )
+                                        }
+                                        Err(e) => {
+                                            warn!("Failed to load Qwen3-ASR: {e}");
+                                            None
+                                        }
+                                    }
+                                })
+                            }
+                            #[cfg(not(feature = "qwen3"))]
+                            {
+                                None
+                            }
+                        }
+                        config::schema::EngineDeployment::Cloud {
+                            ref api_url,
+                            ref api_key,
+                        } => Some(Arc::new(voice_engine::CloudAsrEngine::new(
+                            api_url.clone(),
+                            api_key.expose().to_string(),
+                        ))
+                            as Arc<dyn TranscriptionEngine>),
+                    }
+                };
 
                 drop(config_guard);
 
-                // TTS: system TTS fallback, Qwen3-TTS will be wired later
-                let tts: Option<Arc<dyn voice_engine::TtsEngine>> =
-                    Some(Arc::new(voice_engine::AvSpeechTtsEngine::new(&data_dir)));
+                // TTS: config-driven with engine manager wrapping primary + system fallback
+                let tts: Option<Arc<dyn voice_engine::TtsEngine>> = {
+                    let system_tts = Arc::new(voice_engine::AvSpeechTtsEngine::new(&data_dir));
+
+                    match voice_config.output.deployment {
+                        config::schema::EngineDeployment::Cloud {
+                            ref api_url,
+                            ref api_key,
+                        } => {
+                            let cloud = Arc::new(voice_engine::CloudTtsEngine::new(
+                                api_url.clone(),
+                                api_key.expose().to_string(),
+                            ));
+                            let manager =
+                                voice_engine::TtsEngineManager::new(cloud, Some(system_tts));
+                            Some(Arc::new(manager) as Arc<dyn voice_engine::TtsEngine>)
+                        }
+                        config::schema::EngineDeployment::Local => {
+                            #[cfg(feature = "qwen3")]
+                            {
+                                if let config::schema::TtsEngineKind::Qwen3 =
+                                    voice_config.output.tts_engine
+                                {
+                                    if let Some(dir) = model_manager.qwen3_tts_model_dir() {
+                                        match voice_engine::Qwen3TtsEngine::new(&dir).await {
+                                            Ok(engine) => {
+                                                info!("Qwen3-TTS loaded — wrapping with system fallback");
+                                                let manager =
+                                                    voice_engine::TtsEngineManager::new(
+                                                        Arc::new(engine),
+                                                        Some(system_tts),
+                                                    );
+                                                Some(Arc::new(manager)
+                                                    as Arc<dyn voice_engine::TtsEngine>)
+                                            }
+                                            Err(e) => {
+                                                warn!("Qwen3-TTS failed, using system TTS: {e}");
+                                                Some(
+                                                    system_tts
+                                                        as Arc<dyn voice_engine::TtsEngine>,
+                                                )
+                                            }
+                                        }
+                                    } else {
+                                        Some(system_tts as Arc<dyn voice_engine::TtsEngine>)
+                                    }
+                                } else {
+                                    Some(system_tts as Arc<dyn voice_engine::TtsEngine>)
+                                }
+                            }
+                            #[cfg(not(feature = "qwen3"))]
+                            {
+                                Some(system_tts as Arc<dyn voice_engine::TtsEngine>)
+                            }
+                        }
+                    }
+                };
 
                 // Always create VoiceService — even without a local engine yet.
                 // If the model is still downloading, voice_conversation_start will wait.

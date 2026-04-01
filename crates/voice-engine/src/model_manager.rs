@@ -27,6 +27,18 @@ impl ModelManager {
     pub fn models_dir(&self) -> &Path {
         &self.models_dir
     }
+
+    /// Check if Qwen3-TTS model exists.
+    pub fn qwen3_tts_model_dir(&self) -> Option<PathBuf> {
+        let dir = self.models_dir.join("qwen3-tts-0.6b");
+        dir.is_dir().then_some(dir)
+    }
+
+    /// Check if Qwen3-ASR model exists.
+    pub fn qwen3_asr_model_dir(&self) -> Option<PathBuf> {
+        let dir = self.models_dir.join("qwen3-asr-0.6b");
+        dir.is_dir().then_some(dir)
+    }
 }
 
 #[cfg(test)]

@@ -50,6 +50,7 @@ voice-engine = { workspace = true }
 
 [features]
 default = []
+qwen3 = ["voice-engine/qwen3"]
 
 [dev-dependencies]
 tempfile = { workspace = true }
