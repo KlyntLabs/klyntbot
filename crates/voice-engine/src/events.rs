@@ -121,6 +121,12 @@ pub enum VoiceEvent {
     ModelReady {
         engine: String,
     },
+    /// Model download progress update.
+    DownloadProgress {
+        model: String,
+        downloaded: u64,
+        total: u64,
+    },
 }
 
 pub const VOICE_EVENT: &str = "voice:event";

@@ -147,6 +147,41 @@ pub fn create_voice_session_key() -> SessionKey {
     )
 }
 
+/// Build `TtsParams` from the active voice persona in config.
+pub fn tts_params_from_config(
+    output: &config::schema::VoiceOutputConfig,
+) -> voice_engine::TtsParams {
+    match output.personas.get(&output.default_persona) {
+        Some(config::schema::VoicePersona::Preset {
+            speaker,
+            speed,
+            temperature,
+        }) => voice_engine::TtsParams {
+            voice_name: Some(speaker.clone()),
+            speaking_rate: *speed,
+            temperature: Some(*temperature),
+            instruct: None,
+            ..Default::default()
+        },
+        Some(config::schema::VoicePersona::Custom {
+            description,
+            speed,
+            temperature,
+        }) => voice_engine::TtsParams {
+            voice_name: None,
+            speaking_rate: *speed,
+            temperature: Some(*temperature),
+            instruct: Some(description.clone()),
+            ..Default::default()
+        },
+        None => voice_engine::TtsParams {
+            speaking_rate: output.speaking_rate,
+            voice_name: output.voice_preferences.get("default").cloned(),
+            ..Default::default()
+        },
+    }
+}
+
 // ── Start response ──────────────────────────────────────────
 
 /// Result of starting a voice conversation.
@@ -311,6 +346,7 @@ impl VoiceConversationManager {
             state.touch();
             state.turn_count
         };
+        self.voice_service.set_conversation_active(true);
 
         // Upsert session in DB
         let metadata = serde_json::json!({
@@ -815,57 +851,24 @@ impl VoiceConversationManager {
         // Call TTS via voice service (emits SpeakResponse event)
         let tts_params = {
             let config = self.config.read().await;
-            let persona = config.output.personas.get(&config.output.default_persona);
-            match persona {
-                Some(config::schema::VoicePersona::Preset {
-                    speaker,
-                    speed,
-                    temperature,
-                }) => voice_engine::TtsParams {
-                    voice_name: Some(speaker.clone()),
-                    speaking_rate: *speed,
-                    temperature: Some(*temperature),
-                    instruct: None,
-                    ..Default::default()
-                },
-                Some(config::schema::VoicePersona::Custom {
-                    description,
-                    speed,
-                    temperature,
-                }) => voice_engine::TtsParams {
-                    voice_name: None,
-                    speaking_rate: *speed,
-                    temperature: Some(*temperature),
-                    instruct: Some(description.clone()),
-                    ..Default::default()
-                },
-                None => voice_engine::TtsParams {
-                    speaking_rate: config.output.speaking_rate,
-                    voice_name: config.output.voice_preferences.get("default").cloned(),
-                    ..Default::default()
-                },
-            }
+            tts_params_from_config(&config.output)
         };
-        if let Err(e) = self
-            .voice_service
-            .handle_response(&tts_text, &tts_params)
-            .await
-        {
-            warn!("Speaking phase: TTS failed: {e}");
-        }
-
-        // Start audio monitor for interrupt detection.
+        // Start monitor FIRST so interrupts work during synthesis, not just playback.
         // MonitorSession contains a cpal::Stream which is !Send, so we extract
         // the Send-safe rms_rx + stop_signal and keep the stream alive on a
         // blocking thread (same pattern as VoiceService::begin_capture).
         let mut monitor = start_monitor_safe(&self.voice_service);
 
-        // Estimate TTS duration: ~150ms per word
-        let word_count = tts_text.split_whitespace().count();
-        let estimated_duration_ms = (word_count as u64) * 150;
-        let speak_start = tokio::time::Instant::now();
-        let speak_deadline =
-            speak_start + std::time::Duration::from_millis(estimated_duration_ms.max(1000));
+        // Spawn TTS synthesis concurrently so the monitor can detect interrupts
+        // while synthesis is still in progress.
+        let voice_svc = self.voice_service.clone();
+        let tts_text_owned = tts_text.to_string();
+        let tts_params_owned = tts_params.clone();
+        let mut tts_handle = tokio::spawn(async move {
+            voice_svc
+                .handle_response_with_completion(&tts_text_owned, &tts_params_owned)
+                .await
+        });
 
         // Speech interrupt threshold: RMS above 0.02 indicates the user is talking
         const INTERRUPT_RMS_THRESHOLD: f32 = 0.02;
@@ -883,6 +886,7 @@ impl VoiceConversationManager {
                         VoiceCommand::End => {
                             info!("Speaking phase: End received");
                             self.voice_service.stop_tts_playback().await;
+                            tts_handle.abort();
                             if let Some(ref stop) = monitor.stop_signal {
                                 stop.store(true, Ordering::Relaxed);
                             }
@@ -893,6 +897,7 @@ impl VoiceConversationManager {
                         VoiceCommand::Pause => {
                             info!("Speaking phase: Pause received");
                             self.voice_service.stop_tts_playback().await;
+                            tts_handle.abort();
                             if let Some(ref stop) = monitor.stop_signal {
                                 stop.store(true, Ordering::Relaxed);
                             }
@@ -903,6 +908,7 @@ impl VoiceConversationManager {
                         }
                         VoiceCommand::Interrupt => {
                             self.voice_service.stop_tts_playback().await;
+                            tts_handle.abort();
                             interrupted = true;
                         }
                         _ => {} // Resume/Continue/NewSession handled elsewhere
@@ -912,17 +918,26 @@ impl VoiceConversationManager {
                     if rms > INTERRUPT_RMS_THRESHOLD {
                         consecutive_speech_samples += 1;
                         if consecutive_speech_samples >= SPEECH_SAMPLE_THRESHOLD {
-                            info!("Speaking phase: speech detected (rms={rms:.3}), interrupt");
+                            info!("Speaking phase: speech interrupt");
                             self.voice_service.stop_tts_playback().await;
+                            tts_handle.abort();
                             interrupted = true;
+                            break;
                         }
                     } else {
                         consecutive_speech_samples = 0;
                     }
                 }
-                _ = tokio::time::sleep_until(speak_deadline) => {
-                    // TTS playback estimated complete
-                    info!("Speaking phase: TTS playback estimated complete");
+                result = &mut tts_handle => {
+                    match result {
+                        Ok(Ok(Some(playback_rx))) => {
+                            // TTS synthesized — wait for playback to finish
+                            let _ = playback_rx.await;
+                        }
+                        Ok(Ok(None)) => {} // No playback (empty clip or no native audio)
+                        Ok(Err(e)) => warn!("Speaking phase: TTS failed: {e}"),
+                        Err(e) => warn!("Speaking phase: TTS task panicked: {e}"),
+                    }
                     break;
                 }
             }
@@ -939,15 +954,7 @@ impl VoiceConversationManager {
         drop(monitor);
 
         if interrupted {
-            // Estimate how far into the text we got
-            let elapsed_ms = speak_start.elapsed().as_millis() as u64;
-            let fraction = if estimated_duration_ms > 0 {
-                (elapsed_ms as f64 / estimated_duration_ms as f64).min(1.0)
-            } else {
-                1.0
-            };
-            let estimated_chars = (tts_text.len() as f64 * fraction) as usize;
-            let new_tts_position = tts_position + estimated_chars;
+            let new_tts_position = tts_position;
 
             {
                 let mut state = self.state.lock().await;
@@ -1105,6 +1112,17 @@ impl VoiceConversationManager {
         );
         state.phase = next;
         state.touch();
+
+        // Update conversation_active flag to prevent model unloading mid-turn.
+        match next {
+            ConversationPhase::Listening => {
+                self.voice_service.set_conversation_active(true);
+            }
+            ConversationPhase::Idle => {
+                self.voice_service.set_conversation_active(false);
+            }
+            _ => {}
+        }
     }
 }
 

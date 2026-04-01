@@ -9,8 +9,10 @@ import { VoiceOrbCanvas } from "./VoiceOrbCanvas";
 const AUTO_HIDE_DELAY_MS = 3000;
 
 export function VoiceBrainOrb() {
-  const { phase, audioLevel, start, end, sessionInfo } = useVoiceConversation();
+  const { phase, audioLevel, start, end, interrupt, newSession, sessionInfo } =
+    useVoiceConversation();
   const prevPhaseRef = useRef(phase);
+  const clickTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Unlock AudioContext on mount (orb opens via global hotkey, not a click).
   // Also register a one-shot click/keydown listener: WebKit requires a user gesture
@@ -67,18 +69,55 @@ export function VoiceBrainOrb() {
     return () => window.removeEventListener("keydown", onKey);
   }, [end]);
 
-  // Unlock audio + enable dragging on any user interaction.
-  const onMouseDown = async () => {
+  // Click: interrupt during speaking. Double-click: new session.
+  const onClick = () => {
+    if (clickTimerRef.current) {
+      clearTimeout(clickTimerRef.current);
+      clickTimerRef.current = null;
+      newSession();
+      return;
+    }
+    clickTimerRef.current = setTimeout(() => {
+      clickTimerRef.current = null;
+      if (phase === "speaking") {
+        interrupt();
+      }
+    }, 250);
+  };
+
+  // Unlock audio on first interaction.
+  const onMouseDown = () => {
     unlockAudioContext();
-    if (window.__TAURI_INTERNALS__) {
+  };
+
+  // Start window drag on mouse move (not mousedown) to avoid suppressing onClick.
+  const onMouseMove = async (e: React.MouseEvent) => {
+    if (e.buttons === 1 && window.__TAURI_INTERNALS__) {
       const { getCurrentWindow } = await import("@tauri-apps/api/window");
       getCurrentWindow().startDragging();
     }
   };
 
   return (
-    <div onMouseDown={onMouseDown} style={{ width: "100%", height: "100%", cursor: "grab" }}>
+    <button
+      type="button"
+      onClick={onClick}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") onClick();
+      }}
+      onMouseDown={onMouseDown}
+      onMouseMove={onMouseMove}
+      style={{
+        width: "100%",
+        height: "100%",
+        cursor: "grab",
+        background: "none",
+        border: "none",
+        padding: 0,
+        display: "block",
+      }}
+    >
       <VoiceOrbCanvas phase={phase} audioLevel={audioLevel} />
-    </div>
+    </button>
   );
 }

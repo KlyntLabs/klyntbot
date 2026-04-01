@@ -9,14 +9,13 @@ use std::time::Instant;
 
 use async_trait::async_trait;
 use tokio::sync::mpsc;
-use tracing::{debug, info, warn};
+use tracing::{info, warn};
 
 use crate::stt::{AudioStream, PartialTranscript, TranscriptStream, TranscriptionEngine};
 use crate::types::{Language, Transcript};
 
 const IDLE_UNLOAD_SECS: u64 = 300;
 pub(crate) const QWEN3_ASR_SAMPLE_RATE: u32 = 16_000;
-const EXPECTED_SAMPLES: usize = QWEN3_ASR_SAMPLE_RATE as usize * 30;
 
 struct InnerState {
     last_used: Instant,
@@ -83,92 +82,107 @@ impl Qwen3AsrEngine {
 impl TranscriptionEngine for Qwen3AsrEngine {
     async fn transcribe_stream(&self, mut audio: AudioStream) -> common::Result<TranscriptStream> {
         let (tx, rx) = mpsc::channel::<PartialTranscript>(32);
-
         let state = self.state.clone();
         let models_dir = self.models_dir.clone();
         let allowed_languages = self.allowed_languages.clone();
 
-        tokio::spawn(async move {
-            let mut all_samples: Vec<f32> = Vec::with_capacity(EXPECTED_SAMPLES);
-            while let Some(chunk) = audio.recv().await {
-                all_samples.extend_from_slice(&chunk.samples);
-            }
+        // Channel to feed audio from async world to blocking thread.
+        // Uses std::sync::mpsc because the blocking thread needs a sync receiver.
+        // `None` signals end-of-audio.
+        let (audio_in_tx, audio_in_rx) = std::sync::mpsc::channel::<Option<Vec<f32>>>();
 
-            if all_samples.is_empty() {
-                warn!("Empty audio stream, skipping transcription");
-                return;
-            }
-
-            debug!(
-                "Qwen3-ASR transcribing {} samples ({:.1}s)",
-                all_samples.len(),
-                all_samples.len() as f32 / QWEN3_ASR_SAMPLE_RATE as f32
-            );
-
-            // Run inference in a blocking thread (CPU/GPU-bound).
-            // AsrInference holds Metal tensors which may not be Send,
-            // so we load + infer within the same spawn_blocking call.
-            let result =
-                tokio::task::spawn_blocking(move || -> Result<(String, String), String> {
-                    let mut guard = state.lock().unwrap();
-                    if guard.model.is_none() {
-                        info!("Lazy-loading Qwen3-ASR from {}...", models_dir.display());
-                        let start = Instant::now();
-                        let model = Qwen3AsrEngine::load_model(&models_dir)?;
-                        info!("Qwen3-ASR loaded in {:.1}s", start.elapsed().as_secs_f32());
+        // Blocking thread owns the model lock and StreamingState (which is !Send
+        // due to Metal tensors in EncoderCache). The MutexGuard is held for the
+        // entire streaming session, serializing transcription — acceptable since
+        // only one voice capture runs at a time.
+        let transcript_tx = tx;
+        std::thread::spawn(move || {
+            let mut guard = state.lock().unwrap();
+            if guard.model.is_none() {
+                info!("Lazy-loading Qwen3-ASR from {}...", models_dir.display());
+                let start_time = Instant::now();
+                match Qwen3AsrEngine::load_model(&models_dir) {
+                    Ok(model) => {
+                        info!(
+                            "Qwen3-ASR loaded in {:.1}s",
+                            start_time.elapsed().as_secs_f32()
+                        );
                         guard.model = Some(model);
                     }
-                    guard.last_used = Instant::now();
-                    let model = guard.model.as_ref().ok_or("Model not loaded")?;
-                    let opts = qwen3_asr::TranscribeOptions::default();
-                    let result = model
-                        .transcribe_samples(&all_samples, opts)
-                        .map_err(|e| format!("Inference failed: {e}"))?;
-                    Ok((result.text, result.language))
-                })
-                .await;
+                    Err(e) => {
+                        warn!("Qwen3-ASR model load failed: {e}");
+                        return;
+                    }
+                }
+            }
+            guard.last_used = Instant::now();
 
-            match result {
-                Ok(Ok((text, lang))) => {
-                    let text = text.trim().to_string();
-                    let normalized = normalize_language(&lang);
-                    let lang = if lang.is_empty()
-                        || (!allowed_languages.is_empty()
-                            && !allowed_languages.iter().any(|a| a == normalized))
-                    {
-                        "en".to_string()
-                    } else {
-                        normalized.to_string()
-                    };
-                    debug!(
-                        "Qwen3-ASR result: '{}' (lang={})",
-                        &text[..text.len().min(80)],
-                        lang
-                    );
-                    let _ = tx
-                        .send(PartialTranscript {
-                            text,
+            // Scope the immutable borrow of `guard.model` so we can update
+            // `guard.last_used` again after streaming completes.
+            {
+                let model = guard.model.as_ref().unwrap();
+
+                let opts = qwen3_asr::StreamingOptions::default().with_chunk_size_sec(2.0);
+                let mut streaming = model.init_streaming(opts);
+
+                // Process incoming audio chunks incrementally.
+                while let Ok(Some(samples)) = audio_in_rx.recv() {
+                    match model.feed_audio(&mut streaming, &samples) {
+                        Ok(Some(result)) => {
+                            let normalized = normalize_language(&result.language);
+                            let _ = transcript_tx.blocking_send(PartialTranscript {
+                                text: result.text.trim().to_string(),
+                                segments: vec![],
+                                language: Language::new(normalized),
+                                is_final: false,
+                            });
+                        }
+                        Ok(None) => {} // Not enough audio accumulated for a chunk yet
+                        Err(e) => {
+                            warn!("Qwen3-ASR streaming feed error: {e}");
+                        }
+                    }
+                }
+
+                // Finalize: flush remaining buffered audio and run final inference.
+                match model.finish_streaming(&mut streaming) {
+                    Ok(result) => {
+                        let normalized = normalize_language(&result.language);
+                        let lang = if result.language.is_empty()
+                            || (!allowed_languages.is_empty()
+                                && !allowed_languages.iter().any(|a| a == normalized))
+                        {
+                            "en".to_string()
+                        } else {
+                            normalized.to_string()
+                        };
+                        let _ = transcript_tx.blocking_send(PartialTranscript {
+                            text: result.text.trim().to_string(),
                             segments: vec![],
                             language: Language::new(lang),
                             is_final: true,
-                        })
-                        .await;
-                }
-                Ok(Err(e)) => {
-                    warn!("Qwen3-ASR inference error: {e}");
-                    let _ = tx
-                        .send(PartialTranscript {
-                            text: String::new(),
-                            segments: vec![],
-                            language: Language::default(),
-                            is_final: true,
-                        })
-                        .await;
-                }
-                Err(e) => {
-                    warn!("Qwen3-ASR inference task failed: {e}");
+                        });
+                    }
+                    Err(e) => {
+                        warn!("Qwen3-ASR streaming finish error: {e}");
+                    }
                 }
             }
+            // Model borrow released; update last_used timestamp.
+            guard.last_used = Instant::now();
+            // guard drops here, releasing the model lock
+        });
+
+        // Async relay: forward audio chunks from the async AudioStream to the
+        // blocking thread via the std::sync::mpsc channel.
+        tokio::spawn(async move {
+            while let Some(chunk) = audio.recv().await {
+                if audio_in_tx.send(Some(chunk.samples)).is_err() {
+                    break; // Blocking thread exited
+                }
+            }
+            // Signal end of audio
+            let _ = audio_in_tx.send(None);
         });
 
         Ok(rx)

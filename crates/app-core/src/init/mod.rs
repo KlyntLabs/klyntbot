@@ -619,6 +619,11 @@ impl AppCore {
                 let data_dir = config_guard.data_dir_path();
 
                 let model_manager = ModelManager::new(&data_dir);
+                let has_custom_personas = voice_config
+                    .output
+                    .personas
+                    .values()
+                    .any(|p| matches!(p, config::schema::VoicePersona::Custom { .. }));
 
                 // STT: config-driven engine selection with deployment mode
                 let stt_local: Option<Arc<dyn TranscriptionEngine>> = {
@@ -674,7 +679,14 @@ impl AppCore {
                             if let config::schema::TtsEngineKind::Qwen3 =
                                 voice_config.output.tts_engine
                             {
-                                if let Some(dir) = model_manager.qwen3_tts_model_dir() {
+                                let model_dir = if has_custom_personas {
+                                    model_manager
+                                        .qwen3_tts_instruct_model_dir()
+                                        .or_else(|| model_manager.qwen3_tts_model_dir())
+                                } else {
+                                    model_manager.qwen3_tts_model_dir()
+                                };
+                                if let Some(dir) = model_dir {
                                     match voice_engine::Qwen3TtsEngine::new(&dir).await {
                                         Ok(engine) => {
                                             info!(
@@ -839,8 +851,11 @@ impl AppCore {
 
                 // Periodic idle unload for Qwen3-TTS model (reclaim GPU memory).
                 if let Some(tts_engine) = qwen3_tts_ref {
+                    let svc_for_idle = Arc::clone(&service);
                     spawn_periodic_timer(&shutdown_token, 300, move || {
-                        tts_engine.unload_if_idle();
+                        if !svc_for_idle.is_conversation_active() {
+                            tts_engine.unload_if_idle();
+                        }
                     });
                 }
 
@@ -858,12 +873,37 @@ impl AppCore {
                         let system_tts_for_swap =
                             Arc::clone(&system_tts) as Arc<dyn voice_engine::TtsEngine>;
                         let allowed_langs = voice_config.input.allowed_languages.clone();
+                        let has_custom = has_custom_personas;
                         tokio::spawn(async move {
                             let mm = voice_engine::ModelManager::new(&mm_dir);
                             use voice_engine::model_manager::Qwen3Model;
+                            let svc_for_asr = Arc::clone(&svc_for_swap);
+                            let svc_for_tts = Arc::clone(&svc_for_swap);
                             let (asr, tts) = tokio::join!(
-                                mm.download_model(Qwen3Model::Asr),
-                                mm.download_model(Qwen3Model::Tts),
+                                mm.download_model_with_progress(
+                                    Qwen3Model::Asr,
+                                    move |downloaded, total| {
+                                        svc_for_asr.try_emit_event(
+                                            voice_engine::VoiceEvent::DownloadProgress {
+                                                model: "Qwen3-ASR".into(),
+                                                downloaded,
+                                                total,
+                                            },
+                                        );
+                                    }
+                                ),
+                                mm.download_model_with_progress(
+                                    Qwen3Model::Tts,
+                                    move |downloaded, total| {
+                                        svc_for_tts.try_emit_event(
+                                            voice_engine::VoiceEvent::DownloadProgress {
+                                                model: "Qwen3-TTS".into(),
+                                                downloaded,
+                                                total,
+                                            },
+                                        );
+                                    }
+                                ),
                             );
                             if let Err(e) = &asr {
                                 warn!("Qwen3-ASR download: {e}");
@@ -900,6 +940,13 @@ impl AppCore {
                                     Err(e) => warn!(
                                         "Qwen3-TTS engine creation after download failed: {e}"
                                     ),
+                                }
+                            }
+
+                            // Download 1.7B instruct model when custom personas are configured
+                            if has_custom {
+                                if let Err(e) = mm.download_model(Qwen3Model::TtsInstruct).await {
+                                    warn!("Qwen3-TTS 1.7B instruct download: {e}");
                                 }
                             }
                         });

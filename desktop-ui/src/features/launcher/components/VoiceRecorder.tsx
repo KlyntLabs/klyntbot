@@ -1,7 +1,9 @@
-import { useVoiceEvents } from "@features/voice/hooks/useVoiceEvents";
+import { useEvent } from "@shared/hooks/useEvent";
 import { ipc } from "@shared/hooks/useIpc";
 import { Mic, Square } from "lucide-react";
-import { useCallback, useEffect, useRef } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+
+type VoiceSessionState = "idle" | "capturing" | "processing" | "response";
 
 interface VoiceRecorderProps {
   onTranscriptReady: (transcript: string) => void;
@@ -29,7 +31,33 @@ function Waveform({ level }: { level: number }) {
 }
 
 export function VoiceRecorder({ onTranscriptReady, onCancel }: VoiceRecorderProps) {
-  const { sessionState, transcript, audioLevel } = useVoiceEvents();
+  const [sessionState, setSessionState] = useState<VoiceSessionState>("idle");
+  const [transcript, setTranscript] = useState("");
+  const [audioLevel, setAudioLevel] = useState(0);
+
+  useEvent<Record<string, unknown>>("voice:event", (payload) => {
+    switch (payload.type) {
+      case "captureStarted":
+        setSessionState("capturing");
+        setTranscript("");
+        break;
+      case "audioLevel":
+        setAudioLevel(payload.rms as number);
+        break;
+      case "partialTranscript":
+        setTranscript(payload.text as string);
+        break;
+      case "captureEnded":
+      case "processingInBackground":
+        setSessionState("processing");
+        break;
+      case "finalized":
+        setSessionState("response");
+        setTranscript(payload.text as string);
+        break;
+    }
+  });
+
   const hasStarted = useRef(false);
   const animationFrame = useRef<number>();
 

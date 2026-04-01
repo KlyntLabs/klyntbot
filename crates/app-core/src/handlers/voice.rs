@@ -39,8 +39,14 @@ impl AppCore {
             let session_key = "desktop-voice".to_string();
             let voice_svc = self.voice_service()?.clone();
             let agent = self.agent.clone();
+            let config = self.config.clone();
 
             tokio::spawn(async move {
+                let tts_params = {
+                    let cfg = config.read().await;
+                    super::voice_conversation::tts_params_from_config(&cfg.voice.output)
+                };
+
                 match agent
                     .process_direct_streaming(transcript.text.clone(), session_key)
                     .await
@@ -49,9 +55,8 @@ impl AppCore {
                         let mut event_rx = streaming_handle.event_rx;
                         while let Some(event) = event_rx.recv().await {
                             if let agent::AgentEvent::Done { content, .. } = event {
-                                if let Err(e) = voice_svc
-                                    .handle_response(&content, &voice_engine::TtsParams::default())
-                                    .await
+                                if let Err(e) =
+                                    voice_svc.handle_response(&content, &tts_params).await
                                 {
                                     tracing::warn!("Voice TTS response failed: {e}");
                                 }

@@ -45,78 +45,126 @@ fn base64_encode_audio(clip: &AudioClip) -> String {
     base64::engine::general_purpose::STANDARD.encode(&bytes)
 }
 
-/// Play audio samples directly through the system default output device.
-/// Runs in a blocking thread since cpal::Stream is !Send.
-fn play_audio_native(samples: Vec<f32>, sample_rate: u32) {
-    std::thread::spawn(move || {
-        use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
+enum AudioCommand {
+    Play {
+        samples: Vec<f32>,
+        sample_rate: u32,
+        done_tx: tokio::sync::oneshot::Sender<()>,
+    },
+    Stop,
+}
 
-        let host = cpal::default_host();
-        let device = match host.default_output_device() {
-            Some(d) => d,
-            None => {
-                warn!("No default audio output device found");
-                return;
+/// Persistent audio output player. Runs a dedicated thread that receives
+/// audio via a channel and plays through the system default output device.
+pub struct AudioPlayer {
+    tx: std::sync::mpsc::Sender<AudioCommand>,
+    _thread: std::thread::JoinHandle<()>,
+}
+
+impl AudioPlayer {
+    pub fn new() -> Self {
+        let (tx, rx) = std::sync::mpsc::channel::<AudioCommand>();
+
+        let thread = std::thread::spawn(move || {
+            use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
+
+            while let Ok(cmd) = rx.recv() {
+                match cmd {
+                    AudioCommand::Play {
+                        samples,
+                        sample_rate,
+                        done_tx,
+                    } => {
+                        let host = cpal::default_host();
+                        let Some(device) = host.default_output_device() else {
+                            warn!("No default audio output device");
+                            let _ = done_tx.send(());
+                            continue;
+                        };
+
+                        let config = cpal::StreamConfig {
+                            channels: 1,
+                            sample_rate: cpal::SampleRate(sample_rate),
+                            buffer_size: cpal::BufferSize::Default,
+                        };
+
+                        let samples = Arc::new(samples);
+                        let pos = Arc::new(std::sync::atomic::AtomicUsize::new(0));
+                        let done = Arc::new(AtomicBool::new(false));
+                        let done_flag = done.clone();
+                        let samples_ref = samples.clone();
+                        let pos_ref = pos.clone();
+
+                        let stream = match device.build_output_stream(
+                            &config,
+                            move |data: &mut [f32], _: &cpal::OutputCallbackInfo| {
+                                let current = pos_ref.load(Ordering::Relaxed);
+                                let remaining = samples_ref.len().saturating_sub(current);
+                                let to_copy = data.len().min(remaining);
+                                if to_copy > 0 {
+                                    data[..to_copy]
+                                        .copy_from_slice(&samples_ref[current..current + to_copy]);
+                                    pos_ref.store(current + to_copy, Ordering::Relaxed);
+                                }
+                                for sample in data[to_copy..].iter_mut() {
+                                    *sample = 0.0;
+                                }
+                                if to_copy == 0 {
+                                    done_flag.store(true, Ordering::Relaxed);
+                                }
+                            },
+                            |err| warn!("Audio output error: {err}"),
+                            None,
+                        ) {
+                            Ok(s) => s,
+                            Err(e) => {
+                                warn!("Failed to build audio output stream: {e}");
+                                let _ = done_tx.send(());
+                                continue;
+                            }
+                        };
+
+                        if let Err(e) = stream.play() {
+                            warn!("Failed to play audio stream: {e}");
+                            let _ = done_tx.send(());
+                            continue;
+                        }
+
+                        // Wait for playback to finish or stop command.
+                        while !done.load(Ordering::Relaxed) {
+                            if let Ok(AudioCommand::Stop) = rx.try_recv() {
+                                break;
+                            }
+                            std::thread::sleep(std::time::Duration::from_millis(25));
+                        }
+                        let _ = done_tx.send(());
+                    }
+                    AudioCommand::Stop => {} // No-op when not playing
+                }
             }
-        };
+        });
 
-        let config = cpal::StreamConfig {
-            channels: 1,
-            sample_rate: cpal::SampleRate(sample_rate),
-            buffer_size: cpal::BufferSize::Default,
-        };
-
-        let samples = Arc::new(samples);
-        let pos = Arc::new(std::sync::atomic::AtomicUsize::new(0));
-        let done = Arc::new(std::sync::atomic::AtomicBool::new(false));
-        let done_clone = done.clone();
-
-        let samples_ref = samples.clone();
-        let pos_ref = pos.clone();
-
-        let stream = match device.build_output_stream(
-            &config,
-            move |data: &mut [f32], _: &cpal::OutputCallbackInfo| {
-                let current = pos_ref.load(std::sync::atomic::Ordering::Relaxed);
-                let remaining = samples_ref.len().saturating_sub(current);
-                let to_copy = data.len().min(remaining);
-                if to_copy > 0 {
-                    data[..to_copy].copy_from_slice(&samples_ref[current..current + to_copy]);
-                    pos_ref.store(current + to_copy, std::sync::atomic::Ordering::Relaxed);
-                }
-                // Silence any remaining buffer
-                for sample in data[to_copy..].iter_mut() {
-                    *sample = 0.0;
-                }
-                if to_copy == 0 {
-                    done_clone.store(true, std::sync::atomic::Ordering::Relaxed);
-                }
-            },
-            move |err| {
-                warn!("Audio output stream error: {err}");
-            },
-            None,
-        ) {
-            Ok(s) => s,
-            Err(e) => {
-                warn!("Failed to build audio output stream: {e}");
-                return;
-            }
-        };
-
-        if let Err(e) = stream.play() {
-            warn!("Failed to play audio stream: {e}");
-            return;
+        Self {
+            tx,
+            _thread: thread,
         }
+    }
 
-        // Wait for playback to finish
-        let total_duration_ms = (samples.len() as u64 * 1000) / sample_rate as u64;
-        let deadline = Instant::now() + std::time::Duration::from_millis(total_duration_ms + 500);
-        while !done.load(std::sync::atomic::Ordering::Relaxed) && Instant::now() < deadline {
-            std::thread::sleep(std::time::Duration::from_millis(50));
-        }
-        // Stream drops here, stopping playback
-    });
+    /// Play audio and return a receiver that resolves when playback completes.
+    pub fn play(&self, samples: Vec<f32>, sample_rate: u32) -> tokio::sync::oneshot::Receiver<()> {
+        let (done_tx, done_rx) = tokio::sync::oneshot::channel();
+        let _ = self.tx.send(AudioCommand::Play {
+            samples,
+            sample_rate,
+            done_tx,
+        });
+        done_rx
+    }
+
+    /// Stop current playback immediately.
+    pub fn stop(&self) {
+        let _ = self.tx.send(AudioCommand::Stop);
+    }
 }
 
 /// Configuration for the VoiceService.
@@ -205,6 +253,13 @@ pub struct VoiceService {
     /// Set by the silence notification task when silence is detected.
     /// Polled by VoiceConversationManager to trigger automatic finalization.
     silence_detected: Arc<AtomicBool>,
+
+    /// Set to true while a voice conversation is active.
+    /// Prevents idle model unloading during active conversations.
+    conversation_active: Arc<AtomicBool>,
+
+    /// Persistent audio player — dedicated thread for cpal output.
+    audio_player: AudioPlayer,
 }
 
 impl VoiceService {
@@ -237,6 +292,8 @@ impl VoiceService {
             first_capture_complete: AtomicBool::new(false),
             echo_fired_this_session: AtomicBool::new(false),
             silence_detected: Arc::new(AtomicBool::new(false)),
+            conversation_active: Arc::new(AtomicBool::new(false)),
+            audio_player: AudioPlayer::new(),
         }
     }
 
@@ -282,10 +339,27 @@ impl VoiceService {
         }
     }
 
+    /// Set whether a voice conversation is currently active.
+    ///
+    /// When `true`, idle model unloading is suppressed to avoid latency spikes
+    /// mid-conversation.
+    pub fn set_conversation_active(&self, active: bool) {
+        self.conversation_active.store(active, Ordering::Relaxed);
+    }
+
+    /// Returns `true` if a voice conversation is currently active.
+    pub fn is_conversation_active(&self) -> bool {
+        self.conversation_active.load(Ordering::Relaxed)
+    }
+
     /// Try to unload the STT model if it has been idle.
     ///
     /// Called periodically by a maintenance timer to reclaim memory.
+    /// No-op while a conversation is active to avoid mid-turn latency spikes.
     pub fn try_unload_idle_stt(&self) {
+        if self.is_conversation_active() {
+            return;
+        }
         if let Ok(guard) = self.stt_local.read() {
             if let Some(ref engine) = *guard {
                 engine.unload_if_idle();
@@ -368,8 +442,9 @@ impl VoiceService {
         Ok((active, silence_rx, rms_rx, session_id, engine_kind))
     }
 
-    /// Signal the frontend to fade out TTS playback via Web Audio API.
+    /// Stop any in-progress TTS audio playback and signal the frontend to fade out.
     pub async fn stop_tts_playback(&self) {
+        self.audio_player.stop();
         let _ = self.event_tx.send(VoiceEvent::TtsFadeOut).await;
     }
 
@@ -664,6 +739,17 @@ impl VoiceService {
         response_text: &str,
         tts_params: &TtsParams,
     ) -> common::Result<()> {
+        self.handle_response_with_completion(response_text, tts_params)
+            .await?;
+        Ok(())
+    }
+
+    /// Synthesize TTS and return a receiver that signals when playback ends.
+    pub async fn handle_response_with_completion(
+        &self,
+        response_text: &str,
+        tts_params: &TtsParams,
+    ) -> common::Result<Option<tokio::sync::oneshot::Receiver<()>>> {
         let tts = self.tts.read().ok().and_then(|g| g.clone());
         match tts {
             Some(tts) => {
@@ -675,6 +761,7 @@ impl VoiceService {
                 match tts.synthesize(response_text, tts_params).await {
                     Ok(clip) if clip.samples.is_empty() => {
                         warn!("TTS: synthesized clip is empty (0 samples), skipping playback");
+                        Ok(None)
                     }
                     Ok(clip) => {
                         info!(
@@ -683,31 +770,39 @@ impl VoiceService {
                             clip.sample_rate,
                             self.config.native_audio
                         );
+                        // Encode before any move of clip.samples.
                         let audio_base64 = if self.config.native_audio {
-                            play_audio_native(clip.samples, clip.sample_rate);
                             String::new()
                         } else {
                             base64_encode_audio(&clip)
+                        };
+                        let sample_rate = clip.sample_rate;
+                        let playback_rx = if self.config.native_audio {
+                            Some(self.audio_player.play(clip.samples, clip.sample_rate))
+                        } else {
+                            None
                         };
                         let _ = self
                             .event_tx
                             .send(VoiceEvent::SpeakResponse {
                                 audio_base64,
-                                sample_rate: clip.sample_rate,
+                                sample_rate,
                                 text: response_text.to_string(),
                             })
                             .await;
+                        Ok(playback_rx)
                     }
                     Err(e) => {
                         warn!("TTS synthesis failed: {e}");
+                        Ok(None)
                     }
                 }
             }
             None => {
                 warn!("TTS: no engine available, cannot speak response");
+                Ok(None)
             }
         }
-        Ok(())
     }
 
     /// Get the active engine kind (Local or Cloud).
@@ -735,6 +830,12 @@ impl VoiceService {
             .await
             .map_err(|_| common::KlyntbotError::BusDisconnected)?;
         Ok(())
+    }
+
+    /// Non-blocking emit — used from sync callbacks inside async tasks.
+    /// Drops the event silently if the channel is full (acceptable for progress updates).
+    pub fn try_emit_event(&self, event: VoiceEvent) {
+        let _ = self.event_tx.try_send(event);
     }
 }
 

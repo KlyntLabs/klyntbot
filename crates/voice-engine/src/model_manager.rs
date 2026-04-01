@@ -108,6 +108,22 @@ impl ModelManager {
     /// Lists files via the HF API, downloads each one, then writes a
     /// `.complete` marker to signal the model is ready.
     pub async fn download_model(&self, model: Qwen3Model) -> common::Result<PathBuf> {
+        self.download_model_with_progress(model, |_, _| {}).await
+    }
+
+    /// Download a Qwen3 model with a progress callback.
+    ///
+    /// `on_progress` is called after each file completes with
+    /// `(bytes_downloaded_so_far, total_bytes)`. It is called from a
+    /// sync context inside the async task, so it must not block or `.await`.
+    pub async fn download_model_with_progress<F>(
+        &self,
+        model: Qwen3Model,
+        on_progress: F,
+    ) -> common::Result<PathBuf>
+    where
+        F: Fn(u64, u64) + Send + 'static,
+    {
         let dest = self.models_dir.join(model.dir_name());
 
         if dest.join(".complete").exists() {
@@ -203,6 +219,8 @@ impl ModelManager {
                     total_bytes as f64 / 1_048_576.0
                 );
             }
+
+            on_progress(downloaded_bytes, total_bytes);
         }
 
         // Write completion marker — model_dir() checks for this
