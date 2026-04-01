@@ -5,7 +5,7 @@
 use std::sync::Arc;
 use std::time::Instant;
 
-use bus::{ContextUpdateQueue, DomainEventBus};
+use bus::{ContextUpdateQueue, CorrectionKind, DomainEvent, DomainEventBus};
 use chrono::{Duration, TimeZone, Utc};
 use tracing::{debug, info, warn};
 
@@ -106,6 +106,8 @@ impl SimulationHarness {
 
         let mut checkpoint_results: Vec<CheckpointResult> = Vec::new();
         let mut day_counter: u32 = 0;
+        let mut total_messages: u32 = 0;
+        let mut total_facts_extracted: u32 = 0;
 
         info!(
             persona = %self.scenario.persona.name,
@@ -130,6 +132,14 @@ impl SimulationHarness {
                 metrics.accumulator_mut().messages_processed += 1;
                 if msg.is_correction {
                     metrics.accumulator_mut().corrections += 1;
+                    self.bus.publish(DomainEvent::UserCorrectedAI {
+                        original: String::new(),
+                        correction: msg.content.clone(),
+                        kind: CorrectionKind::Reaction,
+                        strength: 1.0,
+                        session_key: "sim-session".to_string(),
+                        active_skill: Some(msg.topic.clone()),
+                    });
                 }
                 if let Some(ref gt) = msg.ground_truth {
                     if gt.introduces_fact.is_some() {
