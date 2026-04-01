@@ -2,6 +2,8 @@
 //! SimulatedEpoch, PersonaRunner, ActionExecutor, MetricCollector,
 //! GroundTruthVerifier, and ReportGenerator.
 
+use std::collections::HashMap;
+use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::Arc;
 use std::time::Instant;
 
@@ -9,6 +11,7 @@ use bus::{ContextUpdateQueue, CorrectionKind, DomainEvent, DomainEventBus};
 use chrono::{Duration, TimeZone, Utc};
 use context_engine::MemoryRetriever;
 use tracing::{debug, info, warn};
+use uuid::Uuid;
 
 use crate::actions::ActionExecutor;
 use crate::epoch::{CronTrigger, EpochStep, SimulatedEpoch};
@@ -210,6 +213,11 @@ impl SimulationHarness {
                         metrics.accumulator_mut().retrieval_recall_sum += recall;
                         metrics.accumulator_mut().retrieval_count += 1;
                     }
+                }
+
+                // Routing stability: check if message content matches expected topic keywords
+                if message_matches_topic_keywords(&msg.content, &msg.topic) {
+                    metrics.accumulator_mut().routing_matches += 1;
                 }
 
                 // Token tracking (150 per scripted call).
@@ -418,6 +426,27 @@ impl SimulationHarness {
         }
 
         metrics.accumulator_mut().facts_extracted += total_extracted;
+
+        // Write episodic memory for high-importance messages (feeds weekly reflection).
+        if observation.importance >= 0.7 {
+            let ts = msg.simulated_at.to_rfc3339();
+            let episode = cognitive::EpisodicMemory {
+                id: Uuid::new_v4().to_string(),
+                domain: msg.topic.clone(),
+                content: msg.content.clone(),
+                summary: None,
+                importance: observation.importance,
+                occurred_at: ts.clone(),
+                recorded_at: ts,
+                stability: 1.0,
+                last_accessed: None,
+                access_count: 0,
+                project_id: None,
+                scope_type: "system".to_string(),
+                scope_id: None,
+            };
+            let _ = self.episodic_repo.insert(&episode).await;
+        }
     }
 
     /// Execute a simulated cron trigger.
@@ -470,6 +499,40 @@ impl SimulationHarness {
         // is available in the simulation context.
         debug!("AtomDecay: stub — no decay cycle executed in Phase 1");
         Ok(())
+    }
+}
+
+/// Check if a message's content contains keywords associated with its topic.
+/// This is a simplified version of what SkillRouter does with Aho-Corasick matching.
+fn message_matches_topic_keywords(content: &str, topic: &str) -> bool {
+    let lower = content.to_lowercase();
+    match topic {
+        "tasks" => {
+            lower.contains("task")
+                || lower.contains("todo")
+                || lower.contains("done")
+                || lower.contains("prioritize")
+        }
+        "finance" => {
+            lower.contains("expense")
+                || lower.contains("budget")
+                || lower.contains("spend")
+                || lower.contains("income")
+        }
+        "notes" => lower.contains("note") || lower.contains("summarize") || lower.contains("write"),
+        "productivity" => {
+            lower.contains("focus") || lower.contains("productive") || lower.contains("time")
+        }
+        "learning" => {
+            lower.contains("learn") || lower.contains("flashcard") || lower.contains("quiz")
+        }
+        "automation" => {
+            lower.contains("remind") || lower.contains("recurring") || lower.contains("automate")
+        }
+        "insights" => {
+            lower.contains("pattern") || lower.contains("connection") || lower.contains("insight")
+        }
+        _ => true, // "chat" and unknown topics — always match
     }
 }
 
