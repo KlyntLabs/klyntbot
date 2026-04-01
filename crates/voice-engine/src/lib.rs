@@ -34,7 +34,7 @@ pub use events::{VoiceEvent, VOICE_EVENT};
 pub use model_manager::ModelManager;
 pub use pronunciation::compute_pronunciation_report;
 pub use router::VoiceRouter;
-pub use service::{MemoryEchoProvider, VoiceService, VoiceServiceConfig};
+pub use service::{MemoryEchoProvider, PronunciationProvider, VoiceService, VoiceServiceConfig};
 pub use session::VoiceSessionState;
 pub use stt::{PartialTranscript, TranscriptionEngine};
 pub use tts::TtsEngine;

@@ -630,9 +630,7 @@ impl AppCore {
                                     match voice_engine::Qwen3AsrEngine::new(&dir) {
                                         Ok(engine) => {
                                             info!("Qwen3-ASR loaded from {}", dir.display());
-                                            Some(
-                                                Arc::new(engine) as Arc<dyn TranscriptionEngine>
-                                            )
+                                            Some(Arc::new(engine) as Arc<dyn TranscriptionEngine>)
                                         }
                                         Err(e) => {
                                             warn!("Failed to load Qwen3-ASR: {e}");
@@ -652,8 +650,7 @@ impl AppCore {
                         } => Some(Arc::new(voice_engine::CloudAsrEngine::new(
                             api_url.clone(),
                             api_key.expose().to_string(),
-                        ))
-                            as Arc<dyn TranscriptionEngine>),
+                        )) as Arc<dyn TranscriptionEngine>),
                     }
                 };
 
@@ -686,20 +683,16 @@ impl AppCore {
                                         match voice_engine::Qwen3TtsEngine::new(&dir).await {
                                             Ok(engine) => {
                                                 info!("Qwen3-TTS loaded — wrapping with system fallback");
-                                                let manager =
-                                                    voice_engine::TtsEngineManager::new(
-                                                        Arc::new(engine),
-                                                        Some(system_tts),
-                                                    );
+                                                let manager = voice_engine::TtsEngineManager::new(
+                                                    Arc::new(engine),
+                                                    Some(system_tts),
+                                                );
                                                 Some(Arc::new(manager)
                                                     as Arc<dyn voice_engine::TtsEngine>)
                                             }
                                             Err(e) => {
                                                 warn!("Qwen3-TTS failed, using system TTS: {e}");
-                                                Some(
-                                                    system_tts
-                                                        as Arc<dyn voice_engine::TtsEngine>,
-                                                )
+                                                Some(system_tts as Arc<dyn voice_engine::TtsEngine>)
                                             }
                                         }
                                     } else {
@@ -756,6 +749,7 @@ impl AppCore {
                     stt_local,
                     tts,
                     Some(Arc::clone(&echo_provider)),
+                    None, // pronunciation provider — wired when feature-language-learning is enabled
                     model_manager,
                     svc_config,
                 );
@@ -787,7 +781,28 @@ impl AppCore {
                 if has_local_engine {
                     info!("Voice service initialized (local engine ready)");
                 } else {
-                    info!("Voice service initialized (no local STT — Qwen3 engines pending)");
+                    // Auto-download Qwen3 models in background on first launch.
+                    if matches!(
+                        voice_config.input.deployment,
+                        config::schema::EngineDeployment::Local
+                    ) {
+                        let mm_dir = data_dir.clone();
+                        tokio::spawn(async move {
+                            let mm = voice_engine::ModelManager::new(&mm_dir);
+                            use voice_engine::model_manager::Qwen3Model;
+                            let (asr, tts) = tokio::join!(
+                                mm.download_model(Qwen3Model::Asr),
+                                mm.download_model(Qwen3Model::Tts),
+                            );
+                            if let Err(e) = asr {
+                                warn!("Qwen3-ASR download: {e}");
+                            }
+                            if let Err(e) = tts {
+                                warn!("Qwen3-TTS download: {e}");
+                            }
+                        });
+                    }
+                    info!("Voice service initialized (no local STT — Qwen3 download pending)");
                 }
             }
         }

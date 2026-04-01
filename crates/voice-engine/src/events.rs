@@ -2,6 +2,9 @@
 
 use serde::{Deserialize, Serialize};
 
+use crate::error_classifier::PhonemeScore;
+use crate::feedback_decider::FeedbackLevel;
+use crate::pronunciation_analyzer::SyllableTone;
 use crate::types::EngineKind;
 
 /// Lightweight segment data for frontend word-level confidence display.
@@ -75,6 +78,23 @@ pub enum VoiceEvent {
     SetupRequired {
         needs_model: bool,
         needs_mic_permission: bool,
+    },
+    /// Detailed pronunciation report after a scored turn.
+    PronunciationReport {
+        overall_score: f32,
+        phoneme_scores: Vec<PhonemeScore>,
+        tone_scores: Vec<SyllableTone>,
+        feedback_level: FeedbackLevel,
+    },
+    /// Adaptive feedback level escalated for a phoneme.
+    FeedbackEscalated {
+        phoneme: String,
+        from_level: FeedbackLevel,
+        to_level: FeedbackLevel,
+    },
+    /// Chinese tone contour data for visualization.
+    ToneContour {
+        syllables: Vec<SyllableTone>,
     },
 }
 

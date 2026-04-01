@@ -51,6 +51,45 @@ pub fn denoise_48khz(samples: &[f32]) -> Vec<f32> {
     output
 }
 
+/// Encode f32 samples as a WAV byte buffer (16-bit PCM mono).
+pub fn encode_wav_bytes(samples: &[f32], sample_rate: u32) -> Vec<u8> {
+    let data_len = (samples.len() * 2) as u32;
+    let file_len = 36 + data_len;
+    let mut buf = Vec::with_capacity(44 + samples.len() * 2);
+
+    buf.extend_from_slice(b"RIFF");
+    buf.extend_from_slice(&file_len.to_le_bytes());
+    buf.extend_from_slice(b"WAVE");
+    buf.extend_from_slice(b"fmt ");
+    buf.extend_from_slice(&16u32.to_le_bytes());
+    buf.extend_from_slice(&1u16.to_le_bytes()); // PCM
+    buf.extend_from_slice(&1u16.to_le_bytes()); // mono
+    buf.extend_from_slice(&sample_rate.to_le_bytes());
+    buf.extend_from_slice(&(sample_rate * 2).to_le_bytes());
+    buf.extend_from_slice(&2u16.to_le_bytes());
+    buf.extend_from_slice(&16u16.to_le_bytes());
+    buf.extend_from_slice(b"data");
+    buf.extend_from_slice(&data_len.to_le_bytes());
+
+    for &s in samples {
+        let i16_sample = (s * i16::MAX as f32).clamp(i16::MIN as f32, i16::MAX as f32) as i16;
+        buf.extend_from_slice(&i16_sample.to_le_bytes());
+    }
+
+    buf
+}
+
+/// Decode 16-bit PCM LE bytes to f32 samples.
+pub fn decode_pcm_16bit(bytes: &[u8]) -> Vec<f32> {
+    bytes
+        .chunks_exact(2)
+        .map(|chunk| {
+            let sample = i16::from_le_bytes([chunk[0], chunk[1]]);
+            sample as f32 / i16::MAX as f32
+        })
+        .collect()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -98,5 +137,25 @@ mod tests {
         let input = vec![0.01; 4800];
         let output = denoise_48khz(&input);
         assert_eq!(output.len(), input.len());
+    }
+
+    #[test]
+    fn wav_encoding_produces_valid_header() {
+        let samples = vec![0.0f32; 100];
+        let wav = encode_wav_bytes(&samples, 16000);
+        assert_eq!(&wav[0..4], b"RIFF");
+        assert_eq!(&wav[8..12], b"WAVE");
+        assert_eq!(wav.len(), 44 + 200);
+    }
+
+    #[test]
+    fn pcm_16bit_roundtrip() {
+        let original = vec![0.5, -0.5, 0.0, 1.0, -1.0];
+        let wav = encode_wav_bytes(&original, 16000);
+        let decoded = decode_pcm_16bit(&wav[44..]); // skip header
+        assert_eq!(decoded.len(), original.len());
+        for (a, b) in original.iter().zip(decoded.iter()) {
+            assert!((a - b).abs() < 0.001, "{a} vs {b}");
+        }
     }
 }

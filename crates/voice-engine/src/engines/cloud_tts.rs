@@ -62,14 +62,7 @@ impl TtsEngine for CloudTtsEngine {
             common::KlyntbotError::Provider(common::ProviderError::Http(e.to_string()))
         })?;
 
-        // PCM 16-bit LE mono at 24kHz
-        let samples: Vec<f32> = bytes
-            .chunks_exact(2)
-            .map(|chunk| {
-                let sample = i16::from_le_bytes([chunk[0], chunk[1]]);
-                sample as f32 / i16::MAX as f32
-            })
-            .collect();
+        let samples = crate::dsp::decode_pcm_16bit(&bytes);
 
         debug!("Cloud TTS returned {} samples", samples.len());
 
@@ -85,7 +78,7 @@ impl TtsEngine for CloudTtsEngine {
     }
 
     fn available_voices(&self, _lang: &Language) -> Vec<VoiceInfo> {
-        ["alloy", "echo", "fable", "onyx", "nova", "shimmer"]
+        super::QWEN3_VOICES
             .iter()
             .map(|v| VoiceInfo {
                 identifier: v.to_string(),

@@ -50,7 +50,7 @@ impl TranscriptionEngine for CloudAsrEngine {
                 return;
             }
 
-            let wav_bytes = encode_wav_bytes(&all_samples, 16000);
+            let wav_bytes = crate::dsp::encode_wav_bytes(&all_samples, 16000);
             let url = format!("{}/audio/transcriptions", api_url);
 
             let form = reqwest::multipart::Form::new()
@@ -75,10 +75,8 @@ impl TranscriptionEngine for CloudAsrEngine {
                 Ok(response) if response.status().is_success() => {
                     if let Ok(text) = response.text().await {
                         if let Ok(result) = serde_json::from_str::<serde_json::Value>(&text) {
-                            let transcript_text =
-                                result["text"].as_str().unwrap_or("").to_string();
-                            let language =
-                                result["language"].as_str().unwrap_or("en").to_string();
+                            let transcript_text = result["text"].as_str().unwrap_or("").to_string();
+                            let language = result["language"].as_str().unwrap_or("en").to_string();
 
                             let _ = tx
                                 .send(PartialTranscript {
@@ -156,48 +154,5 @@ impl TranscriptionEngine for CloudAsrEngine {
 
     fn display_name(&self) -> &str {
         "Cloud ASR"
-    }
-}
-
-/// Encode f32 samples as a WAV byte buffer (16-bit PCM).
-fn encode_wav_bytes(samples: &[f32], sample_rate: u32) -> Vec<u8> {
-    let data_len = (samples.len() * 2) as u32;
-    let file_len = 36 + data_len;
-    let mut buf = Vec::with_capacity(44 + samples.len() * 2);
-
-    // WAV header
-    buf.extend_from_slice(b"RIFF");
-    buf.extend_from_slice(&file_len.to_le_bytes());
-    buf.extend_from_slice(b"WAVE");
-    buf.extend_from_slice(b"fmt ");
-    buf.extend_from_slice(&16u32.to_le_bytes());
-    buf.extend_from_slice(&1u16.to_le_bytes()); // PCM
-    buf.extend_from_slice(&1u16.to_le_bytes()); // mono
-    buf.extend_from_slice(&sample_rate.to_le_bytes());
-    buf.extend_from_slice(&(sample_rate * 2).to_le_bytes());
-    buf.extend_from_slice(&2u16.to_le_bytes());
-    buf.extend_from_slice(&16u16.to_le_bytes());
-    buf.extend_from_slice(b"data");
-    buf.extend_from_slice(&data_len.to_le_bytes());
-
-    for &s in samples {
-        let i16_sample = (s * i16::MAX as f32).clamp(i16::MIN as f32, i16::MAX as f32) as i16;
-        buf.extend_from_slice(&i16_sample.to_le_bytes());
-    }
-
-    buf
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn wav_encoding_produces_valid_header() {
-        let samples = vec![0.0f32; 100];
-        let wav = encode_wav_bytes(&samples, 16000);
-        assert_eq!(&wav[0..4], b"RIFF");
-        assert_eq!(&wav[8..12], b"WAVE");
-        assert_eq!(wav.len(), 44 + 200); // header + 100 samples * 2 bytes
     }
 }

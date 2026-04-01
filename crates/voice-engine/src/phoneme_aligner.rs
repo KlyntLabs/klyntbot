@@ -58,15 +58,11 @@ impl PronunciationAnalyzer for Qwen3PhonemeAligner {
         alignment: &PhonemeAlignment,
     ) -> common::Result<ToneContour> {
         if alignment.language.as_str() != "zh" {
-            return Ok(ToneContour {
-                syllables: vec![],
-            });
+            return Ok(ToneContour { syllables: vec![] });
         }
 
         // TODO: Use pitch-detection crate (YIN) to extract F0 contour per syllable.
-        Ok(ToneContour {
-            syllables: vec![],
-        })
+        Ok(ToneContour { syllables: vec![] })
     }
 }
 

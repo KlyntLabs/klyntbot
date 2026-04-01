@@ -71,22 +71,15 @@ fn classify_tone(f0_contour: &[f32]) -> u8 {
 ///
 /// Only operates on Chinese (`zh`) audio. For other languages, returns an
 /// empty contour.
-pub fn analyze_tones(
-    _audio: &AudioClip,
-    alignment: &PhonemeAlignment,
-) -> ToneContour {
+pub fn analyze_tones(_audio: &AudioClip, alignment: &PhonemeAlignment) -> ToneContour {
     if alignment.language.as_str() != "zh" {
-        return ToneContour {
-            syllables: vec![],
-        };
+        return ToneContour { syllables: vec![] };
     }
 
     // TODO: Extract actual F0 contour per syllable using pitch-detection crate.
     // For now, return empty — will be populated when the aligner provides
     // real phoneme timing data.
-    ToneContour {
-        syllables: vec![],
-    }
+    ToneContour { syllables: vec![] }
 }
 
 #[cfg(test)]

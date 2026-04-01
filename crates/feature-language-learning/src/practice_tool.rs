@@ -92,13 +92,8 @@ impl Tool for LanguagePracticeTool {
             "log_exam" => {
                 let exam_type = params["exam_type"]
                     .as_str()
-                    .ok_or_else(|| {
-                        ToolError::InvalidParams("missing 'exam_type'".to_string())
-                    })?;
-                let score = params
-                    .get("score")
-                    .and_then(|v| v.as_f64())
-                    .unwrap_or(0.0);
+                    .ok_or_else(|| ToolError::InvalidParams("missing 'exam_type'".to_string()))?;
+                let score = params.get("score").and_then(|v| v.as_f64()).unwrap_or(0.0);
                 serde_json::json!({
                     "status": "exam_logged",
                     "exam_type": exam_type,

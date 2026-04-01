@@ -28,6 +28,16 @@ pub trait MemoryEchoProvider: Send + Sync {
     async fn lookup(&self, partial_text: &str, learning_active: bool) -> Option<String>;
 }
 
+/// Hook for pronunciation analysis pipeline (dependency-inverted from feature-language-learning).
+///
+/// Called after each transcription with the transcript text, language, and audio duration.
+/// Implementations run phoneme alignment, tone analysis, error classification, and
+/// emit VoiceEvents for the frontend.
+#[async_trait::async_trait]
+pub trait PronunciationProvider: Send + Sync {
+    async fn analyze(&self, transcript: &str, language: &Language, duration_ms: u64);
+}
+
 /// Base64-encode an `AudioClip`'s raw float samples for transport to the frontend.
 fn base64_encode_audio(clip: &AudioClip) -> String {
     use base64::Engine;
@@ -93,6 +103,8 @@ pub struct VoiceService {
     tts: std::sync::RwLock<Option<Arc<dyn TtsEngine>>>,
     /// Memory echo provider for dependency-inverted memory lookups.
     memory_echo: Option<Arc<dyn MemoryEchoProvider>>,
+    /// Pronunciation analysis hook (injected from feature-language-learning).
+    pronunciation: Option<Arc<dyn PronunciationProvider>>,
     capture: AudioCapture,
     model_manager: ModelManager,
     router: VoiceRouter,
@@ -127,6 +139,7 @@ impl VoiceService {
         stt_local: Option<Arc<dyn TranscriptionEngine>>,
         tts: Option<Arc<dyn TtsEngine>>,
         memory_echo: Option<Arc<dyn MemoryEchoProvider>>,
+        pronunciation: Option<Arc<dyn PronunciationProvider>>,
         model_manager: ModelManager,
         config: VoiceServiceConfig,
     ) -> Self {
@@ -136,6 +149,7 @@ impl VoiceService {
             stt_local: std::sync::RwLock::new(stt_local),
             tts: std::sync::RwLock::new(tts),
             memory_echo,
+            pronunciation,
             capture: AudioCapture::new(config.capture.clone()),
             model_manager,
             router: VoiceRouter::new(),
@@ -463,6 +477,16 @@ impl VoiceService {
 
         let report = compute_pronunciation_report(&transcript);
 
+        if let Some(ref provider) = self.pronunciation {
+            let provider = Arc::clone(provider);
+            let text = transcript.text.clone();
+            let lang = transcript.language.clone();
+            let dur = duration.as_millis() as u64;
+            tokio::spawn(async move {
+                provider.analyze(&text, &lang, dur).await;
+            });
+        }
+
         // Generate audio_ref path for FSRS playback.
         // TODO: tee the audio stream during capture to actually write the WAV file.
         // For now we prepare the path so downstream consumers can check for it.
@@ -615,6 +639,7 @@ mod tests {
         let model_manager = ModelManager::new(tmp.path());
         let svc = VoiceService::new(
             stt,
+            None,
             None,
             None,
             model_manager,
@@ -823,6 +848,7 @@ mod tests {
             Some(mock_stt),
             Some(mock_tts),
             None,
+            None,
             model_manager,
             VoiceServiceConfig::default(),
         );
@@ -871,6 +897,7 @@ mod tests {
         let svc = VoiceService::new(
             Some(mock_stt),
             Some(mock_tts),
+            None,
             None,
             model_manager,
             VoiceServiceConfig::default(),
@@ -938,6 +965,7 @@ mod tests {
         let model_manager = ModelManager::new(tmp.path());
         let svc = VoiceService::new(
             Some(mock_stt.clone()),
+            None,
             None,
             None,
             model_manager,

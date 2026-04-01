@@ -33,10 +33,7 @@ pub struct ErrorReport {
 /// Compares each aligned phoneme's confidence against thresholds:
 /// - >= 0.8: correct
 /// - < 0.8: error (phoneme is "weak")
-pub fn classify_errors(
-    alignment: &PhonemeAlignment,
-    _tones: Option<&ToneContour>,
-) -> ErrorReport {
+pub fn classify_errors(alignment: &PhonemeAlignment, _tones: Option<&ToneContour>) -> ErrorReport {
     let phoneme_scores: Vec<PhonemeScore> = alignment
         .phonemes
         .iter()

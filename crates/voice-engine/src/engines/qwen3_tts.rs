@@ -14,11 +14,6 @@ use crate::types::*;
 
 const QWEN3_TTS_SAMPLE_RATE: u32 = 24_000;
 
-/// Voice identifiers supported by Qwen3-TTS.
-const VOICES: &[&str] = &[
-    "alloy", "echo", "fable", "onyx", "nova", "shimmer",
-];
-
 pub struct Qwen3TtsEngine {
     model_dir: PathBuf,
     loaded: Mutex<bool>,
@@ -73,7 +68,7 @@ impl TtsEngine for Qwen3TtsEngine {
     }
 
     fn available_voices(&self, _lang: &Language) -> Vec<VoiceInfo> {
-        VOICES
+        super::QWEN3_VOICES
             .iter()
             .map(|v| VoiceInfo {
                 identifier: v.to_string(),
@@ -94,7 +89,7 @@ mod tests {
 
     #[test]
     fn voices_list_not_empty() {
-        assert!(!VOICES.is_empty());
+        assert!(!super::QWEN3_VOICES.is_empty());
     }
 
     #[test]
