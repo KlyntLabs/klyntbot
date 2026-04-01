@@ -126,6 +126,8 @@ pub struct VoiceServiceConfig {
     pub privacy_mode: PrivacyLevel,
     /// Data directory for saving audio captures and TTS output.
     pub data_dir: PathBuf,
+    /// When true, audio plays natively via cpal and base64 encoding is skipped.
+    pub native_audio: bool,
 }
 
 impl Default for VoiceServiceConfig {
@@ -134,6 +136,7 @@ impl Default for VoiceServiceConfig {
             capture: CaptureConfig::default(),
             privacy_mode: PrivacyLevel::Standard,
             data_dir: PathBuf::from("."),
+            native_audio: false,
         }
     }
 }
@@ -675,13 +678,17 @@ impl VoiceService {
                     }
                     Ok(clip) => {
                         info!(
-                            "TTS: {} samples at {}Hz, playing natively + emitting SpeakResponse",
+                            "TTS: {} samples at {}Hz, emitting SpeakResponse (native_audio={})",
                             clip.samples.len(),
-                            clip.sample_rate
+                            clip.sample_rate,
+                            self.config.native_audio
                         );
-                        // Play directly through system audio output (bypasses WebView AudioContext)
-                        play_audio_native(clip.samples.clone(), clip.sample_rate);
-                        let audio_base64 = base64_encode_audio(&clip);
+                        let audio_base64 = if self.config.native_audio {
+                            play_audio_native(clip.samples, clip.sample_rate);
+                            String::new()
+                        } else {
+                            base64_encode_audio(&clip)
+                        };
                         let _ = self
                             .event_tx
                             .send(VoiceEvent::SpeakResponse {

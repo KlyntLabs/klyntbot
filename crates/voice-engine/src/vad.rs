@@ -22,6 +22,14 @@ pub struct WebrtcVadProcessor {
     vad: webrtc_vad::Vad,
 }
 
+// SAFETY: `webrtc_vad::Vad` wraps a `*mut Fvad` raw pointer. `libfvad`
+// uses no thread-local state; the pointer is exclusively owned by this
+// struct (no aliased mutable access). Moving it to another thread is
+// safe as long as concurrent access is prevented — enforced by the
+// `Mutex` wrapper in `capture.rs`.
+#[cfg(feature = "vad")]
+unsafe impl Send for WebrtcVadProcessor {}
+
 #[cfg(feature = "vad")]
 impl WebrtcVadProcessor {
     /// Create a new WebRTC VAD processor.
@@ -43,10 +51,11 @@ impl WebrtcVadProcessor {
     /// Internally converts to i16 for the WebRTC VAD C API.
     /// For best results, pass 480 samples (30ms) at a time.
     pub fn process_chunk(&mut self, samples: &[f32]) -> VadDecision {
-        let i16_samples: Vec<i16> = samples
-            .iter()
-            .map(|&s| (s * i16::MAX as f32).clamp(i16::MIN as f32, i16::MAX as f32) as i16)
-            .collect();
+        // Stack-allocate for the fixed 480-sample VAD frame size
+        let mut i16_samples = [0i16; 480];
+        for (dst, &src) in i16_samples.iter_mut().zip(samples.iter()) {
+            *dst = (src * i16::MAX as f32).clamp(i16::MIN as f32, i16::MAX as f32) as i16;
+        }
 
         match self.vad.is_voice_segment(&i16_samples) {
             Ok(true) => {

@@ -130,6 +130,17 @@ impl AudioCapture {
         let mut silence_fired = false;
         let mut rms_counter: u32 = 0;
 
+        // Persistent DSP state shared with callback via Mutex.
+        // DenoiseState must persist across callbacks for RNNoise's recurrent GRU.
+        // VAD buffer accumulates samples across callbacks since cpal buffers
+        // are often <480 samples (the minimum VAD frame size at 16kHz).
+        #[cfg(feature = "vad")]
+        let dsp_state = std::sync::Mutex::new((
+            crate::vad::WebrtcVadProcessor::new(true),
+            nnnoiseless::DenoiseState::new(),
+            Vec::<f32>::with_capacity(960), // VAD accumulation buffer
+        ));
+
         let stream = device
             .build_input_stream(
                 &stream_config,
@@ -140,9 +151,83 @@ impl AudioCapture {
 
                     let rms = compute_rms(data);
 
-                    // Silence detection: only fires after user has spoken at least once.
-                    // This prevents auto-stop when the user hasn't started talking yet.
-                    if rms > silence_threshold {
+                    // RMS emission throttled to ~30fps (based on native sample rate)
+                    rms_counter += data.len() as u32;
+                    if rms_counter >= native_sample_rate / 30 {
+                        let _ = rms_tx.try_send(rms);
+                        rms_counter = 0;
+                    }
+
+                    // Mix to mono (average channels)
+                    let mono: Vec<f32> = if num_channels > 1 {
+                        data.chunks(num_channels as usize)
+                            .map(|frame| frame.iter().sum::<f32>() / num_channels as f32)
+                            .collect()
+                    } else {
+                        data.to_vec()
+                    };
+
+                    // Denoise + downsample + VAD using persistent DSP state
+                    #[cfg(feature = "vad")]
+                    let (downsampled, is_speech) = {
+                        if let Ok(mut guard) = dsp_state.lock() {
+                            let (ref mut vad_proc, ref mut denoise, ref mut vad_buf) = *guard;
+                            let denoised = if native_sample_rate == 48000 {
+                                crate::dsp::denoise_48khz(denoise, &mono)
+                            } else {
+                                mono
+                            };
+                            let ds = if native_sample_rate != target_sample_rate {
+                                crate::dsp::downsample_with_filter(
+                                    &denoised,
+                                    native_sample_rate,
+                                    target_sample_rate,
+                                )
+                            } else {
+                                denoised
+                            };
+                            // Accumulate downsampled samples for VAD (cpal buffers are often <480)
+                            vad_buf.extend_from_slice(&ds);
+                            let mut speech = false;
+                            while vad_buf.len() >= 480 {
+                                let frame: Vec<f32> = vad_buf.drain(..480).collect();
+                                if matches!(
+                                    vad_proc.process_chunk(&frame),
+                                    crate::vad::VadDecision::Speech(_)
+                                ) {
+                                    speech = true;
+                                    break;
+                                }
+                            }
+                            (ds, speech)
+                        } else {
+                            let ds = if native_sample_rate != target_sample_rate {
+                                crate::dsp::downsample_with_filter(
+                                    &mono,
+                                    native_sample_rate,
+                                    target_sample_rate,
+                                )
+                            } else {
+                                mono
+                            };
+                            (ds, rms > silence_threshold)
+                        }
+                    };
+                    #[cfg(not(feature = "vad"))]
+                    let (downsampled, is_speech) = {
+                        let ds = if native_sample_rate != target_sample_rate {
+                            crate::dsp::downsample_with_filter(
+                                &mono,
+                                native_sample_rate,
+                                target_sample_rate,
+                            )
+                        } else {
+                            mono
+                        };
+                        (ds, rms > silence_threshold)
+                    };
+
+                    if is_speech {
                         last_voice_time = Instant::now();
                         has_heard_voice = true;
                         silence_fired = false;
@@ -153,34 +238,6 @@ impl AudioCapture {
                         let _ = silence_tx.try_send(());
                         silence_fired = true;
                     }
-
-                    // RMS emission throttled to ~30fps (based on native sample rate)
-                    rms_counter += data.len() as u32;
-                    if rms_counter >= native_sample_rate / 30 {
-                        let _ = rms_tx.try_send(rms);
-                        rms_counter = 0;
-                    }
-
-                    // Downsample to 16kHz mono for Whisper:
-                    // 1) Mix to mono (average channels)
-                    // 2) Skip samples to match target rate (simple decimation)
-                    let mono: Vec<f32> = if num_channels > 1 {
-                        data.chunks(num_channels as usize)
-                            .map(|frame| frame.iter().sum::<f32>() / num_channels as f32)
-                            .collect()
-                    } else {
-                        data.to_vec()
-                    };
-
-                    let downsampled = if native_sample_rate != target_sample_rate {
-                        crate::dsp::downsample_with_filter(
-                            &mono,
-                            native_sample_rate,
-                            target_sample_rate,
-                        )
-                    } else {
-                        mono
-                    };
 
                     let chunk = AudioChunk {
                         samples: downsampled,

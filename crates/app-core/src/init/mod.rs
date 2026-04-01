@@ -722,6 +722,7 @@ impl AppCore {
                         config::schema::VoicePrivacyMode::Off => PrivacyLevel::Off,
                     },
                     data_dir: data_dir.clone(),
+                    native_audio: true,
                 };
 
                 let has_local_engine = stt_local.is_some();

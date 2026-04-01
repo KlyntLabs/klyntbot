@@ -30,20 +30,18 @@ pub fn downsample_with_filter(samples: &[f32], src_rate: u32, dst_rate: u32) -> 
 
 /// Apply noise reduction via nnnoiseless (RNNoise).
 /// Operates on 48kHz mono audio in frames of 480 samples.
+/// `state` must persist across calls for the GRU recurrent context to work.
 #[cfg(feature = "vad")]
-pub fn denoise_48khz(samples: &[f32]) -> Vec<f32> {
-    use nnnoiseless::DenoiseState;
-
-    let mut state = DenoiseState::new();
+pub fn denoise_48khz(state: &mut nnnoiseless::DenoiseState, samples: &[f32]) -> Vec<f32> {
     let mut output = Vec::with_capacity(samples.len());
-    let mut frame_buf = [0.0f32; DenoiseState::FRAME_SIZE];
+    let mut frame_buf = [0.0f32; nnnoiseless::DenoiseState::FRAME_SIZE];
 
-    for chunk in samples.chunks(DenoiseState::FRAME_SIZE) {
+    for chunk in samples.chunks(nnnoiseless::DenoiseState::FRAME_SIZE) {
         frame_buf[..chunk.len()].copy_from_slice(chunk);
-        if chunk.len() < DenoiseState::FRAME_SIZE {
+        if chunk.len() < nnnoiseless::DenoiseState::FRAME_SIZE {
             frame_buf[chunk.len()..].fill(0.0);
         }
-        let mut out_frame = [0.0f32; DenoiseState::FRAME_SIZE];
+        let mut out_frame = [0.0f32; nnnoiseless::DenoiseState::FRAME_SIZE];
         state.process_frame(&mut out_frame, &frame_buf);
         output.extend_from_slice(&out_frame[..chunk.len()]);
     }
@@ -135,7 +133,8 @@ mod tests {
     #[test]
     fn denoise_preserves_length() {
         let input = vec![0.01; 4800];
-        let output = denoise_48khz(&input);
+        let mut state = nnnoiseless::DenoiseState::new();
+        let output = denoise_48khz(&mut state, &input);
         assert_eq!(output.len(), input.len());
     }
 
