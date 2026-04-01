@@ -1,7 +1,7 @@
 use serde::{Deserialize, Serialize};
 
-use crate::scenario::{CheckpointAssertion, Checkpoint, MetricName};
 use super::{BaselineMetrics, MetricSnapshot};
+use crate::scenario::{Checkpoint, CheckpointAssertion, MetricName};
 
 // ---------------------------------------------------------------------------
 // Result types
@@ -52,9 +52,7 @@ impl GroundTruthVerifier {
                     subject,
                     predicate,
                     old_object,
-                } => {
-                    Self::check_fact_superseded(fact_repo, subject, predicate, old_object).await
-                }
+                } => Self::check_fact_superseded(fact_repo, subject, predicate, old_object).await,
                 CheckpointAssertion::MetricAbove { metric, threshold } => {
                     Self::check_metric_above(latest_snapshot, *metric, *threshold)
                 }
@@ -88,7 +86,10 @@ impl GroundTruthVerifier {
         min_confidence: f64,
     ) -> AssertionResult {
         let query = format!("{subject} {predicate} {object}");
-        let facts = fact_repo.search_fts(&query, None, 10).await.unwrap_or_default();
+        let facts = fact_repo
+            .search_fts(&query, None, 10)
+            .await
+            .unwrap_or_default();
 
         let found = facts.iter().find(|f| {
             f.subject == subject
@@ -115,7 +116,10 @@ impl GroundTruthVerifier {
         old_object: &str,
     ) -> AssertionResult {
         let query = format!("{subject} {predicate} {old_object}");
-        let facts = fact_repo.search_fts(&query, None, 10).await.unwrap_or_default();
+        let facts = fact_repo
+            .search_fts(&query, None, 10)
+            .await
+            .unwrap_or_default();
 
         let found = facts.iter().any(|f| {
             f.subject == subject
@@ -240,17 +244,13 @@ mod tests {
         assert!((get_metric_value(&snap, &MetricName::KnowledgeRetention) - 0.9).abs() < 1e-9);
         assert!((get_metric_value(&snap, &MetricName::RetrievalPrecision) - 0.8).abs() < 1e-9);
         assert!((get_metric_value(&snap, &MetricName::RetrievalRecall) - 0.7).abs() < 1e-9);
-        assert!(
-            (get_metric_value(&snap, &MetricName::FactExtractionAccuracy) - 0.85).abs() < 1e-9
-        );
+        assert!((get_metric_value(&snap, &MetricName::FactExtractionAccuracy) - 0.85).abs() < 1e-9);
         assert!(
             (get_metric_value(&snap, &MetricName::ContradictionDetectionRate) - 0.3).abs() < 1e-9
         );
         assert!((get_metric_value(&snap, &MetricName::CorrectionRate) - 0.1).abs() < 1e-9);
         assert!((get_metric_value(&snap, &MetricName::TokenEfficiency) - 500.0).abs() < 1e-9);
-        assert!(
-            (get_metric_value(&snap, &MetricName::PersonalizationScore) - 0.75).abs() < 1e-9
-        );
+        assert!((get_metric_value(&snap, &MetricName::PersonalizationScore) - 0.75).abs() < 1e-9);
         assert!((get_metric_value(&snap, &MetricName::TaskCompletionRate) - 0.6).abs() < 1e-9);
         assert!((get_metric_value(&snap, &MetricName::RoutingStability) - 0.95).abs() < 1e-9);
         assert!((get_metric_value(&snap, &MetricName::InsightUsefulness) - 0.5).abs() < 1e-9);
@@ -271,7 +271,9 @@ mod tests {
             insight_usefulness: 0.6,
         };
 
-        assert!((get_baseline_value(&baselines, &MetricName::TokenEfficiency) - 100.0).abs() < 1e-9);
+        assert!(
+            (get_baseline_value(&baselines, &MetricName::TokenEfficiency) - 100.0).abs() < 1e-9
+        );
         assert!(
             (get_baseline_value(&baselines, &MetricName::PersonalizationScore) - 0.8).abs() < 1e-9
         );
@@ -284,7 +286,9 @@ mod tests {
         );
 
         // Tier 1 and Tier 3 return 0.0
-        assert!((get_baseline_value(&baselines, &MetricName::KnowledgeRetention) - 0.0).abs() < 1e-9);
+        assert!(
+            (get_baseline_value(&baselines, &MetricName::KnowledgeRetention) - 0.0).abs() < 1e-9
+        );
         assert!(
             (get_baseline_value(&baselines, &MetricName::AutotunerPromotionSuccess) - 0.0).abs()
                 < 1e-9

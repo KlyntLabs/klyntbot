@@ -196,11 +196,11 @@ mod tests {
         };
 
         let final_metrics = MetricSnapshot {
-            token_efficiency: 400.0,       // improved (lower is better)
-            personalization_score: 0.75,   // improved 50%
-            task_completion_rate: 0.6,     // unchanged (0%)
-            routing_stability: 0.9,        // improved 12.5%
-            insight_usefulness: 0.6,       // improved 50%
+            token_efficiency: 400.0,     // improved (lower is better)
+            personalization_score: 0.75, // improved 50%
+            task_completion_rate: 0.6,   // unchanged (0%)
+            routing_stability: 0.9,      // improved 12.5%
+            insight_usefulness: 0.6,     // improved 50%
             ..MetricSnapshot::default()
         };
 
