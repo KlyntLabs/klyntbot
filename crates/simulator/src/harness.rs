@@ -126,6 +126,18 @@ impl SimulationHarness {
         let mut metrics = MetricCollector::new(30);
         let action_executor = ActionExecutor::new(Arc::clone(&self.bus));
 
+        // Subscribe to bus for ContradictionDetected events.
+        let contradiction_count = Arc::new(AtomicU32::new(0));
+        let mut bus_rx = self.bus.subscribe();
+        let cc = Arc::clone(&contradiction_count);
+        let contradiction_listener = tokio::spawn(async move {
+            while let Ok(event) = bus_rx.recv().await {
+                if matches!(event, bus::DomainEvent::ContradictionDetected { .. }) {
+                    cc.fetch_add(1, Ordering::Relaxed);
+                }
+            }
+        });
+
         // Collect all known facts for retention measurement.
         let mut known_facts = self.scenario.persona.profile.known_facts.clone();
         for phase_facts in [
@@ -159,7 +171,26 @@ impl SimulationHarness {
             }
 
             // Phase 3: MESSAGE PHASE
-            let messages = persona_runner.generate_day(plan.simulated_now);
+            let mut messages = persona_runner.generate_day(plan.simulated_now);
+
+            // Backfill retrieval annotations: for each message, annotate with
+            // recently extracted fact IDs from the same topic so retrieval
+            // precision/recall can be measured against real DB state.
+            for msg in &mut messages {
+                let relevant = persona_runner.relevant_facts_for_topic(&msg.topic);
+                if !relevant.is_empty() {
+                    if let Some(ref mut gt) = msg.ground_truth {
+                        gt.relevant_facts = relevant;
+                    } else {
+                        msg.ground_truth = Some(crate::persona::GroundTruthAnnotation {
+                            introduces_fact: None,
+                            relevant_facts: relevant,
+                            expected_skill: None,
+                        });
+                    }
+                }
+            }
+
             total_messages += messages.len() as u32;
             for msg in &messages {
                 // Track accumulator metrics.
@@ -201,6 +232,22 @@ impl SimulationHarness {
                 // Drive cognitive pipeline: extract facts from message.
                 self.run_cognitive_pipeline(msg, &mut metrics).await;
 
+                // Record extracted fact IDs for future retrieval annotation backfill.
+                if msg
+                    .ground_truth
+                    .as_ref()
+                    .and_then(|gt| gt.introduces_fact.as_ref())
+                    .is_some()
+                {
+                    if let Ok(facts) =
+                        self.fact_repo.search_fts(&msg.content, Some(&msg.topic), 1).await
+                    {
+                        for fact in facts {
+                            persona_runner.record_extracted_fact(&msg.topic, &fact.id);
+                        }
+                    }
+                }
+
                 // Step 3d: Drive retrieval for precision/recall metrics.
                 let retrieved = self.retriever.retrieve(&msg.content, 10).await;
                 let retrieved_ids: Vec<String> = retrieved.iter().map(|e| e.id.clone()).collect();
@@ -223,6 +270,10 @@ impl SimulationHarness {
                 // Token tracking (150 per scripted call).
                 metrics.accumulator_mut().total_tokens += 150;
             }
+
+            // Read contradiction events detected during this epoch's message processing.
+            let contradictions = contradiction_count.swap(0, Ordering::Relaxed);
+            metrics.accumulator_mut().contradictions_detected += contradictions;
 
             // Phase 3.5: CONTEXT UPDATE DRAIN
             let _ = self.context_queue.drain();
@@ -284,6 +335,9 @@ impl SimulationHarness {
                 );
             }
         }
+
+        // Stop the contradiction listener before building the report.
+        contradiction_listener.abort();
 
         // Build the final report.
         let wall_time_secs = run_start.elapsed().as_secs_f64();
