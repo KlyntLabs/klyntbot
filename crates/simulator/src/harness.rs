@@ -239,8 +239,10 @@ impl SimulationHarness {
                     .and_then(|gt| gt.introduces_fact.as_ref())
                     .is_some()
                 {
-                    if let Ok(facts) =
-                        self.fact_repo.search_fts(&msg.content, Some(&msg.topic), 1).await
+                    if let Ok(facts) = self
+                        .fact_repo
+                        .search_fts(&msg.content, Some(&msg.topic), 1)
+                        .await
                     {
                         for fact in facts {
                             persona_runner.record_extracted_fact(&msg.topic, &fact.id);
