@@ -553,8 +553,9 @@ impl SimulationHarness {
             }
             CronTrigger::AutotunerNightly => {
                 debug!(trigger = "AutotunerNightly", %simulated_now, "Executing cron");
-                let metric_source: Arc<dyn autotuner::traits::MetricSource> =
-                    Arc::new(crate::providers::SimMetricSource::new(self.inner_pool.clone()));
+                let metric_source: Arc<dyn autotuner::traits::MetricSource> = Arc::new(
+                    crate::providers::SimMetricSource::new(self.inner_pool.clone()),
+                );
                 let trial_repo = storage::TrialRepo::new(self.inner_pool.clone());
                 let cycle = autotuner::NightlyCycle::new(
                     config::AutoTunerConfig::default(),
