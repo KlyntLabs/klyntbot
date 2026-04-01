@@ -172,6 +172,15 @@ impl AudioCapture {
                         data.to_vec()
                     };
 
+                    // Apply RNNoise noise reduction on 48kHz mono audio
+                    // before downsampling. nnnoiseless is calibrated for 48kHz.
+                    #[cfg(feature = "vad")]
+                    let mono = if native_sample_rate == 48000 {
+                        crate::dsp::denoise_48khz(&mono)
+                    } else {
+                        mono
+                    };
+
                     let downsampled = if native_sample_rate != target_sample_rate {
                         crate::dsp::downsample_with_filter(
                             &mono,

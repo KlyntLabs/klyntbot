@@ -58,13 +58,20 @@ enum McpCommands {
 }
 
 /// Position the voice orb at the bottom-right of the window's current monitor.
+/// Uses logical (scaled) coordinates via `scale_factor` to handle Retina displays,
+/// and leaves margin for the macOS Dock and menu bar.
 fn position_orb_bottom_right(window: &tauri::WebviewWindow) {
     if let Ok(Some(monitor)) = window.current_monitor() {
-        let pos = monitor.position();
+        let scale = monitor.scale_factor();
         let size = monitor.size();
-        let x = pos.x + size.width as i32 - 200 - 24;
-        let y = pos.y + size.height as i32 - 200 - 24;
-        let _ = window.set_position(tauri::PhysicalPosition::new(x, y));
+        // Convert physical pixels to logical points
+        let logical_w = (size.width as f64 / scale) as i32;
+        let logical_h = (size.height as f64 / scale) as i32;
+        // 360px window, but the visible sphere is ~30% radius centered in the canvas.
+        // Offset so the sphere tucks into the corner (overlap window edge by ~100px).
+        let x = logical_w - 260;
+        let y = logical_h - 260;
+        let _ = window.set_position(tauri::LogicalPosition::new(x, y));
     }
 }
 

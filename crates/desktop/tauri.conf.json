@@ -108,8 +108,8 @@
         "label": "voice-orb",
         "url": "/#/voice-orb",
         "title": "",
-        "width": 200,
-        "height": 200,
+        "width": 360,
+        "height": 360,
         "resizable": false,
         "decorations": false,
         "visible": false,
@@ -118,12 +118,7 @@
         "alwaysOnTop": true,
         "skipTaskbar": true,
         "center": false,
-        "focus": false,
-        "windowEffects": {
-          "effects": ["hudWindow"],
-          "state": "active",
-          "radius": 100.0
-        }
+        "focus": false
       }
     ],
     "macOSPrivateApi": true,
