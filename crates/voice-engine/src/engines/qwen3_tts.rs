@@ -243,6 +243,10 @@ impl TtsEngine for Qwen3TtsEngine {
     fn display_name(&self) -> &str {
         "Qwen3-TTS"
     }
+
+    fn unload_if_idle(&self) -> bool {
+        Qwen3TtsEngine::unload_if_idle(self)
+    }
 }
 
 /// Map our Language type to the string the Qwen3 model expects.

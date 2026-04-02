@@ -153,6 +153,12 @@ impl TtsEngine for TtsEngineManager {
     fn display_name(&self) -> &str {
         self.primary.display_name()
     }
+
+    fn unload_if_idle(&self) -> bool {
+        let primary = self.primary.unload_if_idle();
+        let fallback = self.fallback.as_ref().is_some_and(|f| f.unload_if_idle());
+        primary || fallback
+    }
 }
 
 #[cfg(test)]

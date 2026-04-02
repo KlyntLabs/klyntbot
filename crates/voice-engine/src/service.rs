@@ -430,6 +430,21 @@ impl VoiceService {
         }
     }
 
+    /// Try to unload the TTS model if it has been idle.
+    ///
+    /// Called periodically by a maintenance timer to reclaim GPU memory.
+    /// No-op while a conversation is active.
+    pub fn try_unload_idle_tts(&self) {
+        if self.is_conversation_active() {
+            return;
+        }
+        if let Ok(guard) = self.tts.read() {
+            if let Some(ref engine) = *guard {
+                engine.unload_if_idle();
+            }
+        }
+    }
+
     /// Eagerly preload the STT model so it's ready before first voice use.
     pub async fn preload_stt(&self) -> common::Result<()> {
         let engine = self.stt_local.read().ok().and_then(|g| g.clone());

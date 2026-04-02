@@ -535,13 +535,9 @@ impl VoiceConversationManager {
             Ok(Some((transcript, _metadata))) => {
                 let text = transcript.text.trim().to_string();
                 if text.is_empty() {
-                    let paused = self.state.lock().await.paused;
-                    if paused {
-                        info!("Listening phase: empty transcript + End requested, going idle");
-                        self.transition_to(ConversationPhase::Idle).await;
-                        return;
-                    }
-                    info!("Listening phase: empty transcript, returning to listening");
+                    // Go idle to avoid a tight re-entry loop.
+                    info!("Listening phase: empty transcript, going idle");
+                    self.transition_to(ConversationPhase::Idle).await;
                     return;
                 }
                 info!("Listening phase: transcript = \"{}\"", text);
@@ -553,13 +549,6 @@ impl VoiceConversationManager {
             }
             Ok(None) => {
                 info!("Listening phase: no transcript (session was already stopped)");
-                // Empty capture — stay in listening or go idle
-                // Check if we were in the middle of a conversation
-                let turn_count = self.state.lock().await.turn_count;
-                if turn_count > 0 {
-                    // Re-listen
-                    return;
-                }
                 self.transition_to(ConversationPhase::Idle).await;
             }
             Err(e) => {

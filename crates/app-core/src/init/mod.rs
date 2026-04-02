@@ -656,7 +656,8 @@ impl AppCore {
                 drop(config_guard);
 
                 // TTS: config-driven with engine manager wrapping primary + system fallback.
-                // Keep a reference to the Qwen3 engine for preloading and idle unload.
+                // Temporary ref for one-shot preload only — idle unload routes
+                // through VoiceService to avoid stale refs after hot-swap.
                 let mut qwen3_tts_ref: Option<Arc<voice_engine::Qwen3TtsEngine>> = None;
                 let system_tts = Arc::new(voice_engine::AvSpeechTtsEngine::new(&data_dir));
                 let tts: Option<Arc<dyn voice_engine::TtsEngine>> = {
@@ -844,12 +845,11 @@ impl AppCore {
                 }
 
                 // Periodic idle unload for Qwen3-TTS model (reclaim GPU memory).
-                if let Some(tts_engine) = qwen3_tts_ref {
+                // Routes through VoiceService so hot-swapped engines are reached.
+                {
                     let svc_for_idle = Arc::clone(&service);
                     spawn_periodic_timer(&shutdown_token, 300, move || {
-                        if !svc_for_idle.is_conversation_active() {
-                            tts_engine.unload_if_idle();
-                        }
+                        svc_for_idle.try_unload_idle_tts()
                     });
                 }
 
