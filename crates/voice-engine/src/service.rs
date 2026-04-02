@@ -445,6 +445,15 @@ impl VoiceService {
         }
     }
 
+    /// Override the silence detection duration for subsequent captures.
+    pub fn set_silence_duration(&self, duration: std::time::Duration) {
+        if let Ok(mut cfg) = self.config.write() {
+            cfg.capture.silence_duration = duration;
+        }
+        // Also update AudioCapture's own config so the next start() call picks it up.
+        self.capture.set_silence_duration(duration);
+    }
+
     /// Eagerly preload the STT model so it's ready before first voice use.
     pub async fn preload_stt(&self) -> common::Result<()> {
         let engine = self.stt_local.read().ok().and_then(|g| g.clone());

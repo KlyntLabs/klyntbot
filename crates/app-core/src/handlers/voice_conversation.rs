@@ -463,6 +463,14 @@ impl VoiceConversationManager {
     async fn run_listening_phase(&self, cmd_rx: &mut mpsc::Receiver<VoiceCommand>) {
         info!("Listening phase: starting capture");
 
+        // Apply conversation-mode silence duration (shorter for faster turn-taking)
+        {
+            let config = self.config.read().await;
+            let secs = config.conversation.conversation_silence_secs;
+            self.voice_service
+                .set_silence_duration(std::time::Duration::from_secs_f32(secs));
+        }
+
         // Start audio capture
         let capture_result = self.voice_service.start_capture().await;
         let (_session_id, _engine_kind) = match capture_result {
@@ -480,6 +488,12 @@ impl VoiceConversationManager {
                 return;
             }
         };
+
+        // Preload TTS model in background so it's warm when the response comes
+        let voice_svc = self.voice_service.clone();
+        tokio::spawn(async move {
+            voice_svc.preload_tts().await;
+        });
 
         // Poll for silence detection or commands.
         // VoiceService emits CaptureEnded when silence is detected, but the

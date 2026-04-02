@@ -78,6 +78,13 @@ impl AudioCapture {
         }
     }
 
+    /// Override just the silence duration (takes effect on next capture start).
+    pub fn set_silence_duration(&self, duration: Duration) {
+        if let Ok(mut guard) = self.config.write() {
+            guard.silence_duration = duration;
+        }
+    }
+
     /// Enumerate all audio devices in a single cpal host query.
     /// Returns (input_names, output_names, default_input_name, default_output_name).
     pub fn enumerate_devices() -> (Vec<String>, Vec<String>, Option<String>, Option<String>) {
