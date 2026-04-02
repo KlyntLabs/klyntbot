@@ -12,6 +12,7 @@ use uuid::Uuid;
 
 use crate::events::AppEventEmitter;
 use config::schema::VoiceConfig;
+use tokio_util::sync::CancellationToken;
 use voice_engine::{MemoryEchoProvider, MonitorSession, VoiceEvent, VoiceService};
 
 /// Wrapper that makes `MonitorSession` moveable to a blocking thread.
@@ -585,32 +586,34 @@ impl VoiceConversationManager {
         }
     }
 
-    // ── 6. run_reflecting_phase ─────────────────────────────
+    // ── 6. Shared reflecting preamble ─────────────────────────
 
-    async fn run_reflecting_phase(&self, cmd_rx: &mut mpsc::Receiver<VoiceCommand>) {
-        let (transcript_text, session_key_str) = {
+    /// Shared preamble for reflecting and streaming response phases.
+    /// Returns (event_rx, cancel_token, session_key_str) or None if we should bail.
+    async fn prepare_reflecting_phase(
+        &self,
+    ) -> Option<(mpsc::Receiver<agent::AgentEvent>, CancellationToken, String)> {
+        let (transcript_text, session_key_str, needs_title, turn_count) = {
             let state = self.state.lock().await;
-            let text = state.pending_transcript.clone().unwrap_or_default();
-            let sk = state
-                .session_key
-                .as_ref()
-                .map(|k| k.to_string())
-                .unwrap_or_default();
-            (text, sk)
+            (
+                state.pending_transcript.clone().unwrap_or_default(),
+                state
+                    .session_key
+                    .as_ref()
+                    .map(|k| k.to_string())
+                    .unwrap_or_default(),
+                state.session_title.is_empty(),
+                state.turn_count,
+            )
         };
 
         if transcript_text.is_empty() {
-            info!("Reflecting phase: empty transcript, back to listening");
+            info!("Reflecting preamble: empty transcript, back to listening");
             self.transition_to(ConversationPhase::Listening).await;
-            return;
+            return None;
         }
 
-        // Auto-title from first voice transcript (matches text chat behavior).
-        // Extract under the lock, drop it, then do the DB call.
-        let needs_title = {
-            let state = self.state.lock().await;
-            state.session_title.is_empty()
-        };
+        // Auto-title from first voice transcript (matches text chat behavior)
         if needs_title {
             let title: String = transcript_text.chars().take(60).collect();
             let metadata = serde_json::json!({
@@ -623,7 +626,6 @@ impl VoiceConversationManager {
                 .upsert_voice_session(&session_key_str, &metadata)
                 .await;
             self.state.lock().await.session_title = title;
-            // Notify sidebar to refresh the thread title
             self.emitter.emit_event(
                 "chat:thread_updated",
                 serde_json::json!({ "sessionKey": session_key_str }),
@@ -631,13 +633,13 @@ impl VoiceConversationManager {
         }
 
         info!(
-            "Reflecting phase: sending to agent (session={})",
+            "Reflecting preamble: sending to agent (session={})",
             session_key_str
         );
 
-        let (turn_count, session_title) = {
+        let session_title = {
             let state = self.state.lock().await;
-            (state.turn_count, state.session_title.clone())
+            state.session_title.clone()
         };
         let _ = self
             .voice_service
@@ -659,7 +661,6 @@ impl VoiceConversationManager {
                 .emit_event(desktop_shared::events::CHAT_MESSAGE_ADDED, val);
         }
 
-        // Call agent
         let streaming_handle = match self
             .agent
             .process_direct_streaming(transcript_text, session_key_str.clone())
@@ -667,7 +668,7 @@ impl VoiceConversationManager {
         {
             Ok(handle) => handle,
             Err(e) => {
-                warn!("Reflecting phase: agent error: {e}");
+                warn!("Reflecting preamble: agent error: {e}");
                 let _ = self
                     .voice_service
                     .emit_event(VoiceEvent::Error {
@@ -676,12 +677,25 @@ impl VoiceConversationManager {
                     })
                     .await;
                 self.transition_to(ConversationPhase::Idle).await;
-                return;
+                return None;
             }
         };
 
-        let mut event_rx = streaming_handle.event_rx;
-        let cancel_token = streaming_handle.cancel_token;
+        Some((
+            streaming_handle.event_rx,
+            streaming_handle.cancel_token,
+            session_key_str,
+        ))
+    }
+
+    // ── 6a. run_reflecting_phase ─────────────────────────────
+
+    async fn run_reflecting_phase(&self, cmd_rx: &mut mpsc::Receiver<VoiceCommand>) {
+        let (mut event_rx, cancel_token, session_key_str) =
+            match self.prepare_reflecting_phase().await {
+                Some(v) => v,
+                None => return,
+            };
         let mut response_content = String::new();
 
         // Forward agent events to the emitter, collect the final content
@@ -830,6 +844,25 @@ impl VoiceConversationManager {
         self.transition_to(ConversationPhase::Speaking).await;
     }
 
+    /// Emit PhaseChanged speaking on the first TTS sentence, then mark the flag.
+    async fn emit_speaking_phase_if_first(&self, first_sent: &mut bool) {
+        if !*first_sent {
+            *first_sent = true;
+            let (tc, title) = {
+                let state = self.state.lock().await;
+                (state.turn_count, state.session_title.clone())
+            };
+            let _ = self
+                .voice_service
+                .emit_event(VoiceEvent::PhaseChanged {
+                    phase: ConversationPhase::Speaking.as_str().to_string(),
+                    session_title: Some(title),
+                    turn_count: tc,
+                })
+                .await;
+        }
+    }
+
     // ── 6b. run_streaming_response_phase ──────────────────────
 
     /// Combined reflecting + speaking phase that overlaps LLM generation, TTS synthesis, and playback.
@@ -838,99 +871,11 @@ impl VoiceConversationManager {
     /// LLM chunks through a `SentenceAccumulator`, sends each complete sentence to a
     /// `StreamingTtsPipeline`, and plays audio as soon as each sentence is synthesized.
     async fn run_streaming_response_phase(&self, cmd_rx: &mut mpsc::Receiver<VoiceCommand>) {
-        // ── (a) Same setup as run_reflecting_phase ──────────────────────────
-
-        let (transcript_text, session_key_str) = {
-            let state = self.state.lock().await;
-            let text = state.pending_transcript.clone().unwrap_or_default();
-            let sk = state
-                .session_key
-                .as_ref()
-                .map(|k| k.to_string())
-                .unwrap_or_default();
-            (text, sk)
-        };
-
-        if transcript_text.is_empty() {
-            info!("Streaming response: empty transcript, back to listening");
-            self.transition_to(ConversationPhase::Listening).await;
-            return;
-        }
-
-        // Auto-title from first voice transcript
-        let needs_title = {
-            let state = self.state.lock().await;
-            state.session_title.is_empty()
-        };
-        if needs_title {
-            let title: String = transcript_text.chars().take(60).collect();
-            let metadata = serde_json::json!({
-                "title": title,
-                "is_voice_session": true,
-            });
-            let _ = self
-                .repos
-                .sessions
-                .upsert_voice_session(&session_key_str, &metadata)
-                .await;
-            self.state.lock().await.session_title = title;
-            self.emitter.emit_event(
-                "chat:thread_updated",
-                serde_json::json!({ "sessionKey": session_key_str }),
-            );
-        }
-
-        info!(
-            "Streaming response: sending to agent (session={})",
-            session_key_str
-        );
-
-        // Emit PhaseChanged reflecting
-        let (turn_count, session_title) = {
-            let state = self.state.lock().await;
-            (state.turn_count, state.session_title.clone())
-        };
-        let _ = self
-            .voice_service
-            .emit_event(VoiceEvent::PhaseChanged {
-                phase: ConversationPhase::Reflecting.as_str().to_string(),
-                session_title: Some(session_title),
-                turn_count,
-            })
-            .await;
-
-        // Emit chat:message_added for the voice transcript
-        if let Ok(val) = serde_json::to_value(&desktop_shared::events::ChatMessagePayload {
-            session_key: session_key_str.clone(),
-            source: "voice".to_string(),
-        }) {
-            self.emitter
-                .emit_event(desktop_shared::events::CHAT_MESSAGE_ADDED, val);
-        }
-
-        // Start agent streaming
-        let streaming_handle = match self
-            .agent
-            .process_direct_streaming(transcript_text, session_key_str.clone())
-            .await
-        {
-            Ok(handle) => handle,
-            Err(e) => {
-                warn!("Streaming response: agent error: {e}");
-                let _ = self
-                    .voice_service
-                    .emit_event(VoiceEvent::Error {
-                        message: format!("Agent processing failed: {e}"),
-                        recoverable: true,
-                    })
-                    .await;
-                self.transition_to(ConversationPhase::Idle).await;
-                return;
-            }
-        };
-
-        let mut event_rx = streaming_handle.event_rx;
-        let cancel_token = streaming_handle.cancel_token;
+        let (mut event_rx, cancel_token, session_key_str) =
+            match self.prepare_reflecting_phase().await {
+                Some(v) => v,
+                None => return,
+            };
 
         // ── (b) Set up TTS pipeline ────────────────────────────────────────
 
@@ -960,6 +905,17 @@ impl VoiceConversationManager {
 
         // ── (d) Main event loop ────────────────────────────────────────────
 
+        // Cancel all active pipelines (agent + TTS + playback).
+        macro_rules! cancel_pipelines {
+            () => {
+                cancel_token.cancel();
+                if let Some(ref stop) = tts_stop {
+                    stop.store(true, Ordering::Relaxed);
+                }
+                self.voice_service.stop_tts_playback().await;
+            };
+        }
+
         let mut response_content = String::new();
         let mut interrupted = false;
         let mut first_sentence_sent = false;
@@ -971,11 +927,7 @@ impl VoiceConversationManager {
                 Some(cmd) = cmd_rx.recv() => {
                     if matches!(cmd, VoiceCommand::End | VoiceCommand::Pause) {
                         info!("Streaming response: End/Pause received, cancelling");
-                        cancel_token.cancel();
-                        if let Some(ref stop) = tts_stop {
-                            stop.store(true, Ordering::Relaxed);
-                        }
-                        self.voice_service.stop_tts_playback().await;
+                        cancel_pipelines!();
                         if let Some(ref stop) = monitor.stop_signal {
                             stop.store(true, Ordering::Relaxed);
                         }
@@ -988,11 +940,7 @@ impl VoiceConversationManager {
                     }
                     if matches!(cmd, VoiceCommand::Interrupt) {
                         info!("Streaming response: Interrupt received");
-                        cancel_token.cancel();
-                        if let Some(ref stop) = tts_stop {
-                            stop.store(true, Ordering::Relaxed);
-                        }
-                        self.voice_service.stop_tts_playback().await;
+                        cancel_pipelines!();
                         interrupted = true;
                         break;
                     }
@@ -1003,11 +951,7 @@ impl VoiceConversationManager {
                         consecutive_speech_samples += 1;
                         if consecutive_speech_samples >= SPEECH_SAMPLE_THRESHOLD {
                             info!("Streaming response: speech interrupt detected");
-                            cancel_token.cancel();
-                            if let Some(ref stop) = tts_stop {
-                                stop.store(true, Ordering::Relaxed);
-                            }
-                            self.voice_service.stop_tts_playback().await;
+                            cancel_pipelines!();
                             interrupted = true;
                             break;
                         }
@@ -1019,7 +963,6 @@ impl VoiceConversationManager {
                 event = event_rx.recv() => {
                     match event {
                         Some(agent::AgentEvent::ContentChunk { data }) => {
-                            // Forward to chat UI
                             if let Ok(val) = serde_json::to_value(
                                 &desktop_shared::events::ContentChunkPayload {
                                     session_key: session_key_str.clone(),
@@ -1033,25 +976,9 @@ impl VoiceConversationManager {
                             }
                             response_content.push_str(&data);
 
-                            // Feed into sentence accumulator and drain complete sentences
                             accumulator.push(&data);
                             while let Some(sentence) = accumulator.take_sentence() {
-                                if !first_sentence_sent {
-                                    first_sentence_sent = true;
-                                    // Emit PhaseChanged speaking on first sentence
-                                    let (tc, title) = {
-                                        let state = self.state.lock().await;
-                                        (state.turn_count, state.session_title.clone())
-                                    };
-                                    let _ = self
-                                        .voice_service
-                                        .emit_event(VoiceEvent::PhaseChanged {
-                                            phase: ConversationPhase::Speaking.as_str().to_string(),
-                                            session_title: Some(title),
-                                            turn_count: tc,
-                                        })
-                                        .await;
-                                }
+                                self.emit_speaking_phase_if_first(&mut first_sentence_sent).await;
                                 if let Some(ref tx) = sentence_tx {
                                     let _ = tx
                                         .send(voice_engine::SentenceItem {
@@ -1064,7 +991,6 @@ impl VoiceConversationManager {
                         }
                         Some(agent::AgentEvent::Done { content, message_id }) => {
                             response_content = content.clone();
-                            // Forward done event
                             if let Ok(val) = serde_json::to_value(
                                 &desktop_shared::events::DonePayload {
                                     session_key: session_key_str.clone(),
@@ -1077,7 +1003,6 @@ impl VoiceConversationManager {
                                 );
                             }
                             let _ = message_id;
-                            // Notify the chat UI that the assistant response is persisted
                             if let Ok(val) = serde_json::to_value(
                                 &desktop_shared::events::ChatMessagePayload {
                                     session_key: session_key_str.clone(),
@@ -1092,20 +1017,7 @@ impl VoiceConversationManager {
 
                             // Flush remaining text from accumulator as final sentence
                             if let Some(remainder) = accumulator.flush() {
-                                if !first_sentence_sent {
-                                    let (tc, title) = {
-                                        let state = self.state.lock().await;
-                                        (state.turn_count, state.session_title.clone())
-                                    };
-                                    let _ = self
-                                        .voice_service
-                                        .emit_event(VoiceEvent::PhaseChanged {
-                                            phase: ConversationPhase::Speaking.as_str().to_string(),
-                                            session_title: Some(title),
-                                            turn_count: tc,
-                                        })
-                                        .await;
-                                }
+                                self.emit_speaking_phase_if_first(&mut first_sentence_sent).await;
                                 if let Some(ref tx) = sentence_tx {
                                     let _ = tx
                                         .send(voice_engine::SentenceItem {
@@ -1182,7 +1094,6 @@ impl VoiceConversationManager {
 
         // ── (e) After loop — wait for TTS pipeline completion ──────────────
 
-        // Drop sentence_tx so the pipeline knows no more sentences are coming
         drop(sentence_tx);
 
         if !interrupted {
@@ -1560,9 +1471,8 @@ impl VoiceConversationManager {
                 self.voice_service.set_conversation_active(false);
                 // Restore the general silence threshold (conversation mode uses a shorter one)
                 let general_silence = self.config.read().await.conversation.silence_threshold_secs;
-                self.voice_service.set_silence_duration(
-                    std::time::Duration::from_secs_f32(general_silence),
-                );
+                self.voice_service
+                    .set_silence_duration(std::time::Duration::from_secs_f32(general_silence));
             }
             _ => {}
         }
