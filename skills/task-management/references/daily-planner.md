@@ -18,7 +18,7 @@ metadata:
 **When the user asks for their daily plan** ("daily plan", "what should I focus on", "morning plan", "plan my day"):
 
 1. Check today's calendar events via Google Calendar MCP tools (if available, otherwise skip)
-2. Generate the plan: `{"action": "plan", "count": 3}`
+2. Generate the plan: `tasks(action: "plan_day", count: 3)`
 3. Display the integrated plan with calendar context
 4. Ask what they want to do: accept, swap, skip, or defer
 

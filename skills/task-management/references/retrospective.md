@@ -23,7 +23,7 @@ metadata:
 
 ### Step 1: OKR Progress Review
 
-Pull all active objectives: `okr list`
+Pull all active objectives: `okr(action: "objective.list")`
 
 For each objective, present Key Results with scoring:
 
@@ -136,7 +136,7 @@ Good Key Results are:
 What are 2–4 Key Results for this objective?
 ```
 
-Create each KR via `okr add_key_result`.
+Create each KR via `okr(action: "kr.create")`. For action-mode KRs, use `okr(action: "kr.set_progress")` to directly set progress during reviews.
 
 ## Interaction Style
 

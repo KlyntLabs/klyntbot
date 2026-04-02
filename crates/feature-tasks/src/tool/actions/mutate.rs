@@ -25,8 +25,12 @@ impl TaskTool {
         let patch = TaskPatch {
             id: id.to_string(),
             title: p.optional_str("title")?.map(String::from),
-            description: p.optional_str("description")?.map(|s| Some(s.to_string())),
-            priority: p.optional_u64("priority")?.map(|v| Some(v as i16)),
+            description: p.clearable_str("description")?,
+            priority: if p.has("priority") {
+                Some(p.optional_u64("priority")?.map(|v| v as i16))
+            } else {
+                None
+            },
             due_date: p.optional_str("due_date")?.map(|s| {
                 if s.is_empty() || s == "null" {
                     None
@@ -43,31 +47,29 @@ impl TaskTool {
             last_reminded_at: None,
             calendar_event_uid: None,
             next_instance_date: None,
-            estimated_minutes: p.optional_u64("estimated_minutes")?.map(|v| Some(v as i32)),
+            estimated_minutes: if p.has("estimated_minutes") {
+                Some(p.optional_u64("estimated_minutes")?.map(|v| v as i32))
+            } else {
+                None
+            },
             recurrence_rule: None,
             area_id: p.optional_str("area_id")?.map(String::from),
-            project_id: p.optional_str("project_id")?.map(|s| Some(s.to_string())),
-            key_result_id: p
-                .optional_str("key_result_id")?
-                .map(|s| Some(s.to_string())),
-            status_label_id: p
-                .optional_str("status_label_id")?
-                .map(|s| Some(s.to_string())),
+            project_id: p.clearable_str("project_id")?,
+            key_result_id: p.clearable_str("key_result_id")?,
+            status_label_id: p.clearable_str("status_label_id")?,
             position: p.optional_u64("position")?.map(|v| v as i32),
-            group_id: p.optional_str("group_id")?.map(|s| Some(s.to_string())),
+            group_id: p.clearable_str("group_id")?,
             // New agentic fields
             task_type: p.optional_str("task_type")?.map(String::from),
-            acceptance_criteria: p
-                .optional_str("acceptance_criteria")?
-                .map(|s| Some(s.to_string())),
-            agent_config: p.optional_str("agent_config")?.map(|s| Some(s.to_string())),
+            acceptance_criteria: p.clearable_str("acceptance_criteria")?,
+            agent_config: p.clearable_str("agent_config")?,
             execution_state: None,
             spawned_execution_id: None,
-            energy_level: p.optional_str("energy_level")?.map(|s| Some(s.to_string())),
+            energy_level: p.clearable_str("energy_level")?,
             complexity_score: None,
             completed: None,
             actual_minutes: None,
-            objective_id: p.optional_str("objective_id")?.map(|s| Some(s.to_string())),
+            objective_id: p.clearable_str("objective_id")?,
             scheduled_start: p.optional_str("scheduled_start")?.map(|s| {
                 if s.is_empty() || s == "null" {
                     None
@@ -294,6 +296,62 @@ impl TaskTool {
         } else {
             Err(ToolError::ExecutionFailed(format!("Task not found: {}", id)).into())
         }
+    }
+
+    pub(crate) async fn handle_reopen(&self, p: &ParamExtractor<'_>) -> Result<String> {
+        let id = p.required_str("id")?;
+
+        let row = self
+            .repo
+            .get(id)
+            .await?
+            .ok_or_else(|| ToolError::ExecutionFailed(format!("Task not found: {}", id)))?;
+
+        if row.status != "done" {
+            return Err(ToolError::InvalidParams(format!(
+                "Task is not completed (status: {})",
+                row.status
+            ))
+            .into());
+        }
+
+        let key_result_id = row.key_result_id.clone();
+
+        let patch = TaskPatch {
+            id: id.to_string(),
+            status: Some("todo".to_string()),
+            completed: Some(false),
+            ..Default::default()
+        };
+
+        let updated = self.repo.update(&patch).await?;
+
+        // Log activity
+        if self.config.auto_log_activity {
+            let _ = self
+                .repo
+                .log_activity(
+                    id,
+                    "status_change",
+                    Some("status"),
+                    Some("done"),
+                    Some("todo"),
+                    "user",
+                    Some("Task reopened"),
+                )
+                .await;
+        }
+
+        // Cascade KR progress if task was linked
+        if let Some(ref kr_id) = key_result_id {
+            if let Some(ref handler) = self.progress_handler {
+                if let Err(e) = handler.recalculate_kr_progress(kr_id).await {
+                    warn!("Failed to cascade progress for KR {}: {}", kr_id, e);
+                }
+            }
+        }
+
+        Ok(format!("Reopened task: {}", updated.title))
     }
 
     // ─── Activity logging helper ────────────────────────────────────

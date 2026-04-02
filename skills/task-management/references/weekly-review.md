@@ -26,7 +26,7 @@ A review is NOT a report. It's an **interactive workflow** where the agent walks
 
 ### Phase 1: Get Clear (process loose ends)
 
-1. Check for overdue tasks: `todo list filter=overdue`
+1. Check for overdue tasks: `tasks(action: "list", due_before: "today")`
 2. For each overdue task, ask the user:
    ```
    ⚠️ Overdue tasks need triage:
@@ -37,11 +37,11 @@ A review is NOT a report. It's an **interactive workflow** where the agent walks
    2. "Send invoice to client" (1 day overdue, P1)
       → Complete | Reschedule to [when] | Drop
    ```
-3. Process their responses (update due dates, complete, or archive)
+3. Process their responses (update due dates, complete, reopen if needed, or archive)
 
 ### Phase 2: Get Current (review active work)
 
-1. Pull active projects: `project list`
+1. Pull active projects: `project(action: "list", status: "active")`
 2. For each active project, show a health summary:
    ```
    📊 Project health check:
@@ -56,7 +56,7 @@ A review is NOT a report. It's an **interactive workflow** where the agent walks
       This needs urgent attention. Reprioritize?
    ```
 3. For each yellow/red project, ask the user for a decision
-4. Check OKR progress if objectives exist: `okr list`
+4. Check OKR progress if objectives exist: `okr(action: "objective.list")`
    ```
    📈 OKR check-in:
 
@@ -69,7 +69,7 @@ A review is NOT a report. It's an **interactive workflow** where the agent walks
 
 ### Phase 3: Get Creative (plan next week)
 
-1. Show upcoming deadlines for next 7 days: `todo list filter=upcoming`
+1. Show upcoming deadlines for next 7 days: `tasks(action: "list", due_before: "next week")`
 2. Ask about priorities:
    ```
    📋 Looking ahead to next week:

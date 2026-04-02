@@ -15,7 +15,6 @@ use common::{Result, ToolError};
 use storage::{KeyResultRepo, ObjectiveRepo};
 use tools_core::ProgressHandler;
 
-/// Tool for managing OKR objectives and key results.
 pub struct OkrTool {
     objective_repo: ObjectiveRepo,
     kr_repo: KeyResultRepo,
@@ -44,7 +43,7 @@ impl Tool for OkrTool {
     }
 
     fn description(&self) -> &str {
-        "Manage OKR objectives and key results. Actions: objective.create, objective.list, objective.show, objective.update, objective.delete, kr.create, kr.list, kr.show, kr.update, kr.update_metric, kr.delete"
+        "Manage OKR objectives and key results. Actions: objective.create, objective.list, objective.show, objective.update, objective.delete, kr.create, kr.list, kr.show, kr.update, kr.update_metric, kr.set_progress, kr.delete"
     }
 
     fn metadata(&self) -> tools_core::ToolMetadata {
@@ -66,7 +65,7 @@ impl Tool for OkrTool {
                         "objective.create", "objective.list", "objective.show",
                         "objective.update", "objective.delete",
                         "kr.create", "kr.list", "kr.show",
-                        "kr.update", "kr.update_metric", "kr.delete"
+                        "kr.update", "kr.update_metric", "kr.set_progress", "kr.delete"
                     ],
                     "description": "Action to perform"
                 },
@@ -89,7 +88,8 @@ impl Tool for OkrTool {
                 },
                 "target_value": { "type": "number", "description": "Target value (for metric KRs)" },
                 "current_value": { "type": "number", "description": "Current metric value (for kr.update_metric)" },
-                "unit": { "type": "string", "description": "Unit label (for metric KRs)" }
+                "unit": { "type": "string", "description": "Unit label (for metric KRs)" },
+                "progress": { "type": "number", "description": "Progress override 0-100 (for kr.set_progress)" }
             },
             "required": ["action"]
         })
@@ -194,6 +194,11 @@ impl Tool for OkrTool {
                 if let Some(due) = obj.due_date {
                     output.push_str(&format!("Due: {}\n", due));
                 }
+                output.push_str(&format!("Created: {}\n", obj.created_at));
+                output.push_str(&format!("Updated: {}\n", obj.updated_at));
+                if let Some(completed) = obj.completed_at {
+                    output.push_str(&format!("Completed: {}\n", completed));
+                }
 
                 if !krs.is_empty() {
                     output.push_str(&format!("\nKey Results ({}):\n", krs.len()));
@@ -226,16 +231,14 @@ impl Tool for OkrTool {
                     None
                 };
 
+                let desc = p.clearable_str("description")?;
+
                 let updated = self
                     .objective_repo
                     .update(
                         id,
                         p.optional_str("title")?,
-                        if args.get("description").is_some() {
-                            Some(p.optional_str("description")?)
-                        } else {
-                            None
-                        },
+                        desc.as_ref().map(|o| o.as_deref()),
                         p.optional_str("status")?,
                         if args.get("priority").is_some() {
                             Some(p.optional_u64("priority")?.map(|v| v as i16))
@@ -388,6 +391,11 @@ impl Tool for OkrTool {
                 if let Some(due) = kr.due_date {
                     output.push_str(&format!("Due: {}\n", due));
                 }
+                output.push_str(&format!("Created: {}\n", kr.created_at));
+                output.push_str(&format!("Updated: {}\n", kr.updated_at));
+                if let Some(completed) = kr.completed_at {
+                    output.push_str(&format!("Completed: {}\n", completed));
+                }
 
                 Ok(output)
             }
@@ -410,16 +418,14 @@ impl Tool for OkrTool {
                     None
                 };
 
+                let desc = p.clearable_str("description")?;
+
                 let updated = self
                     .kr_repo
                     .update(
                         id,
                         p.optional_str("title")?,
-                        if args.get("description").is_some() {
-                            Some(p.optional_str("description")?)
-                        } else {
-                            None
-                        },
+                        desc.as_ref().map(|o| o.as_deref()),
                         p.optional_str("status")?,
                         due_date_opt,
                     )
@@ -459,6 +465,31 @@ impl Tool for OkrTool {
                     updated.current_value,
                     updated.unit.as_deref().unwrap_or(""),
                     updated.progress
+                ))
+            }
+
+            "kr.set_progress" => {
+                let id = p.required_str("id")?;
+                let progress = p.optional_f64("progress")?.ok_or_else(|| {
+                    ToolError::InvalidParams("progress is required (0-100)".to_string())
+                })?;
+
+                let kr =
+                    self.kr_repo.get(id).await?.ok_or_else(|| {
+                        ToolError::InvalidParams("Key result not found".to_string())
+                    })?;
+
+                self.kr_repo.update_progress(id, progress).await?;
+
+                // Cascade to parent objective
+                let _ = self
+                    .objective_repo
+                    .recalculate_progress(&kr.objective_id)
+                    .await;
+
+                Ok(format!(
+                    "Key Result progress set: {} = {:.1}%",
+                    kr.title, progress
                 ))
             }
 

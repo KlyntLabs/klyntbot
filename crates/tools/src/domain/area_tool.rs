@@ -1,6 +1,6 @@
 //! AreaTool — Tool interface for PARA area management.
 //!
-//! Provides 5 actions: create, list, show, update, reorder.
+//! Provides 6 actions: create, list, show, update, delete, reorder.
 
 use async_trait::async_trait;
 use chrono::Utc;
@@ -11,7 +11,6 @@ use crate::{RoutingContext, Tool};
 use common::{Result, ToolError};
 use storage::AreaRepo;
 
-/// Tool for managing top-level PARA areas.
 pub struct AreaTool {
     area_repo: AreaRepo,
 }
@@ -29,7 +28,7 @@ impl Tool for AreaTool {
     }
 
     fn description(&self) -> &str {
-        "Manage areas (top-level PARA containers). Actions: create, list, show, update, reorder."
+        "Manage areas (top-level PARA containers). Actions: create, list, show, update, delete, reorder."
     }
 
     fn metadata(&self) -> tools_core::ToolMetadata {
@@ -47,12 +46,12 @@ impl Tool for AreaTool {
             "properties": {
                 "action": {
                     "type": "string",
-                    "enum": ["create", "list", "show", "update", "reorder"],
+                    "enum": ["create", "list", "show", "update", "delete", "reorder"],
                     "description": "Action to perform"
                 },
                 "id": {
                     "type": "string",
-                    "description": "Area ID (for show/update/reorder)"
+                    "description": "Area ID (for show/update/delete/reorder)"
                 },
                 "name": {
                     "type": "string",
@@ -187,22 +186,17 @@ impl Tool for AreaTool {
             "update" => {
                 let id = p.required_str("id")?;
 
+                let desc = p.clearable_str("description")?;
+                let icon = p.clearable_str("icon")?;
+
                 let updated = self
                     .area_repo
                     .update(
                         id,
                         p.optional_str("name")?,
-                        if args.get("description").is_some() {
-                            Some(p.optional_str("description")?)
-                        } else {
-                            None
-                        },
+                        desc.as_ref().map(|o| o.as_deref()),
                         p.optional_str("color")?,
-                        if args.get("icon").is_some() {
-                            Some(p.optional_str("icon")?)
-                        } else {
-                            None
-                        },
+                        icon.as_ref().map(|o| o.as_deref()),
                         p.optional_str("status")?,
                     )
                     .await?;
@@ -222,6 +216,16 @@ impl Tool for AreaTool {
 
                 self.area_repo.reorder(id, position).await?;
                 Ok(format!("Area {} moved to position {}", id, position))
+            }
+
+            "delete" => {
+                let id = p.required_str("id")?;
+                let deleted = self.area_repo.delete(id).await?;
+                if deleted {
+                    Ok(format!("Area {} deleted.", id))
+                } else {
+                    Err(ToolError::InvalidParams("Area not found".to_string()).into())
+                }
             }
 
             _ => Err(ToolError::InvalidParams(format!("Unknown action: {}", action)).into()),

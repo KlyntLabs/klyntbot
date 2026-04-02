@@ -87,7 +87,7 @@ Mar 3:  Research and scoping       (2 days)
 2. **Gather context**: If the goal is vague, use `ask_user` to clarify scope and constraints
 3. **Generate the plan**: Present the decomposed subtasks to the user
 4. **Confirm**: Ask the user to approve, adjust, or regenerate
-5. **Create tasks**: After approval, create each subtask via `todo add` with:
+5. **Create tasks**: After approval, create each subtask via `tasks(action: "create")` with:
    - The parent task as context in the description
    - Appropriate due dates (especially for workback)
    - Sequential numbering in titles for ordered plans (e.g., "1/6: Research requirements")

@@ -231,7 +231,7 @@ impl Tool for TaskTool {
     }
 
     fn description(&self) -> &str {
-        "Manage tasks with agentic execution support. Actions: create, update, complete, delete, show, list, summary, tree, search, focus, unfocus, log_time, add_dep, remove_dep, batch, recur, list_recurring, delete_recurring, plan_day, decompose, execute, cancel_execution, suggest, apply_suggestion, dismiss_suggestion, list_suggestions, forecast_task, forecast_project, accuracy_report."
+        "Manage tasks with agentic execution support. Actions: create, update, complete, reopen, delete, show, list, summary, tree, search, focus, unfocus, log_time, add_dep, remove_dep, batch, recur, list_recurring, delete_recurring, plan_day, decompose, execute, cancel_execution, suggest, apply_suggestion, dismiss_suggestion, list_suggestions, forecast_task, forecast_project, accuracy_report."
     }
 
     fn parameters(&self) -> Value {
@@ -241,7 +241,7 @@ impl Tool for TaskTool {
                 "action": {
                     "type": "string",
                     "enum": [
-                        "create", "update", "complete", "delete",
+                        "create", "update", "complete", "reopen", "delete",
                         "show", "list", "summary", "tree",
                         "search",
                         "focus", "unfocus", "log_time",
@@ -345,6 +345,18 @@ impl Tool for TaskTool {
                     "type": "boolean",
                     "description": "Filter for tasks not assigned to any project or area (list)"
                 },
+                "due_after": {
+                    "type": "string",
+                    "description": "Filter tasks due after this date (RFC3339 or YYYY-MM-DD)"
+                },
+                "due_before": {
+                    "type": "string",
+                    "description": "Filter tasks due before this date (RFC3339 or YYYY-MM-DD)"
+                },
+                "status_label_id": { "type": "string", "description": "Status label ID (for update)" },
+                "group_id": { "type": "string", "description": "Group ID (for update)" },
+                "scheduled_start": { "type": "string", "description": "Scheduled start datetime (for update)" },
+                "scheduled_end": { "type": "string", "description": "Scheduled end datetime (for update)" },
                 "operations": {
                     "type": "array",
                     "items": {
@@ -382,6 +394,7 @@ impl Tool for TaskTool {
             "create" => self.handle_create(&p, ctx).await,
             "update" => self.handle_update(&p).await,
             "complete" => self.handle_complete(&p).await,
+            "reopen" => self.handle_reopen(&p).await,
             "delete" => self.handle_delete(&p).await,
             "show" => self.handle_show(&p).await,
             "list" => self.handle_list(&p).await,

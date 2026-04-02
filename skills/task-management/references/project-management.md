@@ -5,7 +5,7 @@ license: MIT
 metadata:
   author: klyntbot
   version: "1.0.0"
-  updated-on: "2026-03-10"
+  updated-on: "2026-04-02"
   source: official
   tags: "project,manage,plan,milestone"
   always: false
@@ -21,26 +21,39 @@ Tasks are organized using PARA (Projects, Areas, Resources, Archives) combined w
 
 Areas are top-level categories (e.g., Work, Personal, Health). Every task belongs to an area.
 
-- `area list` — show all areas
-- `area add` — create a new area
-- `area show` — view area details with projects
+- `area(action: "list")` — show all areas (optional `status` filter)
+- `area(action: "create")` — create a new area
+- `area(action: "show")` — view area details with project/task counts
+- `area(action: "update")` — update name, description, color, icon, status
+- `area(action: "delete")` — permanently remove an area
+- `area(action: "reorder")` — change display position
 
 ## Projects
 
-Projects group related tasks within an area. They have deadlines and completion targets.
+Projects group related tasks within an area. They have deadlines, instructions, and completion targets.
 
-- `project list` — list projects (optionally filtered by area)
-- `project add` — create a project within an area
-- `project show` — view project details with tasks
+- `project(action: "list")` — list projects (filterable by area, status, tag)
+- `project(action: "create")` — create a project within an area (supports `start_date`, `target_end_date`)
+- `project(action: "show")` — view project details with tasks and all metadata
+- `project(action: "update")` — update any field including `instructions`, `ai_personality`, `user_role`, `start_date`, `target_end_date`, `settings`, `workflow_id`. Pass `null` to clear nullable fields.
+- `project(action: "delete")` — permanently remove a project (linked tasks keep their data)
+- `project(action: "archive")` — soft-archive a project
+- `project(action: "tasks")` — list tasks belonging to a project
 
 ## OKRs
 
-Objectives and Key Results provide goal-setting at the area level.
+Objectives and Key Results provide goal-setting at the project level.
 
-- `okr list` — list objectives
-- `okr add_objective` — create an objective
-- `okr add_key_result` — add a measurable key result
-- `okr update_progress` — update key result progress
+- `okr(action: "objective.list")` — list objectives (filterable by project, status)
+- `okr(action: "objective.create")` — create an objective with title, description, priority, due_date
+- `okr(action: "objective.show")` — view objective with KRs, timestamps, and completion info
+- `okr(action: "objective.update")` — update title, description, status, priority, due_date
+- `okr(action: "objective.delete")` — delete an objective
+- `okr(action: "kr.create")` — add a measurable key result (metric or action tracking mode)
+- `okr(action: "kr.update")` — update KR title, description, status, due_date
+- `okr(action: "kr.update_metric")` — update current value for metric-mode KRs
+- `okr(action: "kr.set_progress")` — directly set progress (0-100) for action-mode KRs
+- `okr(action: "kr.delete")` — delete a key result
 
 ## Project Health Scoring
 

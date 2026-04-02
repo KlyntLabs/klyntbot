@@ -178,6 +178,11 @@ When a user's request crosses into another domain, hand off cleanly:
 - For calendar operations, use Google Calendar MCP tools when available
 - Use `suggest` action for proactive AI suggestions (reprioritize, reschedule, decompose)
 - Use `forecast_task` / `forecast_project` for estimation forecasting
+- Use `reopen` action to uncomplete tasks (resets to "todo")
+- Use `due_after` / `due_before` filters for date-range task listing
+- Projects support `start_date`, `target_end_date`, `instructions`, `ai_personality`, `user_role` fields
+- Use `kr.set_progress` to directly set progress on action-mode KRs
+- Areas and projects can be **deleted** (not just archived)
 
 ## Response Style
 

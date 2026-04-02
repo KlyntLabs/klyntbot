@@ -1,6 +1,4 @@
-//! ProjectTool - Tool interface for project system
-//!
-//! Provides 6 actions for project management through the Tool trait.
+//! ProjectTool - Tool interface for project system.
 //! Projects belong to areas (area_id is required for create).
 
 use async_trait::async_trait;
@@ -11,7 +9,6 @@ use crate::params::ParamExtractor;
 use crate::{RoutingContext, Tool};
 use common::{Result, ToolError};
 
-/// ProjectTool for managing projects and project-task relationships
 pub struct ProjectTool {
     project_repo: storage::ProjectRepo,
     task_repo: storage::TaskRepo,
@@ -33,7 +30,7 @@ impl Tool for ProjectTool {
     }
 
     fn description(&self) -> &str {
-        "Manage projects. Actions: create, list, show, update, archive, tasks."
+        "Manage projects. Actions: create, list, show, update, delete, archive, tasks."
     }
 
     fn metadata(&self) -> tools_core::ToolMetadata {
@@ -51,12 +48,12 @@ impl Tool for ProjectTool {
             "properties": {
                 "action": {
                     "type": "string",
-                    "enum": ["create", "list", "show", "update", "archive", "tasks"],
+                    "enum": ["create", "list", "show", "update", "delete", "archive", "tasks"],
                     "description": "Action to perform"
                 },
                 "id": {
                     "type": "string",
-                    "description": "Project ID (for show/update/archive/tasks)"
+                    "description": "Project ID (for show/update/delete/archive/tasks)"
                 },
                 "area_id": {
                     "type": "string",
@@ -92,6 +89,34 @@ impl Tool for ProjectTool {
                 "limit": {
                     "type": "integer",
                     "description": "Max results (for list/tasks)"
+                },
+                "instructions": {
+                    "type": "string",
+                    "description": "Project instructions for AI context, JSON string (update only). Pass null to clear."
+                },
+                "ai_personality": {
+                    "type": "string",
+                    "description": "AI personality for this project (update only). Pass null to clear."
+                },
+                "user_role": {
+                    "type": "string",
+                    "description": "User's role in this project (update only). Pass null to clear."
+                },
+                "start_date": {
+                    "type": "string",
+                    "description": "Project start date ISO8601 (for create/update). Pass null to clear."
+                },
+                "target_end_date": {
+                    "type": "string",
+                    "description": "Target end date ISO8601 (for create/update). Pass null to clear."
+                },
+                "settings": {
+                    "type": "string",
+                    "description": "Project settings, JSON string (update only). Pass null to clear."
+                },
+                "workflow_id": {
+                    "type": "string",
+                    "description": "Status workflow ID (update only). Pass null to clear."
                 }
             },
             "required": ["action"]
@@ -114,7 +139,7 @@ impl Tool for ProjectTool {
                     area_id: area_id.to_string(),
                     name: name.to_string(),
                     description: p.optional_str("description")?.map(String::from),
-                    color: p.optional_str("color")?.unwrap_or("orange").to_string(),
+                    color: p.optional_str("color")?.unwrap_or("blue").to_string(),
                     tags: p.string_array_or_empty("tags")?,
                     status: "active".to_string(),
                     created_at: now,
@@ -123,8 +148,8 @@ impl Tool for ProjectTool {
                     instructions: None,
                     ai_personality: None,
                     user_role: None,
-                    start_date: None,
-                    target_end_date: None,
+                    start_date: p.optional_str("start_date")?.map(String::from),
+                    target_end_date: p.optional_str("target_end_date")?.map(String::from),
                     settings: None,
                 };
 
@@ -183,11 +208,12 @@ impl Tool for ProjectTool {
 
             "show" => {
                 let id = p.required_str("id")?;
-                let proj = self
+                let stats = self
                     .project_repo
-                    .get(id)
+                    .get_with_stats(id)
                     .await?
                     .ok_or_else(|| ToolError::InvalidParams("Project not found".to_string()))?;
+                let proj = &stats.project;
 
                 let mut output = format!("Project: {}\n", proj.name);
                 output.push_str(&format!("ID: {}\n", proj.id));
@@ -202,17 +228,34 @@ impl Tool for ProjectTool {
                 }
                 output.push_str(&format!("Created: {}\n", proj.created_at));
                 output.push_str(&format!("Updated: {}\n", proj.updated_at));
-
-                let stats = self.project_repo.get_with_stats(id).await?;
-                if let Some(s) = stats {
-                    output.push_str(&format!(
-                        "\nTasks: {} total ({} todo, {} doing, {} done)\n",
-                        s.task_count_total,
-                        s.task_count_todo,
-                        s.task_count_doing,
-                        s.task_count_done
-                    ));
+                if let Some(ref wf) = proj.workflow_id {
+                    output.push_str(&format!("Workflow: {}\n", wf));
                 }
+                if let Some(ref instructions) = proj.instructions {
+                    output.push_str(&format!("Instructions: {}\n", instructions));
+                }
+                if let Some(ref personality) = proj.ai_personality {
+                    output.push_str(&format!("AI Personality: {}\n", personality));
+                }
+                if let Some(ref role) = proj.user_role {
+                    output.push_str(&format!("User Role: {}\n", role));
+                }
+                if let Some(ref start) = proj.start_date {
+                    output.push_str(&format!("Start Date: {}\n", start));
+                }
+                if let Some(ref end) = proj.target_end_date {
+                    output.push_str(&format!("Target End Date: {}\n", end));
+                }
+                if let Some(ref settings) = proj.settings {
+                    output.push_str(&format!("Settings: {}\n", settings));
+                }
+                output.push_str(&format!(
+                    "\nTasks: {} total ({} todo, {} doing, {} done)\n",
+                    stats.task_count_total,
+                    stats.task_count_todo,
+                    stats.task_count_doing,
+                    stats.task_count_done
+                ));
 
                 Ok(output)
             }
@@ -224,7 +267,7 @@ impl Tool for ProjectTool {
                     id: id.to_string(),
                     area_id: p.optional_str("area_id")?.map(String::from),
                     name: p.optional_str("name")?.map(String::from),
-                    description: p.optional_str("description")?.map(|s| Some(s.to_string())),
+                    description: p.clearable_str("description")?,
                     color: p.optional_str("color")?.map(String::from),
                     tags: if args.get("tags").is_some() {
                         Some(p.string_array_or_empty("tags")?)
@@ -232,8 +275,13 @@ impl Tool for ProjectTool {
                         None
                     },
                     status: p.optional_str("status")?.map(String::from),
-                    workflow_id: None,
-                    ..Default::default()
+                    workflow_id: p.clearable_str("workflow_id")?,
+                    instructions: p.clearable_str("instructions")?,
+                    ai_personality: p.clearable_str("ai_personality")?,
+                    user_role: p.clearable_str("user_role")?,
+                    start_date: p.clearable_str("start_date")?,
+                    target_end_date: p.clearable_str("target_end_date")?,
+                    settings: p.clearable_str("settings")?,
                 };
 
                 let updated = self.project_repo.update(&patch).await?;
@@ -282,6 +330,16 @@ impl Tool for ProjectTool {
                 }
 
                 Ok(output)
+            }
+
+            "delete" => {
+                let id = p.required_str("id")?;
+                let deleted = self.project_repo.delete(id).await?;
+                if deleted {
+                    Ok(format!("Project {} deleted.", id))
+                } else {
+                    Err(ToolError::InvalidParams("Project not found".to_string()).into())
+                }
             }
 
             _ => Err(ToolError::InvalidParams(format!("Unknown action: {}", action)).into()),

@@ -32,6 +32,11 @@ impl<'a> ParamExtractor<'a> {
         Self { args }
     }
 
+    /// Check if a key is present in the args (including null values).
+    pub fn has(&self, name: &str) -> bool {
+        self.args.get(name).is_some()
+    }
+
     // ── Required extractors ──────────────────────────────────────────
 
     /// Extract a required string parameter.
@@ -174,6 +179,23 @@ impl<'a> ParamExtractor<'a> {
         }
     }
 
+    /// Extract a clearable string parameter for `Option<Option<String>>` patch fields.
+    ///
+    /// - Key absent → `Ok(None)` (don't touch the field)
+    /// - Key present, value is `null` → `Ok(Some(None))` (clear the field)
+    /// - Key present, value is a string → `Ok(Some(Some(owned_string)))` (set the field)
+    /// - Key present, wrong type → `Err`
+    pub fn clearable_str(&self, name: &str) -> Result<Option<Option<String>>, KlyntbotError> {
+        match self.args.get(name) {
+            None => Ok(None),
+            Some(Value::Null) => Ok(Some(None)),
+            Some(v) => v
+                .as_str()
+                .map(|s| Some(Some(s.to_string())))
+                .ok_or_else(|| wrong_type(name, "a string or null")),
+        }
+    }
+
     /// Extract string values from an optional JSON array of strings.
     /// Returns empty Vec if key absent, silently filters non-string elements.
     pub fn string_array_or_empty(&self, name: &str) -> Result<Vec<String>, KlyntbotError> {
@@ -242,5 +264,25 @@ mod tests {
         let p = ParamExtractor::new(&args);
         assert_eq!(p.optional_str("s").unwrap(), Some("hello"));
         assert_eq!(p.optional_str("missing").unwrap(), None);
+    }
+
+    #[test]
+    fn test_clearable_str() {
+        let args = json!({"set": "value", "clear": null});
+        let p = ParamExtractor::new(&args);
+
+        // Key present with string → Some(Some(value))
+        assert_eq!(
+            p.clearable_str("set").unwrap(),
+            Some(Some("value".to_string()))
+        );
+        // Key present with null → Some(None) (clear signal)
+        assert_eq!(p.clearable_str("clear").unwrap(), Some(None));
+        // Key absent → None (don't touch)
+        assert_eq!(p.clearable_str("missing").unwrap(), None);
+        // Key present with wrong type → Err
+        let args2 = json!({"bad": 42});
+        let p2 = ParamExtractor::new(&args2);
+        assert!(p2.clearable_str("bad").is_err());
     }
 }

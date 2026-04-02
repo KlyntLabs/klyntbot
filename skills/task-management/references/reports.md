@@ -35,7 +35,7 @@ metadata:
    - Present: grouped by project if possible
 
 3. **Blockers & Overdue**
-   - Tool: `tasks list` with filter for overdue or blocked
+   - Tool: `tasks(action: "list", due_before: "today")` for overdue
    - Present: each with days overdue and priority
 
 4. **Patterns**
@@ -49,7 +49,7 @@ metadata:
    - Present: topics explored, notes created
 
 6. **Next Week**
-   - Tool: `tasks list` with filter for due next 7 days
+   - Tool: `tasks(action: "list", due_after: "today", due_before: "next week")` for upcoming deadlines
    - Present: upcoming deadlines, suggested focus areas
 
 ### Output Format
@@ -67,16 +67,16 @@ Do NOT ask interactive questions — this is a passive report, not a review work
 ### Sections
 
 1. **Project Overview**
-   - Tool: `project get` for the named project
-   - Present: title, status, date range, completion %
+   - Tool: `project(action: "show")` for the named project
+   - Present: title, status, start/end dates, instructions, completion %
 
 2. **Task Analysis**
    - Tool: `tasks list` filtered by project
    - Present: completed vs total, overdue count, avg completion time
 
 3. **OKR Progress** (if objectives exist)
-   - Tool: `okr list` filtered by project
-   - Present: each KR with current vs target
+   - Tool: `okr(action: "objective.list", project_id: "...")` filtered by project
+   - Present: each KR with current vs target, timestamps
 
 4. **Time Investment**
    - Tool: `productivity activity_summary` filtered by project tags

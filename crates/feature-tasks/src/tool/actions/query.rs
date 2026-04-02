@@ -29,8 +29,12 @@ impl TaskTool {
             unassigned: p.optional_bool("unassigned")?.unwrap_or(false),
             task_type: p.optional_str("task_type")?.map(String::from),
             energy_level: p.optional_str("energy_level")?.map(String::from),
-            due_after: None,
-            due_before: None,
+            due_after: p
+                .optional_str("due_after")?
+                .and_then(|s| common::parse_datetime(s, &self.timezone)),
+            due_before: p
+                .optional_str("due_before")?
+                .and_then(|s| common::parse_datetime(s, &self.timezone)),
             templates_only: false,
             root_only: false,
             status_group: None,
@@ -137,6 +141,29 @@ impl TaskTool {
                 }
                 if let Some(est) = task.estimated_minutes {
                     output.push_str(&format!("Estimated: {} min\n", est));
+                }
+                if let Some(ref scheduled_start) = task.scheduled_start {
+                    output.push_str(&format!("Scheduled Start: {}\n", scheduled_start));
+                }
+                if let Some(ref scheduled_end) = task.scheduled_end {
+                    output.push_str(&format!("Scheduled End: {}\n", scheduled_end));
+                }
+                if let Some(ref group_id) = task.group_id {
+                    output.push_str(&format!("Group: {}\n", group_id));
+                }
+                if let Some(ref label_id) = task.status_label_id {
+                    output.push_str(&format!("Status Label: {}\n", label_id));
+                }
+                if let Some(actual) = task.actual_minutes {
+                    output.push_str(&format!("Actual: {} min\n", actual));
+                }
+                if let Some(ref rule) = task.recurrence_rule {
+                    output.push_str(&format!("Recurrence: {}\n", rule));
+                }
+                output.push_str(&format!("Created: {}\n", task.created_at));
+                output.push_str(&format!("Updated: {}\n", task.updated_at));
+                if let Some(completed_at) = task.completed_at {
+                    output.push_str(&format!("Completed: {}\n", completed_at));
                 }
 
                 // Recent activity
