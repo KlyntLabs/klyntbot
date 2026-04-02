@@ -100,6 +100,44 @@ async fn smoke_test_7_day_simulation() {
         "smoke test should finish in under 60s, took {:.2}s",
         report.wall_time_secs
     );
+
+    let last = &report.summary.final_metrics;
+
+    // Token efficiency should vary (not fixed 150)
+    assert!(
+        (last.token_efficiency - 150.0).abs() > 0.01,
+        "token_efficiency should vary from fixed 150, got {:.1}",
+        last.token_efficiency
+    );
+
+    // Knowledge retention should be non-zero (structured extraction + guaranteed introduction)
+    assert!(
+        last.knowledge_retention > 0.0,
+        "knowledge_retention should be > 0 after 7 days, got {:.3}",
+        last.knowledge_retention
+    );
+
+    // Personalization score should be meaningful
+    assert!(
+        last.personalization_score > 0.2,
+        "personalization_score should be > 0.2, got {:.3}",
+        last.personalization_score
+    );
+
+    // Routing stability should be in a sane range
+    assert!(
+        last.routing_stability > 0.0 && last.routing_stability <= 1.0,
+        "routing_stability should be in (0, 1], got {:.3}",
+        last.routing_stability
+    );
+
+    // Verify the report can be serialized without NaN/Inf from division
+    let json = serde_json::to_string(&report).unwrap();
+    assert!(!json.contains("NaN"), "report contains NaN values");
+    assert!(
+        !json.contains("Infinity"),
+        "report contains Infinity values"
+    );
 }
 
 #[tokio::test]

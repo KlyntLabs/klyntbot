@@ -27,6 +27,9 @@ tool_action_rate = 0.6
 [persona.phases.routine]
 duration_days = 60
 correction_rate = 0.08
+new_facts = [
+    { subject = "user", predicate = "budgets_for", object = "dining out" },
+]
 topic_weights = { finance = 0.5, tasks = 0.2, notes = 0.2, chat = 0.1 }
 new_fact_introduction_rate = 0.1
 tool_action_rate = 0.7
@@ -34,6 +37,9 @@ tool_action_rate = 0.7
 [persona.phases.power_user]
 duration_days = 60
 correction_rate = 0.03
+new_facts = [
+    { subject = "user", predicate = "tracks_currency", object = "EUR" },
+]
 topic_weights = { finance = 0.4, tasks = 0.2, insights = 0.2, productivity = 0.1, chat = 0.1 }
 new_fact_introduction_rate = 0.05
 tool_action_rate = 0.8
@@ -44,6 +50,7 @@ correction_rate = 0.10
 shift_description = "User starts investing"
 new_facts = [
     { subject = "user", predicate = "interested_in", object = "ETF investing" },
+    { subject = "user", predicate = "saves_for", object = "investment portfolio" },
 ]
 topic_weights = { finance = 0.5, notes = 0.2, learning = 0.2, chat = 0.1 }
 new_fact_introduction_rate = 0.3
@@ -52,17 +59,18 @@ tool_action_rate = 0.5
 [[checkpoints]]
 at_day = 7
 assertions = [
-    { type = "metric_above", metric = "knowledge_retention", threshold = 0.0 },
+    { type = "metric_above", metric = "knowledge_retention", threshold = 0.3 },
 ]
 
 [[checkpoints]]
 at_day = 90
 assertions = [
-    { type = "metric_above", metric = "personalization_score", threshold = 0.0 },
+    { type = "metric_above", metric = "personalization_score", threshold = 0.4 },
 ]
 
 [[checkpoints]]
 at_day = 157
 assertions = [
-    { type = "metric_above", metric = "knowledge_retention", threshold = 0.0 },
+    { type = "metric_above", metric = "knowledge_retention", threshold = 0.5 },
+    { type = "metric_above", metric = "task_completion_rate", threshold = 0.2 },
 ]

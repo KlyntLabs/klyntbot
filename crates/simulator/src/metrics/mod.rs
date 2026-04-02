@@ -77,6 +77,7 @@ pub struct EpochAccumulator {
     pub routing_matches: u32,
     pub tasks_created: u32,
     pub tasks_completed: u32,
+    pub facts_superseded: u32,
 }
 
 // ---------------------------------------------------------------------------
@@ -88,6 +89,9 @@ pub struct MetricCollector {
     pub baselines: Option<BaselineMetrics>,
     baseline_day: u32,
     accumulator: EpochAccumulator,
+    cumulative_tasks_created: u32,
+    cumulative_tasks_completed: u32,
+    cumulative_facts_superseded: u32,
 }
 
 impl MetricCollector {
@@ -99,6 +103,9 @@ impl MetricCollector {
             baselines: None,
             baseline_day: baseline_after_day,
             accumulator: EpochAccumulator::default(),
+            cumulative_tasks_created: 0,
+            cumulative_tasks_completed: 0,
+            cumulative_facts_superseded: 0,
         }
     }
 
@@ -106,6 +113,10 @@ impl MetricCollector {
     /// counters as events happen during the epoch.
     pub fn accumulator_mut(&mut self) -> &mut EpochAccumulator {
         &mut self.accumulator
+    }
+
+    pub fn total_facts_superseded(&self) -> u32 {
+        self.cumulative_facts_superseded
     }
 
     /// Finalise the current epoch: compute derived rates from the accumulator,
@@ -123,6 +134,10 @@ impl MetricCollector {
         insight_usefulness: f64,
         wall_time_ms: f64,
     ) {
+        self.cumulative_tasks_created += self.accumulator.tasks_created;
+        self.cumulative_tasks_completed += self.accumulator.tasks_completed;
+        self.cumulative_facts_superseded += self.accumulator.facts_superseded;
+
         let acc = &self.accumulator;
         let msgs = acc.messages_processed.max(1) as f64;
 
@@ -147,10 +162,10 @@ impl MetricCollector {
         };
 
         let token_efficiency = acc.total_tokens as f64 / msgs;
-        let task_completion_rate = if acc.tasks_created == 0 {
+        let task_completion_rate = if self.cumulative_tasks_created == 0 {
             0.0
         } else {
-            acc.tasks_completed as f64 / acc.tasks_created as f64
+            (self.cumulative_tasks_completed as f64 / self.cumulative_tasks_created as f64).min(1.0)
         };
         let routing_stability = acc.routing_matches as f64 / msgs;
 
@@ -378,6 +393,54 @@ mod tests {
 
         // Accumulator should be reset.
         assert_eq!(collector.accumulator_mut().messages_processed, 0);
+    }
+
+    #[test]
+    fn task_completion_rate_is_cumulative() {
+        let mut collector = MetricCollector::new(30);
+
+        // Epoch 1: 4 tasks created, 0 completed → rate = 0/4 = 0.0
+        {
+            let acc = collector.accumulator_mut();
+            acc.messages_processed = 5;
+            acc.tasks_created = 4;
+            acc.tasks_completed = 0;
+        }
+        collector.snapshot(utc(2026, 4, 1, 12, 0), 1, 0.8, 0.5, 0.5, 1, 0.5, 100.0);
+        assert!(
+            (collector.timeline[0].task_completion_rate - 0.0).abs() < 1e-9,
+            "epoch 1: expected 0.0, got {}",
+            collector.timeline[0].task_completion_rate
+        );
+
+        // Epoch 2: 0 created, 3 completed → cumulative 4 created, 3 completed → rate = 3/4 = 0.75
+        {
+            let acc = collector.accumulator_mut();
+            acc.messages_processed = 5;
+            acc.tasks_created = 0;
+            acc.tasks_completed = 3;
+        }
+        collector.snapshot(utc(2026, 4, 2, 12, 0), 2, 0.8, 0.5, 0.5, 1, 0.5, 100.0);
+        assert!(
+            (collector.timeline[1].task_completion_rate - 0.75).abs() < 1e-9,
+            "epoch 2: expected 0.75, got {}",
+            collector.timeline[1].task_completion_rate
+        );
+
+        // Epoch 3: 2 created, 1 completed → cumulative 6 created, 4 completed → rate = 4/6 ≈ 0.6667
+        {
+            let acc = collector.accumulator_mut();
+            acc.messages_processed = 5;
+            acc.tasks_created = 2;
+            acc.tasks_completed = 1;
+        }
+        collector.snapshot(utc(2026, 4, 3, 12, 0), 3, 0.8, 0.5, 0.5, 1, 0.5, 100.0);
+        let expected = 4.0 / 6.0;
+        assert!(
+            (collector.timeline[2].task_completion_rate - expected).abs() < 1e-9,
+            "epoch 3: expected {expected}, got {}",
+            collector.timeline[2].task_completion_rate
+        );
     }
 
     #[test]

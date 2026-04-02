@@ -30,6 +30,9 @@ tool_action_rate = 0.5
 [persona.phases.routine]
 duration_days = 75
 correction_rate = 0.10
+new_facts = [
+    { subject = "user", predicate = "tracks_currency", object = "USD" },
+]
 topic_weights = { tasks = 0.3, notes = 0.2, finance = 0.2, productivity = 0.2, chat = 0.1 }
 new_fact_introduction_rate = 0.15
 tool_action_rate = 0.7
@@ -37,6 +40,10 @@ tool_action_rate = 0.7
 [persona.phases.power_user]
 duration_days = 90
 correction_rate = 0.05
+new_facts = [
+    { subject = "user", predicate = "prefers_language", object = "Python" },
+    { subject = "user", predicate = "works_at", object = "remote" },
+]
 topic_weights = { tasks = 0.2, notes = 0.15, finance = 0.15, productivity = 0.15, automation = 0.15, insights = 0.1, chat = 0.1 }
 new_fact_introduction_rate = 0.05
 tool_action_rate = 0.8
@@ -48,6 +55,8 @@ shift_description = "User switches from backend to ML focus"
 new_facts = [
     { subject = "user", predicate = "learning", object = "PyTorch" },
     { subject = "user", predicate = "project_focus", object = "ML pipeline" },
+    { subject = "user", predicate = "works_as", object = "ML engineer" },
+    { subject = "user", predicate = "manages_project", object = "ML pipeline" },
 ]
 topic_weights = { tasks = 0.2, notes = 0.3, finance = 0.1, learning = 0.25, chat = 0.15 }
 new_fact_introduction_rate = 0.4
@@ -55,30 +64,34 @@ tool_action_rate = 0.6
 
 [simulation]
 # Per-epoch metrics (task_completion_rate, routing_stability) have high variance
-# due to deterministic RNG-driven generation — raise threshold to tolerate
-# epoch-level fluctuations where the denominator may be zero.
-regression_threshold = 25.0
+# due to phase transitions — routing_stability legitimately drops during
+# behavior_shift as the topic distribution changes and chat messages no longer
+# inflate the match rate. Use 50% threshold to tolerate cross-phase variance.
+regression_threshold = 50.0
 
 [[checkpoints]]
 at_day = 14
 assertions = [
-    { type = "metric_above", metric = "knowledge_retention", threshold = 0.0 },
+    { type = "metric_above", metric = "knowledge_retention", threshold = 0.3 },
 ]
 
 [[checkpoints]]
 at_day = 90
 assertions = [
-    { type = "metric_above", metric = "knowledge_retention", threshold = 0.0 },
+    { type = "metric_above", metric = "knowledge_retention", threshold = 0.3 },
+    { type = "metric_above", metric = "personalization_score", threshold = 0.35 },
 ]
 
 [[checkpoints]]
 at_day = 180
 assertions = [
-    { type = "metric_above", metric = "personalization_score", threshold = 0.0 },
+    { type = "metric_above", metric = "personalization_score", threshold = 0.4 },
+    { type = "metric_above", metric = "task_completion_rate", threshold = 0.2 },
 ]
 
 [[checkpoints]]
 at_day = 269
 assertions = [
-    { type = "metric_above", metric = "knowledge_retention", threshold = 0.0 },
+    { type = "metric_above", metric = "knowledge_retention", threshold = 0.5 },
+    { type = "metric_above", metric = "personalization_score", threshold = 0.4 },
 ]

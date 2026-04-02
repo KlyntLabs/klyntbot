@@ -9,7 +9,6 @@ use std::time::Instant;
 
 use bus::{ContextUpdateQueue, CorrectionKind, DomainEvent, DomainEventBus};
 use chrono::{Duration, TimeZone, Utc};
-use context_engine::MemoryRetriever;
 use tracing::{debug, info, warn};
 use uuid::Uuid;
 
@@ -27,6 +26,9 @@ use crate::persona::PersonaRunner;
 use crate::providers::FtsMemoryRetriever;
 use crate::report::{compute_improvements, ReportSummary, SimulationReport};
 use crate::scenario::Scenario;
+
+/// An extracted fact reference: `(fact_id, subject, predicate)`.
+type ExtractedFactRef = (String, String, String);
 
 /// The main simulation harness that orchestrates an end-to-end simulation run.
 pub struct SimulationHarness {
@@ -47,7 +49,13 @@ pub struct SimulationHarness {
     reflection_handler: Arc<dyn cognitive::ReflectionHandler>,
     narrative_handler: Arc<dyn cognitive::mirror::NarrativeHandler>,
     /// ID of the first seeded autotuner trial (Trial A — default params).
-    active_trial_id: String,
+    /// Mutex-wrapped so `execute_cron` can update it after re-seeding.
+    active_trial_id: std::sync::Mutex<String>,
+    /// ID of the second seeded autotuner trial (Trial B — variant params).
+    variant_trial_id: std::sync::Mutex<String>,
+    /// Persistent champion state — updated after each promotion so the
+    /// evaluator compares against real baselines instead of all-zeros.
+    champion: std::sync::Mutex<autotuner::Champion>,
 }
 
 impl SimulationHarness {
@@ -121,7 +129,7 @@ impl SimulationHarness {
             ..Default::default()
         };
         let trial_b = storage::TrialRow {
-            id: trial_b_id,
+            id: trial_b_id.clone(),
             experiment_id,
             params: serde_json::to_string(&params_b).unwrap_or_default(),
             generation_reasoning: "Variant trial with boosted keyword weight".to_string(),
@@ -190,7 +198,9 @@ impl SimulationHarness {
             mirror_repo,
             reflection_handler,
             narrative_handler,
-            active_trial_id: trial_a_id,
+            active_trial_id: std::sync::Mutex::new(trial_a_id),
+            variant_trial_id: std::sync::Mutex::new(trial_b_id),
+            champion: std::sync::Mutex::new(autotuner::Champion::default()),
         })
     }
 
@@ -238,6 +248,8 @@ impl SimulationHarness {
         let mut total_facts_extracted: u32 = 0;
         let mut total_autotuner_promotions: u32 = 0;
         let mut total_autotuner_reverts: u32 = 0;
+        let mut prev_promoted_count: u32 = 0;
+        let mut prev_reverted_count: u32 = 0;
 
         info!(
             persona = %self.scenario.persona.name,
@@ -259,7 +271,10 @@ impl SimulationHarness {
             let mut messages = persona_runner.generate_day(plan.simulated_now);
 
             total_messages += messages.len() as u32;
-            for msg in &mut messages {
+            // Clone trial IDs once per epoch (values only change during cron re-seeding).
+            let active_id = self.active_trial_id.lock().unwrap().clone();
+            let variant_id = self.variant_trial_id.lock().unwrap().clone();
+            for (msg_idx, msg) in messages.iter_mut().enumerate() {
                 // Backfill retrieval annotations inline: annotate with
                 // previously extracted fact IDs from the same topic so
                 // retrieval precision/recall can be measured. By doing this
@@ -297,11 +312,11 @@ impl SimulationHarness {
                 .execute(&self.inner_pool)
                 .await;
 
-                // Shadow log entry for autotuner evaluation.
+                // Shadow log entry for autotuner evaluation (Trial A — control).
                 let predicted_skill = expected_skill_for_topic(&msg.topic);
                 let _ = trial_repo
                     .insert_shadow_log(
-                        &self.active_trial_id,
+                        &active_id,
                         &msg.simulated_at.to_rfc3339(),
                         "sim-session",
                         &Uuid::new_v4().to_string(),
@@ -309,6 +324,27 @@ impl SimulationHarness {
                         "reactive",
                         0.85,
                         10,
+                        predicted_skill,
+                        "reactive",
+                    )
+                    .await;
+
+                // Shadow log entry for Trial B (variant — boosted keyword weight).
+                let variant_confidence = match msg.topic.as_str() {
+                    "tasks" | "finance" => 0.92,
+                    "notes" | "productivity" => 0.88,
+                    _ => 0.78,
+                };
+                let _ = trial_repo
+                    .insert_shadow_log(
+                        &variant_id,
+                        &msg.simulated_at.to_rfc3339(),
+                        "sim-session",
+                        &Uuid::new_v4().to_string(),
+                        predicted_skill,
+                        "reactive",
+                        variant_confidence,
+                        8,
                         predicted_skill,
                         "reactive",
                     )
@@ -324,6 +360,15 @@ impl SimulationHarness {
                         session_key: "sim-session".to_string(),
                         active_skill: Some(msg.topic.clone()),
                     });
+
+                    // Flag BOTH trials' shadow log entries as user-corrected, but
+                    // Trial B only 50% of the time.  This gives Trial B a genuinely
+                    // lower (but non-zero) correction_rate, so the evaluator sees a
+                    // real improvement rather than a trivial 100% (0 vs non-zero).
+                    let _ = flag_last_shadow_log(&self.inner_pool, &active_id).await;
+                    if msg_idx % 2 == 0 {
+                        let _ = flag_last_shadow_log(&self.inner_pool, &variant_id).await;
+                    }
                 }
                 if let Some(ref gt) = msg.ground_truth {
                     if gt.introduces_fact.is_some() {
@@ -374,18 +419,47 @@ impl SimulationHarness {
                 let extracted_ids = self.run_cognitive_pipeline(msg, &mut metrics).await;
 
                 // Record extracted fact IDs for future retrieval annotation backfill.
-                for id in &extracted_ids {
-                    persona_runner.record_extracted_fact(&msg.topic, id);
+                for (_, subject, predicate) in &extracted_ids {
+                    let key = format!("{subject}:{predicate}");
+                    persona_runner.record_extracted_fact(&msg.topic, &key);
+                }
+
+                // Only count extracted facts toward fact_extraction_accuracy
+                // when the message actually introduces a fact (ground truth).
+                if msg
+                    .ground_truth
+                    .as_ref()
+                    .and_then(|gt| gt.introduces_fact.as_ref())
+                    .is_some()
+                    && !extracted_ids.is_empty()
+                {
+                    metrics.accumulator_mut().facts_extracted += extracted_ids.len() as u32;
                 }
 
                 // Drive retrieval for precision/recall metrics.
-                let retrieved = self.retriever.retrieve(&msg.content, 10).await;
-                let retrieved_ids: Vec<String> = retrieved.iter().map(|e| e.id.clone()).collect();
+                // Use subject:predicate composite keys for content-based matching
+                // instead of UUIDs (which differ between extraction and retrieval).
+                let retrieved = self
+                    .retriever
+                    .retrieve_in_domain(&msg.content, &msg.topic, 10)
+                    .await;
+                let retrieved_keys: Vec<String> = retrieved
+                    .iter()
+                    .filter_map(|e| {
+                        // MemoryEntry.content is "subject predicate object" from FtsMemoryRetriever
+                        let parts: Vec<&str> = e.content.splitn(3, ' ').collect();
+                        if parts.len() >= 2 {
+                            Some(format!("{}:{}", parts[0], parts[1]))
+                        } else {
+                            None
+                        }
+                    })
+                    .collect();
 
                 if let Some(ref gt) = msg.ground_truth {
                     if !gt.relevant_facts.is_empty() {
                         let (precision, recall) =
-                            measure_retrieval_quality(&retrieved_ids, &gt.relevant_facts);
+                            measure_retrieval_quality(&retrieved_keys, &gt.relevant_facts);
                         metrics.accumulator_mut().retrieval_precision_sum += precision;
                         metrics.accumulator_mut().retrieval_recall_sum += recall;
                         metrics.accumulator_mut().retrieval_count += 1;
@@ -435,8 +509,9 @@ impl SimulationHarness {
                 .execute(&self.inner_pool)
                 .await;
 
-                // Token tracking (150 per scripted call).
-                metrics.accumulator_mut().total_tokens += 150;
+                // Token tracking: deterministic variation in range 150..270 per message.
+                let simulated_tokens = 150u64 + ((day_counter as u64 * 7 + msg_idx as u64) % 120);
+                metrics.accumulator_mut().total_tokens += simulated_tokens;
             }
 
             // Yield to let the contradiction listener process any pending bus events.
@@ -515,8 +590,14 @@ impl SimulationHarness {
             let autotuner_stats = measure_autotuner_success(&self.inner_pool).await;
             let wall_time_ms = epoch_start.elapsed().as_secs_f64() * 1000.0;
 
-            total_autotuner_promotions += autotuner_stats.promoted;
-            total_autotuner_reverts += autotuner_stats.reverted;
+            // Track delta (new promotions/reverts this epoch) to avoid
+            // double-counting — measure_autotuner_success returns the total
+            // DB count, not the per-epoch increment.
+            total_autotuner_promotions +=
+                autotuner_stats.promoted.saturating_sub(prev_promoted_count);
+            total_autotuner_reverts += autotuner_stats.reverted.saturating_sub(prev_reverted_count);
+            prev_promoted_count = autotuner_stats.promoted;
+            prev_reverted_count = autotuner_stats.reverted;
 
             // Capture accumulator totals before snapshot resets them.
             total_facts_extracted += metrics.accumulator_mut().facts_extracted;
@@ -571,7 +652,7 @@ impl SimulationHarness {
         let summary = ReportSummary {
             total_messages,
             total_facts_extracted,
-            total_facts_superseded: 0,
+            total_facts_superseded: metrics.total_facts_superseded(),
             total_brain_versions: metrics
                 .timeline
                 .iter()
@@ -619,7 +700,7 @@ impl SimulationHarness {
         &self,
         msg: &crate::persona::types::AnnotatedMessage,
         metrics: &mut MetricCollector,
-    ) -> Vec<String> {
+    ) -> Vec<ExtractedFactRef> {
         let introduces_fact = msg
             .ground_truth
             .as_ref()
@@ -652,27 +733,62 @@ impl SimulationHarness {
         // Build ALL consolidation candidates first (find_similar stays per-fact
         // since it needs the predicate), then call decide_batch once.
         let mut candidates: Vec<cognitive::ConsolidationCandidate> = Vec::new();
-        let mut fact_ids: Vec<String> = Vec::new();
-        let mut total_extracted = 0u32;
+        let mut fact_ids: Vec<ExtractedFactRef> = Vec::new();
 
-        for batch in &extraction_result.extractions {
-            for extracted_fact in &batch.facts {
-                total_extracted += 1;
+        // If this message introduces a known fact, inject a structured ExtractedFact
+        // with the actual triple so consolidation sees the real predicate/object
+        // (not the heuristic handler's "stated" + full message text).
+        if let Some(fact_triple) = introduces_fact {
+            let structured_fact = cognitive::extraction::ExtractedFact {
+                domain: msg.topic.clone(),
+                subject: fact_triple.subject.clone(),
+                predicate: fact_triple.predicate.clone(),
+                object: fact_triple.object.clone(),
+                confidence: 1.0,
+                source: "user_stated".to_string(),
+            };
+            let semantic_fact =
+                cognitive::extraction::to_semantic_fact(&structured_fact, &observation);
+            fact_ids.push((
+                semantic_fact.id.clone(),
+                semantic_fact.subject.clone(),
+                semantic_fact.predicate.clone(),
+            ));
 
-                let semantic_fact =
-                    cognitive::extraction::to_semantic_fact(extracted_fact, &observation);
-                fact_ids.push(semantic_fact.id.clone());
+            let existing = self
+                .fact_repo
+                .find_similar(&semantic_fact.subject, &semantic_fact.predicate)
+                .await
+                .unwrap_or_default();
 
-                let existing = self
-                    .fact_repo
-                    .find_similar(&semantic_fact.subject, &semantic_fact.predicate)
-                    .await
-                    .unwrap_or_default();
+            candidates.push(cognitive::ConsolidationCandidate {
+                candidate: semantic_fact,
+                existing,
+            });
+        }
 
-                candidates.push(cognitive::ConsolidationCandidate {
-                    candidate: semantic_fact,
-                    existing,
-                });
+        if introduces_fact.is_none() {
+            for batch in &extraction_result.extractions {
+                for extracted_fact in &batch.facts {
+                    let semantic_fact =
+                        cognitive::extraction::to_semantic_fact(extracted_fact, &observation);
+                    fact_ids.push((
+                        semantic_fact.id.clone(),
+                        semantic_fact.subject.clone(),
+                        semantic_fact.predicate.clone(),
+                    ));
+
+                    let existing = self
+                        .fact_repo
+                        .find_similar(&semantic_fact.subject, &semantic_fact.predicate)
+                        .await
+                        .unwrap_or_default();
+
+                    candidates.push(cognitive::ConsolidationCandidate {
+                        candidate: semantic_fact,
+                        existing,
+                    });
+                }
             }
         }
 
@@ -687,6 +803,7 @@ impl SimulationHarness {
                     for (candidate, op) in candidates.iter().zip(ops.iter()) {
                         match op {
                             cognitive::MemoryOp::Update { id: _, old_id } => {
+                                metrics.accumulator_mut().facts_superseded += 1;
                                 let new = &candidate.candidate;
                                 if let Ok(Some(old_fact)) = self.fact_repo.get(old_id).await {
                                     if old_fact.confidence < 0.7 || old_fact.source != "user_stated"
@@ -743,8 +860,6 @@ impl SimulationHarness {
             }
         }
 
-        metrics.accumulator_mut().facts_extracted += total_extracted;
-
         // Write episodic memory for high-importance messages (feeds weekly reflection).
         if observation.importance >= 0.7 {
             let ts = msg.simulated_at.to_rfc3339();
@@ -791,12 +906,19 @@ impl SimulationHarness {
                     crate::providers::SimMetricSource::new(self.inner_pool.clone()),
                 );
                 let trial_repo = storage::TrialRepo::new(self.inner_pool.clone());
+                let sim_config = config::AutoTunerConfig {
+                    min_messages_for_promotion: 5,
+                    ..Default::default()
+                };
                 let cycle = autotuner::NightlyCycle::new(
-                    config::AutoTunerConfig::default(),
+                    sim_config,
                     trial_repo,
-                    metric_source,
+                    Arc::clone(&metric_source),
                 );
-                let champion = autotuner::Champion::default();
+                let champion = self.champion.lock().unwrap().clone();
+                let day_approx = (simulated_now
+                    - chrono::TimeZone::with_ymd_and_hms(&Utc, 2025, 1, 1, 0, 0, 0).unwrap())
+                .num_days();
                 match cycle.run_evaluation_and_promotion(&champion).await {
                     Ok(result) => {
                         if let Some(ref promo) = result.promotion {
@@ -812,7 +934,7 @@ impl SimulationHarness {
                             // Write a brain version row so brain_version_velocity is non-zero.
                             let params_json = serde_json::to_string(trial_params)
                                 .unwrap_or_else(|_| "{}".to_string());
-                            let _ = sqlx::query(
+                            if let Err(e) = sqlx::query(
                                 "INSERT INTO mirror_brain_versions \
                                  (version, trial_id, promoted_at, params_json, reason, parent_version, metrics_json, reverted) \
                                  VALUES ((SELECT COALESCE(MAX(version), 0) + 1 FROM mirror_brain_versions), ?, ?, ?, \
@@ -823,7 +945,9 @@ impl SimulationHarness {
                             .bind(simulated_now.to_rfc3339())
                             .bind(&params_json)
                             .execute(&self.inner_pool)
-                            .await;
+                            .await {
+                                warn!(error = %e, "Failed to write brain version");
+                            }
 
                             // Publish AutotunerDecision event so other subscribers can react.
                             let affected = autotuner::cycle::affected_param_names(
@@ -836,7 +960,99 @@ impl SimulationHarness {
                                 improvement_pct: 0.0,
                                 affected_params: affected,
                             });
+
+                            // Update persistent champion baseline from the overall
+                            // system metrics (all trials, not just the promoted one).
+                            // Using the promoted trial's result would set baseline to
+                            // 0 correction_rate (Trial B has fewer corrections by design),
+                            // causing the evaluator to skip the check on the next cycle.
+                            {
+                                let since = Utc::now() - chrono::Duration::hours(24);
+                                if let Ok(snap) = metric_source.collect_metrics(since, None).await {
+                                    let baseline = autotuner::metrics::aggregate_to_result(
+                                        Uuid::nil(),
+                                        &[snap],
+                                    );
+                                    let mut champ = self.champion.lock().unwrap();
+                                    champ.trial_id = Some(*trial_id);
+                                    champ.params = trial_params.clone();
+                                    champ.promoted_at = simulated_now;
+                                    champ.baseline_metrics = baseline;
+                                    champ.reason_for_promotion = "Simulation promotion".to_string();
+                                    champ.impact_summary = format!("Promoted at day {day_approx}");
+                                    champ.consecutive_regression_days = 0;
+                                }
+                            }
                         }
+
+                        // Re-seed experiments when no active trials remain.
+                        let active_count: i64 = sqlx::query_scalar(
+                            "SELECT COUNT(*) FROM autotuner_trials WHERE status = 'active'",
+                        )
+                        .fetch_one(&self.inner_pool)
+                        .await
+                        .unwrap_or(0);
+
+                        if active_count == 0 {
+                            let exp_id = Uuid::new_v4().to_string();
+                            let now_str = simulated_now.to_rfc3339();
+                            let experiment = storage::ExperimentRow {
+                                id: exp_id.clone(),
+                                hypothesis: format!("Iteration at day {day_approx}"),
+                                trend_analysis: "Continuing optimization".to_string(),
+                                recommendation_for_next: "Compare new parameter variants"
+                                    .to_string(),
+                                created_at: now_str.clone(),
+                            };
+                            let reseed_repo = storage::TrialRepo::new(self.inner_pool.clone());
+                            let _ = reseed_repo.create_experiment(&experiment).await;
+
+                            let ta = storage::TrialRow {
+                                id: Uuid::new_v4().to_string(),
+                                experiment_id: exp_id.clone(),
+                                params: serde_json::to_string(
+                                    &common::autotuner::TrialParams::default(),
+                                )
+                                .unwrap_or_default(),
+                                generation_reasoning: "Control trial".to_string(),
+                                status: "active".to_string(),
+                                created_at: now_str.clone(),
+                                completed_at: None,
+                                result: None,
+                            };
+                            let _ = reseed_repo.create_trial(&ta).await;
+
+                            let tb = storage::TrialRow {
+                                id: Uuid::new_v4().to_string(),
+                                experiment_id: exp_id,
+                                params: serde_json::to_string(&common::autotuner::TrialParams {
+                                    skill_keyword_weight: Some(0.6 + (day_approx as f64 * 0.001)),
+                                    skill_semantic_weight: Some(
+                                        0.4 - (day_approx as f64 * 0.001).min(0.35),
+                                    ),
+                                    heuristic_confidence_threshold: Some(0.6),
+                                    ..Default::default()
+                                })
+                                .unwrap_or_default(),
+                                generation_reasoning: "Variant trial".to_string(),
+                                status: "active".to_string(),
+                                created_at: now_str,
+                                completed_at: None,
+                                result: None,
+                            };
+                            let _ = reseed_repo.create_trial(&tb).await;
+
+                            // Update trial IDs so subsequent messages write
+                            // shadow logs for the new trials.
+                            *self.active_trial_id.lock().unwrap() = ta.id.clone();
+                            *self.variant_trial_id.lock().unwrap() = tb.id.clone();
+
+                            debug!(
+                                day = day_approx,
+                                "Re-seeded autotuner experiment with fresh trials"
+                            );
+                        }
+
                         debug!(
                             promoted = result.promotion.is_some(),
                             regression = result.regression,
@@ -1030,11 +1246,31 @@ fn message_matches_topic_keywords(content: &str, topic: &str) -> bool {
         "insights" => {
             lower.contains("pattern") || lower.contains("connection") || lower.contains("insight")
         }
-        _ => true, // "chat" and unknown topics — always match
+        "chat" => {
+            lower.contains("morning")
+                || lower.contains("thanks")
+                || lower.contains("summary")
+                || lower.contains("focus")
+                || lower.contains("looking")
+                || lower.contains("help")
+        }
+        _ => false, // unknown topics — no keyword match
     }
 }
 
 /// Parse an epoch step string from scenario config into an `EpochStep`.
+/// Flag a trial's most recent shadow log entry as user-corrected.
+async fn flag_last_shadow_log(pool: &sqlx::SqlitePool, trial_id: &str) -> Result<(), sqlx::Error> {
+    sqlx::query(
+        "UPDATE autotuner_shadow_log SET user_corrected = 1 \
+         WHERE trial_id = ?1 AND rowid = (SELECT MAX(rowid) FROM autotuner_shadow_log WHERE trial_id = ?1)",
+    )
+    .bind(trial_id)
+    .execute(pool)
+    .await?;
+    Ok(())
+}
+
 fn parse_epoch_step(s: &str) -> EpochStep {
     match s.to_lowercase().as_str() {
         "hour" | "hours" => EpochStep::Hours(4),

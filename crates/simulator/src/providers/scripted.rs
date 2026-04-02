@@ -4,8 +4,11 @@
 //! without hitting any real provider API.
 
 use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::Mutex;
 
 use async_trait::async_trait;
+use rand::rngs::StdRng;
+use rand::{Rng, SeedableRng};
 use serde_json::Value;
 
 use common::Result;
@@ -19,6 +22,7 @@ use providers::types::{
 pub struct ScriptedProvider {
     responses: Vec<String>,
     call_count: AtomicUsize,
+    rng: Mutex<StdRng>,
 }
 
 impl ScriptedProvider {
@@ -34,6 +38,20 @@ impl ScriptedProvider {
         Self {
             responses,
             call_count: AtomicUsize::new(0),
+            rng: Mutex::new(StdRng::seed_from_u64(42)),
+        }
+    }
+
+    /// Create a `ScriptedProvider` with the given responses and a specific RNG seed.
+    pub fn with_seed(responses: Vec<String>, seed: u64) -> Self {
+        assert!(
+            !responses.is_empty(),
+            "ScriptedProvider requires at least one response"
+        );
+        Self {
+            responses,
+            call_count: AtomicUsize::new(0),
+            rng: Mutex::new(StdRng::seed_from_u64(seed)),
         }
     }
 
@@ -59,14 +77,19 @@ impl LlmProvider for ScriptedProvider {
         let idx = self.call_count.fetch_add(1, Ordering::SeqCst);
         let response_text = &self.responses[idx % self.responses.len()];
 
+        let (prompt_tokens, completion_tokens) = {
+            let mut rng = self.rng.lock().unwrap();
+            (rng.random_range(80..200u32), rng.random_range(30..120u32))
+        };
+
         Ok(LlmResponse {
             content: Some(response_text.clone()),
             tool_calls: vec![],
             finish_reason: "stop".to_string(),
             usage: Usage {
-                prompt_tokens: 100,
-                completion_tokens: 50,
-                total_tokens: 150,
+                prompt_tokens,
+                completion_tokens,
+                total_tokens: prompt_tokens + completion_tokens,
                 cache_read_tokens: 0,
                 cache_write_tokens: 0,
             },
@@ -100,7 +123,8 @@ impl LlmProvider for ScriptedProvider {
     }
 
     async fn count_tokens(&self, _messages: &[Message], _tools: Option<&[Value]>) -> Result<usize> {
-        Ok(150)
+        let mut rng = self.rng.lock().unwrap();
+        Ok(rng.random_range(100..250usize))
     }
 
     fn capabilities(&self) -> ProviderCapabilities {
@@ -142,9 +166,11 @@ mod tests {
 
         let r1 = provider.chat(&messages, None, &params).await.unwrap();
         assert_eq!(r1.content.as_deref(), Some("first"));
+        assert!(r1.usage.total_tokens > 0);
 
         let r2 = provider.chat(&messages, None, &params).await.unwrap();
         assert_eq!(r2.content.as_deref(), Some("second"));
+        assert!(r2.usage.total_tokens > 0);
 
         // Cycles back to first
         let r3 = provider.chat(&messages, None, &params).await.unwrap();
@@ -199,11 +225,11 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn count_tokens_returns_fixed_value() {
+    async fn count_tokens_returns_variable_value() {
         let provider = ScriptedProvider::default_response();
         let messages = vec![Message::user("test")];
         let count = provider.count_tokens(&messages, None).await.unwrap();
-        assert_eq!(count, 150);
+        assert!((100..250).contains(&count));
     }
 
     #[test]

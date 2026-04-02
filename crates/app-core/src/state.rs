@@ -291,9 +291,7 @@ impl AppCore {
     pub async fn launcher_clipboard_repo(
         &self,
     ) -> Result<&feature_launcher::ClipboardRepo, ApiError> {
-        self.launcher_engine()
-            .await
-            .map(|e| &e.clipboard_repo)
+        self.launcher_engine().await.map(|e| &e.clipboard_repo)
     }
 
     /// Return autotuner orchestrator or `None` when disabled.

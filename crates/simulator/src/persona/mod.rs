@@ -274,10 +274,7 @@ impl PersonaRunner {
                 let text = fill_template(template, &vars);
                 let gt = GroundTruthAnnotation {
                     introduces_fact: Some(fact.clone()),
-                    relevant_facts: vec![format!(
-                        "{}:{}:{}",
-                        fact.subject, fact.predicate, fact.object
-                    )],
+                    relevant_facts: vec![],
                     expected_skill: None,
                 };
                 (text, Some(gt))
@@ -317,6 +314,34 @@ impl PersonaRunner {
                 is_correction,
                 topic,
             });
+        }
+
+        // Guarantee all facts are introduced by the last day of each phase.
+        let is_last_day_of_phase = self.day_in_phase + 1 >= config.duration_days;
+        if is_last_day_of_phase {
+            while let Some(fact) = self.pick_unintroduced_fact() {
+                let template = pick_template(FACT_INTRODUCTION_TEMPLATES, &mut self.rng);
+                let vars = [
+                    ("predicate", fact.predicate.as_str()),
+                    ("object", fact.object.as_str()),
+                ];
+                let text = fill_template(template, &vars);
+                let gt = GroundTruthAnnotation {
+                    introduces_fact: Some(fact.clone()),
+                    relevant_facts: vec![],
+                    expected_skill: None,
+                };
+                let msg_time = simulated_date + Duration::hours(20);
+                messages.push(AnnotatedMessage {
+                    content: text,
+                    phase,
+                    simulated_at: msg_time,
+                    ground_truth: Some(gt),
+                    tool_actions: vec![],
+                    is_correction: false,
+                    topic: "chat".to_string(),
+                });
+            }
         }
 
         // 4. Increment day_in_phase.
