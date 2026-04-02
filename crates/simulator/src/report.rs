@@ -77,41 +77,63 @@ pub fn compute_improvements(
 ) -> HashMap<String, f64> {
     let mut improvements = HashMap::new();
 
-    // Higher is better: (final - baseline) / baseline * 100
-    if baselines.personalization_score > 0.0 {
-        let pct = (final_metrics.personalization_score - baselines.personalization_score)
-            / baselines.personalization_score
-            * 100.0;
-        improvements.insert("personalization_score".to_string(), pct);
-    }
-
-    if baselines.routing_stability > 0.0 {
-        let pct = (final_metrics.routing_stability - baselines.routing_stability)
-            / baselines.routing_stability
-            * 100.0;
-        improvements.insert("routing_stability".to_string(), pct);
-    }
-
-    if baselines.task_completion_rate > 0.0 {
-        let pct = (final_metrics.task_completion_rate - baselines.task_completion_rate)
-            / baselines.task_completion_rate
-            * 100.0;
-        improvements.insert("task_completion_rate".to_string(), pct);
-    }
-
-    if baselines.insight_usefulness > 0.0 {
-        let pct = (final_metrics.insight_usefulness - baselines.insight_usefulness)
-            / baselines.insight_usefulness
-            * 100.0;
-        improvements.insert("insight_usefulness".to_string(), pct);
-    }
-
     // Lower is better: (baseline - final) / baseline * 100
     if baselines.token_efficiency > 0.0 {
         let pct = (baselines.token_efficiency - final_metrics.token_efficiency)
             / baselines.token_efficiency
             * 100.0;
         improvements.insert("token_efficiency".to_string(), pct);
+    }
+
+    // Higher is better: (final - baseline) / baseline * 100
+    let higher_is_better: &[(&str, f64, f64)] = &[
+        (
+            "personalization_score",
+            baselines.personalization_score,
+            final_metrics.personalization_score,
+        ),
+        (
+            "routing_stability",
+            baselines.routing_stability,
+            final_metrics.routing_stability,
+        ),
+        (
+            "task_completion_rate",
+            baselines.task_completion_rate,
+            final_metrics.task_completion_rate,
+        ),
+        (
+            "insight_usefulness",
+            baselines.insight_usefulness,
+            final_metrics.insight_usefulness,
+        ),
+        (
+            "knowledge_retention",
+            baselines.knowledge_retention,
+            final_metrics.knowledge_retention,
+        ),
+        (
+            "retrieval_precision",
+            baselines.retrieval_precision,
+            final_metrics.retrieval_precision,
+        ),
+        (
+            "retrieval_recall",
+            baselines.retrieval_recall,
+            final_metrics.retrieval_recall,
+        ),
+        (
+            "fact_extraction_accuracy",
+            baselines.fact_extraction_accuracy,
+            final_metrics.fact_extraction_accuracy,
+        ),
+    ];
+
+    for &(name, baseline, current) in higher_is_better {
+        if baseline > 0.0 {
+            let pct = (current - baseline) / baseline * 100.0;
+            improvements.insert(name.to_string(), pct);
+        }
     }
 
     improvements
@@ -193,6 +215,7 @@ mod tests {
             task_completion_rate: 0.6,
             routing_stability: 0.8,
             insight_usefulness: 0.4,
+            ..Default::default()
         };
 
         let final_metrics = MetricSnapshot {
@@ -230,6 +253,7 @@ mod tests {
             task_completion_rate: 0.5,
             routing_stability: 0.0,
             insight_usefulness: 0.0,
+            ..Default::default()
         };
 
         let final_metrics = MetricSnapshot {

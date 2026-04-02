@@ -45,6 +45,11 @@ pub struct BaselineMetrics {
     pub task_completion_rate: f64,
     pub routing_stability: f64,
     pub insight_usefulness: f64,
+    // Tier 1 — memory fidelity baselines
+    pub knowledge_retention: f64,
+    pub retrieval_precision: f64,
+    pub retrieval_recall: f64,
+    pub fact_extraction_accuracy: f64,
 }
 
 // ---------------------------------------------------------------------------
@@ -92,6 +97,8 @@ pub struct MetricCollector {
     cumulative_tasks_created: u32,
     cumulative_tasks_completed: u32,
     cumulative_facts_superseded: u32,
+    cumulative_facts_introduced: u32,
+    cumulative_contradictions: u32,
 }
 
 impl MetricCollector {
@@ -106,6 +113,8 @@ impl MetricCollector {
             cumulative_tasks_created: 0,
             cumulative_tasks_completed: 0,
             cumulative_facts_superseded: 0,
+            cumulative_facts_introduced: 0,
+            cumulative_contradictions: 0,
         }
     }
 
@@ -137,6 +146,8 @@ impl MetricCollector {
         self.cumulative_tasks_created += self.accumulator.tasks_created;
         self.cumulative_tasks_completed += self.accumulator.tasks_completed;
         self.cumulative_facts_superseded += self.accumulator.facts_superseded;
+        self.cumulative_facts_introduced += self.accumulator.facts_introduced;
+        self.cumulative_contradictions += self.accumulator.contradictions_detected;
 
         let acc = &self.accumulator;
         let msgs = acc.messages_processed.max(1) as f64;
@@ -147,8 +158,11 @@ impl MetricCollector {
         } else {
             acc.facts_extracted as f64 / acc.facts_introduced as f64
         };
-        let contradiction_detection_rate =
-            acc.contradictions_detected as f64 / (acc.facts_introduced.max(1) as f64);
+        let contradiction_detection_rate = if self.cumulative_facts_introduced == 0 {
+            0.0
+        } else {
+            self.cumulative_contradictions as f64 / self.cumulative_facts_introduced as f64
+        };
 
         let retrieval_precision = if acc.retrieval_count == 0 {
             0.0
@@ -172,7 +186,7 @@ impl MetricCollector {
         let personalization_score = behavioral::personalization_score(
             knowledge_retention,
             retrieval_precision,
-            correction_rate,
+            retrieval_recall,
         );
 
         let snap = MetricSnapshot {
@@ -219,12 +233,20 @@ impl MetricCollector {
             bl.task_completion_rate += s.task_completion_rate;
             bl.routing_stability += s.routing_stability;
             bl.insight_usefulness += s.insight_usefulness;
+            bl.knowledge_retention += s.knowledge_retention;
+            bl.retrieval_precision += s.retrieval_precision;
+            bl.retrieval_recall += s.retrieval_recall;
+            bl.fact_extraction_accuracy += s.fact_extraction_accuracy;
         }
         bl.token_efficiency /= n;
         bl.personalization_score /= n;
         bl.task_completion_rate /= n;
         bl.routing_stability /= n;
         bl.insight_usefulness /= n;
+        bl.knowledge_retention /= n;
+        bl.retrieval_precision /= n;
+        bl.retrieval_recall /= n;
+        bl.fact_extraction_accuracy /= n;
 
         self.baselines = Some(bl);
     }
@@ -260,36 +282,63 @@ impl MetricCollector {
             }
         }
 
-        // Other tier-2 metrics: regression = decrease.
-        let checks: &[(&str, f64, f64)] = &[
+        // Other metrics: regression = decrease.
+        // Fourth tuple element: skip regression check when current is 0.0
+        // (the metric is undefined for that epoch, not regressed).
+        let checks: &[(&str, f64, f64, bool)] = &[
             (
                 "personalization_score",
                 bl.personalization_score,
                 latest.personalization_score,
+                false,
             ),
             (
                 "task_completion_rate",
                 bl.task_completion_rate,
                 latest.task_completion_rate,
+                true,
             ),
             (
                 "routing_stability",
                 bl.routing_stability,
                 latest.routing_stability,
+                false,
             ),
             (
                 "insight_usefulness",
                 bl.insight_usefulness,
                 latest.insight_usefulness,
+                false,
+            ),
+            (
+                "knowledge_retention",
+                bl.knowledge_retention,
+                latest.knowledge_retention,
+                false,
+            ),
+            (
+                "retrieval_precision",
+                bl.retrieval_precision,
+                latest.retrieval_precision,
+                true,
+            ),
+            (
+                "retrieval_recall",
+                bl.retrieval_recall,
+                latest.retrieval_recall,
+                true,
+            ),
+            (
+                "fact_extraction_accuracy",
+                bl.fact_extraction_accuracy,
+                latest.fact_extraction_accuracy,
+                false,
             ),
         ];
 
-        for &(name, baseline, current) in checks {
+        for &(name, baseline, current, skip_when_zero) in checks {
             if baseline > 0.0 {
-                // Skip rate metrics where current is zero due to the final epoch
-                // having no relevant events (e.g., no tasks created that day).
-                // A zero denominator makes the rate undefined, not regressed.
-                if current == 0.0 && name == "task_completion_rate" {
+                if skip_when_zero && current == 0.0 {
                     continue;
                 }
                 let pct = (baseline - current) / baseline * 100.0;
@@ -379,9 +428,9 @@ mod tests {
         // routing_stability = 8 / 10 = 0.8
         assert!((snap.routing_stability - 0.8).abs() < 1e-9);
 
-        // personalization_score = 0.85 * 0.4 + 0.8 * 0.3 + (1 - 0.2) * 0.3
-        //                       = 0.34 + 0.24 + 0.24 = 0.82
-        assert!((snap.personalization_score - 0.82).abs() < 1e-9);
+        // personalization_score = 0.85 * 0.4 + 0.8 * 0.3 + 0.6 * 0.3
+        //                       = 0.34 + 0.24 + 0.18 = 0.76
+        assert!((snap.personalization_score - 0.76).abs() < 1e-9);
 
         // Pass-through values
         assert!((snap.knowledge_retention - 0.85).abs() < 1e-9);
@@ -506,5 +555,52 @@ mod tests {
         assert!(alert_names.contains(&"token_efficiency"));
         // Routing stability went from 0.9 to 0.4 — >50% decrease.
         assert!(alert_names.contains(&"routing_stability"));
+    }
+
+    #[test]
+    fn contradiction_rate_is_cumulative() {
+        let mut collector = MetricCollector::new(30);
+
+        // Epoch 1: 2 facts introduced, 1 contradiction
+        {
+            let acc = collector.accumulator_mut();
+            acc.messages_processed = 5;
+            acc.facts_introduced = 2;
+            acc.contradictions_detected = 1;
+        }
+        collector.snapshot(utc(2026, 4, 1, 12, 0), 1, 0.8, 0.5, 0.5, 1, 0.5, 100.0);
+        assert!(
+            (collector.timeline[0].contradiction_detection_rate - 0.5).abs() < 1e-9,
+            "epoch 1: expected 0.5, got {}",
+            collector.timeline[0].contradiction_detection_rate
+        );
+
+        // Epoch 2: 0 facts introduced, 0 contradictions — cumulative still 1/2 = 0.5
+        {
+            let acc = collector.accumulator_mut();
+            acc.messages_processed = 5;
+            acc.facts_introduced = 0;
+            acc.contradictions_detected = 0;
+        }
+        collector.snapshot(utc(2026, 4, 2, 12, 0), 2, 0.8, 0.5, 0.5, 1, 0.5, 100.0);
+        assert!(
+            (collector.timeline[1].contradiction_detection_rate - 0.5).abs() < 1e-9,
+            "epoch 2: expected 0.5 (cumulative), got {}",
+            collector.timeline[1].contradiction_detection_rate
+        );
+
+        // Epoch 3: 3 facts introduced, 2 contradictions — cumulative (1+2)/(2+3) = 3/5 = 0.6
+        {
+            let acc = collector.accumulator_mut();
+            acc.messages_processed = 5;
+            acc.facts_introduced = 3;
+            acc.contradictions_detected = 2;
+        }
+        collector.snapshot(utc(2026, 4, 3, 12, 0), 3, 0.8, 0.5, 0.5, 1, 0.5, 100.0);
+        assert!(
+            (collector.timeline[2].contradiction_detection_rate - 0.6).abs() < 1e-9,
+            "epoch 3: expected 0.6 (cumulative 3/5), got {}",
+            collector.timeline[2].contradiction_detection_rate
+        );
     }
 }

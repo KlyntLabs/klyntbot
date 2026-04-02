@@ -1174,15 +1174,18 @@ impl SimulationHarness {
             }
             CronTrigger::MemoryMaintenance => {
                 debug!(trigger = "MemoryMaintenance", %simulated_now, "Executing cron");
-                let node_count: (i64,) = sqlx::query_as(
-                    "SELECT COUNT(*) FROM book_tree_nodes WHERE source_type = 'Note'",
+                let (note_count, distinct_titles): (i64, i64) = sqlx::query_as(
+                    "SELECT COUNT(*), COUNT(DISTINCT title) \
+                     FROM book_tree_nodes WHERE source_type = 'Note'",
                 )
                 .fetch_one(&self.inner_pool)
                 .await
-                .unwrap_or((0,));
+                .unwrap_or((0, 0));
 
-                if node_count.0 >= 3 {
-                    let stability = (node_count.0 as f64 / 50.0).min(1.0);
+                if note_count >= 3 {
+                    let diversity = distinct_titles as f64 / note_count as f64;
+                    let volume_score = (note_count as f64 / 50.0).min(1.0);
+                    let stability = diversity * 0.6 + volume_score * 0.4;
                     let _ = sqlx::query(
                         "INSERT OR REPLACE INTO communities \
                          (id, name, summary, stability, member_count, source_note_count, \
@@ -1192,13 +1195,13 @@ impl SimulationHarness {
                                  datetime('now'), datetime('now'))",
                     )
                     .bind(stability)
-                    .bind(node_count.0)
-                    .bind(node_count.0)
+                    .bind(note_count)
+                    .bind(note_count)
                     .execute(&self.inner_pool)
                     .await;
                     debug!(
-                        nodes = node_count.0,
-                        stability, "Community stability updated"
+                        note_count,
+                        distinct_titles, stability, "Community stability updated"
                     );
                 }
             }
@@ -1258,7 +1261,6 @@ fn message_matches_topic_keywords(content: &str, topic: &str) -> bool {
     }
 }
 
-/// Parse an epoch step string from scenario config into an `EpochStep`.
 /// Flag a trial's most recent shadow log entry as user-corrected.
 async fn flag_last_shadow_log(pool: &sqlx::SqlitePool, trial_id: &str) -> Result<(), sqlx::Error> {
     sqlx::query(
@@ -1271,6 +1273,7 @@ async fn flag_last_shadow_log(pool: &sqlx::SqlitePool, trial_id: &str) -> Result
     Ok(())
 }
 
+/// Parse an epoch step string from scenario config into an `EpochStep`.
 fn parse_epoch_step(s: &str) -> EpochStep {
     match s.to_lowercase().as_str() {
         "hour" | "hours" => EpochStep::Hours(4),

@@ -1,6 +1,19 @@
 use crate::persona::FactTriple;
 use std::collections::HashSet;
 
+const NEGATION_MARKERS: &[&str] = &[
+    "not ",
+    "no longer ",
+    "stopped ",
+    "quit ",
+    "never ",
+    "don't ",
+    "doesn't ",
+    "isn't ",
+    "aren't ",
+    "wasn't ",
+];
+
 /// Measure the fraction of known facts that exist unsuperseded in the repo.
 ///
 /// Uses three matching strategies:
@@ -25,6 +38,10 @@ pub async fn measure_knowledge_retention(
 
     let mut found = 0u32;
     for fact in known_facts {
+        // Hoist lowercased variants out of the inner loop
+        let pred_lower = fact.predicate.to_lowercase();
+        let obj_lower_known = fact.object.to_lowercase();
+
         let retained = all_facts.iter().any(|r| {
             // Strategy 1: exact triple match
             if r.subject == fact.subject && r.predicate == fact.predicate && r.object == fact.object
@@ -33,13 +50,21 @@ pub async fn measure_knowledge_retention(
             }
             // Strategy 2: content match (object contains both predicate and object terms)
             let obj_lower = r.object.to_lowercase();
-            if obj_lower.contains(&fact.predicate.to_lowercase())
-                && obj_lower.contains(&fact.object.to_lowercase())
-            {
+            if obj_lower.contains(&pred_lower) && obj_lower.contains(&obj_lower_known) {
                 return true;
             }
             // Strategy 3: subject match + object contains the fact's object value
-            r.subject == fact.subject && obj_lower.contains(&fact.object.to_lowercase())
+            // Reject if negation markers appear before the match position
+            if r.subject == fact.subject && obj_lower.contains(&obj_lower_known) {
+                let has_negation = if let Some(pos) = obj_lower.find(&obj_lower_known) {
+                    let prefix = &obj_lower[..pos];
+                    NEGATION_MARKERS.iter().any(|neg| prefix.contains(neg))
+                } else {
+                    false
+                };
+                return !has_negation;
+            }
+            false
         });
         if retained {
             found += 1;
@@ -150,6 +175,49 @@ mod tests {
         assert!(
             (retention - 1.0).abs() < 1e-9,
             "expected retention 1.0, got {retention}"
+        );
+    }
+
+    #[tokio::test]
+    async fn retention_rejects_negated_facts() {
+        let (pool, inner) = test_pool().await;
+        std::mem::forget(pool);
+
+        let repo = cognitive::SemanticFactRepo::new(inner);
+
+        let fact = cognitive::SemanticFact {
+            id: "negated-1".to_string(),
+            domain: "personal".to_string(),
+            subject: "user".to_string(),
+            predicate: "stated".to_string(),
+            object: "I am no longer a software engineer".to_string(),
+            confidence: 0.5,
+            source: "heuristic".to_string(),
+            valid_from: chrono::Utc::now().to_rfc3339(),
+            valid_until: None,
+            recorded_at: chrono::Utc::now().to_rfc3339(),
+            superseded_at: None,
+            superseded_by: None,
+            stability: 1.0,
+            last_accessed: None,
+            access_count: 0,
+            project_id: None,
+            memory_type: "semantic".to_string(),
+            scope_type: "global".to_string(),
+            scope_id: None,
+        };
+        repo.upsert(&fact).await.expect("upsert negated fact");
+
+        let known = vec![FactTriple {
+            subject: "user".to_string(),
+            predicate: "works_as".to_string(),
+            object: "software engineer".to_string(),
+        }];
+
+        let retention = measure_knowledge_retention(&repo, &known).await;
+        assert!(
+            (retention - 0.0).abs() < 1e-9,
+            "negated fact should NOT count as retained, got {retention}"
         );
     }
 

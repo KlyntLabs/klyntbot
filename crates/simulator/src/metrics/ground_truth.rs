@@ -202,13 +202,16 @@ fn get_metric_value(snapshot: &MetricSnapshot, metric: &MetricName) -> f64 {
 
 fn get_baseline_value(baselines: &BaselineMetrics, metric: &MetricName) -> f64 {
     match metric {
-        // Tier 2 — behavioral quality (baselines available)
         MetricName::TokenEfficiency => baselines.token_efficiency,
         MetricName::PersonalizationScore => baselines.personalization_score,
         MetricName::TaskCompletionRate => baselines.task_completion_rate,
         MetricName::RoutingStability => baselines.routing_stability,
         MetricName::InsightUsefulness => baselines.insight_usefulness,
-        // Tier 1 and Tier 3 — no baselines tracked
+        MetricName::KnowledgeRetention => baselines.knowledge_retention,
+        MetricName::RetrievalPrecision => baselines.retrieval_precision,
+        MetricName::RetrievalRecall => baselines.retrieval_recall,
+        MetricName::FactExtractionAccuracy => baselines.fact_extraction_accuracy,
+        // System health metrics — no baselines
         _ => 0.0,
     }
 }
@@ -262,15 +265,20 @@ mod tests {
     }
 
     #[test]
-    fn get_baseline_value_returns_tier2_only() {
+    fn get_baseline_value_returns_tracked_metrics() {
         let baselines = BaselineMetrics {
             token_efficiency: 100.0,
             personalization_score: 0.8,
             task_completion_rate: 0.7,
             routing_stability: 0.9,
             insight_usefulness: 0.6,
+            knowledge_retention: 0.85,
+            retrieval_precision: 0.75,
+            retrieval_recall: 0.7,
+            fact_extraction_accuracy: 0.9,
         };
 
+        // Tier 2
         assert!(
             (get_baseline_value(&baselines, &MetricName::TokenEfficiency) - 100.0).abs() < 1e-9
         );
@@ -285,13 +293,26 @@ mod tests {
             (get_baseline_value(&baselines, &MetricName::InsightUsefulness) - 0.6).abs() < 1e-9
         );
 
-        // Tier 1 and Tier 3 return 0.0
+        // Tier 1
         assert!(
-            (get_baseline_value(&baselines, &MetricName::KnowledgeRetention) - 0.0).abs() < 1e-9
+            (get_baseline_value(&baselines, &MetricName::KnowledgeRetention) - 0.85).abs() < 1e-9
         );
+        assert!(
+            (get_baseline_value(&baselines, &MetricName::RetrievalPrecision) - 0.75).abs() < 1e-9
+        );
+        assert!((get_baseline_value(&baselines, &MetricName::RetrievalRecall) - 0.7).abs() < 1e-9);
+        assert!(
+            (get_baseline_value(&baselines, &MetricName::FactExtractionAccuracy) - 0.9).abs()
+                < 1e-9
+        );
+
+        // System health — still 0.0
         assert!(
             (get_baseline_value(&baselines, &MetricName::AutotunerPromotionSuccess) - 0.0).abs()
                 < 1e-9
+        );
+        assert!(
+            (get_baseline_value(&baselines, &MetricName::CommunityStability) - 0.0).abs() < 1e-9
         );
     }
 

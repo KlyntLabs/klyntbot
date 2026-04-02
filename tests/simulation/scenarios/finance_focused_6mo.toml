@@ -56,6 +56,9 @@ topic_weights = { finance = 0.5, notes = 0.2, learning = 0.2, chat = 0.1 }
 new_fact_introduction_rate = 0.3
 tool_action_rate = 0.5
 
+[simulation]
+regression_threshold = 50.0
+
 [[checkpoints]]
 at_day = 7
 assertions = [
@@ -65,7 +68,7 @@ assertions = [
 [[checkpoints]]
 at_day = 90
 assertions = [
-    { type = "metric_above", metric = "personalization_score", threshold = 0.4 },
+    { type = "metric_above", metric = "knowledge_retention", threshold = 0.3 },
 ]
 
 [[checkpoints]]

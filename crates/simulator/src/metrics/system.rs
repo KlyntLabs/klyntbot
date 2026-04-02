@@ -64,21 +64,23 @@ pub async fn measure_autotuner_success(pool: &sqlx::SqlitePool) -> AutotunerStat
     }
 }
 
-/// Measure insight usefulness: fraction of cross-domain insights that exist.
-/// In simulation, each insight row represents a successful cross-domain connection.
-/// Usefulness = count of insights / total simulated days so far (normalized to 0-1).
+/// Measure insight usefulness: fraction of cross-domain insights that reference
+/// 2+ distinct domains.  Single-domain rows are cron health-check artifacts and
+/// don't represent real cross-domain connections.
+/// Usefulness = qualified insights / total simulated days so far (normalized to 0-1).
 pub async fn measure_insight_usefulness(pool: &sqlx::SqlitePool, day: u32) -> f64 {
-    let count: (i64,) = sqlx::query_as("SELECT COUNT(*) FROM cross_domain_insights")
-        .fetch_one(pool)
-        .await
-        .unwrap_or((0,));
+    // Count only insights whose dot_refs JSON array has 2+ distinct domains
+    let count: (i64,) = sqlx::query_as(
+        "SELECT COUNT(*) FROM cross_domain_insights \
+         WHERE json_array_length(dot_refs) >= 2",
+    )
+    .fetch_one(pool)
+    .await
+    .unwrap_or((0,));
 
     if day == 0 {
         return 0.0;
     }
-    // Normalize: insights per week, capped at 1.0
-    // CrossDomainInsight fires daily, so max theoretical = day count
-    // A score of 1.0 means an insight was generated every day
     (count.0 as f64 / day as f64).min(1.0)
 }
 
@@ -143,5 +145,44 @@ mod tests {
         assert!((stats.success_rate - 2.0 / 3.0).abs() < 1e-9);
         assert_eq!(stats.promoted, 2);
         assert_eq!(stats.reverted, 1);
+    }
+
+    #[tokio::test]
+    async fn insight_usefulness_requires_cross_domain() {
+        let pool = sqlx::SqlitePool::connect("sqlite::memory:").await.unwrap();
+
+        sqlx::query(
+            "CREATE TABLE IF NOT EXISTS cross_domain_insights (
+                date TEXT, insight_text TEXT, dot_refs TEXT
+            )",
+        )
+        .execute(&pool)
+        .await
+        .unwrap();
+
+        // Insert an insight referencing only 1 domain (should NOT count)
+        sqlx::query(
+            "INSERT INTO cross_domain_insights (date, insight_text, dot_refs) \
+             VALUES ('2026-01-01', 'single domain', '[\"tasks\"]')",
+        )
+        .execute(&pool)
+        .await
+        .unwrap();
+
+        // Insert an insight referencing 2+ domains (should count)
+        sqlx::query(
+            "INSERT INTO cross_domain_insights (date, insight_text, dot_refs) \
+             VALUES ('2026-01-02', 'cross domain', '[\"tasks\",\"finance\"]')",
+        )
+        .execute(&pool)
+        .await
+        .unwrap();
+
+        let usefulness = measure_insight_usefulness(&pool, 10).await;
+        // Only 1 of 2 insights qualifies: 1/10 = 0.1
+        assert!(
+            (usefulness - 0.1).abs() < 1e-9,
+            "expected 0.1 (1 qualified insight / 10 days), got {usefulness}"
+        );
     }
 }

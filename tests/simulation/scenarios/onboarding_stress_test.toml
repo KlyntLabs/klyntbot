@@ -54,6 +54,9 @@ topic_weights = { tasks = 0.3, notes = 0.2, productivity = 0.2, automation = 0.2
 new_fact_introduction_rate = 0.05
 tool_action_rate = 0.8
 
+[simulation]
+regression_threshold = 50.0
+
 [[checkpoints]]
 at_day = 21
 assertions = [
@@ -63,5 +66,5 @@ assertions = [
 [[checkpoints]]
 at_day = 81
 assertions = [
-    { type = "metric_above", metric = "personalization_score", threshold = 0.4 },
+    { type = "metric_above", metric = "knowledge_retention", threshold = 0.3 },
 ]
