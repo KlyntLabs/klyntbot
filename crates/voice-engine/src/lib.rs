@@ -5,8 +5,6 @@
 //! the `AudioCapture` subsystem, and the `VoiceService` orchestrator.
 
 pub mod capture;
-pub mod sentence_accumulator;
-pub mod streaming_tts;
 pub mod dsp;
 pub mod engine_manager;
 pub mod engines;
@@ -19,9 +17,11 @@ pub mod phoneme_aligner;
 pub mod pronunciation;
 pub mod pronunciation_analyzer;
 pub mod router;
+pub mod sentence_accumulator;
 pub mod service;
 pub mod session;
 pub mod stt;
+pub mod streaming_tts;
 pub mod tone_analyzer;
 pub mod tts;
 pub mod types;
@@ -39,5 +39,7 @@ pub use router::VoiceRouter;
 pub use service::{MemoryEchoProvider, PronunciationProvider, VoiceService, VoiceServiceConfig};
 pub use session::VoiceSessionState;
 pub use stt::{PartialTranscript, TranscriptionEngine};
+pub use sentence_accumulator::SentenceAccumulator;
+pub use streaming_tts::{SentenceItem, StreamingTtsHandle, StreamingTtsPipeline};
 pub use tts::TtsEngine;
 pub use types::*;
