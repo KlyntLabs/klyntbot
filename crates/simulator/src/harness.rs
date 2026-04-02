@@ -803,8 +803,15 @@ impl SimulationHarness {
                             let (trial_id, _trial_result, trial_params) = promo;
                             debug!(trial_id = %trial_id, "Autotuner promoted trial — writing brain version");
 
+                            // Mark the trial as promoted so measure_autotuner_success picks it up.
+                            let status_repo = storage::TrialRepo::new(self.inner_pool.clone());
+                            let _ = status_repo
+                                .update_trial_status(&trial_id.to_string(), "promoted")
+                                .await;
+
                             // Write a brain version row so brain_version_velocity is non-zero.
-                            let params_json = serde_json::to_string(trial_params).unwrap_or_else(|_| "{}".to_string());
+                            let params_json = serde_json::to_string(trial_params)
+                                .unwrap_or_else(|_| "{}".to_string());
                             let _ = sqlx::query(
                                 "INSERT INTO mirror_brain_versions \
                                  (version, trial_id, promoted_at, params_json, reason, parent_version, metrics_json, reverted) \
