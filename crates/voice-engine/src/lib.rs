@@ -6,6 +6,7 @@
 
 pub mod capture;
 pub mod sentence_accumulator;
+pub mod streaming_tts;
 pub mod dsp;
 pub mod engine_manager;
 pub mod engines;
