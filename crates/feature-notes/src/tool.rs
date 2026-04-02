@@ -26,7 +26,7 @@ impl Tool for NotesTool {
     }
 
     fn description(&self) -> &str {
-        "Manage notes and notebooks. Actions: create_note, get_note, update_note, delete_note, list_notes, search_notes, tag_note, link_notes, create_notebook, list_notebooks, archive_note, unarchive_note, list_archived, get_backlinks, capture_inbox, list_inbox, update_notebook."
+        "Manage notes and notebooks. Actions: create_note, get_note, update_note, delete_note, list_notes, search_notes, tag_note, link_notes, create_notebook, list_notebooks, delete_notebook, archive_note, unarchive_note, list_archived, get_backlinks, capture_inbox, list_inbox, delete_inbox_item, update_notebook."
     }
 
     fn parameters(&self) -> Value {
@@ -38,9 +38,9 @@ impl Tool for NotesTool {
                     "enum": [
                         "create_note", "get_note", "update_note", "delete_note",
                         "list_notes", "search_notes", "tag_note", "link_notes",
-                        "create_notebook", "list_notebooks",
+                        "create_notebook", "list_notebooks", "delete_notebook",
                         "archive_note", "unarchive_note", "list_archived",
-                        "get_backlinks", "capture_inbox", "list_inbox",
+                        "get_backlinks", "capture_inbox", "list_inbox", "delete_inbox_item",
                         "update_notebook"
                     ],
                     "description": "Action to perform"
@@ -61,9 +61,10 @@ impl Tool for NotesTool {
                     "items": { "type": "string" },
                     "description": "Target note IDs for linking"
                 },
-                "icon": { "type": "string", "description": "Notebook icon emoji" },
+                "icon": { "type": "string", "description": "Icon emoji (for notes/notebooks, update only). Pass null to clear." },
+                "color": { "type": "string", "description": "Color (for notes/notebooks, update only). Pass null to clear." },
                 "content": { "type": "string", "description": "Content for inbox capture" },
-                "parent_id": { "type": "string", "description": "Parent notebook ID" }
+                "parent_id": { "type": "string", "description": "Parent notebook ID. Pass null to clear." }
             },
             "required": ["action"]
         })
@@ -84,12 +85,14 @@ impl Tool for NotesTool {
             "link_notes" => self.handle_link_notes(&p).await,
             "create_notebook" => self.handle_create_notebook(&p).await,
             "list_notebooks" => self.handle_list_notebooks().await,
+            "delete_notebook" => self.handle_delete_notebook(&p).await,
             "archive_note" => self.handle_archive_note(&p).await,
             "unarchive_note" => self.handle_unarchive_note(&p).await,
             "list_archived" => self.handle_list_archived().await,
             "get_backlinks" => self.handle_get_backlinks(&p).await,
             "capture_inbox" => self.handle_capture_inbox(&p).await,
             "list_inbox" => self.handle_list_inbox().await,
+            "delete_inbox_item" => self.handle_delete_inbox_item(&p).await,
             "update_notebook" => self.handle_update_notebook(&p).await,
             _ => Err(ToolError::InvalidParams(format!("Unknown action: {action}")).into()),
         }
@@ -148,12 +151,21 @@ impl NotesTool {
         let note = Note::from_row(row, tags);
         let links = self.repo.get_links_from(id).await?;
 
-        let mut out = format!("# {}\n\n{}", note.title, note.body);
+        let mut out = format!("# {}\n\nID: {}\n\n{}", note.title, note.id, note.body);
         if !note.tags.is_empty() {
             out.push_str(&format!("\n\nTags: {}", note.tags.join(", ")));
         }
         if note.pinned {
             out.push_str("\nPinned");
+        }
+        if note.archived {
+            out.push_str("\nArchived");
+        }
+        if let Some(ref icon) = note.icon {
+            out.push_str(&format!("\nIcon: {icon}"));
+        }
+        if let Some(ref color) = note.color {
+            out.push_str(&format!("\nColor: {color}"));
         }
         if !links.is_empty() {
             let link_ids: Vec<&str> = links.iter().map(|l| l.target_id.as_str()).collect();
@@ -162,6 +174,8 @@ impl NotesTool {
         if let Some(nb) = &note.notebook_id {
             out.push_str(&format!("\nNotebook: {nb}"));
         }
+        out.push_str(&format!("\nCreated: {}", note.created_at));
+        out.push_str(&format!("\nUpdated: {}", note.updated_at));
         Ok(out)
     }
 
@@ -170,7 +184,9 @@ impl NotesTool {
         let title = p.optional_str("title")?;
         let body = p.optional_str("body")?;
         let pinned = p.optional_bool("pinned")?;
-        let notebook_id = p.optional_str("notebook_id")?.map(Some);
+        let notebook_id = p.clearable_str("notebook_id")?;
+        let icon = p.clearable_str("icon")?;
+        let color = p.clearable_str("color")?;
 
         let updated = self
             .repo
@@ -181,9 +197,9 @@ impl NotesTool {
                 None,
                 None,
                 pinned,
-                notebook_id,
-                None,
-                None,
+                notebook_id.as_ref().map(|o| o.as_deref()),
+                icon.as_ref().map(|o| o.as_deref()),
+                color.as_ref().map(|o| o.as_deref()),
                 None,
                 None,
                 None,
@@ -374,15 +390,36 @@ impl NotesTool {
         Ok(out)
     }
 
+    async fn handle_delete_notebook(&self, p: &ParamExtractor<'_>) -> Result<String> {
+        let id = p.required_str("id")?;
+        if self.repo.delete_notebook(id).await? {
+            Ok(format!("Deleted notebook {id}"))
+        } else {
+            Err(ToolError::InvalidParams(format!("Notebook not found: {id}")).into())
+        }
+    }
+
+    async fn handle_delete_inbox_item(&self, p: &ParamExtractor<'_>) -> Result<String> {
+        let id = p.required_str("id")?;
+        self.repo.delete_inbox_item(id).await?;
+        Ok(format!("Deleted inbox item {id}"))
+    }
+
     async fn handle_update_notebook(&self, p: &ParamExtractor<'_>) -> Result<String> {
         let id = p.required_str("id")?;
         let title = p.optional_str("title")?;
-        let icon = p.optional_str("icon")?.map(Some);
-        let parent_id = p.optional_str("parent_id")?.map(Some);
-        let color = p.optional_str("color")?.map(Some);
+        let icon = p.clearable_str("icon")?;
+        let parent_id = p.clearable_str("parent_id")?;
+        let color = p.clearable_str("color")?;
         let row = self
             .repo
-            .update_notebook(id, title, icon, color, parent_id)
+            .update_notebook(
+                id,
+                title,
+                icon.as_ref().map(|o| o.as_deref()),
+                color.as_ref().map(|o| o.as_deref()),
+                parent_id.as_ref().map(|o| o.as_deref()),
+            )
             .await?;
         Ok(format!(
             "Updated notebook \"{}\" (id: {})",

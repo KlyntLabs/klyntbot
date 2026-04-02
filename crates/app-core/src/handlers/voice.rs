@@ -1,100 +1,35 @@
-//! Voice capture handlers — business logic for voice commands.
+//! Voice dictation handlers — speech-to-text for the chat input field.
 
-use desktop_shared::commands::voice::*;
 use desktop_shared::errors::ApiError;
-use voice_engine::EngineKind;
 
 use crate::state::AppCore;
 
 impl AppCore {
-    /// Start a voice capture session.
-    pub async fn voice_start_capture(&self) -> Result<VoiceCaptureInfo, ApiError> {
+    /// Start voice dictation — begins capturing audio for speech-to-text.
+    pub async fn voice_start_dictation(&self) -> Result<(), ApiError> {
         let service = self.voice_service()?;
-        let (session_id, engine) = service
+        service
             .start_capture()
             .await
             .map_err(|e| ApiError::new("VOICE_ERROR", &e.to_string()))?;
-
-        Ok(VoiceCaptureInfo {
-            session_id,
-            engine,
-            state: voice_engine::VoiceSessionState::Capturing,
-        })
+        Ok(())
     }
 
-    /// Stop the current voice capture, send transcript through agent, relay response to TTS.
-    pub async fn voice_stop_capture(&self) -> Result<(), ApiError> {
+    /// Stop voice dictation — finalizes capture and returns the transcript text.
+    pub async fn voice_stop_dictation(&self) -> Result<String, ApiError> {
         let service = self.voice_service()?;
         let result = service
             .stop_capture()
             .await
             .map_err(|e| ApiError::new("VOICE_ERROR", &e.to_string()))?;
 
-        if let Some((transcript, _metadata)) = result {
-            if transcript.text.trim().is_empty() {
-                return Ok(());
-            }
-
-            // Send transcript through the agent pipeline and relay response to TTS.
-            let session_key = "desktop-voice".to_string();
-            let voice_svc = self.voice_service()?.clone();
-            let agent = self.agent.clone();
-            let config = self.config.clone();
-
-            tokio::spawn(async move {
-                let tts_params = {
-                    let cfg = config.read().await;
-                    super::voice_conversation::tts_params_from_config(&cfg.voice.output)
-                };
-
-                match agent
-                    .process_direct_streaming(transcript.text.clone(), session_key)
-                    .await
-                {
-                    Ok(streaming_handle) => {
-                        let mut event_rx = streaming_handle.event_rx;
-                        while let Some(event) = event_rx.recv().await {
-                            if let agent::AgentEvent::Done { content, .. } = event {
-                                if let Err(e) =
-                                    voice_svc.handle_response(&content, &tts_params).await
-                                {
-                                    tracing::warn!("Voice TTS response failed: {e}");
-                                }
-                                break;
-                            }
-                        }
-                    }
-                    Err(e) => {
-                        tracing::warn!("Agent processing of voice transcript failed: {e}");
-                    }
-                }
-            });
+        match result {
+            Some((transcript, _metadata)) => Ok(transcript.text),
+            None => Ok(String::new()),
         }
-
-        Ok(())
     }
 
-    /// Dismiss the voice orb (processing continues in background).
-    pub async fn voice_dismiss(&self) -> Result<(), ApiError> {
-        let service = self.voice_service()?;
-        service.dismiss().await;
-        Ok(())
-    }
-
-    /// Get current voice status.
-    pub async fn voice_get_status(&self) -> Result<VoiceStatusResponse, ApiError> {
-        let service = self.voice_service()?;
-        let state = service.session_state().await;
-        let engine = service.engine_kind().unwrap_or(EngineKind::Local);
-
-        Ok(VoiceStatusResponse {
-            state,
-            engine,
-            enabled: true,
-        })
-    }
-
-    /// Simulate a VoiceEvent for dev/testing (inject event into the frontend stream).
+    /// Simulate a VoiceEvent for dev/testing.
     pub async fn voice_simulate_event(
         &self,
         event_json: serde_json::Value,

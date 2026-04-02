@@ -151,9 +151,10 @@ export function useVoiceConversation() {
   useEvent<Record<string, unknown>>("voice:event", handleEvent);
 
   // Actions
-  const start = useCallback(async (): Promise<SessionInfo> => {
+  const start = useCallback(async (sessionKey?: string): Promise<SessionInfo> => {
     const result = await ipc<{ sessionKey: string; sessionTitle: string; isContinuing: boolean }>(
       "voice_conversation_start",
+      sessionKey ? { sessionKey } : undefined,
     );
     const info: SessionInfo = { key: result.sessionKey, title: result.sessionTitle, turnCount: 0 };
     setSessionInfo(info);

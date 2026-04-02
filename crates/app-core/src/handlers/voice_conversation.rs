@@ -89,7 +89,7 @@ impl Default for VoiceConversationState {
             pending_transcript: None,
             pending_response_text: None,
             tts_position: 0,
-            session_title: "Voice session".to_string(),
+            session_title: String::new(),
         }
     }
 }
@@ -105,7 +105,7 @@ impl VoiceConversationState {
         self.pending_transcript = None;
         self.pending_response_text = None;
         self.tts_position = 0;
-        self.session_title = "New voice session".to_string();
+        self.session_title = String::new();
     }
 
     pub fn touch(&mut self) {
@@ -140,9 +140,9 @@ pub fn compute_breath_ms(response_text: &str) -> u64 {
     (base + extra).min(800)
 }
 
-pub fn create_voice_session_key() -> SessionKey {
+fn create_chat_session_key() -> SessionKey {
     SessionKey::new(
-        &ChannelName::new("desktop"),
+        &ChannelName::new("chat"),
         &ChatId::new(Uuid::new_v4().to_string()),
     )
 }
@@ -246,7 +246,12 @@ impl VoiceConversationManager {
     // ── 1. resolve_session ──────────────────────────────────
 
     /// Smart session attachment: reuse warm sessions, or create a new one.
-    pub async fn resolve_session(&self) -> SessionKey {
+    pub async fn resolve_session(&self, explicit_key: Option<&str>) -> SessionKey {
+        // 0. Explicit key provided by frontend (active chat thread)
+        if let Some(key) = explicit_key {
+            return SessionKey::from(key);
+        }
+
         let config = self.config.read().await;
         let warm_session_min = config.conversation.warm_session_minutes;
         let warm_chat_min = config.conversation.warm_chat_minutes;
@@ -269,30 +274,26 @@ impl VoiceConversationManager {
             }
         }
 
-        // 3. Query DB for most recent "desktop" session — if updated recently, attach
+        // 3. Query DB for most recent session — if updated recently, attach
         if let Ok(sessions) = self
             .repos
             .sessions
             .list_sessions_since(Utc::now() - Duration::minutes(warm_chat_min as i64))
             .await
         {
-            if let Some(session) = sessions.iter().find(|s| s.key.starts_with("desktop:")) {
-                let key = SessionKey::from_parts(
-                    "desktop",
-                    session.key.strip_prefix("desktop:").unwrap_or(&session.key),
-                );
-                return key;
+            if let Some(session) = sessions.first() {
+                return SessionKey::from(session.key.as_str());
             }
         }
 
         // 4. Otherwise create new
-        create_voice_session_key()
+        create_chat_session_key()
     }
 
     // ── 2. start ────────────────────────────────────────────
 
     /// Begin (or resume) a voice conversation.
-    pub async fn start(&self) -> common::Result<StartResponse> {
+    pub async fn start(&self, session_key: Option<String>) -> common::Result<StartResponse> {
         if !self.voice_service.is_available() {
             let _ = self
                 .voice_service
@@ -307,7 +308,7 @@ impl VoiceConversationManager {
             ));
         }
 
-        let session_key = self.resolve_session().await;
+        let session_key = self.resolve_session(session_key.as_deref()).await;
 
         // Check if we're continuing an existing session
         let is_continuing = {
@@ -332,7 +333,7 @@ impl VoiceConversationManager {
                 Err(_) => "Voice session".to_string(),
             }
         } else {
-            "New voice session".to_string()
+            String::new()
         };
 
         // Update state
@@ -398,12 +399,12 @@ impl VoiceConversationManager {
         // Reset state directly under the lock
         {
             let mut state = self.state.lock().await;
-            let new_key = create_voice_session_key();
+            let new_key = create_chat_session_key();
             state.reset_for_new_session(new_key);
         }
 
         // Now start fresh (resolve_session will see the new key)
-        self.start().await
+        self.start(None).await
     }
 
     // ── 3. spawn_supervised_loop ──────────────────────────────
@@ -524,7 +525,7 @@ impl VoiceConversationManager {
                         VoiceCommand::NewSession => {
                             info!("Listening phase: NewSession, stopping capture");
                             let _ = self.voice_service.stop_capture().await;
-                            let new_key = create_voice_session_key();
+                            let new_key = create_chat_session_key();
                             self.state.lock().await.reset_for_new_session(new_key);
                             self.transition_to(ConversationPhase::Idle).await;
                             return;
@@ -616,12 +617,31 @@ impl VoiceConversationManager {
             return;
         }
 
+        // Auto-title from first voice transcript (matches text chat behavior).
+        // Extract under the lock, drop it, then do the DB call.
+        let needs_title = {
+            let state = self.state.lock().await;
+            state.session_title.is_empty()
+        };
+        if needs_title {
+            let title: String = transcript_text.chars().take(60).collect();
+            let metadata = serde_json::json!({
+                "title": title,
+                "is_voice_session": true,
+            });
+            let _ = self
+                .repos
+                .sessions
+                .upsert_voice_session(&session_key_str, &metadata)
+                .await;
+            self.state.lock().await.session_title = title;
+        }
+
         info!(
             "Reflecting phase: sending to agent (session={})",
             session_key_str
         );
 
-        // Emit PhaseChanged for reflecting
         let (turn_count, session_title) = {
             let state = self.state.lock().await;
             (state.turn_count, state.session_title.clone())
@@ -634,6 +654,17 @@ impl VoiceConversationManager {
                 turn_count,
             })
             .await;
+
+        // Emit chat:message_added so the chat UI shows the voice transcript.
+        // The agent pipeline (process_direct_streaming) handles message persistence
+        // internally — we don't persist here to avoid duplicate rows.
+        if let Ok(val) = serde_json::to_value(&desktop_shared::events::ChatMessagePayload {
+            session_key: session_key_str.clone(),
+            source: "voice".to_string(),
+        }) {
+            self.emitter
+                .emit_event(desktop_shared::events::CHAT_MESSAGE_ADDED, val);
+        }
 
         // Call agent
         let streaming_handle = match self
@@ -704,6 +735,18 @@ impl VoiceConversationManager {
                                 );
                             }
                             let _ = message_id; // consumed by DonePayload via session
+                            // Notify the chat UI that the assistant response is persisted
+                            if let Ok(val) =
+                                serde_json::to_value(&desktop_shared::events::ChatMessagePayload {
+                                    session_key: session_key_str.clone(),
+                                    source: "voice".to_string(),
+                                })
+                            {
+                                self.emitter.emit_event(
+                                    desktop_shared::events::CHAT_MESSAGE_ADDED,
+                                    val,
+                                );
+                            }
                             break;
                         }
                         Some(agent::AgentEvent::Error { message }) => {
@@ -1185,10 +1228,10 @@ mod tests {
 
     #[tokio::test]
     async fn new_session_creates_unique_keys() {
-        let key1 = create_voice_session_key();
-        let key2 = create_voice_session_key();
+        let key1 = create_chat_session_key();
+        let key2 = create_chat_session_key();
         assert_ne!(key1.as_str(), key2.as_str());
-        assert!(key1.as_str().starts_with("desktop:"));
+        assert!(key1.as_str().starts_with("chat:"));
     }
 
     #[test]
@@ -1224,17 +1267,17 @@ mod tests {
     fn state_resets_on_new_session() {
         let mut state = VoiceConversationState {
             turn_count: 5,
-            session_key: Some(SessionKey::from_parts("desktop", "old-uuid")),
+            session_key: Some(SessionKey::from_parts("chat", "old-uuid")),
             pending_response_text: Some("old response".into()),
             ..Default::default()
         };
 
-        state.reset_for_new_session(SessionKey::from_parts("desktop", "new-uuid"));
+        state.reset_for_new_session(SessionKey::from_parts("chat", "new-uuid"));
 
         assert_eq!(state.turn_count, 0);
         assert_eq!(
             state.session_key.as_ref().unwrap().as_str(),
-            "desktop:new-uuid"
+            "chat:new-uuid"
         );
         assert!(state.pending_response_text.is_none());
         assert!(!state.interrupted);

@@ -20,10 +20,11 @@ impl AppCore {
     /// Start a voice conversation (resolves/creates session).
     pub async fn voice_conversation_start(
         &self,
+        session_key: Option<String>,
     ) -> Result<VoiceConversationStartResponse, ApiError> {
         let manager = self.voice_conversation_manager()?;
         let result = manager
-            .start()
+            .start(session_key)
             .await
             .map_err(|e| ApiError::new("VOICE_ERROR", e.to_string()))?;
         Ok(result.into())

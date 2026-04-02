@@ -16,8 +16,9 @@ fn set_tray_voice(active: bool, phase: u8) {
 #[tauri::command]
 pub async fn voice_conversation_start(
     state: State<'_, Arc<AppCore>>,
+    session_key: Option<String>,
 ) -> Result<VoiceConversationStartResponse, ApiError> {
-    let result = state.voice_conversation_start().await?;
+    let result = state.voice_conversation_start(session_key).await?;
     set_tray_voice(true, 1);
     Ok(result)
 }
@@ -92,7 +93,13 @@ pub(crate) async fn dispatch_dev(
     use super::dev_helpers as dev;
 
     Some(match cmd {
-        "voice_conversation_start" => dev::val(core.voice_conversation_start().await),
+        "voice_conversation_start" => {
+            let session_key = _body
+                .get("sessionKey")
+                .and_then(|v| v.as_str())
+                .map(String::from);
+            dev::val(core.voice_conversation_start(session_key).await)
+        }
         "voice_conversation_pause" => dev::val(core.voice_conversation_pause().await),
         "voice_conversation_resume" => dev::val(core.voice_conversation_resume().await),
         "voice_conversation_interrupt" => dev::val(core.voice_conversation_interrupt().await),

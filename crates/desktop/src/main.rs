@@ -361,19 +361,20 @@ fn run_desktop_app() {
                                         {
                                             let core =
                                                 handle.state::<std::sync::Arc<app_core::AppCore>>();
-                                            // Quick capture without orb — just start, record, stop, spoken confirmation
-                                            match core.voice_start_capture().await {
-                                                Ok(_) => {
-                                                    crate::tray_countdown::VOICE_ACTIVE.store(
-                                                        true,
-                                                        std::sync::atomic::Ordering::Relaxed,
-                                                    );
-                                                    // No orb — voice events still flow for the background pipeline
-                                                }
-                                                Err(e) => {
-                                                    tracing::warn!(
-                                                        "Quick voice journal failed: {e}"
-                                                    );
+                                            // Quick capture without orb — start conversation manager directly
+                                            if let Ok(manager) = core.voice_conversation_manager() {
+                                                match manager.start(None).await {
+                                                    Ok(_) => {
+                                                        crate::tray_countdown::VOICE_ACTIVE.store(
+                                                            true,
+                                                            std::sync::atomic::Ordering::Relaxed,
+                                                        );
+                                                    }
+                                                    Err(e) => {
+                                                        tracing::warn!(
+                                                            "Quick voice journal failed: {e}"
+                                                        );
+                                                    }
                                                 }
                                             }
                                             return;
@@ -423,7 +424,7 @@ fn run_desktop_app() {
                                                     let _ = handle.emit("voice:unlock-audio", ());
                                                 }
 
-                                                match manager.start().await {
+                                                match manager.start(None).await {
                                                     Ok(_) => {
                                                         crate::tray_countdown::VOICE_ACTIVE.store(
                                                             true,
@@ -460,55 +461,6 @@ fn run_desktop_app() {
                                                     false,
                                                     std::sync::atomic::Ordering::Relaxed,
                                                 );
-                                            }
-                                        } else {
-                                            // Fallback: no conversation manager, use legacy voice capture
-                                            if let Some(orb_window) =
-                                                handle.get_webview_window("voice-orb")
-                                            {
-                                                let is_visible =
-                                                    orb_window.is_visible().unwrap_or(false);
-                                                if is_visible {
-                                                    let _ = core.voice_stop_capture().await;
-                                                    crate::tray_countdown::VOICE_ACTIVE.store(
-                                                        false,
-                                                        std::sync::atomic::Ordering::Relaxed,
-                                                    );
-                                                    return;
-                                                }
-                                            }
-                                            // Open orb and start capture
-                                            if let Some(orb_window) =
-                                                handle.get_webview_window("voice-orb")
-                                            {
-                                                position_orb_bottom_right(&orb_window);
-                                                let _ = orb_window.show();
-                                                let _ = orb_window.set_focus();
-                                            }
-                                            tokio::time::sleep(
-                                                std::time::Duration::from_millis(100),
-                                            )
-                                            .await;
-                                            match core.voice_start_capture().await {
-                                                Ok(_info) => {
-                                                    crate::tray_countdown::VOICE_ACTIVE.store(
-                                                        true,
-                                                        std::sync::atomic::Ordering::Relaxed,
-                                                    );
-                                                }
-                                                Err(e) => {
-                                                    tracing::warn!(
-                                                        "Failed to start voice capture: {e}"
-                                                    );
-                                                    let _ = handle.emit(
-                                                        "voice:event",
-                                                        serde_json::json!({
-                                                            "type": "error",
-                                                            "message": e.to_string(),
-                                                            "recoverable": true
-                                                        }),
-                                                    );
-                                                }
                                             }
                                         }
                                     });
@@ -810,10 +762,8 @@ fn run_desktop_app() {
             commands::fabric::fabric_graph_expand,
             commands::fabric::fabric_graph_action,
             // Voice
-            commands::voice::voice_start_capture,
-            commands::voice::voice_stop_capture,
-            commands::voice::voice_dismiss,
-            commands::voice::voice_get_status,
+            commands::voice::voice_start_dictation,
+            commands::voice::voice_stop_dictation,
             commands::voice::voice_simulate_event,
             // Voice Conversation
             commands::voice_conversation::voice_conversation_start,

@@ -1,5 +1,7 @@
 import { useAutoResizeTextarea } from "@shared/hooks/useAutoResizeTextarea";
 import { useClickOutside } from "@shared/hooks/useClickOutside";
+import { useEvent } from "@shared/hooks/useEvent";
+import { ipc } from "@shared/hooks/useIpc";
 import { ChevronDown, Mic, Plus, Send, Users } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
@@ -27,6 +29,7 @@ export function ChatInput({
   const { ref: textareaRef, handleInput } = useAutoResizeTextarea(input);
   const { squads } = useSquads();
   const [popup, setPopup] = useState<{ x: number; y: number } | null>(null);
+  const [isDictating, setIsDictating] = useState(false);
   const popupRef = useRef<HTMLDivElement>(null);
   useClickOutside(popupRef, () => setPopup(null), !!popup);
 
@@ -60,6 +63,34 @@ export function ChatInput({
     if (squadId) onSelectDefault();
   };
 
+  const startDictation = async () => {
+    try {
+      setIsDictating(true);
+      await ipc("voice_start_dictation");
+    } catch {
+      setIsDictating(false);
+    }
+  };
+
+  const stopDictation = async () => {
+    if (!isDictating) return;
+    setIsDictating(false); // Clear immediately to block re-entrant calls
+    try {
+      const transcript = await ipc<string>("voice_stop_dictation");
+      if (transcript) {
+        onInputChange(input ? `${input} ${transcript}` : transcript);
+      }
+    } catch {
+      // stop_capture returns Ok(None) gracefully when session is already gone
+    }
+  };
+
+  useEvent<Record<string, unknown>>("voice:event", (payload) => {
+    if (isDictating && payload.type === "captureEnded") {
+      stopDictation();
+    }
+  });
+
   return (
     <div className="p-6">
       <div className="max-w-3xl mx-auto">
@@ -90,8 +121,13 @@ export function ChatInput({
           />
           <button
             type="button"
-            aria-label="Voice input"
-            className="size-8 flex items-center justify-center text-muted-foreground hover:text-foreground transition-colors shrink-0 rounded-lg hover:bg-accent"
+            aria-label={isDictating ? "Stop dictation" : "Voice input"}
+            onClick={isDictating ? stopDictation : startDictation}
+            className={`size-8 flex items-center justify-center transition-colors shrink-0 rounded-lg ${
+              isDictating
+                ? "text-destructive animate-pulse bg-destructive/10"
+                : "text-muted-foreground hover:text-foreground hover:bg-accent"
+            }`}
           >
             <Mic className="size-4" strokeWidth={1.5} />
           </button>
