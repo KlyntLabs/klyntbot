@@ -100,8 +100,10 @@ pub struct AppCore {
     pub embedding_engine: Option<Arc<tools::embedding_engine::EmbeddingEngine>>,
     /// LanceDB vector store for semantic similarity search (None when unavailable).
     pub vector_store: Option<VectorStore>,
-    /// Launcher search engine (None when launcher feature is disabled).
-    pub launcher_engine: Option<Arc<LauncherSearchEngine>>,
+    /// Launcher search engine — initialized lazily on first launcher access
+    /// to avoid loading the 10-50 MB icon cache and spawning background
+    /// refreshers at startup.
+    pub launcher_engine: tokio::sync::OnceCell<Arc<LauncherSearchEngine>>,
     /// Proactive suggestion handler (None when tasks AI is not configured).
     pub proactive_handler: Option<Arc<dyn feature_tasks::ProactiveHandler>>,
     /// Suggestion applier handler (None when tasks AI is not configured).
@@ -267,19 +269,31 @@ impl AppCore {
             .ok_or_else(|| ApiError::new("NOT_AVAILABLE", "Deck preference repo not available"))
     }
 
-    /// Return launcher search engine or a "feature disabled" error.
-    pub fn launcher_engine(&self) -> Result<&Arc<LauncherSearchEngine>, ApiError> {
+    /// Return launcher search engine, initializing lazily on first access.
+    pub async fn launcher_engine(&self) -> Result<&Arc<LauncherSearchEngine>, ApiError> {
         self.launcher_engine
-            .as_ref()
-            .ok_or_else(|| ApiError::new("FEATURE_DISABLED", "launcher feature is not enabled"))
+            .get_or_try_init(|| async {
+                let config = self.config.read().await;
+                let result = crate::init::launcher::init_launcher(
+                    &config,
+                    &self.storage_pool,
+                    &self.shutdown_token,
+                )
+                .await;
+                result
+                    .launcher_engine
+                    .ok_or_else(|| ApiError::new("FEATURE_DISABLED", "launcher init failed"))
+            })
+            .await
     }
 
     /// Return launcher clipboard repo or a "feature disabled" error.
-    pub fn launcher_clipboard_repo(&self) -> Result<&feature_launcher::ClipboardRepo, ApiError> {
-        self.launcher_engine
-            .as_ref()
+    pub async fn launcher_clipboard_repo(
+        &self,
+    ) -> Result<&feature_launcher::ClipboardRepo, ApiError> {
+        self.launcher_engine()
+            .await
             .map(|e| &e.clipboard_repo)
-            .ok_or_else(|| ApiError::new("FEATURE_DISABLED", "launcher feature is not enabled"))
     }
 
     /// Return autotuner orchestrator or `None` when disabled.

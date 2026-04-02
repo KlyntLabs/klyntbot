@@ -307,6 +307,18 @@ impl AgentRuntime {
         };
 
         // Step 1: Match message to orchestrator skill via SkillRouter
+        // Lazily precompute skill embeddings on first message (avoids loading
+        // the ONNX model at startup).
+        if let Some(ref engine) = self.embedding_engine {
+            let engine_clone = Arc::clone(engine);
+            let embed_fn: skill_system::types::EmbedFn =
+                Arc::new(move |text: &str| engine_clone.embed(text));
+            self.skill_catalog
+                .write()
+                .await
+                .ensure_embeddings(&embed_fn)
+                .await;
+        }
         let mut profile = {
             let catalog = self.skill_catalog.read().await;
             let router = self.skill_router.read().await;

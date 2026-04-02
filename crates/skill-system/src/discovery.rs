@@ -375,6 +375,14 @@ impl SkillCatalog {
         Ok(())
     }
 
+    /// Lazily precompute description embeddings on first call. No-op if already done.
+    pub async fn ensure_embeddings(&mut self, embed: &EmbedFn) {
+        if !self.embeddings.is_empty() {
+            return;
+        }
+        self.precompute_embeddings(embed).await;
+    }
+
     /// Precompute description embeddings for semantic matching.
     pub async fn precompute_embeddings(&mut self, embed: &EmbedFn) {
         let mut embeddings = HashMap::new();

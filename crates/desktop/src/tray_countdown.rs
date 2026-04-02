@@ -43,6 +43,8 @@ pub fn notify_focus_ended(app: &AppHandle) {
 }
 
 const POLL_INTERVAL_SECS: u64 = 30;
+/// Slow tick when nothing is actively counting down (saves ~86K wakeups/day).
+const IDLE_TICK_SECS: u64 = 10;
 
 async fn countdown_loop(app: AppHandle) {
     let mut cached: Option<NextItem> = None;
@@ -121,6 +123,21 @@ async fn countdown_loop(app: AppHandle) {
             None => {
                 set_tray_title(&app, "");
             }
+        }
+
+        // Adaptive tick: 1s when actively counting down, IDLE_TICK_SECS otherwise.
+        // Saves CPU/power when no countdown is displayed.
+        let target_secs = if cached.is_some()
+            || FOCUS_ACTIVE.load(Ordering::Relaxed)
+            || VOICE_ACTIVE.load(Ordering::Relaxed)
+        {
+            1
+        } else {
+            IDLE_TICK_SECS
+        };
+        if interval.period() != tokio::time::Duration::from_secs(target_secs) {
+            interval = tokio::time::interval(tokio::time::Duration::from_secs(target_secs));
+            interval.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
         }
     }
 }

@@ -10,12 +10,12 @@ use tracing::{error, info};
 use crate::handlers::launcher::LauncherSearchEngine;
 
 /// Results from launcher initialization phase.
-pub(super) struct LauncherResult {
+pub(crate) struct LauncherResult {
     pub launcher_engine: Option<Arc<LauncherSearchEngine>>,
 }
 
 /// Initialize the launcher feature (always enabled).
-pub(super) async fn init_launcher(
+pub(crate) async fn init_launcher(
     config: &config::Config,
     storage_pool: &StoragePool,
     shutdown_token: &CancellationToken,

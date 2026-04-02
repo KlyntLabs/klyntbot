@@ -312,13 +312,9 @@ impl AgentLoopBuilder {
             .unwrap_or_else(|| Arc::new(tools::EmbeddingEngine::new()));
 
         // Precompute skill description embeddings for semantic matching
-        {
-            let engine_clone = Arc::clone(&embedding_engine);
-            let embed_fn: skill_system::types::EmbedFn =
-                Arc::new(move |text: &str| engine_clone.embed(text));
-            skill_catalog.precompute_embeddings(&embed_fn).await;
-        }
-
+        // Skill embeddings are precomputed lazily on first message instead of
+        // at startup. This avoids loading the ~23 MB ONNX model at boot.
+        // The router falls back to keyword-only scoring until embeddings are ready.
         let skill_catalog = Arc::new(tokio::sync::RwLock::new(skill_catalog));
         let skill_router = Arc::new(tokio::sync::RwLock::new(skill_router));
 

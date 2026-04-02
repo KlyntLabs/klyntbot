@@ -69,7 +69,11 @@ impl CompoundEmitter {
 
 impl AppEventEmitter for CompoundEmitter {
     fn emit_event(&self, event_name: &str, payload: serde_json::Value) {
-        self.primary.emit_event(event_name, payload.clone());
-        let _ = self.broadcast.send((event_name.to_string(), payload));
+        if self.broadcast.receiver_count() > 0 {
+            self.primary.emit_event(event_name, payload.clone());
+            let _ = self.broadcast.send((event_name.to_string(), payload));
+        } else {
+            self.primary.emit_event(event_name, payload);
+        }
     }
 }

@@ -4,7 +4,7 @@ mod coaching;
 mod cognitive;
 mod cron;
 mod deadline;
-mod launcher;
+pub(crate) mod launcher;
 mod productivity;
 mod storage;
 
@@ -131,7 +131,7 @@ impl AppCore {
 
         // DomainEventBus is created before cron so the proactive scan callback
         // can capture it and emit ProactiveSuggestionCreated after persisting.
-        let domain_event_bus = Arc::new(bus::DomainEventBus::new(256));
+        let domain_event_bus = Arc::new(bus::DomainEventBus::new(64));
 
         // Context update queue for live context refresher (shared between agent + background services).
         let context_update_queue = Arc::new(bus::ContextUpdateQueue::new());
@@ -340,8 +340,8 @@ impl AppCore {
         .await;
 
         // ── Phase 8: Launcher ─────────────────────────────────────────────
-        let launcher::LauncherResult { launcher_engine } =
-            launcher::init_launcher(&config, &storage_pool, &shutdown_token).await;
+        // Deferred to first launcher access via OnceCell in AppCore.
+        // Saves 10-50 MB (icon cache) + background refresher CPU at startup.
 
         // ── Phase 9: Mirror self-reflection layer ────────────────────────
         let (mirror_facade, mirror_handles, mirror_shutdown) = {
@@ -556,7 +556,7 @@ impl AppCore {
             note_embedding_handler,
             embedding_engine: appcore_embedding_engine,
             vector_store: appcore_vector_store,
-            launcher_engine,
+            launcher_engine: tokio::sync::OnceCell::new(),
             proactive_handler,
             suggestion_applier,
             decomposition_handler,
