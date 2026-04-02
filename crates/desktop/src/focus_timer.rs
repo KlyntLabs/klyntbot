@@ -791,7 +791,7 @@ async fn read_preferences(app: &AppHandle) -> (bool, bool) {
 // ── Completion handlers ─────────────────────────────────────────────
 
 pub fn open_tray_window(app: &AppHandle) {
-    if let Some(window) = app.get_webview_window(WINDOW_TRAY) {
+    if let Some(window) = crate::lazy_window::get_or_create_window(app, WINDOW_TRAY) {
         let positioned = if let Some(tray) = app.tray_by_id("klynt-tray") {
             if let Ok(Some(rect)) = tray.rect() {
                 if let Ok(win_size) = window.outer_size() {

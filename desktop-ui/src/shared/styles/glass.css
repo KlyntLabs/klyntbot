@@ -8,7 +8,7 @@
      Primary glass — dropdowns, popovers, dialogs
      ───────────────────────────────────────────────────────────────── */
   .glass-panel {
-    @apply backdrop-blur-[80px] backdrop-saturate-[1.6];
+    @apply backdrop-blur-[24px] backdrop-saturate-[1.6];
     background: var(--surface-glass);
     border: 1px solid var(--glass-border);
     border-radius: var(--radius-xl);
@@ -20,7 +20,7 @@
      Sidebar glass — standalone rounded panel
      ───────────────────────────────────────────────────────────────── */
   .glass-sidebar {
-    @apply backdrop-blur-[100px] backdrop-saturate-[1.8];
+    @apply backdrop-blur-[24px] backdrop-saturate-[1.8];
     background: var(--surface-glass-sidebar);
     border: 1px solid var(--glass-border);
     border-radius: var(--radius-xl);
@@ -30,7 +30,7 @@
      Toolbar glass — standalone rounded bar
      ───────────────────────────────────────────────────────────────── */
   .glass-toolbar {
-    @apply backdrop-blur-[60px] backdrop-saturate-150;
+    @apply backdrop-blur-[20px] backdrop-saturate-150;
     background: var(--surface-glass-toolbar);
     border: 1px solid var(--glass-border);
     border-radius: var(--radius-xl);
@@ -40,7 +40,7 @@
      Input glass — subtle translucency for form elements
      ───────────────────────────────────────────────────────────────── */
   .glass-input {
-    @apply backdrop-blur-[40px] backdrop-saturate-[1.3];
+    @apply backdrop-blur-[16px] backdrop-saturate-[1.3];
     background: var(--surface-glass-subtle);
     border: 1px solid var(--glass-border);
     border-radius: var(--radius-xl);
@@ -59,7 +59,7 @@
      Button glass — interactive glass element
      ───────────────────────────────────────────────────────────────── */
   .glass-button {
-    @apply backdrop-blur-[30px] backdrop-saturate-[1.2];
+    @apply backdrop-blur-[12px] backdrop-saturate-[1.2];
     background: var(--surface-glass-subtle);
     border: 1px solid var(--glass-border);
     border-radius: var(--radius-lg);
@@ -82,7 +82,7 @@
      Dark frosted glass that matches the main app's theme.
      ───────────────────────────────────────────────────────────────── */
   .glass-floating {
-    @apply backdrop-blur-[80px] backdrop-saturate-[1.8];
+    @apply backdrop-blur-[24px] backdrop-saturate-[1.8];
     background: var(--surface-glass-floating);
     border: 1px solid var(--glass-border);
     border-radius: var(--radius-xl);
@@ -106,7 +106,7 @@
      the desktop).
      ───────────────────────────────────────────────────────────────── */
   .glass-dropdown {
-    @apply backdrop-blur-[80px] backdrop-saturate-[1.8];
+    @apply backdrop-blur-[24px] backdrop-saturate-[1.8];
     background: var(--surface-glass-dropdown);
     border: 1px solid var(--glass-border);
     border-radius: var(--radius-xl);
@@ -120,7 +120,7 @@
      Card glass — content cards with subtle depth
      ───────────────────────────────────────────────────────────────── */
   .glass-card {
-    @apply backdrop-blur-[50px] backdrop-saturate-150;
+    @apply backdrop-blur-[16px] backdrop-saturate-150;
     background: var(--surface-glass-card);
     border: 1px solid var(--glass-border-card);
     border-radius: var(--radius-xl);
@@ -130,7 +130,6 @@
      Message bubble glass — chat bubbles
      ───────────────────────────────────────────────────────────────── */
   .glass-bubble {
-    @apply backdrop-blur-[40px] backdrop-saturate-[1.4];
     background: var(--surface-glass-bubble);
     border: 1px solid var(--glass-border-bubble);
     border-radius: var(--radius-2xl);
@@ -140,7 +139,6 @@
      User message bubble — dark gray glass
      ───────────────────────────────────────────────────────────────── */
   .glass-bubble-user {
-    @apply backdrop-blur-[40px] backdrop-saturate-[1.4];
     background: var(--surface-glass-bubble-user);
     border: 1px solid var(--glass-border-bubble-user);
     border-radius: var(--radius-2xl);
@@ -150,7 +148,7 @@
      Context menu — macOS-native dark frosted glass
      ───────────────────────────────────────────────────────────────── */
   .context-menu {
-    @apply backdrop-blur-[80px] backdrop-saturate-[1.8];
+    @apply backdrop-blur-[24px] backdrop-saturate-[1.8];
     background: rgba(22, 22, 24, 0.88);
     border: 1px solid var(--glass-border-strong);
     border-radius: 10px;
@@ -164,7 +162,7 @@
      Badge glass — small pill elements
      ───────────────────────────────────────────────────────────────── */
   .glass-badge {
-    @apply backdrop-blur-[20px];
+    @apply backdrop-blur-[12px];
     background: rgba(255, 255, 255, 0.06);
     border: 1px solid rgba(255, 255, 255, 0.08);
     border-radius: var(--radius-pill);
@@ -205,6 +203,27 @@
   }
 
   /* ─────────────────────────────────────────────────────────────────
+     Accessibility — disable all backdrop-filter for users who prefer
+     reduced motion. Saves significant GPU compositing work.
+     ───────────────────────────────────────────────────────────────── */
+  @media (prefers-reduced-motion: reduce) {
+    .glass-panel,
+    .glass-sidebar,
+    .glass-toolbar,
+    .glass-input,
+    .glass-button,
+    .glass-floating,
+    .glass-dropdown,
+    .glass-card,
+    .context-menu,
+    .glass-badge,
+    .tag-pill {
+      -webkit-backdrop-filter: none;
+      backdrop-filter: none;
+    }
+  }
+
+  /* ─────────────────────────────────────────────────────────────────
      Note card — interactive card with hover lift
      ───────────────────────────────────────────────────────────────── */
   .note-card {
@@ -232,7 +251,7 @@
      Tag pill — colored glass badge for tags
      ───────────────────────────────────────────────────────────────── */
   .tag-pill {
-    @apply backdrop-blur-[10px];
+    @apply backdrop-blur-[8px];
     display: inline-flex;
     align-items: center;
     gap: 2px;

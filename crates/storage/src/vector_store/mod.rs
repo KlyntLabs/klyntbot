@@ -80,57 +80,27 @@ impl VectorStore {
             .await
             .map_err(|e| StorageError::Vector(format!("LanceDB connect failed: {e}")))?;
         let store = Self { db: Arc::new(db) };
-        store
-            .ensure_table("todo_embeddings", schemas::todo_schema())
-            .await?;
-        store
-            .ensure_table("conv_embeddings", schemas::conv_schema())
-            .await?;
-        store
-            .ensure_table(
-                "cognitive_fact_embeddings",
-                schemas::cognitive_fact_schema(),
-            )
-            .await?;
-        store
-            .ensure_table("activity_embeddings", schemas::activity_embedding_schema())
-            .await?;
-        store
-            .ensure_table(
-                "work_context_embeddings",
-                schemas::work_context_embedding_schema(),
-            )
-            .await?;
-        store
-            .ensure_table("task_embeddings", schemas::task_embedding_schema())
-            .await?;
-        store
-            .ensure_table("note_embeddings", schemas::note_embedding_schema())
-            .await?;
-        store
-            .ensure_table("insight_embeddings", schemas::insight_embedding_schema())
-            .await?;
-        store
-            .ensure_table("entity_embeddings", schemas::entity_embedding_schema())
-            .await?;
-        store
-            .ensure_table(
-                "flashcard_embeddings",
-                schemas::flashcard_embedding_schema(),
-            )
-            .await?;
-        store
-            .ensure_table(
-                "tree_node_embeddings",
-                schemas::tree_node_embedding_schema(),
-            )
-            .await?;
-        store
-            .ensure_table(
-                "community_embeddings",
-                schemas::community_embedding_schema(),
-            )
-            .await?;
+
+        // Fetch table list once instead of per-table (saves 11 round-trips).
+        let existing = store
+            .db
+            .table_names()
+            .execute()
+            .await
+            .map_err(|e| StorageError::Vector(format!("LanceDB list tables: {e}")))?;
+
+        store.ensure_table("todo_embeddings", schemas::todo_schema(), &existing).await?;
+        store.ensure_table("conv_embeddings", schemas::conv_schema(), &existing).await?;
+        store.ensure_table("cognitive_fact_embeddings", schemas::cognitive_fact_schema(), &existing).await?;
+        store.ensure_table("activity_embeddings", schemas::activity_embedding_schema(), &existing).await?;
+        store.ensure_table("work_context_embeddings", schemas::work_context_embedding_schema(), &existing).await?;
+        store.ensure_table("task_embeddings", schemas::task_embedding_schema(), &existing).await?;
+        store.ensure_table("note_embeddings", schemas::note_embedding_schema(), &existing).await?;
+        store.ensure_table("insight_embeddings", schemas::insight_embedding_schema(), &existing).await?;
+        store.ensure_table("entity_embeddings", schemas::entity_embedding_schema(), &existing).await?;
+        store.ensure_table("flashcard_embeddings", schemas::flashcard_embedding_schema(), &existing).await?;
+        store.ensure_table("tree_node_embeddings", schemas::tree_node_embedding_schema(), &existing).await?;
+        store.ensure_table("community_embeddings", schemas::community_embedding_schema(), &existing).await?;
         Ok(store)
     }
 
@@ -139,17 +109,12 @@ impl VectorStore {
         &self,
         name: &str,
         schema: arrow_schema::Schema,
+        existing: &[String],
     ) -> Result<(), StorageError> {
         use arrow_array::{RecordBatch, RecordBatchIterator};
         use arrow_schema::{ArrowError, SchemaRef};
 
-        let table_names = self
-            .db
-            .table_names()
-            .execute()
-            .await
-            .map_err(|e| StorageError::Vector(format!("LanceDB list tables: {e}")))?;
-        if !table_names.contains(&name.to_string()) {
+        if !existing.iter().any(|t| t == name) {
             let schema_ref: SchemaRef = Arc::new(schema);
             let reader = RecordBatchIterator::new(
                 std::iter::empty::<Result<RecordBatch, ArrowError>>(),

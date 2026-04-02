@@ -41,7 +41,7 @@ export function QuickTranslatePopup({
   return createPortal(
     <div
       ref={popupRef}
-      className="fixed z-50 max-w-[320px] min-w-[200px] rounded-xl p-3 shadow-2xl backdrop-blur-[80px] backdrop-saturate-[1.6]"
+      className="fixed z-50 max-w-[320px] min-w-[200px] rounded-xl p-3 shadow-2xl backdrop-blur-[24px] backdrop-saturate-[1.6]"
       style={{
         top: position.top,
         left: position.left,

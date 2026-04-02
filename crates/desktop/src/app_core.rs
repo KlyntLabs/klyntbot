@@ -239,7 +239,7 @@ fn wire_event_channels(
             };
 
             // Show overlay window on the monitor where the cursor is (= where the distracting app is)
-            if let Some(overlay) = handle.get_webview_window("distraction-overlay") {
+            if let Some(overlay) = crate::lazy_window::get_or_create_window(handle, "distraction-overlay") {
                 // Position on the active monitor before showing
                 if let Err(e) = center_on_cursor_monitor(&overlay) {
                     debug!("failed to position overlay on cursor monitor: {e}");

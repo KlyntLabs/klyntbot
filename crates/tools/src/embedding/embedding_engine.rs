@@ -19,9 +19,9 @@ use common::Result;
 /// Expected embedding dimensionality for all-MiniLM-L6-v2-Q.
 pub const EMBEDDING_DIM: usize = 384;
 
-/// Idle timeout before the ONNX model is unloaded from memory (2 minutes).
+/// Idle timeout before the ONNX model is unloaded from memory (1 minute).
 /// The quantized model (~23MB) reloads from disk cache in <500ms.
-const EMBEDDING_IDLE_SECS: u64 = 120;
+const EMBEDDING_IDLE_SECS: u64 = 60;
 
 /// Core embedding engine wrapping fastembed with lazy model initialization.
 ///

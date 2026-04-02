@@ -16,6 +16,7 @@ mod commands;
 #[cfg(debug_assertions)]
 mod dev_server;
 mod focus_timer;
+mod lazy_window;
 mod notify;
 mod oauth;
 mod shortcuts;
@@ -25,7 +26,7 @@ use std::sync::atomic::Ordering;
 use std::sync::Arc;
 
 use clap::{Parser, Subcommand};
-use commands::window::{QUIT_REQUESTED, WINDOW_LAUNCHER, WINDOW_QUICK_CAPTURE, WINDOW_TRAY};
+use commands::window::{QUIT_REQUESTED, WINDOW_TRAY};
 use tauri::image::Image;
 use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
 use tauri::Manager;
@@ -400,7 +401,7 @@ fn run_desktop_app() {
                                             if phase == ConversationPhase::Idle {
                                                 // First press → open orb and start conversation
                                                 if let Some(orb_window) =
-                                                    handle.get_webview_window("voice-orb")
+                                                    crate::lazy_window::get_or_create_window(&handle, "voice-orb")
                                                 {
                                                     position_orb_bottom_right(&orb_window);
                                                     let _ = orb_window.show();
@@ -600,28 +601,9 @@ fn run_desktop_app() {
                 })
                 .build(app)?;
 
-            // Tray window — transparent + dismiss-on-blur (CSS handles the card styling)
-            if let Some(tray_window) = app.get_webview_window(WINDOW_TRAY) {
-                dismiss_on_blur(&tray_window);
-            }
-
-            // Launcher window — dismiss-on-blur + reset state so next open is fresh
-            if let Some(launcher_window) = app.get_webview_window(WINDOW_LAUNCHER) {
-                let w = launcher_window.clone();
-                launcher_window.on_window_event(move |event| {
-                    if let tauri::WindowEvent::Focused(false) = event {
-                        let _ = w.hide();
-                        // Reset launcher state so next open (via hotkey) starts fresh
-                        use tauri::Emitter;
-                        let _ = w.emit("voice-recording-reset", ());
-                    }
-                });
-            }
-
-            // Quick capture window — dismiss-on-blur
-            if let Some(capture_window) = app.get_webview_window(WINDOW_QUICK_CAPTURE) {
-                dismiss_on_blur(&capture_window);
-            }
+            // Auxiliary windows (tray, launcher, quick-capture, distraction-overlay,
+            // voice-orb) are created lazily on first show via lazy_window.rs.
+            // Dismiss-on-blur handlers are registered at creation time.
 
             // Periodic mimalloc memory compaction — force the allocator to
             // return freed pages to the OS. Without this, mimalloc retains all

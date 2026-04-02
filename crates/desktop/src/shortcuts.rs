@@ -58,8 +58,7 @@ pub fn register_shortcuts(app: &AppHandle, config: &ShortcutsConfig) -> Result<(
 /// Toggle a window's visibility. Tray uses `focus_timer::open_tray_window` for
 /// correct positioning; others use center + show + focus.
 pub fn toggle_window(app: &AppHandle, window_label: &str) {
-    use tauri::Manager;
-    if let Some(window) = app.get_webview_window(window_label) {
+    if let Some(window) = crate::lazy_window::get_or_create_window(app, window_label) {
         if window.is_visible().unwrap_or(false) {
             let _ = window.hide();
         } else if window_label == WINDOW_TRAY {

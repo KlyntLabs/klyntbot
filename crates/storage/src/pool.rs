@@ -32,6 +32,10 @@ impl StoragePool {
         sqlx::query("PRAGMA cache_size = -2000;")
             .execute(&pool)
             .await?;
+        // Prevent unbounded WAL file growth (default is 1000 pages ≈ 4MB).
+        sqlx::query("PRAGMA wal_autocheckpoint = 1000;")
+            .execute(&pool)
+            .await?;
         sqlx::migrate!("./migrations").run(&pool).await?;
         Ok(Self(pool))
     }
