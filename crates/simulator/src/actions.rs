@@ -194,6 +194,36 @@ impl ActionExecutor {
                     score: duration_mins.map(f64::from).unwrap_or(50.0),
                 });
             }
+
+            SimulatedToolAction::CreateFlashcard {
+                front,
+                back: _,
+                topic,
+            } => {
+                let atom_id = Uuid::new_v4().to_string();
+                debug!(atom_id = %atom_id, topic = %topic, "action: CreateFlashcard");
+                self.bus.publish(DomainEvent::KnowledgeAtomCreated {
+                    atom_id,
+                    atom_type: "flashcard".to_string(),
+                    domain: topic.clone(),
+                    source_note_id: None,
+                    personal_importance: 0.7,
+                });
+                let truncated = &front[..front.floor_char_boundary(30)];
+                debug!(front = %truncated, "flashcard front (truncated)");
+            }
+
+            SimulatedToolAction::ReviewFlashcard { topic, rating } => {
+                debug!(topic = %topic, rating = %rating, "action: ReviewFlashcard");
+                self.bus.publish(DomainEvent::AtomFlashcardReviewed {
+                    atom_id: Uuid::new_v4().to_string(),
+                    card_id: Uuid::new_v4().to_string(),
+                    quality: *rating,
+                    recall_speed_ms: 2000,
+                    new_retention_pct: f64::from(*rating) * 20.0,
+                    source_note_id: None,
+                });
+            }
         }
 
         Ok(())

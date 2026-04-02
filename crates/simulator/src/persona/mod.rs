@@ -201,6 +201,22 @@ impl PersonaRunner {
                 task_ref: self.created_task_titles.last().cloned(),
                 duration_mins: self.rng.random_range(15..60),
             }),
+            "learning" => {
+                let topics = ["Rust", "Python", "ML", "algorithms"];
+                let topic = topics[self.rng.random_range(0..topics.len())];
+                if self.rng.random::<f64>() < 0.4 {
+                    Some(SimulatedToolAction::ReviewFlashcard {
+                        topic: topic.to_string(),
+                        rating: self.rng.random_range(1..=5),
+                    })
+                } else {
+                    Some(SimulatedToolAction::CreateFlashcard {
+                        front: format!("What is {topic}?"),
+                        back: format!("{topic} is a key concept"),
+                        topic: topic.to_string(),
+                    })
+                }
+            }
             _ => None,
         }
     }
@@ -438,6 +454,7 @@ impl PersonaRunner {
             "automation" => Some("automation".to_string()),
             "learning" => Some("general".to_string()),
             "insights" => Some("general".to_string()),
+            "coaching" => Some("general".to_string()),
             _ => None,
         }
     }

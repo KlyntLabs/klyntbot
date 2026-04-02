@@ -62,6 +62,14 @@ pub const LEARNING_TEMPLATES: &[&str] = &[
     "I just learned that {content}",
 ];
 
+pub const COACHING_TEMPLATES: &[&str] = &[
+    "I'm feeling overwhelmed with my workload",
+    "Help me set better priorities for this week",
+    "What patterns do you see in my productivity?",
+    "I keep procrastinating on {task} — any advice?",
+    "How can I improve my work-life balance?",
+];
+
 pub const CORRECTION_TEMPLATES: &[&str] = &[
     "No, I meant {correct_value}, not {wrong_value}",
     "That's wrong — it should be {correct_value}",
@@ -96,6 +104,7 @@ pub fn templates_for_topic(topic: &str) -> &'static [&'static str] {
         "automation" => AUTOMATION_TEMPLATES,
         "insights" => INSIGHTS_TEMPLATES,
         "learning" => LEARNING_TEMPLATES,
+        "coaching" => COACHING_TEMPLATES,
         "correction" => CORRECTION_TEMPLATES,
         "fact_introduction" => FACT_INTRODUCTION_TEMPLATES,
         _ => CHAT_TEMPLATES,

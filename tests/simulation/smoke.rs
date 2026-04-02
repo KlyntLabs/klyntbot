@@ -9,7 +9,27 @@ use simulator::providers::HeuristicNarrativeHandler;
 use simulator::report::SimulationReport;
 use simulator::scenario::Scenario;
 
-// ── Shared helper ──────────────────────────────────────────────────────
+// ── Shared helpers ─────────────────────────────────────────────────────
+
+fn print_checkpoints(report: &SimulationReport) {
+    for cp in &report.checkpoints {
+        let status = if cp.all_passed { "PASS" } else { "FAIL" };
+        eprintln!("  Checkpoint day {}: {}", cp.at_day, status);
+        for a in &cp.assertions {
+            let mark = if a.passed { "  [x]" } else { "  [ ]" };
+            eprintln!(
+                "    {} {} (actual: {:?}, expected: {})",
+                mark, a.description, a.actual_value, a.expected
+            );
+        }
+    }
+    for r in &report.summary.regression_alerts {
+        eprintln!(
+            "  REGRESSION: {} baseline={:.3} current={:.3} change={:.1}%",
+            r.metric, r.baseline, r.current, r.regression_pct
+        );
+    }
+}
 
 async fn run_scenario(toml: &str) -> SimulationReport {
     let scenario = Scenario::from_toml(toml).unwrap();
@@ -280,23 +300,7 @@ async fn run_finance_focused_6mo() {
         report.summary.checkpoint_pass_rate,
         report.summary.regression_alerts.len()
     );
-    for cp in &report.checkpoints {
-        let status = if cp.all_passed { "PASS" } else { "FAIL" };
-        eprintln!("  Checkpoint day {}: {}", cp.at_day, status);
-        for a in &cp.assertions {
-            let mark = if a.passed { "  [x]" } else { "  [ ]" };
-            eprintln!(
-                "    {} {} (actual: {:?}, expected: {})",
-                mark, a.description, a.actual_value, a.expected
-            );
-        }
-    }
-    for r in &report.summary.regression_alerts {
-        eprintln!(
-            "  REGRESSION: {} baseline={:.3} current={:.3} change={:.1}%",
-            r.metric, r.baseline, r.current, r.regression_pct
-        );
-    }
+    print_checkpoints(&report);
     assert!(
         report.summary.checkpoint_pass_rate >= 1.0,
         "Finance scenario checkpoints failed (pass_rate={:.2})",
@@ -322,26 +326,50 @@ async fn run_onboarding_stress_test() {
         report.summary.checkpoint_pass_rate,
         report.summary.regression_alerts.len()
     );
-    for cp in &report.checkpoints {
-        let status = if cp.all_passed { "PASS" } else { "FAIL" };
-        eprintln!("  Checkpoint day {}: {}", cp.at_day, status);
-        for a in &cp.assertions {
-            let mark = if a.passed { "  [x]" } else { "  [ ]" };
-            eprintln!(
-                "    {} {} (actual: {:?}, expected: {})",
-                mark, a.description, a.actual_value, a.expected
-            );
-        }
-    }
-    for r in &report.summary.regression_alerts {
-        eprintln!(
-            "  REGRESSION: {} baseline={:.3} current={:.3} change={:.1}%",
-            r.metric, r.baseline, r.current, r.regression_pct
-        );
-    }
+    print_checkpoints(&report);
     assert!(
         report.summary.checkpoint_pass_rate >= 1.0,
         "Onboarding stress test checkpoints failed (pass_rate={:.2})",
+        report.summary.checkpoint_pass_rate
+    );
+}
+
+#[tokio::test]
+async fn run_fact_contradiction() {
+    let report = run_scenario(include_str!("scenarios/fact_contradiction.toml")).await;
+    eprintln!(
+        "Contradiction test: {} msgs, {:.2}s, contradictions={:.3}, superseded={}",
+        report.summary.total_messages,
+        report.wall_time_secs,
+        report.summary.final_metrics.contradiction_detection_rate,
+        report.summary.total_facts_superseded,
+    );
+    print_checkpoints(&report);
+    assert!(
+        report.summary.total_facts_superseded > 0,
+        "Expected at least 1 fact supersession"
+    );
+    assert!(
+        report.summary.checkpoint_pass_rate >= 1.0,
+        "Contradiction scenario checkpoints failed (pass_rate={:.2})",
+        report.summary.checkpoint_pass_rate
+    );
+}
+
+#[tokio::test]
+async fn run_coaching_persona() {
+    let report = run_scenario(include_str!("scenarios/coaching_persona.toml")).await;
+    eprintln!(
+        "Coaching persona: {} msgs, {:.2}s, retention={:.3}, personalization={:.3}",
+        report.summary.total_messages,
+        report.wall_time_secs,
+        report.summary.final_metrics.knowledge_retention,
+        report.summary.final_metrics.personalization_score,
+    );
+    print_checkpoints(&report);
+    assert!(
+        report.summary.checkpoint_pass_rate >= 1.0,
+        "Coaching scenario checkpoints failed (pass_rate={:.2})",
         report.summary.checkpoint_pass_rate
     );
 }

@@ -428,6 +428,8 @@ impl SimulationHarness {
                         SimulatedToolAction::RecordTransaction { .. } => "finance",
                         SimulatedToolAction::StartFocus { .. }
                         | SimulatedToolAction::RecordProductivityEvent { .. } => "productivity",
+                        SimulatedToolAction::CreateFlashcard { .. }
+                        | SimulatedToolAction::ReviewFlashcard { .. } => "learning",
                         SimulatedToolAction::CreateObjective { .. } => "okr",
                     };
                     let _ = sqlx::query(
@@ -1292,6 +1294,13 @@ fn message_matches_topic_keywords(content: &str, topic: &str) -> bool {
         }
         "insights" => {
             lower.contains("pattern") || lower.contains("connection") || lower.contains("insight")
+        }
+        "coaching" => {
+            lower.contains("overwhelm")
+                || lower.contains("priorit")
+                || lower.contains("advice")
+                || lower.contains("balance")
+                || lower.contains("procrastinat")
         }
         "chat" => {
             lower.contains("morning")

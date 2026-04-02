@@ -141,6 +141,15 @@ pub enum SimulatedToolAction {
         event_type: String,
         duration_mins: Option<u32>,
     },
+    CreateFlashcard {
+        front: String,
+        back: String,
+        topic: String,
+    },
+    ReviewFlashcard {
+        topic: String,
+        rating: u8,
+    },
 }
 
 // ── Annotated message ──────────────────────────────────────────────────
