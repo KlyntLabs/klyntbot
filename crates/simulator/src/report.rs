@@ -98,6 +98,11 @@ pub fn compute_improvements(
             final_metrics.routing_stability,
         ),
         (
+            "routing_accuracy",
+            baselines.routing_accuracy,
+            final_metrics.routing_accuracy,
+        ),
+        (
             "task_completion_rate",
             baselines.task_completion_rate,
             final_metrics.task_completion_rate,

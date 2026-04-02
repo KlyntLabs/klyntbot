@@ -25,6 +25,7 @@ pub struct MetricSnapshot {
     pub personalization_score: f64,
     pub task_completion_rate: f64,
     pub routing_stability: f64,
+    pub routing_accuracy: f64,
     pub insight_usefulness: f64,
     // Tier 3 — system health
     pub autotuner_promotion_success: f64,
@@ -44,6 +45,7 @@ pub struct BaselineMetrics {
     pub personalization_score: f64,
     pub task_completion_rate: f64,
     pub routing_stability: f64,
+    pub routing_accuracy: f64,
     pub insight_usefulness: f64,
     // Tier 1 — memory fidelity baselines
     pub knowledge_retention: f64,
@@ -80,6 +82,8 @@ pub struct EpochAccumulator {
     pub retrieval_recall_sum: f64,
     pub retrieval_count: u32,
     pub routing_matches: u32,
+    pub routing_correct: u32,
+    pub routing_total: u32,
     pub tasks_created: u32,
     pub tasks_completed: u32,
     pub facts_superseded: u32,
@@ -182,6 +186,11 @@ impl MetricCollector {
             (self.cumulative_tasks_completed as f64 / self.cumulative_tasks_created as f64).min(1.0)
         };
         let routing_stability = acc.routing_matches as f64 / msgs;
+        let routing_accuracy = if acc.routing_total == 0 {
+            0.0
+        } else {
+            acc.routing_correct as f64 / acc.routing_total as f64
+        };
 
         let personalization_score = behavioral::personalization_score(
             knowledge_retention,
@@ -201,6 +210,7 @@ impl MetricCollector {
             personalization_score,
             task_completion_rate,
             routing_stability,
+            routing_accuracy,
             insight_usefulness,
             autotuner_promotion_success,
             community_stability,
@@ -232,6 +242,7 @@ impl MetricCollector {
             bl.personalization_score += s.personalization_score;
             bl.task_completion_rate += s.task_completion_rate;
             bl.routing_stability += s.routing_stability;
+            bl.routing_accuracy += s.routing_accuracy;
             bl.insight_usefulness += s.insight_usefulness;
             bl.knowledge_retention += s.knowledge_retention;
             bl.retrieval_precision += s.retrieval_precision;
@@ -242,6 +253,7 @@ impl MetricCollector {
         bl.personalization_score /= n;
         bl.task_completion_rate /= n;
         bl.routing_stability /= n;
+        bl.routing_accuracy /= n;
         bl.insight_usefulness /= n;
         bl.knowledge_retention /= n;
         bl.retrieval_precision /= n;
@@ -302,6 +314,12 @@ impl MetricCollector {
                 "routing_stability",
                 bl.routing_stability,
                 latest.routing_stability,
+                false,
+            ),
+            (
+                "routing_accuracy",
+                bl.routing_accuracy,
+                latest.routing_accuracy,
                 false,
             ),
             (
@@ -386,6 +404,8 @@ mod tests {
             acc.retrieval_recall_sum = 1.8;
             acc.retrieval_count = 3;
             acc.routing_matches = 8;
+            acc.routing_correct = 7;
+            acc.routing_total = 10;
             acc.tasks_created = 4;
             acc.tasks_completed = 3;
         }
@@ -427,6 +447,9 @@ mod tests {
 
         // routing_stability = 8 / 10 = 0.8
         assert!((snap.routing_stability - 0.8).abs() < 1e-9);
+
+        // routing_accuracy = 7 / 10 = 0.7
+        assert!((snap.routing_accuracy - 0.7).abs() < 1e-9);
 
         // personalization_score = 0.85 * 0.4 + 0.8 * 0.3 + 0.6 * 0.3
         //                       = 0.34 + 0.24 + 0.18 = 0.76

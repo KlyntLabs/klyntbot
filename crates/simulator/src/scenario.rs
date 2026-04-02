@@ -70,6 +70,7 @@ pub enum MetricName {
     PersonalizationScore,
     TaskCompletionRate,
     RoutingStability,
+    RoutingAccuracy,
     InsightUsefulness,
     AutotunerPromotionSuccess,
     CommunityStability,

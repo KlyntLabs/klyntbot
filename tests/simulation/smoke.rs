@@ -131,6 +131,13 @@ async fn smoke_test_7_day_simulation() {
         last.routing_stability
     );
 
+    // Routing accuracy (real SkillRouter) should be in valid range
+    assert!(
+        last.routing_accuracy >= 0.0 && last.routing_accuracy <= 1.0,
+        "routing_accuracy should be in [0, 1], got {:.3}",
+        last.routing_accuracy
+    );
+
     // Verify the report can be serialized without NaN/Inf from division
     let json = serde_json::to_string(&report).unwrap();
     assert!(!json.contains("NaN"), "report contains NaN values");
@@ -218,6 +225,10 @@ async fn run_software_engineer_12mo() {
         eprintln!(
             "  Token efficiency:      {:.0} → {:.0}",
             first.token_efficiency, last.token_efficiency
+        );
+        eprintln!(
+            "  Routing accuracy:      {:.3} → {:.3}",
+            first.routing_accuracy, last.routing_accuracy
         );
         eprintln!(
             "  Community stability:   {:.3} → {:.3}",

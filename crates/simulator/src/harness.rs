@@ -12,6 +12,10 @@ use chrono::{Duration, TimeZone, Utc};
 use tracing::{debug, info, warn};
 use uuid::Uuid;
 
+use skill_system::discovery::{SkillSource, BUILTIN_SKILLS};
+use skill_system::router::SkillRouter;
+use skill_system::types::SkillCatalog;
+
 use crate::actions::ActionExecutor;
 use crate::epoch::{CronTrigger, EpochStep, SimulatedEpoch};
 use crate::metrics::ground_truth::{CheckpointResult, GroundTruthVerifier};
@@ -56,6 +60,8 @@ pub struct SimulationHarness {
     /// Persistent champion state — updated after each promotion so the
     /// evaluator compares against real baselines instead of all-zeros.
     champion: std::sync::Mutex<autotuner::Champion>,
+    skill_router: Option<SkillRouter>,
+    skill_catalog: Option<SkillCatalog>,
 }
 
 impl SimulationHarness {
@@ -183,6 +189,25 @@ impl SimulationHarness {
         .execute(&inner_pool)
         .await;
 
+        // Load built-in skills for real routing evaluation.
+        let builtin_entries: Vec<(String, String)> = BUILTIN_SKILLS
+            .iter()
+            .map(|(name, content)| (name.to_string(), content.to_string()))
+            .collect();
+        let (skill_catalog, skill_router) = {
+            let source = SkillSource::BuiltIn(builtin_entries);
+            match SkillCatalog::discover_sync(&[source]) {
+                Ok(catalog) => {
+                    let router = SkillRouter::new(&catalog);
+                    (Some(catalog), Some(router))
+                }
+                Err(e) => {
+                    warn!(error = %e, "Failed to load skill catalog — routing_accuracy will be 0");
+                    (None, None)
+                }
+            }
+        };
+
         Ok(Self {
             scenario,
             pool,
@@ -201,6 +226,8 @@ impl SimulationHarness {
             active_trial_id: std::sync::Mutex::new(trial_a_id),
             variant_trial_id: std::sync::Mutex::new(trial_b_id),
             champion: std::sync::Mutex::new(autotuner::Champion::default()),
+            skill_router,
+            skill_catalog,
         })
     }
 
@@ -469,6 +496,23 @@ impl SimulationHarness {
                 // Routing stability: check if message content matches expected topic keywords
                 if message_matches_topic_keywords(&msg.content, &msg.topic) {
                     metrics.accumulator_mut().routing_matches += 1;
+                }
+
+                // Real routing accuracy: compare SkillRouter output against expected_skill
+                if let (Some(ref router), Some(ref catalog)) =
+                    (&self.skill_router, &self.skill_catalog)
+                {
+                    if let Some(expected) = msg
+                        .ground_truth
+                        .as_ref()
+                        .and_then(|gt| gt.expected_skill.as_ref())
+                    {
+                        let selected = router.select_orchestrator(&msg.content, catalog, None);
+                        metrics.accumulator_mut().routing_total += 1;
+                        if selected.name == *expected {
+                            metrics.accumulator_mut().routing_correct += 1;
+                        }
+                    }
                 }
 
                 // ── Domain entity rows: usage, interaction, strategy ──
