@@ -209,6 +209,10 @@ pub struct VoiceConversationConfig {
     /// Variable pause after response based on length (default: true)
     #[serde(default = "default_true")]
     pub adaptive_breath: bool,
+    /// Stream TTS sentence-by-sentence during LLM generation (default: true).
+    /// When false, waits for the complete response before synthesizing.
+    #[serde(default = "default_true")]
+    pub streaming_tts: bool,
 }
 
 impl Default for VoiceConversationConfig {
@@ -219,6 +223,7 @@ impl Default for VoiceConversationConfig {
             silence_threshold_secs: 1.5,
             auto_resume: true,
             adaptive_breath: true,
+            streaming_tts: true,
         }
     }
 }
