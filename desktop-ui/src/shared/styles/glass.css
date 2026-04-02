@@ -20,7 +20,6 @@
      Sidebar glass — standalone rounded panel
      ───────────────────────────────────────────────────────────────── */
   .glass-sidebar {
-    @apply backdrop-blur-[24px] backdrop-saturate-[1.8];
     background: var(--surface-glass-sidebar);
     border: 1px solid var(--glass-border);
     border-radius: var(--radius-xl);
@@ -59,7 +58,6 @@
      Button glass — interactive glass element
      ───────────────────────────────────────────────────────────────── */
   .glass-button {
-    @apply backdrop-blur-[12px] backdrop-saturate-[1.2];
     background: var(--surface-glass-subtle);
     border: 1px solid var(--glass-border);
     border-radius: var(--radius-lg);
@@ -120,7 +118,6 @@
      Card glass — content cards with subtle depth
      ───────────────────────────────────────────────────────────────── */
   .glass-card {
-    @apply backdrop-blur-[16px] backdrop-saturate-150;
     background: var(--surface-glass-card);
     border: 1px solid var(--glass-border-card);
     border-radius: var(--radius-xl);
@@ -162,7 +159,6 @@
      Badge glass — small pill elements
      ───────────────────────────────────────────────────────────────── */
   .glass-badge {
-    @apply backdrop-blur-[12px];
     background: rgba(255, 255, 255, 0.06);
     border: 1px solid rgba(255, 255, 255, 0.08);
     border-radius: var(--radius-pill);
@@ -208,16 +204,11 @@
      ───────────────────────────────────────────────────────────────── */
   @media (prefers-reduced-motion: reduce) {
     .glass-panel,
-    .glass-sidebar,
     .glass-toolbar,
     .glass-input,
-    .glass-button,
     .glass-floating,
     .glass-dropdown,
-    .glass-card,
-    .context-menu,
-    .glass-badge,
-    .tag-pill {
+    .context-menu {
       -webkit-backdrop-filter: none;
       backdrop-filter: none;
     }
@@ -251,7 +242,6 @@
      Tag pill — colored glass badge for tags
      ───────────────────────────────────────────────────────────────── */
   .tag-pill {
-    @apply backdrop-blur-[8px];
     display: inline-flex;
     align-items: center;
     gap: 2px;
