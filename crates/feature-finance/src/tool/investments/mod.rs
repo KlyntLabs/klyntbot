@@ -31,8 +31,10 @@ impl FinanceTool {
         match action {
             "portfolio_create" => self.portfolio_create(p).await,
             "portfolio_list" => self.portfolio_list(p).await,
+            "portfolio_delete" => self.portfolio_delete(p).await,
             "investment_add" => self.investment_add(p).await,
             "investment_update" => self.investment_update(p).await,
+            "investment_delete" => self.investment_delete(p).await,
             "investment_tx" => self.investment_tx(p).await,
             "investment_summary" => self.investment_summary(p).await,
             "price_fetch" => self.price_fetch(p).await,
@@ -113,6 +115,16 @@ impl FinanceTool {
         }
 
         Ok(serde_json::to_string_pretty(&result).unwrap())
+    }
+
+    async fn portfolio_delete(&self, p: &ParamExtractor<'_>) -> Result<String> {
+        let id = p.required_str("id")?;
+        let deleted = self.storage.investments.delete_portfolio(id).await?;
+        if deleted {
+            Ok(format!("Portfolio {id} and all its investments deleted."))
+        } else {
+            Err(ToolError::InvalidParams(format!("Portfolio not found: {id}")).into())
+        }
     }
 
     // ── Investment holdings ────────────────────────────────────────────────────
@@ -267,6 +279,16 @@ impl FinanceTool {
             "notes": updated.notes,
         });
         Ok(serde_json::to_string_pretty(&json!({"investment": investment})).unwrap())
+    }
+
+    async fn investment_delete(&self, p: &ParamExtractor<'_>) -> Result<String> {
+        let id = p.required_str("id")?;
+        let deleted = self.storage.investments.delete_investment(id).await?;
+        if deleted {
+            Ok(format!("Investment {id} and its transactions deleted."))
+        } else {
+            Err(ToolError::InvalidParams(format!("Investment not found: {id}")).into())
+        }
     }
 
     // ── Investment transactions ────────────────────────────────────────────────

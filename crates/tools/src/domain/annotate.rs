@@ -51,6 +51,21 @@ pub struct DeleteParams {
 }
 
 #[derive(Debug, ActionParams)]
+pub struct UpdateParams {
+    /// Annotation ID to update
+    #[param(required)]
+    pub id: String,
+    /// New content (replaces existing)
+    pub content: Option<String>,
+    /// Comma-separated tags (replaces existing)
+    pub tags: Option<String>,
+    /// Priority level (0=normal, 1=important, 2=critical)
+    pub priority: Option<i32>,
+    /// ISO8601 expiry timestamp. Pass empty string to clear.
+    pub expires_at: Option<String>,
+}
+
+#[derive(Debug, ActionParams)]
 pub struct SearchParams {
     /// Search query (full-text via FTS5)
     #[param(required)]
@@ -71,7 +86,7 @@ impl AnnotateTool {
 
 #[tool_actions(
     name = "annotate",
-    description = "Create, retrieve, list, delete, or search persistent annotations on any entity (tool, fact, rule, skill, project).",
+    description = "Create, retrieve, update, list, delete, or search persistent annotations on any entity (tool, fact, rule, skill, project).",
     category = "Memory",
     tags = "annotation,note,gotcha",
     cost = "Free"
@@ -117,6 +132,39 @@ impl AnnotateTool {
             "content": params.content,
         })
         .to_string())
+    }
+
+    #[action(name = "update")]
+    async fn handle_update(&self, params: UpdateParams, _ctx: &RoutingContext) -> Result<String> {
+        let existing = self
+            .repo
+            .get_by_id(&params.id)
+            .await
+            .map_err(|e| {
+                common::ToolError::ExecutionFailed(format!("Failed to get annotation: {e}"))
+            })?
+            .ok_or_else(|| {
+                common::ToolError::InvalidParams(format!("Annotation not found: {}", params.id))
+            })?;
+
+        let updated = Annotation {
+            content: params.content.unwrap_or(existing.content),
+            tags: params.tags.unwrap_or(existing.tags),
+            priority: params.priority.unwrap_or(existing.priority),
+            expires_at: match params.expires_at {
+                Some(s) if s.is_empty() => None,
+                Some(s) => Some(s),
+                None => existing.expires_at,
+            },
+            updated_at: chrono::Utc::now().to_rfc3339(),
+            ..existing
+        };
+
+        self.repo.upsert(&updated).await.map_err(|e| {
+            common::ToolError::ExecutionFailed(format!("Failed to update annotation: {e}"))
+        })?;
+
+        Ok(format!("Updated annotation {}", params.id))
     }
 
     #[action(name = "get")]
@@ -194,6 +242,15 @@ fn format_annotations(annotations: &[Annotation]) -> String {
         ));
         if !ann.tags.is_empty() {
             out.push_str(&format!("  tags: {}\n", ann.tags));
+        }
+        if let Some(ref exp) = ann.expires_at {
+            out.push_str(&format!("  expires: {}\n", exp));
+        }
+        if let Some(ref quote) = ann.quoted_text {
+            out.push_str(&format!("  quoted: {}\n", quote));
+        }
+        if let Some(ref suggestion) = ann.ai_suggestion {
+            out.push_str(&format!("  ai_suggestion: {}\n", suggestion));
         }
     }
     out

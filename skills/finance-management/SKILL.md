@@ -182,6 +182,17 @@ When a user's request crosses into another domain, hand off cleanly:
 | "notify me when budget exceeds 80%" | `automation` | Threshold + budget ID |
 | "tell my partner about the spending report" | `communication` | Formatted report summary |
 
+## Delete Operations
+
+Goals, liabilities, portfolios, investments, and allocation targets can be deleted:
+- `finance(action: "goal_delete", id: "...")`
+- `finance(action: "liability_delete", id: "...")`
+- `finance(action: "portfolio_delete", id: "...")` — cascades to investments + transactions
+- `finance(action: "investment_delete", id: "...")` — cascades to transactions
+- `finance(action: "allocation_target_delete", id: "...")`
+
+Use `goal_list` with `goal_status: "all"` to see completed/paused goals (default shows only active).
+
 ## Red Flags
 
 For amount conversion reference, see `scripts/validate_amount.md`.

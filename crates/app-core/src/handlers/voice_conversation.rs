@@ -635,6 +635,11 @@ impl VoiceConversationManager {
                 .upsert_voice_session(&session_key_str, &metadata)
                 .await;
             self.state.lock().await.session_title = title;
+            // Notify sidebar to refresh the thread title
+            self.emitter.emit_event(
+                "chat:thread_updated",
+                serde_json::json!({ "sessionKey": session_key_str }),
+            );
         }
 
         info!(

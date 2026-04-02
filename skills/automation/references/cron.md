@@ -27,7 +27,19 @@ cron(action="add", message="Time to take a break!", every_seconds=1200)
 cron(action="add", message="Check GitHub stars and report", every_seconds=600)
 cron(action="list")
 cron(action="remove", job_id="abc123")
+cron(action="enable", job_id="abc123")
+cron(action="disable", job_id="abc123")
+cron(action="run", job_id="abc123")
 ```
+
+## Actions
+
+- `add` — create a new scheduled job (requires `message` + `every_seconds` or `cron_expr`)
+- `list` — list all scheduled jobs
+- `remove` — delete a job by ID
+- `enable` — re-enable a disabled job
+- `disable` — pause a job without deleting it
+- `run` — manually trigger a job immediately
 
 ## Time Expressions
 

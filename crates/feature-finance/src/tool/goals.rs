@@ -27,13 +27,15 @@ impl FinanceTool {
     ) -> Result<String> {
         match action {
             "goal_create" => self.goal_create(p).await,
-            "goal_list" => self.goal_list().await,
+            "goal_list" => self.goal_list(p).await,
             "goal_update" => self.goal_update(p).await,
+            "goal_delete" => self.goal_delete(p).await,
             "goal_fire" => self.goal_fire(p).await,
             "goal_whatif" => self.goal_whatif(p).await,
             "liability_add" => self.liability_add(p).await,
             "liability_list" => self.liability_list().await,
             "liability_update" => self.liability_update(p).await,
+            "liability_delete" => self.liability_delete(p).await,
             "net_worth" => self.net_worth(p).await,
             _ => Err(ToolError::InvalidParams(format!("Unknown goal action: {action}")).into()),
         }
@@ -132,8 +134,12 @@ impl FinanceTool {
         Ok(serde_json::to_string_pretty(&result).unwrap())
     }
 
-    async fn goal_list(&self) -> Result<String> {
-        let rows = self.storage.goals.list_active().await?;
+    async fn goal_list(&self, p: &ParamExtractor<'_>) -> Result<String> {
+        let status = p.optional_str("goal_status")?;
+        let rows = match status {
+            Some("all") => self.storage.goals.list_all().await?,
+            _ => self.storage.goals.list_active().await?,
+        };
 
         if rows.is_empty() {
             return Ok("No active goals.".to_string());
@@ -169,10 +175,12 @@ impl FinanceTool {
 
     async fn goal_update(&self, p: &ParamExtractor<'_>) -> Result<String> {
         let id = p.required_str("id")?;
+        let name = p.optional_str("name")?.map(String::from);
         let current_amount = p.optional_i64("current_amount")?;
         let target_amount = p.optional_i64("target_amount")?;
         let monthly_contribution = p.optional_i64("monthly_contribution")?;
         let expected_return_rate = p.optional_f64("expected_return_rate")?;
+        let inflation_rate = p.optional_f64("inflation_rate")?;
         let deadline = p.optional_str("deadline")?.map(parse_date).transpose()?;
         let status = p
             .optional_str("status")?
@@ -182,10 +190,12 @@ impl FinanceTool {
             })
             .transpose()?;
 
-        if current_amount.is_none()
+        if name.is_none()
+            && current_amount.is_none()
             && target_amount.is_none()
             && monthly_contribution.is_none()
             && expected_return_rate.is_none()
+            && inflation_rate.is_none()
             && deadline.is_none()
             && status.is_none()
         {
@@ -194,12 +204,12 @@ impl FinanceTool {
 
         let patch = FinanceGoalPatch {
             id: id.to_string(),
-            name: None,
+            name,
             current_amount,
             target_amount,
             monthly_contribution: monthly_contribution.map(Some),
             expected_return_rate: expected_return_rate.map(Some),
-            inflation_rate: None,
+            inflation_rate: inflation_rate.map(Some),
             deadline: deadline.map(Some),
             status: status.map(|s| s.as_str().to_string()),
             base_target_amount: None,
@@ -241,6 +251,16 @@ impl FinanceTool {
         });
 
         Ok(serde_json::to_string_pretty(&result).unwrap())
+    }
+
+    async fn goal_delete(&self, p: &ParamExtractor<'_>) -> Result<String> {
+        let id = p.required_str("id")?;
+        let deleted = self.storage.goals.delete(id).await?;
+        if deleted {
+            Ok(format!("Goal {id} deleted."))
+        } else {
+            Err(ToolError::InvalidParams(format!("Goal not found: {id}")).into())
+        }
     }
 
     async fn goal_fire(&self, p: &ParamExtractor<'_>) -> Result<String> {
@@ -558,6 +578,16 @@ impl FinanceTool {
         });
 
         Ok(serde_json::to_string_pretty(&result).unwrap())
+    }
+
+    async fn liability_delete(&self, p: &ParamExtractor<'_>) -> Result<String> {
+        let id = p.required_str("id")?;
+        let deleted = self.storage.liabilities.delete(id).await?;
+        if deleted {
+            Ok(format!("Liability {id} deleted."))
+        } else {
+            Err(ToolError::InvalidParams(format!("Liability not found: {id}")).into())
+        }
     }
 
     async fn net_worth(&self, _p: &ParamExtractor<'_>) -> Result<String> {

@@ -62,6 +62,12 @@ pub trait CronHandler: Send + Sync {
 
     /// Remove a cron job by ID
     async fn remove_job(&self, job_id: &str) -> Result<bool>;
+
+    /// Enable or disable a cron job
+    async fn enable_job(&self, job_id: &str, enabled: bool) -> Result<bool>;
+
+    /// Manually trigger a cron job
+    async fn run_job(&self, job_id: &str) -> Result<bool>;
 }
 
 /// Tool for cron job management via the LLM agent.
@@ -96,7 +102,7 @@ impl Tool for CronTool {
     }
 
     fn description(&self) -> &str {
-        "Schedule reminders and recurring tasks. Actions: add, list, remove."
+        "Schedule reminders and recurring tasks. Actions: add, list, remove, enable, disable, run."
     }
 
     fn metadata(&self) -> tools_core::ToolMetadata {
@@ -114,7 +120,7 @@ impl Tool for CronTool {
             "properties": {
                 "action": {
                     "type": "string",
-                    "enum": ["add", "list", "remove"],
+                    "enum": ["add", "list", "remove", "enable", "disable", "run"],
                     "description": "Action to perform"
                 },
                 "name": {
@@ -135,7 +141,7 @@ impl Tool for CronTool {
                 },
                 "job_id": {
                     "type": "string",
-                    "description": "Job ID (for remove)"
+                    "description": "Job ID (for remove/enable/disable/run)"
                 }
             },
             "required": ["action"]
@@ -271,6 +277,30 @@ impl Tool for CronTool {
                     Ok(format!("Job not found: {}", job_id))
                 }
             }
+            "enable" => {
+                let job_id = p.required_str("job_id")?;
+                if handler.enable_job(job_id, true).await? {
+                    Ok(format!("Enabled job: {}", job_id))
+                } else {
+                    Ok(format!("Job not found: {}", job_id))
+                }
+            }
+            "disable" => {
+                let job_id = p.required_str("job_id")?;
+                if handler.enable_job(job_id, false).await? {
+                    Ok(format!("Disabled job: {}", job_id))
+                } else {
+                    Ok(format!("Job not found: {}", job_id))
+                }
+            }
+            "run" => {
+                let job_id = p.required_str("job_id")?;
+                if handler.run_job(job_id).await? {
+                    Ok(format!("Triggered job: {}", job_id))
+                } else {
+                    Ok(format!("Job not found or not runnable: {}", job_id))
+                }
+            }
             _ => Err(ToolError::InvalidParams(format!("Unknown action: {}", action)).into()),
         }
     }
@@ -312,6 +342,12 @@ mod tests {
             vec![]
         }
         async fn remove_job(&self, _job_id: &str) -> Result<bool> {
+            Ok(true)
+        }
+        async fn enable_job(&self, _job_id: &str, _enabled: bool) -> Result<bool> {
+            Ok(true)
+        }
+        async fn run_job(&self, _job_id: &str) -> Result<bool> {
             Ok(true)
         }
     }

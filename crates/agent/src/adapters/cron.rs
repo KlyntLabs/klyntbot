@@ -83,4 +83,15 @@ impl CronHandler for CronHandlerAdapter {
     async fn remove_job(&self, job_id: &str) -> Result<bool> {
         self.service.remove_job(job_id).await
     }
+
+    async fn enable_job(&self, job_id: &str, enabled: bool) -> Result<bool> {
+        match self.service.enable_job(job_id, enabled).await? {
+            Some(_) => Ok(true),
+            None => Ok(false),
+        }
+    }
+
+    async fn run_job(&self, job_id: &str) -> Result<bool> {
+        self.service.run_job(job_id, false).await
+    }
 }

@@ -122,17 +122,18 @@ impl Tool for FinanceTool {
          Actions: account_add, account_list, account_update, account_delete, \
          tx_add, tx_list, tx_update, tx_delete, tx_search, tx_recurring_add, \
          budget_create, budget_list, budget_status, budget_update, budget_delete, \
-         portfolio_create, portfolio_list, investment_add, investment_update, \
+         portfolio_create, portfolio_list, portfolio_delete, \
+         investment_add, investment_update, investment_delete, \
          investment_tx, investment_summary, price_fetch, price_refresh, \
          portfolio_drift, portfolio_rebalance, portfolio_returns, portfolio_correlation, \
-         liability_add, liability_list, liability_update, net_worth, \
-         goal_create, goal_list, goal_update, goal_fire, goal_whatif, \
+         liability_add, liability_list, liability_update, liability_delete, net_worth, \
+         goal_create, goal_list, goal_update, goal_delete, goal_fire, goal_whatif, \
          report_spending, report_income, report_trends, report_net_worth_history, \
          daily_review, analyze_spending_anomalies, analyze_spending_trends, \
          analyze_recurring_charges, analyze_category_correlation, \
          fire_traditional, fire_coast, fire_lean, fire_fat, \
          fire_withdrawal_sim, fire_backtest, fire_sensitivity, \
-         allocation_target_set, allocation_target_list, \
+         allocation_target_set, allocation_target_list, allocation_target_delete, \
          snapshot_record, snapshot_history, settings_get, settings_update."
     }
 
@@ -146,12 +147,12 @@ impl Tool for FinanceTool {
                         "account_add", "account_list", "account_update", "account_delete",
                         "tx_add", "tx_list", "tx_update", "tx_delete", "tx_search", "tx_recurring_add",
                         "budget_create", "budget_list", "budget_status", "budget_update", "budget_delete",
-                        "portfolio_create", "portfolio_list",
-                        "investment_add", "investment_update", "investment_tx", "investment_summary",
+                        "portfolio_create", "portfolio_list", "portfolio_delete",
+                        "investment_add", "investment_update", "investment_delete", "investment_tx", "investment_summary",
                         "price_fetch", "price_refresh",
                         "portfolio_drift", "portfolio_rebalance", "portfolio_returns", "portfolio_correlation",
-                        "liability_add", "liability_list", "liability_update", "net_worth",
-                        "goal_create", "goal_list", "goal_update", "goal_fire", "goal_whatif",
+                        "liability_add", "liability_list", "liability_update", "liability_delete", "net_worth",
+                        "goal_create", "goal_list", "goal_update", "goal_delete", "goal_fire", "goal_whatif",
                         "report_spending", "report_income", "report_trends", "report_net_worth_history",
                         "daily_review",
                         "finance_health_check",
@@ -159,7 +160,7 @@ impl Tool for FinanceTool {
                         "analyze_recurring_charges", "analyze_category_correlation",
                         "fire_traditional", "fire_coast", "fire_lean", "fire_fat",
                         "fire_withdrawal_sim", "fire_backtest", "fire_sensitivity",
-                        "allocation_target_set", "allocation_target_list",
+                        "allocation_target_set", "allocation_target_list", "allocation_target_delete",
                         "snapshot_record", "snapshot_history",
                         "settings_get", "settings_update"
                     ],
@@ -216,6 +217,7 @@ impl Tool for FinanceTool {
                 "monthly_payment": { "type": "integer" },
                 "due_date": { "type": "string" },
                 "goal_type": { "type": "string" },
+                "goal_status": { "type": "string", "enum": ["active", "completed", "paused", "all"], "description": "Goal status filter (for goal_list)" },
                 "target_amount": { "type": "integer" },
                 "current_amount": { "type": "integer" },
                 "deadline": { "type": "string" },
@@ -287,8 +289,10 @@ impl Tool for FinanceTool {
 
             "portfolio_create"
             | "portfolio_list"
+            | "portfolio_delete"
             | "investment_add"
             | "investment_update"
+            | "investment_delete"
             | "investment_tx"
             | "investment_summary"
             | "price_fetch"
@@ -298,10 +302,9 @@ impl Tool for FinanceTool {
             | "portfolio_returns"
             | "portfolio_correlation" => self.handle_investment(action, &p, ctx).await,
 
-            "goal_create" | "goal_list" | "goal_update" | "goal_fire" | "goal_whatif"
-            | "liability_add" | "liability_list" | "liability_update" | "net_worth" => {
-                self.handle_goal(action, &p, ctx).await
-            }
+            "goal_create" | "goal_list" | "goal_update" | "goal_delete" | "goal_fire"
+            | "goal_whatif" | "liability_add" | "liability_list" | "liability_update"
+            | "liability_delete" | "net_worth" => self.handle_goal(action, &p, ctx).await,
 
             "report_spending"
             | "report_income"
@@ -327,7 +330,7 @@ impl Tool for FinanceTool {
             | "fire_sensitivity" => self.handle_fire(action, &p, ctx).await,
 
             // Allocation targets
-            "allocation_target_set" | "allocation_target_list" => {
+            "allocation_target_set" | "allocation_target_list" | "allocation_target_delete" => {
                 self.handle_allocation(action, &p, ctx).await
             }
 

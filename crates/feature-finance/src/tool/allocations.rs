@@ -19,6 +19,7 @@ impl FinanceTool {
         match action {
             "allocation_target_set" => self.allocation_target_set(p).await,
             "allocation_target_list" => self.allocation_target_list(p).await,
+            "allocation_target_delete" => self.allocation_target_delete(p).await,
             _ => {
                 Err(ToolError::InvalidParams(format!("Unknown allocation action: {action}")).into())
             }
@@ -77,6 +78,12 @@ impl FinanceTool {
             "tolerance_band": row.tolerance_band,
         }))
         .unwrap())
+    }
+
+    async fn allocation_target_delete(&self, p: &ParamExtractor<'_>) -> Result<String> {
+        let id = p.required_str("id")?;
+        self.storage.allocations.delete(id).await?;
+        Ok(format!("Allocation target {id} deleted."))
     }
 
     async fn allocation_target_list(&self, p: &ParamExtractor<'_>) -> Result<String> {

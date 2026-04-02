@@ -61,7 +61,7 @@ and automated workflows using the cron system.
 | 1 | Is user asking for a one-time reminder? | Use cron with one-shot schedule | Go to step 2 |
 | 2 | Is it a recurring schedule? | Convert to cron expression or `every_seconds` | Go to step 3 |
 | 3 | Is the "reminder" actually a task that needs creating? | **Delegate to task-management** | Go to step 4 |
-| 4 | Is it about listing/managing existing jobs? | Use `cron(action: "list")` or `cron(action: "delete")` | Ask for clarification |
+| 4 | Is it about listing/managing existing jobs? | Use `cron(action: "list")`, `remove`, `enable`, `disable`, or `run` | Ask for clarification |
 
 ### When to Use Reminder Mode vs Task Mode
 

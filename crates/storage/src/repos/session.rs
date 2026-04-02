@@ -59,7 +59,8 @@ impl SessionRepo {
              VALUES (?1, ?2, 'voice', ?3, ?4)
              ON CONFLICT (key) DO UPDATE SET
                updated_at = ?4,
-               conversation_type = 'voice'
+               conversation_type = 'voice',
+               metadata = ?2
              RETURNING *",
         )
         .bind(key)

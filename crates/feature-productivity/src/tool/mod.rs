@@ -541,6 +541,8 @@ impl ProductivityTool {
         let name = p.required_str("name")?;
         let category_type_str = p.required_str("category_type")?;
         let category_type: CategoryType = category_type_str.parse()?;
+        let color = p.optional_str("color")?.map(|s| s.to_string());
+        let icon = p.optional_str("icon")?.map(|s| s.to_string());
 
         let app_names = p.string_array_or_empty("app_names")?;
         let bundle_ids = p.string_array_or_empty("bundle_ids")?;
@@ -556,8 +558,8 @@ impl ProductivityTool {
             id: id.to_string(),
             name: name.to_string(),
             category_type,
-            color: None,
-            icon: None,
+            color,
+            icon,
             rules: Some(rules),
             is_system: false,
         };

@@ -73,6 +73,7 @@ pub async fn chat_threads(
                 .metadata
                 .get("title")
                 .and_then(|v| v.as_str())
+                .filter(|t| !t.is_empty())
                 .unwrap_or(&s.key)
                 .to_string();
             let ctx = ctx_map.get(s.key.as_str());
