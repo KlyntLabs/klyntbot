@@ -14,8 +14,8 @@ use lancedb::Connection;
 
 use crate::error::StorageError;
 
-const LANCE_INDEX_CACHE_BYTES: usize = 16 * 1024 * 1024;
-const LANCE_METADATA_CACHE_BYTES: usize = 16 * 1024 * 1024;
+const LANCE_INDEX_CACHE_BYTES: usize = 8 * 1024 * 1024;
+const LANCE_METADATA_CACHE_BYTES: usize = 8 * 1024 * 1024;
 
 mod cognitive;
 mod community;
@@ -89,18 +89,82 @@ impl VectorStore {
             .await
             .map_err(|e| StorageError::Vector(format!("LanceDB list tables: {e}")))?;
 
-        store.ensure_table("todo_embeddings", schemas::todo_schema(), &existing).await?;
-        store.ensure_table("conv_embeddings", schemas::conv_schema(), &existing).await?;
-        store.ensure_table("cognitive_fact_embeddings", schemas::cognitive_fact_schema(), &existing).await?;
-        store.ensure_table("activity_embeddings", schemas::activity_embedding_schema(), &existing).await?;
-        store.ensure_table("work_context_embeddings", schemas::work_context_embedding_schema(), &existing).await?;
-        store.ensure_table("task_embeddings", schemas::task_embedding_schema(), &existing).await?;
-        store.ensure_table("note_embeddings", schemas::note_embedding_schema(), &existing).await?;
-        store.ensure_table("insight_embeddings", schemas::insight_embedding_schema(), &existing).await?;
-        store.ensure_table("entity_embeddings", schemas::entity_embedding_schema(), &existing).await?;
-        store.ensure_table("flashcard_embeddings", schemas::flashcard_embedding_schema(), &existing).await?;
-        store.ensure_table("tree_node_embeddings", schemas::tree_node_embedding_schema(), &existing).await?;
-        store.ensure_table("community_embeddings", schemas::community_embedding_schema(), &existing).await?;
+        store
+            .ensure_table("todo_embeddings", schemas::todo_schema(), &existing)
+            .await?;
+        store
+            .ensure_table("conv_embeddings", schemas::conv_schema(), &existing)
+            .await?;
+        store
+            .ensure_table(
+                "cognitive_fact_embeddings",
+                schemas::cognitive_fact_schema(),
+                &existing,
+            )
+            .await?;
+        store
+            .ensure_table(
+                "activity_embeddings",
+                schemas::activity_embedding_schema(),
+                &existing,
+            )
+            .await?;
+        store
+            .ensure_table(
+                "work_context_embeddings",
+                schemas::work_context_embedding_schema(),
+                &existing,
+            )
+            .await?;
+        store
+            .ensure_table(
+                "task_embeddings",
+                schemas::task_embedding_schema(),
+                &existing,
+            )
+            .await?;
+        store
+            .ensure_table(
+                "note_embeddings",
+                schemas::note_embedding_schema(),
+                &existing,
+            )
+            .await?;
+        store
+            .ensure_table(
+                "insight_embeddings",
+                schemas::insight_embedding_schema(),
+                &existing,
+            )
+            .await?;
+        store
+            .ensure_table(
+                "entity_embeddings",
+                schemas::entity_embedding_schema(),
+                &existing,
+            )
+            .await?;
+        store
+            .ensure_table(
+                "flashcard_embeddings",
+                schemas::flashcard_embedding_schema(),
+                &existing,
+            )
+            .await?;
+        store
+            .ensure_table(
+                "tree_node_embeddings",
+                schemas::tree_node_embedding_schema(),
+                &existing,
+            )
+            .await?;
+        store
+            .ensure_table(
+                "community_embeddings",
+                schemas::community_embedding_schema(),
+                &existing,
+            )
+            .await?;
         Ok(store)
     }
 

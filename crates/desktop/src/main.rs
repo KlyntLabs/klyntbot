@@ -3,12 +3,26 @@
 #[global_allocator]
 static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;
 
-// FFI binding for mimalloc's aggressive collection. The symbol is always
-// present when mimalloc is the global allocator — no extra crate needed.
+// FFI bindings for mimalloc tuning. The symbols are always present when
+// mimalloc is the global allocator — no extra crate needed.
 unsafe extern "C" {
     /// Force mimalloc to return freed pages to the OS.
     /// `force = true` aggressively collects across all thread-local heaps.
     fn mi_collect(force: bool);
+    /// Set a mimalloc runtime option. Returns true if successful.
+    fn mi_option_set(option: i32, value: i64) -> bool;
+}
+
+/// Configure mimalloc for minimal memory retention.
+fn configure_mimalloc() {
+    const MI_OPTION_PURGE_DELAY: i32 = 10;
+    const MI_OPTION_ARENA_PURGE_MULT: i32 = 24;
+    unsafe {
+        // Purge freed pages immediately instead of retaining them (default: 10ms).
+        mi_option_set(MI_OPTION_PURGE_DELAY, 0);
+        // Purge arena segments more aggressively (default: 10).
+        mi_option_set(MI_OPTION_ARENA_PURGE_MULT, 1);
+    }
 }
 
 mod app_core;
@@ -81,6 +95,7 @@ fn dismiss_on_blur(window: &tauri::WebviewWindow) {
 }
 
 fn main() {
+    configure_mimalloc();
     let cli = Cli::parse();
 
     match cli.command {
@@ -614,7 +629,7 @@ fn run_desktop_app() {
                 let shutdown = app.state::<Arc<app_core::AppCore>>().shutdown_token.clone();
                 tauri::async_runtime::spawn(async move {
                     let mut interval =
-                        tokio::time::interval(std::time::Duration::from_secs(60));
+                        tokio::time::interval(std::time::Duration::from_secs(30));
                     loop {
                         tokio::select! {
                             _ = shutdown.cancelled() => break,

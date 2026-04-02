@@ -63,19 +63,20 @@ fn dismiss_on_blur(window: &WebviewWindow) {
 // ── Per-window builders ──────────────────────────────────────────────
 
 fn build_launcher(app: &AppHandle) -> tauri::Result<WebviewWindow> {
-    let window = WebviewWindowBuilder::new(app, WINDOW_LAUNCHER, WebviewUrl::App("/#/launcher".into()))
-        .title("")
-        .inner_size(660.0, 580.0)
-        .resizable(false)
-        .decorations(false)
-        .visible(false)
-        .transparent(true)
-        .shadow(false)
-        .always_on_top(true)
-        .skip_taskbar(true)
-        .center()
-        .effects(hud_effects())
-        .build()?;
+    let window =
+        WebviewWindowBuilder::new(app, WINDOW_LAUNCHER, WebviewUrl::App("/#/launcher".into()))
+            .title("")
+            .inner_size(660.0, 580.0)
+            .resizable(false)
+            .decorations(false)
+            .visible(false)
+            .transparent(true)
+            .shadow(false)
+            .always_on_top(true)
+            .skip_taskbar(true)
+            .center()
+            .effects(hud_effects())
+            .build()?;
 
     // Enhanced dismiss-on-blur: hide + reset voice recording state
     let w = window.clone();

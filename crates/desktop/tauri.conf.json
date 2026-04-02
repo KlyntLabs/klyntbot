@@ -4,7 +4,10 @@
   "identifier": "com.klynt.app",
   "build": {
     "beforeDevCommand": "",
-    "beforeBuildCommand": "cd ../../desktop-ui && bun run build",
+    "beforeBuildCommand": {
+      "script": "bun run build",
+      "cwd": "../../desktop-ui"
+    },
     "devUrl": "http://localhost:1420",
     "frontendDist": "../../desktop-ui/dist"
   },
