@@ -1558,6 +1558,11 @@ impl VoiceConversationManager {
             }
             ConversationPhase::Idle => {
                 self.voice_service.set_conversation_active(false);
+                // Restore the general silence threshold (conversation mode uses a shorter one)
+                let general_silence = self.config.read().await.conversation.silence_threshold_secs;
+                self.voice_service.set_silence_duration(
+                    std::time::Duration::from_secs_f32(general_silence),
+                );
             }
             _ => {}
         }

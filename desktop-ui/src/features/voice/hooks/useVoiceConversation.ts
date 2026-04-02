@@ -1,6 +1,6 @@
 import { useEvent } from "@shared/hooks/useEvent";
 import { ipc } from "@shared/hooks/useIpc";
-import { playTtsAudio, stopTtsAudio } from "@shared/lib/audio";
+import { clearTtsQueue, enqueueTtsChunk, playTtsAudio, stopTtsAudio } from "@shared/lib/audio";
 import { isTauri } from "@shared/lib/utils";
 import { useCallback, useRef, useState } from "react";
 
@@ -116,8 +116,25 @@ export function useVoiceConversation() {
         }
         break;
       }
+      case "speakChunk": {
+        // Streaming TTS: enqueue each sentence chunk for sequential playback.
+        // In Tauri, audio plays natively via cpal — only enqueue in browser dev mode.
+        if (!isTauri) {
+          const base64 = payload.audioBase64 as string;
+          const sampleRate = (payload.sampleRate as number) ?? 24000;
+          enqueueTtsChunk(base64, sampleRate);
+        }
+        // Update ttsAudio state with latest chunk text for UI display
+        setTtsAudio({
+          base64: "",
+          sampleRate: (payload.sampleRate as number) ?? 24000,
+          text: payload.text as string,
+        });
+        break;
+      }
       case "ttsFadeOut":
         stopTtsAudio();
+        clearTtsQueue();
         // Delay clearing so CSS can animate a 300ms fade-out on the speaking visual
         setTimeout(() => setTtsAudio(null), 300);
         break;
@@ -193,6 +210,7 @@ export function useVoiceConversation() {
 
   const end = useCallback(async () => {
     stopTtsAudio();
+    clearTtsQueue();
     await ipc("voice_conversation_end");
     setPhase("idle");
     // Hide orb window if in Tauri
