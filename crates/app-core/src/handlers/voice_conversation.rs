@@ -152,28 +152,7 @@ pub fn tts_params_from_config(
     output: &config::schema::VoiceOutputConfig,
 ) -> voice_engine::TtsParams {
     match output.personas.get(&output.default_persona) {
-        Some(config::schema::VoicePersona::Preset {
-            speaker,
-            speed,
-            temperature,
-        }) => voice_engine::TtsParams {
-            voice_name: Some(speaker.clone()),
-            speaking_rate: *speed,
-            temperature: Some(*temperature),
-            instruct: None,
-            ..Default::default()
-        },
-        Some(config::schema::VoicePersona::Custom {
-            description,
-            speed,
-            temperature,
-        }) => voice_engine::TtsParams {
-            voice_name: None,
-            speaking_rate: *speed,
-            temperature: Some(*temperature),
-            instruct: Some(description.clone()),
-            ..Default::default()
-        },
+        Some(persona) => super::voice::tts_params_for_persona(persona),
         None => voice_engine::TtsParams {
             speaking_rate: output.speaking_rate,
             voice_name: output.voice_preferences.get("default").cloned(),

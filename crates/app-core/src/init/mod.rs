@@ -676,40 +676,33 @@ impl AppCore {
                             Some(Arc::new(manager) as Arc<dyn voice_engine::TtsEngine>)
                         }
                         config::schema::EngineDeployment::Local => {
-                            if let config::schema::TtsEngineKind::Qwen3 =
-                                voice_config.output.tts_engine
-                            {
-                                let model_dir = if has_custom_personas {
-                                    model_manager
-                                        .qwen3_tts_instruct_model_dir()
-                                        .or_else(|| model_manager.qwen3_tts_model_dir())
-                                } else {
+                            let model_dir = match voice_config.output.tts_engine {
+                                config::schema::TtsEngineKind::Qwen3 => model_manager
+                                    .qwen3_tts_instruct_model_dir()
+                                    .or_else(|| model_manager.qwen3_tts_model_dir()),
+                                config::schema::TtsEngineKind::Qwen3Base => {
                                     model_manager.qwen3_tts_model_dir()
-                                };
-                                if let Some(dir) = model_dir {
-                                    match voice_engine::Qwen3TtsEngine::new(&dir).await {
-                                        Ok(engine) => {
-                                            info!(
-                                                "Qwen3-TTS loaded — wrapping with system fallback"
-                                            );
-                                            let engine = Arc::new(engine);
-                                            qwen3_tts_ref = Some(Arc::clone(&engine));
-                                            let manager = voice_engine::TtsEngineManager::new(
-                                                engine,
-                                                Some(Arc::clone(&system_tts)
-                                                    as Arc<dyn voice_engine::TtsEngine>),
-                                            );
-                                            Some(Arc::new(manager)
-                                                as Arc<dyn voice_engine::TtsEngine>)
-                                        }
-                                        Err(e) => {
-                                            warn!("Qwen3-TTS failed, using system TTS: {e}");
+                                }
+                                config::schema::TtsEngineKind::System => None,
+                            };
+                            if let Some(dir) = model_dir {
+                                match voice_engine::Qwen3TtsEngine::new(&dir).await {
+                                    Ok(engine) => {
+                                        info!("Qwen3-TTS loaded — wrapping with system fallback");
+                                        let engine = Arc::new(engine);
+                                        qwen3_tts_ref = Some(Arc::clone(&engine));
+                                        let manager = voice_engine::TtsEngineManager::new(
+                                            engine,
                                             Some(Arc::clone(&system_tts)
-                                                as Arc<dyn voice_engine::TtsEngine>)
-                                        }
+                                                as Arc<dyn voice_engine::TtsEngine>),
+                                        );
+                                        Some(Arc::new(manager) as Arc<dyn voice_engine::TtsEngine>)
                                     }
-                                } else {
-                                    Some(Arc::clone(&system_tts) as Arc<dyn voice_engine::TtsEngine>)
+                                    Err(e) => {
+                                        warn!("Qwen3-TTS failed, using system TTS: {e}");
+                                        Some(Arc::clone(&system_tts)
+                                            as Arc<dyn voice_engine::TtsEngine>)
+                                    }
                                 }
                             } else {
                                 Some(Arc::clone(&system_tts) as Arc<dyn voice_engine::TtsEngine>)
@@ -726,15 +719,16 @@ impl AppCore {
                         silence_duration: std::time::Duration::from_secs_f32(
                             voice_config.input.silence_threshold_secs,
                         ),
+                        selected_device: voice_config.input.selected_device.clone(),
+                        noise_reduction: voice_config.input.noise_reduction,
                         ..Default::default()
                     },
-                    privacy_mode: match voice_config.input.privacy_mode {
-                        config::schema::VoicePrivacyMode::Standard => PrivacyLevel::Standard,
-                        config::schema::VoicePrivacyMode::Strict => PrivacyLevel::Strict,
-                        config::schema::VoicePrivacyMode::Off => PrivacyLevel::Off,
-                    },
+                    privacy_mode: crate::handlers::voice::privacy_level(
+                        voice_config.input.privacy_mode,
+                    ),
                     data_dir: data_dir.clone(),
                     native_audio: true,
+                    output_device: voice_config.output.selected_device.clone(),
                 };
 
                 let has_local_engine = stt_local.is_some();

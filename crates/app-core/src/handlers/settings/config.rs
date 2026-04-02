@@ -81,6 +81,11 @@ impl AppCore {
             *hot = config::HotConfig::from(&*cfg);
         }
 
+        // Propagate voice config changes to the live VoiceService
+        if section == "voice" {
+            self.propagate_voice_config(&cfg.voice);
+        }
+
         Ok(section_result)
     }
 

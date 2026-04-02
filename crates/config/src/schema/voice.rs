@@ -17,9 +17,11 @@ pub enum SttEngineKind {
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub enum TtsEngineKind {
-    /// Qwen3-TTS local or cloud (default).
+    /// Qwen3-TTS 1.7B CustomVoice — supports voice personas (default).
     #[default]
     Qwen3,
+    /// Qwen3-TTS 0.6B Base — single generic voice, no persona support.
+    Qwen3Base,
     /// macOS system TTS via AVSpeechSynthesizer.
     System,
 }
@@ -97,6 +99,14 @@ pub struct VoiceInputConfig {
     /// Prevents mispronunciation from triggering wrong-language transcripts.
     #[serde(default = "default_allowed_languages")]
     pub allowed_languages: Vec<String>,
+    /// Preferred input device name (None = system default).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub selected_device: Option<String>,
+    /// Enable RNNoise noise reduction (default: false).
+    /// Useful for noisy environments or built-in laptop mics.
+    /// High-quality mics may sound worse with this enabled.
+    #[serde(default)]
+    pub noise_reduction: bool,
 }
 
 impl Default for VoiceInputConfig {
@@ -110,6 +120,8 @@ impl Default for VoiceInputConfig {
             use_neural_vad: false,
             deployment: EngineDeployment::default(),
             allowed_languages: default_allowed_languages(),
+            selected_device: None,
+            noise_reduction: false,
         }
     }
 }
@@ -131,6 +143,9 @@ pub struct VoiceOutputConfig {
     /// Deployment mode: local model or cloud API.
     #[serde(default)]
     pub deployment: EngineDeployment,
+    /// Preferred output device name (None = system default).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub selected_device: Option<String>,
     /// Active voice persona key.
     #[serde(default = "default_persona_name")]
     pub default_persona: String,
@@ -148,6 +163,7 @@ impl Default for VoiceOutputConfig {
             speak_during_focus: false,
             tts_engine: TtsEngineKind::default(),
             deployment: EngineDeployment::default(),
+            selected_device: None,
             default_persona: default_persona_name(),
             personas: default_personas(),
         }
@@ -253,11 +269,13 @@ fn default_allowed_languages() -> Vec<String> {
 }
 
 fn default_personas() -> std::collections::HashMap<String, VoicePersona> {
+    // Qwen3-TTS-1.7B-CustomVoice preset speakers:
+    // serena, vivian, uncle_fu, ryan, aiden, ono_anna, sohee, eric, dylan
     let mut m = std::collections::HashMap::new();
     m.insert(
         "neutral".into(),
         VoicePersona::Preset {
-            speaker: "alloy".into(),
+            speaker: "serena".into(),
             speed: 1.0,
             temperature: 0.85,
         },
@@ -265,7 +283,7 @@ fn default_personas() -> std::collections::HashMap<String, VoicePersona> {
     m.insert(
         "professional".into(),
         VoicePersona::Preset {
-            speaker: "onyx".into(),
+            speaker: "ryan".into(),
             speed: 0.95,
             temperature: 0.8,
         },
@@ -273,7 +291,7 @@ fn default_personas() -> std::collections::HashMap<String, VoicePersona> {
     m.insert(
         "friendly".into(),
         VoicePersona::Preset {
-            speaker: "nova".into(),
+            speaker: "vivian".into(),
             speed: 1.0,
             temperature: 0.9,
         },
@@ -281,7 +299,7 @@ fn default_personas() -> std::collections::HashMap<String, VoicePersona> {
     m.insert(
         "calm".into(),
         VoicePersona::Preset {
-            speaker: "shimmer".into(),
+            speaker: "aiden".into(),
             speed: 0.9,
             temperature: 0.7,
         },
@@ -289,7 +307,7 @@ fn default_personas() -> std::collections::HashMap<String, VoicePersona> {
     m.insert(
         "energetic".into(),
         VoicePersona::Preset {
-            speaker: "echo".into(),
+            speaker: "dylan".into(),
             speed: 1.1,
             temperature: 0.95,
         },
@@ -297,7 +315,7 @@ fn default_personas() -> std::collections::HashMap<String, VoicePersona> {
     m.insert(
         "storyteller".into(),
         VoicePersona::Preset {
-            speaker: "fable".into(),
+            speaker: "eric".into(),
             speed: 0.92,
             temperature: 0.8,
         },

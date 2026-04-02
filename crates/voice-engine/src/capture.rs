@@ -24,6 +24,12 @@ pub struct CaptureConfig {
     pub silence_threshold: f32,
     /// Duration of continuous silence before auto-stop (default: 1.5s).
     pub silence_duration: Duration,
+    /// Preferred input device name (None = system default).
+    pub selected_device: Option<String>,
+    /// Enable RNNoise noise reduction (default: false).
+    /// Useful for noisy environments or built-in laptop mics.
+    /// High-quality mics (Shure, AirPods) may sound worse with this enabled.
+    pub noise_reduction: bool,
 }
 
 impl Default for CaptureConfig {
@@ -33,6 +39,8 @@ impl Default for CaptureConfig {
             channels: 1,
             silence_threshold: 0.01,
             silence_duration: Duration::from_millis(1500),
+            selected_device: None,
+            noise_reduction: false,
         }
     }
 }
@@ -53,34 +61,81 @@ pub struct CaptureSession {
 
 /// Audio capture subsystem wrapping cpal.
 pub struct AudioCapture {
-    config: CaptureConfig,
+    config: std::sync::RwLock<CaptureConfig>,
 }
 
 impl AudioCapture {
     pub fn new(config: CaptureConfig) -> Self {
-        Self { config }
+        Self {
+            config: std::sync::RwLock::new(config),
+        }
     }
 
-    /// List available input devices.
-    pub fn list_devices() -> Vec<String> {
+    /// Hot-update capture config (takes effect on next capture start).
+    pub fn update_config(&self, config: CaptureConfig) {
+        if let Ok(mut guard) = self.config.write() {
+            *guard = config;
+        }
+    }
+
+    /// Enumerate all audio devices in a single cpal host query.
+    /// Returns (input_names, output_names, default_input_name, default_output_name).
+    pub fn enumerate_devices() -> (Vec<String>, Vec<String>, Option<String>, Option<String>) {
         let host = cpal::default_host();
-        host.input_devices()
+        let input = host
+            .input_devices()
             .map(|devices| devices.filter_map(|d| d.name().ok()).collect())
-            .unwrap_or_default()
+            .unwrap_or_default();
+        let output = host
+            .output_devices()
+            .map(|devices| devices.filter_map(|d| d.name().ok()).collect())
+            .unwrap_or_default();
+        let default_in = host.default_input_device().and_then(|d| d.name().ok());
+        let default_out = host.default_output_device().and_then(|d| d.name().ok());
+        (input, output, default_in, default_out)
     }
 
-    /// Start capturing audio from the default input device.
+    /// Resolve the input device by name, falling back to system default.
+    fn resolve_input_device(name: Option<&str>) -> common::Result<cpal::Device> {
+        let host = cpal::default_host();
+        if let Some(name) = name {
+            if let Ok(devices) = host.input_devices() {
+                for d in devices {
+                    if d.name().ok().as_deref() == Some(name) {
+                        return Ok(d);
+                    }
+                }
+                debug!(
+                    "Selected input device '{}' not found, falling back to default",
+                    name
+                );
+            }
+        }
+        host.default_input_device().ok_or_else(|| {
+            common::KlyntbotError::Channel(common::ChannelError::ConnectionFailed(
+                "No audio input device found".to_string(),
+            ))
+        })
+    }
+
+    /// Start capturing audio from the configured input device.
     ///
     /// Returns a `CaptureSession` with receivers for audio chunks, RMS levels,
     /// and silence detection. The capture runs until the session is dropped
     /// or `stop()` is called.
     pub fn start(&self) -> common::Result<CaptureSession> {
-        let host = cpal::default_host();
-        let device = host.default_input_device().ok_or_else(|| {
-            common::KlyntbotError::Channel(common::ChannelError::ConnectionFailed(
-                "No audio input device found".to_string(),
-            ))
-        })?;
+        // Snapshot config at capture start — hot-reloaded values take effect here.
+        let cfg = self
+            .config
+            .read()
+            .map_err(|_| {
+                common::KlyntbotError::Channel(common::ChannelError::ConnectionFailed(
+                    "Capture config lock poisoned".to_string(),
+                ))
+            })?
+            .clone();
+
+        let device = Self::resolve_input_device(cfg.selected_device.as_deref())?;
 
         let device_name = device.name().unwrap_or_else(|_| "unknown".to_string());
         info!("Opening audio input: {}", device_name);
@@ -98,7 +153,7 @@ impl AudioCapture {
         let native_channels = default_config.channels();
         info!(
             "Device native config: {}Hz, {} ch (target: {}Hz)",
-            native_sample_rate, native_channels, self.config.sample_rate
+            native_sample_rate, native_channels, cfg.sample_rate
         );
 
         let stream_config = cpal::StreamConfig {
@@ -117,10 +172,11 @@ impl AudioCapture {
         let stop_signal = Arc::new(AtomicBool::new(false));
         let stop_signal_cb = stop_signal.clone();
 
-        let silence_threshold = self.config.silence_threshold;
-        let silence_duration = self.config.silence_duration;
-        let target_sample_rate = self.config.sample_rate;
+        let silence_threshold = cfg.silence_threshold;
+        let silence_duration = cfg.silence_duration;
+        let target_sample_rate = cfg.sample_rate;
         let num_channels = native_channels;
+        let noise_reduction = cfg.noise_reduction;
 
         // State for silence detection (lives in the audio callback thread).
         // `has_heard_voice` ensures we don't fire silence until the user has
@@ -172,11 +228,12 @@ impl AudioCapture {
                     let (downsampled, is_speech) = {
                         if let Ok(mut guard) = dsp_state.lock() {
                             let (ref mut vad_proc, ref mut denoise, ref mut vad_buf) = *guard;
-                            // RNNoise denoising — disabled by default. High-quality mics
-                            // (Shure MV7+, AirPods) don't need it, and the denoiser can
-                            // attenuate clean speech. TODO: make configurable via config.
-                            let denoised = mono;
-                            let _ = denoise; // keep state alive for future use
+                            // RNNoise operates on 48kHz mono — run before downsampling.
+                            let denoised = if noise_reduction && native_sample_rate == 48000 {
+                                crate::dsp::denoise_48khz(denoise, &mono)
+                            } else {
+                                mono
+                            };
                             let ds = if native_sample_rate != target_sample_rate {
                                 crate::dsp::downsample_with_filter(
                                     &denoised,
@@ -266,7 +323,7 @@ impl AudioCapture {
 
         debug!(
             "Audio capture started: {}Hz, {} ch",
-            self.config.sample_rate, self.config.channels
+            cfg.sample_rate, cfg.channels
         );
 
         Ok(CaptureSession {
@@ -434,6 +491,6 @@ mod tests {
     #[test]
     fn list_devices_does_not_panic() {
         // Just verify it doesn't crash -- may return empty on CI
-        let _ = AudioCapture::list_devices();
+        let _ = AudioCapture::enumerate_devices();
     }
 }

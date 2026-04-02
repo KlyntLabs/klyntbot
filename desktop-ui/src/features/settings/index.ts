@@ -16,4 +16,5 @@ export { LauncherSettings } from "./pages/LauncherSettings";
 export { McpServersSettings } from "./pages/McpServersSettings";
 export { PersonalizationSettings } from "./pages/PersonalizationSettings";
 export { TasksSettings } from "./pages/TasksSettings";
+export { VoiceSettings } from "./pages/VoiceSettings";
 export { WorkContextSettings } from "./pages/WorkContextSettings";

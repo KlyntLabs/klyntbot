@@ -23,8 +23,7 @@ struct InnerState {
 }
 
 pub struct Qwen3AsrEngine {
-    /// Parent models directory (e.g., `~/.klyntbot/models/`).
-    /// `from_pretrained` will create `{models_dir}/Qwen--Qwen3-ASR-0.6B/` inside.
+    /// Parent models directory. `from_pretrained` caches to a subdirectory inside.
     models_dir: PathBuf,
     state: Arc<Mutex<InnerState>>,
     allowed_languages: Vec<String>,
@@ -46,9 +45,11 @@ fn normalize_language(lang: &str) -> &str {
 }
 
 impl Qwen3AsrEngine {
-    /// Create a new Qwen3-ASR engine. `models_dir` is the parent models directory
-    /// (e.g., `~/.klyntbot/models/`). The model will be auto-downloaded on first use
-    /// via `from_pretrained` if not already cached.
+    /// Create a new Qwen3-ASR engine.
+    ///
+    /// `models_dir` is the parent models directory (e.g., `~/.klyntbot/models/`).
+    /// `from_pretrained` caches to `{models_dir}/Qwen--Qwen3-ASR-0.6B/` and builds
+    /// the tokenizer from raw components. The model is lazily loaded on first use.
     pub fn new(
         models_dir: impl Into<PathBuf>,
         allowed_languages: Vec<String>,
@@ -69,8 +70,8 @@ impl Qwen3AsrEngine {
         })
     }
 
-    /// Load model via `from_pretrained` which handles tokenizer reconstruction
-    /// and model download if needed.
+    /// Load model via `from_pretrained` which downloads (if needed) and builds
+    /// the tokenizer from raw components (vocab.json + merges.txt).
     fn load_model(models_dir: &std::path::Path) -> Result<qwen3_asr::AsrInference, String> {
         let device = qwen3_asr::best_device();
         qwen3_asr::AsrInference::from_pretrained("Qwen/Qwen3-ASR-0.6B", models_dir, device)

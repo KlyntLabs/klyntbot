@@ -132,6 +132,9 @@ const LauncherSettings = lazy(() =>
 const WorkContextSettings = lazy(() =>
   import("../features/settings").then((m) => ({ default: m.WorkContextSettings })),
 );
+const VoiceSettings = lazy(() =>
+  import("../features/settings").then((m) => ({ default: m.VoiceSettings })),
+);
 
 // (Debug feature — now integrated into System page)
 
@@ -286,6 +289,14 @@ export const router = createHashRouter([
         element: (
           <SettingsLayout>
             <PersonalizationSettings />
+          </SettingsLayout>
+        ),
+      },
+      {
+        path: "/settings/voice",
+        element: (
+          <SettingsLayout>
+            <VoiceSettings />
           </SettingsLayout>
         ),
       },

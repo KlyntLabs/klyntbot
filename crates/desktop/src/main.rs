@@ -765,6 +765,11 @@ fn run_desktop_app() {
             commands::voice::voice_start_dictation,
             commands::voice::voice_stop_dictation,
             commands::voice::voice_simulate_event,
+            commands::voice::voice_list_devices,
+            commands::voice::voice_model_status,
+            commands::voice::voice_download_model,
+            commands::voice::voice_delete_model,
+            commands::voice::voice_test_persona,
             // Voice Conversation
             commands::voice_conversation::voice_conversation_start,
             commands::voice_conversation::voice_conversation_pause,

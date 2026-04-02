@@ -51,6 +51,16 @@ impl Qwen3Model {
             Self::Asr => "Qwen3-ASR-0.6B",
         }
     }
+
+    /// Parse an API model key ("asr", "tts", "ttsInstruct") into a variant.
+    pub fn from_api_key(key: &str) -> Option<Self> {
+        match key {
+            "asr" => Some(Self::Asr),
+            "tts" => Some(Self::Tts),
+            "ttsInstruct" => Some(Self::TtsInstruct),
+            _ => None,
+        }
+    }
 }
 
 /// File entry from HuggingFace API tree listing.
@@ -77,6 +87,14 @@ impl ModelManager {
         &self.models_dir
     }
 
+    /// Returns the parent data directory (e.g., `~/.klyntbot/`).
+    pub fn data_dir(&self) -> PathBuf {
+        self.models_dir
+            .parent()
+            .unwrap_or(Path::new("."))
+            .to_path_buf()
+    }
+
     /// Check if Qwen3-TTS model exists.
     pub fn qwen3_tts_model_dir(&self) -> Option<PathBuf> {
         self.model_dir(Qwen3Model::Tts)
@@ -93,14 +111,21 @@ impl ModelManager {
     }
 
     /// Check if a model directory exists and has a completion marker.
+    /// For ASR, also checks the `from_pretrained` cache path (`Qwen--*`).
     fn model_dir(&self, model: Qwen3Model) -> Option<PathBuf> {
+        // Check ModelManager download path first
         let dir = self.models_dir.join(model.dir_name());
-        // Only consider complete if the marker file exists
         if dir.join(".complete").exists() {
-            Some(dir)
-        } else {
-            None
+            return Some(dir);
         }
+        // For ASR, also check from_pretrained cache path
+        if matches!(model, Qwen3Model::Asr) {
+            let hf_dir = self.models_dir.join(model.repo_id().replace('/', "--"));
+            if hf_dir.join(".complete").exists() {
+                return Some(hf_dir);
+            }
+        }
+        None
     }
 
     /// Download a Qwen3 model from HuggingFace if not already present.

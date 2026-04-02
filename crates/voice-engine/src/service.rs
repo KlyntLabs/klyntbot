@@ -55,15 +55,19 @@ enum AudioCommand {
 }
 
 /// Persistent audio output player. Runs a dedicated thread that receives
-/// audio via a channel and plays through the system default output device.
+/// audio via a channel and plays through the configured output device.
 pub struct AudioPlayer {
     tx: std::sync::mpsc::Sender<AudioCommand>,
     _thread: std::thread::JoinHandle<()>,
+    /// Shared output device name — updated on config hot-reload.
+    output_device: Arc<std::sync::RwLock<Option<String>>>,
 }
 
 impl AudioPlayer {
-    pub fn new() -> Self {
+    pub fn new(output_device: Option<String>) -> Self {
         let (tx, rx) = std::sync::mpsc::channel::<AudioCommand>();
+        let device_ref = Arc::new(std::sync::RwLock::new(output_device));
+        let device_ref_thread = device_ref.clone();
 
         let thread = std::thread::spawn(move || {
             use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
@@ -76,8 +80,19 @@ impl AudioPlayer {
                         done_tx,
                     } => {
                         let host = cpal::default_host();
-                        let Some(device) = host.default_output_device() else {
-                            warn!("No default audio output device");
+                        let preferred = device_ref_thread.read().ok().and_then(|g| g.clone());
+                        let device = preferred
+                            .as_deref()
+                            .and_then(|name| {
+                                host.output_devices().ok().and_then(|devices| {
+                                    devices
+                                        .into_iter()
+                                        .find(|d| d.name().ok().as_deref() == Some(name))
+                                })
+                            })
+                            .or_else(|| host.default_output_device());
+                        let Some(device) = device else {
+                            warn!("No audio output device available");
                             let _ = done_tx.send(());
                             continue;
                         };
@@ -147,6 +162,7 @@ impl AudioPlayer {
         Self {
             tx,
             _thread: thread,
+            output_device: device_ref,
         }
     }
 
@@ -165,6 +181,13 @@ impl AudioPlayer {
     pub fn stop(&self) {
         let _ = self.tx.send(AudioCommand::Stop);
     }
+
+    /// Update the preferred output device (takes effect on next play).
+    pub fn set_output_device(&self, device: Option<String>) {
+        if let Ok(mut guard) = self.output_device.write() {
+            *guard = device;
+        }
+    }
 }
 
 /// Configuration for the VoiceService.
@@ -176,6 +199,8 @@ pub struct VoiceServiceConfig {
     pub data_dir: PathBuf,
     /// When true, audio plays natively via cpal and base64 encoding is skipped.
     pub native_audio: bool,
+    /// Preferred output device name (None = system default).
+    pub output_device: Option<String>,
 }
 
 impl Default for VoiceServiceConfig {
@@ -185,6 +210,7 @@ impl Default for VoiceServiceConfig {
             privacy_mode: PrivacyLevel::Standard,
             data_dir: PathBuf::from("."),
             native_audio: false,
+            output_device: None,
         }
     }
 }
@@ -233,7 +259,7 @@ pub struct VoiceService {
     capture: AudioCapture,
     model_manager: ModelManager,
     router: VoiceRouter,
-    config: VoiceServiceConfig,
+    config: std::sync::RwLock<VoiceServiceConfig>,
 
     /// Current active session (at most one at a time).
     active_session: Arc<Mutex<Option<ActiveSession>>>,
@@ -276,6 +302,7 @@ impl VoiceService {
         config: VoiceServiceConfig,
     ) -> Self {
         let (event_tx, event_rx) = mpsc::channel(128);
+        let audio_player = AudioPlayer::new(config.output_device.clone());
 
         Self {
             stt_local: std::sync::RwLock::new(stt_local),
@@ -285,7 +312,7 @@ impl VoiceService {
             capture: AudioCapture::new(config.capture.clone()),
             model_manager,
             router: VoiceRouter::new(),
-            config,
+            config: std::sync::RwLock::new(config),
             active_session: Arc::new(Mutex::new(None)),
             event_tx,
             event_rx: Arc::new(std::sync::Mutex::new(Some(event_rx))),
@@ -293,7 +320,7 @@ impl VoiceService {
             echo_fired_this_session: AtomicBool::new(false),
             silence_detected: Arc::new(AtomicBool::new(false)),
             conversation_active: Arc::new(AtomicBool::new(false)),
-            audio_player: AudioPlayer::new(),
+            audio_player,
         }
     }
 
@@ -302,6 +329,42 @@ impl VoiceService {
     /// Synchronous — safe to call from non-async init code.
     pub fn take_event_rx(&self) -> Option<mpsc::Receiver<VoiceEvent>> {
         self.event_rx.lock().ok()?.take()
+    }
+
+    /// Access the model manager for status checks and downloads.
+    pub fn model_manager(&self) -> &ModelManager {
+        &self.model_manager
+    }
+
+    /// Read a snapshot of the current service config.
+    fn cfg(&self) -> VoiceServiceConfig {
+        self.config.read().map(|g| g.clone()).unwrap_or_default()
+    }
+
+    /// Returns true if the STT engine is loaded and ready.
+    pub fn is_stt_loaded(&self) -> bool {
+        self.stt_local.read().ok().is_some_and(|g| g.is_some())
+    }
+
+    /// Returns true if the TTS engine is loaded and ready.
+    pub fn is_tts_loaded(&self) -> bool {
+        self.tts.read().ok().is_some_and(|g| g.is_some())
+    }
+
+    /// Stop any in-progress audio playback.
+    pub fn stop_playback(&self) {
+        self.audio_player.stop();
+    }
+
+    /// Hot-reload voice config. Updates capture config, output device, and
+    /// service config so changes take effect on the next operation.
+    pub fn update_config(&self, new_config: VoiceServiceConfig) {
+        self.capture.update_config(new_config.capture.clone());
+        self.audio_player
+            .set_output_device(new_config.output_device.clone());
+        if let Ok(mut guard) = self.config.write() {
+            *guard = new_config;
+        }
     }
 
     /// Get current session state.
@@ -592,7 +655,7 @@ impl VoiceService {
 
             // Memory echo: fire once per turn on the first partial with ≥3 words.
             // Skip entirely in Strict privacy mode.
-            if self.config.privacy_mode != PrivacyLevel::Strict
+            if self.cfg().privacy_mode != PrivacyLevel::Strict
                 && partial.text.split_whitespace().count() >= 3
                 && !self.echo_fired_this_session.swap(true, Ordering::Relaxed)
             {
@@ -652,7 +715,7 @@ impl VoiceService {
         // TODO: tee the audio stream during capture to actually write the WAV file.
         // For now we prepare the path so downstream consumers can check for it.
         let audio_ref = {
-            let audio_dir = self.config.data_dir.join("voice_captures");
+            let audio_dir = self.cfg().data_dir.join("voice_captures");
             let _ = tokio::fs::create_dir_all(&audio_dir).await;
             let filename = format!("{}.wav", session.id);
             let path = audio_dir.join(filename);
@@ -670,7 +733,7 @@ impl VoiceService {
             audio_ref,
             duration,
             engine: engine_kind,
-            privacy_mode: self.config.privacy_mode,
+            privacy_mode: self.cfg().privacy_mode,
         };
 
         // Reuse cached intents from the last partial instead of re-detecting.
@@ -764,20 +827,21 @@ impl VoiceService {
                         Ok(None)
                     }
                     Ok(clip) => {
+                        let native_audio = self.cfg().native_audio;
                         info!(
                             "TTS: {} samples at {}Hz, emitting SpeakResponse (native_audio={})",
                             clip.samples.len(),
                             clip.sample_rate,
-                            self.config.native_audio
+                            native_audio
                         );
                         // Encode before any move of clip.samples.
-                        let audio_base64 = if self.config.native_audio {
+                        let audio_base64 = if native_audio {
                             String::new()
                         } else {
                             base64_encode_audio(&clip)
                         };
                         let sample_rate = clip.sample_rate;
-                        let playback_rx = if self.config.native_audio {
+                        let playback_rx = if native_audio {
                             Some(self.audio_player.play(clip.samples, clip.sample_rate))
                         } else {
                             None
