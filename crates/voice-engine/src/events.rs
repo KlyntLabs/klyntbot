@@ -61,6 +61,22 @@ pub enum VoiceEvent {
         sample_rate: u32,
         text: String,
     },
+    /// One sentence of TTS audio in the streaming pipeline.
+    SpeakChunk {
+        /// Base64-encoded audio (empty when native_audio is true).
+        #[serde(rename = "audioBase64")]
+        audio_base64: String,
+        #[serde(rename = "sampleRate")]
+        sample_rate: u32,
+        /// The sentence text that was synthesized.
+        text: String,
+        /// 0-based index of this chunk in the response.
+        #[serde(rename = "chunkIndex")]
+        chunk_index: u32,
+        /// True if this is the last chunk.
+        #[serde(rename = "isFinal")]
+        is_final: bool,
+    },
     Error {
         message: String,
         recoverable: bool,

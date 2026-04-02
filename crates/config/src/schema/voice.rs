@@ -209,6 +209,14 @@ pub struct VoiceConversationConfig {
     /// Variable pause after response based on length (default: true)
     #[serde(default = "default_true")]
     pub adaptive_breath: bool,
+    /// Stream TTS sentence-by-sentence during LLM generation (default: true).
+    /// When false, waits for the complete response before synthesizing.
+    #[serde(default = "default_true")]
+    pub streaming_tts: bool,
+    /// Silence duration for conversation mode (default: 0.8s).
+    /// Shorter than the general silence_threshold_secs (1.5s) for faster turn-taking.
+    #[serde(default = "default_conversation_silence")]
+    pub conversation_silence_secs: f32,
 }
 
 impl Default for VoiceConversationConfig {
@@ -219,6 +227,8 @@ impl Default for VoiceConversationConfig {
             silence_threshold_secs: 1.5,
             auto_resume: true,
             adaptive_breath: true,
+            streaming_tts: true,
+            conversation_silence_secs: default_conversation_silence(),
         }
     }
 }
@@ -246,6 +256,10 @@ fn default_voice_hotkey() -> String {
 
 fn default_silence_threshold() -> f32 {
     1.5
+}
+
+fn default_conversation_silence() -> f32 {
+    0.8
 }
 
 fn default_speaking_rate() -> f32 {
