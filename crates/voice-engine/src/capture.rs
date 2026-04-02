@@ -172,11 +172,11 @@ impl AudioCapture {
                     let (downsampled, is_speech) = {
                         if let Ok(mut guard) = dsp_state.lock() {
                             let (ref mut vad_proc, ref mut denoise, ref mut vad_buf) = *guard;
-                            let denoised = if native_sample_rate == 48000 {
-                                crate::dsp::denoise_48khz(denoise, &mono)
-                            } else {
-                                mono
-                            };
+                            // RNNoise denoising — disabled by default. High-quality mics
+                            // (Shure MV7+, AirPods) don't need it, and the denoiser can
+                            // attenuate clean speech. TODO: make configurable via config.
+                            let denoised = mono;
+                            let _ = denoise; // keep state alive for future use
                             let ds = if native_sample_rate != target_sample_rate {
                                 crate::dsp::downsample_with_filter(
                                     &denoised,
