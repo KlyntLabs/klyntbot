@@ -8,7 +8,7 @@ use std::collections::HashSet;
 /// 2. **Content match**: the fact's object field contains the known fact's key terms
 ///    (handles heuristic extraction which stores the full message as the object)
 ///
-/// A fact counts as retained if any unsuperseded FTS result matches via either strategy.
+/// Fetches all active facts in a single query instead of issuing one FTS query per known fact.
 pub async fn measure_knowledge_retention(
     repo: &cognitive::SemanticFactRepo,
     known_facts: &[FactTriple],
@@ -17,32 +17,22 @@ pub async fn measure_knowledge_retention(
         return 1.0;
     }
 
+    // Single query: get ALL unsuperseded facts
+    let all_facts = repo.list_all_active().await.unwrap_or_default();
+
     let mut found = 0u32;
-
     for fact in known_facts {
-        let query = format!("{} {} {}", fact.subject, fact.predicate, fact.object);
-        let results = match repo.search_fts(&query, None, 10).await {
-            Ok(r) => r,
-            Err(_) => continue,
-        };
-
-        let retained = results.iter().any(|r| {
-            if r.superseded_at.is_some() {
-                return false;
-            }
+        let retained = all_facts.iter().any(|r| {
             // Strategy 1: exact triple match
             if r.subject == fact.subject && r.predicate == fact.predicate && r.object == fact.object
             {
                 return true;
             }
-            // Strategy 2: content match — the stored fact's object contains
-            // the key terms from the known fact (handles heuristic extraction
-            // where object = full message content)
+            // Strategy 2: content match
             let obj_lower = r.object.to_lowercase();
             obj_lower.contains(&fact.predicate.to_lowercase())
                 && obj_lower.contains(&fact.object.to_lowercase())
         });
-
         if retained {
             found += 1;
         }

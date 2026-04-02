@@ -1,0 +1,58 @@
+[persona]
+name = "confused_new_user"
+timezone = "UTC"
+language = "en"
+seed = 777
+
+[persona.messages_per_day]
+onboarding = 10
+routine = 6
+power_user = 4
+shift = 3
+
+[persona.profile]
+known_facts = [
+    { subject = "user", predicate = "experience_level", object = "beginner" },
+    { subject = "user", predicate = "goal", object = "get organized" },
+]
+
+[persona.phases.onboarding]
+duration_days = 21
+correction_rate = 0.40
+topic_weights = { tasks = 0.3, chat = 0.4, notes = 0.2, finance = 0.1 }
+new_fact_introduction_rate = 0.7
+tool_action_rate = 0.3
+
+[persona.phases.routine]
+duration_days = 30
+correction_rate = 0.20
+topic_weights = { tasks = 0.4, notes = 0.3, chat = 0.2, finance = 0.1 }
+new_fact_introduction_rate = 0.2
+tool_action_rate = 0.5
+
+[persona.phases.power_user]
+duration_days = 20
+correction_rate = 0.08
+topic_weights = { tasks = 0.3, notes = 0.2, productivity = 0.2, finance = 0.2, chat = 0.1 }
+new_fact_introduction_rate = 0.05
+tool_action_rate = 0.7
+
+[persona.phases.behavior_shift]
+duration_days = 10
+correction_rate = 0.05
+shift_description = "User becomes confident"
+topic_weights = { tasks = 0.3, notes = 0.2, productivity = 0.2, automation = 0.2, chat = 0.1 }
+new_fact_introduction_rate = 0.05
+tool_action_rate = 0.8
+
+[[checkpoints]]
+at_day = 21
+assertions = [
+    { type = "metric_above", metric = "correction_rate", threshold = 0.0 },
+]
+
+[[checkpoints]]
+at_day = 81
+assertions = [
+    { type = "metric_above", metric = "personalization_score", threshold = 0.0 },
+]

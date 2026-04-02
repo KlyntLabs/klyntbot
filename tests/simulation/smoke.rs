@@ -1,13 +1,31 @@
 use std::sync::Arc;
 
-use cognitive::{ConsolidationHandler, ExtractionHandler};
+use cognitive::{ConsolidationHandler, ExtractionHandler, ReflectionHandler};
 use klyntbot::agent::cognitive_handlers::{
-    HeuristicConsolidationHandler, HeuristicExtractionHandler,
+    HeuristicConsolidationHandler, HeuristicExtractionHandler, HeuristicReflectionHandler,
 };
 use simulator::harness::SimulationHarness;
+use simulator::providers::HeuristicNarrativeHandler;
+use simulator::report::SimulationReport;
 use simulator::scenario::Scenario;
 
-// ── Smoke test scenario (7 days) ────────────────────────────────────
+// ── Shared helper ──────────────────────────────────────────────────────
+
+async fn run_scenario(toml: &str) -> SimulationReport {
+    let scenario = Scenario::from_toml(toml).unwrap();
+    let extraction: Arc<dyn ExtractionHandler> = Arc::new(HeuristicExtractionHandler);
+    let consolidation: Arc<dyn ConsolidationHandler> = Arc::new(HeuristicConsolidationHandler);
+    let reflection: Arc<dyn ReflectionHandler> = Arc::new(HeuristicReflectionHandler);
+    let narrative: Arc<dyn cognitive::mirror::NarrativeHandler> =
+        Arc::new(HeuristicNarrativeHandler);
+    let harness =
+        SimulationHarness::new(scenario, extraction, consolidation, reflection, narrative)
+            .await
+            .unwrap();
+    harness.run().await.unwrap()
+}
+
+// ── Smoke test scenario (7 days) ────────────────────────────────────────
 
 const SMOKE_SCENARIO_TOML: &str = r#"
 [persona]
@@ -66,17 +84,7 @@ assertions = [
 
 #[tokio::test]
 async fn smoke_test_7_day_simulation() {
-    let scenario = Scenario::from_toml(SMOKE_SCENARIO_TOML).unwrap();
-    assert_eq!(scenario.total_days(), 7);
-
-    let extraction: Arc<dyn ExtractionHandler> = Arc::new(HeuristicExtractionHandler);
-    let consolidation: Arc<dyn ConsolidationHandler> = Arc::new(HeuristicConsolidationHandler);
-
-    let harness = SimulationHarness::new(scenario, extraction, consolidation)
-        .await
-        .unwrap();
-
-    let report = harness.run().await.unwrap();
+    let report = run_scenario(SMOKE_SCENARIO_TOML).await;
 
     assert!(
         report.summary.total_messages > 0,
@@ -107,17 +115,7 @@ async fn scenario_12mo_parses() {
 
 #[tokio::test]
 async fn run_software_engineer_12mo() {
-    let toml_content = include_str!("scenarios/software_engineer_12mo.toml");
-    let scenario = Scenario::from_toml(toml_content).unwrap();
-
-    let extraction: Arc<dyn ExtractionHandler> = Arc::new(HeuristicExtractionHandler);
-    let consolidation: Arc<dyn ConsolidationHandler> = Arc::new(HeuristicConsolidationHandler);
-
-    let harness = SimulationHarness::new(scenario, extraction, consolidation)
-        .await
-        .unwrap();
-
-    let report = harness.run().await.unwrap();
+    let report = run_scenario(include_str!("scenarios/software_engineer_12mo.toml")).await;
 
     // Write JSON report
     let output_dir = std::env::var("SIMULATION_OUTPUT_DIR")
@@ -216,4 +214,85 @@ async fn run_software_engineer_12mo() {
 
     assert!(report.summary.total_messages > 0);
     assert!(report.passed(), "Simulation failed — see report above");
+}
+
+#[tokio::test]
+async fn run_finance_focused_6mo() {
+    let report = run_scenario(include_str!("scenarios/finance_focused_6mo.toml")).await;
+    eprintln!(
+        "Finance 6mo: {} msgs, {:.2}s, retention={:.3}, personalization={:.3}",
+        report.summary.total_messages,
+        report.wall_time_secs,
+        report.summary.final_metrics.knowledge_retention,
+        report.summary.final_metrics.personalization_score
+    );
+    eprintln!(
+        "  checkpoint_pass_rate={:.2}, regressions={}",
+        report.summary.checkpoint_pass_rate,
+        report.summary.regression_alerts.len()
+    );
+    for cp in &report.checkpoints {
+        let status = if cp.all_passed { "PASS" } else { "FAIL" };
+        eprintln!("  Checkpoint day {}: {}", cp.at_day, status);
+        for a in &cp.assertions {
+            let mark = if a.passed { "  [x]" } else { "  [ ]" };
+            eprintln!(
+                "    {} {} (actual: {:?}, expected: {})",
+                mark, a.description, a.actual_value, a.expected
+            );
+        }
+    }
+    for r in &report.summary.regression_alerts {
+        eprintln!(
+            "  REGRESSION: {} baseline={:.3} current={:.3} change={:.1}%",
+            r.metric, r.baseline, r.current, r.regression_pct
+        );
+    }
+    assert!(
+        report.summary.checkpoint_pass_rate >= 1.0,
+        "Finance scenario checkpoints failed (pass_rate={:.2})",
+        report.summary.checkpoint_pass_rate
+    );
+}
+
+#[tokio::test]
+async fn run_onboarding_stress_test() {
+    let report = run_scenario(include_str!("scenarios/onboarding_stress_test.toml")).await;
+    let first_cr = report
+        .metric_timeline
+        .first()
+        .map(|m| m.correction_rate)
+        .unwrap_or(0.0);
+    let last_cr = report.summary.final_metrics.correction_rate;
+    eprintln!(
+        "Onboarding stress: {} msgs, {:.2}s, correction_rate={:.3}→{:.3}",
+        report.summary.total_messages, report.wall_time_secs, first_cr, last_cr
+    );
+    eprintln!(
+        "  checkpoint_pass_rate={:.2}, regressions={}",
+        report.summary.checkpoint_pass_rate,
+        report.summary.regression_alerts.len()
+    );
+    for cp in &report.checkpoints {
+        let status = if cp.all_passed { "PASS" } else { "FAIL" };
+        eprintln!("  Checkpoint day {}: {}", cp.at_day, status);
+        for a in &cp.assertions {
+            let mark = if a.passed { "  [x]" } else { "  [ ]" };
+            eprintln!(
+                "    {} {} (actual: {:?}, expected: {})",
+                mark, a.description, a.actual_value, a.expected
+            );
+        }
+    }
+    for r in &report.summary.regression_alerts {
+        eprintln!(
+            "  REGRESSION: {} baseline={:.3} current={:.3} change={:.1}%",
+            r.metric, r.baseline, r.current, r.regression_pct
+        );
+    }
+    assert!(
+        report.summary.checkpoint_pass_rate >= 1.0,
+        "Onboarding stress test checkpoints failed (pass_rate={:.2})",
+        report.summary.checkpoint_pass_rate
+    );
 }

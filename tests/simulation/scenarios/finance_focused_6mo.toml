@@ -1,0 +1,68 @@
+[persona]
+name = "finance_tracker"
+timezone = "UTC"
+language = "en"
+seed = 99
+
+[persona.messages_per_day]
+onboarding = 6
+routine = 4
+power_user = 5
+shift = 3
+
+[persona.profile]
+known_facts = [
+    { subject = "user", predicate = "tracks_currency", object = "USD" },
+    { subject = "user", predicate = "budgets_for", object = "monthly groceries" },
+    { subject = "user", predicate = "saves_for", object = "house down payment" },
+]
+
+[persona.phases.onboarding]
+duration_days = 7
+correction_rate = 0.20
+topic_weights = { finance = 0.6, tasks = 0.2, chat = 0.2 }
+new_fact_introduction_rate = 0.5
+tool_action_rate = 0.6
+
+[persona.phases.routine]
+duration_days = 60
+correction_rate = 0.08
+topic_weights = { finance = 0.5, tasks = 0.2, notes = 0.2, chat = 0.1 }
+new_fact_introduction_rate = 0.1
+tool_action_rate = 0.7
+
+[persona.phases.power_user]
+duration_days = 60
+correction_rate = 0.03
+topic_weights = { finance = 0.4, tasks = 0.2, insights = 0.2, productivity = 0.1, chat = 0.1 }
+new_fact_introduction_rate = 0.05
+tool_action_rate = 0.8
+
+[persona.phases.behavior_shift]
+duration_days = 30
+correction_rate = 0.10
+shift_description = "User starts investing"
+new_facts = [
+    { subject = "user", predicate = "interested_in", object = "ETF investing" },
+]
+topic_weights = { finance = 0.5, notes = 0.2, learning = 0.2, chat = 0.1 }
+new_fact_introduction_rate = 0.3
+tool_action_rate = 0.5
+
+[[checkpoints]]
+at_day = 7
+assertions = [
+    { type = "metric_above", metric = "knowledge_retention", threshold = 0.0 },
+]
+
+[[checkpoints]]
+at_day = 90
+assertions = [
+    { type = "metric_above", metric = "personalization_score", threshold = 0.0 },
+]
+
+[[checkpoints]]
+at_day = 157
+assertions = [
+    { type = "metric_above", metric = "knowledge_retention", threshold = 0.0 },
+]

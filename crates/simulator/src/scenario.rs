@@ -16,6 +16,11 @@ pub struct SimulationConfig {
     pub max_cognitive_calls_per_day: u32,
     #[serde(default = "default_epoch_step")]
     pub epoch_step: String,
+    /// Percentage threshold for regression detection (default: 10.0).
+    /// Per-epoch metrics with high variance (task_completion_rate, routing_stability)
+    /// may need a higher tolerance (e.g. 25.0).
+    #[serde(default = "default_regression_threshold")]
+    pub regression_threshold: f64,
 }
 
 fn default_cognitive_llm_model() -> String {
@@ -34,6 +39,10 @@ fn default_epoch_step() -> String {
     "day".to_string()
 }
 
+fn default_regression_threshold() -> f64 {
+    10.0
+}
+
 impl Default for SimulationConfig {
     fn default() -> Self {
         Self {
@@ -41,6 +50,7 @@ impl Default for SimulationConfig {
             cognitive_temperature: default_cognitive_temperature(),
             max_cognitive_calls_per_day: default_max_cognitive_calls_per_day(),
             epoch_step: default_epoch_step(),
+            regression_threshold: default_regression_threshold(),
         }
     }
 }

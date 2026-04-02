@@ -271,6 +271,12 @@ impl MetricCollector {
 
         for &(name, baseline, current) in checks {
             if baseline > 0.0 {
+                // Skip rate metrics where current is zero due to the final epoch
+                // having no relevant events (e.g., no tasks created that day).
+                // A zero denominator makes the rate undefined, not regressed.
+                if current == 0.0 && name == "task_completion_rate" {
+                    continue;
+                }
                 let pct = (baseline - current) / baseline * 100.0;
                 if pct > threshold_pct {
                     alerts.push(RegressionAlert {

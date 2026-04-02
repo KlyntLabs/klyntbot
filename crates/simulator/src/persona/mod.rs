@@ -3,7 +3,7 @@ pub mod types;
 
 pub use types::*;
 
-use std::collections::{HashSet, VecDeque};
+use std::collections::{HashMap, HashSet, VecDeque};
 
 use chrono::{DateTime, Duration, Utc};
 use rand::rngs::StdRng;
@@ -26,6 +26,7 @@ pub struct PersonaRunner {
     introduced_facts: HashSet<String>,
     topic_history: VecDeque<String>,
     created_task_titles: Vec<String>,
+    extracted_fact_ids_by_topic: HashMap<String, Vec<String>>,
 }
 
 impl PersonaRunner {
@@ -40,6 +41,7 @@ impl PersonaRunner {
             introduced_facts: HashSet::new(),
             topic_history: VecDeque::new(),
             created_task_titles: Vec::new(),
+            extracted_fact_ids_by_topic: HashMap::new(),
         }
     }
 
@@ -69,6 +71,23 @@ impl PersonaRunner {
             LifecyclePhase::PowerUser => self.persona.messages_per_day.power_user,
             LifecyclePhase::BehaviorShift => self.persona.messages_per_day.shift,
         }
+    }
+
+    /// Record an extracted fact ID associated with a topic, for later
+    /// retrieval annotation backfill.
+    pub fn record_extracted_fact(&mut self, topic: &str, fact_id: &str) {
+        self.extracted_fact_ids_by_topic
+            .entry(topic.to_string())
+            .or_default()
+            .push(fact_id.to_string());
+    }
+
+    /// Return the most recent (up to 5) extracted fact IDs for the given topic.
+    pub fn relevant_facts_for_topic(&self, topic: &str) -> Vec<String> {
+        self.extracted_fact_ids_by_topic
+            .get(topic)
+            .map(|ids| ids.iter().rev().take(5).cloned().collect())
+            .unwrap_or_default()
     }
 
     /// Advance the phase if the current phase's duration has been exceeded.
@@ -141,21 +160,29 @@ impl PersonaRunner {
     ) -> Option<SimulatedToolAction> {
         match topic {
             "tasks" => {
-                let titles = [
-                    "review PR",
-                    "update docs",
-                    "fix bug in parser",
-                    "write tests",
-                    "deploy staging",
-                    "plan sprint",
-                ];
-                let title = titles[self.rng.random_range(0..titles.len())].to_string();
-                self.created_task_titles.push(title.clone());
-                Some(SimulatedToolAction::CreateTask {
-                    title,
-                    due_offset_days: Some(self.rng.random_range(1..8)),
-                    project: Some("main".to_string()),
-                })
+                // 30% chance to complete an existing task instead of creating a new one
+                if !self.created_task_titles.is_empty() && self.rng.random::<f64>() < 0.3 {
+                    let idx = self.rng.random_range(0..self.created_task_titles.len());
+                    Some(SimulatedToolAction::CompleteTask {
+                        task_ref: self.created_task_titles[idx].clone(),
+                    })
+                } else {
+                    let titles = [
+                        "review PR",
+                        "update docs",
+                        "fix bug in parser",
+                        "write tests",
+                        "deploy staging",
+                        "plan sprint",
+                    ];
+                    let title = titles[self.rng.random_range(0..titles.len())].to_string();
+                    self.created_task_titles.push(title.clone());
+                    Some(SimulatedToolAction::CreateTask {
+                        title,
+                        due_offset_days: Some(self.rng.random_range(1..8)),
+                        project: Some("main".to_string()),
+                    })
+                }
             }
             "notes" => Some(SimulatedToolAction::CreateNote {
                 title: format!("note-{}", self.rng.random_range(1..1000u32)),
