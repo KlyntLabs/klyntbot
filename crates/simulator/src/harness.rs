@@ -631,8 +631,9 @@ impl SimulationHarness {
             let knowledge_retention =
                 measure_knowledge_retention(&self.fact_repo, &known_facts).await;
             let community_stability = measure_community_stability(&self.inner_pool).await;
+            let thirty_days_ago = plan.simulated_now - Duration::days(30);
             let brain_versions =
-                count_brain_versions_since(&self.inner_pool, &plan.previous.to_rfc3339()).await;
+                count_brain_versions_since(&self.inner_pool, &thirty_days_ago.to_rfc3339()).await;
             let autotuner_stats = measure_autotuner_success(&self.inner_pool).await;
             let wall_time_ms = epoch_start.elapsed().as_secs_f64() * 1000.0;
 
@@ -661,6 +662,16 @@ impl SimulationHarness {
                 insight_usefulness,
                 wall_time_ms,
             );
+
+            let now_rfc3339 = plan.simulated_now.to_rfc3339();
+            let (memory_retrievability, meta_rule_count) = tokio::join!(
+                crate::metrics::cognitive::measure_average_retrievability(
+                    &self.inner_pool,
+                    &now_rfc3339,
+                ),
+                crate::metrics::cognitive::count_meta_rules(&self.inner_pool),
+            );
+            metrics.update_latest_cognitive(memory_retrievability, meta_rule_count);
 
             // Progress logging every 30 days.
             if plan.day_of_simulation % 30 == 0 {

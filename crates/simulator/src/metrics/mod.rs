@@ -1,4 +1,5 @@
 pub mod behavioral;
+pub mod cognitive;
 pub mod ground_truth;
 pub mod memory;
 pub mod system;
@@ -31,6 +32,9 @@ pub struct MetricSnapshot {
     pub autotuner_promotion_success: f64,
     pub community_stability: f64,
     pub brain_version_velocity: u32,
+    // Tier 4 — cognitive depth
+    pub memory_retrievability: f64,
+    pub meta_rule_count: u32,
     // Performance
     pub wall_time_per_epoch_ms: f64,
 }
@@ -215,6 +219,8 @@ impl MetricCollector {
             autotuner_promotion_success,
             community_stability,
             brain_version_velocity,
+            memory_retrievability: 0.0,
+            meta_rule_count: 0,
             wall_time_per_epoch_ms: wall_time_ms,
         };
 
@@ -227,6 +233,14 @@ impl MetricCollector {
 
         // Reset accumulator for the next epoch.
         self.accumulator = EpochAccumulator::default();
+    }
+
+    /// Update the latest snapshot with cognitive metrics computed externally.
+    pub fn update_latest_cognitive(&mut self, memory_retrievability: f64, meta_rule_count: u32) {
+        if let Some(snap) = self.timeline.last_mut() {
+            snap.memory_retrievability = memory_retrievability;
+            snap.meta_rule_count = meta_rule_count;
+        }
     }
 
     /// Average all timeline snapshots to establish tier-2 baselines.

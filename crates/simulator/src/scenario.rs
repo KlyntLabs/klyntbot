@@ -71,6 +71,8 @@ pub enum MetricName {
     TaskCompletionRate,
     RoutingStability,
     RoutingAccuracy,
+    MemoryRetrievability,
+    MetaRuleCount,
     InsightUsefulness,
     AutotunerPromotionSuccess,
     CommunityStability,
@@ -92,6 +94,11 @@ pub enum CheckpointAssertion {
         subject: String,
         predicate: String,
         old_object: String,
+    },
+    FactNotExists {
+        subject: String,
+        predicate: String,
+        object: String,
     },
     MetricAbove {
         metric: MetricName,

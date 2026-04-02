@@ -53,6 +53,11 @@ impl GroundTruthVerifier {
                     predicate,
                     old_object,
                 } => Self::check_fact_superseded(fact_repo, subject, predicate, old_object).await,
+                CheckpointAssertion::FactNotExists {
+                    subject,
+                    predicate,
+                    object,
+                } => Self::check_fact_not_exists(fact_repo, subject, predicate, object).await,
                 CheckpointAssertion::MetricAbove { metric, threshold } => {
                     Self::check_metric_above(latest_snapshot, *metric, *threshold)
                 }
@@ -78,6 +83,20 @@ impl GroundTruthVerifier {
         }
     }
 
+    /// Search for facts matching a subject/predicate/object triple via FTS.
+    async fn search_facts(
+        fact_repo: &cognitive::SemanticFactRepo,
+        subject: &str,
+        predicate: &str,
+        object: &str,
+    ) -> Vec<cognitive::SemanticFact> {
+        let query = format!("{subject} {predicate} {object}");
+        fact_repo
+            .search_fts(&query, None, 10)
+            .await
+            .unwrap_or_default()
+    }
+
     async fn check_fact_exists(
         fact_repo: &cognitive::SemanticFactRepo,
         subject: &str,
@@ -85,12 +104,7 @@ impl GroundTruthVerifier {
         object: &str,
         min_confidence: f64,
     ) -> AssertionResult {
-        let query = format!("{subject} {predicate} {object}");
-        let facts = fact_repo
-            .search_fts(&query, None, 10)
-            .await
-            .unwrap_or_default();
-
+        let facts = Self::search_facts(fact_repo, subject, predicate, object).await;
         let found = facts.iter().find(|f| {
             f.subject == subject
                 && f.predicate == predicate
@@ -115,12 +129,7 @@ impl GroundTruthVerifier {
         predicate: &str,
         old_object: &str,
     ) -> AssertionResult {
-        let query = format!("{subject} {predicate} {old_object}");
-        let facts = fact_repo
-            .search_fts(&query, None, 10)
-            .await
-            .unwrap_or_default();
-
+        let facts = Self::search_facts(fact_repo, subject, predicate, old_object).await;
         let found = facts.iter().any(|f| {
             f.subject == subject
                 && f.predicate == predicate
@@ -133,6 +142,28 @@ impl GroundTruthVerifier {
             passed: found,
             actual_value: None,
             expected: "superseded_at is Some".to_string(),
+        }
+    }
+
+    async fn check_fact_not_exists(
+        fact_repo: &cognitive::SemanticFactRepo,
+        subject: &str,
+        predicate: &str,
+        object: &str,
+    ) -> AssertionResult {
+        let facts = Self::search_facts(fact_repo, subject, predicate, object).await;
+        let found = facts.iter().any(|f| {
+            f.subject == subject
+                && f.predicate == predicate
+                && f.object == object
+                && f.superseded_at.is_none()
+        });
+
+        AssertionResult {
+            description: format!("FactNotExists({subject}, {predicate}, {object})"),
+            passed: !found,
+            actual_value: None,
+            expected: "fact should not exist (active, unsuperseded)".to_string(),
         }
     }
 
@@ -194,6 +225,8 @@ fn get_metric_value(snapshot: &MetricSnapshot, metric: &MetricName) -> f64 {
         MetricName::TaskCompletionRate => snapshot.task_completion_rate,
         MetricName::RoutingStability => snapshot.routing_stability,
         MetricName::RoutingAccuracy => snapshot.routing_accuracy,
+        MetricName::MemoryRetrievability => snapshot.memory_retrievability,
+        MetricName::MetaRuleCount => snapshot.meta_rule_count as f64,
         MetricName::InsightUsefulness => snapshot.insight_usefulness,
         MetricName::AutotunerPromotionSuccess => snapshot.autotuner_promotion_success,
         MetricName::CommunityStability => snapshot.community_stability,
@@ -426,5 +459,20 @@ mod tests {
 
         // No baselines => baseline 0.0 => improvement 0.0
         assert!(!result.passed);
+    }
+
+    #[test]
+    fn fact_not_exists_assertion_deserializes() {
+        let toml = r#"
+            type = "fact_not_exists"
+            subject = "user"
+            predicate = "works_as"
+            object = "intern"
+        "#;
+        let assertion: crate::scenario::CheckpointAssertion = toml::from_str(toml).unwrap();
+        assert!(matches!(
+            assertion,
+            crate::scenario::CheckpointAssertion::FactNotExists { .. }
+        ));
     }
 }
