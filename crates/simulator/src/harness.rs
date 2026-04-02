@@ -46,6 +46,9 @@ pub struct SimulationHarness {
     mirror_repo: cognitive::mirror::MirrorRepo,
     reflection_handler: Arc<dyn cognitive::ReflectionHandler>,
     narrative_handler: Arc<dyn cognitive::mirror::NarrativeHandler>,
+    /// ID of the first seeded autotuner trial (Trial A — default params).
+    #[allow(dead_code)]
+    active_trial_id: String,
 }
 
 impl SimulationHarness {
@@ -68,6 +71,67 @@ impl SimulationHarness {
             &cognitive::cognitive_migrations(),
         )
         .await?;
+
+        // Migrate autotuner tables (experiments, trials, shadow log).
+        let trial_repo = storage::TrialRepo::new(inner_pool.clone());
+        trial_repo.migrate().await?;
+
+        // Run feature-tasks migration so the `tasks` table exists for
+        // task-related domain entity rows and metrics.
+        sqlx::query(feature_tasks::TasksFeature::migration_sql())
+            .execute(&inner_pool)
+            .await
+            .map_err(|e| common::KlyntbotError::Storage(format!("tasks migration failed: {e}")))?;
+
+        // Seed an autotuner experiment with two active trials so the
+        // nightly evaluation cycle has data to work with.
+        let experiment_id = Uuid::new_v4().to_string();
+        let trial_a_id = Uuid::new_v4().to_string();
+        let trial_b_id = Uuid::new_v4().to_string();
+        let now_str = chrono::Utc::now().to_rfc3339();
+
+        let experiment = storage::ExperimentRow {
+            id: experiment_id.clone(),
+            hypothesis: "Adjusting routing weights improves skill selection accuracy".to_string(),
+            trend_analysis: "Baseline routing with default weights".to_string(),
+            recommendation_for_next: "Compare default vs tuned keyword/semantic weights"
+                .to_string(),
+            created_at: now_str.clone(),
+        };
+        trial_repo.create_experiment(&experiment).await?;
+
+        // Trial A: default params (all None — uses Config defaults).
+        let params_a = common::autotuner::TrialParams::default();
+        let trial_a = storage::TrialRow {
+            id: trial_a_id.clone(),
+            experiment_id: experiment_id.clone(),
+            params: serde_json::to_string(&params_a).unwrap_or_default(),
+            generation_reasoning: "Control trial with default parameters".to_string(),
+            status: "active".to_string(),
+            created_at: now_str.clone(),
+            completed_at: None,
+            result: None,
+        };
+        trial_repo.create_trial(&trial_a).await?;
+
+        // Trial B: modified routing weights.
+        let params_b = common::autotuner::TrialParams {
+            skill_keyword_weight: Some(0.7),
+            skill_semantic_weight: Some(0.3),
+            heuristic_confidence_threshold: Some(0.65),
+            ..Default::default()
+        };
+        let trial_b = storage::TrialRow {
+            id: trial_b_id,
+            experiment_id,
+            params: serde_json::to_string(&params_b).unwrap_or_default(),
+            generation_reasoning: "Variant trial with boosted keyword weight".to_string(),
+            status: "active".to_string(),
+            created_at: now_str,
+            completed_at: None,
+            result: None,
+        };
+        trial_repo.create_trial(&trial_b).await?;
 
         let bus = Arc::new(DomainEventBus::new(512));
         let context_queue = Arc::new(ContextUpdateQueue::new());
@@ -105,6 +169,7 @@ impl SimulationHarness {
             mirror_repo,
             reflection_handler,
             narrative_handler,
+            active_trial_id: trial_a_id,
         })
     }
 
@@ -525,8 +590,7 @@ impl SimulationHarness {
                             cognitive::MemoryOp::Update { id: _, old_id } => {
                                 let new = &candidate.candidate;
                                 if let Ok(Some(old_fact)) = self.fact_repo.get(old_id).await {
-                                    if old_fact.confidence < 0.7
-                                        || old_fact.source != "user_stated"
+                                    if old_fact.confidence < 0.7 || old_fact.source != "user_stated"
                                     {
                                         continue;
                                     }
@@ -547,8 +611,7 @@ impl SimulationHarness {
                                     if existing.superseded_at.is_some() {
                                         continue;
                                     }
-                                    if existing.confidence < 0.7
-                                        || existing.source != "user_stated"
+                                    if existing.confidence < 0.7 || existing.source != "user_stated"
                                     {
                                         continue;
                                     }
