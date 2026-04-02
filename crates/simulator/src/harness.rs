@@ -46,6 +46,8 @@ pub struct SimulationHarness {
     mirror_repo: cognitive::mirror::MirrorRepo,
     reflection_handler: Arc<dyn cognitive::ReflectionHandler>,
     narrative_handler: Arc<dyn cognitive::mirror::NarrativeHandler>,
+    /// ID of the first seeded autotuner trial (Trial A — default params).
+    active_trial_id: String,
 }
 
 impl SimulationHarness {
@@ -69,6 +71,67 @@ impl SimulationHarness {
         )
         .await?;
 
+        // Migrate autotuner tables (experiments, trials, shadow log).
+        let trial_repo = storage::TrialRepo::new(inner_pool.clone());
+        trial_repo.migrate().await?;
+
+        // Run feature-tasks migration so the `tasks` table exists for
+        // task-related domain entity rows and metrics.
+        sqlx::query(feature_tasks::TasksFeature::migration_sql())
+            .execute(&inner_pool)
+            .await
+            .map_err(|e| common::KlyntbotError::Storage(format!("tasks migration failed: {e}")))?;
+
+        // Seed an autotuner experiment with two active trials so the
+        // nightly evaluation cycle has data to work with.
+        let experiment_id = Uuid::new_v4().to_string();
+        let trial_a_id = Uuid::new_v4().to_string();
+        let trial_b_id = Uuid::new_v4().to_string();
+        let now_str = chrono::Utc::now().to_rfc3339();
+
+        let experiment = storage::ExperimentRow {
+            id: experiment_id.clone(),
+            hypothesis: "Adjusting routing weights improves skill selection accuracy".to_string(),
+            trend_analysis: "Baseline routing with default weights".to_string(),
+            recommendation_for_next: "Compare default vs tuned keyword/semantic weights"
+                .to_string(),
+            created_at: now_str.clone(),
+        };
+        trial_repo.create_experiment(&experiment).await?;
+
+        // Trial A: default params (all None — uses Config defaults).
+        let params_a = common::autotuner::TrialParams::default();
+        let trial_a = storage::TrialRow {
+            id: trial_a_id.clone(),
+            experiment_id: experiment_id.clone(),
+            params: serde_json::to_string(&params_a).unwrap_or_default(),
+            generation_reasoning: "Control trial with default parameters".to_string(),
+            status: "active".to_string(),
+            created_at: now_str.clone(),
+            completed_at: None,
+            result: None,
+        };
+        trial_repo.create_trial(&trial_a).await?;
+
+        // Trial B: modified routing weights.
+        let params_b = common::autotuner::TrialParams {
+            skill_keyword_weight: Some(0.7),
+            skill_semantic_weight: Some(0.3),
+            heuristic_confidence_threshold: Some(0.65),
+            ..Default::default()
+        };
+        let trial_b = storage::TrialRow {
+            id: trial_b_id,
+            experiment_id,
+            params: serde_json::to_string(&params_b).unwrap_or_default(),
+            generation_reasoning: "Variant trial with boosted keyword weight".to_string(),
+            status: "active".to_string(),
+            created_at: now_str,
+            completed_at: None,
+            result: None,
+        };
+        trial_repo.create_trial(&trial_b).await?;
+
         let bus = Arc::new(DomainEventBus::new(512));
         let context_queue = Arc::new(ContextUpdateQueue::new());
 
@@ -90,6 +153,28 @@ impl SimulationHarness {
         .execute(&inner_pool)
         .await;
 
+        // Seed a parent area for task rows (tasks.area_id NOT NULL FK).
+        let _ = sqlx::query(
+            "INSERT OR IGNORE INTO areas (id, name, color, status, created_at, updated_at) \
+             VALUES ('sim-area', 'Simulation', '#6366f1', 'active', ?, ?)",
+        )
+        .bind(&now)
+        .bind(&now)
+        .execute(&inner_pool)
+        .await;
+
+        // Seed a parent finance account for transaction rows
+        // (finance_transactions.account_id NOT NULL FK).
+        let _ = sqlx::query(
+            "INSERT OR IGNORE INTO finance_accounts \
+             (id, name, account_type, currency, balance, created_at, updated_at) \
+             VALUES ('sim-account', 'Simulation Account', 'checking', 'VND', 0, ?, ?)",
+        )
+        .bind(&now)
+        .bind(&now)
+        .execute(&inner_pool)
+        .await;
+
         Ok(Self {
             scenario,
             pool,
@@ -105,6 +190,7 @@ impl SimulationHarness {
             mirror_repo,
             reflection_handler,
             narrative_handler,
+            active_trial_id: trial_a_id,
         })
     }
 
@@ -121,6 +207,7 @@ impl SimulationHarness {
         let mut persona_runner = PersonaRunner::new(self.scenario.persona.clone());
         let mut metrics = MetricCollector::new(30);
         let action_executor = ActionExecutor::new(Arc::clone(&self.bus), self.inner_pool.clone());
+        let trial_repo = storage::TrialRepo::new(self.inner_pool.clone());
 
         // Subscribe to bus for ContradictionDetected events.
         let contradiction_count = Arc::new(AtomicU32::new(0));
@@ -171,10 +258,13 @@ impl SimulationHarness {
             // MESSAGE PHASE
             let mut messages = persona_runner.generate_day(plan.simulated_now);
 
-            // Backfill retrieval annotations: for each message, annotate with
-            // recently extracted fact IDs from the same topic so retrieval
-            // precision/recall can be measured against real DB state.
+            total_messages += messages.len() as u32;
             for msg in &mut messages {
+                // Backfill retrieval annotations inline: annotate with
+                // previously extracted fact IDs from the same topic so
+                // retrieval precision/recall can be measured. By doing this
+                // per-message (instead of pre-loop), message N+1 immediately
+                // sees facts extracted from message N on the same day.
                 let relevant = persona_runner.relevant_facts_for_topic(&msg.topic);
                 if !relevant.is_empty() {
                     if let Some(ref mut gt) = msg.ground_truth {
@@ -187,10 +277,7 @@ impl SimulationHarness {
                         });
                     }
                 }
-            }
 
-            total_messages += messages.len() as u32;
-            for msg in &messages {
                 // Track accumulator metrics.
                 metrics.accumulator_mut().messages_processed += 1;
 
@@ -209,6 +296,23 @@ impl SimulationHarness {
                 .bind(msg.simulated_at.to_rfc3339())
                 .execute(&self.inner_pool)
                 .await;
+
+                // Shadow log entry for autotuner evaluation.
+                let predicted_skill = expected_skill_for_topic(&msg.topic);
+                let _ = trial_repo
+                    .insert_shadow_log(
+                        &self.active_trial_id,
+                        &msg.simulated_at.to_rfc3339(),
+                        "sim-session",
+                        &Uuid::new_v4().to_string(),
+                        predicted_skill,
+                        "reactive",
+                        0.85,
+                        10,
+                        predicted_skill,
+                        "reactive",
+                    )
+                    .await;
 
                 if msg.is_correction {
                     metrics.accumulator_mut().corrections += 1;
@@ -242,6 +346,28 @@ impl SimulationHarness {
                         }
                         _ => {}
                     }
+
+                    // tool_usage row
+                    let tool_name = match action {
+                        SimulatedToolAction::CreateTask { .. }
+                        | SimulatedToolAction::CompleteTask { .. } => "tasks",
+                        SimulatedToolAction::CreateNote { .. }
+                        | SimulatedToolAction::UpdateNote { .. } => "notes",
+                        SimulatedToolAction::RecordTransaction { .. } => "finance",
+                        SimulatedToolAction::StartFocus { .. }
+                        | SimulatedToolAction::RecordProductivityEvent { .. } => "productivity",
+                        SimulatedToolAction::CreateObjective { .. } => "okr",
+                    };
+                    let _ = sqlx::query(
+                        "INSERT INTO tool_usage \
+                         (id, tool_name, action, session_key, channel, success, duration_ms, created_at) \
+                         VALUES (?, ?, 'execute', 'sim-session', 'simulation', 1, 10, ?)",
+                    )
+                    .bind(Uuid::new_v4().to_string())
+                    .bind(tool_name)
+                    .bind(msg.simulated_at.to_rfc3339())
+                    .execute(&self.inner_pool)
+                    .await;
                 }
 
                 // Drive cognitive pipeline: extract facts from message.
@@ -270,6 +396,44 @@ impl SimulationHarness {
                 if message_matches_topic_keywords(&msg.content, &msg.topic) {
                     metrics.accumulator_mut().routing_matches += 1;
                 }
+
+                // ── Domain entity rows: usage, interaction, strategy ──
+                let request_id = Uuid::new_v4().to_string();
+
+                // usage_records
+                let _ = sqlx::query(
+                    "INSERT INTO usage_records \
+                     (id, timestamp, request_id, model, provider, prompt_tokens, completion_tokens, channel, strategy) \
+                     VALUES (?, ?, ?, 'scripted-sim', 'simulator', 100, 50, 'simulation', 'reactive')",
+                )
+                .bind(Uuid::new_v4().to_string())
+                .bind(msg.simulated_at.to_rfc3339())
+                .bind(&request_id)
+                .execute(&self.inner_pool)
+                .await;
+
+                // interaction_log
+                let _ = sqlx::query(
+                    "INSERT INTO interaction_log \
+                     (timestamp, agent_name, tool_names, channel, duration_ms) \
+                     VALUES (?, 'general', ?, 'simulation', 50)",
+                )
+                .bind(msg.simulated_at.to_rfc3339())
+                .bind(&msg.topic)
+                .execute(&self.inner_pool)
+                .await;
+
+                // strategy_records
+                let _ = sqlx::query(
+                    "INSERT INTO strategy_records \
+                     (id, timestamp, request_id, predicted_strategy, actual_strategy, success, execution_mode, chat_id) \
+                     VALUES (?, ?, ?, 'reactive', 'reactive', 1, 'reactive', 'sim-session')",
+                )
+                .bind(Uuid::new_v4().to_string())
+                .bind(msg.simulated_at.to_rfc3339())
+                .bind(&request_id)
+                .execute(&self.inner_pool)
+                .await;
 
                 // Token tracking (150 per scripted call).
                 metrics.accumulator_mut().total_tokens += 150;
@@ -525,8 +689,7 @@ impl SimulationHarness {
                             cognitive::MemoryOp::Update { id: _, old_id } => {
                                 let new = &candidate.candidate;
                                 if let Ok(Some(old_fact)) = self.fact_repo.get(old_id).await {
-                                    if old_fact.confidence < 0.7
-                                        || old_fact.source != "user_stated"
+                                    if old_fact.confidence < 0.7 || old_fact.source != "user_stated"
                                     {
                                         continue;
                                     }
@@ -547,8 +710,7 @@ impl SimulationHarness {
                                     if existing.superseded_at.is_some() {
                                         continue;
                                     }
-                                    if existing.confidence < 0.7
-                                        || existing.source != "user_stated"
+                                    if existing.confidence < 0.7 || existing.source != "user_stated"
                                     {
                                         continue;
                                     }
@@ -637,6 +799,44 @@ impl SimulationHarness {
                 let champion = autotuner::Champion::default();
                 match cycle.run_evaluation_and_promotion(&champion).await {
                     Ok(result) => {
+                        if let Some(ref promo) = result.promotion {
+                            let (trial_id, _trial_result, trial_params) = promo;
+                            debug!(trial_id = %trial_id, "Autotuner promoted trial — writing brain version");
+
+                            // Mark the trial as promoted so measure_autotuner_success picks it up.
+                            let status_repo = storage::TrialRepo::new(self.inner_pool.clone());
+                            let _ = status_repo
+                                .update_trial_status(&trial_id.to_string(), "promoted")
+                                .await;
+
+                            // Write a brain version row so brain_version_velocity is non-zero.
+                            let params_json = serde_json::to_string(trial_params)
+                                .unwrap_or_else(|_| "{}".to_string());
+                            let _ = sqlx::query(
+                                "INSERT INTO mirror_brain_versions \
+                                 (version, trial_id, promoted_at, params_json, reason, parent_version, metrics_json, reverted) \
+                                 VALUES ((SELECT COALESCE(MAX(version), 0) + 1 FROM mirror_brain_versions), ?, ?, ?, \
+                                 'Simulation promotion', \
+                                 (SELECT MAX(version) FROM mirror_brain_versions), '{}', 0)"
+                            )
+                            .bind(trial_id.to_string())
+                            .bind(simulated_now.to_rfc3339())
+                            .bind(&params_json)
+                            .execute(&self.inner_pool)
+                            .await;
+
+                            // Publish AutotunerDecision event so other subscribers can react.
+                            let affected = autotuner::cycle::affected_param_names(
+                                &champion.params,
+                                trial_params,
+                            );
+                            self.bus.publish(DomainEvent::AutotunerDecision {
+                                trial_id: trial_id.to_string(),
+                                verdict: "promoted".to_string(),
+                                improvement_pct: 0.0,
+                                affected_params: affected,
+                            });
+                        }
                         debug!(
                             promoted = result.promotion.is_some(),
                             regression = result.regression,
@@ -787,6 +987,16 @@ impl SimulationHarness {
                 }
             }
         }
+    }
+}
+
+/// Map a simulation topic to its expected orchestrator skill name for shadow log entries.
+fn expected_skill_for_topic(topic: &str) -> &'static str {
+    match topic {
+        "tasks" => "task-management",
+        "finance" => "finance-management",
+        "automation" => "automation",
+        _ => "general",
     }
 }
 
