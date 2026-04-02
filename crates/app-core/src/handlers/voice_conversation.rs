@@ -45,6 +45,7 @@ impl ConversationPhase {
                 | (Self::Listening, Self::Reflecting)
                 | (Self::Listening, Self::Idle)   // pause or end during listening
                 | (Self::Reflecting, Self::Speaking)
+                | (Self::Reflecting, Self::Listening) // streaming TTS interrupt or auto-resume
                 | (Self::Reflecting, Self::Idle)  // cancel during reflecting
                 | (Self::Speaking, Self::Listening) // auto-resume or interrupt
                 | (Self::Speaking, Self::Idle) // end during speaking
@@ -442,7 +443,12 @@ impl VoiceConversationManager {
                     self.run_listening_phase(&mut cmd_rx).await;
                 }
                 ConversationPhase::Reflecting => {
-                    self.run_reflecting_phase(&mut cmd_rx).await;
+                    let use_streaming = self.config.read().await.conversation.streaming_tts;
+                    if use_streaming {
+                        self.run_streaming_response_phase(&mut cmd_rx).await;
+                    } else {
+                        self.run_reflecting_phase(&mut cmd_rx).await;
+                    }
                 }
                 ConversationPhase::Speaking => {
                     self.run_speaking_phase(&mut cmd_rx).await;
@@ -808,6 +814,400 @@ impl VoiceConversationManager {
         }
 
         self.transition_to(ConversationPhase::Speaking).await;
+    }
+
+    // ── 6b. run_streaming_response_phase ──────────────────────
+
+    /// Combined reflecting + speaking phase that overlaps LLM generation, TTS synthesis, and playback.
+    ///
+    /// Instead of waiting for the full LLM response before starting TTS, this method streams
+    /// LLM chunks through a `SentenceAccumulator`, sends each complete sentence to a
+    /// `StreamingTtsPipeline`, and plays audio as soon as each sentence is synthesized.
+    async fn run_streaming_response_phase(&self, cmd_rx: &mut mpsc::Receiver<VoiceCommand>) {
+        // ── (a) Same setup as run_reflecting_phase ──────────────────────────
+
+        let (transcript_text, session_key_str) = {
+            let state = self.state.lock().await;
+            let text = state.pending_transcript.clone().unwrap_or_default();
+            let sk = state
+                .session_key
+                .as_ref()
+                .map(|k| k.to_string())
+                .unwrap_or_default();
+            (text, sk)
+        };
+
+        if transcript_text.is_empty() {
+            info!("Streaming response: empty transcript, back to listening");
+            self.transition_to(ConversationPhase::Listening).await;
+            return;
+        }
+
+        // Auto-title from first voice transcript
+        let needs_title = {
+            let state = self.state.lock().await;
+            state.session_title.is_empty()
+        };
+        if needs_title {
+            let title: String = transcript_text.chars().take(60).collect();
+            let metadata = serde_json::json!({
+                "title": title,
+                "is_voice_session": true,
+            });
+            let _ = self
+                .repos
+                .sessions
+                .upsert_voice_session(&session_key_str, &metadata)
+                .await;
+            self.state.lock().await.session_title = title;
+            self.emitter.emit_event(
+                "chat:thread_updated",
+                serde_json::json!({ "sessionKey": session_key_str }),
+            );
+        }
+
+        info!(
+            "Streaming response: sending to agent (session={})",
+            session_key_str
+        );
+
+        // Emit PhaseChanged reflecting
+        let (turn_count, session_title) = {
+            let state = self.state.lock().await;
+            (state.turn_count, state.session_title.clone())
+        };
+        let _ = self
+            .voice_service
+            .emit_event(VoiceEvent::PhaseChanged {
+                phase: ConversationPhase::Reflecting.as_str().to_string(),
+                session_title: Some(session_title),
+                turn_count,
+            })
+            .await;
+
+        // Emit chat:message_added for the voice transcript
+        if let Ok(val) = serde_json::to_value(&desktop_shared::events::ChatMessagePayload {
+            session_key: session_key_str.clone(),
+            source: "voice".to_string(),
+        }) {
+            self.emitter
+                .emit_event(desktop_shared::events::CHAT_MESSAGE_ADDED, val);
+        }
+
+        // Start agent streaming
+        let streaming_handle = match self
+            .agent
+            .process_direct_streaming(transcript_text, session_key_str.clone())
+            .await
+        {
+            Ok(handle) => handle,
+            Err(e) => {
+                warn!("Streaming response: agent error: {e}");
+                let _ = self
+                    .voice_service
+                    .emit_event(VoiceEvent::Error {
+                        message: format!("Agent processing failed: {e}"),
+                        recoverable: true,
+                    })
+                    .await;
+                self.transition_to(ConversationPhase::Idle).await;
+                return;
+            }
+        };
+
+        let mut event_rx = streaming_handle.event_rx;
+        let cancel_token = streaming_handle.cancel_token;
+
+        // ── (b) Set up TTS pipeline ────────────────────────────────────────
+
+        let tts_params = {
+            let config = self.config.read().await;
+            tts_params_from_config(&config.output)
+        };
+
+        let tts_handle = self.voice_service.start_streaming_tts(&tts_params);
+        let (sentence_tx, tts_done_rx, tts_stop) = match tts_handle {
+            Some(h) => (Some(h.sentence_tx), Some(h.done_rx), Some(h.stop)),
+            None => {
+                warn!("Streaming response: TTS pipeline unavailable, falling back to text-only");
+                (None, None, None)
+            }
+        };
+
+        let mut accumulator = voice_engine::SentenceAccumulator::new(10);
+
+        // ── (c) Set up interrupt monitor ───────────────────────────────────
+
+        let mut monitor = start_monitor_safe(&self.voice_service);
+
+        const INTERRUPT_RMS_THRESHOLD: f32 = 0.02;
+        let mut consecutive_speech_samples = 0u32;
+        const SPEECH_SAMPLE_THRESHOLD: u32 = 3;
+
+        // ── (d) Main event loop ────────────────────────────────────────────
+
+        let mut response_content = String::new();
+        let mut interrupted = false;
+        let mut first_sentence_sent = false;
+
+        loop {
+            tokio::select! {
+                biased;
+
+                Some(cmd) = cmd_rx.recv() => {
+                    if matches!(cmd, VoiceCommand::End | VoiceCommand::Pause) {
+                        info!("Streaming response: End/Pause received, cancelling");
+                        cancel_token.cancel();
+                        if let Some(ref stop) = tts_stop {
+                            stop.store(true, Ordering::Relaxed);
+                        }
+                        self.voice_service.stop_tts_playback().await;
+                        if let Some(ref stop) = monitor.stop_signal {
+                            stop.store(true, Ordering::Relaxed);
+                        }
+                        drop(monitor);
+                        if matches!(cmd, VoiceCommand::Pause) {
+                            self.state.lock().await.paused = true;
+                        }
+                        self.transition_to(ConversationPhase::Idle).await;
+                        return;
+                    }
+                    if matches!(cmd, VoiceCommand::Interrupt) {
+                        info!("Streaming response: Interrupt received");
+                        cancel_token.cancel();
+                        if let Some(ref stop) = tts_stop {
+                            stop.store(true, Ordering::Relaxed);
+                        }
+                        self.voice_service.stop_tts_playback().await;
+                        interrupted = true;
+                        break;
+                    }
+                }
+
+                Some(rms) = monitor.rms_rx.recv() => {
+                    if rms > INTERRUPT_RMS_THRESHOLD {
+                        consecutive_speech_samples += 1;
+                        if consecutive_speech_samples >= SPEECH_SAMPLE_THRESHOLD {
+                            info!("Streaming response: speech interrupt detected");
+                            cancel_token.cancel();
+                            if let Some(ref stop) = tts_stop {
+                                stop.store(true, Ordering::Relaxed);
+                            }
+                            self.voice_service.stop_tts_playback().await;
+                            interrupted = true;
+                            break;
+                        }
+                    } else {
+                        consecutive_speech_samples = 0;
+                    }
+                }
+
+                event = event_rx.recv() => {
+                    match event {
+                        Some(agent::AgentEvent::ContentChunk { data }) => {
+                            // Forward to chat UI
+                            if let Ok(val) = serde_json::to_value(
+                                &desktop_shared::events::ContentChunkPayload {
+                                    session_key: session_key_str.clone(),
+                                    data: data.clone(),
+                                },
+                            ) {
+                                self.emitter.emit_event(
+                                    desktop_shared::events::AGENT_CONTENT_CHUNK,
+                                    val,
+                                );
+                            }
+                            response_content.push_str(&data);
+
+                            // Feed into sentence accumulator and drain complete sentences
+                            accumulator.push(&data);
+                            while let Some(sentence) = accumulator.take_sentence() {
+                                if !first_sentence_sent {
+                                    first_sentence_sent = true;
+                                    // Emit PhaseChanged speaking on first sentence
+                                    let (tc, title) = {
+                                        let state = self.state.lock().await;
+                                        (state.turn_count, state.session_title.clone())
+                                    };
+                                    let _ = self
+                                        .voice_service
+                                        .emit_event(VoiceEvent::PhaseChanged {
+                                            phase: ConversationPhase::Speaking.as_str().to_string(),
+                                            session_title: Some(title),
+                                            turn_count: tc,
+                                        })
+                                        .await;
+                                }
+                                if let Some(ref tx) = sentence_tx {
+                                    let _ = tx
+                                        .send(voice_engine::SentenceItem {
+                                            text: sentence,
+                                            is_final: false,
+                                        })
+                                        .await;
+                                }
+                            }
+                        }
+                        Some(agent::AgentEvent::Done { content, message_id }) => {
+                            response_content = content.clone();
+                            // Forward done event
+                            if let Ok(val) = serde_json::to_value(
+                                &desktop_shared::events::DonePayload {
+                                    session_key: session_key_str.clone(),
+                                    content,
+                                },
+                            ) {
+                                self.emitter.emit_event(
+                                    desktop_shared::events::AGENT_DONE,
+                                    val,
+                                );
+                            }
+                            let _ = message_id;
+
+                            // Flush remaining text from accumulator as final sentence
+                            if let Some(remainder) = accumulator.flush() {
+                                if !first_sentence_sent {
+                                    let (tc, title) = {
+                                        let state = self.state.lock().await;
+                                        (state.turn_count, state.session_title.clone())
+                                    };
+                                    let _ = self
+                                        .voice_service
+                                        .emit_event(VoiceEvent::PhaseChanged {
+                                            phase: ConversationPhase::Speaking.as_str().to_string(),
+                                            session_title: Some(title),
+                                            turn_count: tc,
+                                        })
+                                        .await;
+                                }
+                                if let Some(ref tx) = sentence_tx {
+                                    let _ = tx
+                                        .send(voice_engine::SentenceItem {
+                                            text: remainder,
+                                            is_final: true,
+                                        })
+                                        .await;
+                                }
+                            }
+                            break;
+                        }
+                        Some(agent::AgentEvent::Error { message }) => {
+                            warn!("Streaming response: agent error: {message}");
+                            if let Ok(val) = serde_json::to_value(
+                                &desktop_shared::events::AgentErrorPayload {
+                                    session_key: session_key_str.clone(),
+                                    message,
+                                },
+                            ) {
+                                self.emitter.emit_event(
+                                    desktop_shared::events::AGENT_ERROR,
+                                    val,
+                                );
+                            }
+                            break;
+                        }
+                        Some(agent::AgentEvent::ToolStart { name, args, agent }) => {
+                            let action = args.get("action").and_then(|v| v.as_str()).map(String::from);
+                            if let Ok(val) = serde_json::to_value(
+                                &desktop_shared::events::ToolStartPayload {
+                                    session_key: session_key_str.clone(),
+                                    name,
+                                    action,
+                                    agent,
+                                },
+                            ) {
+                                self.emitter.emit_event(
+                                    desktop_shared::events::AGENT_TOOL_START,
+                                    val,
+                                );
+                            }
+                        }
+                        Some(agent::AgentEvent::ToolEnd { name, success, duration_ms, result, agent }) => {
+                            if let Ok(val) = serde_json::to_value(
+                                &desktop_shared::events::ToolEndPayload {
+                                    session_key: session_key_str.clone(),
+                                    name,
+                                    action: None,
+                                    success,
+                                    duration_ms,
+                                    result,
+                                    estimated_tokens: None,
+                                    agent,
+                                },
+                            ) {
+                                self.emitter.emit_event(
+                                    desktop_shared::events::AGENT_TOOL_END,
+                                    val,
+                                );
+                            }
+                        }
+                        Some(other_event) => {
+                            if let Ok(val) = serde_json::to_value(&other_event) {
+                                self.emitter.emit_event("agent:event", val);
+                            }
+                        }
+                        None => {
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+
+        // ── (e) After loop — wait for TTS pipeline completion ──────────────
+
+        // Drop sentence_tx so the pipeline knows no more sentences are coming
+        drop(sentence_tx);
+
+        if !interrupted {
+            if let Some(done_rx) = tts_done_rx {
+                // Wait for TTS playback to finish with a 30s timeout
+                let _ = tokio::time::timeout(
+                    std::time::Duration::from_secs(30),
+                    done_rx,
+                )
+                .await;
+            }
+        }
+
+        // Stop monitor
+        if let Some(ref stop) = monitor.stop_signal {
+            stop.store(true, Ordering::Relaxed);
+        }
+        drop(monitor);
+
+        // Update state
+        {
+            let mut state = self.state.lock().await;
+            state.pending_response_text = Some(response_content);
+            state.pending_transcript = None;
+            state.turn_count += 1;
+            state.tts_position = 0;
+            state.interrupted = interrupted;
+            state.touch();
+        }
+
+        // Emit chat thread event
+        {
+            let state = self.state.lock().await;
+            if let Some(ref sk) = state.session_key {
+                let is_new = state.turn_count == 1;
+                self.emitter.emit_chat_thread(is_new, sk.as_str());
+            }
+        }
+
+        // ── (f) Post-loop transition ───────────────────────────────────────
+
+        if interrupted {
+            let _ = self.voice_service.emit_event(VoiceEvent::TtsFadeOut).await;
+            let _ = self
+                .voice_service
+                .emit_event(VoiceEvent::ContinueAvailable { timeout_secs: 8 })
+                .await;
+            self.transition_to(ConversationPhase::Listening).await;
+        } else {
+            self.auto_resume_or_idle().await;
+        }
     }
 
     // ── 7. run_speaking_phase ───────────────────────────────
