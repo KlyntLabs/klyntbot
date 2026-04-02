@@ -19,6 +19,7 @@ use crate::metrics::ground_truth::{CheckpointResult, GroundTruthVerifier};
 use crate::metrics::memory::{measure_knowledge_retention, measure_retrieval_quality};
 use crate::metrics::system::{
     count_brain_versions_since, measure_autotuner_success, measure_community_stability,
+    measure_insight_usefulness,
 };
 use crate::metrics::MetricCollector;
 use crate::persona::types::SimulatedToolAction;
@@ -77,6 +78,17 @@ impl SimulationHarness {
             FtsMemoryRetriever::new(cognitive::SemanticFactRepo::new(inner_pool.clone()));
         let rule_repo = cognitive::ProceduralRuleRepo::new(inner_pool.clone());
         let mirror_repo = cognitive::mirror::MirrorRepo::new(pool.clone());
+
+        // Ensure a parent session row exists for session message persistence.
+        let now = chrono::Utc::now().to_rfc3339();
+        let _ = sqlx::query(
+            "INSERT OR IGNORE INTO sessions (key, metadata, created_at, updated_at) \
+             VALUES ('sim-session', '{}', ?, ?)",
+        )
+        .bind(&now)
+        .bind(&now)
+        .execute(&inner_pool)
+        .await;
 
         Ok(Self {
             scenario,
@@ -181,6 +193,23 @@ impl SimulationHarness {
             for msg in &messages {
                 // Track accumulator metrics.
                 metrics.accumulator_mut().messages_processed += 1;
+
+                // Persist session message for conversation recall.
+                let msg_id = Uuid::new_v4().to_string();
+                let role = "user";
+                let _ = sqlx::query(
+                    "INSERT INTO session_messages \
+                     (id, session_key, role, content, timestamp) \
+                     VALUES (?, ?, ?, ?, ?)",
+                )
+                .bind(&msg_id)
+                .bind("sim-session")
+                .bind(role)
+                .bind(&msg.content)
+                .bind(msg.simulated_at.to_rfc3339())
+                .execute(&self.inner_pool)
+                .await;
+
                 if msg.is_correction {
                     metrics.accumulator_mut().corrections += 1;
                     self.bus.publish(DomainEvent::UserCorrectedAI {
@@ -246,6 +275,8 @@ impl SimulationHarness {
                 metrics.accumulator_mut().total_tokens += 150;
             }
 
+            // Yield to let the contradiction listener process any pending bus events.
+            tokio::task::yield_now().await;
             // Read contradiction events detected during this epoch's message processing.
             let contradictions = contradiction_count.swap(0, Ordering::Relaxed);
             metrics.accumulator_mut().contradictions_detected += contradictions;
@@ -326,6 +357,9 @@ impl SimulationHarness {
             // Capture accumulator totals before snapshot resets them.
             total_facts_extracted += metrics.accumulator_mut().facts_extracted;
 
+            let insight_usefulness =
+                measure_insight_usefulness(&self.inner_pool, day_counter).await;
+
             metrics.snapshot(
                 plan.simulated_now,
                 plan.day_of_simulation,
@@ -333,7 +367,7 @@ impl SimulationHarness {
                 autotuner_stats.success_rate,
                 community_stability,
                 brain_versions,
-                0.0, // insight_usefulness — not yet measured in simulation
+                insight_usefulness,
                 wall_time_ms,
             );
 
@@ -388,7 +422,11 @@ impl SimulationHarness {
         };
 
         let report = SimulationReport {
-            scenario: format!("{}_{}", self.scenario.persona.name, self.scenario.total_days()),
+            scenario: format!(
+                "{}_{}",
+                self.scenario.persona.name,
+                self.scenario.total_days()
+            ),
             persona: self.scenario.persona.name.clone(),
             simulated_days: day_counter,
             wall_time_secs,
