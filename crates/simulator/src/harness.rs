@@ -799,6 +799,37 @@ impl SimulationHarness {
                 let champion = autotuner::Champion::default();
                 match cycle.run_evaluation_and_promotion(&champion).await {
                     Ok(result) => {
+                        if let Some(ref promo) = result.promotion {
+                            let (trial_id, _trial_result, trial_params) = promo;
+                            debug!(trial_id = %trial_id, "Autotuner promoted trial — writing brain version");
+
+                            // Write a brain version row so brain_version_velocity is non-zero.
+                            let params_json = serde_json::to_string(trial_params).unwrap_or_else(|_| "{}".to_string());
+                            let _ = sqlx::query(
+                                "INSERT INTO mirror_brain_versions \
+                                 (version, trial_id, promoted_at, params_json, reason, parent_version, metrics_json, reverted) \
+                                 VALUES ((SELECT COALESCE(MAX(version), 0) + 1 FROM mirror_brain_versions), ?, ?, ?, \
+                                 'Simulation promotion', \
+                                 (SELECT MAX(version) FROM mirror_brain_versions), '{}', 0)"
+                            )
+                            .bind(trial_id.to_string())
+                            .bind(simulated_now.to_rfc3339())
+                            .bind(&params_json)
+                            .execute(&self.inner_pool)
+                            .await;
+
+                            // Publish AutotunerDecision event so other subscribers can react.
+                            let affected = autotuner::cycle::affected_param_names(
+                                &champion.params,
+                                trial_params,
+                            );
+                            self.bus.publish(DomainEvent::AutotunerDecision {
+                                trial_id: trial_id.to_string(),
+                                verdict: "promoted".to_string(),
+                                improvement_pct: 0.0,
+                                affected_params: affected,
+                            });
+                        }
                         debug!(
                             promoted = result.promotion.is_some(),
                             regression = result.regression,
