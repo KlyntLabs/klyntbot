@@ -5,6 +5,7 @@
 //! the `AudioCapture` subsystem, and the `VoiceService` orchestrator.
 
 pub mod capture;
+pub mod sentence_accumulator;
 pub mod dsp;
 pub mod engine_manager;
 pub mod engines;
