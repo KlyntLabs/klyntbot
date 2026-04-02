@@ -388,7 +388,8 @@ impl SimulationHarness {
         // Build the final report.
         let wall_time_secs = run_start.elapsed().as_secs_f64();
         let final_metrics = metrics.timeline.last().cloned().unwrap_or_default();
-        let regression_alerts = metrics.check_regressions(10.0);
+        let regression_alerts =
+            metrics.check_regressions(self.scenario.simulation.regression_threshold);
 
         let improvement_pct = metrics
             .baselines
@@ -515,6 +516,59 @@ impl SimulationHarness {
             match self.consolidation_handler.decide_batch(&candidates).await {
                 Ok(ops) => {
                     cognitive::execute_memory_ops(&ops, &candidates, &self.fact_repo, None).await;
+
+                    // Contradiction detection: mirror the logic from
+                    // cognitive::services::background that checks Update/Add ops
+                    // for conflicting user-stated facts with high confidence.
+                    for (candidate, op) in candidates.iter().zip(ops.iter()) {
+                        match op {
+                            cognitive::MemoryOp::Update { id: _, old_id } => {
+                                let new = &candidate.candidate;
+                                if let Ok(Some(old_fact)) = self.fact_repo.get(old_id).await {
+                                    if old_fact.confidence < 0.7
+                                        || old_fact.source != "user_stated"
+                                    {
+                                        continue;
+                                    }
+                                    if old_fact.object != new.object {
+                                        self.bus.publish(DomainEvent::ContradictionDetected {
+                                            existing_subject: old_fact.subject.clone(),
+                                            existing_predicate: old_fact.predicate.clone(),
+                                            existing_object: old_fact.object.clone(),
+                                            new_object: new.object.clone(),
+                                            confidence: new.confidence,
+                                        });
+                                    }
+                                }
+                            }
+                            cognitive::MemoryOp::Add { .. } => {
+                                let new = &candidate.candidate;
+                                for existing in &candidate.existing {
+                                    if existing.superseded_at.is_some() {
+                                        continue;
+                                    }
+                                    if existing.confidence < 0.7
+                                        || existing.source != "user_stated"
+                                    {
+                                        continue;
+                                    }
+                                    if existing.object != new.object
+                                        && existing.subject == new.subject
+                                        && existing.predicate == new.predicate
+                                    {
+                                        self.bus.publish(DomainEvent::ContradictionDetected {
+                                            existing_subject: existing.subject.clone(),
+                                            existing_predicate: existing.predicate.clone(),
+                                            existing_object: existing.object.clone(),
+                                            new_object: new.object.clone(),
+                                            confidence: new.confidence,
+                                        });
+                                    }
+                                }
+                            }
+                            _ => {}
+                        }
+                    }
                 }
                 Err(e) => {
                     debug!(error = %e, "Consolidation failed, falling back to direct add");

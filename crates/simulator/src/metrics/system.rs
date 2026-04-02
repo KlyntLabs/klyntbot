@@ -68,11 +68,10 @@ pub async fn measure_autotuner_success(pool: &sqlx::SqlitePool) -> AutotunerStat
 /// In simulation, each insight row represents a successful cross-domain connection.
 /// Usefulness = count of insights / total simulated days so far (normalized to 0-1).
 pub async fn measure_insight_usefulness(pool: &sqlx::SqlitePool, day: u32) -> f64 {
-    let count: (i64,) =
-        sqlx::query_as("SELECT COUNT(*) FROM cross_domain_insights")
-            .fetch_one(pool)
-            .await
-            .unwrap_or((0,));
+    let count: (i64,) = sqlx::query_as("SELECT COUNT(*) FROM cross_domain_insights")
+        .fetch_one(pool)
+        .await
+        .unwrap_or((0,));
 
     if day == 0 {
         return 0.0;

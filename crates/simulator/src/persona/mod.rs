@@ -160,21 +160,29 @@ impl PersonaRunner {
     ) -> Option<SimulatedToolAction> {
         match topic {
             "tasks" => {
-                let titles = [
-                    "review PR",
-                    "update docs",
-                    "fix bug in parser",
-                    "write tests",
-                    "deploy staging",
-                    "plan sprint",
-                ];
-                let title = titles[self.rng.random_range(0..titles.len())].to_string();
-                self.created_task_titles.push(title.clone());
-                Some(SimulatedToolAction::CreateTask {
-                    title,
-                    due_offset_days: Some(self.rng.random_range(1..8)),
-                    project: Some("main".to_string()),
-                })
+                // 30% chance to complete an existing task instead of creating a new one
+                if !self.created_task_titles.is_empty() && self.rng.random::<f64>() < 0.3 {
+                    let idx = self.rng.random_range(0..self.created_task_titles.len());
+                    Some(SimulatedToolAction::CompleteTask {
+                        task_ref: self.created_task_titles[idx].clone(),
+                    })
+                } else {
+                    let titles = [
+                        "review PR",
+                        "update docs",
+                        "fix bug in parser",
+                        "write tests",
+                        "deploy staging",
+                        "plan sprint",
+                    ];
+                    let title = titles[self.rng.random_range(0..titles.len())].to_string();
+                    self.created_task_titles.push(title.clone());
+                    Some(SimulatedToolAction::CreateTask {
+                        title,
+                        due_offset_days: Some(self.rng.random_range(1..8)),
+                        project: Some("main".to_string()),
+                    })
+                }
             }
             "notes" => Some(SimulatedToolAction::CreateNote {
                 title: format!("note-{}", self.rng.random_range(1..1000u32)),
