@@ -47,7 +47,6 @@ pub struct SimulationHarness {
     reflection_handler: Arc<dyn cognitive::ReflectionHandler>,
     narrative_handler: Arc<dyn cognitive::mirror::NarrativeHandler>,
     /// ID of the first seeded autotuner trial (Trial A — default params).
-    #[allow(dead_code)]
     active_trial_id: String,
 }
 
@@ -186,6 +185,7 @@ impl SimulationHarness {
         let mut persona_runner = PersonaRunner::new(self.scenario.persona.clone());
         let mut metrics = MetricCollector::new(30);
         let action_executor = ActionExecutor::new(Arc::clone(&self.bus), self.inner_pool.clone());
+        let trial_repo = storage::TrialRepo::new(self.inner_pool.clone());
 
         // Subscribe to bus for ContradictionDetected events.
         let contradiction_count = Arc::new(AtomicU32::new(0));
@@ -236,10 +236,13 @@ impl SimulationHarness {
             // MESSAGE PHASE
             let mut messages = persona_runner.generate_day(plan.simulated_now);
 
-            // Backfill retrieval annotations: for each message, annotate with
-            // recently extracted fact IDs from the same topic so retrieval
-            // precision/recall can be measured against real DB state.
+            total_messages += messages.len() as u32;
             for msg in &mut messages {
+                // Backfill retrieval annotations inline: annotate with
+                // previously extracted fact IDs from the same topic so
+                // retrieval precision/recall can be measured. By doing this
+                // per-message (instead of pre-loop), message N+1 immediately
+                // sees facts extracted from message N on the same day.
                 let relevant = persona_runner.relevant_facts_for_topic(&msg.topic);
                 if !relevant.is_empty() {
                     if let Some(ref mut gt) = msg.ground_truth {
@@ -252,10 +255,7 @@ impl SimulationHarness {
                         });
                     }
                 }
-            }
 
-            total_messages += messages.len() as u32;
-            for msg in &messages {
                 // Track accumulator metrics.
                 metrics.accumulator_mut().messages_processed += 1;
 
@@ -274,6 +274,23 @@ impl SimulationHarness {
                 .bind(msg.simulated_at.to_rfc3339())
                 .execute(&self.inner_pool)
                 .await;
+
+                // Shadow log entry for autotuner evaluation.
+                let predicted_skill = expected_skill_for_topic(&msg.topic);
+                let _ = trial_repo
+                    .insert_shadow_log(
+                        &self.active_trial_id,
+                        &msg.simulated_at.to_rfc3339(),
+                        "sim-session",
+                        &Uuid::new_v4().to_string(),
+                        predicted_skill,
+                        "reactive",
+                        0.85,
+                        10,
+                        predicted_skill,
+                        "reactive",
+                    )
+                    .await;
 
                 if msg.is_correction {
                     metrics.accumulator_mut().corrections += 1;
@@ -850,6 +867,16 @@ impl SimulationHarness {
                 }
             }
         }
+    }
+}
+
+/// Map a simulation topic to its expected orchestrator skill name for shadow log entries.
+fn expected_skill_for_topic(topic: &str) -> &'static str {
+    match topic {
+        "tasks" => "task-management",
+        "finance" => "finance-management",
+        "automation" => "automation",
+        _ => "general",
     }
 }
 
