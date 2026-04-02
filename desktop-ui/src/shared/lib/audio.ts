@@ -115,6 +115,8 @@ interface AudioChunk {
 /** Queue of audio chunks waiting to be played in order. */
 const chunkQueue: AudioChunk[] = [];
 let queuePlaying = false;
+/** Incremented on clear — stale drainQueue calls exit when they see a newer generation. */
+let queueGeneration = 0;
 
 /**
  * Enqueue a streaming TTS audio chunk for sequential playback.
@@ -124,24 +126,26 @@ export function enqueueTtsChunk(base64: string, sampleRate: number): void {
   if (!base64) return;
   chunkQueue.push({ base64, sampleRate });
   if (!queuePlaying) {
-    drainQueue();
+    drainQueue(queueGeneration);
   }
 }
 
-/** Process the chunk queue sequentially. */
-async function drainQueue(): Promise<void> {
+async function drainQueue(generation: number): Promise<void> {
   queuePlaying = true;
-  while (chunkQueue.length > 0) {
+  while (chunkQueue.length > 0 && generation === queueGeneration) {
     const chunk = chunkQueue.shift();
     if (!chunk) break;
     await playBase64Audio(chunk.base64, chunk.sampleRate);
   }
-  queuePlaying = false;
+  if (generation === queueGeneration) {
+    queuePlaying = false;
+  }
 }
 
 /** Clear the streaming audio queue and stop current playback. */
 export function clearTtsQueue(): void {
   chunkQueue.length = 0;
+  queueGeneration++;
   queuePlaying = false;
   stopTtsAudio();
 }

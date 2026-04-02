@@ -38,10 +38,10 @@ pub trait PronunciationProvider: Send + Sync {
     async fn analyze(&self, transcript: &str, language: &Language, duration_ms: u64);
 }
 
-/// Base64-encode an `AudioClip`'s raw float samples for transport to the frontend.
-fn base64_encode_audio(clip: &AudioClip) -> String {
+/// Base64-encode raw float32 PCM samples for transport to the frontend.
+pub fn base64_encode_f32_audio(samples: &[f32]) -> String {
     use base64::Engine;
-    let bytes: Vec<u8> = clip.samples.iter().flat_map(|s| s.to_le_bytes()).collect();
+    let bytes: Vec<u8> = samples.iter().flat_map(|s| s.to_le_bytes()).collect();
     base64::engine::general_purpose::STANDARD.encode(&bytes)
 }
 
@@ -56,11 +56,23 @@ enum AudioCommand {
 
 /// Persistent audio output player. Runs a dedicated thread that receives
 /// audio via a channel and plays through the configured output device.
+///
+/// Cloning is cheap — clones share the same playback thread.
 pub struct AudioPlayer {
     tx: std::sync::mpsc::Sender<AudioCommand>,
-    _thread: std::thread::JoinHandle<()>,
+    _thread: Arc<std::thread::JoinHandle<()>>,
     /// Shared output device name — updated on config hot-reload.
     output_device: Arc<std::sync::RwLock<Option<String>>>,
+}
+
+impl Clone for AudioPlayer {
+    fn clone(&self) -> Self {
+        Self {
+            tx: self.tx.clone(),
+            _thread: self._thread.clone(),
+            output_device: self.output_device.clone(),
+        }
+    }
 }
 
 impl AudioPlayer {
@@ -161,7 +173,7 @@ impl AudioPlayer {
 
         Self {
             tx,
-            _thread: thread,
+            _thread: Arc::new(thread),
             output_device: device_ref,
         }
     }
@@ -862,7 +874,7 @@ impl VoiceService {
                         let audio_base64 = if native_audio {
                             String::new()
                         } else {
-                            base64_encode_audio(&clip)
+                            base64_encode_f32_audio(&clip.samples)
                         };
                         let sample_rate = clip.sample_rate;
                         let playback_rx = if native_audio {
@@ -899,15 +911,14 @@ impl VoiceService {
         tts_params: &TtsParams,
     ) -> Option<crate::streaming_tts::StreamingTtsHandle> {
         let tts = self.tts.read().ok().and_then(|g| g.clone())?;
-        let native_audio = self.cfg().native_audio;
-        let output_device = self.cfg().output_device.clone();
+        let cfg = self.cfg();
 
         Some(crate::streaming_tts::StreamingTtsPipeline::start(
             tts,
             tts_params.clone(),
-            AudioPlayer::new(output_device),
+            self.audio_player.clone(),
             self.event_tx.clone(),
-            native_audio,
+            cfg.native_audio,
         ))
     }
 

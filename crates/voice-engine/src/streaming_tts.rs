@@ -9,12 +9,11 @@
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 
-use base64::Engine as _;
 use tokio::sync::{mpsc, oneshot};
 use tracing::warn;
 
 use crate::events::VoiceEvent;
-use crate::service::AudioPlayer;
+use crate::service::{base64_encode_f32_audio, AudioPlayer};
 use crate::tts::TtsEngine;
 use crate::types::TtsParams;
 
@@ -90,9 +89,7 @@ impl StreamingTtsPipeline {
                 let audio_base64 = if native_audio {
                     String::new()
                 } else {
-                    let bytes: Vec<u8> =
-                        clip.samples.iter().flat_map(|s| s.to_le_bytes()).collect();
-                    base64::engine::general_purpose::STANDARD.encode(&bytes)
+                    base64_encode_f32_audio(&clip.samples)
                 };
 
                 let event = VoiceEvent::SpeakChunk {
