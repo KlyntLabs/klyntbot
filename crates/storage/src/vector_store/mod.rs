@@ -14,8 +14,8 @@ use lancedb::Connection;
 
 use crate::error::StorageError;
 
-const LANCE_INDEX_CACHE_BYTES: usize = 64 * 1024 * 1024;
-const LANCE_METADATA_CACHE_BYTES: usize = 64 * 1024 * 1024;
+const LANCE_INDEX_CACHE_BYTES: usize = 16 * 1024 * 1024;
+const LANCE_METADATA_CACHE_BYTES: usize = 16 * 1024 * 1024;
 
 mod cognitive;
 mod community;

@@ -1169,8 +1169,11 @@ impl AppCore {
             let repo = core.note_repo.clone();
             let token = shutdown_token.clone();
             tokio::spawn(async move {
-                // Small delay to let the app finish starting
-                tokio::time::sleep(std::time::Duration::from_secs(5)).await;
+                // Delay long enough for the app to settle. The ONNX embedding
+                // model is ~420 MB; loading it at startup inflates idle RSS.
+                // 120s matches EMBEDDING_IDLE_SECS so the model unloads quickly
+                // if no further embeddings are needed.
+                tokio::time::sleep(std::time::Duration::from_secs(120)).await;
                 if token.is_cancelled() {
                     return;
                 }
