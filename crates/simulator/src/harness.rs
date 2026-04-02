@@ -153,6 +153,28 @@ impl SimulationHarness {
         .execute(&inner_pool)
         .await;
 
+        // Seed a parent area for task rows (tasks.area_id NOT NULL FK).
+        let _ = sqlx::query(
+            "INSERT OR IGNORE INTO areas (id, name, color, status, created_at, updated_at) \
+             VALUES ('sim-area', 'Simulation', '#6366f1', 'active', ?, ?)",
+        )
+        .bind(&now)
+        .bind(&now)
+        .execute(&inner_pool)
+        .await;
+
+        // Seed a parent finance account for transaction rows
+        // (finance_transactions.account_id NOT NULL FK).
+        let _ = sqlx::query(
+            "INSERT OR IGNORE INTO finance_accounts \
+             (id, name, account_type, currency, balance, created_at, updated_at) \
+             VALUES ('sim-account', 'Simulation Account', 'checking', 'VND', 0, ?, ?)",
+        )
+        .bind(&now)
+        .bind(&now)
+        .execute(&inner_pool)
+        .await;
+
         Ok(Self {
             scenario,
             pool,
@@ -324,6 +346,28 @@ impl SimulationHarness {
                         }
                         _ => {}
                     }
+
+                    // tool_usage row
+                    let tool_name = match action {
+                        SimulatedToolAction::CreateTask { .. }
+                        | SimulatedToolAction::CompleteTask { .. } => "tasks",
+                        SimulatedToolAction::CreateNote { .. }
+                        | SimulatedToolAction::UpdateNote { .. } => "notes",
+                        SimulatedToolAction::RecordTransaction { .. } => "finance",
+                        SimulatedToolAction::StartFocus { .. }
+                        | SimulatedToolAction::RecordProductivityEvent { .. } => "productivity",
+                        SimulatedToolAction::CreateObjective { .. } => "okr",
+                    };
+                    let _ = sqlx::query(
+                        "INSERT INTO tool_usage \
+                         (id, tool_name, action, session_key, channel, success, duration_ms, created_at) \
+                         VALUES (?, ?, 'execute', 'sim-session', 'simulation', 1, 10, ?)",
+                    )
+                    .bind(Uuid::new_v4().to_string())
+                    .bind(tool_name)
+                    .bind(msg.simulated_at.to_rfc3339())
+                    .execute(&self.inner_pool)
+                    .await;
                 }
 
                 // Drive cognitive pipeline: extract facts from message.
@@ -352,6 +396,44 @@ impl SimulationHarness {
                 if message_matches_topic_keywords(&msg.content, &msg.topic) {
                     metrics.accumulator_mut().routing_matches += 1;
                 }
+
+                // ── Domain entity rows: usage, interaction, strategy ──
+                let request_id = Uuid::new_v4().to_string();
+
+                // usage_records
+                let _ = sqlx::query(
+                    "INSERT INTO usage_records \
+                     (id, timestamp, request_id, model, provider, prompt_tokens, completion_tokens, channel, strategy) \
+                     VALUES (?, ?, ?, 'scripted-sim', 'simulator', 100, 50, 'simulation', 'reactive')",
+                )
+                .bind(Uuid::new_v4().to_string())
+                .bind(msg.simulated_at.to_rfc3339())
+                .bind(&request_id)
+                .execute(&self.inner_pool)
+                .await;
+
+                // interaction_log
+                let _ = sqlx::query(
+                    "INSERT INTO interaction_log \
+                     (timestamp, agent_name, tool_names, channel, duration_ms) \
+                     VALUES (?, 'general', ?, 'simulation', 50)",
+                )
+                .bind(msg.simulated_at.to_rfc3339())
+                .bind(&msg.topic)
+                .execute(&self.inner_pool)
+                .await;
+
+                // strategy_records
+                let _ = sqlx::query(
+                    "INSERT INTO strategy_records \
+                     (id, timestamp, request_id, predicted_strategy, actual_strategy, success, execution_mode, chat_id) \
+                     VALUES (?, ?, ?, 'reactive', 'reactive', 1, 'reactive', 'sim-session')",
+                )
+                .bind(Uuid::new_v4().to_string())
+                .bind(msg.simulated_at.to_rfc3339())
+                .bind(&request_id)
+                .execute(&self.inner_pool)
+                .await;
 
                 // Token tracking (150 per scripted call).
                 metrics.accumulator_mut().total_tokens += 150;

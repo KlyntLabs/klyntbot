@@ -48,18 +48,30 @@ impl ActionExecutor {
     ) -> common::Result<()> {
         match action {
             SimulatedToolAction::CreateTask {
-                title: _,
+                title,
                 due_offset_days: _,
                 project,
             } => {
                 let task_id = Uuid::new_v4().to_string();
                 debug!(task_id = %task_id, "action: CreateTask");
                 self.bus.publish(DomainEvent::TaskCreated {
-                    task_id,
+                    task_id: task_id.clone(),
                     project: project.clone(),
                     estimate_mins: None,
                     task_type: "todo".to_string(),
                 });
+
+                // INSERT task row into the tasks table.
+                let _ = sqlx::query(
+                    "INSERT OR IGNORE INTO tasks (id, title, area_id, status, priority, created_at, updated_at, completed) \
+                     VALUES (?, ?, 'sim-area', 'todo', 3, ?, ?, 0)",
+                )
+                .bind(&task_id)
+                .bind(title)
+                .bind(simulated_now.to_rfc3339())
+                .bind(simulated_now.to_rfc3339())
+                .execute(&self.pool)
+                .await;
             }
 
             SimulatedToolAction::CompleteTask { task_ref } => {
@@ -70,6 +82,16 @@ impl ActionExecutor {
                     estimated_duration_mins: None,
                     deviation_pct: None,
                 });
+
+                // UPDATE the task row to completed.
+                let _ = sqlx::query(
+                    "UPDATE tasks SET status = 'completed', completed = 1, completed_at = ?, updated_at = ? WHERE title = ?",
+                )
+                .bind(simulated_now.to_rfc3339())
+                .bind(simulated_now.to_rfc3339())
+                .bind(task_ref)
+                .execute(&self.pool)
+                .await;
             }
 
             SimulatedToolAction::CreateNote { title, content } => {
@@ -101,7 +123,7 @@ impl ActionExecutor {
             SimulatedToolAction::RecordTransaction {
                 amount,
                 category,
-                description: _,
+                description,
             } => {
                 debug!(category = %category, amount = %amount, "action: RecordTransaction");
                 self.bus.publish(DomainEvent::TransactionRecorded {
@@ -109,6 +131,23 @@ impl ActionExecutor {
                     amount: *amount,
                     is_over_budget: false,
                 });
+
+                // INSERT a finance_transactions row.
+                let tx_id = Uuid::new_v4().to_string();
+                let _ = sqlx::query(
+                    "INSERT INTO finance_transactions \
+                     (id, account_id, tx_type, amount, currency, category, notes, tx_date, created_at, updated_at) \
+                     VALUES (?, 'sim-account', 'expense', ?, 'VND', ?, ?, ?, ?, ?)",
+                )
+                .bind(&tx_id)
+                .bind(*amount as i64)
+                .bind(category)
+                .bind(description)
+                .bind(simulated_now.format("%Y-%m-%d").to_string())
+                .bind(simulated_now.to_rfc3339())
+                .bind(simulated_now.to_rfc3339())
+                .execute(&self.pool)
+                .await;
             }
 
             SimulatedToolAction::StartFocus {
@@ -173,6 +212,27 @@ mod tests {
         storage::StoragePool::run_feature_migrations(&inner, &cognitive::cognitive_migrations())
             .await
             .expect("cognitive migrations");
+        // Run feature-tasks migration so task INSERTs succeed.
+        sqlx::query(feature_tasks::TasksFeature::migration_sql())
+            .execute(&inner)
+            .await
+            .expect("tasks migration");
+        // Seed parent rows for FK constraints.
+        sqlx::query(
+            "INSERT OR IGNORE INTO areas (id, name, color, status) \
+             VALUES ('sim-area', 'Simulation', '#6366f1', 'active')",
+        )
+        .execute(&inner)
+        .await
+        .expect("seed area");
+        sqlx::query(
+            "INSERT OR IGNORE INTO finance_accounts \
+             (id, name, account_type, currency, balance) \
+             VALUES ('sim-account', 'Simulation Account', 'checking', 'VND', 0)",
+        )
+        .execute(&inner)
+        .await
+        .expect("seed finance account");
         // Keep the StoragePool alive by leaking it (tests are short-lived).
         std::mem::forget(pool);
         inner
