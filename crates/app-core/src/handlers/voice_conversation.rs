@@ -1176,11 +1176,7 @@ impl VoiceConversationManager {
         if !interrupted {
             if let Some(done_rx) = tts_done_rx {
                 // Wait for TTS playback to finish with a 30s timeout
-                let _ = tokio::time::timeout(
-                    std::time::Duration::from_secs(30),
-                    done_rx,
-                )
-                .await;
+                let _ = tokio::time::timeout(std::time::Duration::from_secs(30), done_rx).await;
             }
         }
 

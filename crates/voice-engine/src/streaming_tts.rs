@@ -185,13 +185,19 @@ mod tests {
 
         handle
             .sentence_tx
-            .send(SentenceItem { text: "Hello world.".to_string(), is_final: false })
+            .send(SentenceItem {
+                text: "Hello world.".to_string(),
+                is_final: false,
+            })
             .await
             .unwrap();
 
         handle
             .sentence_tx
-            .send(SentenceItem { text: "Goodbye world.".to_string(), is_final: true })
+            .send(SentenceItem {
+                text: "Goodbye world.".to_string(),
+                is_final: true,
+            })
             .await
             .unwrap();
 
@@ -236,20 +242,18 @@ mod tests {
         let tts = Arc::new(MockTtsEngine);
         let (event_tx, mut event_rx) = mpsc::channel::<VoiceEvent>(16);
 
-        let handle = StreamingTtsPipeline::start(
-            tts,
-            TtsParams::default(),
-            make_player(),
-            event_tx,
-            false,
-        );
+        let handle =
+            StreamingTtsPipeline::start(tts, TtsParams::default(), make_player(), event_tx, false);
 
         // Signal stop immediately before sending any sentence.
         handle.stop.store(true, Ordering::Relaxed);
 
         handle
             .sentence_tx
-            .send(SentenceItem { text: "Should not be synthesized.".to_string(), is_final: true })
+            .send(SentenceItem {
+                text: "Should not be synthesized.".to_string(),
+                is_final: true,
+            })
             .await
             .unwrap();
 
@@ -268,6 +272,9 @@ mod tests {
             }
         }
 
-        assert_eq!(speak_chunk_count, 0, "no SpeakChunk events expected after stop");
+        assert_eq!(
+            speak_chunk_count, 0,
+            "no SpeakChunk events expected after stop"
+        );
     }
 }
