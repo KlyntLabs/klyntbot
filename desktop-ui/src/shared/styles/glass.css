@@ -298,4 +298,32 @@
       rgba(255, 255, 255, 0.04) 100%
     );
   }
+
+  /* ─────────────────────────────────────────────────────────────────
+     GPU layer containment — prevent children from promoting to
+     separate compositing layers. Reduces IOAccelerator texture memory.
+     ───────────────────────────────────────────────────────────────── */
+  .glass-sidebar,
+  .glass-panel,
+  .glass-card {
+    contain: paint;
+  }
+
+  /* ─────────────────────────────────────────────────────────────────
+     Content virtualization — skip rendering off-screen items in
+     scrollable lists. WebKit skips layout, paint, and GPU layer
+     creation for hidden items. contain-intrinsic-size prevents
+     scrollbar jitter by reserving estimated height.
+     ───────────────────────────────────────────────────────────────── */
+  .glass-bubble,
+  .glass-bubble-user {
+    content-visibility: auto;
+    contain-intrinsic-size: auto 60px;
+  }
+
+  .glass-card,
+  .note-card {
+    content-visibility: auto;
+    contain-intrinsic-size: auto 120px;
+  }
 }
