@@ -1077,6 +1077,18 @@ impl VoiceConversationManager {
                                 );
                             }
                             let _ = message_id;
+                            // Notify the chat UI that the assistant response is persisted
+                            if let Ok(val) = serde_json::to_value(
+                                &desktop_shared::events::ChatMessagePayload {
+                                    session_key: session_key_str.clone(),
+                                    source: "voice".to_string(),
+                                },
+                            ) {
+                                self.emitter.emit_event(
+                                    desktop_shared::events::CHAT_MESSAGE_ADDED,
+                                    val,
+                                );
+                            }
 
                             // Flush remaining text from accumulator as final sentence
                             if let Some(remainder) = accumulator.flush() {

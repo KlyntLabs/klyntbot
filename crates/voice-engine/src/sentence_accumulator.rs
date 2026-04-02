@@ -17,9 +17,10 @@ fn is_sentence_end(c: char) -> bool {
 impl SentenceAccumulator {
     /// Creates a new accumulator.
     ///
-    /// `min_sentence_len` is the minimum number of characters (inclusive) that must precede
-    /// a punctuation mark for a sentence boundary to be recognised. This prevents splitting
-    /// on abbreviations such as "Dr." when `min_sentence_len` is, e.g., 10.
+    /// `min_sentence_len` is the minimum byte length (inclusive) up to and including the
+    /// punctuation mark for a sentence boundary to be recognised. This prevents splitting
+    /// on abbreviations such as "Dr." when `min_sentence_len` is, e.g., 10. Note: for
+    /// multi-byte UTF-8 characters (CJK), this effectively uses a lower character threshold.
     pub fn new(min_sentence_len: usize) -> Self {
         Self {
             buffer: String::new(),
