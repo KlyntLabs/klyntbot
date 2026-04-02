@@ -884,6 +884,31 @@ impl VoiceService {
         }
     }
 
+    /// Start a streaming TTS pipeline for sentence-by-sentence synthesis.
+    pub fn start_streaming_tts(
+        &self,
+        tts_params: &TtsParams,
+    ) -> Option<crate::streaming_tts::StreamingTtsHandle> {
+        let tts = self.tts.read().ok().and_then(|g| g.clone())?;
+        let native_audio = self.cfg().native_audio;
+        let output_device = self.cfg().output_device.clone();
+
+        Some(crate::streaming_tts::StreamingTtsPipeline::start(
+            tts,
+            tts_params.clone(),
+            AudioPlayer::new(output_device),
+            self.event_tx.clone(),
+            native_audio,
+        ))
+    }
+
+    /// Eagerly preload the TTS model so it's warm for the first response.
+    pub async fn preload_tts(&self) {
+        if let Some(tts) = self.tts.read().ok().and_then(|g| g.clone()) {
+            let _ = tts.preload().await;
+        }
+    }
+
     /// Get the active engine kind (Local or Cloud).
     pub fn engine_kind(&self) -> Option<EngineKind> {
         self.active_engine().map(|(_, k)| k)

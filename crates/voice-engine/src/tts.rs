@@ -17,4 +17,9 @@ pub trait TtsEngine: Send + Sync {
     fn unload_if_idle(&self) -> bool {
         false
     }
+
+    /// Eagerly load the model into memory. Default: no-op.
+    async fn preload(&self) -> common::Result<()> {
+        Ok(())
+    }
 }
