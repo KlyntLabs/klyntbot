@@ -158,6 +158,20 @@ async fn smoke_test_7_day_simulation() {
         last.routing_accuracy
     );
 
+    // Response quality should be in valid range
+    assert!(
+        last.response_quality >= 0.0 && last.response_quality <= 1.0,
+        "response_quality should be in [0, 1], got {:.3}",
+        last.response_quality
+    );
+
+    // Salience extract rate should be populated
+    assert!(
+        last.salience_extract_rate >= 0.0 && last.salience_extract_rate <= 1.0,
+        "salience_extract_rate should be in [0, 1], got {:.3}",
+        last.salience_extract_rate
+    );
+
     // Verify the report can be serialized without NaN/Inf from division
     let json = serde_json::to_string(&report).unwrap();
     assert!(!json.contains("NaN"), "report contains NaN values");
@@ -249,6 +263,14 @@ async fn run_software_engineer_12mo() {
         eprintln!(
             "  Routing accuracy:      {:.3} → {:.3}",
             first.routing_accuracy, last.routing_accuracy
+        );
+        eprintln!(
+            "  Response quality:      {:.3} → {:.3}",
+            first.response_quality, last.response_quality
+        );
+        eprintln!(
+            "  Salience extract rate: {:.3} → {:.3}",
+            first.salience_extract_rate, last.salience_extract_rate
         );
         eprintln!(
             "  Community stability:   {:.3} → {:.3}",

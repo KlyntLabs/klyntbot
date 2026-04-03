@@ -100,6 +100,8 @@ pub struct GroundTruthAnnotation {
     pub introduces_fact: Option<FactTriple>,
     pub relevant_facts: Vec<String>,
     pub expected_skill: Option<String>,
+    #[serde(default)]
+    pub expected_response: Option<String>,
 }
 
 // ── Simulated tool actions ─────────────────────────────────────────────

@@ -225,6 +225,8 @@ fn get_metric_value(snapshot: &MetricSnapshot, metric: &MetricName) -> f64 {
         MetricName::TaskCompletionRate => snapshot.task_completion_rate,
         MetricName::RoutingStability => snapshot.routing_stability,
         MetricName::RoutingAccuracy => snapshot.routing_accuracy,
+        MetricName::ResponseQuality => snapshot.response_quality,
+        MetricName::SalienceExtractRate => snapshot.salience_extract_rate,
         MetricName::MemoryRetrievability => snapshot.memory_retrievability,
         MetricName::MetaRuleCount => snapshot.meta_rule_count as f64,
         MetricName::InsightUsefulness => snapshot.insight_usefulness,

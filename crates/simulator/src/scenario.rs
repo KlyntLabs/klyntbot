@@ -71,6 +71,8 @@ pub enum MetricName {
     TaskCompletionRate,
     RoutingStability,
     RoutingAccuracy,
+    ResponseQuality,
+    SalienceExtractRate,
     MemoryRetrievability,
     MetaRuleCount,
     InsightUsefulness,

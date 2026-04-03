@@ -62,6 +62,9 @@ pub struct SimulationHarness {
     champion: std::sync::Mutex<autotuner::Champion>,
     skill_router: Option<SkillRouter>,
     skill_catalog: Option<SkillCatalog>,
+    embedding_engine: Option<tools::EmbeddingEngine>,
+    /// Pre-cached embeddings for the 8 reference answer strings (one per topic).
+    reference_embeddings: HashMap<String, Vec<f32>>,
 }
 
 impl SimulationHarness {
@@ -208,6 +211,27 @@ impl SimulationHarness {
             }
         };
 
+        let embedding_engine = tools::EmbeddingEngine::new();
+        // Pre-cache embeddings for the 8 reference answer strings to avoid
+        // re-embedding the same text hundreds of times during the simulation.
+        let reference_texts = [
+            "Here are your tasks. I can help you create, complete, or prioritize them.",
+            "I can help with your notes. Let me search, create, or summarize them.",
+            "Here's your financial summary. I can track expenses, check budgets, or show trends.",
+            "Let me help with your focus and productivity. I can start a session or show your stats.",
+            "I understand you're looking for guidance. Let me help you with priorities and habits.",
+            "I can help you study. Let me create flashcards or quiz you on the topic.",
+            "I can set up reminders and recurring tasks to automate your workflow.",
+            "Let me analyze patterns across your data and show you cross-domain connections.",
+        ];
+        let mut reference_embeddings = HashMap::new();
+        for text in &reference_texts {
+            if let Ok(emb) = embedding_engine.embed(text) {
+                reference_embeddings.insert(text.to_string(), emb);
+            }
+        }
+        let embedding_engine = Some(embedding_engine);
+
         Ok(Self {
             scenario,
             pool,
@@ -228,6 +252,8 @@ impl SimulationHarness {
             champion: std::sync::Mutex::new(autotuner::Champion::default()),
             skill_router,
             skill_catalog,
+            embedding_engine,
+            reference_embeddings,
         })
     }
 
@@ -316,6 +342,7 @@ impl SimulationHarness {
                             introduces_fact: None,
                             relevant_facts: relevant,
                             expected_skill: None,
+                            expected_response: None,
                         });
                     }
                 }
@@ -442,6 +469,40 @@ impl SimulationHarness {
                     .bind(msg.simulated_at.to_rfc3339())
                     .execute(&self.inner_pool)
                     .await;
+
+                    // Salience: classify the domain event this action produced.
+                    let salience_event = match action {
+                        SimulatedToolAction::CreateTask { project, .. } => {
+                            Some(DomainEvent::TaskCreated {
+                                task_id: String::new(),
+                                project: project.clone(),
+                                estimate_mins: None,
+                                task_type: "todo".to_string(),
+                            })
+                        }
+                        SimulatedToolAction::CompleteTask { task_ref } => {
+                            Some(DomainEvent::TaskCompleted {
+                                task_id: task_ref.clone(),
+                                actual_duration_mins: None,
+                                estimated_duration_mins: None,
+                                deviation_pct: None,
+                            })
+                        }
+                        SimulatedToolAction::RecordTransaction {
+                            category, amount, ..
+                        } => Some(DomainEvent::TransactionRecorded {
+                            category: category.clone(),
+                            amount: *amount,
+                            is_over_budget: false,
+                        }),
+                        _ => None,
+                    };
+                    if let Some(ref event) = salience_event {
+                        crate::metrics::cognitive::record_salience(
+                            event,
+                            metrics.accumulator_mut(),
+                        );
+                    }
                 }
 
                 // Drive cognitive pipeline: extract facts from message.
@@ -516,6 +577,40 @@ impl SimulationHarness {
                         }
                     }
                 }
+
+                // Response quality: measure topic-to-reference alignment via embedding
+                // similarity. Compares the user's message against the expected response
+                // for the topic. Uses cached reference embeddings to avoid re-embedding
+                // the same 8 reference strings on every message.
+                // NOTE: With a real LLM, this should score the AI's actual response instead.
+                if let Some(ref engine) = self.embedding_engine {
+                    if let Some(expected) = msg
+                        .ground_truth
+                        .as_ref()
+                        .and_then(|gt| gt.expected_response.as_deref())
+                    {
+                        let cached = self
+                            .reference_embeddings
+                            .get(expected)
+                            .map(|v| v.as_slice());
+                        if let Some(score) = crate::metrics::cognitive::score_response_quality(
+                            engine,
+                            &msg.content,
+                            cached,
+                            expected,
+                        ) {
+                            metrics.accumulator_mut().response_quality_sum += score;
+                            metrics.accumulator_mut().response_quality_count += 1;
+                        }
+                    }
+                }
+
+                // Salience: classify the message as a ChatTurnCompleted event.
+                let chat_event = DomainEvent::ChatTurnCompleted {
+                    user_message: msg.content.clone(),
+                    session_key: "sim-session".to_string(),
+                };
+                crate::metrics::cognitive::record_salience(&chat_event, metrics.accumulator_mut());
 
                 // ── Domain entity rows: usage, interaction, strategy ──
                 let request_id = Uuid::new_v4().to_string();

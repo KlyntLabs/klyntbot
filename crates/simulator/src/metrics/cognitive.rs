@@ -43,6 +43,35 @@ pub async fn count_meta_rules(pool: &sqlx::SqlitePool) -> u32 {
     count.map(|(n,)| n as u32).unwrap_or(0)
 }
 
+/// Record a domain event's salience verdict on the metric accumulator.
+pub fn record_salience(event: &bus::DomainEvent, acc: &mut super::EpochAccumulator) {
+    match cognitive::services::salience::evaluate_salience(event) {
+        cognitive::types::SalienceVerdict::Extract => acc.salience_extract += 1,
+        cognitive::types::SalienceVerdict::Accumulate => acc.salience_accumulate += 1,
+        cognitive::types::SalienceVerdict::Discard => acc.salience_discard += 1,
+    }
+}
+
+/// Score a text against a reference answer using embedding cosine similarity.
+///
+/// Returns a score in [0, 1] where 1.0 = perfect semantic match.
+/// Returns `None` if embedding fails (engine not available, etc.).
+///
+/// When `ref_embedding` is provided (pre-cached), skips re-embedding the reference.
+pub fn score_response_quality(
+    engine: &tools::EmbeddingEngine,
+    text: &str,
+    ref_embedding: Option<&[f32]>,
+    reference: &str,
+) -> Option<f64> {
+    let text_emb = engine.embed(text).ok()?;
+    let ref_emb = match ref_embedding {
+        Some(cached) => cached.to_vec(),
+        None => engine.embed(reference).ok()?,
+    };
+    Some(common::helpers::cosine_similarity(&text_emb, &ref_emb))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -59,5 +88,21 @@ mod tests {
         let pool = sqlx::SqlitePool::connect("sqlite::memory:").await.unwrap();
         let count = count_meta_rules(&pool).await;
         assert_eq!(count, 0);
+    }
+
+    #[test]
+    fn score_response_quality_identical_texts() {
+        let engine = tools::EmbeddingEngine::new();
+        let score = score_response_quality(
+            &engine,
+            "Here are your tasks for today",
+            None,
+            "Here are your tasks for today",
+        );
+        // If embedding engine is available, identical texts score near 1.0
+        // If not available (no semantic-search feature), score is None — OK
+        if let Some(s) = score {
+            assert!(s > 0.95, "identical texts should score > 0.95, got {s}");
+        }
     }
 }

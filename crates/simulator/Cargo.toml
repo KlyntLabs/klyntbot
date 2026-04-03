@@ -19,6 +19,7 @@ feature-tasks.workspace = true
 feature-notes.workspace = true
 feature-finance.workspace = true
 feature-productivity.workspace = true
+tools.workspace = true
 
 async-trait.workspace = true
 chrono = { workspace = true }

@@ -27,6 +27,8 @@ pub struct MetricSnapshot {
     pub task_completion_rate: f64,
     pub routing_stability: f64,
     pub routing_accuracy: f64,
+    pub response_quality: f64,
+    pub salience_extract_rate: f64,
     pub insight_usefulness: f64,
     // Tier 3 — system health
     pub autotuner_promotion_success: f64,
@@ -91,6 +93,11 @@ pub struct EpochAccumulator {
     pub tasks_created: u32,
     pub tasks_completed: u32,
     pub facts_superseded: u32,
+    pub salience_extract: u32,
+    pub salience_accumulate: u32,
+    pub salience_discard: u32,
+    pub response_quality_sum: f64,
+    pub response_quality_count: u32,
 }
 
 // ---------------------------------------------------------------------------
@@ -196,6 +203,18 @@ impl MetricCollector {
             acc.routing_correct as f64 / acc.routing_total as f64
         };
 
+        let response_quality = if acc.response_quality_count == 0 {
+            0.0
+        } else {
+            acc.response_quality_sum / acc.response_quality_count as f64
+        };
+        let salience_total = acc.salience_extract + acc.salience_accumulate + acc.salience_discard;
+        let salience_extract_rate = if salience_total == 0 {
+            0.0
+        } else {
+            acc.salience_extract as f64 / salience_total as f64
+        };
+
         let personalization_score = behavioral::personalization_score(
             knowledge_retention,
             retrieval_precision,
@@ -215,6 +234,8 @@ impl MetricCollector {
             task_completion_rate,
             routing_stability,
             routing_accuracy,
+            response_quality,
+            salience_extract_rate,
             insight_usefulness,
             autotuner_promotion_success,
             community_stability,

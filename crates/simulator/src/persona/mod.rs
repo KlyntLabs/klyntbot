@@ -292,6 +292,7 @@ impl PersonaRunner {
                     introduces_fact: Some(fact.clone()),
                     relevant_facts: vec![],
                     expected_skill: None,
+                    expected_response: None,
                 };
                 (text, Some(gt))
             } else if is_correction {
@@ -315,6 +316,7 @@ impl PersonaRunner {
                     introduces_fact: None,
                     relevant_facts: vec![],
                     expected_skill: self.expected_skill_for_topic(&topic),
+                    expected_response: self.expected_response_for_topic(&topic),
                 };
                 (text, Some(gt))
             };
@@ -346,6 +348,7 @@ impl PersonaRunner {
                     introduces_fact: Some(fact.clone()),
                     relevant_facts: vec![],
                     expected_skill: None,
+                    expected_response: None,
                 };
                 let msg_time = simulated_date + Duration::hours(20);
                 messages.push(AnnotatedMessage {
@@ -441,6 +444,21 @@ impl PersonaRunner {
                 ("content", "lifetimes are lexical in older Rust".to_string()),
             ],
             _ => vec![],
+        }
+    }
+
+    /// Map topic to an expected response hint for ground-truth annotations.
+    fn expected_response_for_topic(&self, topic: &str) -> Option<String> {
+        match topic {
+            "tasks" => Some("Here are your tasks. I can help you create, complete, or prioritize them.".to_string()),
+            "notes" => Some("I can help with your notes. Let me search, create, or summarize them.".to_string()),
+            "finance" => Some("Here's your financial summary. I can track expenses, check budgets, or show trends.".to_string()),
+            "productivity" => Some("Let me help with your focus and productivity. I can start a session or show your stats.".to_string()),
+            "coaching" => Some("I understand you're looking for guidance. Let me help you with priorities and habits.".to_string()),
+            "learning" => Some("I can help you study. Let me create flashcards or quiz you on the topic.".to_string()),
+            "automation" => Some("I can set up reminders and recurring tasks to automate your workflow.".to_string()),
+            "insights" => Some("Let me analyze patterns across your data and show you cross-domain connections.".to_string()),
+            _ => None,
         }
     }
 
