@@ -140,8 +140,23 @@ impl AgentHarness {
             analyzer = analyzer.with_shadow_mode();
         }
 
-        // Build context engine (minimal — no context sources for simulation)
-        let context_engine = Arc::new(context_engine::ContextEngine::new());
+        // Build context engine with real sources matching production
+        let context_sources: Vec<Box<dyn context_engine::source::ContextSource>> = vec![
+            Box::new(agent::context_sources::IdentitySource::new(
+                std::path::PathBuf::from("/tmp/klyntbot-sim"),
+                "UTC".to_string(),
+            )),
+            Box::new(cognitive::CognitiveContextSource::new(
+                cognitive::SemanticFactRepo::new(inner_pool.clone()),
+                cognitive::ProceduralRuleRepo::new(inner_pool.clone()),
+            )),
+            Box::new(agent::context_sources::ProductivityContextSource::new(
+                feature_productivity::repos::ProductivityRepos::new(inner_pool.clone()),
+            )),
+        ];
+        let context_engine = Arc::new(
+            context_engine::ContextEngine::new().with_sources(context_sources),
+        );
 
         // Build cost tracker
         let usage_repo = storage::UsageRepo::new(inner_pool);
