@@ -73,6 +73,8 @@ pub struct SimulationHarness {
     /// Coaching pattern detector — records trigger firings and detects
     /// behavioral patterns (afternoon energy drop, task avoidance, etc.).
     coaching_detector: Arc<TokioMutex<feature_coaching::PatternDetector>>,
+    /// Meta-rule detector — tracks correction streaks and proposes meta-rules.
+    meta_rule_detector: TokioMutex<cognitive::mirror::MetaRuleDetector>,
 }
 
 impl SimulationHarness {
@@ -334,6 +336,10 @@ impl SimulationHarness {
             None
         };
 
+        let meta_rule_detector = TokioMutex::new(cognitive::mirror::MetaRuleDetector::new(
+            mirror_repo.clone(),
+        ));
+
         Ok(Self {
             scenario,
             pool,
@@ -360,9 +366,8 @@ impl SimulationHarness {
             coaching_accumulator: Arc::new(TokioMutex::new(
                 feature_coaching::SignalAccumulator::new(),
             )),
-            coaching_detector: Arc::new(TokioMutex::new(
-                feature_coaching::PatternDetector::new(),
-            )),
+            coaching_detector: Arc::new(TokioMutex::new(feature_coaching::PatternDetector::new())),
+            meta_rule_detector,
         })
     }
 
@@ -389,9 +394,15 @@ impl SimulationHarness {
         let mut bus_rx = self.bus.subscribe();
         let cc = Arc::clone(&contradiction_count);
         let contradiction_listener = tokio::spawn(async move {
-            while let Ok(event) = bus_rx.recv().await {
-                if matches!(event, bus::DomainEvent::ContradictionDetected { .. }) {
-                    cc.fetch_add(1, Ordering::Relaxed);
+            loop {
+                match tokio::time::timeout(std::time::Duration::from_secs(5), bus_rx.recv()).await {
+                    Ok(Ok(event)) => {
+                        if matches!(event, bus::DomainEvent::ContradictionDetected { .. }) {
+                            cc.fetch_add(1, Ordering::Relaxed);
+                        }
+                    }
+                    Ok(Err(_)) => break,
+                    Err(_) => continue,
                 }
             }
         });
@@ -407,17 +418,25 @@ impl SimulationHarness {
             // Minimal UserSituation — the simulation doesn't have a real user,
             // but the accumulator needs one for trigger evaluation.
             let mut situation = cognitive::situation::UserSituation::default();
-            while let Ok(event) = coaching_rx.recv().await {
+            loop {
+                let event = match tokio::time::timeout(
+                    std::time::Duration::from_secs(5),
+                    coaching_rx.recv(),
+                )
+                .await
+                {
+                    Ok(Ok(e)) => e,
+                    Ok(Err(_)) => break, // channel closed
+                    Err(_) => continue,  // timeout — check again
+                };
                 // Incrementally update situation from relevant events.
                 match &event {
                     DomainEvent::DistractionDetected { .. } => {
-                        situation.distraction_risk =
-                            (situation.distraction_risk + 0.15).min(1.0);
+                        situation.distraction_risk = (situation.distraction_risk + 0.15).min(1.0);
                     }
                     DomainEvent::FocusSessionStarted { .. } => {
                         situation.focus_state = 0.9;
-                        situation.distraction_risk =
-                            (situation.distraction_risk - 0.2).max(0.0);
+                        situation.distraction_risk = (situation.distraction_risk - 0.2).max(0.0);
                     }
                     DomainEvent::FocusSessionEnded { quality, .. } => {
                         situation.focus_state = *quality;
@@ -426,8 +445,7 @@ impl SimulationHarness {
                         situation.task_avoidance_detected = true;
                     }
                     DomainEvent::BudgetAlert { .. } => {
-                        situation.deadline_pressure =
-                            (situation.deadline_pressure + 0.2).min(1.0);
+                        situation.deadline_pressure = (situation.deadline_pressure + 0.2).min(1.0);
                     }
                     _ => {}
                 }
@@ -492,6 +510,7 @@ impl SimulationHarness {
         while let Some(plan) = epoch.advance() {
             let epoch_start = Instant::now();
             day_counter = plan.day_of_simulation;
+            eprintln!("  [sim] day {day_counter} starting...");
 
             // PRE-MESSAGE CRONS
             for trigger in &plan.cron_pre_message {
@@ -592,6 +611,16 @@ impl SimulationHarness {
                         session_key: "sim-session".to_string(),
                         active_skill: Some(msg.topic.clone()),
                     });
+
+                    // Drive the MetaRuleDetector so it proposes rules from
+                    // correction streaks and persists them to mirror_meta_rules.
+                    let alert = {
+                        let mut detector = self.meta_rule_detector.lock().await;
+                        detector.record_correction("sim-session", predicted_skill)
+                    };
+                    if let Some(ref a) = alert {
+                        self.meta_rule_detector.lock().await.handle_alert(a).await;
+                    }
 
                     // Flag BOTH trials' shadow log entries as user-corrected, but
                     // Trial B only 50% of the time.  This gives Trial B a genuinely
@@ -722,14 +751,17 @@ impl SimulationHarness {
 
                 // Only count extracted facts toward fact_extraction_accuracy
                 // when the message actually introduces a fact (ground truth).
-                if msg
+                // Count as extracted only if extraction produced exactly 1 result
+                // (matching the single introduced fact). Over-extraction or
+                // no extraction both reduce accuracy.
+                if let Some(_introduced) = msg
                     .ground_truth
                     .as_ref()
                     .and_then(|gt| gt.introduces_fact.as_ref())
-                    .is_some()
-                    && !extracted_ids.is_empty()
                 {
-                    metrics.accumulator_mut().facts_extracted += extracted_ids.len() as u32;
+                    if extracted_ids.len() == 1 {
+                        metrics.accumulator_mut().facts_extracted += 1;
+                    }
                 }
 
                 // Drive retrieval for precision/recall metrics.
@@ -784,30 +816,9 @@ impl SimulationHarness {
                     }
                 }
 
-                // Heuristic-path response quality: scores the user's message against
-                // the expected response via embedding similarity. The agent-path block
-                // below scores the agent's actual response instead.
-                if let Some(ref engine) = self.embedding_engine {
-                    if let Some(expected) = msg
-                        .ground_truth
-                        .as_ref()
-                        .and_then(|gt| gt.expected_response.as_deref())
-                    {
-                        let cached = self
-                            .reference_embeddings
-                            .get(expected)
-                            .map(|v| v.as_slice());
-                        if let Some(score) = crate::metrics::cognitive::score_response_quality(
-                            engine,
-                            &msg.content,
-                            cached,
-                            expected,
-                        ) {
-                            metrics.accumulator_mut().response_quality_sum += score;
-                            metrics.accumulator_mut().response_quality_count += 1;
-                        }
-                    }
-                }
+                // Response quality is only measured in agent mode (which has an
+                // actual agent response to score). In heuristic mode there is no
+                // response, so the metric stays at 0.0.
 
                 // Salience: classify the message as a ChatTurnCompleted event.
                 let chat_event = DomainEvent::ChatTurnCompleted {
@@ -819,7 +830,40 @@ impl SimulationHarness {
                 // AGENT PATH: run message through real AgentRuntime
                 if let Some(ref agent) = self.agent_harness {
                     let history = conversation_tracker.history_messages();
-                    let agent_result = agent.process(msg, day_counter, &history).await;
+                    eprintln!("  [sim] day {day_counter} msg {msg_idx}: agent processing...");
+                    let agent_result = match tokio::time::timeout(
+                        std::time::Duration::from_secs(60),
+                        agent.process(msg, day_counter, &history),
+                    )
+                    .await
+                    {
+                        Ok(result) => result,
+                        Err(_) => {
+                            eprintln!(
+                                "  [sim] day {day_counter} msg {msg_idx}: agent TIMEOUT (60s)"
+                            );
+                            crate::agent_types::AgentResult {
+                                selected_skill: String::new(),
+                                mode_used: "timeout".to_string(),
+                                tool_calls: vec![],
+                                iterations: 0,
+                                response: String::new(),
+                                error: Some("pipeline timeout (60s)".to_string()),
+                                breakpoints: vec![crate::agent_types::AgentBreakpoint {
+                                    kind: crate::agent_types::BreakpointKind::LoopTimeout,
+                                    message_content: msg.content.clone(),
+                                    details: "agent.process() exceeded 60s timeout".to_string(),
+                                    day: day_counter,
+                                    phase: msg.phase.to_string(),
+                                }],
+                            }
+                        }
+                    };
+                    eprintln!(
+                        "  [sim] day {day_counter} msg {msg_idx}: agent done (mode={}, tools={})",
+                        agent_result.mode_used,
+                        agent_result.tool_calls.len()
+                    );
 
                     // Update running totals
                     agent_total_calls += 1;
@@ -980,20 +1024,14 @@ impl SimulationHarness {
                                 if let Some(ref engine) = self.embedding_engine {
                                     let context =
                                         format!("{} {}", agent_result.response, followup.content);
-                                    match (
+                                    if let (Ok(resp_emb), Ok(ctx_emb)) = (
                                         engine.embed(&followup_result.response),
                                         engine.embed(&context),
                                     ) {
-                                        (Ok(resp_emb), Ok(ctx_emb)) => {
-                                            let score = common::helpers::cosine_similarity(
-                                                &resp_emb, &ctx_emb,
-                                            );
-                                            metrics.accumulator_mut().multi_turn_coherence_sum +=
-                                                score;
-                                            metrics.accumulator_mut().multi_turn_coherence_count +=
-                                                1;
-                                        }
-                                        _ => {}
+                                        let score =
+                                            common::helpers::cosine_similarity(&resp_emb, &ctx_emb);
+                                        metrics.accumulator_mut().multi_turn_coherence_sum += score;
+                                        metrics.accumulator_mut().multi_turn_coherence_count += 1;
                                     }
                                 }
                             }
@@ -1135,9 +1173,11 @@ impl SimulationHarness {
             let knowledge_retention =
                 measure_knowledge_retention(&self.fact_repo, &known_facts).await;
             let community_stability = measure_community_stability(&self.inner_pool).await;
-            let thirty_days_ago = plan.simulated_now - Duration::days(30);
+            let epoch_start_str = plan.previous.to_rfc3339();
+            let epoch_end_str = plan.simulated_now.to_rfc3339();
             let brain_versions =
-                count_brain_versions_since(&self.inner_pool, &thirty_days_ago.to_rfc3339()).await;
+                count_brain_versions_since(&self.inner_pool, &epoch_start_str, &epoch_end_str)
+                    .await;
             let autotuner_stats = measure_autotuner_success(&self.inner_pool).await;
             let wall_time_ms = epoch_start.elapsed().as_secs_f64() * 1000.0;
 
@@ -1168,10 +1208,12 @@ impl SimulationHarness {
             );
 
             let now_rfc3339 = plan.simulated_now.to_rfc3339();
+            let start_rfc3339 = start_date.to_rfc3339();
             let (memory_retrievability, meta_rule_count) = tokio::join!(
                 crate::metrics::cognitive::measure_average_retrievability(
                     &self.inner_pool,
                     &now_rfc3339,
+                    &start_rfc3339,
                 ),
                 crate::metrics::cognitive::count_meta_rules(&self.inner_pool),
             );
@@ -1199,10 +1241,7 @@ impl SimulationHarness {
             let patterns = det.detect_patterns();
             let signal_count = acc.window_size();
             let conditions = acc.condition_names();
-            let fired_count: usize = conditions
-                .iter()
-                .map(|c| det.history_count(c))
-                .sum();
+            let fired_count: usize = conditions.iter().map(|c| det.history_count(c)).sum();
 
             info!(
                 signals = signal_count,
@@ -1806,10 +1845,8 @@ impl SimulationHarness {
                                         "Cross-domain connection between {} ({} facts) and {} ({} facts)",
                                         d1, c1, d2, c2
                                     );
-                                    let dot_refs = serde_json::to_string(
-                                        &vec![d1, d2],
-                                    )
-                                    .unwrap_or_default();
+                                    let dot_refs =
+                                        serde_json::to_string(&vec![d1, d2]).unwrap_or_default();
                                     let date = simulated_now.format("%Y-%m-%d").to_string();
                                     let _ = sqlx::query(
                                         "INSERT INTO cross_domain_insights \
@@ -1867,6 +1904,38 @@ impl SimulationHarness {
                         note_count,
                         distinct_titles, stability, "Community stability updated"
                     );
+                } else {
+                    // Fallback: seed community from active semantic facts when
+                    // not enough notes exist yet.
+                    let fact_count: (i64,) = sqlx::query_as(
+                        "SELECT COUNT(*) FROM semantic_facts WHERE superseded_at IS NULL",
+                    )
+                    .fetch_one(&self.inner_pool)
+                    .await
+                    .unwrap_or((0,));
+
+                    if fact_count.0 > 0 {
+                        let stability =
+                            (fact_count.0 as f64 / (fact_count.0 as f64 + 5.0)).min(1.0);
+                        let now_str = simulated_now.to_rfc3339();
+                        let _ = sqlx::query(
+                            "INSERT OR REPLACE INTO communities \
+                             (id, name, summary, stability, member_count, source_note_count, \
+                              created_at, updated_at) \
+                             VALUES ('sim-community', 'simulation', \
+                                     'Auto-generated from semantic facts', ?1, ?2, 0, \
+                                     ?3, ?3)",
+                        )
+                        .bind(stability)
+                        .bind(fact_count.0)
+                        .bind(&now_str)
+                        .execute(&self.inner_pool)
+                        .await;
+                        debug!(
+                            fact_count = fact_count.0,
+                            stability, "Community stability seeded from facts"
+                        );
+                    }
                 }
             }
         }

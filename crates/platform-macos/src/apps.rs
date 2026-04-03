@@ -260,6 +260,26 @@ pub fn icon_for_file_type(_extension: &str) -> Option<String> {
     None
 }
 
+/// Activate (bring to front) a running application by PID.
+/// Returns true if the app was successfully activated, false if not found or failed.
+#[cfg(target_os = "macos")]
+pub fn activate_app(pid: i32) -> bool {
+    use objc2_app_kit::{NSApplicationActivationOptions, NSRunningApplication};
+
+    let app = NSRunningApplication::runningApplicationWithProcessIdentifier(pid);
+    match app {
+        Some(app) => unsafe {
+            app.activateWithOptions(NSApplicationActivationOptions::ActivateIgnoringOtherApps)
+        },
+        None => false,
+    }
+}
+
+#[cfg(not(target_os = "macos"))]
+pub fn activate_app(_pid: i32) -> bool {
+    false
+}
+
 /// Convert an NSImage (passed as AnyObject) to a base64 PNG data URI.
 ///
 /// Uses TIFFRepresentation → NSBitmapImageRep → PNG conversion.

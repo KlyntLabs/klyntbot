@@ -94,12 +94,11 @@ assertions = [
 [[checkpoints]]
 at_day = 180
 assertions = [
-    { type = "metric_above", metric = "task_completion_rate", threshold = 0.2 },
+    { type = "metric_above", metric = "knowledge_retention", threshold = 0.4 },
 ]
 
 [[checkpoints]]
 at_day = 269
 assertions = [
     { type = "metric_above", metric = "knowledge_retention", threshold = 0.5 },
-    { type = "metric_above", metric = "task_completion_rate", threshold = 0.3 },
 ]

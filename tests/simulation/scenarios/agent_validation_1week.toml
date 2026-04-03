@@ -1,0 +1,64 @@
+[persona]
+name = "agent_validation_1week"
+timezone = "UTC"
+language = "en"
+seed = 77
+
+[persona.messages_per_day]
+onboarding = 3
+routine = 3
+power_user = 3
+shift = 3
+
+[persona.profile]
+known_facts = [
+    { subject = "user", predicate = "works_as", object = "developer" },
+]
+
+[persona.phases.onboarding]
+duration_days = 3
+correction_rate = 0.15
+topic_weights = { tasks = 0.4, notes = 0.3, chat = 0.3 }
+new_fact_introduction_rate = 0.4
+tool_action_rate = 0.5
+
+[persona.phases.routine]
+duration_days = 2
+correction_rate = 0.08
+topic_weights = { tasks = 0.3, notes = 0.2, finance = 0.2, productivity = 0.2, chat = 0.1 }
+new_fact_introduction_rate = 0.15
+tool_action_rate = 0.5
+
+[persona.phases.power_user]
+duration_days = 1
+correction_rate = 0.05
+topic_weights = { tasks = 0.2, notes = 0.2, finance = 0.2, productivity = 0.2, chat = 0.2 }
+new_fact_introduction_rate = 0.05
+tool_action_rate = 0.6
+
+[persona.phases.behavior_shift]
+duration_days = 1
+correction_rate = 0.10
+shift_description = "starts tracking expenses"
+new_facts = [
+    { subject = "user", predicate = "tracks", object = "monthly expenses" },
+]
+topic_weights = { tasks = 0.3, finance = 0.4, chat = 0.3 }
+new_fact_introduction_rate = 0.3
+tool_action_rate = 0.4
+
+[simulation]
+regression_threshold = 75.0
+agent_mode = true
+agent_breakpoint_threshold = 0.60
+agent_max_iterations = 3
+agent_provider = "deepseek"
+agent_model = "deepseek-chat"
+multi_turn_history_depth = 3
+followup_rate = 0.05
+
+[[checkpoints]]
+at_day = 7
+assertions = [
+    { type = "metric_above", metric = "knowledge_retention", threshold = 0.1 },
+]

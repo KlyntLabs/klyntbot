@@ -154,9 +154,8 @@ impl AgentHarness {
                 feature_productivity::repos::ProductivityRepos::new(inner_pool.clone()),
             )),
         ];
-        let context_engine = Arc::new(
-            context_engine::ContextEngine::new().with_sources(context_sources),
-        );
+        let context_engine =
+            Arc::new(context_engine::ContextEngine::new().with_sources(context_sources));
 
         // Build cost tracker
         let usage_repo = storage::UsageRepo::new(inner_pool);
@@ -170,7 +169,14 @@ impl AgentHarness {
         )));
         let active_profile = Arc::new(RwLock::new(None));
 
-        // Assemble runtime
+        // Assemble runtime — override execution_model with the scenario's
+        // agent_model so the correct model name is sent to the LLM provider.
+        let pipeline_config = PipelineConfig {
+            execution_model: model.to_string(),
+            provider_name: provider_name.to_string(),
+            pipeline_timeout_secs: 60,
+            ..PipelineConfig::default()
+        };
         let mut runtime = AgentRuntime::new(
             skill_catalog,
             skill_router,
@@ -178,7 +184,7 @@ impl AgentHarness {
             context_engine,
             exec_router,
             cost_tracker,
-            PipelineConfig::default(),
+            pipeline_config,
             active_profile,
             hot_config,
         );
@@ -271,9 +277,7 @@ impl AgentHarness {
                 .with_domain_bus(Arc::clone(bus)),
         );
         registry.register(feature_productivity::ProductivityTool::new(
-            prod_repos,
-            focus_mgr,
-            aggregator,
+            prod_repos, focus_mgr, aggregator,
         ));
 
         // Learning tool (no handler — graceful no-op in simulation)

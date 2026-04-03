@@ -44,4 +44,16 @@ impl AppCore {
         let repo = self.launcher_clipboard_repo().await?;
         repo.pin(id, pinned).await.map_err(map_storage_err)
     }
+
+    /// Execute a window tiling action.
+    pub async fn launcher_window_action(
+        &self,
+        action: feature_launcher::WindowAction,
+    ) -> Result<(), ApiError> {
+        let engine = self.launcher_engine().await?;
+        engine
+            .window_manager
+            .execute(&action)
+            .map_err(|e| ApiError::new("WINDOW_ACTION_ERROR", e.to_string()))
+    }
 }

@@ -12132,6 +12132,7 @@ dependencies = [
  "common",
  "config",
  "context_engine",
+ "feature-coaching",
  "feature-finance",
  "feature-learning",
  "feature-notes",

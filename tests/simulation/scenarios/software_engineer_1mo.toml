@@ -56,10 +56,11 @@ tool_action_rate = 0.5
 regression_threshold = 75.0
 agent_mode = true
 agent_breakpoint_threshold = 0.60
+agent_max_iterations = 3
 agent_provider = "deepseek"
 agent_model = "deepseek-chat"
 multi_turn_history_depth = 5
-followup_rate = 0.15
+followup_rate = 0.10
 
 [[checkpoints]]
 at_day = 7

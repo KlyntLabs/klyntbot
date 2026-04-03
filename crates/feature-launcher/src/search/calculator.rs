@@ -1,4 +1,17 @@
+use std::sync::LazyLock;
+
 use regex::Regex;
+
+static WHAT_PCT_RE: LazyLock<Regex> = LazyLock::new(|| {
+    Regex::new(r"^what\s+%?\s*(?:percent\s+)?is\s+([\d.]+)\s+of\s+([\d.]+)$").unwrap()
+});
+static PCT_OF_RE: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"^([\d.]+)\s*%\s*of\s+([\d.]+)$").unwrap());
+static ADD_SUB_PCT_RE: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"^([\d.]+)\s*([+-])\s*([\d.]+)\s*%$").unwrap());
+static UNIT_RE: LazyLock<Regex> = LazyLock::new(|| {
+    Regex::new(r"^([\d.]+)\s*°?\s*([a-z]+)\s+(?:to|in)\s+°?\s*([a-z]+)$").unwrap()
+});
 
 pub struct CalculatorResult {
     pub expression: String,
@@ -137,9 +150,7 @@ impl Calculator {
         let lower = expr.trim().to_lowercase();
 
         // "what % is X of Y" or "what percent is X of Y"
-        let what_pct_re =
-            Regex::new(r"^what\s+%?\s*(?:percent\s+)?is\s+([\d.]+)\s+of\s+([\d.]+)$").ok()?;
-        if let Some(caps) = what_pct_re.captures(&lower) {
+        if let Some(caps) = WHAT_PCT_RE.captures(&lower) {
             let part: f64 = caps[1].parse().ok()?;
             let whole: f64 = caps[2].parse().ok()?;
             if whole == 0.0 {
@@ -153,8 +164,7 @@ impl Calculator {
         }
 
         // "X% of Y"
-        let pct_of_re = Regex::new(r"^([\d.]+)\s*%\s*of\s+([\d.]+)$").ok()?;
-        if let Some(caps) = pct_of_re.captures(&lower) {
+        if let Some(caps) = PCT_OF_RE.captures(&lower) {
             let pct: f64 = caps[1].parse().ok()?;
             let whole: f64 = caps[2].parse().ok()?;
             let result = whole * pct / 100.0;
@@ -170,8 +180,7 @@ impl Calculator {
         }
 
         // "X + Y%" or "X - Y%"
-        let add_sub_pct_re = Regex::new(r"^([\d.]+)\s*([+-])\s*([\d.]+)\s*%$").ok()?;
-        if let Some(caps) = add_sub_pct_re.captures(&lower) {
+        if let Some(caps) = ADD_SUB_PCT_RE.captures(&lower) {
             let base: f64 = caps[1].parse().ok()?;
             let op = &caps[2];
             let pct: f64 = caps[3].parse().ok()?;
@@ -202,8 +211,7 @@ impl Calculator {
 
         // Pattern: <number> <unit> to <unit>
         // Also handle ° variants: "100°f to °c", "100 f to c"
-        let re = Regex::new(r"^([\d.]+)\s*°?\s*([a-z]+)\s+(?:to|in)\s+°?\s*([a-z]+)$").ok()?;
-        let caps = re.captures(&lower)?;
+        let caps = UNIT_RE.captures(&lower)?;
         let value: f64 = caps[1].parse().ok()?;
         let from = caps[2].to_string();
         let to = caps[3].to_string();

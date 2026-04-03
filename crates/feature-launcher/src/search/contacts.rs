@@ -3,7 +3,7 @@ use parking_lot::RwLock;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct ContactEntry {
     pub name: String,
     pub email: Option<String>,
@@ -15,6 +15,7 @@ pub struct ContactsSource {
     contacts: Arc<RwLock<Vec<ContactEntry>>>,
     /// Once set, we never attempt to load contacts again (denied or failed).
     gave_up: Arc<AtomicBool>,
+    cache_path: Option<std::path::PathBuf>,
 }
 
 impl Default for ContactsSource {
@@ -28,6 +29,39 @@ impl ContactsSource {
         Self {
             contacts: Arc::new(RwLock::new(Vec::new())),
             gave_up: Arc::new(AtomicBool::new(false)),
+            cache_path: None,
+        }
+    }
+
+    pub fn with_cache_dir(cache_dir: std::path::PathBuf) -> Self {
+        let cache_path = cache_dir.join("contacts-cache.json");
+        Self {
+            contacts: Arc::new(RwLock::new(Vec::new())),
+            gave_up: Arc::new(AtomicBool::new(false)),
+            cache_path: Some(cache_path),
+        }
+    }
+
+    /// Try loading contacts from disk cache. Returns None if cache is stale (>10 min).
+    fn try_load_cache(&self) -> Option<Vec<ContactEntry>> {
+        let path = self.cache_path.as_ref()?;
+        let metadata = std::fs::metadata(path).ok()?;
+        let age = metadata.modified().ok()?.elapsed().ok()?;
+        if age > std::time::Duration::from_secs(600) {
+            return None;
+        }
+        let data = std::fs::read_to_string(path).ok()?;
+        serde_json::from_str(&data).ok()
+    }
+
+    fn write_cache(&self, contacts: &[ContactEntry]) {
+        if let Some(path) = &self.cache_path {
+            if let Some(parent) = path.parent() {
+                let _ = std::fs::create_dir_all(parent);
+            }
+            if let Ok(json) = serde_json::to_string(contacts) {
+                let _ = std::fs::write(path, json);
+            }
         }
     }
 
@@ -155,7 +189,18 @@ impl super::SearchSource for ContactsSource {
     }
 
     async fn refresh(&self) {
+        // Try disk cache first (avoids Swift subprocess)
+        if let Some(cached) = self.try_load_cache() {
+            let count = cached.len();
+            *self.contacts.write() = cached;
+            tracing::debug!("Loaded {count} contacts from disk cache");
+            return;
+        }
+
         let contacts = self.load_contacts().await;
+        if !contacts.is_empty() {
+            self.write_cache(&contacts);
+        }
         *self.contacts.write() = contacts;
     }
 

@@ -19,6 +19,15 @@ pub struct BrowserHistorySource {
     permission_warned: Arc<AtomicBool>,
 }
 
+/// RAII guard that removes a temp file when dropped.
+struct CleanupGuard<'a>(&'a std::path::Path);
+
+impl Drop for CleanupGuard<'_> {
+    fn drop(&mut self) {
+        let _ = std::fs::remove_file(self.0);
+    }
+}
+
 impl BrowserHistorySource {
     pub fn new(browser: String, max_days: i64) -> Self {
         Self {
@@ -48,8 +57,9 @@ impl BrowserHistorySource {
         // Copy to temp file (browser holds write lock)
         let temp_dir = std::env::temp_dir().join("klyntbot-history");
         let _ = std::fs::create_dir_all(&temp_dir);
-        let temp_db = temp_dir.join("History-copy");
+        let temp_db = temp_dir.join(format!("History-{}.db", std::process::id()));
         std::fs::copy(&db_path, &temp_db)?;
+        let _cleanup = CleanupGuard(&temp_db);
 
         // Query with sqlx (in-process SQLite)
         let url = format!("sqlite:{}", temp_db.display());
@@ -71,7 +81,7 @@ impl BrowserHistorySource {
         .await
         .unwrap_or_default();
 
-        let _ = std::fs::remove_file(&temp_db);
+        drop(pool);
 
         Ok(rows
             .into_iter()

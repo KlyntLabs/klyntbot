@@ -605,7 +605,12 @@ impl ExecutionCore {
                         if let Some(ref tx) = tx {
                             // Truncate result to 2KB to avoid huge WebSocket payloads
                             let truncated = if result_str.len() > 2048 {
-                                let mut s = result_str[..2048].to_string();
+                                // Find a valid UTF-8 char boundary at or before 2048
+                                let end = (0..=2048)
+                                    .rev()
+                                    .find(|&i| result_str.is_char_boundary(i))
+                                    .unwrap_or(0);
+                                let mut s = result_str[..end].to_string();
                                 s.push_str("…[truncated]");
                                 Some(s)
                             } else {
