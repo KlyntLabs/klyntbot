@@ -37,6 +37,12 @@ pub struct MetricSnapshot {
     // Tier 4 — cognitive depth
     pub memory_retrievability: f64,
     pub meta_rule_count: u32,
+    // Tier 5 — agent path metrics
+    pub agent_routing_accuracy: f64,
+    pub agent_tool_selection: f64,
+    pub agent_mode_distribution: f64,
+    pub react_convergence_rate: f64,
+    pub agent_response_quality: f64,
     // Performance
     pub wall_time_per_epoch_ms: f64,
 }
@@ -98,6 +104,19 @@ pub struct EpochAccumulator {
     pub salience_discard: u32,
     pub response_quality_sum: f64,
     pub response_quality_count: u32,
+    // Agent path counters
+    pub agent_calls: u32,
+    pub agent_successful: u32,
+    pub agent_routing_correct: u32,
+    pub agent_routing_total: u32,
+    pub agent_tool_selection_correct: u32,
+    pub agent_tool_selection_total: u32,
+    pub agent_tool_calls: u32,
+    pub agent_reactive_count: u32,
+    pub agent_react_converged: u32,
+    pub agent_react_iterations_sum: u32,
+    pub agent_response_quality_sum: f64,
+    pub agent_response_quality_count: u32,
 }
 
 // ---------------------------------------------------------------------------
@@ -221,6 +240,33 @@ impl MetricCollector {
             retrieval_recall,
         );
 
+        // Agent path metrics
+        let agent_routing_accuracy = if acc.agent_routing_total == 0 {
+            0.0
+        } else {
+            acc.agent_routing_correct as f64 / acc.agent_routing_total as f64
+        };
+        let agent_tool_selection = if acc.agent_tool_selection_total == 0 {
+            0.0
+        } else {
+            acc.agent_tool_selection_correct as f64 / acc.agent_tool_selection_total as f64
+        };
+        let agent_mode_distribution = if acc.agent_calls == 0 {
+            0.0
+        } else {
+            acc.agent_reactive_count as f64 / acc.agent_calls as f64
+        };
+        let react_convergence_rate = if acc.agent_reactive_count == 0 {
+            0.0
+        } else {
+            acc.agent_react_converged as f64 / acc.agent_reactive_count as f64
+        };
+        let agent_response_quality = if acc.agent_response_quality_count == 0 {
+            0.0
+        } else {
+            acc.agent_response_quality_sum / acc.agent_response_quality_count as f64
+        };
+
         let snap = MetricSnapshot {
             epoch,
             knowledge_retention,
@@ -240,6 +286,11 @@ impl MetricCollector {
             autotuner_promotion_success,
             community_stability,
             brain_version_velocity,
+            agent_routing_accuracy,
+            agent_tool_selection,
+            agent_mode_distribution,
+            react_convergence_rate,
+            agent_response_quality,
             memory_retrievability: 0.0,
             meta_rule_count: 0,
             wall_time_per_epoch_ms: wall_time_ms,

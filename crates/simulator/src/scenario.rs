@@ -21,6 +21,15 @@ pub struct SimulationConfig {
     /// may need a higher tolerance (e.g. 25.0).
     #[serde(default = "default_regression_threshold")]
     pub regression_threshold: f64,
+    /// Enable the agent execution path (dual-mode). Default: false.
+    #[serde(default)]
+    pub agent_mode: bool,
+    /// Maximum breakpoint rate before CI failure (default: 0.20 = 20%).
+    #[serde(default = "default_agent_breakpoint_threshold")]
+    pub agent_breakpoint_threshold: f64,
+    /// ReAct loop iteration limit for agent path.
+    #[serde(default = "default_agent_max_iterations")]
+    pub agent_max_iterations: u32,
 }
 
 fn default_cognitive_llm_model() -> String {
@@ -43,6 +52,14 @@ fn default_regression_threshold() -> f64 {
     10.0
 }
 
+fn default_agent_breakpoint_threshold() -> f64 {
+    0.20
+}
+
+fn default_agent_max_iterations() -> u32 {
+    15
+}
+
 impl Default for SimulationConfig {
     fn default() -> Self {
         Self {
@@ -51,6 +68,9 @@ impl Default for SimulationConfig {
             max_cognitive_calls_per_day: default_max_cognitive_calls_per_day(),
             epoch_step: default_epoch_step(),
             regression_threshold: default_regression_threshold(),
+            agent_mode: false,
+            agent_breakpoint_threshold: default_agent_breakpoint_threshold(),
+            agent_max_iterations: default_agent_max_iterations(),
         }
     }
 }
@@ -79,6 +99,12 @@ pub enum MetricName {
     AutotunerPromotionSuccess,
     CommunityStability,
     BrainVersionVelocity,
+    // Tier 5 — agent path metrics
+    AgentRoutingAccuracy,
+    AgentToolSelection,
+    AgentModeDistribution,
+    ReactConvergenceRate,
+    AgentResponseQuality,
 }
 
 // ── Checkpoint assertions ──────────────────────────────────────────────

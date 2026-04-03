@@ -282,6 +282,45 @@ async fn run_software_engineer_12mo() {
         );
     }
 
+    // Agent path metrics (only when agent_mode is enabled)
+    if let Some(ref agent) = report.summary.agent_summary {
+        eprintln!();
+        eprintln!("  Agent Path Summary:");
+        eprintln!("  ─────────────────────────────────────────────");
+        eprintln!("  Total calls:          {}", agent.total_agent_calls);
+        eprintln!("  Successful:           {}", agent.successful);
+        eprintln!("  Breakpoints:          {}", agent.breakpoints.len());
+        eprintln!(
+            "  Routing accuracy:     {:.3}",
+            agent.agent_routing_accuracy
+        );
+        eprintln!("  Tool selection:       {:.3}", agent.agent_tool_selection);
+        eprintln!(
+            "  React convergence:    {:.3}",
+            agent.react_convergence_rate
+        );
+        eprintln!("  Avg react iterations: {:.1}", agent.avg_react_iterations);
+        if !agent.breakpoints_by_kind.is_empty() {
+            eprintln!("  Breakpoints by kind:");
+            for (kind, count) in &agent.breakpoints_by_kind {
+                eprintln!("    {}: {}", kind, count);
+            }
+        }
+        // Print first 3 breakpoint details for diagnostics
+        if !agent.breakpoints.is_empty() {
+            eprintln!("  Sample breakpoints:");
+            for bp in agent.breakpoints.iter().take(3) {
+                eprintln!("    {:?} | day {} | {}", bp.kind, bp.day, bp.details);
+            }
+        }
+        if !agent.mode_distribution.is_empty() {
+            eprintln!("  Mode distribution:");
+            for (mode, count) in &agent.mode_distribution {
+                eprintln!("    {}: {}", mode, count);
+            }
+        }
+    }
+
     // Print checkpoint details
     eprintln!();
     for cp in &report.checkpoints {

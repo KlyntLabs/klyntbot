@@ -12121,6 +12121,8 @@ dependencies = [
 name = "simulator"
 version = "0.1.0"
 dependencies = [
+ "activity-log",
+ "agent",
  "async-trait",
  "autotuner",
  "bus",
@@ -12130,6 +12132,7 @@ dependencies = [
  "config",
  "context_engine",
  "feature-finance",
+ "feature-learning",
  "feature-notes",
  "feature-productivity",
  "feature-tasks",
@@ -12145,6 +12148,7 @@ dependencies = [
  "storage",
  "tempfile",
  "tokio",
+ "tokio-util",
  "toml 0.8.23",
  "tools",
  "tracing",

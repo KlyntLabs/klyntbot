@@ -65,6 +65,7 @@ pub struct SimulationHarness {
     embedding_engine: Option<tools::EmbeddingEngine>,
     /// Pre-cached embeddings for the 8 reference answer strings (one per topic).
     reference_embeddings: HashMap<String, Vec<f32>>,
+    agent_harness: Option<crate::agent_harness::AgentHarness>,
 }
 
 impl SimulationHarness {
@@ -98,6 +99,35 @@ impl SimulationHarness {
             .execute(&inner_pool)
             .await
             .map_err(|e| common::KlyntbotError::Storage(format!("tasks migration failed: {e}")))?;
+
+        // Run additional feature migrations needed for agent-path tool execution.
+        if scenario.simulation.agent_mode {
+            // Notes tables
+            sqlx::query(feature_notes::NotesFeature::migration_sql())
+                .execute(&inner_pool)
+                .await
+                .map_err(|e| {
+                    common::KlyntbotError::Storage(format!("notes migration failed: {e}"))
+                })?;
+            // Finance tables
+            sqlx::query(feature_finance::FinanceFeature::migration_sql())
+                .execute(&inner_pool)
+                .await
+                .map_err(|e| {
+                    common::KlyntbotError::Storage(format!("finance migration failed: {e}"))
+                })?;
+            // Activity log tables
+            for m in activity_log::ActivityLog::migrations_static() {
+                sqlx::query(&m.sql)
+                    .execute(&inner_pool)
+                    .await
+                    .map_err(|e| {
+                        common::KlyntbotError::Storage(format!(
+                            "activity_log migration failed: {e}"
+                        ))
+                    })?;
+            }
+        }
 
         // Seed an autotuner experiment with two active trials so the
         // nightly evaluation cycle has data to work with.
@@ -232,6 +262,52 @@ impl SimulationHarness {
         }
         let embedding_engine = Some(embedding_engine);
 
+        // Build agent harness if agent_mode is enabled.
+        let agent_harness = if scenario.simulation.agent_mode {
+            // Build a separate SkillCatalog/SkillRouter for the AgentRuntime
+            // (it needs Arc<RwLock<>> ownership, so we discover a second copy).
+            let agent_skills = {
+                let entries: Vec<(String, String)> = BUILTIN_SKILLS
+                    .iter()
+                    .map(|(n, c)| (n.to_string(), c.to_string()))
+                    .collect();
+                let source = SkillSource::BuiltIn(entries);
+                SkillCatalog::discover_sync(&[source]).ok()
+            };
+            match agent_skills {
+                Some(catalog) => {
+                    let router = SkillRouter::new(&catalog);
+                    let catalog_arc = Arc::new(tokio::sync::RwLock::new(catalog));
+                    let router_arc = Arc::new(tokio::sync::RwLock::new(router));
+                    match crate::agent_harness::AgentHarness::new(
+                        &pool,
+                        inner_pool.clone(),
+                        Arc::clone(&bus),
+                        Arc::clone(&context_queue),
+                        catalog_arc,
+                        router_arc,
+                        None, // embedding engine for agent harness (optional)
+                        scenario.simulation.agent_max_iterations,
+                        scenario.persona.seed,
+                    )
+                    .await
+                    {
+                        Ok(h) => Some(h),
+                        Err(e) => {
+                            warn!(error = %e, "Failed to create AgentHarness — agent path disabled");
+                            None
+                        }
+                    }
+                }
+                None => {
+                    warn!("Failed to load skill catalog for agent harness — agent path disabled");
+                    None
+                }
+            }
+        } else {
+            None
+        };
+
         Ok(Self {
             scenario,
             pool,
@@ -254,6 +330,7 @@ impl SimulationHarness {
             skill_catalog,
             embedding_engine,
             reference_embeddings,
+            agent_harness,
         })
     }
 
@@ -303,6 +380,14 @@ impl SimulationHarness {
         let mut total_autotuner_reverts: u32 = 0;
         let mut prev_promoted_count: u32 = 0;
         let mut prev_reverted_count: u32 = 0;
+
+        // Agent path counters
+        let mut agent_breakpoints: Vec<crate::agent_types::AgentBreakpoint> = Vec::new();
+        let mut agent_total_calls: u32 = 0;
+        let mut agent_successful: u32 = 0;
+        let mut agent_react_iterations_sum: u32 = 0;
+        let mut agent_reactive_total: u32 = 0;
+        let mut agent_mode_counts: HashMap<String, u32> = HashMap::new();
 
         info!(
             persona = %self.scenario.persona.name,
@@ -578,11 +663,9 @@ impl SimulationHarness {
                     }
                 }
 
-                // Response quality: measure topic-to-reference alignment via embedding
-                // similarity. Compares the user's message against the expected response
-                // for the topic. Uses cached reference embeddings to avoid re-embedding
-                // the same 8 reference strings on every message.
-                // NOTE: With a real LLM, this should score the AI's actual response instead.
+                // Heuristic-path response quality: scores the user's message against
+                // the expected response via embedding similarity. The agent-path block
+                // below scores the agent's actual response instead.
                 if let Some(ref engine) = self.embedding_engine {
                     if let Some(expected) = msg
                         .ground_truth
@@ -611,6 +694,95 @@ impl SimulationHarness {
                     session_key: "sim-session".to_string(),
                 };
                 crate::metrics::cognitive::record_salience(&chat_event, metrics.accumulator_mut());
+
+                // AGENT PATH: run message through real AgentRuntime
+                if let Some(ref agent) = self.agent_harness {
+                    let agent_result = agent.process(msg, day_counter).await;
+
+                    // Update running totals
+                    agent_total_calls += 1;
+                    if agent_result.error.is_none() && agent_result.breakpoints.is_empty() {
+                        agent_successful += 1;
+                    }
+                    *agent_mode_counts
+                        .entry(agent_result.mode_used.clone())
+                        .or_default() += 1;
+
+                    // Accumulate agent metrics on the epoch accumulator
+                    metrics.accumulator_mut().agent_calls += 1;
+                    if agent_result.error.is_none() && agent_result.breakpoints.is_empty() {
+                        metrics.accumulator_mut().agent_successful += 1;
+                    }
+                    if let Some(ref gt) = msg.ground_truth {
+                        if let Some(ref expected) = gt.expected_skill {
+                            metrics.accumulator_mut().agent_routing_total += 1;
+                            if agent_result.selected_skill == *expected {
+                                metrics.accumulator_mut().agent_routing_correct += 1;
+                            }
+                        }
+                    }
+                    if agent_result.mode_used == "reactive" {
+                        metrics.accumulator_mut().agent_reactive_count += 1;
+                        agent_reactive_total += 1;
+                        if agent_result.error.is_none() {
+                            metrics.accumulator_mut().agent_react_converged += 1;
+                        }
+                        metrics.accumulator_mut().agent_react_iterations_sum +=
+                            agent_result.iterations;
+                        agent_react_iterations_sum += agent_result.iterations;
+                    }
+                    if !agent_result.tool_calls.is_empty() {
+                        metrics.accumulator_mut().agent_tool_calls += 1;
+                        // Check tool selection against expected tool for this topic
+                        let expected_tool = match msg.topic.as_str() {
+                            "tasks" => Some("tasks"),
+                            "finance" => Some("finance"),
+                            "notes" => Some("notes"),
+                            "productivity" => Some("productivity"),
+                            "learning" => Some("learning"),
+                            "automation" => Some("cron"),
+                            _ => None,
+                        };
+                        if let Some(expected) = expected_tool {
+                            metrics.accumulator_mut().agent_tool_selection_total += 1;
+                            if agent_result.tool_calls.iter().any(|t| t == expected) {
+                                metrics.accumulator_mut().agent_tool_selection_correct += 1;
+                            }
+                        }
+                    }
+
+                    // Collect breakpoints
+                    for bp in agent_result.breakpoints {
+                        agent_breakpoints.push(bp);
+                    }
+
+                    // Score agent response quality via embedding similarity
+                    if agent_result.error.is_none() {
+                        if let Some(ref engine) = self.embedding_engine {
+                            if let Some(expected) = msg
+                                .ground_truth
+                                .as_ref()
+                                .and_then(|gt| gt.expected_response.as_deref())
+                            {
+                                let cached = self
+                                    .reference_embeddings
+                                    .get(expected)
+                                    .map(|v| v.as_slice());
+                                if let Some(score) =
+                                    crate::metrics::cognitive::score_response_quality(
+                                        engine,
+                                        &agent_result.response,
+                                        cached,
+                                        expected,
+                                    )
+                                {
+                                    metrics.accumulator_mut().agent_response_quality_sum += score;
+                                    metrics.accumulator_mut().agent_response_quality_count += 1;
+                                }
+                            }
+                        }
+                    }
+                }
 
                 // ── Domain entity rows: usage, interaction, strategy ──
                 let request_id = Uuid::new_v4().to_string();
@@ -817,6 +989,33 @@ impl SimulationHarness {
             improvement_pct,
             checkpoint_pass_rate,
             regression_alerts,
+            agent_summary: if self.agent_harness.is_some() {
+                let mut by_kind: HashMap<String, u32> = HashMap::new();
+                for bp in &agent_breakpoints {
+                    *by_kind.entry(format!("{:?}", bp.kind)).or_default() += 1;
+                }
+
+                let last = metrics.timeline.last();
+                let avg_react_iterations = if agent_reactive_total == 0 {
+                    0.0
+                } else {
+                    agent_react_iterations_sum as f64 / agent_reactive_total as f64
+                };
+
+                Some(crate::agent_types::AgentSummary {
+                    total_agent_calls: agent_total_calls,
+                    successful: agent_successful,
+                    breakpoints: agent_breakpoints,
+                    breakpoints_by_kind: by_kind,
+                    agent_routing_accuracy: last.map(|s| s.agent_routing_accuracy).unwrap_or(0.0),
+                    agent_tool_selection: last.map(|s| s.agent_tool_selection).unwrap_or(0.0),
+                    react_convergence_rate: last.map(|s| s.react_convergence_rate).unwrap_or(0.0),
+                    avg_react_iterations,
+                    mode_distribution: agent_mode_counts,
+                })
+            } else {
+                None
+            },
         };
 
         let report = SimulationReport {
@@ -832,6 +1031,7 @@ impl SimulationHarness {
             metric_timeline: metrics.timeline,
             checkpoints: checkpoint_results,
             summary,
+            agent_breakpoint_threshold: self.scenario.simulation.agent_breakpoint_threshold,
         };
 
         info!(
@@ -1280,8 +1480,7 @@ impl SimulationHarness {
                 match self.fact_repo.list_all_active().await {
                     Ok(facts) if !facts.is_empty() => {
                         // Group facts by domain, look for cross-domain connections.
-                        let mut domains: std::collections::HashMap<String, Vec<String>> =
-                            std::collections::HashMap::new();
+                        let mut domains: HashMap<String, Vec<String>> = HashMap::new();
                         for f in &facts {
                             domains
                                 .entry(f.domain.clone())

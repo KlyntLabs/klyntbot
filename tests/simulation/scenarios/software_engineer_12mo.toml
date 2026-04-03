@@ -68,6 +68,8 @@ tool_action_rate = 0.6
 # behavior_shift as the topic distribution changes and chat messages no longer
 # inflate the match rate. Use 50% threshold to tolerate cross-phase variance.
 regression_threshold = 50.0
+agent_mode = true
+agent_breakpoint_threshold = 0.40
 
 [[checkpoints]]
 at_day = 14

@@ -19,7 +19,11 @@ feature-tasks.workspace = true
 feature-notes.workspace = true
 feature-finance.workspace = true
 feature-productivity.workspace = true
+feature-learning.workspace = true
+activity-log.workspace = true
+agent.workspace = true
 tools.workspace = true
+tokio-util = { workspace = true }
 
 async-trait.workspace = true
 chrono = { workspace = true }

@@ -167,21 +167,41 @@ pub trait LlmProvider: Send + Sync {
         tools: Option<&[Value]>,
         params: &ChatParams,
     ) -> Result<LlmStream> {
-        // Default: call chat() and emit a single chunk
+        // Default: call chat() and wrap the response as stream chunks.
         let response = self.chat(messages, tools, params).await?;
 
-        let chunk = LlmStreamChunk {
+        let mut chunks: Vec<std::result::Result<LlmStreamChunk, common::KlyntbotError>> =
+            Vec::with_capacity(response.tool_calls.len() + 1);
+
+        // Emit one chunk per tool call so call_provider_streaming can
+        // reconstruct them via its PartialToolCall accumulator.
+        for (i, tc) in response.tool_calls.iter().enumerate() {
+            chunks.push(Ok(LlmStreamChunk {
+                content: None,
+                tool_call_delta: Some(ToolCallDelta {
+                    index: i,
+                    id: Some(tc.id.clone()),
+                    name: Some(tc.name.clone()),
+                    arguments: Some(serde_json::to_string(&tc.arguments).unwrap_or_default()),
+                }),
+                is_final: false,
+                finish_reason: None,
+                reasoning_content: None,
+                usage: None,
+            }));
+        }
+
+        // Final chunk with content, finish reason, and usage.
+        chunks.push(Ok(LlmStreamChunk {
             content: response.content,
             tool_call_delta: None,
             is_final: true,
             finish_reason: Some(response.finish_reason),
             reasoning_content: response.reasoning_content,
             usage: Some(response.usage),
-        };
+        }));
 
-        Ok(Box::pin(futures_util::stream::once(
-            async move { Ok(chunk) },
-        )))
+        Ok(Box::pin(futures_util::stream::iter(chunks)))
     }
 
     /// Check if streaming is supported

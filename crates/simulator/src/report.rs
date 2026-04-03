@@ -21,6 +21,7 @@ pub struct SimulationReport {
     pub metric_timeline: Vec<MetricSnapshot>,
     pub checkpoints: Vec<CheckpointResult>,
     pub summary: ReportSummary,
+    pub agent_breakpoint_threshold: f64,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -36,6 +37,7 @@ pub struct ReportSummary {
     pub improvement_pct: HashMap<String, f64>,
     pub checkpoint_pass_rate: f64,
     pub regression_alerts: Vec<RegressionAlert>,
+    pub agent_summary: Option<crate::agent_types::AgentSummary>,
 }
 
 impl SimulationReport {
@@ -56,9 +58,23 @@ impl SimulationReport {
         Ok(path)
     }
 
-    /// Returns `true` if all checkpoints passed and there are no regression alerts.
+    /// Returns `true` if all checkpoints passed, there are no regression alerts,
+    /// and the agent breakpoint rate (if agent mode was active) is within threshold.
     pub fn passed(&self) -> bool {
-        self.summary.checkpoint_pass_rate >= 1.0 && self.summary.regression_alerts.is_empty()
+        let base =
+            self.summary.checkpoint_pass_rate >= 1.0 && self.summary.regression_alerts.is_empty();
+
+        // If agent mode was active, also check breakpoint rate
+        if let Some(ref agent) = self.summary.agent_summary {
+            let breakpoint_rate = if agent.total_agent_calls == 0 {
+                0.0
+            } else {
+                agent.breakpoints.len() as f64 / agent.total_agent_calls as f64
+            };
+            base && breakpoint_rate <= self.agent_breakpoint_threshold
+        } else {
+            base
+        }
     }
 }
 
@@ -169,6 +185,7 @@ mod tests {
             improvement_pct: HashMap::new(),
             checkpoint_pass_rate,
             regression_alerts,
+            agent_summary: None,
         }
     }
 
@@ -182,6 +199,7 @@ mod tests {
             metric_timeline: Vec::new(),
             checkpoints: Vec::new(),
             summary,
+            agent_breakpoint_threshold: 0.20,
         }
     }
 

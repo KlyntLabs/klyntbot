@@ -233,6 +233,11 @@ fn get_metric_value(snapshot: &MetricSnapshot, metric: &MetricName) -> f64 {
         MetricName::AutotunerPromotionSuccess => snapshot.autotuner_promotion_success,
         MetricName::CommunityStability => snapshot.community_stability,
         MetricName::BrainVersionVelocity => snapshot.brain_version_velocity as f64,
+        MetricName::AgentRoutingAccuracy => snapshot.agent_routing_accuracy,
+        MetricName::AgentToolSelection => snapshot.agent_tool_selection,
+        MetricName::AgentModeDistribution => snapshot.agent_mode_distribution,
+        MetricName::ReactConvergenceRate => snapshot.react_convergence_rate,
+        MetricName::AgentResponseQuality => snapshot.agent_response_quality,
     }
 }
 
