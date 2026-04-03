@@ -38,11 +38,12 @@ pub struct DiscordChannel {
     bus: Mutex<Option<Arc<MessageBus>>>,
     heartbeat_task: Mutex<Option<JoinHandle<()>>>,
     interactions: InteractionTracker,
+    data_dir: PathBuf,
 }
 
 impl DiscordChannel {
     /// Create a new Discord channel
-    pub fn new(config: DiscordConfig) -> Result<Self> {
+    pub fn new(config: DiscordConfig, data_dir: PathBuf) -> Result<Self> {
         let client = build_http_client(Duration::from_secs(30))?;
 
         Ok(Self {
@@ -54,6 +55,7 @@ impl DiscordChannel {
             bus: Mutex::new(None),
             heartbeat_task: Mutex::new(None),
             interactions: InteractionTracker::new(),
+            data_dir,
         })
     }
 
@@ -129,12 +131,8 @@ impl DiscordChannel {
         Ok(())
     }
 
-    /// Get media directory
-    fn media_dir() -> PathBuf {
-        let mut path = dirs::home_dir().unwrap_or_else(|| PathBuf::from("."));
-        path.push(".klyntbot");
-        path.push("media");
-        path
+    fn media_dir(&self) -> PathBuf {
+        self.data_dir.join("media")
     }
 
     /// Start typing indicator for a channel
@@ -235,7 +233,7 @@ impl DiscordChannel {
 
         // Handle attachments - download them
         if let Some(attachments) = payload.get("attachments").and_then(|v| v.as_array()) {
-            let media_dir = Self::media_dir();
+            let media_dir = self.media_dir();
             if let Err(e) = tokio::fs::create_dir_all(&media_dir).await {
                 warn!("Failed to create media directory: {}", e);
             }
@@ -942,29 +940,35 @@ mod tests {
 
     #[test]
     fn test_channel_name() {
-        let channel = DiscordChannel::new(make_config()).unwrap();
+        let channel = DiscordChannel::new(make_config(), PathBuf::from("/tmp/test-data")).unwrap();
         assert_eq!(channel.name(), "discord");
     }
 
     #[test]
     fn test_is_allowed_empty_allowlist() {
-        let channel = DiscordChannel::new(make_config()).unwrap();
+        let channel = DiscordChannel::new(make_config(), PathBuf::from("/tmp/test-data")).unwrap();
         assert!(channel.is_allowed("anyone"));
         assert!(channel.is_allowed("12345"));
     }
 
     #[test]
     fn test_is_allowed_with_allowlist() {
-        let channel =
-            DiscordChannel::new(make_config_with_allowlist(vec!["12345".to_string()])).unwrap();
+        let channel = DiscordChannel::new(
+            make_config_with_allowlist(vec!["12345".to_string()]),
+            PathBuf::from("/tmp/test-data"),
+        )
+        .unwrap();
         assert!(channel.is_allowed("12345"));
         assert!(!channel.is_allowed("99999"));
     }
 
     #[test]
     fn test_is_allowed_compound_id() {
-        let channel =
-            DiscordChannel::new(make_config_with_allowlist(vec!["user1".to_string()])).unwrap();
+        let channel = DiscordChannel::new(
+            make_config_with_allowlist(vec!["user1".to_string()]),
+            PathBuf::from("/tmp/test-data"),
+        )
+        .unwrap();
         assert!(channel.is_allowed("user1|extra"));
         assert!(!channel.is_allowed("user2|extra"));
     }
@@ -984,9 +988,9 @@ mod tests {
 
     #[test]
     fn test_media_dir() {
-        let path = DiscordChannel::media_dir();
-        assert!(path.to_string_lossy().contains(".klyntbot"));
-        assert!(path.to_string_lossy().ends_with("media"));
+        let channel = DiscordChannel::new(make_config(), PathBuf::from("/tmp/test-data")).unwrap();
+        let path = channel.media_dir();
+        assert_eq!(path, PathBuf::from("/tmp/test-data/media"));
     }
 
     #[test]
@@ -1100,7 +1104,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_stop_sets_running_false() {
-        let channel = DiscordChannel::new(make_config()).unwrap();
+        let channel = DiscordChannel::new(make_config(), PathBuf::from("/tmp/test-data")).unwrap();
         channel.running.store(true, Ordering::SeqCst);
         channel.stop().await.unwrap();
         assert!(!channel.running.load(Ordering::SeqCst));

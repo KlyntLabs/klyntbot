@@ -51,7 +51,7 @@ fn discord_allowlist_filters() {
         allow_from: vec!["user_abc".to_string()],
         ..Default::default()
     };
-    let channel = DiscordChannel::new(config).unwrap();
+    let channel = DiscordChannel::new(config, std::path::PathBuf::from("/tmp/test-data")).unwrap();
     assert!(channel.is_allowed("user_abc"));
     assert!(!channel.is_allowed("user_xyz"));
 }

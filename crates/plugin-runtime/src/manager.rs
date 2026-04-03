@@ -17,14 +17,6 @@ pub struct PluginManager {
 }
 
 impl PluginManager {
-    /// Default plugins directory: `~/.klyntbot/plugins/`.
-    pub fn default_plugins_dir() -> PathBuf {
-        dirs::home_dir()
-            .unwrap_or_else(|| PathBuf::from("."))
-            .join(".klyntbot")
-            .join("plugins")
-    }
-
     /// Scan a directory for plugin subdirectories containing `klyntbot.plugin.json`.
     ///
     /// Returns `(manifest, wasm_path)` pairs for each valid plugin found.

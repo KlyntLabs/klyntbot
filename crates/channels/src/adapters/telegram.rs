@@ -6,6 +6,7 @@ use async_trait::async_trait;
 use reqwest::Client;
 use serde::Deserialize;
 use serde_json::{json, Value};
+use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::time::Duration;
@@ -32,11 +33,16 @@ pub struct TelegramChannel {
     running: Arc<AtomicBool>,
     typing: TypingManager,
     interactions: InteractionTracker,
+    data_dir: PathBuf,
 }
 
 impl TelegramChannel {
     /// Create a new Telegram channel
-    pub fn new(config: TelegramConfig, groq_api_key: Option<String>) -> Result<Self> {
+    pub fn new(
+        config: TelegramConfig,
+        groq_api_key: Option<String>,
+        data_dir: PathBuf,
+    ) -> Result<Self> {
         let proxy_url = config.proxy.clone();
         let client = build_http_client_with_builder(|builder| {
             let mut configured = builder.timeout(Duration::from_secs(30));
@@ -72,6 +78,7 @@ impl TelegramChannel {
             running: Arc::new(AtomicBool::new(false)),
             typing: TypingManager::new(),
             interactions: InteractionTracker::new(),
+            data_dir,
         })
     }
 
@@ -425,11 +432,7 @@ impl TelegramChannel {
             .await
             .map_err(|e| ChannelError::SendFailed(e.to_string()))?;
 
-        // Save to media directory
-        let media_dir = dirs::home_dir()
-            .ok_or_else(|| ChannelError::SendFailed("Cannot find home dir".to_string()))?
-            .join(".klyntbot")
-            .join("media");
+        let media_dir = self.data_dir.join("media");
 
         tokio::fs::create_dir_all(&media_dir)
             .await

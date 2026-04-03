@@ -75,6 +75,8 @@ impl ChannelManager {
     pub async fn initialize_channels(&self) -> Result<()> {
         let mut channels = self.channels.write().await;
 
+        let data_dir = self.config.data_dir_path();
+
         // Telegram (needs groq key for voice transcription)
         let groq_key = (!self.config.providers.groq.api_key.is_empty())
             .then(|| self.config.providers.groq.api_key.expose().clone());
@@ -82,14 +84,18 @@ impl ChannelManager {
             channels,
             self.config.channels.telegram,
             "telegram",
-            TelegramChannel::new(self.config.channels.telegram.clone(), groq_key)
+            TelegramChannel::new(
+                self.config.channels.telegram.clone(),
+                groq_key,
+                data_dir.clone()
+            )
         );
 
         init_channel!(
             channels,
             self.config.channels.discord,
             "discord",
-            DiscordChannel::new(self.config.channels.discord.clone())
+            DiscordChannel::new(self.config.channels.discord.clone(), data_dir.clone())
         );
 
         init_channel!(
