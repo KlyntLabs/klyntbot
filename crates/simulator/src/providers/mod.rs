@@ -1,3 +1,4 @@
+pub mod adversarial_wrapper;
 pub mod cognitive_bridge;
 pub mod retrieval;
 pub mod scripted;
@@ -5,6 +6,7 @@ pub mod sim_metric_source;
 pub mod sim_narrative;
 pub mod simulation_provider;
 
+pub use adversarial_wrapper::AdversarialProviderWrapper;
 pub use cognitive_bridge::CognitiveBridgeConfig;
 pub use retrieval::FtsMemoryRetriever;
 pub use scripted::ScriptedProvider;

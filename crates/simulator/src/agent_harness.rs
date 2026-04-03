@@ -4,7 +4,7 @@
 use std::sync::Arc;
 
 use tokio::sync::RwLock;
-use tracing::debug;
+use tracing::{debug, warn};
 
 use agent::agent_runtime::AgentRuntime;
 use agent::intent_pipeline::analysis::IntentAnalyzer;
@@ -27,6 +27,53 @@ use crate::agent_types::{AgentBreakpoint, AgentResult, BreakpointKind};
 use crate::persona::types::AnnotatedMessage;
 use crate::providers::SimulationProvider;
 
+/// Create an LLM provider from scenario config using the provider registry.
+/// Falls back to mock with a warning if the provider is unknown or the API key is missing.
+fn create_provider(provider_name: &str, model: &str, seed: u64) -> DynProvider {
+    if provider_name == "mock" {
+        return Arc::new(SimulationProvider::new(seed));
+    }
+
+    let spec = match providers::ProviderRegistry::find_by_name(provider_name) {
+        Some(s) => s,
+        None => {
+            warn!(
+                provider = provider_name,
+                "Unknown provider — falling back to mock"
+            );
+            return Arc::new(SimulationProvider::new(seed));
+        }
+    };
+
+    let api_key = match std::env::var(spec.env_key) {
+        Ok(key) if !key.is_empty() => key,
+        _ => {
+            warn!(
+                env_var = spec.env_key,
+                provider = provider_name,
+                "API key not found — falling back to mock provider"
+            );
+            return Arc::new(SimulationProvider::new(seed));
+        }
+    };
+
+    if provider_name == "anthropic" {
+        Arc::new(providers::AnthropicNativeProvider::new(
+            config::Secret::new(api_key),
+            spec.default_api_base.to_string(),
+            model.to_string(),
+        ))
+    } else {
+        match providers::OpenAiCompatProvider::new(spec.default_api_base, api_key, model) {
+            Ok(p) => Arc::new(p),
+            Err(e) => {
+                warn!(error = %e, "Failed to create provider — falling back to mock");
+                Arc::new(SimulationProvider::new(seed))
+            }
+        }
+    }
+}
+
 /// Wraps an `AgentRuntime` with real registered tools for simulation.
 pub struct AgentHarness {
     runtime: Arc<AgentRuntime>,
@@ -47,9 +94,24 @@ impl AgentHarness {
         skill_router: Arc<RwLock<SkillRouter>>,
         embedding_engine: Option<Arc<tools::EmbeddingEngine>>,
         max_iterations: u32,
+        provider_name: &str,
+        model: &str,
+        provider_error_rate: f64,
         seed: u64,
     ) -> common::Result<Self> {
-        let provider: DynProvider = Arc::new(SimulationProvider::new(seed));
+        let inner_provider = create_provider(provider_name, model, seed);
+        let is_real_llm = provider_name != "mock";
+
+        // Wrap with adversarial error injection if configured
+        let provider: DynProvider = if provider_error_rate > 0.0 {
+            Arc::new(crate::providers::AdversarialProviderWrapper::new(
+                inner_provider,
+                provider_error_rate,
+                seed,
+            ))
+        } else {
+            inner_provider
+        };
 
         // Build tool registry with real domain tools
         let mut tool_registry = ToolRegistry::new();
@@ -66,10 +128,17 @@ impl AgentHarness {
         let reactive = ReactiveEngine::new(Arc::clone(&core), max_iterations);
         let exec_router = ExecutionRouter::new(direct, reactive);
 
-        // Build IntentAnalyzer (heuristic-only, no LLM classifier calls)
+        // Build IntentAnalyzer — shadow mode for mock, real classification for LLM
         let orch_config = OrchestratorConfig::default();
-        let analyzer = IntentAnalyzer::new(provider.clone(), "simulation-agent", &orch_config)
-            .with_shadow_mode();
+        let model_name = if is_real_llm {
+            model
+        } else {
+            "simulation-agent"
+        };
+        let mut analyzer = IntentAnalyzer::new(provider.clone(), model_name, &orch_config);
+        if !is_real_llm {
+            analyzer = analyzer.with_shadow_mode();
+        }
 
         // Build context engine (minimal — no context sources for simulation)
         let context_engine = Arc::new(context_engine::ContextEngine::new());

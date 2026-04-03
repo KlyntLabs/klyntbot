@@ -21,7 +21,6 @@ use providers::types::{
 pub struct SimulationProvider {
     call_count: AtomicUsize,
     rng: Mutex<StdRng>,
-    provider_error_rate: f64,
 }
 
 impl SimulationProvider {
@@ -29,13 +28,7 @@ impl SimulationProvider {
         Self {
             call_count: AtomicUsize::new(0),
             rng: Mutex::new(StdRng::seed_from_u64(seed)),
-            provider_error_rate: 0.0,
         }
-    }
-
-    pub fn with_error_rate(mut self, rate: f64) -> Self {
-        self.provider_error_rate = rate;
-        self
     }
 
     /// Extract text content from the last user message.
@@ -265,55 +258,6 @@ impl LlmProvider for SimulationProvider {
                 },
                 reasoning_content: None,
             });
-        }
-
-        // Adversarial: occasionally return malformed responses
-        if self.provider_error_rate > 0.0 {
-            let inject = {
-                let mut rng = self.rng.lock().unwrap();
-                rng.random::<f64>() < self.provider_error_rate
-            };
-            if inject {
-                let malformation = {
-                    let mut rng = self.rng.lock().unwrap();
-                    rng.random_range(0u8..4)
-                };
-                let bad_call = match malformation {
-                    0 => ToolCall {
-                        id: format!("call_{}", self.call_count.load(Ordering::Relaxed)),
-                        name: "taks".to_string(), // typo
-                        arguments: json!({"action": "list"}),
-                    },
-                    1 => ToolCall {
-                        id: format!("call_{}", self.call_count.load(Ordering::Relaxed)),
-                        name: "tasks".to_string(),
-                        arguments: json!(null), // invalid arguments
-                    },
-                    2 => ToolCall {
-                        id: String::new(), // empty ID
-                        name: "tasks".to_string(),
-                        arguments: json!({"action": "list"}),
-                    },
-                    _ => ToolCall {
-                        id: format!("call_{}", self.call_count.load(Ordering::Relaxed)),
-                        name: "nonexistent_tool".to_string(),
-                        arguments: json!({"action": "query"}),
-                    },
-                };
-                return Ok(LlmResponse {
-                    content: None,
-                    tool_calls: vec![bad_call],
-                    finish_reason: "tool_use".to_string(),
-                    usage: Usage {
-                        prompt_tokens,
-                        completion_tokens,
-                        total_tokens: prompt_tokens + completion_tokens,
-                        cache_read_tokens: 0,
-                        cache_write_tokens: 0,
-                    },
-                    reasoning_content: None,
-                });
-            }
         }
 
         let tool_calls = self.generate_tool_calls(messages).unwrap_or_default();

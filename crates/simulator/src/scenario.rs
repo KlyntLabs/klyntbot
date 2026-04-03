@@ -36,6 +36,13 @@ pub struct SimulationConfig {
     /// Probability of generating a follow-up message after an agent response. Default: 0.15.
     #[serde(default = "default_followup_rate")]
     pub followup_rate: f64,
+    /// LLM provider for agent path. "mock" (default) uses SimulationProvider.
+    /// Real providers: "deepseek", "anthropic", "openai", "groq".
+    #[serde(default = "default_agent_provider")]
+    pub agent_provider: String,
+    /// Model name for the selected provider. Default: "deepseek-chat".
+    #[serde(default = "default_agent_model")]
+    pub agent_model: String,
 }
 
 fn default_cognitive_llm_model() -> String {
@@ -74,6 +81,14 @@ fn default_followup_rate() -> f64 {
     0.15
 }
 
+fn default_agent_provider() -> String {
+    "mock".to_string()
+}
+
+fn default_agent_model() -> String {
+    "deepseek-chat".to_string()
+}
+
 impl Default for SimulationConfig {
     fn default() -> Self {
         Self {
@@ -87,6 +102,8 @@ impl Default for SimulationConfig {
             agent_max_iterations: default_agent_max_iterations(),
             multi_turn_history_depth: default_multi_turn_history_depth(),
             followup_rate: default_followup_rate(),
+            agent_provider: default_agent_provider(),
+            agent_model: default_agent_model(),
         }
     }
 }

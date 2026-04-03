@@ -279,6 +279,16 @@ impl SimulationHarness {
                     let router = SkillRouter::new(&catalog);
                     let catalog_arc = Arc::new(tokio::sync::RwLock::new(catalog));
                     let router_arc = Arc::new(tokio::sync::RwLock::new(router));
+                    let max_provider_error_rate = [
+                        &scenario.persona.phases.onboarding,
+                        &scenario.persona.phases.routine,
+                        &scenario.persona.phases.power_user,
+                        &scenario.persona.phases.behavior_shift,
+                    ]
+                    .iter()
+                    .map(|p| p.provider_error_rate)
+                    .fold(0.0f64, f64::max);
+
                     match crate::agent_harness::AgentHarness::new(
                         &pool,
                         inner_pool.clone(),
@@ -288,6 +298,9 @@ impl SimulationHarness {
                         router_arc,
                         None, // embedding engine for agent harness (optional)
                         scenario.simulation.agent_max_iterations,
+                        &scenario.simulation.agent_provider,
+                        &scenario.simulation.agent_model,
+                        max_provider_error_rate,
                         scenario.persona.seed,
                     )
                     .await

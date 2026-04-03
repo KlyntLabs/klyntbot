@@ -103,7 +103,6 @@ impl ActionExecutor {
                 });
                 self.bus.publish(DomainEvent::NoteContentChanged {
                     note_id: note_id.clone(),
-                    content: content.clone(),
                 });
                 self.upsert_tree_node(&note_id, content, title).await;
             }
@@ -115,7 +114,6 @@ impl ActionExecutor {
                 debug!(note_ref = %note_ref, "action: UpdateNote");
                 self.bus.publish(DomainEvent::NoteContentChanged {
                     note_id: note_ref.clone(),
-                    content: new_content.clone(),
                 });
                 self.upsert_tree_node(note_ref, new_content, note_ref).await;
             }

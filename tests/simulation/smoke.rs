@@ -11,6 +11,65 @@ use simulator::scenario::Scenario;
 
 // ── Shared helpers ─────────────────────────────────────────────────────
 
+fn print_agent_summary(report: &SimulationReport) {
+    if let Some(ref agent) = report.summary.agent_summary {
+        eprintln!();
+        eprintln!("  Agent Path Summary:");
+        eprintln!("  ─────────────────────────────────────────────");
+        eprintln!("  Total calls:          {}", agent.total_agent_calls);
+        eprintln!("  Successful:           {}", agent.successful);
+        eprintln!("  Breakpoints:          {}", agent.breakpoints.len());
+        eprintln!(
+            "  Routing accuracy:     {:.3}",
+            agent.agent_routing_accuracy
+        );
+        eprintln!("  Tool selection:       {:.3}", agent.agent_tool_selection);
+        eprintln!(
+            "  React convergence:    {:.3}",
+            agent.react_convergence_rate
+        );
+        eprintln!("  Avg react iterations: {:.1}", agent.avg_react_iterations);
+        eprintln!(
+            "  Response quality:     {:.3}",
+            report.summary.final_metrics.agent_response_quality
+        );
+        if !agent.breakpoints_by_kind.is_empty() {
+            eprintln!("  Breakpoints by kind:");
+            for (kind, count) in &agent.breakpoints_by_kind {
+                eprintln!("    {}: {}", kind, count);
+            }
+        }
+        if !agent.breakpoints.is_empty() {
+            eprintln!("  Sample breakpoints:");
+            for bp in agent.breakpoints.iter().take(3) {
+                eprintln!("    {:?} | day {} | {}", bp.kind, bp.day, bp.details);
+            }
+        }
+        if !agent.mode_distribution.is_empty() {
+            eprintln!("  Mode distribution:");
+            for (mode, count) in &agent.mode_distribution {
+                eprintln!("    {}: {}", mode, count);
+            }
+        }
+        eprintln!("  Followups:            {}", agent.total_followups);
+        eprintln!("  Multi-turn coherence: {:.3}", agent.multi_turn_coherence);
+        eprintln!(
+            "  Workflows:            {} (parallel: {}, sequential: {})",
+            agent.total_workflows, agent.parallel_workflows, agent.sequential_workflows
+        );
+        eprintln!(
+            "  Chain success:        {:.3}",
+            agent.cross_feature_chain_success
+        );
+        eprintln!("  Adversarial total:    {}", agent.total_adversarial);
+        eprintln!(
+            "  Adversarial resilience: {:.3}",
+            agent.adversarial_resilience
+        );
+        eprintln!("  Error recovery rate:  {:.3}", agent.error_recovery_rate);
+    }
+}
+
 fn print_checkpoints(report: &SimulationReport) {
     for cp in &report.checkpoints {
         let status = if cp.all_passed { "PASS" } else { "FAIL" };
@@ -282,61 +341,7 @@ async fn run_software_engineer_12mo() {
         );
     }
 
-    // Agent path metrics (only when agent_mode is enabled)
-    if let Some(ref agent) = report.summary.agent_summary {
-        eprintln!();
-        eprintln!("  Agent Path Summary:");
-        eprintln!("  ─────────────────────────────────────────────");
-        eprintln!("  Total calls:          {}", agent.total_agent_calls);
-        eprintln!("  Successful:           {}", agent.successful);
-        eprintln!("  Breakpoints:          {}", agent.breakpoints.len());
-        eprintln!(
-            "  Routing accuracy:     {:.3}",
-            agent.agent_routing_accuracy
-        );
-        eprintln!("  Tool selection:       {:.3}", agent.agent_tool_selection);
-        eprintln!(
-            "  React convergence:    {:.3}",
-            agent.react_convergence_rate
-        );
-        eprintln!("  Avg react iterations: {:.1}", agent.avg_react_iterations);
-        if !agent.breakpoints_by_kind.is_empty() {
-            eprintln!("  Breakpoints by kind:");
-            for (kind, count) in &agent.breakpoints_by_kind {
-                eprintln!("    {}: {}", kind, count);
-            }
-        }
-        // Print first 3 breakpoint details for diagnostics
-        if !agent.breakpoints.is_empty() {
-            eprintln!("  Sample breakpoints:");
-            for bp in agent.breakpoints.iter().take(3) {
-                eprintln!("    {:?} | day {} | {}", bp.kind, bp.day, bp.details);
-            }
-        }
-        if !agent.mode_distribution.is_empty() {
-            eprintln!("  Mode distribution:");
-            for (mode, count) in &agent.mode_distribution {
-                eprintln!("    {}: {}", mode, count);
-            }
-        }
-        // Tier 6 metrics
-        eprintln!("  Followups:            {}", agent.total_followups);
-        eprintln!("  Multi-turn coherence: {:.3}", agent.multi_turn_coherence);
-        eprintln!(
-            "  Workflows:            {} (parallel: {}, sequential: {})",
-            agent.total_workflows, agent.parallel_workflows, agent.sequential_workflows
-        );
-        eprintln!(
-            "  Chain success:        {:.3}",
-            agent.cross_feature_chain_success
-        );
-        eprintln!("  Adversarial total:    {}", agent.total_adversarial);
-        eprintln!(
-            "  Adversarial resilience: {:.3}",
-            agent.adversarial_resilience
-        );
-        eprintln!("  Error recovery rate:  {:.3}", agent.error_recovery_rate);
-    }
+    print_agent_summary(&report);
 
     // Print checkpoint details
     eprintln!();
@@ -432,6 +437,36 @@ async fn run_fact_contradiction() {
         "Contradiction scenario checkpoints failed (pass_rate={:.2})",
         report.summary.checkpoint_pass_rate
     );
+}
+
+#[tokio::test]
+async fn run_software_engineer_1mo() {
+    // Skip if no API key available (CI-safe)
+    if std::env::var("DEEPSEEK_API_KEY").map_or(true, |k| k.is_empty()) {
+        eprintln!("Skipping 1mo real LLM test — DEEPSEEK_API_KEY not set");
+        return;
+    }
+
+    let report = run_scenario(include_str!("scenarios/software_engineer_1mo.toml")).await;
+
+    eprintln!("\n============================================================");
+    eprintln!(
+        "  REAL LLM SIMULATION: {} ({})",
+        report.persona, report.simulated_days
+    );
+    eprintln!("============================================================");
+    eprintln!("  Wall time:          {:.2}s", report.wall_time_secs);
+    eprintln!("  Total messages:     {}", report.summary.total_messages);
+
+    print_agent_summary(&report);
+    print_checkpoints(&report);
+    eprintln!(
+        "  Verdict: {}",
+        if report.passed() { "PASSED" } else { "FAILED" }
+    );
+
+    assert!(report.summary.total_messages > 0);
+    // Don't assert passed() — real LLM results are unpredictable during development
 }
 
 #[tokio::test]
