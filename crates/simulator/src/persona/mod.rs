@@ -1,3 +1,4 @@
+pub mod conversation;
 pub mod templates;
 pub mod types;
 
@@ -10,8 +11,8 @@ use rand::rngs::StdRng;
 use rand::{Rng, SeedableRng};
 
 use templates::{
-    fill_template, pick_template, templates_for_topic, CORRECTION_TEMPLATES,
-    FACT_INTRODUCTION_TEMPLATES,
+    fill_template, pick_template, templates_for_topic, BACKREFERENCE_TEMPLATES,
+    CORRECTION_TEMPLATES, FACT_INTRODUCTION_TEMPLATES,
 };
 
 // ── PersonaRunner ─────────────────────────────────────────────────────
@@ -323,6 +324,18 @@ impl PersonaRunner {
 
             let tool_actions = tool_action.into_iter().collect();
 
+            let workflow = match topic.as_str() {
+                "cross_feature_parallel" => Some(crate::agent_types::WorkflowPattern::Parallel {
+                    expected_tools: vec!["tasks".to_string(), "notes".to_string()],
+                }),
+                "cross_feature_sequential" => {
+                    Some(crate::agent_types::WorkflowPattern::Sequential {
+                        chain: vec!["notes".to_string(), "tasks".to_string()],
+                    })
+                }
+                _ => None,
+            };
+
             messages.push(AnnotatedMessage {
                 content,
                 phase,
@@ -331,6 +344,9 @@ impl PersonaRunner {
                 tool_actions,
                 is_correction,
                 topic,
+                is_followup: false,
+                workflow,
+                is_adversarial: false,
             });
         }
 
@@ -359,6 +375,9 @@ impl PersonaRunner {
                     tool_actions: vec![],
                     is_correction: false,
                     topic: "chat".to_string(),
+                    is_followup: false,
+                    workflow: None,
+                    is_adversarial: false,
                 });
             }
         }
@@ -443,6 +462,28 @@ impl PersonaRunner {
                 ("topic", "Rust".to_string()),
                 ("content", "lifetimes are lexical in older Rust".to_string()),
             ],
+            "cross_feature_parallel" => {
+                let actions = ["review PR", "update docs", "fix parser bug", "write tests"];
+                let action = actions[self.rng.random_range(0..actions.len())];
+                vec![
+                    ("action", action.to_string()),
+                    ("topic", "meeting notes".to_string()),
+                    ("amount", format!("${}", self.rng.random_range(10..500u32))),
+                    ("category", "software".to_string()),
+                    (
+                        "task",
+                        self.created_task_titles
+                            .last()
+                            .cloned()
+                            .unwrap_or_else(|| "my task".to_string()),
+                    ),
+                ]
+            }
+            "cross_feature_sequential" => vec![
+                ("topic", "meeting notes".to_string()),
+                ("project", "main project".to_string()),
+                ("category", "software".to_string()),
+            ],
             _ => vec![],
         }
     }
@@ -473,9 +514,104 @@ impl PersonaRunner {
             "learning" => Some("general".to_string()),
             "insights" => Some("general".to_string()),
             "coaching" => Some("general".to_string()),
+            "cross_feature_parallel" => Some("task-management".to_string()),
+            "cross_feature_sequential" => Some("task-management".to_string()),
             _ => None,
         }
     }
+
+    /// Return the [`PhaseConfig`] for the current lifecycle phase (alias of `phase_config`).
+    pub fn current_phase_config(&self) -> &PhaseConfig {
+        match self.current_phase {
+            LifecyclePhase::Onboarding => &self.persona.phases.onboarding,
+            LifecyclePhase::Routine => &self.persona.phases.routine,
+            LifecyclePhase::PowerUser => &self.persona.phases.power_user,
+            LifecyclePhase::BehaviorShift => &self.persona.phases.behavior_shift,
+        }
+    }
+
+    /// Generate an adversarial message if the RNG triggers it.
+    pub fn generate_adversarial(
+        &mut self,
+        simulated_at: DateTime<Utc>,
+        adversarial_rate: f64,
+    ) -> Option<AnnotatedMessage> {
+        if adversarial_rate <= 0.0 || self.rng.random::<f64>() >= adversarial_rate {
+            return None;
+        }
+
+        // Pick category: 40% ambiguous, 40% contradictory, 20% conflicting facts
+        let roll: f64 = self.rng.random();
+        let template = if roll < 0.4 {
+            templates::pick_template(templates::ADVERSARIAL_AMBIGUOUS, &mut self.rng)
+        } else if roll < 0.8 {
+            templates::pick_template(templates::ADVERSARIAL_CONTRADICTORY, &mut self.rng)
+        } else {
+            templates::pick_template(templates::ADVERSARIAL_CONFLICTING_FACTS, &mut self.rng)
+        };
+
+        let content = templates::fill_template(template, &[]);
+
+        Some(AnnotatedMessage {
+            content,
+            phase: self.current_phase,
+            simulated_at,
+            ground_truth: None,
+            tool_actions: vec![],
+            is_correction: false,
+            topic: "adversarial".to_string(),
+            is_followup: false,
+            workflow: None,
+            is_adversarial: true,
+        })
+    }
+
+    /// Optionally generate a follow-up message referencing the agent's previous response.
+    pub fn generate_followup(
+        &mut self,
+        agent_response: &str,
+        simulated_at: DateTime<Utc>,
+        followup_rate: f64,
+    ) -> Option<AnnotatedMessage> {
+        if self.rng.random::<f64>() >= followup_rate {
+            return None;
+        }
+
+        let key_phrase = extract_key_phrase(agent_response)?;
+        let template = pick_template(BACKREFERENCE_TEMPLATES, &mut self.rng);
+        let content = fill_template(template, &[("previous_context", &key_phrase)]);
+
+        Some(AnnotatedMessage {
+            content,
+            phase: self.current_phase,
+            simulated_at,
+            ground_truth: None,
+            tool_actions: vec![],
+            is_correction: false,
+            topic: "followup".to_string(),
+            is_followup: true,
+            workflow: None,
+            is_adversarial: false,
+        })
+    }
+}
+
+/// Extract a short key phrase from an agent response for template insertion.
+/// Takes the first sentence, truncated to 80 chars.
+pub fn extract_key_phrase(response: &str) -> Option<String> {
+    let trimmed = response.trim();
+    if trimmed.is_empty() {
+        return None;
+    }
+    let first_sentence = trimmed
+        .split(['.', '!', '?'])
+        .next()
+        .unwrap_or(trimmed)
+        .trim();
+    if first_sentence.is_empty() {
+        return None;
+    }
+    Some(common::truncate_chars(first_sentence, 80, ""))
 }
 
 // ── Tests ─────────────────────────────────────────────────────────────
@@ -525,6 +661,9 @@ mod tests {
                     tool_action_rate: 0.3,
                     shift_description: None,
                     new_facts: vec![],
+                    adversarial_rate: 0.0,
+                    error_injection_rate: 0.0,
+                    provider_error_rate: 0.0,
                 },
                 routine: PhaseConfig {
                     duration_days: 7,
@@ -538,6 +677,9 @@ mod tests {
                     tool_action_rate: 0.5,
                     shift_description: None,
                     new_facts: vec![],
+                    adversarial_rate: 0.0,
+                    error_injection_rate: 0.0,
+                    provider_error_rate: 0.0,
                 },
                 power_user: PhaseConfig {
                     duration_days: 7,
@@ -552,6 +694,9 @@ mod tests {
                     tool_action_rate: 0.7,
                     shift_description: None,
                     new_facts: vec![],
+                    adversarial_rate: 0.0,
+                    error_injection_rate: 0.0,
+                    provider_error_rate: 0.0,
                 },
                 behavior_shift: PhaseConfig {
                     duration_days: 7,
@@ -569,6 +714,9 @@ mod tests {
                         predicate: "learning".to_string(),
                         object: "Python".to_string(),
                     }],
+                    adversarial_rate: 0.0,
+                    error_injection_rate: 0.0,
+                    provider_error_rate: 0.0,
                 },
             },
         }

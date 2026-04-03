@@ -84,6 +84,51 @@ pub const FACT_INTRODUCTION_TEMPLATES: &[&str] = &[
     "Did I mention I {predicate} {object}?",
 ];
 
+pub const BACKREFERENCE_TEMPLATES: &[&str] = &[
+    "You mentioned {previous_context} — can you expand on that?",
+    "Going back to what you said about {previous_context}, I have a question",
+    "Actually, about {previous_context} — I changed my mind",
+    "That's helpful. Now based on that, can you help me with something else?",
+    "Wait, you said {previous_context}? That's not what I expected",
+];
+
+pub const CROSS_FEATURE_PARALLEL_TEMPLATES: &[&str] = &[
+    "Create a task to {action} AND add a note about {topic}",
+    "Record expense of {amount} for {category} and start a focus session",
+    "Set up a reminder for {action} and create flashcards about {topic}",
+    "Add a note about {topic} and track time on {task}",
+];
+
+pub const CROSS_FEATURE_SEQUENTIAL_TEMPLATES: &[&str] = &[
+    "Check my notes on {topic} and create a task based on what you find",
+    "Look at my tasks for {project} and summarize them in a note",
+    "Review my spending on {category} and add a note about the trend",
+    "Find my flashcards on {topic} and create a task to review them",
+];
+
+pub const ADVERSARIAL_AMBIGUOUS: &[&str] = &[
+    "Do the thing with the stuff from last time",
+    "Can you update that thing I mentioned?",
+    "Handle the usual for this week",
+    "You know what I need — just do it",
+    "Same as before but different",
+];
+
+pub const ADVERSARIAL_CONTRADICTORY: &[&str] = &[
+    "Create a task... actually delete it... no wait, keep it",
+    "Record $50 expense — no, make it income — actually it's an expense",
+    "Start a focus session, but cancel it, but actually yes start it",
+    "Add a note about the meeting — wait, remove it — okay fine, add it",
+    "Set priority to high, no low, no actually urgent",
+];
+
+pub const ADVERSARIAL_CONFLICTING_FACTS: &[&str] = &[
+    "Actually I work as a doctor now, not an engineer",
+    "I switched to using EUR now, forget about my old currency",
+    "My main project is called something completely different now",
+    "I moved to Tokyo last week, update everything",
+];
+
 // ── Functions ─────────────────────────────────────────────────────────
 
 /// Pick a random template from the slice.
@@ -107,6 +152,8 @@ pub fn templates_for_topic(topic: &str) -> &'static [&'static str] {
         "coaching" => COACHING_TEMPLATES,
         "correction" => CORRECTION_TEMPLATES,
         "fact_introduction" => FACT_INTRODUCTION_TEMPLATES,
+        "cross_feature_parallel" => CROSS_FEATURE_PARALLEL_TEMPLATES,
+        "cross_feature_sequential" => CROSS_FEATURE_SEQUENTIAL_TEMPLATES,
         _ => CHAT_TEMPLATES,
     }
 }

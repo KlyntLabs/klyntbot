@@ -30,6 +30,12 @@ pub struct SimulationConfig {
     /// ReAct loop iteration limit for agent path.
     #[serde(default = "default_agent_max_iterations")]
     pub agent_max_iterations: u32,
+    /// Number of prior conversation turns to pass as history. Default: 5.
+    #[serde(default = "default_multi_turn_history_depth")]
+    pub multi_turn_history_depth: u32,
+    /// Probability of generating a follow-up message after an agent response. Default: 0.15.
+    #[serde(default = "default_followup_rate")]
+    pub followup_rate: f64,
 }
 
 fn default_cognitive_llm_model() -> String {
@@ -60,6 +66,14 @@ fn default_agent_max_iterations() -> u32 {
     15
 }
 
+fn default_multi_turn_history_depth() -> u32 {
+    5
+}
+
+fn default_followup_rate() -> f64 {
+    0.15
+}
+
 impl Default for SimulationConfig {
     fn default() -> Self {
         Self {
@@ -71,6 +85,8 @@ impl Default for SimulationConfig {
             agent_mode: false,
             agent_breakpoint_threshold: default_agent_breakpoint_threshold(),
             agent_max_iterations: default_agent_max_iterations(),
+            multi_turn_history_depth: default_multi_turn_history_depth(),
+            followup_rate: default_followup_rate(),
         }
     }
 }
@@ -105,6 +121,11 @@ pub enum MetricName {
     AgentModeDistribution,
     ReactConvergenceRate,
     AgentResponseQuality,
+    // Tier 6 — multi-turn, cross-feature, adversarial
+    MultiTurnCoherence,
+    CrossFeatureChainSuccess,
+    AdversarialResilience,
+    ErrorRecoveryRate,
 }
 
 // ── Checkpoint assertions ──────────────────────────────────────────────

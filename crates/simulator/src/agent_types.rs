@@ -38,6 +38,16 @@ pub struct AgentResult {
     pub breakpoints: Vec<AgentBreakpoint>,
 }
 
+/// Expected workflow pattern for cross-feature messages.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum WorkflowPattern {
+    /// Independent tools executed in parallel.
+    Parallel { expected_tools: Vec<String> },
+    /// Tools executed sequentially — output of one feeds the next.
+    Sequential { chain: Vec<String> },
+}
+
 /// Aggregate statistics from the agent path across the entire simulation.
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct AgentSummary {
@@ -50,4 +60,13 @@ pub struct AgentSummary {
     pub react_convergence_rate: f64,
     pub avg_react_iterations: f64,
     pub mode_distribution: HashMap<String, u32>,
+    pub multi_turn_coherence: f64,
+    pub cross_feature_chain_success: f64,
+    pub adversarial_resilience: f64,
+    pub error_recovery_rate: f64,
+    pub total_workflows: u32,
+    pub parallel_workflows: u32,
+    pub sequential_workflows: u32,
+    pub total_adversarial: u32,
+    pub total_followups: u32,
 }

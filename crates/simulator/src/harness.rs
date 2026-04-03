@@ -346,7 +346,10 @@ impl SimulationHarness {
         let mut epoch = SimulatedEpoch::new(start_date, end_date, step);
         let mut persona_runner = PersonaRunner::new(self.scenario.persona.clone());
         let mut metrics = MetricCollector::new(30);
-        let action_executor = ActionExecutor::new(Arc::clone(&self.bus), self.inner_pool.clone());
+        let action_executor = crate::error_injector::ErrorInjector::new(
+            ActionExecutor::new(Arc::clone(&self.bus), self.inner_pool.clone()),
+            self.scenario.persona.seed,
+        );
         let trial_repo = storage::TrialRepo::new(self.inner_pool.clone());
 
         // Subscribe to bus for ContradictionDetected events.
@@ -388,6 +391,14 @@ impl SimulationHarness {
         let mut agent_react_iterations_sum: u32 = 0;
         let mut agent_reactive_total: u32 = 0;
         let mut agent_mode_counts: HashMap<String, u32> = HashMap::new();
+        let mut conversation_tracker = crate::persona::conversation::ConversationTracker::new(
+            self.scenario.simulation.multi_turn_history_depth as usize,
+        );
+        let mut total_followups: u32 = 0;
+        let mut total_adversarial: u32 = 0;
+        let mut total_workflows: u32 = 0;
+        let mut parallel_workflows: u32 = 0;
+        let mut sequential_workflows: u32 = 0;
 
         info!(
             persona = %self.scenario.persona.name,
@@ -515,9 +526,32 @@ impl SimulationHarness {
                     }
                 }
 
+                // Adversarial: probabilistically replace message with adversarial content.
+                // Must happen BEFORE tool actions so the adversarial message's empty
+                // tool_actions replaces the original ones.
+                let adversarial_rate = persona_runner.current_phase_config().adversarial_rate;
+                if adversarial_rate > 0.0 {
+                    if let Some(adversarial_msg) =
+                        persona_runner.generate_adversarial(msg.simulated_at, adversarial_rate)
+                    {
+                        *msg = adversarial_msg;
+                        total_adversarial += 1;
+                    }
+                }
+
                 // Execute tool actions.
+                let error_injection_rate =
+                    persona_runner.current_phase_config().error_injection_rate;
+                let mut msg_had_error_injection = false;
                 for action in &msg.tool_actions {
-                    if let Err(e) = action_executor.execute(action, msg.simulated_at).await {
+                    let (exec_result, was_injected) = action_executor
+                        .execute(action, msg.simulated_at, error_injection_rate)
+                        .await;
+                    if was_injected {
+                        metrics.accumulator_mut().error_injected += 1;
+                        msg_had_error_injection = true;
+                    }
+                    if let Err(e) = exec_result {
                         warn!(error = %e, "Failed to execute tool action");
                     }
                     // Track tasks_created / tasks_completed.
@@ -697,7 +731,8 @@ impl SimulationHarness {
 
                 // AGENT PATH: run message through real AgentRuntime
                 if let Some(ref agent) = self.agent_harness {
-                    let agent_result = agent.process(msg, day_counter).await;
+                    let history = conversation_tracker.history_messages();
+                    let agent_result = agent.process(msg, day_counter, &history).await;
 
                     // Update running totals
                     agent_total_calls += 1;
@@ -751,6 +786,52 @@ impl SimulationHarness {
                         }
                     }
 
+                    // Track cross-feature workflows
+                    if let Some(ref wf) = msg.workflow {
+                        total_workflows += 1;
+                        match wf {
+                            crate::agent_types::WorkflowPattern::Parallel { expected_tools } => {
+                                parallel_workflows += 1;
+                                metrics.accumulator_mut().cross_feature_total += 1;
+                                if expected_tools.iter().all(|expected| {
+                                    agent_result.tool_calls.iter().any(|t| t == expected)
+                                }) {
+                                    metrics.accumulator_mut().cross_feature_success += 1;
+                                }
+                            }
+                            crate::agent_types::WorkflowPattern::Sequential { chain } => {
+                                sequential_workflows += 1;
+                                metrics.accumulator_mut().cross_feature_total += 1;
+                                if chain.iter().all(|expected| {
+                                    agent_result.tool_calls.iter().any(|t| t == expected)
+                                }) {
+                                    metrics.accumulator_mut().cross_feature_success += 1;
+                                }
+                            }
+                        }
+                    }
+
+                    // Track error recovery: if this message had an injected tool
+                    // failure (heuristic path) but the agent still produced
+                    // a meaningful response, count it as recovered.
+                    if msg_had_error_injection
+                        && agent_result.error.is_none()
+                        && !agent_result.response.trim().is_empty()
+                    {
+                        metrics.accumulator_mut().error_recovered += 1;
+                    }
+
+                    // Track adversarial resilience: resilient = agent produced
+                    // a non-empty response without errors (low confidence is
+                    // acceptable for intentionally ambiguous messages).
+                    if msg.is_adversarial {
+                        metrics.accumulator_mut().adversarial_total += 1;
+                        if agent_result.error.is_none() && !agent_result.response.trim().is_empty()
+                        {
+                            metrics.accumulator_mut().adversarial_resilient += 1;
+                        }
+                    }
+
                     // Collect breakpoints
                     for bp in agent_result.breakpoints {
                         agent_breakpoints.push(bp);
@@ -779,6 +860,68 @@ impl SimulationHarness {
                                     metrics.accumulator_mut().agent_response_quality_sum += score;
                                     metrics.accumulator_mut().agent_response_quality_count += 1;
                                 }
+                            }
+                        }
+                    }
+
+                    // Record turn for multi-turn history
+                    if agent_result.error.is_none() {
+                        conversation_tracker.record(&msg.content, &agent_result.response);
+                    }
+
+                    // Generate followup message referencing agent's response
+                    if agent_result.error.is_none() {
+                        if let Some(followup) = persona_runner.generate_followup(
+                            &agent_result.response,
+                            msg.simulated_at,
+                            self.scenario.simulation.followup_rate,
+                        ) {
+                            total_followups += 1;
+                            let followup_history = conversation_tracker.history_messages();
+                            let followup_result = agent
+                                .process(&followup, day_counter, &followup_history)
+                                .await;
+
+                            // Record followup turn
+                            if followup_result.error.is_none() {
+                                conversation_tracker
+                                    .record(&followup.content, &followup_result.response);
+                            }
+
+                            // Score multi-turn coherence via embedding similarity
+                            if followup_result.error.is_none() {
+                                if let Some(ref engine) = self.embedding_engine {
+                                    let context =
+                                        format!("{} {}", agent_result.response, followup.content);
+                                    match (
+                                        engine.embed(&followup_result.response),
+                                        engine.embed(&context),
+                                    ) {
+                                        (Ok(resp_emb), Ok(ctx_emb)) => {
+                                            let score = common::helpers::cosine_similarity(
+                                                &resp_emb, &ctx_emb,
+                                            );
+                                            metrics.accumulator_mut().multi_turn_coherence_sum +=
+                                                score;
+                                            metrics.accumulator_mut().multi_turn_coherence_count +=
+                                                1;
+                                        }
+                                        _ => {}
+                                    }
+                                }
+                            }
+
+                            // Track followup agent metrics
+                            metrics.accumulator_mut().agent_calls += 1;
+                            agent_total_calls += 1;
+                            if followup_result.error.is_none()
+                                && followup_result.breakpoints.is_empty()
+                            {
+                                metrics.accumulator_mut().agent_successful += 1;
+                                agent_successful += 1;
+                            }
+                            for bp in followup_result.breakpoints {
+                                agent_breakpoints.push(bp);
                             }
                         }
                     }
@@ -1002,6 +1145,37 @@ impl SimulationHarness {
                     agent_react_iterations_sum as f64 / agent_reactive_total as f64
                 };
 
+                // Compute run-long averages from timeline (not just last epoch,
+                // since features like cross-feature and adversarial are phase-specific).
+                let (mut coherence_sum, mut coherence_count) = (0.0f64, 0u32);
+                for snap in &metrics.timeline {
+                    if snap.multi_turn_coherence > 0.0 {
+                        coherence_sum += snap.multi_turn_coherence;
+                        coherence_count += 1;
+                    }
+                }
+                let run_coherence = if coherence_count == 0 {
+                    0.0
+                } else {
+                    coherence_sum / coherence_count as f64
+                };
+                // For chain success / adversarial / error: use the epoch with highest activity
+                let run_chain_success = metrics
+                    .timeline
+                    .iter()
+                    .map(|s| s.cross_feature_chain_success)
+                    .fold(0.0f64, f64::max);
+                let run_adversarial = metrics
+                    .timeline
+                    .iter()
+                    .map(|s| s.adversarial_resilience)
+                    .fold(0.0f64, f64::max);
+                let run_error_recovery = metrics
+                    .timeline
+                    .iter()
+                    .map(|s| s.error_recovery_rate)
+                    .fold(0.0f64, f64::max);
+
                 Some(crate::agent_types::AgentSummary {
                     total_agent_calls: agent_total_calls,
                     successful: agent_successful,
@@ -1012,6 +1186,15 @@ impl SimulationHarness {
                     react_convergence_rate: last.map(|s| s.react_convergence_rate).unwrap_or(0.0),
                     avg_react_iterations,
                     mode_distribution: agent_mode_counts,
+                    multi_turn_coherence: run_coherence,
+                    cross_feature_chain_success: run_chain_success,
+                    adversarial_resilience: run_adversarial,
+                    error_recovery_rate: run_error_recovery,
+                    total_workflows,
+                    parallel_workflows,
+                    sequential_workflows,
+                    total_adversarial,
+                    total_followups,
                 })
             } else {
                 None

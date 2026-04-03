@@ -33,6 +33,15 @@ pub struct PhaseConfig {
     pub shift_description: Option<String>,
     #[serde(default)]
     pub new_facts: Vec<FactTriple>,
+    /// Probability of generating an adversarial message. Default: 0.0 (opt-in).
+    #[serde(default)]
+    pub adversarial_rate: f64,
+    /// Probability of injecting a tool execution failure. Default: 0.0.
+    #[serde(default)]
+    pub error_injection_rate: f64,
+    /// Probability of provider returning malformed responses. Default: 0.0.
+    #[serde(default)]
+    pub provider_error_rate: f64,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -165,4 +174,7 @@ pub struct AnnotatedMessage {
     pub tool_actions: Vec<SimulatedToolAction>,
     pub is_correction: bool,
     pub topic: String,
+    pub is_followup: bool,
+    pub workflow: Option<crate::agent_types::WorkflowPattern>,
+    pub is_adversarial: bool,
 }

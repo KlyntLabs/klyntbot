@@ -43,6 +43,11 @@ pub struct MetricSnapshot {
     pub agent_mode_distribution: f64,
     pub react_convergence_rate: f64,
     pub agent_response_quality: f64,
+    // Tier 6 — multi-turn, cross-feature, adversarial
+    pub multi_turn_coherence: f64,
+    pub cross_feature_chain_success: f64,
+    pub adversarial_resilience: f64,
+    pub error_recovery_rate: f64,
     // Performance
     pub wall_time_per_epoch_ms: f64,
 }
@@ -117,6 +122,15 @@ pub struct EpochAccumulator {
     pub agent_react_iterations_sum: u32,
     pub agent_response_quality_sum: f64,
     pub agent_response_quality_count: u32,
+    // Tier 6 — multi-turn, cross-feature, adversarial (added early for compilation)
+    pub multi_turn_coherence_sum: f64,
+    pub multi_turn_coherence_count: u32,
+    pub cross_feature_success: u32,
+    pub cross_feature_total: u32,
+    pub adversarial_resilient: u32,
+    pub adversarial_total: u32,
+    pub error_recovered: u32,
+    pub error_injected: u32,
 }
 
 // ---------------------------------------------------------------------------
@@ -267,6 +281,27 @@ impl MetricCollector {
             acc.agent_response_quality_sum / acc.agent_response_quality_count as f64
         };
 
+        let multi_turn_coherence = if acc.multi_turn_coherence_count == 0 {
+            0.0
+        } else {
+            acc.multi_turn_coherence_sum / acc.multi_turn_coherence_count as f64
+        };
+        let cross_feature_chain_success = if acc.cross_feature_total == 0 {
+            0.0
+        } else {
+            acc.cross_feature_success as f64 / acc.cross_feature_total as f64
+        };
+        let adversarial_resilience = if acc.adversarial_total == 0 {
+            0.0
+        } else {
+            acc.adversarial_resilient as f64 / acc.adversarial_total as f64
+        };
+        let error_recovery_rate = if acc.error_injected == 0 {
+            0.0
+        } else {
+            acc.error_recovered as f64 / acc.error_injected as f64
+        };
+
         let snap = MetricSnapshot {
             epoch,
             knowledge_retention,
@@ -291,6 +326,10 @@ impl MetricCollector {
             agent_mode_distribution,
             react_convergence_rate,
             agent_response_quality,
+            multi_turn_coherence,
+            cross_feature_chain_success,
+            adversarial_resilience,
+            error_recovery_rate,
             memory_retrievability: 0.0,
             meta_rule_count: 0,
             wall_time_per_epoch_ms: wall_time_ms,

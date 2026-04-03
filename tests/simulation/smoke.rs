@@ -319,6 +319,23 @@ async fn run_software_engineer_12mo() {
                 eprintln!("    {}: {}", mode, count);
             }
         }
+        // Tier 6 metrics
+        eprintln!("  Followups:            {}", agent.total_followups);
+        eprintln!("  Multi-turn coherence: {:.3}", agent.multi_turn_coherence);
+        eprintln!(
+            "  Workflows:            {} (parallel: {}, sequential: {})",
+            agent.total_workflows, agent.parallel_workflows, agent.sequential_workflows
+        );
+        eprintln!(
+            "  Chain success:        {:.3}",
+            agent.cross_feature_chain_success
+        );
+        eprintln!("  Adversarial total:    {}", agent.total_adversarial);
+        eprintln!(
+            "  Adversarial resilience: {:.3}",
+            agent.adversarial_resilience
+        );
+        eprintln!("  Error recovery rate:  {:.3}", agent.error_recovery_rate);
     }
 
     // Print checkpoint details

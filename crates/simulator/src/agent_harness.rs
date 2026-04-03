@@ -180,7 +180,12 @@ impl AgentHarness {
     }
 
     /// Process a single message through the agent pipeline.
-    pub async fn process(&self, msg: &AnnotatedMessage, day: u32) -> AgentResult {
+    pub async fn process(
+        &self,
+        msg: &AnnotatedMessage,
+        day: u32,
+        history: &[providers::types::Message],
+    ) -> AgentResult {
         let ctx = RoutingContext::new(
             ChannelName::new("simulation".to_string()),
             ChatId::new("sim-session".to_string()),
@@ -200,7 +205,11 @@ impl AgentHarness {
             .runtime
             .process_message(
                 &msg.content,
-                vec![providers::types::Message::user(&msg.content)],
+                {
+                    let mut h = history.to_vec();
+                    h.push(providers::types::Message::user(&msg.content));
+                    h
+                },
                 &tool_defs,
                 &tool_name_refs,
                 &ctx,

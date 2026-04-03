@@ -21,6 +21,7 @@ use providers::types::{
 pub struct SimulationProvider {
     call_count: AtomicUsize,
     rng: Mutex<StdRng>,
+    provider_error_rate: f64,
 }
 
 impl SimulationProvider {
@@ -28,7 +29,13 @@ impl SimulationProvider {
         Self {
             call_count: AtomicUsize::new(0),
             rng: Mutex::new(StdRng::seed_from_u64(seed)),
+            provider_error_rate: 0.0,
         }
+    }
+
+    pub fn with_error_rate(mut self, rate: f64) -> Self {
+        self.provider_error_rate = rate;
+        self
     }
 
     /// Extract text content from the last user message.
@@ -48,10 +55,86 @@ impl SimulationProvider {
         })
     }
 
+    /// Check for tool results from previous iterations and generate follow-up tool calls.
+    fn generate_chained_call(&self, messages: &[Message]) -> Option<Vec<ToolCall>> {
+        // Look for Tool result messages (from previous reactive iterations)
+        let last_tool = messages.iter().rev().find_map(|m| match m {
+            Message::Tool { name, .. } => Some(name.as_str()),
+            _ => None,
+        })?;
+
+        let call_id = self.call_count.load(Ordering::Relaxed);
+
+        match last_tool {
+            "notes" => Some(vec![ToolCall {
+                id: format!("call_{call_id}_chain"),
+                name: "tasks".to_string(),
+                arguments: json!({"action": "create", "title": "Follow up on note", "project": "main"}),
+            }]),
+            "tasks" => Some(vec![ToolCall {
+                id: format!("call_{call_id}_chain"),
+                name: "notes".to_string(),
+                arguments: json!({"action": "search", "query": "task summary"}),
+            }]),
+            "finance" => Some(vec![ToolCall {
+                id: format!("call_{call_id}_chain"),
+                name: "notes".to_string(),
+                arguments: json!({"action": "search", "query": "financial summary"}),
+            }]),
+            _ => None,
+        }
+    }
+
     /// Inspect the last user message and return appropriate tool calls.
     fn generate_tool_calls(&self, messages: &[Message]) -> Option<Vec<ToolCall>> {
         let content = Self::last_user_content(messages)?;
         let lower = content.to_lowercase();
+
+        // Multi-domain detection: check for 2+ domain keywords
+        let has_task = lower.contains("task") || lower.contains("todo");
+        let has_note = lower.contains("note") || lower.contains("summarize");
+        let has_finance =
+            lower.contains("expense") || lower.contains("budget") || lower.contains("spend");
+        let has_focus = lower.contains("focus") || lower.contains("productive");
+
+        let domain_count = [has_task, has_note, has_finance, has_focus]
+            .iter()
+            .filter(|&&b| b)
+            .count();
+
+        if domain_count >= 2 {
+            let call_id = self.call_count.load(Ordering::Relaxed);
+            let mut calls = Vec::new();
+            if has_task {
+                calls.push(ToolCall {
+                    id: format!("call_{call_id}_tasks"),
+                    name: "tasks".to_string(),
+                    arguments: json!({"action": "list"}),
+                });
+            }
+            if has_note {
+                calls.push(ToolCall {
+                    id: format!("call_{call_id}_notes"),
+                    name: "notes".to_string(),
+                    arguments: json!({"action": "search", "query": content}),
+                });
+            }
+            if has_finance {
+                calls.push(ToolCall {
+                    id: format!("call_{call_id}_finance"),
+                    name: "finance".to_string(),
+                    arguments: json!({"action": "record", "amount": 50.0, "category": "general", "description": "Simulated"}),
+                });
+            }
+            if has_focus {
+                calls.push(ToolCall {
+                    id: format!("call_{call_id}_productivity"),
+                    name: "productivity".to_string(),
+                    arguments: json!({"action": "start_focus", "duration_mins": 25}),
+                });
+            }
+            return Some(calls);
+        }
 
         // Task-related
         if lower.contains("task") || lower.contains("todo") || lower.contains("prioritize") {
@@ -166,6 +249,72 @@ impl LlmProvider for SimulationProvider {
             let mut rng = self.rng.lock().unwrap();
             (rng.random_range(80..200u32), rng.random_range(30..120u32))
         };
+
+        // Check for sequential chaining (tool results from previous iterations)
+        if let Some(chained) = self.generate_chained_call(messages) {
+            return Ok(LlmResponse {
+                content: None,
+                tool_calls: chained,
+                finish_reason: "tool_use".to_string(),
+                usage: Usage {
+                    prompt_tokens,
+                    completion_tokens,
+                    total_tokens: prompt_tokens + completion_tokens,
+                    cache_read_tokens: 0,
+                    cache_write_tokens: 0,
+                },
+                reasoning_content: None,
+            });
+        }
+
+        // Adversarial: occasionally return malformed responses
+        if self.provider_error_rate > 0.0 {
+            let inject = {
+                let mut rng = self.rng.lock().unwrap();
+                rng.random::<f64>() < self.provider_error_rate
+            };
+            if inject {
+                let malformation = {
+                    let mut rng = self.rng.lock().unwrap();
+                    rng.random_range(0u8..4)
+                };
+                let bad_call = match malformation {
+                    0 => ToolCall {
+                        id: format!("call_{}", self.call_count.load(Ordering::Relaxed)),
+                        name: "taks".to_string(), // typo
+                        arguments: json!({"action": "list"}),
+                    },
+                    1 => ToolCall {
+                        id: format!("call_{}", self.call_count.load(Ordering::Relaxed)),
+                        name: "tasks".to_string(),
+                        arguments: json!(null), // invalid arguments
+                    },
+                    2 => ToolCall {
+                        id: String::new(), // empty ID
+                        name: "tasks".to_string(),
+                        arguments: json!({"action": "list"}),
+                    },
+                    _ => ToolCall {
+                        id: format!("call_{}", self.call_count.load(Ordering::Relaxed)),
+                        name: "nonexistent_tool".to_string(),
+                        arguments: json!({"action": "query"}),
+                    },
+                };
+                return Ok(LlmResponse {
+                    content: None,
+                    tool_calls: vec![bad_call],
+                    finish_reason: "tool_use".to_string(),
+                    usage: Usage {
+                        prompt_tokens,
+                        completion_tokens,
+                        total_tokens: prompt_tokens + completion_tokens,
+                        cache_read_tokens: 0,
+                        cache_write_tokens: 0,
+                    },
+                    reasoning_content: None,
+                });
+            }
+        }
 
         let tool_calls = self.generate_tool_calls(messages).unwrap_or_default();
         let has_tools = !tool_calls.is_empty();

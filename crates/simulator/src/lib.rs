@@ -2,6 +2,7 @@ pub mod actions;
 pub mod agent_harness;
 pub mod agent_types;
 pub mod epoch;
+pub mod error_injector;
 pub mod harness;
 pub mod metrics;
 pub mod persona;

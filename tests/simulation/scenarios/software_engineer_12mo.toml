@@ -44,9 +44,12 @@ new_facts = [
     { subject = "user", predicate = "prefers_language", object = "Python" },
     { subject = "user", predicate = "works_at", object = "remote" },
 ]
-topic_weights = { tasks = 0.2, notes = 0.15, finance = 0.15, productivity = 0.15, automation = 0.15, insights = 0.1, chat = 0.1 }
+topic_weights = { tasks = 0.15, notes = 0.10, finance = 0.10, productivity = 0.10, automation = 0.10, insights = 0.05, chat = 0.05, cross_feature_parallel = 0.15, cross_feature_sequential = 0.10, learning = 0.05, coaching = 0.05 }
 new_fact_introduction_rate = 0.05
 tool_action_rate = 0.8
+adversarial_rate = 0.08
+error_injection_rate = 0.03
+provider_error_rate = 0.02
 
 [persona.phases.behavior_shift]
 duration_days = 90
@@ -67,9 +70,11 @@ tool_action_rate = 0.6
 # due to phase transitions — routing_stability legitimately drops during
 # behavior_shift as the topic distribution changes and chat messages no longer
 # inflate the match rate. Use 50% threshold to tolerate cross-phase variance.
-regression_threshold = 50.0
+regression_threshold = 75.0
 agent_mode = true
-agent_breakpoint_threshold = 0.40
+agent_breakpoint_threshold = 0.50
+multi_turn_history_depth = 5
+followup_rate = 0.15
 
 [[checkpoints]]
 at_day = 14

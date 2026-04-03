@@ -238,6 +238,10 @@ fn get_metric_value(snapshot: &MetricSnapshot, metric: &MetricName) -> f64 {
         MetricName::AgentModeDistribution => snapshot.agent_mode_distribution,
         MetricName::ReactConvergenceRate => snapshot.react_convergence_rate,
         MetricName::AgentResponseQuality => snapshot.agent_response_quality,
+        MetricName::MultiTurnCoherence => snapshot.multi_turn_coherence,
+        MetricName::CrossFeatureChainSuccess => snapshot.cross_feature_chain_success,
+        MetricName::AdversarialResilience => snapshot.adversarial_resilience,
+        MetricName::ErrorRecoveryRate => snapshot.error_recovery_rate,
     }
 }
 
