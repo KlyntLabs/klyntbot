@@ -9,6 +9,7 @@ use std::time::Instant;
 
 use bus::{ContextUpdateQueue, CorrectionKind, DomainEvent, DomainEventBus};
 use chrono::{Duration, TimeZone, Utc};
+use tokio::sync::Mutex as TokioMutex;
 use tracing::{debug, info, warn};
 use uuid::Uuid;
 
@@ -66,6 +67,12 @@ pub struct SimulationHarness {
     /// Pre-cached embeddings for the 8 reference answer strings (one per topic).
     reference_embeddings: HashMap<String, Vec<f32>>,
     agent_harness: Option<crate::agent_harness::AgentHarness>,
+    /// Coaching signal accumulator — fed from domain events to exercise the
+    /// coaching detection pipeline during simulation.
+    coaching_accumulator: Arc<TokioMutex<feature_coaching::SignalAccumulator>>,
+    /// Coaching pattern detector — records trigger firings and detects
+    /// behavioral patterns (afternoon energy drop, task avoidance, etc.).
+    coaching_detector: Arc<TokioMutex<feature_coaching::PatternDetector>>,
 }
 
 impl SimulationHarness {
@@ -350,6 +357,12 @@ impl SimulationHarness {
             embedding_engine,
             reference_embeddings,
             agent_harness,
+            coaching_accumulator: Arc::new(TokioMutex::new(
+                feature_coaching::SignalAccumulator::new(),
+            )),
+            coaching_detector: Arc::new(TokioMutex::new(
+                feature_coaching::PatternDetector::new(),
+            )),
         })
     }
 
@@ -379,6 +392,56 @@ impl SimulationHarness {
             while let Ok(event) = bus_rx.recv().await {
                 if matches!(event, bus::DomainEvent::ContradictionDetected { .. }) {
                     cc.fetch_add(1, Ordering::Relaxed);
+                }
+            }
+        });
+
+        // Subscribe coaching pipeline to domain events.
+        // The accumulator converts events to signals and evaluates trigger
+        // conditions; fired triggers feed the pattern detector for behavioral
+        // pattern recognition (afternoon energy drop, task avoidance, etc.).
+        let coaching_acc = Arc::clone(&self.coaching_accumulator);
+        let coaching_det = Arc::clone(&self.coaching_detector);
+        let mut coaching_rx = self.bus.subscribe();
+        let coaching_listener = tokio::spawn(async move {
+            // Minimal UserSituation — the simulation doesn't have a real user,
+            // but the accumulator needs one for trigger evaluation.
+            let mut situation = cognitive::situation::UserSituation::default();
+            while let Ok(event) = coaching_rx.recv().await {
+                // Incrementally update situation from relevant events.
+                match &event {
+                    DomainEvent::DistractionDetected { .. } => {
+                        situation.distraction_risk =
+                            (situation.distraction_risk + 0.15).min(1.0);
+                    }
+                    DomainEvent::FocusSessionStarted { .. } => {
+                        situation.focus_state = 0.9;
+                        situation.distraction_risk =
+                            (situation.distraction_risk - 0.2).max(0.0);
+                    }
+                    DomainEvent::FocusSessionEnded { quality, .. } => {
+                        situation.focus_state = *quality;
+                    }
+                    DomainEvent::TaskDeferred { .. } => {
+                        situation.task_avoidance_detected = true;
+                    }
+                    DomainEvent::BudgetAlert { .. } => {
+                        situation.deadline_pressure =
+                            (situation.deadline_pressure + 0.2).min(1.0);
+                    }
+                    _ => {}
+                }
+
+                let mut acc = coaching_acc.lock().await;
+                acc.push_event(&event);
+                let fired = acc.evaluate(&situation);
+                drop(acc);
+
+                if !fired.is_empty() {
+                    let mut det = coaching_det.lock().await;
+                    for trigger in &fired {
+                        det.record_trigger(trigger);
+                    }
                 }
             }
         });
@@ -1127,6 +1190,36 @@ impl SimulationHarness {
 
         // Stop the contradiction listener before building the report.
         contradiction_listener.abort();
+
+        // Stop coaching listener and log detected patterns.
+        coaching_listener.abort();
+        {
+            let acc = self.coaching_accumulator.lock().await;
+            let det = self.coaching_detector.lock().await;
+            let patterns = det.detect_patterns();
+            let signal_count = acc.window_size();
+            let conditions = acc.condition_names();
+            let fired_count: usize = conditions
+                .iter()
+                .map(|c| det.history_count(c))
+                .sum();
+
+            info!(
+                signals = signal_count,
+                triggers_fired = fired_count,
+                patterns_detected = patterns.len(),
+                "Coaching pipeline summary"
+            );
+            for p in &patterns {
+                info!(
+                    name = %p.name,
+                    confidence = format!("{:.2}", p.confidence),
+                    signals = p.signal_count,
+                    domain = %p.domain,
+                    "Detected coaching pattern"
+                );
+            }
+        }
 
         // Build the final report.
         let wall_time_secs = run_start.elapsed().as_secs_f64();

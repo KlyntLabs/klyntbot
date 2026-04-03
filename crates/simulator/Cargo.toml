@@ -20,6 +20,7 @@ feature-notes.workspace = true
 feature-finance.workspace = true
 feature-productivity.workspace = true
 feature-learning.workspace = true
+feature-coaching.workspace = true
 activity-log.workspace = true
 agent.workspace = true
 tools.workspace = true
