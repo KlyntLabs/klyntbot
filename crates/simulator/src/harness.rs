@@ -127,6 +127,12 @@ impl SimulationHarness {
                         ))
                     })?;
             }
+            // Productivity tables
+            storage::StoragePool::run_feature_migrations(
+                &inner_pool,
+                &feature_productivity::ProductivityFeature::migrations_static(),
+            )
+            .await?;
         }
 
         // Seed an autotuner experiment with two active trials so the

@@ -242,6 +242,36 @@ impl AgentHarness {
         // Work context tool
         registry.register(activity_log::WorkContextTool::new(pool.clone()));
 
+        // Productivity tool
+        let prod_repos = feature_productivity::repos::ProductivityRepos::new(inner_pool.clone());
+        let focus_mgr = std::sync::Arc::new(
+            feature_productivity::FocusManager::new(
+                prod_repos.clone(),
+                feature_productivity::config::FocusConfig::default(),
+            )
+            .with_domain_bus(Arc::clone(bus)),
+        );
+        let aggregator = std::sync::Arc::new(
+            feature_productivity::DailyAggregator::new(prod_repos.clone())
+                .with_domain_bus(Arc::clone(bus)),
+        );
+        registry.register(feature_productivity::ProductivityTool::new(
+            prod_repos,
+            focus_mgr,
+            aggregator,
+        ));
+
+        // Learning tool (no handler — graceful no-op in simulation)
+        registry.register(tools::LearningTool::new(None));
+
+        // Mirror tool (read-only access to self-reflection layer)
+        let mirror_repo = cognitive::mirror::MirrorRepo::new(pool.clone());
+        let mirror_facade = std::sync::Arc::new(cognitive::mirror::MirrorFacade::new(mirror_repo));
+        registry.register(tools::MirrorTool::new(mirror_facade));
+
+        // Cron tool (no handler — read-only listing in simulation)
+        registry.register(tools::cron_tool::CronTool::new());
+
         debug!(
             tool_count = registry.tool_names().len(),
             "Agent harness tools registered"
