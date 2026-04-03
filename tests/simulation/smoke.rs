@@ -92,9 +92,39 @@ fn print_checkpoints(report: &SimulationReport) {
 
 async fn run_scenario(toml: &str) -> SimulationReport {
     let scenario = Scenario::from_toml(toml).unwrap();
-    let extraction: Arc<dyn ExtractionHandler> = Arc::new(HeuristicExtractionHandler);
-    let consolidation: Arc<dyn ConsolidationHandler> = Arc::new(HeuristicConsolidationHandler);
-    let reflection: Arc<dyn ReflectionHandler> = Arc::new(HeuristicReflectionHandler);
+    let bridge_config =
+        simulator::providers::CognitiveBridgeConfig::from(&scenario.simulation);
+
+    let (extraction, consolidation, reflection): (
+        Arc<dyn ExtractionHandler>,
+        Arc<dyn ConsolidationHandler>,
+        Arc<dyn ReflectionHandler>,
+    ) = if bridge_config.is_heuristic() {
+        (
+            Arc::new(HeuristicExtractionHandler),
+            Arc::new(HeuristicConsolidationHandler),
+            Arc::new(HeuristicReflectionHandler),
+        )
+    } else {
+        let provider = create_cognitive_provider(&bridge_config);
+        let params = providers::ChatParams::new(&bridge_config.model)
+            .with_temperature(bridge_config.temperature as f32);
+        (
+            Arc::new(klyntbot::agent::cognitive_handlers::LlmExtractionHandler::new(
+                provider.clone(),
+                params.clone(),
+            )) as Arc<dyn ExtractionHandler>,
+            Arc::new(klyntbot::agent::cognitive_handlers::LlmConsolidationHandler::new(
+                provider.clone(),
+                params.clone(),
+            )) as Arc<dyn ConsolidationHandler>,
+            Arc::new(klyntbot::agent::cognitive_handlers::LlmReflectionHandler::new(
+                provider,
+                params,
+            )) as Arc<dyn ReflectionHandler>,
+        )
+    };
+
     let narrative: Arc<dyn cognitive::mirror::NarrativeHandler> =
         Arc::new(HeuristicNarrativeHandler);
     let harness =
@@ -102,6 +132,38 @@ async fn run_scenario(toml: &str) -> SimulationReport {
             .await
             .unwrap();
     harness.run().await.unwrap()
+}
+
+fn create_cognitive_provider(
+    config: &simulator::providers::CognitiveBridgeConfig,
+) -> providers::DynProvider {
+    let model = &config.model;
+    let provider_name = if model.contains("claude") || model.contains("anthropic") {
+        "anthropic"
+    } else if model.contains("deepseek") {
+        "deepseek"
+    } else if model.contains("gpt") || model.contains("o1") || model.contains("o3") {
+        "openai"
+    } else {
+        "deepseek"
+    };
+
+    let spec = providers::ProviderRegistry::find_by_name(provider_name)
+        .expect("unknown cognitive provider");
+    let api_key = std::env::var(spec.env_key).unwrap_or_default();
+
+    if provider_name == "anthropic" {
+        Arc::new(providers::AnthropicNativeProvider::new(
+            config::Secret::new(api_key),
+            spec.default_api_base.to_string(),
+            model.to_string(),
+        ))
+    } else {
+        Arc::new(
+            providers::OpenAiCompatProvider::new(spec.default_api_base, api_key, model)
+                .expect("failed to create cognitive provider"),
+        )
+    }
 }
 
 // ── Smoke test scenario (7 days) ────────────────────────────────────────
