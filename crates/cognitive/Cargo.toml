@@ -9,6 +9,7 @@ license.workspace = true
 common = { workspace = true }
 storage = { workspace = true }
 bus = { workspace = true }
+feature-notes = { workspace = true }
 context_engine = { workspace = true }
 chrono = { workspace = true }
 dashmap = { workspace = true }

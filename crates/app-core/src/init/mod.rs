@@ -131,7 +131,7 @@ impl AppCore {
 
         // DomainEventBus is created before cron so the proactive scan callback
         // can capture it and emit ProactiveSuggestionCreated after persisting.
-        let domain_event_bus = Arc::new(bus::DomainEventBus::new(64));
+        let domain_event_bus = Arc::new(bus::DomainEventBus::new(512));
 
         // Context update queue for live context refresher (shared between agent + background services).
         let context_update_queue = Arc::new(bus::ContextUpdateQueue::new());

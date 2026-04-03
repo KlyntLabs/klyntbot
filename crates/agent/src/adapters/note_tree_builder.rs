@@ -5,11 +5,16 @@
 //! Tries `parse_tiptap_to_tree` on the content first (valid Tiptap JSON),
 //! falls back to `parse_markdown_to_tree` if that returns no nodes.
 
+use std::collections::HashMap;
 use std::sync::Arc;
 
 use tokio::sync::broadcast;
 use tokio_util::sync::CancellationToken;
 use tracing::{debug, info, warn};
+
+/// Debounce window: ignore events for the same note within this duration.
+/// Tree rebuild + LanceDB embed is expensive — avoid redundant work during rapid edits.
+const DEBOUNCE_SECS: u64 = 3;
 
 use bus::{
     ContextUpdate, ContextUpdateQueue, ContextUpdateReason, DomainEvent, DomainEventBus,
@@ -28,6 +33,7 @@ pub struct NoteTreeBuilder {
     embedder: Arc<dyn TextEmbedder>,
     context_update_queue: Option<Arc<ContextUpdateQueue>>,
     domain_event_bus: Option<Arc<DomainEventBus>>,
+    note_repo: feature_notes::repo::NoteRepo,
 }
 
 impl NoteTreeBuilder {
@@ -37,6 +43,7 @@ impl NoteTreeBuilder {
         embedder: Arc<dyn TextEmbedder>,
         context_update_queue: Option<Arc<ContextUpdateQueue>>,
         domain_event_bus: Option<Arc<DomainEventBus>>,
+        note_repo: feature_notes::repo::NoteRepo,
     ) -> Self {
         Self {
             tree_repo,
@@ -44,6 +51,7 @@ impl NoteTreeBuilder {
             embedder,
             context_update_queue,
             domain_event_bus,
+            note_repo,
         }
     }
 
@@ -55,6 +63,7 @@ impl NoteTreeBuilder {
         shutdown: CancellationToken,
     ) {
         info!("NoteTreeBuilder: subscriber started");
+        let mut debounce_map: HashMap<String, tokio::time::Instant> = HashMap::new();
 
         loop {
             tokio::select! {
@@ -64,9 +73,32 @@ impl NoteTreeBuilder {
                 }
                 result = rx.recv() => {
                     match result {
-                        Ok(DomainEvent::NoteContentChanged { note_id, content }) => {
-                            if let Err(e) = self.handle_note_changed(&note_id, &content).await {
-                                warn!(note_id = %note_id, "NoteTreeBuilder: failed to process note change: {e}");
+                        Ok(DomainEvent::NoteContentChanged { note_id }) => {
+                            let now = tokio::time::Instant::now();
+                            if let Some(last) = debounce_map.get(&note_id) {
+                                if now.duration_since(*last).as_secs() < DEBOUNCE_SECS {
+                                    debug!(note_id = %note_id, "NoteTreeBuilder: debounced");
+                                    continue;
+                                }
+                            }
+                            debounce_map.insert(note_id.clone(), now);
+                            if debounce_map.len() > 500 {
+                                let cutoff = now - tokio::time::Duration::from_secs(60);
+                                debounce_map.retain(|_, ts| *ts > cutoff);
+                            }
+
+                            match self.note_repo.get_note(&note_id).await {
+                                Ok(Some(note)) => {
+                                    if let Err(e) = self.handle_note_changed(&note_id, &note.body).await {
+                                        warn!(note_id = %note_id, "NoteTreeBuilder: failed to process note change: {e}");
+                                    }
+                                }
+                                Ok(None) => {
+                                    debug!(note_id = %note_id, "NoteTreeBuilder: note not found, skipping");
+                                }
+                                Err(e) => {
+                                    warn!(note_id = %note_id, "NoteTreeBuilder: failed to fetch note: {e}");
+                                }
                             }
                         }
                         Ok(_) => {

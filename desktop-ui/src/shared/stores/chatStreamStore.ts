@@ -130,7 +130,8 @@ type Listener = () => void;
 // ── Store ───────────────────────────────────────────────────────────────
 
 class ChatStreamStore {
-  private static MAX_IDLE_SESSIONS = 20;
+  private static MAX_IDLE_SESSIONS = 5;
+  private static MAX_TOOL_RESULT_LENGTH = 2000;
   private states = new Map<string, StreamSnapshot>();
   private listeners = new Set<Listener>();
   private eventSources = new Map<string, EventSource>();
@@ -464,7 +465,14 @@ class ChatStreamStore {
             action: payload.action,
             success: payload.success,
             durationMs: payload.durationMs,
-            result: payload.result,
+            result:
+              payload.result &&
+              payload.result.length > ChatStreamStore.MAX_TOOL_RESULT_LENGTH
+                ? payload.result.slice(
+                    0,
+                    ChatStreamStore.MAX_TOOL_RESULT_LENGTH,
+                  ) + "\n… (truncated)"
+                : payload.result,
             estimatedTokens: payload.estimatedTokens,
             agent: payload.agent,
           },

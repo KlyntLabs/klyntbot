@@ -10,6 +10,9 @@ jobs:
     permissions:
       contents: write
     runs-on: macos-latest
+    env:
+      MACOSX_DEPLOYMENT_TARGET: '14.0'
+      CMAKE_OSX_DEPLOYMENT_TARGET: '14.0'
     steps:
       - name: Checkout source
         uses: actions/checkout@v4
@@ -50,13 +53,14 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+          MACOSX_DEPLOYMENT_TARGET: '14.0'
         with:
           tagName: v__VERSION__
           releaseName: 'Klynt v__VERSION__'
           releaseBody: 'Download the .dmg to install Klynt.'
           releaseDraft: false
           prerelease: false
-          args: --target aarch64-apple-darwin --config '{"build":{"beforeBuildCommand":""}}'
+          args: --config '{"build":{"beforeBuildCommand":""}}'
           projectPath: crates/desktop
           tauriScript: cargo tauri
 
@@ -68,8 +72,8 @@ jobs:
           VERSION="${TAG_NAME#v}"
 
           # Find the built artifacts
-          DMG=$(find target/aarch64-apple-darwin/release/bundle/dmg -name "*.dmg" | head -1)
-          UPDATER_TAR=$(find target/aarch64-apple-darwin/release/bundle/macos -name "*.tar.gz" | head -1)
+          DMG=$(find target/release/bundle/dmg -name "*.dmg" | head -1)
+          UPDATER_TAR=$(find target/release/bundle/macos -name "*.tar.gz" | head -1)
           UPDATER_SIG="${UPDATER_TAR}.sig"
 
           # Create latest.json for the updater

@@ -507,10 +507,9 @@ fn register_cron_callbacks(
                         match cache.find_unextracted_notes(50).await {
                             Ok(notes) => {
                                 let count = notes.len();
-                                for (note_id, body) in notes {
+                                for note_id in notes {
                                     bus.publish(bus::DomainEvent::NoteEditingFinished {
                                         note_id,
-                                        content: body,
                                     });
                                 }
                                 if count > 0 {

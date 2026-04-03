@@ -2318,6 +2318,7 @@ dependencies = [
  "config",
  "context_engine",
  "dashmap",
+ "feature-notes",
  "futures-util",
  "petgraph 0.7.1",
  "providers",

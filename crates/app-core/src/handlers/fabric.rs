@@ -475,7 +475,6 @@ impl AppCore {
                 if let Some(bus) = &self.domain_event_bus {
                     bus.publish(bus::DomainEvent::NoteContentChanged {
                         note_id: note_id.clone(),
-                        content,
                     });
                 }
 

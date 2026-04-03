@@ -11,7 +11,7 @@ pub struct SessionConfig {
     /// Maximum number of history messages to load (default: 50)
     #[serde(default = "default_history_limit")]
     pub history_limit: usize,
-    /// Maximum number of sessions to keep in the in-memory cache (default: 1000)
+    /// Maximum number of sessions to keep in the in-memory cache (default: 50)
     #[serde(default = "default_max_cache_size")]
     pub max_cache_size: usize,
     /// Number of days before an inactive session is considered stale and deleted (default: 30)
@@ -185,7 +185,7 @@ mod tests {
     #[test]
     fn test_session_max_cache_size_default() {
         let config = SessionConfig::default();
-        assert_eq!(config.max_cache_size, 1000);
+        assert_eq!(config.max_cache_size, 50);
     }
 
     #[test]

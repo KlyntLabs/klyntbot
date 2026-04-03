@@ -154,7 +154,6 @@ impl AppCore {
             if !created.body.is_empty() {
                 bus.publish(bus::DomainEvent::NoteContentChanged {
                     note_id: id.clone(),
-                    content: created.body.clone(),
                 });
             }
         }
@@ -222,7 +221,6 @@ impl AppCore {
             if params.body.is_some() || params.body_html.is_some() {
                 bus.publish(bus::DomainEvent::NoteContentChanged {
                     note_id: params.id.clone(),
-                    content: updated.body.clone(),
                 });
             }
         }
@@ -541,7 +539,6 @@ impl AppCore {
                 if !note.body.is_empty() {
                     bus.publish(bus::DomainEvent::NoteEditingFinished {
                         note_id: params.note_id,
-                        content: note.body,
                     });
                 }
             }

@@ -29,7 +29,7 @@ pub struct KlyntbotClientHandler {
     /// Server name for logging context
     server_name: String,
     /// Optional channel to notify when the server signals a tool list change.
-    tool_list_changed_tx: Option<tokio::sync::mpsc::UnboundedSender<String>>,
+    tool_list_changed_tx: Option<tokio::sync::mpsc::Sender<String>>,
     /// Workspace root path for roots listing.
     data_dir: Option<String>,
     /// Optional sampling delegate for LLM completion requests.
@@ -47,10 +47,7 @@ impl KlyntbotClientHandler {
     }
 
     /// Create a handler with a tool-list-changed notification channel.
-    pub fn with_tool_list_changed_tx(
-        mut self,
-        tx: tokio::sync::mpsc::UnboundedSender<String>,
-    ) -> Self {
+    pub fn with_tool_list_changed_tx(mut self, tx: tokio::sync::mpsc::Sender<String>) -> Self {
         self.tool_list_changed_tx = Some(tx);
         self
     }
@@ -153,7 +150,11 @@ impl ClientHandler for KlyntbotClientHandler {
             "MCP server tool list changed, triggering re-discovery"
         );
         if let Some(ref tx) = self.tool_list_changed_tx {
-            let _ = tx.send(self.server_name.clone());
+            if let Err(tokio::sync::mpsc::error::TrySendError::Full(_)) =
+                tx.try_send(self.server_name.clone())
+            {
+                tracing::warn!(server = %self.server_name, "tool_list_changed channel full, notification dropped");
+            }
         }
     }
 
