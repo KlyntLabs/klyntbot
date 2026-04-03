@@ -92,8 +92,7 @@ fn print_checkpoints(report: &SimulationReport) {
 
 async fn run_scenario(toml: &str) -> SimulationReport {
     let scenario = Scenario::from_toml(toml).unwrap();
-    let bridge_config =
-        simulator::providers::CognitiveBridgeConfig::from(&scenario.simulation);
+    let bridge_config = simulator::providers::CognitiveBridgeConfig::from(&scenario.simulation);
 
     let (extraction, consolidation, reflection): (
         Arc<dyn ExtractionHandler>,
@@ -110,18 +109,21 @@ async fn run_scenario(toml: &str) -> SimulationReport {
         let params = providers::ChatParams::new(&bridge_config.model)
             .with_temperature(bridge_config.temperature as f32);
         (
-            Arc::new(klyntbot::agent::cognitive_handlers::LlmExtractionHandler::new(
-                provider.clone(),
-                params.clone(),
-            )) as Arc<dyn ExtractionHandler>,
-            Arc::new(klyntbot::agent::cognitive_handlers::LlmConsolidationHandler::new(
-                provider.clone(),
-                params.clone(),
-            )) as Arc<dyn ConsolidationHandler>,
-            Arc::new(klyntbot::agent::cognitive_handlers::LlmReflectionHandler::new(
-                provider,
-                params,
-            )) as Arc<dyn ReflectionHandler>,
+            Arc::new(
+                klyntbot::agent::cognitive_handlers::LlmExtractionHandler::new(
+                    provider.clone(),
+                    params.clone(),
+                ),
+            ) as Arc<dyn ExtractionHandler>,
+            Arc::new(
+                klyntbot::agent::cognitive_handlers::LlmConsolidationHandler::new(
+                    provider.clone(),
+                    params.clone(),
+                ),
+            ) as Arc<dyn ConsolidationHandler>,
+            Arc::new(
+                klyntbot::agent::cognitive_handlers::LlmReflectionHandler::new(provider, params),
+            ) as Arc<dyn ReflectionHandler>,
         )
     };
 
@@ -428,6 +430,45 @@ async fn run_software_engineer_12mo() {
 
     assert!(report.summary.total_messages > 0);
     assert!(report.passed(), "Simulation failed — see report above");
+}
+
+#[tokio::test]
+async fn run_cognitive_llm_validation() {
+    // Skip if no API key available (CI-safe)
+    if std::env::var("DEEPSEEK_API_KEY").map_or(true, |k| k.is_empty()) {
+        eprintln!("Skipping cognitive LLM validation — DEEPSEEK_API_KEY not set");
+        return;
+    }
+
+    let report =
+        run_scenario(include_str!("scenarios/cognitive_llm_validation.toml")).await;
+
+    eprintln!("\n============================================================");
+    eprintln!("  COGNITIVE LLM VALIDATION: {}", report.persona);
+    eprintln!("============================================================");
+    eprintln!("  Simulated days:     {}", report.simulated_days);
+    eprintln!("  Wall time:          {:.2}s", report.wall_time_secs);
+    eprintln!("  Total messages:     {}", report.summary.total_messages);
+    eprintln!(
+        "  Facts extracted:    {}",
+        report.summary.total_facts_extracted
+    );
+    eprintln!(
+        "  Knowledge retention: {:.3}",
+        report.summary.final_metrics.knowledge_retention
+    );
+    eprintln!(
+        "  Fact extraction acc: {:.3}",
+        report.summary.final_metrics.fact_extraction_accuracy
+    );
+    print_checkpoints(&report);
+    eprintln!(
+        "  Verdict: {}",
+        if report.passed() { "PASSED" } else { "FAILED" }
+    );
+
+    assert!(report.summary.total_messages > 0);
+    // Don't assert passed() — real LLM results vary
 }
 
 #[tokio::test]

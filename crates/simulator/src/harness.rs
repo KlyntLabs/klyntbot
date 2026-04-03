@@ -1794,28 +1794,34 @@ impl SimulationHarness {
                                 .or_default()
                                 .push(format!("{} {} {}", f.subject, f.predicate, f.object));
                         }
-                        if domains.len() >= 2 {
-                            let domain_names: Vec<&String> = domains.keys().collect();
-                            let insight_text = format!(
-                                "Cross-domain pattern: {} domains active ({}) with {} total facts",
-                                domains.len(),
-                                domain_names
-                                    .iter()
-                                    .map(|d| d.as_str())
-                                    .collect::<Vec<_>>()
-                                    .join(", "),
-                                facts.len()
-                            );
-                            let dot_refs = serde_json::to_string(&domain_names).unwrap_or_default();
-                            let date = simulated_now.format("%Y-%m-%d").to_string();
-                            let _ = sqlx::query(
-                                "INSERT INTO cross_domain_insights (date, insight_text, dot_refs) VALUES (?1, ?2, ?3)",
-                            )
-                            .bind(&date)
-                            .bind(&insight_text)
-                            .bind(&dot_refs)
-                            .execute(&self.inner_pool)
-                            .await;
+                        let domain_list: Vec<String> = domains.keys().cloned().collect();
+                        if domain_list.len() >= 2 {
+                            for i in 0..domain_list.len() {
+                                for j in (i + 1)..domain_list.len() {
+                                    let d1 = &domain_list[i];
+                                    let d2 = &domain_list[j];
+                                    let c1 = domains.get(d1).map(|v| v.len()).unwrap_or(0);
+                                    let c2 = domains.get(d2).map(|v| v.len()).unwrap_or(0);
+                                    let insight_text = format!(
+                                        "Cross-domain connection between {} ({} facts) and {} ({} facts)",
+                                        d1, c1, d2, c2
+                                    );
+                                    let dot_refs = serde_json::to_string(
+                                        &vec![d1, d2],
+                                    )
+                                    .unwrap_or_default();
+                                    let date = simulated_now.format("%Y-%m-%d").to_string();
+                                    let _ = sqlx::query(
+                                        "INSERT INTO cross_domain_insights \
+                                         (date, insight_text, dot_refs) VALUES (?1, ?2, ?3)",
+                                    )
+                                    .bind(&date)
+                                    .bind(&insight_text)
+                                    .bind(&dot_refs)
+                                    .execute(&self.inner_pool)
+                                    .await;
+                                }
+                            }
                         }
                     }
                     Ok(_) => {
