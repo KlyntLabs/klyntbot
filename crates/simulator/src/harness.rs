@@ -558,88 +558,93 @@ impl SimulationHarness {
                     }
                 }
 
-                // Execute tool actions.
-                let error_injection_rate =
-                    persona_runner.current_phase_config().error_injection_rate;
+                // Execute tool actions — only in heuristic mode.
+                // When agent_mode is active, the AgentRuntime executes tools
+                // via its own pipeline, so we skip the heuristic action executor
+                // to avoid duplicate DB writes and conflicting state.
                 let mut msg_had_error_injection = false;
-                for action in &msg.tool_actions {
-                    let (exec_result, was_injected) = action_executor
-                        .execute(action, msg.simulated_at, error_injection_rate)
+                if self.agent_harness.is_none() {
+                    let error_injection_rate =
+                        persona_runner.current_phase_config().error_injection_rate;
+                    for action in &msg.tool_actions {
+                        let (exec_result, was_injected) = action_executor
+                            .execute(action, msg.simulated_at, error_injection_rate)
+                            .await;
+                        if was_injected {
+                            metrics.accumulator_mut().error_injected += 1;
+                            msg_had_error_injection = true;
+                        }
+                        if let Err(e) = exec_result {
+                            warn!(error = %e, "Failed to execute tool action");
+                        }
+                        // Track tasks_created / tasks_completed.
+                        match action {
+                            SimulatedToolAction::CreateTask { .. } => {
+                                metrics.accumulator_mut().tasks_created += 1;
+                            }
+                            SimulatedToolAction::CompleteTask { .. } => {
+                                metrics.accumulator_mut().tasks_completed += 1;
+                            }
+                            _ => {}
+                        }
+
+                        // tool_usage row
+                        let tool_name = match action {
+                            SimulatedToolAction::CreateTask { .. }
+                            | SimulatedToolAction::CompleteTask { .. } => "tasks",
+                            SimulatedToolAction::CreateNote { .. }
+                            | SimulatedToolAction::UpdateNote { .. } => "notes",
+                            SimulatedToolAction::RecordTransaction { .. } => "finance",
+                            SimulatedToolAction::StartFocus { .. }
+                            | SimulatedToolAction::RecordProductivityEvent { .. } => "productivity",
+                            SimulatedToolAction::CreateFlashcard { .. }
+                            | SimulatedToolAction::ReviewFlashcard { .. } => "learning",
+                            SimulatedToolAction::CreateObjective { .. } => "okr",
+                        };
+                        let _ = sqlx::query(
+                            "INSERT INTO tool_usage \
+                             (id, tool_name, action, session_key, channel, success, duration_ms, created_at) \
+                             VALUES (?, ?, 'execute', 'sim-session', 'simulation', 1, 10, ?)",
+                        )
+                        .bind(Uuid::new_v4().to_string())
+                        .bind(tool_name)
+                        .bind(msg.simulated_at.to_rfc3339())
+                        .execute(&self.inner_pool)
                         .await;
-                    if was_injected {
-                        metrics.accumulator_mut().error_injected += 1;
-                        msg_had_error_injection = true;
-                    }
-                    if let Err(e) = exec_result {
-                        warn!(error = %e, "Failed to execute tool action");
-                    }
-                    // Track tasks_created / tasks_completed.
-                    match action {
-                        SimulatedToolAction::CreateTask { .. } => {
-                            metrics.accumulator_mut().tasks_created += 1;
-                        }
-                        SimulatedToolAction::CompleteTask { .. } => {
-                            metrics.accumulator_mut().tasks_completed += 1;
-                        }
-                        _ => {}
-                    }
 
-                    // tool_usage row
-                    let tool_name = match action {
-                        SimulatedToolAction::CreateTask { .. }
-                        | SimulatedToolAction::CompleteTask { .. } => "tasks",
-                        SimulatedToolAction::CreateNote { .. }
-                        | SimulatedToolAction::UpdateNote { .. } => "notes",
-                        SimulatedToolAction::RecordTransaction { .. } => "finance",
-                        SimulatedToolAction::StartFocus { .. }
-                        | SimulatedToolAction::RecordProductivityEvent { .. } => "productivity",
-                        SimulatedToolAction::CreateFlashcard { .. }
-                        | SimulatedToolAction::ReviewFlashcard { .. } => "learning",
-                        SimulatedToolAction::CreateObjective { .. } => "okr",
-                    };
-                    let _ = sqlx::query(
-                        "INSERT INTO tool_usage \
-                         (id, tool_name, action, session_key, channel, success, duration_ms, created_at) \
-                         VALUES (?, ?, 'execute', 'sim-session', 'simulation', 1, 10, ?)",
-                    )
-                    .bind(Uuid::new_v4().to_string())
-                    .bind(tool_name)
-                    .bind(msg.simulated_at.to_rfc3339())
-                    .execute(&self.inner_pool)
-                    .await;
-
-                    // Salience: classify the domain event this action produced.
-                    let salience_event = match action {
-                        SimulatedToolAction::CreateTask { project, .. } => {
-                            Some(DomainEvent::TaskCreated {
-                                task_id: String::new(),
-                                project: project.clone(),
-                                estimate_mins: None,
-                                task_type: "todo".to_string(),
-                            })
+                        // Salience: classify the domain event this action produced.
+                        let salience_event = match action {
+                            SimulatedToolAction::CreateTask { project, .. } => {
+                                Some(DomainEvent::TaskCreated {
+                                    task_id: String::new(),
+                                    project: project.clone(),
+                                    estimate_mins: None,
+                                    task_type: "todo".to_string(),
+                                })
+                            }
+                            SimulatedToolAction::CompleteTask { task_ref } => {
+                                Some(DomainEvent::TaskCompleted {
+                                    task_id: task_ref.clone(),
+                                    actual_duration_mins: None,
+                                    estimated_duration_mins: None,
+                                    deviation_pct: None,
+                                })
+                            }
+                            SimulatedToolAction::RecordTransaction {
+                                category, amount, ..
+                            } => Some(DomainEvent::TransactionRecorded {
+                                category: category.clone(),
+                                amount: *amount,
+                                is_over_budget: false,
+                            }),
+                            _ => None,
+                        };
+                        if let Some(ref event) = salience_event {
+                            crate::metrics::cognitive::record_salience(
+                                event,
+                                metrics.accumulator_mut(),
+                            );
                         }
-                        SimulatedToolAction::CompleteTask { task_ref } => {
-                            Some(DomainEvent::TaskCompleted {
-                                task_id: task_ref.clone(),
-                                actual_duration_mins: None,
-                                estimated_duration_mins: None,
-                                deviation_pct: None,
-                            })
-                        }
-                        SimulatedToolAction::RecordTransaction {
-                            category, amount, ..
-                        } => Some(DomainEvent::TransactionRecorded {
-                            category: category.clone(),
-                            amount: *amount,
-                            is_over_budget: false,
-                        }),
-                        _ => None,
-                    };
-                    if let Some(ref event) = salience_event {
-                        crate::metrics::cognitive::record_salience(
-                            event,
-                            metrics.accumulator_mut(),
-                        );
                     }
                 }
 
@@ -949,15 +954,23 @@ impl SimulationHarness {
                 // ── Domain entity rows: usage, interaction, strategy ──
                 let request_id = Uuid::new_v4().to_string();
 
+                // Estimate tokens from message length (~4 chars/token for English)
+                // plus a base overhead for system prompt / tool definitions.
+                let prompt_tokens = (msg.content.len() as u64 / 4).max(20) + 80;
+                let completion_tokens = prompt_tokens / 3 + 30;
+                let estimated_tokens = prompt_tokens + completion_tokens;
+
                 // usage_records
                 let _ = sqlx::query(
                     "INSERT INTO usage_records \
                      (id, timestamp, request_id, model, provider, prompt_tokens, completion_tokens, channel, strategy) \
-                     VALUES (?, ?, ?, 'scripted-sim', 'simulator', 100, 50, 'simulation', 'reactive')",
+                     VALUES (?, ?, ?, 'scripted-sim', 'simulator', ?, ?, 'simulation', 'reactive')",
                 )
                 .bind(Uuid::new_v4().to_string())
                 .bind(msg.simulated_at.to_rfc3339())
                 .bind(&request_id)
+                .bind(prompt_tokens as i64)
+                .bind(completion_tokens as i64)
                 .execute(&self.inner_pool)
                 .await;
 
@@ -984,9 +997,8 @@ impl SimulationHarness {
                 .execute(&self.inner_pool)
                 .await;
 
-                // Token tracking: deterministic variation in range 150..270 per message.
-                let simulated_tokens = 150u64 + ((day_counter as u64 * 7 + msg_idx as u64) % 120);
-                metrics.accumulator_mut().total_tokens += simulated_tokens;
+                // Token tracking: content-based estimate computed above.
+                metrics.accumulator_mut().total_tokens += estimated_tokens;
             }
 
             // Yield to let the contradiction listener process any pending bus events.
