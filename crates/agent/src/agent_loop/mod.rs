@@ -85,6 +85,8 @@ pub struct AgentLoop {
         tokio::sync::Mutex<Option<cognitive::background::BackgroundConsolidationService>>,
     /// Cancellation token for the work context inference loop.
     pub(crate) _inference_loop_token: Option<CancellationToken>,
+    /// Parent cancellation token for all tree builder subscriber tasks.
+    pub(crate) _tree_builder_token: Option<CancellationToken>,
     /// Activity ingestion service for chat message logging.
     pub(crate) activity_svc: Option<Arc<activity_log::ActivityIngestionService>>,
     /// Shared skill catalog — used for hot-reload of skill packages.
@@ -433,6 +435,11 @@ impl AgentLoop {
 
         // Stop the MCP health check background service
         if let Some(token) = &self._mcp_health_check_token {
+            token.cancel();
+        }
+
+        // Stop all tree builder subscriber tasks
+        if let Some(token) = &self._tree_builder_token {
             token.cancel();
         }
 

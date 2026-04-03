@@ -201,7 +201,6 @@ impl AppCore {
                 if !note.body.is_empty() {
                     bus.publish(bus::DomainEvent::NoteContentChanged {
                         note_id: note.id.clone(),
-                        content: note.body.clone(),
                     });
                 }
             }

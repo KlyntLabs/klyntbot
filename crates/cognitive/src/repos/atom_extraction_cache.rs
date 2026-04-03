@@ -23,14 +23,11 @@ impl AtomExtractionCache {
     }
 
     /// Find note IDs that have never been extracted (no entry in cache).
-    /// Returns Vec of (note_id, body) pairs, limited to avoid overload.
-    pub async fn find_unextracted_notes(
-        &self,
-        limit: i64,
-    ) -> Result<Vec<(String, String)>, sqlx::Error> {
-        sqlx::query_as::<_, (String, String)>(
+    /// Returns Vec of note IDs, limited to avoid overload.
+    pub async fn find_unextracted_notes(&self, limit: i64) -> Result<Vec<String>, sqlx::Error> {
+        let rows = sqlx::query_scalar::<_, String>(
             r#"
-            SELECT n.id, n.body
+            SELECT n.id
             FROM notes n
             LEFT JOIN atom_extraction_cache c ON c.note_id = n.id
             WHERE n.body != ''
@@ -42,7 +39,8 @@ impl AtomExtractionCache {
         )
         .bind(limit)
         .fetch_all(&self.pool)
-        .await
+        .await?;
+        Ok(rows)
     }
 
     /// Update or insert the cache entry for a note.

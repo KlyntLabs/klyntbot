@@ -48,9 +48,9 @@ pub struct McpManager {
     #[allow(dead_code)]
     config: McpConfig,
     /// Sender for tool-list-changed notifications from MCP servers.
-    tool_list_changed_tx: tokio::sync::mpsc::UnboundedSender<String>,
+    tool_list_changed_tx: tokio::sync::mpsc::Sender<String>,
     /// Receiver for tool-list-changed notifications (taken by `start_health_check`).
-    tool_list_changed_rx: Option<tokio::sync::mpsc::UnboundedReceiver<String>>,
+    tool_list_changed_rx: Option<tokio::sync::mpsc::Receiver<String>>,
     /// Client handler options (retained for reconnect).
     client_data_dir: Option<String>,
     client_sampling: Option<Arc<dyn super::handler::SamplingDelegate>>,
@@ -70,8 +70,7 @@ impl McpManager {
         options: McpClientOptions,
     ) -> Self {
         let circuit_breaker = Arc::new(McpCircuitBreaker::new(3, 60));
-        let (tool_list_changed_tx, tool_list_changed_rx) =
-            tokio::sync::mpsc::unbounded_channel::<String>();
+        let (tool_list_changed_tx, tool_list_changed_rx) = tokio::sync::mpsc::channel::<String>(32);
         let mut connections = HashMap::new();
         let mut ready_count = 0usize;
         let mut failed_count = 0usize;
@@ -180,7 +179,7 @@ impl McpManager {
     async fn connect_one(
         server_def: &config::McpServerDef,
         circuit_breaker: &Arc<McpCircuitBreaker>,
-        tool_list_changed_tx: Option<&tokio::sync::mpsc::UnboundedSender<String>>,
+        tool_list_changed_tx: Option<&tokio::sync::mpsc::Sender<String>>,
         data_dir: Option<String>,
         sampling_delegate: Option<Arc<dyn super::handler::SamplingDelegate>>,
     ) -> anyhow::Result<McpConnection> {
@@ -217,7 +216,7 @@ impl McpManager {
         server_def: &config::McpServerDef,
         tool_timeout: Duration,
         circuit_breaker: &Arc<McpCircuitBreaker>,
-        tool_list_changed_tx: Option<&tokio::sync::mpsc::UnboundedSender<String>>,
+        tool_list_changed_tx: Option<&tokio::sync::mpsc::Sender<String>>,
         data_dir: Option<String>,
         sampling_delegate: Option<Arc<dyn super::handler::SamplingDelegate>>,
     ) -> anyhow::Result<McpConnection> {
@@ -396,9 +395,7 @@ impl McpManager {
     ///
     /// Called once before `start_health_check` to pass the receiver to the
     /// background task. Returns `None` on second call.
-    pub fn take_tool_list_changed_rx(
-        &mut self,
-    ) -> Option<tokio::sync::mpsc::UnboundedReceiver<String>> {
+    pub fn take_tool_list_changed_rx(&mut self) -> Option<tokio::sync::mpsc::Receiver<String>> {
         self.tool_list_changed_rx.take()
     }
 

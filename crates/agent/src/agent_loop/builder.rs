@@ -699,6 +699,7 @@ impl AgentLoopBuilder {
             };
 
         // ── Wire memory retrieval + InsightForge ─────────────────────
+        let mut tree_builder_token: Option<CancellationToken> = None;
         let mut memory_service_for_shadow: Option<Arc<cognitive::UnifiedMemoryService>> = None;
         let context_engine = if let Some(fact_repo) = cognitive_fact_repo {
             let mut retriever = cognitive::UnifiedMemoryService::new(fact_repo)
@@ -790,8 +791,15 @@ impl AgentLoopBuilder {
                         .with_community_search(community_adapter.clone(), community_adapter);
                     forge.add_searcher(Arc::new(note_tree_navigator));
 
+                    // Parent cancellation token for all tree builder subscriber tasks.
+                    // Child tokens are derived below so cancelling this one stops all 8 tasks.
+                    let tree_builder_parent_token = CancellationToken::new();
+                    tree_builder_token = Some(tree_builder_parent_token.clone());
+
                     // NoteTreeBuilder subscriber (event-driven tree rebuild + LanceDB embed)
                     if let Some(ref domain_bus) = self.domain_event_bus {
+                        let note_tree_note_repo =
+                            feature_notes::repo::NoteRepo::new(storage_pool.inner().clone());
                         let note_tree_builder =
                             Arc::new(crate::adapters::note_tree_builder::NoteTreeBuilder::new(
                                 tree_repo.clone(),
@@ -799,9 +807,10 @@ impl AgentLoopBuilder {
                                 text_embedder.clone(),
                                 self.context_update_queue.clone(),
                                 self.domain_event_bus.clone(),
+                                note_tree_note_repo,
                             ));
                         let tree_builder_rx = domain_bus.subscribe();
-                        let tree_builder_shutdown = CancellationToken::new();
+                        let tree_builder_shutdown = tree_builder_parent_token.child_token();
                         let _tree_builder_handle = tokio::spawn({
                             let builder = Arc::clone(&note_tree_builder);
                             let shutdown = tree_builder_shutdown.clone();
@@ -822,7 +831,7 @@ impl AgentLoopBuilder {
                                 storage_pool.inner().clone(),
                             ));
                         let task_tree_rx = domain_bus.subscribe();
-                        let task_tree_shutdown = CancellationToken::new();
+                        let task_tree_shutdown = tree_builder_parent_token.child_token();
                         let _task_tree_handle = tokio::spawn({
                             let builder = Arc::clone(&task_tree_builder);
                             let shutdown = task_tree_shutdown.clone();
@@ -838,7 +847,7 @@ impl AgentLoopBuilder {
                                 storage_pool.inner().clone(),
                             ));
                         let linker_rx = domain_bus.subscribe();
-                        let linker_shutdown = CancellationToken::new();
+                        let linker_shutdown = tree_builder_parent_token.child_token();
                         let _linker_handle = tokio::spawn({
                             let linker = Arc::clone(&entity_linker);
                             let shutdown = linker_shutdown.clone();
@@ -860,7 +869,7 @@ impl AgentLoopBuilder {
                                 self.context_update_queue.clone(),
                             ));
                         let comm_builder_rx = domain_bus.subscribe();
-                        let comm_builder_shutdown = CancellationToken::new();
+                        let comm_builder_shutdown = tree_builder_parent_token.child_token();
                         let _comm_builder_handle = tokio::spawn({
                             let builder = Arc::clone(&community_builder);
                             let shutdown = comm_builder_shutdown.clone();
@@ -881,7 +890,7 @@ impl AgentLoopBuilder {
                             ),
                         );
                         let finance_tree_rx = domain_bus.subscribe();
-                        let finance_tree_shutdown = CancellationToken::new();
+                        let finance_tree_shutdown = tree_builder_parent_token.child_token();
                         let _finance_tree_handle = tokio::spawn({
                             let builder = Arc::clone(&finance_tree_builder);
                             let shutdown = finance_tree_shutdown.clone();
@@ -901,7 +910,7 @@ impl AgentLoopBuilder {
                                 self.domain_event_bus.clone(),
                             ));
                         let productivity_tree_rx = domain_bus.subscribe();
-                        let productivity_tree_shutdown = CancellationToken::new();
+                        let productivity_tree_shutdown = tree_builder_parent_token.child_token();
                         let _productivity_tree_handle = tokio::spawn({
                             let builder = Arc::clone(&productivity_tree_builder);
                             let shutdown = productivity_tree_shutdown.clone();
@@ -921,7 +930,7 @@ impl AgentLoopBuilder {
                                 self.domain_event_bus.clone(),
                             ));
                         let okr_tree_rx = domain_bus.subscribe();
-                        let okr_tree_shutdown = CancellationToken::new();
+                        let okr_tree_shutdown = tree_builder_parent_token.child_token();
                         let _okr_tree_handle = tokio::spawn({
                             let builder = Arc::clone(&okr_tree_builder);
                             let shutdown = okr_tree_shutdown.clone();
@@ -942,7 +951,7 @@ impl AgentLoopBuilder {
                             ),
                         );
                         let learning_tree_rx = domain_bus.subscribe();
-                        let learning_tree_shutdown = CancellationToken::new();
+                        let learning_tree_shutdown = tree_builder_parent_token.child_token();
                         let _learning_tree_handle = tokio::spawn({
                             let builder = Arc::clone(&learning_tree_builder);
                             let shutdown = learning_tree_shutdown.clone();
@@ -1835,6 +1844,7 @@ impl AgentLoopBuilder {
             },
             cognitive_bg_service: tokio::sync::Mutex::new(cognitive_bg_service),
             _inference_loop_token,
+            _tree_builder_token: tree_builder_token,
             activity_svc: self.activity_svc,
             skill_catalog,
             skill_router,

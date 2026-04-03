@@ -64,6 +64,7 @@ impl AtomExtractionService {
         let max_tokens = config.max_tokens;
 
         tokio::spawn(async move {
+            let note_repo = feature_notes::repo::NoteRepo::new(pool.clone());
             let cache = AtomExtractionCache::new(pool.clone());
             let atom_repo = KnowledgeAtomRepo::new(pool);
             let mut debounce_map: HashMap<String, tokio::time::Instant> = HashMap::new();
@@ -78,7 +79,7 @@ impl AtomExtractionService {
                     }
                     result = rx.recv() => {
                         match result {
-                            Ok(DomainEvent::NoteEditingFinished { note_id, content }) => {
+                            Ok(DomainEvent::NoteEditingFinished { note_id }) => {
                                 // Debounce: skip if we processed this note recently
                                 let now = tokio::time::Instant::now();
                                 if let Some(last) = debounce_map.get(&note_id) {
@@ -94,6 +95,19 @@ impl AtomExtractionService {
                                     let cutoff = now - tokio::time::Duration::from_secs(60);
                                     debounce_map.retain(|_, ts| *ts > cutoff);
                                 }
+
+                                // Fetch content from DB instead of carrying it on the event
+                                let content = match note_repo.get_note(&note_id).await {
+                                    Ok(Some(note)) => note.body,
+                                    Ok(None) => {
+                                        debug!(note_id, "AtomExtraction: note not found, skipping");
+                                        continue;
+                                    }
+                                    Err(e) => {
+                                        warn!(note_id, error = %e, "AtomExtraction: failed to fetch note");
+                                        continue;
+                                    }
+                                };
 
                                 if let Err(e) = process_note(
                                     &note_id,

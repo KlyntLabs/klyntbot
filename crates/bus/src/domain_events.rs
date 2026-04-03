@@ -251,11 +251,9 @@ pub enum DomainEvent {
     },
     NoteContentChanged {
         note_id: String,
-        content: String,
     },
     NoteEditingFinished {
         note_id: String,
-        content: String,
     },
     NoteDeleted {
         note_id: String,
@@ -935,7 +933,6 @@ mod tests {
         let mut rx = bus.subscribe();
         bus.publish(DomainEvent::NoteEditingFinished {
             note_id: "note-1".to_string(),
-            content: "some content".to_string(),
         });
         let event = rx.try_recv().unwrap();
         assert!(

@@ -242,6 +242,9 @@ impl FileWatcherService {
 
         let language = detect_language(path);
         let dir = path.parent().unwrap_or(path).to_path_buf();
+        if self.project_cache.len() > 2000 {
+            self.project_cache.clear();
+        }
         let project = self
             .project_cache
             .entry(dir)

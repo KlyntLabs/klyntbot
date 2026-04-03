@@ -82,6 +82,7 @@ impl Session {
             metadata: None,
         });
         self.updated_at = Utc::now();
+        self.trim_if_needed();
     }
 
     /// Add a message with full structured data (tool calls, metadata).
@@ -103,6 +104,7 @@ impl Session {
             metadata,
         });
         self.updated_at = Utc::now();
+        self.trim_if_needed();
     }
 
     /// Get recent message history for LLM context
@@ -115,6 +117,15 @@ impl Session {
     pub fn clear(&mut self) {
         self.messages.clear();
         self.updated_at = Utc::now();
+    }
+
+    /// Trim in-memory messages if they exceed the threshold.
+    /// Keeps the most recent `IN_MEMORY_TRIM_KEEP` messages.
+    fn trim_if_needed(&mut self) {
+        if self.messages.len() > IN_MEMORY_TRIM_THRESHOLD {
+            let drain_count = self.messages.len() - IN_MEMORY_TRIM_KEEP;
+            self.messages.drain(..drain_count);
+        }
     }
 
     /// Validate session integrity and auto-repair issues.
@@ -198,6 +209,14 @@ const COMPACTION_THRESHOLD: usize = 1000;
 
 /// Number of entries to keep after compaction
 const COMPACTION_KEEP: usize = 500;
+
+/// In-memory trim threshold: trim the Vec when it exceeds this.
+/// Must be ≤ COMPACTION_THRESHOLD so SQL compaction can still fire for
+/// sessions loaded from disk with many historical messages.
+const IN_MEMORY_TRIM_THRESHOLD: usize = 600;
+
+/// Number of messages to keep after an in-memory trim.
+const IN_MEMORY_TRIM_KEEP: usize = COMPACTION_KEEP;
 
 /// Session manager backed by a SQL repository.
 ///
@@ -909,6 +928,19 @@ mod tests {
         for i in 1..session.messages.len() {
             assert!(session.messages[i].timestamp >= session.messages[i - 1].timestamp);
         }
+    }
+
+    #[test]
+    fn session_trims_messages_when_exceeding_threshold() {
+        let mut session = Session::new("test");
+        for i in 0..=IN_MEMORY_TRIM_THRESHOLD {
+            session.add_message("user", format!("message {i}"));
+        }
+        assert_eq!(session.messages.len(), IN_MEMORY_TRIM_KEEP);
+        assert_eq!(
+            session.messages.last().unwrap().content,
+            format!("message {IN_MEMORY_TRIM_THRESHOLD}")
+        );
     }
 
     #[tokio::test]
