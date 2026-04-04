@@ -64,7 +64,7 @@ impl BrowserHistorySource {
         let rows = sqlx::query_as::<_, (String, String, i64)>(
             "SELECT COALESCE(title, ''), url, last_visit_time FROM urls \
              WHERE last_visit_time > ? AND url NOT LIKE 'chrome%' \
-             ORDER BY last_visit_time DESC LIMIT 500",
+             ORDER BY last_visit_time DESC LIMIT 100",
         )
         .bind(cutoff_us)
         .fetch_all(&pool)

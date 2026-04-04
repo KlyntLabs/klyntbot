@@ -9,7 +9,7 @@ use tauri_plugin_global_shortcut::{GlobalShortcutExt, ShortcutState};
 
 use tauri::Emitter;
 
-use crate::commands::window::{WINDOW_LAUNCHER, WINDOW_QUICK_CAPTURE, WINDOW_TRAY};
+use crate::commands::window::{WINDOW_LAUNCHER, WINDOW_TRAY};
 use crate::focus_timer;
 
 /// Register all three global shortcuts from config, mapping each to its window toggle.
@@ -25,10 +25,9 @@ pub fn register_shortcuts(app: &AppHandle, config: &ShortcutsConfig) -> Result<(
         .map_err(|e| format!("failed to unregister existing shortcuts: {e}"))?;
 
     // Phase 1: Parse all shortcut strings — fail fast before touching OS state.
-    let raw_mappings: [(&str, &'static str); 3] = [
+    let raw_mappings: [(&str, &'static str); 2] = [
         (&config.launcher, WINDOW_LAUNCHER),
         (&config.tray, WINDOW_TRAY),
-        (&config.quick_capture, WINDOW_QUICK_CAPTURE),
     ];
     let parsed: Vec<(tauri_plugin_global_shortcut::Shortcut, &'static str)> = raw_mappings
         .iter()

@@ -19,13 +19,8 @@ pub async fn shortcuts_update(
     state: State<'_, Arc<AppCore>>,
     launcher: String,
     tray: String,
-    quick_capture: String,
 ) -> Result<ShortcutsConfig, ApiError> {
-    let shortcuts = ShortcutsConfig {
-        launcher,
-        tray,
-        quick_capture,
-    };
+    let shortcuts = ShortcutsConfig { launcher, tray };
 
     // Snapshot current config for rollback.
     let old_shortcuts = state.config.read().await.shortcuts.clone();
@@ -70,14 +65,9 @@ pub(crate) async fn dispatch_dev(
             let shortcuts = ShortcutsConfig {
                 launcher: try_field!(dev::get_str(body, "launcher")),
                 tray: try_field!(dev::get_str(body, "tray")),
-                quick_capture: try_field!(dev::get_str(body, "quickCapture")),
             };
             // Validate shortcut strings parse (no OS registration in dev mode).
-            for (name, value) in [
-                ("launcher", &shortcuts.launcher),
-                ("tray", &shortcuts.tray),
-                ("quickCapture", &shortcuts.quick_capture),
-            ] {
+            for (name, value) in [("launcher", &shortcuts.launcher), ("tray", &shortcuts.tray)] {
                 if let Err(e) = value.parse::<tauri_plugin_global_shortcut::Shortcut>() {
                     return Some(Err(ApiError::new(
                         "VALIDATION",

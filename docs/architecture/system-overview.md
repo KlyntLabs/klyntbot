@@ -44,7 +44,7 @@ Klyntbot serves as a personal AI assistant that:
                                +---------+
 ```
 
-**Desktop App** — Tauri 2 with React 19 frontend. System tray app (hides from Dock on macOS). 5 windows: main, launcher, tray popup, distraction overlay, quick capture.
+**Desktop App** — Tauri 2 with React 19 frontend. System tray app (hides from Dock on macOS). 5 windows: main, launcher, tray popup, distraction overlay, voice orb.
 
 **MCP Server** — Exposes tools to external AI clients via JSON-RPC over stdio or HTTP. Same `AppCore` business logic as desktop.
 

@@ -131,7 +131,11 @@ impl AppCore {
 
         // DomainEventBus is created before cron so the proactive scan callback
         // can capture it and emit ProactiveSuggestionCreated after persisting.
-        let domain_event_bus = Arc::new(bus::DomainEventBus::new(512));
+        // Reduced from 512 to 128: with ~20 subscribers each cloning every
+        // event, 512 slots × 20 clones = 10k concurrent DomainEvent values
+        // under backpressure, causing GB-scale heap pressure. 128 slots shed
+        // load faster via Lagged errors to slow subscribers.
+        let domain_event_bus = Arc::new(bus::DomainEventBus::new(128));
 
         // Context update queue for live context refresher (shared between agent + background services).
         let context_update_queue = Arc::new(bus::ContextUpdateQueue::new());
@@ -1040,13 +1044,16 @@ impl AppCore {
                 );
             }
 
-            // Cleanup old snapshots and snippets (retain 90 days)
+            // Cleanup old snapshots, snippets, and event logs
             {
                 let mirror_repo = ::cognitive::mirror::MirrorRepo::new(storage_pool.clone());
+                let event_log_repo =
+                    ::cognitive::repos::EventLogRepo::new(storage_pool.inner().clone());
                 cron_service.register_handler(
                     cron::JOB_MIRROR_CLEANUP,
                     Arc::new(move |_job: &scheduling::CronJob| {
                         let mirror_repo = mirror_repo.clone();
+                        let event_log_repo = event_log_repo.clone();
                         tokio::task::block_in_place(|| {
                             rt.block_on(async move {
                                 let snap_count =
@@ -1055,8 +1062,12 @@ impl AppCore {
                                     mirror_repo.cleanup_old_snippets(90).await.unwrap_or(0);
                                 let preview_count =
                                     mirror_repo.cleanup_old_trial_previews(90).await.unwrap_or(0);
+                                // Prune event logs — unbounded growth causes RSS bloat
+                                // via SQLite WAL + in-process page cache.
+                                let event_count =
+                                    event_log_repo.prune_old_events(7).await.unwrap_or(0);
                                 Ok(Some(format!(
-                                    "Mirror cleanup: deleted {snap_count} snapshots, {snip_count} snippets, {preview_count} trial previews"
+                                    "Mirror cleanup: deleted {snap_count} snapshots, {snip_count} snippets, {preview_count} trial previews, {event_count} event log rows"
                                 )))
                             })
                         })

@@ -124,6 +124,10 @@ impl ActivityTracker {
             let mut prev_site: Option<String> = None;
             let pending_registrations: Arc<Mutex<HashSet<String>>> =
                 Arc::new(Mutex::new(HashSet::new()));
+            // Backpressure: skip browser URL fetch if previous osascript is still running.
+            // spawn_blocking tasks can't be cancelled — backpressure is the only way
+            // to prevent thread stacking (8MB per OS thread on macOS).
+            let browser_url_busy = Arc::new(std::sync::atomic::AtomicBool::new(false));
 
             loop {
                 tokio::select! {
@@ -144,15 +148,21 @@ impl ActivityTracker {
                                 let raw_title = info.window_title.as_deref();
 
                                 // Get browser URL via AppleScript (None for non-browsers).
-                                // Run on blocking thread to avoid starving the Tokio runtime.
-                                let url = {
+                                // Skip if previous osascript is still running — spawn_blocking
+                                // can't be cancelled, so backpressure prevents thread stacking.
+                                let url = if browser_url_busy.load(std::sync::atomic::Ordering::Relaxed) {
+                                    None
+                                } else {
                                     let app = info.app_name.clone();
                                     let bid = info.bundle_id.clone();
-                                    tokio::task::spawn_blocking(move || {
-                                        macos::get_browser_url(&app, bid.as_deref())
-                                    })
-                                    .await
-                                    .unwrap_or(None)
+                                    let busy = Arc::clone(&browser_url_busy);
+                                    busy.store(true, std::sync::atomic::Ordering::Relaxed);
+                                    let handle = tokio::task::spawn_blocking(move || {
+                                        let result = macos::get_browser_url(&app, bid.as_deref());
+                                        busy.store(false, std::sync::atomic::Ordering::Relaxed);
+                                        result
+                                    });
+                                    handle.await.unwrap_or(None)
                                 };
 
                                 // Categorize

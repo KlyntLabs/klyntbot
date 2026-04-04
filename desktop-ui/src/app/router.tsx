@@ -146,11 +146,6 @@ const SystemTrayPage = lazy(() =>
   import("../features/tray").then((m) => ({ default: m.SystemTrayPage })),
 );
 
-// ── Quick Capture ────────────────────────────────────────────────
-const QuickCapturePage = lazy(() =>
-  import("../features/notes").then((m) => ({ default: m.QuickCapturePage })),
-);
-
 // ── Voice Feature ───────────────────────────────────────────────
 const VoiceOrbPage = lazy(() => import("@features/voice/pages/VoiceOrbPage"));
 
@@ -373,7 +368,6 @@ export const router = createHashRouter([
   { path: "/setup/*", element: <ConversationRunner /> },
   { path: "/launcher", element: <LauncherPage /> },
   { path: "/tray", element: <SystemTrayPage /> },
-  { path: "/quick-capture", element: <QuickCapturePage /> },
   { path: "/voice-orb", element: <VoiceOrbPage /> },
   { path: "/distraction-overlay", element: <DistractionOverlay /> },
   { path: "*", element: <SetupRedirect /> },

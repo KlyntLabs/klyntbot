@@ -129,9 +129,20 @@ impl CategorizationService {
     }
 
     /// Insert into mem_cache with a size cap to prevent unbounded growth.
+    /// Evicts ~25% of entries on overflow instead of clearing everything,
+    /// which prevents a thundering herd of LLM/DB calls after each wipe.
     fn cache_insert(&mut self, key: String, result: ClassificationResult) {
         if self.mem_cache.len() >= MEM_CACHE_MAX {
-            self.mem_cache.clear();
+            let to_remove = MEM_CACHE_MAX / 4;
+            let mut removed = 0;
+            self.mem_cache.retain(|_, _| {
+                if removed < to_remove {
+                    removed += 1;
+                    false
+                } else {
+                    true
+                }
+            });
         }
         self.mem_cache.insert(key, result);
     }

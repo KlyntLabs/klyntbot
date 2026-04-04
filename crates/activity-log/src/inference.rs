@@ -583,6 +583,26 @@ impl ContextInferenceEngine {
         }
     }
 
+    /// Remove centroid entries for contexts that are no longer active.
+    /// Called after archival to prevent monotonic growth of the in-memory HashMap.
+    pub async fn prune_archived_centroids(&self) {
+        let active = match WorkContextRepo::list_active(&self.pool).await {
+            Ok(a) => a,
+            Err(e) => {
+                tracing::warn!("Failed to list active contexts for centroid pruning: {e}");
+                return;
+            }
+        };
+        let active_ids: HashSet<&str> = active.iter().map(|c| c.id.as_str()).collect();
+        let mut centroids = self.centroids.write().await;
+        let before = centroids.len();
+        centroids.retain(|id, _| active_ids.contains(id.as_str()));
+        let pruned = before - centroids.len();
+        if pruned > 0 {
+            tracing::info!("Pruned {pruned} archived centroid(s) from in-memory cache");
+        }
+    }
+
     /// Reclassify contexts currently typed as "general" using improved heuristics (FIX 4).
     /// Called once at startup.
     pub async fn reclassify_general_contexts(&self) -> common::Result<usize> {

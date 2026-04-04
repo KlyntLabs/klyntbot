@@ -76,7 +76,10 @@ impl ContextInferenceLoop {
                     _ = archival_interval.tick() => {
                         match WorkContextRepo::archive_dormant(&pool, dormancy_days).await {
                             Ok(0) => {}
-                            Ok(n) => info!("Archived {n} dormant work context(s)"),
+                            Ok(n) => {
+                                info!("Archived {n} dormant work context(s)");
+                                engine.prune_archived_centroids().await;
+                            }
                             Err(e) => warn!("Dormant context archival error: {e}"),
                         }
                     }

@@ -312,16 +312,18 @@ fn wire_event_channels(
                             cognitive::types::SalienceVerdict::Accumulate => "accumulate",
                             cognitive::types::SalienceVerdict::Discard => "discard",
                         };
-                        // Use the domain event's variant name only — avoid Debug-formatting
-                        // the entire event, which would clone large payloads like full note
-                        // content into a temporary String (never returned to OS by mimalloc).
+                        // Avoid serializing the full DomainEvent on every tick — large
+                        // payloads (note content, chat turns) cause GB-scale heap pressure
+                        // under mimalloc because the temporary allocations are not returned
+                        // to the OS between mi_collect cycles (sawtooth memory pattern).
                         let event_type = event.variant_name().to_string();
+                        let payload_value = serde_json::Value::String(event_type.clone());
                         let payload = desktop_shared::cognitive_commands::DomainEventPayload {
                             event_type,
                             salience: salience_str.to_string(),
                             domain: event.domain().to_string(),
                             timestamp: chrono::Utc::now().to_rfc3339(),
-                            payload: serde_json::to_value(&event).unwrap_or_default(),
+                            payload: payload_value,
                         };
                         let _ = app_handle_clone.emit("cognitive:domain_event", &payload);
                         if let Some(fe) =

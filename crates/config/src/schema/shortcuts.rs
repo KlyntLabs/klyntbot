@@ -5,7 +5,6 @@ use serde::{Deserialize, Serialize};
 pub struct ShortcutsConfig {
     pub launcher: String,
     pub tray: String,
-    pub quick_capture: String,
 }
 
 impl Default for ShortcutsConfig {
@@ -13,7 +12,6 @@ impl Default for ShortcutsConfig {
         Self {
             launcher: "alt+space".to_string(),
             tray: "alt+shift+space".to_string(),
-            quick_capture: "super+shift+c".to_string(),
         }
     }
 }

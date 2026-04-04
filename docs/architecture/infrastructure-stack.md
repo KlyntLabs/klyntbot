@@ -23,7 +23,6 @@ The primary runtime is a macOS desktop application built with Tauri 2.
 | `launcher` | 660x580 | No decorations, transparent, always-on-top, HUD blur | `/#/launcher` |
 | `tray` | 320x600 | No decorations, transparent, always-on-top, HUD blur | `/#/tray` |
 | `distraction-overlay` | 340x300 | No decorations, transparent, always-on-top, focused | `/#/distraction-overlay` |
-| `quick-capture` | 500x200 | No decorations, transparent, always-on-top | `/#/quick-capture` |
 
 **macOS-specific:**
 - `macOSPrivateApi: true` — required for `ActivationPolicy::Accessory` (hide from Dock) and native vibrancy

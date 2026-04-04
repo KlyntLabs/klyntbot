@@ -4,6 +4,7 @@
 //! the LiveContextRefresher in the agent crate drains and injects them into
 //! the ReactiveEngine at iteration boundaries.
 
+use std::collections::VecDeque;
 use std::sync::Mutex;
 
 use chrono::{DateTime, Duration, Utc};
@@ -61,7 +62,7 @@ pub struct ContextUpdate {
 }
 
 pub struct ContextUpdateQueue {
-    inner: Mutex<Vec<ContextUpdate>>,
+    inner: Mutex<VecDeque<ContextUpdate>>,
 }
 
 impl std::fmt::Debug for ContextUpdateQueue {
@@ -76,7 +77,7 @@ impl std::fmt::Debug for ContextUpdateQueue {
 impl ContextUpdateQueue {
     pub fn new() -> Self {
         Self {
-            inner: Mutex::new(Vec::new()),
+            inner: Mutex::new(VecDeque::new()),
         }
     }
 
@@ -93,18 +94,19 @@ impl ContextUpdateQueue {
                     < Duration::seconds(DEDUP_WINDOW_SECS)
         });
         if !is_duplicate {
-            // Drop oldest entries if queue is too large (prevents unbounded growth)
+            // Drop oldest entries if queue is too large (prevents unbounded growth).
+            // VecDeque::pop_front is O(1) vs Vec::remove(0) which is O(n).
             while queue.len() >= Self::MAX_PENDING {
-                queue.remove(0);
+                queue.pop_front();
             }
-            queue.push(update);
+            queue.push_back(update);
         }
     }
 
     /// Drain all pending updates atomically.
     pub fn drain(&self) -> Vec<ContextUpdate> {
         let mut queue = self.inner.lock().unwrap();
-        std::mem::take(&mut *queue)
+        std::mem::take(&mut *queue).into()
     }
 }
 

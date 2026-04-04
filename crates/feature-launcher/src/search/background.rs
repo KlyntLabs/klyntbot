@@ -2,6 +2,7 @@ use super::SearchSource;
 use dashmap::DashMap;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
+use tokio::task::JoinHandle;
 use tokio_util::sync::CancellationToken;
 
 use super::CachedResult;
@@ -11,8 +12,15 @@ pub struct RefreshEntry {
     pub interval: Duration,
 }
 
+struct TrackedSource {
+    entry: RefreshEntry,
+    last_refreshed: Instant,
+    /// Guard against concurrent refreshes — skip if previous is still running.
+    in_flight: Option<JoinHandle<()>>,
+}
+
 pub struct BackgroundRefresher {
-    entries: Vec<(RefreshEntry, Instant)>,
+    sources: Vec<TrackedSource>,
     query_cache: Arc<DashMap<(&'static str, String), CachedResult>>,
     shutdown: CancellationToken,
     last_cache_eviction: Instant,
@@ -24,16 +32,20 @@ impl BackgroundRefresher {
         query_cache: Arc<DashMap<(&'static str, String), CachedResult>>,
         shutdown: CancellationToken,
     ) -> Self {
-        let entries = entries
+        let sources = entries
             .into_iter()
             .map(|e| {
                 let initial = Instant::now() - e.interval;
-                (e, initial)
+                TrackedSource {
+                    entry: e,
+                    last_refreshed: initial,
+                    in_flight: None,
+                }
             })
             .collect();
 
         Self {
-            entries,
+            sources,
             query_cache,
             shutdown,
             last_cache_eviction: Instant::now(),
@@ -59,14 +71,25 @@ impl BackgroundRefresher {
     async fn tick(&mut self) {
         let now = Instant::now();
 
-        for (entry, last_refreshed) in &mut self.entries {
-            if now.duration_since(*last_refreshed) >= entry.interval {
-                let source = Arc::clone(&entry.source);
+        for tracked in &mut self.sources {
+            if now.duration_since(tracked.last_refreshed) >= tracked.entry.interval {
+                // Skip if previous refresh is still running (backpressure)
+                if let Some(handle) = &tracked.in_flight {
+                    if !handle.is_finished() {
+                        tracing::debug!(
+                            "Skipping refresh for {} — previous still running",
+                            tracked.entry.source.name()
+                        );
+                        continue;
+                    }
+                }
+
+                let source = Arc::clone(&tracked.entry.source);
                 tracing::debug!("Refreshing source: {}", source.name());
-                tokio::spawn(async move {
+                tracked.in_flight = Some(tokio::spawn(async move {
                     source.refresh().await;
-                });
-                *last_refreshed = Instant::now();
+                }));
+                tracked.last_refreshed = Instant::now();
             }
         }
 

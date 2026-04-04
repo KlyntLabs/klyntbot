@@ -22,7 +22,6 @@ interface AgentsConfig {
 const SHORTCUT_DEFAULTS = {
   launcher: "alt+space",
   tray: "alt+shift+space",
-  quickCapture: "super+shift+c",
 };
 
 export function GeneralSettings() {
@@ -61,7 +60,6 @@ export function GeneralSettings() {
     () => ({
       launcher: shortcutEdits.launcher ?? shortcutsConfig.launcher,
       tray: shortcutEdits.tray ?? shortcutsConfig.tray,
-      quickCapture: shortcutEdits.quickCapture ?? shortcutsConfig.quickCapture,
     }),
     [shortcutEdits, shortcutsConfig],
   );
@@ -159,7 +157,6 @@ export function GeneralSettings() {
               [
                 ["launcher", "Launcher"],
                 ["tray", "Tray popup"],
-                ["quickCapture", "Quick capture"],
               ] as const
             ).map(([key, label]) => (
               <div key={key} className="flex items-center justify-between gap-4">

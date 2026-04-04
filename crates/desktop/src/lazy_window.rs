@@ -6,7 +6,7 @@ use tauri::window::{Effect, EffectState, EffectsBuilder};
 use tauri::{AppHandle, Emitter, Manager, WebviewUrl, WebviewWindow, WebviewWindowBuilder};
 use tracing::{info, warn};
 
-use crate::commands::window::{WINDOW_LAUNCHER, WINDOW_QUICK_CAPTURE, WINDOW_TRAY};
+use crate::commands::window::{WINDOW_LAUNCHER, WINDOW_TRAY};
 
 /// Get an existing window or lazily create it on first access.
 ///
@@ -21,7 +21,6 @@ pub fn get_or_create_window(app: &AppHandle, label: &str) -> Option<WebviewWindo
         WINDOW_LAUNCHER => build_launcher(app),
         WINDOW_TRAY => build_tray(app),
         "distraction-overlay" => build_distraction_overlay(app),
-        WINDOW_QUICK_CAPTURE => build_quick_capture(app),
         "voice-orb" => build_voice_orb(app),
         _ => {
             warn!("get_or_create_window: unknown label '{label}'");
@@ -128,29 +127,6 @@ fn build_distraction_overlay(app: &AppHandle) -> tauri::Result<WebviewWindow> {
     .focused(true)
     .effects(hud_effects())
     .build()
-}
-
-fn build_quick_capture(app: &AppHandle) -> tauri::Result<WebviewWindow> {
-    let window = WebviewWindowBuilder::new(
-        app,
-        WINDOW_QUICK_CAPTURE,
-        WebviewUrl::App("/#/quick-capture".into()),
-    )
-    .title("")
-    .inner_size(500.0, 200.0)
-    .resizable(false)
-    .decorations(false)
-    .visible(false)
-    .transparent(true)
-    .shadow(false)
-    .always_on_top(true)
-    .skip_taskbar(true)
-    .center()
-    .effects(hud_effects())
-    .build()?;
-
-    dismiss_on_blur(&window);
-    Ok(window)
 }
 
 fn build_voice_orb(app: &AppHandle) -> tauri::Result<WebviewWindow> {

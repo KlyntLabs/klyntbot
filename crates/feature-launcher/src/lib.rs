@@ -64,7 +64,7 @@ impl FeaturePackage for LauncherFeature {
         serde_json::json!({
             "enabled": true,
             "clipboardHistoryEnabled": true,
-            "clipboardMaxEntries": 1000,
+            "clipboardMaxEntries": 100,
             "scriptsDir": "~/.klyntbot/scripts"
         })
     }
