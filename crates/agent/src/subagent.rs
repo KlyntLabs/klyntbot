@@ -420,10 +420,10 @@ async fn run_subagent_task(
     config: SubagentConfig,
     profile: SubagentProfile,
 ) -> std::result::Result<(String, String), Box<dyn std::error::Error + Send + Sync>> {
+    use crate::execution::budget::{DepthMode, ExecutionBudget};
     use crate::execution::core::ExecutionCore;
+    use crate::execution::execute_loop::execute_loop;
     use crate::execution::types::ExecutionParams;
-    use crate::intent_pipeline::engines::reactive::ReactiveEngine;
-    use crate::intent_pipeline::engines::{EngineResult, ExecutionEngine};
     use tokio::sync::RwLock;
 
     // Build subagent tool registry based on profile
@@ -478,8 +478,6 @@ async fn run_subagent_task(
         Arc::clone(provider),
         Arc::new(RwLock::new(tools)),
     ));
-    let engine = ReactiveEngine::new(core, profile.max_iterations());
-
     // Build system prompt and messages
     let system_prompt = build_subagent_prompt(workspace, task, profile);
     let messages = vec![
@@ -491,19 +489,25 @@ async fn run_subagent_task(
         .with_timeout(std::time::Duration::from_secs(config.task_timeout));
     let routing_ctx = RoutingContext::new("subagent".into(), "background".into());
 
-    // Execute via ReactiveEngine
-    let outcome = engine
-        .execute(messages, &tool_defs, &params, &routing_ctx, None)
-        .await
-        .map_err(|e| Box::new(e) as Box<dyn std::error::Error + Send + Sync>)?;
+    // Execute via unified execute loop with a fixed budget
+    let mut budget = ExecutionBudget::with_limits(
+        DepthMode::Normal,
+        120_000, // generous token budget for subagents
+        profile.max_iterations(),
+    );
+    let result = execute_loop(
+        &core,
+        messages,
+        &tool_defs,
+        &params,
+        &mut budget,
+        &routing_ctx,
+        None,
+    )
+    .await
+    .map_err(|e| Box::new(e) as Box<dyn std::error::Error + Send + Sync>)?;
 
-    match outcome {
-        EngineResult::Complete { content, .. } => Ok(("ok".to_string(), content)),
-        EngineResult::Escalate { .. } => Err(Box::new(common::KlyntbotError::Tool(
-            common::ToolError::ExecutionFailed("subagent unexpectedly escalated".to_string()),
-        ))
-            as Box<dyn std::error::Error + Send + Sync>),
-    }
+    Ok(("ok".to_string(), result.content))
 }
 
 /// Build a focused system prompt for subagents, tailored to the profile.

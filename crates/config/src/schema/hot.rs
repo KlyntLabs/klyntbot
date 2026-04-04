@@ -16,7 +16,7 @@ pub struct HotConfig {
     pub temperature: f32,
     pub max_tokens: u32,
     pub max_tool_iterations: u32,
-    pub pipeline_timeout_secs: u64,
+    pub safety_timeout_secs: u64,
     pub monthly_budget_usd: Option<f64>,
 }
 
@@ -27,7 +27,7 @@ pub struct HotConfigDiff {
     pub temperature_changed: bool,
     pub max_tokens_changed: bool,
     pub max_tool_iterations_changed: bool,
-    pub pipeline_timeout_changed: bool,
+    pub safety_timeout_changed: bool,
     pub budget_changed: bool,
 }
 
@@ -37,7 +37,7 @@ impl HotConfigDiff {
             || self.temperature_changed
             || self.max_tokens_changed
             || self.max_tool_iterations_changed
-            || self.pipeline_timeout_changed
+            || self.safety_timeout_changed
             || self.budget_changed
     }
 }
@@ -49,7 +49,7 @@ impl From<&Config> for HotConfig {
             temperature: config.agents.defaults.temperature,
             max_tokens: config.agents.defaults.max_tokens,
             max_tool_iterations: config.agents.defaults.max_tool_iterations,
-            pipeline_timeout_secs: config.agents.defaults.pipeline_timeout_secs,
+            safety_timeout_secs: config.agents.defaults.execution.safety_timeout_secs,
             monthly_budget_usd: config.agents.monthly_budget_usd,
         }
     }
@@ -63,7 +63,7 @@ impl HotConfig {
             temperature_changed: (self.temperature - other.temperature).abs() > f32::EPSILON,
             max_tokens_changed: self.max_tokens != other.max_tokens,
             max_tool_iterations_changed: self.max_tool_iterations != other.max_tool_iterations,
-            pipeline_timeout_changed: self.pipeline_timeout_secs != other.pipeline_timeout_secs,
+            safety_timeout_changed: self.safety_timeout_secs != other.safety_timeout_secs,
             budget_changed: self.monthly_budget_usd != other.monthly_budget_usd,
         }
     }
@@ -81,7 +81,7 @@ mod tests {
         config.agents.defaults.temperature = 0.5;
         config.agents.defaults.max_tokens = 4096;
         config.agents.defaults.max_tool_iterations = 10;
-        config.agents.defaults.pipeline_timeout_secs = 120;
+        config.agents.defaults.execution.safety_timeout_secs = 120;
         config.agents.monthly_budget_usd = Some(50.0);
 
         let hot = HotConfig::from(&config);
@@ -89,7 +89,7 @@ mod tests {
         assert_eq!(hot.temperature, 0.5);
         assert_eq!(hot.max_tokens, 4096);
         assert_eq!(hot.max_tool_iterations, 10);
-        assert_eq!(hot.pipeline_timeout_secs, 120);
+        assert_eq!(hot.safety_timeout_secs, 120);
         assert_eq!(hot.monthly_budget_usd, Some(50.0));
     }
 

@@ -14,12 +14,12 @@ pub use schema::hot::{HotConfig, HotConfigDiff};
 pub use schema::{
     default_finance_categories, AutoTunerConfig, BookEntityResolutionConfig, BookIndexConfig,
     BookRetrievalCfg, Config, ContentConfig, ContentSourceConfig, DiscordConfig, EmailConfig,
-    ExtendedThinkingConfig, FinanceBudgetingConfig, FinanceCategoryConfig, FinanceConfig,
-    FinanceDefaultCategory, FinanceExpectedReturnsConfig, FinanceInflationConfig,
+    ExecutionConfig, ExtendedThinkingConfig, FinanceBudgetingConfig, FinanceCategoryConfig,
+    FinanceConfig, FinanceDefaultCategory, FinanceExpectedReturnsConfig, FinanceInflationConfig,
     FinancePriceRefreshConfig, FinanceSchedulingConfig, FireConfig, LearningConfig,
     LifecycleConfig, McpAuthConfig, McpConfig, McpOAuthCredentials, McpServerDef,
     McpServerSettings, McpTransport, OrchestratorConfig, PackTier, PacksConfig, PermissionsConfig,
-    ProviderManagerConfig, Secret, ShortcutsConfig, SixJarRatios, SlackConfig, TelegramConfig,
-    TodoEnrichmentConfig, TrustLevel, WakeDeliveryConfig, DEFAULT_STARTUP_TIMEOUT_SEC,
-    DEFAULT_TOOL_TIMEOUT_SEC,
+    ProviderManagerConfig, Secret, ShortcutsConfig, SixJarRatios, SkillBudgetOverride, SlackConfig,
+    TelegramConfig, TodoEnrichmentConfig, TrustLevel, WakeDeliveryConfig,
+    DEFAULT_STARTUP_TIMEOUT_SEC, DEFAULT_TOOL_TIMEOUT_SEC,
 };

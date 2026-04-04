@@ -5,6 +5,8 @@ use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
+type SourceEntry = (PathBuf, Arc<dyn SearchSource>, Option<Duration>);
+
 /// A file path to watch, the source to refresh on change, and an optional
 /// minimum interval between refreshes (cooldown). Sources like browser history
 /// sit on high-churn files — the cooldown prevents redundant work even when the
@@ -23,7 +25,7 @@ pub struct SourceFileWatcher {
 
 impl SourceFileWatcher {
     pub fn start(watches: Vec<WatchEntry>) -> Result<Self, notify::Error> {
-        let source_map: Arc<Vec<(PathBuf, Arc<dyn SearchSource>, Option<Duration>)>> = Arc::new(
+        let source_map: Arc<Vec<SourceEntry>> = Arc::new(
             watches
                 .into_iter()
                 .filter(|w| w.path.exists())

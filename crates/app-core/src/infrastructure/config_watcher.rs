@@ -42,7 +42,7 @@ pub fn start_config_watcher(
                             temp_changed = diff.temperature_changed,
                             tokens_changed = diff.max_tokens_changed,
                             iterations_changed = diff.max_tool_iterations_changed,
-                            timeout_changed = diff.pipeline_timeout_changed,
+                            timeout_changed = diff.safety_timeout_changed,
                             budget_changed = diff.budget_changed,
                             "config hot-reload: applying changes"
                         );

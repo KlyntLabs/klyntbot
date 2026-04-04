@@ -1105,40 +1105,6 @@ async fn set_default_intent_windows(cron_service: &scheduling::CronService) {
     }
 }
 
-/// Lazily ensure a user-facing cron job exists. Called when a feature is first used
-/// (e.g., first task created → daily digest, first atom → morning briefing).
-/// No-op if the job already exists.
-pub async fn ensure_lazy_job(
-    cron_service: &Arc<CronService>,
-    name: &str,
-    schedule: scheduling::CronSchedule,
-    description: &str,
-) -> Result<(), common::KlyntbotError> {
-    let existing: std::collections::HashSet<String> = cron_service
-        .list_jobs(true)
-        .await
-        .into_iter()
-        .map(|j| j.name)
-        .collect();
-
-    if !existing.contains(name) {
-        cron_service
-            .add_job(
-                name,
-                schedule,
-                description,
-                false,
-                None,
-                None,
-                false,
-                scheduling::CronOrigin::User,
-            )
-            .await?;
-        tracing::info!("Lazy-created cron job: {name}");
-    }
-    Ok(())
-}
-
 /// Refresh insight progress snapshots for all notes with insights.
 pub async fn refresh_insight_progress(
     svc: &feature_insights::InsightService,
@@ -1280,20 +1246,4 @@ async fn generate_insights_via_llm(
     }
 
     Ok(sentences)
-}
-
-/// Parse "HH:MM" to cron expression "M H * * *".
-fn parse_time_to_cron(time_str: &str) -> Option<String> {
-    let parts: Vec<&str> = time_str.split(':').collect();
-    if parts.len() != 2 {
-        warn!("invalid time format '{}', expected HH:MM", time_str);
-        return None;
-    }
-    let hour: u8 = parts[0].parse().ok()?;
-    let minute: u8 = parts[1].parse().ok()?;
-    if hour >= 24 || minute >= 60 {
-        warn!("invalid time '{}': hour 0-23, minute 0-59", time_str);
-        return None;
-    }
-    Some(format!("{} {} * * *", minute, hour))
 }

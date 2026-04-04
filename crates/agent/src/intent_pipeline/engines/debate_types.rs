@@ -281,18 +281,13 @@ pub enum SquadInteractionMode {
     LeadResponse,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
 #[serde(rename_all = "snake_case")]
 pub enum DefaultInteractionMode {
+    #[default]
     Lead,
     Debate,
     Smart,
-}
-
-impl Default for DefaultInteractionMode {
-    fn default() -> Self {
-        Self::Lead
-    }
 }
 
 impl DefaultInteractionMode {
@@ -304,7 +299,7 @@ impl DefaultInteractionMode {
         }
     }
 
-    pub fn from_str(s: &str) -> Self {
+    pub fn parse(s: &str) -> Self {
         match s {
             "debate" => Self::Debate,
             "smart" => Self::Smart,

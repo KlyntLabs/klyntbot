@@ -303,4 +303,39 @@ pub enum AgentEvent {
         #[serde(rename = "toolsSummary")]
         tools_summary: String,
     },
+
+    // ── Budget HUD (Deep/Ultra mode) ─────────────────────────
+    /// Emitted after each turn with current budget state.
+    /// UI renders the live budget HUD from this.
+    BudgetUpdate {
+        tokens_remaining_pct: f32,
+        turns_used: u32,
+        max_turns: u32,
+        cost_usd: f64,
+        depth: String,
+    },
+
+    /// User extended the budget mid-conversation.
+    BudgetExtended {
+        additional_turns: u32,
+        new_max_turns: u32,
+    },
+
+    // ── Depth suggestion (adaptive layer) ────────────────────
+    /// Mirror/history suggests a different depth mode.
+    DepthSuggestion { recommended: String, reason: String },
+
+    // ── Enrichment progress (Phase 4) ────────────────────────
+    /// Post-response enrichment started (Mirror, Coaching, NoteTree, FSRS).
+    EnrichmentStarted { phase: String },
+
+    /// Post-response enrichment completed.
+    EnrichmentComplete { phase: String, summary: String },
+
+    // ── Turn tracking ────────────────────────────────────────
+    /// Emitted at the end of each execute-loop turn.
+    TurnComplete {
+        turn: u32,
+        budget_remaining_pct: f32,
+    },
 }

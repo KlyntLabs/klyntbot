@@ -20,7 +20,7 @@ pub(crate) fn privacy_level(mode: config::schema::VoicePrivacyMode) -> voice_eng
 
 fn parse_model(name: &str) -> Result<Qwen3Model, ApiError> {
     Qwen3Model::from_api_key(name)
-        .ok_or_else(|| ApiError::new("INVALID_PARAMS", &format!("Unknown model: {name}")))
+        .ok_or_else(|| ApiError::new("INVALID_PARAMS", format!("Unknown model: {name}")))
 }
 
 /// Convert a voice persona config into TTS synthesis parameters.
@@ -59,7 +59,7 @@ impl AppCore {
         service
             .start_capture()
             .await
-            .map_err(|e| ApiError::new("VOICE_ERROR", &e.to_string()))?;
+            .map_err(|e| ApiError::new("VOICE_ERROR", e.to_string()))?;
         Ok(())
     }
 
@@ -68,7 +68,7 @@ impl AppCore {
         let result = service
             .stop_capture()
             .await
-            .map_err(|e| ApiError::new("VOICE_ERROR", &e.to_string()))?;
+            .map_err(|e| ApiError::new("VOICE_ERROR", e.to_string()))?;
         match result {
             Some((transcript, _metadata)) => Ok(transcript.text),
             None => Ok(String::new()),
@@ -81,11 +81,11 @@ impl AppCore {
     ) -> Result<(), ApiError> {
         let service = self.voice_service()?;
         let event: voice_engine::VoiceEvent = serde_json::from_value(event_json)
-            .map_err(|e| ApiError::new("VALIDATION", &format!("Invalid VoiceEvent: {e}")))?;
+            .map_err(|e| ApiError::new("VALIDATION", format!("Invalid VoiceEvent: {e}")))?;
         service
             .emit_event(event)
             .await
-            .map_err(|e| ApiError::new("VOICE_ERROR", &e.to_string()))
+            .map_err(|e| ApiError::new("VOICE_ERROR", e.to_string()))
     }
 
     /// Preview a voice persona by synthesizing a short sample.
@@ -99,7 +99,7 @@ impl AppCore {
             .get(&persona_key)
             .cloned()
             .ok_or_else(|| {
-                ApiError::new("NOT_FOUND", &format!("Persona '{persona_key}' not found"))
+                ApiError::new("NOT_FOUND", format!("Persona '{persona_key}' not found"))
             })?;
         drop(cfg);
 
@@ -248,7 +248,7 @@ impl AppCore {
         if dir.exists() {
             tokio::fs::remove_dir_all(&dir)
                 .await
-                .map_err(|e| ApiError::new("IO_ERROR", &e.to_string()))?;
+                .map_err(|e| ApiError::new("IO_ERROR", e.to_string()))?;
         }
         Ok(())
     }

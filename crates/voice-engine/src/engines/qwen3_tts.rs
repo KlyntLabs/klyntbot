@@ -5,18 +5,24 @@
 //! with automatic idle unloading to manage memory.
 
 use std::path::PathBuf;
+#[cfg(feature = "qwen3")]
 use std::sync::{Arc, Mutex};
+#[cfg(feature = "qwen3")]
 use std::time::Instant;
 
 use async_trait::async_trait;
-use tracing::{debug, info, warn};
+use tracing::info;
+#[cfg(feature = "qwen3")]
+use tracing::{debug, warn};
 
 use crate::tts::TtsEngine;
 use crate::types::*;
 
 const QWEN3_TTS_SAMPLE_RATE: u32 = 24_000;
+#[cfg(feature = "qwen3")]
 const IDLE_UNLOAD_SECS: u64 = 300;
 /// Max characters per text chunk — keeps generation within the 2048 max_codes budget.
+#[cfg(feature = "qwen3")]
 const MAX_CHUNK_CHARS: usize = 400;
 
 #[cfg(feature = "qwen3")]
@@ -26,6 +32,7 @@ struct InnerState {
 }
 
 pub struct Qwen3TtsEngine {
+    #[cfg_attr(not(feature = "qwen3"), allow(dead_code))]
     model_dir: PathBuf,
     #[cfg(feature = "qwen3")]
     state: Arc<Mutex<InnerState>>,

@@ -938,6 +938,7 @@ impl AgentLoop {
                 event_tx.clone(),
                 cancel_token,
                 correction,
+                crate::execution::DepthMode::Normal,
             )
             .await?;
 

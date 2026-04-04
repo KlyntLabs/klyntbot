@@ -21,7 +21,7 @@ impl AppCore {
 
         /// Check if a source should be fetched (no filter = fetch all).
         fn want(sources: Option<&[TimelineSource]>, s: TimelineSource) -> bool {
-            sources.map_or(true, |list| list.contains(&s))
+            sources.is_none_or(|list| list.contains(&s))
         }
 
         let mut entries = Vec::new();
@@ -486,7 +486,7 @@ fn format_with_separators(n: u64) -> String {
     let s = n.to_string();
     let mut result = String::with_capacity(s.len() + s.len() / 3);
     for (i, c) in s.chars().enumerate() {
-        if i > 0 && (s.len() - i) % 3 == 0 {
+        if i > 0 && (s.len() - i).is_multiple_of(3) {
             result.push('.');
         }
         result.push(c);

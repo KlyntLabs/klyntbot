@@ -319,7 +319,7 @@ impl AppCore {
                             let subtree = tree_repo
                                 .get_subtree(&root.id)
                                 .await
-                                .map_err(|e| map_cognitive_err(e))?;
+                                .map_err(map_cognitive_err)?;
                             for node in subtree {
                                 nodes.push(FabricTreeNode {
                                     id: node.id,

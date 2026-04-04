@@ -304,7 +304,7 @@ async fn execute_squad_message_bg(
         .ok_or_else(|| ApiError::new("NOT_AVAILABLE", "LLM provider not configured"))?;
 
     // 3. Detect interaction mode
-    let default_mode = DefaultInteractionMode::from_str(&resolved.squad.default_interaction_mode);
+    let default_mode = DefaultInteractionMode::parse(&resolved.squad.default_interaction_mode);
     let mode = detect_interaction_mode(content, &resolved.personas, default_mode);
 
     // 4. Load orchestrator skill body for domain grounding
@@ -1581,6 +1581,13 @@ pub async fn relay_chat_stream(
                             "live context reassembled during execution"
                         );
                     }
+                    // Budget-bounded execution events — logged for now, UI integration later.
+                    AgentEvent::BudgetUpdate { .. }
+                    | AgentEvent::BudgetExtended { .. }
+                    | AgentEvent::DepthSuggestion { .. }
+                    | AgentEvent::EnrichmentStarted { .. }
+                    | AgentEvent::EnrichmentComplete { .. }
+                    | AgentEvent::TurnComplete { .. } => {}
                 }
             }
             else => break,

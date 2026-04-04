@@ -67,12 +67,11 @@ const SEARCHER_STOP_WORDS: &[&str] = &[
 fn extract_first_keyword(query: &str, extra_stop: &[&str]) -> String {
     query
         .split(|c: char| !c.is_alphanumeric())
-        .filter(|w| {
+        .find(|w| {
             w.len() > 2
                 && !SEARCHER_STOP_WORDS.contains(&w.to_lowercase().as_str())
                 && !extra_stop.contains(&w.to_lowercase().as_str())
         })
-        .next()
         .unwrap_or("")
         .to_string()
 }

@@ -9,7 +9,6 @@ use autotuner::{ShadowContext, ShadowRetriever};
 use chrono::{DateTime, Utc};
 use common::TrialParams;
 use config::OrchestratorConfig;
-use providers::DynProvider;
 use storage::{TrialRepo, TrialRow};
 use tokio::sync::RwLock;
 use tracing::{debug, warn};
@@ -57,16 +56,12 @@ impl AutoTunerHookImpl {
     pub fn new(
         orchestrator: Arc<AutoTunerOrchestrator>,
         trial_repo: TrialRepo,
-        provider: DynProvider,
-        model: &str,
         config: &OrchestratorConfig,
     ) -> Self {
         Self {
             orchestrator,
             trial_repo,
-            shadow_classifier: super::shadow_classifier::AgentShadowClassifier::new(
-                provider, model, config,
-            ),
+            shadow_classifier: super::shadow_classifier::AgentShadowClassifier::new(config),
             shadow_retriever: None,
             active_trials_cache: RwLock::new((DateTime::<Utc>::MIN_UTC, Vec::new())),
         }
@@ -284,7 +279,7 @@ impl AutoTunerHook for AutoTunerHookImpl {
 mod tests {
     use super::*;
     use async_trait::async_trait;
-    use providers::{ChatParams, LlmProvider, LlmResponse, Message};
+    use providers::{ChatParams, DynProvider, LlmProvider, LlmResponse, Message};
     use serde_json::Value;
 
     /// A provider that panics if called — verifies shadow mode skips LLM.
@@ -332,13 +327,7 @@ mod tests {
         trial_repo.migrate().await.unwrap();
         let orchestrator = make_orchestrator(&pool, false).await;
 
-        let hook = AutoTunerHookImpl::new(
-            orchestrator,
-            trial_repo,
-            Arc::new(PanickingProvider),
-            "mock",
-            &OrchestratorConfig::default(),
-        );
+        let hook = AutoTunerHookImpl::new(orchestrator, trial_repo, &OrchestratorConfig::default());
 
         // Should return immediately without panicking (inactive orchestrator).
         hook.on_message_received("hello", "test-chat").await;
@@ -393,8 +382,6 @@ mod tests {
         let hook = AutoTunerHookImpl::new(
             orchestrator,
             trial_repo.clone(),
-            Arc::new(PanickingProvider) as DynProvider,
-            "mock",
             &OrchestratorConfig::default(),
         );
 
@@ -453,8 +440,6 @@ mod tests {
         let hook = AutoTunerHookImpl::new(
             orchestrator,
             trial_repo.clone(),
-            Arc::new(PanickingProvider) as DynProvider,
-            "mock",
             &OrchestratorConfig::default(),
         );
 

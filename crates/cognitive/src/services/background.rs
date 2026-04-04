@@ -702,7 +702,7 @@ impl BackgroundConsolidationService {
                 }
 
                 batch_count += 1;
-                if batch_count % 100 == 0 {
+                if batch_count.is_multiple_of(100) {
                     if let Some(ref dlq) = failed_obs_repo {
                         let removed = dlq.cleanup_permanently_failed().await;
                         if removed > 0 {

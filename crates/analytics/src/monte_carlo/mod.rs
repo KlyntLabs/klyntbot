@@ -284,7 +284,7 @@ impl MonteCarloEngine {
 
             let is_worse = terminal < worst_terminal
                 || (terminal == zero
-                    && worst_ruin_year.map_or(true, |wy| this_ruin_year.is_some_and(|ry| ry < wy)));
+                    && worst_ruin_year.is_none_or(|wy| this_ruin_year.is_some_and(|ry| ry < wy)));
             if is_worse {
                 worst_terminal = terminal;
                 worst_idx = run_idx;

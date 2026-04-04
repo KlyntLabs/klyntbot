@@ -8,9 +8,6 @@ use tracing::{debug, warn};
 
 use agent::agent_runtime::AgentRuntime;
 use agent::intent_pipeline::analysis::IntentAnalyzer;
-use agent::intent_pipeline::engines::direct::DirectEngine;
-use agent::intent_pipeline::engines::reactive::ReactiveEngine;
-use agent::intent_pipeline::router::ExecutionRouter;
 use agent::intent_pipeline::types::PipelineConfig;
 use agent::AgentEvent;
 use agent::ExecutionCore;
@@ -93,14 +90,13 @@ impl AgentHarness {
         skill_catalog: Arc<RwLock<SkillCatalog>>,
         skill_router: Arc<RwLock<SkillRouter>>,
         embedding_engine: Option<Arc<tools::EmbeddingEngine>>,
-        max_iterations: u32,
+        _max_iterations: u32,
         provider_name: &str,
         model: &str,
         provider_error_rate: f64,
         seed: u64,
     ) -> common::Result<Self> {
         let inner_provider = create_provider(provider_name, model, seed);
-        let is_real_llm = provider_name != "mock";
 
         // Wrap with adversarial error injection if configured
         let provider: DynProvider = if provider_error_rate > 0.0 {
@@ -124,21 +120,9 @@ impl AgentHarness {
             ExecutionCore::new(provider.clone(), Arc::clone(&tool_registry))
                 .with_domain_bus(Arc::clone(&bus)),
         );
-        let direct = DirectEngine::new(Arc::clone(&core));
-        let reactive = ReactiveEngine::new(Arc::clone(&core), max_iterations);
-        let exec_router = ExecutionRouter::new(direct, reactive);
-
-        // Build IntentAnalyzer — shadow mode for mock, real classification for LLM
+        // Build IntentAnalyzer — heuristic + embedding only (no LLM classifier).
         let orch_config = OrchestratorConfig::default();
-        let model_name = if is_real_llm {
-            model
-        } else {
-            "simulation-agent"
-        };
-        let mut analyzer = IntentAnalyzer::new(provider.clone(), model_name, &orch_config);
-        if !is_real_llm {
-            analyzer = analyzer.with_shadow_mode();
-        }
+        let analyzer = IntentAnalyzer::new(&orch_config);
 
         // Build context engine with real sources matching production
         let context_sources: Vec<Box<dyn context_engine::source::ContextSource>> = vec![
@@ -174,7 +158,7 @@ impl AgentHarness {
         let pipeline_config = PipelineConfig {
             execution_model: model.to_string(),
             provider_name: provider_name.to_string(),
-            pipeline_timeout_secs: 60,
+            safety_timeout_secs: 90, // tight for simulation — enough for real API calls
             ..PipelineConfig::default()
         };
         let mut runtime = AgentRuntime::new(
@@ -182,7 +166,7 @@ impl AgentHarness {
             skill_router,
             analyzer,
             context_engine,
-            exec_router,
+            core,
             cost_tracker,
             pipeline_config,
             active_profile,
@@ -335,6 +319,7 @@ impl AgentHarness {
                 Some(event_tx),
                 None, // no cancellation
                 None, // no correction context
+                agent::execution::DepthMode::Normal,
             )
             .await;
 

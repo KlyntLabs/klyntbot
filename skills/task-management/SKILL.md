@@ -24,6 +24,11 @@ metadata:
       - create a task
       - add todo
       - add a task
+      - create area
+      - create an area
+      - new area
+      - create project
+      - new project
       - plan my day
       - plan my morning
       - plan my evening

@@ -46,6 +46,7 @@ impl Default for RelevanceWeights {
 
 /// Combined relevance score for memory retrieval ranking.
 /// See `RelevanceWeights::default()` for default weight distribution.
+#[allow(clippy::too_many_arguments)]
 pub fn relevance_score(
     semantic_similarity: f64,
     retrievability: f64,

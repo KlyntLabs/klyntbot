@@ -300,6 +300,16 @@ pub struct VoiceService {
     audio_player: AudioPlayer,
 }
 
+/// Output of [`VoiceService::begin_capture`]: session handle, silence/RMS
+/// channels, session ID, and detected engine kind — all `Send`-safe.
+type CaptureComponents = (
+    ActiveSession,
+    mpsc::Receiver<()>,
+    mpsc::Receiver<f32>,
+    String,
+    EngineKind,
+);
+
 impl VoiceService {
     /// Create a new VoiceService.
     ///
@@ -479,15 +489,7 @@ impl VoiceService {
     /// stream on a blocking thread, and returns only `Send`-safe parts. This
     /// keeps `CaptureSession` out of any async generator state.
     /// Returns `(session, silence_rx, rms_rx, session_id, engine_kind)`.
-    fn begin_capture(
-        &self,
-    ) -> common::Result<(
-        ActiveSession,
-        mpsc::Receiver<()>,
-        mpsc::Receiver<f32>,
-        String,
-        EngineKind,
-    )> {
+    fn begin_capture(&self) -> common::Result<CaptureComponents> {
         let (_, engine_kind) = self.active_engine().ok_or_else(|| {
             common::KlyntbotError::Provider(common::ProviderError::InvalidResponse(
                 "No transcription engine available. Waiting for model download.".to_string(),

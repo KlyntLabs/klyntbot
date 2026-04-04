@@ -235,6 +235,7 @@ impl SquadRepo {
     }
 
     /// Update a non-builtin squad. Returns error for builtins.
+    #[allow(clippy::too_many_arguments)]
     pub async fn update(
         &self,
         id: &str,

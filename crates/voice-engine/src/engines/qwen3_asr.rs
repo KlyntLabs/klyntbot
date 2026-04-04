@@ -15,6 +15,8 @@ use crate::stt::{AudioStream, PartialTranscript, TranscriptStream, Transcription
 use crate::types::{Language, Transcript};
 
 const IDLE_UNLOAD_SECS: u64 = 300;
+// Exported for callers that need to resample audio to match the model's expected rate.
+#[allow(dead_code)]
 pub(crate) const QWEN3_ASR_SAMPLE_RATE: u32 = 16_000;
 
 struct InnerState {

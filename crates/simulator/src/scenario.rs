@@ -2,6 +2,8 @@ use std::path::Path;
 
 use serde::{Deserialize, Serialize};
 
+use agent::execution::DepthMode;
+
 use crate::persona::{Persona, PersonaPhases};
 
 // ── Simulation config ──────────────────────────────────────────────────
@@ -43,6 +45,9 @@ pub struct SimulationConfig {
     /// Model name for the selected provider. Default: "deepseek-chat".
     #[serde(default = "default_agent_model")]
     pub agent_model: String,
+    /// Depth mode for agent execution. Default: Normal.
+    #[serde(default)]
+    pub agent_depth_mode: DepthMode,
 }
 
 fn default_cognitive_llm_model() -> String {
@@ -104,6 +109,7 @@ impl Default for SimulationConfig {
             followup_rate: default_followup_rate(),
             agent_provider: default_agent_provider(),
             agent_model: default_agent_model(),
+            agent_depth_mode: DepthMode::default(),
         }
     }
 }

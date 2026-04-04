@@ -1,8 +1,6 @@
 //! AgentRuntime — agent-first execution pipeline.
 //!
-//! Flow: SkillRouter.select_orchestrator → set active profile → IntentAnalyzer →
-//! ContextEngine → tool filtering via SkillPackage → ExecutionRouter →
-//! ResponseValidator → CostTracker → StrategyRepo
+//! 6-phase flow: Route → Prepare → Execute (budget-bounded) → Enrich → Record → Adapt
 
 use std::sync::Arc;
 use std::time::{Duration, Instant};
@@ -20,9 +18,8 @@ use super::scenario;
 use crate::autotuner::hooks::AutoTunerHook;
 use crate::events::AgentEvent;
 
-use crate::execution::ExecutionParams;
+use crate::execution::{execute_loop, DepthMode, ExecutionBudget, ExecutionParams};
 use crate::intent_pipeline::analysis::IntentAnalyzer;
-use crate::intent_pipeline::router::{ExecutionRouter, RouterResult};
 use crate::intent_pipeline::types::IntentAnalysis;
 use crate::intent_pipeline::types::PipelineConfig;
 use crate::output::cost_tracker::CostTracker;
@@ -51,6 +48,12 @@ pub struct RuntimeResult {
     pub validation: ValidationResult,
     /// Name of the agent that handled this message.
     pub agent_name: String,
+    /// Total turns executed in the loop.
+    pub turns: u32,
+    /// Whether the budget was exhausted (vs natural completion).
+    pub budget_exhausted: bool,
+    /// All tool calls made during execution.
+    pub tool_calls: Vec<String>,
 }
 
 /// Agent-driven runtime that replaces IntentPipeline.
@@ -62,7 +65,7 @@ pub struct AgentRuntime {
     skill_router: Arc<RwLock<skill_system::router::SkillRouter>>,
     analyzer: IntentAnalyzer,
     context_engine: Arc<ContextEngine>,
-    router: ExecutionRouter,
+    core: Arc<crate::execution::ExecutionCore>,
     validator: ResponseValidator,
     cost_tracker: Arc<CostTracker>,
     config: PipelineConfig,
@@ -107,7 +110,7 @@ impl AgentRuntime {
         skill_router: Arc<RwLock<skill_system::router::SkillRouter>>,
         analyzer: IntentAnalyzer,
         context_engine: Arc<ContextEngine>,
-        router: ExecutionRouter,
+        core: Arc<crate::execution::ExecutionCore>,
         cost_tracker: Arc<CostTracker>,
         config: PipelineConfig,
         active_profile: Arc<RwLock<Option<Arc<SkillPackage>>>>,
@@ -118,7 +121,7 @@ impl AgentRuntime {
             skill_router,
             analyzer,
             context_engine,
-            router,
+            core,
             validator: ResponseValidator::new(config.max_response_tokens),
             cost_tracker,
             config,
@@ -278,11 +281,12 @@ impl AgentRuntime {
         event_tx: Option<tokio::sync::mpsc::Sender<AgentEvent>>,
         cancel_token: Option<tokio_util::sync::CancellationToken>,
         correction: Option<context_engine::CorrectionContext>,
+        depth: DepthMode,
     ) -> Result<RuntimeResult> {
         let pipeline_start = Instant::now();
 
         // Read only the hot-reloadable timeout (avoids cloning the full HotConfig with its String fields)
-        let hot_timeout_secs = self.hot_config.read().await.pipeline_timeout_secs;
+        let hot_timeout_secs = self.hot_config.read().await.safety_timeout_secs;
 
         // Emit pipeline start immediately for frontend progress indication
         if let Some(ref tx) = event_tx {
@@ -421,13 +425,13 @@ impl AgentRuntime {
         let classify_ms = classify_start.elapsed().as_millis() as u64;
         debug!(
             "AgentRuntime: classified as {:?} (source: {:?}, confidence: {:.2})",
-            analysis.mode, analysis.source, analysis.confidence
+            analysis.complexity, analysis.source, analysis.confidence
         );
 
         if let Some(ref tx) = event_tx {
             let _ = tx
                 .send(AgentEvent::ClassificationComplete {
-                    strategy: analysis.mode.to_string(),
+                    strategy: analysis.complexity.to_string(),
                     confidence: analysis.confidence,
                     source: format!("{:?}", analysis.source),
                     duration_ms: classify_ms,
@@ -470,13 +474,12 @@ impl AgentRuntime {
                         .await;
                 }
 
-                // Increase iteration budget for orchestration (multiple delegations)
-                if let crate::intent_pipeline::types::ExecutionMode::Reactive {
-                    ref mut max_iterations,
-                } = analysis.mode
-                {
-                    *max_iterations = (*max_iterations)
-                        .max(crate::intent_pipeline::analysis::ORCHESTRATION_MIN_ITERATIONS);
+                // Ensure at least Moderate complexity for orchestration
+                if matches!(
+                    analysis.complexity,
+                    crate::intent_pipeline::types::ComplexityLevel::Simple
+                ) {
+                    analysis.complexity = crate::intent_pipeline::types::ComplexityLevel::Moderate;
                 }
             }
         } else if analysis.needs_orchestration {
@@ -502,27 +505,16 @@ impl AgentRuntime {
             });
         }
 
-        // Step 4: Cap max_iterations from agent profile (skip for orchestrator —
-        // the orchestration boost in step 3b must not be clipped by the profile cap)
-        if !analysis.needs_orchestration {
-            if let crate::intent_pipeline::types::ExecutionMode::Reactive {
-                ref mut max_iterations,
-            } = analysis.mode
-            {
-                *max_iterations = (*max_iterations).min(profile.max_iterations());
-            }
-        }
-
-        // Step 5: Confidence check — downgrade to Direct mode for low-confidence
+        // Step 5: Confidence check — downgrade to Simple for low-confidence
         // instead of blocking the user with a technical clarification message.
         if let Some(ref evaluator) = self.confidence_evaluator {
             let threshold = evaluator.threshold();
             if analysis.confidence < threshold {
                 debug!(
-                    "AgentRuntime: low confidence ({:.2} < {:.2}), downgrading to Direct mode",
+                    "AgentRuntime: low confidence ({:.2} < {:.2}), downgrading to Simple",
                     analysis.confidence, threshold
                 );
-                analysis.mode = crate::intent_pipeline::types::ExecutionMode::Direct;
+                analysis.complexity = crate::intent_pipeline::types::ComplexityLevel::Simple;
             }
         }
 
@@ -547,7 +539,7 @@ impl AgentRuntime {
         };
 
         let prompt = system_prompt.unwrap_or(&self.config.system_prompt);
-        let strategy = ExecutionStrategy::from(&analysis.mode);
+        let strategy = ExecutionStrategy::from(&analysis.complexity);
 
         let context_request = ContextRequest {
             message_text: message.to_string(),
@@ -628,10 +620,9 @@ impl AgentRuntime {
         const COT_COMPLEXITY_THRESHOLD: u8 = 4;
         let complexity_score = analysis.signals.complexity_score();
 
-        let planning_prompt = match analysis.mode {
-            crate::intent_pipeline::types::ExecutionMode::Reactive { .. }
-                if analysis.signals.has_hypothetical =>
-            {
+        let planning_prompt = match analysis.complexity {
+            crate::intent_pipeline::types::ComplexityLevel::Simple => None,
+            _ if analysis.signals.has_hypothetical => {
                 // Scenario reasoning — use specialized prompt
                 Some(scenario::build_scenario_prompt(
                     message,
@@ -639,9 +630,7 @@ impl AgentRuntime {
                     self.config.scenario_max_graph_depth,
                 ))
             }
-            crate::intent_pipeline::types::ExecutionMode::Reactive { .. }
-                if complexity_score >= COT_COMPLEXITY_THRESHOLD =>
-            {
+            _ if complexity_score >= COT_COMPLEXITY_THRESHOLD => {
                 Some(build_planning_prompt(message, &filtered_tools))
             }
             _ => None,
@@ -655,18 +644,20 @@ impl AgentRuntime {
             }
         }
 
-        // Step 8: Execute via router
+        // ── Phase 3: Execute (budget-bounded) ────────────────────────────────
+        let skill_name = &agent_name;
+        let mut budget = ExecutionBudget::new(depth, skill_name);
+
         if let Some(ref tx) = event_tx {
             let _ = tx
                 .send(AgentEvent::ExecutionStarted {
-                    engine: analysis.mode.to_string(),
-                    max_iterations: analysis.mode.max_iterations() as usize,
+                    engine: format!("execute_loop/{}", depth),
+                    max_iterations: budget.max_turns() as usize,
                 })
                 .await;
         }
 
         let mut params = ExecutionParams::new(&self.config.execution_model)
-            .with_max_iterations(analysis.mode.max_iterations())
             .with_original_message(message.to_string())
             .with_context_window(self.config.context_window);
 
@@ -676,11 +667,6 @@ impl AgentRuntime {
         if let Some(prompt) = planning_prompt {
             params = params.with_planning_prompt(prompt);
         }
-
-        if hot_timeout_secs > 0 {
-            params = params.with_pipeline_timeout(Duration::from_secs(hot_timeout_secs));
-        }
-
         if let Some(ref queue) = self.context_update_queue {
             params = params.with_context_update_queue(Arc::clone(queue));
         }
@@ -689,45 +675,38 @@ impl AgentRuntime {
         let rewrite_triggered = assembled.rewrite_triggered;
         let rewrite_source = assembled.rewrite_source.clone();
 
-        let pipeline_future = self.router.execute(
-            analysis.mode.clone(),
+        // Safety timeout wraps the entire execution (0 = disabled)
+        let execute_fut = execute_loop(
+            &self.core,
             assembled.messages,
             &filtered_tools,
             &params,
+            &mut budget,
             ctx,
             event_tx.clone(),
         );
 
-        let router_result = if let Some(timeout_dur) = params.pipeline_timeout {
-            match tokio::time::timeout(timeout_dur, pipeline_future).await {
-                Ok(result) => result?,
-                Err(_) => {
-                    warn!("Pipeline execution timed out after {:?}", timeout_dur);
-                    if let Some(ref tx) = event_tx {
-                        let _ = tx
-                            .send(AgentEvent::Error {
-                                message: format!(
-                                    "Execution timed out after {}s",
-                                    timeout_dur.as_secs()
-                                ),
-                            })
-                            .await;
-                    }
-                    return Err(common::KlyntbotError::Timeout(format!(
-                        "Pipeline execution exceeded {}s limit",
-                        timeout_dur.as_secs()
-                    )));
-                }
-            }
+        let loop_result = if hot_timeout_secs > 0 {
+            let safety_timeout = Duration::from_secs(hot_timeout_secs);
+            tokio::time::timeout(safety_timeout, execute_fut)
+                .await
+                .map_err(|_| {
+                    common::KlyntbotError::Timeout(format!(
+                        "Safety timeout ({}s) — this is a bug, please report it",
+                        hot_timeout_secs
+                    ))
+                })??
         } else {
-            pipeline_future.await?
+            execute_fut.await?
         };
 
         // Clear event_tx to prevent stale state across calls
         *self.current_event_tx.write().await = None;
 
+        // Phase 4: Enrich (async, depth-gated) — wired by AppCore, not here.
+
         // Step 9: Validate
-        let mut validation = self.validator.validate(&router_result.content);
+        let mut validation = self.validator.validate(&loop_result.content);
         if !validation.is_valid {
             warn!(
                 "AgentRuntime: response validation failed with {} warning(s)",
@@ -735,12 +714,12 @@ impl AgentRuntime {
             );
         }
 
-        let mode_name = router_result.final_mode.clone();
+        let mode_name = depth.to_string();
 
         // Step 10: Record usage + strategy + interaction in parallel (independent DB writes)
         let pipeline_elapsed_ms = pipeline_start.elapsed().as_millis() as u64;
         let usage_fut = self.record_usage(
-            &router_result,
+            &loop_result.usage,
             &mode_name,
             ctx,
             &event_tx,
@@ -748,7 +727,9 @@ impl AgentRuntime {
         );
         let strategy_fut = self.record_strategy(
             &analysis,
-            &router_result,
+            &mode_name,
+            loop_result.turns as usize,
+            loop_result.tool_calls.last().cloned(),
             &validation,
             ctx,
             pipeline_start,
@@ -759,7 +740,7 @@ impl AgentRuntime {
         let interaction_fut = async {
             if let Some(ref recorder) = self.interaction_recorder {
                 let tools_used: Vec<&str> =
-                    router_result.tool_name.as_deref().into_iter().collect();
+                    loop_result.tool_calls.iter().map(String::as_str).collect();
                 recorder
                     .record(
                         &agent_name,
@@ -774,11 +755,11 @@ impl AgentRuntime {
 
         // Step 11: AutoTuner hook — record ground truth after response delivery.
         if let Some(ref hook) = self.autotuner_hook {
-            let tokens = router_result.usage.prompt_tokens + router_result.usage.completion_tokens;
+            let tokens = loop_result.usage.prompt_tokens + loop_result.usage.completion_tokens;
             hook.on_message_completed(
                 ctx.chat_id.as_str(),
                 &agent_name,
-                analysis.mode.short_name(),
+                analysis.complexity.short_name(),
                 tokens,
                 pipeline_elapsed_ms,
             )
@@ -793,6 +774,9 @@ impl AgentRuntime {
             classification: analysis,
             validation,
             agent_name,
+            turns: loop_result.turns,
+            budget_exhausted: loop_result.budget_exhausted,
+            tool_calls: loop_result.tool_calls,
         })
     }
 
@@ -906,19 +890,18 @@ impl AgentRuntime {
 
     async fn record_usage(
         &self,
-        result: &RouterResult,
+        usage: &providers::Usage,
         mode_name: &str,
         ctx: &RoutingContext,
         event_tx: &Option<tokio::sync::mpsc::Sender<AgentEvent>>,
         pipeline_elapsed_ms: u64,
     ) {
-        let cost =
-            crate::output::cost_tracker::estimate_cost(&result.usage, &self.config.execution_model);
+        let cost = crate::output::cost_tracker::estimate_cost(usage, &self.config.execution_model);
 
         if let Err(e) = self
             .cost_tracker
             .record(
-                &result.usage,
+                usage,
                 &self.config.execution_model,
                 &self.config.provider_name,
                 mode_name,
@@ -932,10 +915,10 @@ impl AgentRuntime {
         if let Some(ref tx) = event_tx {
             let _ = tx
                 .send(AgentEvent::UsageReport {
-                    prompt_tokens: result.usage.prompt_tokens,
-                    completion_tokens: result.usage.completion_tokens,
-                    cache_read_tokens: result.usage.cache_read_tokens,
-                    cache_write_tokens: result.usage.cache_write_tokens,
+                    prompt_tokens: usage.prompt_tokens,
+                    completion_tokens: usage.completion_tokens,
+                    cache_read_tokens: usage.cache_read_tokens,
+                    cache_write_tokens: usage.cache_write_tokens,
                     estimated_cost_usd: cost,
                     model: self.config.execution_model.clone(),
                     response_time_ms: pipeline_elapsed_ms,
@@ -954,10 +937,13 @@ impl AgentRuntime {
         }
     }
 
+    #[allow(clippy::too_many_arguments)]
     async fn record_strategy(
         &self,
         analysis: &IntentAnalysis,
-        result: &RouterResult,
+        mode_name: &str,
+        iterations_used: usize,
+        tool_name: Option<String>,
         validation: &ValidationResult,
         ctx: &RoutingContext,
         start: Instant,
@@ -975,20 +961,20 @@ impl AgentRuntime {
             id: uuid::Uuid::new_v4(),
             timestamp: chrono::Utc::now(),
             request_id: uuid::Uuid::new_v4().to_string(),
-            predicted_strategy: analysis.mode.to_string(),
-            actual_strategy: result.final_mode.clone(),
-            escalation_count: result.escalated as i32,
-            iterations_used: result.iterations as i32,
-            max_iterations: analysis.mode.max_iterations() as i32,
+            predicted_strategy: analysis.complexity.to_string(),
+            actual_strategy: mode_name.to_string(),
+            escalation_count: 0, // no escalation in unified loop
+            iterations_used: iterations_used as i32,
+            max_iterations: analysis.signals.iteration_budget() as i32,
             success: validation.is_valid,
             user_satisfaction: None,
             response_time_ms: elapsed_ms,
             chat_id: Some(ctx.chat_id.to_string()),
-            tool_name: result.tool_name.clone(),
-            tool_success: result.tool_name.as_ref().map(|_| validation.is_valid),
-            tool_duration_ms: result.tool_name.as_ref().map(|_| elapsed_ms),
+            tool_name: tool_name.clone(),
+            tool_success: tool_name.as_ref().map(|_| validation.is_valid),
+            tool_duration_ms: tool_name.as_ref().map(|_| elapsed_ms),
             complexity_signals: serde_json::to_value(&analysis.signals).unwrap_or_default(),
-            execution_mode: Some(result.final_mode.clone()),
+            execution_mode: Some(mode_name.to_string()),
             retrieved_memory_count: Some(retrieved_memory_count as i32),
             rewrite_triggered: rewrite_triggered as i32,
             rewrite_source,
@@ -1215,11 +1201,9 @@ impl tools::DelegationHandler for AgentRuntime {
         )
         .await;
 
-        // 6. Execute via router with reduced budget
+        // 6. Execute via budget-bounded loop with reduced budget
         let max_iters = profile.max_iterations().min(8);
-        let mode = crate::intent_pipeline::types::ExecutionMode::Reactive {
-            max_iterations: max_iters,
-        };
+        let mut budget = ExecutionBudget::with_limits(DepthMode::Normal, 40_000, max_iters);
         let mut params = ExecutionParams::new(&self.config.execution_model)
             .with_max_iterations(max_iters)
             .with_original_message(query.to_string())
@@ -1240,17 +1224,16 @@ impl tools::DelegationHandler for AgentRuntime {
             parent_tx.map(|tx| delegation_event_filter(tx, agent_name.to_string()))
         };
 
-        let result = self
-            .router
-            .execute(
-                mode,
-                assembled.messages,
-                &filtered_tools,
-                &params,
-                &delegated_ctx,
-                delegation_tx,
-            )
-            .await;
+        let result = execute_loop(
+            &self.core,
+            assembled.messages,
+            &filtered_tools,
+            &params,
+            &mut budget,
+            &delegated_ctx,
+            delegation_tx,
+        )
+        .await;
 
         let duration_ms = start.elapsed().as_millis() as u64;
         let success = result.is_ok();
@@ -1311,9 +1294,7 @@ mod tests {
     use std::sync::Mutex;
     use tools::registry::ToolRegistry;
 
-    use crate::execution::ExecutionCore;
-    use crate::intent_pipeline::engines::direct::DirectEngine;
-    use crate::intent_pipeline::engines::reactive::ReactiveEngine;
+    use crate::execution::{DepthMode, ExecutionCore};
     use tools::DelegationHandler;
 
     struct MockProvider {
@@ -1401,12 +1382,7 @@ mod tests {
         let registry = Arc::new(RwLock::new(ToolRegistry::new()));
         let core = Arc::new(ExecutionCore::new(provider.clone(), Arc::clone(&registry)));
 
-        let direct = DirectEngine::new(Arc::clone(&core));
-        let reactive = ReactiveEngine::new(Arc::clone(&core), 10);
-        let router = ExecutionRouter::new(direct, reactive);
-
-        let analyzer =
-            IntentAnalyzer::new(provider.clone(), "mock", &OrchestratorConfig::default());
+        let analyzer = IntentAnalyzer::new(&OrchestratorConfig::default());
 
         let pool = sqlx::SqlitePool::connect(":memory:")
             .await
@@ -1425,7 +1401,7 @@ mod tests {
             skill_router,
             analyzer,
             Arc::new(ContextEngine::new()),
-            router,
+            core,
             cost_tracker,
             PipelineConfig::default(),
             active_profile,
@@ -1459,6 +1435,7 @@ mod tests {
                 None,
                 None,
                 None,
+                DepthMode::Normal,
             )
             .await
             .unwrap();
@@ -1483,6 +1460,7 @@ mod tests {
                 None,
                 None,
                 None,
+                DepthMode::Normal,
             )
             .await
             .unwrap();
@@ -1511,6 +1489,7 @@ mod tests {
                 None,
                 None,
                 None,
+                DepthMode::Normal,
             )
             .await
             .unwrap();
@@ -1539,12 +1518,13 @@ mod tests {
                 None,
                 None,
                 None,
+                DepthMode::Normal,
             )
             .await
             .unwrap();
 
-        // Low confidence should downgrade to Direct mode, not block with clarification
-        assert_eq!(result.mode_used, "direct");
+        // Low confidence should downgrade to Simple complexity, not block with clarification
+        assert_eq!(result.mode_used, "normal");
         assert_eq!(result.content, "Hello! How can I help?");
     }
 
@@ -1593,6 +1573,7 @@ mod tests {
                 Some(tx),
                 None,
                 None,
+                DepthMode::Normal,
             )
             .await
             .unwrap();
@@ -1630,7 +1611,18 @@ mod tests {
         ctx.delegation_depth = MAX_DELEGATION_DEPTH; // At max depth
 
         let result = runtime
-            .process_message("hello", vec![], &[], &[], &ctx, None, None, None, None)
+            .process_message(
+                "hello",
+                vec![],
+                &[],
+                &[],
+                &ctx,
+                None,
+                None,
+                None,
+                None,
+                DepthMode::Normal,
+            )
             .await
             .unwrap();
 

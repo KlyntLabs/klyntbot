@@ -4,7 +4,7 @@
 //! algorithm via the `pitch-detection` crate, then classifies each syllable
 //! as Mandarin tone 1-4 or neutral based on contour shape.
 
-use crate::pronunciation_analyzer::{PhonemeAlignment, SyllableTone, ToneContour};
+use crate::pronunciation_analyzer::{PhonemeAlignment, ToneContour};
 use crate::types::AudioClip;
 
 /// Classify a tone contour into Mandarin tones 1-4 (or 5 for neutral).
@@ -15,6 +15,8 @@ use crate::types::AudioClip;
 /// - Tone 3 (dipping): F0 falls then rises
 /// - Tone 4 (falling): F0 falls from high to low
 /// - Tone 5 (neutral): short, unstressed
+// WIP: will be called once the aligner provides real per-syllable F0 windows.
+#[allow(dead_code)]
 fn classify_tone(f0_contour: &[f32]) -> u8 {
     let n = f0_contour.len();
     if n < 3 {

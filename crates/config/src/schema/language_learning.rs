@@ -44,22 +44,13 @@ impl Default for FeedbackConfig {
 ///
 /// Target languages are read from `LanguageConfig::target_lang` (in `config.language`)
 /// to avoid duplicating language preferences across config sections.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct LanguageLearningConfig {
     #[serde(default)]
     pub enabled: bool,
     #[serde(default)]
     pub feedback: FeedbackConfig,
-}
-
-impl Default for LanguageLearningConfig {
-    fn default() -> Self {
-        Self {
-            enabled: false,
-            feedback: FeedbackConfig::default(),
-        }
-    }
 }
 
 fn default_escalation_threshold() -> f32 {

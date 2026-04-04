@@ -400,7 +400,7 @@ impl SessionAggregator {
         }
 
         // Periodically persist stats (every 60 ticks ~ 5 min)
-        if new_tick_count % 60 == 0 {
+        if new_tick_count.is_multiple_of(60) {
             let breakdown = serde_json::to_string(&app_counts).ok();
             let _ = self
                 .session_repo

@@ -155,7 +155,7 @@ impl CommunityBuilder {
         let mut new_community_ids: HashSet<String> = HashSet::new();
 
         // 5. Process each community
-        for (_comm_idx, members) in &community_members {
+        for members in community_members.values() {
             if members.len() < MIN_COMMUNITY_SIZE {
                 continue;
             }

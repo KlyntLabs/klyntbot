@@ -298,7 +298,7 @@ impl AgentManager {
                 continue;
             }
             let blended = kw_score * 0.7 + sem_score * 0.3;
-            if best.map_or(true, |(_, s)| blended > s) {
+            if best.is_none_or(|(_, s)| blended > s) {
                 best = Some((name.as_str(), blended));
             }
         }

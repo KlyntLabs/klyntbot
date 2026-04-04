@@ -13,6 +13,7 @@ use voice_engine::PronunciationProvider;
 /// 1. Run phoneme alignment (when the aligner is available)
 /// 2. Classify errors and decide feedback level
 /// 3. Emit pronunciation events for the frontend
+#[derive(Default)]
 pub struct AppPronunciationProvider;
 
 impl AppPronunciationProvider {

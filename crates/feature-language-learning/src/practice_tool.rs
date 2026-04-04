@@ -6,6 +6,7 @@ use serde_json::Value;
 use common::{Result, ToolError};
 use tools_core::{RoutingContext, Tool};
 
+#[derive(Default)]
 pub struct LanguagePracticeTool;
 
 impl LanguagePracticeTool {

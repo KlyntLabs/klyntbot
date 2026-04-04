@@ -831,34 +831,9 @@ impl SimulationHarness {
                 if let Some(ref agent) = self.agent_harness {
                     let history = conversation_tracker.history_messages();
                     eprintln!("  [sim] day {day_counter} msg {msg_idx}: agent processing...");
-                    let agent_result = match tokio::time::timeout(
-                        std::time::Duration::from_secs(60),
-                        agent.process(msg, day_counter, &history),
-                    )
-                    .await
-                    {
-                        Ok(result) => result,
-                        Err(_) => {
-                            eprintln!(
-                                "  [sim] day {day_counter} msg {msg_idx}: agent TIMEOUT (60s)"
-                            );
-                            crate::agent_types::AgentResult {
-                                selected_skill: String::new(),
-                                mode_used: "timeout".to_string(),
-                                tool_calls: vec![],
-                                iterations: 0,
-                                response: String::new(),
-                                error: Some("pipeline timeout (60s)".to_string()),
-                                breakpoints: vec![crate::agent_types::AgentBreakpoint {
-                                    kind: crate::agent_types::BreakpointKind::LoopTimeout,
-                                    message_content: msg.content.clone(),
-                                    details: "agent.process() exceeded 60s timeout".to_string(),
-                                    day: day_counter,
-                                    phase: msg.phase.to_string(),
-                                }],
-                            }
-                        }
-                    };
+                    // Budget-bounded execution — no external timeout wrapper needed.
+                    // The safety timeout (600s) is inside the pipeline.
+                    let agent_result = agent.process(msg, day_counter, &history).await;
                     eprintln!(
                         "  [sim] day {day_counter} msg {msg_idx}: agent done (mode={}, tools={})",
                         agent_result.mode_used,
@@ -1174,10 +1149,9 @@ impl SimulationHarness {
                 measure_knowledge_retention(&self.fact_repo, &known_facts).await;
             let community_stability = measure_community_stability(&self.inner_pool).await;
             let epoch_start_str = plan.previous.to_rfc3339();
-            let epoch_end_str = plan.simulated_now.to_rfc3339();
+            let _epoch_end_str = plan.simulated_now.to_rfc3339();
             let brain_versions =
-                count_brain_versions_since(&self.inner_pool, &epoch_start_str, &epoch_end_str)
-                    .await;
+                count_brain_versions_since(&self.inner_pool, &epoch_start_str).await;
             let autotuner_stats = measure_autotuner_success(&self.inner_pool).await;
             let wall_time_ms = epoch_start.elapsed().as_secs_f64() * 1000.0;
 
@@ -1208,12 +1182,11 @@ impl SimulationHarness {
             );
 
             let now_rfc3339 = plan.simulated_now.to_rfc3339();
-            let start_rfc3339 = start_date.to_rfc3339();
+            let _start_rfc3339 = start_date.to_rfc3339();
             let (memory_retrievability, meta_rule_count) = tokio::join!(
                 crate::metrics::cognitive::measure_average_retrievability(
                     &self.inner_pool,
                     &now_rfc3339,
-                    &start_rfc3339,
                 ),
                 crate::metrics::cognitive::count_meta_rules(&self.inner_pool),
             );

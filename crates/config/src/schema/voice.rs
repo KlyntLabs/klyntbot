@@ -27,10 +27,11 @@ pub enum TtsEngineKind {
 }
 
 /// Deployment mode — local model or cloud API.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 #[serde(tag = "mode", rename_all = "camelCase")]
 pub enum EngineDeployment {
     /// Run model locally on device (MLX/Metal).
+    #[default]
     Local,
     /// Call a cloud API (OpenAI-compatible endpoint).
     Cloud {
@@ -39,12 +40,6 @@ pub enum EngineDeployment {
         #[serde(rename = "apiKey")]
         api_key: Secret<String>,
     },
-}
-
-impl Default for EngineDeployment {
-    fn default() -> Self {
-        Self::Local
-    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

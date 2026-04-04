@@ -659,8 +659,7 @@ pub async fn run_bootstrap_replay(orch: &AutoTunerOrchestrator) -> common::Resul
 
     // 6. Build the shadow classifier.
     let config = config::OrchestratorConfig::default();
-    let classifier =
-        shadow_classifier::AgentShadowClassifier::new(orch.provider.clone(), &orch.model, &config);
+    let classifier = shadow_classifier::AgentShadowClassifier::new(&config);
 
     // 7. For each session's user messages, run shadow classification and compare
     //    against ground truth strategy_records (matched by chat_id + timestamp ±30s).

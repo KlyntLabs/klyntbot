@@ -51,6 +51,7 @@ impl ReviewSessionRepo {
     }
 
     /// Mark a session as completed with summary data.
+    #[allow(clippy::too_many_arguments)]
     pub async fn complete(
         &self,
         id: &str,

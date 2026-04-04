@@ -1,7 +1,8 @@
 //! Execution engines for the intent pipeline.
 //!
-//! Each engine handles one `ExecutionMode`: Direct or Reactive.
-//! All implement the `ExecutionEngine` trait with a unified `EngineResult`.
+//! Direct and Reactive engines have been unified into `execution::execute_loop`.
+//! This module retains the `ExecutionEngine` trait and `EngineResult` for
+//! specialized engines (debate, interaction) that haven't been unified yet.
 
 use async_trait::async_trait;
 use providers::Usage;
@@ -11,11 +12,7 @@ use crate::execution::{ExecutionParams, ReasoningTrace};
 
 pub mod debate;
 pub mod debate_types;
-pub mod direct;
 pub mod interaction;
-pub mod reactive;
-#[cfg(test)]
-pub(crate) mod test_utils;
 
 /// Result from an execution engine.
 pub enum EngineResult {

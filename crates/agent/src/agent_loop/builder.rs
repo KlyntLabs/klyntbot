@@ -270,8 +270,7 @@ impl AgentLoopBuilder {
             }
         }
 
-        let mut skill_catalog =
-            skill_system::types::SkillCatalog::discover(&discovery_sources).await?;
+        let skill_catalog = skill_system::types::SkillCatalog::discover(&discovery_sources).await?;
         let skill_router = skill_system::router::SkillRouter::new(&skill_catalog);
 
         // Build reference files map for SkillContextSource
@@ -960,8 +959,7 @@ impl AgentLoopBuilder {
                         // Background tree node backfill — re-indexes all existing data.
                         // Gated by KLYNTBOT_BACKFILL=1 env var (default: off).
                         // Only needed for dev/migration; live events handle ongoing indexing.
-                        if std::env::var("KLYNTBOT_BACKFILL")
-                            .map_or(false, |v| v == "1" || v == "true")
+                        if std::env::var("KLYNTBOT_BACKFILL").is_ok_and(|v| v == "1" || v == "true")
                         {
                             let backfill_builder = Arc::clone(&note_tree_builder);
                             let backfill_task_tree_builder = Arc::clone(&task_tree_builder);
@@ -1651,23 +1649,9 @@ impl AgentLoopBuilder {
         }
         let execution_core = Arc::new(execution_core);
 
-        let direct_engine =
-            crate::intent_pipeline::engines::direct::DirectEngine::new(Arc::clone(&execution_core));
-        let reactive_engine = crate::intent_pipeline::engines::reactive::ReactiveEngine::new(
-            Arc::clone(&execution_core),
-            config.agents.defaults.max_tool_iterations,
-        );
-
-        let router =
-            crate::intent_pipeline::router::ExecutionRouter::new(direct_engine, reactive_engine);
-
-        let mut analyzer = crate::intent_pipeline::analysis::IntentAnalyzer::new(
-            provider.clone(),
-            &config.agents.defaults.model,
-            &config.orchestrator,
-        )
-        .with_strategy_repo(repos.strategies.clone())
-        .with_shadow_mode();
+        let mut analyzer =
+            crate::intent_pipeline::analysis::IntentAnalyzer::new(&config.orchestrator)
+                .with_strategy_repo(repos.strategies.clone());
 
         // Wire live autotuner reference into IntentAnalyzer for per-message threshold reads
         if let Some(ref orchestrator) = self.autotuner {
@@ -1689,7 +1673,7 @@ impl AgentLoopBuilder {
             channel: "unknown".to_string(),
             provider_name: provider.name().to_string(),
             scenario_max_graph_depth: config.scenario.max_graph_depth,
-            pipeline_timeout_secs: config.agents.defaults.pipeline_timeout_secs,
+            safety_timeout_secs: config.agents.defaults.execution.safety_timeout_secs,
         };
 
         // ── Interaction recorder ──────────────────────────────────────────
@@ -1706,7 +1690,7 @@ impl AgentLoopBuilder {
             Arc::clone(&skill_router),
             analyzer,
             Arc::clone(&context_engine),
-            router,
+            execution_core,
             cost_tracker,
             runtime_config,
             Arc::clone(&active_profile),
@@ -1752,8 +1736,6 @@ impl AgentLoopBuilder {
                 let mut hook = crate::autotuner::hooks::AutoTunerHookImpl::new(
                     Arc::clone(orchestrator),
                     trial_repo,
-                    provider.clone(),
-                    &config.agents.defaults.model,
                     &config.orchestrator,
                 );
 

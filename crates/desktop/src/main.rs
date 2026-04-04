@@ -84,16 +84,6 @@ fn position_orb_bottom_right(window: &tauri::WebviewWindow) {
     }
 }
 
-/// Register a dismiss-on-blur handler that hides the window when it loses focus.
-fn dismiss_on_blur(window: &tauri::WebviewWindow) {
-    let w = window.clone();
-    window.on_window_event(move |event| {
-        if let tauri::WindowEvent::Focused(false) = event {
-            let _ = w.hide();
-        }
-    });
-}
-
 fn main() {
     configure_mimalloc();
     let cli = Cli::parse();

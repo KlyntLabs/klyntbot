@@ -14,6 +14,7 @@ use common::Result;
 use serde_json::Value;
 use tools_core::{FeatureMigration, FeaturePackage, HealthStatus};
 
+#[derive(Default)]
 pub struct LanguageLearningFeature;
 
 impl LanguageLearningFeature {

@@ -132,7 +132,7 @@ impl InsightService {
                 tooltip: dot.tooltip.clone(),
                 detail_route: Some(dot.detail_route.clone()),
             };
-            let _ = bus.publish(event);
+            bus.publish(event);
         }
 
         Some(dot)
