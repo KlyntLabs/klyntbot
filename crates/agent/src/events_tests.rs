@@ -11,12 +11,10 @@
 //!   ToolStart     → { "type": "toolStart",      "name": "...", "args": {...} }
 //!   ToolEnd       → { "type": "toolEnd",        "name": "...", "success": bool, "durationMs": N }
 //!   IterationStart→ { "type": "iterationStart", "iteration": N, "max": N }
-//!   ClassificationComplete → { "type": "classificationComplete", "strategy": "...", ... }
 //!   ContextAssembled       → { "type": "contextAssembled",       "totalTokens": N, ... }
 //!   ExecutionStarted       → { "type": "executionStarted",       "engine": "...", ... }
 //!   ConfidenceAssessed     → { "type": "confidenceAssessed",     "score": N, "action": "..." }
-//!   PlanStepCompleted      → { "type": "planStepCompleted",      "planId": "...", ... }
-//!   PlanCompleted          → { "type": "planCompleted",          "planId": "...", "summary": "..." }
+//!   PlanStepCompleted      → { "type": "planStepCompleted",      "stepIndex": N, ... }
 
 #[cfg(test)]
 mod tests {
@@ -162,25 +160,6 @@ mod tests {
         assert_eq!(v["max"], 5);
     }
 
-    // ── ClassificationComplete ────────────────────────────────────────────────
-
-    #[test]
-    fn classification_complete_serializes_all_fields_camel_case() {
-        // AC-3.6: ClassificationComplete { strategy, confidence, source, duration_ms }
-        // duration_ms → "durationMs"; type tag → "classificationComplete"
-        let event = AgentEvent::ClassificationComplete {
-            strategy: "direct".to_string(),
-            confidence: 0.9,
-            source: "heuristic".to_string(),
-            duration_ms: 10,
-        };
-        let v = serialize(&event);
-        assert_eq!(v["type"], "classificationComplete");
-        assert_eq!(v["strategy"], "direct");
-        assert_eq!(v["durationMs"], 10);
-        assert!(v.get("duration_ms").is_none());
-    }
-
     // ── ContextAssembled ──────────────────────────────────────────────────────
 
     #[test]
@@ -253,12 +232,6 @@ mod tests {
             AgentEvent::IterationStart {
                 iteration: 1,
                 max: 5,
-            },
-            AgentEvent::ClassificationComplete {
-                strategy: "s".to_string(),
-                confidence: 0.5,
-                source: "src".to_string(),
-                duration_ms: 1,
             },
             AgentEvent::ContextAssembled {
                 total_tokens: 100,

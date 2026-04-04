@@ -224,16 +224,17 @@ impl ServerHandler for KlyntbotServerHandler {
                 .await
             }
             "klyntbot://config/skills" => {
-                let catalog = self.app.agent.skill_catalog();
-                let catalog = catalog.read().await;
-                let skills: Vec<serde_json::Value> = catalog
-                    .all_skills()
-                    .map(|pkg| {
-                        serde_json::json!({
-                            "name": pkg.name,
-                            "type": format!("{:?}", pkg.skill_type),
-                            "description": pkg.description,
-                            "scope": format!("{:?}", pkg.scope),
+                let store = self.app.agent.skill_store();
+                let store = store.read().await;
+                let skills: Vec<serde_json::Value> = store
+                    .names()
+                    .into_iter()
+                    .filter_map(|name| {
+                        store.get(name).map(|entry| {
+                            serde_json::json!({
+                                "name": entry.frontmatter.name,
+                                "description": entry.frontmatter.description,
+                            })
                         })
                     })
                     .collect();

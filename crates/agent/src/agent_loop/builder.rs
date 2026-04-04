@@ -28,7 +28,6 @@ use tools::{
 };
 use tools_core::FeaturePackage;
 
-use super::super::confidence::ConfidenceEvaluator;
 use super::super::context_sources::{
     AreaSource, BootstrapSource, IdentitySource, PageContextSource, PersonaContextSource,
     ProductivityContextSource, ProjectContextSource, SessionContextSource, TodoSource,
@@ -241,81 +240,25 @@ impl AgentLoopBuilder {
         };
         let repos = storage::Repos::from_pool(&storage_pool);
 
-        // ── Skill discovery ─────────────────────────────────────────────────
-        let mut discovery_sources = vec![skill_system::discovery::SkillSource::BuiltIn(
-            skill_system::discovery::BUILTIN_SKILLS
-                .iter()
-                .map(|(n, c)| (n.to_string(), c.to_string()))
-                .collect(),
-        )];
-        // Scan user skills directory if data_dir is set
+        // ── Skill store (flat, file-based) ─────────────────────────────────
         let data_dir_path = config.data_dir_path();
-        let user_skills_dir = data_dir_path.join("skills");
-        if user_skills_dir.exists() {
-            discovery_sources.push(skill_system::discovery::SkillSource::Directory(
-                user_skills_dir,
-                skill_system::types::SkillScope::User,
-            ));
-        }
-        // Scan project-level skills if project_root is set
-        if let Some(ref project_root) = config.project_root {
-            let project_skills = std::path::PathBuf::from(project_root)
-                .join(".agents")
-                .join("skills");
-            if project_skills.exists() {
-                discovery_sources.push(skill_system::discovery::SkillSource::Directory(
-                    project_skills,
-                    skill_system::types::SkillScope::Project,
-                ));
-            }
-        }
+        let skills_dir = data_dir_path.join("skills");
+        let skill_store = skill_system::SkillStore::load(&skills_dir)?;
 
-        let skill_catalog = skill_system::types::SkillCatalog::discover(&discovery_sources).await?;
-        let skill_router = skill_system::router::SkillRouter::new(&skill_catalog);
-
-        // Build reference files map for SkillContextSource
-        let reference_files = Arc::new(skill_system::discovery::builtin_reference_map());
-
-        // Build skill reference index for progressive loading
+        // Build skill reference index for the skill_reference tool
         let skill_reference_index = {
-            let mut skill_bodies = std::collections::HashMap::new();
-            let mut ref_files = std::collections::HashMap::new();
-
-            for pkg in skill_catalog.all_skills() {
-                skill_bodies.insert(pkg.name.clone(), pkg.body.clone());
-            }
-
-            // Re-key reference files from "builtin::skill/references/name.md" to "skill/name"
-            for (key, content) in reference_files.iter() {
-                if let Some((skill_name, ref_name)) = parse_reference_key(key) {
-                    ref_files.insert(format!("{}/{}", skill_name, ref_name), content.clone());
-                }
-            }
-
+            let skill_bodies = skill_store.build_reference_index();
+            // No separate reference files in the flat model — pass empty map
+            let ref_files = std::collections::HashMap::new();
             Arc::new(tools::SkillReferenceIndex::new(skill_bodies, ref_files))
         };
 
-        // Shared active profile — written by AgentRuntime, read by SkillContextSource
-        let active_profile: Arc<
-            tokio::sync::RwLock<Option<Arc<skill_system::types::SkillPackage>>>,
-        > = Arc::new(tokio::sync::RwLock::new(None));
-
-        // Shared activated skills — written per-message, read by SkillContextSource
-        let activated_skills: Arc<
-            tokio::sync::RwLock<Vec<Arc<skill_system::types::SkillPackage>>>,
-        > = Arc::new(tokio::sync::RwLock::new(vec![]));
+        let skill_store = Arc::new(tokio::sync::RwLock::new(skill_store));
 
         // ── Shared embedding engine (reuse injected instance or create new) ──
         let embedding_engine = self
             .embedding_engine
             .unwrap_or_else(|| Arc::new(tools::EmbeddingEngine::new()));
-
-        // Precompute skill description embeddings for semantic matching
-        // Skill embeddings are precomputed lazily on first message instead of
-        // at startup. This avoids loading the ~23 MB ONNX model at boot.
-        // The router falls back to keyword-only scoring until embeddings are ready.
-        let skill_catalog = Arc::new(tokio::sync::RwLock::new(skill_catalog));
-        let skill_router = Arc::new(tokio::sync::RwLock::new(skill_router));
 
         // ── Context sources ───────────────────────────────────────────────
         let confidence_bits = Arc::new(std::sync::atomic::AtomicU32::new(
@@ -328,7 +271,14 @@ impl AgentLoopBuilder {
             crate::persona::PersonaManager::load(&personas_dir).await,
         ));
 
+        // Soul context source (KLYNTBOT.md)
+        let soul_source = skill_system::SoulContextSource::load(&data_dir_path)?;
+        // Skill listing source (frontmatter listing of all skills)
+        let skill_listing_source = skill_system::SkillListingSource::new(Arc::clone(&skill_store));
+
         let mut sources: Vec<Box<dyn ContextSource>> = vec![
+            Box::new(soul_source),
+            Box::new(skill_listing_source),
             Box::new(IdentitySource::new(
                 workspace.clone(),
                 config.timezone.clone(),
@@ -337,11 +287,6 @@ impl AgentLoopBuilder {
             Box::new(SessionContextSource::new(repos.clone())),
             Box::new(AreaSource::new(repos.areas.clone())),
             Box::new(TodoSource::new(repos.tasks.clone())),
-            Box::new(skill_system::context::SkillContextSource::new(
-                Arc::clone(&active_profile),
-                Arc::clone(&activated_skills),
-                Arc::clone(&reference_files),
-            )),
             Box::new(PersonaContextSource::new(
                 Arc::clone(&persona_manager),
                 repos.session_context.clone(),
@@ -1037,9 +982,12 @@ impl AgentLoopBuilder {
 
                 // Build skill trees at startup (non-blocking)
                 let tree_repo_for_skills = tree_repo.clone();
+                let skill_store_for_trees = Arc::clone(&skill_store);
                 tokio::spawn(async move {
+                    let store = skill_store_for_trees.read().await;
                     match crate::adapters::book_index_skill_builder::build_all_skill_trees(
                         tree_repo_for_skills.as_ref(),
+                        &store,
                     )
                     .await
                     {
@@ -1483,25 +1431,6 @@ impl AgentLoopBuilder {
             &skill_reference_index,
         )));
 
-        // ── Confidence evaluator ──────────────────────────────────────────
-        let confidence_evaluator = if config.confidence.enabled {
-            if config.confidence.tool_overrides.is_empty() {
-                Some(ConfidenceEvaluator::new(config.confidence.threshold))
-            } else {
-                let mut tool_map =
-                    crate::learning::ToolConfidenceMap::new(config.confidence.threshold);
-                for (tool_name, threshold) in &config.confidence.tool_overrides {
-                    tool_map.set_threshold(tool_name, *threshold);
-                }
-                Some(ConfidenceEvaluator::new_with_map(
-                    config.confidence.threshold,
-                    tool_map,
-                ))
-            }
-        } else {
-            None
-        };
-
         // ── Reminder engine ───────────────────────────────────────────────
         let reminder_engine = if let Some(ref dispatcher) = notification_dispatcher {
             let mut engine = super::super::ReminderEngine::new(
@@ -1563,11 +1492,10 @@ impl AgentLoopBuilder {
                 }
             });
 
-            let threshold_handle = confidence_evaluator.as_ref().map(|e| e.threshold_handle());
             let mut service = crate::learning::LearningService::new(
                 Arc::clone(store),
                 adaptive,
-                threshold_handle,
+                None, // No confidence evaluator in flat architecture
                 Duration::from_secs(config.learning.analysis_interval_secs),
             )
             .with_event_bus(event_bus);
@@ -1649,32 +1577,12 @@ impl AgentLoopBuilder {
         }
         let execution_core = Arc::new(execution_core);
 
-        let mut analyzer =
-            crate::intent_pipeline::analysis::IntentAnalyzer::new(&config.orchestrator)
-                .with_strategy_repo(repos.strategies.clone());
-
-        // Wire live autotuner reference into IntentAnalyzer for per-message threshold reads
-        if let Some(ref orchestrator) = self.autotuner {
-            analyzer = analyzer.with_autotuner(Arc::clone(orchestrator));
-        }
-
         let cost_tracker = Arc::new(
             crate::output::CostTracker::from_repo(storage::UsageRepo::new(
                 storage_pool.inner().clone(),
             ))
             .with_monthly_budget(config.agents.monthly_budget_usd),
         );
-
-        let runtime_config = crate::intent_pipeline::types::PipelineConfig {
-            execution_model: config.agents.defaults.model.clone(),
-            system_prompt: String::new(),
-            context_window: provider.context_window(),
-            max_response_tokens: config.agents.defaults.max_tokens as usize,
-            channel: "unknown".to_string(),
-            provider_name: provider.name().to_string(),
-            scenario_max_graph_depth: config.scenario.max_graph_depth,
-            safety_timeout_secs: config.agents.defaults.execution.safety_timeout_secs,
-        };
 
         // ── Interaction recorder ──────────────────────────────────────────
         let interaction_recorder = if config.learning.enabled {
@@ -1686,23 +1594,16 @@ impl AgentLoopBuilder {
         };
 
         let mut runtime = crate::agent_runtime::AgentRuntime::new(
-            Arc::clone(&skill_catalog),
-            Arc::clone(&skill_router),
-            analyzer,
             Arc::clone(&context_engine),
             execution_core,
             cost_tracker,
-            runtime_config,
-            Arc::clone(&active_profile),
+            config.agents.defaults.model.clone(),
+            provider.name().to_string(),
+            provider.context_window(),
+            config.agents.defaults.max_tokens as usize,
             Arc::clone(&hot_config),
         )
-        .with_strategy_repo(repos.strategies.clone())
-        .with_activated_skills(Arc::clone(&activated_skills))
-        .with_embedding_engine(Arc::clone(&embedding_engine));
-
-        if let Some(evaluator) = confidence_evaluator {
-            runtime = runtime.with_confidence_evaluator(Arc::new(evaluator));
-        }
+        .with_tool_registry(Arc::clone(&tool_registry));
 
         if let Some(recorder) = interaction_recorder {
             runtime = runtime.with_interaction_recorder(recorder);
@@ -1711,9 +1612,6 @@ impl AgentLoopBuilder {
         // Inject procedural rule repo for transparency (L5 cognitive rules)
         let rule_repo = cognitive::ProceduralRuleRepo::new(storage_pool.inner().clone());
         runtime = runtime.with_procedural_rule_repo(rule_repo);
-
-        // Inject tool registry for delegation support
-        runtime = runtime.with_tool_registry(Arc::clone(&tool_registry));
 
         // Inject user situation for RetrievalContext
         if let Some(ref sit) = self.user_situation {
@@ -1736,7 +1634,6 @@ impl AgentLoopBuilder {
                 let mut hook = crate::autotuner::hooks::AutoTunerHookImpl::new(
                     Arc::clone(orchestrator),
                     trial_repo,
-                    &config.orchestrator,
                 );
 
                 // Wire Phase 2 shadow retriever if memory service is available
@@ -1768,20 +1665,12 @@ impl AgentLoopBuilder {
             }
         }
 
-        // Inject domain event bus for SkillRouted event emission
-        if let Some(ref domain_bus) = self.domain_event_bus {
-            runtime = runtime.with_domain_bus(Arc::clone(domain_bus));
-        }
-
         // Inject context update queue for live context refresher
         if let Some(ref queue) = self.context_update_queue {
             runtime = runtime.with_context_update_queue(Arc::clone(queue));
         }
 
         let runtime = Arc::new(runtime);
-
-        // Two-phase init: set the self-reference for delegation after Arc wrapping
-        runtime.set_delegation_self_ref(Arc::clone(&runtime) as Arc<dyn tools::DelegationHandler>);
 
         info!("Agent runtime initialized");
 
@@ -1824,8 +1713,7 @@ impl AgentLoopBuilder {
             _inference_loop_token,
             _tree_builder_token: tree_builder_token,
             activity_svc: self.activity_svc,
-            skill_catalog,
-            skill_router,
+            skill_store,
             embedding_engine,
             hot_config,
         })
@@ -1841,30 +1729,6 @@ impl AgentLoop {
     ) -> AgentLoopBuilder {
         AgentLoopBuilder::new(bus, provider, config)
     }
-}
-
-/// Parse a reference file key into (skill_name, reference_name).
-fn parse_reference_key(key: &str) -> Option<(String, String)> {
-    // Format: "builtin::{skill}/references/{name}.md"
-    if let Some(rest) = key.strip_prefix("builtin::") {
-        let parts: Vec<&str> = rest.splitn(2, "/references/").collect();
-        if parts.len() == 2 {
-            let name = parts[1].strip_suffix(".md").unwrap_or(parts[1]);
-            return Some((parts[0].to_string(), name.to_string()));
-        }
-    }
-    // Format: "{path}/references/{name}.md"
-    if let Some(idx) = key.find("/references/") {
-        let skill_path = &key[..idx];
-        let skill_name = std::path::Path::new(skill_path)
-            .file_name()
-            .and_then(|n| n.to_str())
-            .unwrap_or(skill_path);
-        let name = &key[idx + "/references/".len()..];
-        let name = name.strip_suffix(".md").unwrap_or(name);
-        return Some((skill_name.to_string(), name.to_string()));
-    }
-    None
 }
 
 /// Backfill tree nodes for all existing notes that may not have been indexed yet.

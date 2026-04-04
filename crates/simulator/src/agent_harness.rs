@@ -7,16 +7,11 @@ use tokio::sync::RwLock;
 use tracing::{debug, warn};
 
 use agent::agent_runtime::AgentRuntime;
-use agent::intent_pipeline::analysis::IntentAnalyzer;
-use agent::intent_pipeline::types::PipelineConfig;
 use agent::AgentEvent;
 use agent::ExecutionCore;
 use bus::DomainEventBus;
 use common::{ChannelName, ChatId};
-use config::OrchestratorConfig;
 use providers::DynProvider;
-use skill_system::router::SkillRouter;
-use skill_system::types::SkillCatalog;
 use tools::registry::ToolRegistry;
 use tools::RoutingContext;
 
@@ -87,10 +82,7 @@ impl AgentHarness {
         inner_pool: sqlx::SqlitePool,
         bus: Arc<DomainEventBus>,
         context_queue: Arc<bus::ContextUpdateQueue>,
-        skill_catalog: Arc<RwLock<SkillCatalog>>,
-        skill_router: Arc<RwLock<SkillRouter>>,
         embedding_engine: Option<Arc<tools::EmbeddingEngine>>,
-        _max_iterations: u32,
         provider_name: &str,
         model: &str,
         provider_error_rate: f64,
@@ -115,14 +107,11 @@ impl AgentHarness {
 
         let tool_registry = Arc::new(RwLock::new(tool_registry));
 
-        // Build execution core -> engines -> router
+        // Build execution core
         let core = Arc::new(
             ExecutionCore::new(provider.clone(), Arc::clone(&tool_registry))
                 .with_domain_bus(Arc::clone(&bus)),
         );
-        // Build IntentAnalyzer — heuristic + embedding only (no LLM classifier).
-        let orch_config = OrchestratorConfig::default();
-        let analyzer = IntentAnalyzer::new(&orch_config);
 
         // Build context engine with real sources matching production
         let context_sources: Vec<Box<dyn context_engine::source::ContextSource>> = vec![
@@ -151,37 +140,24 @@ impl AgentHarness {
         let hot_config = Arc::new(RwLock::new(config::HotConfig::from(
             &config::Config::default(),
         )));
-        let active_profile = Arc::new(RwLock::new(None));
 
         // Assemble runtime — override execution_model with the scenario's
         // agent_model so the correct model name is sent to the LLM provider.
-        let pipeline_config = PipelineConfig {
-            execution_model: model.to_string(),
-            provider_name: provider_name.to_string(),
-            safety_timeout_secs: 90, // tight for simulation — enough for real API calls
-            ..PipelineConfig::default()
-        };
         let mut runtime = AgentRuntime::new(
-            skill_catalog,
-            skill_router,
-            analyzer,
             context_engine,
             core,
             cost_tracker,
-            pipeline_config,
-            active_profile,
+            model.to_string(),
+            provider_name.to_string(),
+            128_000, // context_window
+            8_192,   // max_response_tokens
             hot_config,
         );
 
         // Wire optional deps
         runtime = runtime
             .with_tool_registry(Arc::clone(&tool_registry))
-            .with_domain_bus(Arc::clone(&bus))
             .with_context_update_queue(context_queue);
-
-        if let Some(engine) = embedding_engine {
-            runtime = runtime.with_embedding_engine(engine);
-        }
 
         let runtime = Arc::new(runtime);
 
@@ -293,12 +269,11 @@ impl AgentHarness {
             ChatId::new("sim-session".to_string()),
         );
 
-        // Get tool definitions and names under a single lock
-        let (tool_defs, tool_names) = {
+        // Get tool definitions under lock
+        let tool_defs = {
             let registry = self.tool_registry.read().await;
-            (registry.get_definitions(), registry.tool_names())
+            registry.get_definitions()
         };
-        let tool_name_refs: Vec<&str> = tool_names.iter().map(|s| s.as_str()).collect();
 
         // Collect agent events via channel
         let (event_tx, mut event_rx) = tokio::sync::mpsc::channel(64);
@@ -313,12 +288,9 @@ impl AgentHarness {
                     h
                 },
                 &tool_defs,
-                &tool_name_refs,
                 &ctx,
-                None, // no system prompt override
                 Some(event_tx),
                 None, // no cancellation
-                None, // no correction context
                 agent::execution::DepthMode::Normal,
             )
             .await;
@@ -367,20 +339,6 @@ impl AgentHarness {
                         kind: BreakpointKind::ResponseEmpty,
                         message_content: msg.content.clone(),
                         details: "agent returned empty response".to_string(),
-                        day,
-                        phase: phase.clone(),
-                    });
-                }
-
-                // Check for low confidence
-                if runtime_result.classification.confidence < 0.5 {
-                    breakpoints.push(AgentBreakpoint {
-                        kind: BreakpointKind::ClassificationLowConfidence,
-                        message_content: msg.content.clone(),
-                        details: format!(
-                            "confidence {:.2} below threshold",
-                            runtime_result.classification.confidence
-                        ),
                         day,
                         phase: phase.clone(),
                     });

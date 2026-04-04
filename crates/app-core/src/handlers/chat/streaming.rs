@@ -3,12 +3,12 @@
 use std::collections::{HashMap, HashSet, VecDeque};
 use std::sync::Arc;
 
-use agent::intent_pipeline::engines::debate;
-use agent::intent_pipeline::engines::debate_types::{
+use agent::engines::debate;
+use agent::engines::debate_types::{
     DebateConfig, DebateContext, DebateEvent, DebateResult, DefaultInteractionMode,
     SquadInteractionMode,
 };
-use agent::intent_pipeline::engines::interaction::detect_interaction_mode;
+use agent::engines::interaction::detect_interaction_mode;
 use agent::AgentEvent;
 use cognitive::{BlackboardRepo, PersonaAccuracyRepo, ResolvedSquad};
 use common::EntityCard;
@@ -309,11 +309,11 @@ async fn execute_squad_message_bg(
 
     // 4. Load orchestrator skill body for domain grounding
     let skill_prompt = {
-        let catalog_arc = agent.skill_catalog();
-        let catalog = catalog_arc.read().await;
-        catalog
+        let store_arc = agent.skill_store();
+        let store = store_arc.read().await;
+        store
             .get(&resolved.squad.orchestrator_skill)
-            .map(|pkg| pkg.body.clone())
+            .map(|entry| entry.body.clone())
             .unwrap_or_default()
     };
 
@@ -1191,23 +1191,6 @@ pub async fn relay_chat_stream(
                             }
                         );
                         break;
-                    }
-                    AgentEvent::ClassificationComplete { strategy, confidence, source, duration_ms } => {
-                        transparency.classification = Some(TransparencyClassification {
-                            strategy: strategy.clone(),
-                            confidence,
-                            source: source.clone(),
-                        });
-                        transparency.timing.get_or_insert_with(Default::default).classification_ms = Some(duration_ms);
-                        emit!(
-                            AGENT_CLASSIFICATION_COMPLETE,
-                            ClassificationCompletePayload {
-                                session_key: sk.clone(),
-                                strategy,
-                                confidence,
-                                source,
-                            }
-                        );
                     }
                     AgentEvent::ExecutionStarted { engine, max_iterations } => {
                         transparency.execution = Some(TransparencyExecution {

@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 use std::fmt;
 use std::path::PathBuf;
 
-use super::agents::{AgentsConfig, SkillConfig};
+use super::agents::AgentsConfig;
 use super::autotuner::AutoTunerConfig;
 
 use super::capture::CaptureConfig;
@@ -23,7 +23,6 @@ use super::learning::LearningConfig;
 use super::lifecycle::LifecycleConfig;
 use super::mcp::McpConfig;
 use super::notes::NotesConfig;
-use super::orchestrator::OrchestratorConfig;
 use super::packs::PacksConfig;
 use super::plugins::PluginsConfig;
 use super::productivity::ProductivityConfig;
@@ -140,9 +139,6 @@ pub struct Config {
     #[serde(default)]
     pub productivity: ProductivityConfig,
 
-    #[serde(default)]
-    pub orchestrator: OrchestratorConfig,
-
     /// Provider manager routing (primary/fallback/classifier)
     #[serde(default)]
     pub provider_manager: ProviderManagerConfig,
@@ -185,10 +181,6 @@ pub struct Config {
     /// MCP (Model Context Protocol) server connections and server settings.
     #[serde(default)]
     pub mcp: McpConfig,
-
-    /// Skill discovery system configuration.
-    #[serde(default)]
-    pub skills: SkillConfig,
 
     /// AI coding tool integrations (Claude Code, Cursor, Codex, etc.).
     #[serde(default)]

@@ -23,8 +23,8 @@ pub mod system;
 
 // ── Module re-exports (backward-compatible paths) ───────────────────────────
 pub use domain::{
-    agent_task_tool, annotate, area_tool, context_request, cron_tool, delegation, docs,
-    learning_tool, memory_tool, mirror, okr_tool, project_tool, skill_reference, spawn,
+    agent_task_tool, annotate, area_tool, context_request, cron_tool, docs, learning_tool,
+    memory_tool, mirror, okr_tool, project_tool, skill_reference, spawn,
 };
 pub use embedding::{embedding_engine, embedding_store};
 pub use system::{ask_user, browser, filesystem, glob_tool, grep, message, web};
@@ -51,9 +51,6 @@ pub use annotate::AnnotateTool;
 
 // Area
 pub use area_tool::AreaTool;
-
-// Delegation
-pub use delegation::{DelegationHandler, DelegationTool};
 
 // Conversation recall
 pub use conversation_recall::{

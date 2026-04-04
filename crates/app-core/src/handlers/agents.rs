@@ -37,7 +37,7 @@ impl AppCore {
         let skills_dir = workspace.join("skills");
 
         // Start with built-in skills
-        let builtins = skill_system::discovery::builtin_skills_info();
+        let builtins = agent::agent_profile::builtin_agents();
         let mut profiles: Vec<AgentProfileSummary> = Vec::new();
 
         for bi in &builtins {
@@ -51,16 +51,16 @@ impl AppCore {
                 has_override,
             }];
 
-            for reference in &bi.references {
+            for skill in &bi.skills {
                 let ref_override = skills_dir
                     .join(bi.name)
                     .join("references")
-                    .join(format!("{}.md", reference.name))
+                    .join(format!("{}.md", skill.name))
                     .exists();
                 files.push(AgentFileSummary {
-                    filename: format!("references/{}.md", reference.name),
-                    display_name: reference.name.to_string(),
-                    description: extract_description(reference.content),
+                    filename: format!("references/{}.md", skill.name),
+                    display_name: skill.name.to_string(),
+                    description: extract_description(skill.content),
                     is_builtin: true,
                     has_override: ref_override,
                 });
@@ -80,7 +80,7 @@ impl AppCore {
                             .and_then(|s| s.to_str())
                             .unwrap_or("unknown");
                         // Skip if already in built-in list
-                        if bi.references.iter().any(|r| r.name == stem) {
+                        if bi.skills.iter().any(|r| r.name == stem) {
                             continue;
                         }
                         let content = tokio::fs::read_to_string(&path).await.unwrap_or_default();
@@ -204,7 +204,7 @@ impl AppCore {
         }
 
         // Fall back to built-in
-        let builtins = skill_system::discovery::builtin_skills_info();
+        let builtins = agent::agent_profile::builtin_agents();
         let bi = builtins.iter().find(|b| b.name == agent_name);
 
         if let Some(bi) = bi {
@@ -219,11 +219,11 @@ impl AppCore {
             // references/foo.md
             if let Some(stripped) = filename.strip_prefix("references/") {
                 let ref_name = stripped.strip_suffix(".md").unwrap_or(stripped);
-                if let Some(reference) = bi.references.iter().find(|r| r.name == ref_name) {
+                if let Some(skill) = bi.skills.iter().find(|s| s.name == ref_name) {
                     return Ok(AgentFileContent {
                         agent_name: agent_name.to_string(),
                         filename: filename.to_string(),
-                        content: reference.content.to_string(),
+                        content: skill.content.to_string(),
                         is_builtin: true,
                     });
                 }

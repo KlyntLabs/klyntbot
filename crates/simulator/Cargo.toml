@@ -13,7 +13,6 @@ context_engine.workspace = true
 autotuner.workspace = true
 session.workspace = true
 scheduling.workspace = true
-skill-system.workspace = true
 providers.workspace = true
 feature-tasks.workspace = true
 feature-notes.workspace = true

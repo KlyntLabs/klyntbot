@@ -3,7 +3,7 @@
 //! This crate provides the AgentLoop and related agent functionality.
 //!
 //! - `adapters/` — trait implementations bridging lower-layer contracts
-//! - Core modules: agent_loop, agent_runtime, intent_pipeline, execution, etc.
+//! - Core modules: agent_loop, agent_runtime, execution, etc.
 
 // ── Grouped modules ─────────────────────────────────────────────────────────
 pub mod adapters;
@@ -18,13 +18,13 @@ pub mod agent_runtime;
 pub mod confidence;
 pub mod content_registry;
 pub mod context_sources;
+pub mod engines;
 pub mod enrichment;
 pub mod events;
 #[cfg(test)]
 mod events_tests;
 pub mod execution;
 pub mod handlers;
-pub mod intent_pipeline;
 pub mod learning;
 #[cfg(test)]
 mod notes_integration_tests;

@@ -314,7 +314,7 @@ impl AppCore {
                                  --- NOTE: {title} ---\n{body}\n--- END NOTE ---\n\n\
                                  --- ANALYSIS ---\n{tab}\n--- END ANALYSIS ---"
                             );
-                            let system_prompt = agent::intent_pipeline::engines::debate::build_persona_system_prompt(
+                            let system_prompt = agent::engines::debate::build_persona_system_prompt(
                                 &base_prompt,
                                 &persona,
                                 None,

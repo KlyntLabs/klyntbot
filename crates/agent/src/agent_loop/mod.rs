@@ -89,10 +89,8 @@ pub struct AgentLoop {
     pub(crate) _tree_builder_token: Option<CancellationToken>,
     /// Activity ingestion service for chat message logging.
     pub(crate) activity_svc: Option<Arc<activity_log::ActivityIngestionService>>,
-    /// Shared skill catalog — used for hot-reload of skill packages.
-    pub(crate) skill_catalog: Arc<RwLock<skill_system::types::SkillCatalog>>,
-    /// Shared skill router — rebuilt after reload.
-    pub(crate) skill_router: Arc<RwLock<skill_system::router::SkillRouter>>,
+    /// Shared skill store — flat file-based skill loading, used for hot-reload.
+    pub(crate) skill_store: Arc<RwLock<skill_system::SkillStore>>,
     /// Shared embedding engine — reused for hot-reload embedding recomputation.
     pub(crate) embedding_engine: Arc<tools::EmbeddingEngine>,
     /// Shared hot-reloadable config — updated by ConfigWatcherService without restart.
@@ -106,10 +104,10 @@ impl AgentLoop {
         Arc::clone(&self.tool_registry)
     }
 
-    /// Public accessor for the skill catalog.
+    /// Public accessor for the skill store.
     /// Used by `klyntbot-server` to expose active skills via MCP resources.
-    pub fn skill_catalog(&self) -> Arc<RwLock<skill_system::types::SkillCatalog>> {
-        Arc::clone(&self.skill_catalog)
+    pub fn skill_store(&self) -> Arc<RwLock<skill_system::SkillStore>> {
+        Arc::clone(&self.skill_store)
     }
 
     /// Public accessor for the shared hot-reloadable config.
@@ -117,36 +115,11 @@ impl AgentLoop {
         Arc::clone(&self.hot_config)
     }
 
-    /// Reload skill packages from workspace (hot-reload after UI edits).
+    /// Reload skill files from disk (hot-reload after UI edits).
     pub async fn reload_agents(&self) -> common::Result<()> {
-        // Re-discover skills from all sources
-        let data_dir_path = self.config.data_dir_path();
-        let mut sources = vec![skill_system::discovery::SkillSource::BuiltIn(
-            skill_system::discovery::BUILTIN_SKILLS
-                .iter()
-                .map(|(n, c)| (n.to_string(), c.to_string()))
-                .collect(),
-        )];
-        let user_skills_dir = data_dir_path.join("skills");
-        if user_skills_dir.exists() {
-            sources.push(skill_system::discovery::SkillSource::Directory(
-                user_skills_dir,
-                skill_system::types::SkillScope::User,
-            ));
-        }
-        let mut new_catalog = skill_system::types::SkillCatalog::discover(&sources).await?;
-
-        // Recompute embeddings for the new catalog using the shared engine
-        let engine = Arc::clone(&self.embedding_engine);
-        let embed_fn: skill_system::types::EmbedFn = Arc::new(move |text: &str| engine.embed(text));
-        new_catalog.precompute_embeddings(&embed_fn).await;
-
-        let new_router = skill_system::router::SkillRouter::new(&new_catalog);
-
-        let mut catalog = self.skill_catalog.write().await;
-        *catalog = new_catalog;
-        let mut router = self.skill_router.write().await;
-        *router = new_router;
+        let mut store = self.skill_store.write().await;
+        store.reload()?;
+        info!("Skills reloaded ({} skills)", store.names().len());
         Ok(())
     }
 
@@ -162,7 +135,7 @@ impl AgentLoop {
         };
 
         if let Some(ref strategy_repo) = self.strategy_repo {
-            let window_minutes = self.config.orchestrator.satisfaction_window_minutes as i64;
+            let window_minutes: i64 = 30; // Default satisfaction window
             let since = chrono::Utc::now() - chrono::Duration::minutes(window_minutes);
             match strategy_repo
                 .set_satisfaction_for_chat(msg.chat_id.as_str(), since, score)
@@ -911,20 +884,10 @@ impl AgentLoop {
         routing_ctx: &RoutingContext,
         event_tx: Option<tokio::sync::mpsc::Sender<AgentEvent>>,
         cancel_token: Option<CancellationToken>,
-        correction: Option<context_engine::CorrectionContext>,
+        _correction: Option<context_engine::CorrectionContext>,
     ) -> Result<String> {
-        let system_prompt = self
-            .context_engine
-            .build_system_prompt(
-                routing_ctx.channel.as_str(),
-                routing_ctx.chat_id.as_str(),
-                Some(content),
-            )
-            .await;
-
         let history_messages = Self::convert_history(&history);
-        let (tool_defs, tool_names) = self.get_tool_info().await;
-        let tool_name_refs: Vec<&str> = tool_names.iter().map(|s| s.as_str()).collect();
+        let (tool_defs, _tool_names) = self.get_tool_info().await;
 
         let result = self
             .runtime
@@ -932,12 +895,9 @@ impl AgentLoop {
                 content,
                 history_messages,
                 &tool_defs,
-                &tool_name_refs,
                 routing_ctx,
-                Some(&system_prompt),
                 event_tx.clone(),
                 cancel_token,
-                correction,
                 crate::execution::DepthMode::Normal,
             )
             .await?;

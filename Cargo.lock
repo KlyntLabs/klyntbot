@@ -12145,7 +12145,6 @@ dependencies = [
  "serde",
  "serde_json",
  "session",
- "skill-system",
  "sqlx",
  "storage",
  "tempfile",

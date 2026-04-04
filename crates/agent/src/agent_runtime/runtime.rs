@@ -1,162 +1,95 @@
-//! AgentRuntime — agent-first execution pipeline.
+//! AgentRuntime — flat 3-phase execution pipeline.
 //!
-//! 6-phase flow: Route → Prepare → Execute (budget-bounded) → Enrich → Record → Adapt
+//! 3-phase flow: Prepare → Execute (budget-bounded) → Record
+//! All tools available to every message. No routing, no classification, no delegation.
 
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
-use bus::DomainEventBus;
-use common::{helpers::tool_def_name, Result};
+use common::Result;
 use context_engine::{ContextEngine, ContextRequest, ExecutionStrategy};
 use providers::Message;
-use skill_system::types::{SkillCatalog, SkillPackage};
 use tokio::sync::RwLock;
 use tools::RoutingContext;
-use tracing::{debug, warn};
+use tracing::warn;
 
-use super::scenario;
 use crate::autotuner::hooks::AutoTunerHook;
 use crate::events::AgentEvent;
-
 use crate::execution::{execute_loop, DepthMode, ExecutionBudget, ExecutionParams};
-use crate::intent_pipeline::analysis::IntentAnalyzer;
-use crate::intent_pipeline::types::IntentAnalysis;
-use crate::intent_pipeline::types::PipelineConfig;
 use crate::output::cost_tracker::CostTracker;
 use crate::output::validator::{ResponseValidator, ValidationResult};
 
-/// Default maximum delegation depth to prevent infinite loops.
-const MAX_DELEGATION_DEPTH: u32 = 2;
-
-/// The agent used as orchestrator for multi-agent requests.
-const ORCHESTRATOR_AGENT: &str = "general";
-
-/// Tools allowed for the orchestrator (in addition to `delegate`, which is injected separately).
-const ORCHESTRATOR_ALLOWED_TOOLS: &[&str] = &[tools::ask_user::ASK_USER_TOOL_NAME, "memory"];
-
 /// Result of processing a message through the agent runtime.
-/// Same structure as `PipelineResult` for compatibility during migration.
 #[derive(Debug)]
 pub struct RuntimeResult {
-    /// The final response content.
     pub content: String,
-    /// Which execution mode actually produced the result.
     pub mode_used: String,
-    /// Full intent analysis from the classifier.
-    pub classification: IntentAnalysis,
-    /// Validation warnings (if any).
     pub validation: ValidationResult,
-    /// Name of the agent that handled this message.
     pub agent_name: String,
-    /// Total turns executed in the loop.
     pub turns: u32,
-    /// Whether the budget was exhausted (vs natural completion).
     pub budget_exhausted: bool,
-    /// All tool calls made during execution.
     pub tool_calls: Vec<String>,
 }
 
-/// Agent-driven runtime that replaces IntentPipeline.
+/// Flat agent runtime — all tools available to every message.
 ///
-/// The key difference: agent selection happens first, and the agent profile
-/// shapes everything downstream (system prompt, tool filtering, iteration budget).
+/// Replaces the routed/delegated pipeline with a simple 3-phase flow:
+/// 1. Prepare (context assembly)
+/// 2. Execute (budget-bounded loop)
+/// 3. Record (usage + interaction)
 pub struct AgentRuntime {
-    skill_catalog: Arc<RwLock<SkillCatalog>>,
-    skill_router: Arc<RwLock<skill_system::router::SkillRouter>>,
-    analyzer: IntentAnalyzer,
     context_engine: Arc<ContextEngine>,
     core: Arc<crate::execution::ExecutionCore>,
     validator: ResponseValidator,
     cost_tracker: Arc<CostTracker>,
-    config: PipelineConfig,
-    strategy_repo: Option<storage::StrategyRepo>,
-    confidence_evaluator: Option<Arc<crate::confidence::ConfidenceEvaluator>>,
-    /// Shared with SkillContextSource — written here, read during context assembly.
-    active_profile: Arc<RwLock<Option<Arc<SkillPackage>>>>,
-    /// Records interactions for behavioral pattern analysis.
+    execution_model: String,
+    provider_name: String,
+    context_window: usize,
+    max_response_tokens: usize,
     interaction_recorder: Option<crate::learning::InteractionRecorder>,
-    /// Procedural rules repo for transparency (L5 cognitive rules).
     procedural_rule_repo: Option<cognitive::ProceduralRuleRepo>,
-    /// Tool registry for looking up tool definitions during delegation.
     tool_registry: Option<Arc<RwLock<tools::registry::ToolRegistry>>>,
-    /// Self-reference for delegation handler (set after Arc construction via OnceLock).
-    delegation_self_ref: std::sync::OnceLock<Arc<dyn tools::DelegationHandler>>,
-    /// Event sender for transparency events during delegation (set per-message).
-    current_event_tx: RwLock<Option<tokio::sync::mpsc::Sender<AgentEvent>>>,
-    /// AutoTuner hook — runs shadow classification and records ground truth.
     autotuner_hook: Option<Arc<dyn AutoTunerHook>>,
-    /// Shared user situation for building RetrievalContext.
     user_situation: Option<Arc<tokio::sync::Mutex<cognitive::situation::UserSituation>>>,
-    /// Task repo for querying the focused task (active_task in RetrievalContext).
     task_repo: Option<storage::TaskRepo>,
-    /// Shared active desktop view for query rewriting context.
     active_view: Option<Arc<tokio::sync::RwLock<Option<context_engine::ActiveView>>>>,
-    /// Shared activated skills — written per-message, read by SkillContextSource.
-    activated_skills: Option<Arc<tokio::sync::RwLock<Vec<Arc<SkillPackage>>>>>,
-    /// Embedding engine for generating query embeddings (semantic skill routing).
-    embedding_engine: Option<Arc<tools::EmbeddingEngine>>,
-    /// Domain event bus for publishing cross-feature events (e.g. SkillRouted).
-    domain_event_bus: Option<Arc<DomainEventBus>>,
-    /// Shared hot-reloadable config — read per-message for model, temperature, iterations.
     hot_config: Arc<RwLock<config::HotConfig>>,
-    /// Shared context update queue for live context refresher.
     context_update_queue: Option<Arc<bus::ContextUpdateQueue>>,
 }
 
 impl AgentRuntime {
-    #[allow(clippy::too_many_arguments)]
     pub fn new(
-        skill_catalog: Arc<RwLock<SkillCatalog>>,
-        skill_router: Arc<RwLock<skill_system::router::SkillRouter>>,
-        analyzer: IntentAnalyzer,
         context_engine: Arc<ContextEngine>,
         core: Arc<crate::execution::ExecutionCore>,
         cost_tracker: Arc<CostTracker>,
-        config: PipelineConfig,
-        active_profile: Arc<RwLock<Option<Arc<SkillPackage>>>>,
+        execution_model: String,
+        provider_name: String,
+        context_window: usize,
+        max_response_tokens: usize,
         hot_config: Arc<RwLock<config::HotConfig>>,
     ) -> Self {
         Self {
-            skill_catalog,
-            skill_router,
-            analyzer,
             context_engine,
             core,
-            validator: ResponseValidator::new(config.max_response_tokens),
+            validator: ResponseValidator::new(max_response_tokens),
             cost_tracker,
-            config,
-            strategy_repo: None,
-            confidence_evaluator: None,
-            active_profile,
+            execution_model,
+            provider_name,
+            context_window,
+            max_response_tokens,
             interaction_recorder: None,
             procedural_rule_repo: None,
             tool_registry: None,
-            delegation_self_ref: std::sync::OnceLock::new(),
-            current_event_tx: RwLock::new(None),
             autotuner_hook: None,
             user_situation: None,
             task_repo: None,
             active_view: None,
-            activated_skills: None,
-            embedding_engine: None,
-            domain_event_bus: None,
             hot_config,
             context_update_queue: None,
         }
     }
 
-    pub fn with_strategy_repo(mut self, repo: storage::StrategyRepo) -> Self {
-        self.strategy_repo = Some(repo);
-        self
-    }
-
-    pub fn with_confidence_evaluator(
-        mut self,
-        evaluator: Arc<crate::confidence::ConfidenceEvaluator>,
-    ) -> Self {
-        self.confidence_evaluator = Some(evaluator);
-        self
-    }
+    // ── Builder methods ─────────────────────────────────────────
 
     pub fn with_interaction_recorder(
         mut self,
@@ -171,7 +104,6 @@ impl AgentRuntime {
         self
     }
 
-    /// Set the tool registry for delegation support.
     pub fn with_tool_registry(
         mut self,
         registry: Arc<RwLock<tools::registry::ToolRegistry>>,
@@ -180,13 +112,11 @@ impl AgentRuntime {
         self
     }
 
-    /// Set the autotuner hook for shadow classification callbacks.
     pub fn with_autotuner_hook(mut self, hook: Arc<dyn AutoTunerHook>) -> Self {
         self.autotuner_hook = Some(hook);
         self
     }
 
-    /// Set the shared user situation for building RetrievalContext.
     pub fn with_user_situation(
         mut self,
         sit: Arc<tokio::sync::Mutex<cognitive::situation::UserSituation>>,
@@ -195,13 +125,11 @@ impl AgentRuntime {
         self
     }
 
-    /// Set the task repo for querying the focused task during query rewriting.
     pub fn with_task_repo(mut self, repo: storage::TaskRepo) -> Self {
         self.task_repo = Some(repo);
         self
     }
 
-    /// Set the shared active desktop view for RetrievalContext.
     pub fn with_active_view(
         mut self,
         view: Arc<tokio::sync::RwLock<Option<context_engine::ActiveView>>>,
@@ -210,556 +138,145 @@ impl AgentRuntime {
         self
     }
 
-    /// Set the shared activated skills for per-message skill activation.
-    pub fn with_activated_skills(
-        mut self,
-        skills: Arc<tokio::sync::RwLock<Vec<Arc<SkillPackage>>>>,
-    ) -> Self {
-        self.activated_skills = Some(skills);
-        self
-    }
-
-    /// Set the embedding engine for semantic skill routing.
-    pub fn with_embedding_engine(mut self, engine: Arc<tools::EmbeddingEngine>) -> Self {
-        self.embedding_engine = Some(engine);
-        self
-    }
-
-    /// Set the domain event bus for publishing SkillRouted and other cross-feature events.
-    pub fn with_domain_bus(mut self, bus: Arc<DomainEventBus>) -> Self {
-        self.domain_event_bus = Some(bus);
-        self
-    }
-
-    /// Set the context update queue for live context refresher.
     pub fn with_context_update_queue(mut self, queue: Arc<bus::ContextUpdateQueue>) -> Self {
         self.context_update_queue = Some(queue);
         self
     }
 
-    /// Set the self-reference for delegation support (called after Arc wrapping).
-    pub fn set_delegation_self_ref(&self, handler: Arc<dyn tools::DelegationHandler>) {
-        let _ = self.delegation_self_ref.set(handler);
+    // ── Accessors ───────────────────────────────────────────────
+
+    pub fn tool_registry(&self) -> Option<&Arc<RwLock<tools::registry::ToolRegistry>>> {
+        self.tool_registry.as_ref()
     }
 
-    /// Get the shared active profile handle (for SkillContextSource).
-    pub fn active_profile_handle(&self) -> Arc<RwLock<Option<Arc<SkillPackage>>>> {
-        Arc::clone(&self.active_profile)
-    }
+    // ── Main pipeline ───────────────────────────────────────────
 
-    /// Get the shared skill catalog handle (for reload, delegation lookups, etc.).
-    pub fn skill_catalog_handle(&self) -> Arc<RwLock<SkillCatalog>> {
-        Arc::clone(&self.skill_catalog)
-    }
-
-    /// Get the shared skill router handle.
-    pub fn skill_router_handle(&self) -> Arc<RwLock<skill_system::router::SkillRouter>> {
-        Arc::clone(&self.skill_router)
-    }
-
-    /// Process a user message through the agent runtime.
-    ///
-    /// 1. Match message to agent profile
-    /// 2. Set active profile (read by AgentContextSource during context assembly)
-    /// 3. Classify intent (heuristics → LLM classifier)
-    /// 4. Override max_iterations from agent profile
-    /// 5. Confidence check
-    /// 6. Assemble context (includes agent instructions via AgentContextSource)
-    /// 7. Filter tools based on agent profile (not ToolGroup)
-    /// 8. Execute via router
-    /// 9. Validate response
-    /// 10. Record usage + strategy
-    #[allow(clippy::too_many_arguments)]
     pub async fn process_message(
         &self,
         message: &str,
         history: Vec<Message>,
-        tool_definitions: &[serde_json::Value],
-        tool_names: &[&str],
+        tool_definitions: &[serde_json::Value], // ALL tools, unfiltered
         ctx: &RoutingContext,
-        system_prompt: Option<&str>,
         event_tx: Option<tokio::sync::mpsc::Sender<AgentEvent>>,
         cancel_token: Option<tokio_util::sync::CancellationToken>,
-        correction: Option<context_engine::CorrectionContext>,
         depth: DepthMode,
     ) -> Result<RuntimeResult> {
         let pipeline_start = Instant::now();
+        let hot = self.hot_config.read().await;
+        let safety_timeout_secs = hot.safety_timeout_secs;
+        drop(hot);
 
-        // Read only the hot-reloadable timeout (avoids cloning the full HotConfig with its String fields)
-        let hot_timeout_secs = self.hot_config.read().await.safety_timeout_secs;
-
-        // Emit pipeline start immediately for frontend progress indication
+        // Emit pipeline start
         if let Some(ref tx) = event_tx {
             let _ = tx.send(AgentEvent::PipelineStarted).await;
         }
 
-        // Step 0a: AutoTuner hook — shadow classification before live processing.
-        if let Some(ref hook) = self.autotuner_hook {
-            hook.on_message_received(message, ctx.chat_id.as_str())
-                .await;
-        }
-
-        // Step 0b: Generate query embedding for semantic skill routing
-        let query_embedding: Vec<f32> = if let Some(ref engine) = self.embedding_engine {
-            engine
-                .clone()
-                .embed_async(message.to_string())
-                .await
-                .unwrap_or_default()
-        } else {
-            vec![]
-        };
-
-        // Step 1: Match message to orchestrator skill via SkillRouter
-        // Lazily precompute skill embeddings on first message (avoids loading
-        // the ONNX model at startup).
-        if let Some(ref engine) = self.embedding_engine {
-            let engine_clone = Arc::clone(engine);
-            let embed_fn: skill_system::types::EmbedFn =
-                Arc::new(move |text: &str| engine_clone.embed(text));
-            self.skill_catalog
-                .write()
-                .await
-                .ensure_embeddings(&embed_fn)
-                .await;
-        }
-        let mut profile = {
-            let catalog = self.skill_catalog.read().await;
-            let router = self.skill_router.read().await;
-            let champion_params = self
-                .autotuner_hook
-                .as_ref()
-                .and_then(|h| h.current_champion_params());
-            let (kw_w, sem_w) = champion_params
-                .as_ref()
-                .map(|p| (p.skill_keyword_weight, p.skill_semantic_weight))
-                .unwrap_or((None, None));
-            Arc::clone(router.select_orchestrator_blended(
-                message,
-                &query_embedding,
-                &catalog,
-                kw_w,
-                sem_w,
-            ))
-        };
-        let mut agent_name = profile.name.clone();
-        debug!("AgentRuntime: matched skill '{}'", agent_name);
-
-        // Emit agent selection event for transparency
-        if let Some(ref tx) = event_tx {
-            let _ = tx
-                .send(AgentEvent::AgentSelected {
-                    name: profile.name.clone(),
-                    description: profile.description.clone(),
-                })
-                .await;
-
-            // Emit always-loaded skill references
-            for skill_name in profile.always_skills() {
-                let _ = tx
-                    .send(AgentEvent::SkillLoaded {
-                        name: skill_name.clone(),
-                        trigger: "always".to_string(),
-                        agent: Some(profile.name.clone()),
-                    })
-                    .await;
-            }
-        }
-
-        // Step 2: Set active profile for AgentContextSource
-        {
-            let mut guard = self.active_profile.write().await;
-            *guard = Some(Arc::clone(&profile));
-        }
-
-        // Step 2a: Activate per-message skills (keyword + semantic)
-        if let Some(ref activated_skills) = self.activated_skills {
-            let catalog = self.skill_catalog.read().await;
-            let router = self.skill_router.read().await;
-            let activated = router.activate_skills(message, &query_embedding, &catalog, None);
-            if !activated.is_empty() {
-                let mut lock = activated_skills.write().await;
-                lock.clear();
-                for skill in activated {
-                    lock.push(Arc::clone(skill));
-                }
-            }
-        }
-
-        // Step 3: Filter MCP tool names to those the matched agent can access
-        let filtered_tool_names: Vec<&str> = tool_names
-            .iter()
-            .filter(|name| {
-                match mcp::sanitize::extract_server_name(name) {
-                    Some(server) => profile.allows_mcp_server(server),
-                    None => true, // Native tools pass through (filtered separately by profile.tools)
-                }
-            })
-            .copied()
-            .collect();
-
-        // Step 3c: Spawn memory pre-fetch concurrently with classification.
-        // Build a preliminary RetrievalContext using the initial profile (pre-orchestration
-        // override). For ~95% of messages this is identical to the final one.
-        let prefetch_retrieval_ctx = self
-            .build_retrieval_context(&profile.name, &history, correction.clone())
-            .await;
-        let prefetch_retrieval_ctx_for_spawn = prefetch_retrieval_ctx.clone();
-        let prefetch_engine = Arc::clone(&self.context_engine);
-        let prefetch_message = message.to_string();
-        let prefetch_session_key =
-            Some(common::SessionKey::new(&ctx.channel, &ctx.chat_id).to_string());
-        let prefetch_handle = tokio::spawn(async move {
-            prefetch_engine
-                .prefetch_memory(
-                    &prefetch_message,
-                    prefetch_session_key,
-                    prefetch_retrieval_ctx_for_spawn,
-                )
-                .await
-        });
-
-        // Step 4: Classify intent
-        let classify_start = Instant::now();
-        let mut analysis = self.analyzer.analyze(message, &filtered_tool_names).await;
-        let classify_ms = classify_start.elapsed().as_millis() as u64;
-        debug!(
-            "AgentRuntime: classified as {:?} (source: {:?}, confidence: {:.2})",
-            analysis.complexity, analysis.source, analysis.confidence
-        );
-
-        if let Some(ref tx) = event_tx {
-            let _ = tx
-                .send(AgentEvent::ClassificationComplete {
-                    strategy: analysis.complexity.to_string(),
-                    confidence: analysis.confidence,
-                    source: format!("{:?}", analysis.source),
-                    duration_ms: classify_ms,
-                })
-                .await;
-        }
-
-        // Step 3b: Orchestration override — route multi-agent intents to orchestrator.
-        // Only redirect to general when the router selected it as fallback.
-        // Domain specialists (task-management, finance-management, etc.) keep their
-        // tools and instructions — they can delegate via DelegationTool when needed.
-        // Overriding a domain specialist to general strips its tools, causing the
-        // LLM to report "tools aren't available" for domain-specific requests.
-        if analysis.needs_orchestration && agent_name == ORCHESTRATOR_AGENT {
-            let general = {
-                let catalog = self.skill_catalog.read().await;
-                catalog.get(ORCHESTRATOR_AGENT).cloned()
-            };
-            if let Some(general) = general {
-                debug!(
-                    "Orchestration override: routing '{}' → {} agent",
-                    agent_name, ORCHESTRATOR_AGENT
-                );
-                profile = general;
-                agent_name = ORCHESTRATOR_AGENT.to_string();
-
-                // Update active profile
-                {
-                    let mut guard = self.active_profile.write().await;
-                    *guard = Some(Arc::clone(&profile));
-                }
-
-                // Emit updated agent selection so the UI reflects the orchestrator
-                if let Some(ref tx) = event_tx {
-                    let _ = tx
-                        .send(AgentEvent::AgentSelected {
-                            name: profile.name.clone(),
-                            description: profile.description.clone(),
-                        })
-                        .await;
-                }
-
-                // Ensure at least Moderate complexity for orchestration
-                if matches!(
-                    analysis.complexity,
-                    crate::intent_pipeline::types::ComplexityLevel::Simple
-                ) {
-                    analysis.complexity = crate::intent_pipeline::types::ComplexityLevel::Moderate;
-                }
-            }
-        } else if analysis.needs_orchestration {
-            // Domain specialist already selected — clear the flag so downstream
-            // tool filtering uses the specialist's tool allowlist, not the
-            // bare orchestrator set (ask_user + memory only).
-            debug!(
-                "Orchestration override skipped: domain specialist '{}' already selected",
-                agent_name
-            );
-            analysis.needs_orchestration = false;
-        }
-
-        // Emit SkillRouted domain event for Mirror self-reflection layer.
-        // Placed after orchestration override so agent_name reflects the final routing.
-        if let Some(ref domain_bus) = self.domain_event_bus {
-            domain_bus.publish(bus::DomainEvent::SkillRouted {
-                skill_name: agent_name.clone(),
-                confidence: analysis.confidence as f64,
-                source: format!("{:?}", analysis.source),
-                trigger_phrases: vec![],
-                session_key: common::SessionKey::new(&ctx.channel, &ctx.chat_id).to_string(),
-            });
-        }
-
-        // Step 5: Confidence check — downgrade to Simple for low-confidence
-        // instead of blocking the user with a technical clarification message.
-        if let Some(ref evaluator) = self.confidence_evaluator {
-            let threshold = evaluator.threshold();
-            if analysis.confidence < threshold {
-                debug!(
-                    "AgentRuntime: low confidence ({:.2} < {:.2}), downgrading to Simple",
-                    analysis.confidence, threshold
-                );
-                analysis.complexity = crate::intent_pipeline::types::ComplexityLevel::Simple;
-            }
-        }
-
-        // Step 5.5: Reuse the preliminary retrieval context when the profile didn't change
-        // (no orchestration override). Only rebuild when the profile was swapped.
-        let retrieval_context = if analysis.needs_orchestration {
-            self.build_retrieval_context(&profile.name, &history, correction)
-                .await
-        } else {
-            prefetch_retrieval_ctx
-        };
-
-        // Step 6: Assemble context (AgentContextSource injects agent instructions + skills)
-        // Await the pre-fetched memory from the concurrent task spawned in Step 3c.
-        // If orchestration override changed the profile, the prefetch used the
-        // wrong RetrievalContext — discard it and let assemble do a fresh retrieval.
-        let prefetched_memory = if analysis.needs_orchestration {
-            prefetch_handle.abort();
-            None
-        } else {
-            prefetch_handle.await.ok().flatten()
-        };
-
-        let prompt = system_prompt.unwrap_or(&self.config.system_prompt);
-        let strategy = ExecutionStrategy::from(&analysis.complexity);
+        // ── Phase 1: Prepare ─────────────────────────────────────
+        let retrieval_context = self.build_retrieval_context(&history).await;
 
         let context_request = ContextRequest {
             message_text: message.to_string(),
             history,
-            system_prompt: prompt.to_string(),
-            strategy,
+            system_prompt: String::new(), // Built by ContextSources (SoulContextSource + SkillListingSource)
+            strategy: ExecutionStrategy::ToolAssisted { max_iterations: 30 },
             tool_definitions: tool_definitions.to_vec(),
-            context_window: self.config.context_window,
+            context_window: self.context_window,
             session_key: Some(common::SessionKey::new(&ctx.channel, &ctx.chat_id).to_string()),
             retrieval_context,
         };
-        let assemble_start = Instant::now();
-        let assembled = self
-            .context_engine
-            .assemble_with_prefetched(context_request, prefetched_memory)
-            .await;
-        let assemble_ms = assemble_start.elapsed().as_millis() as u64;
 
-        debug!(
-            "AgentRuntime: assembled context with {} messages, {} tokens",
-            assembled.messages.len(),
-            assembled.token_count
-        );
+        let assemble_start = Instant::now();
+        let assembled = self.context_engine.assemble(context_request).await;
+        let assemble_ms = assemble_start.elapsed().as_millis() as u64;
 
         if let Some(ref tx) = event_tx {
             let _ = tx
                 .send(AgentEvent::ContextAssembled {
                     total_tokens: assembled.token_count,
-                    budget: self.config.context_window,
+                    budget: self.context_window,
                     duration_ms: assemble_ms,
                 })
                 .await;
         }
 
-        // Emit learning context summaries for transparency
+        // Emit learning context summaries
         if let Some(ref tx) = event_tx {
             self.emit_learning_summary(tx).await;
         }
 
-        // Step 7: Filter tools based on agent profile (replaces ToolGroup filtering)
-        // When orchestrating, restrict to coordination-only tools (delegate is added in 7b).
-        let mut filtered_tools = if analysis.needs_orchestration {
-            tool_definitions
-                .iter()
-                .filter(|t| {
-                    tool_def_name(t)
-                        .map(|n| ORCHESTRATOR_ALLOWED_TOOLS.contains(&n))
-                        .unwrap_or(false)
-                })
-                .cloned()
-                .collect()
-        } else {
-            filter_tools_for_profile(tool_definitions, &profile)
-        };
+        // Create budget
+        let mut budget = ExecutionBudget::new(depth, "general");
 
-        // Step 7b: Add DelegationTool if agent can delegate and depth allows
-        inject_delegation_tool(
-            &profile,
-            ctx.delegation_depth,
-            &self.delegation_self_ref,
-            &self.tool_registry,
-            &mut filtered_tools,
-        )
-        .await;
-
-        debug!(
-            "AgentRuntime: filtered {} → {} tools (agent: {})",
-            tool_definitions.len(),
-            filtered_tools.len(),
-            agent_name
-        );
-
-        // Store event_tx for delegation transparency events
-        *self.current_event_tx.write().await = event_tx.clone();
-
-        // Step 7c: Chain-of-thought planning for complex tasks
-        // Threshold 4: triggers for multi-step requests (3+ tools + sequential deps)
-        const COT_COMPLEXITY_THRESHOLD: u8 = 4;
-        let complexity_score = analysis.signals.complexity_score();
-
-        let planning_prompt = match analysis.complexity {
-            crate::intent_pipeline::types::ComplexityLevel::Simple => None,
-            _ if analysis.signals.has_hypothetical => {
-                // Scenario reasoning — use specialized prompt
-                Some(scenario::build_scenario_prompt(
-                    message,
-                    &filtered_tools,
-                    self.config.scenario_max_graph_depth,
-                ))
-            }
-            _ if complexity_score >= COT_COMPLEXITY_THRESHOLD => {
-                Some(build_planning_prompt(message, &filtered_tools))
-            }
-            _ => None,
-        };
-
-        if planning_prompt.is_some() {
-            if let Some(ref tx) = event_tx {
-                let _ = tx
-                    .send(AgentEvent::PlanningStarted { complexity_score })
-                    .await;
-            }
-        }
-
-        // ── Phase 3: Execute (budget-bounded) ────────────────────────────────
-        let skill_name = &agent_name;
-        let mut budget = ExecutionBudget::new(depth, skill_name);
-
-        if let Some(ref tx) = event_tx {
-            let _ = tx
-                .send(AgentEvent::ExecutionStarted {
-                    engine: format!("execute_loop/{}", depth),
-                    max_iterations: budget.max_turns() as usize,
-                })
-                .await;
-        }
-
-        let mut params = ExecutionParams::new(&self.config.execution_model)
+        // Build execution params
+        let mut params = ExecutionParams::new(&self.execution_model)
+            .with_max_iterations(budget.max_turns())
             .with_original_message(message.to_string())
-            .with_context_window(self.config.context_window);
+            .with_context_window(self.context_window);
 
         if let Some(token) = cancel_token {
             params = params.with_cancel_token(token);
-        }
-        if let Some(prompt) = planning_prompt {
-            params = params.with_planning_prompt(prompt);
         }
         if let Some(ref queue) = self.context_update_queue {
             params = params.with_context_update_queue(Arc::clone(queue));
         }
 
-        let retrieved_memory_count = assembled.retrieved_memory_count;
-        let rewrite_triggered = assembled.rewrite_triggered;
-        let rewrite_source = assembled.rewrite_source.clone();
+        // ── Phase 2: Execute ─────────────────────────────────────
+        let safety_timeout = Duration::from_secs(safety_timeout_secs.max(1));
 
-        // Safety timeout wraps the entire execution (0 = disabled)
-        let execute_fut = execute_loop(
-            &self.core,
-            assembled.messages,
-            &filtered_tools,
-            &params,
-            &mut budget,
-            ctx,
-            event_tx.clone(),
-        );
+        let loop_result = tokio::time::timeout(
+            safety_timeout,
+            execute_loop(
+                &self.core,
+                assembled.messages,
+                tool_definitions, // ALL tools, flat
+                &params,
+                &mut budget,
+                ctx,
+                event_tx.clone(),
+            ),
+        )
+        .await
+        .map_err(|_| {
+            common::KlyntbotError::Timeout(format!(
+                "Safety timeout ({safety_timeout_secs}s) — this is a bug, please report it"
+            ))
+        })??;
 
-        let loop_result = if hot_timeout_secs > 0 {
-            let safety_timeout = Duration::from_secs(hot_timeout_secs);
-            tokio::time::timeout(safety_timeout, execute_fut)
-                .await
-                .map_err(|_| {
-                    common::KlyntbotError::Timeout(format!(
-                        "Safety timeout ({}s) — this is a bug, please report it",
-                        hot_timeout_secs
-                    ))
-                })??
-        } else {
-            execute_fut.await?
-        };
-
-        // Clear event_tx to prevent stale state across calls
-        *self.current_event_tx.write().await = None;
-
-        // Phase 4: Enrich (async, depth-gated) — wired by AppCore, not here.
-
-        // Step 9: Validate
-        let mut validation = self.validator.validate(&loop_result.content);
-        if !validation.is_valid {
-            warn!(
-                "AgentRuntime: response validation failed with {} warning(s)",
-                validation.warnings.len()
-            );
-        }
-
+        // ── Phase 3: Record ──────────────────────────────────────
         let mode_name = depth.to_string();
-
-        // Step 10: Record usage + strategy + interaction in parallel (independent DB writes)
+        let mut validation = self.validator.validate(&loop_result.content);
         let pipeline_elapsed_ms = pipeline_start.elapsed().as_millis() as u64;
-        let usage_fut = self.record_usage(
+
+        // Record usage
+        self.record_usage(
             &loop_result.usage,
             &mode_name,
             ctx,
             &event_tx,
             pipeline_elapsed_ms,
-        );
-        let strategy_fut = self.record_strategy(
-            &analysis,
-            &mode_name,
-            loop_result.turns as usize,
-            loop_result.tool_calls.last().cloned(),
-            &validation,
-            ctx,
-            pipeline_start,
-            retrieved_memory_count,
-            rewrite_triggered,
-            rewrite_source,
-        );
-        let interaction_fut = async {
-            if let Some(ref recorder) = self.interaction_recorder {
-                let tools_used: Vec<&str> =
-                    loop_result.tool_calls.iter().map(String::as_str).collect();
-                recorder
-                    .record(
-                        &agent_name,
-                        &tools_used,
-                        ctx.channel.as_str(),
-                        pipeline_elapsed_ms,
-                    )
-                    .await;
-            }
-        };
-        tokio::join!(usage_fut, strategy_fut, interaction_fut);
+        )
+        .await;
 
-        // Step 11: AutoTuner hook — record ground truth after response delivery.
+        // Record interaction
+        if let Some(ref recorder) = self.interaction_recorder {
+            let tools_used: Vec<&str> = loop_result.tool_calls.iter().map(|s| s.as_str()).collect();
+            recorder
+                .record(
+                    "flat",
+                    &tools_used,
+                    ctx.channel.as_str(),
+                    pipeline_elapsed_ms,
+                )
+                .await;
+        }
+
+        // AutoTuner hook
         if let Some(ref hook) = self.autotuner_hook {
             let tokens = loop_result.usage.prompt_tokens + loop_result.usage.completion_tokens;
             hook.on_message_completed(
                 ctx.chat_id.as_str(),
-                &agent_name,
-                analysis.complexity.short_name(),
+                "flat",
+                &mode_name,
                 tokens,
                 pipeline_elapsed_ms,
             )
@@ -771,28 +288,20 @@ impl AgentRuntime {
         Ok(RuntimeResult {
             content: final_content,
             mode_used: mode_name,
-            classification: analysis,
             validation,
-            agent_name,
+            agent_name: "klyntbot".to_string(),
             turns: loop_result.turns,
             budget_exhausted: loop_result.budget_exhausted,
             tool_calls: loop_result.tool_calls,
         })
     }
 
-    /// Build a `RetrievalContext` from the current agent state.
-    ///
-    /// Extracted as a helper so we can build a preliminary context for memory
-    /// pre-fetching (before classification) and the final context (after
-    /// orchestration overrides) without duplicating logic.
+    // ── Helpers ──────────────────────────────────────────────────
+
     async fn build_retrieval_context(
         &self,
-        profile_name: &str,
         history: &[Message],
-        correction: Option<context_engine::CorrectionContext>,
     ) -> Option<context_engine::RetrievalContext> {
-        let active_skill = Some(profile_name.to_string());
-
         let recent_user_messages: Vec<String> = history
             .iter()
             .rev()
@@ -826,9 +335,7 @@ impl AgentRuntime {
                     .map(|t| context_engine::ActiveTaskContext {
                         title: t.title,
                         project_name: t.project_id,
-                        domain: active_skill
-                            .as_deref()
-                            .map(|s| s.replace("-management", "").replace('-', " ")),
+                        domain: None,
                     }),
                 Err(e) => {
                     warn!("Failed to query focused task for retrieval context: {e}");
@@ -840,7 +347,7 @@ impl AgentRuntime {
         };
 
         Some(context_engine::RetrievalContext {
-            active_skill,
+            active_skill: None,
             active_task,
             recent_user_messages,
             situation,
@@ -849,14 +356,12 @@ impl AgentRuntime {
             } else {
                 None
             },
-            recent_correction: correction,
+            recent_correction: None,
             hierarchical_intent: None,
         })
     }
 
-    /// Emit learning context summary events for transparency panel.
     async fn emit_learning_summary(&self, tx: &tokio::sync::mpsc::Sender<AgentEvent>) {
-        // Learned procedural rules (from L5 cognitive pipeline)
         if let Some(ref rule_repo) = self.procedural_rule_repo {
             if let Ok(rules) = rule_repo.list_all_active().await {
                 if !rules.is_empty() {
@@ -875,17 +380,6 @@ impl AgentRuntime {
                 }
             }
         }
-
-        // Confidence threshold (in-memory read, no DB hit)
-        if let Some(ref evaluator) = self.confidence_evaluator {
-            let threshold = evaluator.threshold();
-            let _ = tx
-                .send(AgentEvent::LearningEvent {
-                    event_type: "confidence".into(),
-                    detail: format!("threshold: {:.0}%", threshold * 100.0),
-                })
-                .await;
-        }
     }
 
     async fn record_usage(
@@ -896,14 +390,14 @@ impl AgentRuntime {
         event_tx: &Option<tokio::sync::mpsc::Sender<AgentEvent>>,
         pipeline_elapsed_ms: u64,
     ) {
-        let cost = crate::output::cost_tracker::estimate_cost(usage, &self.config.execution_model);
+        let cost = crate::output::cost_tracker::estimate_cost(usage, &self.execution_model);
 
         if let Err(e) = self
             .cost_tracker
             .record(
                 usage,
-                &self.config.execution_model,
-                &self.config.provider_name,
+                &self.execution_model,
+                &self.provider_name,
                 mode_name,
                 ctx.channel.as_str(),
             )
@@ -920,7 +414,7 @@ impl AgentRuntime {
                     cache_read_tokens: usage.cache_read_tokens,
                     cache_write_tokens: usage.cache_write_tokens,
                     estimated_cost_usd: cost,
-                    model: self.config.execution_model.clone(),
+                    model: self.execution_model.clone(),
                     response_time_ms: pipeline_elapsed_ms,
                 })
                 .await;
@@ -936,689 +430,134 @@ impl AgentRuntime {
             }
         }
     }
-
-    #[allow(clippy::too_many_arguments)]
-    async fn record_strategy(
-        &self,
-        analysis: &IntentAnalysis,
-        mode_name: &str,
-        iterations_used: usize,
-        tool_name: Option<String>,
-        validation: &ValidationResult,
-        ctx: &RoutingContext,
-        start: Instant,
-        retrieved_memory_count: usize,
-        rewrite_triggered: bool,
-        rewrite_source: Option<String>,
-    ) {
-        let Some(ref strategy_repo) = self.strategy_repo else {
-            return;
-        };
-
-        let elapsed_ms = start.elapsed().as_millis() as i64;
-
-        let record = storage::StrategyRecordRow {
-            id: uuid::Uuid::new_v4(),
-            timestamp: chrono::Utc::now(),
-            request_id: uuid::Uuid::new_v4().to_string(),
-            predicted_strategy: analysis.complexity.to_string(),
-            actual_strategy: mode_name.to_string(),
-            escalation_count: 0, // no escalation in unified loop
-            iterations_used: iterations_used as i32,
-            max_iterations: analysis.signals.iteration_budget() as i32,
-            success: validation.is_valid,
-            user_satisfaction: None,
-            response_time_ms: elapsed_ms,
-            chat_id: Some(ctx.chat_id.to_string()),
-            tool_name: tool_name.clone(),
-            tool_success: tool_name.as_ref().map(|_| validation.is_valid),
-            tool_duration_ms: tool_name.as_ref().map(|_| elapsed_ms),
-            complexity_signals: serde_json::to_value(&analysis.signals).unwrap_or_default(),
-            execution_mode: Some(mode_name.to_string()),
-            retrieved_memory_count: Some(retrieved_memory_count as i32),
-            rewrite_triggered: rewrite_triggered as i32,
-            rewrite_source,
-        };
-
-        if let Err(e) = strategy_repo.create(&record).await {
-            warn!("AgentRuntime: failed to record strategy: {}", e);
-        }
-    }
-}
-
-/// Create a filtered event sender for delegation.
-///
-/// Spawns a tokio task that reads from a new channel, suppresses sub-agent
-/// reasoning (ContentChunk, IterationStart), and forwards tool/skill events
-/// with agent attribution injected.
-fn delegation_event_filter(
-    parent_tx: tokio::sync::mpsc::Sender<AgentEvent>,
-    agent_name: String,
-) -> tokio::sync::mpsc::Sender<AgentEvent> {
-    let (filtered_tx, mut filtered_rx) = tokio::sync::mpsc::channel::<AgentEvent>(64);
-
-    tokio::spawn(async move {
-        while let Some(event) = filtered_rx.recv().await {
-            let forwarded = match event {
-                // Suppress sub-agent reasoning from reaching the parent stream
-                AgentEvent::ContentChunk { .. } | AgentEvent::IterationStart { .. } => continue,
-
-                // Forward tool events with agent attribution
-                AgentEvent::ToolStart { name, args, .. } => AgentEvent::ToolStart {
-                    name,
-                    args,
-                    agent: Some(agent_name.clone()),
-                },
-                AgentEvent::ToolEnd {
-                    name,
-                    success,
-                    duration_ms,
-                    result,
-                    ..
-                } => AgentEvent::ToolEnd {
-                    name,
-                    success,
-                    duration_ms,
-                    result,
-                    agent: Some(agent_name.clone()),
-                },
-                AgentEvent::SkillLoaded { name, trigger, .. } => AgentEvent::SkillLoaded {
-                    name,
-                    trigger,
-                    agent: Some(agent_name.clone()),
-                },
-
-                // Pass through all other events unchanged
-                other => other,
-            };
-
-            if parent_tx.send(forwarded).await.is_err() {
-                break;
-            }
-        }
-    });
-
-    filtered_tx
-}
-
-/// Filter tool definitions to only those allowed by the skill package.
-/// Native tools are filtered by `pkg.tools` (None = all allowed, Some([]) = deny-all).
-/// MCP tools are filtered by `pkg.mcp_tools` (empty = none allowed, `["*"]` = all).
-fn filter_tools_for_profile(
-    tool_defs: &[serde_json::Value],
-    profile: &SkillPackage,
-) -> Vec<serde_json::Value> {
-    let native_allowlist = profile.allowed_tool_names();
-
-    tool_defs
-        .iter()
-        .filter(|t| {
-            let Some(name) = tool_def_name(t) else {
-                return true;
-            };
-
-            if let Some(server_name) = mcp::sanitize::extract_server_name(name) {
-                return profile.allows_mcp_server(server_name);
-            }
-
-            match &native_allowlist {
-                Some(allowed) => allowed.contains(name),
-                None => true,
-            }
-        })
-        .cloned()
-        .collect()
-}
-
-/// Inject a DelegationTool into the tool list and registry if the agent can delegate
-/// and we haven't reached max depth. Returns true if the tool was injected.
-async fn inject_delegation_tool(
-    profile: &SkillPackage,
-    depth: u32,
-    delegation_self_ref: &std::sync::OnceLock<Arc<dyn tools::DelegationHandler>>,
-    tool_registry: &Option<Arc<RwLock<tools::registry::ToolRegistry>>>,
-    filtered_tools: &mut Vec<serde_json::Value>,
-) {
-    if profile.can_delegate_to().is_empty() || depth >= MAX_DELEGATION_DEPTH {
-        return;
-    }
-
-    let Some(handler) = delegation_self_ref.get() else {
-        return;
-    };
-
-    let delegation_tool = tools::DelegationTool::with_handler(handler.clone())
-        .with_allowed_agents(profile.can_delegate_to().to_vec())
-        .with_depth(depth, MAX_DELEGATION_DEPTH);
-
-    filtered_tools.push(tools::Tool::to_schema(&delegation_tool));
-
-    if let Some(ref registry) = tool_registry {
-        let mut reg = registry.write().await;
-        reg.register(delegation_tool);
-    }
-}
-
-#[async_trait::async_trait]
-impl tools::DelegationHandler for AgentRuntime {
-    async fn delegate(
-        &self,
-        agent_name: &str,
-        query: &str,
-        ctx: &RoutingContext,
-        depth: u32,
-    ) -> Result<String> {
-        let start = Instant::now();
-
-        // 1. Look up the delegated skill package
-        let profile = {
-            let catalog = self.skill_catalog.read().await;
-            catalog.get(agent_name).cloned()
-        }
-        .ok_or_else(|| {
-            common::KlyntbotError::Tool(common::ToolError::ExecutionFailed(format!(
-                "Unknown agent for delegation: '{agent_name}'"
-            )))
-        })?;
-
-        // Read the current caller agent name for transparency events
-        let caller_name = {
-            let guard = self.active_profile.read().await;
-            guard
-                .as_ref()
-                .map(|p| p.name.clone())
-                .unwrap_or_else(|| "unknown".to_string())
-        };
-
-        debug!(
-            "Delegation: {} → {} for query '{}' (depth {})",
-            caller_name, agent_name, query, depth
-        );
-
-        // Emit DelegationStarted event and sub-agent skills
-        if let Some(tx) = self.current_event_tx.read().await.as_ref() {
-            let _ = tx
-                .send(AgentEvent::DelegationStarted {
-                    from_agent: caller_name.clone(),
-                    to_agent: agent_name.to_string(),
-                    query: query.to_string(),
-                    depth,
-                })
-                .await;
-
-            // Emit SkillLoaded for the delegated skill's always-loaded references
-            for skill_name in profile.always_skills() {
-                let _ = tx
-                    .send(AgentEvent::SkillLoaded {
-                        name: skill_name.clone(),
-                        trigger: "always".to_string(),
-                        agent: Some(agent_name.to_string()),
-                    })
-                    .await;
-            }
-        }
-
-        // 2. Set the delegated agent as active profile (for AgentContextSource)
-        {
-            let mut guard = self.active_profile.write().await;
-            *guard = Some(Arc::clone(&profile));
-        }
-
-        // 3. Build context with the delegated agent's instructions
-        let messages = vec![Message::user(query)];
-        let strategy = ExecutionStrategy::ToolAssisted {
-            max_iterations: profile.max_iterations().min(8),
-        };
-        let context_request = ContextRequest {
-            message_text: query.to_string(),
-            history: messages,
-            system_prompt: self.config.system_prompt.clone(),
-            strategy,
-            tool_definitions: vec![],
-            context_window: self.config.context_window,
-            session_key: None, // delegation — no session tracking
-            retrieval_context: None,
-        };
-        let assembled = self.context_engine.assemble(context_request).await;
-
-        // 4. Filter tools to delegated agent's allowed set
-        let tool_defs: Vec<serde_json::Value> = if let Some(ref registry) = self.tool_registry {
-            let reg = registry.read().await;
-            reg.get_definitions().to_vec()
-        } else {
-            vec![]
-        };
-
-        let mut filtered_tools = filter_tools_for_profile(&tool_defs, &profile);
-
-        // 5. Optionally add DelegationTool for chained delegation
-        inject_delegation_tool(
-            &profile,
-            depth,
-            &self.delegation_self_ref,
-            &self.tool_registry,
-            &mut filtered_tools,
-        )
-        .await;
-
-        // 6. Execute via budget-bounded loop with reduced budget
-        let max_iters = profile.max_iterations().min(8);
-        let mut budget = ExecutionBudget::with_limits(DepthMode::Normal, 40_000, max_iters);
-        let mut params = ExecutionParams::new(&self.config.execution_model)
-            .with_max_iterations(max_iters)
-            .with_original_message(query.to_string())
-            .with_context_window(self.config.context_window);
-
-        if let Some(ref queue) = self.context_update_queue {
-            params = params.with_context_update_queue(Arc::clone(queue));
-        }
-
-        // Build delegated routing context with incremented depth
-        let mut delegated_ctx = ctx.clone();
-        delegated_ctx.delegation_depth = depth + 1;
-
-        // Use a filtered event sender that suppresses sub-agent reasoning
-        // and injects agent attribution into tool/skill events.
-        let delegation_tx = {
-            let parent_tx = self.current_event_tx.read().await.clone();
-            parent_tx.map(|tx| delegation_event_filter(tx, agent_name.to_string()))
-        };
-
-        let result = execute_loop(
-            &self.core,
-            assembled.messages,
-            &filtered_tools,
-            &params,
-            &mut budget,
-            &delegated_ctx,
-            delegation_tx,
-        )
-        .await;
-
-        let duration_ms = start.elapsed().as_millis() as u64;
-        let success = result.is_ok();
-
-        // Emit DelegationCompleted event
-        if let Some(tx) = self.current_event_tx.read().await.as_ref() {
-            let _ = tx
-                .send(AgentEvent::DelegationCompleted {
-                    from_agent: caller_name.clone(),
-                    to_agent: agent_name.to_string(),
-                    success,
-                    duration_ms,
-                })
-                .await;
-        }
-
-        // Restore caller's active profile
-        // (The caller will re-set it if needed in its own process_message flow)
-
-        debug!(
-            "Delegation {} → {} completed in {}ms (success: {})",
-            caller_name, agent_name, duration_ms, success
-        );
-
-        result.map(|r| r.content)
-    }
-}
-
-/// Build a chain-of-thought planning prompt for complex tasks.
-fn build_planning_prompt(user_message: &str, tools: &[serde_json::Value]) -> String {
-    let tool_names: Vec<&str> = tools.iter().filter_map(tool_def_name).collect();
-    format!(
-        "This is a complex request. Before executing:\n\
-         1. Briefly consider the optimistic, skeptical, and practical angles.\n\
-         2. Synthesize into a balanced approach.\n\
-         3. Then create a step-by-step plan.\n\
-         \n\
-         User request: {user_message}\n\
-         Available tools: [{}]\n\
-         \n\
-         Format each step as:\n\
-         1. <description> [tool: <tool_name>]\n\
-         2. <description> [tool: <tool_name>]\n\
-         ...\n\
-         \n\
-         Keep the plan concise (3-7 steps). Then execute step 1.",
-        tool_names.join(", ")
-    )
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use async_trait::async_trait;
-    use config::OrchestratorConfig;
-    use providers::{ChatParams, LlmProvider, LlmResponse, Usage};
-    use serde_json::Value;
-    use std::sync::Mutex;
+    use providers::{ChatParams, DynProvider, LlmResponse, Usage};
+    use std::sync::Arc;
     use tools::registry::ToolRegistry;
 
-    use crate::execution::{DepthMode, ExecutionCore};
-    use tools::DelegationHandler;
-
-    struct MockProvider {
-        responses: Mutex<Vec<LlmResponse>>,
-    }
-
-    impl MockProvider {
-        fn new(responses: Vec<LlmResponse>) -> Arc<Self> {
-            Arc::new(Self {
-                responses: Mutex::new(responses),
-            })
-        }
-    }
-
-    #[async_trait]
-    impl LlmProvider for MockProvider {
-        async fn chat(
-            &self,
-            _messages: &[Message],
-            _tools: Option<&[Value]>,
-            _params: &ChatParams,
-        ) -> common::Result<LlmResponse> {
-            let mut responses = self.responses.lock().unwrap();
-            if responses.is_empty() {
-                Ok(LlmResponse {
-                    content: Some("fallback".to_string()),
-                    tool_calls: vec![],
-                    finish_reason: "stop".to_string(),
-                    usage: Usage::default(),
-                    reasoning_content: None,
-                })
-            } else {
-                Ok(responses.remove(0))
-            }
-        }
-        fn default_model(&self) -> &str {
-            "mock"
-        }
-        fn name(&self) -> &str {
-            "mock"
-        }
+    fn routing_ctx() -> RoutingContext {
+        RoutingContext::new(
+            common::ChannelName::new("test".to_string()),
+            common::ChatId::new("test-chat".to_string()),
+        )
     }
 
     fn text_response(text: &str) -> LlmResponse {
         LlmResponse {
             content: Some(text.to_string()),
+            usage: Usage {
+                prompt_tokens: 100,
+                completion_tokens: 50,
+                total_tokens: 150,
+                cache_read_tokens: 0,
+                cache_write_tokens: 0,
+            },
             tool_calls: vec![],
-            finish_reason: "stop".to_string(),
-            usage: Usage::default(),
+            finish_reason: "end_turn".to_string(),
             reasoning_content: None,
         }
     }
 
-    fn routing_ctx() -> RoutingContext {
-        RoutingContext::new("test".into(), "test".into())
+    struct MockProvider {
+        response: String,
     }
 
-    fn make_skill_catalog_and_router() -> (
-        Arc<RwLock<SkillCatalog>>,
-        Arc<RwLock<skill_system::router::SkillRouter>>,
-    ) {
-        let source = skill_system::discovery::SkillSource::BuiltIn(
-            skill_system::discovery::BUILTIN_SKILLS
-                .iter()
-                .map(|(n, c)| (n.to_string(), c.to_string()))
-                .collect(),
-        );
-        let catalog = SkillCatalog::discover_sync(&[source]).unwrap();
-        let router = skill_system::router::SkillRouter::new(&catalog);
-        (
-            Arc::new(RwLock::new(catalog)),
-            Arc::new(RwLock::new(router)),
-        )
+    #[async_trait::async_trait]
+    impl providers::LlmProvider for MockProvider {
+        async fn chat(
+            &self,
+            _messages: &[providers::Message],
+            _tools: Option<&[serde_json::Value]>,
+            _params: &ChatParams,
+        ) -> std::result::Result<LlmResponse, common::KlyntbotError> {
+            Ok(text_response(&self.response))
+        }
+
+        fn name(&self) -> &str {
+            "mock"
+        }
+
+        fn default_model(&self) -> &str {
+            "mock-model"
+        }
+
+        fn context_window(&self) -> usize {
+            128_000
+        }
     }
 
-    async fn make_runtime(provider: Arc<dyn LlmProvider>) -> AgentRuntime {
-        let (runtime, _registry) = make_runtime_with_registry(provider).await;
-        runtime
-    }
-
-    /// Shared builder: returns the runtime and its tool registry for delegation wiring.
-    async fn make_runtime_with_registry(
-        provider: Arc<dyn LlmProvider>,
-    ) -> (AgentRuntime, Arc<RwLock<ToolRegistry>>) {
+    async fn make_runtime(response: &str) -> (AgentRuntime, Arc<RwLock<ToolRegistry>>) {
+        let provider: DynProvider = Arc::new(MockProvider {
+            response: response.to_string(),
+        });
         let registry = Arc::new(RwLock::new(ToolRegistry::new()));
-        let core = Arc::new(ExecutionCore::new(provider.clone(), Arc::clone(&registry)));
+        let core = Arc::new(crate::execution::ExecutionCore::new(
+            provider,
+            Arc::clone(&registry),
+        ));
 
-        let analyzer = IntentAnalyzer::new(&OrchestratorConfig::default());
-
-        let pool = sqlx::SqlitePool::connect(":memory:")
-            .await
-            .expect("in-memory SQLite for tests");
-        let usage_repo = storage::UsageRepo::new(pool);
+        let context_engine = Arc::new(context_engine::ContextEngine::new());
+        let pool = storage::StoragePool::connect_in_memory().await.unwrap();
+        let usage_repo = storage::UsageRepo::new(pool.inner().clone());
         let cost_tracker = Arc::new(CostTracker::from_repo(usage_repo));
-
-        let active_profile = Arc::new(RwLock::new(None));
-        let (skill_catalog, skill_router) = make_skill_catalog_and_router();
-
         let hot_config = Arc::new(RwLock::new(config::HotConfig::from(
             &config::Config::default(),
         )));
+
         let runtime = AgentRuntime::new(
-            skill_catalog,
-            skill_router,
-            analyzer,
-            Arc::new(ContextEngine::new()),
+            context_engine,
             core,
             cost_tracker,
-            PipelineConfig::default(),
-            active_profile,
+            "mock-model".to_string(),
+            "mock".to_string(),
+            128_000,
+            8192,
             hot_config,
-        );
+        )
+        .with_tool_registry(Arc::clone(&registry));
+
         (runtime, registry)
     }
 
     #[tokio::test]
-    async fn test_agent_runtime_selects_correct_skill() {
-        let (catalog, router) = make_skill_catalog_and_router();
-        let catalog = catalog.read().await;
-        let router = router.read().await;
-        let selected = router.select_orchestrator("create a task to review budget", &catalog, None);
-        assert_eq!(selected.name, "task-management");
-    }
-
-    #[tokio::test]
-    async fn test_runtime_processes_greeting_via_general_agent() {
-        let provider = MockProvider::new(vec![text_response("Hi there!")]);
-        let runtime = make_runtime(provider).await;
+    async fn test_runtime_processes_greeting() {
+        let (runtime, _registry) = make_runtime("Hello! How can I help you?").await;
+        let ctx = routing_ctx();
 
         let result = runtime
             .process_message(
-                "hello",
-                vec![],
-                &[],
-                &[],
-                &routing_ctx(),
-                None,
-                None,
-                None,
-                None,
-                DepthMode::Normal,
-            )
-            .await
-            .unwrap();
-
-        assert_eq!(result.agent_name, "general");
-        assert_eq!(result.content, "Hi there!");
-    }
-
-    #[tokio::test]
-    async fn test_runtime_routes_task_message_to_task_agent() {
-        let provider = MockProvider::new(vec![text_response("Task created!")]);
-        let runtime = make_runtime(provider).await;
-
-        let result = runtime
-            .process_message(
-                "create a task for my project planning",
-                vec![],
-                &[],
-                &[],
-                &routing_ctx(),
-                None,
-                None,
-                None,
-                None,
-                DepthMode::Normal,
-            )
-            .await
-            .unwrap();
-
-        assert_eq!(result.agent_name, "task-management");
-        assert_eq!(result.content, "Task created!");
-    }
-
-    #[tokio::test]
-    async fn test_runtime_sets_active_profile() {
-        let provider = MockProvider::new(vec![text_response("Done")]);
-        let runtime = make_runtime(provider).await;
-        let handle = runtime.active_profile_handle();
-
-        // Before processing, active profile is None
-        assert!(handle.read().await.is_none());
-
-        let _result = runtime
-            .process_message(
-                "check my budget",
-                vec![],
-                &[],
-                &[],
-                &routing_ctx(),
-                None,
-                None,
-                None,
-                None,
-                DepthMode::Normal,
-            )
-            .await
-            .unwrap();
-
-        // After processing, active profile should be set
-        let guard = handle.read().await;
-        assert!(guard.is_some());
-        assert_eq!(guard.as_ref().unwrap().name, "finance-management");
-    }
-
-    #[tokio::test]
-    async fn test_runtime_downgrades_to_direct_on_low_confidence() {
-        let provider = MockProvider::new(vec![text_response("Hello! How can I help?")]);
-        let runtime = make_runtime(provider)
-            .await
-            .with_confidence_evaluator(Arc::new(crate::confidence::ConfidenceEvaluator::new(0.99)));
-
-        let result = runtime
-            .process_message(
-                "hello",
-                vec![],
-                &[],
-                &[],
-                &routing_ctx(),
-                None,
-                None,
-                None,
-                None,
-                DepthMode::Normal,
-            )
-            .await
-            .unwrap();
-
-        // Low confidence should downgrade to Simple complexity, not block with clarification
-        assert_eq!(result.mode_used, "normal");
-        assert_eq!(result.content, "Hello! How can I help?");
-    }
-
-    /// Helper: build runtime with tool_registry and delegation_self_ref wired up.
-    async fn make_delegation_runtime(provider: Arc<dyn LlmProvider>) -> Arc<AgentRuntime> {
-        let (runtime, registry) = make_runtime_with_registry(provider).await;
-        let runtime = Arc::new(runtime.with_tool_registry(registry));
-        runtime.set_delegation_self_ref(Arc::clone(&runtime) as Arc<dyn tools::DelegationHandler>);
-        runtime
-    }
-
-    #[tokio::test]
-    async fn test_multi_agent_heuristic_defers_to_llm() {
-        // A message with both finance and task triggers + sequential language
-        // should cause the heuristic to return None (defer to LLM classifier).
-        use crate::intent_pipeline::analysis::analyze_heuristic;
-
-        let result = analyze_heuristic(
-            "first check my transactions then create a task for the missing ones",
-        );
-        assert!(
-            result.is_none(),
-            "Expected heuristic to defer multi-agent message to LLM, got: {:?}",
-            result
-        );
-    }
-
-    #[tokio::test]
-    async fn test_delegation_tool_injected_for_general_agent() {
-        // The general agent has can_delegate_to: [task, finance, automation, communication]
-        // When delegation_self_ref is set and depth < max, the delegate tool should be added.
-        let provider = MockProvider::new(vec![text_response("Hello!")]);
-        let runtime = make_delegation_runtime(provider).await;
-
-        // Use an event channel to capture events
-        let (tx, mut rx) = tokio::sync::mpsc::channel(32);
-
-        let result = runtime
-            .process_message(
-                "hello",
-                vec![],
-                &[],
-                &[],
-                &routing_ctx(),
-                None,
-                Some(tx),
-                None,
-                None,
-                DepthMode::Normal,
-            )
-            .await
-            .unwrap();
-
-        assert_eq!(result.agent_name, "general");
-
-        // Verify the delegation tool was registered in the tool registry
-        if let Some(ref registry) = runtime.tool_registry {
-            let reg = registry.read().await;
-            let defs = reg.get_definitions();
-            let has_delegate = defs.iter().any(|d| {
-                d.get("function")
-                    .and_then(|f| f.get("name"))
-                    .and_then(|n| n.as_str())
-                    == Some("delegate")
-            });
-            assert!(
-                has_delegate,
-                "Expected 'delegate' tool in registry for general agent"
-            );
-        }
-
-        // Drain events (we don't assert specific events here, just ensure no panic)
-        rx.close();
-        while rx.recv().await.is_some() {}
-    }
-
-    #[tokio::test]
-    async fn test_delegation_tool_not_injected_at_max_depth() {
-        // When delegation_depth >= MAX_DELEGATION_DEPTH, the delegate tool should NOT be added.
-        let provider = MockProvider::new(vec![text_response("Hello!")]);
-        let runtime = make_delegation_runtime(provider).await;
-
-        let mut ctx = routing_ctx();
-        ctx.delegation_depth = MAX_DELEGATION_DEPTH; // At max depth
-
-        let result = runtime
-            .process_message(
-                "hello",
-                vec![],
-                &[],
+                "hi",
+                vec![providers::Message::user("hi")],
                 &[],
                 &ctx,
                 None,
                 None,
+                DepthMode::Normal,
+            )
+            .await;
+
+        assert!(result.is_ok());
+        let result = result.unwrap();
+        assert!(result.content.contains("Hello"));
+        assert_eq!(result.agent_name, "klyntbot");
+        assert_eq!(result.mode_used, "normal");
+    }
+
+    #[tokio::test]
+    async fn test_runtime_result_has_no_classification() {
+        let (runtime, _registry) = make_runtime("Sure!").await;
+        let ctx = routing_ctx();
+
+        let result = runtime
+            .process_message(
+                "test",
+                vec![providers::Message::user("test")],
+                &[],
+                &ctx,
                 None,
                 None,
                 DepthMode::Normal,
@@ -1626,185 +565,8 @@ mod tests {
             .await
             .unwrap();
 
-        assert_eq!(result.agent_name, "general");
-
-        // Verify the delegation tool was NOT registered
-        if let Some(ref registry) = runtime.tool_registry {
-            let reg = registry.read().await;
-            let defs = reg.get_definitions();
-            let has_delegate = defs.iter().any(|d| {
-                d.get("function")
-                    .and_then(|f| f.get("name"))
-                    .and_then(|n| n.as_str())
-                    == Some("delegate")
-            });
-            assert!(
-                !has_delegate,
-                "Expected NO 'delegate' tool at max delegation depth"
-            );
-        }
-    }
-
-    #[tokio::test]
-    async fn test_delegation_events_emitted() {
-        // Verify DelegationStarted and DelegationCompleted events are emitted during delegation.
-        let provider = MockProvider::new(vec![
-            // First call: the general agent's LLM response (delegate tool won't be called since
-            // the mock just returns text). We test the DelegationHandler directly instead.
-            text_response("Delegated response"),
-        ]);
-        let runtime = make_delegation_runtime(provider).await;
-
-        let (tx, mut rx) = tokio::sync::mpsc::channel(32);
-
-        // Set up event channel and active profile for the delegation
-        *runtime.current_event_tx.write().await = Some(tx);
-        {
-            let catalog = runtime.skill_catalog.read().await;
-            let general = catalog.get("general").unwrap();
-            let mut guard = runtime.active_profile.write().await;
-            *guard = Some(Arc::clone(general));
-        }
-
-        // Call delegate directly
-        let ctx = routing_ctx();
-        let result: common::Result<String> = runtime
-            .delegate("task-management", "list my tasks", &ctx, 1)
-            .await;
-
-        assert!(result.is_ok(), "Delegation should succeed: {:?}", result);
-
-        // Collect emitted events
-        rx.close();
-        let mut events = vec![];
-        while let Some(event) = rx.recv().await {
-            events.push(event);
-        }
-
-        // Should have DelegationStarted and DelegationCompleted
-        let started = events.iter().any(
-            |e| matches!(e, AgentEvent::DelegationStarted { to_agent, .. } if to_agent == "task-management"),
-        );
-        let completed = events.iter().any(|e| {
-            matches!(e, AgentEvent::DelegationCompleted { to_agent, success, .. } if to_agent == "task-management" && *success)
-        });
-
-        assert!(
-            started,
-            "Expected DelegationStarted event for 'task-management'"
-        );
-        assert!(
-            completed,
-            "Expected DelegationCompleted event for 'task-management'"
-        );
-    }
-
-    mod filter_tests {
-        use super::*;
-        use serde_json::json;
-        use skill_system::types::{KlyntbotMeta, SkillMetadata, SkillScope, SkillType};
-        use std::path::PathBuf;
-        use std::time::SystemTime;
-
-        fn make_tool_def(name: &str) -> serde_json::Value {
-            json!({
-                "type": "function",
-                "function": {
-                    "name": name,
-                    "description": "test tool",
-                    "parameters": { "type": "object", "properties": {} }
-                }
-            })
-        }
-
-        fn make_test_pkg(
-            name: &str,
-            tools: Option<Vec<String>>,
-            mcp_tools: Vec<String>,
-        ) -> SkillPackage {
-            SkillPackage {
-                name: name.into(),
-                description: "test".into(),
-                skill_type: SkillType::Skill,
-                scope: SkillScope::BuiltIn,
-                location: PathBuf::new(),
-                body: String::new(),
-                summary: String::new(),
-                metadata: SkillMetadata {
-                    klyntbot: Some(KlyntbotMeta {
-                        tools,
-                        mcp_tools,
-                        ..Default::default()
-                    }),
-                    ..Default::default()
-                },
-                resources: Vec::new(),
-                loaded_at: SystemTime::now(),
-                trusted: true,
-            }
-        }
-
-        #[test]
-        fn test_filter_blocks_mcp_tools_for_restricted_agent() {
-            let profile = make_test_pkg("task", Some(vec!["task".into(), "area".into()]), vec![]);
-
-            let tool_defs = vec![
-                make_tool_def("task"),
-                make_tool_def("area"),
-                make_tool_def("mcp_linear_create_issue"),
-                make_tool_def("mcp_linear_list_issues"),
-                make_tool_def("finance"),
-            ];
-
-            let filtered = filter_tools_for_profile(&tool_defs, &profile);
-            let names: Vec<&str> = filtered.iter().filter_map(|t| tool_def_name(t)).collect();
-
-            // ask_user is always added, so task and area pass, plus ask_user if present
-            assert!(names.contains(&"task"));
-            assert!(names.contains(&"area"));
-            assert!(!names.contains(&"mcp_linear_create_issue"));
-            assert!(!names.contains(&"mcp_linear_list_issues"));
-            assert!(!names.contains(&"finance"));
-        }
-
-        #[test]
-        fn test_filter_allows_mcp_tools_for_wildcard_agent() {
-            // tools: None means all native tools allowed
-            let profile = make_test_pkg("general", None, vec!["*".into()]);
-
-            let tool_defs = vec![
-                make_tool_def("task"),
-                make_tool_def("mcp_linear_create_issue"),
-                make_tool_def("mcp_github_list_repos"),
-            ];
-
-            let filtered = filter_tools_for_profile(&tool_defs, &profile);
-            let names: Vec<&str> = filtered.iter().filter_map(|t| tool_def_name(t)).collect();
-
-            assert!(names.contains(&"task"));
-            assert!(names.contains(&"mcp_linear_create_issue"));
-            assert!(names.contains(&"mcp_github_list_repos"));
-        }
-
-        #[test]
-        fn test_filter_allows_specific_mcp_server() {
-            let profile =
-                make_test_pkg("comms", Some(vec!["message".into()]), vec!["linear".into()]);
-
-            let tool_defs = vec![
-                make_tool_def("message"),
-                make_tool_def("mcp_linear_create_issue"),
-                make_tool_def("mcp_github_list_repos"),
-                make_tool_def("task"),
-            ];
-
-            let filtered = filter_tools_for_profile(&tool_defs, &profile);
-            let names: Vec<&str> = filtered.iter().filter_map(|t| tool_def_name(t)).collect();
-
-            assert!(names.contains(&"message"));
-            assert!(names.contains(&"mcp_linear_create_issue"));
-            assert!(!names.contains(&"mcp_github_list_repos"));
-            assert!(!names.contains(&"task"));
-        }
+        // RuntimeResult has no classification field — flat pipeline
+        assert!(!result.content.is_empty());
+        assert_eq!(result.turns, 1);
     }
 }

@@ -1,49 +1,7 @@
 ---
 name: automation
-description: >
-  Automation and scheduling specialist for reminders and recurring automations.
-  Use when the user mentions cron, schedule, reminder, remind me,
-  recurring, every day, every hour, every minute, automate, or automation.
-license: MIT
-metadata:
-  author: klyntbot
-  version: "2.0.0"
-  klyntbot:
-    summary: Cron job scheduling, reminders, recurring automations, and time-based automation.
-    type: orchestrator
-    tools: [cron, spawn, ask_user, memory, productivity]
-    mcp_tools: []
-    max_iterations: 10
-    can_delegate_to: []
-    always_skills: [cron]
-    invokes: ["task-management"]
-    triggers:
-      - remind me
-      - reminder
-      - schedule
-      - every day
-      - every hour
-      - every week
-      - every month
-      - every minute
-      - recurring
-      - cron
-      - automate
-      - automation
-      - set an alarm
-      - daily at
-      - weekly on
-      - at 8am
-      - at noon
-      - every morning
-      - every evening
-      - every night
-      - don't let me forget
-      - repeat
-      - periodically
-      - on a schedule
-      - timer
-      - check in on me
+description: Reminders, cron jobs, and recurring automations
+whenToUse: When the user mentions remind, schedule, every day, recurring, cron, or automate
 ---
 
 You are the automation agent. You help users set up reminders, recurring tasks,

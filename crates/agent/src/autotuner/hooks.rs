@@ -8,7 +8,6 @@ use async_trait::async_trait;
 use autotuner::{ShadowContext, ShadowRetriever};
 use chrono::{DateTime, Utc};
 use common::TrialParams;
-use config::OrchestratorConfig;
 use storage::{TrialRepo, TrialRow};
 use tokio::sync::RwLock;
 use tracing::{debug, warn};
@@ -41,27 +40,21 @@ pub trait AutoTunerHook: Send + Sync {
 /// How long to cache active trials before re-querying the DB (seconds).
 const ACTIVE_TRIALS_CACHE_TTL_SECS: i64 = 60;
 
-/// Concrete implementation of [`AutoTunerHook`] that runs shadow classification
+/// Concrete implementation of [`AutoTunerHook`] that runs shadow retrieval
 /// for active trials and logs predictions to the shadow_log table.
 pub struct AutoTunerHookImpl {
     orchestrator: Arc<AutoTunerOrchestrator>,
     trial_repo: TrialRepo,
-    shadow_classifier: super::shadow_classifier::AgentShadowClassifier,
     shadow_retriever: Option<Arc<dyn ShadowRetriever>>,
     /// Cached active trials with timestamp to avoid querying DB per message.
     active_trials_cache: RwLock<(DateTime<Utc>, Vec<TrialRow>)>,
 }
 
 impl AutoTunerHookImpl {
-    pub fn new(
-        orchestrator: Arc<AutoTunerOrchestrator>,
-        trial_repo: TrialRepo,
-        config: &OrchestratorConfig,
-    ) -> Self {
+    pub fn new(orchestrator: Arc<AutoTunerOrchestrator>, trial_repo: TrialRepo) -> Self {
         Self {
             orchestrator,
             trial_repo,
-            shadow_classifier: super::shadow_classifier::AgentShadowClassifier::new(config),
             shadow_retriever: None,
             active_trials_cache: RwLock::new((DateTime::<Utc>::MIN_UTC, Vec::new())),
         }
@@ -108,8 +101,7 @@ impl AutoTunerHook for AutoTunerHookImpl {
             session_key: format!("shadow:{chat_id}"),
         };
 
-        // Parse trial params once — reused for classification and retrieval.
-        use autotuner::ShadowClassifier;
+        // Parse trial params once — reused for retrieval.
         let parsed_trials: Vec<(&TrialRow, TrialParams)> = active_trials
             .iter()
             .filter_map(|trial| {
@@ -125,60 +117,6 @@ impl AutoTunerHook for AutoTunerHookImpl {
                     .ok()
             })
             .collect();
-
-        // Shadow classification
-        let mut insert_futs = Vec::new();
-        for (trial, params) in &parsed_trials {
-            let prediction = match self
-                .shadow_classifier
-                .classify_shadow(message, &context, params)
-                .await
-            {
-                Ok(p) => p,
-                Err(e) => {
-                    debug!(
-                        "autotuner hook: shadow classification failed for trial {}: {e}",
-                        trial.id
-                    );
-                    continue;
-                }
-            };
-
-            let trial_id = trial.id.clone();
-            let ts = timestamp.clone();
-            let cid = chat_id.to_string();
-            let repo = self.trial_repo.clone();
-
-            insert_futs.push(async move {
-                if let Err(e) = repo
-                    .insert_shadow_log(
-                        &trial_id,
-                        &ts,
-                        &cid,
-                        "",
-                        &prediction.predicted_orchestrator,
-                        &prediction.predicted_mode,
-                        prediction.confidence as f64,
-                        prediction.predicted_iteration_budget as i64,
-                        "pending",
-                        "pending",
-                    )
-                    .await
-                {
-                    warn!(
-                        "autotuner hook: failed to insert shadow log for trial {trial_id}: {e}"
-                    );
-                } else {
-                    debug!(
-                        "autotuner hook: shadow logged trial {trial_id} → mode={}, confidence={:.2}",
-                        prediction.predicted_mode, prediction.confidence
-                    );
-                }
-            });
-        }
-
-        // Execute all inserts concurrently instead of sequentially.
-        futures_util::future::join_all(insert_futs).await;
 
         // Shadow retrieval (Phase 2) — control retrieval hoisted outside loop
         if let Some(ref retriever) = self.shadow_retriever {
@@ -327,7 +265,7 @@ mod tests {
         trial_repo.migrate().await.unwrap();
         let orchestrator = make_orchestrator(&pool, false).await;
 
-        let hook = AutoTunerHookImpl::new(orchestrator, trial_repo, &OrchestratorConfig::default());
+        let hook = AutoTunerHookImpl::new(orchestrator, trial_repo);
 
         // Should return immediately without panicking (inactive orchestrator).
         hook.on_message_received("hello", "test-chat").await;
@@ -379,11 +317,7 @@ mod tests {
             .await
             .unwrap();
 
-        let hook = AutoTunerHookImpl::new(
-            orchestrator,
-            trial_repo.clone(),
-            &OrchestratorConfig::default(),
-        );
+        let hook = AutoTunerHookImpl::new(orchestrator, trial_repo.clone());
 
         // Call on_message_completed — should update ground truth from "pending"
         hook.on_message_completed("chat-gt", "general", "reactive", 100, 500)
@@ -402,56 +336,5 @@ mod tests {
             (rate - 0.0).abs() < f64::EPSILON,
             "Expected 0.0 agreement (predicted=direct, actual=reactive), got {rate}"
         );
-    }
-
-    #[tokio::test]
-    async fn hook_runs_shadow_classification_for_active_trials() {
-        let pool = storage::StoragePool::connect_in_memory().await.unwrap();
-        let trial_repo = TrialRepo::new(pool.inner().clone());
-        trial_repo.migrate().await.unwrap();
-        let orchestrator = make_orchestrator(&pool, true).await;
-
-        // Create an experiment and an active trial
-        let exp = storage::rows::trial::ExperimentRow {
-            id: "exp-1".to_string(),
-            hypothesis: "test".to_string(),
-            trend_analysis: "test".to_string(),
-            recommendation_for_next: "test".to_string(),
-            created_at: chrono::Utc::now().to_rfc3339(),
-        };
-        trial_repo.create_experiment(&exp).await.unwrap();
-
-        let trial = storage::rows::trial::TrialRow {
-            id: "trial-1".to_string(),
-            experiment_id: "exp-1".to_string(),
-            params: serde_json::to_string(&TrialParams {
-                heuristic_confidence_threshold: Some(0.80),
-                ..Default::default()
-            })
-            .unwrap(),
-            generation_reasoning: "test".to_string(),
-            status: "active".to_string(),
-            created_at: chrono::Utc::now().to_rfc3339(),
-            completed_at: None,
-            result: None,
-        };
-        trial_repo.create_trial(&trial).await.unwrap();
-
-        let hook = AutoTunerHookImpl::new(
-            orchestrator,
-            trial_repo.clone(),
-            &OrchestratorConfig::default(),
-        );
-
-        // "hello" is a greeting — Layer 1 handles it without LLM.
-        hook.on_message_received("hello", "test-chat").await;
-
-        // Verify a shadow log entry was created (check via raw SQL since we
-        // don't have a list method yet).
-        let count: (i64,) = sqlx::query_as("SELECT COUNT(*) FROM autotuner_shadow_log")
-            .fetch_one(pool.inner())
-            .await
-            .unwrap();
-        assert_eq!(count.0, 1, "Expected 1 shadow log entry");
     }
 }

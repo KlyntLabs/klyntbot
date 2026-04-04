@@ -13,10 +13,6 @@ use tokio::sync::Mutex as TokioMutex;
 use tracing::{debug, info, warn};
 use uuid::Uuid;
 
-use skill_system::discovery::{SkillSource, BUILTIN_SKILLS};
-use skill_system::router::SkillRouter;
-use skill_system::types::SkillCatalog;
-
 use crate::actions::ActionExecutor;
 use crate::epoch::{CronTrigger, EpochStep, SimulatedEpoch};
 use crate::metrics::ground_truth::{CheckpointResult, GroundTruthVerifier};
@@ -61,8 +57,6 @@ pub struct SimulationHarness {
     /// Persistent champion state — updated after each promotion so the
     /// evaluator compares against real baselines instead of all-zeros.
     champion: std::sync::Mutex<autotuner::Champion>,
-    skill_router: Option<SkillRouter>,
-    skill_catalog: Option<SkillCatalog>,
     embedding_engine: Option<tools::EmbeddingEngine>,
     /// Pre-cached embeddings for the 8 reference answer strings (one per topic).
     reference_embeddings: HashMap<String, Vec<f32>>,
@@ -237,25 +231,6 @@ impl SimulationHarness {
         .execute(&inner_pool)
         .await;
 
-        // Load built-in skills for real routing evaluation.
-        let builtin_entries: Vec<(String, String)> = BUILTIN_SKILLS
-            .iter()
-            .map(|(name, content)| (name.to_string(), content.to_string()))
-            .collect();
-        let (skill_catalog, skill_router) = {
-            let source = SkillSource::BuiltIn(builtin_entries);
-            match SkillCatalog::discover_sync(&[source]) {
-                Ok(catalog) => {
-                    let router = SkillRouter::new(&catalog);
-                    (Some(catalog), Some(router))
-                }
-                Err(e) => {
-                    warn!(error = %e, "Failed to load skill catalog — routing_accuracy will be 0");
-                    (None, None)
-                }
-            }
-        };
-
         let embedding_engine = tools::EmbeddingEngine::new();
         // Pre-cache embeddings for the 8 reference answer strings to avoid
         // re-embedding the same text hundreds of times during the simulation.
@@ -279,56 +254,32 @@ impl SimulationHarness {
 
         // Build agent harness if agent_mode is enabled.
         let agent_harness = if scenario.simulation.agent_mode {
-            // Build a separate SkillCatalog/SkillRouter for the AgentRuntime
-            // (it needs Arc<RwLock<>> ownership, so we discover a second copy).
-            let agent_skills = {
-                let entries: Vec<(String, String)> = BUILTIN_SKILLS
-                    .iter()
-                    .map(|(n, c)| (n.to_string(), c.to_string()))
-                    .collect();
-                let source = SkillSource::BuiltIn(entries);
-                SkillCatalog::discover_sync(&[source]).ok()
-            };
-            match agent_skills {
-                Some(catalog) => {
-                    let router = SkillRouter::new(&catalog);
-                    let catalog_arc = Arc::new(tokio::sync::RwLock::new(catalog));
-                    let router_arc = Arc::new(tokio::sync::RwLock::new(router));
-                    let max_provider_error_rate = [
-                        &scenario.persona.phases.onboarding,
-                        &scenario.persona.phases.routine,
-                        &scenario.persona.phases.power_user,
-                        &scenario.persona.phases.behavior_shift,
-                    ]
-                    .iter()
-                    .map(|p| p.provider_error_rate)
-                    .fold(0.0f64, f64::max);
+            let max_provider_error_rate = [
+                &scenario.persona.phases.onboarding,
+                &scenario.persona.phases.routine,
+                &scenario.persona.phases.power_user,
+                &scenario.persona.phases.behavior_shift,
+            ]
+            .iter()
+            .map(|p| p.provider_error_rate)
+            .fold(0.0f64, f64::max);
 
-                    match crate::agent_harness::AgentHarness::new(
-                        &pool,
-                        inner_pool.clone(),
-                        Arc::clone(&bus),
-                        Arc::clone(&context_queue),
-                        catalog_arc,
-                        router_arc,
-                        None, // embedding engine for agent harness (optional)
-                        scenario.simulation.agent_max_iterations,
-                        &scenario.simulation.agent_provider,
-                        &scenario.simulation.agent_model,
-                        max_provider_error_rate,
-                        scenario.persona.seed,
-                    )
-                    .await
-                    {
-                        Ok(h) => Some(h),
-                        Err(e) => {
-                            warn!(error = %e, "Failed to create AgentHarness — agent path disabled");
-                            None
-                        }
-                    }
-                }
-                None => {
-                    warn!("Failed to load skill catalog for agent harness — agent path disabled");
+            match crate::agent_harness::AgentHarness::new(
+                &pool,
+                inner_pool.clone(),
+                Arc::clone(&bus),
+                Arc::clone(&context_queue),
+                None, // embedding engine for agent harness (optional)
+                &scenario.simulation.agent_provider,
+                &scenario.simulation.agent_model,
+                max_provider_error_rate,
+                scenario.persona.seed,
+            )
+            .await
+            {
+                Ok(h) => Some(h),
+                Err(e) => {
+                    warn!(error = %e, "Failed to create AgentHarness — agent path disabled");
                     None
                 }
             }
@@ -358,8 +309,6 @@ impl SimulationHarness {
             active_trial_id: std::sync::Mutex::new(trial_a_id),
             variant_trial_id: std::sync::Mutex::new(trial_b_id),
             champion: std::sync::Mutex::new(autotuner::Champion::default()),
-            skill_router,
-            skill_catalog,
             embedding_engine,
             reference_embeddings,
             agent_harness,
@@ -797,23 +746,6 @@ impl SimulationHarness {
                 // Routing stability: check if message content matches expected topic keywords
                 if message_matches_topic_keywords(&msg.content, &msg.topic) {
                     metrics.accumulator_mut().routing_matches += 1;
-                }
-
-                // Real routing accuracy: compare SkillRouter output against expected_skill
-                if let (Some(ref router), Some(ref catalog)) =
-                    (&self.skill_router, &self.skill_catalog)
-                {
-                    if let Some(expected) = msg
-                        .ground_truth
-                        .as_ref()
-                        .and_then(|gt| gt.expected_skill.as_ref())
-                    {
-                        let selected = router.select_orchestrator(&msg.content, catalog, None);
-                        metrics.accumulator_mut().routing_total += 1;
-                        if selected.name == *expected {
-                            metrics.accumulator_mut().routing_correct += 1;
-                        }
-                    }
                 }
 
                 // Response quality is only measured in agent mode (which has an
@@ -1926,7 +1858,7 @@ fn expected_skill_for_topic(topic: &str) -> &'static str {
 }
 
 /// Check if a message's content contains keywords associated with its topic.
-/// This is a simplified version of what SkillRouter does with Aho-Corasick matching.
+/// Uses simple keyword matching to verify routing stability.
 fn message_matches_topic_keywords(content: &str, topic: &str) -> bool {
     let lower = content.to_lowercase();
     match topic {

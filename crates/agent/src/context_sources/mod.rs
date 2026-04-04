@@ -3,7 +3,6 @@
 //! Each source implements `ContextSource` (defined in `context_engine`) and
 //! provides a section of the system prompt. Caching is handled per-source.
 
-pub mod agent;
 pub mod annotation;
 pub mod area;
 pub mod bootstrap;
@@ -16,7 +15,6 @@ pub mod project;
 pub mod session_context_source;
 pub mod todo;
 
-pub use agent::AgentContextSource;
 pub use annotation::AnnotationContextSource;
 pub use area::AreaSource;
 pub use bootstrap::BootstrapSource;

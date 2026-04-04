@@ -692,8 +692,8 @@ impl AppCore {
 
         // Perspectives tab uses the debate engine; all other tabs use a single LLM call.
         let content = if tab == "perspectives" {
-            use agent::intent_pipeline::engines::debate::run_debate;
-            use agent::intent_pipeline::engines::debate_types::*;
+            use agent::engines::debate::run_debate;
+            use agent::engines::debate_types::*;
             use tokio_util::sync::CancellationToken;
 
             let resolved = self
@@ -1104,8 +1104,8 @@ impl AppCore {
         note_id: &str,
         squad_id: Option<&str>,
     ) -> Result<(), ApiError> {
-        use agent::intent_pipeline::engines::debate::run_debate;
-        use agent::intent_pipeline::engines::debate_types::*;
+        use agent::engines::debate::run_debate;
+        use agent::engines::debate_types::*;
         use tokio_util::sync::CancellationToken;
 
         let provider = self
@@ -1357,8 +1357,8 @@ struct InsightPipelineArgs {
 }
 
 async fn run_insight_pipeline(args: InsightPipelineArgs) {
-    use agent::intent_pipeline::engines::debate::run_debate;
-    use agent::intent_pipeline::engines::debate_types::*;
+    use agent::engines::debate::run_debate;
+    use agent::engines::debate_types::*;
     use tokio_util::sync::CancellationToken;
 
     let InsightPipelineArgs {

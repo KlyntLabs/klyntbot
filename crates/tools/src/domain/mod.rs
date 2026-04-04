@@ -5,7 +5,6 @@ pub mod annotate;
 pub mod area_tool;
 pub mod context_request;
 pub mod cron_tool;
-pub mod delegation;
 pub mod docs;
 pub mod learning_tool;
 pub mod memory_tool;

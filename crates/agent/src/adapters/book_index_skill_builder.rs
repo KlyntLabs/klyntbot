@@ -15,19 +15,22 @@ pub fn build_skill_tree(skill_name: &str, content: &str) -> Vec<TreeNode> {
     nodes
 }
 
-/// Build all skill trees from compiled skill content.
+/// Build all skill trees from the loaded skill store.
 /// Returns the SHA-256 checksum of all content for change detection.
 pub async fn build_all_skill_trees(
     tree_repo: &dyn context_engine::book_index::BookTreeRepo,
+    store: &skill_system::SkillStore,
 ) -> common::Result<String> {
     let mut hasher = Sha256::new();
 
-    for (name, content) in skill_system::discovery::BUILTIN_SKILLS {
-        hasher.update(content.as_bytes());
+    for (name, body) in store.build_reference_index() {
+        hasher.update(body.as_bytes());
 
-        tree_repo.delete_by_source(&SourceType::Skill, name).await?;
+        tree_repo
+            .delete_by_source(&SourceType::Skill, &name)
+            .await?;
 
-        let nodes = build_skill_tree(name, content);
+        let nodes = build_skill_tree(&name, &body);
         if !nodes.is_empty() {
             tree_repo.insert_nodes(&nodes).await?;
             tracing::debug!(

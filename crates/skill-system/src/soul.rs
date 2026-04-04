@@ -1,0 +1,114 @@
+//! SoulContextSource — loads KLYNTBOT.md as always-present context.
+
+use std::path::{Path, PathBuf};
+use std::sync::Arc;
+
+use async_trait::async_trait;
+use tokio::sync::RwLock;
+use tracing::debug;
+
+use context_engine::source::{ContextSource, SourceContext};
+
+/// Default KLYNTBOT.md content, installed on first run.
+const DEFAULT_SOUL: &str = r#"# Klyntbot
+
+You are Klyntbot, a personal AI assistant.
+
+## Personality
+- Helpful, concise, and proactive
+- Speak naturally, not robotically
+- Match the user's language (if they write in Vietnamese, respond in Vietnamese)
+
+## Preferences
+- Use metric units
+- Currency: VND
+- Timezone: auto-detect from system
+"#;
+
+/// Context source that loads KLYNTBOT.md from the data directory.
+pub struct SoulContextSource {
+    content: Arc<RwLock<String>>,
+    path: PathBuf,
+}
+
+impl SoulContextSource {
+    /// Create and load the soul file. Installs default if missing.
+    pub fn load(data_dir: &Path) -> common::Result<Self> {
+        let path = data_dir.join("KLYNTBOT.md");
+
+        if !path.exists() {
+            std::fs::write(&path, DEFAULT_SOUL)?;
+            debug!(path = %path.display(), "Installed default KLYNTBOT.md");
+        }
+
+        let content = std::fs::read_to_string(&path)?;
+
+        Ok(Self {
+            content: Arc::new(RwLock::new(content)),
+            path,
+        })
+    }
+
+    /// Reload from disk (for hot-reload via config watcher).
+    pub async fn reload(&self) -> common::Result<()> {
+        let content = std::fs::read_to_string(&self.path)?;
+        *self.content.write().await = content;
+        debug!("KLYNTBOT.md reloaded");
+        Ok(())
+    }
+}
+
+#[async_trait]
+impl ContextSource for SoulContextSource {
+    fn name(&self) -> &str {
+        "soul"
+    }
+
+    fn priority(&self) -> u8 {
+        50 // Highest priority — soul is the most important context
+    }
+
+    fn protected(&self) -> bool {
+        true // Never evicted by token budget
+    }
+
+    async fn provide(&self, _ctx: &SourceContext) -> Option<String> {
+        let content = self.content.read().await;
+        if content.is_empty() {
+            None
+        } else {
+            Some(content.clone())
+        }
+    }
+
+    fn estimated_tokens(&self) -> usize {
+        300 // KLYNTBOT.md is typically short
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn default_soul_is_valid() {
+        assert!(DEFAULT_SOUL.contains("Klyntbot"));
+        assert!(DEFAULT_SOUL.contains("Personality"));
+    }
+
+    #[tokio::test]
+    async fn soul_loads_from_tempdir() {
+        let dir = tempfile::tempdir().unwrap();
+        let source = SoulContextSource::load(dir.path()).unwrap();
+        let ctx = SourceContext {
+            channel: String::new(),
+            chat_id: String::new(),
+            message: None,
+            intent_summary: None,
+            project_id: None,
+        };
+        let content = source.provide(&ctx).await;
+        assert!(content.is_some());
+        assert!(content.unwrap().contains("Klyntbot"));
+    }
+}

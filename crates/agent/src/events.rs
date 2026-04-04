@@ -40,15 +40,6 @@ pub enum AgentEvent {
     /// A new agent iteration has started.
     IterationStart { iteration: usize, max: usize },
 
-    /// Pipeline classification step completed.
-    ClassificationComplete {
-        strategy: String,
-        confidence: f32,
-        source: String,
-        #[serde(rename = "durationMs")]
-        duration_ms: u64,
-    },
-
     /// Context assembly step completed.
     ContextAssembled {
         #[serde(rename = "totalTokens")]

@@ -145,19 +145,8 @@ pub(super) async fn init_cron(
             )
             .with_strategy_repo(repos.strategies.clone())
             .with_episodic_memory_repo(episodic_memory_repo)
-            .with_session_repo(repos.sessions.clone())
             .with_memory_param_sink(Arc::clone(&memory_param_sink)),
         );
-        // Spawn bootstrap replay as a background task to seed the first experiment
-        // from historical session data (no-op if experiments already exist).
-        {
-            let orch_clone = Arc::clone(&orchestrator);
-            tokio::spawn(async move {
-                if let Err(e) = agent::autotuner::run_bootstrap_replay(&orch_clone).await {
-                    warn!("bootstrap replay failed (non-fatal): {e}");
-                }
-            });
-        }
         agent::autotuner::AutoTunerOrchestrator::register_nightly_cycle(
             Arc::clone(&orchestrator),
             &cron_service,
