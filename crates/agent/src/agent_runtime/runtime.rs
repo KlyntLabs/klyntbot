@@ -19,6 +19,14 @@ use crate::execution::{execute_loop, DepthMode, ExecutionBudget, ExecutionParams
 use crate::output::cost_tracker::CostTracker;
 use crate::output::validator::{ResponseValidator, ValidationResult};
 
+/// LLM endpoint configuration for the runtime.
+pub struct RuntimeConfig {
+    pub execution_model: String,
+    pub provider_name: String,
+    pub context_window: usize,
+    pub max_response_tokens: usize,
+}
+
 /// Result of processing a message through the agent runtime.
 #[derive(Debug)]
 pub struct RuntimeResult {
@@ -45,7 +53,6 @@ pub struct AgentRuntime {
     execution_model: String,
     provider_name: String,
     context_window: usize,
-    max_response_tokens: usize,
     interaction_recorder: Option<crate::learning::InteractionRecorder>,
     procedural_rule_repo: Option<cognitive::ProceduralRuleRepo>,
     tool_registry: Option<Arc<RwLock<tools::registry::ToolRegistry>>>,
@@ -62,21 +69,17 @@ impl AgentRuntime {
         context_engine: Arc<ContextEngine>,
         core: Arc<crate::execution::ExecutionCore>,
         cost_tracker: Arc<CostTracker>,
-        execution_model: String,
-        provider_name: String,
-        context_window: usize,
-        max_response_tokens: usize,
+        cfg: RuntimeConfig,
         hot_config: Arc<RwLock<config::HotConfig>>,
     ) -> Self {
         Self {
             context_engine,
             core,
-            validator: ResponseValidator::new(max_response_tokens),
+            validator: ResponseValidator::new(cfg.max_response_tokens),
             cost_tracker,
-            execution_model,
-            provider_name,
-            context_window,
-            max_response_tokens,
+            execution_model: cfg.execution_model,
+            provider_name: cfg.provider_name,
+            context_window: cfg.context_window,
             interaction_recorder: None,
             procedural_rule_repo: None,
             tool_registry: None,
@@ -151,6 +154,7 @@ impl AgentRuntime {
 
     // ── Main pipeline ───────────────────────────────────────────
 
+    #[allow(clippy::too_many_arguments)]
     pub async fn process_message(
         &self,
         message: &str,
@@ -512,10 +516,12 @@ mod tests {
             context_engine,
             core,
             cost_tracker,
-            "mock-model".to_string(),
-            "mock".to_string(),
-            128_000,
-            8192,
+            RuntimeConfig {
+                execution_model: "mock-model".to_string(),
+                provider_name: "mock".to_string(),
+                context_window: 128_000,
+                max_response_tokens: 8192,
+            },
             hot_config,
         )
         .with_tool_registry(Arc::clone(&registry));

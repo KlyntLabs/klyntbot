@@ -47,7 +47,6 @@ pub struct AgentLoop {
     pub(crate) bus: Arc<MessageBus>,
     pub(crate) inbound_rx: Option<mpsc::Receiver<InboundMessage>>,
     pub(crate) config: Config,
-    pub(crate) context_engine: Arc<context_engine::ContextEngine>,
     pub(crate) session_manager: SessionManager,
     pub(crate) tool_registry: Arc<RwLock<tools::registry::ToolRegistry>>,
     pub(crate) running: Arc<AtomicBool>,
@@ -91,8 +90,6 @@ pub struct AgentLoop {
     pub(crate) activity_svc: Option<Arc<activity_log::ActivityIngestionService>>,
     /// Shared skill store — flat file-based skill loading, used for hot-reload.
     pub(crate) skill_store: Arc<RwLock<skill_system::SkillStore>>,
-    /// Shared embedding engine — reused for hot-reload embedding recomputation.
-    pub(crate) embedding_engine: Arc<tools::EmbeddingEngine>,
     /// Shared hot-reloadable config — updated by ConfigWatcherService without restart.
     pub(crate) hot_config: Arc<RwLock<config::HotConfig>>,
 }

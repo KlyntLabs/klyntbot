@@ -269,7 +269,6 @@ impl SimulationHarness {
                 inner_pool.clone(),
                 Arc::clone(&bus),
                 Arc::clone(&context_queue),
-                None, // embedding engine for agent harness (optional)
                 &scenario.simulation.agent_provider,
                 &scenario.simulation.agent_model,
                 max_provider_error_rate,

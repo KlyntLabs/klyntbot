@@ -47,7 +47,7 @@ pub use services::{
 
 // ── Type re-exports ──────────────────────────────────────────────────────────
 pub use agent_loop::{AgentLoop, StreamingHandle};
-pub use agent_runtime::{AgentRuntime, RuntimeResult};
+pub use agent_runtime::{AgentRuntime, RuntimeConfig, RuntimeResult};
 pub use cognitive_embedder::TextEmbedderImpl;
 pub use confidence::{ConfidenceAssessment, ConfidenceEvaluator, DecisionAction, DecisionLogger};
 pub use context_sources::ConfidenceSource;

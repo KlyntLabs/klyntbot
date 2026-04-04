@@ -82,7 +82,6 @@ impl AgentHarness {
         inner_pool: sqlx::SqlitePool,
         bus: Arc<DomainEventBus>,
         context_queue: Arc<bus::ContextUpdateQueue>,
-        embedding_engine: Option<Arc<tools::EmbeddingEngine>>,
         provider_name: &str,
         model: &str,
         provider_error_rate: f64,
@@ -147,10 +146,12 @@ impl AgentHarness {
             context_engine,
             core,
             cost_tracker,
-            model.to_string(),
-            provider_name.to_string(),
-            128_000, // context_window
-            8_192,   // max_response_tokens
+            agent::RuntimeConfig {
+                execution_model: model.to_string(),
+                provider_name: provider_name.to_string(),
+                context_window: 128_000,
+                max_response_tokens: 8_192,
+            },
             hot_config,
         );
 

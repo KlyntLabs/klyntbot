@@ -1597,10 +1597,12 @@ impl AgentLoopBuilder {
             Arc::clone(&context_engine),
             execution_core,
             cost_tracker,
-            config.agents.defaults.model.clone(),
-            provider.name().to_string(),
-            provider.context_window(),
-            config.agents.defaults.max_tokens as usize,
+            crate::agent_runtime::RuntimeConfig {
+                execution_model: config.agents.defaults.model.clone(),
+                provider_name: provider.name().to_string(),
+                context_window: provider.context_window(),
+                max_response_tokens: config.agents.defaults.max_tokens as usize,
+            },
             Arc::clone(&hot_config),
         )
         .with_tool_registry(Arc::clone(&tool_registry));
@@ -1684,7 +1686,6 @@ impl AgentLoopBuilder {
             bus,
             inbound_rx: Some(inbound_rx),
             config,
-            context_engine,
             session_manager,
             tool_registry,
             running: Arc::new(AtomicBool::new(false)),
@@ -1714,7 +1715,6 @@ impl AgentLoopBuilder {
             _tree_builder_token: tree_builder_token,
             activity_svc: self.activity_svc,
             skill_store,
-            embedding_engine,
             hot_config,
         })
     }

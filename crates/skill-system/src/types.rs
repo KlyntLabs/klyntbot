@@ -132,12 +132,6 @@ pub enum SkillChange {
     Updated(String),
 }
 
-pub struct SkillCatalog {
-    pub(crate) skills: HashMap<String, Arc<SkillPackage>>,
-    pub(crate) embeddings: HashMap<String, Vec<f32>>,
-    pub(crate) loaded_at: SystemTime,
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
