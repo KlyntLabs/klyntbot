@@ -4,24 +4,20 @@ use chrono::Utc;
 use desktop_shared::errors::ApiError;
 use feature_launcher::{
     Calculator, ClipboardRepo, FrequencyRepo, LauncherItem, LauncherItemKind, SourceRegistry,
-    UrlNavigation, WindowManager,
+    UrlNavigation,
 };
 use feature_notes::repo::NoteRepo;
 use storage::Repos;
-use tokio_util::sync::CancellationToken;
 
 use crate::errors::map_storage_err;
 
 /// Central search engine that fans out queries to all providers.
 pub struct LauncherSearchEngine {
-    pub(crate) registry: SourceRegistry,
-    pub(crate) frequency_repo: FrequencyRepo,
-    pub(crate) clipboard_repo: ClipboardRepo,
-    /// Held so the OS file-watcher thread is joined on drop.
-    pub(crate) _file_watcher: Option<feature_launcher::SourceFileWatcher>,
-    /// Held so the clipboard monitor task is cancelled on drop.
-    pub(crate) _clipboard_cancel: Option<CancellationToken>,
-    pub(crate) window_manager: WindowManager,
+    pub registry: SourceRegistry,
+    pub frequency_repo: FrequencyRepo,
+    pub clipboard_repo: ClipboardRepo,
+    /// Stored here so the OS watcher thread is joined on drop.
+    pub _file_watcher: Option<feature_launcher::SourceFileWatcher>,
 }
 
 impl LauncherSearchEngine {

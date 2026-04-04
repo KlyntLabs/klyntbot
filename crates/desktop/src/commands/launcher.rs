@@ -5,7 +5,6 @@ use std::sync::Arc;
 use desktop_shared::errors::ApiError;
 use feature_launcher::{
     ClipboardEntry, DashboardData, LauncherItem, ScriptRunner, SystemAction, SystemCommands,
-    WindowAction,
 };
 use tauri::State;
 
@@ -74,29 +73,9 @@ pub async fn launcher_system_command(action: SystemAction) -> Result<(), ApiErro
 }
 
 #[tauri::command]
-pub async fn launcher_window_action(
-    state: State<'_, Arc<AppCore>>,
-    action: WindowAction,
-) -> Result<(), ApiError> {
-    state.launcher_window_action(action).await
-}
-
-#[tauri::command]
 pub async fn launcher_open_app(path: String) -> Result<(), ApiError> {
     #[cfg(target_os = "macos")]
     {
-        // Activate in-place if already running — avoids ~200ms `open` subprocess latency
-        let app_path = std::path::PathBuf::from(&path);
-        let running = platform_macos::apps::running_applications();
-        let already_running = running
-            .iter()
-            .find(|a| a.path.as_ref().is_some_and(|p| p == &app_path));
-        if let Some(app) = already_running {
-            if platform_macos::apps::activate_app(app.pid) {
-                return Ok(());
-            }
-        }
-        // Fall back to `open` for non-running apps
         std::process::Command::new("open")
             .arg(&path)
             .spawn()
@@ -124,7 +103,6 @@ pub(crate) const DEV_COMMANDS: &[&str] = &[
     "launcher_run_script",
     "launcher_system_command",
     "launcher_open_app",
-    "launcher_window_action",
 ];
 
 #[cfg(debug_assertions)]
@@ -170,11 +148,6 @@ pub(crate) async fn dispatch_dev(
         "launcher_open_app" => {
             let path: String = dev::get(body, "path").unwrap_or_default();
             dev::val(launcher_open_app(path).await)
-        }
-        "launcher_window_action" => {
-            let action: feature_launcher::WindowAction =
-                dev::get(body, "action").unwrap_or(feature_launcher::WindowAction::Maximize);
-            dev::val(core.launcher_window_action(action).await)
         }
         _ => return None,
     })

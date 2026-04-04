@@ -10,12 +10,12 @@ use tracing::{error, info};
 use crate::handlers::launcher::LauncherSearchEngine;
 
 /// Results from launcher initialization phase.
-pub(crate) struct LauncherResult {
+pub(super) struct LauncherResult {
     pub launcher_engine: Option<Arc<LauncherSearchEngine>>,
 }
 
 /// Initialize the launcher feature (always enabled).
-pub(crate) async fn init_launcher(
+pub(super) async fn init_launcher(
     config: &config::Config,
     storage_pool: &StoragePool,
     shutdown_token: &CancellationToken,
@@ -126,10 +126,7 @@ pub(crate) async fn init_launcher(
 
     // Contacts — prefix @, pre-loaded index refreshed by BackgroundRefresher
     if launcher_config.sources.contacts.enabled {
-        let cache_dir = config.data_dir_path().join("cache");
-        sources.push(Arc::new(feature_launcher::ContactsSource::with_cache_dir(
-            cache_dir,
-        )));
+        sources.push(Arc::new(feature_launcher::ContactsSource::new()));
     }
 
     // Running apps — pre-loaded index refreshed by BackgroundRefresher
@@ -283,30 +280,11 @@ pub(crate) async fn init_launcher(
         None
     };
 
-    // Start clipboard monitor
-    let clipboard_cancel = if launcher_config.sources.clipboard.enabled {
-        let monitor = feature_launcher::ClipboardMonitor::new(
-            clipboard_repo.clone(),
-            launcher_config.sources.clipboard.max_entries,
-        );
-        let cancel = shutdown_token.child_token();
-        let monitor_cancel = cancel.clone();
-        tokio::spawn(async move {
-            monitor.start(monitor_cancel).await;
-        });
-        info!("ClipboardMonitor started (500ms poll)");
-        Some(cancel)
-    } else {
-        None
-    };
-
     let engine = Arc::new(LauncherSearchEngine {
         registry,
         frequency_repo,
         clipboard_repo,
         _file_watcher: file_watcher,
-        _clipboard_cancel: clipboard_cancel,
-        window_manager: feature_launcher::WindowManager::new(),
     });
 
     info!("launcher feature initialized");

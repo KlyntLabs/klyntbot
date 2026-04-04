@@ -4,7 +4,7 @@ mod coaching;
 mod cognitive;
 mod cron;
 mod deadline;
-pub(crate) mod launcher;
+mod launcher;
 mod productivity;
 mod storage;
 
@@ -340,8 +340,8 @@ impl AppCore {
         .await;
 
         // ── Phase 8: Launcher ─────────────────────────────────────────────
-        // Deferred to first launcher access via OnceCell in AppCore.
-        // Saves 10-50 MB (icon cache) + background refresher CPU at startup.
+        let launcher::LauncherResult { launcher_engine } =
+            launcher::init_launcher(&config, &storage_pool, &shutdown_token).await;
 
         // ── Phase 9: Mirror self-reflection layer ────────────────────────
         let (mirror_facade, mirror_handles, mirror_shutdown) = {
@@ -556,7 +556,7 @@ impl AppCore {
             note_embedding_handler,
             embedding_engine: appcore_embedding_engine,
             vector_store: appcore_vector_store,
-            launcher_engine: tokio::sync::OnceCell::new(),
+            launcher_engine,
             proactive_handler,
             suggestion_applier,
             decomposition_handler,

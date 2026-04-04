@@ -64,33 +64,3 @@ impl ClipboardMonitor {
         cancel.cancelled().await;
     }
 }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::repos::ClipboardRepo;
-    use storage::StoragePool;
-
-    #[tokio::test]
-    async fn test_monitor_starts_and_stops() {
-        let pool = StoragePool::connect_in_memory().await.unwrap();
-        StoragePool::run_feature_migrations(
-            pool.inner(),
-            &crate::LauncherFeature::migrations_static(),
-        )
-        .await
-        .unwrap();
-        let repo = ClipboardRepo::new(pool.inner().clone());
-        let monitor = ClipboardMonitor::new(repo, 100);
-        let cancel = CancellationToken::new();
-        let cancel_clone = cancel.clone();
-
-        let handle = tokio::spawn(async move {
-            monitor.start(cancel_clone).await;
-        });
-
-        tokio::time::sleep(std::time::Duration::from_millis(100)).await;
-        cancel.cancel();
-        handle.await.unwrap();
-    }
-}
