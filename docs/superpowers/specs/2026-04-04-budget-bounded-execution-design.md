@@ -59,7 +59,11 @@ Three user-selectable depth modes, presented as pills under the chat input:
 ### Normal (default)
 
 - Budget: skill-default tokens + turns (e.g., task-management: 40K/12 turns)
-- No HUD visible
+- Subtle depth status line at top of chat: `Normal • 12 turns • $0.004  [Deep Think?]`
+  - Tiny gray text, always dismissible, consistent across all modes
+  - One-tap `[Deep Think?]` escalates the current session without re-typing
+  - When Mirror has an adaptive suggestion, the link pulses briefly
+  - Provides visual continuity so Deep/Ultra HUD doesn't feel like a sudden mode switch
 - No Mirror/Coaching injection
 - No auto-save
 - Feels: instant, frictionless — like your own quick thoughts
@@ -335,6 +339,32 @@ Since we haven't released production yet, this is a clean breaking change:
 7. **Update config schema** (remove pipeline_timeout, add ExecutionConfig)
 8. **Update simulator** to use ExecutionBudget
 9. **Update desktop UI** to render depth pills + HUD (separate PR)
+
+## UX Polish Details
+
+### Budget Extend Button
+
+Context-aware copy instead of generic "+20 turns":
+- Finance context: "Think deeper on FIRE (+20 turns)"
+- Research context: "Continue research (+20 turns)"
+- Task context: "Keep planning (+20 turns)"
+
+Uses the active skill name to generate the label.
+
+### Ultra First-Use Confirmation
+
+Soft confirmation the first time a user selects Ultra for a new skill:
+- "Ultra will use up to 3× budget and auto-save to notes. Continue?"
+- One-time per skill (persisted in user preferences)
+- Skippable via settings toggle
+
+### Monthly Budget in HUD
+
+When monthly budget hits 80%, the depth status line integrates the warning:
+- `Normal • 12 turns • Monthly budget at 82% [Deep Think?]`
+- In Deep/Ultra HUD: amber indicator replaces the cost display
+- "Still want to go Ultra?" prompt appears on depth escalation
+- Keeps everything in one mental model — no separate toasts or modals
 
 ## Non-Goals
 
