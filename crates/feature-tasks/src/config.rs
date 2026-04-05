@@ -145,7 +145,7 @@ fn default_semantic_threshold() -> f64 {
 }
 
 fn default_embedding_model() -> String {
-    "all-MiniLM-L6-v2-Q".to_string()
+    "bge-small-en-v1.5-Q".to_string()
 }
 
 fn default_rrf_k() -> u32 {

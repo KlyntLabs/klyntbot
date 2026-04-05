@@ -16,7 +16,7 @@ use crate::embedding_store::EmbeddingRecord;
 use crate::todo_types::Todo;
 use common::Result;
 
-/// Expected embedding dimensionality for all-MiniLM-L6-v2-Q.
+/// Expected embedding dimensionality for bge-small-en-v1.5-Q.
 pub const EMBEDDING_DIM: usize = 384;
 
 /// Idle timeout before the ONNX model is unloaded from memory (1 minute).
@@ -68,7 +68,7 @@ impl EmbeddingEngine {
         if guard.is_none() {
             info!("Initializing embedding model (first use)...");
             let model = TextEmbedding::try_new(
-                InitOptions::new(EmbeddingModel::AllMiniLML6V2Q).with_show_download_progress(true),
+                InitOptions::new(EmbeddingModel::BGESmallENV15Q).with_show_download_progress(true),
             )
             .map_err(|e| {
                 common::ToolError::ExecutionFailed(format!(
@@ -201,7 +201,7 @@ impl EmbeddingEngine {
 
     /// Get the name of the embedding model being used.
     pub fn model_name(&self) -> &str {
-        "all-MiniLM-L6-v2-Q"
+        "bge-small-en-v1.5-Q"
     }
 
     /// Cosine similarity between two vectors.

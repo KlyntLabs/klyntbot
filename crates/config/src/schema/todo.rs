@@ -121,7 +121,7 @@ pub struct TodoSearchConfig {
     #[serde(default = "default_semantic_threshold")]
     pub semantic_threshold: f64,
 
-    /// Embedding model name (default: "all-MiniLM-L6-v2-Q")
+    /// Embedding model name (default: "bge-small-en-v1.5-Q")
     #[serde(default = "default_embedding_model")]
     pub embedding_model: String,
 
@@ -142,7 +142,7 @@ impl Default for TodoSearchConfig {
 }
 
 fn default_embedding_model() -> String {
-    "all-MiniLM-L6-v2-Q".to_string()
+    "bge-small-en-v1.5-Q".to_string()
 }
 
 fn default_rrf_k() -> u32 {
