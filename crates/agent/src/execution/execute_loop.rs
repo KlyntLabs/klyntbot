@@ -158,13 +158,29 @@ pub async fn execute_loop(
             }
 
             CycleOutcome::EmptyResponse => {
-                warn!("Execute loop: empty response from LLM");
-                // Treat as completion with empty content
+                if !last_content.is_empty() {
+                    // Had content from a previous turn — use that rather than
+                    // returning nothing.
+                    warn!("Execute loop: empty response after prior content, using last content");
+                    return Ok(ExecuteLoopResult {
+                        content: std::mem::take(&mut last_content),
+                        usage: accumulated_usage,
+                        turns: budget.turns_used(),
+                        budget_exhausted: false,
+                        tool_calls: all_tool_calls,
+                    });
+                }
+                if !budget.exhausted() {
+                    // Budget remaining — retry (tick_turn already called above).
+                    warn!("Execute loop: empty response from LLM, retrying");
+                    continue;
+                }
+                warn!("Execute loop: empty response from LLM, no budget for retry");
                 return Ok(ExecuteLoopResult {
                     content: String::new(),
                     usage: accumulated_usage,
                     turns: budget.turns_used(),
-                    budget_exhausted: false,
+                    budget_exhausted: true,
                     tool_calls: all_tool_calls,
                 });
             }

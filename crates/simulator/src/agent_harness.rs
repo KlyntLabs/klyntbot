@@ -19,6 +19,59 @@ use crate::agent_types::{AgentBreakpoint, AgentResult, BreakpointKind};
 use crate::persona::types::AnnotatedMessage;
 use crate::providers::SimulationProvider;
 
+// ── Error-injecting tool wrapper ─────────────────────────────────────
+
+/// Wraps a tool and probabilistically returns an error on `execute`.
+struct ErrorInjectingTool {
+    inner: tools::DynTool,
+    rate: f64,
+    rng: std::sync::Mutex<rand::rngs::StdRng>,
+}
+
+impl ErrorInjectingTool {
+    fn new(inner: tools::DynTool, rate: f64, seed: u64) -> Self {
+        use rand::SeedableRng;
+        let name_hash = inner
+            .name()
+            .bytes()
+            .fold(0u64, |a, b| a.wrapping_add(b as u64));
+        Self {
+            inner,
+            rate,
+            rng: std::sync::Mutex::new(rand::rngs::StdRng::seed_from_u64(
+                seed.wrapping_add(name_hash),
+            )),
+        }
+    }
+}
+
+#[async_trait::async_trait]
+impl tools::Tool for ErrorInjectingTool {
+    fn name(&self) -> &str {
+        self.inner.name()
+    }
+    fn description(&self) -> &str {
+        self.inner.description()
+    }
+    fn parameters(&self) -> serde_json::Value {
+        self.inner.parameters()
+    }
+    async fn execute(
+        &self,
+        args: serde_json::Value,
+        ctx: &RoutingContext,
+    ) -> common::Result<String> {
+        let injected = {
+            let mut rng = self.rng.lock().unwrap();
+            crate::error_injector::sample_injected_error(&mut rng, self.rate)
+        };
+        if let Some(err) = injected {
+            return Err(err);
+        }
+        self.inner.execute(args, ctx).await
+    }
+}
+
 /// Create an LLM provider from scenario config using the provider registry.
 /// Falls back to mock with a warning if the provider is unknown or the API key is missing.
 fn create_provider(provider_name: &str, model: &str, seed: u64) -> DynProvider {
@@ -85,6 +138,7 @@ impl AgentHarness {
         provider_name: &str,
         model: &str,
         provider_error_rate: f64,
+        error_injection_rate: f64,
         seed: u64,
     ) -> common::Result<Self> {
         let inner_provider = create_provider(provider_name, model, seed);
@@ -103,6 +157,15 @@ impl AgentHarness {
         // Build tool registry with real domain tools
         let mut tool_registry = ToolRegistry::new();
         Self::register_tools(&mut tool_registry, pool, &inner_pool, &bus);
+
+        // Wrap tools with error injection if configured
+        if error_injection_rate > 0.0 {
+            let mut wrapped = ToolRegistry::new();
+            for tool in tool_registry.take_all() {
+                wrapped.register(ErrorInjectingTool::new(tool, error_injection_rate, seed));
+            }
+            tool_registry = wrapped;
+        }
 
         let tool_registry = Arc::new(RwLock::new(tool_registry));
 
@@ -279,23 +342,17 @@ impl AgentHarness {
         // Collect agent events via channel — drain live for real-time visibility
         let (event_tx, mut event_rx) = tokio::sync::mpsc::channel(64);
 
-        use std::sync::atomic::{AtomicU32, AtomicU64, Ordering::Relaxed};
-        let drain_prompt = Arc::new(AtomicU32::new(0));
-        let drain_completion = Arc::new(AtomicU32::new(0));
-        let drain_cache_read = Arc::new(AtomicU32::new(0));
-        let drain_cache_write = Arc::new(AtomicU32::new(0));
-        let drain_cost_micro = Arc::new(AtomicU64::new(0));
-
-        let dp = drain_prompt.clone();
-        let dc = drain_completion.clone();
-        let dcr = drain_cache_read.clone();
-        let dcw = drain_cache_write.clone();
-        let dcm = drain_cost_micro.clone();
-
         let msg_preview: String = msg.content.chars().take(60).collect();
         let event_drain = tokio::spawn(async move {
             let mut tool_calls = Vec::<String>::new();
             let mut iterations = 0u32;
+            let mut prompt_tokens = 0u32;
+            let mut completion_tokens = 0u32;
+            let mut cache_read_tokens = 0u32;
+            let mut cache_write_tokens = 0u32;
+            let mut cost_micro = 0u64;
+            let mut tool_failures = 0u32;
+
             while let Some(event) = event_rx.recv().await {
                 match event {
                     AgentEvent::ToolStart { ref name, .. } => {
@@ -316,22 +373,25 @@ impl AgentHarness {
                         );
                     }
                     AgentEvent::UsageReport {
-                        prompt_tokens,
-                        completion_tokens,
-                        cache_read_tokens,
-                        cache_write_tokens,
+                        prompt_tokens: pt,
+                        completion_tokens: ct,
+                        cache_read_tokens: crt,
+                        cache_write_tokens: cwt,
                         estimated_cost_usd,
                         response_time_ms,
                         ..
                     } => {
                         eprintln!(
-                            "      $ {prompt_tokens}+{completion_tokens} tokens, ${estimated_cost_usd:.4}, {response_time_ms}ms"
+                            "      $ {pt}+{ct} tokens, ${estimated_cost_usd:.4}, {response_time_ms}ms"
                         );
-                        dp.fetch_add(prompt_tokens, Relaxed);
-                        dc.fetch_add(completion_tokens, Relaxed);
-                        dcr.fetch_add(cache_read_tokens, Relaxed);
-                        dcw.fetch_add(cache_write_tokens, Relaxed);
-                        dcm.fetch_add((estimated_cost_usd * 1_000_000.0) as u64, Relaxed);
+                        prompt_tokens += pt;
+                        completion_tokens += ct;
+                        cache_read_tokens += crt;
+                        cache_write_tokens += cwt;
+                        cost_micro += (estimated_cost_usd * 1_000_000.0) as u64;
+                    }
+                    AgentEvent::ToolEnd { success: false, .. } => {
+                        tool_failures += 1;
                     }
                     AgentEvent::Done { .. } => {
                         eprintln!("      ✓ done: {msg_preview}…");
@@ -342,7 +402,16 @@ impl AgentHarness {
                     _ => {}
                 }
             }
-            (tool_calls, iterations)
+            (
+                tool_calls,
+                iterations,
+                prompt_tokens,
+                completion_tokens,
+                cache_read_tokens,
+                cache_write_tokens,
+                cost_micro,
+                tool_failures,
+            )
         });
 
         let result = self
@@ -363,7 +432,16 @@ impl AgentHarness {
             .await;
 
         // Wait for event drain to finish and collect results
-        let (tool_calls, iterations) = event_drain.await.unwrap_or_default();
+        let (
+            tool_calls,
+            iterations,
+            drain_prompt,
+            drain_completion,
+            drain_cache_read,
+            drain_cache_write,
+            drain_cost_micro,
+            drain_tool_failures,
+        ) = event_drain.await.unwrap_or_default();
 
         let mut breakpoints = Vec::new();
         let phase = msg.phase.to_string();
@@ -407,11 +485,12 @@ impl AgentHarness {
                     response: runtime_result.content,
                     error: None,
                     breakpoints,
-                    prompt_tokens: drain_prompt.load(Relaxed),
-                    completion_tokens: drain_completion.load(Relaxed),
-                    cache_read_tokens: drain_cache_read.load(Relaxed),
-                    cache_write_tokens: drain_cache_write.load(Relaxed),
-                    cost_usd: drain_cost_micro.load(Relaxed) as f64 / 1_000_000.0,
+                    prompt_tokens: drain_prompt,
+                    completion_tokens: drain_completion,
+                    cache_read_tokens: drain_cache_read,
+                    cache_write_tokens: drain_cache_write,
+                    cost_usd: drain_cost_micro as f64 / 1_000_000.0,
+                    tool_failures: drain_tool_failures,
                 }
             }
             Err(e) => {
@@ -443,11 +522,12 @@ impl AgentHarness {
                     response: String::new(),
                     error: Some(error_str),
                     breakpoints,
-                    prompt_tokens: drain_prompt.load(Relaxed),
-                    completion_tokens: drain_completion.load(Relaxed),
-                    cache_read_tokens: drain_cache_read.load(Relaxed),
-                    cache_write_tokens: drain_cache_write.load(Relaxed),
-                    cost_usd: drain_cost_micro.load(Relaxed) as f64 / 1_000_000.0,
+                    prompt_tokens: drain_prompt,
+                    completion_tokens: drain_completion,
+                    cache_read_tokens: drain_cache_read,
+                    cache_write_tokens: drain_cache_write,
+                    cost_usd: drain_cost_micro as f64 / 1_000_000.0,
+                    tool_failures: drain_tool_failures,
                 }
             }
         }

@@ -305,6 +305,13 @@ impl ToolRegistry {
             .collect()
     }
 
+    /// Remove and return all tools, leaving the registry empty.
+    pub fn take_all(&mut self) -> Vec<DynTool> {
+        self.metadata.clear();
+        self.invalidate_cache();
+        std::mem::take(&mut self.tools).into_values().collect()
+    }
+
     /// Get list of registered tool names
     pub fn tool_names(&self) -> Vec<String> {
         self.tools.keys().cloned().collect()

@@ -490,17 +490,21 @@ impl PersonaRunner {
         }
     }
 
-    /// Map topic to an expected response hint for ground-truth annotations.
+    /// Map topic to a semantic intent description for ground-truth scoring.
+    ///
+    /// These are domain-intent phrases, not literal expected text. Embedding
+    /// similarity measures whether the agent's response addresses the right
+    /// domain — not whether it matches a specific wording.
     fn expected_response_for_topic(&self, topic: &str) -> Option<String> {
         match topic {
-            "tasks" => Some("Here are your tasks. I can help you create, complete, or prioritize them.".to_string()),
-            "notes" => Some("I can help with your notes. Let me search, create, or summarize them.".to_string()),
-            "finance" => Some("Here's your financial summary. I can track expenses, check budgets, or show trends.".to_string()),
-            "productivity" => Some("Let me help with your focus and productivity. I can start a session or show your stats.".to_string()),
-            "coaching" => Some("I understand you're looking for guidance. Let me help you with priorities and habits.".to_string()),
-            "learning" => Some("I can help you study. Let me create flashcards or quiz you on the topic.".to_string()),
-            "automation" => Some("I can set up reminders and recurring tasks to automate your workflow.".to_string()),
-            "insights" => Some("Let me analyze patterns across your data and show you cross-domain connections.".to_string()),
+            "tasks" => Some("task management: listing tasks, creating tasks, completing tasks, setting priorities and deadlines, project planning".to_string()),
+            "notes" => Some("note taking: creating notes, searching notes, organizing knowledge, summarizing content, documentation".to_string()),
+            "finance" => Some("financial tracking: recording expenses, checking budgets, transaction categories, spending trends, financial summary".to_string()),
+            "productivity" => Some("productivity and focus: starting focus sessions, tracking time, work habits, distraction management, energy levels".to_string()),
+            "coaching" => Some("personal coaching: behavioral guidance, habit formation, priority management, motivation, work-life balance".to_string()),
+            "learning" => Some("learning and study: flashcards, spaced repetition, knowledge review, quiz practice, educational content".to_string()),
+            "automation" => Some("workflow automation: scheduled reminders, recurring tasks, cron jobs, automated notifications".to_string()),
+            "insights" => Some("cross-domain insights: pattern analysis, connections between data, trends, correlations, behavioral patterns".to_string()),
             _ => None,
         }
     }

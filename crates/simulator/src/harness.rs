@@ -254,15 +254,20 @@ impl SimulationHarness {
 
         // Build agent harness if agent_mode is enabled.
         let agent_harness = if scenario.simulation.agent_mode {
-            let max_provider_error_rate = [
+            let phases = [
                 &scenario.persona.phases.onboarding,
                 &scenario.persona.phases.routine,
                 &scenario.persona.phases.power_user,
                 &scenario.persona.phases.behavior_shift,
-            ]
-            .iter()
-            .map(|p| p.provider_error_rate)
-            .fold(0.0f64, f64::max);
+            ];
+            let max_provider_error_rate = phases
+                .iter()
+                .map(|p| p.provider_error_rate)
+                .fold(0.0f64, f64::max);
+            let max_error_injection_rate = phases
+                .iter()
+                .map(|p| p.error_injection_rate)
+                .fold(0.0f64, f64::max);
 
             match crate::agent_harness::AgentHarness::new(
                 &pool,
@@ -272,6 +277,7 @@ impl SimulationHarness {
                 &scenario.simulation.agent_provider,
                 &scenario.simulation.agent_model,
                 max_provider_error_rate,
+                max_error_injection_rate,
                 scenario.persona.seed,
             )
             .await
@@ -824,7 +830,13 @@ impl SimulationHarness {
                         agent_react_iterations_sum += agent_result.iterations;
 
                         metrics.accumulator_mut().agent_tool_calls += 1;
-                        // Check tool selection against expected tool for this topic
+                    }
+
+                    // Check tool selection: did the agent use the expected domain
+                    // tool for this topic? Scored for all messages with a known
+                    // topic→tool mapping, regardless of whether the agent made tool
+                    // calls (no tool calls for a tool-expected topic = incorrect).
+                    {
                         let expected_tool = match msg.topic.as_str() {
                             "tasks" => Some("tasks"),
                             "finance" => Some("finance"),
@@ -832,6 +844,7 @@ impl SimulationHarness {
                             "productivity" => Some("productivity"),
                             "learning" => Some("learning"),
                             "automation" => Some("cron"),
+                            "coaching" => Some("productivity"),
                             _ => None,
                         };
                         if let Some(expected) = expected_tool {
@@ -875,13 +888,20 @@ impl SimulationHarness {
                         }
                     }
 
-                    // Track error recovery: if this message had an injected tool
-                    // failure (heuristic path) but the agent still produced
-                    // a meaningful response, count it as recovered.
-                    if msg_had_error_injection
+                    // Track error recovery: count tool failures the agent
+                    // encountered, and whether it still produced a response.
+                    if agent_result.tool_failures > 0 {
+                        metrics.accumulator_mut().error_injected += agent_result.tool_failures;
+                        // One recovery event per turn that succeeded despite failures.
+                        if agent_result.error.is_none() && !agent_result.response.trim().is_empty()
+                        {
+                            metrics.accumulator_mut().error_recovered += 1;
+                        }
+                    } else if msg_had_error_injection
                         && agent_result.error.is_none()
                         && !agent_result.response.trim().is_empty()
                     {
+                        // Heuristic-path fallback (when agent mode skips tool execution)
                         metrics.accumulator_mut().error_recovered += 1;
                     }
 

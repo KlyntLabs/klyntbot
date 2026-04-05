@@ -41,6 +41,7 @@ pub struct AgentResult {
     pub cache_read_tokens: u32,
     pub cache_write_tokens: u32,
     pub cost_usd: f64,
+    pub tool_failures: u32,
 }
 
 /// Expected workflow pattern for cross-feature messages.
