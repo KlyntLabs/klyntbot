@@ -230,16 +230,24 @@ impl MetricCollector {
             (self.cumulative_tasks_completed as f64 / self.cumulative_tasks_created as f64).min(1.0)
         };
         let routing_stability = acc.routing_matches as f64 / msgs;
-        let routing_accuracy = if acc.routing_total == 0 {
-            0.0
-        } else {
+        // In the flat skill system, routing accuracy comes from agent path
+        // (all messages handled by "klyntbot"). Fall back to heuristic metric
+        // if agent routing data is absent.
+        let routing_accuracy = if acc.agent_routing_total > 0 {
+            acc.agent_routing_correct as f64 / acc.agent_routing_total as f64
+        } else if acc.routing_total > 0 {
             acc.routing_correct as f64 / acc.routing_total as f64
+        } else {
+            0.0
         };
 
-        let response_quality = if acc.response_quality_count == 0 {
-            0.0
-        } else {
+        // Prefer agent-path response quality over heuristic-mode metric.
+        let response_quality = if acc.agent_response_quality_count > 0 {
+            acc.agent_response_quality_sum / acc.agent_response_quality_count as f64
+        } else if acc.response_quality_count > 0 {
             acc.response_quality_sum / acc.response_quality_count as f64
+        } else {
+            0.0
         };
         let salience_total = acc.salience_extract + acc.salience_accumulate + acc.salience_discard;
         let salience_extract_rate = if salience_total == 0 {

@@ -40,13 +40,17 @@ pub(super) async fn init_storage(
     let repos = Repos::from_pool(&storage_pool);
     let vector_store = VectorStore::connect(&data_dir).await.ok();
     // Create ANN indexes + compact fragment files in the background.
+    // Deferred by 60s to avoid a memory stampede at startup — compaction
+    // and IVF-PQ training mmap many fragment files and can spike RSS by
+    // hundreds of MB when all 12 tables are processed at once.
     if let Some(vs) = &vector_store {
         let vs_bg = vs.clone();
         tokio::spawn(async move {
-            // Compact first to merge small fragments and reclaim memory
+            tokio::time::sleep(std::time::Duration::from_secs(60)).await;
             if let Err(e) = vs_bg.optimize_all_tables().await {
                 warn!("LanceDB startup compaction failed (non-fatal): {e}");
             }
+            tokio::time::sleep(std::time::Duration::from_secs(5)).await;
             if let Err(e) = vs_bg.ensure_indexes(256).await {
                 warn!("ANN index creation failed (non-fatal): {e}");
             }

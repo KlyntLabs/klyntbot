@@ -1,6 +1,7 @@
 use std::collections::VecDeque;
 use std::convert::Infallible;
 use std::sync::Arc;
+use std::time::{Duration, Instant};
 
 use axum::extract::{Path, State};
 use axum::response::sse::{Event, KeepAlive, Sse};
@@ -12,6 +13,9 @@ use super::{err, ok, ApiResult, DevState, SseChannels, SseEmitter};
 use crate::app_core::AppCore;
 use crate::commands::dev_helpers as dev;
 use ::app_core::events::AppEventEmitter;
+
+/// Maximum age for an SSE channel with no active receivers before eviction.
+const SSE_CHANNEL_TTL: Duration = Duration::from_secs(300);
 
 /// Handle `chat_send` separately because it needs SSE channel state to relay
 /// streaming agent events back to the browser via Server-Sent Events.
@@ -30,11 +34,17 @@ pub(super) async fn dispatch_chat_send(
     };
     let context: Option<desktop_shared::commands::SessionContextInput> = dev::get(body, "context");
 
+    // Evict stale SSE channels (no receiver for >5 min)
+    sse_channels.retain(|_, (sender, created)| {
+        sender.receiver_count() > 0 || created.elapsed() < SSE_CHANNEL_TTL
+    });
+
     match core.chat_send(content, session_key.clone(), context).await {
         Ok((user_msg, stream_info)) => {
             let tx = sse_channels
                 .entry(session_key)
-                .or_insert_with(|| broadcast::channel(256).0)
+                .or_insert_with(|| (broadcast::channel(256).0, Instant::now()))
+                .0
                 .clone();
             let emitter: Arc<dyn AppEventEmitter> = Arc::new(SseEmitter { tx });
             core.spawn_chat_relay(stream_info, emitter);
@@ -57,8 +67,9 @@ pub(super) async fn sse_handler(
     let rx = state
         .sse_channels
         .entry(session_key.clone())
-        .or_insert_with(|| broadcast::channel(256).0)
+        .or_insert_with(|| (broadcast::channel(256).0, Instant::now()))
         .value()
+        .0
         .subscribe();
 
     let sse_channels = Arc::clone(&state.sse_channels);
@@ -114,7 +125,8 @@ pub(super) async fn dispatch_insight_tab_chat(
     let session_key = params.session_key.clone();
     let tx = sse_channels
         .entry(session_key.clone())
-        .or_insert_with(|| broadcast::channel(256).0)
+        .or_insert_with(|| (broadcast::channel(256).0, Instant::now()))
+        .0
         .clone();
     let emitter: Arc<dyn AppEventEmitter> = Arc::new(SseEmitter { tx });
 
@@ -245,17 +257,18 @@ pub(super) async fn cognitive_sse_handler(
                     match result {
                         Ok(event) => {
                             let salience = cognitive::salience::evaluate_salience(&event);
-                            let salience_str = match salience {
-                                cognitive::types::SalienceVerdict::Extract => "extract",
-                                cognitive::types::SalienceVerdict::Accumulate => "accumulate",
-                                cognitive::types::SalienceVerdict::Discard => "discard",
-                            };
+                            let salience_str = salience.as_str();
+                            // Avoid serializing the full DomainEvent — large payloads
+                            // (note content, chat turns) cause GB-scale heap pressure.
+                            // Match the production path in app_core.rs: send only the
+                            // variant name, not the full payload.
+                            let event_type = event.variant_name().to_string();
                             let payload = serde_json::json!({
-                                "eventType": format!("{:?}", event).split('{').next().unwrap_or("Unknown").trim(),
+                                "eventType": &event_type,
                                 "salience": salience_str,
                                 "domain": event.domain(),
                                 "timestamp": chrono::Utc::now().to_rfc3339(),
-                                "payload": serde_json::to_value(&event).unwrap_or_default(),
+                                "payload": event_type,
                             });
                             let cog_data = serde_json::to_string(&payload).unwrap_or_default();
                             let cog_event = Event::default().event("cognitive:domain_event").data(cog_data);

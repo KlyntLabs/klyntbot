@@ -131,11 +131,11 @@ impl AppCore {
 
         // DomainEventBus is created before cron so the proactive scan callback
         // can capture it and emit ProactiveSuggestionCreated after persisting.
-        // Reduced from 512 to 128: with ~20 subscribers each cloning every
-        // event, 512 slots × 20 clones = 10k concurrent DomainEvent values
-        // under backpressure, causing GB-scale heap pressure. 128 slots shed
-        // load faster via Lagged errors to slow subscribers.
-        let domain_event_bus = Arc::new(bus::DomainEventBus::new(128));
+        // With ~15 subscribers each cloning every event, slot count × clones
+        // determines peak memory under backpressure. 32 slots shed load
+        // aggressively via Lagged errors. Heavy-payload events (note content,
+        // chat turns) make even small ring buffers expensive.
+        let domain_event_bus = Arc::new(bus::DomainEventBus::new(32));
 
         // Context update queue for live context refresher (shared between agent + background services).
         let context_update_queue = Arc::new(bus::ContextUpdateQueue::new());
@@ -270,10 +270,12 @@ impl AppCore {
 
         let shutdown_token = CancellationToken::new();
 
-        // Idle-unload for the ONNX embedding model (interval matches EMBEDDING_IDLE_SECS)
+        // Idle-unload for the ONNX embedding model — check every 30s so the
+        // model is unloaded within ~30s of exceeding the 60s idle threshold
+        // (previously 120s poll meant up to 180s of retained model memory).
         {
             let engine = Arc::clone(&embedding_engine);
-            spawn_periodic_timer(&shutdown_token, 120, move || {
+            spawn_periodic_timer(&shutdown_token, 30, move || {
                 engine.unload_if_idle();
             });
         }
@@ -463,38 +465,51 @@ impl AppCore {
             });
         }
 
-        // ── Auto-create note on trial kill (fire-and-forget) ─────────────
+        // ── Auto-create note on trial kill ──────────────────────────────
         {
             let note_repo = note_repo.clone();
             let mut rx = domain_event_bus.subscribe();
+            let token = shutdown_token.clone();
             tokio::spawn(async move {
-                while let Ok(event) = rx.recv().await {
-                    if let bus::DomainEvent::MirrorTrialKilled { trial_id } = event {
-                        let now = feature_notes::repo::utc_now_str();
-                        let row = feature_notes::models::NoteRow {
-                            id: uuid::Uuid::new_v4().to_string(),
-                            notebook_id: None,
-                            title: format!("Killed experiment: {trial_id}"),
-                            body: "Manually killed this experiment trial from the Mirror."
-                                .to_string(),
-                            body_html: None,
-                            body_json: None,
-                            pinned: 0,
-                            archived: 0,
-                            icon: None,
-                            color: None,
-                            embedding_updated_at: None,
-                            split_content: None,
-                            split_mode: None,
-                            perspective_config: None,
-                            last_visited_at: None,
-                            created_at: now.clone(),
-                            updated_at: now,
-                        };
-                        if let Err(e) = note_repo.create_note(&row).await {
-                            tracing::warn!(
-                                "mirror: failed to auto-create note for killed trial {trial_id}: {e}"
-                            );
+                loop {
+                    tokio::select! {
+                        _ = token.cancelled() => break,
+                        result = rx.recv() => {
+                            match result {
+                                Ok(bus::DomainEvent::MirrorTrialKilled { trial_id }) => {
+                                    let now = feature_notes::repo::utc_now_str();
+                                    let row = feature_notes::models::NoteRow {
+                                        id: uuid::Uuid::new_v4().to_string(),
+                                        notebook_id: None,
+                                        title: format!("Killed experiment: {trial_id}"),
+                                        body: "Manually killed this experiment trial from the Mirror."
+                                            .to_string(),
+                                        body_html: None,
+                                        body_json: None,
+                                        pinned: 0,
+                                        archived: 0,
+                                        icon: None,
+                                        color: None,
+                                        embedding_updated_at: None,
+                                        split_content: None,
+                                        split_mode: None,
+                                        perspective_config: None,
+                                        last_visited_at: None,
+                                        created_at: now.clone(),
+                                        updated_at: now,
+                                    };
+                                    if let Err(e) = note_repo.create_note(&row).await {
+                                        tracing::warn!(
+                                            "mirror: failed to auto-create note for killed trial {trial_id}: {e}"
+                                        );
+                                    }
+                                }
+                                Ok(_) => {}
+                                Err(tokio::sync::broadcast::error::RecvError::Lagged(n)) => {
+                                    tracing::warn!("trial-kill note task lagged by {n} events");
+                                }
+                                Err(tokio::sync::broadcast::error::RecvError::Closed) => break,
+                            }
                         }
                     }
                 }
@@ -1277,9 +1292,17 @@ fn spawn_background(
         }
     });
 
+    let cm_token = shutdown_token.child_token();
     tokio::spawn(async move {
-        if let Err(e) = channel_manager.lock().await.start_all().await {
-            tracing::error!("channel manager error: {}", e);
+        tokio::select! {
+            result = async { channel_manager.lock().await.start_all().await } => {
+                if let Err(e) = result {
+                    tracing::error!("channel manager error: {}", e);
+                }
+            }
+            _ = cm_token.cancelled() => {
+                info!("channel manager shutdown via token");
+            }
         }
     });
 

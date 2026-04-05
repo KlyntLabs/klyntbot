@@ -619,7 +619,7 @@ fn run_desktop_app() {
                 let shutdown = app.state::<Arc<app_core::AppCore>>().shutdown_token.clone();
                 tauri::async_runtime::spawn(async move {
                     let mut interval =
-                        tokio::time::interval(std::time::Duration::from_secs(30));
+                        tokio::time::interval(std::time::Duration::from_secs(10));
                     loop {
                         tokio::select! {
                             _ = shutdown.cancelled() => break,
@@ -634,7 +634,10 @@ fn run_desktop_app() {
             }
 
             // Start the tray countdown (next upcoming event in menu bar)
-            tray_countdown::spawn(app.handle());
+            {
+                let shutdown = app.state::<Arc<app_core::AppCore>>().shutdown_token.clone();
+                tray_countdown::spawn(app.handle(), shutdown);
+            }
 
             Ok(())
         })

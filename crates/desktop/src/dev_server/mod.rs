@@ -26,7 +26,8 @@ use tracing::{error, info};
 use crate::app_core::AppCore;
 use ::app_core::events::AppEventEmitter;
 
-pub(super) type SseChannels = Arc<DashMap<String, broadcast::Sender<(String, Value)>>>;
+pub(super) type SseChannels =
+    Arc<DashMap<String, (broadcast::Sender<(String, Value)>, std::time::Instant)>>;
 
 #[derive(Clone)]
 pub(super) struct DevState {

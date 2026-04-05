@@ -159,18 +159,11 @@ fn spawn_event_log_persistence(
                             Ok(event) => {
                                 let salience = cognitive::salience::evaluate_salience(&event);
                                 let domain = event.domain();
-                                let salience_str = match salience {
-                                    cognitive::types::SalienceVerdict::Extract => "extract",
-                                    cognitive::types::SalienceVerdict::Accumulate => "accumulate",
-                                    cognitive::types::SalienceVerdict::Discard => "discard",
-                                };
-                                let event_type = format!("{:?}", event)
-                                    .split('{')
-                                    .next()
-                                    .unwrap_or("Unknown")
-                                    .trim()
-                                    .to_string();
-                                let payload = serde_json::to_string(&event).unwrap_or_default();
+                                let salience_str = salience.as_str();
+                                let event_type = event.variant_name().to_string();
+                                // Store only the variant name — full serialization
+                                // causes heap pressure with large payloads.
+                                let payload = &event_type;
                                 let ts = chrono::Utc::now().to_rfc3339();
                                 let id = uuid::Uuid::new_v4().to_string();
 

@@ -744,8 +744,6 @@ impl LlmProvider for AnthropicNativeProvider {
 
     async fn health_check(&self) -> Result<ProviderHealth> {
         let url = format!("{}/v1/messages", self.base_url);
-        let health_client =
-            build_http_client(Duration::from_secs(5)).expect("failed to build health check client");
 
         // Send a minimal request — Anthropic doesn't have a /models endpoint,
         // so we POST a tiny messages request and check for a non-error response.
@@ -756,11 +754,13 @@ impl LlmProvider for AnthropicNativeProvider {
             "messages": [{"role": "user", "content": "ping"}],
         });
 
-        match health_client
+        match self
+            .client
             .post(&url)
             .header("x-api-key", self.api_key.expose())
             .header("anthropic-version", &self.api_version)
             .header("content-type", "application/json")
+            .timeout(Duration::from_secs(5))
             .json(&body)
             .send()
             .await

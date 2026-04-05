@@ -205,15 +205,15 @@ pub struct SessionMessage {
 }
 
 /// Compaction threshold: compact when entries exceed this count
-const COMPACTION_THRESHOLD: usize = 1000;
+const COMPACTION_THRESHOLD: usize = 200;
 
 /// Number of entries to keep after compaction
-const COMPACTION_KEEP: usize = 500;
+const COMPACTION_KEEP: usize = 100;
 
 /// In-memory trim threshold: trim the Vec when it exceeds this.
 /// Must be ≤ COMPACTION_THRESHOLD so SQL compaction can still fire for
 /// sessions loaded from disk with many historical messages.
-const IN_MEMORY_TRIM_THRESHOLD: usize = 600;
+const IN_MEMORY_TRIM_THRESHOLD: usize = 150;
 
 /// Number of messages to keep after an in-memory trim.
 const IN_MEMORY_TRIM_KEEP: usize = COMPACTION_KEEP;

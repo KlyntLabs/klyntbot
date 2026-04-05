@@ -74,7 +74,7 @@ pub(super) async fn init_agent(
 
     // 8. Build AgentLoop
     let (pipeline_broadcast_tx, _) =
-        tokio::sync::broadcast::channel::<cognitive::PipelineEvent>(64);
+        tokio::sync::broadcast::channel::<cognitive::PipelineEvent>(16);
     let pipeline_tx = pipeline_broadcast_tx.clone();
     let mut builder = AgentLoop::builder(bus.clone(), provider, config.clone())
         .with_pool(storage_pool.inner().clone())

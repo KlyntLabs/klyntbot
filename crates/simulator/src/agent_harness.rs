@@ -276,8 +276,54 @@ impl AgentHarness {
             registry.get_definitions()
         };
 
-        // Collect agent events via channel
+        // Collect agent events via channel — drain live for real-time visibility
         let (event_tx, mut event_rx) = tokio::sync::mpsc::channel(64);
+
+        let msg_preview: String = msg.content.chars().take(60).collect();
+        let event_drain = tokio::spawn(async move {
+            let mut tool_calls = Vec::<String>::new();
+            let mut iterations = 0u32;
+            while let Some(event) = event_rx.recv().await {
+                match event {
+                    AgentEvent::ToolStart { ref name, .. } => {
+                        eprintln!("      → tool: {name}");
+                        tool_calls.push(name.clone());
+                    }
+                    AgentEvent::IterationStart { iteration, max, .. } => {
+                        eprintln!("      ↻ turn {iteration}/{max}");
+                        iterations = iteration as u32;
+                    }
+                    AgentEvent::ContextAssembled {
+                        total_tokens,
+                        budget,
+                        duration_ms,
+                    } => {
+                        eprintln!(
+                            "      ◈ context: {total_tokens}/{budget} tokens ({duration_ms}ms)"
+                        );
+                    }
+                    AgentEvent::UsageReport {
+                        prompt_tokens,
+                        completion_tokens,
+                        estimated_cost_usd,
+                        response_time_ms,
+                        ..
+                    } => {
+                        eprintln!(
+                            "      $ {prompt_tokens}+{completion_tokens} tokens, ${estimated_cost_usd:.4}, {response_time_ms}ms"
+                        );
+                    }
+                    AgentEvent::Done { .. } => {
+                        eprintln!("      ✓ done: {msg_preview}…");
+                    }
+                    AgentEvent::Error { message } => {
+                        eprintln!("      ✗ error: {message}");
+                    }
+                    _ => {}
+                }
+            }
+            (tool_calls, iterations)
+        });
 
         let result = self
             .runtime
@@ -296,20 +342,8 @@ impl AgentHarness {
             )
             .await;
 
-        // Drain events to count tool calls and iterations
-        let mut tool_calls = Vec::new();
-        let mut iterations = 0u32;
-        while let Ok(event) = event_rx.try_recv() {
-            match event {
-                AgentEvent::ToolStart { name, .. } => {
-                    tool_calls.push(name);
-                }
-                AgentEvent::IterationStart { iteration, .. } => {
-                    iterations = iteration as u32;
-                }
-                _ => {}
-            }
-        }
+        // Wait for event drain to finish and collect results
+        let (tool_calls, iterations) = event_drain.await.unwrap_or_default();
 
         let mut breakpoints = Vec::new();
         let phase = msg.phase.to_string();

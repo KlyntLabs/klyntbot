@@ -793,7 +793,8 @@ impl SimulationHarness {
                             }
                         }
                     }
-                    if agent_result.mode_used == "reactive" {
+                    // Track tool-assisted execution (any message with tool calls)
+                    if !agent_result.tool_calls.is_empty() {
                         metrics.accumulator_mut().agent_reactive_count += 1;
                         agent_reactive_total += 1;
                         if agent_result.error.is_none() {
@@ -802,8 +803,7 @@ impl SimulationHarness {
                         metrics.accumulator_mut().agent_react_iterations_sum +=
                             agent_result.iterations;
                         agent_react_iterations_sum += agent_result.iterations;
-                    }
-                    if !agent_result.tool_calls.is_empty() {
+
                         metrics.accumulator_mut().agent_tool_calls += 1;
                         // Check tool selection against expected tool for this topic
                         let expected_tool = match msg.topic.as_str() {
@@ -1846,14 +1846,10 @@ impl SimulationHarness {
     }
 }
 
-/// Map a simulation topic to its expected orchestrator skill name for shadow log entries.
-fn expected_skill_for_topic(topic: &str) -> &'static str {
-    match topic {
-        "tasks" => "task-management",
-        "finance" => "finance-management",
-        "automation" => "automation",
-        _ => "general",
-    }
+/// Map a simulation topic to expected agent name.
+/// In the flat skill system, all messages are handled by "klyntbot".
+fn expected_skill_for_topic(_topic: &str) -> &'static str {
+    "klyntbot"
 }
 
 /// Check if a message's content contains keywords associated with its topic.

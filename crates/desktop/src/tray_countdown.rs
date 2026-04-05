@@ -26,10 +26,10 @@ struct NextItem {
 }
 
 /// Spawn the background countdown loop. Call once during app setup.
-pub fn spawn(app: &AppHandle) {
+pub fn spawn(app: &AppHandle, shutdown: tokio_util::sync::CancellationToken) {
     let app = app.clone();
     tauri::async_runtime::spawn(async move {
-        countdown_loop(app).await;
+        countdown_loop(app, shutdown).await;
     });
 }
 
@@ -46,13 +46,16 @@ const POLL_INTERVAL_SECS: u64 = 30;
 /// Slow tick when nothing is actively counting down (saves ~86K wakeups/day).
 const IDLE_TICK_SECS: u64 = 10;
 
-async fn countdown_loop(app: AppHandle) {
+async fn countdown_loop(app: AppHandle, shutdown: tokio_util::sync::CancellationToken) {
     let mut cached: Option<NextItem> = None;
     let mut poll_counter: u64 = 0;
     let mut interval = tokio::time::interval(tokio::time::Duration::from_secs(1));
 
     loop {
-        interval.tick().await;
+        tokio::select! {
+            _ = shutdown.cancelled() => break,
+            _ = interval.tick() => {}
+        }
 
         // If focus timer is active, it owns the tray title — skip
         if FOCUS_ACTIVE.load(Ordering::Relaxed) {

@@ -18,7 +18,10 @@ impl StoragePool {
             })?;
         }
         let url = format!("sqlite:{}?mode=rwc", db_path.display());
-        let pool = sqlx::SqlitePool::connect(&url).await?;
+        let pool = sqlx::pool::PoolOptions::<sqlx::Sqlite>::new()
+            .max_connections(5)
+            .connect(&url)
+            .await?;
         sqlx::query("PRAGMA journal_mode=WAL;")
             .execute(&pool)
             .await?;

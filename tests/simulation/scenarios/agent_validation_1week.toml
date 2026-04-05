@@ -55,7 +55,7 @@ agent_max_iterations = 3
 agent_provider = "deepseek"
 agent_model = "deepseek-chat"
 multi_turn_history_depth = 3
-followup_rate = 0.05
+followup_rate = 0.30
 
 [[checkpoints]]
 at_day = 7

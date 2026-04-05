@@ -156,6 +156,7 @@ impl VectorStore {
     /// - Merges small fragment files into larger ones (compaction)
     /// - Prunes old versions older than 7 days
     /// - Re-optimizes indices for unindexed data
+    ///
     pub async fn optimize_all_tables(&self) -> Result<(), StorageError> {
         for &table_name in ALL_TABLES {
             let tbl = match self.db.open_table(table_name).execute().await {

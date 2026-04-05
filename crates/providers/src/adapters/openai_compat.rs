@@ -454,11 +454,12 @@ impl LlmProvider for OpenAiCompatProvider {
 
     async fn health_check(&self) -> Result<ProviderHealth> {
         let url = format!("{}/models", self.api_base);
-        let health_client = build_http_client(Duration::from_secs(5))?;
 
-        let mut request = health_client
+        let mut request = self
+            .client
             .get(&url)
-            .header("Authorization", format!("Bearer {}", self.api_key));
+            .header("Authorization", format!("Bearer {}", self.api_key))
+            .timeout(Duration::from_secs(5));
 
         for (key, value) in &self.extra_headers {
             request = request.header(key, value);

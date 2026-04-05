@@ -316,7 +316,7 @@ impl PersonaRunner {
                 let gt = GroundTruthAnnotation {
                     introduces_fact: None,
                     relevant_facts: vec![],
-                    expected_skill: self.expected_skill_for_topic(&topic),
+                    expected_skill: self.expected_skill_for_topic(&topic).map(String::from),
                     expected_response: self.expected_response_for_topic(&topic),
                 };
                 (text, Some(gt))
@@ -503,21 +503,10 @@ impl PersonaRunner {
         }
     }
 
-    /// Map topic to expected skill name for ground-truth annotations.
-    fn expected_skill_for_topic(&self, topic: &str) -> Option<String> {
-        match topic {
-            "tasks" => Some("task-management".to_string()),
-            "notes" => Some("general".to_string()),
-            "finance" => Some("finance-management".to_string()),
-            "productivity" => Some("general".to_string()),
-            "automation" => Some("automation".to_string()),
-            "learning" => Some("general".to_string()),
-            "insights" => Some("general".to_string()),
-            "coaching" => Some("general".to_string()),
-            "cross_feature_parallel" => Some("task-management".to_string()),
-            "cross_feature_sequential" => Some("task-management".to_string()),
-            _ => None,
-        }
+    /// Expected agent name for ground-truth annotations.
+    /// In the flat skill system, all messages are handled by "klyntbot".
+    fn expected_skill_for_topic(&self, _topic: &str) -> Option<&'static str> {
+        Some("klyntbot")
     }
 
     /// Return the [`PhaseConfig`] for the current lifecycle phase (alias of `phase_config`).

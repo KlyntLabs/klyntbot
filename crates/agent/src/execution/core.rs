@@ -25,8 +25,10 @@ const INTERACTIVE_TOOL_TIMEOUT: std::time::Duration = std::time::Duration::from_
 /// Maximum number of tool calls that can execute concurrently within a single cycle.
 const MAX_CONCURRENT_TOOLS: usize = 10;
 
-/// Maximum length for a single tool result (100KB).
-const MAX_TOOL_RESULT_LENGTH: usize = 100_000;
+/// Maximum length for a single tool result (50KB).
+/// Tool results accumulate across 500+ messages per session, so this
+/// limit directly bounds session cache footprint.
+const MAX_TOOL_RESULT_LENGTH: usize = 50_000;
 
 /// Sanitize tool result string before injecting into conversation messages.
 ///
@@ -45,7 +47,7 @@ fn sanitize_tool_result(input: &str) -> String {
             truncate_at -= 1;
         }
         let mut truncated = cleaned[..truncate_at].to_string();
-        truncated.push_str("\n[truncated - result exceeded 100KB]");
+        truncated.push_str("\n[truncated - result exceeded 50KB]");
         truncated
     } else {
         cleaned

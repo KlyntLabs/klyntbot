@@ -302,42 +302,40 @@ fn wire_event_channels(
     {
         let mut event_rx = channels.domain_event_bus.subscribe();
         let app_handle_clone = app_handle.clone();
+        let token = shutdown.clone();
         tokio::spawn(async move {
             loop {
-                match event_rx.recv().await {
-                    Ok(event) => {
-                        let salience = cognitive::salience::evaluate_salience(&event);
-                        let salience_str = match salience {
-                            cognitive::types::SalienceVerdict::Extract => "extract",
-                            cognitive::types::SalienceVerdict::Accumulate => "accumulate",
-                            cognitive::types::SalienceVerdict::Discard => "discard",
-                        };
-                        // Avoid serializing the full DomainEvent on every tick — large
-                        // payloads (note content, chat turns) cause GB-scale heap pressure
-                        // under mimalloc because the temporary allocations are not returned
-                        // to the OS between mi_collect cycles (sawtooth memory pattern).
-                        let event_type = event.variant_name().to_string();
-                        let payload_value = serde_json::Value::String(event_type.clone());
-                        let payload = desktop_shared::cognitive_commands::DomainEventPayload {
-                            event_type,
-                            salience: salience_str.to_string(),
-                            domain: event.domain().to_string(),
-                            timestamp: chrono::Utc::now().to_rfc3339(),
-                            payload: payload_value,
-                        };
-                        let _ = app_handle_clone.emit("cognitive:domain_event", &payload);
-                        if let Some(fe) =
-                            desktop_shared::commands::fabric::FabricGraphEvent::from_domain_event(
-                                &event,
-                            )
-                        {
-                            let _ = app_handle_clone.emit("fabric_graph", &fe);
+                tokio::select! {
+                    _ = token.cancelled() => break,
+                    result = event_rx.recv() => {
+                        match result {
+                            Ok(event) => {
+                                let salience = cognitive::salience::evaluate_salience(&event);
+                                let salience_str = salience.as_str();
+                                let event_type = event.variant_name().to_string();
+                                let payload_value = serde_json::Value::String(event_type.clone());
+                                let payload = desktop_shared::cognitive_commands::DomainEventPayload {
+                                    event_type,
+                                    salience: salience_str.to_string(),
+                                    domain: event.domain().to_string(),
+                                    timestamp: chrono::Utc::now().to_rfc3339(),
+                                    payload: payload_value,
+                                };
+                                let _ = app_handle_clone.emit("cognitive:domain_event", &payload);
+                                if let Some(fe) =
+                                    desktop_shared::commands::fabric::FabricGraphEvent::from_domain_event(
+                                        &event,
+                                    )
+                                {
+                                    let _ = app_handle_clone.emit("fabric_graph", &fe);
+                                }
+                            }
+                            Err(tokio::sync::broadcast::error::RecvError::Lagged(n)) => {
+                                warn!("debug event forwarder lagged by {n} events");
+                            }
+                            Err(tokio::sync::broadcast::error::RecvError::Closed) => break,
                         }
                     }
-                    Err(tokio::sync::broadcast::error::RecvError::Lagged(n)) => {
-                        warn!("debug event forwarder lagged by {n} events");
-                    }
-                    Err(tokio::sync::broadcast::error::RecvError::Closed) => break,
                 }
             }
         });
@@ -380,23 +378,29 @@ fn wire_event_channels(
     {
         let app_handle_clone = app_handle.clone();
         let mut pipeline_rx = channels.pipeline_rx;
+        let token = shutdown.clone();
         tokio::spawn(async move {
             loop {
-                match pipeline_rx.recv().await {
-                    Ok(pe) => {
-                        let event_name = match &pe {
-                            cognitive::PipelineEvent::Extraction { .. } => "cognitive:extraction",
-                            cognitive::PipelineEvent::Consolidation { .. } => {
-                                "cognitive:consolidation"
+                tokio::select! {
+                    _ = token.cancelled() => break,
+                    result = pipeline_rx.recv() => {
+                        match result {
+                            Ok(pe) => {
+                                let event_name = match &pe {
+                                    cognitive::PipelineEvent::Extraction { .. } => "cognitive:extraction",
+                                    cognitive::PipelineEvent::Consolidation { .. } => {
+                                        "cognitive:consolidation"
+                                    }
+                                    _ => continue, // BatchStarted, DeadLetterQueued, DeadLetterReprocessed — no desktop handling needed
+                                };
+                                let _ = app_handle_clone.emit(event_name, &pe);
                             }
-                            _ => continue, // BatchStarted, DeadLetterQueued, DeadLetterReprocessed — no desktop handling needed
-                        };
-                        let _ = app_handle_clone.emit(event_name, &pe);
+                            Err(tokio::sync::broadcast::error::RecvError::Lagged(n)) => {
+                                warn!("pipeline event forwarder lagged by {n} events");
+                            }
+                            Err(tokio::sync::broadcast::error::RecvError::Closed) => break,
+                        }
                     }
-                    Err(tokio::sync::broadcast::error::RecvError::Lagged(n)) => {
-                        warn!("pipeline event forwarder lagged by {n} events");
-                    }
-                    Err(tokio::sync::broadcast::error::RecvError::Closed) => break,
                 }
             }
         });

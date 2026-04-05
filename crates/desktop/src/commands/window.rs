@@ -1,4 +1,7 @@
 use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::Arc;
+
+use app_core::AppCore;
 use tauri::Manager;
 
 pub const WINDOW_TRAY: &str = "tray";
@@ -46,9 +49,10 @@ pub fn show_dashboard(app: tauri::AppHandle) {
 }
 
 #[tauri::command]
-pub fn quit_app(app: tauri::AppHandle) {
+pub async fn quit_app(app: tauri::AppHandle) {
     QUIT_REQUESTED.store(true, Ordering::SeqCst);
-    // TODO: In a future task, add graceful shutdown sequence here
-    // (stop focus timer, persist lifecycle state, shutdown core)
+    if let Some(core) = app.try_state::<Arc<AppCore>>() {
+        core.shutdown().await;
+    }
     app.exit(0);
 }

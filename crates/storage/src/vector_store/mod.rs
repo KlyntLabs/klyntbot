@@ -14,8 +14,13 @@ use lancedb::Connection;
 
 use crate::error::StorageError;
 
-const LANCE_INDEX_CACHE_BYTES: usize = 8 * 1024 * 1024;
-const LANCE_METADATA_CACHE_BYTES: usize = 8 * 1024 * 1024;
+/// Index cache: holds loaded IVF partition data, HNSW graphs, scalar index details.
+/// 128 MB fits hot partitions for all ~12 tables without forcing re-reads on every query.
+/// Default is 6 GiB (designed for cloud/server), way too much for a single-user desktop app.
+const LANCE_INDEX_CACHE_BYTES: usize = 128 * 1024 * 1024;
+/// Metadata cache: holds manifests, deletion vectors, page locations.
+/// 32 MB is generous for 12 tables worth of metadata.
+const LANCE_METADATA_CACHE_BYTES: usize = 32 * 1024 * 1024;
 
 mod cognitive;
 mod community;
