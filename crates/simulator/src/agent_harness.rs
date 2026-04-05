@@ -279,6 +279,19 @@ impl AgentHarness {
         // Collect agent events via channel — drain live for real-time visibility
         let (event_tx, mut event_rx) = tokio::sync::mpsc::channel(64);
 
+        use std::sync::atomic::{AtomicU32, AtomicU64, Ordering::Relaxed};
+        let drain_prompt = Arc::new(AtomicU32::new(0));
+        let drain_completion = Arc::new(AtomicU32::new(0));
+        let drain_cache_read = Arc::new(AtomicU32::new(0));
+        let drain_cache_write = Arc::new(AtomicU32::new(0));
+        let drain_cost_micro = Arc::new(AtomicU64::new(0));
+
+        let dp = drain_prompt.clone();
+        let dc = drain_completion.clone();
+        let dcr = drain_cache_read.clone();
+        let dcw = drain_cache_write.clone();
+        let dcm = drain_cost_micro.clone();
+
         let msg_preview: String = msg.content.chars().take(60).collect();
         let event_drain = tokio::spawn(async move {
             let mut tool_calls = Vec::<String>::new();
@@ -305,6 +318,8 @@ impl AgentHarness {
                     AgentEvent::UsageReport {
                         prompt_tokens,
                         completion_tokens,
+                        cache_read_tokens,
+                        cache_write_tokens,
                         estimated_cost_usd,
                         response_time_ms,
                         ..
@@ -312,6 +327,11 @@ impl AgentHarness {
                         eprintln!(
                             "      $ {prompt_tokens}+{completion_tokens} tokens, ${estimated_cost_usd:.4}, {response_time_ms}ms"
                         );
+                        dp.fetch_add(prompt_tokens, Relaxed);
+                        dc.fetch_add(completion_tokens, Relaxed);
+                        dcr.fetch_add(cache_read_tokens, Relaxed);
+                        dcw.fetch_add(cache_write_tokens, Relaxed);
+                        dcm.fetch_add((estimated_cost_usd * 1_000_000.0) as u64, Relaxed);
                     }
                     AgentEvent::Done { .. } => {
                         eprintln!("      ✓ done: {msg_preview}…");
@@ -387,6 +407,11 @@ impl AgentHarness {
                     response: runtime_result.content,
                     error: None,
                     breakpoints,
+                    prompt_tokens: drain_prompt.load(Relaxed),
+                    completion_tokens: drain_completion.load(Relaxed),
+                    cache_read_tokens: drain_cache_read.load(Relaxed),
+                    cache_write_tokens: drain_cache_write.load(Relaxed),
+                    cost_usd: drain_cost_micro.load(Relaxed) as f64 / 1_000_000.0,
                 }
             }
             Err(e) => {
@@ -418,6 +443,11 @@ impl AgentHarness {
                     response: String::new(),
                     error: Some(error_str),
                     breakpoints,
+                    prompt_tokens: drain_prompt.load(Relaxed),
+                    completion_tokens: drain_completion.load(Relaxed),
+                    cache_read_tokens: drain_cache_read.load(Relaxed),
+                    cache_write_tokens: drain_cache_write.load(Relaxed),
+                    cost_usd: drain_cost_micro.load(Relaxed) as f64 / 1_000_000.0,
                 }
             }
         }

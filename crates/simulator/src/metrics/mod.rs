@@ -1,5 +1,6 @@
 pub mod behavioral;
 pub mod cognitive;
+pub mod cost;
 pub mod ground_truth;
 pub mod memory;
 pub mod system;
@@ -50,6 +51,14 @@ pub struct MetricSnapshot {
     pub error_recovery_rate: f64,
     // Performance
     pub wall_time_per_epoch_ms: f64,
+    // Tier 7 — cost economics
+    pub cost_per_outcome_usd: f64,
+    pub cache_hit_rate: f64,
+    // Tier 4 — cognitive depth (extended)
+    pub retrievability_min: f64,
+    pub retrievability_p25: f64,
+    // Tier 2 — behavioral quality (extended)
+    pub estimation_deviation_avg: f64,
 }
 
 // ---------------------------------------------------------------------------
@@ -69,6 +78,8 @@ pub struct BaselineMetrics {
     pub retrieval_precision: f64,
     pub retrieval_recall: f64,
     pub fact_extraction_accuracy: f64,
+    pub cost_per_outcome_usd: f64,
+    pub cache_hit_rate: f64,
 }
 
 // ---------------------------------------------------------------------------
@@ -131,6 +142,13 @@ pub struct EpochAccumulator {
     pub adversarial_total: u32,
     pub error_recovered: u32,
     pub error_injected: u32,
+    // Cost tracking
+    pub total_cost_usd: f64,
+    pub total_prompt_tokens: u64,
+    pub total_cache_read_tokens: u64,
+    // Estimation tracking
+    pub estimation_deviation_sum: f64,
+    pub estimation_count: u32,
 }
 
 // ---------------------------------------------------------------------------
@@ -341,6 +359,12 @@ impl MetricCollector {
             memory_retrievability: 0.0,
             meta_rule_count: 0,
             wall_time_per_epoch_ms: wall_time_ms,
+            // Populated post-snapshot via update_latest_cost_and_estimation
+            cost_per_outcome_usd: 0.0,
+            cache_hit_rate: 0.0,
+            retrievability_min: 0.0,
+            retrievability_p25: 0.0,
+            estimation_deviation_avg: 0.0,
         };
 
         self.timeline.push(snap);
@@ -359,6 +383,24 @@ impl MetricCollector {
         if let Some(snap) = self.timeline.last_mut() {
             snap.memory_retrievability = memory_retrievability;
             snap.meta_rule_count = meta_rule_count;
+        }
+    }
+
+    /// Update the latest snapshot with cost and estimation metrics computed externally.
+    pub fn update_latest_cost_and_estimation(
+        &mut self,
+        cost_per_outcome_usd: f64,
+        cache_hit_rate: f64,
+        retrievability_min: f64,
+        retrievability_p25: f64,
+        estimation_deviation_avg: f64,
+    ) {
+        if let Some(snap) = self.timeline.last_mut() {
+            snap.cost_per_outcome_usd = cost_per_outcome_usd;
+            snap.cache_hit_rate = cache_hit_rate;
+            snap.retrievability_min = retrievability_min;
+            snap.retrievability_p25 = retrievability_p25;
+            snap.estimation_deviation_avg = estimation_deviation_avg;
         }
     }
 
@@ -381,6 +423,8 @@ impl MetricCollector {
             bl.retrieval_precision += s.retrieval_precision;
             bl.retrieval_recall += s.retrieval_recall;
             bl.fact_extraction_accuracy += s.fact_extraction_accuracy;
+            bl.cost_per_outcome_usd += s.cost_per_outcome_usd;
+            bl.cache_hit_rate += s.cache_hit_rate;
         }
         bl.token_efficiency /= n;
         bl.personalization_score /= n;
@@ -392,6 +436,8 @@ impl MetricCollector {
         bl.retrieval_precision /= n;
         bl.retrieval_recall /= n;
         bl.fact_extraction_accuracy /= n;
+        bl.cost_per_outcome_usd /= n;
+        bl.cache_hit_rate /= n;
 
         self.baselines = Some(bl);
     }
@@ -422,6 +468,21 @@ impl MetricCollector {
                     metric: "token_efficiency".into(),
                     baseline: bl.token_efficiency,
                     current: latest.token_efficiency,
+                    regression_pct: pct,
+                });
+            }
+        }
+
+        // Cost per outcome: regression = increase.
+        if bl.cost_per_outcome_usd > 0.0 {
+            let pct = (latest.cost_per_outcome_usd - bl.cost_per_outcome_usd)
+                / bl.cost_per_outcome_usd
+                * 100.0;
+            if pct > threshold_pct {
+                alerts.push(RegressionAlert {
+                    metric: "cost_per_outcome_usd".into(),
+                    baseline: bl.cost_per_outcome_usd,
+                    current: latest.cost_per_outcome_usd,
                     regression_pct: pct,
                 });
             }
@@ -484,6 +545,12 @@ impl MetricCollector {
                 bl.fact_extraction_accuracy,
                 latest.fact_extraction_accuracy,
                 false,
+            ),
+            (
+                "cache_hit_rate",
+                bl.cache_hit_rate,
+                latest.cache_hit_rate,
+                true, // skip when 0.0
             ),
         ];
 

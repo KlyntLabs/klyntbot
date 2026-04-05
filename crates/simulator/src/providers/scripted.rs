@@ -86,13 +86,11 @@ impl LlmProvider for ScriptedProvider {
             content: Some(response_text.clone()),
             tool_calls: vec![],
             finish_reason: "stop".to_string(),
-            usage: Usage {
+            usage: super::simulation_provider::simulated_usage(
+                idx,
                 prompt_tokens,
                 completion_tokens,
-                total_tokens: prompt_tokens + completion_tokens,
-                cache_read_tokens: 0,
-                cache_write_tokens: 0,
-            },
+            ),
             reasoning_content: None,
         })
     }

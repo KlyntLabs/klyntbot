@@ -149,6 +149,13 @@ pub enum MetricName {
     CrossFeatureChainSuccess,
     AdversarialResilience,
     ErrorRecoveryRate,
+    // Tier 7 — cost economics
+    CostPerOutcomeUsd,
+    CacheHitRate,
+    // Extended cognitive/behavioral
+    RetrievabilityMin,
+    RetrievabilityP25,
+    EstimationDeviationAvg,
 }
 
 // ── Checkpoint assertions ──────────────────────────────────────────────

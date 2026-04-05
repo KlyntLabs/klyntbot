@@ -622,8 +622,23 @@ impl SimulationHarness {
                             SimulatedToolAction::CreateTask { .. } => {
                                 metrics.accumulator_mut().tasks_created += 1;
                             }
-                            SimulatedToolAction::CompleteTask { .. } => {
+                            SimulatedToolAction::CompleteTask {
+                                estimated_duration_mins,
+                                actual_duration_mins,
+                                ..
+                            } => {
                                 metrics.accumulator_mut().tasks_completed += 1;
+                                if let (Some(est), Some(act)) =
+                                    (estimated_duration_mins, actual_duration_mins)
+                                {
+                                    if *est > 0 {
+                                        let deviation =
+                                            ((*act as f64 - *est as f64) / *est as f64).abs();
+                                        metrics.accumulator_mut().estimation_deviation_sum +=
+                                            deviation;
+                                        metrics.accumulator_mut().estimation_count += 1;
+                                    }
+                                }
                             }
                             _ => {}
                         }
@@ -662,7 +677,7 @@ impl SimulationHarness {
                                     task_type: "todo".to_string(),
                                 })
                             }
-                            SimulatedToolAction::CompleteTask { task_ref } => {
+                            SimulatedToolAction::CompleteTask { task_ref, .. } => {
                                 Some(DomainEvent::TaskCompleted {
                                     task_id: task_ref.clone(),
                                     actual_duration_mins: None,
@@ -823,6 +838,14 @@ impl SimulationHarness {
                         }
                     }
 
+                    // Cost and cache tracking from agent path
+                    {
+                        let acc = metrics.accumulator_mut();
+                        acc.total_cost_usd += agent_result.cost_usd;
+                        acc.total_prompt_tokens += agent_result.prompt_tokens as u64;
+                        acc.total_cache_read_tokens += agent_result.cache_read_tokens as u64;
+                    }
+
                     // Track cross-feature workflows
                     if let Some(ref wf) = msg.workflow {
                         total_workflows += 1;
@@ -968,16 +991,30 @@ impl SimulationHarness {
                 let estimated_tokens = prompt_tokens + completion_tokens;
 
                 // usage_records
+                let cache_fraction = crate::providers::simulation_provider::CACHE_FRACTION;
+                let cache_read = (prompt_tokens as f64 * cache_fraction) as i64;
+                let cache_write = if day_counter <= 1 {
+                    (prompt_tokens as f64 * cache_fraction) as i64
+                } else {
+                    0
+                };
+                let estimated_cost =
+                    prompt_tokens as f64 * 0.000003 + completion_tokens as f64 * 0.000015;
+
                 let _ = sqlx::query(
                     "INSERT INTO usage_records \
-                     (id, timestamp, request_id, model, provider, prompt_tokens, completion_tokens, channel, strategy) \
-                     VALUES (?, ?, ?, 'scripted-sim', 'simulator', ?, ?, 'simulation', 'reactive')",
+                     (id, timestamp, request_id, model, provider, prompt_tokens, completion_tokens, \
+                      cache_read_tokens, cache_write_tokens, estimated_cost_usd, channel, strategy) \
+                     VALUES (?, ?, ?, 'scripted-sim', 'simulator', ?, ?, ?, ?, ?, 'simulation', 'reactive')",
                 )
                 .bind(Uuid::new_v4().to_string())
                 .bind(msg.simulated_at.to_rfc3339())
                 .bind(&request_id)
                 .bind(prompt_tokens as i64)
                 .bind(completion_tokens as i64)
+                .bind(cache_read)
+                .bind(cache_write)
+                .bind(estimated_cost)
                 .execute(&self.inner_pool)
                 .await;
 
@@ -1006,6 +1043,9 @@ impl SimulationHarness {
 
                 // Token tracking: content-based estimate computed above.
                 metrics.accumulator_mut().total_tokens += estimated_tokens;
+                metrics.accumulator_mut().total_cost_usd += estimated_cost;
+                metrics.accumulator_mut().total_prompt_tokens += prompt_tokens;
+                metrics.accumulator_mut().total_cache_read_tokens += cache_read as u64;
             }
 
             // Yield to let the contradiction listener process any pending bus events.
@@ -1098,6 +1138,16 @@ impl SimulationHarness {
             // Capture accumulator totals before snapshot resets them.
             total_facts_extracted += metrics.accumulator_mut().facts_extracted;
 
+            // Capture metrics that snapshot() will reset.
+            let epoch_outcomes = metrics.accumulator_mut().tasks_completed
+                + metrics.accumulator_mut().facts_extracted;
+            let epoch_estimation_avg = if metrics.accumulator_mut().estimation_count > 0 {
+                metrics.accumulator_mut().estimation_deviation_sum
+                    / metrics.accumulator_mut().estimation_count as f64
+            } else {
+                0.0
+            };
+
             let insight_usefulness =
                 measure_insight_usefulness(&self.inner_pool, day_counter).await;
 
@@ -1113,15 +1163,37 @@ impl SimulationHarness {
             );
 
             let now_rfc3339 = plan.simulated_now.to_rfc3339();
-            let _start_rfc3339 = start_date.to_rfc3339();
-            let (memory_retrievability, meta_rule_count) = tokio::join!(
-                crate::metrics::cognitive::measure_average_retrievability(
+            let epoch_start_str_cost = plan.previous.to_rfc3339();
+            let (meta_rule_count, cost_per_outcome, cache_rate, ret_dist) = tokio::join!(
+                crate::metrics::cognitive::count_meta_rules(&self.inner_pool),
+                crate::metrics::cost::measure_cost_efficiency(
+                    &self.inner_pool,
+                    &epoch_start_str_cost,
+                    epoch_outcomes,
+                ),
+                crate::metrics::cost::measure_cache_hit_rate(
+                    &self.inner_pool,
+                    &epoch_start_str_cost,
+                ),
+                crate::metrics::cognitive::measure_retrievability_distribution(
                     &self.inner_pool,
                     &now_rfc3339,
                 ),
-                crate::metrics::cognitive::count_meta_rules(&self.inner_pool),
             );
+            // Derive average retrievability from distribution; 1.0 sentinel when no facts exist.
+            let memory_retrievability = if ret_dist.avg == 0.0 && ret_dist.min == 0.0 {
+                1.0
+            } else {
+                ret_dist.avg
+            };
             metrics.update_latest_cognitive(memory_retrievability, meta_rule_count);
+            metrics.update_latest_cost_and_estimation(
+                cost_per_outcome,
+                cache_rate,
+                ret_dist.min,
+                ret_dist.p25,
+                epoch_estimation_avg,
+            );
 
             // Progress logging every 30 days.
             if plan.day_of_simulation % 30 == 0 {

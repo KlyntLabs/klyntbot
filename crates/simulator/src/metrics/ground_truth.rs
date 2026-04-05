@@ -242,6 +242,11 @@ fn get_metric_value(snapshot: &MetricSnapshot, metric: &MetricName) -> f64 {
         MetricName::CrossFeatureChainSuccess => snapshot.cross_feature_chain_success,
         MetricName::AdversarialResilience => snapshot.adversarial_resilience,
         MetricName::ErrorRecoveryRate => snapshot.error_recovery_rate,
+        MetricName::CostPerOutcomeUsd => snapshot.cost_per_outcome_usd,
+        MetricName::CacheHitRate => snapshot.cache_hit_rate,
+        MetricName::RetrievabilityMin => snapshot.retrievability_min,
+        MetricName::RetrievabilityP25 => snapshot.retrievability_p25,
+        MetricName::EstimationDeviationAvg => snapshot.estimation_deviation_avg,
     }
 }
 
@@ -257,6 +262,8 @@ fn get_baseline_value(baselines: &BaselineMetrics, metric: &MetricName) -> f64 {
         MetricName::RetrievalPrecision => baselines.retrieval_precision,
         MetricName::RetrievalRecall => baselines.retrieval_recall,
         MetricName::FactExtractionAccuracy => baselines.fact_extraction_accuracy,
+        MetricName::CostPerOutcomeUsd => baselines.cost_per_outcome_usd,
+        MetricName::CacheHitRate => baselines.cache_hit_rate,
         // System health metrics — no baselines
         _ => 0.0,
     }
@@ -323,6 +330,8 @@ mod tests {
             retrieval_precision: 0.75,
             retrieval_recall: 0.7,
             fact_extraction_accuracy: 0.9,
+            cost_per_outcome_usd: 0.0,
+            cache_hit_rate: 0.0,
         };
 
         // Tier 2

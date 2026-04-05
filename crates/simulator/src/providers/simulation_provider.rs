@@ -18,6 +18,26 @@ use providers::types::{
     ProviderHealth, ToolCall, Usage, UserContent,
 };
 
+/// Fraction of prompt tokens assumed cacheable (system prompt + tool definitions).
+pub(crate) const CACHE_FRACTION: f64 = 0.4;
+
+/// Build a `Usage` with simulated cache tokens: first call writes to cache,
+/// subsequent calls read from it.
+pub(crate) fn simulated_usage(
+    call_num: usize,
+    prompt_tokens: u32,
+    completion_tokens: u32,
+) -> Usage {
+    let cacheable = (prompt_tokens as f64 * CACHE_FRACTION) as u32;
+    Usage {
+        prompt_tokens,
+        completion_tokens,
+        total_tokens: prompt_tokens + completion_tokens,
+        cache_read_tokens: if call_num > 0 { cacheable } else { 0 },
+        cache_write_tokens: if call_num == 0 { cacheable } else { 0 },
+    }
+}
+
 pub struct SimulationProvider {
     call_count: AtomicUsize,
     rng: Mutex<StdRng>,
@@ -236,12 +256,14 @@ impl LlmProvider for SimulationProvider {
         _tools: Option<&[Value]>,
         _params: &ChatParams,
     ) -> Result<LlmResponse> {
-        let _idx = self.call_count.fetch_add(1, Ordering::SeqCst);
+        let call_num = self.call_count.fetch_add(1, Ordering::SeqCst);
 
         let (prompt_tokens, completion_tokens) = {
             let mut rng = self.rng.lock().unwrap();
             (rng.random_range(80..200u32), rng.random_range(30..120u32))
         };
+
+        let usage = simulated_usage(call_num, prompt_tokens, completion_tokens);
 
         // Check for sequential chaining (tool results from previous iterations)
         if let Some(chained) = self.generate_chained_call(messages) {
@@ -249,13 +271,7 @@ impl LlmProvider for SimulationProvider {
                 content: None,
                 tool_calls: chained,
                 finish_reason: "tool_use".to_string(),
-                usage: Usage {
-                    prompt_tokens,
-                    completion_tokens,
-                    total_tokens: prompt_tokens + completion_tokens,
-                    cache_read_tokens: 0,
-                    cache_write_tokens: 0,
-                },
+                usage,
                 reasoning_content: None,
             });
         }
@@ -276,13 +292,7 @@ impl LlmProvider for SimulationProvider {
             } else {
                 "stop".to_string()
             },
-            usage: Usage {
-                prompt_tokens,
-                completion_tokens,
-                total_tokens: prompt_tokens + completion_tokens,
-                cache_read_tokens: 0,
-                cache_write_tokens: 0,
-            },
+            usage,
             reasoning_content: None,
         })
     }
@@ -383,5 +393,22 @@ mod tests {
         let response = provider.chat(&messages, None, &params).await.unwrap();
 
         assert_eq!(response.tool_calls[0].name, "finance");
+    }
+
+    #[tokio::test]
+    async fn cache_tokens_are_nonzero() {
+        let provider = SimulationProvider::new(42);
+        let params = ChatParams::new("simulation-agent");
+        let messages = vec![Message::user("test message")];
+        let response = provider.chat(&messages, None, &params).await.unwrap();
+        let messages2 = vec![Message::user("second message")];
+        let response2 = provider.chat(&messages2, None, &params).await.unwrap();
+        assert!(
+            response.usage.cache_write_tokens > 0 || response2.usage.cache_read_tokens > 0,
+            "at least one call should have nonzero cache tokens: \
+             first write={}, second read={}",
+            response.usage.cache_write_tokens,
+            response2.usage.cache_read_tokens,
+        );
     }
 }

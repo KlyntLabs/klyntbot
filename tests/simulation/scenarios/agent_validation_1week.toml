@@ -61,4 +61,5 @@ followup_rate = 0.30
 at_day = 7
 assertions = [
     { type = "metric_above", metric = "knowledge_retention", threshold = 0.1 },
+    { type = "metric_above", metric = "cache_hit_rate", threshold = 0.05 },
 ]

@@ -74,14 +74,35 @@ impl ActionExecutor {
                 .await;
             }
 
-            SimulatedToolAction::CompleteTask { task_ref } => {
+            SimulatedToolAction::CompleteTask {
+                task_ref,
+                estimated_duration_mins,
+                actual_duration_mins,
+            } => {
                 debug!(task_ref = %task_ref, "action: CompleteTask");
+
+                let deviation_pct = match (estimated_duration_mins, actual_duration_mins) {
+                    (Some(est), Some(act)) if *est > 0 => {
+                        Some((*act as f64 - *est as f64) / *est as f64 * 100.0)
+                    }
+                    _ => None,
+                };
+
                 self.bus.publish(DomainEvent::TaskCompleted {
                     task_id: task_ref.clone(),
-                    actual_duration_mins: None,
-                    estimated_duration_mins: None,
-                    deviation_pct: None,
+                    actual_duration_mins: actual_duration_mins.map(|m| m as i64),
+                    estimated_duration_mins: estimated_duration_mins.map(|m| m as i64),
+                    deviation_pct,
                 });
+
+                if let (Some(est), Some(act)) = (estimated_duration_mins, actual_duration_mins) {
+                    self.bus.publish(DomainEvent::EstimationRecorded {
+                        task_id: task_ref.clone(),
+                        estimated_mins: *est,
+                        actual_mins: *act,
+                        deviation_pct: deviation_pct.unwrap_or(0.0),
+                    });
+                }
 
                 // UPDATE the task row to completed.
                 let _ = sqlx::query(
@@ -323,6 +344,8 @@ mod tests {
 
         let action = SimulatedToolAction::CompleteTask {
             task_ref: "task-abc".into(),
+            estimated_duration_mins: None,
+            actual_duration_mins: None,
         };
 
         executor
@@ -333,6 +356,39 @@ mod tests {
         let event = rx.try_recv().expect("should receive TaskCompleted");
         assert!(
             matches!(event, DomainEvent::TaskCompleted { task_id, .. } if task_id == "task-abc")
+        );
+    }
+
+    #[tokio::test]
+    async fn complete_task_emits_estimation_recorded() {
+        let bus = Arc::new(DomainEventBus::new(32));
+        let mut rx = bus.subscribe();
+        let pool = test_pool().await;
+        let executor = ActionExecutor::new(Arc::clone(&bus), pool);
+
+        let action = SimulatedToolAction::CompleteTask {
+            task_ref: "task-xyz".into(),
+            estimated_duration_mins: Some(30),
+            actual_duration_mins: Some(45),
+        };
+
+        executor
+            .execute(&action, Utc::now())
+            .await
+            .expect("execute should succeed");
+
+        let _completed = rx.try_recv().expect("should receive TaskCompleted");
+        let estimation = rx.try_recv().expect("should receive EstimationRecorded");
+        assert!(
+            matches!(
+                estimation,
+                DomainEvent::EstimationRecorded {
+                    estimated_mins: 30,
+                    actual_mins: 45,
+                    ..
+                }
+            ),
+            "got {estimation:?}"
         );
     }
 

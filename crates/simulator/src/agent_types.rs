@@ -36,6 +36,11 @@ pub struct AgentResult {
     pub response: String,
     pub error: Option<String>,
     pub breakpoints: Vec<AgentBreakpoint>,
+    pub prompt_tokens: u32,
+    pub completion_tokens: u32,
+    pub cache_read_tokens: u32,
+    pub cache_write_tokens: u32,
+    pub cost_usd: f64,
 }
 
 /// Expected workflow pattern for cross-feature messages.

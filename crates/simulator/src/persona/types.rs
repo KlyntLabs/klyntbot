@@ -125,6 +125,8 @@ pub enum SimulatedToolAction {
     },
     CompleteTask {
         task_ref: String,
+        estimated_duration_mins: Option<u32>,
+        actual_duration_mins: Option<u32>,
     },
     CreateNote {
         title: String,

@@ -166,6 +166,8 @@ impl PersonaRunner {
                     let idx = self.rng.random_range(0..self.created_task_titles.len());
                     Some(SimulatedToolAction::CompleteTask {
                         task_ref: self.created_task_titles[idx].clone(),
+                        estimated_duration_mins: Some(self.rng.random_range(15..120)),
+                        actual_duration_mins: Some(self.rng.random_range(10..150)),
                     })
                 } else {
                     let titles = [
