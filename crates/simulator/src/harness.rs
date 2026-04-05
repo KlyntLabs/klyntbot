@@ -862,24 +862,68 @@ impl SimulationHarness {
                         metrics.accumulator_mut().agent_tool_calls += 1;
                     }
 
-                    // Tool selection: only scored when the persona intended tool
-                    // calls. If the persona didn't generate tool_actions, the agent
-                    // answering from context (no tools) is correct behavior.
+                    // Tool selection: scored when persona intended tool calls AND
+                    // a known domain tool mapping exists for the topic.
+                    // - "learning" excluded: no flashcard tool; the learning tool
+                    //   is for internal ML metrics.
+                    // - "coaching" excluded: templates are conversational, not
+                    //   tool-invoking.
                     if !msg.tool_actions.is_empty() {
                         let expected_tool = match msg.topic.as_str() {
                             "tasks" => Some("tasks"),
                             "finance" => Some("finance"),
                             "notes" => Some("notes"),
                             "productivity" => Some("productivity"),
-                            "learning" => Some("learning"),
                             "automation" => Some("cron"),
-                            "coaching" => Some("productivity"),
                             _ => None,
                         };
                         if let Some(expected) = expected_tool {
-                            metrics.accumulator_mut().agent_tool_selection_total += 1;
-                            if agent_result.tool_calls.iter().any(|t| t == expected) {
-                                metrics.accumulator_mut().agent_tool_selection_correct += 1;
+                            // Skip scoring if ALL tool calls were to non-existent
+                            // tools (adversarial wrapper injected fake names).
+                            let has_real_call = agent_result.tool_calls.is_empty()
+                                || agent_result.tool_calls.iter().any(|t| {
+                                    matches!(
+                                        t.as_str(),
+                                        "tasks"
+                                            | "finance"
+                                            | "notes"
+                                            | "productivity"
+                                            | "learning"
+                                            | "cron"
+                                            | "okr"
+                                            | "area"
+                                            | "project"
+                                            | "annotate"
+                                            | "work_context"
+                                            | "mirror"
+                                            | "memory"
+                                    )
+                                });
+                            if has_real_call {
+                                metrics.accumulator_mut().agent_tool_selection_total += 1;
+                                if agent_result.tool_calls.iter().any(|t| t == expected) {
+                                    metrics.accumulator_mut().agent_tool_selection_correct += 1;
+                                } else {
+                                    let called: Vec<&str> = agent_result
+                                        .tool_calls
+                                        .iter()
+                                        .map(|s| s.as_str())
+                                        .collect();
+                                    agent_breakpoints.push(
+                                        crate::agent_types::AgentBreakpoint {
+                                            kind: crate::agent_types::BreakpointKind::ToolSelectionMismatch,
+                                            message_content: msg.content.chars().take(80).collect(),
+                                            details: format!(
+                                                "expected '{}' (topic={}), called: {:?}",
+                                                expected, msg.topic, called
+                                            ),
+                                            day: day_counter,
+                                            phase: persona_runner
+                                                .current_phase()
+                                                .to_string(),
+                                        },
+                                    );
+                                }
                             }
                         }
                     }

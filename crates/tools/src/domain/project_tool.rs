@@ -30,7 +30,7 @@ impl Tool for ProjectTool {
     }
 
     fn description(&self) -> &str {
-        "Manage projects. Actions: create, list, show, update, delete, archive, tasks."
+        "Manage multi-task projects (containers that group related tasks). Create, list, show, update, delete, or archive projects. Use the 'tasks' tool for individual task operations."
     }
 
     fn metadata(&self) -> tools_core::ToolMetadata {

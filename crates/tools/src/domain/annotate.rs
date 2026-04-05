@@ -86,7 +86,7 @@ impl AnnotateTool {
 
 #[tool_actions(
     name = "annotate",
-    description = "Create, retrieve, update, list, delete, or search persistent annotations on any entity (tool, fact, rule, skill, project).",
+    description = "Add metadata annotations to internal system entities (tools, facts, rules, skills). For user-facing notes, use the 'notes' tool instead.",
     category = "Memory",
     tags = "annotation,note,gotcha",
     cost = "Free"

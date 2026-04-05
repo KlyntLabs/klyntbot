@@ -43,7 +43,7 @@ impl Tool for OkrTool {
     }
 
     fn description(&self) -> &str {
-        "Manage OKR objectives and key results. Actions: objective.create, objective.list, objective.show, objective.update, objective.delete, kr.create, kr.list, kr.show, kr.update, kr.update_metric, kr.set_progress, kr.delete"
+        "Manage quarterly OKR (Objectives and Key Results) goal-setting. Create and track strategic objectives with measurable key results. NOT for daily tasks or personal productivity goals."
     }
 
     fn metadata(&self) -> tools_core::ToolMetadata {

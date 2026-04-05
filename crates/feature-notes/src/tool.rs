@@ -26,7 +26,7 @@ impl Tool for NotesTool {
     }
 
     fn description(&self) -> &str {
-        "Manage notes and notebooks. Actions: create_note, get_note, update_note, delete_note, list_notes, search_notes, tag_note, link_notes, create_notebook, list_notebooks, delete_notebook, archive_note, unarchive_note, list_archived, get_backlinks, capture_inbox, list_inbox, delete_inbox_item, update_notebook."
+        "Manage the user's personal notes and notebooks. Create, read, update, delete, search, tag, and link notes. Supports notebooks, inbox capture, and archiving. NOT for system annotations — use 'annotate' for those."
     }
 
     fn parameters(&self) -> Value {

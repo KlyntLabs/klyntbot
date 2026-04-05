@@ -28,7 +28,7 @@ impl Tool for AreaTool {
     }
 
     fn description(&self) -> &str {
-        "Manage areas (top-level PARA containers). Actions: create, list, show, update, delete, reorder."
+        "Manage life areas — top-level responsibility categories (e.g., Health, Career, Family) that group projects. PARA methodology containers. NOT for individual tasks or projects."
     }
 
     fn metadata(&self) -> tools_core::ToolMetadata {

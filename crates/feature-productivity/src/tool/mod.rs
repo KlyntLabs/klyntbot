@@ -576,7 +576,7 @@ impl Tool for ProductivityTool {
     }
 
     fn description(&self) -> &str {
-        "Track productivity, manage focus sessions, set goals, and view activity data. Actions: focus_start, focus_end, focus_status, pomodoro_start, activity_today, activity_summary, activity_week, activity_score, activity_compare, set_goal, check_goals, list_goals, remove_goal, log_time, activity_export, list_categories, set_category."
+        "Track daily productivity and focus. Start/end focus sessions (Pomodoro), log time, set productivity goals, and view activity summaries. NOT for financial goals or task management."
     }
 
     fn parameters(&self) -> Value {

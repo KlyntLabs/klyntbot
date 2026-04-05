@@ -116,9 +116,9 @@ impl Tool for FinanceTool {
     }
 
     fn description(&self) -> &str {
-        "Manage personal finances: accounts, transactions, budgets, investments, portfolios, \
-         goals, liabilities, net worth, FIRE planning, spending analytics, portfolio analytics, \
-         allocation targets, snapshots, and settings. \
+        "Manage personal finances: bank accounts, income/expense transactions, budgets, \
+         investments, portfolios, financial goals, liabilities, net worth, and FIRE planning. \
+         For productivity goals or focus sessions, use the 'productivity' tool. \
          Actions: account_add, account_list, account_update, account_delete, \
          tx_add, tx_list, tx_update, tx_delete, tx_search, tx_recurring_add, \
          budget_create, budget_list, budget_status, budget_update, budget_delete, \

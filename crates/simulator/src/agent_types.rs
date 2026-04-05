@@ -14,6 +14,7 @@ pub enum BreakpointKind {
     FabricationDetected,
     ClassificationLowConfidence,
     ResponseEmpty,
+    ToolSelectionMismatch,
 }
 
 /// A structured failure record from the agent path.
