@@ -74,21 +74,94 @@ impl MetricSource for SimMetricSource {
         .await
         .unwrap_or((0.0, 0.0));
 
+        // ── Token and latency metrics from usage/interaction tables ──
+        let (avg_tokens,): (f64,) = sqlx::query_as(
+            "SELECT COALESCE(AVG(CAST(prompt_tokens + completion_tokens AS REAL)), 0.0)
+             FROM usage_records WHERE timestamp >= ?1",
+        )
+        .bind(&since_str)
+        .fetch_one(&self.pool)
+        .await
+        .unwrap_or((0.0,));
+
+        let (avg_response_time,): (f64,) = sqlx::query_as(
+            "SELECT COALESCE(AVG(CAST(duration_ms AS REAL)), 0.0)
+             FROM interaction_log WHERE timestamp >= ?1",
+        )
+        .bind(&since_str)
+        .fetch_one(&self.pool)
+        .await
+        .unwrap_or((0.0,));
+
+        // ── Memory relevance: average stability of active semantic facts ──
+        let (memory_relevance,): (f64,) = sqlx::query_as(
+            "SELECT COALESCE(AVG(stability), 0.0)
+             FROM semantic_facts WHERE superseded_at IS NULL",
+        )
+        .fetch_one(&self.pool)
+        .await
+        .unwrap_or((0.0,));
+
+        // ── Retrieval recall from shadow retrieval log (overlap / control) ──
+        let (retrieval_recall,): (f64,) = sqlx::query_as(
+            "SELECT COALESCE(AVG(CASE WHEN control_retrieved_count > 0
+                 THEN CAST(overlap_count AS REAL) / control_retrieved_count
+                 ELSE 0.0 END), 0.0)
+             FROM autotuner_shadow_retrieval_log
+             WHERE (?1 IS NULL OR trial_id = ?1)
+               AND created_at >= ?2",
+        )
+        .bind(&tid_str)
+        .bind(&since_str)
+        .fetch_one(&self.pool)
+        .await
+        .unwrap_or((0.0,));
+
+        // ── Promotion accuracy: promoted / (promoted + reverted) ──
+        let (promoted, reverted): (i64, i64) = sqlx::query_as(
+            "SELECT
+                 COALESCE(SUM(CASE WHEN status = 'promoted' THEN 1 ELSE 0 END), 0),
+                 COALESCE(SUM(CASE WHEN status = 'reverted' THEN 1 ELSE 0 END), 0)
+             FROM autotuner_trials",
+        )
+        .fetch_one(&self.pool)
+        .await
+        .unwrap_or((0, 0));
+        let promotion_accuracy = if promoted + reverted > 0 {
+            promoted as f64 / (promoted + reverted) as f64
+        } else {
+            0.0
+        };
+
+        // ── Knowledge retention: FSRS-5 retrievability across active facts ──
+        // R = 1 / (1 + elapsed_days / (9 * stability))
+        let (knowledge_retention,): (f64,) = sqlx::query_as(
+            "SELECT COALESCE(AVG(
+                 1.0 / (1.0 + (julianday(?1) - julianday(COALESCE(last_reviewed_at, created_at)))
+                               / (9.0 * MAX(stability, 0.01)))
+             ), 0.0)
+             FROM semantic_facts WHERE superseded_at IS NULL",
+        )
+        .bind(&since_str)
+        .fetch_one(&self.pool)
+        .await
+        .unwrap_or((0.0,));
+
         Ok(MetricSnapshot {
             correction_rate,
             classification_accuracy,
             total_messages: total_msgs as u32,
             routing_stability: classification_accuracy, // best proxy in sim
             retrieval_precision,
+            retrieval_recall,
             memory_freshness,
-            // Fields we cannot measure inside the simulator — safe defaults.
-            avg_tokens_per_message: 0.0,
-            avg_response_time_ms: 0.0,
-            memory_relevance: 0.0,
+            avg_tokens_per_message: avg_tokens,
+            avg_response_time_ms: avg_response_time,
+            memory_relevance,
+            promotion_accuracy,
+            knowledge_retention_score: knowledge_retention,
             user_satisfaction: None,
-            retrieval_recall: 0.0,
-            promotion_accuracy: 0.0,
-            knowledge_retention_score: 0.0,
+            // Query rewriting is not simulated — 0.0 is correct.
             rewrite_trigger_rate: 0.0,
             rewrite_engagement_rate: 0.0,
         })

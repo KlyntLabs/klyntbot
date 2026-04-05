@@ -384,13 +384,23 @@ impl SimulationHarness {
                     Err(_) => continue,  // timeout — check again
                 };
                 // Incrementally update situation from relevant events.
+                // Deltas scale with accumulated state to model diminishing
+                // returns (first distraction is jarring, fifth is background
+                // noise) and recovery inertia.
                 match &event {
                     DomainEvent::DistractionDetected { .. } => {
-                        situation.distraction_risk = (situation.distraction_risk + 0.15).min(1.0);
+                        // Diminishing impact: each distraction adds less as risk climbs.
+                        let delta = 0.20 * (1.0 - situation.distraction_risk * 0.6);
+                        situation.distraction_risk = (situation.distraction_risk + delta).min(1.0);
                     }
-                    DomainEvent::FocusSessionStarted { .. } => {
-                        situation.focus_state = 0.9;
-                        situation.distraction_risk = (situation.distraction_risk - 0.2).max(0.0);
+                    DomainEvent::FocusSessionStarted { target_mins, .. } => {
+                        // Longer sessions signal higher commitment → higher initial focus.
+                        let commitment = (*target_mins as f64 / 60.0).clamp(0.5, 1.0);
+                        situation.focus_state = 0.7 + commitment * 0.25;
+                        // Focus start partially clears distraction risk.
+                        let recovery = 0.15 + commitment * 0.10;
+                        situation.distraction_risk =
+                            (situation.distraction_risk - recovery).max(0.0);
                     }
                     DomainEvent::FocusSessionEnded { quality, .. } => {
                         situation.focus_state = *quality;
@@ -399,7 +409,10 @@ impl SimulationHarness {
                         situation.task_avoidance_detected = true;
                     }
                     DomainEvent::BudgetAlert { .. } => {
-                        situation.deadline_pressure = (situation.deadline_pressure + 0.2).min(1.0);
+                        // Escalating pressure: each alert compounds more.
+                        let escalation = 0.15 + situation.deadline_pressure * 0.10;
+                        situation.deadline_pressure =
+                            (situation.deadline_pressure + escalation).min(1.0);
                     }
                     _ => {}
                 }
@@ -478,6 +491,9 @@ impl SimulationHarness {
             // Clone trial IDs once per epoch (values only change during cron re-seeding).
             let active_id = self.active_trial_id.lock().unwrap().clone();
             let variant_id = self.variant_trial_id.lock().unwrap().clone();
+            // Per-epoch routing stats for the mirror snapshot.
+            let mut epoch_routing_confidence_sum = 0.0f64;
+            let mut epoch_routing_fallbacks = 0u32;
             for (msg_idx, msg) in messages.iter_mut().enumerate() {
                 // Backfill retrieval annotations inline: annotate with
                 // previously extracted fact IDs from the same topic so
@@ -517,8 +533,12 @@ impl SimulationHarness {
                 .execute(&self.inner_pool)
                 .await;
 
-                // Shadow log entry for autotuner evaluation (Trial A — control).
+                // Shadow log entries for autotuner evaluation.
+                // Confidence is derived from topic clarity × trial keyword weight.
                 let predicted_skill = expected_skill_for_topic(&msg.topic);
+                let control_confidence = compute_routing_confidence(&msg.topic, 0.5, msg_idx); // default weight
+                let variant_confidence = compute_routing_confidence(&msg.topic, 0.7, msg_idx); // boosted keyword
+
                 let _ = trial_repo
                     .insert_shadow_log(
                         &active_id,
@@ -527,19 +547,13 @@ impl SimulationHarness {
                         &Uuid::new_v4().to_string(),
                         predicted_skill,
                         "reactive",
-                        0.85,
+                        control_confidence,
                         10,
                         predicted_skill,
                         "reactive",
                     )
                     .await;
 
-                // Shadow log entry for Trial B (variant — boosted keyword weight).
-                let variant_confidence = match msg.topic.as_str() {
-                    "tasks" | "finance" => 0.92,
-                    "notes" | "productivity" => 0.88,
-                    _ => 0.78,
-                };
                 let _ = trial_repo
                     .insert_shadow_log(
                         &variant_id,
@@ -576,12 +590,13 @@ impl SimulationHarness {
                         self.meta_rule_detector.lock().await.handle_alert(a).await;
                     }
 
-                    // Flag BOTH trials' shadow log entries as user-corrected, but
-                    // Trial B only 50% of the time.  This gives Trial B a genuinely
-                    // lower (but non-zero) correction_rate, so the evaluator sees a
-                    // real improvement rather than a trivial 100% (0 vs non-zero).
+                    // Flag BOTH trials' shadow log entries as user-corrected.
+                    // Trial B only gets flagged when its routing confidence was
+                    // below the threshold — meaning it would have made a mistake.
+                    // High-confidence topics (tasks, finance) avoid Trial B
+                    // corrections while ambiguous topics (coaching) still get them.
                     let _ = flag_last_shadow_log(&self.inner_pool, &active_id).await;
-                    if msg_idx % 2 == 0 {
+                    if variant_confidence < 0.87 {
                         let _ = flag_last_shadow_log(&self.inner_pool, &variant_id).await;
                     }
                 }
@@ -666,13 +681,25 @@ impl SimulationHarness {
                             | SimulatedToolAction::ReviewFlashcard { .. } => "learning",
                             SimulatedToolAction::CreateObjective { .. } => "okr",
                         };
+                        // Realistic tool latency: fast lookup tools ~5-20ms,
+                        // medium write tools ~15-50ms, slow generation ~30-100ms.
+                        let base_ms: i64 = match tool_name {
+                            "tasks" | "notes" => 12,
+                            "finance" | "productivity" => 25,
+                            "learning" => 50,
+                            _ => 18,
+                        };
+                        let noise = (msg_idx as i64 * 7 + base_ms * 3) % (base_ms / 2).max(1) + 1;
+                        let duration_ms = base_ms + noise;
+
                         let _ = sqlx::query(
                             "INSERT INTO tool_usage \
                              (id, tool_name, action, session_key, channel, success, duration_ms, created_at) \
-                             VALUES (?, ?, 'execute', 'sim-session', 'simulation', 1, 10, ?)",
+                             VALUES (?, ?, 'execute', 'sim-session', 'simulation', 1, ?, ?)",
                         )
                         .bind(Uuid::new_v4().to_string())
                         .bind(tool_name)
+                        .bind(duration_ms)
                         .bind(msg.simulated_at.to_rfc3339())
                         .execute(&self.inner_pool)
                         .await;
@@ -768,9 +795,13 @@ impl SimulationHarness {
                 }
 
                 // Routing stability: check if message content matches expected topic keywords
-                if message_matches_topic_keywords(&msg.content, &msg.topic) {
+                let topic_matched = message_matches_topic_keywords(&msg.content, &msg.topic);
+                if topic_matched {
                     metrics.accumulator_mut().routing_matches += 1;
+                } else {
+                    epoch_routing_fallbacks += 1;
                 }
+                epoch_routing_confidence_sum += control_confidence;
 
                 // Response quality is only measured in agent mode (which has an
                 // actual agent response to score). In heuristic mode there is no
@@ -778,7 +809,6 @@ impl SimulationHarness {
 
                 // Salience: classify the message as a ChatTurnCompleted event.
                 let chat_event = DomainEvent::ChatTurnCompleted {
-                    user_message: msg.content.clone(),
                     session_key: "sim-session".to_string(),
                 };
                 crate::metrics::cognitive::record_salience(&chat_event, metrics.accumulator_mut());
@@ -1103,9 +1133,17 @@ impl SimulationHarness {
                 .bind(24_i64)
                 .bind(total_msgs)
                 .bind(&distribution_json)
-                .bind(0.0_f64) // fallback_rate -- no fallbacks in simulation
-                .bind(0.85_f64) // avg_routing_confidence -- simulated default
-                .bind(0_i64) // low_confidence_count
+                .bind(if total_msgs > 0 {
+                    epoch_routing_fallbacks as f64 / total_msgs as f64
+                } else {
+                    0.0
+                })
+                .bind(if !messages.is_empty() {
+                    epoch_routing_confidence_sum / messages.len() as f64
+                } else {
+                    0.0
+                })
+                .bind(epoch_routing_fallbacks as i64)
                 .execute(&self.inner_pool)
                 .await;
             }
@@ -1933,6 +1971,30 @@ impl SimulationHarness {
 /// In the flat skill system, all messages are handled by "klyntbot".
 fn expected_skill_for_topic(_topic: &str) -> &'static str {
     "klyntbot"
+}
+
+/// Compute a realistic routing confidence for a shadow log entry.
+///
+/// `base_keyword_weight` is the trial's keyword weight (higher = more
+/// keyword-dependent).  Clear-keyword topics score high; ambiguous topics
+/// score lower.  The `msg_idx` adds deterministic per-message jitter.
+fn compute_routing_confidence(topic: &str, base_keyword_weight: f64, msg_idx: usize) -> f64 {
+    // Topic clarity: how distinctly keyword-routable each topic is.
+    let clarity = match topic {
+        "tasks" => 0.95,        // very clear keywords (task, todo, done)
+        "finance" => 0.93,      // clear (expense, budget, spend)
+        "notes" => 0.88,        // moderate (note, summarize overlap with other topics)
+        "productivity" => 0.82, // overlaps with tasks, coaching
+        "learning" => 0.90,     // clear (flashcard, quiz, learn)
+        "automation" => 0.85,   // moderate (schedule, remind)
+        "coaching" => 0.75,     // low — overlaps productivity, tasks
+        _ => 0.70,              // unknown topics
+    };
+    // Keyword weight amplifies clarity for keyword-clear topics, dampens for ambiguous ones.
+    let weighted = clarity * base_keyword_weight + clarity * (1.0 - base_keyword_weight) * 0.8;
+    // Deterministic jitter ±0.04
+    let jitter = ((msg_idx as f64 * 0.0137).sin() * 0.04).clamp(-0.04, 0.04);
+    (weighted + jitter).clamp(0.50, 0.99)
 }
 
 /// Check if a message's content contains keywords associated with its topic.

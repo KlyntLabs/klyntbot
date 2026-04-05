@@ -234,12 +234,33 @@ impl ActionExecutor {
 
             SimulatedToolAction::ReviewFlashcard { topic, rating } => {
                 debug!(topic = %topic, rating = %rating, "action: ReviewFlashcard");
+                // Realistic recall speed: higher ratings = faster recall.
+                // Rating 1 (forgot): 3000-5000ms, Rating 4 (easy): 600-1200ms.
+                let base_speed: u64 = match *rating {
+                    1 => 4000,
+                    2 => 2500,
+                    3 => 1500,
+                    _ => 900,
+                };
+                let noise = topic.bytes().fold(0u64, |a, b| a.wrapping_add(b as u64)) % 500;
+                let recall_speed_ms = base_speed + noise;
+
+                // Retention follows FSRS-5 mapping: rating → expected retention.
+                let base_retention: f64 = match *rating {
+                    1 => 30.0,
+                    2 => 50.0,
+                    3 => 70.0,
+                    _ => 90.0,
+                };
+                let retention_noise = (noise as f64 % 10.0) - 5.0;
+                let new_retention_pct = (base_retention + retention_noise).clamp(10.0, 99.0);
+
                 self.bus.publish(DomainEvent::AtomFlashcardReviewed {
                     atom_id: Uuid::new_v4().to_string(),
                     card_id: Uuid::new_v4().to_string(),
                     quality: *rating,
-                    recall_speed_ms: 2000,
-                    new_retention_pct: f64::from(*rating) * 20.0,
+                    recall_speed_ms,
+                    new_retention_pct,
                     source_note_id: None,
                 });
             }
