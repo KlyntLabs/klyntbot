@@ -64,12 +64,16 @@ pub async fn measure_autotuner_success(pool: &sqlx::SqlitePool) -> AutotunerStat
     }
 }
 
-/// Measure insight usefulness: fraction of cross-domain insights that reference
-/// 2+ distinct domains.  Single-domain rows are cron health-check artifacts and
-/// don't represent real cross-domain connections.
-/// Usefulness = qualified insights / total simulated days so far (normalized to 0-1).
-pub async fn measure_insight_usefulness(pool: &sqlx::SqlitePool, day: u32) -> f64 {
-    // Count only insights whose dot_refs JSON array has 2+ distinct domains
+/// Measure insight usefulness: ratio of qualified cross-domain insights to
+/// total messages processed.
+///
+/// Only counts insights whose `dot_refs` JSON array references 2+ distinct
+/// domains — single-domain rows are cron health-check artifacts.
+///
+/// `total_messages` is the cumulative message count so far (not per-epoch).
+/// This normalisation prevents the metric from saturating at 1.0 in short sims
+/// (the old per-day formula always hit 1.0 once any insights existed).
+pub async fn measure_insight_usefulness(pool: &sqlx::SqlitePool, total_messages: u32) -> f64 {
     let count: (i64,) = sqlx::query_as(
         "SELECT COUNT(*) FROM cross_domain_insights \
          WHERE json_array_length(dot_refs) >= 2",
@@ -78,10 +82,10 @@ pub async fn measure_insight_usefulness(pool: &sqlx::SqlitePool, day: u32) -> f6
     .await
     .unwrap_or((0,));
 
-    if day == 0 {
+    if total_messages == 0 {
         return 0.0;
     }
-    (count.0 as f64 / day as f64).min(1.0)
+    (count.0 as f64 / total_messages as f64).min(1.0)
 }
 
 // ---------------------------------------------------------------------------

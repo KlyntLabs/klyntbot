@@ -403,6 +403,22 @@ async fn run_software_engineer_12mo() {
             "  Brain version velocity:{} → {}",
             first.brain_version_velocity, last.brain_version_velocity
         );
+        eprintln!(
+            "  Cost/outcome (USD):    {:.6} → {:.6}",
+            first.cost_per_outcome_usd, last.cost_per_outcome_usd
+        );
+        eprintln!(
+            "  Cache hit rate:        {:.4} → {:.4}",
+            first.cache_hit_rate, last.cache_hit_rate
+        );
+        eprintln!(
+            "  Retrievability min:    {:.3} → {:.3}",
+            first.retrievability_min, last.retrievability_min
+        );
+        eprintln!(
+            "  Estimation deviation:  {:.3} → {:.3}",
+            first.estimation_deviation_avg, last.estimation_deviation_avg
+        );
     }
 
     print_agent_summary(&report);
@@ -637,12 +653,24 @@ async fn run_agent_validation_1week() {
     eprintln!("    Response quality:     {:.3}", fm.response_quality);
     eprintln!("    Salience extract:     {:.3}", fm.salience_extract_rate);
     eprintln!("    Insight usefulness:   {:.3}", fm.insight_usefulness);
+    eprintln!(
+        "    Estimation deviation:  {:.3}",
+        fm.estimation_deviation_avg
+    );
     eprintln!();
     eprintln!("  TIER 3 — System Health");
     eprintln!("    Community stability:  {:.3}", fm.community_stability);
     eprintln!("    Brain ver velocity:   {}", fm.brain_version_velocity);
     eprintln!("    Meta-rule count:      {}", fm.meta_rule_count);
     eprintln!("    Retrievability:       {:.3}", fm.memory_retrievability);
+    eprintln!();
+    eprintln!("  TIER 4 — Cognitive Depth");
+    eprintln!("    Retrievability min:   {:.3}", fm.retrievability_min);
+    eprintln!("    Retrievability p25:   {:.3}", fm.retrievability_p25);
+    eprintln!();
+    eprintln!("  TIER 7 — Cost Economics");
+    eprintln!("    Cost/outcome (USD):   {:.6}", fm.cost_per_outcome_usd);
+    eprintln!("    Cache hit rate:       {:.4}", fm.cache_hit_rate);
     eprintln!();
 
     print_agent_summary(&report);

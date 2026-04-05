@@ -14,7 +14,7 @@ use serde_json::Value;
 use common::Result;
 use providers::types::{
     ChatParams, DynProvider, LlmProvider, LlmResponse, LlmStream, Message, ProviderCapabilities,
-    ProviderHealth, Usage,
+    ProviderHealth,
 };
 
 /// An [`LlmProvider`] that returns pre-defined text responses, cycling through

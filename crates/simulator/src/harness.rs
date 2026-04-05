@@ -598,6 +598,35 @@ impl SimulationHarness {
                     }
                 }
 
+                // Accumulate persona intent metrics (both modes).
+                // These track what the persona *intended* to do, regardless of
+                // whether the agent or heuristic executor carried it out.
+                for action in &msg.tool_actions {
+                    match action {
+                        SimulatedToolAction::CreateTask { .. } => {
+                            metrics.accumulator_mut().tasks_created += 1;
+                        }
+                        SimulatedToolAction::CompleteTask {
+                            estimated_duration_mins,
+                            actual_duration_mins,
+                            ..
+                        } => {
+                            metrics.accumulator_mut().tasks_completed += 1;
+                            if let (Some(est), Some(act)) =
+                                (estimated_duration_mins, actual_duration_mins)
+                            {
+                                if *est > 0 {
+                                    let deviation =
+                                        ((*act as f64 - *est as f64) / *est as f64).abs();
+                                    metrics.accumulator_mut().estimation_deviation_sum += deviation;
+                                    metrics.accumulator_mut().estimation_count += 1;
+                                }
+                            }
+                        }
+                        _ => {}
+                    }
+                }
+
                 // Execute tool actions — only in heuristic mode.
                 // When agent_mode is active, the AgentRuntime executes tools
                 // via its own pipeline, so we skip the heuristic action executor
@@ -616,31 +645,6 @@ impl SimulationHarness {
                         }
                         if let Err(e) = exec_result {
                             warn!(error = %e, "Failed to execute tool action");
-                        }
-                        // Track tasks_created / tasks_completed.
-                        match action {
-                            SimulatedToolAction::CreateTask { .. } => {
-                                metrics.accumulator_mut().tasks_created += 1;
-                            }
-                            SimulatedToolAction::CompleteTask {
-                                estimated_duration_mins,
-                                actual_duration_mins,
-                                ..
-                            } => {
-                                metrics.accumulator_mut().tasks_completed += 1;
-                                if let (Some(est), Some(act)) =
-                                    (estimated_duration_mins, actual_duration_mins)
-                                {
-                                    if *est > 0 {
-                                        let deviation =
-                                            ((*act as f64 - *est as f64) / *est as f64).abs();
-                                        metrics.accumulator_mut().estimation_deviation_sum +=
-                                            deviation;
-                                        metrics.accumulator_mut().estimation_count += 1;
-                                    }
-                                }
-                            }
-                            _ => {}
                         }
 
                         // tool_usage row
@@ -1141,15 +1145,8 @@ impl SimulationHarness {
             // Capture metrics that snapshot() will reset.
             let epoch_outcomes = metrics.accumulator_mut().tasks_completed
                 + metrics.accumulator_mut().facts_extracted;
-            let epoch_estimation_avg = if metrics.accumulator_mut().estimation_count > 0 {
-                metrics.accumulator_mut().estimation_deviation_sum
-                    / metrics.accumulator_mut().estimation_count as f64
-            } else {
-                0.0
-            };
-
             let insight_usefulness =
-                measure_insight_usefulness(&self.inner_pool, day_counter).await;
+                measure_insight_usefulness(&self.inner_pool, total_messages).await;
 
             metrics.snapshot(
                 plan.simulated_now,
@@ -1192,7 +1189,7 @@ impl SimulationHarness {
                 cache_rate,
                 ret_dist.min,
                 ret_dist.p25,
-                epoch_estimation_avg,
+                metrics.cumulative_estimation_deviation_avg(),
             );
 
             // Progress logging every 30 days.

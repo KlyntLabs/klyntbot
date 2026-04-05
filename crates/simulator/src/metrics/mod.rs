@@ -165,6 +165,8 @@ pub struct MetricCollector {
     cumulative_facts_superseded: u32,
     cumulative_facts_introduced: u32,
     cumulative_contradictions: u32,
+    cumulative_estimation_deviation_sum: f64,
+    cumulative_estimation_count: u32,
 }
 
 impl MetricCollector {
@@ -181,6 +183,8 @@ impl MetricCollector {
             cumulative_facts_superseded: 0,
             cumulative_facts_introduced: 0,
             cumulative_contradictions: 0,
+            cumulative_estimation_deviation_sum: 0.0,
+            cumulative_estimation_count: 0,
         }
     }
 
@@ -192,6 +196,15 @@ impl MetricCollector {
 
     pub fn total_facts_superseded(&self) -> u32 {
         self.cumulative_facts_superseded
+    }
+
+    /// Cumulative average estimation deviation across all epochs.
+    pub fn cumulative_estimation_deviation_avg(&self) -> f64 {
+        if self.cumulative_estimation_count == 0 {
+            0.0
+        } else {
+            self.cumulative_estimation_deviation_sum / self.cumulative_estimation_count as f64
+        }
     }
 
     /// Finalise the current epoch: compute derived rates from the accumulator,
@@ -214,6 +227,8 @@ impl MetricCollector {
         self.cumulative_facts_superseded += self.accumulator.facts_superseded;
         self.cumulative_facts_introduced += self.accumulator.facts_introduced;
         self.cumulative_contradictions += self.accumulator.contradictions_detected;
+        self.cumulative_estimation_deviation_sum += self.accumulator.estimation_deviation_sum;
+        self.cumulative_estimation_count += self.accumulator.estimation_count;
 
         let acc = &self.accumulator;
         let msgs = acc.messages_processed.max(1) as f64;
