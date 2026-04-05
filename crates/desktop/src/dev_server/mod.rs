@@ -26,8 +26,13 @@ use tracing::{error, info};
 use crate::app_core::AppCore;
 use ::app_core::events::AppEventEmitter;
 
-pub(super) type SseChannels =
-    Arc<DashMap<String, (broadcast::Sender<(String, Value)>, std::time::Instant)>>;
+/// An SSE channel with its creation time for TTL-based eviction.
+pub(super) struct SseChannel {
+    pub sender: broadcast::Sender<(String, Value)>,
+    pub created_at: std::time::Instant,
+}
+
+pub(super) type SseChannels = Arc<DashMap<String, SseChannel>>;
 
 #[derive(Clone)]
 pub(super) struct DevState {

@@ -35,16 +35,19 @@ pub(super) async fn dispatch_chat_send(
     let context: Option<desktop_shared::commands::SessionContextInput> = dev::get(body, "context");
 
     // Evict stale SSE channels (no receiver for >5 min)
-    sse_channels.retain(|_, (sender, created)| {
-        sender.receiver_count() > 0 || created.elapsed() < SSE_CHANNEL_TTL
+    sse_channels.retain(|_, ch| {
+        ch.sender.receiver_count() > 0 || ch.created_at.elapsed() < SSE_CHANNEL_TTL
     });
 
     match core.chat_send(content, session_key.clone(), context).await {
         Ok((user_msg, stream_info)) => {
             let tx = sse_channels
                 .entry(session_key)
-                .or_insert_with(|| (broadcast::channel(256).0, Instant::now()))
-                .0
+                .or_insert_with(|| super::SseChannel {
+                    sender: broadcast::channel(256).0,
+                    created_at: Instant::now(),
+                })
+                .sender
                 .clone();
             let emitter: Arc<dyn AppEventEmitter> = Arc::new(SseEmitter { tx });
             core.spawn_chat_relay(stream_info, emitter);
@@ -67,9 +70,12 @@ pub(super) async fn sse_handler(
     let rx = state
         .sse_channels
         .entry(session_key.clone())
-        .or_insert_with(|| (broadcast::channel(256).0, Instant::now()))
+        .or_insert_with(|| super::SseChannel {
+            sender: broadcast::channel(256).0,
+            created_at: Instant::now(),
+        })
         .value()
-        .0
+        .sender
         .subscribe();
 
     let sse_channels = Arc::clone(&state.sse_channels);
@@ -125,8 +131,11 @@ pub(super) async fn dispatch_insight_tab_chat(
     let session_key = params.session_key.clone();
     let tx = sse_channels
         .entry(session_key.clone())
-        .or_insert_with(|| (broadcast::channel(256).0, Instant::now()))
-        .0
+        .or_insert_with(|| super::SseChannel {
+            sender: broadcast::channel(256).0,
+            created_at: Instant::now(),
+        })
+        .sender
         .clone();
     let emitter: Arc<dyn AppEventEmitter> = Arc::new(SseEmitter { tx });
 

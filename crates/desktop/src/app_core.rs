@@ -311,15 +311,13 @@ fn wire_event_channels(
                         match result {
                             Ok(event) => {
                                 let salience = cognitive::salience::evaluate_salience(&event);
-                                let salience_str = salience.as_str();
                                 let event_type = event.variant_name().to_string();
-                                let payload_value = serde_json::Value::String(event_type.clone());
                                 let payload = desktop_shared::cognitive_commands::DomainEventPayload {
-                                    event_type,
-                                    salience: salience_str.to_string(),
+                                    salience: salience.as_str().to_string(),
                                     domain: event.domain().to_string(),
                                     timestamp: chrono::Utc::now().to_rfc3339(),
-                                    payload: payload_value,
+                                    payload: serde_json::Value::String(event_type.clone()),
+                                    event_type,
                                 };
                                 let _ = app_handle_clone.emit("cognitive:domain_event", &payload);
                                 if let Some(fe) =
