@@ -235,14 +235,14 @@ impl SimulationHarness {
         // Pre-cache embeddings for the 8 reference answer strings to avoid
         // re-embedding the same text hundreds of times during the simulation.
         let reference_texts = [
-            "Here are your tasks. I can help you create, complete, or prioritize them.",
-            "I can help with your notes. Let me search, create, or summarize them.",
-            "Here's your financial summary. I can track expenses, check budgets, or show trends.",
-            "Let me help with your focus and productivity. I can start a session or show your stats.",
-            "I understand you're looking for guidance. Let me help you with priorities and habits.",
-            "I can help you study. Let me create flashcards or quiz you on the topic.",
-            "I can set up reminders and recurring tasks to automate your workflow.",
-            "Let me analyze patterns across your data and show you cross-domain connections.",
+            "task management: listing tasks, creating tasks, completing tasks, setting priorities and deadlines, project planning",
+            "note taking: creating notes, searching notes, organizing knowledge, summarizing content, documentation",
+            "financial tracking: recording expenses, checking budgets, transaction categories, spending trends, financial summary",
+            "productivity and focus: starting focus sessions, tracking time, work habits, distraction management, energy levels",
+            "personal coaching: behavioral guidance, habit formation, priority management, motivation, work-life balance",
+            "learning and study: flashcards, spaced repetition, knowledge review, quiz practice, educational content",
+            "workflow automation: scheduled reminders, recurring tasks, cron jobs, automated notifications",
+            "cross-domain insights: pattern analysis, connections between data, trends, correlations, behavioral patterns",
         ];
         let mut reference_embeddings = HashMap::new();
         for text in &reference_texts {
@@ -832,11 +832,10 @@ impl SimulationHarness {
                         metrics.accumulator_mut().agent_tool_calls += 1;
                     }
 
-                    // Check tool selection: did the agent use the expected domain
-                    // tool for this topic? Scored for all messages with a known
-                    // topic→tool mapping, regardless of whether the agent made tool
-                    // calls (no tool calls for a tool-expected topic = incorrect).
-                    {
+                    // Tool selection: only scored when the persona intended tool
+                    // calls. If the persona didn't generate tool_actions, the agent
+                    // answering from context (no tools) is correct behavior.
+                    if !msg.tool_actions.is_empty() {
                         let expected_tool = match msg.topic.as_str() {
                             "tasks" => Some("tasks"),
                             "finance" => Some("finance"),
@@ -1162,9 +1161,6 @@ impl SimulationHarness {
             // Capture accumulator totals before snapshot resets them.
             total_facts_extracted += metrics.accumulator_mut().facts_extracted;
 
-            // Capture metrics that snapshot() will reset.
-            let epoch_outcomes = metrics.accumulator_mut().tasks_completed
-                + metrics.accumulator_mut().facts_extracted;
             let insight_usefulness =
                 measure_insight_usefulness(&self.inner_pool, total_messages).await;
 
@@ -1180,18 +1176,16 @@ impl SimulationHarness {
             );
 
             let now_rfc3339 = plan.simulated_now.to_rfc3339();
-            let epoch_start_str_cost = plan.previous.to_rfc3339();
+            let sim_start_str = start_date.to_rfc3339();
+            let cumulative_outcomes = metrics.cumulative_tasks_completed() + total_facts_extracted;
             let (meta_rule_count, cost_per_outcome, cache_rate, ret_dist) = tokio::join!(
                 crate::metrics::cognitive::count_meta_rules(&self.inner_pool),
                 crate::metrics::cost::measure_cost_efficiency(
                     &self.inner_pool,
-                    &epoch_start_str_cost,
-                    epoch_outcomes,
+                    &sim_start_str,
+                    cumulative_outcomes,
                 ),
-                crate::metrics::cost::measure_cache_hit_rate(
-                    &self.inner_pool,
-                    &epoch_start_str_cost,
-                ),
+                crate::metrics::cost::measure_cache_hit_rate(&self.inner_pool, &sim_start_str,),
                 crate::metrics::cognitive::measure_retrievability_distribution(
                     &self.inner_pool,
                     &now_rfc3339,

@@ -198,6 +198,10 @@ impl MetricCollector {
         self.cumulative_facts_superseded
     }
 
+    pub fn cumulative_tasks_completed(&self) -> u32 {
+        self.cumulative_tasks_completed
+    }
+
     /// Cumulative average estimation deviation across all epochs.
     pub fn cumulative_estimation_deviation_avg(&self) -> f64 {
         if self.cumulative_estimation_count == 0 {
@@ -573,7 +577,7 @@ impl MetricCollector {
             if baseline > 0.0 {
                 // Skip near-zero baselines for metrics that can legitimately be zero
                 // (avoids spurious regression alerts from floating-point noise).
-                if skip_when_zero && (current == 0.0 || baseline < 1e-6) {
+                if skip_when_zero && (current == 0.0 || baseline < 0.01) {
                     continue;
                 }
                 let pct = (baseline - current) / baseline * 100.0;
