@@ -581,13 +581,57 @@ async fn run_software_engineer_1mo() {
         report.persona, report.simulated_days
     );
     eprintln!("============================================================");
+    let fm = &report.summary.final_metrics;
     eprintln!("  Wall time:          {:.2}s", report.wall_time_secs);
     eprintln!("  Total messages:     {}", report.summary.total_messages);
+    eprintln!(
+        "  Facts extracted:    {}",
+        report.summary.total_facts_extracted
+    );
+    eprintln!();
+    eprintln!("  TIER 1 — Memory Fidelity");
+    eprintln!("    Knowledge retention:  {:.3}", fm.knowledge_retention);
+    eprintln!("    Retrieval precision:  {:.3}", fm.retrieval_precision);
+    eprintln!(
+        "    Fact extraction acc:  {:.3}",
+        fm.fact_extraction_accuracy
+    );
+    eprintln!(
+        "    Contradiction rate:   {:.3}",
+        fm.contradiction_detection_rate
+    );
+    eprintln!();
+    eprintln!("  TIER 2 — Behavioral Quality");
+    eprintln!("    Token efficiency:     {:.0}", fm.token_efficiency);
+    eprintln!("    Personalization:      {:.3}", fm.personalization_score);
+    eprintln!("    Routing accuracy:     {:.3}", fm.routing_accuracy);
+    eprintln!("    Response quality:     {:.3}", fm.response_quality);
+    eprintln!("    Salience extract:     {:.3}", fm.salience_extract_rate);
+    eprintln!("    Insight usefulness:   {:.3}", fm.insight_usefulness);
+    eprintln!(
+        "    Estimation deviation: {:.3}",
+        fm.estimation_deviation_avg
+    );
+    eprintln!();
+    eprintln!("  TIER 3 — System Health");
+    eprintln!("    Community stability:  {:.3}", fm.community_stability);
+    eprintln!("    Brain ver velocity:   {}", fm.brain_version_velocity);
+    eprintln!("    Meta-rule count:      {}", fm.meta_rule_count);
+    eprintln!("    Retrievability:       {:.3}", fm.memory_retrievability);
+    eprintln!();
+    eprintln!("  TIER 4 — Cognitive Depth");
+    eprintln!("    Retrievability min:   {:.3}", fm.retrievability_min);
+    eprintln!("    Retrievability p25:   {:.3}", fm.retrievability_p25);
+    eprintln!();
+    eprintln!("  TIER 7 — Cost Economics");
+    eprintln!("    Cost/outcome (USD):   {:.6}", fm.cost_per_outcome_usd);
+    eprintln!("    Cache hit rate:       {:.4}", fm.cache_hit_rate);
+    eprintln!();
 
     print_agent_summary(&report);
     print_checkpoints(&report);
     eprintln!(
-        "  Verdict: {}",
+        "\n  Verdict: {}",
         if report.passed() { "PASSED" } else { "FAILED" }
     );
 

@@ -571,7 +571,9 @@ impl MetricCollector {
 
         for &(name, baseline, current, skip_when_zero) in checks {
             if baseline > 0.0 {
-                if skip_when_zero && current == 0.0 {
+                // Skip near-zero baselines for metrics that can legitimately be zero
+                // (avoids spurious regression alerts from floating-point noise).
+                if skip_when_zero && (current == 0.0 || baseline < 1e-6) {
                     continue;
                 }
                 let pct = (baseline - current) / baseline * 100.0;
