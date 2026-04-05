@@ -12631,6 +12631,7 @@ dependencies = [
  "arrow-schema",
  "chrono",
  "common",
+ "dashmap",
  "futures-util",
  "lance",
  "lance-io",

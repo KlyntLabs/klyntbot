@@ -19,12 +19,7 @@ impl VectorStore {
         limit: usize,
         threshold: f64,
     ) -> Result<Vec<(String, String, String, String, String, String, f64)>, StorageError> {
-        let tbl = self
-            .db
-            .open_table("conv_embeddings")
-            .execute()
-            .await
-            .map_err(|e| StorageError::Vector(format!("open table conv_embeddings: {e}")))?;
+        let tbl = self.get_table("conv_embeddings").await?;
 
         let results = tbl
             .query()

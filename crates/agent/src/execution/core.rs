@@ -685,7 +685,15 @@ impl ExecutionCore {
                 for r in &results {
                     domain_bus.publish(bus::DomainEvent::ToolCallExecuted {
                         tool_name: r.tool_name.clone(),
-                        args_preview: Some(r.arguments.to_string()),
+                        args_preview: {
+                            let full = r.arguments.to_string();
+                            Some(if full.len() > 200 {
+                                let end = full.floor_char_boundary(200);
+                                format!("{}...", &full[..end])
+                            } else {
+                                full
+                            })
+                        },
                         session_key: Some(
                             common::SessionKey::from_parts(
                                 routing_ctx.channel.as_str(),

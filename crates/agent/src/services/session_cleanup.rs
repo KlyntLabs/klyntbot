@@ -5,12 +5,14 @@ use std::time::Duration;
 use tokio_util::sync::CancellationToken;
 use tracing::{info, warn};
 
+use sqlx::SqlitePool;
 use storage::SessionRepo;
 
 /// Spawns a background task that deletes sessions older than `ttl_days` every
 /// `interval_hours` hours. Shuts down gracefully when the `CancellationToken` is cancelled.
 pub struct SessionCleanupService {
     repo: SessionRepo,
+    pool: SqlitePool,
     ttl_days: u32,
     interval: Duration,
     token: CancellationToken,
@@ -19,12 +21,14 @@ pub struct SessionCleanupService {
 impl SessionCleanupService {
     pub fn new(
         repo: SessionRepo,
+        pool: SqlitePool,
         ttl_days: u32,
         cleanup_interval_hours: u32,
         token: CancellationToken,
     ) -> Self {
         Self {
             repo,
+            pool,
             ttl_days,
             interval: Duration::from_secs(cleanup_interval_hours as u64 * 3600),
             token,
@@ -55,6 +59,40 @@ impl SessionCleanupService {
                             error = %e,
                             "SessionCleanupService: failed to delete stale sessions"
                         ),
+                    }
+
+                    // Clean up old log records that grow without bound.
+                    let cutoff = (chrono::Utc::now()
+                        - chrono::Duration::days(self.ttl_days as i64))
+                    .to_rfc3339();
+                    for (table, ts_col) in [
+                        ("interaction_log", "timestamp"),
+                        ("decision_log", "created_at"),
+                        ("tool_usage", "created_at"),
+                    ] {
+                        match sqlx::query(&format!(
+                            "DELETE FROM {table} WHERE {ts_col} < ?1"
+                        ))
+                        .bind(&cutoff)
+                        .execute(&self.pool)
+                        .await
+                        {
+                            Ok(result) => {
+                                if result.rows_affected() > 0 {
+                                    info!(
+                                        table,
+                                        deleted = result.rows_affected(),
+                                        "cleaned old log records"
+                                    );
+                                }
+                            }
+                            Err(e) => {
+                                // Tables may not exist yet — skip silently.
+                                if !e.to_string().contains("no such table") {
+                                    warn!(table, error = %e, "log cleanup failed");
+                                }
+                            }
+                        }
                     }
                 }
                 _ = self.token.cancelled() => {

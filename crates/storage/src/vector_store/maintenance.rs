@@ -35,7 +35,7 @@ impl VectorStore {
     /// repeatedly — it is a no-op if indexes already exist.
     pub async fn ensure_indexes(&self, min_rows: usize) -> Result<(), StorageError> {
         for &table_name in ALL_TABLES {
-            let tbl = match self.db.open_table(table_name).execute().await {
+            let tbl = match self.get_table(table_name).await {
                 Ok(t) => t,
                 Err(_) => continue,
             };
@@ -82,7 +82,7 @@ impl VectorStore {
     ///
     /// This is intended for background maintenance, not the hot path.
     pub async fn dedup_table(&self, table: &str, ts_column: &str) -> Result<usize, StorageError> {
-        let tbl = match self.db.open_table(table).execute().await {
+        let tbl = match self.get_table(table).await {
             Ok(t) => t,
             Err(_) => return Ok(0),
         };
@@ -159,7 +159,7 @@ impl VectorStore {
     ///
     pub async fn optimize_all_tables(&self) -> Result<(), StorageError> {
         for &table_name in ALL_TABLES {
-            let tbl = match self.db.open_table(table_name).execute().await {
+            let tbl = match self.get_table(table_name).await {
                 Ok(t) => t,
                 Err(_) => continue,
             };
@@ -177,6 +177,10 @@ impl VectorStore {
                 }
             }
         }
+
+        // Invalidate cached handles so subsequent operations get fresh state
+        // that reflects the compacted tables.
+        self.invalidate_table_cache();
 
         Ok(())
     }

@@ -10,7 +10,8 @@
 use std::path::Path;
 use std::sync::Arc;
 
-use lancedb::Connection;
+use dashmap::DashMap;
+use lancedb::{Connection, Table};
 
 use crate::error::StorageError;
 
@@ -56,6 +57,9 @@ pub use tree_node::TreeNodeSearchResult;
 #[derive(Clone)]
 pub struct VectorStore {
     pub(crate) db: Arc<Connection>,
+    /// Cache of open table handles, keyed by table name.
+    /// Avoids re-loading manifests from disk on every operation.
+    table_cache: Arc<DashMap<String, Table>>,
 }
 
 impl std::fmt::Debug for VectorStore {
@@ -84,7 +88,10 @@ impl VectorStore {
             .execute()
             .await
             .map_err(|e| StorageError::Vector(format!("LanceDB connect failed: {e}")))?;
-        let store = Self { db: Arc::new(db) };
+        let store = Self {
+            db: Arc::new(db),
+            table_cache: Arc::new(DashMap::new()),
+        };
 
         // Fetch table list once instead of per-table (saves 11 round-trips).
         let existing = store
@@ -171,6 +178,32 @@ impl VectorStore {
             )
             .await?;
         Ok(store)
+    }
+
+    /// Get a cached table handle, opening the table on first access.
+    ///
+    /// Subsequent calls for the same table name return a cloned handle from the
+    /// cache, avoiding repeated manifest loads from disk.
+    pub(crate) async fn get_table(&self, name: &str) -> Result<Table, StorageError> {
+        if let Some(tbl) = self.table_cache.get(name) {
+            return Ok(tbl.clone());
+        }
+        let tbl = self
+            .db
+            .open_table(name)
+            .execute()
+            .await
+            .map_err(|e| StorageError::Vector(format!("open table {name}: {e}")))?;
+        self.table_cache.insert(name.to_string(), tbl.clone());
+        Ok(tbl)
+    }
+
+    /// Clear all cached table handles.
+    ///
+    /// Should be called after `optimize_all_tables()` so that subsequent
+    /// operations get fresh handles that reflect the compacted state.
+    pub(crate) fn invalidate_table_cache(&self) {
+        self.table_cache.clear();
     }
 
     /// Create the table if it does not already exist.

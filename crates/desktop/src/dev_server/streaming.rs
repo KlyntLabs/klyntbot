@@ -17,6 +17,13 @@ use ::app_core::events::AppEventEmitter;
 /// Maximum age for an SSE channel with no active receivers before eviction.
 const SSE_CHANNEL_TTL: Duration = Duration::from_secs(300);
 
+/// Evict stale SSE channels that have no active receivers and exceeded TTL.
+fn evict_stale_channels(channels: &SseChannels) {
+    channels.retain(|_, ch| {
+        ch.sender.receiver_count() > 0 || ch.created_at.elapsed() < SSE_CHANNEL_TTL
+    });
+}
+
 /// Handle `chat_send` separately because it needs SSE channel state to relay
 /// streaming agent events back to the browser via Server-Sent Events.
 pub(super) async fn dispatch_chat_send(
@@ -34,10 +41,7 @@ pub(super) async fn dispatch_chat_send(
     };
     let context: Option<desktop_shared::commands::SessionContextInput> = dev::get(body, "context");
 
-    // Evict stale SSE channels (no receiver for >5 min)
-    sse_channels.retain(|_, ch| {
-        ch.sender.receiver_count() > 0 || ch.created_at.elapsed() < SSE_CHANNEL_TTL
-    });
+    evict_stale_channels(sse_channels);
 
     match core.chat_send(content, session_key.clone(), context).await {
         Ok((user_msg, stream_info)) => {
@@ -65,6 +69,8 @@ pub(super) async fn sse_handler(
     State(state): State<DevState>,
     Path(session_key): Path<String>,
 ) -> Sse<impl Stream<Item = Result<Event, Infallible>>> {
+    evict_stale_channels(&state.sse_channels);
+
     // Use atomic entry API to avoid TOCTOU race with chat_send:
     // whichever handler runs first creates the channel, the other reuses it.
     let rx = state

@@ -244,7 +244,6 @@ mod tests {
     #[test]
     fn test_chat_turn_completed_is_extract() {
         let verdict = evaluate_salience(&DomainEvent::ChatTurnCompleted {
-            user_message: "My favorite language is Rust".into(),
             session_key: "test-session".into(),
         });
         assert_eq!(verdict, SalienceVerdict::Extract);

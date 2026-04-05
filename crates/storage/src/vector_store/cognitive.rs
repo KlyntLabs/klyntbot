@@ -50,12 +50,7 @@ impl VectorStore {
         top_k: usize,
         min_similarity: f64,
     ) -> Result<Vec<(String, f64)>, StorageError> {
-        let tbl = self
-            .db
-            .open_table("cognitive_fact_embeddings")
-            .execute()
-            .await
-            .map_err(|e| StorageError::Vector(format!("Open cognitive table: {e}")))?;
+        let tbl = self.get_table("cognitive_fact_embeddings").await?;
 
         // Build domain filter: domain IN ('identity', 'energy', ...)
         let mut query = tbl

@@ -47,12 +47,7 @@ impl VectorStore {
         limit: usize,
         min_similarity: f64,
     ) -> Result<Vec<CommunitySearchResult>, StorageError> {
-        let tbl = self
-            .db
-            .open_table("community_embeddings")
-            .execute()
-            .await
-            .map_err(|e| StorageError::Vector(format!("Open community_embeddings table: {e}")))?;
+        let tbl = self.get_table("community_embeddings").await?;
 
         let query = tbl
             .query()

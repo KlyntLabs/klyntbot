@@ -162,7 +162,6 @@ impl AppCore {
                 score: payload["score"].as_f64().unwrap_or(0.0),
             },
             "ChatTurnCompleted" => bus::DomainEvent::ChatTurnCompleted {
-                user_message: payload["user_message"].as_str().unwrap_or("").to_string(),
                 session_key: payload["session_key"]
                     .as_str()
                     .unwrap_or("debug")

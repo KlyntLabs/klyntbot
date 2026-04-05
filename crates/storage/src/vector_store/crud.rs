@@ -69,12 +69,7 @@ impl VectorStore {
         vector: &[f32],
         extra_fields: &[(&str, &str)],
     ) -> Result<(), StorageError> {
-        let tbl = self
-            .db
-            .open_table(table)
-            .execute()
-            .await
-            .map_err(|e| StorageError::Vector(format!("open table {table}: {e}")))?;
+        let tbl = self.get_table(table).await?;
 
         let schema: SchemaRef = tbl
             .schema()
@@ -144,12 +139,7 @@ impl VectorStore {
         limit: usize,
         threshold: f64,
     ) -> Result<Vec<(String, f64)>, StorageError> {
-        let tbl = self
-            .db
-            .open_table(table)
-            .execute()
-            .await
-            .map_err(|e| StorageError::Vector(format!("open table {table}: {e}")))?;
+        let tbl = self.get_table(table).await?;
 
         let results = tbl
             .query()
@@ -193,7 +183,7 @@ impl VectorStore {
 
     /// Delete an embedding by ID.
     pub async fn delete(&self, table: &str, id: &str) -> Result<(), StorageError> {
-        let tbl = match self.db.open_table(table).execute().await {
+        let tbl = match self.get_table(table).await {
             Ok(t) => t,
             Err(_) => return Ok(()), // table may not exist yet
         };
@@ -211,7 +201,7 @@ impl VectorStore {
     /// within the predicate should already be escaped via [`sanitize_predicate_value`].
     pub async fn delete_where(&self, table: &str, predicate: &str) -> Result<(), StorageError> {
         validate_predicate(predicate)?;
-        let tbl = match self.db.open_table(table).execute().await {
+        let tbl = match self.get_table(table).await {
             Ok(t) => t,
             Err(_) => return Ok(()), // table may not exist yet
         };
@@ -230,12 +220,7 @@ impl VectorStore {
         table: &str,
         id: &str,
     ) -> Result<Option<Vec<f32>>, StorageError> {
-        let tbl = self
-            .db
-            .open_table(table)
-            .execute()
-            .await
-            .map_err(|e| StorageError::Vector(format!("open table {table}: {e}")))?;
+        let tbl = self.get_table(table).await?;
 
         let predicate = format!("id = '{}'", sanitize_predicate_value(id)?);
 
@@ -280,12 +265,7 @@ impl VectorStore {
 
     /// Count the number of rows in a table.
     pub async fn count(&self, table: &str) -> Result<usize, StorageError> {
-        let tbl = self
-            .db
-            .open_table(table)
-            .execute()
-            .await
-            .map_err(|e| StorageError::Vector(format!("open table {table}: {e}")))?;
+        let tbl = self.get_table(table).await?;
         let n = tbl
             .count_rows(None)
             .await

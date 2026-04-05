@@ -37,5 +37,5 @@ pub use rust_decimal::Decimal;
 
 pub use date::parse_datetime;
 pub use helpers::{truncate_at_boundary, truncate_chars};
-pub use http::{build_http_client, build_http_client_with_builder};
+pub use http::{build_http_client, build_http_client_with_builder, shared_http_client};
 pub use ports::NotificationSender;

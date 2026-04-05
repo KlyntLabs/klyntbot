@@ -272,7 +272,6 @@ pub enum DomainEvent {
 
     // -- Chat --
     ChatTurnCompleted {
-        user_message: String,
         session_key: String,
     },
 
@@ -572,7 +571,7 @@ impl DomainEvent {
     /// Return the enum variant name without payload (e.g. `"NoteContentChanged"`).
     ///
     /// Unlike `format!("{:?}", self)`, this never allocates a copy of large
-    /// inner fields like note content or user messages.
+    /// inner fields like note content.
     pub fn variant_name(&self) -> &'static str {
         // serde tag serialization would work but allocates; a manual match is zero-cost.
         match self {

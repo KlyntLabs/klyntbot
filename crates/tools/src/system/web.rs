@@ -7,7 +7,7 @@ use std::time::Duration;
 use tracing::{debug, warn};
 use url::Url;
 
-use common::{build_http_client_with_builder, Result, ToolError};
+use common::{build_http_client_with_builder, shared_http_client, Result, ToolError};
 use tools_core::{RoutingContext, ToolParams};
 
 #[derive(Debug, ToolParams)]
@@ -41,10 +41,7 @@ impl WebSearchTool {
     pub fn new(api_key: Option<String>, max_results: u8) -> Self {
         Self {
             api_key,
-            client: build_http_client_with_builder(|builder| {
-                builder.timeout(Duration::from_secs(30))
-            })
-            .unwrap(),
+            client: shared_http_client(),
             max_results,
         }
     }

@@ -112,6 +112,16 @@ impl MemoryMaintenanceService {
                             _ => {}
                         }
                     }
+
+                    // Compact all tables to reclaim memory from copy-on-write fragments.
+                    if let Err(e) = self.store.optimize_all_tables().await {
+                        warn!(
+                            error = %e,
+                            "MemoryMaintenanceService: compaction failed"
+                        );
+                    } else {
+                        info!("MemoryMaintenanceService: compaction complete");
+                    }
                 }
                 _ = self.token.cancelled() => {
                     info!("MemoryMaintenanceService: shutting down");

@@ -939,19 +939,22 @@ pub async fn relay_chat_stream(
     has_context: bool,
     journey_tracker: Option<crate::journey::JourneyTracker>,
 ) {
-    // Guard ensures active_streams cleanup even on panic
+    // Guard ensures active_streams + pending_interactions cleanup even on panic
     struct StreamGuard {
         key: String,
         streams: Arc<ActiveStreams>,
+        pending: Arc<PendingInteractions>,
     }
     impl Drop for StreamGuard {
         fn drop(&mut self) {
             self.streams.remove(&self.key);
+            self.pending.remove(&self.key);
         }
     }
     let _guard = StreamGuard {
         key: session_key.clone(),
         streams: Arc::clone(&active_streams),
+        pending: Arc::clone(&pending_interactions),
     };
 
     let sk = &session_key;
@@ -1621,7 +1624,7 @@ impl AppCore {
             &self.repos,
             &self.agent,
             &self.active_streams,
-            content.clone(),
+            content,
             session_key.clone(),
             context,
             false,
@@ -1633,10 +1636,7 @@ impl AppCore {
 
         // Publish chat turn to cognitive consolidation pipeline
         if let Some(bus) = &self.domain_event_bus {
-            bus.publish(bus::DomainEvent::ChatTurnCompleted {
-                user_message: content,
-                session_key,
-            });
+            bus.publish(bus::DomainEvent::ChatTurnCompleted { session_key });
         }
 
         Ok(result)
@@ -1653,7 +1653,7 @@ impl AppCore {
             &self.repos,
             &self.agent,
             &self.active_streams,
-            content.clone(),
+            content,
             session_key.clone(),
             None,
             true,
@@ -1665,10 +1665,7 @@ impl AppCore {
 
         // Publish chat turn to cognitive consolidation pipeline
         if let Some(bus) = &self.domain_event_bus {
-            bus.publish(bus::DomainEvent::ChatTurnCompleted {
-                user_message: content,
-                session_key,
-            });
+            bus.publish(bus::DomainEvent::ChatTurnCompleted { session_key });
         }
 
         Ok(result)
@@ -1810,10 +1807,7 @@ impl AppCore {
 
         // Publish chat turn to cognitive consolidation pipeline
         if let Some(bus) = &self.domain_event_bus {
-            bus.publish(bus::DomainEvent::ChatTurnCompleted {
-                user_message: content,
-                session_key,
-            });
+            bus.publish(bus::DomainEvent::ChatTurnCompleted { session_key });
         }
 
         Ok((user_msg, stream_info))

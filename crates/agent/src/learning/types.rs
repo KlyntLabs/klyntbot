@@ -11,6 +11,9 @@ use serde::{Deserialize, Serialize};
 
 use crate::confidence::types::ConfidenceDimensions;
 
+/// Maximum number of threshold changes to retain in memory/DB.
+const MAX_THRESHOLD_HISTORY: usize = 100;
+
 /// A single tool execution outcome record.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct OutcomeRecord {
@@ -114,6 +117,17 @@ pub struct AdaptiveThresholdState {
     pub last_analysis: Option<AnalysisResult>,
     pub threshold_history: Vec<ThresholdChange>,
     pub updated_at: DateTime<Utc>,
+}
+
+impl AdaptiveThresholdState {
+    /// Push a threshold change, dropping oldest entries if the history exceeds the cap.
+    pub fn push_change(&mut self, change: ThresholdChange) {
+        self.threshold_history.push(change);
+        if self.threshold_history.len() > MAX_THRESHOLD_HISTORY {
+            let excess = self.threshold_history.len() - MAX_THRESHOLD_HISTORY;
+            self.threshold_history.drain(..excess);
+        }
+    }
 }
 
 /// A single threshold change event.

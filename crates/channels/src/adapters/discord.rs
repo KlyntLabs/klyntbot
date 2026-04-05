@@ -20,8 +20,8 @@ use crate::ws_manager::{HeartbeatStrategy, WebSocketManager, WsConfig, WsHandler
 use crate::{check_allowlist, Channel};
 use bus::{InboundMessage, MessageBus, MessageKind, OutboundMessage};
 use common::{
-    build_http_client, truncate_chars, Answer, AnswerType, AnswerValue, ChannelError, FormResponse,
-    InteractionRequest, Result,
+    shared_http_client, truncate_chars, Answer, AnswerType, AnswerValue, ChannelError,
+    FormResponse, InteractionRequest, Result,
 };
 use config::DiscordConfig;
 
@@ -44,7 +44,7 @@ pub struct DiscordChannel {
 impl DiscordChannel {
     /// Create a new Discord channel
     pub fn new(config: DiscordConfig, data_dir: PathBuf) -> Result<Self> {
-        let client = build_http_client(Duration::from_secs(30))?;
+        let client = shared_http_client();
 
         Ok(Self {
             config,

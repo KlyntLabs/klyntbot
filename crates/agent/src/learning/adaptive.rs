@@ -55,7 +55,7 @@ fn apply_analysis_impl(
     }
 
     let old = state.current_threshold;
-    state.threshold_history.push(ThresholdChange {
+    state.push_change(ThresholdChange {
         from: old,
         to: new_threshold,
         reason: format!(

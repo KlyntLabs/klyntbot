@@ -74,6 +74,9 @@ pub struct ReasoningTrace {
     pub plan_step_index: Option<usize>,
 }
 
+/// Maximum reasoning traces to retain. Matches the display limit in `summarize()`.
+const MAX_TRACES: usize = 20;
+
 /// Accumulates reasoning traces across execution cycles for context injection.
 #[derive(Debug, Default)]
 pub struct Scratchpad {
@@ -91,9 +94,13 @@ impl Scratchpad {
         }
     }
 
-    /// Append a reasoning trace.
+    /// Append a reasoning trace, trimming old entries beyond [`MAX_TRACES`].
     pub fn add(&mut self, trace: ReasoningTrace) {
         self.traces.push(trace);
+        if self.traces.len() > MAX_TRACES {
+            let drain_count = self.traces.len() - MAX_TRACES;
+            self.traces.drain(..drain_count);
+        }
     }
 
     /// All traces in order.

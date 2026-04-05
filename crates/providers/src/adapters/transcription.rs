@@ -3,10 +3,9 @@
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
 use std::path::Path;
-use std::time::Duration;
 use tracing::{debug, warn};
 
-use common::{build_http_client, KlyntbotError, ProviderError, Result};
+use common::{shared_http_client, KlyntbotError, ProviderError, Result};
 
 /// Default API base URL for Groq
 const DEFAULT_GROQ_API_BASE: &str = "https://api.groq.com/openai/v1";
@@ -40,7 +39,7 @@ pub struct TranscriptionProvider {
 impl TranscriptionProvider {
     /// Create a new transcription provider with the default Groq API base.
     pub fn new(api_key: impl Into<String>) -> Result<Self> {
-        let client = build_http_client(Duration::from_secs(60))?;
+        let client = shared_http_client();
 
         Ok(Self {
             client,

@@ -2,8 +2,10 @@ use std::collections::{HashMap, VecDeque};
 
 use super::types::AssembledContext;
 
-/// Maximum number of entries in the context assembly cache.
-pub(super) const DEFAULT_CACHE_CAPACITY: usize = 8;
+/// During ReAct loops each iteration changes the cache key (growing message history),
+/// so 8 entries means 8 full conversation snapshots coexist. 2 entries retain the
+/// current + one prior without wasting memory on stale intermediate states.
+pub(super) const DEFAULT_CACHE_CAPACITY: usize = 2;
 
 /// Bounded LRU cache for assembled contexts, keyed by SHA-256 of request inputs.
 ///

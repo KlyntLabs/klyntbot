@@ -681,7 +681,6 @@ impl AgentLoop {
         // Publish chat turn to cognitive consolidation pipeline
         if let Some(bus) = &self.domain_event_bus {
             bus.publish(bus::DomainEvent::ChatTurnCompleted {
-                user_message: msg.content.clone(),
                 session_key: session_key.to_string(),
             });
         }

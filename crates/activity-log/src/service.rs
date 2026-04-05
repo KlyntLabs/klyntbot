@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use storage::StoragePool;
 use tracing::{debug, warn};
 
@@ -97,6 +99,36 @@ impl ActivityIngestionService {
                 warn!("Activity ingestion failed: {e}");
             }
         });
+    }
+}
+
+/// Bounded ingestion channel — replaces unbounded fire-and-forget spawns.
+/// A single consumer task processes entries sequentially, preventing task
+/// accumulation when SQLite is slow.
+pub struct BatchIngestionService {
+    tx: tokio::sync::mpsc::Sender<ActivityLogEntry>,
+}
+
+impl BatchIngestionService {
+    /// Create a new batch ingestion service with the given buffer size.
+    /// Spawns a background consumer task.
+    pub fn new(service: Arc<ActivityIngestionService>, buffer: usize) -> Self {
+        let (tx, mut rx) = tokio::sync::mpsc::channel::<ActivityLogEntry>(buffer);
+        tokio::spawn(async move {
+            while let Some(entry) = rx.recv().await {
+                if let Err(e) = service.ingest(entry).await {
+                    warn!("Activity batch ingestion failed: {e}");
+                }
+            }
+        });
+        Self { tx }
+    }
+
+    /// Non-blocking send. Drops the entry if the buffer is full (backpressure).
+    pub fn ingest_nonblocking(&self, entry: ActivityLogEntry) {
+        if self.tx.try_send(entry).is_err() {
+            warn!("Activity ingestion buffer full — dropping entry");
+        }
     }
 }
 

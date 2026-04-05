@@ -407,6 +407,15 @@ impl AppCore {
         if let Err(e) = self.agent.shutdown().await {
             error!("agent shutdown error: {}", e);
         }
+        // Cancel mirror subscribers before the main shutdown token
+        // so they stop consuming domain events immediately.
+        if let Some(ref token) = self._mirror_shutdown {
+            token.cancel();
+        }
+        // Abort the voice conversation loop if still running.
+        if let Some(ref handle) = self.voice_loop_handle {
+            handle.abort();
+        }
         self.shutdown_token.cancel();
         self.cron_service.stop().await;
         info!("app core stopped");

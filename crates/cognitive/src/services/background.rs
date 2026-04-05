@@ -736,13 +736,9 @@ impl BackgroundConsolidationService {
 fn event_to_observation(event: &DomainEvent) -> Option<Observation> {
     let now = Utc::now();
     match event {
-        DomainEvent::ChatTurnCompleted { user_message, .. } => Some(Observation {
-            domain: "general".into(),
-            content: user_message.clone(),
-            importance: 0.8,
-            source_event: "ChatTurnCompleted".into(),
-            timestamp: now,
-        }),
+        // ChatTurnCompleted no longer carries the user message (payload reduction),
+        // so there is no content to extract facts from. Skip it.
+        DomainEvent::ChatTurnCompleted { .. } => None,
         DomainEvent::UserStatedFact { fact, domain } => Some(Observation {
             domain: domain.clone(),
             content: fact.clone(),
@@ -1322,16 +1318,12 @@ mod tests {
     }
 
     #[test]
-    fn test_event_to_observation_chat_turn_completed() {
+    fn test_event_to_observation_chat_turn_completed_is_none() {
         let event = DomainEvent::ChatTurnCompleted {
-            user_message: "I prefer dark mode in all editors".into(),
             session_key: "session-1".into(),
         };
-        let obs = event_to_observation(&event).unwrap();
-        assert_eq!(obs.domain, "general");
-        assert_eq!(obs.importance, 0.8);
-        assert_eq!(obs.content, "I prefer dark mode in all editors");
-        assert_eq!(obs.source_event, "ChatTurnCompleted");
+        // ChatTurnCompleted no longer carries user_message, so no observation.
+        assert!(event_to_observation(&event).is_none());
     }
 
     #[test]

@@ -50,12 +50,7 @@ impl VectorStore {
         min_similarity: f64,
         note_id_filter: Option<&str>,
     ) -> Result<Vec<TreeNodeSearchResult>, StorageError> {
-        let tbl = self
-            .db
-            .open_table("tree_node_embeddings")
-            .execute()
-            .await
-            .map_err(|e| StorageError::Vector(format!("Open tree_node_embeddings table: {e}")))?;
+        let tbl = self.get_table("tree_node_embeddings").await?;
 
         let mut query = tbl
             .query()
@@ -128,7 +123,7 @@ impl VectorStore {
         limit: usize,
         min_similarity: f64,
     ) -> Result<Vec<(String, f64)>, StorageError> {
-        let tbl = match self.db.open_table("tree_node_embeddings").execute().await {
+        let tbl = match self.get_table("tree_node_embeddings").await {
             Ok(t) => t,
             Err(_) => return Ok(Vec::new()), // table doesn't exist yet
         };

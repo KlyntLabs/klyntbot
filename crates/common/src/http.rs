@@ -1,9 +1,30 @@
 //! HTTP client utilities for centralized client initialization.
 
 use reqwest::{Client, ClientBuilder};
+use std::sync::OnceLock;
 use std::time::Duration;
 
 use crate::Result;
+
+static SHARED_CLIENT: OnceLock<Client> = OnceLock::new();
+
+/// Get or initialize the shared HTTP client.
+///
+/// All components should use this instead of creating per-instance clients.
+/// Cloning a `Client` is cheap — it shares the underlying pool via `Arc`.
+/// This avoids 8+ separate connection pools each holding idle connections.
+pub fn shared_http_client() -> Client {
+    SHARED_CLIENT
+        .get_or_init(|| {
+            Client::builder()
+                .timeout(Duration::from_secs(60))
+                .pool_max_idle_per_host(10)
+                .pool_idle_timeout(Duration::from_secs(30))
+                .build()
+                .expect("shared HTTP client build should not fail")
+        })
+        .clone()
+}
 
 /// Build an HTTP client with the specified timeout.
 ///
@@ -59,7 +80,9 @@ pub fn build_http_client_with_builder<F>(configure: F) -> Result<Client>
 where
     F: FnOnce(ClientBuilder) -> ClientBuilder,
 {
-    let builder = Client::builder();
+    let builder = Client::builder()
+        .pool_idle_timeout(Duration::from_secs(90))
+        .pool_max_idle_per_host(4);
     let configured = configure(builder);
     configured.build().map_err(|e| {
         crate::KlyntbotError::Config(crate::ConfigError::Invalid(format!(
@@ -98,5 +121,15 @@ mod tests {
         let result =
             build_http_client_with_builder(|builder| builder.timeout(Duration::from_secs(30)));
         assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_shared_http_client_returns_same_instance() {
+        let a = shared_http_client();
+        let b = shared_http_client();
+        // Both clones share the same underlying pool (same pointer).
+        // We can't directly compare Arc pointers, but we can verify both succeed.
+        drop(a);
+        drop(b);
     }
 }

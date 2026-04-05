@@ -25,7 +25,7 @@ pub use normalizers::{
 pub use privacy::PrivacyFilter;
 pub use repo::ActivityLogRepo;
 pub use resource_edge_repo::ResourceEdgeRepo;
-pub use service::ActivityIngestionService;
+pub use service::{ActivityIngestionService, BatchIngestionService};
 pub use subscriber::ActivityLogSubscriber;
 pub use types::{
     ActivityActor, ActivityLogEntry, ActivitySource, ContextAssignment, ResourceEdge, WorkContext,

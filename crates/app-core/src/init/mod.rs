@@ -131,11 +131,12 @@ impl AppCore {
 
         // DomainEventBus is created before cron so the proactive scan callback
         // can capture it and emit ProactiveSuggestionCreated after persisting.
-        // With ~15 subscribers each cloning every event, slot count × clones
-        // determines peak memory under backpressure. 32 slots shed load
-        // aggressively via Lagged errors. Heavy-payload events (note content,
-        // chat turns) make even small ring buffers expensive.
-        let domain_event_bus = Arc::new(bus::DomainEventBus::new(32));
+        // With ~25 subscribers each cloning every event, 256 slots give enough
+        // headroom for bursty tool-call sequences without Lagged errors while
+        // remaining bounded. Payload reduction (no user_message in
+        // ChatTurnCompleted, capped args_preview in ToolCallExecuted) keeps
+        // per-slot clone cost low.
+        let domain_event_bus = Arc::new(bus::DomainEventBus::new(256));
 
         // Context update queue for live context refresher (shared between agent + background services).
         let context_update_queue = Arc::new(bus::ContextUpdateQueue::new());
