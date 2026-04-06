@@ -72,7 +72,7 @@ impl EmbeddingEngine {
             #[cfg(feature = "semantic-search")]
             model: Mutex::new(None),
             last_used: Mutex::new(Instant::now()),
-            http_client: reqwest::Client::new(),
+            http_client: common::shared_http_client().clone(),
             #[cfg(not(feature = "semantic-search"))]
             _phantom: (),
         }
@@ -85,7 +85,7 @@ impl EmbeddingEngine {
             #[cfg(feature = "semantic-search")]
             model: Mutex::new(None),
             last_used: Mutex::new(Instant::now()),
-            http_client: reqwest::Client::new(),
+            http_client: common::shared_http_client().clone(),
             #[cfg(not(feature = "semantic-search"))]
             _phantom: (),
         }

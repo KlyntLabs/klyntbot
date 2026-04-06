@@ -6,6 +6,8 @@
 use extism::{Function, UserData, PTR};
 use tracing::{debug, error, info, warn};
 
+use common::shared_http_client;
+
 use crate::manifest::PluginPermission;
 
 /// Shared state passed to all host functions via UserData.
@@ -124,7 +126,7 @@ pub fn build_host_functions(
         plugin_id,
         permissions,
         bus_sender,
-        http_client: reqwest::Client::new(),
+        http_client: shared_http_client().clone(),
     };
     let ud = UserData::new(ctx);
 

@@ -113,7 +113,7 @@ pub async fn exchange_code(
     params.insert("client_id", client_id);
     params.insert("client_secret", client_secret);
 
-    let client = reqwest::Client::new();
+    let client = common::shared_http_client().clone();
     let resp: reqwest::Response = client
         .post(provider.token_url)
         .header("Accept", "application/json")

@@ -6,6 +6,8 @@
 use async_trait::async_trait;
 use tracing::debug;
 
+use common::shared_http_client;
+
 use crate::tts::TtsEngine;
 use crate::types::*;
 
@@ -19,7 +21,7 @@ pub struct CloudTtsEngine {
 impl CloudTtsEngine {
     pub fn new(api_url: String, api_key: String) -> Self {
         Self {
-            client: reqwest::Client::new(),
+            client: shared_http_client().clone(),
             api_url,
             api_key,
             model: "qwen3-tts".to_string(),

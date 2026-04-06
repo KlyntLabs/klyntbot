@@ -8,6 +8,8 @@ use async_trait::async_trait;
 use tokio::sync::mpsc;
 use tracing::warn;
 
+use common::shared_http_client;
+
 use crate::stt::{AudioStream, PartialTranscript, TranscriptStream, TranscriptionEngine};
 use crate::types::*;
 
@@ -21,7 +23,7 @@ pub struct CloudAsrEngine {
 impl CloudAsrEngine {
     pub fn new(api_url: String, api_key: String) -> Self {
         Self {
-            client: reqwest::Client::new(),
+            client: shared_http_client().clone(),
             api_url,
             api_key,
             model: "qwen3-asr".to_string(),
