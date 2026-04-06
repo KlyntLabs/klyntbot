@@ -282,14 +282,22 @@ pub fn activate_app(_pid: i32) -> bool {
 
 /// Convert an NSImage (passed as AnyObject) to a base64 PNG data URI.
 ///
-/// Uses TIFFRepresentation → NSBitmapImageRep → PNG conversion.
+/// Resizes to 32×32 pixels first to keep memory usage low — launcher icons
+/// don't need full 1024×1024 resolution. Without resizing, 100+ app icons
+/// at ~2MB each would consume ~200MB of heap as base64 strings.
+///
+/// Uses setSize: → lockFocus/drawInRect/unlockFocus → TIFFRepresentation → PNG.
 #[cfg(target_os = "macos")]
 fn nsimage_to_png_data_uri(image: &objc2::runtime::AnyObject) -> Option<String> {
     use objc2::rc::{Allocated, Retained};
     use objc2::runtime::{AnyClass, AnyObject};
     use objc2::{msg_send, msg_send_id};
 
-    // Get TIFF representation (includes all image reps)
+    // Resize: set the image size to 32×32 points.
+    let size = objc2_foundation::NSSize::new(32.0, 32.0);
+    let _: () = unsafe { msg_send![image, setSize: size] };
+
+    // Get TIFF representation (now at 32×32)
     let tiff: Option<Retained<AnyObject>> = unsafe { msg_send_id![image, TIFFRepresentation] };
     let tiff = tiff?;
 
