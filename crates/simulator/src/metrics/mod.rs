@@ -172,6 +172,9 @@ pub struct MetricCollector {
     cumulative_contradictions: u32,
     cumulative_estimation_deviation_sum: f64,
     cumulative_estimation_count: u32,
+    cumulative_coaching_helpful: u32,
+    cumulative_coaching_dismissed: u32,
+    cumulative_coaching_stop: u32,
 }
 
 impl MetricCollector {
@@ -190,6 +193,9 @@ impl MetricCollector {
             cumulative_contradictions: 0,
             cumulative_estimation_deviation_sum: 0.0,
             cumulative_estimation_count: 0,
+            cumulative_coaching_helpful: 0,
+            cumulative_coaching_dismissed: 0,
+            cumulative_coaching_stop: 0,
         }
     }
 
@@ -351,11 +357,16 @@ impl MetricCollector {
         } else {
             acc.error_recovered as f64 / acc.error_injected as f64
         };
-        let coaching_total = acc.coaching_helpful + acc.coaching_dismissed + acc.coaching_stop;
+        self.cumulative_coaching_helpful += acc.coaching_helpful;
+        self.cumulative_coaching_dismissed += acc.coaching_dismissed;
+        self.cumulative_coaching_stop += acc.coaching_stop;
+        let coaching_total = self.cumulative_coaching_helpful
+            + self.cumulative_coaching_dismissed
+            + self.cumulative_coaching_stop;
         let coaching_acceptance_rate = if coaching_total == 0 {
             0.0
         } else {
-            acc.coaching_helpful as f64 / coaching_total as f64
+            self.cumulative_coaching_helpful as f64 / coaching_total as f64
         };
 
         let snap = MetricSnapshot {

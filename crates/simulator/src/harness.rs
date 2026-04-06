@@ -571,6 +571,11 @@ impl SimulationHarness {
                 .execute(&self.inner_pool)
                 .await;
 
+                // Emit lifecycle domain events to feed the coaching pipeline.
+                // Topic-driven: productivity → focus sessions, tasks → occasional
+                // deferrals, finance → budget alerts, any → distraction noise.
+                emit_coaching_events(&self.bus, &msg.topic, msg_idx, day_counter);
+
                 // Shadow log entries for autotuner evaluation.
                 // Confidence is derived from topic clarity × trial keyword weight.
                 let predicted_skill = expected_skill_for_topic(&msg.topic);
@@ -2054,6 +2059,63 @@ impl SimulationHarness {
                 }
             }
         }
+    }
+}
+
+/// Emit synthetic domain events that feed the coaching pipeline's
+/// `SignalAccumulator`.  Without these the coaching listener never sees
+/// DistractionDetected / FocusSessionStarted / TaskDeferred / BudgetAlert
+/// and the acceptance-rate metric stays at zero.
+fn emit_coaching_events(bus: &bus::DomainEventBus, topic: &str, msg_idx: usize, day: u32) {
+    // Deterministic selection based on message index + day.
+    let seed = msg_idx.wrapping_mul(31).wrapping_add(day as usize);
+
+    match topic {
+        "productivity" | "coaching" => {
+            // Every productivity message starts a focus session.
+            let target_mins = 25 + (seed % 35) as i64; // 25-59 min
+            bus.publish(DomainEvent::FocusSessionStarted {
+                session_type: "pomodoro".to_string(),
+                target_mins,
+            });
+            // End with variable quality.
+            let quality = 0.4 + (seed % 50) as f64 / 100.0; // 0.40–0.89
+            bus.publish(DomainEvent::FocusSessionEnded {
+                duration_secs: target_mins * 60,
+                quality,
+                interruptions: (seed % 4) as i32,
+            });
+        }
+        "tasks" => {
+            // ~30% of task messages simulate a deferral.
+            if seed % 10 < 3 {
+                bus.publish(DomainEvent::TaskDeferred {
+                    task_id: format!("sim-task-{day}-{msg_idx}"),
+                    times_deferred: 1 + (seed % 3) as i32,
+                });
+            }
+        }
+        "finance" => {
+            // ~40% of finance messages trigger a budget alert.
+            if seed % 10 < 4 {
+                let spent = 80.0 + (seed % 40) as f64; // 80–119
+                bus.publish(DomainEvent::BudgetAlert {
+                    category: "dining".to_string(),
+                    spent,
+                    limit: 100.0,
+                });
+            }
+        }
+        _ => {}
+    }
+
+    // Background distraction noise: ~20% of ALL messages.
+    if seed % 5 == 0 {
+        bus.publish(DomainEvent::DistractionDetected {
+            app: "social_media".to_string(),
+            duration_secs: Some(30 + (seed % 90) as i64),
+            context: format!("day{day}_msg{msg_idx}"),
+        });
     }
 }
 
