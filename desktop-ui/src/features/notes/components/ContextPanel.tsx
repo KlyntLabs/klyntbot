@@ -1,6 +1,6 @@
 import { formatRelativeTime } from "@shared/lib/dates";
 import { tagBgColor, tagColor } from "@shared/lib/tagColor";
-import type { Note } from "@shared/types";
+import type { Note, NoteListItem } from "@shared/types";
 import { ChevronDown, ChevronRight, ExternalLink } from "lucide-react";
 import { useMemo, useState } from "react";
 import type { InsightReviewActions, InsightReviewState } from "../hooks/useInsightReview";
@@ -13,7 +13,7 @@ interface ContextPanelProps {
   noteId: string | null;
   isGraphMode: boolean;
   note: Note | null;
-  notes: Note[];
+  notes: NoteListItem[];
   onSelectNote: (id: string) => void;
   onExpandGraph: () => void;
   // Insight Review

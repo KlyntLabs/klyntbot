@@ -1,4 +1,4 @@
-import type { InboxItem, Note, Notebook } from "@shared/types";
+import type { InboxItem, NoteListItem, Notebook } from "@shared/types";
 import { useCallback, useState } from "react";
 import { InboxSection } from "./InboxSection";
 import { NotebookTree } from "./NotebookTree";
@@ -9,7 +9,7 @@ import { NotebookTree } from "./NotebookTree";
 
 interface NavigationSidebarProps {
   notebooks: Notebook[];
-  notes: Note[];
+  notes: NoteListItem[];
   selectedNoteId: string | null;
   autoRenameId: string | null;
   onAutoRenameDone: () => void;

@@ -1,5 +1,5 @@
 import { ipc } from "@shared/hooks/useIpc";
-import type { Note } from "@shared/types";
+import type { Note, NoteListItem } from "@shared/types";
 import { Mark, mergeAttributes } from "@tiptap/core";
 import { Plugin, PluginKey } from "@tiptap/pm/state";
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -173,7 +173,7 @@ interface WikiLinkMenuProps {
 export function WikiLinkMenu({ editor, currentNoteTitle }: WikiLinkMenuProps) {
   const [state, setState] = useState<WikiLinkMenuState>(null);
   const [coords, setCoords] = useState({ x: 0, y: 0 });
-  const [results, setResults] = useState<Note[]>([]);
+  const [results, setResults] = useState<NoteListItem[]>([]);
   const [selectedIndex, setSelectedIndex] = useState(0);
   const selectedIndexRef = useRef(0);
   selectedIndexRef.current = selectedIndex;
@@ -205,7 +205,7 @@ export function WikiLinkMenu({ editor, currentNoteTitle }: WikiLinkMenuProps) {
     }
     debounceRef.current = setTimeout(async () => {
       try {
-        const notes = await ipc<Note[]>("note_search", { query: state.query });
+        const notes = await ipc<NoteListItem[]>("note_search", { query: state.query });
         setResults(notes.slice(0, 8));
         setSelectedIndex(0);
       } catch (e) {
@@ -216,7 +216,7 @@ export function WikiLinkMenu({ editor, currentNoteTitle }: WikiLinkMenuProps) {
   }, [state?.query]);
 
   const insertWikiLink = useCallback(
-    (note: Note) => {
+    (note: NoteListItem) => {
       if (!editor || !state) return;
       const cursorPos = editor.state.selection.from;
       editor
@@ -268,7 +268,7 @@ export function WikiLinkMenu({ editor, currentNoteTitle }: WikiLinkMenuProps) {
 
   // Keyboard navigation — use refs to keep the listener stable
   // Index 0 is the "Create" option when query is present, results follow at index 1+
-  const resultsRef = useRef<Note[]>([]);
+  const resultsRef = useRef<NoteListItem[]>([]);
   resultsRef.current = results;
   const insertRef = useRef(insertWikiLink);
   insertRef.current = insertWikiLink;

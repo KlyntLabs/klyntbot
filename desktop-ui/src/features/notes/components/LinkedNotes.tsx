@@ -1,5 +1,5 @@
 import { useQuery } from "@shared/hooks/useQuery";
-import type { Note } from "@shared/types";
+import type { NoteListItem } from "@shared/types";
 import { FileText } from "lucide-react";
 import { useNavigate } from "react-router";
 
@@ -10,7 +10,7 @@ interface LinkedNotesProps {
 
 export function LinkedNotes({ entityType, entityId }: LinkedNotesProps) {
   const navigate = useNavigate();
-  const { data: notes } = useQuery<Note[]>("note_list_by_entity", { entityType, entityId }, []);
+  const { data: notes } = useQuery<NoteListItem[]>("note_list_by_entity", { entityType, entityId }, []);
 
   if (notes.length === 0) return null;
 

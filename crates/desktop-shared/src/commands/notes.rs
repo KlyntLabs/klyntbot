@@ -23,6 +23,22 @@ pub struct NoteResponse {
     pub updated_at: String,
 }
 
+/// Lightweight note for list views — excludes body, HTML, split/perspective data.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct NoteListItem {
+    pub id: String,
+    pub notebook_id: Option<String>,
+    pub title: String,
+    pub pinned: bool,
+    pub archived: bool,
+    pub icon: Option<String>,
+    pub color: Option<String>,
+    pub tags: Vec<String>,
+    pub created_at: String,
+    pub updated_at: String,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct NoteCreateParams {

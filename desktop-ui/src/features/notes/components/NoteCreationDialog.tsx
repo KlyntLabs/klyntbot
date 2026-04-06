@@ -1,5 +1,5 @@
 import { ipc } from "@shared/hooks/useIpc";
-import type { Note } from "@shared/types";
+import type { NoteListItem } from "@shared/types";
 import { FileText, Sparkles, X } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 
@@ -17,7 +17,7 @@ export function NoteCreationDialog({
   onNavigateNote,
 }: NoteCreationDialogProps) {
   const [title, setTitle] = useState("");
-  const [similarNotes, setSimilarNotes] = useState<Note[]>([]);
+  const [similarNotes, setSimilarNotes] = useState<NoteListItem[]>([]);
   const [searching, setSearching] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -44,7 +44,7 @@ export function NoteCreationDialog({
     setSearching(true);
     debounceRef.current = setTimeout(async () => {
       try {
-        const results = await ipc<Note[]>("note_search", { query: q });
+        const results = await ipc<NoteListItem[]>("note_search", { query: q });
         setSimilarNotes(results.slice(0, 5));
       } catch {
         setSimilarNotes([]);

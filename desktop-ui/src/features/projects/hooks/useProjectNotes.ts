@@ -1,5 +1,5 @@
 import { ipc } from "@shared/hooks/useIpc";
-import type { Note } from "@shared/types";
+import type { NoteListItem } from "@shared/types";
 import { useCallback, useEffect, useState } from "react";
 
 /**
@@ -7,7 +7,7 @@ import { useCallback, useEffect, useState } from "react";
  * merges and deduplicates client-side.
  */
 export function useProjectNotes(notebookIds: string[]) {
-  const [data, setData] = useState<Note[]>([]);
+  const [data, setData] = useState<NoteListItem[]>([]);
   const [loading, setLoading] = useState(true);
 
   // Stable key for dependency tracking — avoids stale closure from array reference changes
@@ -23,7 +23,7 @@ export function useProjectNotes(notebookIds: string[]) {
     setLoading(true);
     try {
       const results = await Promise.all(
-        ids.map((notebookId) => ipc<Note[]>("note_list", { notebookId })),
+        ids.map((notebookId) => ipc<NoteListItem[]>("note_list", { notebookId })),
       );
       const merged = results.flat();
       const seen = new Set<string>();

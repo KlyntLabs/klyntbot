@@ -3,6 +3,7 @@ import { useMutation } from "@shared/hooks/useMutation";
 import { useQuery } from "@shared/hooks/useQuery";
 import type {
   Note,
+  NoteListItem,
   Notebook,
   NotebookCreateParams,
   NoteCreateParams,
@@ -67,7 +68,7 @@ export default function KnowledgeBasePage() {
       return kind === "notebook" || kind === "note";
     },
   });
-  const { data: notes, refetch: refetchNotes } = useQuery<Note[]>("note_list", undefined, [], {
+  const { data: notes, refetch: refetchNotes } = useQuery<NoteListItem[]>("note_list", undefined, [], {
     invalidateOn: ["entity:updated"],
     invalidateFilter: (p) => {
       const kind = (p as { entityKind?: string })?.entityKind;
@@ -136,14 +137,29 @@ export default function KnowledgeBasePage() {
   }, [searchParams, setSearchParams]);
 
   const noteMap = useMemo(() => {
-    const map = new Map<string, Note>();
+    const map = new Map<string, NoteListItem>();
     for (const n of notes) map.set(n.id, n);
     return map;
   }, [notes]);
 
-  const selectedNote = selectedNoteId ? noteMap.get(selectedNoteId) : undefined;
+  const selectedNoteItem = selectedNoteId ? noteMap.get(selectedNoteId) : undefined;
 
-  useCrossDomainCheck("note", selectedNote?.id, selectedNote?.title, selectedNote?.createdAt);
+  // Full note (with body/html) fetched on demand for the editor and related panels
+  const { data: selectedNote } = useQuery<Note>(
+    "note_get",
+    selectedNoteId ? { id: selectedNoteId } : null,
+    undefined,
+    {
+      invalidateOn: ["entity:updated"],
+      invalidateFilter: (p) => {
+        const kind = (p as { entityKind?: string })?.entityKind;
+        const id = (p as { entityId?: string })?.entityId;
+        return kind === "note" && id === selectedNoteId;
+      },
+    },
+  );
+
+  useCrossDomainCheck("note", selectedNoteItem?.id, selectedNoteItem?.title, selectedNoteItem?.createdAt);
 
   // ── Insight derived state ─────────────────────────────────────────────
   const insightOpen = insightState.isOpen;

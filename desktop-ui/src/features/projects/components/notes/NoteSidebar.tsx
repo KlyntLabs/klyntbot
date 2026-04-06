@@ -1,12 +1,12 @@
 import { ipc } from "@shared/hooks/useIpc";
 import { useQuery } from "@shared/hooks/useQuery";
-import type { Note, Notebook } from "@shared/types";
+import type { NoteListItem, Notebook } from "@shared/types";
 import { BookOpen, Search } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 interface NoteSidebarProps {
   notebookIds: string[];
-  notes: Note[];
+  notes: NoteListItem[];
   loading: boolean;
   selectedNoteId: string | null;
   onSelectNote: (noteId: string) => void;
@@ -20,7 +20,7 @@ export function NoteSidebar({
   onSelectNote,
 }: NoteSidebarProps) {
   const [searchQuery, setSearchQuery] = useState("");
-  const [searchResults, setSearchResults] = useState<Note[] | null>(null);
+  const [searchResults, setSearchResults] = useState<NoteListItem[] | null>(null);
   const [searching, setSearching] = useState(false);
   const searchTimer = useRef<ReturnType<typeof setTimeout>>();
 
@@ -48,10 +48,10 @@ export function NoteSidebar({
       try {
         const results = await Promise.all(
           notebookIds.map((notebookId) =>
-            ipc<Note[]>("note_search_hybrid", {
+            ipc<NoteListItem[]>("note_search_hybrid", {
               query,
               notebookId,
-            }).catch(() => [] as Note[]),
+            }).catch(() => [] as NoteListItem[]),
           ),
         );
         const merged = results.flat();

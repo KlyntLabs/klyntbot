@@ -10,7 +10,7 @@ use desktop_shared::commands::{
     InboxItemResponse, InsightChatParams, InsightChatStarted, InsightEvolutionResponse,
     InsightQuizSubmitParams, InsightReviewResponse, InsightReviewStarted,
     InsightSaveFlashcardsParams, InsightVersionResponse, KnowledgeGrowthResponse, NoteCreateParams,
-    NoteEditingFinishedParams, NoteLinkResponse, NoteResponse, NoteRetentionHealthResponse,
+    NoteEditingFinishedParams, NoteListItem, NoteLinkResponse, NoteResponse, NoteRetentionHealthResponse,
     NoteSuggestionsResponse, NoteUpdateParams, NoteVersionResponse, NotebookCreateParams,
     NotebookResponse, NotebookUpdateParams, PersonaChatParams, PersonaChatResponse,
     PersonaResponse, RatePersonaParams, RecentLearningSession, ScenarioChallengeResponse,
@@ -37,7 +37,7 @@ impl ::app_core::events::AppEventEmitter for TauriEmitter {
 pub async fn note_list(
     state: State<'_, Arc<AppCore>>,
     notebook_id: Option<String>,
-) -> Result<Vec<NoteResponse>, ApiError> {
+) -> Result<Vec<NoteListItem>, ApiError> {
     state.note_list(notebook_id).await
 }
 
@@ -86,7 +86,7 @@ pub async fn note_delete(
 pub async fn note_search(
     state: State<'_, Arc<AppCore>>,
     query: String,
-) -> Result<Vec<NoteResponse>, ApiError> {
+) -> Result<Vec<NoteListItem>, ApiError> {
     state.note_search(query).await
 }
 
@@ -94,7 +94,7 @@ pub async fn note_search(
 pub async fn note_search_semantic(
     state: State<'_, Arc<AppCore>>,
     query: String,
-) -> Result<Vec<NoteResponse>, ApiError> {
+) -> Result<Vec<NoteListItem>, ApiError> {
     state.note_search_semantic(&query).await
 }
 
@@ -118,7 +118,7 @@ pub async fn note_list_by_entity(
     state: State<'_, Arc<AppCore>>,
     entity_type: String,
     entity_id: String,
-) -> Result<Vec<NoteResponse>, ApiError> {
+) -> Result<Vec<NoteListItem>, ApiError> {
     state.note_list_by_entity(entity_type, entity_id).await
 }
 
@@ -232,7 +232,7 @@ pub async fn note_unarchive(
 #[tauri::command]
 pub async fn note_list_archived(
     state: State<'_, Arc<AppCore>>,
-) -> Result<Vec<NoteResponse>, ApiError> {
+) -> Result<Vec<NoteListItem>, ApiError> {
     state.note_list_archived().await
 }
 

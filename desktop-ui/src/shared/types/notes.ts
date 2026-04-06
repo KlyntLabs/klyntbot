@@ -50,6 +50,20 @@ export interface Note {
   updatedAt: string;
 }
 
+/// Lightweight note for list views — excludes body, HTML, split/perspective data.
+export interface NoteListItem {
+  id: string;
+  notebookId: string | null;
+  title: string;
+  pinned: boolean;
+  archived: boolean;
+  icon: string | null;
+  color: string | null;
+  tags: string[];
+  createdAt: string;
+  updatedAt: string;
+}
+
 // ── Note Versions ──────────────────────────────────────────
 
 export interface NoteVersion {

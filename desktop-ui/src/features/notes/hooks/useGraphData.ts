@@ -1,5 +1,5 @@
 import { useQuery } from "@shared/hooks/useQuery";
-import type { Note, NoteLink } from "@shared/types";
+import type { NoteListItem, NoteLink } from "@shared/types";
 import { useMemo } from "react";
 
 // ── Types ────────────────────────────────────────────────────────────────
@@ -56,7 +56,7 @@ function bfs(startId: string, adjacency: Map<string, Set<string>>, maxHops: numb
 
 export function useGraphData(
   view: SmartView,
-  notes: Note[],
+  notes: NoteListItem[],
   noteId: string | null,
   hopRadius: number,
 ): GraphData {
@@ -83,7 +83,7 @@ export function useGraphData(
     // Build full node map
     const allNodes = new Map<string, GraphNode>();
     for (const note of notes) {
-      const bodyLines = (note.body || "").split("\n").filter(Boolean);
+      const bodyLines = ("" as string).split("\n").filter(Boolean);
       allNodes.set(note.id, {
         id: note.id,
         title: note.title,

@@ -1,24 +1,24 @@
 import { ipc } from "@shared/hooks/useIpc";
 import { formatDate } from "@shared/lib/dates";
-import type { Note } from "@shared/types";
+import type { NoteListItem } from "@shared/types";
 import { FileText, Search } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 interface HybridSearchResult {
-  exact: Note[];
-  related: Note[];
+  exact: NoteListItem[];
+  related: NoteListItem[];
 }
 
 interface NoteFinderProps {
   isOpen: boolean;
   onClose: () => void;
   onSelectNote: (id: string) => void;
-  notes: Note[];
+  notes: NoteListItem[];
 }
 
 export function NoteFinder({ isOpen, onClose, onSelectNote, notes }: NoteFinderProps) {
   const [query, setQuery] = useState("");
-  const [results, setResults] = useState<Note[]>(notes);
+  const [results, setResults] = useState<NoteListItem[]>(notes);
   const [selectedIndex, setSelectedIndex] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
@@ -182,7 +182,7 @@ export function NoteFinder({ isOpen, onClose, onSelectNote, notes }: NoteFinderP
                   </div>
                 )}
                 <div className="text-[11px] text-muted-foreground/80 leading-relaxed whitespace-pre-wrap">
-                  {selectedNote.body || "No content"}
+                  No preview available
                 </div>
               </>
             ) : (

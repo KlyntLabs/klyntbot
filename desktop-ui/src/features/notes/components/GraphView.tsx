@@ -1,5 +1,5 @@
 import { useClickOutside } from "@shared/hooks/useClickOutside";
-import type { Note, Notebook } from "@shared/types";
+import type { NoteListItem, Notebook } from "@shared/types";
 import type { FabricCommunityDetail } from "@shared/types/fabric";
 import { Maximize2, Minus, Plus, RotateCcw, Settings2 } from "lucide-react";
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -45,7 +45,7 @@ function extractHeadings(bodyPreview: string): string[] {
 }
 
 interface GraphViewProps {
-  notes: Note[];
+  notes: NoteListItem[];
   notebooks: Notebook[];
   activeNoteId: string | null;
   onSelectNote: (id: string) => void;

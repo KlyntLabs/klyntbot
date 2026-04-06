@@ -1,9 +1,9 @@
 import { tagBgColor, tagColor } from "@shared/lib/tagColor";
-import type { Note } from "@shared/types";
+import type { NoteListItem } from "@shared/types";
 import { useMemo } from "react";
 
 interface TagsExplorerProps {
-  notes: Note[];
+  notes: NoteListItem[];
   activeTags: string[];
   selectedNoteId: string | null;
   onToggleTag: (tag: string, additive: boolean) => void;

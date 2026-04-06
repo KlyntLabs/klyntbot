@@ -1,6 +1,6 @@
 import { useClickOutside } from "@shared/hooks/useClickOutside";
 import { formatDate } from "@shared/lib/dates";
-import type { Note, Notebook } from "@shared/types";
+import type { NoteListItem, Notebook } from "@shared/types";
 import { ContextMenu, ContextMenuItem, ContextMenuSeparator, ContextMenuSubmenu } from "@shared/ui";
 import {
   Archive,
@@ -83,7 +83,7 @@ interface TreeItem {
 
 interface NotebookTreeProps {
   notebooks: Notebook[];
-  notes: Note[];
+  notes: NoteListItem[];
   selectedNoteId: string | null;
   autoRenameId: string | null;
   onAutoRenameDone: () => void;
@@ -189,7 +189,7 @@ const ITEM_COLORS = [
 
 type ContextTarget =
   | { kind: "folder"; notebook: Notebook; x: number; y: number }
-  | { kind: "note"; note: Note; x: number; y: number }
+  | { kind: "note"; note: NoteListItem; x: number; y: number }
   | { kind: "blank"; x: number; y: number }
   | null;
 
@@ -459,7 +459,7 @@ export function NotebookTree({
   }, [notebooks]);
 
   const noteMap = useMemo(() => {
-    const m = new Map<string, Note>();
+    const m = new Map<string, NoteListItem>();
     for (const n of notes) m.set(n.id, n);
     return m;
   }, [notes]);

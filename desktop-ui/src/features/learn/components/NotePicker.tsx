@@ -1,5 +1,5 @@
 import { ipc } from "@shared/hooks/useIpc";
-import type { Note } from "@shared/types";
+import type { NoteListItem } from "@shared/types";
 import { FileText, Search } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 
@@ -10,7 +10,7 @@ interface NotePickerProps {
 
 export function NotePicker({ onSelect, onCancel }: NotePickerProps) {
   const [query, setQuery] = useState("");
-  const [results, setResults] = useState<Note[]>([]);
+  const [results, setResults] = useState<NoteListItem[]>([]);
   const [loading, setLoading] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -38,7 +38,7 @@ export function NotePicker({ onSelect, onCancel }: NotePickerProps) {
     const id = ++requestIdRef.current;
     setLoading(true);
     try {
-      const notes = await ipc<Note[]>("note_search", { query: q });
+      const notes = await ipc<NoteListItem[]>("note_search", { query: q });
       if (id !== requestIdRef.current) return; // stale response
       setResults(notes.slice(0, 10));
     } catch {

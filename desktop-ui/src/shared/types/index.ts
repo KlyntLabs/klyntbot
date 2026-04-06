@@ -178,6 +178,7 @@ export type {
   AgentProfileSummary,
   InboxItem,
   Note,
+  NoteListItem,
   Notebook,
   NotebookCreateParams,
   NoteCreateParams,

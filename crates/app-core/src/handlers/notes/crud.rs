@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use desktop_shared::commands::{
     BacklinkResponse, HybridSearchResponse, NoteCreateParams, NoteEditingFinishedParams,
-    NoteLinkResponse, NoteResponse, NoteUpdateParams, NoteVersionResponse,
+    NoteListItem, NoteLinkResponse, NoteResponse, NoteUpdateParams, NoteVersionResponse,
 };
 use desktop_shared::errors::ApiError;
 use desktop_shared::types::EntityKind;
@@ -10,8 +10,8 @@ use feature_notes::models::{NoteRow, NoteVersionRow};
 use feature_notes::repo::utc_now_str;
 
 use super::converters::{
-    extract_links_and_mentions, note_row_to_response, note_with_tags, notes_with_tags_batch,
-    version_row_to_response,
+    extract_links_and_mentions, note_row_to_response, note_with_tags, notes_list_items_batch,
+    notes_with_tags_batch, version_row_to_response,
 };
 use crate::errors::map_storage_err;
 use crate::state::{AppCore, EntityUpdate, HandlerResult};
@@ -24,14 +24,14 @@ impl AppCore {
     pub async fn note_list(
         &self,
         notebook_id: Option<String>,
-    ) -> Result<Vec<NoteResponse>, ApiError> {
+    ) -> Result<Vec<NoteListItem>, ApiError> {
         let rows = self
             .note_repo
             .list_notes(notebook_id.as_deref())
             .await
             .map_err(map_storage_err)?;
 
-        notes_with_tags_batch(self, &rows).await
+        notes_list_items_batch(self, &rows).await
     }
 
     pub async fn note_get(&self, id: String) -> Result<NoteResponse, ApiError> {
@@ -44,14 +44,14 @@ impl AppCore {
         note_with_tags(self, &row).await
     }
 
-    pub async fn note_search(&self, query: String) -> Result<Vec<NoteResponse>, ApiError> {
+    pub async fn note_search(&self, query: String) -> Result<Vec<NoteListItem>, ApiError> {
         let rows = self
             .note_repo
             .search_notes(&query)
             .await
             .map_err(map_storage_err)?;
 
-        notes_with_tags_batch(self, &rows).await
+        notes_list_items_batch(self, &rows).await
     }
 
     pub async fn note_links_all(&self) -> Result<Vec<NoteLinkResponse>, ApiError> {
@@ -74,14 +74,14 @@ impl AppCore {
         &self,
         entity_type: String,
         entity_id: String,
-    ) -> Result<Vec<NoteResponse>, ApiError> {
+    ) -> Result<Vec<NoteListItem>, ApiError> {
         let rows = self
             .note_repo
             .list_notes_by_entity(&entity_type, &entity_id)
             .await
             .map_err(map_storage_err)?;
 
-        notes_with_tags_batch(self, &rows).await
+        notes_list_items_batch(self, &rows).await
     }
 
     pub async fn note_version_list(
@@ -421,7 +421,9 @@ impl AppCore {
 
     // ── Semantic search ─────────────────────────────────────────────
 
-    pub async fn note_search_semantic(&self, query: &str) -> Result<Vec<NoteResponse>, ApiError> {
+    pub async fn note_search_semantic(&self, query: &str) -> Result<Vec<NoteListItem>, ApiError> {
+        use super::converters::note_row_to_list_item;
+
         let handler = self
             .note_embedding_handler
             .as_ref()
@@ -441,7 +443,7 @@ impl AppCore {
         for (note_id, _score) in results {
             if let Ok(Some(row)) = self.note_repo.get_note(&note_id).await {
                 let tags = self.note_repo.get_tags(&note_id).await.unwrap_or_default();
-                notes.push(note_row_to_response(&row, tags));
+                notes.push(note_row_to_list_item(&row, tags));
             }
         }
         Ok(notes)
@@ -475,14 +477,14 @@ impl AppCore {
         Ok(((), updates))
     }
 
-    pub async fn note_list_archived(&self) -> Result<Vec<NoteResponse>, ApiError> {
+    pub async fn note_list_archived(&self) -> Result<Vec<NoteListItem>, ApiError> {
         let rows = self
             .note_repo
             .list_archived_notes()
             .await
             .map_err(map_storage_err)?;
 
-        notes_with_tags_batch(self, &rows).await
+        notes_list_items_batch(self, &rows).await
     }
 
     // ── Unlinked mentions handler ────────────────────────────────────

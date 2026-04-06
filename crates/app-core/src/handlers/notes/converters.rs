@@ -1,4 +1,4 @@
-use desktop_shared::commands::{NoteResponse, NoteVersionResponse, NotebookResponse};
+use desktop_shared::commands::{NoteListItem, NoteResponse, NoteVersionResponse, NotebookResponse};
 use desktop_shared::errors::ApiError;
 use feature_notes::link_parser;
 use feature_notes::models::{NoteRow, NoteVersionRow, NotebookRow};
@@ -69,6 +69,41 @@ pub(crate) async fn notes_with_tags_batch(
         .map(|row| {
             let tags = tag_map.remove(&row.id).unwrap_or_default();
             note_row_to_response(row, tags)
+        })
+        .collect())
+}
+
+pub(crate) fn note_row_to_list_item(row: &NoteRow, tags: Vec<String>) -> NoteListItem {
+    NoteListItem {
+        id: row.id.clone(),
+        notebook_id: row.notebook_id.clone(),
+        title: row.title.clone(),
+        pinned: row.pinned != 0,
+        archived: row.archived != 0,
+        icon: row.icon.clone(),
+        color: row.color.clone(),
+        tags,
+        created_at: row.created_at.clone(),
+        updated_at: row.updated_at.clone(),
+    }
+}
+
+/// Convert a list of NoteRows to NoteListItems with batch-fetched tags (single query).
+pub(crate) async fn notes_list_items_batch(
+    core: &AppCore,
+    rows: &[NoteRow],
+) -> Result<Vec<NoteListItem>, ApiError> {
+    let ids: Vec<String> = rows.iter().map(|r| r.id.clone()).collect();
+    let mut tag_map = core
+        .note_repo
+        .get_tags_batch(&ids)
+        .await
+        .map_err(map_storage_err)?;
+    Ok(rows
+        .iter()
+        .map(|row| {
+            let tags = tag_map.remove(&row.id).unwrap_or_default();
+            note_row_to_list_item(row, tags)
         })
         .collect())
 }
