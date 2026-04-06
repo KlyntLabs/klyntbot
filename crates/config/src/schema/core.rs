@@ -230,6 +230,41 @@ pub struct Config {
     /// Language learning engine configuration (pronunciation feedback, FSRS).
     #[serde(default)]
     pub language_learning: LanguageLearningConfig,
+
+    /// Embedding provider for semantic search.
+    #[serde(default)]
+    pub embedding: EmbeddingConfig,
+}
+
+/// Embedding provider configuration.
+///
+/// Default: `"local"` (bge-small-en-v1.5-Q via fastembed, 384 dims).
+/// Set to `"openai"` to use text-embedding-3-small via API (384 dims).
+/// When `"openai"`, the OpenAI API key from `providers.openai.api_key` is used.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct EmbeddingConfig {
+    /// Provider: `"local"` (default) or `"openai"`.
+    #[serde(default = "default_embedding_provider")]
+    pub provider: String,
+
+    /// Optional custom API base URL for OpenAI-compatible embedding endpoints.
+    /// Only used when provider is `"openai"`. Defaults to `https://api.openai.com/v1`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub api_base: Option<String>,
+}
+
+impl Default for EmbeddingConfig {
+    fn default() -> Self {
+        Self {
+            provider: default_embedding_provider(),
+            api_base: None,
+        }
+    }
+}
+
+fn default_embedding_provider() -> String {
+    "local".to_string()
 }
 
 fn default_schema_version() -> u32 {

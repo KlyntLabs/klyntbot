@@ -1,8 +1,12 @@
 //! Embedding engine for semantic search.
 //!
-//! Wraps `fastembed::TextEmbedding` with lazy initialization and provides
-//! cosine similarity, batch embedding, and the `EmbeddingHandler` trait
-//! for dependency inversion (testability without loading the 420MB model).
+//! Supports two providers:
+//! - **Local** (default): `bge-small-en-v1.5-Q` via fastembed ONNX runtime.
+//!   Lazy-loaded, auto-unloaded after idle timeout.
+//! - **OpenAI**: `text-embedding-3-small` via API. Requires an API key.
+//!   Requests 384 dimensions (Matryoshka) for LanceDB compatibility.
+//!
+//! Both produce 384-dimensional vectors — no schema migration when switching.
 
 use async_trait::async_trait;
 use chrono::Utc;
@@ -10,31 +14,46 @@ use chrono::Utc;
 use fastembed::{EmbeddingModel, InitOptions, TextEmbedding};
 use std::sync::{Arc, Mutex};
 use std::time::Instant;
-use tracing::{debug, info};
+use tracing::{debug, info, warn};
 
 use crate::embedding_store::EmbeddingRecord;
 use crate::todo_types::Todo;
 use common::Result;
 
-/// Expected embedding dimensionality for bge-small-en-v1.5-Q.
+/// Expected embedding dimensionality (both local and OpenAI produce this).
 pub const EMBEDDING_DIM: usize = 384;
 
 /// Idle timeout before the ONNX model is unloaded from memory (1 minute).
-/// The quantized model (~23MB) reloads from disk cache in <500ms.
 const EMBEDDING_IDLE_SECS: u64 = 60;
 
-/// Core embedding engine wrapping fastembed with lazy model initialization.
+/// Which embedding provider to use.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub enum EmbeddingProvider {
+    /// Local ONNX model via fastembed (bge-small-en-v1.5-Q, 384 dims).
+    #[default]
+    Local,
+    /// OpenAI text-embedding-3-small API (384 dims via Matryoshka).
+    OpenAi {
+        api_key: String,
+        api_base: Option<String>,
+    },
+}
+
+/// Core embedding engine with local and API provider support.
 ///
-/// The model (~420MB) is downloaded on first use, not at construction time.
-/// It is automatically unloaded after [`EMBEDDING_IDLE_SECS`] of inactivity
-/// to reclaim ~500MB of RAM.
+/// **Local mode** (default): the model (~420MB) is downloaded on first use,
+/// not at construction time. Auto-unloaded after [`EMBEDDING_IDLE_SECS`].
 ///
-/// When compiled without the `semantic-search` feature, `embed()` always
-/// returns an error — the struct still exists for API compatibility.
+/// **OpenAI mode**: calls the embeddings API with `dimensions: 384`.
+///
+/// When compiled without the `semantic-search` feature, local mode returns
+/// errors but OpenAI mode still works.
 pub struct EmbeddingEngine {
+    provider: EmbeddingProvider,
     #[cfg(feature = "semantic-search")]
     model: Mutex<Option<TextEmbedding>>,
     last_used: Mutex<Instant>,
+    http_client: reqwest::Client,
     #[cfg(not(feature = "semantic-search"))]
     _phantom: (),
 }
@@ -46,12 +65,27 @@ impl Default for EmbeddingEngine {
 }
 
 impl EmbeddingEngine {
-    /// Create a new engine. The model is NOT loaded until the first embed call.
+    /// Create a new engine with the local provider (default).
     pub fn new() -> Self {
         Self {
+            provider: EmbeddingProvider::Local,
             #[cfg(feature = "semantic-search")]
             model: Mutex::new(None),
             last_used: Mutex::new(Instant::now()),
+            http_client: reqwest::Client::new(),
+            #[cfg(not(feature = "semantic-search"))]
+            _phantom: (),
+        }
+    }
+
+    /// Create a new engine with a specific provider.
+    pub fn with_provider(provider: EmbeddingProvider) -> Self {
+        Self {
+            provider,
+            #[cfg(feature = "semantic-search")]
+            model: Mutex::new(None),
+            last_used: Mutex::new(Instant::now()),
+            http_client: reqwest::Client::new(),
             #[cfg(not(feature = "semantic-search"))]
             _phantom: (),
         }
@@ -107,9 +141,31 @@ impl EmbeddingEngine {
         false
     }
 
-    /// Generate embedding for a single text. Returns `Vec<f32>` of `EMBEDDING_DIM` length.
+    /// Generate embedding for a single text. Returns `Vec<f32>` of [`EMBEDDING_DIM`] length.
+    ///
+    /// Dispatches to local fastembed or OpenAI API based on the configured provider.
     #[cfg(feature = "semantic-search")]
     pub fn embed(&self, text: &str) -> Result<Vec<f32>> {
+        match &self.provider {
+            EmbeddingProvider::Local => self.embed_local(text),
+            EmbeddingProvider::OpenAi { .. } => self.embed_openai_sync(text),
+        }
+    }
+
+    /// Stub when `semantic-search` feature is disabled — OpenAI still works.
+    #[cfg(not(feature = "semantic-search"))]
+    pub fn embed(&self, text: &str) -> Result<Vec<f32>> {
+        match &self.provider {
+            EmbeddingProvider::OpenAi { .. } => self.embed_openai_sync(text),
+            _ => Err(common::ToolError::ExecutionFailed(
+                "Semantic search is disabled. Rebuild with `semantic-search` feature or configure OpenAI embeddings.".to_string(),
+            ).into()),
+        }
+    }
+
+    /// Local fastembed embedding for a single text.
+    #[cfg(feature = "semantic-search")]
+    fn embed_local(&self, text: &str) -> Result<Vec<f32>> {
         self.ensure_model()?;
         let mut guard = self.model.lock().map_err(|e| {
             common::ToolError::ExecutionFailed(format!("Embedding model lock poisoned: {}", e))
@@ -124,13 +180,88 @@ impl EmbeddingEngine {
         })
     }
 
-    /// Stub when `semantic-search` feature is disabled.
-    #[cfg(not(feature = "semantic-search"))]
-    pub fn embed(&self, _text: &str) -> Result<Vec<f32>> {
-        Err(common::ToolError::ExecutionFailed(
-            "Semantic search is disabled. Rebuild with the `semantic-search` feature to enable embeddings.".to_string(),
-        )
-        .into())
+    /// Call OpenAI embeddings API with `dimensions: 384` for LanceDB compatibility.
+    async fn embed_openai(&self, texts: &[&str]) -> Result<Vec<Vec<f32>>> {
+        let (api_key, api_base) = match &self.provider {
+            EmbeddingProvider::OpenAi { api_key, api_base } => (api_key, api_base),
+            _ => {
+                return Err(common::ToolError::ExecutionFailed(
+                    "embed_openai called without OpenAI provider".to_string(),
+                )
+                .into())
+            }
+        };
+        let base = api_base
+            .as_deref()
+            .unwrap_or("https://api.openai.com/v1");
+        let url = format!("{}/embeddings", base.trim_end_matches('/'));
+
+        let body = serde_json::json!({
+            "model": "text-embedding-3-small",
+            "input": texts,
+            "dimensions": EMBEDDING_DIM,
+        });
+
+        let resp = self
+            .http_client
+            .post(&url)
+            .header("Authorization", format!("Bearer {}", api_key))
+            .json(&body)
+            .send()
+            .await
+            .map_err(|e| {
+                common::ToolError::ExecutionFailed(format!("OpenAI embedding request failed: {e}"))
+            })?;
+
+        if !resp.status().is_success() {
+            let status = resp.status();
+            let body = resp.text().await.unwrap_or_default();
+            return Err(common::ToolError::ExecutionFailed(format!(
+                "OpenAI embedding API error {status}: {body}"
+            ))
+            .into());
+        }
+
+        let json: serde_json::Value = resp.json().await.map_err(|e| {
+            common::ToolError::ExecutionFailed(format!("OpenAI embedding parse failed: {e}"))
+        })?;
+
+        let data = json["data"]
+            .as_array()
+            .ok_or_else(|| {
+                common::ToolError::ExecutionFailed(
+                    "OpenAI response missing 'data' array".to_string(),
+                )
+            })?;
+
+        let mut embeddings = Vec::with_capacity(data.len());
+        for item in data {
+            let vec: Vec<f32> = item["embedding"]
+                .as_array()
+                .ok_or_else(|| {
+                    common::ToolError::ExecutionFailed(
+                        "OpenAI embedding item missing 'embedding' array".to_string(),
+                    )
+                })?
+                .iter()
+                .map(|v| v.as_f64().unwrap_or(0.0) as f32)
+                .collect();
+            embeddings.push(vec);
+        }
+
+        Ok(embeddings)
+    }
+
+    /// Synchronous OpenAI embed — for callers that use the sync `embed()` path.
+    fn embed_openai_sync(&self, text: &str) -> Result<Vec<f32>> {
+        tokio::task::block_in_place(|| {
+            let mut results = tokio::runtime::Handle::current()
+                .block_on(self.embed_openai(&[text]))?;
+            results.pop().ok_or_else(|| {
+                common::ToolError::ExecutionFailed("OpenAI returned empty results".to_string())
+                    .into()
+            })
+        })
     }
 
     /// Batch embed multiple texts (more efficient than individual calls).
@@ -139,69 +270,98 @@ impl EmbeddingEngine {
         if texts.is_empty() {
             return Ok(Vec::new());
         }
-        self.ensure_model()?;
-        let mut guard = self.model.lock().map_err(|e| {
-            common::ToolError::ExecutionFailed(format!("Embedding model lock poisoned: {}", e))
-        })?;
-        let model = guard.as_mut().unwrap();
-        let results = model.embed(texts, None).map_err(|e| {
-            common::ToolError::ExecutionFailed(format!("Batch embedding generation failed: {}", e))
-        })?;
-        Ok(results)
+        match &self.provider {
+            EmbeddingProvider::Local => {
+                self.ensure_model()?;
+                let mut guard = self.model.lock().map_err(|e| {
+                    common::ToolError::ExecutionFailed(format!(
+                        "Embedding model lock poisoned: {}",
+                        e
+                    ))
+                })?;
+                let model = guard.as_mut().unwrap();
+                model.embed(texts, None).map_err(|e| {
+                    common::ToolError::ExecutionFailed(format!(
+                        "Batch embedding generation failed: {}",
+                        e
+                    ))
+                    .into()
+                })
+            }
+            EmbeddingProvider::OpenAi { .. } => {
+                tokio::task::block_in_place(|| {
+                    tokio::runtime::Handle::current().block_on(self.embed_openai(texts))
+                })
+            }
+        }
     }
 
     /// Stub when `semantic-search` feature is disabled.
     #[cfg(not(feature = "semantic-search"))]
-    pub fn embed_batch(&self, _texts: &[&str]) -> Result<Vec<Vec<f32>>> {
-        Err(common::ToolError::ExecutionFailed(
-            "Semantic search is disabled. Rebuild with the `semantic-search` feature to enable embeddings.".to_string(),
-        )
-        .into())
+    pub fn embed_batch(&self, texts: &[&str]) -> Result<Vec<Vec<f32>>> {
+        if texts.is_empty() {
+            return Ok(Vec::new());
+        }
+        match &self.provider {
+            EmbeddingProvider::OpenAi { .. } => {
+                tokio::task::block_in_place(|| {
+                    tokio::runtime::Handle::current().block_on(self.embed_openai(texts))
+                })
+            }
+            _ => Err(common::ToolError::ExecutionFailed(
+                "Semantic search is disabled. Rebuild with `semantic-search` feature or configure OpenAI embeddings.".to_string(),
+            ).into()),
+        }
     }
 
-    /// Async wrapper: runs `embed` on a blocking thread pool.
-    ///
-    /// Takes `Arc<Self>` as receiver so the engine can be moved into
-    /// `spawn_blocking` (which requires `'static`). Callers with
-    /// `engine: Arc<EmbeddingEngine>` call it as `engine.clone().embed_async(text).await`.
-    #[cfg(feature = "semantic-search")]
+    /// Async embed — dispatches to local (spawn_blocking) or OpenAI (async HTTP).
     pub async fn embed_async(self: Arc<Self>, text: String) -> Result<Vec<f32>> {
-        tokio::task::spawn_blocking(move || self.embed(&text))
-            .await
-            .map_err(|e| {
-                common::KlyntbotError::from(common::ToolError::ExecutionFailed(format!(
-                    "Embedding task panicked: {e}"
-                )))
-            })?
+        match &self.provider {
+            EmbeddingProvider::Local => {
+                tokio::task::spawn_blocking(move || self.embed(&text))
+                    .await
+                    .map_err(|e| {
+                        common::KlyntbotError::from(common::ToolError::ExecutionFailed(format!(
+                            "Embedding task panicked: {e}"
+                        )))
+                    })?
+            }
+            EmbeddingProvider::OpenAi { .. } => self
+                .embed_openai(&[&text])
+                .await
+                .and_then(|mut v| {
+                    v.pop().ok_or_else(|| {
+                        common::ToolError::ExecutionFailed(
+                            "OpenAI returned empty results".to_string(),
+                        )
+                        .into()
+                    })
+                }),
+        }
     }
 
-    /// Stub when `semantic-search` feature is disabled.
-    #[cfg(not(feature = "semantic-search"))]
-    pub async fn embed_async(self: Arc<Self>, _text: String) -> Result<Vec<f32>> {
-        Err(common::ToolError::ExecutionFailed(
-            "Semantic search is disabled. Rebuild with the `semantic-search` feature to enable embeddings.".to_string(),
-        )
-        .into())
-    }
-
-    /// Check if the embedding model is initialized and available.
-    #[cfg(feature = "semantic-search")]
+    /// Check if the embedding engine is available.
     pub fn is_available(&self) -> bool {
-        self.model
-            .lock()
-            .map(|guard| guard.is_some())
-            .unwrap_or(false)
-    }
-
-    /// Always returns false when `semantic-search` is disabled.
-    #[cfg(not(feature = "semantic-search"))]
-    pub fn is_available(&self) -> bool {
-        false
+        match &self.provider {
+            EmbeddingProvider::OpenAi { api_key, .. } => !api_key.is_empty(),
+            EmbeddingProvider::Local => {
+                #[cfg(feature = "semantic-search")]
+                {
+                    // Lazy init means we're always available until the first call fails.
+                    true
+                }
+                #[cfg(not(feature = "semantic-search"))]
+                false
+            }
+        }
     }
 
     /// Get the name of the embedding model being used.
     pub fn model_name(&self) -> &str {
-        "bge-small-en-v1.5-Q"
+        match &self.provider {
+            EmbeddingProvider::Local => "bge-small-en-v1.5-Q",
+            EmbeddingProvider::OpenAi { .. } => "text-embedding-3-small",
+        }
     }
 
     /// Cosine similarity between two vectors.

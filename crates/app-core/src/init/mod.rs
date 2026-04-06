@@ -174,7 +174,24 @@ impl AppCore {
         .await?;
 
         // ── Note embedding handler (before vector_store is moved into agent) ──
-        let embedding_engine = Arc::new(tools::embedding_engine::EmbeddingEngine::new());
+        let embedding_provider = if config.embedding.provider == "openai" {
+            let api_key = config.providers.openai.api_key.expose().to_string();
+            if api_key.is_empty() {
+                tracing::warn!("Embedding provider set to 'openai' but no API key configured — falling back to local");
+                tools::embedding_engine::EmbeddingProvider::Local
+            } else {
+                tracing::info!("Using OpenAI text-embedding-3-small for embeddings");
+                tools::embedding_engine::EmbeddingProvider::OpenAi {
+                    api_key,
+                    api_base: config.embedding.api_base.clone(),
+                }
+            }
+        } else {
+            tools::embedding_engine::EmbeddingProvider::Local
+        };
+        let embedding_engine = Arc::new(
+            tools::embedding_engine::EmbeddingEngine::with_provider(embedding_provider),
+        );
         let note_embedding_handler: Option<
             Arc<dyn feature_notes::handlers::embedding::NoteEmbeddingHandler>,
         > = if let Some(ref vs) = vector_store {
