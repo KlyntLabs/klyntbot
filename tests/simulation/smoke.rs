@@ -612,6 +612,10 @@ async fn run_software_engineer_1mo() {
         "    Estimation deviation: {:.3}",
         fm.estimation_deviation_avg
     );
+    eprintln!(
+        "    Coaching acceptance:  {:.3}",
+        fm.coaching_acceptance_rate
+    );
     eprintln!();
     eprintln!("  TIER 3 — System Health");
     eprintln!("    Community stability:  {:.3}", fm.community_stability);
@@ -700,6 +704,10 @@ async fn run_agent_validation_1week() {
     eprintln!(
         "    Estimation deviation:  {:.3}",
         fm.estimation_deviation_avg
+    );
+    eprintln!(
+        "    Coaching acceptance:   {:.3}",
+        fm.coaching_acceptance_rate
     );
     eprintln!();
     eprintln!("  TIER 3 — System Health");

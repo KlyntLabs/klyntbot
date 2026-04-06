@@ -367,7 +367,12 @@ impl SimulationHarness {
         // pattern recognition (afternoon energy drop, task avoidance, etc.).
         let coaching_acc = Arc::clone(&self.coaching_accumulator);
         let coaching_det = Arc::clone(&self.coaching_detector);
+        let coaching_bus = Arc::clone(&self.bus);
         let mut coaching_rx = self.bus.subscribe();
+        let persona_seed = self.scenario.persona.seed;
+        // Coaching feedback counters — drained per epoch into the accumulator.
+        let coaching_counters = Arc::new(CoachingCounters::default());
+        let cc_inner = Arc::clone(&coaching_counters);
         let coaching_listener = tokio::spawn(async move {
             // Minimal UserSituation — the simulation doesn't have a real user,
             // but the accumulator needs one for trigger evaluation.
@@ -383,6 +388,11 @@ impl SimulationHarness {
                     Ok(Err(_)) => break, // channel closed
                     Err(_) => continue,  // timeout — check again
                 };
+                // Skip our own CoachingFeedback events to avoid a feedback loop.
+                if matches!(event, DomainEvent::CoachingFeedback { .. }) {
+                    continue;
+                }
+
                 // Incrementally update situation from relevant events.
                 // Deltas scale with accumulated state to model diminishing
                 // returns (first distraction is jarring, fifth is background
@@ -426,6 +436,34 @@ impl SimulationHarness {
                     let mut det = coaching_det.lock().await;
                     for trigger in &fired {
                         det.record_trigger(trigger);
+
+                        // Simulate user feedback for each coaching intervention.
+                        let hash = trigger
+                            .condition_name
+                            .bytes()
+                            .chain(trigger.context.bytes())
+                            .fold(persona_seed, |a, b| {
+                                a.wrapping_mul(31).wrapping_add(b as u64)
+                            });
+                        let roll = (hash % 1000) as f64 / 1000.0;
+                        let response = simulate_feedback(roll, trigger.confidence);
+
+                        match &response {
+                            bus::FeedbackResponse::Helpful => {
+                                cc_inner.helpful.fetch_add(1, Ordering::Relaxed);
+                            }
+                            bus::FeedbackResponse::Dismissed => {
+                                cc_inner.dismissed.fetch_add(1, Ordering::Relaxed);
+                            }
+                            bus::FeedbackResponse::StopSuggesting => {
+                                cc_inner.stop.fetch_add(1, Ordering::Relaxed);
+                            }
+                        }
+
+                        coaching_bus.publish(DomainEvent::CoachingFeedback {
+                            intervention_id: trigger.condition_name.clone(),
+                            response,
+                        });
                     }
                 }
             }
@@ -1150,6 +1188,14 @@ impl SimulationHarness {
             // Read contradiction events detected during this epoch's message processing.
             let contradictions = contradiction_count.swap(0, Ordering::Relaxed);
             metrics.accumulator_mut().contradictions_detected += contradictions;
+
+            // Drain coaching feedback counters from the listener task.
+            metrics.accumulator_mut().coaching_helpful +=
+                coaching_counters.helpful.swap(0, Ordering::Relaxed);
+            metrics.accumulator_mut().coaching_dismissed +=
+                coaching_counters.dismissed.swap(0, Ordering::Relaxed);
+            metrics.accumulator_mut().coaching_stop +=
+                coaching_counters.stop.swap(0, Ordering::Relaxed);
 
             // Seed a routing snapshot for the day's messages.
             if !messages.is_empty() {
@@ -2008,6 +2054,35 @@ impl SimulationHarness {
                 }
             }
         }
+    }
+}
+
+/// Atomic counters for coaching feedback — shared between the coaching
+/// listener task and the main epoch loop.
+#[derive(Default)]
+struct CoachingCounters {
+    helpful: AtomicU32,
+    dismissed: AtomicU32,
+    stop: AtomicU32,
+}
+
+/// Select a synthetic `FeedbackResponse` based on trigger confidence and a
+/// deterministic roll.  Higher-confidence triggers are more likely to be
+/// rated Helpful; lower-confidence ones trend toward Dismissed/StopSuggesting.
+fn simulate_feedback(roll: f64, confidence: f64) -> bus::FeedbackResponse {
+    let (helpful_cutoff, dismissed_cutoff) = if confidence > 0.7 {
+        (0.70, 0.90)
+    } else if confidence > 0.4 {
+        (0.40, 0.85)
+    } else {
+        (0.20, 0.75)
+    };
+    if roll < helpful_cutoff {
+        bus::FeedbackResponse::Helpful
+    } else if roll < dismissed_cutoff {
+        bus::FeedbackResponse::Dismissed
+    } else {
+        bus::FeedbackResponse::StopSuggesting
     }
 }
 

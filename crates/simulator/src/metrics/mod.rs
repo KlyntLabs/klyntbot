@@ -59,6 +59,7 @@ pub struct MetricSnapshot {
     pub retrievability_p25: f64,
     // Tier 2 — behavioral quality (extended)
     pub estimation_deviation_avg: f64,
+    pub coaching_acceptance_rate: f64,
 }
 
 // ---------------------------------------------------------------------------
@@ -149,6 +150,10 @@ pub struct EpochAccumulator {
     // Estimation tracking
     pub estimation_deviation_sum: f64,
     pub estimation_count: u32,
+    // Coaching feedback tracking
+    pub coaching_helpful: u32,
+    pub coaching_dismissed: u32,
+    pub coaching_stop: u32,
 }
 
 // ---------------------------------------------------------------------------
@@ -346,6 +351,12 @@ impl MetricCollector {
         } else {
             acc.error_recovered as f64 / acc.error_injected as f64
         };
+        let coaching_total = acc.coaching_helpful + acc.coaching_dismissed + acc.coaching_stop;
+        let coaching_acceptance_rate = if coaching_total == 0 {
+            0.0
+        } else {
+            acc.coaching_helpful as f64 / coaching_total as f64
+        };
 
         let snap = MetricSnapshot {
             epoch,
@@ -378,6 +389,7 @@ impl MetricCollector {
             memory_retrievability: 0.0,
             meta_rule_count: 0,
             wall_time_per_epoch_ms: wall_time_ms,
+            coaching_acceptance_rate,
             // Populated post-snapshot via update_latest_cost_and_estimation
             cost_per_outcome_usd: 0.0,
             cache_hit_rate: 0.0,

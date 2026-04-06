@@ -191,9 +191,7 @@ impl EmbeddingEngine {
                 .into())
             }
         };
-        let base = api_base
-            .as_deref()
-            .unwrap_or("https://api.openai.com/v1");
+        let base = api_base.as_deref().unwrap_or("https://api.openai.com/v1");
         let url = format!("{}/embeddings", base.trim_end_matches('/'));
 
         let body = serde_json::json!({
@@ -226,13 +224,9 @@ impl EmbeddingEngine {
             common::ToolError::ExecutionFailed(format!("OpenAI embedding parse failed: {e}"))
         })?;
 
-        let data = json["data"]
-            .as_array()
-            .ok_or_else(|| {
-                common::ToolError::ExecutionFailed(
-                    "OpenAI response missing 'data' array".to_string(),
-                )
-            })?;
+        let data = json["data"].as_array().ok_or_else(|| {
+            common::ToolError::ExecutionFailed("OpenAI response missing 'data' array".to_string())
+        })?;
 
         let mut embeddings = Vec::with_capacity(data.len());
         for item in data {
@@ -255,8 +249,8 @@ impl EmbeddingEngine {
     /// Synchronous OpenAI embed — for callers that use the sync `embed()` path.
     fn embed_openai_sync(&self, text: &str) -> Result<Vec<f32>> {
         tokio::task::block_in_place(|| {
-            let mut results = tokio::runtime::Handle::current()
-                .block_on(self.embed_openai(&[text]))?;
+            let mut results =
+                tokio::runtime::Handle::current().block_on(self.embed_openai(&[text]))?;
             results.pop().ok_or_else(|| {
                 common::ToolError::ExecutionFailed("OpenAI returned empty results".to_string())
                     .into()
@@ -288,11 +282,9 @@ impl EmbeddingEngine {
                     .into()
                 })
             }
-            EmbeddingProvider::OpenAi { .. } => {
-                tokio::task::block_in_place(|| {
-                    tokio::runtime::Handle::current().block_on(self.embed_openai(texts))
-                })
-            }
+            EmbeddingProvider::OpenAi { .. } => tokio::task::block_in_place(|| {
+                tokio::runtime::Handle::current().block_on(self.embed_openai(texts))
+            }),
         }
     }
 
@@ -317,26 +309,23 @@ impl EmbeddingEngine {
     /// Async embed — dispatches to local (spawn_blocking) or OpenAI (async HTTP).
     pub async fn embed_async(self: Arc<Self>, text: String) -> Result<Vec<f32>> {
         match &self.provider {
-            EmbeddingProvider::Local => {
-                tokio::task::spawn_blocking(move || self.embed(&text))
-                    .await
-                    .map_err(|e| {
-                        common::KlyntbotError::from(common::ToolError::ExecutionFailed(format!(
-                            "Embedding task panicked: {e}"
-                        )))
-                    })?
-            }
-            EmbeddingProvider::OpenAi { .. } => self
-                .embed_openai(&[&text])
+            EmbeddingProvider::Local => tokio::task::spawn_blocking(move || self.embed(&text))
                 .await
-                .and_then(|mut v| {
+                .map_err(|e| {
+                    common::KlyntbotError::from(common::ToolError::ExecutionFailed(format!(
+                        "Embedding task panicked: {e}"
+                    )))
+                })?,
+            EmbeddingProvider::OpenAi { .. } => {
+                self.embed_openai(&[&text]).await.and_then(|mut v| {
                     v.pop().ok_or_else(|| {
                         common::ToolError::ExecutionFailed(
                             "OpenAI returned empty results".to_string(),
                         )
                         .into()
                     })
-                }),
+                })
+            }
         }
     }
 

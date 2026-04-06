@@ -189,9 +189,9 @@ impl AppCore {
         } else {
             tools::embedding_engine::EmbeddingProvider::Local
         };
-        let embedding_engine = Arc::new(
-            tools::embedding_engine::EmbeddingEngine::with_provider(embedding_provider),
-        );
+        let embedding_engine = Arc::new(tools::embedding_engine::EmbeddingEngine::with_provider(
+            embedding_provider,
+        ));
         let note_embedding_handler: Option<
             Arc<dyn feature_notes::handlers::embedding::NoteEmbeddingHandler>,
         > = if let Some(ref vs) = vector_store {

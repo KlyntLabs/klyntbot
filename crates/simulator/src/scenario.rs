@@ -156,6 +156,7 @@ pub enum MetricName {
     RetrievabilityMin,
     RetrievabilityP25,
     EstimationDeviationAvg,
+    CoachingAcceptanceRate,
 }
 
 // ── Checkpoint assertions ──────────────────────────────────────────────

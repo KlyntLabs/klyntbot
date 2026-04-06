@@ -247,6 +247,7 @@ fn get_metric_value(snapshot: &MetricSnapshot, metric: &MetricName) -> f64 {
         MetricName::RetrievabilityMin => snapshot.retrievability_min,
         MetricName::RetrievabilityP25 => snapshot.retrievability_p25,
         MetricName::EstimationDeviationAvg => snapshot.estimation_deviation_avg,
+        MetricName::CoachingAcceptanceRate => snapshot.coaching_acceptance_rate,
     }
 }
 
