@@ -283,12 +283,8 @@ async fn test_dedup_removes_duplicates() {
 
     // Simulate a crash scenario: manually insert two rows with the same ID
     // by calling add() directly (bypassing the delete step of upsert).
-    let tbl = store
-        .db
-        .open_table("todo_embeddings")
-        .execute()
-        .await
-        .unwrap();
+    // Use get_table() first to ensure the table is created lazily.
+    let tbl = store.get_table("todo_embeddings").await.unwrap();
 
     for ts in ["2024-01-01T00:00:00Z", "2024-01-02T00:00:00Z"] {
         let schema = tbl.schema().await.unwrap();

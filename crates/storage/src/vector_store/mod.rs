@@ -68,6 +68,9 @@ impl std::fmt::Debug for VectorStore {
 
 impl VectorStore {
     /// Open (or create) the LanceDB store at `{data_dir}/lance/`.
+    ///
+    /// Tables are opened lazily on first access via [`get_table`] — no table
+    /// manifests are loaded here, keeping startup I/O near zero.
     pub async fn connect(data_dir: &Path) -> Result<Self, StorageError> {
         let lance_dir = data_dir.join("lance");
         std::fs::create_dir_all(&lance_dir)
@@ -86,147 +89,80 @@ impl VectorStore {
             .execute()
             .await
             .map_err(|e| StorageError::Vector(format!("LanceDB connect failed: {e}")))?;
-        let store = Self {
+        Ok(Self {
             db: Arc::new(db),
             table_cache: Arc::new(DashMap::new()),
-        };
-
-        // Fetch table list once instead of per-table (saves 11 round-trips).
-        let existing = store
-            .db
-            .table_names()
-            .execute()
-            .await
-            .map_err(|e| StorageError::Vector(format!("LanceDB list tables: {e}")))?;
-
-        store
-            .ensure_table("todo_embeddings", schemas::todo_schema(), &existing)
-            .await?;
-        // Pre-release migration: drop conv_embeddings if it has the old `full_content` column.
-        if existing.iter().any(|t| t == "conv_embeddings") {
-            let tbl = store
-                .db
-                .open_table("conv_embeddings")
-                .execute()
-                .await
-                .map_err(|e| StorageError::Vector(format!("open conv_embeddings: {e}")))?;
-            let schema = tbl
-                .schema()
-                .await
-                .map_err(|e| StorageError::Vector(format!("read conv_embeddings schema: {e}")))?;
-            if schema.column_with_name("full_content").is_some() {
-                store
-                    .db
-                    .drop_table("conv_embeddings", &[])
-                    .await
-                    .map_err(|e| StorageError::Vector(format!("drop old conv_embeddings: {e}")))?;
-                tracing::info!("Dropped conv_embeddings table (removed full_content column)");
-                // Remove from existing list so ensure_table recreates it
-                let existing: Vec<String> = existing
-                    .iter()
-                    .filter(|t| t.as_str() != "conv_embeddings")
-                    .cloned()
-                    .collect();
-                store
-                    .ensure_table("conv_embeddings", schemas::conv_schema(), &existing)
-                    .await?;
-            } else {
-                store
-                    .ensure_table("conv_embeddings", schemas::conv_schema(), &existing)
-                    .await?;
-            }
-        } else {
-            store
-                .ensure_table("conv_embeddings", schemas::conv_schema(), &existing)
-                .await?;
-        }
-        store
-            .ensure_table(
-                "cognitive_fact_embeddings",
-                schemas::cognitive_fact_schema(),
-                &existing,
-            )
-            .await?;
-        store
-            .ensure_table(
-                "activity_embeddings",
-                schemas::activity_embedding_schema(),
-                &existing,
-            )
-            .await?;
-        store
-            .ensure_table(
-                "work_context_embeddings",
-                schemas::work_context_embedding_schema(),
-                &existing,
-            )
-            .await?;
-        store
-            .ensure_table(
-                "task_embeddings",
-                schemas::task_embedding_schema(),
-                &existing,
-            )
-            .await?;
-        store
-            .ensure_table(
-                "note_embeddings",
-                schemas::note_embedding_schema(),
-                &existing,
-            )
-            .await?;
-        store
-            .ensure_table(
-                "insight_embeddings",
-                schemas::insight_embedding_schema(),
-                &existing,
-            )
-            .await?;
-        store
-            .ensure_table(
-                "entity_embeddings",
-                schemas::entity_embedding_schema(),
-                &existing,
-            )
-            .await?;
-        store
-            .ensure_table(
-                "flashcard_embeddings",
-                schemas::flashcard_embedding_schema(),
-                &existing,
-            )
-            .await?;
-        store
-            .ensure_table(
-                "tree_node_embeddings",
-                schemas::tree_node_embedding_schema(),
-                &existing,
-            )
-            .await?;
-        store
-            .ensure_table(
-                "community_embeddings",
-                schemas::community_embedding_schema(),
-                &existing,
-            )
-            .await?;
-        Ok(store)
+        })
     }
 
-    /// Get a cached table handle, opening the table on first access.
+    /// Get a cached table handle, opening or creating the table on first access.
     ///
     /// Subsequent calls for the same table name return a cloned handle from the
     /// cache, avoiding repeated manifest loads from disk.
+    ///
+    /// On first access the sequence is:
+    ///   1. Try `open_table` — succeeds for existing tables.
+    ///   2. If `TableNotFound`, look up the schema and create an empty table.
+    ///   3. Any other LanceDB error is propagated as `StorageError::Vector`.
+    ///
+    /// A pre-release schema migration for `conv_embeddings` is applied here:
+    /// if the table exists but still has the legacy `full_content` column it is
+    /// dropped and recreated with the current schema.
     pub(crate) async fn get_table(&self, name: &str) -> Result<Table, StorageError> {
         if let Some(tbl) = self.table_cache.get(name) {
             return Ok(tbl.clone());
         }
+
+        let tbl = match self.db.open_table(name).execute().await {
+            Ok(tbl) => {
+                // Pre-release migration: drop conv_embeddings if it has the old `full_content` column.
+                if name == "conv_embeddings" {
+                    let schema = tbl.schema().await.map_err(|e| {
+                        StorageError::Vector(format!("read conv_embeddings schema: {e}"))
+                    })?;
+                    if schema.column_with_name("full_content").is_some() {
+                        self.db.drop_table("conv_embeddings", &[]).await.map_err(
+                            |e| StorageError::Vector(format!("drop old conv_embeddings: {e}")),
+                        )?;
+                        tracing::info!(
+                            "Dropped conv_embeddings table (removed full_content column)"
+                        );
+                        return self.create_empty_table(name).await;
+                    }
+                }
+                tbl
+            }
+            Err(lancedb::Error::TableNotFound { .. }) => {
+                self.create_empty_table(name).await?
+            }
+            Err(e) => {
+                return Err(StorageError::Vector(format!("open table {name}: {e}")));
+            }
+        };
+
+        self.table_cache.insert(name.to_string(), tbl.clone());
+        Ok(tbl)
+    }
+
+    /// Create an empty table with the schema registered for `name`.
+    async fn create_empty_table(&self, name: &str) -> Result<Table, StorageError> {
+        use arrow_array::{RecordBatch, RecordBatchIterator};
+        use arrow_schema::{ArrowError, SchemaRef};
+
+        let schema = schemas::schema_for_table(name).ok_or_else(|| {
+            StorageError::Vector(format!("no schema registered for table '{name}'"))
+        })?;
+        let schema_ref: SchemaRef = Arc::new(schema);
+        let reader = RecordBatchIterator::new(
+            std::iter::empty::<Result<RecordBatch, ArrowError>>(),
+            schema_ref,
+        );
         let tbl = self
             .db
-            .open_table(name)
+            .create_table(name, Box::new(reader))
             .execute()
             .await
-            .map_err(|e| StorageError::Vector(format!("open table {name}: {e}")))?;
+            .map_err(|e| StorageError::Vector(format!("LanceDB create table {name}: {e}")))?;
         self.table_cache.insert(name.to_string(), tbl.clone());
         Ok(tbl)
     }
@@ -239,28 +175,4 @@ impl VectorStore {
         self.table_cache.clear();
     }
 
-    /// Create the table if it does not already exist.
-    pub(crate) async fn ensure_table(
-        &self,
-        name: &str,
-        schema: arrow_schema::Schema,
-        existing: &[String],
-    ) -> Result<(), StorageError> {
-        use arrow_array::{RecordBatch, RecordBatchIterator};
-        use arrow_schema::{ArrowError, SchemaRef};
-
-        if !existing.iter().any(|t| t == name) {
-            let schema_ref: SchemaRef = Arc::new(schema);
-            let reader = RecordBatchIterator::new(
-                std::iter::empty::<Result<RecordBatch, ArrowError>>(),
-                schema_ref,
-            );
-            self.db
-                .create_table(name, Box::new(reader))
-                .execute()
-                .await
-                .map_err(|e| StorageError::Vector(format!("LanceDB create table {name}: {e}")))?;
-        }
-        Ok(())
-    }
 }

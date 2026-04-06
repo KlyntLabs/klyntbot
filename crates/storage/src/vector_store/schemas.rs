@@ -132,3 +132,24 @@ pub(crate) fn community_embedding_schema() -> Schema {
         Field::new("updated_at", DataType::Utf8, false),
     ])
 }
+
+/// Map a table name to its Arrow schema.
+///
+/// Returns `None` if the table name is not recognized.
+pub(crate) fn schema_for_table(name: &str) -> Option<Schema> {
+    match name {
+        "todo_embeddings" => Some(todo_schema()),
+        "task_embeddings" => Some(task_embedding_schema()),
+        "note_embeddings" => Some(note_embedding_schema()),
+        "conv_embeddings" => Some(conv_schema()),
+        "cognitive_fact_embeddings" => Some(cognitive_fact_schema()),
+        "activity_embeddings" => Some(activity_embedding_schema()),
+        "work_context_embeddings" => Some(work_context_embedding_schema()),
+        "insight_embeddings" => Some(insight_embedding_schema()),
+        "entity_embeddings" => Some(entity_embedding_schema()),
+        "flashcard_embeddings" => Some(flashcard_embedding_schema()),
+        "tree_node_embeddings" => Some(tree_node_embedding_schema()),
+        "community_embeddings" => Some(community_embedding_schema()),
+        _ => None,
+    }
+}
