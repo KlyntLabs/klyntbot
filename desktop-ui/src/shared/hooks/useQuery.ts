@@ -29,8 +29,8 @@ interface CacheEntry {
 
 const cache = new Map<string, CacheEntry>();
 const DEFAULT_STALE_TIME = 30_000;
-const MAX_CACHE_ENTRIES = 200;
-const CACHE_TTL = 5 * 60_000; // 5 minutes
+const MAX_CACHE_ENTRIES = 50;
+const CACHE_TTL = 60_000; // 1 minute
 
 /** Evict stale/excess entries. Only does work when cache is over the high-water mark. */
 function evictCache() {

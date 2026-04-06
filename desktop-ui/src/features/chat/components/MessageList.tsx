@@ -51,7 +51,7 @@ export function MessageList({
   const endRef = useRef<HTMLDivElement>(null);
   const [userScrolledUp, setUserScrolledUp] = useState(false);
   const scrollParentRef = useRef<HTMLElement | null>(null);
-  const isVirtualized = messages.length > 50;
+  const isVirtualized = messages.length > 20;
 
   useEffect(() => {
     const el = containerRef.current;
