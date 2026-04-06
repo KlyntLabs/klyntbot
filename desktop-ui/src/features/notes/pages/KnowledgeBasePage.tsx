@@ -3,23 +3,28 @@ import { useMutation } from "@shared/hooks/useMutation";
 import { useQuery } from "@shared/hooks/useQuery";
 import type {
   Note,
-  NoteListItem,
   Notebook,
   NotebookCreateParams,
   NoteCreateParams,
   NoteImportResult,
+  NoteListItem,
   NoteUpdateParams,
 } from "@shared/types";
 import { open, save } from "@tauri-apps/plugin-dialog";
 import { FileText, GitGraph, PenLine } from "lucide-react";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "react-router";
 import { CardGenerationModal } from "../components/CardGenerationModal";
 import { ContextPanel } from "../components/ContextPanel";
-import { GraphView } from "../components/GraphView";
 import { NavigationSidebar } from "../components/NavigationSidebar";
 import { NoteCreationDialog } from "../components/NoteCreationDialog";
-import { NoteEditorPanel } from "../components/NoteEditorPanel";
+
+const GraphView = lazy(() =>
+  import("../components/GraphView").then((m) => ({ default: m.GraphView })),
+);
+const NoteEditorPanel = lazy(() =>
+  import("../components/NoteEditorPanel").then((m) => ({ default: m.NoteEditorPanel })),
+);
 import { NoteFinder } from "../components/NoteFinder";
 import { ShortcutHelpDialog } from "../components/ShortcutHelpDialog";
 import { VersionHistoryOverlay } from "../components/VersionHistoryOverlay";
@@ -68,13 +73,18 @@ export default function KnowledgeBasePage() {
       return kind === "notebook" || kind === "note";
     },
   });
-  const { data: notes, refetch: refetchNotes } = useQuery<NoteListItem[]>("note_list", undefined, [], {
-    invalidateOn: ["entity:updated"],
-    invalidateFilter: (p) => {
-      const kind = (p as { entityKind?: string })?.entityKind;
-      return kind === "note" || kind === "notebook";
+  const { data: notes, refetch: refetchNotes } = useQuery<NoteListItem[]>(
+    "note_list",
+    undefined,
+    [],
+    {
+      invalidateOn: ["entity:updated"],
+      invalidateFilter: (p) => {
+        const kind = (p as { entityKind?: string })?.entityKind;
+        return kind === "note" || kind === "notebook";
+      },
     },
-  });
+  );
   const { items: inboxItems, deleteItem: deleteInboxItem } = useInbox();
 
   // ── Core state ────────────────────────────────────────────────────────
@@ -159,7 +169,12 @@ export default function KnowledgeBasePage() {
     },
   );
 
-  useCrossDomainCheck("note", selectedNoteItem?.id, selectedNoteItem?.title, selectedNoteItem?.createdAt);
+  useCrossDomainCheck(
+    "note",
+    selectedNoteItem?.id,
+    selectedNoteItem?.title,
+    selectedNoteItem?.createdAt,
+  );
 
   // ── Insight derived state ─────────────────────────────────────────────
   const insightOpen = insightState.isOpen;
@@ -607,32 +622,36 @@ export default function KnowledgeBasePage() {
             <div className="flex justify-end shrink-0 px-3 pt-3">
               <ViewModeToggle viewMode={viewMode} onChange={setViewMode} />
             </div>
-            <GraphView
-              notes={notes}
-              notebooks={notebooks}
-              activeNoteId={selectedNoteId}
-              onSelectNote={setSelectedNoteId}
-              onOpenInEditor={(id) => {
-                setSelectedNoteId(id);
-                setViewMode("editor");
-              }}
-            />
+            <Suspense fallback={null}>
+              <GraphView
+                notes={notes}
+                notebooks={notebooks}
+                activeNoteId={selectedNoteId}
+                onSelectNote={setSelectedNoteId}
+                onOpenInEditor={(id) => {
+                  setSelectedNoteId(id);
+                  setViewMode("editor");
+                }}
+              />
+            </Suspense>
           </>
         ) : selectedNote ? (
           <div className="w-full h-full flex flex-col">
-            <NoteEditorPanel
-              key={selectedNote.id}
-              note={selectedNote}
-              onSave={updateNote}
-              onRenameNote={handleRenameNote}
-              viewMode={viewMode}
-              onViewModeChange={setViewMode}
-              onToggleFocusMode={() =>
-                setLayoutMode((prev) => (prev === "three-panel" ? "focus" : "three-panel"))
-              }
-              focusModeActive={isFocusMode}
-              onGenerateCards={handleGenerateCards}
-            />
+            <Suspense fallback={null}>
+              <NoteEditorPanel
+                key={selectedNote.id}
+                note={selectedNote}
+                onSave={updateNote}
+                onRenameNote={handleRenameNote}
+                viewMode={viewMode}
+                onViewModeChange={setViewMode}
+                onToggleFocusMode={() =>
+                  setLayoutMode((prev) => (prev === "three-panel" ? "focus" : "three-panel"))
+                }
+                focusModeActive={isFocusMode}
+                onGenerateCards={handleGenerateCards}
+              />
+            </Suspense>
           </div>
         ) : (
           <>
