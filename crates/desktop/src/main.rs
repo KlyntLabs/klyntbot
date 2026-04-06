@@ -116,7 +116,12 @@ fn run_mcp_stdio() {
         .with_writer(std::io::stderr)
         .init();
 
-    let rt = tokio::runtime::Runtime::new().expect("Failed to create tokio runtime");
+    let rt = tokio::runtime::Builder::new_multi_thread()
+        .worker_threads(2)
+        .thread_stack_size(2 * 1024 * 1024)
+        .enable_all()
+        .build()
+        .expect("Failed to create tokio runtime");
     rt.block_on(async {
         // Load config
         let config = config::load_with_env_overrides()
@@ -177,6 +182,18 @@ fn run_mcp_stdio() {
 }
 
 fn run_desktop_app() {
+    // Cap Tauri's tokio runtime to 4 workers with 2MB stacks (default: 1 per core, 8MB).
+    // The runtime must not be dropped, so we leak it — it lives for the process lifetime.
+    let rt = tokio::runtime::Builder::new_multi_thread()
+        .worker_threads(4)
+        .thread_stack_size(2 * 1024 * 1024)
+        .enable_all()
+        .build()
+        .expect("tokio runtime");
+    let handle = rt.handle().clone();
+    Box::leak(Box::new(rt));
+    tauri::async_runtime::set(handle);
+
     // Initialize tracing so info!/warn!/debug! output to stderr
     {
         use tracing_subscriber::EnvFilter;
