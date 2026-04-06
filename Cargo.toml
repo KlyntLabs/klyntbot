@@ -209,6 +209,68 @@ tools-core.workspace = true
 extism.workspace = true
 simulator.workspace = true
 
+[profile.dev]
+opt-level = 0
+
+[profile.dev.package."*"]
+opt-level = 2
+
+[profile.dev.package.arrow]
+opt-level = 3
+[profile.dev.package.arrow2]
+opt-level = 3
+[profile.dev.package.arrow-array]
+opt-level = 3
+[profile.dev.package.arrow-buffer]
+opt-level = 3
+[profile.dev.package.arrow-cast]
+opt-level = 3
+[profile.dev.package.arrow-data]
+opt-level = 3
+[profile.dev.package.arrow-ipc]
+opt-level = 3
+[profile.dev.package.arrow-schema]
+opt-level = 3
+[profile.dev.package.arrow-select]
+opt-level = 3
+[profile.dev.package.lance]
+opt-level = 3
+[profile.dev.package.lance-core]
+opt-level = 3
+[profile.dev.package.lance-encoding]
+opt-level = 3
+[profile.dev.package.lance-file]
+opt-level = 3
+[profile.dev.package.lance-index]
+opt-level = 3
+[profile.dev.package.lance-io]
+opt-level = 3
+[profile.dev.package.lance-linalg]
+opt-level = 3
+[profile.dev.package.lance-table]
+opt-level = 3
+[profile.dev.package.lancedb]
+opt-level = 3
+[profile.dev.package.fastembed]
+opt-level = 3
+[profile.dev.package.ort]
+opt-level = 3
+[profile.dev.package.mimalloc]
+opt-level = 3
+
+[profile.dev.package.sqlx]
+opt-level = 2
+[profile.dev.package.reqwest]
+opt-level = 2
+[profile.dev.package.serde]
+opt-level = 2
+[profile.dev.package.serde_json]
+opt-level = 2
+[profile.dev.package.regex]
+opt-level = 2
+[profile.dev.package.tokio]
+opt-level = 2
+
 [profile.release]
 opt-level = 3
 lto = "fat"
