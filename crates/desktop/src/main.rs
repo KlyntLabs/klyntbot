@@ -17,11 +17,22 @@ unsafe extern "C" {
 fn configure_mimalloc() {
     const MI_OPTION_PURGE_DELAY: i32 = 10;
     const MI_OPTION_ARENA_PURGE_MULT: i32 = 24;
+    const MI_OPTION_ABANDONED_PAGE_PURGE: i32 = 25;
+    const MI_OPTION_ALLOW_LARGE_OS_PAGES: i32 = 6;
+    const MI_OPTION_EAGER_COMMIT: i32 = 1;
+    const MI_OPTION_ARENA_EAGER_COMMIT: i32 = 14;
     unsafe {
         // Purge freed pages immediately instead of retaining them (default: 10ms).
         mi_option_set(MI_OPTION_PURGE_DELAY, 0);
         // Purge arena segments more aggressively (default: 10).
         mi_option_set(MI_OPTION_ARENA_PURGE_MULT, 1);
+        // Purge abandoned pages from terminated threads immediately.
+        mi_option_set(MI_OPTION_ABANDONED_PAGE_PURGE, 1);
+        // Disable large OS pages — they can't be partially returned to the OS.
+        mi_option_set(MI_OPTION_ALLOW_LARGE_OS_PAGES, 0);
+        // Don't eagerly commit memory — only commit pages when first accessed.
+        mi_option_set(MI_OPTION_EAGER_COMMIT, 0);
+        mi_option_set(MI_OPTION_ARENA_EAGER_COMMIT, 0);
     }
 }
 
@@ -183,8 +194,13 @@ fn run_mcp_stdio() {
 }
 
 /// Wrapper for mi_collect that matches the `fn()` signature.
+/// Called twice: first pass collects thread-local heaps into the global pool,
+/// second pass returns freed segments to the OS.
 fn purge_mimalloc() {
-    unsafe { mi_collect(true) };
+    unsafe {
+        mi_collect(true);
+        mi_collect(true);
+    };
 }
 
 fn run_desktop_app() {

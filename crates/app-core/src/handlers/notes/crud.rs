@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use desktop_shared::commands::{
     BacklinkResponse, HybridSearchResponse, NoteCreateParams, NoteEditingFinishedParams,
-    NoteListItem, NoteLinkResponse, NoteResponse, NoteUpdateParams, NoteVersionResponse,
+    NoteLinkResponse, NoteListItem, NoteResponse, NoteUpdateParams, NoteVersionResponse,
 };
 use desktop_shared::errors::ApiError;
 use desktop_shared::types::EntityKind;

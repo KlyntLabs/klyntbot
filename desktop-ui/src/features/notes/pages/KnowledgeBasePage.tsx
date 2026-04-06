@@ -12,7 +12,7 @@ import type {
 } from "@shared/types";
 import { open, save } from "@tauri-apps/plugin-dialog";
 import { FileText, GitGraph, PenLine } from "lucide-react";
-import { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "react-router";
 import { CardGenerationModal } from "../components/CardGenerationModal";
 import { ContextPanel } from "../components/ContextPanel";
@@ -25,6 +25,7 @@ const GraphView = lazy(() =>
 const NoteEditorPanel = lazy(() =>
   import("../components/NoteEditorPanel").then((m) => ({ default: m.NoteEditorPanel })),
 );
+
 import { NoteFinder } from "../components/NoteFinder";
 import { ShortcutHelpDialog } from "../components/ShortcutHelpDialog";
 import { VersionHistoryOverlay } from "../components/VersionHistoryOverlay";

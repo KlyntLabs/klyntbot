@@ -10,12 +10,12 @@ use desktop_shared::commands::{
     InboxItemResponse, InsightChatParams, InsightChatStarted, InsightEvolutionResponse,
     InsightQuizSubmitParams, InsightReviewResponse, InsightReviewStarted,
     InsightSaveFlashcardsParams, InsightVersionResponse, KnowledgeGrowthResponse, NoteCreateParams,
-    NoteEditingFinishedParams, NoteListItem, NoteLinkResponse, NoteResponse, NoteRetentionHealthResponse,
-    NoteSuggestionsResponse, NoteUpdateParams, NoteVersionResponse, NotebookCreateParams,
-    NotebookResponse, NotebookUpdateParams, PersonaChatParams, PersonaChatResponse,
-    PersonaResponse, RatePersonaParams, RecentLearningSession, ScenarioChallengeResponse,
-    ScopePreviewParams, ScopePreviewResponse, SetPersonaPinsParams, StrugglingCardResponse,
-    TabContent, UpdatePersonaParams,
+    NoteEditingFinishedParams, NoteLinkResponse, NoteListItem, NoteResponse,
+    NoteRetentionHealthResponse, NoteSuggestionsResponse, NoteUpdateParams, NoteVersionResponse,
+    NotebookCreateParams, NotebookResponse, NotebookUpdateParams, PersonaChatParams,
+    PersonaChatResponse, PersonaResponse, RatePersonaParams, RecentLearningSession,
+    ScenarioChallengeResponse, ScopePreviewParams, ScopePreviewResponse, SetPersonaPinsParams,
+    StrugglingCardResponse, TabContent, UpdatePersonaParams,
 };
 use desktop_shared::errors::ApiError;
 use tauri::{Emitter, State};

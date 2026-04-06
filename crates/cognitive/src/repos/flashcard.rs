@@ -213,7 +213,12 @@ impl FlashcardRepo {
         tx.commit().await?;
 
         // Single SELECT to fetch all inserted rows
-        let placeholders = ids.iter().enumerate().map(|(i, _)| format!("?{}", i + 1)).collect::<Vec<_>>().join(", ");
+        let placeholders = ids
+            .iter()
+            .enumerate()
+            .map(|(i, _)| format!("?{}", i + 1))
+            .collect::<Vec<_>>()
+            .join(", ");
         let sql = format!("SELECT * FROM flashcards WHERE id IN ({placeholders})");
         let mut query = sqlx::query_as::<_, FlashcardRow>(&sql);
         for id in &ids {

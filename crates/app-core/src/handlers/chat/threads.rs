@@ -129,7 +129,7 @@ pub async fn chat_messages(
         .sessions
         .get_recent_messages(&session_key, lim)
         .await
-    .map_err(map_storage_err)?;
+        .map_err(map_storage_err)?;
 
     // Batch-resolve persona names for messages that have persona_id
     let persona_ids: Vec<&str> = rows

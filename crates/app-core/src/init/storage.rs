@@ -48,13 +48,13 @@ pub(super) async fn init_storage(
         }
     }
     // Create ANN indexes + compact remaining tables in the background.
-    // Deferred by 60s to avoid a memory stampede at startup — compaction
-    // and IVF-PQ training mmap many fragment files and can spike RSS by
-    // hundreds of MB when all 12 tables are processed at once.
+    // Deferred by 5 minutes so the app starts lean (~250MB) and the user's
+    // first interactions aren't competing with compaction memory spikes.
+    // The periodic 30-minute compaction cron handles ongoing maintenance.
     if let Some(vs) = &vector_store {
         let vs_bg = vs.clone();
         tokio::spawn(async move {
-            tokio::time::sleep(std::time::Duration::from_secs(60)).await;
+            tokio::time::sleep(std::time::Duration::from_secs(300)).await;
             if let Err(e) = vs_bg.optimize_all_tables().await {
                 warn!("LanceDB startup compaction failed (non-fatal): {e}");
             }
