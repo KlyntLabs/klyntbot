@@ -124,11 +124,11 @@ pub async fn chat_messages(
     session_key: String,
     limit: Option<i64>,
 ) -> Result<Vec<ChatMessageResponse>, ApiError> {
-    let rows = if let Some(lim) = limit {
-        repos.sessions.get_recent_messages(&session_key, lim).await
-    } else {
-        repos.sessions.get_messages(&session_key).await
-    }
+    let lim = limit.unwrap_or(100).min(500);
+    let rows = repos
+        .sessions
+        .get_recent_messages(&session_key, lim)
+        .await
     .map_err(map_storage_err)?;
 
     // Batch-resolve persona names for messages that have persona_id

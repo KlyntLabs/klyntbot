@@ -153,7 +153,7 @@ impl AppCore {
     ) -> Result<Vec<EpisodicMemoryResponse>, ApiError> {
         let pool = self.repos.pool();
         let repo = cognitive::repos::EpisodicMemoryRepo::new(pool.clone());
-        let limit = limit.unwrap_or(50);
+        let limit = limit.unwrap_or(100).min(500);
 
         let memories = match domain.as_deref() {
             Some(d) => repo

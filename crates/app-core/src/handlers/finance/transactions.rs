@@ -11,7 +11,7 @@ impl AppCore {
         limit: Option<i64>,
     ) -> Result<Vec<FinanceTransactionRow>, ApiError> {
         let filter = FinanceTransactionFilter {
-            limit,
+            limit: Some(limit.unwrap_or(100).min(500)),
             ..Default::default()
         };
         self.repos

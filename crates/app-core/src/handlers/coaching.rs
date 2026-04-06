@@ -160,7 +160,7 @@ impl AppCore {
     ) -> Result<Vec<InterventionLogResponse>, ApiError> {
         let repo = self.coaching_log_repo()?;
         let rows = repo
-            .list_recent(limit.unwrap_or(50))
+            .list_recent(limit.unwrap_or(100).min(500))
             .await
             .map_err(|e| ApiError::new("STORAGE_ERROR", e.to_string()))?;
         Ok(rows

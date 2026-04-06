@@ -71,7 +71,7 @@ impl AppCore {
             .event_log_repo
             .as_ref()
             .ok_or_else(|| ApiError::new("FEATURE_DISABLED", "event log not available"))?;
-        repo.list_recent_domain_events(limit.unwrap_or(100))
+        repo.list_recent_domain_events(limit.unwrap_or(100).min(500))
             .await
             .map_err(map_cognitive_err)
     }
@@ -85,7 +85,7 @@ impl AppCore {
             .event_log_repo
             .as_ref()
             .ok_or_else(|| ApiError::new("FEATURE_DISABLED", "event log not available"))?;
-        repo.list_recent_pipeline_events(limit.unwrap_or(100))
+        repo.list_recent_pipeline_events(limit.unwrap_or(100).min(500))
             .await
             .map_err(map_cognitive_err)
     }

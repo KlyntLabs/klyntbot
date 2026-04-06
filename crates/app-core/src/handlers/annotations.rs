@@ -76,7 +76,7 @@ impl AppCore {
     ) -> Result<Vec<AnnotationResponse>, ApiError> {
         let repo = AnnotationRepo::new(self.storage_pool.inner().clone());
         let annotations = repo
-            .list_for_note(&note_id, limit.unwrap_or(200))
+            .list_for_note(&note_id, limit.unwrap_or(100).min(500))
             .await
             .map_err(map_cognitive_err)?;
         Ok(annotations.iter().map(annotation_to_response).collect())
