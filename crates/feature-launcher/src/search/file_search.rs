@@ -165,12 +165,19 @@ impl super::SearchSource for FileSearchSource {
                 let path_str = e.path.display().to_string();
                 // Earlier dirs in config get a mild relevance boost, capped at 30%
                 let dir_boost = 1.0 - (e.dir_index as f64 * 0.05).min(0.3);
-                // Look up file type icon from cache (resolved during refresh)
+                // Look up file type icon: check pre-resolved cache first,
+                // then fall back to lazy resolution for this specific extension.
                 let icon = e
                     .path
                     .extension()
                     .and_then(|ext| ext.to_str())
-                    .and_then(|ext| ext_icons.get(&ext.to_lowercase()).cloned())
+                    .and_then(|ext| {
+                        let lower = ext.to_lowercase();
+                        ext_icons
+                            .get(&lower)
+                            .cloned()
+                            .or_else(|| platform_macos::apps::icon_for_file_type(&lower))
+                    })
                     .or_else(|| Some("file".to_string()));
                 LauncherItem {
                     id: format!("file:{path_str}"),
@@ -189,23 +196,20 @@ impl super::SearchSource for FileSearchSource {
 
     async fn refresh(&self) {
         let dirs = self.scan_dirs.clone();
-        let (new_entries, icons) = tokio::task::spawn_blocking(move || {
-            let entries = Self::walk_dirs(&dirs);
-            let icons = Self::resolve_ext_icons(&entries);
-            (entries, icons)
-        })
-        .await
-        .unwrap_or_else(|e| {
-            tracing::error!("file_search walk task failed: {e}");
-            (vec![], HashMap::new())
-        });
+        let new_entries = tokio::task::spawn_blocking(move || Self::walk_dirs(&dirs))
+            .await
+            .unwrap_or_else(|e| {
+                tracing::error!("file_search walk task failed: {e}");
+                vec![]
+            });
         tracing::info!(
-            "Indexed {} files ({} file type icons)",
-            new_entries.len(),
-            icons.len()
+            "Indexed {} files (icons deferred to search)",
+            new_entries.len()
         );
         *self.entries.write() = new_entries;
-        *self.ext_icons.write() = icons;
+        // Icons resolved lazily during search() — not at index time.
+        // Eagerly resolving 138 file-type icons causes macOS IconServices
+        // to mmap ~4GB of icon cache files into the process.
     }
 }
 

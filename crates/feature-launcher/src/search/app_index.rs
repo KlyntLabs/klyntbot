@@ -62,23 +62,39 @@ impl AppIndex {
         let apps = self.apps.read();
         let scored = super::fuzzy_match(query, &apps, |app| &app.name, limit);
 
-        scored
+        // Resolve icons lazily — only for the few results returned (typically ≤10).
+        // This avoids eagerly mmap'ing macOS IconServices for all 100+ apps.
+        let tmp_dir = std::env::temp_dir().join("klyntbot-icons-tmp");
+        let _ = std::fs::create_dir_all(&tmp_dir);
+
+        let results: Vec<_> = scored
             .into_iter()
-            .map(|(score, app)| LauncherItem {
-                id: format!("app:{}", app.path.display()),
-                title: app.name.clone(),
-                subtitle: Some(app.path.display().to_string()),
-                icon: app
+            .map(|(score, app)| {
+                let icon = app
                     .icon_data
                     .clone()
-                    .or_else(|| Some("app-window".to_string())),
-                kind: LauncherItemKind::Application {
-                    path: app.path.clone(),
-                    running: false,
-                },
-                score: (score as f64) / 1000.0,
+                    .or_else(|| {
+                        self.icon_cache
+                            .as_ref()
+                            .and_then(|c| c.resolve_icon(&app.path, &tmp_dir).0)
+                    })
+                    .or_else(|| Some("app-window".to_string()));
+                LauncherItem {
+                    id: format!("app:{}", app.path.display()),
+                    title: app.name.clone(),
+                    subtitle: Some(app.path.display().to_string()),
+                    icon,
+                    kind: LauncherItemKind::Application {
+                        path: app.path.clone(),
+                        running: false,
+                    },
+                    score: (score as f64) / 1000.0,
+                }
             })
-            .collect()
+            .collect();
+
+        let _ = std::fs::remove_dir_all(&tmp_dir);
+        results
     }
 
     #[cfg(target_os = "macos")]
@@ -94,28 +110,12 @@ impl AppIndex {
             }
         }
 
-        // Extract icons — use shared AppIconCache when available
-        let mut cache_hits = 0usize;
-        let tmp_dir = std::env::temp_dir().join("klyntbot-icons-tmp");
-        let _ = std::fs::create_dir_all(&tmp_dir);
-
-        for app in &mut apps {
-            let (icon, hit) = self
-                .icon_cache
-                .as_ref()
-                .map_or((None, false), |c| c.resolve_icon(&app.path, &tmp_dir));
-            app.icon_data = icon;
-            if hit {
-                cache_hits += 1;
-            }
-        }
-
-        let _ = std::fs::remove_dir_all(&tmp_dir);
-
+        // Icons are resolved lazily during search() — NOT at index time.
+        // Resolving all 100+ app icons eagerly causes macOS IconServices to
+        // mmap ~4GB of icon cache files into the process.
         tracing::info!(
-            "Indexed {} applications ({} icon cache hits)",
-            apps.len(),
-            cache_hits,
+            "Indexed {} applications (icons deferred to search)",
+            apps.len()
         );
         self.set_apps(apps);
     }
