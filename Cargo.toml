@@ -211,9 +211,11 @@ simulator.workspace = true
 
 [profile.dev]
 opt-level = 0
+debug = "line-tables-only"  # Full DWARF = 4.4GB mapped into RSS. Line-tables keeps stack traces.
 
 [profile.dev.package."*"]
 opt-level = 2
+debug = false  # Deps don't need debug info — saves ~4GB of DWARF sections.
 
 [profile.dev.package.arrow]
 opt-level = 3
