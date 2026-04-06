@@ -528,6 +528,8 @@ CREATE INDEX IF NOT EXISTS idx_flashcards_source_note ON flashcards(source_note_
 CREATE INDEX IF NOT EXISTS idx_flashcards_due ON flashcards(due_at);
 CREATE INDEX IF NOT EXISTS idx_flashcards_deck ON flashcards(deck);
 CREATE INDEX IF NOT EXISTS idx_flashcards_state ON flashcards(state);
+CREATE INDEX IF NOT EXISTS idx_flashcards_deck_due ON flashcards(deck, due_at);
+CREATE INDEX IF NOT EXISTS idx_flashcards_state_due ON flashcards(state, due_at);
 
 -- ── FSRS-5 personal parameters ───────────────────────────────────
 
