@@ -106,6 +106,7 @@ fn main() {
 }
 
 fn run_mcp_stdio() {
+    common::memory::set_purge_hook(purge_mimalloc);
     use klyntbot_server::handler::KlyntbotServerHandler;
     use rmcp::service::ServiceExt;
     use tracing_subscriber::EnvFilter;
@@ -181,7 +182,15 @@ fn run_mcp_stdio() {
     });
 }
 
+/// Wrapper for mi_collect that matches the `fn()` signature.
+fn purge_mimalloc() {
+    unsafe { mi_collect(true) };
+}
+
 fn run_desktop_app() {
+    // Register mimalloc purge as the global memory hook so lower-layer crates
+    // (storage, agent) can trigger OS page return after large transient allocations.
+    common::memory::set_purge_hook(purge_mimalloc);
     // Cap Tauri's tokio runtime to 4 workers with 2MB stacks (default: 1 per core, 8MB).
     // The runtime must not be dropped, so we leak it — it lives for the process lifetime.
     let rt = tokio::runtime::Builder::new_multi_thread()
@@ -332,16 +341,9 @@ fn run_desktop_app() {
             app.manage(core);
             app.manage(Arc::new(focus_timer::FocusTimer::new()));
 
-            // Periodically force mimalloc to return freed pages to the OS.
-            // LanceDB compaction and large LLM responses create transient allocations
-            // that mimalloc may retain. This ensures steady-state RSS stays low.
-            tauri::async_runtime::spawn(async {
-                let mut interval = tokio::time::interval(std::time::Duration::from_secs(30));
-                loop {
-                    interval.tick().await;
-                    unsafe { mi_collect(true) };
-                }
-            });
+            // No periodic mi_collect timer needed — common::memory::purge_freed_memory()
+            // is called at the source (after LanceDB compaction, prune, index creation)
+            // via the global purge hook registered above.
 
             // Register global shortcuts from config (or defaults if config invalid).
             {

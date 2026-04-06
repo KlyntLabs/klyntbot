@@ -308,6 +308,7 @@ impl AppCore {
                     if let Err(e) = vs.optimize_all_tables().await {
                         tracing::warn!("Periodic LanceDB compaction failed: {e}");
                     }
+                    common::memory::purge_freed_memory();
                 });
             });
         }

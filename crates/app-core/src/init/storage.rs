@@ -58,6 +58,8 @@ pub(super) async fn init_storage(
             if let Err(e) = vs_bg.optimize_all_tables().await {
                 warn!("LanceDB startup compaction failed (non-fatal): {e}");
             }
+            common::memory::purge_freed_memory();
+
             // Prune large tables to prevent unbounded growth.
             const MAX_CONV_ROWS: usize = 10_000;
             const MAX_ACTIVITY_ROWS: usize = 50_000;
@@ -78,11 +80,13 @@ pub(super) async fn init_storage(
             let _ = vs_bg
                 .prune_table("work_context_embeddings", "updated_at", 5_000)
                 .await;
+            common::memory::purge_freed_memory();
 
             tokio::time::sleep(std::time::Duration::from_secs(5)).await;
             if let Err(e) = vs_bg.ensure_indexes(256).await {
                 warn!("ANN index creation failed (non-fatal): {e}");
             }
+            common::memory::purge_freed_memory();
         });
     }
     info!("storage connected");

@@ -122,6 +122,7 @@ impl MemoryMaintenanceService {
                     } else {
                         info!("MemoryMaintenanceService: compaction complete");
                     }
+                    common::memory::purge_freed_memory();
                 }
                 _ = self.token.cancelled() => {
                     info!("MemoryMaintenanceService: shutting down");

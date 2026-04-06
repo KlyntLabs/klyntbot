@@ -11,6 +11,7 @@ pub mod entity_card;
 pub mod error;
 pub mod helpers;
 pub mod http;
+pub mod memory;
 pub mod notify;
 pub mod ports;
 pub mod prompts;

@@ -242,14 +242,22 @@ impl VectorStore {
     ///
     pub async fn optimize_all_tables(&self) -> Result<(), StorageError> {
         for &table_name in ALL_TABLES {
-            // Open, compact, then drop the table handle before moving to the next.
-            // This lets LanceDB unmap fragment files between tables, preventing a
-            // memory spike when all 12 are processed in quick succession.
-            let result = match self.get_table(table_name).await {
-                Ok(tbl) => tbl.optimize(OptimizeAction::All).await,
+            let tbl = match self.get_table(table_name).await {
+                Ok(t) => t,
                 Err(_) => continue,
             };
-            // Drop the cached handle so fragments can be unmapped.
+
+            // Skip empty tables — compaction is a no-op but still loads
+            // the manifest and allocates Arrow buffers.
+            let row_count = tbl.count_rows(None).await.unwrap_or(0);
+            if row_count == 0 {
+                self.table_cache.remove(table_name);
+                continue;
+            }
+
+            let result = tbl.optimize(OptimizeAction::All).await;
+            // Drop the cached handle so LanceDB can unmap fragment files.
+            drop(tbl);
             self.table_cache.remove(table_name);
 
             match result {
@@ -265,8 +273,10 @@ impl VectorStore {
                 }
             }
 
-            // Small yield between tables to let the allocator return pages to the OS.
-            std::hint::spin_loop();
+            // Force the allocator to return freed pages to the OS immediately.
+            // Without this, mimalloc retains large freed blocks for reuse,
+            // causing RSS to stay elevated after compaction.
+            common::memory::purge_freed_memory();
         }
 
         Ok(())
