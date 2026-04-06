@@ -332,6 +332,17 @@ fn run_desktop_app() {
             app.manage(core);
             app.manage(Arc::new(focus_timer::FocusTimer::new()));
 
+            // Periodically force mimalloc to return freed pages to the OS.
+            // LanceDB compaction and large LLM responses create transient allocations
+            // that mimalloc may retain. This ensures steady-state RSS stays low.
+            tauri::async_runtime::spawn(async {
+                let mut interval = tokio::time::interval(std::time::Duration::from_secs(30));
+                loop {
+                    interval.tick().await;
+                    unsafe { mi_collect(true) };
+                }
+            });
+
             // Register global shortcuts from config (or defaults if config invalid).
             {
                 let core_ref = app.state::<Arc<app_core::AppCore>>();

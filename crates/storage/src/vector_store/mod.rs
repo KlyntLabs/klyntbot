@@ -121,9 +121,12 @@ impl VectorStore {
                         StorageError::Vector(format!("read conv_embeddings schema: {e}"))
                     })?;
                     if schema.column_with_name("full_content").is_some() {
-                        self.db.drop_table("conv_embeddings", &[]).await.map_err(
-                            |e| StorageError::Vector(format!("drop old conv_embeddings: {e}")),
-                        )?;
+                        self.db
+                            .drop_table("conv_embeddings", &[])
+                            .await
+                            .map_err(|e| {
+                                StorageError::Vector(format!("drop old conv_embeddings: {e}"))
+                            })?;
                         tracing::info!(
                             "Dropped conv_embeddings table (removed full_content column)"
                         );
@@ -132,9 +135,7 @@ impl VectorStore {
                 }
                 tbl
             }
-            Err(lancedb::Error::TableNotFound { .. }) => {
-                self.create_empty_table(name).await?
-            }
+            Err(lancedb::Error::TableNotFound { .. }) => self.create_empty_table(name).await?,
             Err(e) => {
                 return Err(StorageError::Vector(format!("open table {name}: {e}")));
             }
@@ -174,5 +175,4 @@ impl VectorStore {
     pub(crate) fn invalidate_table_cache(&self) {
         self.table_cache.clear();
     }
-
 }

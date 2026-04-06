@@ -242,12 +242,17 @@ impl VectorStore {
     ///
     pub async fn optimize_all_tables(&self) -> Result<(), StorageError> {
         for &table_name in ALL_TABLES {
-            let tbl = match self.get_table(table_name).await {
-                Ok(t) => t,
+            // Open, compact, then drop the table handle before moving to the next.
+            // This lets LanceDB unmap fragment files between tables, preventing a
+            // memory spike when all 12 are processed in quick succession.
+            let result = match self.get_table(table_name).await {
+                Ok(tbl) => tbl.optimize(OptimizeAction::All).await,
                 Err(_) => continue,
             };
+            // Drop the cached handle so fragments can be unmapped.
+            self.table_cache.remove(table_name);
 
-            match tbl.optimize(OptimizeAction::All).await {
+            match result {
                 Ok(stats) => {
                     tracing::debug!(
                         "Optimized {table_name}: compaction={:?}, prune={:?}",
@@ -259,11 +264,10 @@ impl VectorStore {
                     tracing::warn!("Failed to optimize {table_name}: {e}");
                 }
             }
-        }
 
-        // Invalidate cached handles so subsequent operations get fresh state
-        // that reflects the compacted tables.
-        self.invalidate_table_cache();
+            // Small yield between tables to let the allocator return pages to the OS.
+            std::hint::spin_loop();
+        }
 
         Ok(())
     }
