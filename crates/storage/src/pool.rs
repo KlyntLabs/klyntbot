@@ -63,6 +63,15 @@ impl StoragePool {
         Ok(Self(pool))
     }
 
+    /// Run PRAGMA optimize to update SQLite query statistics.
+    /// Best called on graceful shutdown.
+    pub async fn optimize(&self) -> Result<(), StorageError> {
+        sqlx::query("PRAGMA optimize;")
+            .execute(&self.0)
+            .await?;
+        Ok(())
+    }
+
     /// Access the inner `sqlx::SqlitePool`.
     pub fn inner(&self) -> &sqlx::SqlitePool {
         &self.0

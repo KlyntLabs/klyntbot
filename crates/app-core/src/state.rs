@@ -418,6 +418,9 @@ impl AppCore {
         }
         self.shutdown_token.cancel();
         self.cron_service.stop().await;
+        if let Err(e) = self.storage_pool.optimize().await {
+            tracing::warn!("SQLite PRAGMA optimize failed: {e}");
+        }
         info!("app core stopped");
     }
 }
