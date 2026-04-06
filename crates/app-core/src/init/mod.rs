@@ -288,12 +288,13 @@ impl AppCore {
 
         let shutdown_token = CancellationToken::new();
 
-        // Idle-unload for the ONNX embedding model — check every 10s so the
-        // model is unloaded within ~10s of exceeding the 15s idle threshold
-        // (aggressive unloading to minimize retained model memory).
+        // Idle-unload for the ONNX embedding model — check every 60s.
+        // The model auto-unloads after 15s idle; this timer just ensures
+        // the check happens. 60s keeps wakeups low while still reclaiming
+        // the ~420MB model within ~75s of last use.
         {
             let engine = Arc::clone(&embedding_engine);
-            spawn_periodic_timer(&shutdown_token, 10, move || {
+            spawn_periodic_timer(&shutdown_token, 60, move || {
                 engine.unload_if_idle();
             });
         }

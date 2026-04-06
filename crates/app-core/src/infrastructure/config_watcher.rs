@@ -8,7 +8,7 @@ use tokio::sync::RwLock;
 use tokio_util::sync::CancellationToken;
 use tracing::{debug, info};
 
-/// Spawns a background task that polls config.json for changes every 5 seconds.
+/// Spawns a background task that polls config.json for changes every 30 seconds.
 ///
 /// When a change is detected in hot-reloadable fields, updates the shared
 /// `HotConfig` and the `AppCore.config` RwLock.
@@ -23,8 +23,8 @@ pub fn start_config_watcher(
     let token = watcher_token.clone();
 
     tokio::spawn(async move {
-        info!("config watcher started (5s poll interval)");
-        let mut interval = tokio::time::interval(std::time::Duration::from_secs(5));
+        info!("config watcher started (30s poll interval)");
+        let mut interval = tokio::time::interval(std::time::Duration::from_secs(30));
         interval.tick().await; // Skip immediate first tick (config was just loaded at init)
         let mut last_mtime: Option<std::time::SystemTime> = None;
 

@@ -173,7 +173,7 @@ pub(super) async fn init_launcher(
     if let Some(s) = find_source("running_apps") {
         refresh_entries.push(feature_launcher::RefreshEntry {
             source: s,
-            interval: std::time::Duration::from_secs(3),
+            interval: std::time::Duration::from_secs(10),
         });
     }
     if let Some(s) = find_source("contacts") {
