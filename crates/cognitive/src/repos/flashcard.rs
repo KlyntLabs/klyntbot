@@ -148,8 +148,13 @@ impl FlashcardRepo {
         &self,
         cards: Vec<NewFlashcard>,
     ) -> Result<Vec<FlashcardRow>, sqlx::Error> {
+        if cards.is_empty() {
+            return Ok(Vec::new());
+        }
+
         let now = Utc::now().to_rfc3339();
-        let mut rows = Vec::with_capacity(cards.len());
+        let mut ids = Vec::with_capacity(cards.len());
+        let mut tx = self.pool.begin().await?;
 
         for card in cards {
             let id = Uuid::new_v4().to_string();
@@ -199,16 +204,22 @@ impl FlashcardRepo {
             .bind(card.difficulty_estimate)
             .bind(&card.prerequisite_concepts)
             .bind(&now)
-            .execute(&self.pool)
+            .execute(&mut *tx)
             .await?;
 
-            let row = sqlx::query_as::<_, FlashcardRow>("SELECT * FROM flashcards WHERE id = ?1")
-                .bind(&id)
-                .fetch_one(&self.pool)
-                .await?;
-
-            rows.push(row);
+            ids.push(id);
         }
+
+        tx.commit().await?;
+
+        // Single SELECT to fetch all inserted rows
+        let placeholders = ids.iter().enumerate().map(|(i, _)| format!("?{}", i + 1)).collect::<Vec<_>>().join(", ");
+        let sql = format!("SELECT * FROM flashcards WHERE id IN ({placeholders})");
+        let mut query = sqlx::query_as::<_, FlashcardRow>(&sql);
+        for id in &ids {
+            query = query.bind(id);
+        }
+        let rows = query.fetch_all(&self.pool).await?;
 
         Ok(rows)
     }
