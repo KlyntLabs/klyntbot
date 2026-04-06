@@ -1,12 +1,15 @@
 import { retentionBarColor, retentionTextColor } from "@shared/lib/retention";
 import { Activity, ArrowLeft, Brain, Play } from "lucide-react";
-import { useState } from "react";
+import { lazy, Suspense, useState } from "react";
 import { Link } from "react-router";
 import type { TopicHealth } from "../hooks/useKnowledgeHealth";
 import { useKnowledgeHealth } from "../hooks/useKnowledgeHealth";
 import { useRetentionHistory } from "../hooks/useRetentionHistory";
 import { AtomGraph } from "./AtomGraph";
-import { RetentionChart } from "./RetentionChart";
+
+const RetentionChart = lazy(() =>
+  import("./RetentionChart").then((m) => ({ default: m.RetentionChart })),
+);
 
 function TopicRow({ topic }: { topic: TopicHealth }) {
   const pct = Math.round(topic.avgRetention * 100);
@@ -81,7 +84,15 @@ function TrendsTab() {
           ))}
         </div>
       </div>
-      <RetentionChart data={retentionData.overall} />
+      <Suspense
+        fallback={
+          <div className="flex items-center justify-center h-full text-muted text-sm">
+            Loading...
+          </div>
+        }
+      >
+        <RetentionChart data={retentionData.overall} />
+      </Suspense>
     </div>
   );
 }

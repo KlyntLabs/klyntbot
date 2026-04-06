@@ -213,10 +213,10 @@ const COMPACTION_KEEP: usize = 100;
 /// In-memory trim threshold: trim the Vec when it exceeds this.
 /// Must be ≤ COMPACTION_THRESHOLD so SQL compaction can still fire for
 /// sessions loaded from disk with many historical messages.
-const IN_MEMORY_TRIM_THRESHOLD: usize = 150;
+const IN_MEMORY_TRIM_THRESHOLD: usize = 60;
 
 /// Number of messages to keep after an in-memory trim.
-const IN_MEMORY_TRIM_KEEP: usize = COMPACTION_KEEP;
+const IN_MEMORY_TRIM_KEEP: usize = 40;
 
 /// Session manager backed by a SQL repository.
 ///

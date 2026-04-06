@@ -146,6 +146,89 @@ impl VectorStore {
         Ok(duplicate_ids.len())
     }
 
+    /// Prune a table to at most `max_rows` by deleting the oldest entries.
+    ///
+    /// Uses `ts_column` (ISO-8601 string) to determine age. Scans only the
+    /// timestamp column, finds a cutoff, and bulk-deletes everything older.
+    /// Returns the number of rows deleted (approximate — concurrent writes
+    /// may shift the exact count).
+    pub async fn prune_table(
+        &self,
+        table: &str,
+        ts_column: &str,
+        max_rows: usize,
+    ) -> Result<usize, StorageError> {
+        let tbl = match self.get_table(table).await {
+            Ok(t) => t,
+            Err(_) => return Ok(0),
+        };
+
+        let row_count = tbl
+            .count_rows(None)
+            .await
+            .map_err(|e| StorageError::Vector(format!("count {table}: {e}")))?;
+
+        if row_count <= max_rows {
+            return Ok(0);
+        }
+
+        let to_delete = row_count - max_rows;
+
+        // Scan only the timestamp column for the oldest `to_delete` rows.
+        let results = tbl
+            .query()
+            .select(Select::columns(&[ts_column]))
+            .limit(to_delete)
+            .execute()
+            .await
+            .map_err(|e| StorageError::Vector(format!("prune scan {table}: {e}")))?;
+
+        let batches: Vec<arrow_array::RecordBatch> = results
+            .try_collect()
+            .await
+            .map_err(|e| StorageError::Vector(format!("prune collect {table}: {e}")))?;
+
+        // Find the maximum (newest) timestamp among the rows we want to delete.
+        let mut cutoff: Option<String> = None;
+        for batch in &batches {
+            if let Some(col) = batch
+                .column_by_name(ts_column)
+                .and_then(|c| c.as_any().downcast_ref::<StringArray>())
+            {
+                for i in 0..batch.num_rows() {
+                    let ts = col.value(i).to_string();
+                    if cutoff.as_ref().map_or(true, |c| ts > *c) {
+                        cutoff = Some(ts);
+                    }
+                }
+            }
+        }
+
+        if let Some(cutoff) = cutoff {
+            let safe_cutoff = sanitize_predicate_value(&cutoff)?;
+            let predicate = format!("{ts_column} <= '{safe_cutoff}'");
+            tbl.delete(&predicate)
+                .await
+                .map_err(|e| StorageError::Vector(format!("prune delete {table}: {e}")))?;
+            tracing::info!("Pruned ~{to_delete} rows from {table} (cutoff: {cutoff})");
+        }
+
+        Ok(to_delete)
+    }
+
+    /// Compact a single table to reclaim memory and disk space.
+    ///
+    /// Useful for high-write-frequency tables (e.g. `work_context_embeddings`)
+    /// that accumulate fragments faster than periodic `optimize_all_tables`.
+    pub async fn optimize_table(&self, table_name: &str) -> Result<(), StorageError> {
+        let tbl = self.get_table(table_name).await?;
+        tbl.optimize(OptimizeAction::All)
+            .await
+            .map_err(|e| StorageError::Vector(format!("optimize {table_name}: {e}")))?;
+        self.table_cache.remove(table_name);
+        Ok(())
+    }
+
     /// Compact all vector tables to reclaim memory and disk space.
     ///
     /// LanceDB uses copy-on-write storage — every upsert/delete creates new

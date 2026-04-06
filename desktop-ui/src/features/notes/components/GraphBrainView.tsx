@@ -4,6 +4,7 @@ import { Color, Group, Mesh, MeshStandardMaterial, PointLight, TorusGeometry } f
 import { useBrainView } from "../hooks/useBrainView";
 import type { ForceLink, ForceNode, GraphElements } from "../hooks/useGraphElements";
 import type { GraphSettings } from "../hooks/useGraphSettings";
+import { disposePool } from "../lib/geometryPool";
 
 interface GraphBrainViewProps {
   elements: GraphElements;
@@ -33,6 +34,11 @@ export function GraphBrainView({
   const { graphRef, nodeThreeObject, setupPostProcessing, resetIdleTimer } = useBrainView({
     settings,
   });
+
+  // Dispose pooled geometries and materials when the component unmounts
+  useEffect(() => {
+    return () => disposePool();
+  }, []);
 
   // Set up bloom post-processing once the graph mounts
   const postProcessingDone = useRef(false);

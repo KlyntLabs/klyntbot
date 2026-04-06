@@ -1,10 +1,13 @@
 import { useInsightChat } from "@features/notes/hooks/useInsightChat";
 import { useCopyToClipboard } from "@shared/hooks/useCopyToClipboard";
 import { ClipboardCopy } from "lucide-react";
-import { useCallback, useState } from "react";
+import { lazy, Suspense, useCallback, useState } from "react";
 import type { TabStatus } from "../../hooks/useInsightReview";
 import { InsightChatInput } from "./InsightChatInput";
-import { MermaidRenderer } from "./MermaidRenderer";
+
+const MermaidRenderer = lazy(() =>
+  import("./MermaidRenderer").then((m) => ({ default: m.MermaidRenderer })),
+);
 
 interface ConceptMapTabProps {
   status: TabStatus;
@@ -127,7 +130,15 @@ export function ConceptMapTab({
       <div>
         <div className="space-y-3">
           <div className="rounded-lg bg-card border border-border p-4">
-            <MermaidRenderer code={mermaidCode} onError={handleRenderError} />
+            <Suspense
+              fallback={
+                <div className="flex items-center justify-center h-full text-muted text-sm">
+                  Loading...
+                </div>
+              }
+            >
+              <MermaidRenderer code={mermaidCode} onError={handleRenderError} />
+            </Suspense>
           </div>
           <CopyButton mermaidCode={mermaidCode} copied={copied} onCopy={handleCopy} />
         </div>

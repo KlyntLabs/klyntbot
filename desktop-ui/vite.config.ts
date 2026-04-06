@@ -40,5 +40,23 @@ export default defineConfig({
     target: "esnext",
     minify: !process.env.TAURI_ENV_DEBUG ? "esbuild" : false,
     sourcemap: !!process.env.TAURI_ENV_DEBUG,
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          three: ["three", "react-force-graph-2d", "react-force-graph-3d"],
+          mermaid: ["mermaid"],
+          recharts: ["recharts"],
+          tiptap: [
+            "@tiptap/react",
+            "@tiptap/starter-kit",
+            "@tiptap/pm/state",
+            "@tiptap/pm/view",
+            "@tiptap/pm/model",
+            "@tiptap/pm/commands",
+            "@tiptap/pm/history",
+          ],
+        },
+      },
+    },
   },
 });

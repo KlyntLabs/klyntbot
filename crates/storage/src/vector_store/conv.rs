@@ -11,14 +11,14 @@ use super::VectorStore;
 impl VectorStore {
     /// Search `conv_embeddings` by nearest-neighbor and return full row data.
     ///
-    /// Returns `(id, session_key, role, content_preview, full_content, created_at, score)` tuples
+    /// Returns `(id, session_key, role, content_preview, created_at, score)` tuples
     /// where `score = 1.0 - distance` and `score >= threshold`.
     pub async fn search_conv_embeddings(
         &self,
         query: &[f32],
         limit: usize,
         threshold: f64,
-    ) -> Result<Vec<(String, String, String, String, String, String, f64)>, StorageError> {
+    ) -> Result<Vec<(String, String, String, String, String, f64)>, StorageError> {
         let tbl = self.get_table("conv_embeddings").await?;
 
         let results = tbl
@@ -49,9 +49,6 @@ impl VectorStore {
             let preview_col = batch
                 .column_by_name("content_preview")
                 .and_then(|c| c.as_any().downcast_ref::<StringArray>());
-            let full_col = batch
-                .column_by_name("full_content")
-                .and_then(|c| c.as_any().downcast_ref::<StringArray>());
             let created_col = batch
                 .column_by_name("created_at")
                 .and_then(|c| c.as_any().downcast_ref::<StringArray>());
@@ -59,8 +56,8 @@ impl VectorStore {
                 .column_by_name("_distance")
                 .and_then(|c| c.as_any().downcast_ref::<Float32Array>());
 
-            let (Some(id_col), Some(sk_col), Some(role_col), Some(preview_col), Some(full_col)) =
-                (id_col, sk_col, role_col, preview_col, full_col)
+            let (Some(id_col), Some(sk_col), Some(role_col), Some(preview_col)) =
+                (id_col, sk_col, role_col, preview_col)
             else {
                 continue; // skip malformed batch
             };
@@ -79,7 +76,6 @@ impl VectorStore {
                         sk_col.value(i).to_string(),
                         role_col.value(i).to_string(),
                         preview_col.value(i).to_string(),
-                        full_col.value(i).to_string(),
                         created_at,
                         score,
                     ));

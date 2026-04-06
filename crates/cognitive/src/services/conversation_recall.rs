@@ -95,7 +95,6 @@ impl ConversationRecallService {
                     ("session_key", metadata.session_key.as_str()),
                     ("role", metadata.role.as_str()),
                     ("content_preview", preview),
-                    ("full_content", content),
                 ],
             )
             .await?;
@@ -114,8 +113,8 @@ impl ConversationRecallService {
     ) -> common::Result<Vec<RecallResult>> {
         let vector = self.embedder.embed(query).await?;
 
-        // search_conv_embeddings returns 7-tuples:
-        // (id, session_key, role, content_preview, full_content, created_at_str, score)
+        // search_conv_embeddings returns 6-tuples:
+        // (id, session_key, role, content_preview, created_at_str, score)
         let raw_results = self
             .vector_store
             .search_conv_embeddings(&vector, limit * 2, threshold as f64)
@@ -126,7 +125,7 @@ impl ConversationRecallService {
         let mut results: Vec<RecallResult> = raw_results
             .into_iter()
             .filter_map(
-                |(id, session_key, role, _preview, full_content, created_at_str, similarity)| {
+                |(id, session_key, role, preview, created_at_str, similarity)| {
                     let created_at = chrono::DateTime::parse_from_rfc3339(&created_at_str)
                         .map(|dt| dt.with_timezone(&Utc))
                         .unwrap_or_else(|e| {
@@ -144,7 +143,7 @@ impl ConversationRecallService {
                             id,
                             session_key,
                             role,
-                            content: full_content,
+                            content: preview,
                             score: decayed_score,
                             created_at,
                         })

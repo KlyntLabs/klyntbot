@@ -92,15 +92,50 @@ impl ContextInferenceEngine {
                 .filter(|c| !cache.contains_key(&c.id))
                 .collect()
         };
-        for ctx in missing {
+        if missing.is_empty() {
+            return;
+        }
+
+        // Embed all missing contexts and collect results
+        let mut new_centroids: Vec<(String, Vec<f32>)> = Vec::new();
+        for ctx in &missing {
             let text = format!("{} {}", ctx.title, ctx.context_type.as_str());
             match self.embedder.embed(&text).await {
                 Ok(vec) => {
-                    self.set_centroid(&ctx.id, vec).await;
+                    new_centroids.push((ctx.id.clone(), vec));
                 }
                 Err(e) => {
                     warn!("Failed to bootstrap centroid for context {}: {e}", ctx.id);
                 }
+            }
+        }
+
+        if new_centroids.is_empty() {
+            return;
+        }
+
+        // Update in-memory cache
+        {
+            let mut cache = self.centroids.write().await;
+            for (id, vec) in &new_centroids {
+                cache.insert(id.clone(), vec.clone());
+            }
+        }
+
+        // Batch-persist to LanceDB (single write instead of N individual writes)
+        if let Some(ref vs) = self.vector_store {
+            let items: Vec<_> = new_centroids
+                .iter()
+                .map(|(id, vec)| {
+                    let extras: &[(&str, &str)] = &[];
+                    (id.as_str(), vec.as_slice(), extras)
+                })
+                .collect();
+            if let Err(e) = vs
+                .upsert_embedding_batch("work_context_embeddings", &items)
+                .await
+            {
+                warn!("Failed to batch-persist centroids: {e}");
             }
         }
     }

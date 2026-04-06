@@ -14,7 +14,7 @@ import {
   Sparkles,
   X,
 } from "lucide-react";
-import { useCallback, useEffect, useState } from "react";
+import { lazy, Suspense, useCallback, useEffect, useState } from "react";
 import { useInsightEvolution } from "../hooks/useInsightEvolution";
 import type {
   InsightReviewActions,
@@ -30,7 +30,6 @@ import { ChangesBanner } from "./insight/ChangesBanner";
 import { ConceptMapTab } from "./insight/ConceptMapTab";
 import { FlashcardReview } from "./insight/FlashcardReview";
 import { GapAnalysisTab } from "./insight/GapAnalysisTab";
-import { InsightEvolutionChart } from "./insight/InsightEvolutionChart";
 import {
   DEFAULT_SCOPE,
   InsightScopePopover,
@@ -45,6 +44,10 @@ import { SelfAssessmentTab } from "./insight/SelfAssessmentTab";
 import { SquadManager } from "./insight/SquadManager";
 import { SquadPicker } from "./insight/SquadPicker";
 import { SynthesisTab } from "./insight/SynthesisTab";
+
+const InsightEvolutionChart = lazy(() =>
+  import("./insight/InsightEvolutionChart").then((m) => ({ default: m.InsightEvolutionChart })),
+);
 
 // ---------------------------------------------------------------------------
 // Props
@@ -270,7 +273,15 @@ export function InsightReviewPanel({ state, actions }: InsightReviewPanelProps) 
         <div className="border-b border-border shrink-0 max-h-[300px] overflow-y-auto">
           {evolution.data && evolution.data.versions.length > 0 && (
             <div className="p-3 border-b border-border">
-              <InsightEvolutionChart versions={evolution.data.versions} />
+              <Suspense
+                fallback={
+                  <div className="flex items-center justify-center h-full text-muted text-sm">
+                    Loading...
+                  </div>
+                }
+              >
+                <InsightEvolutionChart versions={evolution.data.versions} />
+              </Suspense>
             </div>
           )}
           <InsightVersionList

@@ -38,7 +38,7 @@ fn default_history_limit() -> usize {
 }
 
 fn default_max_cache_size() -> usize {
-    10
+    5
 }
 
 fn default_ttl_days() -> u32 {
@@ -185,7 +185,7 @@ mod tests {
     #[test]
     fn test_session_max_cache_size_default() {
         let config = SessionConfig::default();
-        assert_eq!(config.max_cache_size, 10);
+        assert_eq!(config.max_cache_size, 5);
     }
 
     #[test]

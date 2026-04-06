@@ -15,6 +15,7 @@ import { MarkdownContent } from "./MarkdownContent";
 import { SegmentedMessage } from "./SegmentedMessage";
 import { TokenBadge } from "./TokenBadge";
 import { TreePathBreadcrumb } from "./TreePathBreadcrumb";
+import { VirtualizedMessageList } from "./VirtualizedMessageList";
 
 interface MessageListProps {
   messages: ChatMessage[];
@@ -45,9 +46,22 @@ export function MessageList({
   personaMessages,
   statusPhase,
 }: MessageListProps) {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [containerHeight, setContainerHeight] = useState(600);
   const endRef = useRef<HTMLDivElement>(null);
   const [userScrolledUp, setUserScrolledUp] = useState(false);
   const scrollParentRef = useRef<HTMLElement | null>(null);
+  const isVirtualized = messages.length > 50;
+
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+    const obs = new ResizeObserver((entries) => {
+      for (const entry of entries) setContainerHeight(entry.contentRect.height);
+    });
+    obs.observe(el);
+    return () => obs.disconnect();
+  }, []);
 
   // Find the actual scrollable parent (the div with overflow-y-auto)
   useEffect(() => {
@@ -94,6 +108,28 @@ export function MessageList({
     raf.id = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(raf.id);
   }, [isStreaming, userScrolledUp]);
+
+  if (isVirtualized) {
+    return (
+      <div ref={containerRef} className="h-full">
+        <VirtualizedMessageList
+          messages={messages}
+          segments={segments}
+          isStreaming={isStreaming}
+          activeTools={activeTools}
+          error={error}
+          activeInteraction={activeInteraction}
+          sessionKey={sessionKey}
+          onInteractionSubmitted={onInteractionSubmitted}
+          liveTransparency={liveTransparency}
+          activeDelegateAgent={activeDelegateAgent}
+          personaMessages={personaMessages}
+          statusPhase={statusPhase}
+          height={containerHeight}
+        />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6" aria-live="polite">

@@ -39,7 +39,15 @@ pub(super) async fn init_storage(
         .map_err(|e| format!("storage connect failed: {e}"))?;
     let repos = Repos::from_pool(&storage_pool);
     let vector_store = VectorStore::connect(&data_dir).await.ok();
-    // Create ANN indexes + compact fragment files in the background.
+    // Immediately compact high-write-frequency tables before the agent starts.
+    // work_context_embeddings accumulates fragments rapidly (Append+Delete per
+    // centroid update) and can reach 2000+ versions, each memory-mapped.
+    if let Some(vs) = &vector_store {
+        if let Err(e) = vs.optimize_table("work_context_embeddings").await {
+            warn!("Immediate work_context compaction failed (non-fatal): {e}");
+        }
+    }
+    // Create ANN indexes + compact remaining tables in the background.
     // Deferred by 60s to avoid a memory stampede at startup — compaction
     // and IVF-PQ training mmap many fragment files and can spike RSS by
     // hundreds of MB when all 12 tables are processed at once.
@@ -50,6 +58,27 @@ pub(super) async fn init_storage(
             if let Err(e) = vs_bg.optimize_all_tables().await {
                 warn!("LanceDB startup compaction failed (non-fatal): {e}");
             }
+            // Prune large tables to prevent unbounded growth.
+            const MAX_CONV_ROWS: usize = 10_000;
+            const MAX_ACTIVITY_ROWS: usize = 50_000;
+            const MAX_COGNITIVE_ROWS: usize = 20_000;
+            let _ = vs_bg
+                .prune_table("conv_embeddings", "created_at", MAX_CONV_ROWS)
+                .await;
+            let _ = vs_bg
+                .prune_table("activity_embeddings", "updated_at", MAX_ACTIVITY_ROWS)
+                .await;
+            let _ = vs_bg
+                .prune_table(
+                    "cognitive_fact_embeddings",
+                    "updated_at",
+                    MAX_COGNITIVE_ROWS,
+                )
+                .await;
+            let _ = vs_bg
+                .prune_table("work_context_embeddings", "updated_at", 5_000)
+                .await;
+
             tokio::time::sleep(std::time::Duration::from_secs(5)).await;
             if let Err(e) = vs_bg.ensure_indexes(256).await {
                 warn!("ANN index creation failed (non-fatal): {e}");

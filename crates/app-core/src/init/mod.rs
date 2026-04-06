@@ -288,13 +288,27 @@ impl AppCore {
 
         let shutdown_token = CancellationToken::new();
 
-        // Idle-unload for the ONNX embedding model — check every 30s so the
-        // model is unloaded within ~30s of exceeding the 60s idle threshold
-        // (previously 120s poll meant up to 180s of retained model memory).
+        // Idle-unload for the ONNX embedding model — check every 10s so the
+        // model is unloaded within ~10s of exceeding the 15s idle threshold
+        // (aggressive unloading to minimize retained model memory).
         {
             let engine = Arc::clone(&embedding_engine);
-            spawn_periodic_timer(&shutdown_token, 30, move || {
+            spawn_periodic_timer(&shutdown_token, 10, move || {
                 engine.unload_if_idle();
+            });
+        }
+
+        // Periodic LanceDB compaction — merge fragment files every 30 minutes
+        // to prevent unbounded RSS growth from copy-on-write fragment accumulation.
+        if let Some(vs) = &appcore_vector_store {
+            let vs_compact = vs.clone();
+            spawn_periodic_timer(&shutdown_token, 1800, move || {
+                let vs = vs_compact.clone();
+                tokio::spawn(async move {
+                    if let Err(e) = vs.optimize_all_tables().await {
+                        tracing::warn!("Periodic LanceDB compaction failed: {e}");
+                    }
+                });
             });
         }
 
@@ -811,54 +825,12 @@ impl AppCore {
                 let service = Arc::new(service);
                 core.voice_service = Some(Arc::clone(&service));
 
-                // Eagerly preload STT and TTS models in background so they're ready before first voice use.
-                if has_local_engine {
-                    let svc = Arc::clone(&service);
-                    tokio::spawn(async move {
-                        let _ = svc
-                            .emit_event(voice_engine::VoiceEvent::ModelLoading {
-                                engine: "Qwen3-ASR".to_string(),
-                            })
-                            .await;
-                        match svc.preload_stt().await {
-                            Ok(()) => {
-                                let _ = svc
-                                    .emit_event(voice_engine::VoiceEvent::ModelReady {
-                                        engine: "Qwen3-ASR".to_string(),
-                                    })
-                                    .await;
-                            }
-                            Err(e) => {
-                                warn!("Background STT preload failed: {e}");
-                            }
-                        }
-                    });
-                }
-
-                // Preload TTS model in background (separate from STT preload).
-                if let Some(ref tts_engine) = qwen3_tts_ref {
-                    let tts_engine = Arc::clone(tts_engine);
-                    let svc = Arc::clone(&service);
-                    tokio::spawn(async move {
-                        let _ = svc
-                            .emit_event(voice_engine::VoiceEvent::ModelLoading {
-                                engine: "Qwen3-TTS".to_string(),
-                            })
-                            .await;
-                        match tts_engine.preload().await {
-                            Ok(()) => {
-                                let _ = svc
-                                    .emit_event(voice_engine::VoiceEvent::ModelReady {
-                                        engine: "Qwen3-TTS".to_string(),
-                                    })
-                                    .await;
-                            }
-                            Err(e) => {
-                                warn!("Background TTS preload failed: {e}");
-                            }
-                        }
-                    });
-                }
+                // STT and TTS models are lazy-loaded on first voice use.
+                // Previously eagerly preloaded at startup, but the Qwen3-ASR model
+                // alone is 1.7GB — loading it alongside the embedding model and
+                // WebView caused a 15GB startup memory spike. Both engines already
+                // support lazy-load, so first-use latency is the only tradeoff.
+                let _ = (has_local_engine, &qwen3_tts_ref); // suppress unused warnings
 
                 // ── Voice conversation manager ──────────────────────────
                 let voice_config_arc = Arc::new(RwLock::new(voice_config.clone()));

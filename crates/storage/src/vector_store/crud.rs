@@ -128,6 +128,102 @@ impl VectorStore {
         Ok(())
     }
 
+    /// Batch-upsert multiple embeddings in a single write + single delete.
+    ///
+    /// Much more memory-efficient than N individual `upsert_embedding` calls,
+    /// as LanceDB creates one fragment file instead of N.
+    pub async fn upsert_embedding_batch(
+        &self,
+        table: &str,
+        items: &[(&str, &[f32], &[(&str, &str)])],
+    ) -> Result<(), StorageError> {
+        if items.is_empty() {
+            return Ok(());
+        }
+        let tbl = self.get_table(table).await?;
+        let schema: SchemaRef = tbl
+            .schema()
+            .await
+            .map_err(|e| StorageError::Vector(format!("schema for {table}: {e}")))?;
+
+        let ts_col_name = schema
+            .fields()
+            .last()
+            .map(|f| f.name().clone())
+            .unwrap_or_else(|| "updated_at".into());
+
+        let now = chrono::Utc::now().to_rfc3339();
+        let n = items.len();
+
+        // Build column arrays for all items at once
+        let ids: Vec<&str> = items.iter().map(|(id, _, _)| *id).collect();
+        let id_arr = Arc::new(StringArray::from(ids.clone())) as ArrayRef;
+
+        // Build vector array: concatenate all vectors into one flat array,
+        // then wrap in FixedSizeList
+        let dim = items[0].1.len() as i32;
+        let all_floats: Vec<f32> = items
+            .iter()
+            .flat_map(|(_, v, _)| v.iter().copied())
+            .collect();
+        let float_arr = Arc::new(Float32Array::from(all_floats)) as ArrayRef;
+        let vector_arr = Arc::new(
+            FixedSizeListArray::try_new(
+                Arc::new(Field::new("item", arrow_schema::DataType::Float32, true)),
+                dim,
+                float_arr,
+                None,
+            )
+            .map_err(|e| StorageError::Vector(format!("build vector array: {e}")))?,
+        ) as ArrayRef;
+
+        let mut columns: Vec<ArrayRef> = vec![id_arr, vector_arr];
+
+        // Extra fields — assume all items share the same schema
+        let extra_count = items[0].2.len();
+        for col_idx in 0..extra_count {
+            let vals: Vec<&str> = items
+                .iter()
+                .map(|(_, _, extras)| extras[col_idx].1)
+                .collect();
+            columns.push(Arc::new(StringArray::from(vals)) as ArrayRef);
+        }
+
+        // Timestamp column
+        let ts_vals: Vec<&str> = (0..n).map(|_| now.as_str()).collect();
+        columns.push(Arc::new(StringArray::from(ts_vals)) as ArrayRef);
+
+        let batch = RecordBatch::try_new(schema.clone(), columns)
+            .map_err(|e| StorageError::Vector(format!("build batch record: {e}")))?;
+
+        let reader = RecordBatchIterator::new(vec![Ok(batch)].into_iter(), schema);
+
+        // Single bulk insert
+        tbl.add(Box::new(reader))
+            .execute()
+            .await
+            .map_err(|e| StorageError::Vector(format!("LanceDB batch add to {table}: {e}")))?;
+
+        // Single bulk delete of old rows
+        let safe_now = sanitize_predicate_value(&now)?;
+        let id_predicates: Vec<String> = ids
+            .iter()
+            .filter_map(|id| sanitize_predicate_value(id).ok())
+            .map(|safe_id| format!("id = '{safe_id}'"))
+            .collect();
+        if !id_predicates.is_empty() {
+            let predicate = format!(
+                "({}) AND {ts_col_name} < '{safe_now}'",
+                id_predicates.join(" OR ")
+            );
+            if let Err(e) = tbl.delete(&predicate).await {
+                tracing::warn!("LanceDB batch cleanup old in {table} (non-fatal): {e}");
+            }
+        }
+
+        Ok(())
+    }
+
     /// Search for similar vectors, returning `(id, score)` pairs where `score >= threshold`.
     ///
     /// Score is computed as `1.0 - distance`. For cosine distance this equals cosine

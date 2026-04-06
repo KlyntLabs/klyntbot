@@ -10,6 +10,7 @@ import {
   RefreshCw,
   TrendingUp,
 } from "lucide-react";
+import { lazy, Suspense } from "react";
 import { Link } from "react-router";
 import { useLearnDashboard } from "../hooks/useLearnDashboard";
 import { useRetentionHistory } from "../hooks/useRetentionHistory";
@@ -18,8 +19,11 @@ import { AtomGraph } from "./AtomGraph";
 import { CollapsibleSection } from "./CollapsibleSection";
 import { DeckList } from "./DeckList";
 import { QuickGenerate } from "./QuickGenerate";
-import { RetentionChart } from "./RetentionChart";
-import { StatsBar } from "./StatsBar";
+
+const RetentionChart = lazy(() =>
+  import("./RetentionChart").then((m) => ({ default: m.RetentionChart })),
+);
+const StatsBar = lazy(() => import("./StatsBar").then((m) => ({ default: m.StatsBar })));
 
 interface StrugglingCard {
   id: string;
@@ -116,12 +120,20 @@ export function DashboardHome({
       </div>
 
       {/* Stats */}
-      <StatsBar
-        totalDue={totalDue}
-        streak={stats.streak}
-        retention={stats.retention}
-        weekly={stats.weekly}
-      />
+      <Suspense
+        fallback={
+          <div className="flex items-center justify-center h-full text-muted text-sm">
+            Loading...
+          </div>
+        }
+      >
+        <StatsBar
+          totalDue={totalDue}
+          streak={stats.streak}
+          retention={stats.retention}
+          weekly={stats.weekly}
+        />
+      </Suspense>
 
       {/* Action cards */}
       <div className="grid grid-cols-2 gap-3">
@@ -225,7 +237,15 @@ export function DashboardHome({
         storageKey="learn-retention-open"
       >
         <div className="glass-card p-4">
-          <RetentionChart data={retentionData.overall} height={160} />
+          <Suspense
+            fallback={
+              <div className="flex items-center justify-center h-full text-muted text-sm">
+                Loading...
+              </div>
+            }
+          >
+            <RetentionChart data={retentionData.overall} height={160} />
+          </Suspense>
         </div>
       </CollapsibleSection>
 

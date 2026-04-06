@@ -2,23 +2,7 @@ import { useCallback, useRef } from "react";
 import type { ForceGraphMethods } from "react-force-graph-3d";
 import { Mesh } from "three";
 import { UnrealBloomPass } from "three/examples/jsm/postprocessing/UnrealBloomPass.js";
-import {
-  createEntityGeometry,
-  createEntityMaterial,
-  createFinanceGeometry,
-  createFinanceMaterial,
-  createLearningGeometry,
-  createLearningMaterial,
-  createNodeGeometry,
-  createNodeMaterial,
-  createOkrGeometry,
-  createOkrMaterial,
-  createProductivityGeometry,
-  createProductivityMaterial,
-  createProjectGeometry,
-  createProjectMaterial,
-  createTreeMaterial,
-} from "../lib/graphMaterials";
+import { getPooledGeometry, getPooledMaterial } from "../lib/geometryPool";
 import type { ForceNode } from "./useGraphElements";
 import type { GraphSettings } from "./useGraphSettings";
 
@@ -35,96 +19,40 @@ export function useBrainView({ settings }: UseBrainViewParams) {
   // Build a custom Three.js object for each node, branching on nodeType
   const nodeThreeObject = useCallback((node: ForceNode) => {
     const nodeType = node.nodeType ?? "note";
+    let emissiveIntensity: number;
 
-    // ── Entity — OctahedronGeometry (diamond) ────────────────────────
-    if (nodeType === "entity") {
-      const geometry = createEntityGeometry(node.linkCount);
-      const material = createEntityMaterial(node.color);
-      const emissiveIntensity = 0.6;
-      material.userData = { baseEmissive: emissiveIntensity };
-      const mesh = new Mesh(geometry, material);
-      mesh.userData = { nodeId: node.id };
-      return mesh;
+    switch (nodeType) {
+      case "entity":
+        emissiveIntensity = 0.6;
+        break;
+      case "tree_section":
+        emissiveIntensity = 0.2;
+        break;
+      case "tree_text":
+        emissiveIntensity = 0.1;
+        break;
+      case "finance":
+        emissiveIntensity = 0.55;
+        break;
+      case "productivity":
+        emissiveIntensity = 0.5;
+        break;
+      case "okr":
+        emissiveIntensity = 0.6;
+        break;
+      case "learning":
+        emissiveIntensity = 0.5;
+        break;
+      case "project":
+        emissiveIntensity = 0.55;
+        break;
+      default:
+        emissiveIntensity = Math.min(0.3 + (0.7 * node.linkCount) / 15, 1);
+        break;
     }
 
-    // ── Tree section — small semi-transparent sphere ─────────────────
-    if (nodeType === "tree_section") {
-      const normalized = Math.min(node.linkCount, 5) / 5;
-      const radius = 3 + normalized * 2; // 3–5
-      const geometry = createNodeGeometry(radius * 2);
-      const material = createTreeMaterial(node.color, 0.6);
-      material.userData = { baseEmissive: 0.2 };
-      const mesh = new Mesh(geometry, material);
-      mesh.userData = { nodeId: node.id };
-      return mesh;
-    }
-
-    // ── Tree text — tiny semi-transparent sphere ─────────────────────
-    if (nodeType === "tree_text") {
-      const geometry = createNodeGeometry(3); // radius 1.5 → diameter 3
-      const material = createTreeMaterial(node.color, 0.3);
-      material.userData = { baseEmissive: 0.1 };
-      const mesh = new Mesh(geometry, material);
-      mesh.userData = { nodeId: node.id };
-      return mesh;
-    }
-
-    // ── Finance — DodecahedronGeometry ───────────────────────────────
-    if (nodeType === "finance") {
-      const geometry = createFinanceGeometry(node.size);
-      const material = createFinanceMaterial(node.color);
-      material.userData = { baseEmissive: 0.55 };
-      const mesh = new Mesh(geometry, material);
-      mesh.userData = { nodeId: node.id };
-      return mesh;
-    }
-
-    // ── Productivity — TorusGeometry (ring) ──────────────────────────
-    if (nodeType === "productivity") {
-      const geometry = createProductivityGeometry(node.size);
-      const material = createProductivityMaterial(node.color);
-      material.userData = { baseEmissive: 0.5 };
-      const mesh = new Mesh(geometry, material);
-      mesh.userData = { nodeId: node.id };
-      return mesh;
-    }
-
-    // ── OKR — CylinderGeometry (flat disc / target) ──────────────────
-    if (nodeType === "okr") {
-      const geometry = createOkrGeometry(node.size);
-      const material = createOkrMaterial(node.color);
-      material.userData = { baseEmissive: 0.6 };
-      const mesh = new Mesh(geometry, material);
-      mesh.userData = { nodeId: node.id };
-      return mesh;
-    }
-
-    // ── Learning — BoxGeometry (book shape) ──────────────────────────
-    if (nodeType === "learning") {
-      const geometry = createLearningGeometry(node.size);
-      const material = createLearningMaterial(node.color);
-      material.userData = { baseEmissive: 0.5 };
-      const mesh = new Mesh(geometry, material);
-      mesh.userData = { nodeId: node.id };
-      return mesh;
-    }
-
-    // ── Project — CylinderGeometry (pentagon prism) ──────────────────
-    if (nodeType === "project") {
-      const geometry = createProjectGeometry(node.size);
-      const material = createProjectMaterial(node.color);
-      material.userData = { baseEmissive: 0.55 };
-      const mesh = new Mesh(geometry, material);
-      mesh.userData = { nodeId: node.id };
-      return mesh;
-    }
-
-    // ── Note (default) — SphereGeometry ─────────────────────────────
-    const emissiveIntensity = Math.min(0.3 + (0.7 * node.linkCount) / 15, 1);
-    const geometry = createNodeGeometry(node.size * 0.3); // scale down for 3D space
-    const material = createNodeMaterial(node.color, emissiveIntensity);
-    // Store base emissive so hover highlight can restore it
-    material.userData = { baseEmissive: emissiveIntensity };
+    const geometry = getPooledGeometry(nodeType, node.size, node.linkCount);
+    const material = getPooledMaterial(nodeType, node.color, emissiveIntensity);
     const mesh = new Mesh(geometry, material);
     mesh.userData = { nodeId: node.id };
     return mesh;

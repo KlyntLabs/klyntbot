@@ -131,6 +131,7 @@ type Listener = () => void;
 
 class ChatStreamStore {
   private static MAX_IDLE_SESSIONS = 5;
+  private static MAX_SEGMENTS = 200;
   private static MAX_TOOL_RESULT_LENGTH = 2000;
   private states = new Map<string, StreamSnapshot>();
   private listeners = new Set<Listener>();
@@ -172,6 +173,8 @@ class ChatStreamStore {
     if (!isTauri) {
       this.connectEventSource(sessionKey);
     }
+
+    this.evictIdleSessions();
   }
 
   /** Abort streaming with an error. */
@@ -247,13 +250,16 @@ class ChatStreamStore {
 
     this.updateState(sessionKey, (s) => {
       const last = s.segments[s.segments.length - 1];
+      let newSegments: MessageSegment[];
       if (last && last.type === "text") {
-        return {
-          ...s,
-          segments: [...s.segments.slice(0, -1), { type: "text", content: text }],
-        };
+        newSegments = [...s.segments.slice(0, -1), { type: "text", content: text }];
+      } else {
+        newSegments = [...s.segments, { type: "text", content: text }];
       }
-      return { ...s, segments: [...s.segments, { type: "text", content: text }] };
+      if (newSegments.length > ChatStreamStore.MAX_SEGMENTS) {
+        newSegments = newSegments.slice(-ChatStreamStore.MAX_SEGMENTS);
+      }
+      return { ...s, segments: newSegments };
     });
   }
 
@@ -454,29 +460,29 @@ class ChatStreamStore {
         idx === -1
           ? s.activeTools
           : [...s.activeTools.slice(0, idx), ...s.activeTools.slice(idx + 1)];
+      const newSegments = [
+        ...s.segments,
+        {
+          type: "tool" as const,
+          name: payload.name,
+          action: payload.action,
+          success: payload.success,
+          durationMs: payload.durationMs,
+          result:
+            payload.result && payload.result.length > ChatStreamStore.MAX_TOOL_RESULT_LENGTH
+              ? `${payload.result.slice(0, ChatStreamStore.MAX_TOOL_RESULT_LENGTH)}\n… (truncated)`
+              : payload.result,
+          estimatedTokens: payload.estimatedTokens,
+          agent: payload.agent,
+        },
+      ];
       return {
         ...s,
         activeTools,
-        segments: [
-          ...s.segments,
-          {
-            type: "tool" as const,
-            name: payload.name,
-            action: payload.action,
-            success: payload.success,
-            durationMs: payload.durationMs,
-            result:
-              payload.result &&
-              payload.result.length > ChatStreamStore.MAX_TOOL_RESULT_LENGTH
-                ? payload.result.slice(
-                    0,
-                    ChatStreamStore.MAX_TOOL_RESULT_LENGTH,
-                  ) + "\n… (truncated)"
-                : payload.result,
-            estimatedTokens: payload.estimatedTokens,
-            agent: payload.agent,
-          },
-        ],
+        segments:
+          newSegments.length > ChatStreamStore.MAX_SEGMENTS
+            ? newSegments.slice(-ChatStreamStore.MAX_SEGMENTS)
+            : newSegments,
         transparency: {
           ...s.transparency,
           tools: [

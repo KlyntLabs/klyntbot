@@ -15,13 +15,11 @@ use lancedb::{Connection, Table};
 
 use crate::error::StorageError;
 
-/// Index cache: holds loaded IVF partition data, HNSW graphs, scalar index details.
-/// 128 MB fits hot partitions for all ~12 tables without forcing re-reads on every query.
-/// Default is 6 GiB (designed for cloud/server), way too much for a single-user desktop app.
-const LANCE_INDEX_CACHE_BYTES: usize = 128 * 1024 * 1024;
-/// Metadata cache: holds manifests, deletion vectors, page locations.
-/// 32 MB is generous for 12 tables worth of metadata.
-const LANCE_METADATA_CACHE_BYTES: usize = 32 * 1024 * 1024;
+/// Index cache: 32 MB is enough for hot partitions across 12 tables in a single-user app.
+/// Default is 6 GiB (designed for cloud/server).
+const LANCE_INDEX_CACHE_BYTES: usize = 32 * 1024 * 1024;
+/// Metadata cache: 8 MB is ample for 12 tables worth of manifests.
+const LANCE_METADATA_CACHE_BYTES: usize = 8 * 1024 * 1024;
 
 mod cognitive;
 mod community;
@@ -47,7 +45,7 @@ pub use tree_node::TreeNodeSearchResult;
 /// - `todo_embeddings`              — id, vector(384), model, updated_at
 /// - `task_embeddings`              — id, vector(384), model, updated_at
 /// - `note_embeddings`              — id, vector(384), model, updated_at
-/// - `conv_embeddings`              — id, vector(384), session_key, role, content_preview, full_content, created_at
+/// - `conv_embeddings`              — id, vector(384), session_key, role, content_preview, created_at
 /// - `cognitive_fact_embeddings`    — id, vector(384), domain, text, importance, stability, confidence, updated_at
 /// - `activity_embeddings`          — id, vector(384), source, work_context_id, timestamp, updated_at
 /// - `work_context_embeddings`      — id, vector(384), updated_at
@@ -104,9 +102,44 @@ impl VectorStore {
         store
             .ensure_table("todo_embeddings", schemas::todo_schema(), &existing)
             .await?;
-        store
-            .ensure_table("conv_embeddings", schemas::conv_schema(), &existing)
-            .await?;
+        // Pre-release migration: drop conv_embeddings if it has the old `full_content` column.
+        if existing.iter().any(|t| t == "conv_embeddings") {
+            let tbl = store
+                .db
+                .open_table("conv_embeddings")
+                .execute()
+                .await
+                .map_err(|e| StorageError::Vector(format!("open conv_embeddings: {e}")))?;
+            let schema = tbl
+                .schema()
+                .await
+                .map_err(|e| StorageError::Vector(format!("read conv_embeddings schema: {e}")))?;
+            if schema.column_with_name("full_content").is_some() {
+                store
+                    .db
+                    .drop_table("conv_embeddings", &[])
+                    .await
+                    .map_err(|e| StorageError::Vector(format!("drop old conv_embeddings: {e}")))?;
+                tracing::info!("Dropped conv_embeddings table (removed full_content column)");
+                // Remove from existing list so ensure_table recreates it
+                let existing: Vec<String> = existing
+                    .iter()
+                    .filter(|t| t.as_str() != "conv_embeddings")
+                    .cloned()
+                    .collect();
+                store
+                    .ensure_table("conv_embeddings", schemas::conv_schema(), &existing)
+                    .await?;
+            } else {
+                store
+                    .ensure_table("conv_embeddings", schemas::conv_schema(), &existing)
+                    .await?;
+            }
+        } else {
+            store
+                .ensure_table("conv_embeddings", schemas::conv_schema(), &existing)
+                .await?;
+        }
         store
             .ensure_table(
                 "cognitive_fact_embeddings",

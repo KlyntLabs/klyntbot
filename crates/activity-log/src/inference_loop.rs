@@ -22,6 +22,10 @@ impl ContextInferenceLoop {
         cancel: CancellationToken,
     ) -> JoinHandle<()> {
         tokio::spawn(async move {
+            // Defer first run by 30s so the startup memory spike (WebView, LanceDB
+            // init) settles before the embedding model (~420MB) is loaded.
+            tokio::time::sleep(Duration::from_secs(30)).await;
+
             // One-time startup: reclassify "general" contexts with improved heuristics
             match engine.reclassify_general_contexts().await {
                 Ok(0) => {}

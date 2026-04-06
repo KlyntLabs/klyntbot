@@ -23,8 +23,8 @@ use common::Result;
 /// Expected embedding dimensionality (both local and OpenAI produce this).
 pub const EMBEDDING_DIM: usize = 384;
 
-/// Idle timeout before the ONNX model is unloaded from memory (1 minute).
-const EMBEDDING_IDLE_SECS: u64 = 60;
+/// Idle timeout before the ONNX model is unloaded from memory (15 seconds).
+const EMBEDDING_IDLE_SECS: u64 = 15;
 
 /// Which embedding provider to use.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]

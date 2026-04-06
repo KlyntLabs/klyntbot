@@ -2,8 +2,7 @@ import { useClickOutside } from "@shared/hooks/useClickOutside";
 import type { Note, Notebook } from "@shared/types";
 import type { FabricCommunityDetail } from "@shared/types/fabric";
 import { Maximize2, Minus, Plus, RotateCcw, Settings2 } from "lucide-react";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import ForceGraph2D from "react-force-graph-2d";
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useFabricGraph } from "../hooks/useFabricGraph";
 import type { DragCommunityChange, ViewportBounds } from "../hooks/useForceGraph";
 import { useForceGraph } from "../hooks/useForceGraph";
@@ -17,7 +16,6 @@ import { useWaveReveal } from "../hooks/useWaveReveal";
 import { selectHub } from "../lib/graphBfs";
 import { resolveLinkEndpointId } from "../lib/graphUtils";
 import { BatchActionBar } from "./FabricPulseBadge";
-import { GraphBrainView } from "./GraphBrainView";
 import type { ContextMenuAction } from "./GraphContextMenu";
 import { GraphContextMenu } from "./GraphContextMenu";
 import { GraphLegend } from "./GraphLegend";
@@ -26,6 +24,11 @@ import { GraphNodeTooltip } from "./GraphNodeTooltip";
 import { GraphSettingsPopover } from "./GraphSettingsPopover";
 import { GraphToolbar } from "./GraphToolbar";
 import { QuickBridgePopover } from "./QuickBridgePopover";
+
+const ForceGraph2D = lazy(() => import("react-force-graph-2d"));
+const GraphBrainView = lazy(() =>
+  import("./GraphBrainView").then((m) => ({ default: m.GraphBrainView })),
+);
 
 /** Extract first 2-3 markdown headings from a body preview string. */
 function extractHeadings(bodyPreview: string): string[] {
@@ -734,37 +737,45 @@ export function GraphView({
             style={{ position: "absolute", inset: 0, width: "100%", height: "100%" }}
           >
             {cacheReady && (
-              <ForceGraph2D
-                // react-force-graph-2d generics don't align with our custom ForceNode/ForceLink
-                // types, but the runtime behavior is correct. Use `as never` to bypass deep
-                // generic variance mismatch.
-                ref={forceGraph.graphRef as never}
-                graphData={forceGraph.graphData as never}
-                width={containerRef.current?.clientWidth}
-                height={containerRef.current?.clientHeight}
-                nodeCanvasObject={forceGraph.nodeCanvasObject as never}
-                nodeCanvasObjectMode={forceGraph.nodeCanvasObjectMode as never}
-                linkCanvasObject={forceGraph.linkCanvasObject as never}
-                linkCanvasObjectMode={forceGraph.linkCanvasObjectMode as never}
-                nodePointerAreaPaint={forceGraph.nodePointerAreaPaint as never}
-                onNodeClick={forceGraph.onNodeClick as never}
-                onNodeRightClick={forceGraph.onNodeRightClick as never}
-                onNodeHover={forceGraph.onNodeHover as never}
-                onNodeDrag={forceGraph.onNodeDrag as never}
-                onNodeDragEnd={forceGraph.onNodeDragEnd as never}
-                onBackgroundClick={() => {
-                  forceGraph.onBackgroundClick();
-                  setSelectedFabricNode(null);
-                  setSelectedCommunity(null);
-                }}
-                onEngineStop={forceGraph.onEngineStop}
-                onRenderFramePost={forceGraph.onRenderFramePost as never}
-                cooldownTicks={settings.livePhysics ? Infinity : 100}
-                enableNodeDrag={true}
-                enableZoomInteraction={true}
-                enablePanInteraction={true}
-                autoPauseRedraw={false}
-              />
+              <Suspense
+                fallback={
+                  <div className="absolute inset-0 flex items-center justify-center text-muted-foreground text-sm">
+                    Loading graph...
+                  </div>
+                }
+              >
+                <ForceGraph2D
+                  // react-force-graph-2d generics don't align with our custom ForceNode/ForceLink
+                  // types, but the runtime behavior is correct. Use `as never` to bypass deep
+                  // generic variance mismatch.
+                  ref={forceGraph.graphRef as never}
+                  graphData={forceGraph.graphData as never}
+                  width={containerRef.current?.clientWidth}
+                  height={containerRef.current?.clientHeight}
+                  nodeCanvasObject={forceGraph.nodeCanvasObject as never}
+                  nodeCanvasObjectMode={forceGraph.nodeCanvasObjectMode as never}
+                  linkCanvasObject={forceGraph.linkCanvasObject as never}
+                  linkCanvasObjectMode={forceGraph.linkCanvasObjectMode as never}
+                  nodePointerAreaPaint={forceGraph.nodePointerAreaPaint as never}
+                  onNodeClick={forceGraph.onNodeClick as never}
+                  onNodeRightClick={forceGraph.onNodeRightClick as never}
+                  onNodeHover={forceGraph.onNodeHover as never}
+                  onNodeDrag={forceGraph.onNodeDrag as never}
+                  onNodeDragEnd={forceGraph.onNodeDragEnd as never}
+                  onBackgroundClick={() => {
+                    forceGraph.onBackgroundClick();
+                    setSelectedFabricNode(null);
+                    setSelectedCommunity(null);
+                  }}
+                  onEngineStop={forceGraph.onEngineStop}
+                  onRenderFramePost={forceGraph.onRenderFramePost as never}
+                  cooldownTicks={settings.livePhysics ? Infinity : 100}
+                  enableNodeDrag={true}
+                  enableZoomInteraction={true}
+                  enablePanInteraction={true}
+                  autoPauseRedraw={false}
+                />
+              </Suspense>
             )}
           </div>
         )}
@@ -775,25 +786,33 @@ export function GraphView({
             ref={containerRef}
             style={{ position: "absolute", inset: 0, width: "100%", height: "100%" }}
           >
-            <GraphBrainView
-              elements={elements}
-              settings={settings}
-              highlightedClusterId={highlightedClusterId}
-              activeNoteId={activeNoteId}
-              width={containerRef.current?.clientWidth ?? 800}
-              height={containerRef.current?.clientHeight ?? 600}
-              revealedNodes={waveReveal.revealedNodes}
-              isRevealing={waveReveal.isRevealing}
-              onNodeClick={(nodeId: string) => {
-                const node = elements.nodes.find((n) => n.id === nodeId);
-                if (!node || node.nodeType === "note") {
-                  setSelectedFabricNode(null);
-                  onSelectNote(nodeId);
-                } else {
-                  setSelectedFabricNode(node);
-                }
-              }}
-            />
+            <Suspense
+              fallback={
+                <div className="absolute inset-0 flex items-center justify-center text-muted-foreground text-sm">
+                  Loading 3D view...
+                </div>
+              }
+            >
+              <GraphBrainView
+                elements={elements}
+                settings={settings}
+                highlightedClusterId={highlightedClusterId}
+                activeNoteId={activeNoteId}
+                width={containerRef.current?.clientWidth ?? 800}
+                height={containerRef.current?.clientHeight ?? 600}
+                revealedNodes={waveReveal.revealedNodes}
+                isRevealing={waveReveal.isRevealing}
+                onNodeClick={(nodeId: string) => {
+                  const node = elements.nodes.find((n) => n.id === nodeId);
+                  if (!node || node.nodeType === "note") {
+                    setSelectedFabricNode(null);
+                    onSelectNote(nodeId);
+                  } else {
+                    setSelectedFabricNode(node);
+                  }
+                }}
+              />
+            </Suspense>
           </div>
         )}
 

@@ -34,7 +34,6 @@ pub(crate) fn conv_schema() -> Schema {
         Field::new("session_key", DataType::Utf8, false),
         Field::new("role", DataType::Utf8, false),
         Field::new("content_preview", DataType::Utf8, false),
-        Field::new("full_content", DataType::Utf8, false),
         Field::new("created_at", DataType::Utf8, false),
     ])
 }
