@@ -110,9 +110,10 @@ export function DayColumnsView({
   productivitySummary,
 }: DayColumnsViewProps) {
   // Centralized activity timeline fetch — passed to ActivityTrack to avoid duplicate IPC
+  const queryArgs = useMemo(() => ({ date, tzOffsetMins: TZ_OFFSET_MINS }), [date]);
   const { data: activityTimeline } = useQuery<ActivityTimeline[]>(
     "productivity_timeline",
-    { date, tzOffsetMins: TZ_OFFSET_MINS },
+    queryArgs,
     [],
     {
       invalidateOn: ["entity:updated", "activity:switch"],
