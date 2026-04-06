@@ -593,13 +593,22 @@
 }
 
 /* ── Reduced motion ──────────────────────────── */
+/* Respect OS reduced-motion preference — disable infinite animations
+   and heavy backdrop-blur for better performance on low-end hardware. */
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
   *::after {
-    animation-duration: 0.01ms;
-    animation-iteration-count: 1;
-    transition-duration: 0.01ms;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
     scroll-behavior: auto;
+  }
+
+  .glass-panel,
+  .glass-toolbar,
+  .glass-input {
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
   }
 }
