@@ -1,5 +1,5 @@
 import { useClickOutside } from "@shared/hooks/useClickOutside";
-import type { NoteListItem, Notebook } from "@shared/types";
+import type { Notebook, NoteListItem } from "@shared/types";
 import type { FabricCommunityDetail } from "@shared/types/fabric";
 import { Maximize2, Minus, Plus, RotateCcw, Settings2 } from "lucide-react";
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";

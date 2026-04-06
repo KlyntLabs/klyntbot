@@ -324,7 +324,19 @@ impl AppCore {
         )
         .await;
 
-        // ── Phase 5: Productivity ────────────────────────────────────────
+        // ── Phases 5 & 8: Run independent init phases concurrently ─────
+        let (productivity_result, launcher_result) = tokio::join!(
+            productivity::init_productivity(
+                &config,
+                &storage_pool,
+                &domain_event_bus,
+                &activity_svc,
+                &cognitive_provider,
+                &shutdown_token,
+            ),
+            launcher::init_launcher(&config, &storage_pool, &shutdown_token),
+        );
+
         let productivity::ProductivityResult {
             dashboard_poll_interval_secs,
             productivity_repos,
@@ -337,15 +349,9 @@ impl AppCore {
             auto_focus_rx,
             nudge_rx,
             dashboard_tick_rx,
-        } = productivity::init_productivity(
-            &config,
-            &storage_pool,
-            &domain_event_bus,
-            &activity_svc,
-            &cognitive_provider,
-            &shutdown_token,
-        )
-        .await;
+        } = productivity_result;
+
+        let launcher::LauncherResult { launcher_engine } = launcher_result;
 
         // ── Phase 6: Coaching ────────────────────────────────────────────
         let coaching::CoachingResult {
@@ -378,10 +384,6 @@ impl AppCore {
             Arc::clone(&embedding_engine),
         )
         .await;
-
-        // ── Phase 8: Launcher ─────────────────────────────────────────────
-        let launcher::LauncherResult { launcher_engine } =
-            launcher::init_launcher(&config, &storage_pool, &shutdown_token).await;
 
         // ── Phase 9: Mirror self-reflection layer ────────────────────────
         let (mirror_facade, mirror_handles, mirror_shutdown) = {

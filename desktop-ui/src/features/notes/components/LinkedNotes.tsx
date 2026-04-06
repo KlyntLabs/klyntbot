@@ -10,7 +10,11 @@ interface LinkedNotesProps {
 
 export function LinkedNotes({ entityType, entityId }: LinkedNotesProps) {
   const navigate = useNavigate();
-  const { data: notes } = useQuery<NoteListItem[]>("note_list_by_entity", { entityType, entityId }, []);
+  const { data: notes } = useQuery<NoteListItem[]>(
+    "note_list_by_entity",
+    { entityType, entityId },
+    [],
+  );
 
   if (notes.length === 0) return null;
 

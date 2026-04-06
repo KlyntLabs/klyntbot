@@ -1,6 +1,6 @@
 import { useClickOutside } from "@shared/hooks/useClickOutside";
 import { formatDate } from "@shared/lib/dates";
-import type { NoteListItem, Notebook } from "@shared/types";
+import type { Notebook, NoteListItem } from "@shared/types";
 import { ContextMenu, ContextMenuItem, ContextMenuSeparator, ContextMenuSubmenu } from "@shared/ui";
 import {
   Archive,

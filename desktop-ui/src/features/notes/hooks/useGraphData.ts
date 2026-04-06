@@ -1,5 +1,5 @@
 import { useQuery } from "@shared/hooks/useQuery";
-import type { NoteListItem, NoteLink } from "@shared/types";
+import type { NoteLink, NoteListItem } from "@shared/types";
 import { useMemo } from "react";
 
 // ── Types ────────────────────────────────────────────────────────────────

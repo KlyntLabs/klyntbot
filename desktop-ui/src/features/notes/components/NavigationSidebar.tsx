@@ -1,4 +1,4 @@
-import type { InboxItem, NoteListItem, Notebook } from "@shared/types";
+import type { InboxItem, Notebook, NoteListItem } from "@shared/types";
 import { useCallback, useState } from "react";
 import { InboxSection } from "./InboxSection";
 import { NotebookTree } from "./NotebookTree";

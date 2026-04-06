@@ -1,6 +1,6 @@
 import { ipc } from "@shared/hooks/useIpc";
 import { useQuery } from "@shared/hooks/useQuery";
-import type { NoteListItem, Notebook } from "@shared/types";
+import type { Notebook, NoteListItem } from "@shared/types";
 import { BookOpen, Search } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
