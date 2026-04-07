@@ -428,6 +428,7 @@ impl AgentLoopBuilder {
                             min_days: config.cognitive.accumulate_min_days,
                             domain_bus: self.domain_event_bus.clone(),
                             context_update_queue: self.context_update_queue.clone(),
+                            session_repo: Some(storage::SessionRepo::new(pool.clone())),
                         },
                     );
                     info!("Cognitive background consolidation service started");

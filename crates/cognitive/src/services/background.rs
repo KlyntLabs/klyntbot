@@ -212,6 +212,7 @@ pub struct BackgroundServiceConfig {
     pub min_days: usize,
     pub domain_bus: Option<Arc<bus::DomainEventBus>>,
     pub context_update_queue: Option<Arc<bus::ContextUpdateQueue>>,
+    pub session_repo: Option<storage::SessionRepo>,
 }
 
 /// Background service that processes domain events into cognitive memory.
@@ -238,7 +239,9 @@ impl BackgroundConsolidationService {
             min_days,
             domain_bus,
             context_update_queue,
+            session_repo,
         } = config;
+        let _session_repo = session_repo;
         let cancel_clone = cancel.clone();
         let handle = tokio::spawn(async move {
             // Restore accumulated entries from previous session
