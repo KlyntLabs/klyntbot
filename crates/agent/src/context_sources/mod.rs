@@ -13,6 +13,7 @@ pub mod persona;
 pub mod productivity;
 pub mod project;
 pub mod session_context_source;
+pub mod session_memory_source;
 pub mod todo;
 
 pub use annotation::AnnotationContextSource;
@@ -25,4 +26,5 @@ pub use persona::PersonaContextSource;
 pub use productivity::ProductivityContextSource;
 pub use project::ProjectContextSource;
 pub use session_context_source::SessionContextSource;
+pub use session_memory_source::SessionMemoryContextSource;
 pub use todo::TodoSource;
