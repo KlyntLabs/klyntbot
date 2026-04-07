@@ -1365,7 +1365,11 @@ fn summarize_observation(content: &str) -> String {
         .lines()
         .rev()
         .find(|l| l.starts_with("[user]:"))
-        .map(|l| l.trim_start_matches("[user]: ").trim_start_matches("[user]:").trim());
+        .map(|l| {
+            l.trim_start_matches("[user]: ")
+                .trim_start_matches("[user]:")
+                .trim()
+        });
 
     let base = last_user_line.unwrap_or(content);
 
