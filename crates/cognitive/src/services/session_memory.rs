@@ -173,9 +173,7 @@ async fn update_scratchpad(
     if let Err(e) = memory_repo.upsert(session_key, &content, turn_count).await {
         warn!("SessionMemoryService: failed to persist scratchpad for {session_key}: {e}");
     } else {
-        debug!(
-            "SessionMemoryService: updated scratchpad for {session_key} at turn {turn_count}"
-        );
+        debug!("SessionMemoryService: updated scratchpad for {session_key} at turn {turn_count}");
     }
 }
 

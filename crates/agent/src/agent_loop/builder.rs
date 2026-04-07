@@ -446,9 +446,7 @@ impl AgentLoopBuilder {
 
         // ── Session memory service (per-session scratchpad maintenance) ─────
         let session_memory_service: Option<cognitive::SessionMemoryService> =
-            if let (Some(ref pool), Some(ref domain_bus)) =
-                (&self.pool, &self.domain_event_bus)
-            {
+            if let (Some(ref pool), Some(ref domain_bus)) = (&self.pool, &self.domain_event_bus) {
                 let cancel = CancellationToken::new();
                 let svc = cognitive::SessionMemoryService::start(cognitive::SessionMemoryConfig {
                     event_rx: domain_bus.subscribe(),

@@ -781,15 +781,16 @@ async fn event_to_observation(
                 None
             };
 
-            let (content, importance) = match context {
-                Some(history) => (history, 0.7),
-                None => (user_text.clone(), 0.5),
-            };
+            // Importance stays at 0.5 regardless of context richness.
+            // ChatTurnCompleted produces semantic facts (via extraction), not
+            // episodic memories. The 0.7 threshold in the episodic storage
+            // path should only trigger for distinct events (SessionEnded, etc.).
+            let content = context.unwrap_or_else(|| user_text.clone());
 
             Some(Observation {
                 domain: "general".into(),
                 content,
-                importance,
+                importance: 0.5,
                 source_event: "ChatTurnCompleted".into(),
                 timestamp: now,
             })
