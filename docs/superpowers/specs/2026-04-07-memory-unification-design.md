@@ -422,6 +422,94 @@ let score = relevance_score(
 
 ---
 
+## Retrieval & Context Injection
+
+### Memory-Backed Inline References
+
+When the LLM responds during chat, it should reference the memories it draws from using inline markers. The UI renders these as hoverable tooltips showing full detail.
+
+**Example rendered output:**
+
+> "You mentioned you're learning Rust *(3 sources, confirmed 2d ago)* and your energy drops in the afternoon *(behavioral pattern, 8 signals)*. Based on your notes on ownership *(Note: Rust Ownership Model)*, I'd suggest studying in the morning."
+
+**Mechanism: LLM-generated markers.**
+
+The system prompt instructs the LLM to emit reference markers when it draws on retrieved memory. Markers use the format `[@type:id]` where type is `fact`, `rule`, `note`, `task`, or `episode`.
+
+**System prompt injection (added to retrieved memory section):**
+
+```
+When your response draws on any of the memories below, reference them
+inline using [@type:id] markers. The UI will render these as hoverable
+details for the user. Only reference memories you actually use.
+```
+
+**Retrieved memory format change:**
+
+Currently, retrieved facts are injected as plain text:
+```
+## Relevant Memories
+- Jayden is a software engineer (confidence: 0.9)
+- Jayden is learning Rust (confidence: 0.7)
+```
+
+New format includes IDs, convergence, and freshness for the LLM to reference:
+```
+## Relevant Memories
+- [@fact:a1b2] Jayden is a software engineer [strong, 3 sources, confirmed 1d ago]
+- [@fact:c3d4] Jayden is learning Rust [moderate, 2 sources, confirmed 5d ago]
+- [@rule:e5f6] Take breaks in the afternoon when energy drops [8 signals]
+- [@note:g7h8] "Rust Ownership Model" (Notebook: Programming)
+- [@episode:i9j0] Discussed career goals on 2026-04-05
+```
+
+**Freshness labels** (addresses B4 gap):
+
+| Label | Condition |
+|-------|-----------|
+| `strong` | convergence >= 0.4 OR (confidence >= 0.8 AND updated within 7 days) |
+| `moderate` | confidence >= 0.5 AND updated within 30 days |
+| `weak — verify` | confidence < 0.5 OR not updated in 30+ days OR stability < 0.5 |
+
+**Tooltip data per reference type:**
+
+| Type | Tooltip Content |
+|------|----------------|
+| `fact` | Subject, predicate, object, confidence, convergence score, source types, last accessed, stability |
+| `rule` | Rule text, domain, signal count, created date, last reinforced |
+| `note` | Title, body preview (first 200 chars), notebook name, tags, last edited |
+| `task` | Title, status, due date, project/area, priority |
+| `episode` | Summary, occurred date, access count, importance |
+
+### Frontend Implementation
+
+**Marker parsing:** The chat message renderer parses `[@type:id]` patterns in the LLM response. Each marker is replaced with an inline `(...)` element styled as a subtle reference indicator.
+
+**Tooltip fetching:** On hover, the UI fetches the full detail via a Tauri command (e.g., `memory_reference_detail { ref_type, id }`) which returns the tooltip data. This avoids embedding full metadata in the chat stream.
+
+**Fallback:** If the LLM doesn't emit markers (older sessions, non-memory responses), no references are shown. The feature is additive — it enhances but doesn't break existing behavior.
+
+### CognitiveContextSource Formatting Changes
+
+The static context source (priority 60) is updated to include freshness labels:
+
+**User model facts:**
+```
+## What I Know About You
+- Jayden is a software engineer [strong, confirmed 1d ago]
+- Jayden lives in Melbourne [weak — verify, last confirmed 45d ago]
+```
+
+**Procedural rules (already shows signal counts, add freshness):**
+```
+## Learned Patterns
+### general
+- Take breaks after 90 minutes of focused work (12 signals, active 30d)
+- Morning is peak productivity time (5 signals, active 7d)
+```
+
+---
+
 ## Lifecycle & Compaction
 
 ### Independent Compaction Cron
@@ -519,8 +607,13 @@ Existing events consumed by new collectors:
 9. Stage 2 consolidator with grouping, convergence scoring, heuristic + LLM decision paths
 10. `convergence_score` column on `semantic_facts`
 11. Stage 3 writers executing `PromotionOps`
+12. Retrieved memory format change (IDs + freshness labels in injected context)
+13. `[@type:id]` marker system prompt instruction
+14. Frontend: marker parser in chat renderer + `(...)` inline reference component
+15. Frontend: `memory_reference_detail` Tauri command for tooltip data on hover
+16. CognitiveContextSource freshness labels on user model facts and rules
 
-**Testing:** Each collector testable in isolation with mock queue. Consolidator testable with synthetic signals. Integration test: emit events → verify facts/rules/episodes created.
+**Testing:** Each collector testable in isolation with mock queue. Consolidator testable with synthetic signals. Integration test: emit events → verify facts/rules/episodes created. Frontend: verify markers render as hoverable tooltips with correct detail data.
 
 ### Sub-Project 2: Intelligent Scoring
 
@@ -577,3 +670,5 @@ After implementation:
 8. **Deep Mode uses LLM** — Toggle to Deep Mode. Verify consolidator makes LLM calls. Toggle back to Standard. Verify heuristic-only.
 9. **Retrieval feedback logged** — After LLM response, verify `retrieval_feedback` table has entries with precision > 0.
 10. **Flashcard reviews strengthen facts** — Review a flashcard linked to a semantic fact. Verify fact's stability increases.
+11. **Inline references render** — LLM response includes `[@fact:id]` markers. UI renders them as `(...)` with hoverable tooltips showing full detail.
+12. **Freshness labels visible** — Retrieved memory context shows `[strong]`, `[moderate]`, or `[weak — verify]` labels. CognitiveContextSource includes labels on user model facts.
