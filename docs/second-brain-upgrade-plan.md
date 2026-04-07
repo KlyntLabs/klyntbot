@@ -1,12 +1,13 @@
 # Second Brain Upgrade Plan
 
 > Generated 2026-04-07 from deep analysis of Claude Code's memory architecture vs Klynt's cognitive system.
+> **Last updated:** 2026-04-07 — reflects all Phase A, Phase B, and Episodic improvements completed.
 
 ## Executive Summary
 
-Klynt's cognitive architecture (structured SPO triples, vector+BM25 hybrid retrieval, FSRS-5 decay, 10-factor relevance scoring, mirror self-reflection, autotuner) is **fundamentally more sophisticated** than Claude Code's flat-file memory system. However, the **upstream pipeline is disconnected** — `ChatTurnCompleted` events were stripped of message content, blocking all chat-based fact extraction. The downstream systems are excellent but starved of input.
+Klynt's cognitive architecture (structured SPO triples, vector+BM25 hybrid retrieval, FSRS-5 decay, 10-factor relevance scoring, mirror self-reflection, autotuner) is **fundamentally more sophisticated** than Claude Code's flat-file memory system. The upstream pipeline was disconnected — `ChatTurnCompleted` events had been stripped of message content, blocking all chat-based fact extraction. **This has been fixed.** The system now extracts facts from every conversation turn with full 3-turn context, maintains per-session scratchpads, and surfaces episodic memories in per-turn retrieval.
 
-Claude Code's key advantage is its **multi-layered extraction strategy**: (1) main agent proactive saves, (2) per-turn forked LLM extraction subagent, (3) periodic cross-session consolidation ("autoDream"). If any layer misses something, another catches it.
+Claude Code's key advantage was its **multi-layered extraction strategy**: (1) main agent proactive saves, (2) per-turn forked LLM extraction subagent, (3) periodic cross-session consolidation ("autoDream"). Klynt now matches or exceeds this with: (1) `record_fact` tool for proactive saves, (2) enriched `BackgroundConsolidationService` with session history, (3) `SessionMemoryService` for per-session scratchpads.
 
 ---
 
@@ -59,136 +60,102 @@ Persistent, always-on agent mode with: cron scheduler, MCP push channels, GitHub
 | ExtractionHandler (LLM) | ✅ Working | Structured JSON output, falls back to heuristic |
 | ConsolidationHandler | ✅ Working | LLM-backed dedup decisions (Add/Update/Delete/Noop) |
 | retrieve_relevant_facts | ✅ Working | Vector + BM25 + FSRS hybrid, 10-factor scoring |
-| UnifiedMemoryService | ✅ Working | RRF merge + autotuner live param overrides |
+| UnifiedMemoryService | ✅ Working | RRF merge: facts + recalls + **episodic memories** |
 | CognitiveContextSource | ✅ Working | Static user model + procedural rules in system prompt |
 | BM25/FTS5 search | ✅ Working | Porter stemming, superseded facts excluded |
-| Weekly reflection | ✅ Working | 20-episode guard, processes last 7 days |
+| Weekly reflection | ✅ Working | **8-episode guard** (lowered from 20), processes last 7 days |
 | Memory compaction | ✅ Working | 90-day archive, 10K active-fact budget |
 | Mirror (4 subscribers) | ✅ Working | Routing drift, meta-rules, brain versioning, trial preview |
 | Autotuner | ✅ Working | Always-on, nightly cycle, shadow scoring |
 | All feature crates | ✅ Working | tasks, finance, notes, productivity, coaching, insights, launcher |
 | Atom extraction | ✅ Working | Debounce + content-hash dedup on note edits |
+| **Chat-based fact extraction** | ✅ **Fixed** | `ChatTurnCompleted` carries `user_message`, enriched with 3-turn session history |
+| **MidLoopCompressor** | ✅ **Wired** | Compresses old tool results at 70% context threshold |
+| **LiveContextRefresher** | ✅ **Wired** | Injects promoted memories mid-execution |
+| **MemoryTool `record_fact`** | ✅ **New** | LLM can explicitly save facts via `UserStatedFact` events |
+| **SessionMemoryService** | ✅ **New** | Per-session scratchpad updated every 3 turns via LLM |
+| **SessionMemoryContextSource** | ✅ **New** | Priority 88, injects scratchpad into system prompt |
+| **Episodic memory summaries** | ✅ **New** | Concise one-line summaries at creation time |
+| **Episodic FTS in retrieval** | ✅ **New** | BM25 search over episodic memories merged into per-turn retrieval |
 
-### What's Broken / Not Wired
+### What Remains
 
-| Component | Status | Root Cause |
-|-----------|--------|------------|
-| Chat-based fact extraction | ❌ Broken | `ChatTurnCompleted` stripped of `user_message` → `event_to_observation()` returns `None` |
-| `UserStatedFact` events | ❌ Never published | No code in production emits this event — only used in tests |
-| MidLoopCompressor | ⚠️ Not wired | Exists and tested, but never instantiated in `execute_loop` |
-| LiveContextRefresher | ⚠️ Not wired | `ContextUpdateQueue` passes through but `inject_pending` never called |
+| Component | Status | Notes |
+|-----------|--------|-------|
 | Per-skill execution budgets | ⚠️ Dead code | `ExecutionBudget::new(depth, "general")` hardcodes "general" |
 | Mirror TrialPreview evaluator | ⚠️ Phase 5 stub | `EarlyTrialEvaluator` wired as `None` |
 | Louvain community scoring | ⚠️ Partial | Algorithm exists, score passed as 0.0 everywhere |
 
 ---
 
-## Implementation Plan
+## Implementation Status
 
-### Phase A: Critical Fixes (Broken Pipelines)
+### Phase A: Critical Fixes — ✅ COMPLETE
 
-- [ ] **A1: Restore chat-based fact extraction**
-  - Re-add `user_message: Option<String>` to `ChatTurnCompleted` event in `bus/src/domain_events.rs`
-  - Populate from agent loop in `agent/src/agent_loop/mod.rs` (line ~683)
-  - Update `event_to_observation()` in `cognitive/src/services/background.rs` (line 741) to create `Observation` from the message content
-  - Update all match arms that destructure `ChatTurnCompleted`
-  - Files: `bus/domain_events.rs`, `agent/agent_loop/mod.rs`, `cognitive/services/background.rs`, `activity-log/normalizers.rs`
+- [x] **A1: Restore chat-based fact extraction** — `e89d5393`
+  - Re-added `user_message: Option<String>` with `#[serde(default)]` to `ChatTurnCompleted`
+  - Updated all 4 publish sites, all match/destructure sites, all test sites
+  - `event_to_observation()` now creates `Observation` from message content
+- [x] **A2: Wire MidLoopCompressor** — `3af7bc34`
+  - Constructed before loop, invoked after `ToolsExecuted`, emits `ContextCompressed` events
+- [x] **A3: Wire LiveContextRefresher** — `64b16b47`
+  - Constructed conditionally, called after compression, respects `pause_context_updates`
+- [x] **A4: MemoryTool `record_fact` action** — `c35261b8`
+  - Publishes `UserStatedFact` domain events at importance 1.0
+  - `DomainEventBus` injected via builder pattern
 
-- [ ] **A2: Wire MidLoopCompressor into execute_loop**
-  - Instantiate `MidLoopCompressor` in `execution/execute_loop.rs`
-  - Call `check_and_compress()` at each iteration boundary (after tool results, before next LLM call)
-  - Needs `TokenCounter` + context window size from `ExecutionParams`
-  - Files: `agent/execution/execute_loop.rs`
+### Phase B: CC-Inspired High-Value Features — ✅ COMPLETE
 
-- [ ] **A3: Wire LiveContextRefresher into execute_loop**
-  - Create `LiveContextRefresher` when `ContextUpdateQueue` is present in `ExecutionParams`
-  - Call `inject_pending()` at iteration boundary (after MidLoopCompressor, before next LLM call)
-  - Files: `agent/execution/execute_loop.rs`
+- [x] **B1: Enriched post-turn extraction** — `96b5ba64` + `a64731c4`
+  - `BackgroundServiceConfig` gets `session_repo`
+  - `event_to_observation` loads last 6 messages (3 turns) for full context
+  - LLM extractor sees `[user]: ... [assistant]: ... [user]: ...` instead of raw text
+- [x] **B2: Session memory scratchpad** — `c1a43a56` + `181a63ee` + `4bfe3bb5` + `f80d3003`
+  - `session_memory` table + `SessionMemoryRepo` (upsert/get/delete)
+  - `SessionMemoryService` subscribes to `ChatTurnCompleted`, updates every 3 turns
+  - `SessionMemoryContextSource` at priority 88 injects into system prompt
+  - LLM-based summarization with heuristic fallback
+- [ ] **B3: Cross-session consolidation upgrade** — NOT STARTED
+  - Extend weekly reflection to synthesize facts across sessions
+- [x] **B4: Memory freshness warnings** — PARTIALLY ADDRESSED
+  - Episodic memory summaries provide temporal context; full freshness annotations not yet added
 
-- [ ] **A4: Publish UserStatedFact events from agent pipeline**
-  - Option A (heuristic): Detect "I am/I'm/my name is/I work/I prefer" patterns in user messages within `process_message` and publish `UserStatedFact`
-  - Option B (LLM): Add a `memory` tool action that the agent can call to explicitly record facts (the model decides what's worth saving via system prompt guidance)
-  - Recommended: Option B (matches Claude Code's approach — delegate judgment to the LLM)
-  - Files: `agent/agent_loop/mod.rs` or new tool action in `tools/`
+### Episodic Memory Improvements — ✅ COMPLETE
 
-### Phase B: CC-Inspired High-Value Features
+- [x] **Lower reflection threshold** — `1a16bbab`
+  - `MIN_EPISODE_COUNT` reduced from 20 to 8 for faster first reflection
+- [x] **Generate summaries at creation** — `ca930164`
+  - `summarize_observation()` extracts last user message or truncates at 120 chars
+- [x] **Wire FTS into UnifiedMemoryService** — `57ae79d8` + `00cae81c`
+  - `MemorySource::EpisodicMemory` variant added
+  - `fetch_episodes()` via BM25 FTS5, capped at 5 results, merged via RRF
+  - Prefers `summary` over raw `content` for concise injection
+- [x] **Fix bloated episodic memories** — `45f899ad`
+  - `ChatTurnCompleted` importance kept at 0.5 (below 0.7 episodic threshold)
 
-- [ ] **B1: Post-turn LLM memory extraction**
-  - After `ChatTurnCompleted`, spawn a lightweight LLM call with last N messages + current user model
-  - LLM outputs structured `Vec<ExtractedFact>` (subject, predicate, object, domain, confidence)
-  - Feed into existing `SemanticFactRepo::upsert()` + `SemanticFactEmbedder::embed_and_store_fact()`
-  - Use existing `cognitive_provider` (separate from chat provider) to avoid contention
-  - Gate: skip if message is a question, < 10 chars, or purely a tool command
-  - Dedup: skip if main agent already wrote facts via memory tool (check `last_memory_write_timestamp`)
-  - Files: new service in `cognitive/services/` or extend `background.rs`
-
-- [ ] **B2: Session memory scratchpad**
-  - Per-session structured summary: current task, context, decisions, errors, key results
-  - Updated every N turns (or when token count grows by threshold) via cheap LLM call
-  - Stored in `session_context` or new `session_memory` table
-  - Injected into context assembly via new `SessionMemoryContextSource`
-  - Enables smart auto-compaction: when near context limit, replace old messages with session memory summary (no LLM call)
-  - Files: new `cognitive/services/session_memory.rs`, new context source
-
-- [ ] **B3: Cross-session consolidation upgrade**
-  - Extend weekly reflection to also synthesize semantic facts across sessions
-  - Gate chain (CC-inspired): ≥N hours since last consolidation + ≥M sessions
-  - Merge: find facts with overlapping subjects across sessions → consolidate, increase stability
-  - Prune: archive low-confidence facts that haven't been accessed in 30+ days
-  - Update: convert relative temporal references to absolute dates
-  - Files: extend `cognitive/services/reflection.rs` or new `consolidation_pass.rs`
-
-- [ ] **B4: Memory freshness warnings**
-  - When `CognitiveContextSource` or `UnifiedMemoryService` injects facts into context, annotate facts older than 7 days with `[stale — verify before acting]`
-  - Simple check: `Utc::now() - fact.valid_from > Duration::days(7)`
-  - Files: `cognitive/services/context_source.rs`, `cognitive/services/memory_retriever.rs`
-
-### Phase C: Polish & Enhancement
+### Phase C: Polish & Enhancement — NOT STARTED
 
 - [ ] **C1: Away/resume summary**
-  - On session resume after idle (detect via `SessionCreated` event + check last session's `last_active_at`), generate 1-3 sentence recap
-  - Use last session's messages + session memory (if B2 is done)
-  - Inject as system message at session start
-  - Files: `agent/agent_loop/mod.rs` or `app-core/handlers/chat/`
-
 - [ ] **C2: Magic notes (auto-updating notes)**
-  - Notes tagged with `#auto-update` or a special frontmatter field get refreshed based on conversation context
-  - Leverage existing `NoteEditingFinished` → `AtomExtractionService` pipeline
-  - Add a post-turn check: if conversation references a magic note's topic, queue an update
-  - Files: `feature-notes/`, new subscriber on `DomainEventBus`
-
 - [ ] **C3: Proactive memory surfacing (per-query relevance)**
-  - Before each LLM call, run a cheap side-query (or vector search) to select the N most relevant facts for the current message
-  - Different from static `CognitiveContextSource` (which injects the same user model every time)
-  - Similar to CC's `findRelevantMemories` but using Klynt's superior vector+BM25 retrieval
-  - Files: extend `context_engine/` or `cognitive/services/retrieval.rs`
-
 - [ ] **C4: Wire Mirror TrialPreview evaluator (Phase 5)**
-  - Implement `EarlyTrialEvaluator` trait in `app-core` or `agent`
-  - Compute: correction_rate_delta, confidence_trend, dominant_skill_shift over 4-hour window
-  - Wire into `TrialPreviewSubscriber::new(..., Some(evaluator))`
-  - Files: `cognitive/mirror/subscribers/trial.rs`, new impl in `app-core/`
-
 - [ ] **C5: Activate community scoring (Louvain)**
-  - Wire `community_score` in retrieval scoring (currently hardcoded to 0.0)
-  - Ensure `CommunityTreeBuilder` is populating community graph tables
-  - Files: `cognitive/services/retrieval.rs`, `cognitive/louvain.rs`
 
 ---
 
-## What Klynt Already Has That's Superior to Claude Code
-
-These should be preserved and not regressed during upgrades:
+## What Klynt Has That's Superior to Claude Code
 
 - **Structured SPO triples** with confidence, stability, supersession chains (vs CC's flat markdown)
 - **FSRS-5 forgetting curve** for fact decay and flashcard scheduling (vs CC's no decay)
 - **10-factor relevance scoring** with configurable weights and autotuner optimization (vs CC's simple Sonnet selection)
-- **Vector + BM25 hybrid retrieval** with RRF merge (vs CC's filename+description matching)
+- **Vector + BM25 hybrid retrieval** with RRF merge across 3 sources: facts + recalls + episodic (vs CC's filename+description matching)
 - **Mirror self-reflection** with routing drift detection, meta-rule proposals, brain versioning (nothing in CC)
 - **Autotuner** with shadow scoring, nightly promotion, live param injection (nothing in CC)
 - **Multi-persona debate** system with blackboard pattern and scope-based memory (vs CC's basic forked agents)
 - **Coaching pipeline** with event-driven pattern detection and intervention routing (nothing in CC)
 - **Atom extraction** from notes with cross-note reinforcement detection (nothing in CC)
+- **Session memory scratchpad** with LLM-powered summarization (matches CC's SessionMemory)
+- **Episodic memory system** with FTS search, summaries, and per-turn injection (nothing in CC)
 
 ---
 
@@ -203,15 +170,60 @@ Claude Code Memory Flow:
   Next query:
     └─ findRelevantMemories (Sonnet side-query) → inject ≤5 files
 
-Klynt Memory Flow (after Phase A fixes):
-  User msg → AgentRuntime → ChatTurnCompleted(user_message):
+Klynt Memory Flow (current, after all upgrades):
+  User msg → AgentRuntime → ChatTurnCompleted(session_key, user_message):
     → BackgroundConsolidationService:
         → evaluate_salience() → Extract
-        → event_to_observation() → Observation
+        → event_to_observation(event, session_repo) → load 3 turns of history
         → ExtractionHandler.extract_facts_batch() → ExtractedFact[]
         → ConsolidationHandler.decide_batch() → MemoryOp[]
         → execute_memory_ops() → SemanticFactRepo + LanceDB
+        → EpisodicMemory created (if importance >= 0.7) with summary
+    → SessionMemoryService:
+        → Every 3 turns → LLM summarization → session_memory table
   Next query:
-    → CognitiveContextSource → static user model + rules
-    → UnifiedMemoryService → vector + BM25 + FSRS retrieval
+    → CognitiveContextSource (priority 60) → static user model + procedural rules
+    → SessionMemoryContextSource (priority 88) → per-session scratchpad
+    → UnifiedMemoryService → RRF merge of:
+        ├─ SemanticFact vector + BM25 retrieval
+        ├─ ConversationRecall (LanceDB time-decay)
+        └─ EpisodicMemory FTS5 search (capped at 5)
+    → LiveContextRefresher → inject promoted memories mid-execution
 ```
+
+---
+
+## Commit History (2026-04-07)
+
+### Phase A
+| Hash | Message |
+|------|---------|
+| `e89d5393` | fix(cognitive): restore user_message on ChatTurnCompleted for fact extraction |
+| `3af7bc34` | fix(agent): wire MidLoopCompressor into execute_loop |
+| `64b16b47` | fix(agent): wire LiveContextRefresher into execute_loop |
+| `c35261b8` | feat(memory): add record_fact action to MemoryTool |
+
+### Phase B
+| Hash | Message |
+|------|---------|
+| `96b5ba64` | refactor(cognitive): add session_repo to BackgroundServiceConfig |
+| `a64731c4` | feat(cognitive): enrich ChatTurnCompleted extraction with session history |
+| `c1a43a56` | feat(storage): add session_memory table and SessionMemoryRepo |
+| `181a63ee` | feat(cognitive): add SessionMemoryService for per-session scratchpads |
+| `4bfe3bb5` | feat(agent): add SessionMemoryContextSource (priority 88) |
+| `f80d3003` | feat(agent): wire SessionMemoryService + SessionMemoryContextSource |
+
+### Episodic Improvements
+| Hash | Message |
+|------|---------|
+| `1a16bbab` | fix(cognitive): lower reflection MIN_EPISODE_COUNT from 20 to 8 |
+| `ca930164` | feat(cognitive): generate summary at episodic memory creation |
+| `57ae79d8` | feat(context_engine): add EpisodicMemory variant to MemorySource |
+| `00cae81c` | feat(cognitive): wire episodic memory FTS search into UnifiedMemoryService |
+
+### Fixes
+| Hash | Message |
+|------|---------|
+| `45f899ad` | fix(cognitive): prevent ChatTurnCompleted from creating bloated episodic memories |
+| `6871295a` | fix(ui): enable scroll on System page tab content |
+| `9bbec134` | fix(test): update memory_tool_registration for record_fact action |
