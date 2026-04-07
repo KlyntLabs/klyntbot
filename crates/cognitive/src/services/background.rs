@@ -433,7 +433,7 @@ impl BackgroundConsolidationService {
                                     id: uuid::Uuid::new_v4().to_string(),
                                     domain: obs.domain.clone(),
                                     content: obs.content.clone(),
-                                    summary: None,
+                                    summary: Some(summarize_observation(&obs.content)),
                                     importance: obs.importance,
                                     occurred_at: ts.clone(),
                                     recorded_at: ts,
@@ -1356,6 +1356,30 @@ fn summarize_accumulated(event_type: &str, observations: &[Observation]) -> Obse
     }
 }
 
+/// Generate a concise one-line summary from observation content.
+/// For enriched multi-turn context, extracts just the last user message.
+fn summarize_observation(content: &str) -> String {
+    // For enriched ChatTurnCompleted content (multi-line [role]: text format),
+    // extract just the last user message
+    let last_user_line = content
+        .lines()
+        .rev()
+        .find(|l| l.starts_with("[user]:"))
+        .map(|l| l.trim_start_matches("[user]: ").trim_start_matches("[user]:").trim());
+
+    let base = last_user_line.unwrap_or(content);
+
+    if base.len() <= 120 {
+        base.to_string()
+    } else {
+        let truncated = &base[..120];
+        match truncated.rfind(' ') {
+            Some(pos) if pos > 60 => format!("{}...", &truncated[..pos]),
+            _ => format!("{truncated}..."),
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1673,5 +1697,27 @@ mod tests {
             found[0].mention_count, 2,
             "mention_count should be 2 after two upserts"
         );
+    }
+
+    #[test]
+    fn summarize_observation_short_text() {
+        let result = summarize_observation("User prefers dark mode");
+        assert_eq!(result, "User prefers dark mode");
+    }
+
+    #[test]
+    fn summarize_observation_long_text() {
+        let long = "a ".repeat(100);
+        let result = summarize_observation(&long);
+        assert!(result.len() <= 125);
+        assert!(result.ends_with("..."));
+    }
+
+    #[test]
+    fn summarize_observation_enriched_context() {
+        let enriched =
+            "[user]: What language?\n[assistant]: I can help!\n[user]: I prefer Rust for backend";
+        let result = summarize_observation(enriched);
+        assert_eq!(result, "I prefer Rust for backend");
     }
 }
