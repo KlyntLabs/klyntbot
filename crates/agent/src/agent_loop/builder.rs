@@ -416,6 +416,8 @@ impl AgentLoopBuilder {
                     let accum_repo = cognitive::AccumulatedObservationRepo::new(pool.clone());
                     let failed_obs_repo = cognitive::FailedObservationRepo::new(pool.clone());
                     let cancel = CancellationToken::new();
+                    let (signal_tx, signal_rx) =
+                        cognitive::pipeline::signal_queue(256);
                     let bg_service = cognitive::background::BackgroundConsolidationService::start(
                         cognitive::background::BackgroundServiceConfig {
                             event_rx,
@@ -434,6 +436,11 @@ impl AgentLoopBuilder {
                             context_update_queue: self.context_update_queue.clone(),
                             session_repo: Some(storage::SessionRepo::new(pool.clone())),
                             rule_repo: Some(cognitive::repos::ProceduralRuleRepo::new(
+                                pool.clone(),
+                            )),
+                            signal_tx: Some(signal_tx),
+                            signal_rx: Some(signal_rx),
+                            session_memory_repo: Some(storage::SessionMemoryRepo::new(
                                 pool.clone(),
                             )),
                         },

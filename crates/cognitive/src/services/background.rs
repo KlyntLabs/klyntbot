@@ -217,6 +217,12 @@ pub struct BackgroundServiceConfig {
     pub context_update_queue: Option<Arc<bus::ContextUpdateQueue>>,
     pub session_repo: Option<storage::SessionRepo>,
     pub rule_repo: Option<crate::repos::ProceduralRuleRepo>,
+    /// Unified pipeline signal sender (cloned into collectors).
+    pub signal_tx: Option<crate::pipeline::SignalSender>,
+    /// Unified pipeline signal receiver (moved into event loop).
+    pub signal_rx: Option<crate::pipeline::SignalReceiver>,
+    /// Session memory repo for SessionCollector (optional).
+    pub session_memory_repo: Option<storage::SessionMemoryRepo>,
 }
 
 /// Background service that processes domain events into cognitive memory.
@@ -245,7 +251,36 @@ impl BackgroundConsolidationService {
             context_update_queue,
             session_repo,
             rule_repo,
+            signal_tx,
+            mut signal_rx,
+            session_memory_repo,
         } = config;
+        // ── Spawn unified pipeline collectors ─────────────────────────
+        let mut _collector_handles: Vec<JoinHandle<()>> = Vec::new();
+        if let (Some(ref sig_tx), Some(ref bus)) = (&signal_tx, &domain_bus) {
+            _collector_handles.push(crate::pipeline::AtomCollector::start(
+                bus.subscribe(),
+                sig_tx.clone(),
+                cancel.clone(),
+            ));
+            _collector_handles.push(crate::pipeline::CoachingCollector::start(
+                bus.subscribe(),
+                sig_tx.clone(),
+                cancel.clone(),
+            ));
+            if let Some(ref mem_repo) = session_memory_repo {
+                _collector_handles.push(crate::pipeline::SessionCollector::start(
+                    bus.subscribe(),
+                    sig_tx.clone(),
+                    mem_repo.clone(),
+                    cancel.clone(),
+                ));
+            }
+            info!(
+                "Unified pipeline: {} collector(s) started",
+                _collector_handles.len()
+            );
+        }
         let cancel_clone = cancel.clone();
         let handle = tokio::spawn(async move {
             // Restore accumulated entries from previous session
@@ -728,6 +763,32 @@ impl BackgroundConsolidationService {
                         }
                     }
                     info!("Accumulator pruned: removed {to_remove} low-count entries");
+                }
+
+                // ── Drain unified pipeline signals ─────────────────────
+                if let (Some(ref mut rx), Some(ref rr)) = (&mut signal_rx, &rule_repo) {
+                    let mut signals = Vec::new();
+                    while let Ok(signal) = rx.try_recv() {
+                        signals.push(signal);
+                    }
+                    if !signals.is_empty() {
+                        debug!(
+                            "Unified pipeline: draining {} signal(s)",
+                            signals.len()
+                        );
+                        let clusters = crate::pipeline::group_signals(signals);
+                        let ops = crate::pipeline::heuristic_promote(&clusters);
+                        if !ops.is_empty() {
+                            crate::pipeline::execute_promotions(
+                                &ops,
+                                &repo,
+                                rr,
+                                &episodic_repo,
+                                embedder.as_deref(),
+                            )
+                            .await;
+                        }
+                    }
                 }
 
                 batch_count += 1;
