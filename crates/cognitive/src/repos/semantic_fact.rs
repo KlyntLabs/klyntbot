@@ -104,25 +104,21 @@ impl SemanticFactRepo {
 
     /// Update the convergence score for a fact (incremented when independent sources confirm it).
     pub async fn update_convergence(&self, id: &str, convergence: f64) -> Result<(), sqlx::Error> {
-        sqlx::query(
-            "UPDATE semantic_facts SET convergence_score = ?2 WHERE id = ?1",
-        )
-        .bind(id)
-        .bind(convergence)
-        .execute(&self.pool)
-        .await?;
+        sqlx::query("UPDATE semantic_facts SET convergence_score = ?2 WHERE id = ?1")
+            .bind(id)
+            .bind(convergence)
+            .execute(&self.pool)
+            .await?;
         Ok(())
     }
 
     /// Update the confidence value for a fact.
     pub async fn update_confidence(&self, id: &str, confidence: f64) -> Result<(), sqlx::Error> {
-        sqlx::query(
-            "UPDATE semantic_facts SET confidence = ?2 WHERE id = ?1",
-        )
-        .bind(id)
-        .bind(confidence)
-        .execute(&self.pool)
-        .await?;
+        sqlx::query("UPDATE semantic_facts SET confidence = ?2 WHERE id = ?1")
+            .bind(id)
+            .bind(confidence)
+            .execute(&self.pool)
+            .await?;
         Ok(())
     }
 

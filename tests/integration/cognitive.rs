@@ -459,6 +459,9 @@ async fn test_batch_pipeline_processes_domain_events_end_to_end() {
             context_update_queue: None,
             session_repo: None,
             rule_repo: None,
+            signal_tx: None,
+            signal_rx: None,
+            session_memory_repo: None,
         },
     );
 

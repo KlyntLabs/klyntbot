@@ -1,7 +1,7 @@
 //! Signal queue types for the unified pipeline.
 
-use tokio::sync::mpsc;
 use super::signal::CognitiveSignal;
+use tokio::sync::mpsc;
 
 pub type SignalSender = mpsc::Sender<CognitiveSignal>;
 pub type SignalReceiver = mpsc::Receiver<CognitiveSignal>;

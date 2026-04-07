@@ -3,8 +3,8 @@
 use std::collections::HashSet;
 use tracing::info;
 
-use crate::repos::procedural_rule::word_overlap_ratio;
 use super::signal::{CognitiveSignal, SignalSource};
+use crate::repos::procedural_rule::word_overlap_ratio;
 
 const GROUPING_THRESHOLD: f64 = 0.4;
 
@@ -81,7 +81,10 @@ pub fn group_signals(signals: Vec<CognitiveSignal>) -> Vec<KnowledgeCluster> {
 pub fn heuristic_promote(clusters: &[KnowledgeCluster]) -> Vec<PromotionOp> {
     let mut ops = Vec::new();
     for cluster in clusters {
-        let has_coaching = cluster.signals.iter().any(|s| s.source == SignalSource::CoachingPattern);
+        let has_coaching = cluster
+            .signals
+            .iter()
+            .any(|s| s.source == SignalSource::CoachingPattern);
 
         if has_coaching && cluster.max_confidence >= 0.7 {
             ops.push(PromotionOp::CreateRule {
@@ -114,12 +117,18 @@ pub fn heuristic_promote(clusters: &[KnowledgeCluster]) -> Vec<PromotionOp> {
             });
         }
     }
-    info!("Consolidator: {} ops from {} clusters", ops.len(), clusters.len());
+    info!(
+        "Consolidator: {} ops from {} clusters",
+        ops.len(),
+        clusters.len()
+    );
     ops
 }
 
 fn extract_spo(text: &str) -> (String, String, String) {
-    for pred in ["is a", "is", "has", "prefers", "uses", "works", "likes", "wants", "needs"] {
+    for pred in [
+        "is a", "is", "has", "prefers", "uses", "works", "likes", "wants", "needs",
+    ] {
         if let Some(idx) = text.to_lowercase().find(pred) {
             let subject = text[..idx].trim().to_string();
             let object = text[idx + pred.len()..].trim().to_string();
@@ -152,8 +161,8 @@ fn promotion_source(signals: &[CognitiveSignal]) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use chrono::Utc;
     use crate::pipeline::signal::SignalContext;
+    use chrono::Utc;
 
     fn sig(source: SignalSource, content: &str, domain: &str, confidence: f64) -> CognitiveSignal {
         CognitiveSignal {
@@ -190,7 +199,12 @@ mod tests {
     #[test]
     fn test_group_dissimilar() {
         let clusters = group_signals(vec![
-            sig(SignalSource::ChatTurn, "User is learning Rust", "learning", 0.7),
+            sig(
+                SignalSource::ChatTurn,
+                "User is learning Rust",
+                "learning",
+                0.7,
+            ),
             sig(
                 SignalSource::CoachingPattern,
                 "Take breaks in the afternoon",
@@ -252,7 +266,12 @@ mod tests {
         // s2 becomes merged_subject (higher confidence)
         // s2 vs s3: "Rust language learning" in common → ratio > 0.4 → merge
         let clusters = group_signals(vec![
-            sig(SignalSource::ChatTurn, "User is learning Rust language", "learning", 0.6),
+            sig(
+                SignalSource::ChatTurn,
+                "User is learning Rust language",
+                "learning",
+                0.6,
+            ),
             sig(
                 SignalSource::AtomReinforcement,
                 "Learning Rust language every day",

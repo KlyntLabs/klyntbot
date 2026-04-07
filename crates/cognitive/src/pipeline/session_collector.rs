@@ -10,9 +10,24 @@ use super::signal::{CognitiveSignal, SignalContext, SignalSource};
 use super::SignalSender;
 
 const INSIGHT_KEYWORDS: &[&str] = &[
-    "learned", "decided", "error", "fixed", "important", "remember",
-    "preference", "realized", "discovered", "pattern", "issue", "solution",
-    "goal", "plan", "need", "want", "struggle", "improve",
+    "learned",
+    "decided",
+    "error",
+    "fixed",
+    "important",
+    "remember",
+    "preference",
+    "realized",
+    "discovered",
+    "pattern",
+    "issue",
+    "solution",
+    "goal",
+    "plan",
+    "need",
+    "want",
+    "struggle",
+    "improve",
 ];
 const MIN_SCRATCHPAD_LEN: usize = 50;
 

@@ -772,10 +772,7 @@ impl BackgroundConsolidationService {
                         signals.push(signal);
                     }
                     if !signals.is_empty() {
-                        debug!(
-                            "Unified pipeline: draining {} signal(s)",
-                            signals.len()
-                        );
+                        debug!("Unified pipeline: draining {} signal(s)", signals.len());
                         let clusters = crate::pipeline::group_signals(signals);
                         let ops = crate::pipeline::heuristic_promote(&clusters);
                         if !ops.is_empty() {

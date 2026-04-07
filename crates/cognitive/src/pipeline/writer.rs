@@ -4,10 +4,10 @@ use chrono::Utc;
 use tracing::{debug, info, warn};
 use uuid::Uuid;
 
+use super::consolidator::PromotionOp;
 use crate::embedder::SemanticFactEmbedder;
 use crate::repos::{EpisodicMemoryRepo, ProceduralRuleRepo, SemanticFactRepo};
 use crate::types::{EpisodicMemory, ProceduralRule, SemanticFact};
-use super::consolidator::PromotionOp;
 
 pub async fn execute_promotions(
     ops: &[PromotionOp],
@@ -28,51 +28,49 @@ pub async fn execute_promotions(
                 confidence,
                 convergence,
                 source,
-            } => {
-                match fact_repo.find_similar(subject, predicate).await {
-                    Ok(existing) if !existing.is_empty() => {
-                        let best = &existing[0];
-                        let _ = fact_repo
-                            .update_confidence(&best.id, best.confidence.max(*confidence))
-                            .await;
-                        let _ = fact_repo.update_convergence(&best.id, *convergence).await;
-                        debug!("Writer: reinforced fact '{}'", best.id);
-                    }
-                    _ => {
-                        let now = Utc::now().to_rfc3339();
-                        let fact = SemanticFact {
-                            id: Uuid::new_v4().to_string(),
-                            domain: domain.clone(),
-                            subject: subject.clone(),
-                            predicate: predicate.clone(),
-                            object: object.clone(),
-                            confidence: *confidence,
-                            source: source.clone(),
-                            valid_from: now.clone(),
-                            valid_until: None,
-                            recorded_at: now.clone(),
-                            superseded_at: None,
-                            superseded_by: None,
-                            stability: 1.0,
-                            last_accessed: Some(now),
-                            access_count: 0,
-                            convergence_score: *convergence,
-                            project_id: None,
-                            memory_type: "fact".into(),
-                            scope_type: "system".into(),
-                            scope_id: None,
-                        };
-                        if let Err(e) = fact_repo.upsert(&fact).await {
-                            warn!("Writer: failed to create fact: {e}");
-                        } else {
-                            if let Some(emb) = embedder {
-                                let _ = emb.embed_and_store_fact(&fact).await;
-                            }
-                            facts += 1;
+            } => match fact_repo.find_similar(subject, predicate).await {
+                Ok(existing) if !existing.is_empty() => {
+                    let best = &existing[0];
+                    let _ = fact_repo
+                        .update_confidence(&best.id, best.confidence.max(*confidence))
+                        .await;
+                    let _ = fact_repo.update_convergence(&best.id, *convergence).await;
+                    debug!("Writer: reinforced fact '{}'", best.id);
+                }
+                _ => {
+                    let now = Utc::now().to_rfc3339();
+                    let fact = SemanticFact {
+                        id: Uuid::new_v4().to_string(),
+                        domain: domain.clone(),
+                        subject: subject.clone(),
+                        predicate: predicate.clone(),
+                        object: object.clone(),
+                        confidence: *confidence,
+                        source: source.clone(),
+                        valid_from: now.clone(),
+                        valid_until: None,
+                        recorded_at: now.clone(),
+                        superseded_at: None,
+                        superseded_by: None,
+                        stability: 1.0,
+                        last_accessed: Some(now),
+                        access_count: 0,
+                        convergence_score: *convergence,
+                        project_id: None,
+                        memory_type: "fact".into(),
+                        scope_type: "system".into(),
+                        scope_id: None,
+                    };
+                    if let Err(e) = fact_repo.upsert(&fact).await {
+                        warn!("Writer: failed to create fact: {e}");
+                    } else {
+                        if let Some(emb) = embedder {
+                            let _ = emb.embed_and_store_fact(&fact).await;
                         }
+                        facts += 1;
                     }
                 }
-            }
+            },
             PromotionOp::CreateRule {
                 rule_text,
                 domain,

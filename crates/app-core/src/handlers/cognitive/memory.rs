@@ -1,5 +1,7 @@
 //! Cognitive memory reads and helper functions.
 
+use std::collections::HashMap;
+
 use cognitive::decay::retrievability;
 use cognitive::repos::{load_user_model, SemanticFactRepo, RULE_DOMAINS};
 use cognitive::types::{ProceduralRule, SemanticFact};
@@ -445,5 +447,117 @@ impl AppCore {
             rules_count: 0,
             components,
         })
+    }
+
+    // -- Memory Reference Detail -------------------------------------------------
+
+    pub async fn memory_reference_detail(
+        &self,
+        ref_type: &str,
+        ref_id: &str,
+    ) -> Result<MemoryReferenceDetail, ApiError> {
+        let pool = self.repos.pool();
+
+        match ref_type {
+            "fact" => {
+                let fact_repo = SemanticFactRepo::new(pool.clone());
+                match fact_repo.get(ref_id).await.map_err(map_cognitive_err)? {
+                    Some(f) => {
+                        let mut details = HashMap::new();
+                        details.insert("Domain".to_string(), f.domain.clone());
+                        details.insert(
+                            "Confidence".to_string(),
+                            format!("{:.0}%", f.confidence * 100.0),
+                        );
+                        details.insert("Stability".to_string(), format!("{:.1}", f.stability));
+                        details.insert("Source".to_string(), f.source.clone());
+                        if f.convergence_score > 0.0 {
+                            details.insert(
+                                "Convergence".to_string(),
+                                format!("{:.0}%", f.convergence_score * 100.0),
+                            );
+                        }
+                        Ok(MemoryReferenceDetail {
+                            ref_type: "fact".to_string(),
+                            title: format!("{}: {} = {}", f.subject, f.predicate, f.object),
+                            subtitle: format!("{} domain", f.domain),
+                            details,
+                        })
+                    }
+                    None => Ok(MemoryReferenceDetail {
+                        ref_type: "fact".to_string(),
+                        title: "Unknown fact".to_string(),
+                        subtitle: format!("ID: {}", ref_id),
+                        details: HashMap::new(),
+                    }),
+                }
+            }
+            "rule" => {
+                let rule_repo = cognitive::repos::ProceduralRuleRepo::new(pool.clone());
+                let all_rules = rule_repo
+                    .list_all_active()
+                    .await
+                    .map_err(map_cognitive_err)?;
+                match all_rules.iter().find(|r| r.id == ref_id) {
+                    Some(r) => {
+                        let mut details = HashMap::new();
+                        details.insert("Domain".to_string(), r.domain.clone());
+                        details.insert(
+                            "Confidence".to_string(),
+                            format!("{:.0}%", r.confidence * 100.0),
+                        );
+                        details.insert("Signals".to_string(), r.signal_count.to_string());
+                        details.insert("Source".to_string(), r.source.clone());
+                        Ok(MemoryReferenceDetail {
+                            ref_type: "rule".to_string(),
+                            title: r.rule_text.clone(),
+                            subtitle: format!("{} domain", r.domain),
+                            details,
+                        })
+                    }
+                    None => Ok(MemoryReferenceDetail {
+                        ref_type: "rule".to_string(),
+                        title: "Unknown rule".to_string(),
+                        subtitle: format!("ID: {}", ref_id),
+                        details: HashMap::new(),
+                    }),
+                }
+            }
+            "episode" => {
+                let repo = cognitive::repos::EpisodicMemoryRepo::new(pool.clone());
+                match repo.get(ref_id).await.map_err(map_cognitive_err)? {
+                    Some(m) => {
+                        let mut details = HashMap::new();
+                        details.insert("Domain".to_string(), m.domain.clone());
+                        details.insert(
+                            "Importance".to_string(),
+                            format!("{:.0}%", m.importance * 100.0),
+                        );
+                        details.insert("Occurred".to_string(), m.occurred_at.clone());
+                        Ok(MemoryReferenceDetail {
+                            ref_type: "episode".to_string(),
+                            title: m
+                                .summary
+                                .clone()
+                                .unwrap_or_else(|| m.content.chars().take(120).collect()),
+                            subtitle: format!("{} domain", m.domain),
+                            details,
+                        })
+                    }
+                    None => Ok(MemoryReferenceDetail {
+                        ref_type: "episode".to_string(),
+                        title: "Unknown episode".to_string(),
+                        subtitle: format!("ID: {}", ref_id),
+                        details: HashMap::new(),
+                    }),
+                }
+            }
+            _ => Ok(MemoryReferenceDetail {
+                ref_type: ref_type.to_string(),
+                title: "Unknown reference type".to_string(),
+                subtitle: format!("Type: {}, ID: {}", ref_type, ref_id),
+                details: HashMap::new(),
+            }),
+        }
     }
 }

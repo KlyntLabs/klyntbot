@@ -79,6 +79,9 @@ mod tests {
 
     #[test]
     fn test_unknown_pattern_uses_description() {
-        assert_eq!(pattern_to_rule("unknown", "Custom description"), "Custom description");
+        assert_eq!(
+            pattern_to_rule("unknown", "Custom description"),
+            "Custom description"
+        );
     }
 }

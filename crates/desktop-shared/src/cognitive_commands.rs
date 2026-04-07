@@ -271,3 +271,14 @@ pub struct ReflectionResultResponse {
     pub rule_updates: usize,
     pub summary: String,
 }
+
+// ── Memory Reference Detail ────────────────────────────────────────────
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MemoryReferenceDetail {
+    pub ref_type: String,
+    pub title: String,
+    pub subtitle: String,
+    pub details: std::collections::HashMap<String, String>,
+}

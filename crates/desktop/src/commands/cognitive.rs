@@ -98,6 +98,17 @@ pub async fn coaching_pending_interventions(
     state.coaching_pending_interventions().await
 }
 
+// ── Memory Reference Detail ─────────────────────────────────────────────
+
+#[tauri::command]
+pub async fn memory_reference_detail(
+    state: State<'_, Arc<AppCore>>,
+    ref_type: String,
+    ref_id: String,
+) -> Result<MemoryReferenceDetail, ApiError> {
+    state.memory_reference_detail(&ref_type, &ref_id).await
+}
+
 // ── System Status ───────────────────────────────────────────────────────
 
 #[tauri::command]
@@ -246,6 +257,7 @@ pub(crate) const DEV_COMMANDS: &[&str] = &[
     "cognitive_rules_list",
     "cognitive_memory_stats",
     "cognitive_system_status",
+    "memory_reference_detail",
     "cognitive_fact_create",
     "cognitive_fact_update",
     "cognitive_fact_delete",
@@ -355,6 +367,13 @@ pub(crate) async fn dispatch_dev(
                 .await,
         ),
         "memory_health" => dev::val(core.memory_health().await),
+        "memory_reference_detail" => dev::val(
+            core.memory_reference_detail(
+                &dev::get::<String>(body, "ref_type").unwrap_or_default(),
+                &dev::get::<String>(body, "ref_id").unwrap_or_default(),
+            )
+            .await,
+        ),
         _ => return None,
     })
 }

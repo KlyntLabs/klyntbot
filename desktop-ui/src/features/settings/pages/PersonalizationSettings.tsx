@@ -240,6 +240,9 @@ export function PersonalizationSettings() {
       if ("atomExtraction.enabled" in cognitiveEdits) {
         patch.atomExtraction = { enabled: cognitiveEdits["atomExtraction.enabled"] };
       }
+      if ("intelligenceMode" in cognitiveEdits) {
+        patch.intelligenceMode = cognitiveEdits.intelligenceMode;
+      }
       await ipc("config_update_section", { section: "cognitive", patch });
       refetchCognitive();
       setCognitiveEdits({});
@@ -427,6 +430,30 @@ export function PersonalizationSettings() {
                   className="w-full px-3 py-1.5 text-xs text-foreground bg-accent border border-border rounded-md focus:outline-none focus:border-brand/50 transition-colors placeholder:text-dim"
                 />
               )}
+            </div>
+
+            <div className="flex items-center justify-between pt-1 border-t border-border">
+              <div>
+                <span className="text-xs text-muted-foreground">Deep Intelligence Mode</span>
+                <p className="text-[11px] text-dim">
+                  Use full LLM processing for memory extraction and consolidation instead of
+                  heuristics. Higher quality but uses more tokens.
+                </p>
+              </div>
+              <Toggle
+                checked={
+                  "intelligenceMode" in cognitiveEdits
+                    ? cognitiveEdits.intelligenceMode === "deep"
+                    : (cognitive as CognitiveData & { intelligenceMode?: string })
+                        .intelligenceMode === "deep"
+                }
+                onChange={(v) =>
+                  setCognitiveEdits((prev) => ({
+                    ...prev,
+                    intelligenceMode: v ? "deep" : "standard",
+                  }))
+                }
+              />
             </div>
 
             <div className="flex items-center justify-between pt-1 border-t border-border">

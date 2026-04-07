@@ -9,6 +9,7 @@ export {
 } from "./ContextMenu";
 export { Input, type InputProps } from "./Input";
 export { KlyntLogo } from "./KlyntLogo";
+export { MemoryReference } from "./MemoryReference";
 export { Progress, type ProgressProps } from "./Progress";
 export { ProgressRing } from "./ProgressRing";
 export { SaveButton, type SaveButtonProps } from "./SaveButton";

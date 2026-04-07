@@ -416,8 +416,7 @@ impl AgentLoopBuilder {
                     let accum_repo = cognitive::AccumulatedObservationRepo::new(pool.clone());
                     let failed_obs_repo = cognitive::FailedObservationRepo::new(pool.clone());
                     let cancel = CancellationToken::new();
-                    let (signal_tx, signal_rx) =
-                        cognitive::pipeline::signal_queue(256);
+                    let (signal_tx, signal_rx) = cognitive::pipeline::signal_queue(256);
                     let bg_service = cognitive::background::BackgroundConsolidationService::start(
                         cognitive::background::BackgroundServiceConfig {
                             event_rx,
