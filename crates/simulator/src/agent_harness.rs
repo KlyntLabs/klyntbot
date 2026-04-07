@@ -19,6 +19,25 @@ use crate::agent_types::{AgentBreakpoint, AgentResult, BreakpointKind};
 use crate::persona::types::AnnotatedMessage;
 use crate::providers::SimulationProvider;
 
+/// Counters collected from the agent event drain.
+#[derive(Default)]
+struct EventDrainResult {
+    tool_calls: Vec<String>,
+    iterations: u32,
+    prompt_tokens: u32,
+    completion_tokens: u32,
+    cache_read_tokens: u32,
+    cache_write_tokens: u32,
+    cost_micro: u64,
+    tool_failures: u32,
+    context_compressions: u32,
+    compression_ratio_sum: f64,
+    delegation_attempts: u32,
+    delegation_successes: u32,
+    mcp_ready: u32,
+    mcp_failed: u32,
+}
+
 // ── Error-injecting tool wrapper ─────────────────────────────────────
 
 /// Wraps a tool and probabilistically returns an error on `execute`.
@@ -140,6 +159,7 @@ impl AgentHarness {
         provider_error_rate: f64,
         error_injection_rate: f64,
         seed: u64,
+        context_window: usize,
     ) -> common::Result<Self> {
         let inner_provider = create_provider(provider_name, model, seed);
 
@@ -212,7 +232,7 @@ impl AgentHarness {
             agent::RuntimeConfig {
                 execution_model: model.to_string(),
                 provider_name: provider_name.to_string(),
-                context_window: 128_000,
+                context_window,
                 max_response_tokens: 8_192,
             },
             hot_config,
@@ -352,6 +372,12 @@ impl AgentHarness {
             let mut cache_write_tokens = 0u32;
             let mut cost_micro = 0u64;
             let mut tool_failures = 0u32;
+            let mut context_compressions = 0u32;
+            let mut compression_ratio_sum = 0.0f64;
+            let mut delegation_attempts = 0u32;
+            let mut delegation_successes = 0u32;
+            let mut mcp_ready = 0u32;
+            let mut mcp_failed = 0u32;
 
             while let Some(event) = event_rx.recv().await {
                 match event {
@@ -399,10 +425,32 @@ impl AgentHarness {
                     AgentEvent::Error { message } => {
                         eprintln!("      ✗ error: {message}");
                     }
+                    AgentEvent::ContextCompressed {
+                        before_tokens,
+                        after_tokens,
+                        ..
+                    } => {
+                        context_compressions += 1;
+                        if before_tokens > 0 {
+                            compression_ratio_sum += after_tokens as f64 / before_tokens as f64;
+                        }
+                    }
+                    AgentEvent::DelegationStarted { .. } => {
+                        delegation_attempts += 1;
+                    }
+                    AgentEvent::DelegationCompleted { success, .. } => {
+                        if success {
+                            delegation_successes += 1;
+                        }
+                    }
+                    AgentEvent::McpStartupComplete { ready, failed, .. } => {
+                        mcp_ready += ready as u32;
+                        mcp_failed += failed as u32;
+                    }
                     _ => {}
                 }
             }
-            (
+            EventDrainResult {
                 tool_calls,
                 iterations,
                 prompt_tokens,
@@ -411,7 +459,13 @@ impl AgentHarness {
                 cache_write_tokens,
                 cost_micro,
                 tool_failures,
-            )
+                context_compressions,
+                compression_ratio_sum,
+                delegation_attempts,
+                delegation_successes,
+                mcp_ready,
+                mcp_failed,
+            }
         });
 
         let result = self
@@ -432,16 +486,7 @@ impl AgentHarness {
             .await;
 
         // Wait for event drain to finish and collect results
-        let (
-            tool_calls,
-            iterations,
-            drain_prompt,
-            drain_completion,
-            drain_cache_read,
-            drain_cache_write,
-            drain_cost_micro,
-            drain_tool_failures,
-        ) = event_drain.await.unwrap_or_default();
+        let drain = event_drain.await.unwrap_or_default();
 
         let mut breakpoints = Vec::new();
         let phase = msg.phase.to_string();
@@ -480,17 +525,23 @@ impl AgentHarness {
                 AgentResult {
                     selected_skill: runtime_result.agent_name,
                     mode_used: runtime_result.mode_used,
-                    tool_calls,
-                    iterations,
+                    tool_calls: drain.tool_calls,
+                    iterations: drain.iterations,
                     response: runtime_result.content,
                     error: None,
                     breakpoints,
-                    prompt_tokens: drain_prompt,
-                    completion_tokens: drain_completion,
-                    cache_read_tokens: drain_cache_read,
-                    cache_write_tokens: drain_cache_write,
-                    cost_usd: drain_cost_micro as f64 / 1_000_000.0,
-                    tool_failures: drain_tool_failures,
+                    prompt_tokens: drain.prompt_tokens,
+                    completion_tokens: drain.completion_tokens,
+                    cache_read_tokens: drain.cache_read_tokens,
+                    cache_write_tokens: drain.cache_write_tokens,
+                    cost_usd: drain.cost_micro as f64 / 1_000_000.0,
+                    tool_failures: drain.tool_failures,
+                    context_compressions: drain.context_compressions,
+                    compression_ratio_sum: drain.compression_ratio_sum,
+                    delegation_attempts: drain.delegation_attempts,
+                    delegation_successes: drain.delegation_successes,
+                    mcp_ready: drain.mcp_ready,
+                    mcp_failed: drain.mcp_failed,
                 }
             }
             Err(e) => {
@@ -517,17 +568,23 @@ impl AgentHarness {
                 AgentResult {
                     selected_skill: String::new(),
                     mode_used: "error".to_string(),
-                    tool_calls,
-                    iterations,
+                    tool_calls: drain.tool_calls,
+                    iterations: drain.iterations,
                     response: String::new(),
                     error: Some(error_str),
                     breakpoints,
-                    prompt_tokens: drain_prompt,
-                    completion_tokens: drain_completion,
-                    cache_read_tokens: drain_cache_read,
-                    cache_write_tokens: drain_cache_write,
-                    cost_usd: drain_cost_micro as f64 / 1_000_000.0,
-                    tool_failures: drain_tool_failures,
+                    prompt_tokens: drain.prompt_tokens,
+                    completion_tokens: drain.completion_tokens,
+                    cache_read_tokens: drain.cache_read_tokens,
+                    cache_write_tokens: drain.cache_write_tokens,
+                    cost_usd: drain.cost_micro as f64 / 1_000_000.0,
+                    tool_failures: drain.tool_failures,
+                    context_compressions: drain.context_compressions,
+                    compression_ratio_sum: drain.compression_ratio_sum,
+                    delegation_attempts: drain.delegation_attempts,
+                    delegation_successes: drain.delegation_successes,
+                    mcp_ready: drain.mcp_ready,
+                    mcp_failed: drain.mcp_failed,
                 }
             }
         }

@@ -253,6 +253,11 @@ fn get_metric_value(snapshot: &MetricSnapshot, metric: &MetricName) -> f64 {
         MetricName::FocusQualityTrend => snapshot.focus_quality_trend,
         MetricName::BudgetAdherence => snapshot.budget_adherence,
         MetricName::CrossDomainInsightRate => snapshot.cross_domain_insight_rate,
+        MetricName::ContextCompressionRatio => snapshot.context_compression_ratio,
+        MetricName::DelegationSuccessRate => snapshot.delegation_success_rate,
+        MetricName::McpAvailability => snapshot.mcp_availability,
+        MetricName::CommunityChurnRate => snapshot.community_churn_rate,
+        MetricName::DebateAvgConsensus => snapshot.debate_avg_consensus,
     }
 }
 

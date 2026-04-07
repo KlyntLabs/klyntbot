@@ -630,6 +630,19 @@ async fn run_software_engineer_1mo() {
         fm.cross_domain_insight_rate
     );
     eprintln!();
+    eprintln!("  SIGNAL COVERAGE");
+    eprintln!(
+        "    Compression ratio:    {:.3}",
+        fm.context_compression_ratio
+    );
+    eprintln!(
+        "    Delegation success:   {:.3}",
+        fm.delegation_success_rate
+    );
+    eprintln!("    MCP availability:     {:.3}", fm.mcp_availability);
+    eprintln!("    Community churn:      {:.3}", fm.community_churn_rate);
+    eprintln!("    Debate consensus:     {:.3}", fm.debate_avg_consensus);
+    eprintln!();
     eprintln!("  TIER 3 — System Health");
     eprintln!("    Community stability:  {:.3}", fm.community_stability);
     eprintln!("    Brain ver velocity:   {}", fm.brain_version_velocity);
@@ -735,6 +748,19 @@ async fn run_agent_validation_1week() {
         "    Cross-domain rate:    {:.3}",
         fm.cross_domain_insight_rate
     );
+    eprintln!();
+    eprintln!("  SIGNAL COVERAGE");
+    eprintln!(
+        "    Compression ratio:    {:.3}",
+        fm.context_compression_ratio
+    );
+    eprintln!(
+        "    Delegation success:   {:.3}",
+        fm.delegation_success_rate
+    );
+    eprintln!("    MCP availability:     {:.3}", fm.mcp_availability);
+    eprintln!("    Community churn:      {:.3}", fm.community_churn_rate);
+    eprintln!("    Debate consensus:     {:.3}", fm.debate_avg_consensus);
     eprintln!();
     eprintln!("  TIER 3 — System Health");
     eprintln!("    Community stability:  {:.3}", fm.community_stability);

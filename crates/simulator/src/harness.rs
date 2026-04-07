@@ -3,7 +3,7 @@
 //! GroundTruthVerifier, and ReportGenerator.
 
 use std::collections::HashMap;
-use std::sync::atomic::{AtomicU32, Ordering};
+use std::sync::atomic::{AtomicU32, AtomicU64, Ordering};
 use std::sync::Arc;
 use std::time::Instant;
 
@@ -18,8 +18,8 @@ use crate::epoch::{CronTrigger, EpochStep, SimulatedEpoch};
 use crate::metrics::ground_truth::{CheckpointResult, GroundTruthVerifier};
 use crate::metrics::memory::{measure_knowledge_retention, measure_retrieval_quality};
 use crate::metrics::system::{
-    count_brain_versions_since, measure_autotuner_success, measure_community_stability,
-    measure_insight_usefulness,
+    count_brain_versions_since, count_communities, measure_autotuner_success,
+    measure_community_stability, measure_insight_usefulness,
 };
 use crate::metrics::MetricCollector;
 use crate::persona::types::SimulatedToolAction;
@@ -279,6 +279,7 @@ impl SimulationHarness {
                 max_provider_error_rate,
                 max_error_injection_rate,
                 scenario.persona.seed,
+                scenario.simulation.agent_context_window,
             )
             .await
             {
@@ -423,6 +424,20 @@ impl SimulationHarness {
                         let escalation = 0.15 + situation.deadline_pressure * 0.10;
                         situation.deadline_pressure =
                             (situation.deadline_pressure + escalation).min(1.0);
+                    }
+                    DomainEvent::SquadDebateCompleted {
+                        consensus_score,
+                        token_cost,
+                        ..
+                    } => {
+                        cc_inner.debate_count.fetch_add(1, Ordering::Relaxed);
+                        cc_inner.debate_consensus_sum_x1000.fetch_add(
+                            (*consensus_score * 1000.0) as u32,
+                            Ordering::Relaxed,
+                        );
+                        cc_inner
+                            .debate_token_cost
+                            .fetch_add(*token_cost, Ordering::Relaxed);
                     }
                     _ => {}
                 }
@@ -1106,6 +1121,17 @@ impl SimulationHarness {
                         acc.total_cache_read_tokens += agent_result.cache_read_tokens as u64;
                     }
 
+                    // Signal coverage from agent events
+                    {
+                        let acc = metrics.accumulator_mut();
+                        acc.context_compressions += agent_result.context_compressions;
+                        acc.compression_ratio_sum += agent_result.compression_ratio_sum;
+                        acc.delegation_attempts += agent_result.delegation_attempts;
+                        acc.delegation_successes += agent_result.delegation_successes;
+                        acc.mcp_ready += agent_result.mcp_ready;
+                        acc.mcp_failed += agent_result.mcp_failed;
+                    }
+
                     // Track cross-feature workflows
                     if let Some(ref wf) = msg.workflow {
                         total_workflows += 1;
@@ -1329,6 +1355,18 @@ impl SimulationHarness {
             metrics.accumulator_mut().coaching_stop +=
                 coaching_counters.stop.swap(0, Ordering::Relaxed);
 
+            // Drain debate counters from coaching listener
+            let debate_count = coaching_counters.debate_count.swap(0, Ordering::Relaxed);
+            let debate_consensus_x1000 = coaching_counters
+                .debate_consensus_sum_x1000
+                .swap(0, Ordering::Relaxed);
+            metrics.accumulator_mut().debate_count += debate_count;
+            metrics.accumulator_mut().debate_consensus_sum +=
+                debate_consensus_x1000 as f64 / 1000.0;
+            metrics.accumulator_mut().debate_token_cost += coaching_counters
+                .debate_token_cost
+                .swap(0, Ordering::Relaxed);
+
             // Seed a routing snapshot for the day's messages.
             if !messages.is_empty() {
                 let mut topic_counts: HashMap<String, u32> = HashMap::new();
@@ -1402,6 +1440,10 @@ impl SimulationHarness {
             let knowledge_retention =
                 measure_knowledge_retention(&self.fact_repo, &known_facts).await;
             let community_stability = measure_community_stability(&self.inner_pool).await;
+            let (total_communities, weakened_communities) =
+                count_communities(&self.inner_pool).await;
+            metrics.accumulator_mut().communities_discovered = total_communities;
+            metrics.accumulator_mut().communities_weakened = weakened_communities;
             let epoch_start_str = plan.previous.to_rfc3339();
             let _epoch_end_str = plan.simulated_now.to_rfc3339();
             let brain_versions =
@@ -2285,6 +2327,9 @@ struct CoachingCounters {
     helpful: AtomicU32,
     dismissed: AtomicU32,
     stop: AtomicU32,
+    debate_count: AtomicU32,
+    debate_consensus_sum_x1000: AtomicU32,
+    debate_token_cost: AtomicU64,
 }
 
 /// Select a synthetic `FeedbackResponse` based on trigger confidence and a

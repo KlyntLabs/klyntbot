@@ -67,6 +67,13 @@ pub struct MetricSnapshot {
     pub focus_quality_trend: f64,
     pub budget_adherence: f64,
     pub cross_domain_insight_rate: f64,
+    // Signal coverage metrics
+    pub context_compression_ratio: f64,
+    pub delegation_success_rate: f64,
+    pub mcp_availability: f64,
+    pub community_churn_rate: f64,
+    pub debate_avg_consensus: f64,
+    pub debate_count: u32,
 }
 
 // ---------------------------------------------------------------------------
@@ -172,6 +179,19 @@ pub struct EpochAccumulator {
     pub budget_alerts_over: u32,
     // Cross-domain insights
     pub cross_domain_dots: u32,
+    // Signal coverage — agent events
+    pub context_compressions: u32,
+    pub compression_ratio_sum: f64,
+    pub delegation_attempts: u32,
+    pub delegation_successes: u32,
+    pub mcp_ready: u32,
+    pub mcp_failed: u32,
+    // Signal coverage — domain events
+    pub communities_discovered: u32,
+    pub communities_weakened: u32,
+    pub debate_count: u32,
+    pub debate_consensus_sum: f64,
+    pub debate_token_cost: u64,
 }
 
 // ---------------------------------------------------------------------------
@@ -419,6 +439,35 @@ impl MetricCollector {
 
         let cross_domain_insight_rate = acc.cross_domain_dots as f64 / msgs;
 
+        // Signal coverage computations
+        let context_compression_ratio = if acc.context_compressions == 0 {
+            0.0
+        } else {
+            acc.compression_ratio_sum / acc.context_compressions as f64
+        };
+        let delegation_success_rate = if acc.delegation_attempts == 0 {
+            0.0
+        } else {
+            acc.delegation_successes as f64 / acc.delegation_attempts as f64
+        };
+        let mcp_total = acc.mcp_ready + acc.mcp_failed;
+        let mcp_availability = if mcp_total == 0 {
+            1.0 // No MCP usage = fully available by default
+        } else {
+            acc.mcp_ready as f64 / mcp_total as f64
+        };
+        let community_churn_rate = if acc.communities_discovered == 0 {
+            0.0
+        } else {
+            acc.communities_weakened as f64 / acc.communities_discovered as f64
+        };
+        let debate_avg_consensus = if acc.debate_count == 0 {
+            0.0
+        } else {
+            acc.debate_consensus_sum / acc.debate_count as f64
+        };
+        let debate_count = acc.debate_count;
+
         let snap = MetricSnapshot {
             epoch,
             knowledge_retention,
@@ -456,6 +505,13 @@ impl MetricCollector {
             focus_quality_trend,
             budget_adherence,
             cross_domain_insight_rate,
+            // Signal coverage
+            context_compression_ratio,
+            delegation_success_rate,
+            mcp_availability,
+            community_churn_rate,
+            debate_avg_consensus,
+            debate_count,
             // Populated post-snapshot via update_latest_cost_and_estimation
             cost_per_outcome_usd: 0.0,
             cache_hit_rate: 0.0,

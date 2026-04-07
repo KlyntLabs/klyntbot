@@ -48,6 +48,10 @@ pub struct SimulationConfig {
     /// Depth mode for agent execution. Default: Normal.
     #[serde(default)]
     pub agent_depth_mode: DepthMode,
+    /// Context window size for agent execution. Lower values trigger
+    /// mid-loop compression. Default: 128000.
+    #[serde(default = "default_agent_context_window")]
+    pub agent_context_window: usize,
 }
 
 fn default_cognitive_llm_model() -> String {
@@ -94,6 +98,10 @@ fn default_agent_model() -> String {
     "deepseek-chat".to_string()
 }
 
+fn default_agent_context_window() -> usize {
+    128_000
+}
+
 impl Default for SimulationConfig {
     fn default() -> Self {
         Self {
@@ -110,6 +118,7 @@ impl Default for SimulationConfig {
             agent_provider: default_agent_provider(),
             agent_model: default_agent_model(),
             agent_depth_mode: DepthMode::default(),
+            agent_context_window: default_agent_context_window(),
         }
     }
 }
@@ -163,6 +172,12 @@ pub enum MetricName {
     FocusQualityTrend,
     BudgetAdherence,
     CrossDomainInsightRate,
+    // Signal coverage metrics
+    ContextCompressionRatio,
+    DelegationSuccessRate,
+    McpAvailability,
+    CommunityChurnRate,
+    DebateAvgConsensus,
 }
 
 // ── Checkpoint assertions ──────────────────────────────────────────────
