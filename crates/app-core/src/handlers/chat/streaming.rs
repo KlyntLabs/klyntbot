@@ -39,6 +39,9 @@ pub struct ChatStreamInfo {
     pub has_context: bool,
     /// True when the session was just created (not a follow-up in an existing thread).
     pub is_new_session: bool,
+    /// The user message text, forwarded to `relay_chat_stream` so it can publish
+    /// `ChatTurnCompleted` after the assistant response is persisted.
+    pub user_message: Option<String>,
 }
 
 // ── Helper functions (private) ──────────────────────────────────────────
@@ -814,6 +817,7 @@ pub async fn chat_send(
     // 3. Call agent with streaming (agent loop stores user + assistant messages)
     let msg_id = uuid::Uuid::new_v4();
     let now = chrono::Utc::now();
+    let user_message = content.clone();
     let streaming_handle = agent
         .process_direct_streaming(content.clone(), session_key.clone())
         .await
@@ -841,6 +845,7 @@ pub async fn chat_send(
         interaction_rx: streaming_handle.interaction_rx,
         has_context,
         is_new_session,
+        user_message: Some(user_message),
     };
 
     Ok((user_msg, stream_info))
@@ -938,6 +943,8 @@ pub async fn relay_chat_stream(
     emitter: Arc<dyn crate::events::AppEventEmitter>,
     has_context: bool,
     journey_tracker: Option<crate::journey::JourneyTracker>,
+    domain_event_bus: Option<Arc<bus::DomainEventBus>>,
+    user_message: Option<String>,
 ) {
     // Guard ensures active_streams + pending_interactions cleanup even on panic
     struct StreamGuard {
@@ -1154,6 +1161,13 @@ pub async fn relay_chat_stream(
                                 }
                                 Err(e) => tracing::warn!("metadata persist failed for {sk}: {e}"),
                             }
+                        }
+                        // Publish ChatTurnCompleted AFTER response is saved to session
+                        if let Some(ref bus) = domain_event_bus {
+                            bus.publish(bus::DomainEvent::ChatTurnCompleted {
+                                session_key: sk.to_string(),
+                                user_message: user_message.clone(),
+                            });
                         }
                         // Wire: FirstChatResponse journey milestone
                         if let Some(ref tracker) = journey_tracker {
@@ -1620,7 +1634,6 @@ impl AppCore {
                 .await;
         }
 
-        let user_content = content.clone();
         let result = chat_send(
             &self.repos,
             &self.agent,
@@ -1635,14 +1648,6 @@ impl AppCore {
         self.event_emitter
             .emit_chat_thread(result.1.is_new_session, &result.1.session_key);
 
-        // Publish chat turn to cognitive consolidation pipeline
-        if let Some(bus) = &self.domain_event_bus {
-            bus.publish(bus::DomainEvent::ChatTurnCompleted {
-                session_key,
-                user_message: Some(user_content),
-            });
-        }
-
         Ok(result)
     }
 
@@ -1653,7 +1658,6 @@ impl AppCore {
         content: String,
         session_key: String,
     ) -> Result<(ChatMessageResponse, ChatStreamInfo), ApiError> {
-        let user_content = content.clone();
         let result = chat_send(
             &self.repos,
             &self.agent,
@@ -1667,14 +1671,6 @@ impl AppCore {
 
         self.event_emitter
             .emit_chat_thread(result.1.is_new_session, &result.1.session_key);
-
-        // Publish chat turn to cognitive consolidation pipeline
-        if let Some(bus) = &self.domain_event_bus {
-            bus.publish(bus::DomainEvent::ChatTurnCompleted {
-                session_key,
-                user_message: Some(user_content),
-            });
-        }
 
         Ok(result)
     }
@@ -1811,15 +1807,8 @@ impl AppCore {
             interaction_rx,
             has_context,
             is_new_session,
+            user_message: Some(content),
         };
-
-        // Publish chat turn to cognitive consolidation pipeline
-        if let Some(bus) = &self.domain_event_bus {
-            bus.publish(bus::DomainEvent::ChatTurnCompleted {
-                session_key,
-                user_message: Some(content),
-            });
-        }
 
         Ok((user_msg, stream_info))
     }
@@ -1860,6 +1849,7 @@ impl AppCore {
         let active_streams = Arc::clone(&self.active_streams);
         let pending_interactions = Arc::clone(&self.pending_interactions);
         let journey_tracker = self.journey_tracker.clone();
+        let domain_event_bus = self.domain_event_bus.clone();
 
         tokio::spawn(relay_chat_stream(
             repos,
@@ -1871,6 +1861,8 @@ impl AppCore {
             emitter,
             stream_info.has_context,
             journey_tracker,
+            domain_event_bus,
+            stream_info.user_message,
         ));
     }
 }
