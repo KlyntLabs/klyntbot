@@ -113,7 +113,7 @@ export function SystemPage() {
       </div>
 
       {/* Tab Content */}
-      <div className="flex-1 overflow-hidden">
+      <div className="flex-1 overflow-y-auto">
         <Suspense
           fallback={
             <div className="flex items-center justify-center h-full text-muted-foreground text-sm">
