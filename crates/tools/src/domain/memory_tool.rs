@@ -4,6 +4,7 @@
 //! Supports both conversation-only search and unified Todo+Conversation search via RRF.
 
 use async_trait::async_trait;
+use bus::DomainEventBus;
 use serde_json::{json, Value};
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -26,6 +27,8 @@ pub struct MemoryTool {
     todo_embedding_handler: Option<Arc<dyn EmbeddingHandler>>,
     /// LanceDB vector store for todo semantic search
     embedding_store: Option<storage::VectorStore>,
+    /// Domain event bus for publishing facts
+    domain_bus: Option<Arc<DomainEventBus>>,
 }
 
 impl MemoryTool {
@@ -38,6 +41,7 @@ impl MemoryTool {
             todo_repo: None,
             todo_embedding_handler: None,
             embedding_store: None,
+            domain_bus: None,
         }
     }
 
@@ -79,6 +83,12 @@ impl MemoryTool {
         self.embedding_store = Some(store);
         self
     }
+
+    /// Inject domain event bus for publishing facts.
+    pub fn with_domain_bus(mut self, bus: Arc<DomainEventBus>) -> Self {
+        self.domain_bus = Some(bus);
+        self
+    }
 }
 
 impl Default for MemoryTool {
@@ -94,7 +104,7 @@ impl Tool for MemoryTool {
     }
 
     fn description(&self) -> &str {
-        "Search past conversations using semantic similarity. Actions: search_conversations (search conversation history), search_all (unified search across todos and conversations), purge (clear embeddings), status (show memory stats)."
+        "Search past conversations using semantic similarity and record user facts. Actions: search_conversations (search conversation history), search_all (unified search across todos and conversations), purge (clear embeddings), status (show memory stats), record_fact (record a fact about the user into the cognitive pipeline)."
     }
 
     fn metadata(&self) -> tools_core::ToolMetadata {
@@ -118,7 +128,7 @@ impl Tool for MemoryTool {
             "properties": {
                 "action": {
                     "type": "string",
-                    "enum": ["search_conversations", "search_all", "purge", "status"],
+                    "enum": ["search_conversations", "search_all", "purge", "status", "record_fact"],
                     "description": "Action to perform"
                 },
                 "query": {
@@ -149,6 +159,15 @@ impl Tool for MemoryTool {
                 "before_date": {
                     "type": "string",
                     "description": "ISO 8601 date for before_date filter (purge action)"
+                },
+                "fact": {
+                    "type": "string",
+                    "description": "A fact about the user to remember (required for record_fact)"
+                },
+                "domain": {
+                    "type": "string",
+                    "enum": ["identity", "energy", "work", "finance", "learning", "preferences", "general"],
+                    "description": "Domain category for the fact (required for record_fact)"
                 }
             }
         })
@@ -165,6 +184,7 @@ impl Tool for MemoryTool {
             "search_all" => self.search_all(&args).await,
             "purge" => self.purge_embeddings(&args).await,
             "status" => self.show_status().await,
+            "record_fact" => self.record_fact(&args).await,
             _ => Err(common::KlyntbotError::Tool(
                 common::ToolError::InvalidParams(format!("Unknown action: {}", action)),
             )),
@@ -487,6 +507,30 @@ impl MemoryTool {
         ))
     }
 
+    /// Record a user-stated fact and publish it as a domain event.
+    async fn record_fact(&self, args: &Value) -> Result<String> {
+        let fact = args
+            .get("fact")
+            .and_then(|v| v.as_str())
+            .ok_or_else(|| common::ToolError::InvalidParams("fact required".to_string()))?;
+
+        let domain = args
+            .get("domain")
+            .and_then(|v| v.as_str())
+            .unwrap_or("general");
+
+        let bus = self.domain_bus.as_ref().ok_or_else(|| {
+            common::ToolError::InvalidParams("Fact recording not available".to_string())
+        })?;
+
+        bus.publish(bus::DomainEvent::UserStatedFact {
+            fact: fact.to_string(),
+            domain: domain.to_string(),
+        });
+
+        Ok(format!("Recorded: \"{fact}\" (domain: {domain})"))
+    }
+
     /// Show conversation recall status.
     async fn show_status(&self) -> Result<String> {
         let handler = self.conversation_handler.as_ref().ok_or_else(|| {
@@ -584,7 +628,7 @@ mod tests {
         assert_eq!(params["required"], json!(["action"]));
         assert_eq!(
             params["properties"]["action"]["enum"],
-            json!(["search_conversations", "search_all", "purge", "status"])
+            json!(["search_conversations", "search_all", "purge", "status", "record_fact"])
         );
     }
 
@@ -593,13 +637,14 @@ mod tests {
         let tool = MemoryTool::new();
         let params = tool.parameters();
 
-        // Verify all 4 actions are in the enum
+        // Verify all 5 actions are in the enum
         let actions = params["properties"]["action"]["enum"].as_array().unwrap();
-        assert_eq!(actions.len(), 4);
+        assert_eq!(actions.len(), 5);
         assert!(actions.contains(&json!("search_conversations")));
         assert!(actions.contains(&json!("search_all")));
         assert!(actions.contains(&json!("purge")));
         assert!(actions.contains(&json!("status")));
+        assert!(actions.contains(&json!("record_fact")));
     }
 
     #[tokio::test]
@@ -730,5 +775,55 @@ mod tests {
 
         let result = tool.execute(args, &ctx).await.unwrap();
         assert!(result.contains("No conversations found matching"));
+    }
+
+    #[tokio::test]
+    async fn record_fact_publishes_event() {
+        let bus = Arc::new(DomainEventBus::new(16));
+        let mut rx = bus.subscribe();
+        let tool = MemoryTool::new().with_domain_bus(Arc::clone(&bus));
+        let args = json!({
+            "action": "record_fact",
+            "fact": "User is a software engineer",
+            "domain": "identity"
+        });
+        let ctx = RoutingContext::new(
+            common::ChannelName::new("cli"),
+            common::ChatId::new("test".to_string()),
+        );
+        let result = tool.execute(args, &ctx).await.unwrap();
+        assert!(result.contains("Recorded"));
+
+        let event = rx.try_recv().unwrap();
+        match event {
+            bus::DomainEvent::UserStatedFact { fact, domain } => {
+                assert_eq!(fact, "User is a software engineer");
+                assert_eq!(domain, "identity");
+            }
+            other => panic!("Expected UserStatedFact, got: {other:?}"),
+        }
+    }
+
+    #[tokio::test]
+    async fn record_fact_requires_bus() {
+        let tool = MemoryTool::new();
+        let args = json!({"action": "record_fact", "fact": "x", "domain": "general"});
+        let ctx = RoutingContext::new(
+            common::ChannelName::new("cli"),
+            common::ChatId::new("test".to_string()),
+        );
+        assert!(tool.execute(args, &ctx).await.is_err());
+    }
+
+    #[tokio::test]
+    async fn record_fact_requires_fact_param() {
+        let bus = Arc::new(DomainEventBus::new(16));
+        let tool = MemoryTool::new().with_domain_bus(bus);
+        let args = json!({"action": "record_fact", "domain": "general"});
+        let ctx = RoutingContext::new(
+            common::ChannelName::new("cli"),
+            common::ChatId::new("test".to_string()),
+        );
+        assert!(tool.execute(args, &ctx).await.is_err());
     }
 }

@@ -1234,6 +1234,10 @@ impl AgentLoopBuilder {
                         .with_embedding_store(vs.clone());
                 }
 
+                if let Some(ref domain_bus) = self.domain_event_bus {
+                    memory_tool = memory_tool.with_domain_bus(Arc::clone(domain_bus));
+                }
+
                 tool_registry.register(memory_tool);
             }
         }
