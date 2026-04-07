@@ -1,5 +1,4 @@
 import { ActionMenu } from "@features/launcher/components/ActionMenu";
-import { Dashboard } from "@features/launcher/components/Dashboard";
 import { DetailPanel } from "@features/launcher/components/DetailPanel";
 import { LauncherChat } from "@features/launcher/components/LauncherChat";
 import { LauncherInput } from "@features/launcher/components/LauncherInput";
@@ -176,15 +175,40 @@ export function Launcher() {
         ) : (
           <div className="relative rounded-[var(--glass-radius-inner)] overflow-hidden">
             <LauncherInput />
-            {mode === "dashboard" && (
-              <Dashboard onOpenTask={(id) => navigateToMain(`/task/${id}`)} />
-            )}
+            {mode === "dashboard" && <ShortcutHints />}
             {mode === "search" && <ResultsList onExecute={handleExecute} />}
             {mode === "detail" && <DetailPanel />}
             <ActionMenu />
           </div>
         )}
       </div>
+    </div>
+  );
+}
+
+function ShortcutHints() {
+  const hints = [
+    { key: "f/", label: "Files" },
+    { key: "g/", label: "Grep" },
+    { key: "h/", label: "History" },
+    { key: "@", label: "Contacts" },
+    { key: ">", label: "Commands" },
+    { key: "?", label: "Ask AI" },
+  ];
+
+  return (
+    <div className="px-3 py-2.5 flex items-center gap-2 flex-wrap">
+      {hints.map((h) => (
+        <span
+          key={h.key}
+          className="inline-flex items-center gap-1 text-[11px] text-muted-foreground"
+        >
+          <kbd className="px-1.5 py-0.5 rounded bg-accent/60 text-foreground/70 font-mono text-[10px]">
+            {h.key}
+          </kbd>
+          {h.label}
+        </span>
+      ))}
     </div>
   );
 }

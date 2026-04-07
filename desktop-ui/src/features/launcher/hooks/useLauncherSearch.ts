@@ -8,24 +8,48 @@ export function useLauncherSearch() {
   const setResults = useLauncherStore((s) => s.setResults);
   const setIsSearching = useLauncherStore((s) => s.setIsSearching);
   const timerRef = useRef<ReturnType<typeof setTimeout>>(undefined);
+  const versionRef = useRef(0);
+
+  // Fetch default view on mount (empty query = top frecency items)
+  useEffect(() => {
+    ipc<LauncherItem[]>("launcher_search", { query: "" })
+      .then(setResults)
+      .catch(() => {});
+  }, [setResults]);
 
   useEffect(() => {
     if (!query.trim()) {
-      setResults([]);
+      // Refetch defaults when query is cleared
+      const v = ++versionRef.current;
+      ipc<LauncherItem[]>("launcher_search", { query: "" })
+        .then((results) => {
+          if (versionRef.current === v) setResults(results);
+        })
+        .catch(() => {});
       return;
     }
 
     setIsSearching(true);
     clearTimeout(timerRef.current);
+
+    // Cancel-on-keystroke: increment version so stale responses are discarded
+    const version = ++versionRef.current;
+
     timerRef.current = setTimeout(async () => {
       try {
         const results = await ipc<LauncherItem[]>("launcher_search", { query });
-        setResults(results);
+        if (versionRef.current === version) {
+          setResults(results);
+          setIsSearching(false);
+        }
       } catch (e) {
-        console.error("Launcher search failed:", e);
-        setResults([]);
+        if (versionRef.current === version) {
+          console.error("Launcher search failed:", e);
+          setResults([]);
+          setIsSearching(false);
+        }
       }
-    }, 100);
+    }, 30);
 
     return () => clearTimeout(timerRef.current);
   }, [query, setResults, setIsSearching]);

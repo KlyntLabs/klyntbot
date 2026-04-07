@@ -203,6 +203,7 @@ pub(super) const JOB_LEARNING_ANALYSIS: &str = "__klyntbot_learning_analysis";
 pub(super) const JOB_MIRROR_WEEKLY_NARRATIVE: &str = "__klyntbot_mirror_weekly_narrative";
 pub(super) const JOB_MIRROR_CLEANUP: &str = "__klyntbot_mirror_cleanup";
 pub(super) const JOB_CROSS_DOMAIN_NIGHTLY: &str = "__klyntbot_cross_domain_nightly";
+const JOB_LAUNCHER_USAGE_PRUNE: &str = "__klyntbot_launcher_usage_prune";
 
 /// Register individual cron handlers.
 #[allow(clippy::too_many_arguments)]
@@ -812,6 +813,34 @@ fn register_cron_callbacks(
         );
     }
 
+    // ── launcher_usage_prune ──────────────────────────────────────────────
+    {
+        let pool = repos.pool().clone();
+        let rt = rt.clone();
+        cron_service.register_handler(
+            JOB_LAUNCHER_USAGE_PRUNE,
+            Arc::new(move |_job: &scheduling::CronJob| {
+                let pool = pool.clone();
+                tokio::task::block_in_place(|| {
+                    rt.block_on(async move {
+                        let repo = feature_launcher::FrequencyRepo::new(pool);
+                        match repo.prune_old_entries().await {
+                            Ok(0) => Ok(Some("No old launcher usage entries to prune".to_string())),
+                            Ok(n) => {
+                                info!(pruned = n, "Launcher usage prune: removed old entries");
+                                Ok(Some(format!("Pruned {n} old launcher usage entries")))
+                            }
+                            Err(e) => {
+                                warn!(error = %e, "Launcher usage prune failed");
+                                Ok(Some(format!("Launcher usage prune failed: {e}")))
+                            }
+                        }
+                    })
+                })
+            }),
+        );
+    }
+
     // ── recurring_tasks ───────────────────────────────────────────────────
     {
         let todo_repo = repos.tasks.clone();
@@ -998,6 +1027,15 @@ async fn ensure_cron_jobs(
             tz: Some(config.timezone.clone()),
         },
         "Clean old Mirror routing snapshots and snippets",
+        system.clone()
+    );
+    ensure_job!(
+        JOB_LAUNCHER_USAGE_PRUNE,
+        scheduling::CronSchedule::Cron {
+            expr: "0 3 * * 0".to_string(),
+            tz: None
+        },
+        "Prune old launcher usage entries",
         system
     );
 

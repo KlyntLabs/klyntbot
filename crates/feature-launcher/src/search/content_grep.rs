@@ -25,8 +25,8 @@ impl super::SearchSource for ContentGrepSource {
         "content_grep"
     }
 
-    fn prefix(&self) -> Option<char> {
-        Some('?')
+    fn prefix(&self) -> Option<&'static str> {
+        Some("g/")
     }
 
     fn cache_ttl(&self) -> Option<std::time::Duration> {

@@ -46,9 +46,9 @@ pub trait SearchSource: Send + Sync {
     /// Unique source identifier (e.g., "apps", "files", "brew").
     fn name(&self) -> &'static str;
 
-    /// Optional prefix for direct routing (e.g., '?' for grep, '@' for contacts).
+    /// Optional prefix for direct routing (e.g., "?" for grep, "f/" for files).
     /// Sources with a prefix are only queried when the user types that prefix.
-    fn prefix(&self) -> Option<char> {
+    fn prefix(&self) -> Option<&'static str> {
         None
     }
 
@@ -101,12 +101,14 @@ impl SourceRegistry {
             return vec![];
         }
 
-        // Check for prefix routing
-        let first_char = query.chars().next().unwrap();
+        // Check for prefix routing (e.g., "f/ query", "? query", "> cmd")
         for source in &self.sources {
-            if source.prefix() == Some(first_char) {
-                let inner_query = &query[first_char.len_utf8()..];
-                return cached_search(source, inner_query.trim(), limit, &self.query_cache).await;
+            if let Some(prefix) = source.prefix() {
+                if query.starts_with(prefix) {
+                    let inner_query = &query[prefix.len()..];
+                    return cached_search(source, inner_query.trim(), limit, &self.query_cache)
+                        .await;
+                }
             }
         }
 

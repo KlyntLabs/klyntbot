@@ -7,6 +7,24 @@ CREATE TABLE IF NOT EXISTS launcher_frequencies (
     PRIMARY KEY (item_id, kind)
 );
 
+-- Usage log for frecency calculation (exponential decay)
+CREATE TABLE IF NOT EXISTS launcher_usage_log (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    item_id TEXT NOT NULL,
+    kind TEXT NOT NULL,
+    used_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_usage_log_item ON launcher_usage_log(item_id, kind);
+CREATE INDEX IF NOT EXISTS idx_usage_log_time ON launcher_usage_log(used_at);
+
+-- Pinned launcher items for default view
+CREATE TABLE IF NOT EXISTS launcher_pins (
+    item_id TEXT NOT NULL,
+    kind TEXT NOT NULL,
+    position INTEGER NOT NULL DEFAULT 0,
+    PRIMARY KEY (item_id, kind)
+);
+
 -- Clipboard history
 CREATE TABLE IF NOT EXISTS clipboard_history (
     id INTEGER PRIMARY KEY AUTOINCREMENT,

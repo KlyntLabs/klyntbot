@@ -188,8 +188,8 @@ impl super::SearchSource for SystemCommands {
         "system_commands"
     }
 
-    fn prefix(&self) -> Option<char> {
-        Some('>')
+    fn prefix(&self) -> Option<&'static str> {
+        Some(">")
     }
 
     async fn search(&self, query: &str, limit: usize) -> Vec<crate::types::LauncherItem> {

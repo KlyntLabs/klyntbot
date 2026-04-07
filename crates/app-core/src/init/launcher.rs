@@ -40,13 +40,11 @@ pub(super) async fn init_launcher(
     let clipboard_repo = ClipboardRepo::new(pool);
 
     let mut sources: Vec<Arc<dyn feature_launcher::SearchSource>> = Vec::new();
-    let mut icon_cache = None;
+    let icon_cache_dir = config.data_dir_path().join("cache").join("app-icons");
 
     // Apps source
     if launcher_config.sources.apps.enabled {
-        let icon_cache_dir = config.data_dir_path().join("cache").join("app-icons");
-        let app_index = Arc::new(AppIndex::with_cache_dir(icon_cache_dir));
-        icon_cache = app_index.icon_cache();
+        let app_index = Arc::new(AppIndex::with_cache_dir(icon_cache_dir.clone()));
         let idx = Arc::clone(&app_index);
         tokio::spawn(async move { idx.index_applications().await });
         sources.push(app_index);
@@ -131,13 +129,9 @@ pub(super) async fn init_launcher(
 
     // Running apps — pre-loaded index refreshed by BackgroundRefresher
     if launcher_config.sources.running_apps.enabled {
-        let source = if let Some(ref cache) = icon_cache {
-            Arc::new(feature_launcher::RunningAppsSource::with_icon_cache(
-                Arc::clone(cache),
-            ))
-        } else {
-            Arc::new(feature_launcher::RunningAppsSource::new())
-        };
+        let source = Arc::new(feature_launcher::RunningAppsSource::with_icon_cache_dir(
+            icon_cache_dir.clone(),
+        ));
         sources.push(source);
     }
 

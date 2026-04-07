@@ -1,3 +1,5 @@
+import { isTauri } from "@shared/lib/utils";
+import { convertFileSrc } from "@tauri-apps/api/core";
 import { useEffect, useRef } from "react";
 import { useLauncherStore } from "../stores/launcherStore";
 import type { LauncherItem } from "../types";
@@ -74,22 +76,47 @@ export function ResultsList({ onExecute }: ResultsListProps) {
         lastMousePosRef.current = { x: e.clientX, y: e.clientY };
       }}
     >
-      {results.map((item, index) => (
-        <ResultRow
-          key={item.id}
-          item={item}
-          index={index}
-          isSelected={index === selectedIndex}
-          onClick={() => onExecute(index)}
-          onMouseEnter={() => {
-            if (mouseMovedRef.current) {
-              useLauncherStore.getState().setSelectedIndex(index);
-            }
-          }}
-        />
-      ))}
+      {(() => {
+        const uniqueGroups = new Set(results.map((item) => groupLabel(item.kind.type)));
+        const showHeaders = uniqueGroups.size >= 2;
+        let lastGroup = "";
+        return results.map((item, index) => {
+          const group = groupLabel(item.kind.type);
+          const showHeader = showHeaders && group !== "" && group !== lastGroup;
+          lastGroup = group;
+          return (
+            <div key={item.id}>
+              {showHeader && (
+                <div className="px-3 pt-2 pb-1 text-2xs font-medium text-muted-foreground uppercase tracking-wider">
+                  {group}
+                </div>
+              )}
+              <ResultRow
+                item={item}
+                index={index}
+                isSelected={index === selectedIndex}
+                onClick={() => onExecute(index)}
+                onMouseEnter={() => {
+                  if (mouseMovedRef.current) {
+                    useLauncherStore.getState().setSelectedIndex(index);
+                  }
+                }}
+              />
+            </div>
+          );
+        });
+      })()}
     </div>
   );
+}
+
+function groupLabel(kind: string): string {
+  if (kind === "application" || kind === "runningApp") return "Apps";
+  if (kind === "file" || kind === "contentMatch" || kind === "gitRepo") return "Files";
+  if (kind === "task") return "Tasks";
+  if (kind === "note") return "Notes";
+  if (kind === "bookmark" || kind === "browserHistory" || kind === "urlNavigation") return "Web";
+  return "";
 }
 
 function ResultRow({
@@ -113,7 +140,7 @@ function ResultRow({
       className={`flex items-center gap-3 px-4 py-2 cursor-pointer transition-colors duration-100 animate-[result-in_0.15s_ease-out_both] ${
         isSelected ? "bg-muted" : ""
       }`}
-      style={{ animationDelay: `${Math.min(index * 20, 200)}ms` }}
+      style={{ animationDelay: `${Math.min(index * 10, 100)}ms` }}
       onClick={onClick}
       onKeyDown={(e) => {
         if (e.key === "Enter" || e.key === " ") {
@@ -159,9 +186,16 @@ const ICON_MAP: Record<string, string> = {
 };
 
 function ItemIcon({ kind, icon }: { kind: string; icon?: string | null }) {
-  if (icon?.startsWith("data:")) {
-    return <img src={icon} alt="" className="size-6 shrink-0 rounded" />;
+  // File path to cached PNG (sips-extracted app icon)
+  if (icon?.startsWith("/")) {
+    const src = isTauri ? convertFileSrc(icon) : icon;
+    return <img src={src} alt="" className="size-6 shrink-0 rounded" loading="lazy" />;
   }
+  // Legacy base64 data URI
+  if (icon?.startsWith("data:")) {
+    return <img src={icon} alt="" className="size-6 shrink-0 rounded" loading="lazy" />;
+  }
+  // Emoji fallback from ICON_MAP
   return (
     <span className="size-6 flex items-center justify-center text-sm shrink-0">
       {ICON_MAP[kind] || "\u2022"}

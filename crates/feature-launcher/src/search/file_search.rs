@@ -1,7 +1,6 @@
 use crate::types::*;
 use ignore::WalkBuilder;
 use parking_lot::RwLock;
-use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
@@ -30,8 +29,6 @@ struct FileEntry {
 pub struct FileSearchSource {
     entries: Arc<RwLock<Vec<FileEntry>>>,
     scan_dirs: Vec<String>,
-    /// Extension → base64 PNG data URI for file type icons (resolved via NSWorkspace).
-    ext_icons: Arc<RwLock<HashMap<String, String>>>,
 }
 
 impl FileSearchSource {
@@ -39,7 +36,6 @@ impl FileSearchSource {
         Self {
             entries: Arc::new(RwLock::new(Vec::new())),
             scan_dirs,
-            ext_icons: Arc::new(RwLock::new(HashMap::new())),
         }
     }
 
@@ -109,23 +105,6 @@ impl FileSearchSource {
         entries
     }
 
-    /// Resolve system file type icons for each unique extension in the index.
-    /// Called during refresh inside spawn_blocking (blocking ObjC calls).
-    fn resolve_ext_icons(entries: &[FileEntry]) -> HashMap<String, String> {
-        let unique_exts: std::collections::HashSet<String> = entries
-            .iter()
-            .filter_map(|e| e.path.extension()?.to_str().map(|s| s.to_lowercase()))
-            .collect();
-
-        unique_exts
-            .into_iter()
-            .filter_map(|ext| {
-                let icon = platform_macos::apps::icon_for_file_type(&ext)?;
-                Some((ext, icon))
-            })
-            .collect()
-    }
-
     fn classify_extension(path: &Path) -> FileKind {
         match path.extension().and_then(|e| e.to_str()) {
             Some("png" | "jpg" | "jpeg" | "gif" | "svg" | "webp" | "ico" | "heic") => {
@@ -148,6 +127,10 @@ impl FileSearchSource {
 impl super::SearchSource for FileSearchSource {
     fn name(&self) -> &'static str {
         "files"
+    }
+
+    fn prefix(&self) -> Option<&'static str> {
+        Some("f/")
     }
 
     async fn search(&self, query: &str, limit: usize) -> Vec<LauncherItem> {

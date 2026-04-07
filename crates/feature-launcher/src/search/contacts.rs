@@ -150,8 +150,8 @@ impl super::SearchSource for ContactsSource {
         "contacts"
     }
 
-    fn prefix(&self) -> Option<char> {
-        Some('@')
+    fn prefix(&self) -> Option<&'static str> {
+        Some("@")
     }
 
     async fn refresh(&self) {

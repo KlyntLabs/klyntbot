@@ -1,6 +1,5 @@
 use crate::types::*;
 use parking_lot::RwLock;
-use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::Arc;
 
@@ -13,27 +12,21 @@ struct RunningApp {
 #[derive(Clone)]
 pub struct RunningAppsSource {
     apps: Arc<RwLock<Vec<RunningApp>>>,
-    icon_cache: Option<Arc<platform_macos::apps::AppIconCache>>,
-    /// In-memory cache of resolved icon data URIs keyed by app path.
-    /// Prevents repeated NSWorkspace calls which cause macOS IconServices
-    /// to mmap gigabytes of .isdata files over the process lifetime.
-    resolved_icons: Arc<RwLock<HashMap<PathBuf, Option<String>>>>,
+    icon_cache_dir: Option<PathBuf>,
 }
 
 impl RunningAppsSource {
     pub fn new() -> Self {
         Self {
             apps: Arc::new(RwLock::new(Vec::new())),
-            icon_cache: None,
-            resolved_icons: Arc::new(RwLock::new(HashMap::new())),
+            icon_cache_dir: None,
         }
     }
 
-    pub fn with_icon_cache(icon_cache: Arc<platform_macos::apps::AppIconCache>) -> Self {
+    pub fn with_icon_cache_dir(dir: PathBuf) -> Self {
         Self {
             apps: Arc::new(RwLock::new(Vec::new())),
-            icon_cache: Some(icon_cache),
-            resolved_icons: Arc::new(RwLock::new(HashMap::new())),
+            icon_cache_dir: Some(dir),
         }
     }
 }
@@ -76,8 +69,23 @@ impl super::SearchSource for RunningAppsSource {
         scored
             .into_iter()
             .map(|(score, app)| {
-                // Don't resolve icons via NSWorkspace — triggers IconServices mmap leak.
-                let icon = Some("activity".to_string());
+                let icon = self
+                    .icon_cache_dir
+                    .as_ref()
+                    .and_then(|dir| {
+                        let stem = app.path.file_stem()?.to_string_lossy().replace(' ', "_");
+                        let png = dir.join(format!("{stem}.png"));
+                        // If not cached yet (e.g. Finder in CoreServices), extract via sips
+                        if !png.exists() {
+                            let icon_cache = platform_macos::apps::AppIconCache::new(dir.clone());
+                            icon_cache.resolve_icon_path(&app.path);
+                        }
+                        let bytes = std::fs::read(&png).ok()?;
+                        use base64::Engine;
+                        let b64 = base64::engine::general_purpose::STANDARD.encode(&bytes);
+                        Some(format!("data:image/png;base64,{b64}"))
+                    })
+                    .or_else(|| Some("running-app".to_string()));
 
                 LauncherItem {
                     id: format!("running:{}", app.pid),

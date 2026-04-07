@@ -55,7 +55,7 @@ pub fn running_applications() -> Vec<RunningApp> {
     Vec::new()
 }
 
-/// Disk-backed cache for application icons (base64-encoded PNG data URIs).
+/// Disk-backed cache for application icons stored as PNG files.
 pub struct AppIconCache {
     cache_dir: PathBuf,
 }
@@ -69,88 +69,34 @@ impl AppIconCache {
         Self { cache_dir }
     }
 
-    /// Resolve an app icon, returning `(data_uri, was_cache_hit)`.
+    /// Resolve an app icon, returning a path to a cached PNG file.
     ///
-    /// Checks disk cache first; falls back to `sips` extraction on macOS.
-    #[cfg(target_os = "macos")]
-    pub fn resolve_icon(&self, app_path: &Path, tmp_dir: &Path) -> (Option<String>, bool) {
-        let stem = match app_path.file_stem() {
-            Some(s) => s.to_string_lossy().replace(' ', "_"),
-            None => return (None, false),
-        };
-
-        let app_mtime = Self::get_mtime(app_path).unwrap_or(0);
-
-        // Try disk cache
-        let cached_png = self.cache_dir.join(format!("{stem}.png"));
-        let cached_mtime = self.cache_dir.join(format!("{stem}.mtime"));
-
-        if cached_png.exists() && cached_mtime.exists() {
-            if let Ok(stored) = std::fs::read_to_string(&cached_mtime) {
-                if stored.trim().parse::<u64>().ok() == Some(app_mtime) {
-                    if let Ok(png_bytes) = std::fs::read(&cached_png) {
-                        use base64::Engine;
-                        let b64 = base64::engine::general_purpose::STANDARD.encode(&png_bytes);
-                        return (Some(format!("data:image/png;base64,{b64}")), true);
-                    }
-                }
-            }
-        }
-
-        // Cache miss -- extract via sips
-        let data_uri = Self::extract_icon(app_path, tmp_dir);
-
-        // Write to disk cache for next time
-        if let Some(ref uri) = data_uri {
-            if let Some(b64_data) = uri.strip_prefix("data:image/png;base64,") {
-                use base64::Engine;
-                if let Ok(png_bytes) = base64::engine::general_purpose::STANDARD.decode(b64_data) {
-                    let _ = std::fs::write(self.cache_dir.join(format!("{stem}.png")), &png_bytes);
-                    let _ = std::fs::write(
-                        self.cache_dir.join(format!("{stem}.mtime")),
-                        app_mtime.to_string(),
-                    );
-                }
-            }
-        }
-
-        (data_uri, false)
-    }
-
-    #[cfg(not(target_os = "macos"))]
-    pub fn resolve_icon(&self, _app_path: &Path, _tmp_dir: &Path) -> (Option<String>, bool) {
-        (None, false)
-    }
-
-    /// Get the modification time of a path as seconds since UNIX epoch.
-    #[cfg(target_os = "macos")]
-    fn get_mtime(path: &Path) -> Option<u64> {
-        let meta = std::fs::metadata(path).ok()?;
-        let mtime = meta.modified().ok()?;
-        Some(mtime.duration_since(std::time::UNIX_EPOCH).ok()?.as_secs())
-    }
-
-    /// Extract an app's icon as a base64 data URI.
+    /// Checks disk cache first (validated by app mtime); on miss reads the
+    /// app's `Info.plist` via PlistBuddy to locate the `.icns` file, then
+    /// converts it to a 64×64 PNG via `sips`. Never calls NSWorkspace.
     ///
-    /// Tries `sips` (fast, works for apps with `.icns` files) first, then
-    /// falls back to `NSWorkspace.iconForFile:` (handles asset catalogs).
-    ///
-    /// **Blocking:** Callers in async contexts must use `spawn_blocking`.
+    /// **Blocking:** Spawns subprocesses — callers in async contexts must use
+    /// `spawn_blocking`.
     #[cfg(target_os = "macos")]
-    fn extract_icon(app_path: &Path, tmp_dir: &Path) -> Option<String> {
-        // Fast path: try sips-based extraction (works for .icns apps)
-        if let Some(icon) = Self::extract_icon_sips(app_path, tmp_dir) {
-            return Some(icon);
-        }
-        // Fallback: NSWorkspace handles all icon types (asset catalogs, etc.)
-        icon_for_path(app_path)
-    }
-
-    /// Extract icon via PlistBuddy + sips (traditional .icns approach).
-    #[cfg(target_os = "macos")]
-    fn extract_icon_sips(app_path: &Path, tmp_dir: &Path) -> Option<String> {
+    pub fn resolve_icon_path(&self, app_path: &Path) -> Option<PathBuf> {
         use std::process::Command;
 
+        let stem = app_path.file_stem()?.to_string_lossy().replace(' ', "_");
+        let app_mtime = Self::get_mtime(app_path).unwrap_or(0);
+
+        let cached_png = self.cache_dir.join(format!("{stem}.png"));
+        let cached_mtime_file = self.cache_dir.join(format!("{stem}.mtime"));
+
+        // Return cached PNG if mtime still matches
+        if cached_png.exists() && cached_mtime_file.exists() {
+            if let Ok(stored) = std::fs::read_to_string(&cached_mtime_file) {
+                if stored.trim().parse::<u64>().ok() == Some(app_mtime) {
+                    return Some(cached_png);
+                }
+            }
+        }
+
+        // Read CFBundleIconFile from Info.plist via PlistBuddy
         let plist_path = app_path.join("Contents/Info.plist");
         let output = Command::new("/usr/libexec/PlistBuddy")
             .args([
@@ -175,19 +121,17 @@ impl AppIconCache {
             return None;
         }
 
-        let stem = app_path.file_stem()?.to_string_lossy().replace(' ', "_");
-        let png_path = tmp_dir.join(format!("{stem}.png"));
-
+        // Convert .icns → PNG via sips (no NSWorkspace involved)
         let sips_result = Command::new("sips")
             .args([
                 "-s",
                 "format",
                 "png",
                 "--resampleWidth",
-                "32",
+                "64",
                 &icns_path.to_string_lossy(),
                 "--out",
-                &png_path.to_string_lossy(),
+                &cached_png.to_string_lossy(),
             ])
             .output()
             .ok()?;
@@ -196,68 +140,23 @@ impl AppIconCache {
             return None;
         }
 
-        let png_bytes = std::fs::read(&png_path).ok()?;
-        let _ = std::fs::remove_file(&png_path);
+        // Write mtime so subsequent calls hit the cache
+        let _ = std::fs::write(&cached_mtime_file, app_mtime.to_string());
 
-        use base64::Engine;
-        let b64 = base64::engine::general_purpose::STANDARD.encode(&png_bytes);
-        Some(format!("data:image/png;base64,{b64}"))
+        Some(cached_png)
     }
-}
 
-/// Get icon for any file or application path using NSWorkspace.
-///
-/// Uses `NSWorkspace.iconForFile:` which handles all icon types: `.icns`,
-/// asset catalogs, file type associations, etc. Returns a base64 PNG data URI.
-///
-/// **Blocking:** Makes AppKit calls — use inside `spawn_blocking`.
-#[cfg(target_os = "macos")]
-pub fn icon_for_path(path: &Path) -> Option<String> {
-    use objc2::msg_send_id;
-    use objc2::rc::Retained;
-    use objc2::runtime::AnyObject;
-    use objc2_app_kit::NSWorkspace;
-    use objc2_foundation::NSString;
+    #[cfg(not(target_os = "macos"))]
+    pub fn resolve_icon_path(&self, _app_path: &Path) -> Option<PathBuf> {
+        None
+    }
 
-    let path_str = path.to_str()?;
-    let ns_path = NSString::from_str(path_str);
-    let workspace = NSWorkspace::sharedWorkspace();
-
-    // iconForFile: always returns an NSImage (never nil)
-    let image: Retained<AnyObject> = unsafe { msg_send_id![&workspace, iconForFile: &*ns_path] };
-
-    nsimage_to_png_data_uri(&image)
-}
-
-/// Get system icon for a file type/extension using NSWorkspace.
-///
-/// Pass a bare extension like `"rs"`, `"py"`, `"txt"`.
-///
-/// **Blocking:** Makes AppKit calls — use inside `spawn_blocking`.
-#[cfg(target_os = "macos")]
-pub fn icon_for_file_type(extension: &str) -> Option<String> {
-    use objc2::msg_send_id;
-    use objc2::rc::Retained;
-    use objc2::runtime::AnyObject;
-    use objc2_app_kit::NSWorkspace;
-    use objc2_foundation::NSString;
-
-    let ns_ext = NSString::from_str(extension);
-    let workspace = NSWorkspace::sharedWorkspace();
-
-    let image: Retained<AnyObject> = unsafe { msg_send_id![&workspace, iconForFileType: &*ns_ext] };
-
-    nsimage_to_png_data_uri(&image)
-}
-
-#[cfg(not(target_os = "macos"))]
-pub fn icon_for_path(_path: &Path) -> Option<String> {
-    None
-}
-
-#[cfg(not(target_os = "macos"))]
-pub fn icon_for_file_type(_extension: &str) -> Option<String> {
-    None
+    /// Get the modification time of a path as seconds since UNIX epoch.
+    fn get_mtime(path: &Path) -> Option<u64> {
+        let meta = std::fs::metadata(path).ok()?;
+        let mtime = meta.modified().ok()?;
+        Some(mtime.duration_since(std::time::UNIX_EPOCH).ok()?.as_secs())
+    }
 }
 
 /// Activate (bring to front) a running application by PID.
@@ -278,51 +177,4 @@ pub fn activate_app(pid: i32) -> bool {
 #[cfg(not(target_os = "macos"))]
 pub fn activate_app(_pid: i32) -> bool {
     false
-}
-
-/// Convert an NSImage (passed as AnyObject) to a base64 PNG data URI.
-///
-/// Resizes to 32×32 pixels first to keep memory usage low — launcher icons
-/// don't need full 1024×1024 resolution. Without resizing, 100+ app icons
-/// at ~2MB each would consume ~200MB of heap as base64 strings.
-///
-/// Uses setSize: → lockFocus/drawInRect/unlockFocus → TIFFRepresentation → PNG.
-#[cfg(target_os = "macos")]
-fn nsimage_to_png_data_uri(image: &objc2::runtime::AnyObject) -> Option<String> {
-    use objc2::rc::{Allocated, Retained};
-    use objc2::runtime::{AnyClass, AnyObject};
-    use objc2::{msg_send, msg_send_id};
-
-    // Resize: set the image size to 32×32 points.
-    let size = objc2_foundation::NSSize::new(32.0, 32.0);
-    let _: () = unsafe { msg_send![image, setSize: size] };
-
-    // Get TIFF representation (now at 32×32)
-    let tiff: Option<Retained<AnyObject>> = unsafe { msg_send_id![image, TIFFRepresentation] };
-    let tiff = tiff?;
-
-    // Create NSBitmapImageRep from TIFF data
-    let cls = AnyClass::get(c"NSBitmapImageRep")?;
-    let alloc: Allocated<AnyObject> = unsafe { msg_send_id![cls, alloc] };
-    let rep: Option<Retained<AnyObject>> = unsafe { msg_send_id![alloc, initWithData: &*tiff] };
-    let rep = rep?;
-
-    // Convert to PNG — NSBitmapImageFileType::PNG = 4
-    let dict_cls = AnyClass::get(c"NSDictionary")?;
-    let empty: Retained<AnyObject> = unsafe { msg_send_id![dict_cls, new] };
-    let png: Option<Retained<AnyObject>> =
-        unsafe { msg_send_id![&rep, representationUsingType: 4usize, properties: &*empty] };
-    let png = png?;
-
-    // Extract bytes
-    let len: usize = unsafe { msg_send![&png, length] };
-    let ptr: *const u8 = unsafe { msg_send![&png, bytes] };
-    if ptr.is_null() || len == 0 {
-        return None;
-    }
-    let bytes = unsafe { std::slice::from_raw_parts(ptr, len) };
-
-    use base64::Engine;
-    let b64 = base64::engine::general_purpose::STANDARD.encode(bytes);
-    Some(format!("data:image/png;base64,{b64}"))
 }

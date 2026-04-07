@@ -98,6 +98,10 @@ impl super::SearchSource for BrowserHistorySource {
         "browser_history"
     }
 
+    fn prefix(&self) -> Option<&'static str> {
+        Some("h/")
+    }
+
     async fn search(&self, query: &str, limit: usize) -> Vec<LauncherItem> {
         let entries = self.entries.read();
         let scored = super::fuzzy_match2(

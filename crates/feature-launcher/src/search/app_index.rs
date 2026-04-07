@@ -1,6 +1,5 @@
 use crate::types::*;
 use parking_lot::RwLock;
-use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
@@ -9,8 +8,8 @@ pub struct AppEntry {
     pub name: String,
     pub path: PathBuf,
     pub bundle_id: Option<String>,
-    /// Base64-encoded PNG icon data URI (e.g., "data:image/png;base64,...")
-    pub icon_data: Option<String>,
+    /// Path to the cached 64x64 PNG icon (resolved via sips).
+    pub icon_path: Option<PathBuf>,
 }
 
 impl AppEntry {
@@ -24,7 +23,7 @@ impl AppEntry {
             name,
             path: path.to_path_buf(),
             bundle_id: None,
-            icon_data: None,
+            icon_path: None,
         })
     }
 }
@@ -34,10 +33,6 @@ pub struct AppIndex {
     apps: Arc<RwLock<Vec<AppEntry>>>,
     /// Shared icon cache backed by `platform_macos::apps::AppIconCache`.
     icon_cache: Option<Arc<platform_macos::apps::AppIconCache>>,
-    /// In-memory cache of resolved icon data URIs keyed by app path.
-    /// Prevents repeated NSWorkspace calls which cause macOS IconServices
-    /// to mmap gigabytes of .isdata files over the process lifetime.
-    resolved_icons: Arc<RwLock<HashMap<PathBuf, Option<String>>>>,
 }
 
 impl AppIndex {
@@ -45,7 +40,6 @@ impl AppIndex {
         Self {
             apps: Arc::new(RwLock::new(Vec::new())),
             icon_cache: None,
-            resolved_icons: Arc::new(RwLock::new(HashMap::new())),
         }
     }
 
@@ -53,7 +47,6 @@ impl AppIndex {
         Self {
             apps: Arc::new(RwLock::new(Vec::new())),
             icon_cache: Some(Arc::new(platform_macos::apps::AppIconCache::new(cache_dir))),
-            resolved_icons: Arc::new(RwLock::new(HashMap::new())),
         }
     }
 
@@ -72,13 +65,17 @@ impl AppIndex {
         scored
             .into_iter()
             .map(|(score, app)| {
-                // Don't resolve macOS app icons via NSWorkspace — each call triggers
-                // IconServices to mmap .isdata files that are never unmapped, causing
-                // ~1GB+ memory growth over a session. The frontend has emoji fallbacks
-                // for each item kind via ICON_MAP, which is zero-cost.
+                // Convert cached PNG to base64 data URI at search time.
+                // Icons are 64x64 (~5KB each) — tiny compared to the old 1024x1024.
                 let icon = app
-                    .icon_data
-                    .clone()
+                    .icon_path
+                    .as_ref()
+                    .and_then(|p| {
+                        let bytes = std::fs::read(p).ok()?;
+                        use base64::Engine;
+                        let b64 = base64::engine::general_purpose::STANDARD.encode(&bytes);
+                        Some(format!("data:image/png;base64,{b64}"))
+                    })
                     .or_else(|| Some("app-window".to_string()));
 
                 LauncherItem {
@@ -109,12 +106,16 @@ impl AppIndex {
             }
         }
 
-        // Icons are resolved lazily during search() — NOT at index time.
-        // Resolving all 100+ app icons eagerly causes macOS IconServices to
-        // mmap ~4GB of icon cache files into the process.
+        if let Some(cache) = &self.icon_cache {
+            for app in &mut apps {
+                app.icon_path = cache.resolve_icon_path(&app.path);
+            }
+        }
+        let icon_count = apps.iter().filter(|a| a.icon_path.is_some()).count();
         tracing::info!(
-            "Indexed {} applications (icons deferred to search)",
-            apps.len()
+            "Indexed {} applications ({} with icons)",
+            apps.len(),
+            icon_count
         );
         self.set_apps(apps);
     }
@@ -189,19 +190,19 @@ mod tests {
                 name: "Visual Studio Code".into(),
                 path: "/Applications/Visual Studio Code.app".into(),
                 bundle_id: None,
-                icon_data: None,
+                icon_path: None,
             },
             AppEntry {
                 name: "Safari".into(),
                 path: "/Applications/Safari.app".into(),
                 bundle_id: None,
-                icon_data: None,
+                icon_path: None,
             },
             AppEntry {
                 name: "Slack".into(),
                 path: "/Applications/Slack.app".into(),
                 bundle_id: None,
-                icon_data: None,
+                icon_path: None,
             },
         ]);
         let results = index.search("vsc", 10);
@@ -216,7 +217,7 @@ mod tests {
             name: "Safari".into(),
             path: "/Applications/Safari.app".into(),
             bundle_id: None,
-            icon_data: None,
+            icon_path: None,
         }]);
         let results = index.search("", 10);
         assert!(results.is_empty());

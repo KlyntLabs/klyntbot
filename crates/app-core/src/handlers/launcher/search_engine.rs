@@ -1,10 +1,9 @@
 use std::collections::HashMap;
 
-use chrono::Utc;
 use desktop_shared::errors::ApiError;
 use feature_launcher::{
-    Calculator, ClipboardRepo, FrequencyRepo, LauncherItem, LauncherItemKind, SourceRegistry,
-    UrlNavigation,
+    Calculator, ClipboardRepo, FileKind, FrequencyRepo, LauncherItem, LauncherItemKind,
+    SourceRegistry, UrlNavigation,
 };
 use feature_notes::repo::NoteRepo;
 use storage::Repos;
@@ -30,7 +29,64 @@ impl LauncherSearchEngine {
     ) -> Result<Vec<LauncherItem>, ApiError> {
         let query = query.trim();
         if query.is_empty() {
-            return Ok(vec![]);
+            let top = self
+                .frequency_repo
+                .top_frecency(8)
+                .await
+                .unwrap_or_default();
+            let mut defaults = Vec::with_capacity(top.len());
+
+            for (item_id, kind, score) in &top {
+                let item = match kind.as_str() {
+                    "app" | "running_app" => {
+                        let path_str = item_id
+                            .strip_prefix("app:")
+                            .or_else(|| item_id.strip_prefix("running:"))
+                            .unwrap_or(item_id.as_str());
+                        let path = std::path::Path::new(path_str);
+                        let name = path
+                            .file_stem()
+                            .map(|s| s.to_string_lossy().to_string())
+                            .unwrap_or_default();
+                        if name.is_empty() {
+                            continue;
+                        }
+                        let results = self.registry.search(&name, 1).await;
+                        results.into_iter().next().map(|mut item| {
+                            item.score = *score;
+                            item
+                        })
+                    }
+                    "file" | "grep" => {
+                        let path_str = item_id
+                            .strip_prefix("file:")
+                            .or_else(|| item_id.strip_prefix("grep:"))
+                            .unwrap_or(item_id.as_str());
+                        let path = std::path::Path::new(path_str);
+                        let name = path
+                            .file_name()
+                            .map(|s| s.to_string_lossy().to_string())
+                            .unwrap_or_default();
+                        Some(LauncherItem {
+                            id: item_id.clone(),
+                            title: name,
+                            subtitle: Some(path_str.to_string()),
+                            icon: Some("file".to_string()),
+                            kind: LauncherItemKind::File {
+                                path: path.to_path_buf(),
+                                kind: FileKind::File,
+                            },
+                            score: *score,
+                        })
+                    }
+                    _ => None,
+                };
+                if let Some(item) = item {
+                    defaults.push(item);
+                }
+            }
+
+            return Ok(defaults);
         }
 
         // Calculator handles both prefix (=) and universal
@@ -198,25 +254,9 @@ impl LauncherSearchEngine {
             .collect();
 
         if let Ok(boosts) = self.frequency_repo.get_boosts_batch(&batch_keys).await {
-            let now = Utc::now();
-            for ((idx, _, _), (boost, last_used)) in pairs.iter().zip(boosts.iter()) {
-                let recency_multiplier = last_used
-                    .as_ref()
-                    .and_then(|ts| chrono::DateTime::parse_from_rfc3339(ts).ok())
-                    .map(|dt| {
-                        let age = now.signed_duration_since(dt);
-                        if age.num_hours() < 1 {
-                            2.0
-                        } else if age.num_hours() < 24 {
-                            1.5
-                        } else if age.num_days() < 7 {
-                            1.0
-                        } else {
-                            0.5
-                        }
-                    })
-                    .unwrap_or(1.0);
-                items[*idx].score += boost * 0.1 * recency_multiplier;
+            for ((idx, _, _), (boost, _last_used)) in pairs.iter().zip(boosts.iter()) {
+                // Frecency is already time-weighted — just add it as a boost
+                items[*idx].score += boost * 0.3;
             }
         }
     }
