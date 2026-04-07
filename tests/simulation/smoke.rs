@@ -630,6 +630,27 @@ async fn run_software_engineer_1mo() {
         fm.cross_domain_insight_rate
     );
     eprintln!();
+    eprintln!("  SIGNAL COVERAGE");
+    eprintln!(
+        "    Compression ratio:    {:.3}",
+        fm.context_compression_ratio
+    );
+    eprintln!(
+        "    Delegation success:   {:.3}",
+        fm.delegation_success_rate
+    );
+    eprintln!("    MCP availability:     {:.3}", fm.mcp_availability);
+    eprintln!("    Community churn:      {:.3}", fm.community_churn_rate);
+    eprintln!("    Debate consensus:     {:.3}", fm.debate_avg_consensus);
+    eprintln!();
+    eprintln!("  CONVERSATION DEPTH");
+    eprintln!("    Avg drift:            {:.3}", fm.avg_conversation_drift);
+    eprintln!("    Avg depth:            {:.1}", fm.avg_conversation_depth);
+    eprintln!();
+    eprintln!("  RESILIENCE");
+    eprintln!("    Cascade rate:         {:.3}", fm.cascade_rate);
+    eprintln!("    Avg cascade depth:    {:.1}", fm.avg_cascade_depth);
+    eprintln!();
     eprintln!("  TIER 3 — System Health");
     eprintln!("    Community stability:  {:.3}", fm.community_stability);
     eprintln!("    Brain ver velocity:   {}", fm.brain_version_velocity);
@@ -736,6 +757,27 @@ async fn run_agent_validation_1week() {
         fm.cross_domain_insight_rate
     );
     eprintln!();
+    eprintln!("  SIGNAL COVERAGE");
+    eprintln!(
+        "    Compression ratio:    {:.3}",
+        fm.context_compression_ratio
+    );
+    eprintln!(
+        "    Delegation success:   {:.3}",
+        fm.delegation_success_rate
+    );
+    eprintln!("    MCP availability:     {:.3}", fm.mcp_availability);
+    eprintln!("    Community churn:      {:.3}", fm.community_churn_rate);
+    eprintln!("    Debate consensus:     {:.3}", fm.debate_avg_consensus);
+    eprintln!();
+    eprintln!("  CONVERSATION DEPTH");
+    eprintln!("    Avg drift:            {:.3}", fm.avg_conversation_drift);
+    eprintln!("    Avg depth:            {:.1}", fm.avg_conversation_depth);
+    eprintln!();
+    eprintln!("  RESILIENCE");
+    eprintln!("    Cascade rate:         {:.3}", fm.cascade_rate);
+    eprintln!("    Avg cascade depth:    {:.1}", fm.avg_cascade_depth);
+    eprintln!();
     eprintln!("  TIER 3 — System Health");
     eprintln!("    Community stability:  {:.3}", fm.community_stability);
     eprintln!("    Brain ver velocity:   {}", fm.brain_version_velocity);
@@ -760,4 +802,23 @@ async fn run_agent_validation_1week() {
     );
 
     assert!(report.summary.total_messages > 0);
+}
+
+#[tokio::test]
+async fn run_multi_channel_test() {
+    let report = run_scenario(include_str!("scenarios/multi_channel_test.toml")).await;
+    assert!(report.summary.total_messages > 0);
+    eprintln!(
+        "Multi-channel: {} msgs, {:.2}s",
+        report.summary.total_messages, report.wall_time_secs,
+    );
+    // Verify messages were distributed across channels
+    if let Some(last) = report.metric_timeline.last() {
+        if !last.channel_message_distribution.is_empty() {
+            eprintln!("  Channel distribution:");
+            for (ch, count) in &last.channel_message_distribution {
+                eprintln!("    {ch}: {count}");
+            }
+        }
+    }
 }

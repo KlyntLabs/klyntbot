@@ -88,6 +88,25 @@ pub async fn measure_insight_usefulness(pool: &sqlx::SqlitePool, total_messages:
     (count.0 as f64 / total_messages as f64).min(1.0)
 }
 
+/// Count total communities and weakened communities (stability < 0.3).
+///
+/// Returns `(total, weakened)`. Returns `(0, 0)` if the table does not exist.
+pub async fn count_communities(pool: &sqlx::SqlitePool) -> (u32, u32) {
+    let total: Result<(i64,), _> = sqlx::query_as("SELECT COUNT(*) FROM communities")
+        .fetch_one(pool)
+        .await;
+
+    let weakened: Result<(i64,), _> =
+        sqlx::query_as("SELECT COUNT(*) FROM communities WHERE stability < 0.3")
+            .fetch_one(pool)
+            .await;
+
+    (
+        total.map(|(n,)| n as u32).unwrap_or(0),
+        weakened.map(|(n,)| n as u32).unwrap_or(0),
+    )
+}
+
 // ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------

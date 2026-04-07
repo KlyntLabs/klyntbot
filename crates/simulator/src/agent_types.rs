@@ -43,6 +43,13 @@ pub struct AgentResult {
     pub cache_write_tokens: u32,
     pub cost_usd: f64,
     pub tool_failures: u32,
+    // Signal coverage — captured from agent events
+    pub context_compressions: u32,
+    pub compression_ratio_sum: f64,
+    pub delegation_attempts: u32,
+    pub delegation_successes: u32,
+    pub mcp_ready: u32,
+    pub mcp_failed: u32,
 }
 
 /// Expected workflow pattern for cross-feature messages.

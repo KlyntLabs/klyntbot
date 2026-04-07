@@ -50,6 +50,28 @@ impl ConversationTracker {
     pub fn is_empty(&self) -> bool {
         self.turns.is_empty()
     }
+
+    /// Compute semantic drift between the last two agent responses.
+    /// Returns None if fewer than 2 turns exist.
+    /// Uses cosine distance (1 - similarity) — lower = more coherent.
+    pub fn semantic_drift(&self, engine: &tools::EmbeddingEngine) -> Option<f64> {
+        if self.turns.len() < 2 {
+            return None;
+        }
+        let len = self.turns.len();
+        let prev_response = &self.turns[len - 2].1;
+        let curr_response = &self.turns[len - 1].1;
+
+        let prev_emb = engine.embed(prev_response).ok()?;
+        let curr_emb = engine.embed(curr_response).ok()?;
+        let similarity = common::helpers::cosine_similarity(&prev_emb, &curr_emb);
+        Some(1.0 - similarity)
+    }
+
+    /// Return the current turn depth.
+    pub fn depth(&self) -> usize {
+        self.turns.len()
+    }
 }
 
 #[cfg(test)]

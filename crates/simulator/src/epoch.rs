@@ -8,6 +8,8 @@ use serde::{Deserialize, Serialize};
 /// A discrete time step for simulation advancement.
 #[derive(Debug, Clone, Copy, Serialize, Deserialize)]
 pub enum EpochStep {
+    /// Advance by a specific number of minutes.
+    Minutes(u32),
     /// Advance by a specific number of hours.
     Hours(u32),
     /// Advance by exactly one day (24 hours).
@@ -20,9 +22,19 @@ impl EpochStep {
     /// Convert the step into a `chrono::Duration`.
     pub fn to_duration(&self) -> Duration {
         match self {
+            EpochStep::Minutes(m) => Duration::minutes(i64::from(*m)),
             EpochStep::Hours(h) => Duration::hours(i64::from(*h)),
             EpochStep::Day => Duration::hours(24),
             EpochStep::Week => Duration::hours(168),
+        }
+    }
+
+    /// Whether this step is sub-day (multiple epochs per day).
+    pub fn is_sub_day(&self) -> bool {
+        match self {
+            EpochStep::Minutes(_) => true,
+            EpochStep::Hours(h) => *h < 24,
+            _ => false,
         }
     }
 }
@@ -494,6 +506,27 @@ mod tests {
         assert_eq!(epoch.day_of_simulation(), 2);
         epoch.advance();
         assert_eq!(epoch.day_of_simulation(), 3);
+    }
+
+    #[test]
+    fn minutes_step_fires_daily_cron_once() {
+        // 48 steps of 30min = 24 hours. AtomDecay at 03:00 should fire exactly once.
+        let start = utc(2026, 4, 1, 0, 0);
+        let end = start + Duration::hours(24);
+        let mut epoch = SimulatedEpoch::new(start, end, EpochStep::Minutes(30));
+
+        let mut atom_decay_count = 0;
+        while let Some(plan) = epoch.advance() {
+            for cron in &plan.cron_pre_message {
+                if matches!(cron, CronTrigger::AtomDecay) {
+                    atom_decay_count += 1;
+                }
+            }
+        }
+        assert_eq!(
+            atom_decay_count, 1,
+            "AtomDecay should fire exactly once in 24h"
+        );
     }
 
     #[test]

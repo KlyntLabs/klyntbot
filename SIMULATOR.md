@@ -1,6 +1,6 @@
 # Simulator Completeness Analysis
 
-## Current State (40 metrics, 7 tiers + new)
+## Current State (49 metrics, 7 tiers + signal coverage + conversation + resilience)
 
 The simulator measures system behavior across 7 tiers with baseline regression detection, checkpoint assertions, and per-epoch accumulation. All hardcoded stubs replaced with data-driven values. Coaching acceptance rate wired end-to-end. Embedding model upgraded to bge-small-en-v1.5-Q (+92% response quality). OpenAI text-embedding-3-small available as optional upgrade. Salience ground-truth validation added. Four new metrics (work_context_confidence, focus_quality_trend, budget_adherence, cross_domain_insight_rate) wired end-to-end with event emission and accumulator counting.
 
@@ -56,9 +56,49 @@ The simulator measures system behavior across 7 tiers with baseline regression d
 - `budget_adherence` — 1.0 - (over-budget alerts / total budget alerts) from finance topic events
 - `cross_domain_insight_rate` — CrossDomainDotReady events per message (notes/learning topics)
 
+**Signal Coverage (5 additional)**
+- `context_compression_ratio` — avg(after_tokens / before_tokens) from ContextCompressed agent events
+- `delegation_success_rate` — successful / attempted delegations from DelegationCompleted events
+- `mcp_availability` — ready / (ready + failed) from McpStartupComplete events (default 1.0)
+- `community_churn_rate` — weakened / total communities (stability < 0.3 threshold)
+- `debate_avg_consensus` — avg consensus_score from SquadDebateCompleted domain events
+
 **Plus:** `wall_time_per_epoch_ms`
 
-### Latest 1-Month Results (software_engineer_1mo, 143 messages, 31 days)
+### Latest 1-Week Agent Validation (agent_validation_1week, 21 messages, 7 days, DeepSeek)
+
+| Metric | Value | Assessment |
+|---|---|---|
+| knowledge_retention | 1.000 | 2 facts, all fresh |
+| retrieval_precision | 0.000 | No retrieval queries in 1-week run |
+| personalization | 0.400 | Short run, limited data |
+| response_quality | 0.743 | Good — BGE-small cosine similarity |
+| estimation_deviation | 0.389 | 39% avg deviation |
+| coaching_acceptance | 0.000 | No coaching triggers in 1-week |
+| salience_accuracy | 1.000 | Ground-truth validated |
+| work_ctx_confidence | 0.500 | Baseline (no focus events) |
+| focus_quality_trend | 0.000 | No productivity topic in final epoch |
+| budget_adherence | 1.000 | No over-budget alerts |
+| cross_domain_rate | 0.000 | No notes/learning topic in final epoch |
+| context_compression | 0.000 | Expected — 7k/128k tokens, never hits 70% threshold |
+| delegation_success | 0.000 | No agent delegation triggered |
+| mcp_availability | 1.000 | Default — no MCP servers configured |
+| community_churn | 0.000 | Communities exist (stability 0.667) but none weakened < 0.3 |
+| debate_consensus | 0.000 | No squad debates triggered |
+| community_stability | 0.667 | Moderate — 1-week community formation |
+| meta_rule_count | 0 | No mirror learning in 1-week |
+| routing_accuracy | 1.000 | 27/27 correct |
+| tool_selection | 1.000 | All correct (2 ToolSelectionMismatch on empty tool calls) |
+| multi_turn_coherence | 0.927 | Excellent |
+| adversarial_resilience | 1.000 | 2/2 handled |
+| error_recovery_rate | 1.000 | All tool failures recovered |
+| cost_per_outcome_usd | $0.019 | Low — 1-week run |
+| cache_hit_rate | 0.010 | Minimal prompt caching |
+| retrievability | 0.811 | FSRS-5 decay showing correctly |
+| retrievability_min | 0.600 | Tail fact decay visible |
+| retrievability_p25 | 0.750 | Good spread |
+
+### Previous 1-Month Results (software_engineer_1mo, 143 messages, 31 days)
 
 | Metric | Value | Assessment |
 |---|---|---|
@@ -152,34 +192,33 @@ The simulator measures system behavior across 7 tiers with baseline regression d
 
 Signals the production system produces but the simulator doesn't observe:
 
-### High Priority
+### All Event-Based Signals Implemented
 
-6. **Context compression ratio** — `after_tokens / before_tokens` from `ContextCompressed` agent events. Blocked: sim messages use ~7-9k of 128k context window, never triggering the 70% threshold.
-
-### Medium Priority (all implemented)
-
+6. ~~**Context compression ratio**~~ — ✅ `context_compression_ratio`: captured from `ContextCompressed` agent events. Context window now configurable via `agent_context_window` (default 128k).
 7. ~~**Work context confidence**~~ — ✅ `work_context_confidence` metric: 0.4×base + 0.6×mean(focus_quality)
 8. ~~**Cross-domain insight rate**~~ — ✅ `cross_domain_insight_rate`: `CrossDomainDotReady` events emitted for notes/learning topics
 9. ~~**Budget adherence**~~ — ✅ `budget_adherence`: 1 - (over_budget / total_alerts) from finance topic events
 10. ~~**Focus quality trend**~~ — ✅ `focus_quality_trend`: mean quality from `FocusSessionEnded` events
-
-### Lower Priority
-
-11. **Delegation success rate** — from `DelegationCompleted` events
-12. **MCP tool availability** — from `McpStartupComplete` events
-13. **Note community health** — from `CommunityDiscovered/Updated/Weakened` events
-14. **Debate consensus quality** — from `SquadDebateCompleted` events
+11. ~~**Delegation success rate**~~ — ✅ `delegation_success_rate`: captured from `DelegationStarted/Completed` agent events
+12. ~~**MCP tool availability**~~ — ✅ `mcp_availability`: captured from `McpStartupComplete` agent events (defaults to 1.0 when no MCP used)
+13. ~~**Note community health**~~ — ✅ `community_churn_rate`: DB query at epoch boundary counts communities with stability < 0.3
+14. ~~**Debate consensus quality**~~ — ✅ `debate_avg_consensus`: captured from `SquadDebateCompleted` domain events via atomic counters
 
 ### Entire Subsystems Not Simulated
 
 - **Voice interaction** — `PronunciationReport`, `RoutingSuggestion`, `ToneContour`
-- **Squad debates** — `SquadDebateCompleted` with `persona_accuracies`
 
 ---
 
 ## Structural Gaps
 
-- **Time granularity** — epochs are 1-day steps; sub-hour dynamics (focus sessions, context compression) are invisible
-- **Conversation depth** — persona generates mostly independent messages; multi-turn context building is shallow
-- **Error cascades** — 4 error types injected randomly; no cascade testing (e.g., storage timeout → extraction failure → retrieval miss)
-- **Concurrent sessions** — production runs multiple sessions across channels; simulator tests one at a time
+### Recently Resolved
+
+- **Time granularity** — ✅ `EpochStep::Minutes(u32)` added. Scenarios can use `epoch_step = "30min"` for sub-hour resolution. Daily crons still fire correctly (once per crossing). Message batching distributes day's messages across sub-day epochs.
+- **Conversation depth** — ✅ Follow-ups now reference specific prior context (70% context reference, 30% correction). Semantic drift measured via embedding cosine distance. `avg_conversation_drift` and `avg_conversation_depth` metrics added.
+
+### Remaining
+
+All structural gaps resolved:
+- ~~**Error cascades**~~ — ✅ `CascadeState` with dependency-aware injection. When root cause fires (storage/timeout), downstream tools see `cascade_multiplier` (default 3x) elevated rates. `cascade_rate` and `avg_cascade_depth` metrics added. Enable via `error_cascade_enabled = true`.
+- ~~**Concurrent sessions**~~ — ✅ `ChannelConfig` with weighted message distribution. Per-channel `ConversationTracker` instances share DB/bus/metrics. `channel_message_distribution` map tracked per epoch. Configure via `channels = [{name, message_share}]`.

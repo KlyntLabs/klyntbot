@@ -48,6 +48,19 @@ pub struct SimulationConfig {
     /// Depth mode for agent execution. Default: Normal.
     #[serde(default)]
     pub agent_depth_mode: DepthMode,
+    /// Context window size for agent execution. Lower values trigger
+    /// mid-loop compression. Default: 128000.
+    #[serde(default = "default_agent_context_window")]
+    pub agent_context_window: usize,
+    /// Error cascade: when a root error fires, dependent errors get elevated rates.
+    #[serde(default)]
+    pub error_cascade_enabled: bool,
+    /// Multiplier for dependent error rates after a root cause fires. Default: 3.0.
+    #[serde(default = "default_cascade_multiplier")]
+    pub error_cascade_multiplier: f64,
+    /// Concurrent channels to simulate. Default: single channel.
+    #[serde(default)]
+    pub channels: Vec<ChannelConfig>,
 }
 
 fn default_cognitive_llm_model() -> String {
@@ -94,6 +107,24 @@ fn default_agent_model() -> String {
     "deepseek-chat".to_string()
 }
 
+fn default_agent_context_window() -> usize {
+    128_000
+}
+
+fn default_cascade_multiplier() -> f64 {
+    3.0
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ChannelConfig {
+    pub name: String,
+    /// Fraction of total messages routed to this channel (0.0-1.0).
+    pub message_share: f64,
+    /// Seed offset for this channel's persona RNG.
+    #[serde(default)]
+    pub seed_offset: u64,
+}
+
 impl Default for SimulationConfig {
     fn default() -> Self {
         Self {
@@ -110,6 +141,10 @@ impl Default for SimulationConfig {
             agent_provider: default_agent_provider(),
             agent_model: default_agent_model(),
             agent_depth_mode: DepthMode::default(),
+            agent_context_window: default_agent_context_window(),
+            error_cascade_enabled: false,
+            error_cascade_multiplier: default_cascade_multiplier(),
+            channels: Vec::new(),
         }
     }
 }
@@ -163,6 +198,18 @@ pub enum MetricName {
     FocusQualityTrend,
     BudgetAdherence,
     CrossDomainInsightRate,
+    // Signal coverage metrics
+    ContextCompressionRatio,
+    DelegationSuccessRate,
+    McpAvailability,
+    CommunityChurnRate,
+    DebateAvgConsensus,
+    // Conversation depth metrics
+    AvgConversationDrift,
+    AvgConversationDepth,
+    // Resilience metrics
+    CascadeRate,
+    AvgCascadeDepth,
 }
 
 // ── Checkpoint assertions ──────────────────────────────────────────────
