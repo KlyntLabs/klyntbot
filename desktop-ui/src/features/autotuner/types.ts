@@ -32,7 +32,6 @@ export interface MetricsHealth {
 }
 
 export interface AutoTunerStatus {
-  enabled: boolean;
   champion: ChampionSummary;
   activeExperiment: ExperimentSummary | null;
   paused: boolean;

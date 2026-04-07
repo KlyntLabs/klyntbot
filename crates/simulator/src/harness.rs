@@ -578,7 +578,7 @@ impl SimulationHarness {
                 emit_coaching_events(&self.bus, &msg.topic, msg_idx, day_counter);
 
                 // Count metrics from the coaching events we just emitted.
-                // This mirrors emit_coaching_events logic to avoid double-dispatch complexity.
+                // Also record salience + ground-truth for non-ChatTurnCompleted events.
                 {
                     let seed = msg_idx.wrapping_mul(31).wrapping_add(day_counter as usize);
                     match msg.topic.as_str() {
@@ -586,6 +586,36 @@ impl SimulationHarness {
                             let quality = 0.4 + (seed % 50) as f64 / 100.0;
                             metrics.accumulator_mut().focus_quality_sum += quality;
                             metrics.accumulator_mut().focus_quality_count += 1;
+
+                            // Salience: FocusSessionStarted → Accumulate, FocusSessionEnded → Accumulate
+                            let start_evt = DomainEvent::FocusSessionStarted {
+                                session_type: "pomodoro".to_string(),
+                                target_mins: 25 + (seed % 35) as i64,
+                            };
+                            let end_evt = DomainEvent::FocusSessionEnded {
+                                duration_secs: 1500,
+                                quality,
+                                interruptions: (seed % 4) as i32,
+                            };
+                            crate::metrics::cognitive::record_salience(
+                                &start_evt,
+                                metrics.accumulator_mut(),
+                            );
+                            crate::metrics::cognitive::record_salience(
+                                &end_evt,
+                                metrics.accumulator_mut(),
+                            );
+                            metrics.accumulator_mut().salience_validated += 2;
+                            if cognitive::services::salience::evaluate_salience(&start_evt).as_str()
+                                == "accumulate"
+                            {
+                                metrics.accumulator_mut().salience_correct += 1;
+                            }
+                            if cognitive::services::salience::evaluate_salience(&end_evt).as_str()
+                                == "accumulate"
+                            {
+                                metrics.accumulator_mut().salience_correct += 1;
+                            }
                         }
                         "finance" => {
                             if seed % 10 < 4 {
@@ -593,6 +623,42 @@ impl SimulationHarness {
                                 metrics.accumulator_mut().budget_alerts += 1;
                                 if spent > 100.0 {
                                     metrics.accumulator_mut().budget_alerts_over += 1;
+                                }
+
+                                // Salience: BudgetAlert → Extract
+                                let evt = DomainEvent::BudgetAlert {
+                                    category: "dining".to_string(),
+                                    spent,
+                                    limit: 100.0,
+                                };
+                                crate::metrics::cognitive::record_salience(
+                                    &evt,
+                                    metrics.accumulator_mut(),
+                                );
+                                metrics.accumulator_mut().salience_validated += 1;
+                                if cognitive::services::salience::evaluate_salience(&evt).as_str()
+                                    == "extract"
+                                {
+                                    metrics.accumulator_mut().salience_correct += 1;
+                                }
+                            }
+                        }
+                        "tasks" => {
+                            // TaskDeferred events (~30% of task messages)
+                            if seed % 10 < 3 {
+                                let evt = DomainEvent::TaskDeferred {
+                                    task_id: format!("sim-task-{day_counter}-{msg_idx}"),
+                                    times_deferred: 1 + (seed % 3) as i32,
+                                };
+                                crate::metrics::cognitive::record_salience(
+                                    &evt,
+                                    metrics.accumulator_mut(),
+                                );
+                                metrics.accumulator_mut().salience_validated += 1;
+                                if cognitive::services::salience::evaluate_salience(&evt).as_str()
+                                    == "accumulate"
+                                {
+                                    metrics.accumulator_mut().salience_correct += 1;
                                 }
                             }
                         }
@@ -607,6 +673,22 @@ impl SimulationHarness {
                             }
                         }
                         _ => {}
+                    }
+
+                    // DistractionDetected (~20% of ALL messages) → Accumulate
+                    if seed % 5 == 0 {
+                        let evt = DomainEvent::DistractionDetected {
+                            app: "social_media".to_string(),
+                            duration_secs: Some(30 + (seed % 90) as i64),
+                            context: format!("day{day_counter}_msg{msg_idx}"),
+                        };
+                        crate::metrics::cognitive::record_salience(&evt, metrics.accumulator_mut());
+                        metrics.accumulator_mut().salience_validated += 1;
+                        if cognitive::services::salience::evaluate_salience(&evt).as_str()
+                            == "accumulate"
+                        {
+                            metrics.accumulator_mut().salience_correct += 1;
+                        }
                     }
                 }
 

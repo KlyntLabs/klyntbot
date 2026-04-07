@@ -25,20 +25,10 @@ export function AutoTunerPanel() {
     );
   }
 
-  if (!status.enabled) {
-    return (
-      <div className="glass-card p-4">
-        <p className="text-xs font-light text-dim">
-          AutoTuner is disabled. Enable it in settings to let Klyntbot learn your preferences.
-        </p>
-      </div>
-    );
-  }
-
   return (
     <div className="flex flex-col gap-3">
       <ChampionCard status={status} onRefetch={refetch} />
-      {status.enabled && !status.paused && <ExperimentPaceControl />}
+      {!status.paused && <ExperimentPaceControl />}
       <ExperimentTimeline experiments={history} loading={historyLoading} />
     </div>
   );

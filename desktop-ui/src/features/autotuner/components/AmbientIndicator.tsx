@@ -8,7 +8,7 @@ interface AmbientIndicatorProps {
 export function AmbientIndicator({ onClick }: AmbientIndicatorProps) {
   const { data: status } = useAutoTunerStatus();
 
-  if (!status?.enabled) return null;
+  if (!status) return null;
 
   const brainStatus = status.brainGrowth?.status;
 

@@ -17,7 +17,7 @@ pub async fn measure_retrievability_distribution(
     simulated_now: &str,
 ) -> RetrievabilityDistribution {
     let rows: Vec<(f64, f64)> = sqlx::query_as(
-        "SELECT stability, CAST(strftime('%s', recorded_at) AS REAL) \
+        "SELECT stability, CAST(strftime('%s', valid_from) AS REAL) \
          FROM semantic_facts \
          WHERE superseded_at IS NULL AND stability > 0",
     )

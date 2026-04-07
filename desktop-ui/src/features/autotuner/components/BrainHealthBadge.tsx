@@ -21,8 +21,7 @@ function dotConfig(status: BrainGrowth["status"]) {
 export function BrainHealthBadge({ compact = false }: BrainHealthBadgeProps) {
   const { data: status } = useAutoTunerStatus();
 
-  if (!status?.enabled) return null;
-  if (!status.brainGrowth) return null;
+  if (!status?.brainGrowth) return null;
 
   const { color, pulse, label } = dotConfig(status.brainGrowth.status);
 

@@ -193,6 +193,8 @@ pub struct MetricCollector {
     cumulative_coaching_helpful: u32,
     cumulative_coaching_dismissed: u32,
     cumulative_coaching_stop: u32,
+    cumulative_response_quality_sum: f64,
+    cumulative_response_quality_count: u32,
 }
 
 impl MetricCollector {
@@ -214,6 +216,8 @@ impl MetricCollector {
             cumulative_coaching_helpful: 0,
             cumulative_coaching_dismissed: 0,
             cumulative_coaching_stop: 0,
+            cumulative_response_quality_sum: 0.0,
+            cumulative_response_quality_count: 0,
         }
     }
 
@@ -262,6 +266,10 @@ impl MetricCollector {
         self.cumulative_contradictions += self.accumulator.contradictions_detected;
         self.cumulative_estimation_deviation_sum += self.accumulator.estimation_deviation_sum;
         self.cumulative_estimation_count += self.accumulator.estimation_count;
+        self.cumulative_response_quality_sum +=
+            self.accumulator.agent_response_quality_sum + self.accumulator.response_quality_sum;
+        self.cumulative_response_quality_count +=
+            self.accumulator.agent_response_quality_count + self.accumulator.response_quality_count;
 
         let acc = &self.accumulator;
         let msgs = acc.messages_processed.max(1) as f64;
@@ -307,11 +315,9 @@ impl MetricCollector {
             0.0
         };
 
-        // Prefer agent-path response quality over heuristic-mode metric.
-        let response_quality = if acc.agent_response_quality_count > 0 {
-            acc.agent_response_quality_sum / acc.agent_response_quality_count as f64
-        } else if acc.response_quality_count > 0 {
-            acc.response_quality_sum / acc.response_quality_count as f64
+        // Cumulative response quality — prevents error-heavy epochs from zeroing out the metric.
+        let response_quality = if self.cumulative_response_quality_count > 0 {
+            self.cumulative_response_quality_sum / self.cumulative_response_quality_count as f64
         } else {
             0.0
         };

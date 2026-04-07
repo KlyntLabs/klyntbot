@@ -4,10 +4,6 @@ use serde::{Deserialize, Serialize};
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct AutoTunerConfig {
-    /// Whether the autotuner is enabled (default: false — opt-in).
-    #[serde(default)]
-    pub enabled: bool,
-
     /// Cron expression for the nightly experiment cycle (default: "0 2 * * *").
     #[serde(default = "default_schedule")]
     pub schedule: String,
@@ -48,7 +44,6 @@ pub struct AutoTunerConfig {
 impl Default for AutoTunerConfig {
     fn default() -> Self {
         Self {
-            enabled: false,
             schedule: default_schedule(),
             min_messages_for_promotion: default_min_messages(),
             rollback_after_days: default_rollback_days(),
@@ -107,9 +102,8 @@ mod tests {
     use super::*;
 
     #[test]
-    fn default_config_is_disabled() {
+    fn default_config_values() {
         let config = AutoTunerConfig::default();
-        assert!(!config.enabled);
         assert_eq!(config.schedule, "0 2 * * *");
         assert_eq!(config.min_messages_for_promotion, 50);
         assert_eq!(config.rollback_after_days, 3);

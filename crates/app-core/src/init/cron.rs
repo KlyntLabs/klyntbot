@@ -109,57 +109,51 @@ pub(super) async fn init_cron(
         vector_store,
     );
 
-    // ── AutoTuner nightly cycle (conditional) ────────────────────────────
-    let autotuner = if config.autotuner.enabled {
-        let trial_repo = storage::TrialRepo::new(repos.pool().clone());
-        trial_repo
-            .migrate()
-            .await
-            .map_err(|e| format!("autotuner migration failed: {e}"))?;
-        let strategy_repo = repos.strategies.clone();
-        let event_log_repo = cognitive::EventLogRepo::new(repos.pool().clone());
-        let usage_repo = repos.usage.clone();
-        let fact_repo = cognitive::SemanticFactRepo::new(repos.pool().clone());
-        let metric_source: Arc<dyn autotuner::MetricSource> = Arc::new(
-            agent::autotuner::metric_collector::AgentMetricCollector::new(
-                strategy_repo,
-                event_log_repo,
-                usage_repo,
-                trial_repo.clone(),
-                fact_repo,
-            ),
-        );
-        let learning_state = repos.learning_state.clone();
-        let champion =
-            agent::autotuner::AutoTunerOrchestrator::load_champion(&learning_state).await;
-        let episodic_memory_repo = cognitive::EpisodicMemoryRepo::new(repos.pool().clone());
-        let memory_param_sink = Arc::new(std::sync::RwLock::new(None));
-        let orchestrator = Arc::new(
-            agent::autotuner::AutoTunerOrchestrator::new(
-                champion,
-                true,
-                learning_state,
-                trial_repo.clone(),
-                autotuner_provider,
-                config.agents.defaults.model.clone(),
-            )
-            .with_strategy_repo(repos.strategies.clone())
-            .with_episodic_memory_repo(episodic_memory_repo)
-            .with_memory_param_sink(Arc::clone(&memory_param_sink)),
-        );
-        agent::autotuner::AutoTunerOrchestrator::register_nightly_cycle(
-            Arc::clone(&orchestrator),
-            &cron_service,
-            config.autotuner.clone(),
-            trial_repo,
-            metric_source,
-            Some(Arc::clone(domain_event_bus)),
-        );
-        info!("autotuner nightly cycle handler registered");
-        Some(orchestrator)
-    } else {
-        None
-    };
+    // ── AutoTuner nightly cycle ───────────────────────────────────────────
+    let trial_repo = storage::TrialRepo::new(repos.pool().clone());
+    trial_repo
+        .migrate()
+        .await
+        .map_err(|e| format!("autotuner migration failed: {e}"))?;
+    let strategy_repo = repos.strategies.clone();
+    let event_log_repo = cognitive::EventLogRepo::new(repos.pool().clone());
+    let usage_repo = repos.usage.clone();
+    let fact_repo = cognitive::SemanticFactRepo::new(repos.pool().clone());
+    let metric_source: Arc<dyn autotuner::MetricSource> = Arc::new(
+        agent::autotuner::metric_collector::AgentMetricCollector::new(
+            strategy_repo,
+            event_log_repo,
+            usage_repo,
+            trial_repo.clone(),
+            fact_repo,
+        ),
+    );
+    let learning_state = repos.learning_state.clone();
+    let champion = agent::autotuner::AutoTunerOrchestrator::load_champion(&learning_state).await;
+    let episodic_memory_repo = cognitive::EpisodicMemoryRepo::new(repos.pool().clone());
+    let memory_param_sink = Arc::new(std::sync::RwLock::new(None));
+    let orchestrator = Arc::new(
+        agent::autotuner::AutoTunerOrchestrator::new(
+            champion,
+            learning_state,
+            trial_repo.clone(),
+            autotuner_provider,
+            config.agents.defaults.model.clone(),
+        )
+        .with_strategy_repo(repos.strategies.clone())
+        .with_episodic_memory_repo(episodic_memory_repo)
+        .with_memory_param_sink(Arc::clone(&memory_param_sink)),
+    );
+    agent::autotuner::AutoTunerOrchestrator::register_nightly_cycle(
+        Arc::clone(&orchestrator),
+        &cron_service,
+        config.autotuner.clone(),
+        trial_repo,
+        metric_source,
+        Some(Arc::clone(domain_event_bus)),
+    );
+    info!("autotuner nightly cycle handler registered");
+    let autotuner = Some(orchestrator);
 
     let cron_service = Arc::new(cron_service);
     ensure_cron_jobs(&cron_service, config)
@@ -913,13 +907,11 @@ async fn ensure_cron_jobs(
         );
     }
 
-    if config.autotuner.enabled {
-        agent::autotuner::AutoTunerOrchestrator::ensure_nightly_job(
-            cron_service,
-            &config.autotuner.schedule,
-        )
-        .await?;
-    }
+    agent::autotuner::AutoTunerOrchestrator::ensure_nightly_job(
+        cron_service,
+        &config.autotuner.schedule,
+    )
+    .await?;
 
     ensure_job!(
         JOB_ATOM_DECAY,

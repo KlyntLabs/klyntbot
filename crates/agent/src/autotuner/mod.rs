@@ -46,7 +46,6 @@ pub const KNOWLEDGE_TRUST_SNAPSHOT_KEY: &str = "knowledge_trust_snapshot";
 /// [`update_champion`].
 pub struct AutoTunerOrchestrator {
     champion: RwLock<Champion>,
-    active: bool,
     learning_state: LearningStateRepo,
     trial_repo: TrialRepo,
     provider: DynProvider,
@@ -61,7 +60,6 @@ pub struct AutoTunerOrchestrator {
 impl AutoTunerOrchestrator {
     pub fn new(
         champion: Champion,
-        enabled: bool,
         learning_state: LearningStateRepo,
         trial_repo: TrialRepo,
         provider: DynProvider,
@@ -69,7 +67,6 @@ impl AutoTunerOrchestrator {
     ) -> Self {
         Self {
             champion: RwLock::new(champion),
-            active: enabled,
             learning_state,
             trial_repo,
             provider,
@@ -133,15 +130,12 @@ impl AutoTunerOrchestrator {
     }
 
     pub fn is_active(&self) -> bool {
-        self.active
+        true
     }
 
     /// Check if Phase 2 (memory optimization) is ready to activate.
     /// Requires champion stable >= 7 days.
     pub fn is_phase2_ready(&self) -> bool {
-        if !self.active {
-            return false;
-        }
         let Some(champion) = self.champion.try_read().ok() else {
             return false;
         };
@@ -152,9 +146,6 @@ impl AutoTunerOrchestrator {
     /// Return the current champion's trial params if the autotuner is active
     /// and a non-default champion has been promoted.
     pub async fn current_champion_params(&self) -> Option<TrialParams> {
-        if !self.active {
-            return None;
-        }
         let champion = self.champion.read().await;
         if champion.trial_id.is_some() {
             Some(champion.params.clone())
@@ -167,9 +158,6 @@ impl AutoTunerOrchestrator {
     /// is currently held (e.g. during nightly promotion) or the autotuner is
     /// inactive / no champion has been promoted.
     pub fn try_current_champion_params(&self) -> Option<TrialParams> {
-        if !self.active {
-            return None;
-        }
         let champion = self.champion.try_read().ok()?;
         if champion.trial_id.is_some() {
             Some(champion.params.clone())
@@ -835,14 +823,13 @@ mod tests {
     }
 
     /// Build a test orchestrator with in-memory repos and a NoopProvider.
-    async fn make_orch(champion: Champion, enabled: bool) -> AutoTunerOrchestrator {
+    async fn make_orch(champion: Champion) -> AutoTunerOrchestrator {
         let pool = setup_test_pool().await;
         let learning_state = LearningStateRepo::new(pool.clone());
         let trial_repo = TrialRepo::new(pool);
         let provider: DynProvider = Arc::new(providers::NoopProvider);
         AutoTunerOrchestrator::new(
             champion,
-            enabled,
             learning_state,
             trial_repo,
             provider,
@@ -851,15 +838,8 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn inactive_returns_no_params() {
-        let orch = make_orch(Champion::default(), false).await;
-        assert!(!orch.is_active());
-        assert!(orch.current_champion_params().await.is_none());
-    }
-
-    #[tokio::test]
-    async fn active_default_champion_returns_none() {
-        let orch = make_orch(Champion::default(), true).await;
+    async fn default_champion_returns_none() {
+        let orch = make_orch(Champion::default()).await;
         assert!(orch.is_active());
         // Default champion has trial_id = None → returns None.
         assert!(orch.current_champion_params().await.is_none());
@@ -875,7 +855,7 @@ mod tests {
             },
             ..Champion::default()
         };
-        let orch = make_orch(champion, true).await;
+        let orch = make_orch(champion).await;
         let params = orch.current_champion_params().await;
         assert!(params.is_some());
         assert_eq!(params.unwrap().heuristic_confidence_threshold, Some(0.75));
@@ -883,7 +863,7 @@ mod tests {
 
     #[tokio::test]
     async fn update_champion_persists_to_learning_state() {
-        let orch = make_orch(Champion::default(), true).await;
+        let orch = make_orch(Champion::default()).await;
         assert!(orch.champion().await.trial_id.is_none());
 
         let new = Champion {
@@ -942,7 +922,7 @@ mod tests {
             promoted_at: chrono::Utc::now() - chrono::Duration::days(3),
             ..Champion::default()
         };
-        let orch = make_orch(champion, true).await;
+        let orch = make_orch(champion).await;
         let summary = orch.champion_summary().await;
         assert!(summary.days_active >= 3);
     }

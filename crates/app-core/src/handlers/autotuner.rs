@@ -27,7 +27,6 @@ pub struct MetricsHealth {
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct AutoTunerStatus {
-    pub enabled: bool,
     pub champion: autotuner::ChampionSummary,
     pub active_experiment: Option<autotuner::ExperimentSummary>,
     pub paused: bool,
@@ -110,7 +109,6 @@ impl AppCore {
             });
 
             Ok(AutoTunerStatus {
-                enabled: orch.is_active(),
                 champion,
                 active_experiment,
                 paused,
@@ -120,7 +118,6 @@ impl AppCore {
             })
         } else {
             Ok(AutoTunerStatus {
-                enabled: false,
                 champion: autotuner::ChampionSummary {
                     trial_id: None,
                     description: "AutoTuner not enabled".into(),

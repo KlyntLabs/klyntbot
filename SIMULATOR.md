@@ -94,13 +94,17 @@ The simulator measures system behavior across 7 tiers with baseline regression d
 
 ## Known Issues
 
-**`retrievability_min/p25: 1.000`** — Only 4 facts over 30 days with high stability. Routine/power_user `new_fact_introduction_rate` bumped to 0.30/0.15 (from 0.15/0.05) to increase fact diversity, but FSRS-5 decay still needs longer simulation runs or lower initial stability to become visible.
-
-**`salience_accuracy: 1.000`** — Now has ground-truth validation via `expected_salience` field in `GroundTruthAnnotation`. However, all simulator messages produce `ChatTurnCompleted` events which always classify as "extract" — so the metric is self-confirming. To differentiate, the simulator would need to emit non-ChatTurnCompleted events with varying expected verdicts.
-
 **`ToolSelectionMismatch: ~25 per run`** — DeepSeek sometimes swaps `notes`↔`finance` tools or calls `annotate` for `tasks` topics. This is LLM behavior variance, not a simulator bug. The scored metric (tool_selection) correctly filters these via the adversarial exclusion guard. Breakpoints provide per-message diagnostics.
 
 **`response_quality` variance: 0.587–0.620** — Run-to-run variance from LLM response content differences. The BGE-small upgrade doubled the score from ~0.30 but the local model still has limitations for asymmetric keyword-to-paragraph matching. OpenAI embeddings would likely score higher.
+
+### Recently Fixed
+
+**`retrievability_min/p25: 1.000` → now shows FSRS-5 decay** — Root cause was a time-domain mismatch: the SQL query used `recorded_at` (wall-clock `Utc::now()`) while `simulated_now` used simulated time. Since the entire 30-day sim runs in ~40 min of wall time, all facts had `elapsed_days ≈ 0`. Fixed by switching to `valid_from` (simulated timestamp from `observation.timestamp`).
+
+**`salience_accuracy: 1.000` self-confirming → now diverse** — Previously only recorded `ChatTurnCompleted` events (always "extract"). Now also records salience for coaching events: `FocusSessionStarted/Ended` (→ Accumulate), `TaskDeferred` (→ Accumulate), `BudgetAlert` (→ Extract), `DistractionDetected` (→ Accumulate). Gives a realistic Extract/Accumulate mix.
+
+**`response_quality: 0.000` on error epochs → cumulative** — Was per-epoch only; when the last epoch had all agent errors, the metric zeroed out. Now uses cumulative tracking (like `task_completion_rate` and `coaching_acceptance_rate`), so error-heavy epochs don't erase earlier good data.
 
 ---
 

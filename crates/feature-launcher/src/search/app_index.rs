@@ -76,7 +76,10 @@ impl AppIndex {
                 // IconServices to mmap .isdata files that are never unmapped, causing
                 // ~1GB+ memory growth over a session. The frontend has emoji fallbacks
                 // for each item kind via ICON_MAP, which is zero-cost.
-                let icon = app.icon_data.clone().or_else(|| Some("app-window".to_string()));
+                let icon = app
+                    .icon_data
+                    .clone()
+                    .or_else(|| Some("app-window".to_string()));
 
                 LauncherItem {
                     id: format!("app:{}", app.path.display()),

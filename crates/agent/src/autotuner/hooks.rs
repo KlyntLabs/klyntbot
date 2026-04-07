@@ -242,15 +242,11 @@ mod tests {
         }
     }
 
-    async fn make_orchestrator(
-        pool: &storage::StoragePool,
-        enabled: bool,
-    ) -> Arc<AutoTunerOrchestrator> {
+    async fn make_orchestrator(pool: &storage::StoragePool) -> Arc<AutoTunerOrchestrator> {
         let learning_state = storage::LearningStateRepo::new(pool.inner().clone());
         let trial_repo = TrialRepo::new(pool.inner().clone());
         Arc::new(AutoTunerOrchestrator::new(
             autotuner::Champion::default(),
-            enabled,
             learning_state,
             trial_repo,
             Arc::new(PanickingProvider) as DynProvider,
@@ -259,24 +255,11 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn hook_skips_when_inactive() {
-        let pool = storage::StoragePool::connect_in_memory().await.unwrap();
-        let trial_repo = TrialRepo::new(pool.inner().clone());
-        trial_repo.migrate().await.unwrap();
-        let orchestrator = make_orchestrator(&pool, false).await;
-
-        let hook = AutoTunerHookImpl::new(orchestrator, trial_repo);
-
-        // Should return immediately without panicking (inactive orchestrator).
-        hook.on_message_received("hello", "test-chat").await;
-    }
-
-    #[tokio::test]
     async fn on_message_completed_updates_ground_truth() {
         let pool = storage::StoragePool::connect_in_memory().await.unwrap();
         let trial_repo = TrialRepo::new(pool.inner().clone());
         trial_repo.migrate().await.unwrap();
-        let orchestrator = make_orchestrator(&pool, true).await;
+        let orchestrator = make_orchestrator(&pool).await;
 
         // Create experiment + trial + shadow log entry with pending ground truth
         let exp = storage::rows::trial::ExperimentRow {

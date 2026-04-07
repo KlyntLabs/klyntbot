@@ -172,8 +172,7 @@ function TimerView({ timer, onOpenSettings }: { timer: Timer; onOpenSettings: ()
 
   const showLearningLine =
     phase === "working" &&
-    autotunerStatus?.enabled &&
-    (autotunerStatus.champion?.days_active ?? 0) > 3 &&
+    (autotunerStatus?.champion?.days_active ?? 0) > 3 &&
     !learningBannerDismissed;
 
   // Auto-dismiss the learning banner after 8 seconds
