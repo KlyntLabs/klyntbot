@@ -3,6 +3,7 @@
 
 pub mod embedder;
 pub mod mirror;
+pub mod pipeline;
 pub mod repos;
 pub mod search;
 pub mod services;
