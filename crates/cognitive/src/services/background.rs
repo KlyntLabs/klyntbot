@@ -216,6 +216,7 @@ pub struct BackgroundServiceConfig {
     pub domain_bus: Option<Arc<bus::DomainEventBus>>,
     pub context_update_queue: Option<Arc<bus::ContextUpdateQueue>>,
     pub session_repo: Option<storage::SessionRepo>,
+    pub rule_repo: Option<crate::repos::ProceduralRuleRepo>,
 }
 
 /// Background service that processes domain events into cognitive memory.
@@ -243,6 +244,7 @@ impl BackgroundConsolidationService {
             domain_bus,
             context_update_queue,
             session_repo,
+            rule_repo,
         } = config;
         let cancel_clone = cancel.clone();
         let handle = tokio::spawn(async move {
@@ -448,6 +450,28 @@ impl BackgroundConsolidationService {
                                     warn!("Failed to store episodic memory: {e}");
                                 }
                             }
+                        }
+                    }
+
+                    // Reinforce procedural rules when extracted facts match rule patterns.
+                    // Fan out per-observation searches concurrently (mirroring prefetch_existing).
+                    if let Some(ref rr) = rule_repo {
+                        let match_futs: Vec<_> = to_extract
+                            .iter()
+                            .map(|obs| async {
+                                for domain in crate::repos::RULE_DOMAINS {
+                                    if let Ok(Some(matching)) =
+                                        rr.find_similar(&obs.content, domain).await
+                                    {
+                                        return Some(matching.id);
+                                    }
+                                }
+                                None
+                            })
+                            .collect();
+                        let matches = futures_util::future::join_all(match_futs).await;
+                        for rule_id in matches.into_iter().flatten() {
+                            let _ = rr.increment_signal_count(&rule_id).await;
                         }
                     }
 

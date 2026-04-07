@@ -1,13 +1,13 @@
 # Second Brain Upgrade Plan
 
 > Generated 2026-04-07 from deep analysis of Claude Code's memory architecture vs Klynt's cognitive system.
-> **Last updated:** 2026-04-07 — reflects all Phase A, Phase B, and Episodic improvements completed.
+> **Last updated:** 2026-04-07 — reflects all Phase A, Phase B, Episodic, and Procedural Rules improvements completed.
 
 ## Executive Summary
 
-Klynt's cognitive architecture (structured SPO triples, vector+BM25 hybrid retrieval, FSRS-5 decay, 10-factor relevance scoring, mirror self-reflection, autotuner) is **fundamentally more sophisticated** than Claude Code's flat-file memory system. The upstream pipeline was disconnected — `ChatTurnCompleted` events had been stripped of message content, blocking all chat-based fact extraction. **This has been fixed.** The system now extracts facts from every conversation turn with full 3-turn context, maintains per-session scratchpads, and surfaces episodic memories in per-turn retrieval.
+Klynt's cognitive architecture (structured SPO triples, vector+BM25 hybrid retrieval, FSRS-5 decay, 10-factor relevance scoring, mirror self-reflection, autotuner) is **fundamentally more sophisticated** than Claude Code's flat-file memory system. The upstream pipeline was disconnected — `ChatTurnCompleted` events had been stripped of message content, blocking all chat-based fact extraction. **This has been fixed.** The system now extracts facts from every conversation turn with full 3-turn context, maintains per-session scratchpads, surfaces episodic memories in per-turn retrieval, and has a fully functional procedural rules learning system with deduplication, signal reinforcement, stale expiration, and MetaRule promotion.
 
-Claude Code's key advantage was its **multi-layered extraction strategy**: (1) main agent proactive saves, (2) per-turn forked LLM extraction subagent, (3) periodic cross-session consolidation ("autoDream"). Klynt now matches or exceeds this with: (1) `record_fact` tool for proactive saves, (2) enriched `BackgroundConsolidationService` with session history, (3) `SessionMemoryService` for per-session scratchpads.
+Claude Code's key advantage was its **multi-layered extraction strategy**: (1) main agent proactive saves, (2) per-turn forked LLM extraction subagent, (3) periodic cross-session consolidation ("autoDream"). Klynt now matches or exceeds this with: (1) `record_fact` tool for proactive saves, (2) enriched `BackgroundConsolidationService` with session history, (3) `SessionMemoryService` for per-session scratchpads, (4) procedural rules that learn, reinforce, and expire automatically.
 
 ---
 
@@ -54,17 +54,17 @@ Persistent, always-on agent mode with: cron scheduler, MCP push channels, GitHub
 
 | Component | Status | Notes |
 |-----------|--------|-------|
-| BackgroundConsolidationService | ✅ Working | Event-driven, 3s batch window, salience filter |
+| BackgroundConsolidationService | ✅ Working | Event-driven, 3s batch window, salience filter, **signal reinforcement** |
 | Salience filter | ✅ Working | Extract/Accumulate/Discard triage for all domain events |
 | ExtractionHandler (heuristic) | ✅ Working | Pattern-matches source_event, generates SPO facts |
 | ExtractionHandler (LLM) | ✅ Working | Structured JSON output, falls back to heuristic |
 | ConsolidationHandler | ✅ Working | LLM-backed dedup decisions (Add/Update/Delete/Noop) |
 | retrieve_relevant_facts | ✅ Working | Vector + BM25 + FSRS hybrid, 10-factor scoring |
 | UnifiedMemoryService | ✅ Working | RRF merge: facts + recalls + **episodic memories** |
-| CognitiveContextSource | ✅ Working | Static user model + procedural rules in system prompt |
+| CognitiveContextSource | ✅ Working | Static user model + **procedural rules with signal counts** in system prompt |
 | BM25/FTS5 search | ✅ Working | Porter stemming, superseded facts excluded |
-| Weekly reflection | ✅ Working | **8-episode guard** (lowered from 20), processes last 7 days |
-| Memory compaction | ✅ Working | 90-day archive, 10K active-fact budget |
+| Weekly reflection | ✅ Working | **8-episode guard**, processes last 7 days, **rule deduplication** |
+| Memory compaction | ✅ Working | 90-day archive, 10K active-fact budget, **stale rule deactivation** |
 | Mirror (4 subscribers) | ✅ Working | Routing drift, meta-rules, brain versioning, trial preview |
 | Autotuner | ✅ Working | Always-on, nightly cycle, shadow scoring |
 | All feature crates | ✅ Working | tasks, finance, notes, productivity, coaching, insights, launcher |
@@ -77,6 +77,11 @@ Persistent, always-on agent mode with: cron scheduler, MCP push channels, GitHub
 | **SessionMemoryContextSource** | ✅ **New** | Priority 88, injects scratchpad into system prompt |
 | **Episodic memory summaries** | ✅ **New** | Concise one-line summaries at creation time |
 | **Episodic FTS in retrieval** | ✅ **New** | BM25 search over episodic memories merged into per-turn retrieval |
+| **Rule deduplication** | ✅ **New** | FTS5 similarity + Jaccard word overlap prevents duplicate rules |
+| **Rule signal reinforcement** | ✅ **New** | Background extraction matches observations to rules, increments signal_count |
+| **Stale rule compaction** | ✅ **New** | Rules >90 days with signal_count < 2 auto-deactivated |
+| **MetaRule → ProceduralRule** | ✅ **New** | Mirror approval promotes MetaRules to behavioral guidelines |
+| **Rule deactivate UI** | ✅ **New** | Trash icon per rule row in Memory tab |
 
 ### What Remains
 
@@ -133,6 +138,28 @@ Persistent, always-on agent mode with: cron scheduler, MCP push channels, GitHub
 - [x] **Fix bloated episodic memories** — `45f899ad`
   - `ChatTurnCompleted` importance kept at 0.5 (below 0.7 episodic threshold)
 
+### Procedural Rules — ✅ COMPLETE (uncommitted)
+
+- [x] **Rule deduplication** — FTS5 similarity + Jaccard word overlap (>0.6 threshold with simple stemming)
+  - Reflection reinforces existing similar rules instead of creating duplicates
+  - `find_similar(rule_text, domain)` on `ProceduralRuleRepo`
+- [x] **Signal reinforcement** — Background service matches extracted observations to rules across ALL `RULE_DOMAINS`
+  - Concurrent per-observation fan-out via `join_all` (mirroring `prefetch_existing` pattern)
+  - `increment_signal_count()` now called in production (was dead code)
+- [x] **Stale rule compaction** — Rules >90 days with signal_count < 2 auto-deactivated
+  - `deactivate_stale(days, min_signals)` on `ProceduralRuleRepo`
+  - Integrated into compaction cycle alongside fact archival and episodic deletion
+- [x] **MetaRule → ProceduralRule promotion** — `approve_meta_rule()` creates a ProceduralRule
+  - `meta_rule_to_rule_text()` converts MetaRuleAction variants to English sentences
+  - Dedup check via `find_similar` before insert (reinforce existing if similar)
+  - Domain set to `"general"` (in `RULE_DOMAINS`, visible to context injection)
+- [x] **UI deactivate button** — Trash icon per rule row in Memory tab
+  - Calls `cognitive_rule_deactivate`, invalidates queries
+- [x] **Code quality fixes** (from /simplify review)
+  - Fixed domain `"behavior"` → `"general"` (critical: rules were invisible to context injection)
+  - Refactored signal reinforcement to concurrent `join_all` (was sequential N×5 queries)
+  - Optimized `simple_stem` to use `truncate()` instead of redundant `.to_string()`
+
 ### Phase C: Polish & Enhancement — NOT STARTED
 
 - [ ] **C1: Away/resume summary**
@@ -156,6 +183,7 @@ Persistent, always-on agent mode with: cron scheduler, MCP push channels, GitHub
 - **Atom extraction** from notes with cross-note reinforcement detection (nothing in CC)
 - **Session memory scratchpad** with LLM-powered summarization (matches CC's SessionMemory)
 - **Episodic memory system** with FTS search, summaries, and per-turn injection (nothing in CC)
+- **Procedural rules with learning** — dedup, signal reinforcement, stale expiration, MetaRule promotion (nothing in CC)
 
 ---
 
@@ -179,10 +207,24 @@ Klynt Memory Flow (current, after all upgrades):
         → ConsolidationHandler.decide_batch() → MemoryOp[]
         → execute_memory_ops() → SemanticFactRepo + LanceDB
         → EpisodicMemory created (if importance >= 0.7) with summary
+        → Signal reinforcement: match observations to procedural rules (concurrent join_all)
     → SessionMemoryService:
         → Every 3 turns → LLM summarization → session_memory table
+  Weekly (Monday 9am):
+    → run_weekly_reflection():
+        → Load 7 days of episodic memories + user model + existing rules
+        → LLM proposes fact_updates + rule_updates
+        → Rules deduplicated: similar existing rules reinforced, not duplicated
+        → New rules upserted with signal_count: 0
+  Daily (compaction cron):
+    → run_compaction():
+        → Archive superseded facts >90 days
+        → Delete episodic memories >90 days with access_count < 2
+        → Deactivate procedural rules >90 days with signal_count < 2
+  On MetaRule approval (user action):
+    → approve_meta_rule() → promotes to ProceduralRule (domain: "general")
   Next query:
-    → CognitiveContextSource (priority 60) → static user model + procedural rules
+    → CognitiveContextSource (priority 60) → static user model + procedural rules (with signal counts)
     → SessionMemoryContextSource (priority 88) → per-session scratchpad
     → UnifiedMemoryService → RRF merge of:
         ├─ SemanticFact vector + BM25 retrieval
@@ -220,6 +262,16 @@ Klynt Memory Flow (current, after all upgrades):
 | `ca930164` | feat(cognitive): generate summary at episodic memory creation |
 | `57ae79d8` | feat(context_engine): add EpisodicMemory variant to MemorySource |
 | `00cae81c` | feat(cognitive): wire episodic memory FTS search into UnifiedMemoryService |
+
+### Procedural Rules (uncommitted — pending review)
+| Change | Description |
+|--------|-------------|
+| Rule deduplication | `find_similar` + `word_overlap_ratio` with simple stemming |
+| Signal reinforcement | Concurrent `join_all` matching observations to rules across all RULE_DOMAINS |
+| Stale compaction | `deactivate_stale(90, 2)` in compaction cycle |
+| MetaRule promotion | `approve_meta_rule` creates ProceduralRule with dedup |
+| UI deactivate button | Trash icon per rule row in MemoryTab |
+| Quality fixes | Domain `"behavior"` → `"general"`, sequential → concurrent, `truncate()` optimization |
 
 ### Fixes
 | Hash | Message |

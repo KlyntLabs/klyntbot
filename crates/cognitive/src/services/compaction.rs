@@ -7,7 +7,7 @@
 
 use tracing::{debug, info};
 
-use crate::repos::{EpisodicMemoryRepo, SemanticFactRepo};
+use crate::repos::{EpisodicMemoryRepo, ProceduralRuleRepo, SemanticFactRepo};
 
 /// Default: archive superseded facts older than this many days.
 const DEFAULT_ARCHIVE_DAYS: i64 = 90;
@@ -15,6 +15,10 @@ const DEFAULT_ARCHIVE_DAYS: i64 = 90;
 const DEFAULT_EPISODIC_ARCHIVE_DAYS: i64 = 90;
 /// Minimum access count for episodic memories to survive compaction.
 const EPISODIC_MIN_ACCESS_COUNT: i64 = 2;
+/// Default: deactivate procedural rules older than this many days with low signal count.
+const DEFAULT_RULE_STALE_DAYS: i64 = 90;
+/// Minimum signal count for a rule to survive stale compaction.
+const RULE_MIN_SIGNALS: i64 = 2;
 /// Maximum active semantic facts before aggressive compaction.
 const MAX_ACTIVE_FACTS: usize = 10_000;
 /// Stability threshold below which facts are candidates for compaction.
@@ -26,16 +30,19 @@ pub struct CompactionResult {
     pub facts_archived: u64,
     pub episodic_deleted: u64,
     pub low_stability_archived: u64,
+    pub rules_deactivated: u64,
 }
 
 /// Run the full compaction cycle.
 pub async fn run_compaction(
     fact_repo: &SemanticFactRepo,
     episodic_repo: &EpisodicMemoryRepo,
+    rule_repo: Option<&ProceduralRuleRepo>,
 ) -> Result<CompactionResult, sqlx::Error> {
     run_compaction_with_params(
         fact_repo,
         episodic_repo,
+        rule_repo,
         DEFAULT_ARCHIVE_DAYS,
         DEFAULT_EPISODIC_ARCHIVE_DAYS,
         EPISODIC_MIN_ACCESS_COUNT,
@@ -47,6 +54,7 @@ pub async fn run_compaction(
 pub async fn run_compaction_with_params(
     fact_repo: &SemanticFactRepo,
     episodic_repo: &EpisodicMemoryRepo,
+    rule_repo: Option<&ProceduralRuleRepo>,
     archive_days: i64,
     episodic_archive_days: i64,
     min_access_count: i64,
@@ -86,9 +94,20 @@ pub async fn run_compaction_with_params(
         info!("Compaction: aggressively archived {archived_excess} low-stability facts");
     }
 
+    // 4. Deactivate stale procedural rules
+    if let Some(rr) = rule_repo {
+        let deactivated = rr
+            .deactivate_stale(DEFAULT_RULE_STALE_DAYS, RULE_MIN_SIGNALS)
+            .await?;
+        result.rules_deactivated = deactivated;
+        if deactivated > 0 {
+            info!("Compaction: deactivated {deactivated} stale procedural rules");
+        }
+    }
+
     debug!(
-        "Compaction complete: {} facts archived, {} episodic deleted, {} low-stability archived",
-        result.facts_archived, result.episodic_deleted, result.low_stability_archived
+        "Compaction complete: {} facts archived, {} episodic deleted, {} low-stability archived, {} rules deactivated",
+        result.facts_archived, result.episodic_deleted, result.low_stability_archived, result.rules_deactivated
     );
 
     Ok(result)
@@ -156,7 +175,7 @@ mod tests {
         fact_repo.supersede("f1", "f2").await.unwrap();
 
         // Archive with 0-day threshold (archive everything superseded)
-        let result = run_compaction_with_params(&fact_repo, &episodic_repo, 0, 90, 2)
+        let result = run_compaction_with_params(&fact_repo, &episodic_repo, None, 0, 90, 2)
             .await
             .unwrap();
         assert_eq!(result.facts_archived, 1);
@@ -180,7 +199,7 @@ mod tests {
         let recent = test_episodic("e2", "2026-03-05", 0);
         episodic_repo.insert(&recent).await.unwrap();
 
-        let result = run_compaction_with_params(&fact_repo, &episodic_repo, 90, 90, 2)
+        let result = run_compaction_with_params(&fact_repo, &episodic_repo, None, 90, 90, 2)
             .await
             .unwrap();
         assert_eq!(result.episodic_deleted, 1);
@@ -197,9 +216,43 @@ mod tests {
         let fact_repo = SemanticFactRepo::new(pool.clone());
         let episodic_repo = EpisodicMemoryRepo::new(pool);
 
-        let result = run_compaction(&fact_repo, &episodic_repo).await.unwrap();
+        let result = run_compaction(&fact_repo, &episodic_repo, None)
+            .await
+            .unwrap();
         assert_eq!(result.facts_archived, 0);
         assert_eq!(result.episodic_deleted, 0);
         assert_eq!(result.low_stability_archived, 0);
+    }
+
+    #[tokio::test]
+    async fn test_compaction_deactivates_stale_rules() {
+        let pool = setup().await;
+        let fact_repo = SemanticFactRepo::new(pool.clone());
+        let episodic_repo = EpisodicMemoryRepo::new(pool.clone());
+        let rule_repo = crate::repos::ProceduralRuleRepo::new(pool);
+
+        let r = crate::types::ProceduralRule {
+            id: "old-rule".into(),
+            domain: "productivity".into(),
+            rule_text: "Outdated pattern".into(),
+            confidence: 0.5,
+            source: "reflected".into(),
+            signal_count: 0,
+            created_at: "2025-01-01".into(),
+            updated_at: "2025-01-01".into(),
+            active: true,
+            project_id: None,
+            scope_type: "system".into(),
+            scope_id: None,
+        };
+        rule_repo.upsert(&r).await.unwrap();
+
+        let result = run_compaction(&fact_repo, &episodic_repo, Some(&rule_repo))
+            .await
+            .unwrap();
+        assert_eq!(result.rules_deactivated, 1);
+
+        let active = rule_repo.list_active("productivity").await.unwrap();
+        assert!(active.is_empty());
     }
 }

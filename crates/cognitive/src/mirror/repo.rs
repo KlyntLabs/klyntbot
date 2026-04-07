@@ -525,6 +525,15 @@ impl MirrorRepo {
         Ok(())
     }
 
+    pub async fn get_meta_rule_by_id(&self, id: Uuid) -> Result<Option<MetaRule>> {
+        let row = sqlx::query_as::<_, MetaRuleRow>("SELECT * FROM mirror_meta_rules WHERE id = ?1")
+            .bind(id.to_string())
+            .fetch_optional(self.db())
+            .await
+            .map_err(|e| common::KlyntbotError::Storage(e.to_string()))?;
+        row.map(MetaRule::try_from).transpose()
+    }
+
     pub async fn get_meta_rules_by_status(&self, status: MetaRuleStatus) -> Result<Vec<MetaRule>> {
         let status_str = enum_to_str(&status)?;
         let rows = sqlx::query_as::<_, MetaRuleRow>(

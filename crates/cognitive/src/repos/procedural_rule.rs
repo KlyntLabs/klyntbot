@@ -4,6 +4,38 @@ use sqlx::SqlitePool;
 
 use crate::types::ProceduralRule;
 
+/// Normalize a word: lowercase and strip common verb suffixes for basic stemming.
+fn simple_stem(w: &str) -> String {
+    let mut w = w.to_lowercase();
+    if w.len() > 5 && w.ends_with("ed") {
+        w.truncate(w.len() - 2);
+    } else if w.len() > 5 && w.ends_with("ing") {
+        w.truncate(w.len() - 3);
+    }
+    w
+}
+
+/// Compute word overlap ratio between two strings (Jaccard-like).
+/// Applies lowercasing and simple stemming before comparison.
+fn word_overlap_ratio(a: &str, b: &str) -> f64 {
+    let words_a: std::collections::HashSet<String> = a
+        .split_whitespace()
+        .map(|w| simple_stem(w.trim_matches(|c: char| !c.is_alphanumeric())))
+        .filter(|w| w.len() > 2)
+        .collect();
+    let words_b: std::collections::HashSet<String> = b
+        .split_whitespace()
+        .map(|w| simple_stem(w.trim_matches(|c: char| !c.is_alphanumeric())))
+        .filter(|w| w.len() > 2)
+        .collect();
+    if words_a.is_empty() || words_b.is_empty() {
+        return 0.0;
+    }
+    let intersection = words_a.intersection(&words_b).count() as f64;
+    let union = words_a.union(&words_b).count() as f64;
+    intersection / union
+}
+
 #[derive(Debug, Clone)]
 pub struct ProceduralRuleRepo {
     pool: SqlitePool,
@@ -107,6 +139,21 @@ impl ProceduralRuleRepo {
         .await
     }
 
+    /// Deactivate rules not updated in `days` days with fewer than `min_signals` signals.
+    pub async fn deactivate_stale(&self, days: i64, min_signals: i64) -> Result<u64, sqlx::Error> {
+        let result = sqlx::query(
+            "UPDATE procedural_rules SET active = 0, updated_at = datetime('now')
+             WHERE active = 1
+             AND julianday('now') - julianday(updated_at) > ?1
+             AND signal_count < ?2",
+        )
+        .bind(days)
+        .bind(min_signals)
+        .execute(&self.pool)
+        .await?;
+        Ok(result.rows_affected())
+    }
+
     /// Deactivate a rule.
     pub async fn deactivate(&self, id: &str) -> Result<(), sqlx::Error> {
         sqlx::query(
@@ -116,6 +163,33 @@ impl ProceduralRuleRepo {
         .execute(&self.pool)
         .await?;
         Ok(())
+    }
+
+    /// Find an active rule with similar text in the same domain via FTS5.
+    pub async fn find_similar(
+        &self,
+        rule_text: &str,
+        domain: &str,
+    ) -> Result<Option<crate::types::ProceduralRule>, sqlx::Error> {
+        // Build an OR query from significant words so FTS5 finds candidates even
+        // when phrasing differs. The word_overlap_ratio check below applies the
+        // real similarity threshold.
+        let fts_query = rule_text
+            .split_whitespace()
+            .map(|w| w.trim_matches(|c: char| !c.is_alphanumeric()))
+            .filter(|w| w.len() > 2)
+            .collect::<Vec<_>>()
+            .join(" OR ");
+        if fts_query.is_empty() {
+            return Ok(None);
+        }
+        let candidates = self.search_fts(&fts_query, Some(domain), 10).await?;
+        for candidate in candidates {
+            if word_overlap_ratio(&candidate.rule_text, rule_text) > 0.6 {
+                return Ok(Some(candidate));
+            }
+        }
+        Ok(None)
     }
 }
 
@@ -203,5 +277,59 @@ mod tests {
 
         let active = repo.list_active("productivity").await.unwrap();
         assert_eq!(active.len(), 0);
+    }
+
+    #[test]
+    fn test_word_overlap_high() {
+        assert!(
+            word_overlap_ratio(
+                "User works best in mornings",
+                "User works best in the mornings"
+            ) > 0.6
+        );
+    }
+
+    #[test]
+    fn test_word_overlap_low() {
+        assert!(word_overlap_ratio("User works best in mornings", "Track daily expenses") < 0.3);
+    }
+
+    #[test]
+    fn test_word_overlap_empty() {
+        assert!((word_overlap_ratio("", "anything") - 0.0).abs() < f64::EPSILON);
+    }
+
+    #[tokio::test]
+    async fn test_find_similar_match() {
+        let pool = setup().await;
+        let repo = ProceduralRuleRepo::new(pool);
+        let r = test_rule(
+            "r1",
+            "productivity",
+            "Suggest break after 90 minutes of focused work",
+        );
+        repo.upsert(&r).await.unwrap();
+        let found = repo
+            .find_similar(
+                "Take a break after 90 minutes of focus work",
+                "productivity",
+            )
+            .await
+            .unwrap();
+        assert!(found.is_some());
+        assert_eq!(found.unwrap().id, "r1");
+    }
+
+    #[tokio::test]
+    async fn test_find_similar_no_match() {
+        let pool = setup().await;
+        let repo = ProceduralRuleRepo::new(pool);
+        let r = test_rule("r1", "productivity", "Morning is peak time");
+        repo.upsert(&r).await.unwrap();
+        let found = repo
+            .find_similar("Track daily expenses carefully", "productivity")
+            .await
+            .unwrap();
+        assert!(found.is_none());
     }
 }

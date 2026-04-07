@@ -18,6 +18,7 @@ use crate::mirror::{
     NarrativeSnippet, RoutingSnapshot, TrendNarrative, TrialPreview, UserFeedback,
 };
 use crate::repos::EpisodicMemoryRepo;
+use crate::types::ProceduralRule;
 
 /// Cosine similarity between two f32 embedding vectors.
 fn cosine_similarity_f32(a: &[f32], b: &[f32]) -> f64 {
@@ -44,6 +45,7 @@ pub struct MirrorFacade {
     autotuner_bridge: Option<Arc<dyn AutotunerBridge>>,
     pub(crate) active_timers: Option<Arc<DashMap<String, JoinHandle<()>>>>,
     episodic_repo: Option<EpisodicMemoryRepo>,
+    rule_repo: Option<crate::repos::ProceduralRuleRepo>,
     domain_event_bus: Option<Arc<bus::DomainEventBus>>,
     text_embedder: Option<Arc<dyn crate::embedder::TextEmbedder>>,
 }
@@ -59,6 +61,7 @@ impl MirrorFacade {
             autotuner_bridge: None,
             active_timers: None,
             episodic_repo: None,
+            rule_repo: None,
             domain_event_bus: None,
             text_embedder: None,
         }
@@ -89,6 +92,14 @@ impl MirrorFacade {
     /// memories. Returns `self` for builder-style chaining.
     pub fn with_episodic_repo(mut self, repo: EpisodicMemoryRepo) -> Self {
         self.episodic_repo = Some(repo);
+        self
+    }
+
+    /// Attach a [`ProceduralRuleRepo`](crate::repos::ProceduralRuleRepo) so that
+    /// approved meta-rules are promoted to procedural rules. Returns `self` for
+    /// builder-style chaining.
+    pub fn with_rule_repo(mut self, repo: crate::repos::ProceduralRuleRepo) -> Self {
+        self.rule_repo = Some(repo);
         self
     }
 
@@ -201,12 +212,60 @@ impl MirrorFacade {
     // -----------------------------------------------------------------------
 
     /// Approve a pending meta-rule, transitioning it to [`MetaRuleStatus::Active`].
+    ///
+    /// If a [`ProceduralRuleRepo`](crate::repos::ProceduralRuleRepo) is attached,
+    /// the meta-rule is also promoted to a procedural rule. If a similar rule already
+    /// exists its `signal_count` is incremented instead of creating a duplicate.
     pub async fn approve_meta_rule(&self, rule_id: Uuid) -> Result<()> {
         self.repo
             .update_meta_rule_status(rule_id, MetaRuleStatus::Active)
             .await?;
 
         self.write_episodic(format!("Approved meta-rule: {rule_id}"), None, 0.8);
+
+        // Promote to procedural rule if a rule_repo is wired.
+        if let Some(ref rule_repo) = self.rule_repo {
+            if let Ok(Some(meta)) = self.repo.get_meta_rule_by_id(rule_id).await {
+                let rule_text = meta_rule_to_rule_text(&meta);
+                let domain = "general"; // must be in RULE_DOMAINS for context injection
+                match rule_repo.find_similar(&rule_text, domain).await {
+                    Ok(Some(existing)) => {
+                        // Similar rule exists — reinforce it rather than duplicate.
+                        if let Err(e) = rule_repo.increment_signal_count(&existing.id).await {
+                            tracing::warn!(
+                                "mirror: failed to increment signal_count for similar rule {}: {e}",
+                                existing.id
+                            );
+                        }
+                    }
+                    Ok(None) => {
+                        let now = Utc::now().to_rfc3339();
+                        let procedural = ProceduralRule {
+                            id: Uuid::new_v4().to_string(),
+                            domain: domain.to_string(),
+                            rule_text,
+                            confidence: meta.effectiveness_score,
+                            source: "mirror".to_string(),
+                            signal_count: 1,
+                            created_at: now.clone(),
+                            updated_at: now,
+                            active: true,
+                            project_id: None,
+                            scope_type: "system".to_string(),
+                            scope_id: None,
+                        };
+                        if let Err(e) = rule_repo.upsert(&procedural).await {
+                            tracing::warn!("mirror: failed to promote meta-rule {rule_id} to procedural rule: {e}");
+                        }
+                    }
+                    Err(e) => {
+                        tracing::warn!(
+                            "mirror: find_similar failed during meta-rule promotion: {e}"
+                        );
+                    }
+                }
+            }
+        }
 
         Ok(())
     }
@@ -451,6 +510,37 @@ impl MirrorFacade {
             });
         }
     }
+}
+
+// ---------------------------------------------------------------------------
+// Meta-rule helpers
+// ---------------------------------------------------------------------------
+
+/// Convert a [`MetaRule`] into a plain-English rule text suitable for a [`ProceduralRule`].
+fn meta_rule_to_rule_text(meta: &MetaRule) -> String {
+    let action_desc = match &meta.action {
+        MetaRuleAction::AdjustRouting { skill, direction } => {
+            format!("route more toward the {skill} skill ({direction})")
+        }
+        MetaRuleAction::ForceClarification => "ask for clarification before responding".to_string(),
+        MetaRuleAction::SwitchMode { mode } => {
+            format!("switch to {mode} mode")
+        }
+        MetaRuleAction::CreateExperiment { hypothesis } => {
+            format!("create an experiment to test: {hypothesis}")
+        }
+        MetaRuleAction::SurfaceInsight { message } => {
+            if message.is_empty() {
+                "surface a relevant insight".to_string()
+            } else {
+                format!("surface insight: {message}")
+            }
+        }
+        MetaRuleAction::Custom { payload } => {
+            format!("apply custom behavior: {payload}")
+        }
+    };
+    format!("When {}, {}.", meta.trigger_condition, action_desc)
 }
 
 // ---------------------------------------------------------------------------

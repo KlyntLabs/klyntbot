@@ -173,10 +173,32 @@ pub async fn run_weekly_reflection(
         }
     }
 
-    // Apply rule updates
+    // Apply rule updates with deduplication
     for rule in &output.rule_updates {
-        if let Err(e) = rule_repo.upsert(rule).await {
-            warn!("Reflection: failed to upsert rule '{}': {e}", rule.id);
+        match rule_repo.find_similar(&rule.rule_text, &rule.domain).await {
+            Ok(Some(existing)) => {
+                // Reinforce existing rule instead of creating duplicate
+                let _ = rule_repo.increment_signal_count(&existing.id).await;
+                if rule.confidence > existing.confidence {
+                    let mut updated = existing.clone();
+                    updated.confidence = rule.confidence;
+                    updated.updated_at = chrono::Utc::now().to_rfc3339();
+                    let _ = rule_repo.upsert(&updated).await;
+                }
+                debug!(
+                    "Reflection: reinforced existing rule '{}' (signal_count += 1)",
+                    existing.id
+                );
+            }
+            Ok(None) => {
+                if let Err(e) = rule_repo.upsert(rule).await {
+                    warn!("Reflection: failed to upsert rule '{}': {e}", rule.id);
+                }
+            }
+            Err(e) => {
+                warn!("Reflection: dedup search failed: {e}, upserting anyway");
+                let _ = rule_repo.upsert(rule).await;
+            }
         }
     }
 

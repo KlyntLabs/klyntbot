@@ -410,12 +410,16 @@ impl AppCore {
             let episodic_repo = Some(::cognitive::EpisodicMemoryRepo::new(
                 storage_pool.inner().clone(),
             ));
+            let rule_repo = Some(::cognitive::ProceduralRuleRepo::new(
+                storage_pool.inner().clone(),
+            ));
             let (facade, handles, shutdown) = ::cognitive::mirror::MirrorEngine::start(
                 mirror_repo,
                 Arc::clone(&domain_event_bus),
                 narrative_handler,
                 autotuner_bridge,
                 episodic_repo,
+                rule_repo,
             );
 
             // Bootstrap brain version 1 on first run

@@ -137,6 +137,7 @@ export function MemoryTab() {
     summary: string;
   }>("cognitive_run_reflection");
   const { mutate: deleteFact } = useMutation<boolean>("cognitive_fact_delete");
+  const { mutate: deactivateRule } = useMutation<boolean>("cognitive_rule_deactivate");
 
   const handleCompact = async () => {
     await runCompaction({} as never);
@@ -318,6 +319,7 @@ export function MemoryTab() {
                 <th className="text-left p-2 text-muted-foreground font-normal">Conf</th>
                 <th className="text-left p-2 text-muted-foreground font-normal">Signals</th>
                 <th className="text-left p-2 text-muted-foreground font-normal">Active</th>
+                <th className="p-2" />
               </tr>
             </thead>
             <tbody>
@@ -338,11 +340,25 @@ export function MemoryTab() {
                       {r.active ? "ON" : "OFF"}
                     </span>
                   </td>
+                  <td className="p-2">
+                    {r.active && (
+                      <button
+                        type="button"
+                        className="text-2xs text-destructive/60 hover:text-destructive"
+                        onClick={async () => {
+                          await deactivateRule({ id: r.id } as never);
+                          invalidateQueries("cognitive_");
+                        }}
+                      >
+                        <Trash2 className="size-3" />
+                      </button>
+                    )}
+                  </td>
                 </tr>
               ))}
               {rules.length === 0 && (
                 <tr>
-                  <td colSpan={5} className="p-4 text-center text-muted-foreground">
+                  <td colSpan={6} className="p-4 text-center text-muted-foreground">
                     No rules
                   </td>
                 </tr>

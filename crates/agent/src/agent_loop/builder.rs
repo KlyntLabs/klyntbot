@@ -433,6 +433,9 @@ impl AgentLoopBuilder {
                             domain_bus: self.domain_event_bus.clone(),
                             context_update_queue: self.context_update_queue.clone(),
                             session_repo: Some(storage::SessionRepo::new(pool.clone())),
+                            rule_repo: Some(cognitive::repos::ProceduralRuleRepo::new(
+                                pool.clone(),
+                            )),
                         },
                     );
                     info!("Cognitive background consolidation service started");

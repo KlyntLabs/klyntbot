@@ -14,20 +14,20 @@ impl AppCore {
         let pool = self.repos.pool();
         let fact_repo = SemanticFactRepo::new(pool.clone());
         let episodic_repo = cognitive::repos::EpisodicMemoryRepo::new(pool.clone());
+        let rule_repo = cognitive::repos::ProceduralRuleRepo::new(pool.clone());
 
-        let archived = fact_repo
-            .archive_superseded(90)
-            .await
-            .map_err(map_cognitive_err)?;
-
-        let deleted_episodic = episodic_repo
-            .delete_old(90, 2)
-            .await
-            .map_err(map_cognitive_err)?;
+        let result = cognitive::services::compaction::run_compaction(
+            &fact_repo,
+            &episodic_repo,
+            Some(&rule_repo),
+        )
+        .await
+        .map_err(map_cognitive_err)?;
 
         Ok(CompactionResultResponse {
-            archived_count: archived,
-            deleted_episodic,
+            archived_count: result.facts_archived,
+            deleted_episodic: result.episodic_deleted,
+            rules_deactivated: result.rules_deactivated,
         })
     }
 

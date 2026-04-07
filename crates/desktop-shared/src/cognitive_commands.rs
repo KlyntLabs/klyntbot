@@ -261,6 +261,7 @@ pub struct DomainHealthEntry {
 pub struct CompactionResultResponse {
     pub archived_count: u64,
     pub deleted_episodic: u64,
+    pub rules_deactivated: u64,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
