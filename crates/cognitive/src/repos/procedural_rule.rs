@@ -17,7 +17,7 @@ fn simple_stem(w: &str) -> String {
 
 /// Compute word overlap ratio between two strings (Jaccard-like).
 /// Applies lowercasing and simple stemming before comparison.
-fn word_overlap_ratio(a: &str, b: &str) -> f64 {
+pub fn word_overlap_ratio(a: &str, b: &str) -> f64 {
     let words_a: std::collections::HashSet<String> = a
         .split_whitespace()
         .map(|w| simple_stem(w.trim_matches(|c: char| !c.is_alphanumeric())))
