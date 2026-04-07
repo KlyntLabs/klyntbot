@@ -16,6 +16,7 @@ use tools::RoutingContext;
 
 use super::budget::ExecutionBudget;
 use super::core::ExecutionCore;
+use super::live_context_refresher::LiveContextRefresher;
 use super::mid_loop_compressor::MidLoopCompressor;
 use super::types::{accumulate_usage, CycleOutcome, ExecutionParams};
 use crate::events::AgentEvent;
@@ -59,6 +60,10 @@ pub async fn execute_loop(
         core.token_counter().clone(),
         params.context_window,
     );
+    let refresher = params
+        .context_update_queue
+        .as_ref()
+        .map(|queue| LiveContextRefresher::new(core.token_counter().clone(), queue.clone()));
 
     loop {
         // ── Budget gate ──────────────────────────────────────
@@ -201,6 +206,24 @@ pub async fn execute_loop(
                         iteration: budget.turns_used() as usize,
                     })
                     .await;
+            }
+        }
+
+        // ── Live context refresh ─────────────────────────────
+        if !params.pause_context_updates {
+            if let Some(ref refresher) = refresher {
+                let updates = refresher.inject_pending(&mut messages, params.context_window);
+                if !updates.is_empty() {
+                    let tokens_added: usize = updates.iter().map(|u| u.tokens).sum();
+                    if let Some(ref tx) = event_tx {
+                        let _ = tx
+                            .send(AgentEvent::ContextReassembled {
+                                updates,
+                                tokens_added,
+                            })
+                            .await;
+                    }
+                }
             }
         }
 
