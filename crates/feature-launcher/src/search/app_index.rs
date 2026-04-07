@@ -1,5 +1,6 @@
 use crate::types::*;
 use parking_lot::RwLock;
+use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
@@ -33,6 +34,10 @@ pub struct AppIndex {
     apps: Arc<RwLock<Vec<AppEntry>>>,
     /// Shared icon cache backed by `platform_macos::apps::AppIconCache`.
     icon_cache: Option<Arc<platform_macos::apps::AppIconCache>>,
+    /// In-memory cache of resolved icon data URIs keyed by app path.
+    /// Prevents repeated NSWorkspace calls which cause macOS IconServices
+    /// to mmap gigabytes of .isdata files over the process lifetime.
+    resolved_icons: Arc<RwLock<HashMap<PathBuf, Option<String>>>>,
 }
 
 impl AppIndex {
@@ -40,6 +45,7 @@ impl AppIndex {
         Self {
             apps: Arc::new(RwLock::new(Vec::new())),
             icon_cache: None,
+            resolved_icons: Arc::new(RwLock::new(HashMap::new())),
         }
     }
 
@@ -47,6 +53,7 @@ impl AppIndex {
         Self {
             apps: Arc::new(RwLock::new(Vec::new())),
             icon_cache: Some(Arc::new(platform_macos::apps::AppIconCache::new(cache_dir))),
+            resolved_icons: Arc::new(RwLock::new(HashMap::new())),
         }
     }
 
@@ -62,23 +69,35 @@ impl AppIndex {
         let apps = self.apps.read();
         let scored = super::fuzzy_match(query, &apps, |app| &app.name, limit);
 
-        // Resolve icons lazily — only for the few results returned (typically ≤10).
-        // This avoids eagerly mmap'ing macOS IconServices for all 100+ apps.
-        let tmp_dir = std::env::temp_dir().join("klyntbot-icons-tmp");
-        let _ = std::fs::create_dir_all(&tmp_dir);
-
-        let results: Vec<_> = scored
+        scored
             .into_iter()
             .map(|(score, app)| {
+                // Resolve icon with in-memory cache to avoid repeated NSWorkspace calls.
+                // Each NSWorkspace call mmap's IconServices .isdata files that macOS
+                // never unmaps, causing ~1GB growth over a session.
                 let icon = app
                     .icon_data
                     .clone()
                     .or_else(|| {
-                        self.icon_cache
-                            .as_ref()
-                            .and_then(|c| c.resolve_icon(&app.path, &tmp_dir).0)
+                        let cache = self.resolved_icons.read();
+                        if let Some(cached) = cache.get(&app.path) {
+                            return cached.clone();
+                        }
+                        drop(cache);
+
+                        let resolved = self.icon_cache.as_ref().and_then(|c| {
+                            let tmp = std::env::temp_dir().join("klyntbot-icons-tmp");
+                            let _ = std::fs::create_dir_all(&tmp);
+                            let (icon, _) = c.resolve_icon(&app.path, &tmp);
+                            icon
+                        });
+                        self.resolved_icons
+                            .write()
+                            .insert(app.path.clone(), resolved.clone());
+                        resolved
                     })
                     .or_else(|| Some("app-window".to_string()));
+
                 LauncherItem {
                     id: format!("app:{}", app.path.display()),
                     title: app.name.clone(),
@@ -91,10 +110,7 @@ impl AppIndex {
                     score: (score as f64) / 1000.0,
                 }
             })
-            .collect();
-
-        let _ = std::fs::remove_dir_all(&tmp_dir);
-        results
+            .collect()
     }
 
     #[cfg(target_os = "macos")]

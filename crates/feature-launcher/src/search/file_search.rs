@@ -156,27 +156,32 @@ impl super::SearchSource for FileSearchSource {
         }
 
         let entries = self.entries.read();
-        let ext_icons = self.ext_icons.read();
         let scored = super::fuzzy_match(query, &entries, |e| &e.name, limit);
 
         scored
             .into_iter()
             .map(|(score, e)| {
                 let path_str = e.path.display().to_string();
-                // Earlier dirs in config get a mild relevance boost, capped at 30%
                 let dir_boost = 1.0 - (e.dir_index as f64 * 0.05).min(0.3);
-                // Look up file type icon: check pre-resolved cache first,
-                // then fall back to lazy resolution for this specific extension.
+                // Resolve file-type icon with in-memory cache.
+                // Each uncached NSWorkspace call mmap's IconServices .isdata files
+                // that macOS never unmaps — caching prevents growth over time.
                 let icon = e
                     .path
                     .extension()
                     .and_then(|ext| ext.to_str())
                     .and_then(|ext| {
                         let lower = ext.to_lowercase();
-                        ext_icons
-                            .get(&lower)
-                            .cloned()
-                            .or_else(|| platform_macos::apps::icon_for_file_type(&lower))
+                        let cache = self.ext_icons.read();
+                        if let Some(cached) = cache.get(&lower) {
+                            return Some(cached.clone());
+                        }
+                        drop(cache);
+                        let resolved = platform_macos::apps::icon_for_file_type(&lower);
+                        if let Some(ref icon_str) = resolved {
+                            self.ext_icons.write().insert(lower, icon_str.clone());
+                        }
+                        resolved
                     })
                     .or_else(|| Some("file".to_string()));
                 LauncherItem {
