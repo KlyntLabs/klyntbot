@@ -7,6 +7,8 @@ pub enum MemorySource {
     CognitiveFact,
     /// Past conversation message (time-decay scored).
     ConversationRecall,
+    /// Significant event record (episodic memory).
+    EpisodicMemory,
     /// Domain-specific search result (notes, tasks, finance, graph).
     Domain { name: String },
 }

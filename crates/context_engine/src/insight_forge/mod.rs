@@ -231,6 +231,7 @@ impl InsightForge {
                 sources = ?sub_query_results.iter().map(|e| format!("{}:{:.2}", match &e.source {
                     crate::MemorySource::CognitiveFact => "fact".to_string(),
                     crate::MemorySource::ConversationRecall => "recall".to_string(),
+                    crate::MemorySource::EpisodicMemory => "episodic".to_string(),
                     crate::MemorySource::Domain { name } => name.clone(),
                 }, e.score)).collect::<Vec<_>>(),
                 "📊 InsightForge: sub-query results"
@@ -256,6 +257,7 @@ impl InsightForge {
             let source_key = match &entry.source {
                 crate::MemorySource::CognitiveFact => "cognitive".to_string(),
                 crate::MemorySource::ConversationRecall => "recall".to_string(),
+                crate::MemorySource::EpisodicMemory => "episodic".to_string(),
                 crate::MemorySource::Domain { name } => name.clone(),
             };
             let count = source_counts.entry(source_key).or_insert(0);
