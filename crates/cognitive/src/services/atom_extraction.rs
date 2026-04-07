@@ -258,10 +258,21 @@ async fn process_note(
                                 new_salience,
                                 "reinforced existing atom from cross-note reference"
                             );
+                            let prior_sources: i64 = target
+                                .secondary_sources
+                                .as_deref()
+                                .and_then(|s| {
+                                    serde_json::from_str::<Vec<serde_json::Value>>(s).ok()
+                                })
+                                .map(|v| v.len() as i64)
+                                .unwrap_or(0);
                             bus.publish(DomainEvent::AtomReinforced {
                                 atom_id: target.id.clone(),
                                 referencing_note_id: note_id.to_string(),
                                 new_salience,
+                                subject: target.subject.clone(),
+                                domain: target.domain.clone(),
+                                reinforcement_count: prior_sources + 1,
                             });
                             total_reinforced += 1;
                         }

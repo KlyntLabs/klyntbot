@@ -349,6 +349,9 @@ pub enum DomainEvent {
         atom_id: String,
         referencing_note_id: String,
         new_salience: f64,
+        subject: String,
+        domain: String,
+        reinforcement_count: i64,
     },
     AtomInteracted {
         atom_id: String,
