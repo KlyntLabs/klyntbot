@@ -76,26 +76,8 @@ impl super::SearchSource for RunningAppsSource {
         scored
             .into_iter()
             .map(|(score, app)| {
-                // Resolve icon lazily with in-memory cache — only for search results.
-                let icon = {
-                    let cache = self.resolved_icons.read();
-                    if let Some(cached) = cache.get(&app.path) {
-                        cached.clone()
-                    } else {
-                        drop(cache);
-                        let resolved = self.icon_cache.as_ref().and_then(|c| {
-                            let tmp = std::env::temp_dir().join("klyntbot-icons-tmp");
-                            let _ = std::fs::create_dir_all(&tmp);
-                            let (icon, _) = c.resolve_icon(&app.path, &tmp);
-                            icon
-                        });
-                        self.resolved_icons
-                            .write()
-                            .insert(app.path.clone(), resolved.clone());
-                        resolved
-                    }
-                }
-                .or_else(|| Some("activity".to_string()));
+                // Don't resolve icons via NSWorkspace — triggers IconServices mmap leak.
+                let icon = Some("activity".to_string());
 
                 LauncherItem {
                     id: format!("running:{}", app.pid),

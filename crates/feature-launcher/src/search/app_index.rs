@@ -72,31 +72,11 @@ impl AppIndex {
         scored
             .into_iter()
             .map(|(score, app)| {
-                // Resolve icon with in-memory cache to avoid repeated NSWorkspace calls.
-                // Each NSWorkspace call mmap's IconServices .isdata files that macOS
-                // never unmaps, causing ~1GB growth over a session.
-                let icon = app
-                    .icon_data
-                    .clone()
-                    .or_else(|| {
-                        let cache = self.resolved_icons.read();
-                        if let Some(cached) = cache.get(&app.path) {
-                            return cached.clone();
-                        }
-                        drop(cache);
-
-                        let resolved = self.icon_cache.as_ref().and_then(|c| {
-                            let tmp = std::env::temp_dir().join("klyntbot-icons-tmp");
-                            let _ = std::fs::create_dir_all(&tmp);
-                            let (icon, _) = c.resolve_icon(&app.path, &tmp);
-                            icon
-                        });
-                        self.resolved_icons
-                            .write()
-                            .insert(app.path.clone(), resolved.clone());
-                        resolved
-                    })
-                    .or_else(|| Some("app-window".to_string()));
+                // Don't resolve macOS app icons via NSWorkspace — each call triggers
+                // IconServices to mmap .isdata files that are never unmapped, causing
+                // ~1GB+ memory growth over a session. The frontend has emoji fallbacks
+                // for each item kind via ICON_MAP, which is zero-cost.
+                let icon = app.icon_data.clone().or_else(|| Some("app-window".to_string()));
 
                 LauncherItem {
                     id: format!("app:{}", app.path.display()),

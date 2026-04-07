@@ -163,27 +163,9 @@ impl super::SearchSource for FileSearchSource {
             .map(|(score, e)| {
                 let path_str = e.path.display().to_string();
                 let dir_boost = 1.0 - (e.dir_index as f64 * 0.05).min(0.3);
-                // Resolve file-type icon with in-memory cache.
-                // Each uncached NSWorkspace call mmap's IconServices .isdata files
-                // that macOS never unmaps — caching prevents growth over time.
-                let icon = e
-                    .path
-                    .extension()
-                    .and_then(|ext| ext.to_str())
-                    .and_then(|ext| {
-                        let lower = ext.to_lowercase();
-                        let cache = self.ext_icons.read();
-                        if let Some(cached) = cache.get(&lower) {
-                            return Some(cached.clone());
-                        }
-                        drop(cache);
-                        let resolved = platform_macos::apps::icon_for_file_type(&lower);
-                        if let Some(ref icon_str) = resolved {
-                            self.ext_icons.write().insert(lower, icon_str.clone());
-                        }
-                        resolved
-                    })
-                    .or_else(|| Some("file".to_string()));
+                // Don't resolve file-type icons via NSWorkspace — triggers IconServices
+                // mmap leak. Use text fallback from frontend ICON_MAP.
+                let icon = Some("file".to_string());
                 LauncherItem {
                     id: format!("file:{path_str}"),
                     title: e.name.clone(),
