@@ -16,6 +16,7 @@ CREATE TABLE IF NOT EXISTS semantic_facts (
     stability       REAL NOT NULL DEFAULT 1.0,
     last_accessed   TEXT,
     access_count    INTEGER NOT NULL DEFAULT 0,
+    convergence_score REAL NOT NULL DEFAULT 0.0,
     project_id      TEXT,  -- logical FK to projects.id (not enforced, separate database)
     memory_type     TEXT DEFAULT 'fact',
     scope_type      TEXT NOT NULL DEFAULT 'system',

@@ -359,6 +359,7 @@ impl AppCore {
                         stability: 1.0,
                         last_accessed: None,
                         access_count: 0,
+                        convergence_score: 0.0,
                         project_id: None,
                         memory_type: "translation_unit".to_string(),
                         scope_type: "system".to_string(),

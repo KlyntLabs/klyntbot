@@ -35,6 +35,7 @@ pub struct SemanticFact {
     pub stability: f64,
     pub last_accessed: Option<String>,
     pub access_count: i64,
+    pub convergence_score: f64,
     pub project_id: Option<String>,
     pub memory_type: String,
     pub scope_type: String,

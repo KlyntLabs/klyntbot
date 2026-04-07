@@ -66,6 +66,7 @@ fn test_fact(id: &str, predicate: &str, object: &str) -> SemanticFact {
         stability: 1.0,
         last_accessed: None,
         access_count: 0,
+        convergence_score: 0.0,
         project_id: None,
         memory_type: DEFAULT_MEMORY_TYPE.to_string(),
         scope_type: "system".to_string(),

@@ -400,6 +400,7 @@ mod tests {
             stability,
             last_accessed: None,
             access_count,
+            convergence_score: 0.0,
             project_id: None,
             memory_type: DEFAULT_MEMORY_TYPE.to_string(),
             scope_type: "system".to_string(),

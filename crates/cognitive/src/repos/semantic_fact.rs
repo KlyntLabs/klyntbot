@@ -53,9 +53,9 @@ impl SemanticFactRepo {
             r#"
             INSERT INTO semantic_facts (id, domain, subject, predicate, object, confidence, source,
                 valid_from, valid_until, recorded_at, superseded_at, superseded_by,
-                stability, last_accessed, access_count, project_id, memory_type,
+                stability, last_accessed, access_count, convergence_score, project_id, memory_type,
                 scope_type, scope_id)
-            VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19)
+            VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19, ?20)
             ON CONFLICT (id) DO UPDATE SET
                 domain = excluded.domain,
                 subject = excluded.subject,
@@ -70,6 +70,7 @@ impl SemanticFactRepo {
                 stability = excluded.stability,
                 last_accessed = excluded.last_accessed,
                 access_count = excluded.access_count,
+                convergence_score = excluded.convergence_score,
                 project_id = excluded.project_id,
                 memory_type = excluded.memory_type,
                 scope_type = excluded.scope_type,
@@ -91,10 +92,35 @@ impl SemanticFactRepo {
         .bind(fact.stability)
         .bind(&fact.last_accessed)
         .bind(fact.access_count)
+        .bind(fact.convergence_score)
         .bind(&fact.project_id)
         .bind(&fact.memory_type)
         .bind(&fact.scope_type)
         .bind(&fact.scope_id)
+        .execute(&self.pool)
+        .await?;
+        Ok(())
+    }
+
+    /// Update the convergence score for a fact (incremented when independent sources confirm it).
+    pub async fn update_convergence(&self, id: &str, convergence: f64) -> Result<(), sqlx::Error> {
+        sqlx::query(
+            "UPDATE semantic_facts SET convergence_score = ?2 WHERE id = ?1",
+        )
+        .bind(id)
+        .bind(convergence)
+        .execute(&self.pool)
+        .await?;
+        Ok(())
+    }
+
+    /// Update the confidence value for a fact.
+    pub async fn update_confidence(&self, id: &str, confidence: f64) -> Result<(), sqlx::Error> {
+        sqlx::query(
+            "UPDATE semantic_facts SET confidence = ?2 WHERE id = ?1",
+        )
+        .bind(id)
+        .bind(confidence)
         .execute(&self.pool)
         .await?;
         Ok(())
@@ -339,7 +365,7 @@ impl SemanticFactRepo {
         let sql = format!(
             "SELECT id, domain, subject, predicate, object, confidence, source, \
              valid_from, valid_until, recorded_at, superseded_at, superseded_by, \
-             stability, last_accessed, access_count, project_id, memory_type, \
+             stability, last_accessed, access_count, 0.0 AS convergence_score, project_id, memory_type, \
              scope_type, scope_id \
              FROM semantic_facts_archive {where_clause} ORDER BY recorded_at DESC LIMIT {limit_param}"
         );
@@ -363,11 +389,11 @@ impl SemanticFactRepo {
             INSERT INTO semantic_facts
                 (id, domain, subject, predicate, object, confidence, source,
                  valid_from, valid_until, recorded_at, superseded_at, superseded_by,
-                 stability, last_accessed, access_count, project_id, memory_type,
+                 stability, last_accessed, access_count, convergence_score, project_id, memory_type,
                  scope_type, scope_id)
             SELECT id, domain, subject, predicate, object, confidence, source,
                    valid_from, NULL, recorded_at, NULL, NULL,
-                   stability, last_accessed, access_count, project_id, memory_type,
+                   stability, last_accessed, access_count, 0.0, project_id, memory_type,
                    scope_type, scope_id
             FROM semantic_facts_archive
             WHERE id = ?1
@@ -438,7 +464,7 @@ impl SemanticFactRepo {
         sqlx::query_as::<_, SemanticFact>(
             "SELECT id, domain, subject, predicate, object, confidence, source, \
              valid_from, valid_until, recorded_at, superseded_at, superseded_by, \
-             stability, last_accessed, access_count, project_id, memory_type, \
+             stability, last_accessed, access_count, 0.0 AS convergence_score, project_id, memory_type, \
              scope_type, scope_id \
              FROM semantic_facts_archive WHERE subject = ?1 AND predicate = ?2 ORDER BY valid_from DESC",
         )
@@ -662,6 +688,7 @@ mod tests {
             stability: 1.0,
             last_accessed: None,
             access_count: 0,
+            convergence_score: 0.0,
             project_id: None,
             memory_type: DEFAULT_MEMORY_TYPE.to_string(),
             scope_type: "system".to_string(),
@@ -1015,6 +1042,7 @@ mod tests {
             stability: 1.0,
             last_accessed: None,
             access_count: 0,
+            convergence_score: 0.0,
             project_id: None,
             memory_type: crate::types::DEFAULT_MEMORY_TYPE.to_string(),
             scope_type: "system".to_string(),
@@ -1050,6 +1078,7 @@ mod tests {
             stability: 1.0,
             last_accessed: None,
             access_count: 0,
+            convergence_score: 0.0,
             project_id: None,
             memory_type: crate::types::DEFAULT_MEMORY_TYPE.to_string(),
             scope_type: "system".to_string(),
@@ -1075,6 +1104,7 @@ mod tests {
             stability: 1.0,
             last_accessed: None,
             access_count: 0,
+            convergence_score: 0.0,
             project_id: None,
             memory_type: crate::types::DEFAULT_MEMORY_TYPE.to_string(),
             scope_type: "system".to_string(),
@@ -1114,6 +1144,7 @@ mod tests {
             stability: 1.0,
             last_accessed: None,
             access_count: 0,
+            convergence_score: 0.0,
             project_id: None,
             memory_type: crate::types::DEFAULT_MEMORY_TYPE.to_string(),
             scope_type: "system".to_string(),
@@ -1155,6 +1186,7 @@ mod tests {
             stability: 1.0,
             last_accessed: None,
             access_count: 0,
+            convergence_score: 0.0,
             project_id: None,
             memory_type: crate::types::DEFAULT_MEMORY_TYPE.to_string(),
             scope_type: "system".to_string(),
@@ -1179,6 +1211,7 @@ mod tests {
             stability: 1.0,
             last_accessed: None,
             access_count: 0,
+            convergence_score: 0.0,
             project_id: None,
             memory_type: crate::types::DEFAULT_MEMORY_TYPE.to_string(),
             scope_type: "system".to_string(),

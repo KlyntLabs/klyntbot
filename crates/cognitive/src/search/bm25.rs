@@ -174,6 +174,7 @@ mod tests {
             stability: 1.0,
             last_accessed: None,
             access_count: 0,
+            convergence_score: 0.0,
             project_id: None,
             memory_type: "fact".to_string(),
             scope_type: "system".to_string(),

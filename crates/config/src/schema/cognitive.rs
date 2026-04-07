@@ -1,5 +1,15 @@
 use serde::{Deserialize, Serialize};
 
+/// Controls whether the cognitive pipeline uses heuristic-first (Standard)
+/// or full-LLM (Deep) processing.
+#[derive(Debug, Clone, Copy, Default, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub enum IntelligenceMode {
+    #[default]
+    Standard,
+    Deep,
+}
+
 /// Configuration for background cognitive tasks (extraction, consolidation,
 /// reflection, coaching reasoning).
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -117,6 +127,10 @@ pub struct CognitiveConfig {
     /// Set to 0.0 to auto-approve all (default). Set to 1.0 to require confirmation for everything.
     #[serde(default)]
     pub confirm_threshold: f64,
+
+    /// Whether the cognitive pipeline uses heuristic-first (Standard) or full-LLM (Deep) processing.
+    #[serde(default)]
+    pub intelligence_mode: IntelligenceMode,
 }
 
 impl Default for CognitiveConfig {
@@ -150,6 +164,7 @@ impl Default for CognitiveConfig {
             book_index: BookIndexConfig::default(),
             atom_extraction: AtomExtractionConfig::default(),
             confirm_threshold: 0.0,
+            intelligence_mode: IntelligenceMode::Standard,
         }
     }
 }

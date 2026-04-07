@@ -111,6 +111,7 @@ pub fn to_semantic_fact(candidate: &ExtractedFact, observation: &Observation) ->
         stability: 1.0,
         last_accessed: None,
         access_count: 0,
+        convergence_score: 0.0,
         project_id: None,
         memory_type: classify_memory_type(&combined_text).to_string(),
         scope_type: "system".to_string(),
