@@ -312,6 +312,13 @@ pub enum DomainEvent {
         intervention_id: String,
         response: FeedbackResponse,
     },
+    CoachingPatternDetected {
+        pattern_name: String,
+        confidence: f64,
+        description: String,
+        domain: String,
+        signal_count: i32,
+    },
 
     // -- Behavioral learning --
     BehavioralPatternDetected {
@@ -632,6 +639,7 @@ impl DomainEvent {
             Self::UserCorrectedAI { .. } => "UserCorrectedAI",
             Self::AutotunerDecision { .. } => "AutotunerDecision",
             Self::CoachingFeedback { .. } => "CoachingFeedback",
+            Self::CoachingPatternDetected { .. } => "CoachingPatternDetected",
             Self::BehavioralPatternDetected { .. } => "BehavioralPatternDetected",
             Self::KnowledgeAtomCreated { .. } => "KnowledgeAtomCreated",
             Self::KnowledgeAtomAccepted { .. } => "KnowledgeAtomAccepted",
@@ -720,7 +728,7 @@ impl DomainEvent {
 
             Self::UserStatedFact { domain, .. } => domain.as_str(),
             Self::UserCorrectedAI { .. } => "learning",
-            Self::CoachingFeedback { .. } => "coaching",
+            Self::CoachingFeedback { .. } | Self::CoachingPatternDetected { .. } => "coaching",
             Self::ChatTurnCompleted { .. } | Self::ToolCallExecuted { .. } => "general",
 
             Self::NoteCreated { .. }
