@@ -209,7 +209,7 @@ impl AgentRuntime {
         }
 
         // Create budget
-        let mut budget = ExecutionBudget::new(depth, "general");
+        let mut budget = ExecutionBudget::new(depth);
 
         // Build execution params
         let mut params = ExecutionParams::new(&self.execution_model)

@@ -35,7 +35,7 @@ impl std::fmt::Display for DepthMode {
 
 // ── Skill Budget Defaults ────────────────────────────────────
 
-/// Per-skill default budget parameters.
+/// Default budget parameters.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SkillBudget {
     pub normal_tokens: u64,
@@ -52,33 +52,6 @@ impl Default for SkillBudget {
             deep_multiplier: 1.5,
             ultra_multiplier: 3.0,
         }
-    }
-}
-
-/// Well-known skill budget presets.
-pub fn skill_budget_for(skill_name: &str) -> SkillBudget {
-    match skill_name {
-        "task-management" => SkillBudget {
-            normal_tokens: 40_000,
-            normal_turns: 12,
-            ..Default::default()
-        },
-        "finance-management" => SkillBudget {
-            normal_tokens: 80_000,
-            normal_turns: 20,
-            ..Default::default()
-        },
-        "communication" => SkillBudget {
-            normal_tokens: 40_000,
-            normal_turns: 10,
-            ..Default::default()
-        },
-        "automation" => SkillBudget {
-            normal_tokens: 50_000,
-            normal_turns: 15,
-            ..Default::default()
-        },
-        _ => SkillBudget::default(), // "general" and unknown skills
     }
 }
 
@@ -107,9 +80,9 @@ pub struct ExecutionBudget {
 }
 
 impl ExecutionBudget {
-    /// Create a budget from the user's depth choice and the matched skill.
-    pub fn new(depth: DepthMode, skill_name: &str) -> Self {
-        let base = skill_budget_for(skill_name);
+    /// Create a budget from the user's depth choice.
+    pub fn new(depth: DepthMode) -> Self {
+        let base = SkillBudget::default();
         let (max_tokens, max_turns) = match depth {
             DepthMode::Normal => (base.normal_tokens, base.normal_turns),
             DepthMode::DeepThink => (
@@ -221,10 +194,10 @@ mod tests {
     use super::*;
 
     #[test]
-    fn normal_budget_uses_skill_defaults() {
-        let budget = ExecutionBudget::new(DepthMode::Normal, "task-management");
-        assert_eq!(budget.max_tokens, 40_000);
-        assert_eq!(budget.max_turns, 12);
+    fn normal_budget_uses_defaults() {
+        let budget = ExecutionBudget::new(DepthMode::Normal);
+        assert_eq!(budget.max_tokens, 60_000);
+        assert_eq!(budget.max_turns, 15);
         assert!(!budget.exhausted());
         assert!(!budget.should_wrap_up());
         assert!((budget.remaining_pct() - 1.0).abs() < f32::EPSILON);
@@ -232,14 +205,14 @@ mod tests {
 
     #[test]
     fn deep_think_scales_by_multiplier() {
-        let budget = ExecutionBudget::new(DepthMode::DeepThink, "task-management");
-        assert_eq!(budget.max_tokens, 60_000); // 40K * 1.5
-        assert_eq!(budget.max_turns, 18); // 12 * 1.5
+        let budget = ExecutionBudget::new(DepthMode::DeepThink);
+        assert_eq!(budget.max_tokens, 90_000); // 60K * 1.5
+        assert_eq!(budget.max_turns, 22); // 15 * 1.5 = 22.5 → 22 (truncated)
     }
 
     #[test]
     fn ultra_has_unlimited_turns() {
-        let budget = ExecutionBudget::new(DepthMode::Ultra, "general");
+        let budget = ExecutionBudget::new(DepthMode::Ultra);
         assert_eq!(budget.max_turns, u32::MAX);
         // Token budget is still finite
         assert_eq!(budget.max_tokens, 180_000); // 60K * 3.0
