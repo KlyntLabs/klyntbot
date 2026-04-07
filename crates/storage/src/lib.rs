@@ -34,7 +34,8 @@ pub use repos::{TaskFilter, TaskPatch, TaskRepo, TaskSummary, TimeEntryWithTask}
 pub use repos::{AreaRepo, KeyResultRepo, ObjectiveRepo};
 
 // ── Sessions / Context ──────────────────────────────────────────────
-pub use repos::{SessionContextParams, SessionContextRepo, SessionRepo};
+pub use repos::{SessionContextParams, SessionContextRepo, SessionMemoryRepo, SessionRepo};
+pub use rows::session_memory::SessionMemoryRow;
 
 // ── Autotuner ────────────────────────────────────────────────────────
 pub use repos::TrialRepo;

@@ -11,7 +11,7 @@ pub mod types;
 // ── Module re-exports (backward-compatible paths) ──────────
 pub use services::{
     background, compaction, consolidation, context_source, conversation_recall, decay, extraction,
-    memory_retriever, reflection, retrieval, salience, situation, temporal,
+    memory_retriever, reflection, retrieval, salience, session_memory, situation, temporal,
 };
 
 // ── Type re-exports ────────────────────────────────────────
@@ -48,6 +48,7 @@ pub use repos::{NewPersona, PersonaRepo, PersonaRow, PersonaUpdate};
 pub use repos::{NewSquad, ResolvedSquad, SquadMemberRow, SquadRepo, SquadRow};
 pub use repos::{PersonaAccuracy, PersonaAccuracyRepo};
 pub use repos::{ReviewSessionRepo, ReviewSessionRow};
+pub use session_memory::{SessionMemoryConfig, SessionMemoryService};
 pub use situation::{compute_situation, SituationInputs, UserSituation};
 pub use temporal::{ChangeSummary, FactVersion, TemporalService};
 pub use types::*;
