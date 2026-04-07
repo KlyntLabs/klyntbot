@@ -56,10 +56,8 @@ pub async fn execute_loop(
     let mut seen_tool_calls: HashSet<String> = HashSet::new();
     let mut last_content = String::new();
     let mut wrap_up_injected = false;
-    let compressor = MidLoopCompressor::new(
-        core.token_counter().clone(),
-        params.context_window,
-    );
+    let mut synthesis_attempted = false;
+    let compressor = MidLoopCompressor::new(core.token_counter().clone(), params.context_window);
     let refresher = params
         .context_update_queue
         .as_ref()
@@ -83,6 +81,19 @@ pub async fn execute_loop(
                     tool_calls: all_tool_calls,
                 });
             }
+            // Already tried synthesis once — stop to avoid infinite loop
+            // (e.g. if the model keeps returning tool calls instead of text)
+            if synthesis_attempted {
+                warn!("Budget exhausted and synthesis did not produce text — stopping");
+                return Ok(ExecuteLoopResult {
+                    content: String::new(),
+                    usage: accumulated_usage,
+                    turns: budget.turns_used(),
+                    budget_exhausted: true,
+                    tool_calls: all_tool_calls,
+                });
+            }
+            synthesis_attempted = true;
             // No content yet — inject wrap-up and do one final LLM call
             messages.push(providers::types::Message::system(
                 "Your budget is exhausted. Provide a concise final response \

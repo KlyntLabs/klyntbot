@@ -72,4 +72,6 @@ assertions = [
 at_day = 30
 assertions = [
     { type = "metric_above", metric = "knowledge_retention", threshold = 0.3 },
+    { type = "metric_above", metric = "fact_extraction_accuracy", threshold = 0.2 },
+    { type = "metric_above", metric = "retrieval_precision", threshold = 0.1 },
 ]

@@ -628,7 +628,13 @@ mod tests {
         assert_eq!(params["required"], json!(["action"]));
         assert_eq!(
             params["properties"]["action"]["enum"],
-            json!(["search_conversations", "search_all", "purge", "status", "record_fact"])
+            json!([
+                "search_conversations",
+                "search_all",
+                "purge",
+                "status",
+                "record_fact"
+            ])
         );
     }
 

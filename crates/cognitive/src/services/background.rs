@@ -1332,7 +1332,10 @@ mod tests {
             user_message: Some("I'm a software engineer working on Rust projects".into()),
         };
         let obs = event_to_observation(&event);
-        assert!(obs.is_some(), "should create observation when user_message is present");
+        assert!(
+            obs.is_some(),
+            "should create observation when user_message is present"
+        );
         let obs = obs.unwrap();
         assert_eq!(obs.source_event, "ChatTurnCompleted");
         assert!(obs.content.contains("software engineer"));
