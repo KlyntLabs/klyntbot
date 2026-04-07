@@ -13,6 +13,7 @@ pub mod project;
 pub mod project_source;
 pub mod session;
 pub mod session_context;
+pub mod session_memory;
 pub mod status;
 pub mod task;
 pub mod task_group;
@@ -23,6 +24,7 @@ pub mod usage;
 pub use custom_column::{CustomColumnRow, CustomColumnValueRow};
 pub use entity_link::EntityLinkRow;
 pub use project_source::ProjectSourceRow;
+pub use session_memory::SessionMemoryRow;
 pub use status::{StatusLabelRow, StatusWorkflowRow};
 pub use task_group::TaskGroupRow;
 

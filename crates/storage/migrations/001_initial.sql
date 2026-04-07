@@ -152,6 +152,16 @@ CREATE TABLE session_messages (
 CREATE INDEX idx_session_messages_key_ts ON session_messages(session_key, timestamp);
 
 -- ============================================================
+-- Session Memory (per-session scratchpad for conversation state)
+-- ============================================================
+CREATE TABLE session_memory (
+    session_key TEXT PRIMARY KEY REFERENCES sessions(key) ON DELETE CASCADE,
+    content     TEXT NOT NULL DEFAULT '',
+    turn_count  INTEGER NOT NULL DEFAULT 0,
+    updated_at  TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now'))
+);
+
+-- ============================================================
 -- Learning Outcomes
 -- ============================================================
 CREATE TABLE learning_outcomes (
