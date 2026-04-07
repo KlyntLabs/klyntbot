@@ -16,6 +16,7 @@ use tools::RoutingContext;
 
 use super::budget::ExecutionBudget;
 use super::core::ExecutionCore;
+use super::mid_loop_compressor::MidLoopCompressor;
 use super::types::{accumulate_usage, CycleOutcome, ExecutionParams};
 use crate::events::AgentEvent;
 
@@ -54,6 +55,10 @@ pub async fn execute_loop(
     let mut seen_tool_calls: HashSet<String> = HashSet::new();
     let mut last_content = String::new();
     let mut wrap_up_injected = false;
+    let compressor = MidLoopCompressor::new(
+        core.token_counter().clone(),
+        params.context_window,
+    );
 
     loop {
         // ── Budget gate ──────────────────────────────────────
@@ -187,8 +192,17 @@ pub async fn execute_loop(
         }
 
         // ── Mid-loop compression ─────────────────────────────
-        // The caller (process_message) handles compression via MidLoopCompressor
-        // by wrapping this loop. We emit the event for transparency.
+        if let Some((before_tokens, after_tokens)) = compressor.compress_if_needed(&mut messages) {
+            if let Some(ref tx) = event_tx {
+                let _ = tx
+                    .send(AgentEvent::ContextCompressed {
+                        before_tokens,
+                        after_tokens,
+                        iteration: budget.turns_used() as usize,
+                    })
+                    .await;
+            }
+        }
 
         // ── Emit budget update ───────────────────────────────
         if let Some(ref tx) = event_tx {
