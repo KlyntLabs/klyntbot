@@ -1620,6 +1620,7 @@ impl AppCore {
                 .await;
         }
 
+        let user_content = content.clone();
         let result = chat_send(
             &self.repos,
             &self.agent,
@@ -1636,7 +1637,10 @@ impl AppCore {
 
         // Publish chat turn to cognitive consolidation pipeline
         if let Some(bus) = &self.domain_event_bus {
-            bus.publish(bus::DomainEvent::ChatTurnCompleted { session_key });
+            bus.publish(bus::DomainEvent::ChatTurnCompleted {
+                session_key,
+                user_message: Some(user_content),
+            });
         }
 
         Ok(result)
@@ -1649,6 +1653,7 @@ impl AppCore {
         content: String,
         session_key: String,
     ) -> Result<(ChatMessageResponse, ChatStreamInfo), ApiError> {
+        let user_content = content.clone();
         let result = chat_send(
             &self.repos,
             &self.agent,
@@ -1665,7 +1670,10 @@ impl AppCore {
 
         // Publish chat turn to cognitive consolidation pipeline
         if let Some(bus) = &self.domain_event_bus {
-            bus.publish(bus::DomainEvent::ChatTurnCompleted { session_key });
+            bus.publish(bus::DomainEvent::ChatTurnCompleted {
+                session_key,
+                user_message: Some(user_content),
+            });
         }
 
         Ok(result)
@@ -1807,7 +1815,10 @@ impl AppCore {
 
         // Publish chat turn to cognitive consolidation pipeline
         if let Some(bus) = &self.domain_event_bus {
-            bus.publish(bus::DomainEvent::ChatTurnCompleted { session_key });
+            bus.publish(bus::DomainEvent::ChatTurnCompleted {
+                session_key,
+                user_message: Some(content),
+            });
         }
 
         Ok((user_msg, stream_info))

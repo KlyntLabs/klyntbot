@@ -738,7 +738,15 @@ fn event_to_observation(event: &DomainEvent) -> Option<Observation> {
     match event {
         // ChatTurnCompleted no longer carries the user message (payload reduction),
         // so there is no content to extract facts from. Skip it.
-        DomainEvent::ChatTurnCompleted { .. } => None,
+        DomainEvent::ChatTurnCompleted { user_message, .. } => {
+            user_message.as_ref().map(|content| Observation {
+                domain: "general".into(),
+                content: content.clone(),
+                importance: 0.5,
+                source_event: "ChatTurnCompleted".into(),
+                timestamp: now,
+            })
+        }
         DomainEvent::UserStatedFact { fact, domain } => Some(Observation {
             domain: domain.clone(),
             content: fact.clone(),
@@ -1318,12 +1326,28 @@ mod tests {
     }
 
     #[test]
-    fn test_event_to_observation_chat_turn_completed_is_none() {
+    fn event_to_observation_chat_turn_with_message() {
         let event = DomainEvent::ChatTurnCompleted {
             session_key: "session-1".into(),
+            user_message: Some("I'm a software engineer working on Rust projects".into()),
         };
-        // ChatTurnCompleted no longer carries user_message, so no observation.
-        assert!(event_to_observation(&event).is_none());
+        let obs = event_to_observation(&event);
+        assert!(obs.is_some(), "should create observation when user_message is present");
+        let obs = obs.unwrap();
+        assert_eq!(obs.source_event, "ChatTurnCompleted");
+        assert!(obs.content.contains("software engineer"));
+        assert_eq!(obs.domain, "general");
+        assert!((obs.importance - 0.5).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn event_to_observation_chat_turn_without_message() {
+        let event = DomainEvent::ChatTurnCompleted {
+            session_key: "session-1".into(),
+            user_message: None,
+        };
+        let obs = event_to_observation(&event);
+        assert!(obs.is_none(), "should skip when user_message is None");
     }
 
     #[test]

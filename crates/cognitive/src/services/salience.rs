@@ -245,6 +245,7 @@ mod tests {
     fn test_chat_turn_completed_is_extract() {
         let verdict = evaluate_salience(&DomainEvent::ChatTurnCompleted {
             session_key: "test-session".into(),
+            user_message: None,
         });
         assert_eq!(verdict, SalienceVerdict::Extract);
     }

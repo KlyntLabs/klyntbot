@@ -682,6 +682,7 @@ impl AgentLoop {
         if let Some(bus) = &self.domain_event_bus {
             bus.publish(bus::DomainEvent::ChatTurnCompleted {
                 session_key: session_key.to_string(),
+                user_message: Some(msg.content.clone()),
             });
         }
 

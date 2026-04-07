@@ -273,6 +273,10 @@ pub enum DomainEvent {
     // -- Chat --
     ChatTurnCompleted {
         session_key: String,
+        /// The user's message content for cognitive extraction.
+        /// `None` for legacy events or when content is unavailable.
+        #[serde(default)]
+        user_message: Option<String>,
     },
 
     // -- Tool execution --

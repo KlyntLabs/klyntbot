@@ -166,6 +166,10 @@ impl AppCore {
                     .as_str()
                     .unwrap_or("debug")
                     .to_string(),
+                user_message: payload
+                    .get("user_message")
+                    .and_then(|v| v.as_str())
+                    .map(|s| s.to_string()),
             },
             other => {
                 return Err(ApiError::new(

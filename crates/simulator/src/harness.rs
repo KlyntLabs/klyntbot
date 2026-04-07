@@ -1056,6 +1056,7 @@ impl SimulationHarness {
                 // Salience: classify the message as a ChatTurnCompleted event.
                 let chat_event = DomainEvent::ChatTurnCompleted {
                     session_key: "sim-session".to_string(),
+                    user_message: Some(msg.content.clone()),
                 };
                 crate::metrics::cognitive::record_salience(&chat_event, metrics.accumulator_mut());
 

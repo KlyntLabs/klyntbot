@@ -112,7 +112,7 @@ pub fn normalize_domain_event(event: &bus::DomainEvent) -> ActivityLogEntry {
             ),
 
             // Chat
-            bus::DomainEvent::ChatTurnCompleted { session_key } => (
+            bus::DomainEvent::ChatTurnCompleted { session_key, .. } => (
                 ActivitySource::Chat,
                 ActivityActor::User,
                 "prompt",
@@ -651,6 +651,7 @@ mod tests {
         let normalizer = DomainEventNormalizer;
         let event = bus::DomainEvent::ChatTurnCompleted {
             session_key: "sk-1".into(),
+            user_message: None,
         };
         let entry = normalizer.normalize(&event).unwrap();
         assert_eq!(entry.source, ActivitySource::Chat);
