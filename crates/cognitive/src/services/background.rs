@@ -133,14 +133,17 @@ async fn collect_batch(
 }
 
 /// Split a batch of domain events into extraction vs accumulation buckets.
-fn classify_batch(events: Vec<DomainEvent>) -> (Vec<Observation>, Vec<(String, Observation)>) {
+async fn classify_batch(
+    events: Vec<DomainEvent>,
+    session_repo: &Option<storage::SessionRepo>,
+) -> (Vec<Observation>, Vec<(String, Observation)>) {
     let mut to_extract = Vec::new();
     let mut to_accumulate = Vec::new();
 
     for event in events {
         let verdict = evaluate_salience(&event);
         let key = event_type_key(&event);
-        if let Some(obs) = event_to_observation(&event) {
+        if let Some(obs) = event_to_observation(&event, session_repo).await {
             match verdict {
                 SalienceVerdict::Extract => to_extract.push(obs),
                 SalienceVerdict::Accumulate => to_accumulate.push((key, obs)),
@@ -241,7 +244,6 @@ impl BackgroundConsolidationService {
             context_update_queue,
             session_repo,
         } = config;
-        let _session_repo = session_repo;
         let cancel_clone = cancel.clone();
         let handle = tokio::spawn(async move {
             // Restore accumulated entries from previous session
@@ -329,7 +331,7 @@ impl BackgroundConsolidationService {
                     }
                 }
 
-                let (mut to_extract, to_accumulate) = classify_batch(batch);
+                let (mut to_extract, to_accumulate) = classify_batch(batch, &session_repo).await;
 
                 // Prepend DLQ retries at indices 0..dlq_count, then promotions, then new events
                 let dlq_ids_this_batch = std::mem::take(&mut dlq_reprocess_ids);
@@ -736,16 +738,58 @@ impl BackgroundConsolidationService {
 }
 
 /// Convert a `DomainEvent` to an `Observation` for processing.
-fn event_to_observation(event: &DomainEvent) -> Option<Observation> {
+///
+/// For `ChatTurnCompleted`, loads the last 6 messages (3 user+assistant turns)
+/// from session history to give the extractor full conversation context.
+async fn event_to_observation(
+    event: &DomainEvent,
+    session_repo: &Option<storage::SessionRepo>,
+) -> Option<Observation> {
     let now = Utc::now();
     match event {
-        // ChatTurnCompleted no longer carries the user message (payload reduction),
-        // so there is no content to extract facts from. Skip it.
-        DomainEvent::ChatTurnCompleted { user_message, .. } => {
-            user_message.as_ref().map(|content| Observation {
+        DomainEvent::ChatTurnCompleted {
+            session_key,
+            user_message,
+        } => {
+            let user_text = user_message.as_ref()?;
+
+            // Try to load recent session history for richer extraction context
+            let context = if let Some(repo) = session_repo {
+                match repo.get_recent_messages(session_key, 6).await {
+                    Ok(messages) if messages.len() >= 2 => {
+                        let history: String = messages
+                            .iter()
+                            .map(|m| {
+                                let truncated = if m.content.len() > 500 {
+                                    format!("{}...", &m.content[..500])
+                                } else {
+                                    m.content.clone()
+                                };
+                                format!("[{}]: {}", m.role, truncated)
+                            })
+                            .collect::<Vec<_>>()
+                            .join("\n");
+                        Some(history)
+                    }
+                    Ok(_) => None, // <2 messages, fall back to just user_text
+                    Err(e) => {
+                        debug!("Failed to load session history for {session_key}: {e}");
+                        None
+                    }
+                }
+            } else {
+                None
+            };
+
+            let (content, importance) = match context {
+                Some(history) => (history, 0.7),
+                None => (user_text.clone(), 0.5),
+            };
+
+            Some(Observation {
                 domain: "general".into(),
-                content: content.clone(),
-                importance: 0.5,
+                content,
+                importance,
                 source_event: "ChatTurnCompleted".into(),
                 timestamp: now,
             })
@@ -1316,25 +1360,25 @@ mod tests {
     use super::*;
     use chrono::DateTime;
 
-    #[test]
-    fn test_event_to_observation_user_stated_fact() {
+    #[tokio::test]
+    async fn test_event_to_observation_user_stated_fact() {
         let event = DomainEvent::UserStatedFact {
             fact: "I work best in mornings".into(),
             domain: "productivity".into(),
         };
-        let obs = event_to_observation(&event).unwrap();
+        let obs = event_to_observation(&event, &None).await.unwrap();
         assert_eq!(obs.domain, "productivity");
         assert_eq!(obs.importance, 1.0);
         assert_eq!(obs.content, "I work best in mornings");
     }
 
-    #[test]
-    fn event_to_observation_chat_turn_with_message() {
+    #[tokio::test]
+    async fn event_to_observation_chat_turn_with_message() {
         let event = DomainEvent::ChatTurnCompleted {
             session_key: "session-1".into(),
             user_message: Some("I'm a software engineer working on Rust projects".into()),
         };
-        let obs = event_to_observation(&event);
+        let obs = event_to_observation(&event, &None).await;
         assert!(
             obs.is_some(),
             "should create observation when user_message is present"
@@ -1343,27 +1387,28 @@ mod tests {
         assert_eq!(obs.source_event, "ChatTurnCompleted");
         assert!(obs.content.contains("software engineer"));
         assert_eq!(obs.domain, "general");
+        // Without session_repo, falls back to user_message with importance 0.5
         assert!((obs.importance - 0.5).abs() < f64::EPSILON);
     }
 
-    #[test]
-    fn event_to_observation_chat_turn_without_message() {
+    #[tokio::test]
+    async fn event_to_observation_chat_turn_without_message() {
         let event = DomainEvent::ChatTurnCompleted {
             session_key: "session-1".into(),
             user_message: None,
         };
-        let obs = event_to_observation(&event);
+        let obs = event_to_observation(&event, &None).await;
         assert!(obs.is_none(), "should skip when user_message is None");
     }
 
-    #[test]
-    fn test_event_to_observation_budget_alert() {
+    #[tokio::test]
+    async fn test_event_to_observation_budget_alert() {
         let event = DomainEvent::BudgetAlert {
             category: "food".into(),
             spent: 450.0,
             limit: 500.0,
         };
-        let obs = event_to_observation(&event).unwrap();
+        let obs = event_to_observation(&event, &None).await.unwrap();
         assert_eq!(obs.domain, "finance");
         assert!(obs.content.contains("450.00"));
     }
@@ -1442,40 +1487,40 @@ mod tests {
         assert!(summary.content.contains("2 accumulated"));
     }
 
-    #[test]
-    fn test_event_to_observation_task_focus_started() {
+    #[tokio::test]
+    async fn test_event_to_observation_task_focus_started() {
         let event = DomainEvent::TaskFocusStarted {
             task_id: "t1".into(),
             energy_level: "high".into(),
         };
-        let obs = event_to_observation(&event).unwrap();
+        let obs = event_to_observation(&event, &None).await.unwrap();
         assert_eq!(obs.domain, "tasks");
         assert!(obs.content.contains("t1"));
         assert!(obs.content.contains("high"));
         assert_eq!(obs.source_event, "TaskFocusStarted");
     }
 
-    #[test]
-    fn test_event_to_observation_task_focus_ended() {
+    #[tokio::test]
+    async fn test_event_to_observation_task_focus_ended() {
         let event = DomainEvent::TaskFocusEnded {
             task_id: "t1".into(),
             duration_secs: 2700,
         };
-        let obs = event_to_observation(&event).unwrap();
+        let obs = event_to_observation(&event, &None).await.unwrap();
         assert_eq!(obs.domain, "tasks");
         assert!(obs.content.contains("45min")); // 2700 / 60
         assert_eq!(obs.source_event, "TaskFocusEnded");
     }
 
-    #[test]
-    fn test_event_to_observation_estimation_recorded() {
+    #[tokio::test]
+    async fn test_event_to_observation_estimation_recorded() {
         let event = DomainEvent::EstimationRecorded {
             task_id: "t1".into(),
             estimated_mins: 30,
             actual_mins: 75,
             deviation_pct: 150.0,
         };
-        let obs = event_to_observation(&event).unwrap();
+        let obs = event_to_observation(&event, &None).await.unwrap();
         assert_eq!(obs.domain, "tasks");
         assert!(obs.content.contains("estimated 30min"));
         assert!(obs.content.contains("actual 75min"));
@@ -1483,15 +1528,15 @@ mod tests {
         assert_eq!(obs.source_event, "EstimationRecorded");
     }
 
-    #[test]
-    fn test_event_to_observation_estimation_recorded_importance() {
+    #[tokio::test]
+    async fn test_event_to_observation_estimation_recorded_importance() {
         let large_dev = DomainEvent::EstimationRecorded {
             task_id: "t1".into(),
             estimated_mins: 30,
             actual_mins: 75,
             deviation_pct: 150.0,
         };
-        let obs = event_to_observation(&large_dev).unwrap();
+        let obs = event_to_observation(&large_dev, &None).await.unwrap();
         assert!(
             obs.importance >= 0.6,
             "Large deviation should have high importance, got {}",
@@ -1504,7 +1549,7 @@ mod tests {
             actual_mins: 35,
             deviation_pct: 16.7,
         };
-        let obs2 = event_to_observation(&small_dev).unwrap();
+        let obs2 = event_to_observation(&small_dev, &None).await.unwrap();
         assert!(
             obs2.importance <= 0.4,
             "Small deviation should have low importance, got {}",
@@ -1512,42 +1557,42 @@ mod tests {
         );
     }
 
-    #[test]
-    fn test_event_to_observation_task_decomposed() {
+    #[tokio::test]
+    async fn test_event_to_observation_task_decomposed() {
         let event = DomainEvent::TaskDecomposed {
             source_task_id: "t1".into(),
             subtask_ids: vec!["s1".into(), "s2".into(), "s3".into()],
             total_estimated_mins: Some(120),
         };
-        let obs = event_to_observation(&event).unwrap();
+        let obs = event_to_observation(&event, &None).await.unwrap();
         assert_eq!(obs.domain, "tasks");
         assert!(obs.content.contains("3 subtasks"));
         assert!(obs.content.contains("120min"));
         assert_eq!(obs.source_event, "TaskDecomposed");
     }
 
-    #[test]
-    fn test_event_to_observation_day_plan_generated() {
+    #[tokio::test]
+    async fn test_event_to_observation_day_plan_generated() {
         let event = DomainEvent::DayPlanGenerated {
             task_count: 5,
             total_estimated_mins: 360,
         };
-        let obs = event_to_observation(&event).unwrap();
+        let obs = event_to_observation(&event, &None).await.unwrap();
         assert_eq!(obs.domain, "tasks");
         assert!(obs.content.contains("5 tasks"));
         assert!(obs.content.contains("360min"));
         assert_eq!(obs.source_event, "DayPlanGenerated");
     }
 
-    #[test]
-    fn test_event_to_observation_proactive_suggestion() {
+    #[tokio::test]
+    async fn test_event_to_observation_proactive_suggestion() {
         let event = DomainEvent::ProactiveSuggestionCreated {
             suggestion_id: "sug-1".into(),
             suggestion_type: "Decompose".into(),
             task_id: Some("t1".into()),
             confidence: 0.85,
         };
-        let obs = event_to_observation(&event).unwrap();
+        let obs = event_to_observation(&event, &None).await.unwrap();
         assert_eq!(obs.domain, "tasks");
         assert!(obs.content.contains("Decompose"));
         assert!(obs.content.contains("85%"));
