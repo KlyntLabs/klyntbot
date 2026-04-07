@@ -17,6 +17,24 @@ use crate::types::UserModel;
 /// Cache TTL for user model data (seconds).
 const CACHE_TTL_SECS: u64 = 60;
 
+/// Returns a freshness label for a semantic fact based on convergence score,
+/// confidence, and recency of last access.
+fn freshness_label(fact: &crate::types::SemanticFact) -> &'static str {
+    let days_old = fact
+        .last_accessed
+        .as_ref()
+        .and_then(|ts| chrono::DateTime::parse_from_rfc3339(ts).ok())
+        .map(|dt| (chrono::Utc::now() - dt.with_timezone(&chrono::Utc)).num_days())
+        .unwrap_or(90);
+    if fact.convergence_score >= 0.4 || (fact.confidence >= 0.8 && days_old <= 7) {
+        "strong"
+    } else if fact.confidence >= 0.5 && days_old <= 30 {
+        "moderate"
+    } else {
+        "weak -- verify"
+    }
+}
+
 struct CachedModel {
     model: UserModel,
     rules_text: String,
@@ -196,7 +214,15 @@ impl ContextSource for CognitiveContextSource {
                 domain_facts.truncate(self.static_fact_limit);
                 let lines: Vec<String> = domain_facts
                     .iter()
-                    .map(|f| format!("- {}: {} = {}", f.subject, f.predicate, f.object))
+                    .map(|f| {
+                        format!(
+                            "- {}: {} = {} [{}]",
+                            f.subject,
+                            f.predicate,
+                            f.object,
+                            freshness_label(f)
+                        )
+                    })
                     .collect();
                 sections.push(format!("## {label}\n{}", lines.join("\n")));
             }

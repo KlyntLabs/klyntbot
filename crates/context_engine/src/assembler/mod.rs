@@ -544,7 +544,10 @@ impl ContextEngine {
             .into_iter()
             .partition(|e| matches!(e.source, MemorySource::ConversationRecall));
 
-        let mut text = "[Relevant Context]\n".to_string();
+        let mut text = "[Relevant Context]\n\
+            When your response draws on memories below, reference them inline using [@type:id] markers. \
+            The UI renders these as hoverable details. Only reference memories you actually use.\n"
+            .to_string();
 
         if !facts.is_empty() {
             text.push_str("\n## Relevant Facts\n");

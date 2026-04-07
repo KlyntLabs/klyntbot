@@ -19,6 +19,24 @@ const RRF_K: f64 = 60.0;
 /// Minimum relevance score for a fact to be included in results.
 const MIN_FACT_SCORE: f64 = 0.3;
 
+/// Returns a freshness label for a semantic fact based on convergence score,
+/// confidence, and recency of last access.
+fn freshness_label(fact: &crate::types::SemanticFact) -> &'static str {
+    let days_old = fact
+        .last_accessed
+        .as_ref()
+        .and_then(|ts| chrono::DateTime::parse_from_rfc3339(ts).ok())
+        .map(|dt| (chrono::Utc::now() - dt.with_timezone(&chrono::Utc)).num_days())
+        .unwrap_or(90);
+    if fact.convergence_score >= 0.4 || (fact.confidence >= 0.8 && days_old <= 7) {
+        "strong"
+    } else if fact.confidence >= 0.5 && days_old <= 30 {
+        "moderate"
+    } else {
+        "weak -- verify"
+    }
+}
+
 /// Unified memory service that merges conversation recall and cognitive facts.
 ///
 /// Replaces `CognitiveMemoryRetriever`. Fetches from both sources concurrently,
@@ -181,11 +199,12 @@ impl UnifiedMemoryService {
                 .into_iter()
                 .filter(|f| f.score > MIN_FACT_SCORE)
                 .map(|f| {
+                    let label = freshness_label(&f.fact);
                     let content = format!(
-                        "{}: {} = {}",
-                        f.fact.subject, f.fact.predicate, f.fact.object
+                        "[@fact:{}] {}: {} = {} [{}]",
+                        f.fact.id, f.fact.subject, f.fact.predicate, f.fact.object, label
                     );
-                    let predicate = f.fact.predicate;
+                    let predicate = f.fact.predicate.clone();
                     (f.fact.id, f.score, content, predicate)
                 })
                 .collect(),
@@ -223,15 +242,19 @@ impl UnifiedMemoryService {
             Ok(facts) => facts
                 .into_iter()
                 .filter(|f| f.score > MIN_FACT_SCORE)
-                .map(|f| MemoryEntry {
-                    id: f.fact.id,
-                    content: format!(
-                        "{}: {} = {}",
-                        f.fact.subject, f.fact.predicate, f.fact.object
-                    ),
-                    score: f.score,
-                    source: MemorySource::CognitiveFact,
-                    raw_score: f.score,
+                .map(|f| {
+                    let label = freshness_label(&f.fact);
+                    let content = format!(
+                        "[@fact:{}] {}: {} = {} [{}]",
+                        f.fact.id, f.fact.subject, f.fact.predicate, f.fact.object, label
+                    );
+                    MemoryEntry {
+                        id: f.fact.id,
+                        content,
+                        score: f.score,
+                        source: MemorySource::CognitiveFact,
+                        raw_score: f.score,
+                    }
                 })
                 .collect(),
             Err(e) => {
@@ -341,11 +364,12 @@ impl UnifiedMemoryService {
 
                     if let Some((content, summary)) = row {
                         let text = summary.unwrap_or(content);
-                        let display = if text.len() > 200 {
+                        let truncated = if text.len() > 200 {
                             format!("{}...", &text[..text.floor_char_boundary(200)])
                         } else {
                             text
                         };
+                        let display = format!("[@episode:{}] {}", bm25.id, truncated);
                         entries.push((bm25.id.clone(), bm25.score, display));
                     }
                 }
