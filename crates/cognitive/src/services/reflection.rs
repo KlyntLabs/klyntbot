@@ -48,7 +48,7 @@ pub trait ReflectionHandler: Send + Sync {
 
 /// Minimum number of episodic memories required before reflection runs.
 /// Below this threshold, the LLM produces low-quality or hallucinated patterns.
-const MIN_EPISODE_COUNT: usize = 20;
+const MIN_EPISODE_COUNT: usize = 8;
 
 /// Run a weekly reflection cycle.
 ///
@@ -274,7 +274,7 @@ mod tests {
         let episodic_repo = EpisodicMemoryRepo::new(pool.clone());
         let rule_repo = ProceduralRuleRepo::new(pool);
 
-        // Insert only 5 memories — well below MIN_EPISODE_COUNT (20)
+        // Insert only 5 memories — well below MIN_EPISODE_COUNT (8)
         for i in 0..5 {
             let mem = EpisodicMemory {
                 id: format!("ep_{i}"),
