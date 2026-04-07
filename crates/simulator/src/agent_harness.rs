@@ -41,14 +41,25 @@ struct EventDrainResult {
 // ── Error-injecting tool wrapper ─────────────────────────────────────
 
 /// Wraps a tool and probabilistically returns an error on `execute`.
+/// Supports cascade mode: when a root error fires, dependent tools see elevated rates.
 struct ErrorInjectingTool {
     inner: tools::DynTool,
-    rate: f64,
+    base_rate: f64,
+    cascade_state: Arc<crate::error_injector::CascadeState>,
+    cascade_multiplier: f64,
+    cascade_enabled: bool,
     rng: std::sync::Mutex<rand::rngs::StdRng>,
 }
 
 impl ErrorInjectingTool {
-    fn new(inner: tools::DynTool, rate: f64, seed: u64) -> Self {
+    fn new(
+        inner: tools::DynTool,
+        rate: f64,
+        seed: u64,
+        cascade_state: Arc<crate::error_injector::CascadeState>,
+        cascade_multiplier: f64,
+        cascade_enabled: bool,
+    ) -> Self {
         use rand::SeedableRng;
         let name_hash = inner
             .name()
@@ -56,7 +67,10 @@ impl ErrorInjectingTool {
             .fold(0u64, |a, b| a.wrapping_add(b as u64));
         Self {
             inner,
-            rate,
+            base_rate: rate,
+            cascade_state,
+            cascade_multiplier,
+            cascade_enabled,
             rng: std::sync::Mutex::new(rand::rngs::StdRng::seed_from_u64(
                 seed.wrapping_add(name_hash),
             )),
@@ -80,12 +94,32 @@ impl tools::Tool for ErrorInjectingTool {
         args: serde_json::Value,
         ctx: &RoutingContext,
     ) -> common::Result<String> {
-        let injected = {
-            let mut rng = self.rng.lock().unwrap();
-            crate::error_injector::sample_injected_error(&mut rng, self.rate)
-        };
-        if let Some(err) = injected {
-            return Err(err);
+        if self.cascade_enabled {
+            let effective_rate = crate::error_injector::cascade_adjusted_rate(
+                self.base_rate,
+                self.inner.name(),
+                &self.cascade_state,
+                self.cascade_multiplier,
+            );
+            let injected = {
+                let mut rng = self.rng.lock().unwrap();
+                crate::error_injector::sample_cascade_error(
+                    &mut rng,
+                    effective_rate,
+                    &self.cascade_state,
+                )
+            };
+            if let Some(err) = injected {
+                return Err(err);
+            }
+        } else {
+            let injected = {
+                let mut rng = self.rng.lock().unwrap();
+                crate::error_injector::sample_injected_error(&mut rng, self.base_rate)
+            };
+            if let Some(err) = injected {
+                return Err(err);
+            }
         }
         self.inner.execute(args, ctx).await
     }
@@ -142,6 +176,7 @@ fn create_provider(provider_name: &str, model: &str, seed: u64) -> DynProvider {
 pub struct AgentHarness {
     runtime: Arc<AgentRuntime>,
     tool_registry: Arc<RwLock<ToolRegistry>>,
+    cascade_state: Arc<crate::error_injector::CascadeState>,
 }
 
 impl AgentHarness {
@@ -160,6 +195,8 @@ impl AgentHarness {
         error_injection_rate: f64,
         seed: u64,
         context_window: usize,
+        cascade_enabled: bool,
+        cascade_multiplier: f64,
     ) -> common::Result<Self> {
         let inner_provider = create_provider(provider_name, model, seed);
 
@@ -179,10 +216,18 @@ impl AgentHarness {
         Self::register_tools(&mut tool_registry, pool, &inner_pool, &bus);
 
         // Wrap tools with error injection if configured
+        let cascade_state = Arc::new(crate::error_injector::CascadeState::default());
         if error_injection_rate > 0.0 {
             let mut wrapped = ToolRegistry::new();
             for tool in tool_registry.take_all() {
-                wrapped.register(ErrorInjectingTool::new(tool, error_injection_rate, seed));
+                wrapped.register(ErrorInjectingTool::new(
+                    tool,
+                    error_injection_rate,
+                    seed,
+                    Arc::clone(&cascade_state),
+                    cascade_multiplier,
+                    cascade_enabled,
+                ));
             }
             tool_registry = wrapped;
         }
@@ -248,6 +293,7 @@ impl AgentHarness {
         Ok(Self {
             runtime,
             tool_registry,
+            cascade_state,
         })
     }
 
@@ -348,6 +394,9 @@ impl AgentHarness {
         day: u32,
         history: &[providers::types::Message],
     ) -> AgentResult {
+        // Reset cascade state for this execution
+        self.cascade_state.reset();
+
         let ctx = RoutingContext::new(
             ChannelName::new("simulation".to_string()),
             ChatId::new("sim-session".to_string()),

@@ -1,6 +1,6 @@
 # Simulator Completeness Analysis
 
-## Current State (45 metrics, 7 tiers + signal coverage)
+## Current State (49 metrics, 7 tiers + signal coverage + conversation + resilience)
 
 The simulator measures system behavior across 7 tiers with baseline regression detection, checkpoint assertions, and per-epoch accumulation. All hardcoded stubs replaced with data-driven values. Coaching acceptance rate wired end-to-end. Embedding model upgraded to bge-small-en-v1.5-Q (+92% response quality). OpenAI text-embedding-3-small available as optional upgrade. Salience ground-truth validation added. Four new metrics (work_context_confidence, focus_quality_trend, budget_adherence, cross_domain_insight_rate) wired end-to-end with event emission and accumulator counting.
 
@@ -212,7 +212,13 @@ Signals the production system produces but the simulator doesn't observe:
 
 ## Structural Gaps
 
-- **Time granularity** — epochs are 1-day steps; sub-hour dynamics (focus sessions, context compression) are invisible
-- **Conversation depth** — persona generates mostly independent messages; multi-turn context building is shallow
-- **Error cascades** — 4 error types injected randomly; no cascade testing (e.g., storage timeout → extraction failure → retrieval miss)
-- **Concurrent sessions** — production runs multiple sessions across channels; simulator tests one at a time
+### Recently Resolved
+
+- **Time granularity** — ✅ `EpochStep::Minutes(u32)` added. Scenarios can use `epoch_step = "30min"` for sub-hour resolution. Daily crons still fire correctly (once per crossing). Message batching distributes day's messages across sub-day epochs.
+- **Conversation depth** — ✅ Follow-ups now reference specific prior context (70% context reference, 30% correction). Semantic drift measured via embedding cosine distance. `avg_conversation_drift` and `avg_conversation_depth` metrics added.
+
+### Remaining
+
+All structural gaps resolved:
+- ~~**Error cascades**~~ — ✅ `CascadeState` with dependency-aware injection. When root cause fires (storage/timeout), downstream tools see `cascade_multiplier` (default 3x) elevated rates. `cascade_rate` and `avg_cascade_depth` metrics added. Enable via `error_cascade_enabled = true`.
+- ~~**Concurrent sessions**~~ — ✅ `ChannelConfig` with weighted message distribution. Per-channel `ConversationTracker` instances share DB/bus/metrics. `channel_message_distribution` map tracked per epoch. Configure via `channels = [{name, message_share}]`.

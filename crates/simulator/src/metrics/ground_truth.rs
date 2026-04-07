@@ -258,6 +258,10 @@ fn get_metric_value(snapshot: &MetricSnapshot, metric: &MetricName) -> f64 {
         MetricName::McpAvailability => snapshot.mcp_availability,
         MetricName::CommunityChurnRate => snapshot.community_churn_rate,
         MetricName::DebateAvgConsensus => snapshot.debate_avg_consensus,
+        MetricName::AvgConversationDrift => snapshot.avg_conversation_drift,
+        MetricName::AvgConversationDepth => snapshot.avg_conversation_depth,
+        MetricName::CascadeRate => snapshot.cascade_rate,
+        MetricName::AvgCascadeDepth => snapshot.avg_cascade_depth,
     }
 }
 

@@ -74,6 +74,14 @@ pub struct MetricSnapshot {
     pub community_churn_rate: f64,
     pub debate_avg_consensus: f64,
     pub debate_count: u32,
+    // Conversation depth metrics
+    pub avg_conversation_drift: f64,
+    pub avg_conversation_depth: f64,
+    // Resilience metrics
+    pub cascade_rate: f64,
+    pub avg_cascade_depth: f64,
+    // Concurrency metrics
+    pub channel_message_distribution: std::collections::HashMap<String, u32>,
 }
 
 // ---------------------------------------------------------------------------
@@ -192,6 +200,16 @@ pub struct EpochAccumulator {
     pub debate_count: u32,
     pub debate_consensus_sum: f64,
     pub debate_token_cost: u64,
+    // Conversation depth
+    pub conversation_drift_sum: f64,
+    pub conversation_drift_count: u32,
+    pub conversation_depth_sum: u32,
+    pub conversation_depth_count: u32,
+    // Cascade errors
+    pub cascade_triggered: u32,
+    pub cascade_depth_sum: u32,
+    // Concurrency
+    pub channel_messages: std::collections::HashMap<String, u32>,
 }
 
 // ---------------------------------------------------------------------------
@@ -468,6 +486,29 @@ impl MetricCollector {
         };
         let debate_count = acc.debate_count;
 
+        let avg_conversation_drift = if acc.conversation_drift_count == 0 {
+            0.0
+        } else {
+            acc.conversation_drift_sum / acc.conversation_drift_count as f64
+        };
+        let avg_conversation_depth = if acc.conversation_depth_count == 0 {
+            0.0
+        } else {
+            acc.conversation_depth_sum as f64 / acc.conversation_depth_count as f64
+        };
+
+        let cascade_rate = if acc.error_injected == 0 {
+            0.0
+        } else {
+            acc.cascade_triggered as f64 / acc.error_injected as f64
+        };
+        let avg_cascade_depth = if acc.cascade_triggered == 0 {
+            0.0
+        } else {
+            acc.cascade_depth_sum as f64 / acc.cascade_triggered as f64
+        };
+        let channel_message_distribution = std::mem::take(&mut self.accumulator.channel_messages);
+
         let snap = MetricSnapshot {
             epoch,
             knowledge_retention,
@@ -512,6 +553,11 @@ impl MetricCollector {
             community_churn_rate,
             debate_avg_consensus,
             debate_count,
+            avg_conversation_drift,
+            avg_conversation_depth,
+            cascade_rate,
+            avg_cascade_depth,
+            channel_message_distribution,
             // Populated post-snapshot via update_latest_cost_and_estimation
             cost_per_outcome_usd: 0.0,
             cache_hit_rate: 0.0,

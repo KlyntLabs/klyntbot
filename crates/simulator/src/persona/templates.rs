@@ -92,6 +92,20 @@ pub const BACKREFERENCE_TEMPLATES: &[&str] = &[
     "Wait, you said {previous_context}? That's not what I expected",
 ];
 
+pub const CONTEXT_REFERENCE_TEMPLATES: &[&str] = &[
+    "Going back to what you said about {previous_context}, can you elaborate on that?",
+    "Earlier you mentioned {previous_context}. How does that relate to my {topic}?",
+    "I was thinking about your point on {previous_context}. Actually, I changed my mind about {topic}.",
+    "Remember when we discussed {previous_context}? I have a follow-up question about {topic}.",
+    "You said {previous_context} before. Does that still apply if I {action}?",
+];
+
+pub const CORRECTION_FOLLOWUP_TEMPLATES: &[&str] = &[
+    "Actually, that's not quite right. I meant {correct_value}, not what you assumed.",
+    "No, I want you to {correct_value} instead. Please correct that.",
+    "That's wrong — when I said {previous_context}, I meant {correct_value}.",
+];
+
 pub const CROSS_FEATURE_PARALLEL_TEMPLATES: &[&str] = &[
     "Create a task to {action} AND add a note about {topic}",
     "Record expense of {amount} for {category} and start a focus session",

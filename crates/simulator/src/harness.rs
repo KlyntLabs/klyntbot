@@ -9,6 +9,7 @@ use std::time::Instant;
 
 use bus::{ContextUpdateQueue, CorrectionKind, DomainEvent, DomainEventBus};
 use chrono::{Duration, TimeZone, Utc};
+use rand::{Rng, SeedableRng};
 use tokio::sync::Mutex as TokioMutex;
 use tracing::{debug, info, warn};
 use uuid::Uuid;
@@ -280,6 +281,8 @@ impl SimulationHarness {
                 max_error_injection_rate,
                 scenario.persona.seed,
                 scenario.simulation.agent_context_window,
+                scenario.simulation.error_cascade_enabled,
+                scenario.simulation.error_cascade_multiplier,
             )
             .await
             {
@@ -431,10 +434,9 @@ impl SimulationHarness {
                         ..
                     } => {
                         cc_inner.debate_count.fetch_add(1, Ordering::Relaxed);
-                        cc_inner.debate_consensus_sum_x1000.fetch_add(
-                            (*consensus_score * 1000.0) as u32,
-                            Ordering::Relaxed,
-                        );
+                        cc_inner
+                            .debate_consensus_sum_x1000
+                            .fetch_add((*consensus_score * 1000.0) as u32, Ordering::Relaxed);
                         cc_inner
                             .debate_token_cost
                             .fetch_add(*token_cost, Ordering::Relaxed);
@@ -514,6 +516,22 @@ impl SimulationHarness {
         let mut conversation_tracker = crate::persona::conversation::ConversationTracker::new(
             self.scenario.simulation.multi_turn_history_depth as usize,
         );
+        // Per-channel conversation trackers for multi-channel simulation.
+        let mut channel_trackers: HashMap<
+            String,
+            crate::persona::conversation::ConversationTracker,
+        > = HashMap::new();
+        for ch in &self.scenario.simulation.channels {
+            channel_trackers.insert(
+                ch.name.clone(),
+                crate::persona::conversation::ConversationTracker::new(
+                    self.scenario.simulation.multi_turn_history_depth as usize,
+                ),
+            );
+        }
+        let has_channels = !self.scenario.simulation.channels.is_empty();
+        let mut channel_rng =
+            rand::rngs::StdRng::seed_from_u64(self.scenario.persona.seed.wrapping_add(7777));
         let mut total_followups: u32 = 0;
         let mut total_adversarial: u32 = 0;
         let mut total_workflows: u32 = 0;
@@ -527,6 +545,12 @@ impl SimulationHarness {
             "Starting simulation"
         );
 
+        // For sub-day epochs, buffer a full day's messages and distribute
+        // them across epoch time windows.
+        let mut pending_messages: Vec<crate::persona::types::AnnotatedMessage> = Vec::new();
+        let mut current_day: u32 = 0;
+        let is_sub_day = step.is_sub_day();
+
         while let Some(plan) = epoch.advance() {
             let epoch_start = Instant::now();
             day_counter = plan.day_of_simulation;
@@ -537,10 +561,49 @@ impl SimulationHarness {
                 self.execute_cron(trigger, plan.simulated_now).await;
             }
 
-            // MESSAGE PHASE
-            let mut messages = persona_runner.generate_day(plan.simulated_now);
+            // MESSAGE PHASE — for sub-day epochs, generate once per day
+            // then distribute messages by their simulated_at timestamp.
+            let mut messages = if is_sub_day {
+                if plan.day_of_simulation > current_day {
+                    current_day = plan.day_of_simulation;
+                    pending_messages = persona_runner.generate_day(plan.simulated_now);
+                }
+                let mut epoch_msgs = Vec::new();
+                pending_messages.retain(|m| {
+                    if m.simulated_at <= plan.simulated_now {
+                        epoch_msgs.push(m.clone());
+                        false
+                    } else {
+                        true
+                    }
+                });
+                epoch_msgs
+            } else {
+                persona_runner.generate_day(plan.simulated_now)
+            };
 
             total_messages += messages.len() as u32;
+
+            // Assign channels to messages and track distribution
+            let msg_channels: Vec<String> = if has_channels {
+                messages
+                    .iter()
+                    .map(|_| {
+                        let ch =
+                            select_channel(&self.scenario.simulation.channels, &mut channel_rng);
+                        let name = ch.name.clone();
+                        *metrics
+                            .accumulator_mut()
+                            .channel_messages
+                            .entry(name.clone())
+                            .or_insert(0) += 1;
+                        name
+                    })
+                    .collect()
+            } else {
+                vec!["default".to_string(); messages.len()]
+            };
+
             // Clone trial IDs once per epoch (values only change during cron re-seeding).
             let active_id = self.active_trial_id.lock().unwrap().clone();
             let variant_id = self.variant_trial_id.lock().unwrap().clone();
@@ -548,6 +611,15 @@ impl SimulationHarness {
             let mut epoch_routing_confidence_sum = 0.0f64;
             let mut epoch_routing_fallbacks = 0u32;
             for (msg_idx, msg) in messages.iter_mut().enumerate() {
+                // Select the appropriate conversation tracker for this message's channel.
+                let active_tracker = if has_channels {
+                    channel_trackers
+                        .get_mut(&msg_channels[msg_idx])
+                        .unwrap_or(&mut conversation_tracker)
+                } else {
+                    &mut conversation_tracker
+                };
+
                 // Backfill retrieval annotations inline: annotate with
                 // previously extracted fact IDs from the same topic so
                 // retrieval precision/recall can be measured. By doing this
@@ -1000,7 +1072,7 @@ impl SimulationHarness {
 
                 // AGENT PATH: run message through real AgentRuntime
                 if let Some(ref agent) = self.agent_harness {
-                    let history = conversation_tracker.history_messages();
+                    let history = active_tracker.history_messages();
                     eprintln!("  [sim] day {day_counter} msg {msg_idx}: agent processing...");
                     // Budget-bounded execution — no external timeout wrapper needed.
                     // The safety timeout (600s) is inside the pipeline.
@@ -1219,7 +1291,18 @@ impl SimulationHarness {
 
                     // Record turn for multi-turn history
                     if agent_result.error.is_none() {
-                        conversation_tracker.record(&msg.content, &agent_result.response);
+                        active_tracker.record(&msg.content, &agent_result.response);
+
+                        // Conversation coherence measurement
+                        if let Some(ref engine) = self.embedding_engine {
+                            if let Some(drift) = active_tracker.semantic_drift(engine) {
+                                metrics.accumulator_mut().conversation_drift_sum += drift;
+                                metrics.accumulator_mut().conversation_drift_count += 1;
+                            }
+                        }
+                        metrics.accumulator_mut().conversation_depth_sum +=
+                            active_tracker.depth() as u32;
+                        metrics.accumulator_mut().conversation_depth_count += 1;
                     }
 
                     // Generate followup message referencing agent's response
@@ -1230,15 +1313,14 @@ impl SimulationHarness {
                             self.scenario.simulation.followup_rate,
                         ) {
                             total_followups += 1;
-                            let followup_history = conversation_tracker.history_messages();
+                            let followup_history = active_tracker.history_messages();
                             let followup_result = agent
                                 .process(&followup, day_counter, &followup_history)
                                 .await;
 
                             // Record followup turn
                             if followup_result.error.is_none() {
-                                conversation_tracker
-                                    .record(&followup.content, &followup_result.response);
+                                active_tracker.record(&followup.content, &followup_result.response);
                             }
 
                             // Score multi-turn coherence via embedding similarity
@@ -2443,9 +2525,34 @@ async fn flag_last_shadow_log(pool: &sqlx::SqlitePool, trial_id: &str) -> Result
     Ok(())
 }
 
+/// Select a channel by weighted random based on message_share.
+fn select_channel<'a>(
+    channels: &'a [crate::scenario::ChannelConfig],
+    rng: &mut rand::rngs::StdRng,
+) -> &'a crate::scenario::ChannelConfig {
+    let total: f64 = channels.iter().map(|c| c.message_share).sum();
+    let mut roll = rng.random::<f64>() * total;
+    for ch in channels {
+        roll -= ch.message_share;
+        if roll <= 0.0 {
+            return ch;
+        }
+    }
+    channels.last().unwrap()
+}
+
 /// Parse an epoch step string from scenario config into an `EpochStep`.
 fn parse_epoch_step(s: &str) -> EpochStep {
-    match s.to_lowercase().as_str() {
+    let s = s.trim().to_lowercase();
+    if let Some(mins) = s.strip_suffix("min") {
+        let m: u32 = mins.trim().parse().unwrap_or(30);
+        return EpochStep::Minutes(m);
+    }
+    if let Some(hours) = s.strip_suffix('h') {
+        let h: u32 = hours.trim().parse().unwrap_or(4);
+        return EpochStep::Hours(h);
+    }
+    match s.as_str() {
         "hour" | "hours" => EpochStep::Hours(4),
         "week" => EpochStep::Week,
         _ => EpochStep::Day,
@@ -2465,5 +2572,10 @@ mod tests {
         assert!(matches!(parse_epoch_step("hour"), EpochStep::Hours(4)));
         assert!(matches!(parse_epoch_step("hours"), EpochStep::Hours(4)));
         assert!(matches!(parse_epoch_step("unknown"), EpochStep::Day));
+        assert!(matches!(parse_epoch_step("30min"), EpochStep::Minutes(30)));
+        assert!(matches!(parse_epoch_step("15min"), EpochStep::Minutes(15)));
+        assert!(matches!(parse_epoch_step("5min"), EpochStep::Minutes(5)));
+        assert!(matches!(parse_epoch_step("4h"), EpochStep::Hours(4)));
+        assert!(matches!(parse_epoch_step("12h"), EpochStep::Hours(12)));
     }
 }

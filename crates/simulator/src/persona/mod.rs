@@ -11,8 +11,8 @@ use rand::rngs::StdRng;
 use rand::{Rng, SeedableRng};
 
 use templates::{
-    fill_template, pick_template, templates_for_topic, BACKREFERENCE_TEMPLATES,
-    CORRECTION_TEMPLATES, FACT_INTRODUCTION_TEMPLATES,
+    fill_template, pick_template, templates_for_topic, CORRECTION_TEMPLATES,
+    FACT_INTRODUCTION_TEMPLATES,
 };
 
 // ── PersonaRunner ─────────────────────────────────────────────────────
@@ -566,6 +566,7 @@ impl PersonaRunner {
     }
 
     /// Optionally generate a follow-up message referencing the agent's previous response.
+    /// 70% context-referencing follow-ups, 30% correction follow-ups.
     pub fn generate_followup(
         &mut self,
         agent_response: &str,
@@ -577,8 +578,48 @@ impl PersonaRunner {
         }
 
         let key_phrase = extract_key_phrase(agent_response)?;
-        let template = pick_template(BACKREFERENCE_TEMPLATES, &mut self.rng);
-        let content = fill_template(template, &[("previous_context", &key_phrase)]);
+
+        // 70% context reference, 30% correction follow-up
+        let (content, is_correction) = if self.rng.random::<f64>() < 0.7 {
+            let template = pick_template(templates::CONTEXT_REFERENCE_TEMPLATES, &mut self.rng);
+            let last_topic = self
+                .topic_history
+                .back()
+                .cloned()
+                .unwrap_or_else(|| "that".to_string());
+            let actions = [
+                "review it",
+                "change the deadline",
+                "add a note",
+                "update the task",
+            ];
+            let action = actions[self.rng.random_range(0..actions.len())];
+            let text = fill_template(
+                template,
+                &[
+                    ("previous_context", &key_phrase),
+                    ("topic", &last_topic),
+                    ("action", action),
+                ],
+            );
+            (text, false)
+        } else {
+            let template = pick_template(templates::CORRECTION_FOLLOWUP_TEMPLATES, &mut self.rng);
+            let correct_values = [
+                "the updated version",
+                "next Monday instead",
+                "the other project",
+            ];
+            let correct_value = correct_values[self.rng.random_range(0..correct_values.len())];
+            let text = fill_template(
+                template,
+                &[
+                    ("previous_context", &key_phrase),
+                    ("correct_value", correct_value),
+                ],
+            );
+            (text, true)
+        };
 
         Some(AnnotatedMessage {
             content,
@@ -586,7 +627,7 @@ impl PersonaRunner {
             simulated_at,
             ground_truth: None,
             tool_actions: vec![],
-            is_correction: false,
+            is_correction,
             topic: "followup".to_string(),
             is_followup: true,
             workflow: None,
