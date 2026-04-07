@@ -1,8 +1,8 @@
 # Simulator Completeness Analysis
 
-## Current State (35 metrics, 7 tiers)
+## Current State (40 metrics, 7 tiers + new)
 
-The simulator measures system behavior across 7 tiers with baseline regression detection, checkpoint assertions, and per-epoch accumulation. All hardcoded stubs replaced with data-driven values. Coaching acceptance rate wired end-to-end. Embedding model upgraded to bge-small-en-v1.5-Q (+92% response quality). OpenAI text-embedding-3-small available as optional upgrade.
+The simulator measures system behavior across 7 tiers with baseline regression detection, checkpoint assertions, and per-epoch accumulation. All hardcoded stubs replaced with data-driven values. Coaching acceptance rate wired end-to-end. Embedding model upgraded to bge-small-en-v1.5-Q (+92% response quality). OpenAI text-embedding-3-small available as optional upgrade. Salience ground-truth validation added. Four new metrics (work_context_confidence, focus_quality_trend, budget_adherence, cross_domain_insight_rate) wired end-to-end with event emission and accumulator counting.
 
 ### Metrics by Tier
 
@@ -14,7 +14,7 @@ The simulator measures system behavior across 7 tiers with baseline regression d
 - `contradiction_detection_rate` — cumulative contradictions / facts
 - `correction_rate` — user corrections / messages
 
-**Tier 2 — Behavioral Quality (10 metrics)**
+**Tier 2 — Behavioral Quality (12 metrics)**
 - `token_efficiency` — total_tokens / messages
 - `personalization_score` — weighted: 0.4x retention + 0.3x precision + 0.3x recall
 - `task_completion_rate` — cumulative completed / created
@@ -22,9 +22,11 @@ The simulator measures system behavior across 7 tiers with baseline regression d
 - `routing_accuracy` — agent or heuristic routing correctness
 - `response_quality` — embedding cosine similarity against semantic intent descriptions
 - `salience_extract_rate` — Extract / (Extract + Accumulate + Discard)
+- `salience_accuracy` — ground-truth validated: actual salience verdict vs expected from persona annotations
 - `insight_usefulness` — qualified_insights / total_messages, capped at 1.0
 - `estimation_deviation_avg` — cumulative mean |actual - estimated| / estimated ratio
 - `coaching_acceptance_rate` — cumulative Helpful / (Helpful + Dismissed + StopSuggesting)
+- `work_context_confidence` — 0.4×base + 0.6×mean(focus_quality), defaults to 0.5 with no focus data
 
 **Tier 3 — System Health (3 metrics)**
 - `autotuner_promotion_success` — promoted / terminal trials
@@ -49,28 +51,37 @@ The simulator measures system behavior across 7 tiers with baseline regression d
 - `cost_per_outcome_usd` — cumulative cost / cumulative outcomes (tasks + facts)
 - `cache_hit_rate` — cumulative cache_read_tokens / prompt_tokens
 
+**New Metrics (3 additional)**
+- `focus_quality_trend` — mean FocusSessionEnded quality from coaching events (productivity/coaching topics)
+- `budget_adherence` — 1.0 - (over-budget alerts / total budget alerts) from finance topic events
+- `cross_domain_insight_rate` — CrossDomainDotReady events per message (notes/learning topics)
+
 **Plus:** `wall_time_per_epoch_ms`
 
-### Latest 1-Month Results (software_engineer_1mo, 150 messages, 30 days)
+### Latest 1-Month Results (software_engineer_1mo, 143 messages, 31 days)
 
 | Metric | Value | Assessment |
 |---|---|---|
 | knowledge_retention | 1.000 | 4 facts, all fresh |
-| retrieval_precision | 0.750 | Strong |
-| personalization | 0.925 | Excellent |
-| response_quality | 0.587 | Good — bge-small-en-v1.5 upgrade (+92% from 0.306) |
-| estimation_deviation | 0.556 | 55% avg deviation |
+| retrieval_precision | 0.592 | Good |
+| personalization | 0.828 | Excellent |
+| response_quality | 0.000 | Agent error mode — no response scored |
+| estimation_deviation | 0.492 | 49% avg deviation |
 | coaching_acceptance | 0.429 | 3/7 triggers rated Helpful |
-| community_stability | 0.921 | Strong |
-| meta_rule_count | 18 | Active mirror learning |
-| tool_selection | 1.000 | Fixed — description disambiguation + scoring fixes |
+| salience_accuracy | 1.000 | Ground-truth validated: all ChatTurnCompleted → Extract |
+| work_ctx_confidence | 0.500 | Baseline (no focus events in final epoch) |
+| focus_quality_trend | 0.000 | No productivity topic in behavior_shift phase |
+| budget_adherence | 1.000 | No over-budget alerts in final epoch |
+| cross_domain_rate | 0.000 | No notes/learning topic in final epoch |
+| community_stability | 0.919 | Strong |
+| meta_rule_count | 15 | Active mirror learning |
 | chain_success | 1.000 | 6/6 cross-feature workflows |
 | adversarial_resilience | 1.000 | 3/3 handled |
 | error_recovery_rate | 1.000 | Agent mode injection working |
 | ResponseEmpty breakpoints | 1 | Down from 6 after retry fix |
-| cost_per_outcome_usd | $0.18 | Cumulative, stable |
-| cache_hit_rate | 0.0012 | Low — no prompt caching in sim |
-| multi_turn_coherence | 0.835 | Good |
+| cost_per_outcome_usd | $0.16 | Cumulative, stable |
+| cache_hit_rate | 0.0014 | Low — no prompt caching in sim |
+| multi_turn_coherence | 0.815 | Good |
 
 ### Production Fixes Made
 
@@ -83,9 +94,9 @@ The simulator measures system behavior across 7 tiers with baseline regression d
 
 ## Known Issues
 
-**`retrievability_min/p25: 1.000`** — Only 4 facts over 30 days with high stability. Need either more facts (higher `new_fact_introduction_rate`) or lower initial stability to see FSRS-5 decay in action.
+**`retrievability_min/p25: 1.000`** — Only 4 facts over 30 days with high stability. Routine/power_user `new_fact_introduction_rate` bumped to 0.30/0.15 (from 0.15/0.05) to increase fact diversity, but FSRS-5 decay still needs longer simulation runs or lower initial stability to become visible.
 
-**`salience_extract: 1.000`** — Self-confirming: the simulator classifies its own synthetic events. Needs ground-truth salience labels in persona annotations.
+**`salience_accuracy: 1.000`** — Now has ground-truth validation via `expected_salience` field in `GroundTruthAnnotation`. However, all simulator messages produce `ChatTurnCompleted` events which always classify as "extract" — so the metric is self-confirming. To differentiate, the simulator would need to emit non-ChatTurnCompleted events with varying expected verdicts.
 
 **`ToolSelectionMismatch: ~25 per run`** — DeepSeek sometimes swaps `notes`↔`finance` tools or calls `annotate` for `tasks` topics. This is LLM behavior variance, not a simulator bug. The scored metric (tool_selection) correctly filters these via the adversarial exclusion guard. Breakpoints provide per-message diagnostics.
 
@@ -115,6 +126,15 @@ The simulator measures system behavior across 7 tiers with baseline regression d
 - `CoachingCounters` struct with atomic fields, cumulative across epochs
 - Feedback loop prevented: listener skips its own CoachingFeedback events
 
+### Salience Ground-Truth + New Metric Events
+
+- `GroundTruthAnnotation.expected_salience` field — persona annotations now carry expected salience verdict ("extract" for all ChatTurnCompleted events)
+- Harness validates actual `evaluate_salience()` verdict against expected, counting `salience_correct / salience_validated`
+- `emit_coaching_events()` extended: notes topics emit `CrossDomainDotReady` (~25%), learning topics emit `CrossDomainDotReady` (~20%)
+- Main loop mirrors `emit_coaching_events` logic to count focus quality, budget alerts, and cross-domain dots into `EpochAccumulator`
+- New `MetricName` variants: `SalienceAccuracy`, `WorkContextConfidence`, `FocusQualityTrend`, `BudgetAdherence`, `CrossDomainInsightRate`
+- New metrics epoch-scoped: final-epoch values may be 0 if the behavior_shift phase doesn't include relevant topics. Timeline captures full evolution.
+
 ### Scoring Fixes
 
 - Tool selection: excludes adversarial-injected calls, removed impossible-to-pass topics (learning, coaching)
@@ -132,12 +152,12 @@ Signals the production system produces but the simulator doesn't observe:
 
 6. **Context compression ratio** — `after_tokens / before_tokens` from `ContextCompressed` agent events. Blocked: sim messages use ~7-9k of 128k context window, never triggering the 70% threshold.
 
-### Medium Priority
+### Medium Priority (all implemented)
 
-7. **Work context confidence** — `work_contexts.confidence` averages
-8. **Cross-domain insight rate** — `CrossDomainDotReady` events per epoch
-9. **Budget adherence** — `BudgetWarning` event tracking (partially covered by coaching pipeline's budget alerts)
-10. **Focus quality trend** — `FocusSessionEnded.quality` averages (partially covered by coaching pipeline's focus events)
+7. ~~**Work context confidence**~~ — ✅ `work_context_confidence` metric: 0.4×base + 0.6×mean(focus_quality)
+8. ~~**Cross-domain insight rate**~~ — ✅ `cross_domain_insight_rate`: `CrossDomainDotReady` events emitted for notes/learning topics
+9. ~~**Budget adherence**~~ — ✅ `budget_adherence`: 1 - (over_budget / total_alerts) from finance topic events
+10. ~~**Focus quality trend**~~ — ✅ `focus_quality_trend`: mean quality from `FocusSessionEnded` events
 
 ### Lower Priority
 

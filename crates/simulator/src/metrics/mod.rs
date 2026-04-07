@@ -60,6 +60,13 @@ pub struct MetricSnapshot {
     // Tier 2 — behavioral quality (extended)
     pub estimation_deviation_avg: f64,
     pub coaching_acceptance_rate: f64,
+    // Salience ground-truth
+    pub salience_accuracy: f64,
+    // New metrics
+    pub work_context_confidence: f64,
+    pub focus_quality_trend: f64,
+    pub budget_adherence: f64,
+    pub cross_domain_insight_rate: f64,
 }
 
 // ---------------------------------------------------------------------------
@@ -154,6 +161,17 @@ pub struct EpochAccumulator {
     pub coaching_helpful: u32,
     pub coaching_dismissed: u32,
     pub coaching_stop: u32,
+    // Salience ground-truth validation
+    pub salience_correct: u32,
+    pub salience_validated: u32,
+    // Work context confidence (proxy from focus quality)
+    pub focus_quality_sum: f64,
+    pub focus_quality_count: u32,
+    // Budget adherence
+    pub budget_alerts: u32,
+    pub budget_alerts_over: u32,
+    // Cross-domain insights
+    pub cross_domain_dots: u32,
 }
 
 // ---------------------------------------------------------------------------
@@ -369,6 +387,32 @@ impl MetricCollector {
             self.cumulative_coaching_helpful as f64 / coaching_total as f64
         };
 
+        let salience_accuracy = if acc.salience_validated == 0 {
+            0.0
+        } else {
+            acc.salience_correct as f64 / acc.salience_validated as f64
+        };
+
+        let focus_quality_trend = if acc.focus_quality_count == 0 {
+            0.0
+        } else {
+            acc.focus_quality_sum / acc.focus_quality_count as f64
+        };
+
+        let work_context_confidence = if acc.focus_quality_count == 0 {
+            0.5
+        } else {
+            0.4 * 0.5 + 0.6 * (acc.focus_quality_sum / acc.focus_quality_count as f64)
+        };
+
+        let budget_adherence = if acc.budget_alerts == 0 {
+            1.0
+        } else {
+            1.0 - (acc.budget_alerts_over as f64 / acc.budget_alerts as f64)
+        };
+
+        let cross_domain_insight_rate = acc.cross_domain_dots as f64 / msgs;
+
         let snap = MetricSnapshot {
             epoch,
             knowledge_retention,
@@ -401,6 +445,11 @@ impl MetricCollector {
             meta_rule_count: 0,
             wall_time_per_epoch_ms: wall_time_ms,
             coaching_acceptance_rate,
+            salience_accuracy,
+            work_context_confidence,
+            focus_quality_trend,
+            budget_adherence,
+            cross_domain_insight_rate,
             // Populated post-snapshot via update_latest_cost_and_estimation
             cost_per_outcome_usd: 0.0,
             cache_hit_rate: 0.0,

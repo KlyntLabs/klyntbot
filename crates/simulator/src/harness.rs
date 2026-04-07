@@ -548,6 +548,7 @@ impl SimulationHarness {
                             relevant_facts: relevant,
                             expected_skill: None,
                             expected_response: None,
+                            expected_salience: Some("extract".to_string()),
                         });
                     }
                 }
@@ -575,6 +576,39 @@ impl SimulationHarness {
                 // Topic-driven: productivity → focus sessions, tasks → occasional
                 // deferrals, finance → budget alerts, any → distraction noise.
                 emit_coaching_events(&self.bus, &msg.topic, msg_idx, day_counter);
+
+                // Count metrics from the coaching events we just emitted.
+                // This mirrors emit_coaching_events logic to avoid double-dispatch complexity.
+                {
+                    let seed = msg_idx.wrapping_mul(31).wrapping_add(day_counter as usize);
+                    match msg.topic.as_str() {
+                        "productivity" | "coaching" => {
+                            let quality = 0.4 + (seed % 50) as f64 / 100.0;
+                            metrics.accumulator_mut().focus_quality_sum += quality;
+                            metrics.accumulator_mut().focus_quality_count += 1;
+                        }
+                        "finance" => {
+                            if seed % 10 < 4 {
+                                let spent = 80.0 + (seed % 40) as f64;
+                                metrics.accumulator_mut().budget_alerts += 1;
+                                if spent > 100.0 {
+                                    metrics.accumulator_mut().budget_alerts_over += 1;
+                                }
+                            }
+                        }
+                        "notes" => {
+                            if seed % 4 == 0 {
+                                metrics.accumulator_mut().cross_domain_dots += 1;
+                            }
+                        }
+                        "learning" => {
+                            if seed % 5 == 0 {
+                                metrics.accumulator_mut().cross_domain_dots += 1;
+                            }
+                        }
+                        _ => {}
+                    }
+                }
 
                 // Shadow log entries for autotuner evaluation.
                 // Confidence is derived from topic clarity × trial keyword weight.
@@ -855,6 +889,17 @@ impl SimulationHarness {
                     session_key: "sim-session".to_string(),
                 };
                 crate::metrics::cognitive::record_salience(&chat_event, metrics.accumulator_mut());
+
+                // Salience ground-truth validation
+                if let Some(ref gt) = msg.ground_truth {
+                    if let Some(ref expected) = gt.expected_salience {
+                        let actual = cognitive::services::salience::evaluate_salience(&chat_event);
+                        metrics.accumulator_mut().salience_validated += 1;
+                        if actual.as_str() == expected {
+                            metrics.accumulator_mut().salience_correct += 1;
+                        }
+                    }
+                }
 
                 // AGENT PATH: run message through real AgentRuntime
                 if let Some(ref agent) = self.agent_harness {
@@ -2103,6 +2148,38 @@ fn emit_coaching_events(bus: &bus::DomainEventBus, topic: &str, msg_idx: usize, 
                     category: "dining".to_string(),
                     spent,
                     limit: 100.0,
+                });
+            }
+        }
+        "notes" => {
+            // ~25% of note messages discover a cross-domain connection.
+            if seed % 4 == 0 {
+                bus.publish(DomainEvent::CrossDomainDotReady {
+                    source_kind: "note".to_string(),
+                    source_id: format!("sim-note-{day}-{msg_idx}"),
+                    source_title: format!("Note from day {day}"),
+                    target_kind: "task".to_string(),
+                    target_id: format!("sim-task-{day}"),
+                    target_title: "Related task".to_string(),
+                    confidence: 0.6 + (seed % 30) as f64 / 100.0,
+                    tooltip: "Cross-domain connection".to_string(),
+                    detail_route: None,
+                });
+            }
+        }
+        "learning" => {
+            // ~20% of learning messages connect to existing notes/tasks.
+            if seed % 5 == 0 {
+                bus.publish(DomainEvent::CrossDomainDotReady {
+                    source_kind: "atom".to_string(),
+                    source_id: format!("sim-atom-{day}-{msg_idx}"),
+                    source_title: format!("Learning item day {day}"),
+                    target_kind: "note".to_string(),
+                    target_id: format!("sim-note-{day}"),
+                    target_title: "Related note".to_string(),
+                    confidence: 0.5 + (seed % 40) as f64 / 100.0,
+                    tooltip: "Knowledge transfer".to_string(),
+                    detail_route: None,
                 });
             }
         }

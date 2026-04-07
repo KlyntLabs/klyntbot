@@ -248,6 +248,11 @@ fn get_metric_value(snapshot: &MetricSnapshot, metric: &MetricName) -> f64 {
         MetricName::RetrievabilityP25 => snapshot.retrievability_p25,
         MetricName::EstimationDeviationAvg => snapshot.estimation_deviation_avg,
         MetricName::CoachingAcceptanceRate => snapshot.coaching_acceptance_rate,
+        MetricName::SalienceAccuracy => snapshot.salience_accuracy,
+        MetricName::WorkContextConfidence => snapshot.work_context_confidence,
+        MetricName::FocusQualityTrend => snapshot.focus_quality_trend,
+        MetricName::BudgetAdherence => snapshot.budget_adherence,
+        MetricName::CrossDomainInsightRate => snapshot.cross_domain_insight_rate,
     }
 }
 
@@ -316,6 +321,17 @@ mod tests {
         );
         assert!((get_metric_value(&snap, &MetricName::CommunityStability) - 0.65).abs() < 1e-9);
         assert!((get_metric_value(&snap, &MetricName::BrainVersionVelocity) - 3.0).abs() < 1e-9);
+        assert_eq!(get_metric_value(&snap, &MetricName::SalienceAccuracy), 0.0);
+        assert_eq!(
+            get_metric_value(&snap, &MetricName::WorkContextConfidence),
+            0.0
+        );
+        assert_eq!(get_metric_value(&snap, &MetricName::FocusQualityTrend), 0.0);
+        assert_eq!(get_metric_value(&snap, &MetricName::BudgetAdherence), 0.0);
+        assert_eq!(
+            get_metric_value(&snap, &MetricName::CrossDomainInsightRate),
+            0.0
+        );
     }
 
     #[test]

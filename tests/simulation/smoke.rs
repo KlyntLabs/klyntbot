@@ -616,6 +616,19 @@ async fn run_software_engineer_1mo() {
         "    Coaching acceptance:  {:.3}",
         fm.coaching_acceptance_rate
     );
+    eprintln!("    Salience accuracy:    {:.3}", fm.salience_accuracy);
+    eprintln!();
+    eprintln!("  NEW METRICS");
+    eprintln!(
+        "    Work ctx confidence:  {:.3}",
+        fm.work_context_confidence
+    );
+    eprintln!("    Focus quality trend:  {:.3}", fm.focus_quality_trend);
+    eprintln!("    Budget adherence:     {:.3}", fm.budget_adherence);
+    eprintln!(
+        "    Cross-domain rate:    {:.3}",
+        fm.cross_domain_insight_rate
+    );
     eprintln!();
     eprintln!("  TIER 3 — System Health");
     eprintln!("    Community stability:  {:.3}", fm.community_stability);
@@ -708,6 +721,19 @@ async fn run_agent_validation_1week() {
     eprintln!(
         "    Coaching acceptance:   {:.3}",
         fm.coaching_acceptance_rate
+    );
+    eprintln!("    Salience accuracy:    {:.3}", fm.salience_accuracy);
+    eprintln!();
+    eprintln!("  NEW METRICS");
+    eprintln!(
+        "    Work ctx confidence:  {:.3}",
+        fm.work_context_confidence
+    );
+    eprintln!("    Focus quality trend:  {:.3}", fm.focus_quality_trend);
+    eprintln!("    Budget adherence:     {:.3}", fm.budget_adherence);
+    eprintln!(
+        "    Cross-domain rate:    {:.3}",
+        fm.cross_domain_insight_rate
     );
     eprintln!();
     eprintln!("  TIER 3 — System Health");

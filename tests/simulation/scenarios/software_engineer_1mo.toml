@@ -28,14 +28,14 @@ tool_action_rate = 0.5
 duration_days = 8
 correction_rate = 0.10
 topic_weights = { tasks = 0.3, notes = 0.2, finance = 0.2, productivity = 0.2, chat = 0.1 }
-new_fact_introduction_rate = 0.15
+new_fact_introduction_rate = 0.30
 tool_action_rate = 0.6
 
 [persona.phases.power_user]
 duration_days = 8
 correction_rate = 0.05
 topic_weights = { tasks = 0.15, notes = 0.10, finance = 0.10, productivity = 0.10, cross_feature_parallel = 0.15, cross_feature_sequential = 0.10, automation = 0.10, chat = 0.10, learning = 0.05, coaching = 0.05 }
-new_fact_introduction_rate = 0.05
+new_fact_introduction_rate = 0.15
 tool_action_rate = 0.7
 adversarial_rate = 0.10
 error_injection_rate = 0.05

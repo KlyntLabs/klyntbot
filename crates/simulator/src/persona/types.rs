@@ -111,6 +111,10 @@ pub struct GroundTruthAnnotation {
     pub expected_skill: Option<String>,
     #[serde(default)]
     pub expected_response: Option<String>,
+    /// Expected salience verdict for the ChatTurnCompleted event from this message.
+    /// "extract" for messages introducing facts or corrections, "accumulate" for routine tool use, "discard" for pure chat.
+    #[serde(default)]
+    pub expected_salience: Option<String>,
 }
 
 // ── Simulated tool actions ─────────────────────────────────────────────

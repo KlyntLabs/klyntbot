@@ -157,6 +157,12 @@ pub enum MetricName {
     RetrievabilityP25,
     EstimationDeviationAvg,
     CoachingAcceptanceRate,
+    // New metrics
+    SalienceAccuracy,
+    WorkContextConfidence,
+    FocusQualityTrend,
+    BudgetAdherence,
+    CrossDomainInsightRate,
 }
 
 // ── Checkpoint assertions ──────────────────────────────────────────────

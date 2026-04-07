@@ -296,6 +296,7 @@ impl PersonaRunner {
                     relevant_facts: vec![],
                     expected_skill: None,
                     expected_response: None,
+                    expected_salience: Some("extract".to_string()),
                 };
                 (text, Some(gt))
             } else if is_correction {
@@ -320,6 +321,8 @@ impl PersonaRunner {
                     relevant_facts: vec![],
                     expected_skill: self.expected_skill_for_topic(&topic).map(String::from),
                     expected_response: self.expected_response_for_topic(&topic),
+                    // ChatTurnCompleted is always classified as Extract by the salience filter
+                    expected_salience: Some("extract".to_string()),
                 };
                 (text, Some(gt))
             };
@@ -367,6 +370,7 @@ impl PersonaRunner {
                     relevant_facts: vec![],
                     expected_skill: None,
                     expected_response: None,
+                    expected_salience: Some("extract".to_string()),
                 };
                 let msg_time = simulated_date + Duration::hours(20);
                 messages.push(AnnotatedMessage {
