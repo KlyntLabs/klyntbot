@@ -14,6 +14,11 @@ impl EpisodicMemoryRepo {
         Self { pool }
     }
 
+    /// Access the underlying SQLite connection pool.
+    pub fn pool(&self) -> &SqlitePool {
+        &self.pool
+    }
+
     /// Insert a new episodic memory.
     pub async fn insert(&self, mem: &EpisodicMemory) -> Result<(), sqlx::Error> {
         sqlx::query(

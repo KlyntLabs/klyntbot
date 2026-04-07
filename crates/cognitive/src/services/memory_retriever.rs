@@ -9,8 +9,9 @@ use tracing::warn;
 use crate::context_source::CognitiveRetrievalConfig;
 use crate::conversation_recall::ConversationRecallService;
 use crate::embedder::SemanticFactEmbedder;
-use crate::repos::{SemanticFactRepo, USER_MODEL_DOMAINS};
+use crate::repos::{EpisodicMemoryRepo, SemanticFactRepo, USER_MODEL_DOMAINS};
 use crate::retrieval::{retrieve_relevant_facts, RetrievalParams, ScoredFact};
+use crate::search::bm25::search_episodic_memories;
 use crate::situation::UserSituation;
 
 /// RRF constant — same as used in retrieval.rs BM25 merge.
@@ -26,6 +27,7 @@ pub struct UnifiedMemoryService {
     recall: Option<Arc<ConversationRecallService>>,
     fact_repo: SemanticFactRepo,
     embedder: Option<Arc<dyn SemanticFactEmbedder>>,
+    episodic_repo: Option<EpisodicMemoryRepo>,
     config: CognitiveRetrievalConfig,
     situation: Option<Arc<Mutex<UserSituation>>>,
     /// Live champion params from the autotuner. Read on each retrieval to override
@@ -39,6 +41,7 @@ impl UnifiedMemoryService {
             recall: None,
             fact_repo,
             embedder: None,
+            episodic_repo: None,
             config: CognitiveRetrievalConfig::default(),
             situation: None,
             champion_overrides: None,
@@ -47,6 +50,11 @@ impl UnifiedMemoryService {
 
     pub fn with_recall_opt(mut self, recall: Option<Arc<ConversationRecallService>>) -> Self {
         self.recall = recall;
+        self
+    }
+
+    pub fn with_episodic_repo(mut self, repo: EpisodicMemoryRepo) -> Self {
+        self.episodic_repo = Some(repo);
         self
     }
 
@@ -306,18 +314,62 @@ impl UnifiedMemoryService {
             }
         }
     }
+
+    /// Fetch recent episodic memories matching the query via FTS5 BM25.
+    async fn fetch_episodes(&self, query: &str, limit: usize) -> Vec<(String, f64, String)> {
+        let Some(ref repo) = self.episodic_repo else {
+            return Vec::new();
+        };
+        if query.is_empty() {
+            return Vec::new();
+        }
+
+        let pool = repo.pool();
+        match search_episodic_memories(pool, query, None, limit).await {
+            Ok(results) => {
+                let mut entries = Vec::with_capacity(results.len());
+                for bm25 in &results {
+                    // Load full content — prefer summary over raw content.
+                    let row: Option<(String, Option<String>)> = sqlx::query_as(
+                        "SELECT content, summary FROM episodic_memories WHERE id = ?",
+                    )
+                    .bind(&bm25.id)
+                    .fetch_optional(pool)
+                    .await
+                    .ok()
+                    .flatten();
+
+                    if let Some((content, summary)) = row {
+                        let text = summary.unwrap_or(content);
+                        let display = if text.len() > 200 {
+                            format!("{}...", &text[..text.floor_char_boundary(200)])
+                        } else {
+                            text
+                        };
+                        entries.push((bm25.id.clone(), bm25.score, display));
+                    }
+                }
+                entries
+            }
+            Err(e) => {
+                warn!("Episodic BM25 search failed: {e}");
+                Vec::new()
+            }
+        }
+    }
 }
 
 #[async_trait]
 impl MemoryRetriever for UnifiedMemoryService {
     async fn retrieve(&self, query: &str, limit: usize) -> Vec<MemoryEntry> {
         // 1. Fetch concurrently
-        let (facts_raw, recalls_raw) = tokio::join!(
+        let (facts_raw, recalls_raw, episodes_raw) = tokio::join!(
             self.fetch_facts(query, limit),
-            self.fetch_recalls(query, limit)
+            self.fetch_recalls(query, limit),
+            self.fetch_episodes(query, 5)
         );
 
-        if facts_raw.is_empty() && recalls_raw.is_empty() {
+        if facts_raw.is_empty() && recalls_raw.is_empty() && episodes_raw.is_empty() {
             return Vec::new();
         }
 
@@ -338,7 +390,7 @@ impl MemoryRetriever for UnifiedMemoryService {
         };
 
         // 4. RRF merge — rank-based scoring, no pre-normalization needed
-        let capacity = facts_raw.len() + recalls_deduped.len();
+        let capacity = facts_raw.len() + recalls_deduped.len() + episodes_raw.len();
         let mut rrf_scores: HashMap<String, (f64, String, MemorySource, f64)> =
             HashMap::with_capacity(capacity);
 
@@ -359,6 +411,17 @@ impl MemoryRetriever for UnifiedMemoryService {
                 0.0,
                 content.clone(),
                 MemorySource::ConversationRecall,
+                *raw_score,
+            ));
+            entry.0 += rrf;
+        }
+
+        for (rank, (id, raw_score, content)) in episodes_raw.iter().enumerate() {
+            let rrf = 1.0 / (RRF_K + rank as f64 + 1.0);
+            let entry = rrf_scores.entry(id.clone()).or_insert((
+                0.0,
+                content.clone(),
+                MemorySource::EpisodicMemory,
                 *raw_score,
             ));
             entry.0 += rrf;

@@ -667,6 +667,10 @@ impl AgentLoopBuilder {
             let mut retriever = cognitive::UnifiedMemoryService::new(fact_repo)
                 .with_recall_opt(recall_service.clone())
                 .with_embedder_opt(cognitive_embedder);
+            if let Some(ref pool) = self.pool {
+                retriever =
+                    retriever.with_episodic_repo(cognitive::EpisodicMemoryRepo::new(pool.clone()));
+            }
             if let Some(cfg) = cognitive_retrieval_config {
                 retriever = retriever.with_config(cfg);
             }
