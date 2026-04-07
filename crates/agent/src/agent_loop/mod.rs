@@ -82,6 +82,9 @@ pub struct AgentLoop {
     /// Wrapped in Mutex so `shutdown(&self)` can take ownership for graceful stop.
     pub(crate) cognitive_bg_service:
         tokio::sync::Mutex<Option<cognitive::background::BackgroundConsolidationService>>,
+    /// Background session memory service (per-session scratchpad maintenance).
+    /// Stored to prevent drop which would cancel the background task.
+    pub(crate) _session_memory_service: Option<cognitive::SessionMemoryService>,
     /// Cancellation token for the work context inference loop.
     pub(crate) _inference_loop_token: Option<CancellationToken>,
     /// Parent cancellation token for all tree builder subscriber tasks.
@@ -416,6 +419,11 @@ impl AgentLoop {
         // Stop the cognitive background consolidation service (cancels + awaits JoinHandle)
         if let Some(mut svc) = self.cognitive_bg_service.lock().await.take() {
             svc.stop().await;
+        }
+
+        // Stop the session memory service
+        if let Some(ref svc) = self._session_memory_service {
+            svc.shutdown();
         }
 
         // Disconnect MCP servers (cleanly terminates child processes)

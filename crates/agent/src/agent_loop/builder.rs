@@ -30,7 +30,8 @@ use tools_core::FeaturePackage;
 
 use super::super::context_sources::{
     AreaSource, BootstrapSource, IdentitySource, PageContextSource, PersonaContextSource,
-    ProductivityContextSource, ProjectContextSource, SessionContextSource, TodoSource,
+    ProductivityContextSource, ProjectContextSource, SessionContextSource,
+    SessionMemoryContextSource, TodoSource,
 };
 use super::super::{CronHandlerAdapter, SubagentManager};
 use super::{AgentLoop, LastActiveChannel};
@@ -285,6 +286,9 @@ impl AgentLoopBuilder {
             )),
             Box::new(BootstrapSource::new(workspace.clone())),
             Box::new(SessionContextSource::new(repos.clone())),
+            Box::new(SessionMemoryContextSource::new(
+                storage::SessionMemoryRepo::new(storage_pool.inner().clone()),
+            )),
             Box::new(AreaSource::new(repos.areas.clone())),
             Box::new(TodoSource::new(repos.tasks.clone())),
             Box::new(PersonaContextSource::new(
@@ -436,6 +440,25 @@ impl AgentLoopBuilder {
                 } else {
                     None
                 }
+            } else {
+                None
+            };
+
+        // ── Session memory service (per-session scratchpad maintenance) ─────
+        let session_memory_service: Option<cognitive::SessionMemoryService> =
+            if let (Some(ref pool), Some(ref domain_bus)) =
+                (&self.pool, &self.domain_event_bus)
+            {
+                let cancel = CancellationToken::new();
+                let svc = cognitive::SessionMemoryService::start(cognitive::SessionMemoryConfig {
+                    event_rx: domain_bus.subscribe(),
+                    session_repo: storage::SessionRepo::new(pool.clone()),
+                    memory_repo: storage::SessionMemoryRepo::new(pool.clone()),
+                    provider: self.cognitive_provider.clone(),
+                    cancel,
+                });
+                info!("Session memory service started");
+                Some(svc)
             } else {
                 None
             };
@@ -1716,6 +1739,7 @@ impl AgentLoopBuilder {
                 None
             },
             cognitive_bg_service: tokio::sync::Mutex::new(cognitive_bg_service),
+            _session_memory_service: session_memory_service,
             _inference_loop_token,
             _tree_builder_token: tree_builder_token,
             activity_svc: self.activity_svc,

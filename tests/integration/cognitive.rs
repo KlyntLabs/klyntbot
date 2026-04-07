@@ -456,6 +456,7 @@ async fn test_batch_pipeline_processes_domain_events_end_to_end() {
             min_days: 2,
             domain_bus: None,
             context_update_queue: None,
+            session_repo: None,
         },
     );
 
