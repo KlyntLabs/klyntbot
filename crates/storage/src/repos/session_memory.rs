@@ -60,6 +60,17 @@ impl SessionMemoryRepo {
             .await?;
         Ok(())
     }
+
+    /// Delete session memory entries not updated within `days` days.
+    /// Returns the number of rows removed.
+    pub async fn delete_older_than(&self, days: i64) -> Result<u64, StorageError> {
+        let cutoff = (chrono::Utc::now() - chrono::Duration::days(days)).to_rfc3339();
+        let result = sqlx::query("DELETE FROM session_memory WHERE updated_at < ?1")
+            .bind(&cutoff)
+            .execute(&self.pool)
+            .await?;
+        Ok(result.rows_affected())
+    }
 }
 
 #[cfg(test)]
@@ -110,5 +121,42 @@ mod tests {
         repo.upsert("test-session", "content", 1).await.unwrap();
         repo.delete("test-session").await.unwrap();
         assert!(repo.get("test-session").await.unwrap().is_none());
+    }
+
+    #[tokio::test]
+    async fn delete_older_than_removes_stale_entries() {
+        let pool = crate::StoragePool::connect_in_memory().await.unwrap();
+        let inner = pool.inner().clone();
+
+        // Create sessions for FK constraint
+        sqlx::query("INSERT INTO sessions (key) VALUES ('old-session')")
+            .execute(&inner)
+            .await
+            .unwrap();
+        sqlx::query("INSERT INTO sessions (key) VALUES ('recent-session')")
+            .execute(&inner)
+            .await
+            .unwrap();
+
+        // Insert an old session memory directly with an old updated_at
+        sqlx::query(
+            "INSERT INTO session_memory (session_key, content, turn_count, updated_at) \
+             VALUES ('old-session', 'old content', 1, '2020-01-01T00:00:00Z')",
+        )
+        .execute(&inner)
+        .await
+        .unwrap();
+
+        // Insert a recent session memory (should not be deleted)
+        let repo = SessionMemoryRepo::new(inner);
+        repo.upsert("recent-session", "recent content", 3)
+            .await
+            .unwrap();
+
+        let deleted = repo.delete_older_than(90).await.unwrap();
+        assert_eq!(deleted, 1);
+
+        assert!(repo.get("old-session").await.unwrap().is_none());
+        assert!(repo.get("recent-session").await.unwrap().is_some());
     }
 }

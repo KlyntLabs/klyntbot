@@ -123,6 +123,17 @@ impl FailedObservationRepo {
         row.0
     }
 
+    /// Delete observations older than `days` days (by `created_at`).
+    /// Returns the number of rows removed.
+    pub async fn delete_older_than(&self, days: i64) -> Result<u64, sqlx::Error> {
+        let cutoff = (chrono::Utc::now() - chrono::Duration::days(days)).to_rfc3339();
+        let result = sqlx::query("DELETE FROM failed_observations WHERE created_at < ?1")
+            .bind(&cutoff)
+            .execute(&self.pool)
+            .await?;
+        Ok(result.rows_affected())
+    }
+
     /// Delete observations that have exhausted all retries.
     /// Returns the number of rows removed.
     pub async fn cleanup_permanently_failed(&self) -> u64 {
@@ -280,6 +291,34 @@ mod tests {
 
         assert_eq!(repo.count_permanently_failed().await, 1);
         assert_eq!(repo.count_pending().await, 1);
+    }
+
+    #[tokio::test]
+    async fn test_delete_older_than() {
+        let (pool, repo) = setup().await;
+
+        // Insert a row with an old created_at directly (bypassing DEFAULT)
+        let id = uuid::Uuid::new_v4().to_string();
+        sqlx::query(
+            "INSERT INTO failed_observations \
+             (id, observation_json, failure_reason, failed_stage, created_at) \
+             VALUES (?1, '{}', 'test', 'extraction', '2020-01-01 00:00:00')",
+        )
+        .bind(&id)
+        .execute(&pool)
+        .await
+        .unwrap();
+
+        // Insert a recent observation that should NOT be deleted
+        let obs = test_observation();
+        repo.insert(&obs, "extraction", "llm_error").await;
+
+        let deleted = repo.delete_older_than(7).await.unwrap();
+        assert_eq!(deleted, 1);
+
+        // Recent observation should still be present
+        let remaining = repo.list_eligible(10).await;
+        assert_eq!(remaining.len(), 1);
     }
 
     #[tokio::test]

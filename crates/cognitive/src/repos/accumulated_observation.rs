@@ -109,6 +109,17 @@ impl AccumulatedObservationRepo {
         }
     }
 
+    /// Delete observations older than `days` days.
+    /// Returns the number of rows removed.
+    pub async fn delete_older_than(&self, days: i64) -> Result<u64, sqlx::Error> {
+        let cutoff = (chrono::Utc::now() - chrono::Duration::days(days)).to_rfc3339();
+        let result = sqlx::query("DELETE FROM accumulated_observations WHERE observed_at < ?1")
+            .bind(&cutoff)
+            .execute(&self.pool)
+            .await?;
+        Ok(result.rows_affected())
+    }
+
     /// Delete all observations for an event type (after promotion).
     pub async fn delete_by_key(&self, event_type_key: &str) {
         if let Err(e) =
@@ -174,6 +185,39 @@ mod tests {
         let loaded = repo.load_all().await;
         assert_eq!(loaded.len(), 1);
         assert!(loaded.contains_key("OtherEvent"));
+    }
+
+    #[tokio::test]
+    async fn test_delete_older_than() {
+        let pool = setup().await;
+        let repo = AccumulatedObservationRepo::new(pool.clone());
+
+        // Insert a row with an old timestamp directly
+        sqlx::query(
+            "INSERT INTO accumulated_observations \
+             (id, event_type_key, domain, content, importance, source_event, observed_at, day_key) \
+             VALUES ('old-id', 'OldEvent', 'productivity', 'old content', 0.5, 'src', '2020-01-01T00:00:00Z', '2020-01-01')",
+        )
+        .execute(&pool)
+        .await
+        .unwrap();
+
+        // Insert a recent observation that should NOT be deleted
+        let obs = Observation {
+            domain: "productivity".into(),
+            content: "recent".into(),
+            importance: 0.5,
+            source_event: "RecentEvent".into(),
+            timestamp: Utc::now(),
+        };
+        repo.insert("RecentEvent", &obs).await;
+
+        let deleted = repo.delete_older_than(7).await.unwrap();
+        assert_eq!(deleted, 1);
+
+        let loaded = repo.load_all().await;
+        assert!(loaded.contains_key("RecentEvent"));
+        assert!(!loaded.contains_key("OldEvent"));
     }
 
     #[tokio::test]
