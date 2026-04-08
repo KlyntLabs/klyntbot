@@ -911,3 +911,155 @@ async fn test_feedback_tracker_persist_and_load() {
         assert_eq!(strategy.times_accepted, 1);
     }
 }
+
+// ── Reforge cycle end-to-end ───────────────────────────────────
+
+struct MockReforgeHandler;
+
+#[async_trait::async_trait]
+impl klyntbot::cognitive::services::reforge::ReforgeHandler for MockReforgeHandler {
+    async fn synthesize(
+        &self,
+        _input: &klyntbot::cognitive::services::reforge::types::SynthesizeInput,
+    ) -> common::Result<klyntbot::cognitive::services::reforge::types::SynthesizeOutput> {
+        Ok(klyntbot::cognitive::services::reforge::types::SynthesizeOutput {
+            fact_updates: vec![
+                klyntbot::cognitive::services::reforge::types::FactUpdate {
+                    action: "add".into(),
+                    subject: "user".into(),
+                    predicate: "prefers".into(),
+                    object: "morning work".into(),
+                    domain: "productivity".into(),
+                    confidence: 0.8,
+                    reason: "Consistent across sessions".into(),
+                },
+            ],
+            rule_updates: vec![],
+            stale_facts: vec![],
+            cross_session_patterns: vec![],
+            extraction_quality_flag: None,
+        })
+    }
+
+    async fn review(
+        &self,
+        _input: &klyntbot::cognitive::services::reforge::types::ReviewInput,
+    ) -> common::Result<klyntbot::cognitive::services::reforge::types::ReviewOutput> {
+        Ok(klyntbot::cognitive::services::reforge::types::ReviewOutput {
+            skill_edits: vec![],
+            routing_insights: vec![],
+            context_priority_suggestions: vec![],
+        })
+    }
+
+    async fn narrate(
+        &self,
+        _input: &klyntbot::cognitive::services::reforge::types::NarrateInput,
+    ) -> common::Result<String> {
+        Ok("Test Reforge narrative.".into())
+    }
+}
+
+#[tokio::test]
+async fn test_reforge_cycle_end_to_end() {
+    use klyntbot::cognitive::repos::{EpisodicMemoryRepo, ProceduralRuleRepo, SemanticFactRepo};
+    use klyntbot::cognitive::services::reforge::service::run_reforge;
+    use klyntbot::cognitive::services::reforge::skill_files::SkillFileManager;
+    use klyntbot::cognitive::types::EpisodicMemory;
+    use klyntbot::storage::repos::{ReforgeStateRepo, SkillVersionRepo};
+    use klyntbot::storage::SessionMemoryRepo;
+    use tempfile::TempDir;
+
+    // 1. Setup: in-memory pool + cognitive migrations
+    let (pool, inner) = cognitive_pool().await;
+
+    // 2. Construct repos
+    let reforge_state_repo = ReforgeStateRepo::new(inner.clone());
+    let skill_version_repo = SkillVersionRepo::new(inner.clone());
+    let session_memory_repo = SessionMemoryRepo::new(inner.clone());
+    let fact_repo = SemanticFactRepo::new(inner.clone());
+    let episodic_repo = EpisodicMemoryRepo::new(inner.clone());
+    let rule_repo = ProceduralRuleRepo::new(inner.clone());
+
+    // Verify initial reforge state has no runs yet
+    let initial_state: klyntbot::storage::rows::ReforgeStateRow =
+        reforge_state_repo.get().await.unwrap();
+    assert_eq!(initial_state.run_count, 0);
+    assert!(initial_state.last_run_at.is_none());
+
+    // 3. Seed a session scratchpad so the collector finds data.
+    //    session_memory has a FK to sessions — insert a session row first.
+    sqlx::query("INSERT INTO sessions (key) VALUES ('reforge-test-session')")
+        .execute(&inner)
+        .await
+        .unwrap();
+    session_memory_repo
+        .upsert(
+            "reforge-test-session",
+            "User mentioned they prefer working in the mornings.",
+            5,
+        )
+        .await
+        .unwrap();
+
+    // 4. Seed an episodic memory so the collector also finds episodics.
+    let episodic = EpisodicMemory {
+        id: uuid::Uuid::new_v4().to_string(),
+        domain: "productivity".into(),
+        content: "User completed a deep-work block before 10am.".into(),
+        summary: Some("Morning deep work".into()),
+        importance: 0.8,
+        occurred_at: chrono::Utc::now().to_rfc3339(),
+        recorded_at: chrono::Utc::now().to_rfc3339(),
+        stability: 1.0,
+        last_accessed: None,
+        access_count: 0,
+        project_id: None,
+        scope_type: "system".into(),
+        scope_id: None,
+    };
+    episodic_repo.insert(&episodic).await.unwrap();
+
+    // 5. Temp skills directory with a test SKILL.md
+    let skills_tmp = TempDir::new().expect("skills tempdir");
+    let skill_mgr = SkillFileManager::new(skills_tmp.path().to_path_buf());
+    skill_mgr
+        .write_file(
+            "test-skill",
+            "SKILL.md",
+            "---\nname: test-skill\nversion: 1\n---\n# Test Skill\nThis is a test skill.",
+        )
+        .expect("write test SKILL.md");
+
+    // 6. Run the full Reforge cycle with the mock handler
+    let handler = MockReforgeHandler;
+    let result = run_reforge(
+        &reforge_state_repo,
+        &skill_version_repo,
+        &session_memory_repo,
+        &fact_repo,
+        &episodic_repo,
+        &rule_repo,
+        &handler,
+        &skill_mgr,
+    )
+    .await;
+
+    // 7. Assert the cycle ran and produced expected results
+    assert!(result.is_some(), "run_reforge should return Some when there is new data");
+    let r = result.unwrap();
+
+    assert!(r.facts_added > 0, "Expected at least 1 fact added, got {}", r.facts_added);
+    assert!(r.phase_errors.is_empty(), "Expected no phase errors, got: {:?}", r.phase_errors);
+    assert_eq!(r.narrative, "Test Reforge narrative.");
+
+    // 8. Verify reforge_state was updated
+    let state: klyntbot::storage::rows::ReforgeStateRow =
+        reforge_state_repo.get().await.unwrap();
+    assert_eq!(state.run_count, 1, "run_count should be 1 after one cycle");
+    assert!(state.last_run_at.is_some(), "last_run_at should be set after a run");
+
+    // Keep TempDir alive until end of test
+    drop(skills_tmp);
+    drop(pool);
+}
