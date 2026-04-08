@@ -442,6 +442,8 @@ impl AgentLoopBuilder {
                             session_memory_repo: Some(storage::SessionMemoryRepo::new(
                                 pool.clone(),
                             )),
+                            intelligence_mode: config.cognitive.intelligence_mode,
+                            deep_handler: None,
                         },
                     );
                     info!("Cognitive background consolidation service started");

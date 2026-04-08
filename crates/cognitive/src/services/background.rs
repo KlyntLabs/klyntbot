@@ -223,6 +223,10 @@ pub struct BackgroundServiceConfig {
     pub signal_rx: Option<crate::pipeline::SignalReceiver>,
     /// Session memory repo for SessionCollector (optional).
     pub session_memory_repo: Option<storage::SessionMemoryRepo>,
+    /// Intelligence mode: Standard (heuristic) or Deep (LLM-based) consolidation.
+    pub intelligence_mode: config::schema::IntelligenceMode,
+    /// Optional LLM handler for Deep Mode consolidation.
+    pub deep_handler: Option<Arc<dyn crate::pipeline::DeepConsolidationHandler>>,
 }
 
 /// Background service that processes domain events into cognitive memory.
@@ -254,6 +258,8 @@ impl BackgroundConsolidationService {
             signal_tx,
             mut signal_rx,
             session_memory_repo,
+            intelligence_mode,
+            deep_handler,
         } = config;
         // ── Spawn unified pipeline collectors ─────────────────────────
         let mut _collector_handles: Vec<JoinHandle<()>> = Vec::new();
@@ -779,7 +785,15 @@ impl BackgroundConsolidationService {
                     if !signals.is_empty() {
                         debug!("Unified pipeline: draining {} signal(s)", signals.len());
                         let clusters = crate::pipeline::group_signals(signals);
-                        let ops = crate::pipeline::heuristic_promote(&clusters);
+                        let ops = if intelligence_mode == config::schema::IntelligenceMode::Deep {
+                            if let Some(ref handler) = deep_handler {
+                                crate::pipeline::deep_promote(&clusters, handler.as_ref()).await
+                            } else {
+                                crate::pipeline::heuristic_promote(&clusters)
+                            }
+                        } else {
+                            crate::pipeline::heuristic_promote(&clusters)
+                        };
                         if !ops.is_empty() {
                             crate::pipeline::execute_promotions(
                                 &ops,

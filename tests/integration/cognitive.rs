@@ -462,6 +462,8 @@ async fn test_batch_pipeline_processes_domain_events_end_to_end() {
             signal_tx: None,
             signal_rx: None,
             session_memory_repo: None,
+            intelligence_mode: config::schema::IntelligenceMode::Standard,
+            deep_handler: None,
         },
     );
 

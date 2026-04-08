@@ -1,6 +1,8 @@
 //! Stage 2: groups signals, computes convergence, decides promotions.
 
 use std::collections::HashSet;
+
+use async_trait::async_trait;
 use tracing::info;
 
 use super::signal::{CognitiveSignal, SignalSource};
@@ -123,6 +125,40 @@ pub fn heuristic_promote(clusters: &[KnowledgeCluster]) -> Vec<PromotionOp> {
         clusters.len()
     );
     ops
+}
+
+/// Trait for LLM-backed deep consolidation decisions.
+///
+/// Defined here (cognitive crate), implemented in the agent crate with an
+/// actual LLM provider. This follows the same dependency inversion pattern as
+/// `ExtractionHandler` and `ReflectionHandler`.
+#[async_trait]
+pub trait DeepConsolidationHandler: Send + Sync {
+    /// Given knowledge clusters, use an LLM call to decide promotion operations.
+    async fn consolidate_deep(&self, clusters: &[KnowledgeCluster]) -> common::Result<Vec<PromotionOp>>;
+}
+
+/// Use an LLM to decide promotions for the given clusters.
+///
+/// Falls back to `heuristic_promote` if the LLM call fails.
+pub async fn deep_promote(
+    clusters: &[KnowledgeCluster],
+    handler: &dyn DeepConsolidationHandler,
+) -> Vec<PromotionOp> {
+    match handler.consolidate_deep(clusters).await {
+        Ok(ops) => {
+            info!(
+                "Deep consolidation: {} ops from {} clusters",
+                ops.len(),
+                clusters.len()
+            );
+            ops
+        }
+        Err(e) => {
+            tracing::warn!("Deep consolidation failed, falling back to heuristic: {e}");
+            heuristic_promote(clusters)
+        }
+    }
 }
 
 fn extract_spo(text: &str) -> (String, String, String) {
