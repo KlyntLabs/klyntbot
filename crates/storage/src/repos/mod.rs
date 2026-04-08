@@ -27,6 +27,7 @@ pub mod objective;
 pub mod outcome;
 pub mod project_repo;
 pub mod project_source_repo;
+pub mod reforge_state;
 pub mod retrieval_feedback;
 pub mod session;
 pub mod session_context;
@@ -67,6 +68,7 @@ pub use objective::ObjectiveRepo;
 pub use outcome::OutcomeRepo;
 pub use project_repo::{ProjectFilter, ProjectPatch, ProjectRepo, ProjectWithStats};
 pub use project_source_repo::ProjectSourceRepo;
+pub use reforge_state::ReforgeStateRepo;
 pub use retrieval_feedback::RetrievalFeedbackRepo;
 pub use session::SessionRepo;
 pub use session_context::{SessionContextParams, SessionContextRepo};
@@ -137,6 +139,7 @@ pub struct Repos {
     pub tasks: TaskRepo,
     pub tool_usage: ToolUsageRepo,
     pub dnd_override: DndOverrideRepo,
+    pub reforge_state: ReforgeStateRepo,
 }
 
 impl Repos {
@@ -168,6 +171,7 @@ impl Repos {
             tasks: TaskRepo::new(db.clone()),
             tool_usage: ToolUsageRepo::new(db.clone()),
             dnd_override: DndOverrideRepo::new(db.clone()),
+            reforge_state: ReforgeStateRepo::new(db.clone()),
             pool: db,
         }
     }

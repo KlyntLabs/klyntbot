@@ -782,3 +782,15 @@ CREATE TABLE IF NOT EXISTS retrieval_feedback (
 );
 CREATE INDEX IF NOT EXISTS idx_retrieval_feedback_session ON retrieval_feedback(session_key);
 CREATE INDEX IF NOT EXISTS idx_retrieval_feedback_created ON retrieval_feedback(created_at);
+
+-- ============================================================
+-- Reforge Cycle State
+-- ============================================================
+CREATE TABLE reforge_state (
+    id              TEXT PRIMARY KEY DEFAULT 'singleton',
+    last_run_at     TEXT,
+    last_run_stats  TEXT,
+    run_count       INTEGER NOT NULL DEFAULT 0
+);
+
+INSERT INTO reforge_state (id) VALUES ('singleton');
