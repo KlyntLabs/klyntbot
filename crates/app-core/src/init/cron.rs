@@ -5,7 +5,7 @@ use feature_tasks::handlers::suggestion_applier::SuggestionApplier;
 use feature_tasks::{DecompositionHandler, ForecastHandler, ProactiveHandler, TasksConfig};
 use scheduling::CronService;
 use storage::Repos;
-use tracing::{error, info, warn};
+use tracing::{info, warn};
 
 /// Results from the cron initialization phase.
 pub(super) struct CronResult {
@@ -146,15 +146,20 @@ pub(super) async fn init_cron(
         .with_episodic_memory_repo(episodic_memory_repo)
         .with_memory_param_sink(Arc::clone(&memory_param_sink)),
     );
-    agent::autotuner::AutoTunerOrchestrator::register_nightly_cycle(
-        Arc::clone(&orchestrator),
-        &cron_service,
-        config.autotuner.clone(),
-        trial_repo,
-        metric_source,
-        Some(Arc::clone(domain_event_bus)),
-    );
-    info!("autotuner nightly cycle handler registered");
+    // Disabled: autotuner nightly cycle subsumed by Reforge (Phase 6 deferred).
+    // TODO(Task 12): integrate autotuner evaluation into Reforge Phase 6.
+    // agent::autotuner::AutoTunerOrchestrator::register_nightly_cycle(
+    //     Arc::clone(&orchestrator),
+    //     &cron_service,
+    //     config.autotuner.clone(),
+    //     trial_repo,
+    //     metric_source,
+    //     Some(Arc::clone(domain_event_bus)),
+    // );
+    // info!("autotuner nightly cycle handler registered");
+    let _ = trial_repo;
+    let _ = metric_source;
+    info!("autotuner orchestrator built (nightly cycle disabled, pending Reforge Phase 6)");
     let autotuner = Some(orchestrator);
 
     let cron_service = Arc::new(cron_service);
@@ -181,6 +186,7 @@ pub(super) async fn init_cron(
 const JOB_FOCUS_CHECK: &str = "todo_focus_check";
 const JOB_DAILY_DIGEST: &str = "todo_daily_digest";
 const JOB_OVERDUE_CHECK: &str = "todo_overdue_check";
+#[allow(dead_code)] // Disabled: subsumed by Reforge nightly. TODO(Task 9): remove.
 const JOB_WEEKLY_REFLECTION: &str = "__klyntbot_cognitive_weekly_reflection";
 const JOB_WEEKLY_REPORT: &str = "__klyntbot_weekly_report";
 const JOB_DAILY_PLANNING: &str = "__klyntbot_daily_planning";
@@ -202,11 +208,15 @@ const JOB_REMINDER_CHECK: &str = "__klyntbot_reminder_check";
 const JOB_RECURRING_TASKS: &str = "__klyntbot_recurring_tasks";
 pub(super) const JOB_INSIGHT_REFRESH: &str = "__klyntbot_insight_refresh";
 pub(super) const JOB_LEARNING_ANALYSIS: &str = "__klyntbot_learning_analysis";
+#[allow(dead_code)] // Disabled: subsumed by Reforge nightly. TODO(Task 9): remove.
 pub(super) const JOB_MIRROR_WEEKLY_NARRATIVE: &str = "__klyntbot_mirror_weekly_narrative";
+#[allow(dead_code)] // Disabled: subsumed by Reforge nightly. TODO(Task 9): remove.
 pub(super) const JOB_MIRROR_CLEANUP: &str = "__klyntbot_mirror_cleanup";
 pub(super) const JOB_CROSS_DOMAIN_NIGHTLY: &str = "__klyntbot_cross_domain_nightly";
 const JOB_LAUNCHER_USAGE_PRUNE: &str = "__klyntbot_launcher_usage_prune";
+#[allow(dead_code)] // Disabled: subsumed by Reforge nightly. TODO(Task 9): remove.
 const JOB_COGNITIVE_COMPACTION: &str = "__klyntbot_cognitive_compaction_daily";
+const JOB_REFORGE_NIGHTLY: &str = "__klyntbot_reforge_nightly";
 
 /// Register individual cron handlers.
 #[allow(clippy::too_many_arguments)]
@@ -347,62 +357,64 @@ fn register_cron_callbacks(
     }
 
     // ── __klyntbot_cognitive_weekly_reflection ───────────────────────────
-    {
-        let pool = repos.pool().clone();
-        let cog_config = config.clone();
-        let cog_provider = cognitive_provider;
-        let rt = rt.clone();
-        cron_service.register_handler(
-            JOB_WEEKLY_REFLECTION,
-            Arc::new(move |_job: &scheduling::CronJob| {
-                let pool = pool.clone();
-                let cog_config = cog_config.clone();
-                let cog_provider = cog_provider.clone();
-                tokio::task::block_in_place(|| {
-                    rt.block_on(async move {
-                        let fact_repo = cognitive::SemanticFactRepo::new(pool.clone());
-                        let episodic_repo = cognitive::EpisodicMemoryRepo::new(pool.clone());
-                        let rule_repo = cognitive::ProceduralRuleRepo::new(pool.clone());
-
-                        let (reflection_handler, consolidation_handler) =
-                            crate::handlers::cognitive::build_reflection_handlers(
-                                &cog_provider,
-                                &cog_config,
-                            );
-
-                        match cognitive::reflection::run_weekly_reflection(
-                            reflection_handler.as_ref(),
-                            consolidation_handler.as_ref(),
-                            &fact_repo,
-                            &episodic_repo,
-                            &rule_repo,
-                            None,
-                        )
-                        .await
-                        {
-                            Ok(output) => {
-                                info!(
-                                    "Weekly reflection complete: {} facts, {} rules — {}",
-                                    output.fact_updates.len(),
-                                    output.rule_updates.len(),
-                                    output.summary,
-                                );
-                                Ok(Some(format!(
-                                    "Weekly reflection: {} fact updates, {} rule updates",
-                                    output.fact_updates.len(),
-                                    output.rule_updates.len(),
-                                )))
-                            }
-                            Err(e) => {
-                                error!("Weekly reflection failed: {e}");
-                                Ok(Some(format!("Weekly reflection failed: {e}")))
-                            }
-                        }
-                    })
-                })
-            }),
-        );
-    }
+    // Disabled: subsumed by Reforge nightly cycle (Phase 2: Synthesize).
+    // TODO(Task 9): remove entirely after Reforge stabilization.
+    // {
+    //     let pool = repos.pool().clone();
+    //     let cog_config = config.clone();
+    //     let cog_provider = cognitive_provider.clone();
+    //     let rt = rt.clone();
+    //     cron_service.register_handler(
+    //         JOB_WEEKLY_REFLECTION,
+    //         Arc::new(move |_job: &scheduling::CronJob| {
+    //             let pool = pool.clone();
+    //             let cog_config = cog_config.clone();
+    //             let cog_provider = cog_provider.clone();
+    //             tokio::task::block_in_place(|| {
+    //                 rt.block_on(async move {
+    //                     let fact_repo = cognitive::SemanticFactRepo::new(pool.clone());
+    //                     let episodic_repo = cognitive::EpisodicMemoryRepo::new(pool.clone());
+    //                     let rule_repo = cognitive::ProceduralRuleRepo::new(pool.clone());
+    //
+    //                     let (reflection_handler, consolidation_handler) =
+    //                         crate::handlers::cognitive::build_reflection_handlers(
+    //                             &cog_provider,
+    //                             &cog_config,
+    //                         );
+    //
+    //                     match cognitive::reflection::run_weekly_reflection(
+    //                         reflection_handler.as_ref(),
+    //                         consolidation_handler.as_ref(),
+    //                         &fact_repo,
+    //                         &episodic_repo,
+    //                         &rule_repo,
+    //                         None,
+    //                     )
+    //                     .await
+    //                     {
+    //                         Ok(output) => {
+    //                             info!(
+    //                                 "Weekly reflection complete: {} facts, {} rules — {}",
+    //                                 output.fact_updates.len(),
+    //                                 output.rule_updates.len(),
+    //                                 output.summary,
+    //                             );
+    //                             Ok(Some(format!(
+    //                                 "Weekly reflection: {} fact updates, {} rule updates",
+    //                                 output.fact_updates.len(),
+    //                                 output.rule_updates.len(),
+    //                             )))
+    //                         }
+    //                         Err(e) => {
+    //                             error!("Weekly reflection failed: {e}");
+    //                             Ok(Some(format!("Weekly reflection failed: {e}")))
+    //                         }
+    //                     }
+    //                 })
+    //             })
+    //         }),
+    //     );
+    // }
 
     // ── __klyntbot_* bus-routed jobs (shared handler) ────────────────────
     //
@@ -479,44 +491,114 @@ fn register_cron_callbacks(
     }
 
     // ── cognitive_compaction_daily ────────────────────────────────────
+    // Disabled: subsumed by Reforge nightly cycle (Phase 7: Compact).
+    // TODO(Task 9): remove entirely after Reforge stabilization.
+    // {
+    //     let pool = repos.pool().clone();
+    //     let rt = rt.clone();
+    //     cron_service.register_handler(
+    //         JOB_COGNITIVE_COMPACTION,
+    //         Arc::new(move |_job: &scheduling::CronJob| {
+    //             let pool = pool.clone();
+    //             tokio::task::block_in_place(|| {
+    //                 rt.block_on(async {
+    //                     let fact_repo = cognitive::SemanticFactRepo::new(pool.clone());
+    //                     let episodic_repo = cognitive::EpisodicMemoryRepo::new(pool.clone());
+    //                     let rule_repo = cognitive::ProceduralRuleRepo::new(pool.clone());
+    //                     let accum_repo = cognitive::AccumulatedObservationRepo::new(pool.clone());
+    //                     let failed_repo = cognitive::FailedObservationRepo::new(pool.clone());
+    //                     let session_mem_repo = storage::SessionMemoryRepo::new(pool.clone());
+    //                     let co_activation_repo = cognitive::CoActivationRepo::new(pool.clone());
+    //
+    //                     match cognitive::compaction::run_compaction(
+    //                         &fact_repo,
+    //                         &episodic_repo,
+    //                         Some(&rule_repo),
+    //                         Some(&accum_repo),
+    //                         Some(&failed_repo),
+    //                         Some(&session_mem_repo),
+    //                         Some(&co_activation_repo),
+    //                     )
+    //                     .await
+    //                     {
+    //                         Ok(r) => Ok(Some(format!(
+    //                             "Compaction: {} facts, {} episodic, {} rules, {} obs, {} failed, {} sessions, {} co-act",
+    //                             r.facts_archived, r.episodic_deleted, r.rules_deactivated,
+    //                             r.accumulated_obs_deleted, r.failed_obs_deleted,
+    //                             r.session_memory_deleted, r.co_activation_pruned
+    //                         ))),
+    //                         Err(e) => {
+    //                             tracing::warn!("Compaction failed: {e}");
+    //                             Ok(Some(format!("Compaction failed: {e}")))
+    //                         }
+    //                     }
+    //                 })
+    //             })
+    //         }),
+    //     );
+    // }
+
+    // ── reforge_nightly ─────────────────────────────────────────────
     {
         let pool = repos.pool().clone();
+        let repos_reforge = repos.clone();
+        let cog_config = config.clone();
+        let cog_provider = cognitive_provider.clone();
         let rt = rt.clone();
         cron_service.register_handler(
-            JOB_COGNITIVE_COMPACTION,
+            JOB_REFORGE_NIGHTLY,
             Arc::new(move |_job: &scheduling::CronJob| {
                 let pool = pool.clone();
+                let repos_reforge = repos_reforge.clone();
+                let cog_config = cog_config.clone();
+                let cog_provider = cog_provider.clone();
                 tokio::task::block_in_place(|| {
-                    rt.block_on(async {
+                    rt.block_on(async move {
                         let fact_repo = cognitive::SemanticFactRepo::new(pool.clone());
                         let episodic_repo = cognitive::EpisodicMemoryRepo::new(pool.clone());
                         let rule_repo = cognitive::ProceduralRuleRepo::new(pool.clone());
-                        let accum_repo = cognitive::AccumulatedObservationRepo::new(pool.clone());
-                        let failed_repo = cognitive::FailedObservationRepo::new(pool.clone());
-                        let session_mem_repo = storage::SessionMemoryRepo::new(pool.clone());
-                        let co_activation_repo = cognitive::CoActivationRepo::new(pool.clone());
 
-                        match cognitive::compaction::run_compaction(
+                        let handler = crate::handlers::cognitive::build_reforge_handler(
+                            &cog_provider,
+                            &cog_config,
+                        );
+
+                        let data_dir = cog_config.data_dir_path();
+                        let skill_mgr = cognitive::services::reforge::skill_files::SkillFileManager::new(
+                            data_dir.join("skills"),
+                        );
+
+                        match cognitive::services::reforge::service::run_reforge(
+                            &repos_reforge.reforge_state,
+                            &repos_reforge.skill_version,
+                            &repos_reforge.session_memory,
                             &fact_repo,
                             &episodic_repo,
-                            Some(&rule_repo),
-                            Some(&accum_repo),
-                            Some(&failed_repo),
-                            Some(&session_mem_repo),
-                            Some(&co_activation_repo),
+                            &rule_repo,
+                            handler.as_ref(),
+                            &skill_mgr,
                         )
                         .await
                         {
-                            Ok(r) => Ok(Some(format!(
-                                "Compaction: {} facts, {} episodic, {} rules, {} obs, {} failed, {} sessions, {} co-act",
-                                r.facts_archived, r.episodic_deleted, r.rules_deactivated,
-                                r.accumulated_obs_deleted, r.failed_obs_deleted,
-                                r.session_memory_deleted, r.co_activation_pruned
-                            ))),
-                            Err(e) => {
-                                tracing::warn!("Compaction failed: {e}");
-                                Ok(Some(format!("Compaction failed: {e}")))
+                            Some(result) => {
+                                info!(
+                                    facts_added = result.facts_added,
+                                    facts_updated = result.facts_updated,
+                                    rules_added = result.rules_added,
+                                    skills_edited = result.skills_edited,
+                                    errors = result.phase_errors.len(),
+                                    "Reforge nightly cycle complete"
+                                );
+                                Ok(Some(format!(
+                                    "Reforge: +{}f ~{}f +{}r {}sk {}err",
+                                    result.facts_added,
+                                    result.facts_updated,
+                                    result.rules_added,
+                                    result.skills_edited,
+                                    result.phase_errors.len(),
+                                )))
                             }
+                            None => Ok(Some("Reforge: skipped (no new data)".to_string())),
                         }
                     })
                 })
@@ -967,37 +1049,53 @@ async fn ensure_cron_jobs(
         );
     }
 
-    // Weekly cognitive reflection
-    {
-        let reflection_schedule = config
-            .cognitive
-            .reflection_schedule
-            .as_deref()
-            .unwrap_or("0 9 * * 1");
-        ensure_job!(
-            JOB_WEEKLY_REFLECTION,
-            scheduling::CronSchedule::Cron {
-                expr: reflection_schedule.to_string(),
-                tz: Some(config.timezone.clone()),
-            },
-            "Weekly cognitive reflection",
-            system.clone()
-        );
-    }
+    // Disabled: weekly reflection subsumed by Reforge nightly (Phase 2).
+    // TODO(Task 9): remove entirely after Reforge stabilization.
+    // {
+    //     let reflection_schedule = config
+    //         .cognitive
+    //         .reflection_schedule
+    //         .as_deref()
+    //         .unwrap_or("0 9 * * 1");
+    //     ensure_job!(
+    //         JOB_WEEKLY_REFLECTION,
+    //         scheduling::CronSchedule::Cron {
+    //             expr: reflection_schedule.to_string(),
+    //             tz: Some(config.timezone.clone()),
+    //         },
+    //         "Weekly cognitive reflection",
+    //         system.clone()
+    //     );
+    // }
 
-    agent::autotuner::AutoTunerOrchestrator::ensure_nightly_job(
-        cron_service,
-        &config.autotuner.schedule,
-    )
-    .await?;
+    // Disabled: autotuner nightly subsumed by Reforge (Phase 6 deferred).
+    // TODO(Task 12): integrate autotuner evaluation into Reforge Phase 6.
+    // agent::autotuner::AutoTunerOrchestrator::ensure_nightly_job(
+    //     cron_service,
+    //     &config.autotuner.schedule,
+    // )
+    // .await?;
 
+    // Disabled: compaction subsumed by Reforge nightly (Phase 7).
+    // TODO(Task 9): remove entirely after Reforge stabilization.
+    // ensure_job!(
+    //     JOB_COGNITIVE_COMPACTION,
+    //     scheduling::CronSchedule::Cron {
+    //         expr: "0 3 * * *".to_string(),
+    //         tz: Some("UTC".to_string()),
+    //     },
+    //     "Daily memory compaction",
+    //     system.clone()
+    // );
+
+    // ── Reforge nightly ─────────────────────────────────────────────────
     ensure_job!(
-        JOB_COGNITIVE_COMPACTION,
+        JOB_REFORGE_NIGHTLY,
         scheduling::CronSchedule::Cron {
             expr: "0 3 * * *".to_string(),
-            tz: Some("UTC".to_string()),
+            tz: Some(config.timezone.clone()),
         },
-        "Daily memory compaction",
+        "Nightly Reforge: knowledge synthesis, skill improvement, compaction",
         system.clone()
     );
     ensure_job!(
@@ -1069,24 +1167,29 @@ async fn ensure_cron_jobs(
         "Nightly cross-domain insight batch",
         system.clone()
     );
-    ensure_job!(
-        JOB_MIRROR_WEEKLY_NARRATIVE,
-        scheduling::CronSchedule::Cron {
-            expr: "0 10 * * 0".to_string(),
-            tz: Some(config.timezone.clone()),
-        },
-        "Generate weekly Mirror self-reflection narrative",
-        system.clone()
-    );
-    ensure_job!(
-        JOB_MIRROR_CLEANUP,
-        scheduling::CronSchedule::Cron {
-            expr: "0 4 * * 0".to_string(),
-            tz: Some(config.timezone.clone()),
-        },
-        "Clean old Mirror routing snapshots and snippets",
-        system.clone()
-    );
+    // Disabled: mirror weekly narrative subsumed by Reforge nightly (Phase 4: Narrate).
+    // TODO(Task 9): remove entirely after Reforge stabilization.
+    // ensure_job!(
+    //     JOB_MIRROR_WEEKLY_NARRATIVE,
+    //     scheduling::CronSchedule::Cron {
+    //         expr: "0 10 * * 0".to_string(),
+    //         tz: Some(config.timezone.clone()),
+    //     },
+    //     "Generate weekly Mirror self-reflection narrative",
+    //     system.clone()
+    // );
+
+    // Disabled: mirror cleanup subsumed by Reforge nightly (Phase 7: Compact).
+    // TODO(Task 9): remove entirely after Reforge stabilization.
+    // ensure_job!(
+    //     JOB_MIRROR_CLEANUP,
+    //     scheduling::CronSchedule::Cron {
+    //         expr: "0 4 * * 0".to_string(),
+    //         tz: Some(config.timezone.clone()),
+    //     },
+    //     "Clean old Mirror routing snapshots and snippets",
+    //     system.clone()
+    // );
     ensure_job!(
         JOB_LAUNCHER_USAGE_PRUNE,
         scheduling::CronSchedule::Cron {
@@ -1107,28 +1210,39 @@ async fn set_default_intent_windows(cron_service: &scheduling::CronService) {
     use std::time::Duration;
 
     let windows: &[(&str, IntentWindow)] = &[
+        // Disabled: weekly reflection subsumed by Reforge nightly.
+        // (
+        //     JOB_WEEKLY_REFLECTION,
+        //     IntentWindow {
+        //         trigger: IntentTrigger::FirstActivityAfter {
+        //             after_local: chrono::NaiveTime::from_hms_opt(8, 0, 0).unwrap(),
+        //         },
+        //         tolerance: Duration::from_secs(7200),
+        //         catch_up: CatchUpPriority::WhenPresent,
+        //     },
+        // ),
+        // Disabled: mirror weekly narrative subsumed by Reforge nightly.
+        // (
+        //     JOB_MIRROR_WEEKLY_NARRATIVE,
+        //     IntentWindow {
+        //         trigger: IntentTrigger::FirstActivityAfter {
+        //             after_local: chrono::NaiveTime::from_hms_opt(9, 0, 0).unwrap(),
+        //         },
+        //         tolerance: Duration::from_secs(10800),
+        //         catch_up: CatchUpPriority::WhenPresent,
+        //     },
+        // ),
+        // Disabled: autotuner nightly subsumed by Reforge (Phase 6 deferred).
+        // (
+        //     agent::autotuner::JOB_AUTOTUNER_NIGHTLY,
+        //     IntentWindow {
+        //         trigger: IntentTrigger::UserIdle { min_idle_secs: 300 },
+        //         tolerance: Duration::from_secs(14400),
+        //         catch_up: CatchUpPriority::WhenIdle,
+        //     },
+        // ),
         (
-            JOB_WEEKLY_REFLECTION,
-            IntentWindow {
-                trigger: IntentTrigger::FirstActivityAfter {
-                    after_local: chrono::NaiveTime::from_hms_opt(8, 0, 0).unwrap(),
-                },
-                tolerance: Duration::from_secs(7200),
-                catch_up: CatchUpPriority::WhenPresent,
-            },
-        ),
-        (
-            JOB_MIRROR_WEEKLY_NARRATIVE,
-            IntentWindow {
-                trigger: IntentTrigger::FirstActivityAfter {
-                    after_local: chrono::NaiveTime::from_hms_opt(9, 0, 0).unwrap(),
-                },
-                tolerance: Duration::from_secs(10800),
-                catch_up: CatchUpPriority::WhenPresent,
-            },
-        ),
-        (
-            agent::autotuner::JOB_AUTOTUNER_NIGHTLY,
+            JOB_REFORGE_NIGHTLY,
             IntentWindow {
                 trigger: IntentTrigger::UserIdle { min_idle_secs: 300 },
                 tolerance: Duration::from_secs(14400),
