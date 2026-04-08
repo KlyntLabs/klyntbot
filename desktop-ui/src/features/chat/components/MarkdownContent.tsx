@@ -1,4 +1,3 @@
-import { MemoryReference } from "@shared/ui";
 import type { Components } from "react-markdown";
 import Markdown from "react-markdown";
 import rehypeHighlight from "rehype-highlight";
@@ -15,25 +14,10 @@ const rehypePlugins = [rehypeHighlight, rehypeMemoryRef];
 const remarkPlugins = [remarkGfm];
 
 const customComponents: Partial<Components> = {
-  // react-markdown passes HAST properties as camelCase React props directly
-  // on the component (not nested under node.properties).
-  "memory-ref": (props: Record<string, unknown>) => {
-    // Props come directly as camelCase: dataRefType, dataRefId
-    const refType = (props.dataRefType as string) ?? "";
-    const refId = (props.dataRefId as string) ?? "";
-    if (!refType || !refId) {
-      // Fallback: check node.properties (older react-markdown versions)
-      const el = props.node as { properties?: Record<string, string> } | undefined;
-      const p = el?.properties ?? {};
-      const fallbackType = p["data-ref-type"] ?? p.dataRefType ?? "";
-      const fallbackId = p["data-ref-id"] ?? p.dataRefId ?? "";
-      if (fallbackType && fallbackId) {
-        return <MemoryReference refType={fallbackType} refId={fallbackId} />;
-      }
-      return null;
-    }
-    return <MemoryReference refType={refType} refId={refId} />;
-  },
+  // rehypeMemoryRef converts [@type:id] markers into <memory-ref> elements,
+  // stripping them from the visible text. We render nothing — markers are
+  // for backend tracking (retrieval feedback), not user-facing display.
+  "memory-ref": () => null,
 };
 
 interface MarkdownContentProps {
