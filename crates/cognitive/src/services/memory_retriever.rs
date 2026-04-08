@@ -54,6 +54,8 @@ pub struct UnifiedMemoryService {
     champion_overrides: Option<Arc<std::sync::RwLock<Option<common::TrialParams>>>>,
     co_activation_repo: Option<CoActivationRepo>,
     depth_cache: KnowledgeDepthCache,
+    /// Last-retrieved fact metadata: (id, subject, predicate) for feedback detection.
+    last_retrieved_facts: Arc<Mutex<Vec<(String, String, String)>>>,
 }
 
 impl UnifiedMemoryService {
@@ -68,6 +70,7 @@ impl UnifiedMemoryService {
             champion_overrides: None,
             co_activation_repo: None,
             depth_cache: KnowledgeDepthCache::new(60),
+            last_retrieved_facts: Arc::new(Mutex::new(Vec::new())),
         }
     }
 
@@ -107,6 +110,27 @@ impl UnifiedMemoryService {
     pub fn with_co_activation_repo(mut self, repo: CoActivationRepo) -> Self {
         self.co_activation_repo = Some(repo);
         self
+    }
+
+    /// Record retrieval feedback by detecting which facts the LLM referenced.
+    pub async fn record_response_feedback(
+        &self,
+        response_text: &str,
+        session_key: &str,
+        feedback_repo: &storage::RetrievalFeedbackRepo,
+    ) {
+        let facts = self.last_retrieved_facts.lock().await;
+        if facts.is_empty() {
+            return;
+        }
+        let referenced = detect_referenced_facts(response_text, &facts);
+        let retrieved_ids: Vec<String> = facts.iter().map(|(id, _, _)| id.clone()).collect();
+        if let Err(e) = feedback_repo
+            .insert(&retrieved_ids, &referenced, session_key)
+            .await
+        {
+            tracing::debug!("Failed to record retrieval feedback: {e}");
+        }
     }
 
     async fn current_situational_boost(&self) -> f64 {
@@ -207,19 +231,36 @@ impl UnifiedMemoryService {
         )
         .await
         {
-            Ok(facts) => facts
-                .into_iter()
-                .filter(|f| f.score > MIN_FACT_SCORE)
-                .map(|f| {
-                    let label = freshness_label(&f.fact);
-                    let content = format!(
-                        "[@fact:{}] {}: {} = {} [{}]",
-                        f.fact.id, f.fact.subject, f.fact.predicate, f.fact.object, label
-                    );
-                    let predicate = f.fact.predicate.clone();
-                    (f.fact.id, f.score, content, predicate)
-                })
-                .collect(),
+            Ok(facts) => {
+                // Store for feedback detection
+                {
+                    let tuples: Vec<(String, String, String)> = facts
+                        .iter()
+                        .filter(|f| f.score > MIN_FACT_SCORE)
+                        .map(|f| {
+                            (
+                                f.fact.id.clone(),
+                                f.fact.subject.clone(),
+                                f.fact.predicate.clone(),
+                            )
+                        })
+                        .collect();
+                    *self.last_retrieved_facts.lock().await = tuples;
+                }
+                facts
+                    .into_iter()
+                    .filter(|f| f.score > MIN_FACT_SCORE)
+                    .map(|f| {
+                        let label = freshness_label(&f.fact);
+                        let content = format!(
+                            "[@fact:{}] {}: {} = {} [{}]",
+                            f.fact.id, f.fact.subject, f.fact.predicate, f.fact.object, label
+                        );
+                        let predicate = f.fact.predicate.clone();
+                        (f.fact.id, f.score, content, predicate)
+                    })
+                    .collect()
+            }
             Err(e) => {
                 warn!("Cognitive fact retrieval failed: {e}");
                 Vec::new()

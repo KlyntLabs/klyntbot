@@ -1718,6 +1718,15 @@ impl AgentLoopBuilder {
             runtime = runtime.with_context_update_queue(Arc::clone(queue));
         }
 
+        // Wire retrieval feedback recording
+        if let Some(ref mem_svc) = memory_service_for_shadow {
+            runtime = runtime.with_memory_service(Arc::clone(mem_svc));
+        }
+        if let Some(ref pool) = self.pool {
+            runtime =
+                runtime.with_feedback_repo(storage::RetrievalFeedbackRepo::new(pool.clone()));
+        }
+
         let runtime = Arc::new(runtime);
 
         info!("Agent runtime initialized");

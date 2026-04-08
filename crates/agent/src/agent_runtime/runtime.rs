@@ -62,6 +62,8 @@ pub struct AgentRuntime {
     active_view: Option<Arc<tokio::sync::RwLock<Option<context_engine::ActiveView>>>>,
     hot_config: Arc<RwLock<config::HotConfig>>,
     context_update_queue: Option<Arc<bus::ContextUpdateQueue>>,
+    memory_service: Option<Arc<cognitive::UnifiedMemoryService>>,
+    feedback_repo: Option<storage::RetrievalFeedbackRepo>,
 }
 
 impl AgentRuntime {
@@ -89,6 +91,8 @@ impl AgentRuntime {
             active_view: None,
             hot_config,
             context_update_queue: None,
+            memory_service: None,
+            feedback_repo: None,
         }
     }
 
@@ -143,6 +147,16 @@ impl AgentRuntime {
 
     pub fn with_context_update_queue(mut self, queue: Arc<bus::ContextUpdateQueue>) -> Self {
         self.context_update_queue = Some(queue);
+        self
+    }
+
+    pub fn with_memory_service(mut self, svc: Arc<cognitive::UnifiedMemoryService>) -> Self {
+        self.memory_service = Some(svc);
+        self
+    }
+
+    pub fn with_feedback_repo(mut self, repo: storage::RetrievalFeedbackRepo) -> Self {
+        self.feedback_repo = Some(repo);
         self
     }
 
@@ -260,6 +274,22 @@ impl AgentRuntime {
             pipeline_elapsed_ms,
         )
         .await;
+
+        // Record retrieval feedback (fire-and-forget)
+        if let (Some(ref mem_svc), Some(ref fb_repo)) =
+            (&self.memory_service, &self.feedback_repo)
+        {
+            let mem_svc = Arc::clone(mem_svc);
+            let fb_repo = fb_repo.clone();
+            let response = loop_result.content.clone();
+            let session_key =
+                common::SessionKey::new(&ctx.channel, &ctx.chat_id).to_string();
+            tokio::spawn(async move {
+                mem_svc
+                    .record_response_feedback(&response, &session_key, &fb_repo)
+                    .await;
+            });
+        }
 
         // Record interaction
         if let Some(ref recorder) = self.interaction_recorder {
