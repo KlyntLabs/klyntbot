@@ -25,3 +25,4 @@ pub mod session_memory;
 pub mod situation;
 pub mod temporal;
 pub mod tiptap_parser;
+pub mod reforge;
