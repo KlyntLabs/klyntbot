@@ -42,6 +42,7 @@ pub use repos::TrialRepo;
 pub use rows::trial::{ExperimentRow, ShadowLogRow, TrialRow};
 
 // ── Agent / Learning ────────────────────────────────────────────────
+pub use repos::RetrievalFeedbackRepo;
 pub use repos::StatusWorkflowRepo;
 pub use repos::ToolUsageRepo;
 pub use repos::{AgentTaskRepo, CronRepo, UsageRepo};
@@ -49,7 +50,6 @@ pub use repos::{CoachingInterventionLogRepo, InterventionLogRow};
 pub use repos::{CoachingStrategyRepo, CoachingStrategyRow, UpsertCoachingStrategy};
 pub use repos::{DecisionLogRepo, InteractionLogRepo, LearningStateRepo, OutcomeRepo};
 pub use repos::{OverallStats, StrategyRepo, ToolStatsRow};
-pub use repos::RetrievalFeedbackRepo;
 
 // ── Finance ─────────────────────────────────────────────────────────
 pub use finance_storage::FinanceStorage;

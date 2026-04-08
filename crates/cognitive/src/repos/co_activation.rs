@@ -56,7 +56,8 @@ impl CoActivationRepo {
         if peer_ids.is_empty() {
             return Ok(0.0);
         }
-        let placeholders: Vec<String> = (0..peer_ids.len()).map(|i| format!("?{}", i + 2)).collect();
+        let placeholders: Vec<String> =
+            (0..peer_ids.len()).map(|i| format!("?{}", i + 2)).collect();
         let ph = placeholders.join(",");
 
         let sql = format!(
@@ -78,11 +79,7 @@ impl CoActivationRepo {
     }
 
     /// Multiply all strengths by `factor` and delete pairs below `min_strength`.
-    pub async fn decay_all(
-        &self,
-        factor: f64,
-        min_strength: f64,
-    ) -> Result<u64, sqlx::Error> {
+    pub async fn decay_all(&self, factor: f64, min_strength: f64) -> Result<u64, sqlx::Error> {
         sqlx::query("UPDATE co_activation SET strength = strength * ?1")
             .bind(factor)
             .execute(&self.pool)
@@ -96,10 +93,9 @@ impl CoActivationRepo {
 
     /// Count total co-activation pairs.
     pub async fn count_all(&self) -> Result<i64, sqlx::Error> {
-        let (count,): (i64,) =
-            sqlx::query_as("SELECT COUNT(*) FROM co_activation")
-                .fetch_one(&self.pool)
-                .await?;
+        let (count,): (i64,) = sqlx::query_as("SELECT COUNT(*) FROM co_activation")
+            .fetch_one(&self.pool)
+            .await?;
         Ok(count)
     }
 }

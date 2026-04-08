@@ -26,11 +26,7 @@ impl KnowledgeDepthCache {
     }
 
     /// Get cached depth or compute via `count_related` and cache the result.
-    pub async fn get_or_compute(
-        &self,
-        fact: &SemanticFact,
-        repo: &SemanticFactRepo,
-    ) -> f64 {
+    pub async fn get_or_compute(&self, fact: &SemanticFact, repo: &SemanticFactRepo) -> f64 {
         // Check cache
         if let Ok(cache) = self.cache.lock() {
             if let Some((score, ts)) = cache.get(&fact.id) {

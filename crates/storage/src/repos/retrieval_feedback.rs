@@ -59,12 +59,11 @@ impl RetrievalFeedbackRepo {
     /// Count feedback entries in the past N days.
     pub async fn count_since(&self, days: i64) -> Result<i64, sqlx::Error> {
         let cutoff = (chrono::Utc::now() - chrono::Duration::days(days)).to_rfc3339();
-        let row: (i64,) = sqlx::query_as(
-            "SELECT COUNT(*) FROM retrieval_feedback WHERE created_at >= ?1",
-        )
-        .bind(&cutoff)
-        .fetch_one(&self.pool)
-        .await?;
+        let row: (i64,) =
+            sqlx::query_as("SELECT COUNT(*) FROM retrieval_feedback WHERE created_at >= ?1")
+                .bind(&cutoff)
+                .fetch_one(&self.pool)
+                .await?;
         Ok(row.0)
     }
 }

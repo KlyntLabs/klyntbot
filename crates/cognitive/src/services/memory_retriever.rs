@@ -11,8 +11,8 @@ use crate::conversation_recall::ConversationRecallService;
 use crate::embedder::SemanticFactEmbedder;
 use crate::repos::{CoActivationRepo, EpisodicMemoryRepo, SemanticFactRepo, USER_MODEL_DOMAINS};
 use crate::retrieval::{retrieve_relevant_facts, RetrievalParams, ScoredFact};
-use crate::services::scoring::KnowledgeDepthCache;
 use crate::search::bm25::search_episodic_memories;
+use crate::services::scoring::KnowledgeDepthCache;
 use crate::situation::UserSituation;
 
 /// RRF constant — same as used in retrieval.rs BM25 merge.
@@ -559,10 +559,7 @@ pub fn detect_referenced_facts(
         .iter()
         .filter(|(_, subject, _)| {
             let lower = subject.to_lowercase();
-            let words: Vec<&str> = lower
-                .split_whitespace()
-                .filter(|w| w.len() > 2)
-                .collect();
+            let words: Vec<&str> = lower.split_whitespace().filter(|w| w.len() > 2).collect();
             if words.is_empty() {
                 return false;
             }

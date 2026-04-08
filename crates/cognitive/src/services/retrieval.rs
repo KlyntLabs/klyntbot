@@ -647,9 +647,17 @@ mod tests {
             .await
             .unwrap();
 
-        retrieve_relevant_facts(&repo, None, "", &["productivity"], &default_params(10), None, None)
-            .await
-            .unwrap();
+        retrieve_relevant_facts(
+            &repo,
+            None,
+            "",
+            &["productivity"],
+            &default_params(10),
+            None,
+            None,
+        )
+        .await
+        .unwrap();
 
         let updated = repo.get("f1").await.unwrap().unwrap();
         assert_eq!(updated.access_count, 1);
@@ -667,10 +675,17 @@ mod tests {
                 .unwrap();
         }
 
-        let results =
-            retrieve_relevant_facts(&repo, None, "", &["productivity"], &default_params(3), None, None)
-                .await
-                .unwrap();
+        let results = retrieve_relevant_facts(
+            &repo,
+            None,
+            "",
+            &["productivity"],
+            &default_params(3),
+            None,
+            None,
+        )
+        .await
+        .unwrap();
         assert_eq!(results.len(), 3);
     }
 
@@ -679,10 +694,17 @@ mod tests {
         let pool = setup().await;
         let repo = SemanticFactRepo::new(pool);
 
-        let results =
-            retrieve_relevant_facts(&repo, None, "", &["nonexistent"], &default_params(10), None, None)
-                .await
-                .unwrap();
+        let results = retrieve_relevant_facts(
+            &repo,
+            None,
+            "",
+            &["nonexistent"],
+            &default_params(10),
+            None,
+            None,
+        )
+        .await
+        .unwrap();
         assert!(results.is_empty());
     }
 

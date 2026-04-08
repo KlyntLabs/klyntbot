@@ -1,9 +1,9 @@
 pub mod accumulated_observation;
 pub mod annotation;
 pub mod atom_extraction_cache;
-pub mod co_activation;
 pub mod blackboard;
 pub mod book_tree;
+pub mod co_activation;
 pub mod community;
 pub mod deck_preference;
 pub mod entity;
@@ -29,8 +29,8 @@ pub use accumulated_observation::AccumulatedObservationRepo;
 pub use annotation::AnnotationRepo;
 pub use atom_extraction_cache::AtomExtractionCache;
 pub use blackboard::{BlackboardEntry, BlackboardRepo, NewBlackboardEntry};
-pub use co_activation::CoActivationRepo;
 pub use book_tree::SqliteBookTreeRepo;
+pub use co_activation::CoActivationRepo;
 pub use community::{CommunityMemberRow, CommunityRepo, CommunityRow};
 pub use deck_preference::{DeckPreferenceRepo, DeckPreferenceRow};
 pub use entity::{
