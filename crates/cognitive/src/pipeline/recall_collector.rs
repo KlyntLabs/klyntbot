@@ -12,9 +12,9 @@ use tokio::sync::broadcast;
 use tokio_util::sync::CancellationToken;
 use tracing::{debug, info, warn};
 
-use crate::repos::procedural_rule::word_overlap_ratio;
 use super::signal::{CognitiveSignal, SignalContext, SignalSource};
 use super::SignalSender;
+use crate::repos::procedural_rule::word_overlap_ratio;
 
 /// Minimum messages in a cluster to promote a signal.
 const CLUSTER_THRESHOLD: usize = 3;
@@ -167,14 +167,24 @@ mod tests {
         let messages = vec![
             msg("Rust error handling best practices for Result types", "s1"),
             msg("Rust error handling best practices with Option types", "s2"),
-            msg("Rust error handling best practices using unwrap safely", "s3"),
+            msg(
+                "Rust error handling best practices using unwrap safely",
+                "s3",
+            ),
             msg("What should I have for dinner tonight at home", "s1"),
         ];
         let clusters = cluster_messages(&messages);
         // Rust error messages should cluster together; dinner is separate.
-        assert!(clusters.len() >= 2, "expected at least 2 clusters, got {}", clusters.len());
+        assert!(
+            clusters.len() >= 2,
+            "expected at least 2 clusters, got {}",
+            clusters.len()
+        );
         let largest = clusters.iter().max_by_key(|c| c.len()).unwrap();
-        assert!(largest.len() >= 2, "expected largest cluster to have ≥2 messages");
+        assert!(
+            largest.len() >= 2,
+            "expected largest cluster to have ≥2 messages"
+        );
     }
 
     #[test]

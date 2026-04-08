@@ -135,7 +135,10 @@ pub fn heuristic_promote(clusters: &[KnowledgeCluster]) -> Vec<PromotionOp> {
 #[async_trait]
 pub trait DeepConsolidationHandler: Send + Sync {
     /// Given knowledge clusters, use an LLM call to decide promotion operations.
-    async fn consolidate_deep(&self, clusters: &[KnowledgeCluster]) -> common::Result<Vec<PromotionOp>>;
+    async fn consolidate_deep(
+        &self,
+        clusters: &[KnowledgeCluster],
+    ) -> common::Result<Vec<PromotionOp>>;
 }
 
 /// Use an LLM to decide promotions for the given clusters.
