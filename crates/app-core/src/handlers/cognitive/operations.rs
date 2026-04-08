@@ -20,6 +20,10 @@ impl AppCore {
             &fact_repo,
             &episodic_repo,
             Some(&rule_repo),
+            None,
+            None,
+            None,
+            None,
         )
         .await
         .map_err(map_cognitive_err)?;

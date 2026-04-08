@@ -5,9 +5,13 @@
 //! 2. Deletes episodic memories older than 90 days with low access
 //! 3. Enforces size budget on active semantic facts
 
-use tracing::{debug, info};
+use chrono::Datelike;
+use tracing::{debug, info, warn};
 
-use crate::repos::{EpisodicMemoryRepo, ProceduralRuleRepo, SemanticFactRepo};
+use crate::repos::{
+    AccumulatedObservationRepo, CoActivationRepo, EpisodicMemoryRepo, FailedObservationRepo,
+    ProceduralRuleRepo, SemanticFactRepo,
+};
 
 /// Default: archive superseded facts older than this many days.
 const DEFAULT_ARCHIVE_DAYS: i64 = 90;
@@ -23,6 +27,16 @@ const RULE_MIN_SIGNALS: i64 = 2;
 const MAX_ACTIVE_FACTS: usize = 10_000;
 /// Stability threshold below which facts are candidates for compaction.
 const LOW_STABILITY_THRESHOLD: f64 = 0.1;
+/// Delete accumulated observations older than this many days.
+const ACCUMULATED_OBS_MAX_DAYS: i64 = 7;
+/// Delete failed observations older than this many days.
+const FAILED_OBS_MAX_DAYS: i64 = 30;
+/// Delete session memory entries older than this many days.
+const SESSION_MEMORY_MAX_DAYS: i64 = 90;
+/// Weekly co-activation decay multiplier.
+const CO_ACTIVATION_DECAY_FACTOR: f64 = 0.95;
+/// Minimum co-activation strength to survive pruning.
+const CO_ACTIVATION_MIN_STRENGTH: f64 = 0.1;
 
 /// Result of a compaction run.
 #[derive(Debug, Clone, Default)]
@@ -31,6 +45,10 @@ pub struct CompactionResult {
     pub episodic_deleted: u64,
     pub low_stability_archived: u64,
     pub rules_deactivated: u64,
+    pub accumulated_obs_deleted: u64,
+    pub failed_obs_deleted: u64,
+    pub session_memory_deleted: u64,
+    pub co_activation_pruned: u64,
 }
 
 /// Run the full compaction cycle.
@@ -38,8 +56,12 @@ pub async fn run_compaction(
     fact_repo: &SemanticFactRepo,
     episodic_repo: &EpisodicMemoryRepo,
     rule_repo: Option<&ProceduralRuleRepo>,
+    accum_repo: Option<&AccumulatedObservationRepo>,
+    failed_repo: Option<&FailedObservationRepo>,
+    session_mem_repo: Option<&storage::SessionMemoryRepo>,
+    co_activation_repo: Option<&CoActivationRepo>,
 ) -> Result<CompactionResult, sqlx::Error> {
-    run_compaction_with_params(
+    let mut result = run_compaction_with_params(
         fact_repo,
         episodic_repo,
         rule_repo,
@@ -47,7 +69,60 @@ pub async fn run_compaction(
         DEFAULT_EPISODIC_ARCHIVE_DAYS,
         EPISODIC_MIN_ACCESS_COUNT,
     )
-    .await
+    .await?;
+
+    // 5. Clean old accumulated observations
+    if let Some(ar) = accum_repo {
+        let deleted = ar.delete_older_than(ACCUMULATED_OBS_MAX_DAYS).await?;
+        result.accumulated_obs_deleted = deleted;
+        if deleted > 0 {
+            info!("Compaction: deleted {deleted} old accumulated observations");
+        }
+    }
+
+    // 6. Clean old failed observations
+    if let Some(fr) = failed_repo {
+        let deleted = fr.delete_older_than(FAILED_OBS_MAX_DAYS).await?;
+        result.failed_obs_deleted = deleted;
+        if deleted > 0 {
+            info!("Compaction: deleted {deleted} old failed observations");
+        }
+    }
+
+    // 7. Clean old session memory entries
+    if let Some(sm) = session_mem_repo {
+        match sm.delete_older_than(SESSION_MEMORY_MAX_DAYS).await {
+            Ok(deleted) => {
+                result.session_memory_deleted = deleted;
+                if deleted > 0 {
+                    info!("Compaction: deleted {deleted} old session memory entries");
+                }
+            }
+            Err(e) => {
+                warn!("Compaction: failed to clean session memory: {e}");
+            }
+        }
+    }
+
+    // 8. Weekly co-activation decay (Sundays only)
+    if let Some(ca) = co_activation_repo {
+        if chrono::Utc::now().weekday() == chrono::Weekday::Sun {
+            let pruned = ca
+                .decay_all(CO_ACTIVATION_DECAY_FACTOR, CO_ACTIVATION_MIN_STRENGTH)
+                .await?;
+            result.co_activation_pruned = pruned;
+            if pruned > 0 {
+                info!("Compaction: pruned {pruned} weak co-activation pairs");
+            }
+        }
+    }
+
+    debug!(
+        "Compaction complete (extended): {} accum_obs deleted, {} failed_obs deleted, {} session_mem deleted, {} co-activation pruned",
+        result.accumulated_obs_deleted, result.failed_obs_deleted, result.session_memory_deleted, result.co_activation_pruned
+    );
+
+    Ok(result)
 }
 
 /// Run compaction with configurable parameters (for testing).
@@ -217,7 +292,7 @@ mod tests {
         let fact_repo = SemanticFactRepo::new(pool.clone());
         let episodic_repo = EpisodicMemoryRepo::new(pool);
 
-        let result = run_compaction(&fact_repo, &episodic_repo, None)
+        let result = run_compaction(&fact_repo, &episodic_repo, None, None, None, None, None)
             .await
             .unwrap();
         assert_eq!(result.facts_archived, 0);
@@ -248,12 +323,75 @@ mod tests {
         };
         rule_repo.upsert(&r).await.unwrap();
 
-        let result = run_compaction(&fact_repo, &episodic_repo, Some(&rule_repo))
-            .await
-            .unwrap();
+        let result =
+            run_compaction(&fact_repo, &episodic_repo, Some(&rule_repo), None, None, None, None)
+                .await
+                .unwrap();
         assert_eq!(result.rules_deactivated, 1);
 
         let active = rule_repo.list_active("productivity").await.unwrap();
         assert!(active.is_empty());
+    }
+
+    #[tokio::test]
+    async fn test_compaction_cleans_accumulated_observations() {
+        let pool = setup().await;
+        let fact_repo = SemanticFactRepo::new(pool.clone());
+        let episodic_repo = EpisodicMemoryRepo::new(pool.clone());
+        let accum_repo = AccumulatedObservationRepo::new(pool.clone());
+
+        // Insert old observation directly with an old timestamp
+        sqlx::query(
+            "INSERT INTO accumulated_observations \
+             (id, event_type_key, domain, content, importance, source_event, observed_at, day_key) \
+             VALUES ('old-1', 'OldEvent', 'test', 'old content', 0.5, 'ev', '2020-01-01T00:00:00Z', '2020-01-01')",
+        )
+        .execute(&pool)
+        .await
+        .unwrap();
+
+        let result = run_compaction(
+            &fact_repo,
+            &episodic_repo,
+            None,
+            Some(&accum_repo),
+            None,
+            None,
+            None,
+        )
+        .await
+        .unwrap();
+        assert_eq!(result.accumulated_obs_deleted, 1);
+    }
+
+    #[tokio::test]
+    async fn test_compaction_cleans_failed_observations() {
+        let pool = setup().await;
+        let fact_repo = SemanticFactRepo::new(pool.clone());
+        let episodic_repo = EpisodicMemoryRepo::new(pool.clone());
+        let failed_repo = FailedObservationRepo::new(pool.clone());
+
+        // Insert an old failed observation directly
+        sqlx::query(
+            "INSERT INTO failed_observations \
+             (id, observation_json, failure_reason, failed_stage, created_at) \
+             VALUES ('old-f1', '{}', 'test', 'extraction', '2020-01-01T00:00:00Z')",
+        )
+        .execute(&pool)
+        .await
+        .unwrap();
+
+        let result = run_compaction(
+            &fact_repo,
+            &episodic_repo,
+            None,
+            None,
+            Some(&failed_repo),
+            None,
+            None,
+        )
+        .await
+        .unwrap();
+        assert_eq!(result.failed_obs_deleted, 1);
     }
 }
