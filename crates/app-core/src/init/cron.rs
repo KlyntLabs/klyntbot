@@ -206,6 +206,7 @@ pub(super) const JOB_MIRROR_WEEKLY_NARRATIVE: &str = "__klyntbot_mirror_weekly_n
 pub(super) const JOB_MIRROR_CLEANUP: &str = "__klyntbot_mirror_cleanup";
 pub(super) const JOB_CROSS_DOMAIN_NIGHTLY: &str = "__klyntbot_cross_domain_nightly";
 const JOB_LAUNCHER_USAGE_PRUNE: &str = "__klyntbot_launcher_usage_prune";
+const JOB_COGNITIVE_COMPACTION: &str = "__klyntbot_cognitive_compaction_daily";
 
 /// Register individual cron handlers.
 #[allow(clippy::too_many_arguments)]
@@ -471,6 +472,52 @@ fn register_cron_callbacks(
                             warn!("Atom decay cycle failed: {e}");
                         }
                         Ok(None)
+                    })
+                })
+            }),
+        );
+    }
+
+    // ── cognitive_compaction_daily ────────────────────────────────────
+    {
+        let pool = repos.pool().clone();
+        let rt = rt.clone();
+        cron_service.register_handler(
+            JOB_COGNITIVE_COMPACTION,
+            Arc::new(move |_job: &scheduling::CronJob| {
+                let pool = pool.clone();
+                tokio::task::block_in_place(|| {
+                    rt.block_on(async {
+                        let fact_repo = cognitive::SemanticFactRepo::new(pool.clone());
+                        let episodic_repo = cognitive::EpisodicMemoryRepo::new(pool.clone());
+                        let rule_repo = cognitive::ProceduralRuleRepo::new(pool.clone());
+                        let accum_repo = cognitive::AccumulatedObservationRepo::new(pool.clone());
+                        let failed_repo = cognitive::FailedObservationRepo::new(pool.clone());
+                        let session_mem_repo = storage::SessionMemoryRepo::new(pool.clone());
+                        let co_activation_repo = cognitive::CoActivationRepo::new(pool.clone());
+
+                        match cognitive::compaction::run_compaction(
+                            &fact_repo,
+                            &episodic_repo,
+                            Some(&rule_repo),
+                            Some(&accum_repo),
+                            Some(&failed_repo),
+                            Some(&session_mem_repo),
+                            Some(&co_activation_repo),
+                        )
+                        .await
+                        {
+                            Ok(r) => Ok(Some(format!(
+                                "Compaction: {} facts, {} episodic, {} rules, {} obs, {} failed, {} sessions, {} co-act",
+                                r.facts_archived, r.episodic_deleted, r.rules_deactivated,
+                                r.accumulated_obs_deleted, r.failed_obs_deleted,
+                                r.session_memory_deleted, r.co_activation_pruned
+                            ))),
+                            Err(e) => {
+                                tracing::warn!("Compaction failed: {e}");
+                                Ok(Some(format!("Compaction failed: {e}")))
+                            }
+                        }
                     })
                 })
             }),
@@ -944,6 +991,15 @@ async fn ensure_cron_jobs(
     )
     .await?;
 
+    ensure_job!(
+        JOB_COGNITIVE_COMPACTION,
+        scheduling::CronSchedule::Cron {
+            expr: "0 3 * * *".to_string(),
+            tz: Some("UTC".to_string()),
+        },
+        "Daily memory compaction",
+        system.clone()
+    );
     ensure_job!(
         JOB_ATOM_DECAY,
         scheduling::CronSchedule::Cron {
