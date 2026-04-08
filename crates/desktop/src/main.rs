@@ -1072,6 +1072,8 @@ fn run_desktop_app() {
             commands::cognitive::cognitive_event_log,
             commands::cognitive::cognitive_pipeline_log,
             commands::cognitive::memory_reference_detail,
+            commands::cognitive::cognitive_graph_data,
+            commands::cognitive::cognitive_graph_expand_topic,
             // Squads
             commands::squads::list_squads,
             commands::squads::get_squad,

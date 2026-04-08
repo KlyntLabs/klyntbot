@@ -247,6 +247,23 @@ pub async fn cognitive_pipeline_log(
     state.cognitive_pipeline_log(limit).await
 }
 
+// ── Cognitive Graph ─────────────────────────────────────────────────
+
+#[tauri::command]
+pub async fn cognitive_graph_data(
+    state: State<'_, Arc<AppCore>>,
+) -> Result<desktop_shared::commands::cognitive_graph::CognitiveGraphData, ApiError> {
+    state.cognitive_graph_data().await
+}
+
+#[tauri::command]
+pub async fn cognitive_graph_expand_topic(
+    state: State<'_, Arc<AppCore>>,
+    params: desktop_shared::commands::cognitive_graph::TopicExpandParams,
+) -> Result<desktop_shared::commands::cognitive_graph::TopicDetail, ApiError> {
+    state.cognitive_graph_expand_topic(params).await
+}
+
 // ── Dev server dispatch ─────────────────────────────────────────────
 
 #[cfg(test)]
@@ -281,6 +298,8 @@ pub(crate) const DEV_COMMANDS: &[&str] = &[
     "coaching_submit_feedback",
     "coaching_report_ignored",
     "memory_health",
+    "cognitive_graph_data",
+    "cognitive_graph_expand_topic",
 ];
 
 #[cfg(debug_assertions)]
@@ -373,6 +392,12 @@ pub(crate) async fn dispatch_dev(
                 &dev::get::<String>(body, "ref_id").unwrap_or_default(),
             )
             .await,
+        ),
+        // Cognitive Graph
+        "cognitive_graph_data" => dev::val(core.cognitive_graph_data().await),
+        "cognitive_graph_expand_topic" => dev::val(
+            core.cognitive_graph_expand_topic(try_field!(dev::parse_params(body)))
+                .await,
         ),
         _ => return None,
     })

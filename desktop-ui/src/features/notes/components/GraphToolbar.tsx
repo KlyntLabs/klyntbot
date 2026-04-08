@@ -1,7 +1,7 @@
-import { Atom, Brain, Search, TreePine } from "lucide-react";
+import { Atom, Brain, Network, Search, TreePine } from "lucide-react";
 import type { SmartView } from "../hooks/useGraphData";
 
-type LayerKey = "entities" | "tree";
+type LayerKey = "entities" | "tree" | "cognitive";
 
 interface GraphToolbarProps {
   view: SmartView;
@@ -38,6 +38,7 @@ const LAYER_OPTIONS: {
 }[] = [
   { key: "entities", label: "Entities", Icon: Atom },
   { key: "tree", label: "Tree", Icon: TreePine },
+  { key: "cognitive", label: "Cognitive", Icon: Network },
 ];
 
 export function GraphToolbar({
@@ -128,28 +129,30 @@ export function GraphToolbar({
         ))}
       </div>
 
-      {/* Layer toggles */}
-      <div className="flex items-center gap-1 text-xs text-muted-foreground">
-        <span>Layers:</span>
-        <div className="flex items-center gap-0.5 bg-card rounded-lg p-0.5">
-          {LAYER_OPTIONS.map(({ key, label, Icon }) => (
-            <button
-              key={key}
-              type="button"
-              onClick={() => onLayerToggle(key)}
-              className={`px-2 py-1 text-xs rounded-md transition-all flex items-center gap-1 ${
-                layerState[key]
-                  ? "bg-brand/20 text-brand font-medium shadow-sm"
-                  : "text-muted-foreground hover:text-foreground hover:bg-accent"
-              }`}
-              title={`Toggle ${label} layer`}
-            >
-              <Icon size={12} />
-              {label}
-            </button>
-          ))}
+      {/* Layer toggles — only visible in Semantic clustering mode */}
+      {clusteringMode === "semantic" && (
+        <div className="flex items-center gap-1 text-xs text-muted-foreground">
+          <span>Layers:</span>
+          <div className="flex items-center gap-0.5 bg-card rounded-lg p-0.5">
+            {LAYER_OPTIONS.map(({ key, label, Icon }) => (
+              <button
+                key={key}
+                type="button"
+                onClick={() => onLayerToggle(key)}
+                className={`px-2 py-1 text-xs rounded-md transition-all flex items-center gap-1 ${
+                  layerState[key]
+                    ? "bg-brand/20 text-brand font-medium shadow-sm"
+                    : "text-muted-foreground hover:text-foreground hover:bg-accent"
+                }`}
+                title={`Toggle ${label} layer`}
+              >
+                <Icon size={12} />
+                {label}
+              </button>
+            ))}
+          </div>
         </div>
-      </div>
+      )}
 
       {/* Spacer */}
       <div className="flex-1" />

@@ -253,8 +253,8 @@ impl UnifiedMemoryService {
                     .map(|f| {
                         let label = freshness_label(&f.fact);
                         let content = format!(
-                            "[@fact:{}] {}: {} = {} [{}]",
-                            f.fact.id, f.fact.subject, f.fact.predicate, f.fact.object, label
+                            "{}: {} = {} [{}]",
+                            f.fact.subject, f.fact.predicate, f.fact.object, label
                         );
                         let predicate = f.fact.predicate.clone();
                         (f.fact.id, f.score, content, predicate)
@@ -300,8 +300,8 @@ impl UnifiedMemoryService {
                 .map(|f| {
                     let label = freshness_label(&f.fact);
                     let content = format!(
-                        "[@fact:{}] {}: {} = {} [{}]",
-                        f.fact.id, f.fact.subject, f.fact.predicate, f.fact.object, label
+                        "{}: {} = {} [{}]",
+                        f.fact.subject, f.fact.predicate, f.fact.object, label
                     );
                     MemoryEntry {
                         id: f.fact.id,
@@ -426,7 +426,7 @@ impl UnifiedMemoryService {
                         } else {
                             text
                         };
-                        let display = format!("[@episode:{}] {}", bm25.id, truncated);
+                        let display = truncated.to_string();
                         entries.push((bm25.id.clone(), bm25.score, display));
                     }
                 }

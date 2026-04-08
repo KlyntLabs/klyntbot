@@ -35,6 +35,12 @@ export interface GraphSettings {
   layerEntities: boolean;
   /** Show tree structure sub-nodes */
   layerTree: boolean;
+  /** Show cognitive layer nodes (memories, rules, episodes) */
+  layerCognitive: boolean;
+  /** Show meta-rule nodes from cognitive layer */
+  cognitiveRules: boolean;
+  /** Show episodic memory nodes from cognitive layer */
+  cognitiveEpisodes: boolean;
 }
 
 const DEFAULT_SETTINGS: GraphSettings = {
@@ -55,6 +61,9 @@ const DEFAULT_SETTINGS: GraphSettings = {
   linkOpacity: 0.6,
   layerEntities: false,
   layerTree: false,
+  layerCognitive: true,
+  cognitiveRules: true,
+  cognitiveEpisodes: false,
 };
 
 const STORAGE_KEY = "klynt-graph-settings";

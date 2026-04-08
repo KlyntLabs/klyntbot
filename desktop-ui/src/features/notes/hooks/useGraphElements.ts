@@ -41,7 +41,10 @@ export type ForceNodeType =
   | "productivity"
   | "okr"
   | "learning"
-  | "project";
+  | "project"
+  | "topic"
+  | "fact"
+  | "rule";
 
 export interface ForceNode {
   id: string;
@@ -122,12 +125,19 @@ export interface FabricData {
   layerTree: boolean;
 }
 
+export interface CognitiveData {
+  nodes: ForceNode[];
+  links: ForceLink[];
+  communities: Array<{ id: string; name: string; color: string; memberTopicIds: string[] }>;
+}
+
 interface UseGraphElementsParams {
   nodes: GraphNode[];
   links: GraphLink[];
   notebooks: Notebook[];
   clusteringMode: "notebook" | "semantic";
   fabricData?: FabricData;
+  cognitiveData?: CognitiveData;
 }
 
 export function useGraphElements({
@@ -136,6 +146,7 @@ export function useGraphElements({
   notebooks,
   clusteringMode,
   fabricData,
+  cognitiveData,
 }: UseGraphElementsParams): GraphElements {
   return useMemo(() => {
     const clusterMap = new Map<string, ClusterInfo>();
@@ -332,6 +343,28 @@ export function useGraphElements({
       }
     }
 
+    // ── Cognitive layer nodes ──────────────────────────────────────────
+    const cognitiveLinks: ForceLink[] = [];
+    if (cognitiveData) {
+      for (const cn of cognitiveData.nodes) {
+        // clusterId is "community:c0", comm.id is "c0" — match with prefix
+        const comm = cognitiveData.communities.find((c) => cn.clusterId === `community:${c.id}`);
+        forceNodes.push({ ...cn, color: comm?.color ?? (cn.color || "#8b5cf6") });
+      }
+      for (const cl of cognitiveData.links) {
+        cognitiveLinks.push({ ...cl, color: cl.color || "#4B5563" });
+      }
+      // Add cognitive communities to the cluster map
+      for (const comm of cognitiveData.communities) {
+        clusterMap.set(`community:${comm.id}`, {
+          id: `community:${comm.id}`,
+          label: comm.name,
+          color: comm.color,
+          count: comm.memberTopicIds.length,
+        });
+      }
+    }
+
     const edgeCounts = new Map<string, number>();
     for (const link of links) {
       const sourceId = resolveLinkEndpointId(link.source);
@@ -357,8 +390,8 @@ export function useGraphElements({
       forceLinks.push({ source: sourceId, target: targetId, weight, color: sourceColor });
     }
 
-    // Merge entity + tree links into the final link set
-    const allForceLinks = [...forceLinks, ...entityLinks, ...treeLinks];
+    // Merge entity + tree + cognitive links into the final link set
+    const allForceLinks = [...forceLinks, ...entityLinks, ...treeLinks, ...cognitiveLinks];
 
     const allClusters = Array.from(clusterMap.values()).filter((c) => c.count > 0);
     const clusters = allClusters.filter((c) => !c.id.startsWith("community:"));
@@ -369,5 +402,5 @@ export function useGraphElements({
     const fingerprint = computeFingerprint(nodeIdList, edgePairList);
 
     return { nodes: forceNodes, links: allForceLinks, clusters, communities, fingerprint };
-  }, [nodes, links, notebooks, clusteringMode, fabricData]);
+  }, [nodes, links, notebooks, clusteringMode, fabricData, cognitiveData]);
 }

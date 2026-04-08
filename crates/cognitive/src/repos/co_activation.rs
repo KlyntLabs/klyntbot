@@ -91,6 +91,16 @@ impl CoActivationRepo {
         Ok(result.rows_affected())
     }
 
+    /// Load all co-activation pairs (for graph building).
+    pub async fn list_all_pairs(&self) -> Result<Vec<(String, String, f64)>, sqlx::Error> {
+        let rows: Vec<(String, String, f64)> = sqlx::query_as(
+            "SELECT fact_id_a, fact_id_b, strength FROM co_activation ORDER BY strength DESC",
+        )
+        .fetch_all(&self.pool)
+        .await?;
+        Ok(rows)
+    }
+
     /// Count total co-activation pairs.
     pub async fn count_all(&self) -> Result<i64, sqlx::Error> {
         let (count,): (i64,) = sqlx::query_as("SELECT COUNT(*) FROM co_activation")

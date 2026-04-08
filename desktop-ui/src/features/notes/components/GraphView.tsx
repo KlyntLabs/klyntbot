@@ -3,12 +3,13 @@ import type { Notebook, NoteListItem } from "@shared/types";
 import type { FabricCommunityDetail } from "@shared/types/fabric";
 import { Maximize2, Minus, Plus, RotateCcw, Settings2 } from "lucide-react";
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCognitiveGraph } from "../hooks/useCognitiveGraph";
 import { useFabricGraph } from "../hooks/useFabricGraph";
 import type { DragCommunityChange, ViewportBounds } from "../hooks/useForceGraph";
 import { useForceGraph } from "../hooks/useForceGraph";
 import type { GraphLink, GraphNode, SmartView } from "../hooks/useGraphData";
 import { useGraphData } from "../hooks/useGraphData";
-import type { FabricData, ForceNode } from "../hooks/useGraphElements";
+import type { CognitiveData, FabricData, ForceNode } from "../hooks/useGraphElements";
 import { useGraphElements } from "../hooks/useGraphElements";
 import { useGraphPositionCache } from "../hooks/useGraphPositionCache";
 import { useGraphSettings } from "../hooks/useGraphSettings";
@@ -52,9 +53,13 @@ interface GraphViewProps {
   onOpenInEditor?: (id: string) => void;
 }
 
-const LAYER_SETTINGS_KEY: Record<"entities" | "tree", "layerEntities" | "layerTree"> = {
+const LAYER_SETTINGS_KEY: Record<
+  "entities" | "tree" | "cognitive",
+  "layerEntities" | "layerTree" | "layerCognitive"
+> = {
   entities: "layerEntities",
   tree: "layerTree",
+  cognitive: "layerCognitive",
 };
 
 export function GraphView({
@@ -124,12 +129,12 @@ export function GraphView({
   const fabric = useFabricGraph(fabricEnabled);
 
   const handleLayerToggle = useCallback(
-    (layer: "entities" | "tree") => {
+    (layer: "entities" | "tree" | "cognitive") => {
       const settingsKey = LAYER_SETTINGS_KEY[layer];
       const currentlyEnabled = settings[settingsKey];
       setSettings({ [settingsKey]: !currentlyEnabled });
 
-      // When enabling a layer, fetch its data
+      // When enabling a layer, fetch its data (cognitive is fetched via useQuery)
       if (!currentlyEnabled) {
         if (layer === "entities") {
           fabric.expandLayer("entities");
@@ -166,6 +171,19 @@ export function GraphView({
         layerTree: settings.layerTree,
       }
     : undefined;
+
+  // ── Cognitive graph ────────────────────────────────────────────────
+  const cognitiveEnabled = settings.clusteringMode === "semantic" && settings.layerCognitive;
+  const cognitive = useCognitiveGraph(cognitiveEnabled);
+
+  const cognitiveData: CognitiveData | undefined =
+    cognitiveEnabled && cognitive.nodes.length > 0
+      ? {
+          nodes: cognitive.nodes,
+          links: cognitive.links,
+          communities: cognitive.communities,
+        }
+      : undefined;
 
   // ── Data pipeline ──────────────────────────────────────────────────
 
@@ -225,6 +243,7 @@ export function GraphView({
     notebooks,
     clusteringMode: settings.clusteringMode,
     fabricData,
+    cognitiveData,
   });
 
   // Apply cluster filtering -- hide nodes belonging to hidden clusters
@@ -395,6 +414,17 @@ export function GraphView({
     cachedPositions,
     onNodeClick: (nodeId: string) => {
       const node = elements.nodes.find((n) => n.id === nodeId);
+
+      // Cognitive topic nodes: expand/collapse on click
+      if (node?.nodeType === "topic" && node.expandable) {
+        const parts = nodeId.split(":");
+        if (parts.length >= 2) {
+          const topicId = parts.slice(1).join(":");
+          cognitive.expandTopic(topicId);
+        }
+        return;
+      }
+
       if (!node || node.nodeType === "note") {
         setSelectedFabricNode(null);
         onSelectNote(nodeId);
@@ -587,6 +617,9 @@ export function GraphView({
         case "2":
           handleLayerToggle("tree");
           break;
+        case "3":
+          handleLayerToggle("cognitive");
+          break;
         case "s":
         case "S":
           // Apply semantic preset
@@ -719,6 +752,7 @@ export function GraphView({
         layerState={{
           entities: settings.layerEntities,
           tree: settings.layerTree,
+          cognitive: settings.layerCognitive,
         }}
         onLayerToggle={handleLayerToggle}
       />
@@ -804,6 +838,17 @@ export function GraphView({
                 isRevealing={waveReveal.isRevealing}
                 onNodeClick={(nodeId: string) => {
                   const node = elements.nodes.find((n) => n.id === nodeId);
+
+                  // Cognitive topic nodes: expand/collapse on click
+                  if (node?.nodeType === "topic" && node.expandable) {
+                    const parts = nodeId.split(":");
+                    if (parts.length >= 2) {
+                      const topicId = parts.slice(1).join(":");
+                      cognitive.expandTopic(topicId);
+                    }
+                    return;
+                  }
+
                   if (!node || node.nodeType === "note") {
                     setSelectedFabricNode(null);
                     onSelectNote(nodeId);
@@ -1004,9 +1049,28 @@ export function GraphView({
 
 function FabricNodePanel({ node, onClose }: { node: ForceNode; onClose: () => void }) {
   const typeLabel =
-    node.nodeType === "entity" ? "Entity" : node.nodeType === "tree_section" ? "Section" : "Node";
+    node.nodeType === "entity"
+      ? "Entity"
+      : node.nodeType === "tree_section"
+        ? "Section"
+        : node.nodeType === "topic"
+          ? "Topic"
+          : node.nodeType === "fact"
+            ? "Fact"
+            : node.nodeType === "rule"
+              ? "Rule"
+              : "Node";
 
-  const typeIcon = node.nodeType === "entity" ? "diamond" : "section";
+  const typeIcon =
+    node.nodeType === "entity"
+      ? "diamond"
+      : node.nodeType === "topic"
+        ? "brain"
+        : node.nodeType === "fact"
+          ? "dot"
+          : node.nodeType === "rule"
+            ? "shield"
+            : "section";
 
   return (
     <div className="absolute right-0 top-12 bottom-0 w-[280px] z-20 glass-panel border-l border-border/30 overflow-y-auto">
@@ -1017,6 +1081,9 @@ function FabricNodePanel({ node, onClose }: { node: ForceNode; onClose: () => vo
             style={{ backgroundColor: `${node.color}20`, color: node.color }}
           >
             {typeIcon === "diamond" && "◆ "}
+            {typeIcon === "brain" && "◉ "}
+            {typeIcon === "dot" && "● "}
+            {typeIcon === "shield" && "◇ "}
             {typeIcon === "section" && "◎ "}
             {typeLabel}
           </span>
@@ -1049,6 +1116,26 @@ function FabricNodePanel({ node, onClose }: { node: ForceNode; onClose: () => vo
           {node.nodeType === "tree_section" && (
             <div>
               Level: <span className="text-foreground">{node.size > 12 ? "Section" : "Text"}</span>
+            </div>
+          )}
+          {node.nodeType === "topic" && (
+            <>
+              <div>
+                Facts: <span className="text-foreground">{node.linkCount}</span>
+              </div>
+              <div>
+                Domain: <span className="text-foreground">{node.tags[0] || "general"}</span>
+              </div>
+            </>
+          )}
+          {node.nodeType === "fact" && (
+            <div>
+              Source: <span className="text-foreground">{node.tags[0] || "unknown"}</span>
+            </div>
+          )}
+          {node.nodeType === "rule" && (
+            <div>
+              Signals: <span className="text-foreground">{node.linkCount}</span>
             </div>
           )}
         </div>
