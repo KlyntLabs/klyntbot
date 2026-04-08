@@ -769,3 +769,16 @@ CREATE TABLE IF NOT EXISTS cross_domain_insights (
     surfaced    INTEGER NOT NULL DEFAULT 0,
     created_at  TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now'))
 );
+
+-- ── Retrieval feedback ─────────────────────────────────────────
+-- Tracks which retrieved facts the LLM referenced, for autotuner evaluation
+CREATE TABLE IF NOT EXISTS retrieval_feedback (
+    id TEXT PRIMARY KEY,
+    retrieved_fact_ids TEXT NOT NULL,
+    referenced_fact_ids TEXT NOT NULL,
+    precision REAL NOT NULL,
+    session_key TEXT NOT NULL,
+    created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_retrieval_feedback_session ON retrieval_feedback(session_key);
+CREATE INDEX IF NOT EXISTS idx_retrieval_feedback_created ON retrieval_feedback(created_at);

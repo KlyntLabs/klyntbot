@@ -1,0 +1,70 @@
+//! Repository for retrieval feedback tracking.
+//!
+//! Records which retrieved facts the LLM actually referenced in its response,
+//! enabling the autotuner to evaluate retrieval quality.
+
+use sqlx::SqlitePool;
+
+#[derive(Debug, Clone)]
+pub struct RetrievalFeedbackRepo {
+    pool: SqlitePool,
+}
+
+impl RetrievalFeedbackRepo {
+    pub fn new(pool: SqlitePool) -> Self {
+        Self { pool }
+    }
+
+    /// Insert a feedback record. Computes precision as `referenced / retrieved`.
+    pub async fn insert(
+        &self,
+        retrieved_ids: &[String],
+        referenced_ids: &[String],
+        session_key: &str,
+    ) -> Result<(), sqlx::Error> {
+        if retrieved_ids.is_empty() {
+            return Ok(());
+        }
+        let precision = referenced_ids.len() as f64 / retrieved_ids.len() as f64;
+        let id = uuid::Uuid::new_v4().to_string();
+        let retrieved_json = serde_json::to_string(retrieved_ids).unwrap_or_default();
+        let referenced_json = serde_json::to_string(referenced_ids).unwrap_or_default();
+
+        sqlx::query(
+            "INSERT INTO retrieval_feedback (id, retrieved_fact_ids, referenced_fact_ids, precision, session_key)
+             VALUES (?1, ?2, ?3, ?4, ?5)",
+        )
+        .bind(&id)
+        .bind(&retrieved_json)
+        .bind(&referenced_json)
+        .bind(precision)
+        .bind(session_key)
+        .execute(&self.pool)
+        .await?;
+        Ok(())
+    }
+
+    /// Average precision over the past N days.
+    pub async fn avg_precision_since(&self, days: i64) -> Result<f64, sqlx::Error> {
+        let cutoff = (chrono::Utc::now() - chrono::Duration::days(days)).to_rfc3339();
+        let row: (f64,) = sqlx::query_as(
+            "SELECT COALESCE(AVG(precision), 0.0) FROM retrieval_feedback WHERE created_at >= ?1",
+        )
+        .bind(&cutoff)
+        .fetch_one(&self.pool)
+        .await?;
+        Ok(row.0)
+    }
+
+    /// Count feedback entries in the past N days.
+    pub async fn count_since(&self, days: i64) -> Result<i64, sqlx::Error> {
+        let cutoff = (chrono::Utc::now() - chrono::Duration::days(days)).to_rfc3339();
+        let row: (i64,) = sqlx::query_as(
+            "SELECT COUNT(*) FROM retrieval_feedback WHERE created_at >= ?1",
+        )
+        .bind(&cutoff)
+        .fetch_one(&self.pool)
+        .await?;
+        Ok(row.0)
+    }
+}
