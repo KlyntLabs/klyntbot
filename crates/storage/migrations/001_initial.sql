@@ -794,3 +794,21 @@ CREATE TABLE reforge_state (
 );
 
 INSERT INTO reforge_state (id) VALUES ('singleton');
+
+-- ============================================================
+-- Skill Version History
+-- ============================================================
+CREATE TABLE skill_versions (
+    id          TEXT PRIMARY KEY,
+    skill_name  TEXT NOT NULL,
+    version     INTEGER NOT NULL,
+    file_path   TEXT NOT NULL,
+    content     TEXT NOT NULL,
+    diff        TEXT,
+    source      TEXT NOT NULL,
+    reason      TEXT,
+    created_at  TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now'))
+);
+
+CREATE INDEX idx_skill_versions_name ON skill_versions(skill_name, version);
+CREATE INDEX idx_skill_versions_lookup ON skill_versions(skill_name, file_path, version);

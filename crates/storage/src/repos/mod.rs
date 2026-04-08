@@ -29,6 +29,7 @@ pub mod project_repo;
 pub mod project_source_repo;
 pub mod reforge_state;
 pub mod retrieval_feedback;
+pub mod skill_version;
 pub mod session;
 pub mod session_context;
 pub mod session_memory;
@@ -70,6 +71,7 @@ pub use project_repo::{ProjectFilter, ProjectPatch, ProjectRepo, ProjectWithStat
 pub use project_source_repo::ProjectSourceRepo;
 pub use reforge_state::ReforgeStateRepo;
 pub use retrieval_feedback::RetrievalFeedbackRepo;
+pub use skill_version::SkillVersionRepo;
 pub use session::SessionRepo;
 pub use session_context::{SessionContextParams, SessionContextRepo};
 pub use session_memory::SessionMemoryRepo;
@@ -140,6 +142,7 @@ pub struct Repos {
     pub tool_usage: ToolUsageRepo,
     pub dnd_override: DndOverrideRepo,
     pub reforge_state: ReforgeStateRepo,
+    pub skill_version: SkillVersionRepo,
 }
 
 impl Repos {
@@ -172,6 +175,7 @@ impl Repos {
             tool_usage: ToolUsageRepo::new(db.clone()),
             dnd_override: DndOverrideRepo::new(db.clone()),
             reforge_state: ReforgeStateRepo::new(db.clone()),
+            skill_version: SkillVersionRepo::new(db.clone()),
             pool: db,
         }
     }

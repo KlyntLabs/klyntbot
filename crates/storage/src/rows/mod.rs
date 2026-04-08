@@ -13,6 +13,7 @@ pub mod project;
 pub mod project_source;
 pub mod reforge_state;
 pub mod session;
+pub mod skill_version;
 pub mod session_context;
 pub mod session_memory;
 pub mod status;
@@ -27,6 +28,7 @@ pub use entity_link::EntityLinkRow;
 pub use project_source::ProjectSourceRow;
 pub use reforge_state::ReforgeStateRow;
 pub use session_memory::SessionMemoryRow;
+pub use skill_version::SkillVersionRow;
 pub use status::{StatusLabelRow, StatusWorkflowRow};
 pub use task_group::TaskGroupRow;
 
