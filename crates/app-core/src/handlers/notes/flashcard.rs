@@ -140,6 +140,23 @@ impl AppCore {
                 let _ = atom_repo
                     .update_retention(atom_id, retention_pct, card.stability, card.difficulty)
                     .await;
+                // Cross-reinforce linked semantic fact (flashcard -> fact bridge)
+                if let Ok(Some(atom)) = atom_repo.get(atom_id).await {
+                    if let Some(ref fact_id) = atom.semantic_fact_id {
+                        let fact_repo = cognitive::SemanticFactRepo::new(repo.pool().clone());
+                        if let Ok(Some(fact)) = fact_repo.get(fact_id).await {
+                            let new_stability =
+                                cognitive::decay::update_stability(fact.stability, true, 30.0);
+                            let _ = fact_repo.record_access(fact_id, new_stability).await;
+                            tracing::debug!(
+                                "Flashcard review reinforced fact {} (stability: {:.2} -> {:.2})",
+                                fact_id,
+                                fact.stability,
+                                new_stability
+                            );
+                        }
+                    }
+                }
             }
         }
 
