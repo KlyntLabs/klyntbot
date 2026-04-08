@@ -268,6 +268,11 @@ impl BackgroundConsolidationService {
                 sig_tx.clone(),
                 cancel.clone(),
             ));
+            _collector_handles.push(crate::pipeline::RecallCollector::start(
+                bus.subscribe(),
+                sig_tx.clone(),
+                cancel.clone(),
+            ));
             if let Some(ref mem_repo) = session_memory_repo {
                 _collector_handles.push(crate::pipeline::SessionCollector::start(
                     bus.subscribe(),
