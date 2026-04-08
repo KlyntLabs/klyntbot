@@ -9,8 +9,9 @@ use tracing::warn;
 use crate::context_source::CognitiveRetrievalConfig;
 use crate::conversation_recall::ConversationRecallService;
 use crate::embedder::SemanticFactEmbedder;
-use crate::repos::{EpisodicMemoryRepo, SemanticFactRepo, USER_MODEL_DOMAINS};
+use crate::repos::{CoActivationRepo, EpisodicMemoryRepo, SemanticFactRepo, USER_MODEL_DOMAINS};
 use crate::retrieval::{retrieve_relevant_facts, RetrievalParams, ScoredFact};
+use crate::services::scoring::KnowledgeDepthCache;
 use crate::search::bm25::search_episodic_memories;
 use crate::situation::UserSituation;
 
@@ -51,6 +52,8 @@ pub struct UnifiedMemoryService {
     /// Live champion params from the autotuner. Read on each retrieval to override
     /// config defaults for vector_top_k, min_similarity, and relevance weights.
     champion_overrides: Option<Arc<std::sync::RwLock<Option<common::TrialParams>>>>,
+    co_activation_repo: Option<CoActivationRepo>,
+    depth_cache: KnowledgeDepthCache,
 }
 
 impl UnifiedMemoryService {
@@ -63,6 +66,8 @@ impl UnifiedMemoryService {
             config: CognitiveRetrievalConfig::default(),
             situation: None,
             champion_overrides: None,
+            co_activation_repo: None,
+            depth_cache: KnowledgeDepthCache::new(60),
         }
     }
 
@@ -96,6 +101,11 @@ impl UnifiedMemoryService {
         overrides: Arc<std::sync::RwLock<Option<common::TrialParams>>>,
     ) -> Self {
         self.champion_overrides = Some(overrides);
+        self
+    }
+
+    pub fn with_co_activation_repo(mut self, repo: CoActivationRepo) -> Self {
+        self.co_activation_repo = Some(repo);
         self
     }
 
@@ -192,8 +202,8 @@ impl UnifiedMemoryService {
             query,
             USER_MODEL_DOMAINS,
             &params,
-            None,
-            None,
+            self.co_activation_repo.as_ref(),
+            Some(&self.depth_cache),
         )
         .await
         {
@@ -475,6 +485,23 @@ impl MemoryRetriever for UnifiedMemoryService {
                 .unwrap_or(std::cmp::Ordering::Equal)
         });
         results.truncate(limit);
+
+        // 5b. Fire-and-forget co-activation recording for co-retrieved facts
+        if let Some(ref co_repo) = self.co_activation_repo {
+            let fact_ids: Vec<String> = results
+                .iter()
+                .filter(|e| matches!(e.source, MemorySource::CognitiveFact))
+                .map(|e| e.id.clone())
+                .collect();
+            if fact_ids.len() >= 2 {
+                let co_repo = co_repo.clone();
+                tokio::spawn(async move {
+                    if let Err(e) = co_repo.record_co_retrieval(&fact_ids).await {
+                        tracing::debug!("Co-activation recording failed: {e}");
+                    }
+                });
+            }
+        }
 
         // 6. Re-normalize RRF scores to 0.0–1.0 for display
         let rrf_scores_vec: Vec<f64> = results.iter().map(|r| r.score).collect();

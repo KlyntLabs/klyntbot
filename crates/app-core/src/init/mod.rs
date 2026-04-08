@@ -798,7 +798,10 @@ impl AppCore {
                 let voice_memory_retriever: Option<Arc<dyn context_engine::MemoryRetriever>> = {
                     let fact_repo =
                         ::cognitive::SemanticFactRepo::new(storage_pool.inner().clone());
-                    let retriever = ::cognitive::UnifiedMemoryService::new(fact_repo);
+                    let retriever = ::cognitive::UnifiedMemoryService::new(fact_repo)
+                        .with_co_activation_repo(::cognitive::CoActivationRepo::new(
+                            storage_pool.inner().clone(),
+                        ));
                     Some(Arc::new(retriever) as Arc<dyn context_engine::MemoryRetriever>)
                 };
 

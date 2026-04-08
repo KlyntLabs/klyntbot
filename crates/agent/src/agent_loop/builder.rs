@@ -694,6 +694,11 @@ impl AgentLoopBuilder {
                     retriever = retriever.with_champion_overrides(sink);
                 }
             }
+            // Wire co-activation tracking for intelligent scoring
+            if let Some(ref pool) = self.pool {
+                retriever = retriever
+                    .with_co_activation_repo(cognitive::CoActivationRepo::new(pool.clone()));
+            }
             let memory_service = Arc::new(retriever);
             memory_service_for_shadow = Some(Arc::clone(&memory_service));
             let retriever: Arc<dyn context_engine::MemoryRetriever> =
