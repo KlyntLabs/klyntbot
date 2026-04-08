@@ -323,10 +323,17 @@ mod tests {
         };
         rule_repo.upsert(&r).await.unwrap();
 
-        let result =
-            run_compaction(&fact_repo, &episodic_repo, Some(&rule_repo), None, None, None, None)
-                .await
-                .unwrap();
+        let result = run_compaction(
+            &fact_repo,
+            &episodic_repo,
+            Some(&rule_repo),
+            None,
+            None,
+            None,
+            None,
+        )
+        .await
+        .unwrap();
         assert_eq!(result.rules_deactivated, 1);
 
         let active = rule_repo.list_active("productivity").await.unwrap();

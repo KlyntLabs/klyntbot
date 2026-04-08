@@ -1723,8 +1723,7 @@ impl AgentLoopBuilder {
             runtime = runtime.with_memory_service(Arc::clone(mem_svc));
         }
         if let Some(ref pool) = self.pool {
-            runtime =
-                runtime.with_feedback_repo(storage::RetrievalFeedbackRepo::new(pool.clone()));
+            runtime = runtime.with_feedback_repo(storage::RetrievalFeedbackRepo::new(pool.clone()));
         }
 
         let runtime = Arc::new(runtime);

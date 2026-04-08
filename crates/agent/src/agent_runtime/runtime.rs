@@ -276,14 +276,12 @@ impl AgentRuntime {
         .await;
 
         // Record retrieval feedback (fire-and-forget)
-        if let (Some(ref mem_svc), Some(ref fb_repo)) =
-            (&self.memory_service, &self.feedback_repo)
+        if let (Some(ref mem_svc), Some(ref fb_repo)) = (&self.memory_service, &self.feedback_repo)
         {
             let mem_svc = Arc::clone(mem_svc);
             let fb_repo = fb_repo.clone();
             let response = loop_result.content.clone();
-            let session_key =
-                common::SessionKey::new(&ctx.channel, &ctx.chat_id).to_string();
+            let session_key = common::SessionKey::new(&ctx.channel, &ctx.chat_id).to_string();
             tokio::spawn(async move {
                 mem_svc
                     .record_response_feedback(&response, &session_key, &fb_repo)
