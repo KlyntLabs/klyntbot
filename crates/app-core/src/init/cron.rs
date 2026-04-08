@@ -453,6 +453,14 @@ fn register_cron_callbacks(
                                 data_dir.join("skills"),
                             );
 
+                        // Detect manual user edits before running the Reforge
+                        // cycle so the synthesizer sees the latest on-disk content.
+                        cognitive::services::reforge::collector::detect_user_edits(
+                            &skill_mgr,
+                            &repos_reforge.skill_version,
+                        )
+                        .await;
+
                         match cognitive::services::reforge::service::run_reforge(
                             &repos_reforge.reforge_state,
                             &repos_reforge.skill_version,

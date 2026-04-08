@@ -8,8 +8,7 @@ use async_trait::async_trait;
 use serde_json::json;
 
 use cognitive::extraction::ExtractedFact;
-use cognitive::reflection::{ReflectionHandler, ReflectionInput, ReflectionOutput};
-use cognitive::types::{MemoryOp, Observation, ProceduralRule, SemanticFact, DEFAULT_MEMORY_TYPE};
+use cognitive::types::{MemoryOp, Observation};
 use cognitive::{ConsolidationHandler, ExtractionHandler};
 use feature_coaching::reasoner::{
     CoachingDecision, CoachingReasonerHandler, InterventionType, ReasonerInput,
@@ -152,31 +151,6 @@ impl ConsolidationHandler for HeuristicConsolidationHandler {
             ops.push(op);
         }
         Ok(ops)
-    }
-}
-
-/// Heuristic reflection — generates a statistical summary without LLM.
-/// Returns empty fact/rule updates but provides a useful summary.
-pub struct HeuristicReflectionHandler;
-
-#[async_trait]
-impl ReflectionHandler for HeuristicReflectionHandler {
-    async fn reflect(&self, input: &ReflectionInput) -> common::Result<ReflectionOutput> {
-        let mem_count = input.episodic_memories.len();
-        let rule_count = input.procedural_rules.len();
-        let domain_count = input.user_model.non_empty_domain_count();
-
-        let summary = format!(
-            "Heuristic reflection ({} to {}): {} episodic memories, {} active rules, {} domains tracked. \
-             No LLM available for cross-domain synthesis.",
-            input.period_start, input.period_end, mem_count, rule_count, domain_count
-        );
-
-        Ok(ReflectionOutput {
-            fact_updates: vec![],
-            rule_updates: vec![],
-            summary,
-        })
     }
 }
 
@@ -727,165 +701,6 @@ struct DeepDecision {
     importance: Option<f64>,
 }
 
-// ── Reflection ──
-
-const REFLECTION_SYSTEM_PROMPT: &str = "\
-You are a cognitive reflection agent performing weekly self-review. Analyze the user's \
-episodic memories, current model, and procedural rules to identify:\n\n\
-1. Cross-domain patterns (e.g., exercise correlates with productivity)\n\
-2. Facts that should be updated based on new evidence\n\
-3. New procedural rules based on validated patterns (minimum 5 signals across 3+ days)\n\
-4. Facts that may be outdated and should be revisited\n\n\
-Output:\n\
-- fact_updates: New or updated semantic facts. Use source \"reflected\".\n\
-- rule_updates: New or updated procedural rules.\n\
-- summary: 2-3 sentence synthesis of the week's patterns.\n\n\
-Be conservative. Only propose changes with strong evidence.\n\n\
-Respond with JSON in this exact format:\n\
-{\"fact_updates\": [{\"domain\": \"energy\", \"subject\": \"user\", \"predicate\": \"pattern\", \"object\": \"value\", \"confidence\": 0.8, \"source\": \"reflected\"}], \"rule_updates\": [{\"domain\": \"productivity\", \"rule_text\": \"description\", \"confidence\": 0.7}], \"summary\": \"Brief synthesis\"}";
-
-/// LLM-backed weekly reflection.
-pub struct LlmReflectionHandler {
-    provider: DynProvider,
-    params: ChatParams,
-}
-
-impl LlmReflectionHandler {
-    pub fn new(provider: DynProvider, params: ChatParams) -> Self {
-        Self {
-            provider,
-            params: params.with_response_format(ResponseFormat::JsonObject),
-        }
-    }
-}
-
-#[derive(serde::Deserialize)]
-struct ReflectionResultJson {
-    fact_updates: Vec<ReflectionFactJson>,
-    rule_updates: Vec<ReflectionRuleJson>,
-    summary: String,
-}
-
-#[derive(serde::Deserialize)]
-struct ReflectionFactJson {
-    domain: String,
-    subject: String,
-    predicate: String,
-    object: String,
-    confidence: f64,
-    source: String,
-}
-
-#[derive(serde::Deserialize)]
-struct ReflectionRuleJson {
-    domain: String,
-    rule_text: String,
-    confidence: f64,
-}
-
-#[async_trait]
-impl ReflectionHandler for LlmReflectionHandler {
-    async fn reflect(&self, input: &ReflectionInput) -> common::Result<ReflectionOutput> {
-        let memories_text: Vec<String> = input
-            .episodic_memories
-            .iter()
-            .map(|m| format!("[{}] {}: {}", m.occurred_at, m.domain, m.content))
-            .collect();
-
-        let rules_text: Vec<String> = input
-            .procedural_rules
-            .iter()
-            .map(|r| {
-                format!(
-                    "[{}] {} (confidence: {:.0}%)",
-                    r.domain,
-                    r.rule_text,
-                    r.confidence * 100.0
-                )
-            })
-            .collect();
-
-        let model_text = serde_json::to_string_pretty(&input.user_model).unwrap_or_default();
-
-        let user_msg = format!(
-            "Period: {} to {}\n\n## Episodic Memories ({})\n{}\n\n## Current User Model\n{}\n\n## Active Procedural Rules ({})\n{}",
-            input.period_start,
-            input.period_end,
-            memories_text.len(),
-            memories_text.join("\n"),
-            model_text,
-            rules_text.len(),
-            rules_text.join("\n"),
-        );
-
-        let messages = vec![
-            Message::system(REFLECTION_SYSTEM_PROMPT),
-            Message::user(user_msg),
-        ];
-
-        let response = self.provider.chat(&messages, None, &self.params).await?;
-        let content = response.content.unwrap_or_default();
-        let result: ReflectionResultJson = serde_json::from_str(&content).map_err(|e| {
-            common::KlyntbotError::Provider(common::ProviderError::InvalidResponse(format!(
-                "Reflection JSON parse error: {e}"
-            )))
-        })?;
-
-        let now = chrono::Utc::now().format("%Y-%m-%dT%H:%M:%S").to_string();
-        let fact_updates = result
-            .fact_updates
-            .into_iter()
-            .map(|f| SemanticFact {
-                id: uuid::Uuid::new_v4().to_string(),
-                domain: f.domain,
-                subject: f.subject,
-                predicate: f.predicate,
-                object: f.object,
-                confidence: f.confidence,
-                source: f.source,
-                valid_from: now.clone(),
-                valid_until: None,
-                recorded_at: now.clone(),
-                superseded_at: None,
-                superseded_by: None,
-                stability: 1.0,
-                last_accessed: None,
-                access_count: 0,
-                convergence_score: 0.0,
-                project_id: None,
-                memory_type: DEFAULT_MEMORY_TYPE.to_string(),
-                scope_type: "system".to_string(),
-                scope_id: None,
-            })
-            .collect();
-
-        let rule_updates = result
-            .rule_updates
-            .into_iter()
-            .map(|r| ProceduralRule {
-                id: uuid::Uuid::new_v4().to_string(),
-                domain: r.domain,
-                rule_text: r.rule_text,
-                confidence: r.confidence,
-                source: "reflected".into(),
-                signal_count: 0,
-                created_at: now.clone(),
-                updated_at: now.clone(),
-                active: true,
-                project_id: None,
-                scope_type: "system".to_string(),
-                scope_id: None,
-            })
-            .collect();
-
-        Ok(ReflectionOutput {
-            fact_updates,
-            rule_updates,
-            summary: result.summary,
-        })
-    }
-}
-
 // ── Coaching Reasoner ──
 
 const COACHING_SYSTEM_PROMPT: &str = "\
@@ -1030,7 +845,7 @@ mod tests {
 
     use chrono::Utc;
     use cognitive::situation::UserSituation;
-    use cognitive::types::UserModel;
+    use cognitive::types::{SemanticFact, DEFAULT_MEMORY_TYPE};
     use feature_coaching::signal_accumulator::TriggerFired;
     use providers::{LlmResponse, LlmStream, ProviderCapabilities, ProviderHealth, Usage};
 
@@ -1254,39 +1069,6 @@ mod tests {
         assert!(matches!(result, MemoryOp::Add { .. }));
     }
 
-    // ── Heuristic reflection test ──
-
-    #[tokio::test]
-    async fn test_heuristic_reflection_returns_summary() {
-        let handler = HeuristicReflectionHandler;
-        let input = ReflectionInput {
-            episodic_memories: vec![cognitive::types::EpisodicMemory {
-                id: "e1".into(),
-                domain: "productivity".into(),
-                content: "Had a productive morning".into(),
-                summary: Some("Productive morning".into()),
-                importance: 0.7,
-                occurred_at: "2026-03-01T10:00:00".into(),
-                recorded_at: "2026-03-01T10:00:00".into(),
-                stability: 1.0,
-                last_accessed: None,
-                access_count: 0,
-                project_id: None,
-                scope_type: "system".to_string(),
-                scope_id: None,
-            }],
-            user_model: UserModel::default(),
-            procedural_rules: vec![],
-            period_start: "2026-03-01T00:00:00".into(),
-            period_end: "2026-03-07T23:59:59".into(),
-        };
-
-        let output = handler.reflect(&input).await.unwrap();
-        assert!(!output.summary.is_empty());
-        assert!(output.fact_updates.is_empty());
-        assert!(output.rule_updates.is_empty());
-    }
-
     // ── LLM extraction tests ──
 
     #[tokio::test]
@@ -1384,37 +1166,6 @@ mod tests {
             .unwrap();
         let op = ops.into_iter().next().unwrap();
         assert_eq!(op, MemoryOp::Noop);
-    }
-
-    // ── LLM reflection tests ──
-
-    #[tokio::test]
-    async fn test_llm_reflection_parses_output() {
-        let json_response = r#"{
-            "fact_updates": [
-                {"domain":"energy","subject":"user","predicate":"afternoon_dip","object":"energy drops after 3pm","confidence":0.8,"source":"reflected"}
-            ],
-            "rule_updates": [
-                {"domain":"productivity","rule_text":"Suggest break at 3pm when energy declining","confidence":0.75}
-            ],
-            "summary":"User shows consistent afternoon energy decline. Exercise-productivity correlation observed."
-        }"#;
-        let mock = Arc::new(MockProvider::new(mock_response(json_response)));
-        let params = ChatParams::new("test-model").with_max_tokens(2048);
-        let handler = LlmReflectionHandler::new(mock, params);
-
-        let input = ReflectionInput {
-            episodic_memories: vec![],
-            user_model: UserModel::default(),
-            procedural_rules: vec![],
-            period_start: "2026-03-01".into(),
-            period_end: "2026-03-07".into(),
-        };
-        let output = handler.reflect(&input).await.unwrap();
-        assert_eq!(output.fact_updates.len(), 1);
-        assert_eq!(output.fact_updates[0].predicate, "afternoon_dip");
-        assert_eq!(output.rule_updates.len(), 1);
-        assert!(output.summary.contains("afternoon energy decline"));
     }
 
     // ── LLM coaching reasoner tests ──

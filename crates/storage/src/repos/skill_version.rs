@@ -52,7 +52,10 @@ impl SkillVersionRepo {
         Ok(row)
     }
 
-    pub async fn list_versions(&self, skill_name: &str) -> Result<Vec<SkillVersionRow>, StorageError> {
+    pub async fn list_versions(
+        &self,
+        skill_name: &str,
+    ) -> Result<Vec<SkillVersionRow>, StorageError> {
         let rows = sqlx::query_as::<_, SkillVersionRow>(
             "SELECT id, skill_name, version, file_path, content, diff, source, reason, created_at
              FROM skill_versions
@@ -83,11 +86,10 @@ impl SkillVersionRepo {
     }
 
     pub async fn list_skill_names(&self) -> Result<Vec<String>, StorageError> {
-        let rows: Vec<(String,)> = sqlx::query_as(
-            "SELECT DISTINCT skill_name FROM skill_versions ORDER BY skill_name",
-        )
-        .fetch_all(&self.pool)
-        .await?;
+        let rows: Vec<(String,)> =
+            sqlx::query_as("SELECT DISTINCT skill_name FROM skill_versions ORDER BY skill_name")
+                .fetch_all(&self.pool)
+                .await?;
         Ok(rows.into_iter().map(|(n,)| n).collect())
     }
 }
@@ -115,9 +117,17 @@ mod tests {
     async fn test_insert_and_get_latest() {
         let pool = StoragePool::connect_in_memory().await.unwrap();
         let repo = SkillVersionRepo::new(pool.inner().clone());
-        repo.insert(&test_version("general", 1, "Seed")).await.unwrap();
-        repo.insert(&test_version("general", 2, "Reforge")).await.unwrap();
-        let latest = repo.latest_version("general", "SKILL.md").await.unwrap().unwrap();
+        repo.insert(&test_version("general", 1, "Seed"))
+            .await
+            .unwrap();
+        repo.insert(&test_version("general", 2, "Reforge"))
+            .await
+            .unwrap();
+        let latest = repo
+            .latest_version("general", "SKILL.md")
+            .await
+            .unwrap()
+            .unwrap();
         assert_eq!(latest.version, 2);
         assert_eq!(latest.source, "Reforge");
     }
@@ -126,9 +136,15 @@ mod tests {
     async fn test_list_versions() {
         let pool = StoragePool::connect_in_memory().await.unwrap();
         let repo = SkillVersionRepo::new(pool.inner().clone());
-        repo.insert(&test_version("general", 1, "Seed")).await.unwrap();
-        repo.insert(&test_version("general", 2, "Reforge")).await.unwrap();
-        repo.insert(&test_version("general", 3, "User")).await.unwrap();
+        repo.insert(&test_version("general", 1, "Seed"))
+            .await
+            .unwrap();
+        repo.insert(&test_version("general", 2, "Reforge"))
+            .await
+            .unwrap();
+        repo.insert(&test_version("general", 3, "User"))
+            .await
+            .unwrap();
         let versions = repo.list_versions("general").await.unwrap();
         assert_eq!(versions.len(), 3);
         assert_eq!(versions[0].version, 3); // DESC order
@@ -138,7 +154,10 @@ mod tests {
     async fn test_latest_version_returns_none_for_unknown() {
         let pool = StoragePool::connect_in_memory().await.unwrap();
         let repo = SkillVersionRepo::new(pool.inner().clone());
-        let latest = repo.latest_version("nonexistent", "SKILL.md").await.unwrap();
+        let latest = repo
+            .latest_version("nonexistent", "SKILL.md")
+            .await
+            .unwrap();
         assert!(latest.is_none());
     }
 
@@ -146,8 +165,12 @@ mod tests {
     async fn test_list_skill_names() {
         let pool = StoragePool::connect_in_memory().await.unwrap();
         let repo = SkillVersionRepo::new(pool.inner().clone());
-        repo.insert(&test_version("general", 1, "Seed")).await.unwrap();
-        repo.insert(&test_version("finance", 1, "Seed")).await.unwrap();
+        repo.insert(&test_version("general", 1, "Seed"))
+            .await
+            .unwrap();
+        repo.insert(&test_version("finance", 1, "Seed"))
+            .await
+            .unwrap();
         let names = repo.list_skill_names().await.unwrap();
         assert_eq!(names, vec!["finance", "general"]);
     }

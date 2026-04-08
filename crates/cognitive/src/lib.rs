@@ -1,5 +1,5 @@
 //! Cognitive memory system — unified memory with FSRS decay, bi-temporal facts,
-//! Mem0-style consolidation, and weekly reflection.
+//! and Mem0-style consolidation.
 
 pub mod embedder;
 pub mod mirror;
@@ -12,7 +12,7 @@ pub mod types;
 // ── Module re-exports (backward-compatible paths) ──────────
 pub use services::{
     background, compaction, consolidation, context_source, conversation_recall, decay, extraction,
-    memory_retriever, reflection, retrieval, salience, session_memory, situation, temporal,
+    memory_retriever, retrieval, salience, session_memory, situation, temporal,
 };
 
 // ── Type re-exports ────────────────────────────────────────
@@ -26,7 +26,6 @@ pub use conversation_recall::{
 pub use embedder::{SemanticFactEmbedder, TextEmbedder};
 pub use extraction::{BatchExtraction, BatchExtractionResult, ExtractedFact, ExtractionHandler};
 pub use memory_retriever::UnifiedMemoryService;
-pub use reflection::ReflectionHandler;
 pub use repos::event_log::{DomainEventRow, PipelineEventRecord, PipelineEventRow};
 pub use repos::persona_accuracy::alignment_to_fsrs_rating;
 pub use repos::semantic_fact::DomainHealthRow;

@@ -11,42 +11,6 @@ use desktop_shared::errors::ApiError;
 use crate::errors::map_cognitive_err;
 use crate::state::AppCore;
 
-/// Build reflection + consolidation handler pair from a cognitive provider and config.
-///
-/// Returns LLM-backed handlers when a provider is available, heuristic fallbacks otherwise.
-/// Used by both the manual "Run Reflection" API and the weekly cron job.
-pub(crate) fn build_reflection_handlers(
-    cognitive_provider: &Option<providers::DynProvider>,
-    config: &config::Config,
-) -> (
-    Box<dyn cognitive::ReflectionHandler>,
-    Box<dyn cognitive::ConsolidationHandler>,
-) {
-    let reflection: Box<dyn cognitive::ReflectionHandler> = if let Some(ref cp) = cognitive_provider
-    {
-        let params = providers::cognitive_chat_params(config, 2048);
-        Box::new(agent::cognitive_handlers::LlmReflectionHandler::new(
-            cp.clone(),
-            params,
-        ))
-    } else {
-        Box::new(agent::cognitive_handlers::HeuristicReflectionHandler)
-    };
-
-    let consolidation: Box<dyn cognitive::ConsolidationHandler> =
-        if let Some(ref cp) = cognitive_provider {
-            let params = providers::cognitive_chat_params(config, 1024);
-            Box::new(agent::cognitive_handlers::LlmConsolidationHandler::new(
-                cp.clone(),
-                params,
-            ))
-        } else {
-            Box::new(agent::cognitive_handlers::HeuristicConsolidationHandler)
-        };
-
-    (reflection, consolidation)
-}
-
 pub(crate) fn fact_to_response(f: &SemanticFact) -> SemanticFactResponse {
     let elapsed_days = chrono::Utc::now()
         .signed_duration_since(
@@ -339,12 +303,6 @@ impl AppCore {
                 notes: "Archive superseded, prune episodic, size budget".into(),
             },
             ComponentStatusResponse {
-                name: "Reflection".into(),
-                status: "wired".into(),
-                handler_type: if has_llm { "llm" } else { "heuristic" }.into(),
-                notes: "Scheduled via CronService (Monday 9am)".into(),
-            },
-            ComponentStatusResponse {
                 name: "Context Source".into(),
                 status: "wired".into(),
                 handler_type: "n/a".into(),
@@ -397,17 +355,6 @@ impl AppCore {
                 handler_type: "llm".into(),
                 notes: if has_llm {
                     "LlmConsolidationHandler active"
-                } else {
-                    "Built, using heuristic fallback (no cognitive provider)"
-                }
-                .into(),
-            },
-            ComponentStatusResponse {
-                name: "LLM Reflection".into(),
-                status: if has_llm { "wired" } else { "built" }.into(),
-                handler_type: "llm".into(),
-                notes: if has_llm {
-                    "LlmReflectionHandler active"
                 } else {
                     "Built, using heuristic fallback (no cognitive provider)"
                 }

@@ -1,8 +1,8 @@
 use std::sync::Arc;
 
-use cognitive::{ConsolidationHandler, ExtractionHandler, ReflectionHandler};
+use cognitive::{ConsolidationHandler, ExtractionHandler};
 use klyntbot::agent::cognitive_handlers::{
-    HeuristicConsolidationHandler, HeuristicExtractionHandler, HeuristicReflectionHandler,
+    HeuristicConsolidationHandler, HeuristicExtractionHandler,
 };
 use simulator::harness::SimulationHarness;
 use simulator::providers::HeuristicNarrativeHandler;
@@ -94,45 +94,37 @@ async fn run_scenario(toml: &str) -> SimulationReport {
     let scenario = Scenario::from_toml(toml).unwrap();
     let bridge_config = simulator::providers::CognitiveBridgeConfig::from(&scenario.simulation);
 
-    let (extraction, consolidation, reflection): (
-        Arc<dyn ExtractionHandler>,
-        Arc<dyn ConsolidationHandler>,
-        Arc<dyn ReflectionHandler>,
-    ) = if bridge_config.is_heuristic() {
-        (
-            Arc::new(HeuristicExtractionHandler),
-            Arc::new(HeuristicConsolidationHandler),
-            Arc::new(HeuristicReflectionHandler),
-        )
-    } else {
-        let provider = create_cognitive_provider(&bridge_config);
-        let params = providers::ChatParams::new(&bridge_config.model)
-            .with_temperature(bridge_config.temperature as f32);
-        (
-            Arc::new(
-                klyntbot::agent::cognitive_handlers::LlmExtractionHandler::new(
-                    provider.clone(),
-                    params.clone(),
-                ),
-            ) as Arc<dyn ExtractionHandler>,
-            Arc::new(
-                klyntbot::agent::cognitive_handlers::LlmConsolidationHandler::new(
-                    provider.clone(),
-                    params.clone(),
-                ),
-            ) as Arc<dyn ConsolidationHandler>,
-            Arc::new(
-                klyntbot::agent::cognitive_handlers::LlmReflectionHandler::new(provider, params),
-            ) as Arc<dyn ReflectionHandler>,
-        )
-    };
+    let (extraction, consolidation): (Arc<dyn ExtractionHandler>, Arc<dyn ConsolidationHandler>) =
+        if bridge_config.is_heuristic() {
+            (
+                Arc::new(HeuristicExtractionHandler),
+                Arc::new(HeuristicConsolidationHandler),
+            )
+        } else {
+            let provider = create_cognitive_provider(&bridge_config);
+            let params = providers::ChatParams::new(&bridge_config.model)
+                .with_temperature(bridge_config.temperature as f32);
+            (
+                Arc::new(
+                    klyntbot::agent::cognitive_handlers::LlmExtractionHandler::new(
+                        provider.clone(),
+                        params.clone(),
+                    ),
+                ) as Arc<dyn ExtractionHandler>,
+                Arc::new(
+                    klyntbot::agent::cognitive_handlers::LlmConsolidationHandler::new(
+                        provider.clone(),
+                        params.clone(),
+                    ),
+                ) as Arc<dyn ConsolidationHandler>,
+            )
+        };
 
     let narrative: Arc<dyn cognitive::mirror::NarrativeHandler> =
         Arc::new(HeuristicNarrativeHandler);
-    let harness =
-        SimulationHarness::new(scenario, extraction, consolidation, reflection, narrative)
-            .await
-            .unwrap();
+    let harness = SimulationHarness::new(scenario, extraction, consolidation, narrative)
+        .await
+        .unwrap();
     harness.run().await.unwrap()
 }
 
@@ -316,7 +308,13 @@ async fn scenario_12mo_parses() {
 }
 
 #[tokio::test]
+#[ignore] // Real LLM — 269 simulated days × agent_mode. Run explicitly: cargo nextest run --run-ignored -E 'test(run_software_engineer_12mo)'
 async fn run_software_engineer_12mo() {
+    if std::env::var("DEEPSEEK_API_KEY").map_or(true, |k| k.is_empty()) {
+        eprintln!("Skipping 12mo real LLM test — DEEPSEEK_API_KEY not set");
+        return;
+    }
+
     let report = run_scenario(include_str!("scenarios/software_engineer_12mo.toml")).await;
 
     // Write JSON report
@@ -457,6 +455,7 @@ async fn run_software_engineer_12mo() {
 }
 
 #[tokio::test]
+#[ignore] // Real LLM — 15 simulated days with DeepSeek extraction. Run explicitly: cargo nextest run --run-ignored -E 'test(run_cognitive_llm_validation)'
 async fn run_cognitive_llm_validation() {
     // Skip if no API key available (CI-safe)
     if std::env::var("DEEPSEEK_API_KEY").map_or(true, |k| k.is_empty()) {
@@ -566,6 +565,7 @@ async fn run_fact_contradiction() {
 }
 
 #[tokio::test]
+#[ignore] // Real LLM — 30 simulated days × agent_mode. Run explicitly: cargo nextest run --run-ignored -E 'test(run_software_engineer_1mo)'
 async fn run_software_engineer_1mo() {
     // Skip if no API key available (CI-safe)
     if std::env::var("DEEPSEEK_API_KEY").map_or(true, |k| k.is_empty()) {
@@ -696,6 +696,7 @@ async fn run_coaching_persona() {
 }
 
 #[tokio::test]
+#[ignore] // Real LLM — 7 simulated days × agent_mode. Run explicitly: cargo nextest run --run-ignored -E 'test(run_agent_validation_1week)'
 async fn run_agent_validation_1week() {
     if std::env::var("DEEPSEEK_API_KEY").map_or(true, |k| k.is_empty()) {
         eprintln!("Skipping agent validation — DEEPSEEK_API_KEY not set");

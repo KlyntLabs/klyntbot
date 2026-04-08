@@ -87,7 +87,12 @@ fn format_synthesize_input(input: &SynthesizeInput) -> String {
 
     // User model
     if !input.user_model_summary.is_empty() {
-        writeln!(&mut out, "\n## Current User Model\n{}", input.user_model_summary).unwrap();
+        writeln!(
+            &mut out,
+            "\n## Current User Model\n{}",
+            input.user_model_summary
+        )
+        .unwrap();
     }
 
     // Rules
@@ -213,10 +218,7 @@ impl LlmReforgeHandler {
 impl ReforgeHandler for LlmReforgeHandler {
     async fn synthesize(&self, input: &SynthesizeInput) -> common::Result<SynthesizeOutput> {
         let user_msg = format_synthesize_input(input);
-        let messages = vec![
-            Message::system(SYNTHESIZE_PROMPT),
-            Message::user(user_msg),
-        ];
+        let messages = vec![Message::system(SYNTHESIZE_PROMPT), Message::user(user_msg)];
 
         let response = self.provider.chat(&messages, None, &self.params).await?;
         let content = response.content.unwrap_or_default();
@@ -231,10 +233,7 @@ impl ReforgeHandler for LlmReforgeHandler {
 
     async fn review(&self, input: &ReviewInput) -> common::Result<ReviewOutput> {
         let user_msg = format_review_input(input);
-        let messages = vec![
-            Message::system(REVIEW_PROMPT),
-            Message::user(user_msg),
-        ];
+        let messages = vec![Message::system(REVIEW_PROMPT), Message::user(user_msg)];
 
         let response = self.provider.chat(&messages, None, &self.params).await?;
         let content = response.content.unwrap_or_default();
@@ -252,10 +251,7 @@ impl ReforgeHandler for LlmReforgeHandler {
             "## Synthesis Summary\n{}\n\n## Review Summary\n{}\n\n## Routing Summary\n{}",
             input.synthesize_summary, input.review_summary, input.routing_summary
         );
-        let messages = vec![
-            Message::system(NARRATE_PROMPT),
-            Message::user(user_msg),
-        ];
+        let messages = vec![Message::system(NARRATE_PROMPT), Message::user(user_msg)];
 
         // Use plain text format for the narrative — override the stored JsonObject params
         let text_params = self

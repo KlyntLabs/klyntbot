@@ -168,13 +168,6 @@ pub async fn cognitive_run_compaction(
     state.cognitive_run_compaction().await
 }
 
-#[tauri::command]
-pub async fn cognitive_run_reflection(
-    state: State<'_, Arc<AppCore>>,
-) -> Result<ReflectionResultResponse, ApiError> {
-    state.cognitive_run_reflection().await
-}
-
 // ── Coaching Mutations ──────────────────────────────────────────────────
 
 #[tauri::command]
@@ -281,7 +274,6 @@ pub(crate) const DEV_COMMANDS: &[&str] = &[
     "cognitive_rule_create",
     "cognitive_rule_deactivate",
     "cognitive_run_compaction",
-    "cognitive_run_reflection",
     "cognitive_inject_event",
     "cognitive_event_log",
     "cognitive_pipeline_log",
@@ -347,7 +339,6 @@ pub(crate) async fn dispatch_dev(
             dev::val(core.cognitive_rule_deactivate(id).await)
         }
         "cognitive_run_compaction" => dev::val(core.cognitive_run_compaction().await),
-        "cognitive_run_reflection" => dev::val(core.cognitive_run_reflection().await),
         "cognitive_inject_event" => {
             let event_type = try_field!(dev::get_str(body, "event_type"));
             let payload = body.get("payload").cloned().unwrap_or_default();

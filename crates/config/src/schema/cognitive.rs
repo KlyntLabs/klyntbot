@@ -11,7 +11,7 @@ pub enum IntelligenceMode {
 }
 
 /// Configuration for background cognitive tasks (extraction, consolidation,
-/// reflection, coaching reasoning).
+/// coaching reasoning).
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct CognitiveConfig {
@@ -30,14 +30,6 @@ pub struct CognitiveConfig {
     /// Max tokens per cognitive call (default: 1024).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub max_tokens: Option<u32>,
-
-    /// Max tokens for reflection calls (default: 2048).
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub reflection_max_tokens: Option<u32>,
-
-    /// Cron expression for weekly reflection (default: "0 9 * * 1" — Monday 9am).
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub reflection_schedule: Option<String>,
 
     /// Enable dynamic fact retrieval using vector search (default: true).
     #[serde(default = "default_dynamic_facts_enabled")]
@@ -140,8 +132,6 @@ impl Default for CognitiveConfig {
             provider: None,
             temperature: None,
             max_tokens: None,
-            reflection_max_tokens: None,
-            reflection_schedule: None,
             dynamic_facts_enabled: default_dynamic_facts_enabled(),
             static_fact_limit: default_static_fact_limit(),
             dynamic_fact_limit: default_dynamic_fact_limit(),

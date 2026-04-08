@@ -1,7 +1,7 @@
 //! Application-layer services for the cognitive memory system.
 //!
 //! Each module implements a distinct capability: background processing,
-//! memory retrieval, consolidation, extraction, reflection, etc.
+//! memory retrieval, consolidation, extraction, etc.
 //! Domain types live in [`crate::types`], storage in [`crate::repos`].
 
 pub mod atom_decay;
@@ -17,7 +17,7 @@ pub mod fsrs5;
 pub mod louvain;
 pub mod memory_promotion;
 pub mod memory_retriever;
-pub mod reflection;
+pub mod reforge;
 pub mod retrieval;
 pub mod salience;
 pub mod scoring;
@@ -25,4 +25,3 @@ pub mod session_memory;
 pub mod situation;
 pub mod temporal;
 pub mod tiptap_parser;
-pub mod reforge;

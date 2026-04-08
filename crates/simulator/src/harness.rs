@@ -46,9 +46,7 @@ pub struct SimulationHarness {
     retriever: FtsMemoryRetriever,
     extraction_handler: Arc<dyn cognitive::ExtractionHandler>,
     consolidation_handler: Arc<dyn cognitive::ConsolidationHandler>,
-    rule_repo: cognitive::ProceduralRuleRepo,
     mirror_repo: cognitive::mirror::MirrorRepo,
-    reflection_handler: Arc<dyn cognitive::ReflectionHandler>,
     narrative_handler: Arc<dyn cognitive::mirror::NarrativeHandler>,
     /// ID of the first seeded autotuner trial (Trial A — default params).
     /// Mutex-wrapped so `execute_cron` can update it after re-seeding.
@@ -81,7 +79,6 @@ impl SimulationHarness {
         scenario: Scenario,
         extraction_handler: Arc<dyn cognitive::ExtractionHandler>,
         consolidation_handler: Arc<dyn cognitive::ConsolidationHandler>,
-        reflection_handler: Arc<dyn cognitive::ReflectionHandler>,
         narrative_handler: Arc<dyn cognitive::mirror::NarrativeHandler>,
     ) -> common::Result<Self> {
         let pool = storage::StoragePool::connect_in_memory().await?;
@@ -196,7 +193,6 @@ impl SimulationHarness {
         let episodic_repo = cognitive::EpisodicMemoryRepo::new(inner_pool.clone());
         let retriever =
             FtsMemoryRetriever::new(cognitive::SemanticFactRepo::new(inner_pool.clone()));
-        let rule_repo = cognitive::ProceduralRuleRepo::new(inner_pool.clone());
         let mirror_repo = cognitive::mirror::MirrorRepo::new(pool.clone());
 
         // Ensure a parent session row exists for session message persistence.
@@ -311,9 +307,7 @@ impl SimulationHarness {
             retriever,
             extraction_handler,
             consolidation_handler,
-            rule_repo,
             mirror_repo,
-            reflection_handler,
             narrative_handler,
             active_trial_id: std::sync::Mutex::new(trial_a_id),
             variant_trial_id: std::sync::Mutex::new(trial_b_id),
@@ -2131,31 +2125,6 @@ impl SimulationHarness {
                     }
                     Err(e) => {
                         debug!(error = %e, "AutotunerNightly failed (non-fatal)");
-                    }
-                }
-            }
-            CronTrigger::CognitiveReflection => {
-                debug!(trigger = "CognitiveReflection", %simulated_now, "Executing cron");
-                match cognitive::services::reflection::run_weekly_reflection(
-                    self.reflection_handler.as_ref(),
-                    self.consolidation_handler.as_ref(),
-                    &self.fact_repo,
-                    &self.episodic_repo,
-                    &self.rule_repo,
-                    None, // no embedder in simulation
-                )
-                .await
-                {
-                    Ok(output) => {
-                        debug!(
-                            summary = %output.summary,
-                            facts = output.fact_updates.len(),
-                            rules = output.rule_updates.len(),
-                            "CognitiveReflection complete"
-                        );
-                    }
-                    Err(e) => {
-                        debug!(error = %e, "CognitiveReflection cron failed");
                     }
                 }
             }

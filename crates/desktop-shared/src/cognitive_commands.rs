@@ -264,14 +264,6 @@ pub struct CompactionResultResponse {
     pub rules_deactivated: u64,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct ReflectionResultResponse {
-    pub fact_updates: usize,
-    pub rule_updates: usize,
-    pub summary: String,
-}
-
 // ── Memory Reference Detail ────────────────────────────────────────────
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

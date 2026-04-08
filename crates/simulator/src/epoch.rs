@@ -54,8 +54,6 @@ pub enum CronTrigger {
     AnalyticsCleanup,
     /// Memory maintenance — every 12 h at 00:00 and 12:00 UTC.
     MemoryMaintenance,
-    /// Cognitive reflection — Monday at 09:00 UTC.
-    CognitiveReflection,
     /// Mirror weekly narrative — Sunday at 10:00 UTC.
     MirrorWeeklyNarrative,
     /// Mirror cleanup — Sunday at 04:00 UTC.
@@ -267,11 +265,6 @@ fn collect_pre_message_crons(prev: DateTime<Utc>, now: DateTime<Utc>) -> Vec<Cro
 fn collect_post_message_crons(prev: DateTime<Utc>, now: DateTime<Utc>) -> Vec<CronTrigger> {
     let mut triggers = Vec::new();
 
-    // CognitiveReflection — Monday at 09:00 UTC
-    if crosses_weekday_hour(prev, now, Weekday::Mon, 9) {
-        triggers.push(CronTrigger::CognitiveReflection);
-    }
-
     // MirrorWeeklyNarrative — Sunday at 10:00 UTC
     if crosses_weekday_hour(prev, now, Weekday::Sun, 10) {
         triggers.push(CronTrigger::MirrorWeeklyNarrative);
@@ -381,45 +374,6 @@ mod tests {
     }
 
     #[test]
-    fn monday_reflection_fires_on_monday() {
-        // 2026-03-01 is a Sunday.
-        let sunday_8am = utc(2026, 3, 1, 8, 0);
-        assert_eq!(sunday_8am.weekday(), Weekday::Sun);
-
-        let end = utc(2026, 3, 5, 8, 0); // Thursday
-        let mut epoch = SimulatedEpoch::new(sunday_8am, end, EpochStep::Day);
-
-        // Sunday 08:00 -> Monday 08:00: crosses Monday 00:00..08:00 but NOT 09:00.
-        // Wait — Mon 09:00 is NOT in (Sun 08:00, Mon 08:00]. Need to step again.
-        let plan_sun_to_mon = epoch.advance().unwrap();
-        let post: HashSet<CronTrigger> =
-            plan_sun_to_mon.cron_post_message.iter().copied().collect();
-        // Mon 09:00 is at hour 9, but our window ends at Mon 08:00 — does NOT fire.
-        assert!(
-            !post.contains(&CronTrigger::CognitiveReflection),
-            "CognitiveReflection should NOT fire Sun 08:00 -> Mon 08:00 (Mon 09:00 not in range)"
-        );
-
-        // Monday 08:00 -> Tuesday 08:00: crosses Monday 09:00 — SHOULD fire.
-        let plan_mon_to_tue = epoch.advance().unwrap();
-        let post2: HashSet<CronTrigger> =
-            plan_mon_to_tue.cron_post_message.iter().copied().collect();
-        assert!(
-            post2.contains(&CronTrigger::CognitiveReflection),
-            "CognitiveReflection should fire Mon 08:00 -> Tue 08:00 (Mon 09:00 in range)"
-        );
-
-        // Tuesday 08:00 -> Wednesday 08:00: should NOT fire.
-        let plan_tue_to_wed = epoch.advance().unwrap();
-        let post3: HashSet<CronTrigger> =
-            plan_tue_to_wed.cron_post_message.iter().copied().collect();
-        assert!(
-            !post3.contains(&CronTrigger::CognitiveReflection),
-            "CognitiveReflection should NOT fire Tue -> Wed"
-        );
-    }
-
-    #[test]
     fn weekly_step_hits_all_crons() {
         // 2026-03-04 is a Wednesday.
         let wed = utc(2026, 3, 4, 6, 0);
@@ -444,7 +398,6 @@ mod tests {
         assert!(all.contains(&CronTrigger::AutotunerNightly));
         assert!(all.contains(&CronTrigger::AnalyticsCleanup));
         assert!(all.contains(&CronTrigger::MemoryMaintenance));
-        assert!(all.contains(&CronTrigger::CognitiveReflection));
         assert!(all.contains(&CronTrigger::MirrorWeeklyNarrative));
         assert!(all.contains(&CronTrigger::MirrorCleanup));
         assert!(all.contains(&CronTrigger::CrossDomainInsight));

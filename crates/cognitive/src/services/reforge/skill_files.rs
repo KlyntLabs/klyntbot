@@ -101,18 +101,19 @@ impl SkillFileManager {
     ///
     /// Returns the number of skills written. Returns `0` on a second call
     /// because skill directories already exist.
-    pub fn seed_if_empty(&self, defaults: &HashMap<String, Vec<(&str, &str)>>) -> io::Result<usize> {
+    pub fn seed_if_empty(
+        &self,
+        defaults: &HashMap<String, Vec<(&str, &str)>>,
+    ) -> io::Result<usize> {
         // Check if any non-hidden directories already exist.
         if self.skills_dir.exists() {
-            let has_skills = std::fs::read_dir(&self.skills_dir)?
-                .flatten()
-                .any(|e| {
-                    e.path().is_dir()
-                        && e.file_name()
-                            .to_str()
-                            .map(|n| !n.starts_with('.'))
-                            .unwrap_or(false)
-                });
+            let has_skills = std::fs::read_dir(&self.skills_dir)?.flatten().any(|e| {
+                e.path().is_dir()
+                    && e.file_name()
+                        .to_str()
+                        .map(|n| !n.starts_with('.'))
+                        .unwrap_or(false)
+            });
             if has_skills {
                 return Ok(0);
             }

@@ -1,4 +1,4 @@
-//! Cognitive operations — compaction, reflection, event/pipeline logs, event injection.
+//! Cognitive operations — compaction, event/pipeline logs, event injection.
 
 use cognitive::repos::SemanticFactRepo;
 use desktop_shared::cognitive_commands::*;
@@ -6,8 +6,6 @@ use desktop_shared::errors::ApiError;
 
 use crate::errors::map_cognitive_err;
 use crate::state::AppCore;
-
-use super::memory::build_reflection_handlers;
 
 impl AppCore {
     pub async fn cognitive_run_compaction(&self) -> Result<CompactionResultResponse, ApiError> {
@@ -32,37 +30,6 @@ impl AppCore {
             archived_count: result.facts_archived,
             deleted_episodic: result.episodic_deleted,
             rules_deactivated: result.rules_deactivated,
-        })
-    }
-
-    /// Trigger a weekly reflection cycle — creates procedural rules and
-    /// updates facts based on recent episodic memories.
-    pub async fn cognitive_run_reflection(&self) -> Result<ReflectionResultResponse, ApiError> {
-        let pool = self.repos.pool();
-        let fact_repo = SemanticFactRepo::new(pool.clone());
-        let episodic_repo = cognitive::repos::EpisodicMemoryRepo::new(pool.clone());
-        let rule_repo = cognitive::repos::ProceduralRuleRepo::new(pool.clone());
-
-        let config = self.config.read().await;
-        let (reflection_handler, consolidation_handler) =
-            build_reflection_handlers(&self.cognitive_provider, &config);
-        drop(config);
-
-        let output = cognitive::reflection::run_weekly_reflection(
-            reflection_handler.as_ref(),
-            consolidation_handler.as_ref(),
-            &fact_repo,
-            &episodic_repo,
-            &rule_repo,
-            None,
-        )
-        .await
-        .map_err(|e| ApiError::new("REFLECTION_FAILED", e.to_string()))?;
-
-        Ok(ReflectionResultResponse {
-            fact_updates: output.fact_updates.len(),
-            rule_updates: output.rule_updates.len(),
-            summary: output.summary,
         })
     }
 

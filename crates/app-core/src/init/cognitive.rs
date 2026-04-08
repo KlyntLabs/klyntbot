@@ -29,6 +29,53 @@ pub(super) async fn init_cognitive(
         warn!("Failed to seed builtin squads: {e}");
     }
 
+    // Seed compiled default skills to disk on first run (skills dir empty).
+    // Records v1 in skill_versions for each seeded file so the Reforge cycle
+    // can detect user edits against the known baseline.
+    {
+        let skills_dir = config.data_dir_path().join("skills");
+        let skill_mgr =
+            cognitive::services::reforge::skill_files::SkillFileManager::new(skills_dir);
+        let defaults = skill_system::compiled_skill_defaults();
+        match skill_mgr.seed_if_empty(&defaults) {
+            Ok(0) => {
+                // Already seeded on a previous run — nothing to do.
+            }
+            Ok(seeded) => {
+                info!("Seeded {seeded} skills to disk");
+                // Record v1 versions for all seeded files so detect_user_edits
+                // has a baseline to diff against.
+                let version_repo =
+                    storage::repos::SkillVersionRepo::new(storage_pool.inner().clone());
+                let all_files = skill_mgr.read_all();
+                for (skill_name, files) in &all_files {
+                    for file in files {
+                        let row = storage::rows::SkillVersionRow {
+                            id: uuid::Uuid::new_v4().to_string(),
+                            skill_name: skill_name.clone(),
+                            version: 1,
+                            file_path: file.file_path.clone(),
+                            content: file.content.clone(),
+                            diff: None,
+                            source: "Seed".to_string(),
+                            reason: Some("Initial skill from compiled defaults".to_string()),
+                            created_at: chrono::Utc::now().to_rfc3339(),
+                        };
+                        if let Err(e) = version_repo.insert(&row).await {
+                            warn!(
+                                "Failed to record seed version for {}/{}: {e}",
+                                skill_name, file.file_path
+                            );
+                        }
+                    }
+                }
+            }
+            Err(e) => {
+                warn!("Failed to seed skills to disk: {e}");
+            }
+        }
+    }
+
     // Phase 3: Auto-generate ingestion token on first startup if missing.
     if config.capture.ingestion_api.enabled && config.capture.ingestion_api.token.is_none() {
         config.capture.ingestion_api.token = Some(uuid::Uuid::new_v4().to_string());

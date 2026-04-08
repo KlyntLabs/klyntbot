@@ -3,9 +3,57 @@
 use chrono::{Duration, Utc};
 use tracing::debug;
 
-use crate::repos::{load_user_model, EpisodicMemoryRepo, ProceduralRuleRepo, SemanticFactRepo, RULE_DOMAINS};
+use crate::repos::{
+    load_user_model, EpisodicMemoryRepo, ProceduralRuleRepo, SemanticFactRepo, RULE_DOMAINS,
+};
 use crate::services::reforge::skill_files::SkillFileManager;
 use crate::services::reforge::types::{ReforgeCollected, SessionContext};
+
+/// Scan skill files on disk and record a new version row for any file whose
+/// content differs from the latest known version in the database.
+///
+/// This detects manual edits the user made between Reforge cycles so the
+/// nightly synthesizer always works from the current on-disk state.
+pub async fn detect_user_edits(
+    skill_mgr: &SkillFileManager,
+    version_repo: &storage::repos::SkillVersionRepo,
+) {
+    let all_files = skill_mgr.read_all();
+    for (skill_name, files) in &all_files {
+        for file in files {
+            let latest = version_repo
+                .latest_version(skill_name, &file.file_path)
+                .await
+                .ok()
+                .flatten();
+            if let Some(latest) = latest {
+                let known_hash =
+                    super::skill_files::content_hash(&latest.content);
+                if known_hash != file.content_hash {
+                    let diff =
+                        super::skill_files::compute_diff(&latest.content, &file.content);
+                    let row = storage::rows::SkillVersionRow {
+                        id: uuid::Uuid::new_v4().to_string(),
+                        skill_name: skill_name.clone(),
+                        version: latest.version + 1,
+                        file_path: file.file_path.clone(),
+                        content: file.content.clone(),
+                        diff: Some(diff),
+                        source: "User".to_string(),
+                        reason: Some("Detected manual file edit".to_string()),
+                        created_at: chrono::Utc::now().to_rfc3339(),
+                    };
+                    let _ = version_repo.insert(&row).await;
+                    tracing::debug!(
+                        "Detected user edit to {}/{}",
+                        skill_name,
+                        file.file_path
+                    );
+                }
+            }
+        }
+    }
+}
 
 /// Collect all inputs required for a Reforge cycle.
 ///

@@ -131,7 +131,7 @@ pub fn heuristic_promote(clusters: &[KnowledgeCluster]) -> Vec<PromotionOp> {
 ///
 /// Defined here (cognitive crate), implemented in the agent crate with an
 /// actual LLM provider. This follows the same dependency inversion pattern as
-/// `ExtractionHandler` and `ReflectionHandler`.
+/// `ExtractionHandler` and `ConsolidationHandler`.
 #[async_trait]
 pub trait DeepConsolidationHandler: Send + Sync {
     /// Given knowledge clusters, use an LLM call to decide promotion operations.
