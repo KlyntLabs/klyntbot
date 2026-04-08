@@ -546,6 +546,33 @@ fn content_overlaps(recall_content: &str, fact_predicates: &HashSet<String>) -> 
     })
 }
 
+/// Heuristically detect which facts the LLM referenced in its response.
+///
+/// For each retrieved fact, checks whether >50% of the subject's significant words
+/// (length > 2) appear in the response text. Returns IDs of referenced facts.
+pub fn detect_referenced_facts(
+    response_text: &str,
+    retrieved_facts: &[(String, String, String)], // (id, subject, predicate)
+) -> Vec<String> {
+    let response_lower = response_text.to_lowercase();
+    retrieved_facts
+        .iter()
+        .filter(|(_, subject, _)| {
+            let lower = subject.to_lowercase();
+            let words: Vec<&str> = lower
+                .split_whitespace()
+                .filter(|w| w.len() > 2)
+                .collect();
+            if words.is_empty() {
+                return false;
+            }
+            let matches = words.iter().filter(|w| response_lower.contains(*w)).count();
+            matches as f64 / words.len() as f64 > 0.5
+        })
+        .map(|(id, _, _)| id.clone())
+        .collect()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -692,5 +719,21 @@ mod tests {
             !content_overlaps(recall_content, &predicates),
             "Should require ALL predicate words to match, not just one"
         );
+    }
+
+    #[test]
+    fn test_detect_referenced_facts() {
+        let response = "Jayden is working on a Rust project and prefers morning sessions.";
+        let retrieved = vec![
+            ("f1".into(), "Jayden".into(), "occupation".into()),
+            ("f2".into(), "Rust project".into(), "language".into()),
+            ("f3".into(), "afternoon breaks".into(), "schedule".into()),
+        ];
+        let referenced = detect_referenced_facts(response, &retrieved);
+        assert!(referenced.contains(&"f1".to_string()));
+        // "Rust" and "project" both appear in the response
+        assert!(referenced.contains(&"f2".to_string()));
+        // "afternoon" and "breaks" don't appear
+        assert!(!referenced.contains(&"f3".to_string()));
     }
 }

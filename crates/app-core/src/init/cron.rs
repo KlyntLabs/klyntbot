@@ -119,6 +119,7 @@ pub(super) async fn init_cron(
     let event_log_repo = cognitive::EventLogRepo::new(repos.pool().clone());
     let usage_repo = repos.usage.clone();
     let fact_repo = cognitive::SemanticFactRepo::new(repos.pool().clone());
+    let feedback_repo = storage::RetrievalFeedbackRepo::new(repos.pool().clone());
     let metric_source: Arc<dyn autotuner::MetricSource> = Arc::new(
         agent::autotuner::metric_collector::AgentMetricCollector::new(
             strategy_repo,
@@ -126,7 +127,8 @@ pub(super) async fn init_cron(
             usage_repo,
             trial_repo.clone(),
             fact_repo,
-        ),
+        )
+        .with_feedback_repo(feedback_repo),
     );
     let learning_state = repos.learning_state.clone();
     let champion = agent::autotuner::AutoTunerOrchestrator::load_champion(&learning_state).await;

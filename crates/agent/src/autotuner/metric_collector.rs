@@ -15,6 +15,7 @@ pub struct AgentMetricCollector {
     trial_repo: storage::TrialRepo,
     fact_repo: cognitive::SemanticFactRepo,
     review_stats: cognitive::ReviewStatsRepo,
+    feedback_repo: Option<storage::RetrievalFeedbackRepo>,
 }
 
 impl AgentMetricCollector {
@@ -33,7 +34,13 @@ impl AgentMetricCollector {
             trial_repo,
             fact_repo,
             review_stats,
+            feedback_repo: None,
         }
+    }
+
+    pub fn with_feedback_repo(mut self, repo: storage::RetrievalFeedbackRepo) -> Self {
+        self.feedback_repo = Some(repo);
+        self
     }
 }
 
@@ -116,7 +123,23 @@ impl MetricSource for AgentMetricCollector {
             self.strategy_repo.rewrite_trigger_rate_since(since),
             self.strategy_repo.rewrite_engagement_rate_since(since),
         );
-        let (retrieval_precision, memory_freshness) = phase2_metrics;
+        let (shadow_precision, memory_freshness) = phase2_metrics;
+
+        // Blend shadow-log precision with actual retrieval feedback when available
+        let retrieval_precision = if let Some(ref repo) = self.feedback_repo {
+            let feedback_precision: f64 = repo.avg_precision_since(7).await.unwrap_or(0.0);
+            let feedback_count: i64 = repo.count_since(7).await.unwrap_or(0);
+            if feedback_count > 0 && shadow_precision > 0.0 {
+                // Weighted average: feedback has more ground truth
+                feedback_precision * 0.7 + shadow_precision * 0.3
+            } else if feedback_count > 0 {
+                feedback_precision
+            } else {
+                shadow_precision
+            }
+        } else {
+            shadow_precision
+        };
 
         let promotion_accuracy = match fact_health_result {
             Ok(ref domains) => cognitive::DomainHealthRow::average_health(domains),

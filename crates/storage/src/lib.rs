@@ -49,6 +49,7 @@ pub use repos::{CoachingInterventionLogRepo, InterventionLogRow};
 pub use repos::{CoachingStrategyRepo, CoachingStrategyRow, UpsertCoachingStrategy};
 pub use repos::{DecisionLogRepo, InteractionLogRepo, LearningStateRepo, OutcomeRepo};
 pub use repos::{OverallStats, StrategyRepo, ToolStatsRow};
+pub use repos::RetrievalFeedbackRepo;
 
 // ── Finance ─────────────────────────────────────────────────────────
 pub use finance_storage::FinanceStorage;
