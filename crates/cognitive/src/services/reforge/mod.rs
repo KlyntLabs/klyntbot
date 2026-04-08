@@ -1,3 +1,4 @@
+pub mod collector;
 pub mod skill_files;
 pub mod types;
 

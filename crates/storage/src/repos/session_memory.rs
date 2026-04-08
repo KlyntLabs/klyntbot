@@ -61,6 +61,20 @@ impl SessionMemoryRepo {
         Ok(())
     }
 
+    /// List session memories updated since a given timestamp.
+    pub async fn list_since(&self, since: &str) -> Result<Vec<SessionMemoryRow>, StorageError> {
+        let rows = sqlx::query_as::<_, SessionMemoryRow>(
+            "SELECT session_key, content, turn_count, updated_at
+             FROM session_memory
+             WHERE updated_at > ?1
+             ORDER BY updated_at DESC",
+        )
+        .bind(since)
+        .fetch_all(&self.pool)
+        .await?;
+        Ok(rows)
+    }
+
     /// Delete session memory entries not updated within `days` days.
     /// Returns the number of rows removed.
     pub async fn delete_older_than(&self, days: i64) -> Result<u64, StorageError> {
