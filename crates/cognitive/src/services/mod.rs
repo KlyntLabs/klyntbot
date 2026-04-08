@@ -20,6 +20,7 @@ pub mod memory_retriever;
 pub mod reflection;
 pub mod retrieval;
 pub mod salience;
+pub mod scoring;
 pub mod session_memory;
 pub mod situation;
 pub mod temporal;

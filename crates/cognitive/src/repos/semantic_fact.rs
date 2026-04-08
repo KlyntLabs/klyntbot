@@ -237,6 +237,25 @@ impl SemanticFactRepo {
         Ok(())
     }
 
+    /// Count active facts with the same subject in the same domain (excluding self).
+    pub async fn count_related(
+        &self,
+        subject: &str,
+        domain: &str,
+        exclude_id: &str,
+    ) -> Result<i64, sqlx::Error> {
+        let row: (i64,) = sqlx::query_as(
+            "SELECT COUNT(*) FROM semantic_facts
+             WHERE domain = ?1 AND subject = ?2 AND id != ?3 AND superseded_at IS NULL",
+        )
+        .bind(domain)
+        .bind(subject)
+        .bind(exclude_id)
+        .fetch_one(&self.pool)
+        .await?;
+        Ok(row.0)
+    }
+
     /// Fetch multiple facts by ID in a single query.
     pub async fn get_batch(&self, ids: &[&str]) -> Result<Vec<SemanticFact>, sqlx::Error> {
         if ids.is_empty() {
