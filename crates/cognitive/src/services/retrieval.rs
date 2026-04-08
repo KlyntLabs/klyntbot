@@ -13,7 +13,7 @@ use crate::decay::{
 };
 use crate::embedder::SemanticFactEmbedder;
 use crate::repos::{CoActivationRepo, SemanticFactRepo};
-use crate::services::scoring::{self, KnowledgeDepthCache};
+use crate::services::scoring::{self, CommunityCache, KnowledgeDepthCache};
 use crate::types::SemanticFact;
 
 /// Minimum vector results before fallback kicks in.
@@ -98,6 +98,7 @@ pub async fn retrieve_relevant_facts(
     params: &RetrievalParams,
     co_activation_repo: Option<&CoActivationRepo>,
     depth_cache: Option<&KnowledgeDepthCache>,
+    community_cache: Option<&CommunityCache>,
 ) -> Result<Vec<ScoredFact>, sqlx::Error> {
     let use_vector = !query.is_empty() && embedder.map(|e| e.is_available()).unwrap_or(false);
 
@@ -200,20 +201,38 @@ pub async fn retrieve_relevant_facts(
         }
     }
 
-    // Second pass: co-activation re-ranking (needs peer IDs from first pass)
+    // Second pass: community re-ranking (needs peer IDs from first pass).
+    // Uses max(direct co-activation, Louvain transitive community) to capture
+    // both direct and transitive relationships between facts.
     if let Some(co_repo) = co_activation_repo {
         let all_ids: Vec<String> = scored.iter().map(|s| s.fact.id.clone()).collect();
         if all_ids.len() >= 2 {
+            // Lazily compute Louvain community snapshot (cached for ~5 min)
+            let community_snapshot = match community_cache {
+                Some(cache) => cache.get_or_compute(co_repo).await,
+                None => None,
+            };
+
             for result in &mut scored {
                 let peer_ids: Vec<String> = all_ids
                     .iter()
                     .filter(|id| *id != &result.fact.id)
                     .cloned()
                     .collect();
+
+                // Direct pairwise co-activation
                 let co_score =
                     scoring::co_activation_score(&result.fact.id, &peer_ids, co_repo).await;
-                // Add weighted co-activation contribution
-                result.score += co_score * weights.community;
+
+                // Transitive community boost (Louvain)
+                let community_score = community_snapshot
+                    .as_ref()
+                    .map(|snap| scoring::community_boost_score(&result.fact.id, &peer_ids, snap))
+                    .unwrap_or(0.0);
+
+                // Use the stronger signal: direct co-activation or transitive community
+                let effective = co_score.max(community_score);
+                result.score += effective * weights.community;
             }
         }
     }
@@ -397,7 +416,7 @@ pub async fn retrieve_all_domains(
         ..RetrievalParams::new(0)
     };
     // retrieve_relevant_facts already returns results sorted by score.
-    retrieve_relevant_facts(repo, embedder, query, domains, &params, None, None).await
+    retrieve_relevant_facts(repo, embedder, query, domains, &params, None, None, None).await
 }
 
 #[cfg(test)]
@@ -514,6 +533,7 @@ mod tests {
             &default_params(10),
             None,
             None,
+            None,
         )
         .await
         .unwrap();
@@ -544,6 +564,7 @@ mod tests {
             &default_params(10),
             None,
             None,
+            None,
         )
         .await
         .unwrap();
@@ -572,6 +593,7 @@ mod tests {
             &default_params(10),
             None,
             None,
+            None,
         )
         .await
         .unwrap();
@@ -597,6 +619,7 @@ mod tests {
             "query",
             &["productivity"],
             &default_params(10),
+            None,
             None,
             None,
         )
@@ -630,6 +653,7 @@ mod tests {
             &default_params(10),
             None,
             None,
+            None,
         )
         .await
         .unwrap();
@@ -653,6 +677,7 @@ mod tests {
             "",
             &["productivity"],
             &default_params(10),
+            None,
             None,
             None,
         )
@@ -683,6 +708,7 @@ mod tests {
             &default_params(3),
             None,
             None,
+            None,
         )
         .await
         .unwrap();
@@ -700,6 +726,7 @@ mod tests {
             "",
             &["nonexistent"],
             &default_params(10),
+            None,
             None,
             None,
         )
@@ -728,6 +755,7 @@ mod tests {
             "morning routine",
             &["productivity"],
             &default_params(10),
+            None,
             None,
             None,
         )

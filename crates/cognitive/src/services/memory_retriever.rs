@@ -12,7 +12,7 @@ use crate::embedder::SemanticFactEmbedder;
 use crate::repos::{CoActivationRepo, EpisodicMemoryRepo, SemanticFactRepo, USER_MODEL_DOMAINS};
 use crate::retrieval::{retrieve_relevant_facts, RetrievalParams, ScoredFact};
 use crate::search::bm25::search_episodic_memories;
-use crate::services::scoring::KnowledgeDepthCache;
+use crate::services::scoring::{CommunityCache, KnowledgeDepthCache};
 use crate::situation::UserSituation;
 
 /// RRF constant — same as used in retrieval.rs BM25 merge.
@@ -54,6 +54,7 @@ pub struct UnifiedMemoryService {
     champion_overrides: Option<Arc<std::sync::RwLock<Option<common::TrialParams>>>>,
     co_activation_repo: Option<CoActivationRepo>,
     depth_cache: KnowledgeDepthCache,
+    community_cache: CommunityCache,
     /// Last-retrieved fact metadata: (id, subject, predicate) for feedback detection.
     last_retrieved_facts: Arc<Mutex<Vec<(String, String, String)>>>,
 }
@@ -70,6 +71,7 @@ impl UnifiedMemoryService {
             champion_overrides: None,
             co_activation_repo: None,
             depth_cache: KnowledgeDepthCache::new(60),
+            community_cache: CommunityCache::new(300), // 5-minute TTL
             last_retrieved_facts: Arc::new(Mutex::new(Vec::new())),
         }
     }
@@ -228,6 +230,7 @@ impl UnifiedMemoryService {
             &params,
             self.co_activation_repo.as_ref(),
             Some(&self.depth_cache),
+            Some(&self.community_cache),
         )
         .await
         {
@@ -289,6 +292,7 @@ impl UnifiedMemoryService {
             query,
             USER_MODEL_DOMAINS,
             &params,
+            None,
             None,
             None,
         )
@@ -359,6 +363,7 @@ impl UnifiedMemoryService {
             query,
             USER_MODEL_DOMAINS,
             &params,
+            None,
             None,
             None,
         )

@@ -6,6 +6,7 @@ use std::sync::Mutex;
 use std::time::Instant;
 
 use crate::repos::{CoActivationRepo, SemanticFactRepo};
+use crate::services::louvain;
 use crate::types::SemanticFact;
 
 // ── Knowledge depth cache ────────────────────────────────────────
@@ -81,6 +82,92 @@ pub fn convergence_score(fact: &SemanticFact) -> f64 {
     fact.convergence_score
 }
 
+// ── Louvain community cache ─────────────────────────────────────
+
+/// Cached snapshot of Louvain community assignments over co-activation edges.
+#[derive(Clone)]
+pub struct CommunitySnapshot {
+    /// fact_id → community_id
+    pub assignments: HashMap<String, usize>,
+}
+
+/// Caches Louvain community assignments with a TTL. Running Louvain on
+/// co-activation edges is more expensive than single-fact lookups, so we
+/// cache the result for several minutes.
+pub struct CommunityCache {
+    snapshot: Mutex<Option<(CommunitySnapshot, Instant)>>,
+    ttl_secs: u64,
+}
+
+impl CommunityCache {
+    pub fn new(ttl_secs: u64) -> Self {
+        Self {
+            snapshot: Mutex::new(None),
+            ttl_secs,
+        }
+    }
+
+    /// Return a cached snapshot or recompute via Louvain on co-activation edges.
+    pub async fn get_or_compute(&self, co_repo: &CoActivationRepo) -> Option<CommunitySnapshot> {
+        // Check cache
+        if let Ok(guard) = self.snapshot.lock() {
+            if let Some((ref snap, ts)) = *guard {
+                if ts.elapsed().as_secs() < self.ttl_secs {
+                    return Some(snap.clone());
+                }
+            }
+        }
+
+        let pairs = co_repo.list_all_pairs().await.ok()?;
+        if pairs.is_empty() {
+            return None;
+        }
+
+        let result = louvain::detect_communities(&pairs);
+        let snapshot = CommunitySnapshot {
+            assignments: result.assignments,
+        };
+
+        if let Ok(mut guard) = self.snapshot.lock() {
+            *guard = Some((snapshot.clone(), Instant::now()));
+        }
+
+        Some(snapshot)
+    }
+}
+
+/// Transitive community boost: fraction of peer facts that share a Louvain
+/// community with the given fact. Captures indirect relationships that
+/// pairwise co-activation misses (e.g. A↔B + B↔C → A,B,C same community).
+///
+/// Returns 0.0–1.0: 0% peers in same community → 0.0, 50%+ → ~0.8+.
+pub fn community_boost_score(
+    fact_id: &str,
+    peer_ids: &[String],
+    snapshot: &CommunitySnapshot,
+) -> f64 {
+    if peer_ids.is_empty() {
+        return 0.0;
+    }
+    let my_community = match snapshot.assignments.get(fact_id) {
+        Some(c) => c,
+        None => return 0.0, // Not in any community
+    };
+
+    let shared = peer_ids
+        .iter()
+        .filter(|pid| snapshot.assignments.get(pid.as_str()) == Some(my_community))
+        .count();
+
+    if shared == 0 {
+        return 0.0;
+    }
+
+    // Sigmoid: 0% peers → ~0.0, 25% → 0.5, 50%+ → 0.8+
+    let ratio = shared as f64 / peer_ids.len() as f64;
+    1.0 / (1.0 + (-8.0 * (ratio - 0.25)).exp())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -138,5 +225,74 @@ mod tests {
             scope_id: None,
         };
         assert!((convergence_score(&fact) - 0.42).abs() < f64::EPSILON);
+    }
+
+    // ── Community boost tests ───────────────────────────────────
+
+    fn make_snapshot(pairs: &[(&str, usize)]) -> CommunitySnapshot {
+        CommunitySnapshot {
+            assignments: pairs.iter().map(|(id, c)| (id.to_string(), *c)).collect(),
+        }
+    }
+
+    #[test]
+    fn test_community_boost_no_community() {
+        let snap = make_snapshot(&[("peer1", 0), ("peer2", 0)]);
+        let peers = vec!["peer1".to_string(), "peer2".to_string()];
+        // "unknown" is not in any community → 0.0
+        assert!((community_boost_score("unknown", &peers, &snap)).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn test_community_boost_no_overlap() {
+        let snap = make_snapshot(&[("fact1", 0), ("peer1", 1), ("peer2", 1)]);
+        let peers = vec!["peer1".to_string(), "peer2".to_string()];
+        // fact1 is in community 0, peers are in community 1 → 0.0
+        assert!((community_boost_score("fact1", &peers, &snap)).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn test_community_boost_full_overlap() {
+        let snap = make_snapshot(&[("fact1", 0), ("peer1", 0), ("peer2", 0)]);
+        let peers = vec!["peer1".to_string(), "peer2".to_string()];
+        // 100% overlap → high score (ratio=1.0 → sigmoid ~0.997)
+        let score = community_boost_score("fact1", &peers, &snap);
+        assert!(score > 0.95, "Expected > 0.95, got {score}");
+    }
+
+    #[test]
+    fn test_community_boost_partial_overlap() {
+        let snap = make_snapshot(&[
+            ("fact1", 0),
+            ("peer1", 0),
+            ("peer2", 1),
+            ("peer3", 1),
+            ("peer4", 1),
+        ]);
+        let peers = vec![
+            "peer1".to_string(),
+            "peer2".to_string(),
+            "peer3".to_string(),
+            "peer4".to_string(),
+        ];
+        // 25% overlap → sigmoid at inflection (~0.5)
+        let score = community_boost_score("fact1", &peers, &snap);
+        assert!((score - 0.5).abs() < 0.05, "Expected ~0.5, got {score}");
+    }
+
+    #[test]
+    fn test_community_boost_empty_peers() {
+        let snap = make_snapshot(&[("fact1", 0)]);
+        assert!((community_boost_score("fact1", &[], &snap)).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn test_community_boost_sigmoid_shape() {
+        // Verify the sigmoid curve shape at key points
+        let sig = |ratio: f64| 1.0 / (1.0 + (-8.0 * (ratio - 0.25)).exp());
+        assert!(sig(0.0) < 0.15); // 0% → low
+        assert!((sig(0.25) - 0.5).abs() < 0.01); // 25% → inflection
+        assert!(sig(0.5) > 0.8); // 50% → high
+        assert!(sig(1.0) > 0.99); // 100% → saturated
     }
 }

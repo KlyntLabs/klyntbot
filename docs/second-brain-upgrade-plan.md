@@ -89,7 +89,7 @@ Persistent, always-on agent mode with: cron scheduler, MCP push channels, GitHub
 |-----------|--------|-------|
 | Per-skill execution budgets | ⚠️ Dead code | `ExecutionBudget::new(depth, "general")` hardcodes "general" |
 | Mirror TrialPreview evaluator | ⚠️ Phase 5 stub | `EarlyTrialEvaluator` wired as `None` |
-| Louvain community scoring | ⚠️ Partial | Algorithm exists, score passed as 0.0 everywhere |
+| Louvain community scoring | ✅ Complete | CommunityCache + transitive boost wired into retrieval second pass |
 
 ---
 
@@ -160,13 +160,13 @@ Persistent, always-on agent mode with: cron scheduler, MCP push channels, GitHub
   - Refactored signal reinforcement to concurrent `join_all` (was sequential N×5 queries)
   - Optimized `simple_stem` to use `truncate()` instead of redundant `.to_string()`
 
-### Phase C: Polish & Enhancement — NOT STARTED
+### Phase C: Polish & Enhancement — IN PROGRESS
 
 - [ ] **C1: Away/resume summary**
 - [ ] **C2: Magic notes (auto-updating notes)**
 - [ ] **C3: Proactive memory surfacing (per-query relevance)**
 - [ ] **C4: Wire Mirror TrialPreview evaluator (Phase 5)**
-- [ ] **C5: Activate community scoring (Louvain)**
+- [x] **C5: Activate community scoring (Louvain)** — `CommunityCache` (5min TTL) + `community_boost_score()` (transitive sigmoid) wired into retrieval second pass via `max(co_activation, community_boost)`
 
 ---
 
