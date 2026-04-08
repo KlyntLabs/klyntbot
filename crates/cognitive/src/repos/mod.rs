@@ -1,6 +1,7 @@
 pub mod accumulated_observation;
 pub mod annotation;
 pub mod atom_extraction_cache;
+pub mod co_activation;
 pub mod blackboard;
 pub mod book_tree;
 pub mod community;
@@ -28,6 +29,7 @@ pub use accumulated_observation::AccumulatedObservationRepo;
 pub use annotation::AnnotationRepo;
 pub use atom_extraction_cache::AtomExtractionCache;
 pub use blackboard::{BlackboardEntry, BlackboardRepo, NewBlackboardEntry};
+pub use co_activation::CoActivationRepo;
 pub use book_tree::SqliteBookTreeRepo;
 pub use community::{CommunityMemberRow, CommunityRepo, CommunityRow};
 pub use deck_preference::{DeckPreferenceRepo, DeckPreferenceRow};
@@ -84,8 +86,8 @@ pub fn cognitive_migrations() -> Vec<FeatureMigration> {
     vec![
         FeatureMigration {
             feature_name: "cognitive".to_string(),
-            version: 14,
-            description: "Cognitive tables + squads + scope columns + persona skill fields + blackboard + persona accuracy + coaching intervention log + knowledge atoms + atom extraction cache + action_url on coaching_intervention_log + active recall (deck_preferences, review_sessions, flashcard new columns)"
+            version: 15,
+            description: "Cognitive tables + squads + scope columns + persona skill fields + blackboard + persona accuracy + coaching intervention log + knowledge atoms + atom extraction cache + action_url on coaching_intervention_log + active recall (deck_preferences, review_sessions, flashcard new columns) + co_activation"
                 .to_string(),
             sql: include_str!("../../migrations/001_cognitive_tables.sql").to_string(),
         },

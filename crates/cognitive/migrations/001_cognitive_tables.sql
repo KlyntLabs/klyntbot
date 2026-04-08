@@ -688,3 +688,15 @@ CREATE TABLE IF NOT EXISTS review_sessions (
 
 CREATE INDEX IF NOT EXISTS idx_review_sessions_status ON review_sessions(status);
 CREATE INDEX IF NOT EXISTS idx_review_sessions_started ON review_sessions(started_at);
+
+-- ── Co-activation tracking ───────────────────────────────────────
+-- Facts retrieved together strengthen each other (Hebbian co-retrieval)
+CREATE TABLE IF NOT EXISTS co_activation (
+    fact_id_a TEXT NOT NULL,
+    fact_id_b TEXT NOT NULL,
+    strength  REAL NOT NULL DEFAULT 1.0,
+    last_fired TEXT NOT NULL,
+    PRIMARY KEY (fact_id_a, fact_id_b)
+);
+CREATE INDEX IF NOT EXISTS idx_co_activation_a ON co_activation(fact_id_a);
+CREATE INDEX IF NOT EXISTS idx_co_activation_b ON co_activation(fact_id_b);
