@@ -279,6 +279,12 @@ impl BackgroundConsolidationService {
                 sig_tx.clone(),
                 cancel.clone(),
             ));
+            // ChatTurnCollector: runs alongside existing LLM extraction for convergence tracking.
+            _collector_handles.push(crate::pipeline::ChatTurnCollector::start(
+                bus.subscribe(),
+                sig_tx.clone(),
+                cancel.clone(),
+            ));
             if let Some(ref mem_repo) = session_memory_repo {
                 _collector_handles.push(crate::pipeline::SessionCollector::start(
                     bus.subscribe(),
