@@ -192,6 +192,8 @@ impl UnifiedMemoryService {
             query,
             USER_MODEL_DOMAINS,
             &params,
+            None,
+            None,
         )
         .await
         {
@@ -236,6 +238,8 @@ impl UnifiedMemoryService {
             query,
             USER_MODEL_DOMAINS,
             &params,
+            None,
+            None,
         )
         .await
         {
@@ -304,6 +308,8 @@ impl UnifiedMemoryService {
             query,
             USER_MODEL_DOMAINS,
             &params,
+            None,
+            None,
         )
         .await
         {

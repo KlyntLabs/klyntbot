@@ -317,6 +317,8 @@ async fn test_full_pipeline_event_to_retrieval() {
             situational_boost: 0.5,
             ..RetrievalParams::new(0)
         },
+        None,
+        None,
     )
     .await
     .unwrap();
@@ -406,6 +408,8 @@ async fn test_full_pipeline_update_replaces_old_fact() {
             situational_boost: 0.5,
             ..RetrievalParams::new(0)
         },
+        None,
+        None,
     )
     .await
     .unwrap();
@@ -478,6 +482,8 @@ async fn test_batch_pipeline_processes_domain_events_end_to_end() {
             situational_boost: 0.5,
             ..RetrievalParams::new(0)
         },
+        None,
+        None,
     )
     .await
     .unwrap();
@@ -547,6 +553,8 @@ async fn test_batch_pipeline_processes_domain_events_end_to_end() {
             situational_boost: 0.5,
             ..RetrievalParams::new(0)
         },
+        None,
+        None,
     )
     .await
     .unwrap();

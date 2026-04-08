@@ -12,7 +12,8 @@ use crate::decay::{
     relevance_score, retrievability, temporal_recency_score, update_stability, RelevanceWeights,
 };
 use crate::embedder::SemanticFactEmbedder;
-use crate::repos::SemanticFactRepo;
+use crate::repos::{CoActivationRepo, SemanticFactRepo};
+use crate::services::scoring::{self, KnowledgeDepthCache};
 use crate::types::SemanticFact;
 
 /// Minimum vector results before fallback kicks in.
@@ -95,6 +96,8 @@ pub async fn retrieve_relevant_facts(
     query: &str,
     domains: &[&str],
     params: &RetrievalParams,
+    co_activation_repo: Option<&CoActivationRepo>,
+    depth_cache: Option<&KnowledgeDepthCache>,
 ) -> Result<Vec<ScoredFact>, sqlx::Error> {
     let use_vector = !query.is_empty() && embedder.map(|e| e.is_available()).unwrap_or(false);
 
@@ -125,12 +128,13 @@ pub async fn retrieve_relevant_facts(
             .await
         {
             Ok(hits) if hits.len() >= MIN_VECTOR_RESULTS => {
-                vector_path(repo, &hits, params.situational_boost, &weights).await?
+                vector_path(repo, &hits, params.situational_boost, &weights, depth_cache).await?
             }
             Ok(hits) => {
                 // Too few vector results — merge with fallback
                 let mut vector_scored =
-                    vector_path(repo, &hits, params.situational_boost, &weights).await?;
+                    vector_path(repo, &hits, params.situational_boost, &weights, depth_cache)
+                        .await?;
                 let vector_ids: std::collections::HashSet<String> =
                     vector_scored.iter().map(|s| s.fact.id.clone()).collect();
                 let mut fallback = fallback_path(
@@ -139,6 +143,7 @@ pub async fn retrieve_relevant_facts(
                     params.situational_boost,
                     &weights,
                     &params.scope_chain,
+                    depth_cache,
                 )
                 .await?;
                 fallback.retain(|s| !vector_ids.contains(&s.fact.id));
@@ -153,6 +158,7 @@ pub async fn retrieve_relevant_facts(
                     params.situational_boost,
                     &weights,
                     &params.scope_chain,
+                    depth_cache,
                 )
                 .await?
             }
@@ -164,6 +170,7 @@ pub async fn retrieve_relevant_facts(
             params.situational_boost,
             &weights,
             &params.scope_chain,
+            depth_cache,
         )
         .await?
     };
@@ -189,6 +196,24 @@ pub async fn retrieve_relevant_facts(
                     let bm25_boost = 1.0 / (DEFAULT_RRF_K + rank as f64 + 1.0);
                     result.score += bm25_boost;
                 }
+            }
+        }
+    }
+
+    // Second pass: co-activation re-ranking (needs peer IDs from first pass)
+    if let Some(co_repo) = co_activation_repo {
+        let all_ids: Vec<String> = scored.iter().map(|s| s.fact.id.clone()).collect();
+        if all_ids.len() >= 2 {
+            for result in &mut scored {
+                let peer_ids: Vec<String> = all_ids
+                    .iter()
+                    .filter(|id| *id != &result.fact.id)
+                    .cloned()
+                    .collect();
+                let co_score =
+                    scoring::co_activation_score(&result.fact.id, &peer_ids, co_repo).await;
+                // Add weighted co-activation contribution
+                result.score += co_score * weights.community;
             }
         }
     }
@@ -226,6 +251,7 @@ async fn vector_path(
     hits: &[(String, f64)],
     situational_boost: f64,
     weights: &RelevanceWeights,
+    depth_cache: Option<&KnowledgeDepthCache>,
 ) -> Result<Vec<ScoredFact>, sqlx::Error> {
     if hits.is_empty() {
         return Ok(Vec::new());
@@ -238,32 +264,37 @@ async fn vector_path(
     let facts = repo.get_batch(&ids).await?;
     let now = Utc::now();
 
-    Ok(facts
-        .into_iter()
-        .map(|fact| {
-            let similarity = sim_map.get(fact.id.as_str()).copied().unwrap_or(0.5);
-            let (r, freq) = compute_decay_and_freq(&fact, &now);
-            let temporal = temporal_recency_score(&fact.valid_from);
-            let score = relevance_score(
-                similarity,
-                r,
-                fact.confidence,
-                freq,
-                situational_boost,
-                temporal,
-                0.0,
-                0.5,
-                0.0,
-                0.0,
-                weights,
-            );
-            ScoredFact {
-                fact,
-                score,
-                similarity: Some(similarity),
-            }
-        })
-        .collect())
+    let mut scored = Vec::with_capacity(facts.len());
+    for fact in facts {
+        let similarity = sim_map.get(fact.id.as_str()).copied().unwrap_or(0.5);
+        let (r, freq) = compute_decay_and_freq(&fact, &now);
+        let temporal = temporal_recency_score(&fact.valid_from);
+        let hierarchy = match depth_cache {
+            Some(cache) => cache.get_or_compute(&fact, repo).await,
+            None => 0.0,
+        };
+        let cross_note = scoring::convergence_score(&fact);
+        // community_score (co-activation) computed in second pass
+        let score = relevance_score(
+            similarity,
+            r,
+            fact.confidence,
+            freq,
+            situational_boost,
+            temporal,
+            hierarchy,
+            0.5,
+            0.0,
+            cross_note,
+            weights,
+        );
+        scored.push(ScoredFact {
+            fact,
+            score,
+            similarity: Some(similarity),
+        });
+    }
+    Ok(scored)
 }
 
 /// Score facts with neutral similarity (fallback when vector search unavailable).
@@ -273,6 +304,7 @@ async fn fallback_path(
     situational_boost: f64,
     weights: &RelevanceWeights,
     scope_chain: &[(String, Option<String>)],
+    depth_cache: Option<&KnowledgeDepthCache>,
 ) -> Result<Vec<ScoredFact>, sqlx::Error> {
     let all_facts = if scope_chain.is_empty() {
         // Backwards-compatible: load all domains
@@ -292,31 +324,35 @@ async fn fallback_path(
 
     let now = Utc::now();
 
-    let mut scored: Vec<ScoredFact> = all_facts
-        .into_iter()
-        .map(|fact| {
-            let (r, freq) = compute_decay_and_freq(&fact, &now);
-            let temporal = temporal_recency_score(&fact.valid_from);
-            let score = relevance_score(
-                0.5,
-                r,
-                fact.confidence,
-                freq,
-                situational_boost,
-                temporal,
-                0.0,
-                0.5,
-                0.0,
-                0.0,
-                weights,
-            );
-            ScoredFact {
-                fact,
-                score,
-                similarity: None,
-            }
-        })
-        .collect();
+    let mut scored = Vec::with_capacity(all_facts.len());
+    for fact in all_facts {
+        let (r, freq) = compute_decay_and_freq(&fact, &now);
+        let temporal = temporal_recency_score(&fact.valid_from);
+        let hierarchy = match depth_cache {
+            Some(cache) => cache.get_or_compute(&fact, repo).await,
+            None => 0.0,
+        };
+        let cross_note = scoring::convergence_score(&fact);
+        // community_score (co-activation) computed in second pass
+        let score = relevance_score(
+            0.5,
+            r,
+            fact.confidence,
+            freq,
+            situational_boost,
+            temporal,
+            hierarchy,
+            0.5,
+            0.0,
+            cross_note,
+            weights,
+        );
+        scored.push(ScoredFact {
+            fact,
+            score,
+            similarity: None,
+        });
+    }
 
     scored.sort_by(|a, b| {
         b.score
@@ -361,7 +397,7 @@ pub async fn retrieve_all_domains(
         ..RetrievalParams::new(0)
     };
     // retrieve_relevant_facts already returns results sorted by score.
-    retrieve_relevant_facts(repo, embedder, query, domains, &params).await
+    retrieve_relevant_facts(repo, embedder, query, domains, &params, None, None).await
 }
 
 #[cfg(test)]
@@ -476,6 +512,8 @@ mod tests {
             "when do I take breaks",
             &["productivity"],
             &default_params(10),
+            None,
+            None,
         )
         .await
         .unwrap();
@@ -504,6 +542,8 @@ mod tests {
             "anything",
             &["productivity"],
             &default_params(10),
+            None,
+            None,
         )
         .await
         .unwrap();
@@ -530,6 +570,8 @@ mod tests {
             "",
             &["productivity"],
             &default_params(10),
+            None,
+            None,
         )
         .await
         .unwrap();
@@ -555,6 +597,8 @@ mod tests {
             "query",
             &["productivity"],
             &default_params(10),
+            None,
+            None,
         )
         .await
         .unwrap();
@@ -584,6 +628,8 @@ mod tests {
             "query",
             &["productivity"],
             &default_params(10),
+            None,
+            None,
         )
         .await
         .unwrap();
@@ -601,7 +647,7 @@ mod tests {
             .await
             .unwrap();
 
-        retrieve_relevant_facts(&repo, None, "", &["productivity"], &default_params(10))
+        retrieve_relevant_facts(&repo, None, "", &["productivity"], &default_params(10), None, None)
             .await
             .unwrap();
 
@@ -622,7 +668,7 @@ mod tests {
         }
 
         let results =
-            retrieve_relevant_facts(&repo, None, "", &["productivity"], &default_params(3))
+            retrieve_relevant_facts(&repo, None, "", &["productivity"], &default_params(3), None, None)
                 .await
                 .unwrap();
         assert_eq!(results.len(), 3);
@@ -634,7 +680,7 @@ mod tests {
         let repo = SemanticFactRepo::new(pool);
 
         let results =
-            retrieve_relevant_facts(&repo, None, "", &["nonexistent"], &default_params(10))
+            retrieve_relevant_facts(&repo, None, "", &["nonexistent"], &default_params(10), None, None)
                 .await
                 .unwrap();
         assert!(results.is_empty());
@@ -660,6 +706,8 @@ mod tests {
             "morning routine",
             &["productivity"],
             &default_params(10),
+            None,
+            None,
         )
         .await
         .unwrap();
