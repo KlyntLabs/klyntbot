@@ -251,6 +251,7 @@ export function NoteEditor({
         setActivePopover(null);
       }
     };
+    if (!editor.view?.dom) return;
     const editorEl = editor.view.dom;
     editorEl.addEventListener("click", handleClick);
     return () => editorEl.removeEventListener("click", handleClick);
@@ -292,6 +293,7 @@ export function NoteEditor({
       }
     };
 
+    if (!editor.view?.dom) return;
     const editorEl = editor.view.dom;
     editorEl.addEventListener("mouseover", handleMouseOver);
     editorEl.addEventListener("mouseout", handleMouseOut);
@@ -480,7 +482,7 @@ export function NoteEditor({
 
   const handleAnnotationClick = useCallback(
     (markId: string) => {
-      if (!editor) return;
+      if (!editor?.view?.dom) return;
       const el = editor.view.dom.querySelector(
         `.annotation-highlight[data-annotation-id="${markId}"]`,
       );

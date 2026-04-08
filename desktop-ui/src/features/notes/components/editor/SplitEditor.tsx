@@ -377,6 +377,7 @@ export function SplitEditor({
         setActiveAnnotationId(null);
       }
     };
+    if (!leftEditor.view?.dom) return;
     const editorEl = leftEditor.view.dom;
     editorEl.addEventListener("click", handleClick);
     return () => editorEl.removeEventListener("click", handleClick);
@@ -386,7 +387,7 @@ export function SplitEditor({
   const handleSidebarAnnotationClick = useCallback(
     (markId: string) => {
       setActiveAnnotationId(markId);
-      if (!leftEditor) return;
+      if (!leftEditor?.view?.dom) return;
       const el = leftEditor.view.dom.querySelector(
         `.annotation-highlight[data-annotation-id="${markId}"]`,
       );

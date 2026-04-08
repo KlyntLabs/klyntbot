@@ -100,7 +100,7 @@ export function MemoryReference({ refType, refId }: MemoryReferenceProps) {
           className={cn(
             "absolute z-50 bottom-full mb-1.5 left-1/2 -translate-x-1/2",
             "min-w-[220px] max-w-[320px] p-2.5 rounded-lg",
-            "glass-panel border border-border shadow-lg",
+            "glass-dropdown shadow-lg",
             "animate-in fade-in-50 duration-100",
           )}
           onMouseEnter={() => clearTimeout(hideTimerRef.current)}

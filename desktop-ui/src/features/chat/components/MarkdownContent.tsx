@@ -15,12 +15,23 @@ const rehypePlugins = [rehypeHighlight, rehypeMemoryRef];
 const remarkPlugins = [remarkGfm];
 
 const customComponents: Partial<Components> = {
-  // react-markdown renders unknown HTML elements via their tagName
-  "memory-ref": (props: React.ComponentProps<"span"> & { node?: unknown }) => {
-    const el = props.node as { properties?: Record<string, string> } | undefined;
-    const refType = el?.properties?.["data-ref-type"] ?? "";
-    const refId = el?.properties?.["data-ref-id"] ?? "";
-    if (!refType || !refId) return null;
+  // react-markdown passes HAST properties as camelCase React props directly
+  // on the component (not nested under node.properties).
+  "memory-ref": (props: Record<string, unknown>) => {
+    // Props come directly as camelCase: dataRefType, dataRefId
+    const refType = (props.dataRefType as string) ?? "";
+    const refId = (props.dataRefId as string) ?? "";
+    if (!refType || !refId) {
+      // Fallback: check node.properties (older react-markdown versions)
+      const el = props.node as { properties?: Record<string, string> } | undefined;
+      const p = el?.properties ?? {};
+      const fallbackType = p["data-ref-type"] ?? p.dataRefType ?? "";
+      const fallbackId = p["data-ref-id"] ?? p.dataRefId ?? "";
+      if (fallbackType && fallbackId) {
+        return <MemoryReference refType={fallbackType} refId={fallbackId} />;
+      }
+      return null;
+    }
     return <MemoryReference refType={refType} refId={refId} />;
   },
 };

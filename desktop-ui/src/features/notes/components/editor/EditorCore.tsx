@@ -46,7 +46,8 @@ export function useEntityResolution(editor: ReturnType<typeof useEditor>) {
     let timer: ReturnType<typeof setTimeout> | null = null;
 
     async function resolve() {
-      const root = editor?.view.dom;
+      if (!editor?.view?.dom) return;
+      const root = editor.view.dom;
       const mentions = root.querySelectorAll<HTMLElement>("span[data-entity-mention]");
       const wikiLinks = root.querySelectorAll<HTMLElement>("span[data-wiki-link]");
 
