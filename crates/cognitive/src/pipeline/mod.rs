@@ -15,8 +15,8 @@ pub use chat_turn_collector::ChatTurnCollector;
 pub use coaching_collector::CoachingCollector;
 pub use collector::{signal_queue, SignalReceiver, SignalSender};
 pub use consolidator::{
-    deep_promote, group_signals, heuristic_promote, DeepConsolidationHandler, KnowledgeCluster,
-    PromotionOp,
+    deep_promote, group_signals, heuristic_promote, promotion_source, DeepConsolidationHandler,
+    KnowledgeCluster, PromotionOp,
 };
 pub use recall_collector::RecallCollector;
 pub use session_collector::SessionCollector;

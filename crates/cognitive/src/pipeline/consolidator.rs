@@ -179,7 +179,7 @@ fn extract_spo(text: &str) -> (String, String, String) {
     ("user".into(), "noted".into(), text.to_string())
 }
 
-fn promotion_source(signals: &[CognitiveSignal]) -> String {
+pub fn promotion_source(signals: &[CognitiveSignal]) -> String {
     let mut sources: Vec<&str> = signals
         .iter()
         .map(|s| match s.source {

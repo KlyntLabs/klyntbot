@@ -547,6 +547,186 @@ impl ConsolidationHandler for LlmConsolidationHandler {
     }
 }
 
+// ── Deep Consolidation ────────────────────────────────────────────────
+
+const DEEP_CONSOLIDATION_PROMPT: &str = r#"You are a knowledge consolidation engine for a personal AI assistant. You receive clusters of signals from different sources about a user. Each cluster groups signals about the same topic.
+
+For each cluster, decide ONE action:
+- "fact": Extract a semantic fact as a subject-predicate-object triple
+- "rule": Extract a behavioral rule/guideline (only if signals include coaching patterns)
+- "episode": Store as an episodic memory event
+- "skip": Not significant enough to store
+
+Guidelines:
+- Prefer "fact" when confidence >= 0.6 or convergence >= 0.4
+- Use "rule" only when coaching pattern signals are present and confidence >= 0.7
+- Use "episode" for moderate-confidence observations (>= 0.5) that don't fit fact/rule
+- Use "skip" for low-confidence noise
+- Facts must have clear subject, predicate, and object
+- Rules should be prescriptive behavioral guidelines
+- Episodes should be concise event summaries
+
+Respond as JSON:
+{
+  "decisions": [
+    {
+      "cluster_index": 0,
+      "action": "fact",
+      "subject": "Jayden",
+      "predicate": "is learning",
+      "object": "Rust programming",
+      "confidence": 0.85
+    }
+  ]
+}
+
+For "rule" actions, include "rule_text" and "confidence".
+For "episode" actions, include "content", "summary", and "importance" (0.0-1.0).
+For "skip" actions, just include "cluster_index" and "action"."#;
+
+/// LLM-backed deep consolidation handler for the unified cognitive pipeline.
+/// Receives knowledge clusters and uses an LLM to decide promotion operations.
+pub struct LlmDeepConsolidationHandler {
+    provider: DynProvider,
+    params: ChatParams,
+}
+
+impl LlmDeepConsolidationHandler {
+    pub fn new(provider: DynProvider, params: ChatParams) -> Self {
+        Self {
+            provider,
+            params: params.with_response_format(ResponseFormat::JsonObject),
+        }
+    }
+}
+
+#[async_trait]
+impl cognitive::pipeline::DeepConsolidationHandler for LlmDeepConsolidationHandler {
+    async fn consolidate_deep(
+        &self,
+        clusters: &[cognitive::pipeline::KnowledgeCluster],
+    ) -> common::Result<Vec<cognitive::pipeline::PromotionOp>> {
+        if clusters.is_empty() {
+            return Ok(Vec::new());
+        }
+
+        // Format clusters for LLM
+        let mut user_msg = String::from("Analyze these knowledge clusters:\n\n");
+        for (i, cluster) in clusters.iter().enumerate() {
+            let sources: Vec<String> = cluster
+                .signals
+                .iter()
+                .map(|s| format!("{:?}", s.source))
+                .collect();
+            user_msg.push_str(&format!(
+                "[Cluster {i}] subject=\"{}\", domain=\"{}\", convergence={:.2}, \
+                 confidence={:.2}, sources=[{}]\n",
+                cluster.merged_subject,
+                cluster.domain,
+                cluster.convergence_score,
+                cluster.max_confidence,
+                sources.join(", ")
+            ));
+            for obs in &cluster.combined_observations {
+                let truncated = if obs.len() > 200 { &obs[..200] } else { obs };
+                user_msg.push_str(&format!("  - \"{truncated}\"\n"));
+            }
+            user_msg.push('\n');
+        }
+
+        let messages = vec![
+            Message::system(DEEP_CONSOLIDATION_PROMPT),
+            Message::user(user_msg),
+        ];
+
+        let response = self.provider.chat(&messages, None, &self.params).await?;
+        let content = response.content.unwrap_or_default();
+
+        let parsed: DeepConsolidationResponse = serde_json::from_str(&content).map_err(|e| {
+            common::KlyntbotError::Provider(common::ProviderError::InvalidResponse(format!(
+                "Deep consolidation JSON parse: {e}"
+            )))
+        })?;
+
+        let mut ops = Vec::new();
+        for decision in parsed.decisions {
+            let idx = decision.cluster_index;
+            if idx >= clusters.len() {
+                continue;
+            }
+            let cluster = &clusters[idx];
+
+            match decision.action.as_str() {
+                "fact" => {
+                    if let (Some(subject), Some(predicate), Some(object)) =
+                        (decision.subject, decision.predicate, decision.object)
+                    {
+                        ops.push(cognitive::pipeline::PromotionOp::CreateFact {
+                            subject,
+                            predicate,
+                            object,
+                            domain: cluster.domain.clone(),
+                            confidence: decision.confidence.unwrap_or(cluster.max_confidence),
+                            convergence: cluster.convergence_score,
+                            source: format!(
+                                "deep+{}",
+                                cognitive::pipeline::promotion_source(&cluster.signals)
+                            ),
+                        });
+                    }
+                }
+                "rule" => {
+                    if let Some(rule_text) = decision.rule_text {
+                        ops.push(cognitive::pipeline::PromotionOp::CreateRule {
+                            rule_text,
+                            domain: cluster.domain.clone(),
+                            confidence: decision.confidence.unwrap_or(cluster.max_confidence),
+                        });
+                    }
+                }
+                "episode" => {
+                    let content = decision.content.unwrap_or(cluster.merged_subject.clone());
+                    let summary = decision.summary.unwrap_or_else(|| {
+                        if content.len() > 120 {
+                            content[..120].to_string()
+                        } else {
+                            content.clone()
+                        }
+                    });
+                    ops.push(cognitive::pipeline::PromotionOp::CreateEpisode {
+                        content,
+                        summary,
+                        domain: cluster.domain.clone(),
+                        importance: decision.importance.unwrap_or(0.5),
+                    });
+                }
+                _ => {} // "skip" or unknown
+            }
+        }
+
+        Ok(ops)
+    }
+}
+
+#[derive(serde::Deserialize)]
+struct DeepConsolidationResponse {
+    decisions: Vec<DeepDecision>,
+}
+
+#[derive(serde::Deserialize)]
+struct DeepDecision {
+    cluster_index: usize,
+    action: String,
+    subject: Option<String>,
+    predicate: Option<String>,
+    object: Option<String>,
+    rule_text: Option<String>,
+    content: Option<String>,
+    summary: Option<String>,
+    confidence: Option<f64>,
+    importance: Option<f64>,
+}
+
 // ── Reflection ──
 
 const REFLECTION_SYSTEM_PROMPT: &str = "\

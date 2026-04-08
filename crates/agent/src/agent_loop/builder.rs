@@ -443,7 +443,16 @@ impl AgentLoopBuilder {
                                 pool.clone(),
                             )),
                             intelligence_mode: config.cognitive.intelligence_mode,
-                            deep_handler: None,
+                            deep_handler: self.cognitive_provider.as_ref().map(|cp| {
+                                let params = providers::cognitive_chat_params(&config, 4096);
+                                Arc::new(
+                                    crate::adapters::cognitive_handlers::LlmDeepConsolidationHandler::new(
+                                        cp.clone(),
+                                        params,
+                                    ),
+                                )
+                                    as Arc<dyn cognitive::pipeline::DeepConsolidationHandler>
+                            }),
                         },
                     );
                     info!("Cognitive background consolidation service started");
