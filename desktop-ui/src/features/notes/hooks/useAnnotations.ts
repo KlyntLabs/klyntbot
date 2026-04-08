@@ -61,7 +61,13 @@ export function useAnnotations(noteId: string | null, editor: Editor | null) {
         }
       }
     });
-    if (modified) editor.view.dispatch(tr);
+    if (modified) {
+      try {
+        editor.view.dispatch(tr);
+      } catch {
+        /* editor not mounted */
+      }
+    }
   }, [editor, annotations, loading]);
 
   const createAnnotation = useCallback(
@@ -96,7 +102,13 @@ export function useAnnotations(noteId: string | null, editor: Editor | null) {
             }
           }
         });
-        if (modified) editor.view.dispatch(tr);
+        if (modified) {
+          try {
+            editor.view.dispatch(tr);
+          } catch {
+            /* editor not mounted */
+          }
+        }
 
         refetch();
       } catch {

@@ -251,8 +251,13 @@ export function NoteEditor({
         setActivePopover(null);
       }
     };
-    if (!editor.view?.dom) return;
-    const editorEl = editor.view.dom;
+    let editorEl: HTMLElement;
+    try {
+      editorEl = editor.view.dom;
+    } catch {
+      return;
+    }
+    if (!editorEl) return;
     editorEl.addEventListener("click", handleClick);
     return () => editorEl.removeEventListener("click", handleClick);
   }, [editor]);
@@ -293,8 +298,13 @@ export function NoteEditor({
       }
     };
 
-    if (!editor.view?.dom) return;
-    const editorEl = editor.view.dom;
+    let editorEl: HTMLElement;
+    try {
+      editorEl = editor.view.dom;
+    } catch {
+      return;
+    }
+    if (!editorEl) return;
     editorEl.addEventListener("mouseover", handleMouseOver);
     editorEl.addEventListener("mouseout", handleMouseOut);
     return () => {
@@ -482,10 +492,15 @@ export function NoteEditor({
 
   const handleAnnotationClick = useCallback(
     (markId: string) => {
-      if (!editor?.view?.dom) return;
-      const el = editor.view.dom.querySelector(
-        `.annotation-highlight[data-annotation-id="${markId}"]`,
-      );
+      if (!editor) return;
+      let dom: HTMLElement;
+      try {
+        dom = editor.view.dom;
+      } catch {
+        return;
+      }
+      if (!dom) return;
+      const el = dom.querySelector(`.annotation-highlight[data-annotation-id="${markId}"]`);
       if (el) el.scrollIntoView({ behavior: "smooth", block: "center" });
     },
     [editor],

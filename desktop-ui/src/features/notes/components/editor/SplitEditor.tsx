@@ -377,8 +377,13 @@ export function SplitEditor({
         setActiveAnnotationId(null);
       }
     };
-    if (!leftEditor.view?.dom) return;
-    const editorEl = leftEditor.view.dom;
+    let editorEl: HTMLElement;
+    try {
+      editorEl = leftEditor.view.dom;
+    } catch {
+      return;
+    }
+    if (!editorEl) return;
     editorEl.addEventListener("click", handleClick);
     return () => editorEl.removeEventListener("click", handleClick);
   }, [splitMode, leftEditor]);
@@ -387,10 +392,15 @@ export function SplitEditor({
   const handleSidebarAnnotationClick = useCallback(
     (markId: string) => {
       setActiveAnnotationId(markId);
-      if (!leftEditor?.view?.dom) return;
-      const el = leftEditor.view.dom.querySelector(
-        `.annotation-highlight[data-annotation-id="${markId}"]`,
-      );
+      if (!leftEditor) return;
+      let dom: HTMLElement;
+      try {
+        dom = leftEditor.view.dom;
+      } catch {
+        return;
+      }
+      if (!dom) return;
+      const el = dom.querySelector(`.annotation-highlight[data-annotation-id="${markId}"]`);
       if (el) {
         el.scrollIntoView({ behavior: "smooth", block: "center" });
       }

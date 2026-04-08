@@ -152,7 +152,12 @@ export const SlashCommandsExtension = Extension.create({
 
             // Schedule menu open after the "/" is inserted
             requestAnimationFrame(() => {
-              const coords = editor.view.coordsAtPos(from);
+              let coords: { left: number; bottom: number };
+              try {
+                coords = editor.view.coordsAtPos(from);
+              } catch {
+                return;
+              }
               slashMenuCallback?.({
                 active: true,
                 query: "",
