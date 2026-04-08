@@ -552,6 +552,95 @@ impl AppCore {
                     }),
                 }
             }
+            "note" => {
+                match self.note_repo.get_note(ref_id).await {
+                    Ok(Some(note)) => {
+                        let tags = self
+                            .note_repo
+                            .get_tags(ref_id)
+                            .await
+                            .unwrap_or_default();
+                        let notebook_name = if let Some(ref nb_id) = note.notebook_id {
+                            self.note_repo
+                                .list_notebooks()
+                                .await
+                                .ok()
+                                .and_then(|nbs| {
+                                    nbs.into_iter().find(|nb| &nb.id == nb_id).map(|nb| nb.title)
+                                })
+                        } else {
+                            None
+                        };
+                        let mut details = HashMap::new();
+                        if !tags.is_empty() {
+                            details.insert("Tags".to_string(), tags.join(", "));
+                        }
+                        details.insert("Last edited".to_string(), note.updated_at.clone());
+                        let body_preview: String = note.body.chars().take(200).collect();
+                        if !body_preview.is_empty() {
+                            details.insert("Preview".to_string(), body_preview);
+                        }
+                        Ok(MemoryReferenceDetail {
+                            ref_type: "note".to_string(),
+                            title: note.title.clone(),
+                            subtitle: notebook_name.unwrap_or_else(|| "Note".to_string()),
+                            details,
+                        })
+                    }
+                    _ => Ok(MemoryReferenceDetail {
+                        ref_type: "note".to_string(),
+                        title: "Note".to_string(),
+                        subtitle: format!("ID: {}", ref_id),
+                        details: HashMap::new(),
+                    }),
+                }
+            }
+            "task" => {
+                match self.repos.tasks.get(ref_id).await {
+                    Ok(Some(task)) => {
+                        let mut details = HashMap::new();
+                        if let Some(ref desc) = task.description {
+                            let preview: String = desc.chars().take(200).collect();
+                            if !preview.is_empty() {
+                                details.insert("Description".to_string(), preview);
+                            }
+                        }
+                        if let Some(proj_id) = &task.project_id {
+                            details.insert("Project".to_string(), proj_id.clone());
+                        }
+                        if task.area_id != "default" {
+                            details.insert("Area".to_string(), task.area_id.clone());
+                        }
+                        if let Some(p) = task.priority {
+                            let label = match p {
+                                1 => "urgent",
+                                2 => "high",
+                                3 => "medium",
+                                4 => "low",
+                                _ => "none",
+                            };
+                            details.insert("Priority".to_string(), label.to_string());
+                        }
+                        let subtitle = if let Some(due) = task.due_date {
+                            format!("{} · due {}", task.status, due.format("%Y-%m-%d"))
+                        } else {
+                            task.status.clone()
+                        };
+                        Ok(MemoryReferenceDetail {
+                            ref_type: "task".to_string(),
+                            title: task.title.clone(),
+                            subtitle,
+                            details,
+                        })
+                    }
+                    _ => Ok(MemoryReferenceDetail {
+                        ref_type: "task".to_string(),
+                        title: "Task".to_string(),
+                        subtitle: format!("ID: {}", ref_id),
+                        details: HashMap::new(),
+                    }),
+                }
+            }
             _ => Ok(MemoryReferenceDetail {
                 ref_type: ref_type.to_string(),
                 title: "Unknown reference type".to_string(),

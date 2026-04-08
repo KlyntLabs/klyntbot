@@ -129,7 +129,8 @@ impl CognitiveContextSource {
                         .iter()
                         .map(|r| {
                             format!(
-                                "- {} (confidence: {:.0}%, signals: {})",
+                                "- [@rule:{}] {} (confidence: {:.0}%, signals: {})",
+                                r.id,
                                 r.rule_text,
                                 r.confidence * 100.0,
                                 r.signal_count
