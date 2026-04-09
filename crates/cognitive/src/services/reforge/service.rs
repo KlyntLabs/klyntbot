@@ -30,6 +30,8 @@ pub async fn run_reforge(
     rule_repo: &ProceduralRuleRepo,
     handler: &dyn super::ReforgeHandler,
     skill_mgr: &SkillFileManager,
+    mirror_repo: Option<&crate::mirror::MirrorRepo>,
+    feedback_repo: Option<&storage::RetrievalFeedbackRepo>,
 ) -> Option<ReforgeResult> {
     let mut result = ReforgeResult::default();
 
@@ -55,6 +57,8 @@ pub async fn run_reforge(
         episodic_repo,
         rule_repo,
         skill_mgr,
+        mirror_repo,
+        feedback_repo,
     )
     .await;
 

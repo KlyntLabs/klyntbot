@@ -922,9 +922,9 @@ impl klyntbot::cognitive::services::reforge::ReforgeHandler for MockReforgeHandl
         &self,
         _input: &klyntbot::cognitive::services::reforge::types::SynthesizeInput,
     ) -> common::Result<klyntbot::cognitive::services::reforge::types::SynthesizeOutput> {
-        Ok(klyntbot::cognitive::services::reforge::types::SynthesizeOutput {
-            fact_updates: vec![
-                klyntbot::cognitive::services::reforge::types::FactUpdate {
+        Ok(
+            klyntbot::cognitive::services::reforge::types::SynthesizeOutput {
+                fact_updates: vec![klyntbot::cognitive::services::reforge::types::FactUpdate {
                     action: "add".into(),
                     subject: "user".into(),
                     predicate: "prefers".into(),
@@ -932,24 +932,26 @@ impl klyntbot::cognitive::services::reforge::ReforgeHandler for MockReforgeHandl
                     domain: "productivity".into(),
                     confidence: 0.8,
                     reason: "Consistent across sessions".into(),
-                },
-            ],
-            rule_updates: vec![],
-            stale_facts: vec![],
-            cross_session_patterns: vec![],
-            extraction_quality_flag: None,
-        })
+                }],
+                rule_updates: vec![],
+                stale_facts: vec![],
+                cross_session_patterns: vec![],
+                extraction_quality_flag: None,
+            },
+        )
     }
 
     async fn review(
         &self,
         _input: &klyntbot::cognitive::services::reforge::types::ReviewInput,
     ) -> common::Result<klyntbot::cognitive::services::reforge::types::ReviewOutput> {
-        Ok(klyntbot::cognitive::services::reforge::types::ReviewOutput {
-            skill_edits: vec![],
-            routing_insights: vec![],
-            context_priority_suggestions: vec![],
-        })
+        Ok(
+            klyntbot::cognitive::services::reforge::types::ReviewOutput {
+                skill_edits: vec![],
+                routing_insights: vec![],
+                context_priority_suggestions: vec![],
+            },
+        )
     }
 
     async fn narrate(
@@ -1042,22 +1044,37 @@ async fn test_reforge_cycle_end_to_end() {
         &rule_repo,
         &handler,
         &skill_mgr,
+        None,
+        None,
     )
     .await;
 
     // 7. Assert the cycle ran and produced expected results
-    assert!(result.is_some(), "run_reforge should return Some when there is new data");
+    assert!(
+        result.is_some(),
+        "run_reforge should return Some when there is new data"
+    );
     let r = result.unwrap();
 
-    assert!(r.facts_added > 0, "Expected at least 1 fact added, got {}", r.facts_added);
-    assert!(r.phase_errors.is_empty(), "Expected no phase errors, got: {:?}", r.phase_errors);
+    assert!(
+        r.facts_added > 0,
+        "Expected at least 1 fact added, got {}",
+        r.facts_added
+    );
+    assert!(
+        r.phase_errors.is_empty(),
+        "Expected no phase errors, got: {:?}",
+        r.phase_errors
+    );
     assert_eq!(r.narrative, "Test Reforge narrative.");
 
     // 8. Verify reforge_state was updated
-    let state: klyntbot::storage::rows::ReforgeStateRow =
-        reforge_state_repo.get().await.unwrap();
+    let state: klyntbot::storage::rows::ReforgeStateRow = reforge_state_repo.get().await.unwrap();
     assert_eq!(state.run_count, 1, "run_count should be 1 after one cycle");
-    assert!(state.last_run_at.is_some(), "last_run_at should be set after a run");
+    assert!(
+        state.last_run_at.is_some(),
+        "last_run_at should be set after a run"
+    );
 
     // Keep TempDir alive until end of test
     drop(skills_tmp);

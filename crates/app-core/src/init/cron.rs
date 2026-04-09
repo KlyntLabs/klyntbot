@@ -441,6 +441,11 @@ fn register_cron_callbacks(
                         let fact_repo = cognitive::SemanticFactRepo::new(pool.clone());
                         let episodic_repo = cognitive::EpisodicMemoryRepo::new(pool.clone());
                         let rule_repo = cognitive::ProceduralRuleRepo::new(pool.clone());
+                        let mirror_repo = cognitive::mirror::MirrorRepo::new(
+                            storage::StoragePool::from_existing(pool.clone()),
+                        );
+                        let feedback_repo =
+                            storage::RetrievalFeedbackRepo::new(pool.clone());
 
                         let handler = crate::handlers::cognitive::build_reforge_handler(
                             &cog_provider,
@@ -470,6 +475,8 @@ fn register_cron_callbacks(
                             &rule_repo,
                             handler.as_ref(),
                             &skill_mgr,
+                            Some(&mirror_repo),
+                            Some(&feedback_repo),
                         )
                         .await
                         {
