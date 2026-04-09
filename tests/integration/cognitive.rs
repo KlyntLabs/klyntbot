@@ -925,7 +925,7 @@ impl klyntbot::cognitive::services::reforge::ReforgeHandler for MockReforgeHandl
         Ok(
             klyntbot::cognitive::services::reforge::types::SynthesizeOutput {
                 fact_updates: vec![klyntbot::cognitive::services::reforge::types::FactUpdate {
-                    action: "add".into(),
+                    action: klyntbot::cognitive::services::reforge::types::FactAction::Add,
                     subject: "user".into(),
                     predicate: "prefers".into(),
                     object: "morning work".into(),
@@ -1044,6 +1044,7 @@ async fn test_reforge_cycle_end_to_end() {
         &rule_repo,
         &handler,
         &skill_mgr,
+        None,
         None,
         None,
     )

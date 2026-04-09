@@ -10,9 +10,11 @@ use chrono::Utc;
 use tracing::{debug, info, warn};
 
 use crate::repos::{EpisodicMemoryRepo, ProceduralRuleRepo, SemanticFactRepo};
-use crate::services::reforge::skill_files::{compute_diff, content_hash, SkillFileManager};
+use crate::services::reforge::skill_files::{compute_diff, content_hash, SkillFile, SkillFileManager};
 use crate::services::reforge::types::*;
 use crate::types::{EpisodicMemory, ProceduralRule, SemanticFact, DEFAULT_MEMORY_TYPE};
+
+use common::helpers::truncate_chars;
 
 // ---------------------------------------------------------------------------
 // Public entry point
@@ -30,6 +32,7 @@ pub async fn run_reforge(
     rule_repo: &ProceduralRuleRepo,
     handler: &dyn super::ReforgeHandler,
     skill_mgr: &SkillFileManager,
+    pre_read_skill_files: Option<HashMap<String, Vec<SkillFile>>>,
     mirror_repo: Option<&crate::mirror::MirrorRepo>,
     feedback_repo: Option<&storage::RetrievalFeedbackRepo>,
 ) -> Option<ReforgeResult> {
@@ -57,6 +60,7 @@ pub async fn run_reforge(
         episodic_repo,
         rule_repo,
         skill_mgr,
+        pre_read_skill_files,
         mirror_repo,
         feedback_repo,
     )
@@ -170,7 +174,7 @@ pub async fn run_reforge(
     // 5c. Store narrative as episodic memory.
     let narrative_mem = EpisodicMemory {
         id: uuid::Uuid::new_v4().to_string(),
-        domain: "reforge".to_string(),
+        domain: SOURCE_REFORGE.to_string(),
         content: narrative,
         summary: Some("Reforge cycle narrative".to_string()),
         importance: 0.9,
@@ -260,11 +264,10 @@ fn build_synthesize_input(collected: &ReforgeCollected) -> SynthesizeInput {
         .episodic_memories
         .iter()
         .map(|m| {
-            let summary = m
-                .summary
-                .as_deref()
-                .unwrap_or_else(|| truncate(&m.content, 200))
-                .to_string();
+            let summary = match m.summary.as_deref() {
+                Some(s) => s.to_string(),
+                None => truncate_chars(&m.content, 200, ""),
+            };
             EpisodicSummary {
                 domain: m.domain.clone(),
                 summary,
@@ -380,48 +383,11 @@ async fn apply_knowledge(
 
     // --- Fact updates ---
     for fu in &syn.fact_updates {
-        match fu.action.as_str() {
-            "add" => {
-                // Check for existing similar fact first.
-                let existing = fact_repo
-                    .find_similar(&fu.subject, &fu.predicate)
-                    .await
-                    .ok()
-                    .and_then(|v| v.into_iter().next());
-                let new_id = uuid::Uuid::new_v4().to_string();
-                if let Some(old) = existing {
-                    // Supersede the existing fact.
-                    if let Err(e) = fact_repo.supersede(&old.id, &new_id).await {
-                        warn!("Reforge: failed to supersede fact {}: {e}", old.id);
-                    }
-                }
-                let fact = new_semantic_fact(&new_id, fu, &now);
-                if let Err(e) = fact_repo.upsert(&fact).await {
-                    warn!("Reforge: failed to add fact: {e}");
-                } else {
-                    result.facts_added += 1;
-                }
+        match fu.action {
+            FactAction::Add | FactAction::Update => {
+                upsert_fact(fu, fact_repo, &now, result).await;
             }
-            "update" => {
-                let existing = fact_repo
-                    .find_similar(&fu.subject, &fu.predicate)
-                    .await
-                    .ok()
-                    .and_then(|v| v.into_iter().next());
-                let new_id = uuid::Uuid::new_v4().to_string();
-                if let Some(old) = existing {
-                    if let Err(e) = fact_repo.supersede(&old.id, &new_id).await {
-                        warn!("Reforge: failed to supersede fact {}: {e}", old.id);
-                    }
-                }
-                let fact = new_semantic_fact(&new_id, fu, &now);
-                if let Err(e) = fact_repo.upsert(&fact).await {
-                    warn!("Reforge: failed to update fact: {e}");
-                } else {
-                    result.facts_updated += 1;
-                }
-            }
-            "remove" => {
+            FactAction::Remove => {
                 let existing = fact_repo
                     .find_similar(&fu.subject, &fu.predicate)
                     .await
@@ -435,16 +401,13 @@ async fn apply_knowledge(
                     }
                 }
             }
-            other => {
-                warn!("Reforge: unknown fact action '{other}', skipping");
-            }
         }
     }
 
     // --- Rule updates ---
     for ru in &syn.rule_updates {
-        match ru.action.as_str() {
-            "add" => {
+        match ru.action {
+            RuleAction::Add => {
                 let existing = rule_repo
                     .find_similar(&ru.rule_text, &ru.domain)
                     .await
@@ -463,7 +426,7 @@ async fn apply_knowledge(
                         domain: ru.domain.clone(),
                         rule_text: ru.rule_text.clone(),
                         confidence: 0.6,
-                        source: "reforge".to_string(),
+                        source: SOURCE_REFORGE.to_string(),
                         signal_count: 1,
                         created_at: now.clone(),
                         updated_at: now.clone(),
@@ -479,7 +442,7 @@ async fn apply_knowledge(
                     }
                 }
             }
-            "reinforce" => {
+            RuleAction::Update | RuleAction::Reinforce => {
                 let existing = rule_repo
                     .find_similar(&ru.rule_text, &ru.domain)
                     .await
@@ -497,9 +460,6 @@ async fn apply_knowledge(
                         ru.domain
                     );
                 }
-            }
-            other => {
-                warn!("Reforge: unknown rule action '{other}', skipping");
             }
         }
     }
@@ -528,6 +488,35 @@ async fn apply_knowledge(
     }
 }
 
+/// Shared logic for fact add/update: find similar, supersede if exists, create new.
+async fn upsert_fact(
+    fu: &FactUpdate,
+    fact_repo: &SemanticFactRepo,
+    now: &str,
+    result: &mut ReforgeResult,
+) {
+    let existing = fact_repo
+        .find_similar(&fu.subject, &fu.predicate)
+        .await
+        .ok()
+        .and_then(|v| v.into_iter().next());
+    let new_id = uuid::Uuid::new_v4().to_string();
+    let had_existing = existing.is_some();
+    if let Some(old) = existing {
+        if let Err(e) = fact_repo.supersede(&old.id, &new_id).await {
+            warn!("Reforge: failed to supersede fact {}: {e}", old.id);
+        }
+    }
+    let fact = new_semantic_fact(&new_id, fu, now);
+    if let Err(e) = fact_repo.upsert(&fact).await {
+        warn!("Reforge: failed to upsert fact: {e}");
+    } else if had_existing {
+        result.facts_updated += 1;
+    } else {
+        result.facts_added += 1;
+    }
+}
+
 // ---------------------------------------------------------------------------
 // Phase 5b: Apply skill edits
 // ---------------------------------------------------------------------------
@@ -539,16 +528,16 @@ async fn apply_skill_edits(
     skill_version_repo: &storage::repos::SkillVersionRepo,
     result: &mut ReforgeResult,
 ) {
+    // Read all skill files once upfront instead of per-edit.
+    let mut cached_files: HashMap<String, Vec<SkillFile>> = skill_mgr.read_all();
+
     for edit in edits {
         let key = (edit.skill_name.clone(), edit.file_path.clone());
 
-        // Re-read current file from disk.
-        let current_files = skill_mgr.read_all();
-        let current_file = current_files
+        let current_content = match cached_files
             .get(&edit.skill_name)
-            .and_then(|files| files.iter().find(|f| f.file_path == edit.file_path));
-
-        let current_content = match current_file {
+            .and_then(|files| files.iter().find(|f| f.file_path == edit.file_path))
+        {
             Some(f) => f.content.clone(),
             None => {
                 warn!(
@@ -608,6 +597,15 @@ async fn apply_skill_edits(
             continue;
         }
 
+        // Update the in-memory cache so subsequent edits to the same file see
+        // the new content without re-reading from disk.
+        if let Some(files) = cached_files.get_mut(&edit.skill_name) {
+            if let Some(cached) = files.iter_mut().find(|f| f.file_path == edit.file_path) {
+                cached.content_hash = content_hash(&new_content);
+                cached.content = new_content.clone();
+            }
+        }
+
         // Record version in DB.
         let diff = compute_diff(&current_content, &new_content);
         let next_version = match skill_version_repo
@@ -625,7 +623,7 @@ async fn apply_skill_edits(
             file_path: edit.file_path.clone(),
             content: new_content,
             diff: Some(diff),
-            source: "Reforge".to_string(),
+            source: SOURCE_REFORGE.to_string(),
             reason: Some(edit.reason.clone()),
             created_at: Utc::now().to_rfc3339(),
         };
@@ -644,13 +642,13 @@ async fn apply_skill_edits(
 /// Apply a single `SkillEdit` to file content, returning the modified content
 /// or `None` if the edit cannot be applied.
 pub(crate) fn apply_single_edit(content: &str, edit: &SkillEdit) -> Option<String> {
-    match edit.edit_type.as_str() {
-        "frontmatter" => {
+    match edit.edit_type {
+        SkillEditType::Frontmatter => {
             let field = edit.field.as_deref()?;
             let new_value = edit.new_value.as_deref()?;
             apply_frontmatter_edit(content, field, new_value)
         }
-        "body_replace" => {
+        SkillEditType::BodyReplace => {
             let old_text = edit.old_text.as_deref()?;
             let new_text = edit.new_text.as_deref()?;
             if !content.contains(old_text) {
@@ -658,21 +656,17 @@ pub(crate) fn apply_single_edit(content: &str, edit: &SkillEdit) -> Option<Strin
             }
             Some(content.replacen(old_text, new_text, 1))
         }
-        "body_insert" => {
+        SkillEditType::BodyInsert => {
             let section = edit.section.as_deref()?;
             let new_text = edit.new_text.as_deref()?;
             Some(apply_body_insert(content, section, new_text))
         }
-        "body_remove" => {
+        SkillEditType::BodyRemove => {
             let old_text = edit.old_text.as_deref()?;
             if !content.contains(old_text) {
                 return None;
             }
             Some(content.replacen(old_text, "", 1))
-        }
-        other => {
-            warn!("Reforge: unknown edit_type '{other}'");
-            None
         }
     }
 }
@@ -766,7 +760,7 @@ fn new_semantic_fact(id: &str, fu: &FactUpdate, now: &str) -> SemanticFact {
         predicate: fu.predicate.clone(),
         object: fu.object.clone(),
         confidence: fu.confidence,
-        source: "reforge".to_string(),
+        source: SOURCE_REFORGE.to_string(),
         valid_from: now.to_string(),
         valid_until: None,
         recorded_at: now.to_string(),
@@ -833,22 +827,6 @@ fn format_rules(rules: &[ProceduralRule]) -> String {
         .join("\n")
 }
 
-/// Truncate a string to at most `max_chars` characters, appending "..." if truncated.
-fn truncate(s: &str, max_chars: usize) -> &str {
-    if s.len() <= max_chars {
-        s
-    } else {
-        // Find a char boundary at or before max_chars.
-        let end = s
-            .char_indices()
-            .take_while(|(i, _)| *i < max_chars)
-            .last()
-            .map(|(i, c)| i + c.len_utf8())
-            .unwrap_or(0);
-        &s[..end]
-    }
-}
-
 // ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
@@ -857,11 +835,11 @@ fn truncate(s: &str, max_chars: usize) -> &str {
 mod tests {
     use super::*;
 
-    fn make_edit(edit_type: &str) -> SkillEdit {
+    fn make_edit(edit_type: SkillEditType) -> SkillEdit {
         SkillEdit {
             skill_name: "test".to_string(),
             file_path: "SKILL.md".to_string(),
-            edit_type: edit_type.to_string(),
+            edit_type,
             field: None,
             new_value: None,
             old_text: None,
@@ -874,7 +852,7 @@ mod tests {
     #[test]
     fn test_apply_frontmatter_replace() {
         let content = "---\nname: old-name\nversion: 1\n---\n# Body\nHello";
-        let mut edit = make_edit("frontmatter");
+        let mut edit = make_edit(SkillEditType::Frontmatter);
         edit.field = Some("name".to_string());
         edit.new_value = Some("new-name".to_string());
 
@@ -889,7 +867,7 @@ mod tests {
     #[test]
     fn test_apply_frontmatter_insert_new_field() {
         let content = "---\nname: test\n---\n# Body";
-        let mut edit = make_edit("frontmatter");
+        let mut edit = make_edit(SkillEditType::Frontmatter);
         edit.field = Some("priority".to_string());
         edit.new_value = Some("high".to_string());
 
@@ -901,7 +879,7 @@ mod tests {
     #[test]
     fn test_apply_body_replace() {
         let content = "---\nname: test\n---\n# Body\nold text here\nmore content";
-        let mut edit = make_edit("body_replace");
+        let mut edit = make_edit(SkillEditType::BodyReplace);
         edit.old_text = Some("old text here".to_string());
         edit.new_text = Some("new text here".to_string());
 
@@ -914,7 +892,7 @@ mod tests {
     #[test]
     fn test_apply_body_replace_not_found() {
         let content = "---\nname: test\n---\n# Body\nsome content";
-        let mut edit = make_edit("body_replace");
+        let mut edit = make_edit(SkillEditType::BodyReplace);
         edit.old_text = Some("nonexistent text".to_string());
         edit.new_text = Some("replacement".to_string());
 
@@ -925,7 +903,7 @@ mod tests {
     #[test]
     fn test_apply_body_insert() {
         let content = "---\nname: test\n---\n# Section A\nContent A\n# Section B\nContent B";
-        let mut edit = make_edit("body_insert");
+        let mut edit = make_edit(SkillEditType::BodyInsert);
         edit.section = Some("Section A".to_string());
         edit.new_text = Some("Inserted line".to_string());
 
@@ -945,7 +923,7 @@ mod tests {
     #[test]
     fn test_apply_body_insert_fallback_append() {
         let content = "---\nname: test\n---\n# Body\nSome content";
-        let mut edit = make_edit("body_insert");
+        let mut edit = make_edit(SkillEditType::BodyInsert);
         edit.section = Some("Nonexistent Section".to_string());
         edit.new_text = Some("Appended line".to_string());
 
@@ -956,22 +934,12 @@ mod tests {
     #[test]
     fn test_apply_body_remove() {
         let content = "---\nname: test\n---\n# Body\nremove this\nkeep this";
-        let mut edit = make_edit("body_remove");
+        let mut edit = make_edit(SkillEditType::BodyRemove);
         edit.old_text = Some("remove this\n".to_string());
 
         let result = apply_single_edit(content, &edit).unwrap();
         assert!(!result.contains("remove this"));
         assert!(result.contains("keep this"));
-    }
-
-    #[test]
-    fn test_truncate_short() {
-        assert_eq!(truncate("hello", 10), "hello");
-    }
-
-    #[test]
-    fn test_truncate_long() {
-        assert_eq!(truncate("hello world", 5), "hello");
     }
 
     #[test]

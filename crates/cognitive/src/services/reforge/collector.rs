@@ -1,12 +1,14 @@
 //! Phase 1 of the Reforge cycle: gather all inputs needed for nightly synthesis.
 
+use std::collections::HashMap;
+
 use chrono::{Duration, Utc};
 use tracing::debug;
 
 use crate::repos::{
     load_user_model, EpisodicMemoryRepo, ProceduralRuleRepo, SemanticFactRepo, RULE_DOMAINS,
 };
-use crate::services::reforge::skill_files::SkillFileManager;
+use crate::services::reforge::skill_files::{SkillFile, SkillFileManager};
 use crate::services::reforge::types::{ReforgeCollected, RoutingSummary, SessionContext};
 
 /// Scan skill files on disk and record a new version row for any file whose
@@ -14,10 +16,13 @@ use crate::services::reforge::types::{ReforgeCollected, RoutingSummary, SessionC
 ///
 /// This detects manual edits the user made between Reforge cycles so the
 /// nightly synthesizer always works from the current on-disk state.
+///
+/// Returns the files read from disk so callers can reuse them without a
+/// redundant `read_all()` call.
 pub async fn detect_user_edits(
     skill_mgr: &SkillFileManager,
     version_repo: &storage::repos::SkillVersionRepo,
-) {
+) -> HashMap<String, Vec<SkillFile>> {
     let all_files = skill_mgr.read_all();
     for (skill_name, files) in &all_files {
         for file in files {
@@ -41,18 +46,27 @@ pub async fn detect_user_edits(
                         reason: Some("Detected manual file edit".to_string()),
                         created_at: chrono::Utc::now().to_rfc3339(),
                     };
-                    let _ = version_repo.insert(&row).await;
+                    if let Err(e) = version_repo.insert(&row).await {
+                        tracing::warn!(
+                            "Failed to record user edit for {}/{}: {e}",
+                            skill_name,
+                            file.file_path
+                        );
+                    }
                     tracing::debug!("Detected user edit to {}/{}", skill_name, file.file_path);
                 }
             }
         }
     }
+    all_files
 }
 
 /// Collect all inputs required for a Reforge cycle.
 ///
 /// - `last_run_at` — RFC 3339 timestamp of the previous run, or `None` for a
 ///   first-run bootstrap (uses a 7-day look-back window instead).
+/// - `pre_read_skill_files` — if provided, reuses previously-read skill files
+///   (e.g. from `detect_user_edits`) to avoid a redundant `read_all()` call.
 /// - `mirror_repo` — optional mirror repo for routing snapshots and meta-rules.
 /// - `feedback_repo` — optional retrieval feedback repo for precision stats.
 ///
@@ -66,6 +80,7 @@ pub async fn collect(
     episodic_repo: &EpisodicMemoryRepo,
     rule_repo: &ProceduralRuleRepo,
     skill_mgr: &SkillFileManager,
+    pre_read_skill_files: Option<HashMap<String, Vec<SkillFile>>>,
     mirror_repo: Option<&crate::mirror::MirrorRepo>,
     feedback_repo: Option<&storage::RetrievalFeedbackRepo>,
 ) -> Option<ReforgeCollected> {
@@ -132,7 +147,7 @@ pub async fn collect(
     }
 
     // --- Skill files ---
-    let skill_files = skill_mgr.read_all();
+    let skill_files = pre_read_skill_files.unwrap_or_else(|| skill_mgr.read_all());
 
     // --- Routing summaries (from Mirror routing snapshots) ---
     let routing_summaries = if let Some(mirror) = mirror_repo {
@@ -169,11 +184,7 @@ pub async fn collect(
             Some(ts) => {
                 // Calculate days since last run.
                 chrono::DateTime::parse_from_rfc3339(ts)
-                    .map(|dt| {
-                        (Utc::now() - dt.with_timezone(&Utc))
-                            .num_days()
-                            .max(1)
-                    })
+                    .map(|dt| (Utc::now() - dt.with_timezone(&Utc)).num_days().max(1))
                     .unwrap_or(7)
             }
             None => 7,

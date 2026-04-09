@@ -1,5 +1,7 @@
 //! Input/output types for the Reforge cycle phases.
 
+use std::fmt;
+
 use serde::{Deserialize, Serialize};
 
 // ---------------------------------------------------------------------------
@@ -76,9 +78,79 @@ pub struct SynthesizeOutput {
     pub extraction_quality_flag: Option<String>,
 }
 
+// ---------------------------------------------------------------------------
+// Shared constants
+// ---------------------------------------------------------------------------
+
+pub const SOURCE_REFORGE: &str = "reforge";
+
+// ---------------------------------------------------------------------------
+// Enums for stringly-typed action/type fields
+// ---------------------------------------------------------------------------
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum FactAction {
+    Add,
+    Update,
+    Remove,
+}
+
+impl fmt::Display for FactAction {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Add => write!(f, "add"),
+            Self::Update => write!(f, "update"),
+            Self::Remove => write!(f, "remove"),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum RuleAction {
+    Add,
+    Update,
+    Reinforce,
+}
+
+impl fmt::Display for RuleAction {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Add => write!(f, "add"),
+            Self::Update => write!(f, "update"),
+            Self::Reinforce => write!(f, "reinforce"),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum SkillEditType {
+    Frontmatter,
+    BodyReplace,
+    BodyInsert,
+    BodyRemove,
+}
+
+impl fmt::Display for SkillEditType {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Frontmatter => write!(f, "frontmatter"),
+            Self::BodyReplace => write!(f, "body_replace"),
+            Self::BodyInsert => write!(f, "body_insert"),
+            Self::BodyRemove => write!(f, "body_remove"),
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Phase 2 detail types
+// ---------------------------------------------------------------------------
+
 #[derive(Debug, Clone, Deserialize)]
 pub struct FactUpdate {
-    pub action: String,
+    pub action: FactAction,
     pub subject: String,
     pub predicate: String,
     pub object: String,
@@ -89,7 +161,7 @@ pub struct FactUpdate {
 
 #[derive(Debug, Clone, Deserialize)]
 pub struct RuleUpdate {
-    pub action: String,
+    pub action: RuleAction,
     pub rule_text: String,
     pub domain: String,
     pub reason: String,
@@ -141,7 +213,7 @@ pub struct ReviewOutput {
 pub struct SkillEdit {
     pub skill_name: String,
     pub file_path: String,
-    pub edit_type: String,
+    pub edit_type: SkillEditType,
     pub field: Option<String>,
     pub new_value: Option<String>,
     pub old_text: Option<String>,

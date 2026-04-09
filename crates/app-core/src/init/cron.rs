@@ -444,8 +444,7 @@ fn register_cron_callbacks(
                         let mirror_repo = cognitive::mirror::MirrorRepo::new(
                             storage::StoragePool::from_existing(pool.clone()),
                         );
-                        let feedback_repo =
-                            storage::RetrievalFeedbackRepo::new(pool.clone());
+                        let feedback_repo = storage::RetrievalFeedbackRepo::new(pool.clone());
 
                         let handler = crate::handlers::cognitive::build_reforge_handler(
                             &cog_provider,
@@ -460,11 +459,14 @@ fn register_cron_callbacks(
 
                         // Detect manual user edits before running the Reforge
                         // cycle so the synthesizer sees the latest on-disk content.
-                        cognitive::services::reforge::collector::detect_user_edits(
-                            &skill_mgr,
-                            &repos_reforge.skill_version,
-                        )
-                        .await;
+                        // The returned files are passed through to avoid a redundant
+                        // `read_all()` inside the collector.
+                        let pre_read_files =
+                            cognitive::services::reforge::collector::detect_user_edits(
+                                &skill_mgr,
+                                &repos_reforge.skill_version,
+                            )
+                            .await;
 
                         match cognitive::services::reforge::service::run_reforge(
                             &repos_reforge.reforge_state,
@@ -475,6 +477,7 @@ fn register_cron_callbacks(
                             &rule_repo,
                             handler.as_ref(),
                             &skill_mgr,
+                            Some(pre_read_files),
                             Some(&mirror_repo),
                             Some(&feedback_repo),
                         )
