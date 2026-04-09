@@ -72,22 +72,26 @@ pub(crate) async fn dispatch_dev(
         "reforge_state" => dev::val(core.reforge_state().await),
         "reforge_skill_names" => dev::val(core.skill_names().await),
         "reforge_skill_versions" => {
-            let skill_name = try_field!(dev::get_str(body, "skill_name")
-                .or_else(|_| dev::get_str(body, "skillName")));
+            let skill_name = try_field!(
+                dev::get_str(body, "skill_name").or_else(|_| dev::get_str(body, "skillName"))
+            );
             dev::val(core.skill_version_list(&skill_name).await)
         }
         "reforge_skill_version_detail" => {
-            let skill_name = try_field!(dev::get_str(body, "skill_name")
-                .or_else(|_| dev::get_str(body, "skillName")));
+            let skill_name = try_field!(
+                dev::get_str(body, "skill_name").or_else(|_| dev::get_str(body, "skillName"))
+            );
             let version: i64 = try_field!(dev::get(body, "version")
                 .ok_or_else(|| ApiError::new("VALIDATION", "missing required field: version")));
             dev::val(core.skill_version_detail(&skill_name, version).await)
         }
         "reforge_skill_reset" => {
-            let skill_name = try_field!(dev::get_str(body, "skill_name")
-                .or_else(|_| dev::get_str(body, "skillName")));
-            let file_path = try_field!(dev::get_str(body, "file_path")
-                .or_else(|_| dev::get_str(body, "filePath")));
+            let skill_name = try_field!(
+                dev::get_str(body, "skill_name").or_else(|_| dev::get_str(body, "skillName"))
+            );
+            let file_path = try_field!(
+                dev::get_str(body, "file_path").or_else(|_| dev::get_str(body, "filePath"))
+            );
             let version: i64 = try_field!(dev::get(body, "version")
                 .ok_or_else(|| ApiError::new("VALIDATION", "missing required field: version")));
             dev::val(

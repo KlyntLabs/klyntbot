@@ -10,7 +10,9 @@ use chrono::Utc;
 use tracing::{debug, info, warn};
 
 use crate::repos::{EpisodicMemoryRepo, ProceduralRuleRepo, SemanticFactRepo};
-use crate::services::reforge::skill_files::{compute_diff, content_hash, SkillFile, SkillFileManager};
+use crate::services::reforge::skill_files::{
+    compute_diff, content_hash, SkillFile, SkillFileManager,
+};
 use crate::services::reforge::types::*;
 use crate::types::{EpisodicMemory, ProceduralRule, SemanticFact, DEFAULT_MEMORY_TYPE};
 

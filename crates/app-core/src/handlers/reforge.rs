@@ -33,7 +33,10 @@ impl AppCore {
         skill_name: &str,
     ) -> Result<Vec<SkillVersionResponse>, ApiError> {
         let repo = SkillVersionRepo::new(self.repos.pool().clone());
-        let rows = repo.list_versions(skill_name).await.map_err(map_storage_err)?;
+        let rows = repo
+            .list_versions(skill_name)
+            .await
+            .map_err(map_storage_err)?;
         Ok(rows.into_iter().map(version_to_response).collect())
     }
 
@@ -55,9 +58,7 @@ impl AppCore {
     pub async fn skill_names(&self) -> Result<SkillListResponse, ApiError> {
         let repo = SkillVersionRepo::new(self.repos.pool().clone());
         let names = repo.list_skill_names().await.map_err(map_storage_err)?;
-        Ok(SkillListResponse {
-            skill_names: names,
-        })
+        Ok(SkillListResponse { skill_names: names })
     }
 
     /// Reset a skill file to a previous version by reading that version's content
@@ -81,9 +82,7 @@ impl AppCore {
             .ok_or_else(|| {
                 ApiError::new(
                     "NOT_FOUND",
-                    format!(
-                        "version {version} of {skill_name}/{file_path} not found"
-                    ),
+                    format!("version {version} of {skill_name}/{file_path} not found"),
                 )
             })?;
         let new_content = target.content.clone();
@@ -103,9 +102,9 @@ impl AppCore {
         };
 
         // 3. Write the target version's content to disk.
-        manager.write_file(skill_name, file_path, &new_content).map_err(|e| {
-            ApiError::new("IO_ERROR", format!("failed to write skill file: {e}"))
-        })?;
+        manager
+            .write_file(skill_name, file_path, &new_content)
+            .map_err(|e| ApiError::new("IO_ERROR", format!("failed to write skill file: {e}")))?;
 
         // 4. Compute the next version number and diff.
         let latest = repo
