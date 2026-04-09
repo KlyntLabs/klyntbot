@@ -166,6 +166,9 @@ pub(super) async fn dispatch(
     if let Some(r) = commands::mirror::dispatch_dev(cmd, core, &body).await {
         return into_api_result(r);
     }
+    if let Some(r) = commands::reforge::dispatch_dev(cmd, core, &body).await {
+        return into_api_result(r);
+    }
     if let Some(r) = commands::journey::dispatch_dev(cmd, core, &body).await {
         return into_api_result(r);
     }

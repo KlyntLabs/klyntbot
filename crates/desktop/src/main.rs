@@ -1113,6 +1113,12 @@ fn run_desktop_app() {
             commands::mirror::revert_brain_version,
             commands::mirror::kill_trial,
             commands::mirror::continue_trial,
+            // Reforge
+            commands::reforge::reforge_state,
+            commands::reforge::reforge_skill_names,
+            commands::reforge::reforge_skill_versions,
+            commands::reforge::reforge_skill_version_detail,
+            commands::reforge::reforge_skill_reset,
             // Journey
             commands::journey::journey_milestones,
             commands::journey::journey_mark_complete,
