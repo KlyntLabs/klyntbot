@@ -6,6 +6,14 @@ use sqlx::SqlitePool;
 use crate::error::StorageError;
 use crate::rows::learning::{EnrichmentFeedbackRow, OutcomeRow};
 
+#[derive(Debug, Clone, sqlx::FromRow)]
+pub struct ToolFailureStatsRow {
+    pub tool_name: String,
+    pub total_calls: i64,
+    pub failure_count: i64,
+    pub error_types: Option<String>,
+}
+
 /// Repository for learning outcome and enrichment feedback persistence.
 #[derive(Debug, Clone)]
 pub struct OutcomeRepo {
@@ -81,6 +89,29 @@ impl OutcomeRepo {
         .fetch_one(&self.pool)
         .await?;
         Ok(row)
+    }
+
+    /// Aggregate tool failure stats grouped by tool name since a timestamp.
+    pub async fn tool_failure_stats_since(
+        &self,
+        since: DateTime<Utc>,
+    ) -> Result<Vec<ToolFailureStatsRow>, StorageError> {
+        let rows = sqlx::query_as::<_, ToolFailureStatsRow>(
+            "SELECT tool_name,
+                    COUNT(*) AS total_calls,
+                    SUM(CASE WHEN success = 0 THEN 1 ELSE 0 END) AS failure_count,
+                    GROUP_CONCAT(DISTINCT CASE WHEN success = 0 THEN error_category ELSE NULL END) AS error_types
+             FROM learning_outcomes
+             WHERE created_at > ?1
+             GROUP BY tool_name
+             HAVING failure_count > 0
+             ORDER BY failure_count DESC
+             LIMIT 20",
+        )
+        .bind(since.to_rfc3339())
+        .fetch_all(&self.pool)
+        .await?;
+        Ok(rows)
     }
 
     delete_older_than_impl!("learning_outcomes", "created_at");

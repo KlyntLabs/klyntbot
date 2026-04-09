@@ -44,6 +44,13 @@ Each experiment should have a hypothesis, a pace (conservative/balanced/bold), a
 Build on past experiment results: don't repeat configurations that failed. Focus on parameters related to the issues you identified.
 Only suggest experiments when you have evidence (routing problems, retrieval issues, correction patterns). If everything is working well, return an empty trial_suggestions array.
 
+When tool failure data is provided, analyze error patterns and propose skill edits that fix the root cause.
+For example, if a tool consistently receives wrong parameter types, update the skill's Critical Rules to clarify the correct parameter usage.
+
+When correction data is provided, identify which skill instructions led to the mistake and propose targeted fixes.
+
+When previous suggestions are provided, evaluate whether they should still be acted upon or have become stale.
+
 Respond with JSON:
 {\"skill_edits\":[{\"skill_name\":\"...\",\"file_path\":\"...\",\"edit_type\":\"frontmatter\"|\"body_replace\"|\"body_insert\"|\"body_remove\",\"field\":null,\"new_value\":null,\"old_text\":null,\"new_text\":null,\"section\":null,\"reason\":\"...\"}],\"routing_insights\":[\"...\"],\"context_priority_suggestions\":[{\"source\":\"...\",\"suggestion\":\"...\",\"reason\":\"...\"}],\"trial_suggestions\":[{\"hypothesis\":\"...\",\"pace\":\"conservative\"|\"balanced\"|\"bold\",\"param_overrides\":{\"param_name\":0.0}}]}";
 
@@ -171,6 +178,25 @@ fn format_review_input(input: &ReviewInput) -> String {
             &mut out,
             "\n## Retrieval Precision: {:.1}%",
             precision * 100.0
+        )
+        .unwrap();
+    }
+
+    // Tool failures
+    if let Some(ref summary) = input.tool_failure_summary {
+        writeln!(&mut out, "\n## Tool Health (since last cycle)\n{summary}").unwrap();
+    }
+
+    // Correction patterns per skill
+    if let Some(ref summary) = input.correction_summary {
+        writeln!(&mut out, "\n## Correction Patterns\n{summary}").unwrap();
+    }
+
+    // Previous suggestions
+    if let Some(ref summary) = input.previous_suggestions_summary {
+        writeln!(
+            &mut out,
+            "\n## Previous Cycle Suggestions (unacted)\n{summary}"
         )
         .unwrap();
     }

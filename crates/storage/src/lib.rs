@@ -41,6 +41,9 @@ pub use rows::session_memory::SessionMemoryRow;
 pub use repos::TrialRepo;
 pub use rows::trial::{ExperimentRow, ShadowLogRow, TrialRow};
 
+// ── Reforge ────────────────────────────────────────────────────────
+pub use repos::ReforgeSuggestionRepo;
+
 // ── Agent / Learning ────────────────────────────────────────────────
 pub use repos::RetrievalFeedbackRepo;
 pub use repos::StatusWorkflowRepo;

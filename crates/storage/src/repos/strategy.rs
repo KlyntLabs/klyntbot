@@ -171,6 +171,23 @@ impl StrategyRepo {
         Ok(rows)
     }
 
+    /// Get the predicted_strategy from the most recent record for a session key.
+    pub async fn latest_skill_for_session(
+        &self,
+        session_key: &str,
+    ) -> Result<Option<String>, StorageError> {
+        let row: Option<(String,)> = sqlx::query_as(
+            "SELECT predicted_strategy FROM strategy_records
+             WHERE session_key = ?1
+             ORDER BY timestamp DESC
+             LIMIT 1",
+        )
+        .bind(session_key)
+        .fetch_optional(&self.pool)
+        .await?;
+        Ok(row.map(|r| r.0))
+    }
+
     /// Update user_satisfaction on the most recent strategy record for a chat.
     /// Returns true if a record was updated, false if no matching record found.
     pub async fn set_satisfaction_for_chat(

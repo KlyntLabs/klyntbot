@@ -45,6 +45,13 @@ pub struct ReforgeCollected {
     pub retrieval_precision: Option<f64>,
     pub is_bootstrap: bool,
     pub autotuner_ctx: Option<AutotunerContext>,
+    pub tool_failures: Vec<ToolFailureSummary>,
+    pub correction_summaries: Vec<CorrectionSummary>,
+    pub retrieval_precision_by_domain: Vec<(String, f64)>,
+    pub behavioral_metrics: BehavioralMetrics,
+    pub graph_health: GraphHealthMetrics,
+    pub previous_suggestions: Vec<ReforgeSuggestion>,
+    pub extraction_yield_by_domain: Vec<(String, f64)>,
 }
 
 // ---------------------------------------------------------------------------
@@ -193,6 +200,9 @@ pub struct ReviewInput {
     pub new_facts_summary: String,
     pub retrieval_precision: Option<f64>,
     pub autotuner_context: Option<String>,
+    pub tool_failure_summary: Option<String>,
+    pub correction_summary: Option<String>,
+    pub previous_suggestions_summary: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -302,6 +312,58 @@ pub struct AutotunerContext {
 }
 
 // ---------------------------------------------------------------------------
+// Feedback types
+// ---------------------------------------------------------------------------
+
+/// Aggregated tool failure stats for a single tool since last Reforge run.
+#[derive(Debug, Clone, Serialize)]
+pub struct ToolFailureSummary {
+    pub tool_name: String,
+    pub total_calls: u32,
+    pub failure_count: u32,
+    pub failure_rate: f64,
+    pub error_types: Vec<String>,
+}
+
+/// Aggregated corrections attributed to a specific skill.
+#[derive(Debug, Clone, Serialize)]
+pub struct CorrectionSummary {
+    pub skill_name: String,
+    pub correction_count: u32,
+    pub sample_corrections: Vec<String>,
+}
+
+/// Behavioral metrics collected from feature crates.
+#[derive(Debug, Clone, Serialize, Default)]
+pub struct BehavioralMetrics {
+    pub task_estimation_bias: Option<f64>,
+    pub coaching_acceptance_rate: Option<f64>,
+    pub focus_quality_trend: Option<f64>,
+    pub suggestion_dismiss_rate: Option<f64>,
+    pub forecast_accuracy: Option<f64>,
+}
+
+/// Knowledge graph health snapshot.
+#[derive(Debug, Clone, Serialize, Default)]
+pub struct GraphHealthMetrics {
+    pub active_facts: u32,
+    pub active_rules: u32,
+    pub co_activation_pairs: u32,
+    pub facts_per_domain: Vec<(String, u32)>,
+    pub avg_fact_stability: f64,
+}
+
+/// A persisted suggestion from a previous Reforge cycle.
+#[derive(Debug, Clone, Serialize)]
+pub struct ReforgeSuggestion {
+    pub suggestion_type: String,
+    pub content: String,
+    pub reason: String,
+    pub confidence: f64,
+    pub cycle_run_at: String,
+}
+
+// ---------------------------------------------------------------------------
 // Result
 // ---------------------------------------------------------------------------
 
@@ -319,4 +381,6 @@ pub struct ReforgeResult {
     pub trials_created: u32,
     pub champion_promoted: bool,
     pub regression_detected: bool,
+    pub suggestions_persisted: u32,
+    pub patterns_persisted: u32,
 }

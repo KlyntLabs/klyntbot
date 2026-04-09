@@ -176,6 +176,7 @@ impl AgentLoop {
                 None
             };
 
+            let active_skill = self.resolve_active_skill(session_key.as_str()).await;
             self.emit_correction_signal(
                 msg.chat_id.as_str(),
                 last_assistant.unwrap_or_default(),
@@ -183,12 +184,24 @@ impl AgentLoop {
                 bus::CorrectionKind::Reaction,
                 1.0,
                 session_key.to_string(),
-                None,
+                active_skill,
             )
             .await;
         }
 
         Ok(())
+    }
+
+    /// Resolve the active skill for a session from the most recent strategy record.
+    async fn resolve_active_skill(&self, session_key: &str) -> Option<String> {
+        if let Some(ref repo) = self.strategy_repo {
+            repo.latest_skill_for_session(session_key)
+                .await
+                .ok()
+                .flatten()
+        } else {
+            None
+        }
     }
 
     /// Emit a UserCorrectedAI correction signal and mark shadow log entries.
@@ -601,6 +614,12 @@ impl AgentLoop {
 
         // Keyword-based correction detection — emit signal when user corrects the AI
         // Rate-limited: max 1 keyword correction per 3 messages per session.
+        // Resolve active skill once for all correction branches.
+        let correction_skill = if correction_strength.is_some() || is_memory_miss {
+            self.resolve_active_skill(session_key.as_str()).await
+        } else {
+            None
+        };
         if let Some(strength) = correction_strength {
             if let Some(ref original) = last_assistant_content {
                 let should_emit = {
@@ -627,7 +646,7 @@ impl AgentLoop {
                         kind,
                         strength,
                         session_key.to_string(),
-                        None,
+                        correction_skill.clone(),
                     )
                     .await;
                 }
@@ -642,7 +661,7 @@ impl AgentLoop {
                     bus::CorrectionKind::MemoryMiss,
                     0.8,
                     session_key.to_string(),
-                    None,
+                    correction_skill,
                 )
                 .await;
             }
@@ -1009,6 +1028,11 @@ impl AgentLoop {
             };
 
         // Emit correction signal (rate-limited: max 1 keyword correction per 3 messages)
+        let stream_correction_skill = if correction_strength.is_some() || is_memory_miss {
+            self.resolve_active_skill(session_key.as_str()).await
+        } else {
+            None
+        };
         let correction_emitted = if let Some(strength) = correction_strength {
             if let Some(ref original) = last_assistant_content {
                 if cooldown_after_decrement == 0 {
@@ -1031,7 +1055,7 @@ impl AgentLoop {
                         kind,
                         strength,
                         session_key.clone(),
-                        None,
+                        stream_correction_skill.clone(),
                     )
                     .await;
                     true
@@ -1051,7 +1075,7 @@ impl AgentLoop {
                     bus::CorrectionKind::MemoryMiss,
                     0.8,
                     session_key.clone(),
-                    None,
+                    stream_correction_skill,
                 )
                 .await;
             }

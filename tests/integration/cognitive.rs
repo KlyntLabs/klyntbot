@@ -1050,6 +1050,7 @@ async fn test_reforge_cycle_end_to_end() {
         None,
         None, // no autotuner bridge
         None, // no autotuner context
+        None, // no feedback sources
     )
     .await;
 
@@ -1222,6 +1223,7 @@ async fn test_reforge_phase6_with_autotuner_bridge() {
         None,
         Some(&bridge),
         None, // no autotuner context for this test
+        None, // no feedback sources
     )
     .await;
 
@@ -1243,6 +1245,140 @@ async fn test_reforge_phase6_with_autotuner_bridge() {
         r.trials_created, 0,
         "Expected 0 trials created (mock review returns empty trial_suggestions)"
     );
+    assert!(
+        r.phase_errors.is_empty(),
+        "Expected no phase errors, got: {:?}",
+        r.phase_errors
+    );
+
+    drop(skills_tmp);
+    drop(pool);
+}
+
+#[tokio::test]
+async fn test_reforge_with_feedback_signals() {
+    use klyntbot::cognitive::repos::{
+        CoActivationRepo, EpisodicMemoryRepo, EventLogRepo, ProceduralRuleRepo, SemanticFactRepo,
+    };
+    use klyntbot::cognitive::services::reforge::collector::FeedbackSources;
+    use klyntbot::cognitive::services::reforge::service::run_reforge;
+    use klyntbot::cognitive::services::reforge::skill_files::SkillFileManager;
+    use klyntbot::cognitive::types::EpisodicMemory;
+    use klyntbot::storage::repos::{ReforgeStateRepo, SkillVersionRepo};
+    use klyntbot::storage::{ReforgeSuggestionRepo, SessionMemoryRepo};
+    use tempfile::TempDir;
+
+    // 1. Setup: in-memory pool + cognitive migrations
+    let (pool, inner) = cognitive_pool().await;
+
+    // 2. Construct repos
+    let reforge_state_repo = ReforgeStateRepo::new(inner.clone());
+    let skill_version_repo = SkillVersionRepo::new(inner.clone());
+    let session_memory_repo = SessionMemoryRepo::new(inner.clone());
+    let fact_repo = SemanticFactRepo::new(inner.clone());
+    let episodic_repo = EpisodicMemoryRepo::new(inner.clone());
+    let rule_repo = ProceduralRuleRepo::new(inner.clone());
+    let outcome_repo = klyntbot::storage::OutcomeRepo::new(inner.clone());
+    let event_log_repo = EventLogRepo::new(inner.clone());
+    let co_activation_repo = CoActivationRepo::new(inner.clone());
+    let suggestion_repo = ReforgeSuggestionRepo::new(inner.clone());
+
+    // 3. Seed session data
+    sqlx::query("INSERT INTO sessions (key) VALUES ('feedback-test-session')")
+        .execute(&inner)
+        .await
+        .unwrap();
+    session_memory_repo
+        .upsert(
+            "feedback-test-session",
+            "User mentioned they use finance tracking daily.",
+            3,
+        )
+        .await
+        .unwrap();
+
+    let episodic = EpisodicMemory {
+        id: uuid::Uuid::new_v4().to_string(),
+        domain: "finance".into(),
+        content: "User tracked multiple expenses today.".into(),
+        summary: Some("Finance tracking activity".into()),
+        importance: 0.7,
+        occurred_at: chrono::Utc::now().to_rfc3339(),
+        recorded_at: chrono::Utc::now().to_rfc3339(),
+        stability: 3.0,
+        last_accessed: None,
+        access_count: 0,
+        project_id: None,
+        scope_type: "system".into(),
+        scope_id: None,
+    };
+    episodic_repo.insert(&episodic).await.unwrap();
+
+    // 4. Seed a tool failure in learning_outcomes
+    sqlx::query(
+        "INSERT INTO learning_outcomes (id, session_key, tool_name, success, error_category, duration_ms, created_at)
+         VALUES ('tf1', 'feedback-test-session', 'finance:tx_add', 0, 'InvalidParams', 100, datetime('now'))",
+    )
+    .execute(&inner)
+    .await
+    .unwrap();
+
+    // 5. Seed a correction event in domain_event_log
+    sqlx::query(
+        "INSERT INTO domain_event_log (id, event_type, domain, salience, payload, timestamp)
+         VALUES ('corr1', 'UserCorrectedAI', 'chat', 'extract',
+                 '{\"original\":\"wrong\",\"correction\":\"right\",\"kind\":\"KeywordPrefix\",\"strength\":0.8,\"session_key\":\"test\",\"active_skill\":\"finance-management\"}',
+                 datetime('now'))",
+    )
+    .execute(&inner)
+    .await
+    .unwrap();
+
+    // 6. Create skill directory and file
+    let skills_tmp = TempDir::new().unwrap();
+    let skill_dir = skills_tmp.path().join("test-skill");
+    std::fs::create_dir_all(&skill_dir).unwrap();
+    std::fs::write(
+        skill_dir.join("SKILL.md"),
+        "---\nname: test-skill\nversion: 1\n---\n# Test Skill\nBody content.",
+    )
+    .expect("write test SKILL.md");
+    let skill_mgr = SkillFileManager::new(skills_tmp.path().to_path_buf());
+
+    // 7. Run Reforge with feedback sources
+    let handler = MockReforgeHandler;
+    let feedback_sources = FeedbackSources {
+        outcome_repo: Some(&outcome_repo),
+        event_log_repo: Some(&event_log_repo),
+        co_activation_repo: Some(&co_activation_repo),
+        suggestion_repo: Some(&suggestion_repo),
+        pool: Some(&inner),
+    };
+
+    let result = run_reforge(
+        &reforge_state_repo,
+        &skill_version_repo,
+        &session_memory_repo,
+        &fact_repo,
+        &episodic_repo,
+        &rule_repo,
+        &handler,
+        &skill_mgr,
+        None,
+        None,
+        None,
+        None,
+        None,
+        Some(&feedback_sources),
+    )
+    .await;
+
+    // 8. Assert
+    assert!(
+        result.is_some(),
+        "run_reforge should return Some when there is new data"
+    );
+    let r = result.unwrap();
     assert!(
         r.phase_errors.is_empty(),
         "Expected no phase errors, got: {:?}",

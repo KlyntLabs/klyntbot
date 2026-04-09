@@ -39,6 +39,7 @@ pub async fn run_reforge(
     feedback_repo: Option<&storage::RetrievalFeedbackRepo>,
     autotuner_bridge: Option<&dyn super::AutotunerBridge>,
     autotuner_ctx: Option<AutotunerContext>,
+    feedback_sources: Option<&super::collector::FeedbackSources<'_>>,
 ) -> Option<ReforgeResult> {
     let mut result = ReforgeResult::default();
 
@@ -67,6 +68,7 @@ pub async fn run_reforge(
         pre_read_skill_files,
         mirror_repo,
         feedback_repo,
+        feedback_sources,
     )
     .await;
 
@@ -118,6 +120,34 @@ pub async fn run_reforge(
         }
     };
 
+    // Persist high-confidence cross-session patterns as episodic memories.
+    if let Some(ref syn) = synthesize_output {
+        for pattern in &syn.cross_session_patterns {
+            if pattern.confidence >= 0.7 {
+                let mem = EpisodicMemory {
+                    id: uuid::Uuid::new_v4().to_string(),
+                    domain: SOURCE_REFORGE.to_string(),
+                    content: pattern.pattern.clone(),
+                    summary: Some("Cross-session pattern".to_string()),
+                    importance: pattern.confidence,
+                    occurred_at: Utc::now().to_rfc3339(),
+                    recorded_at: Utc::now().to_rfc3339(),
+                    stability: 3.0,
+                    last_accessed: None,
+                    access_count: 0,
+                    project_id: None,
+                    scope_type: "system".to_string(),
+                    scope_id: None,
+                };
+                if let Err(e) = episodic_repo.insert(&mem).await {
+                    warn!("Reforge: failed to persist cross-session pattern: {e}");
+                } else {
+                    result.patterns_persisted += 1;
+                }
+            }
+        }
+    }
+
     // ------------------------------------------------------------------
     // Phase 3: Review (LLM call #2)
     // ------------------------------------------------------------------
@@ -138,6 +168,30 @@ pub async fn run_reforge(
             None
         }
     };
+
+    // Persist context priority suggestions for the next cycle's feedback loop.
+    if let Some(ref review) = review_output {
+        if let Some(repo) = feedback_sources.and_then(|fb| fb.suggestion_repo) {
+            let now = Utc::now().to_rfc3339();
+            for suggestion in &review.context_priority_suggestions {
+                let row = storage::repos::reforge_suggestion::ReforgeSuggestionRow {
+                    id: uuid::Uuid::new_v4().to_string(),
+                    suggestion_type: "context_priority".to_string(),
+                    content: suggestion.suggestion.clone(),
+                    reason: suggestion.reason.clone(),
+                    confidence: 0.8,
+                    cycle_run_at: now.clone(),
+                    acted_upon: false,
+                    created_at: now.clone(),
+                };
+                if let Err(e) = repo.insert(&row).await {
+                    warn!("Reforge: failed to persist context priority suggestion: {e}");
+                } else {
+                    result.suggestions_persisted += 1;
+                }
+            }
+        }
+    }
 
     // ------------------------------------------------------------------
     // Phase 4: Narrate (LLM call #3)
@@ -213,6 +267,8 @@ pub async fn run_reforge(
         "trials_created": result.trials_created,
         "champion_promoted": result.champion_promoted,
         "regression_detected": result.regression_detected,
+        "suggestions_persisted": result.suggestions_persisted,
+        "patterns_persisted": result.patterns_persisted,
     });
     if let Err(e) = reforge_state_repo.record_run(&stats_json.to_string()).await {
         warn!("Reforge: failed to record run: {e}");
@@ -382,6 +438,71 @@ fn build_review_input(
         .as_ref()
         .map(format_autotuner_context);
 
+    // Format feedback strings for the Review prompt
+    let tool_failure_summary = if !collected.tool_failures.is_empty() {
+        Some(
+            collected
+                .tool_failures
+                .iter()
+                .map(|f| {
+                    format!(
+                        "- {} — {}/{} calls failed ({:.0}%) — errors: {}",
+                        f.tool_name,
+                        f.failure_count,
+                        f.total_calls,
+                        f.failure_rate * 100.0,
+                        f.error_types.join(", ")
+                    )
+                })
+                .collect::<Vec<_>>()
+                .join("\n"),
+        )
+    } else {
+        None
+    };
+
+    let correction_summary = if !collected.correction_summaries.is_empty() {
+        Some(
+            collected
+                .correction_summaries
+                .iter()
+                .map(|c| {
+                    let samples = c
+                        .sample_corrections
+                        .iter()
+                        .map(|s| format!("    \"{s}\""))
+                        .collect::<Vec<_>>()
+                        .join("\n");
+                    format!(
+                        "- {} skill: {} corrections\n{samples}",
+                        c.skill_name, c.correction_count
+                    )
+                })
+                .collect::<Vec<_>>()
+                .join("\n"),
+        )
+    } else {
+        None
+    };
+
+    let previous_suggestions_summary = if !collected.previous_suggestions.is_empty() {
+        Some(
+            collected
+                .previous_suggestions
+                .iter()
+                .map(|s| {
+                    format!(
+                        "- [{}] {}: {} (confidence: {:.2})",
+                        s.suggestion_type, s.content, s.reason, s.confidence
+                    )
+                })
+                .collect::<Vec<_>>()
+                .join("\n"),
+        )
+    } else {
+        None
+    };
+
     ReviewInput {
         pending_meta_rules: collected.pending_meta_rules.clone(),
         routing_summaries: collected.routing_summaries.clone(),
@@ -389,6 +510,9 @@ fn build_review_input(
         new_facts_summary,
         retrieval_precision: collected.retrieval_precision,
         autotuner_context,
+        tool_failure_summary,
+        correction_summary,
+        previous_suggestions_summary,
     }
 }
 

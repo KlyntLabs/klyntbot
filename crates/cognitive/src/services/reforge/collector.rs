@@ -9,7 +9,9 @@ use crate::repos::{
     load_user_model, EpisodicMemoryRepo, ProceduralRuleRepo, SemanticFactRepo, RULE_DOMAINS,
 };
 use crate::services::reforge::skill_files::{SkillFile, SkillFileManager};
-use crate::services::reforge::types::{ReforgeCollected, RoutingSummary, SessionContext};
+use crate::services::reforge::types::{
+    BehavioralMetrics, GraphHealthMetrics, ReforgeCollected, RoutingSummary, SessionContext,
+};
 
 /// Scan skill files on disk and record a new version row for any file whose
 /// content differs from the latest known version in the database.
@@ -61,6 +63,26 @@ pub async fn detect_user_edits(
     all_files
 }
 
+/// Optional data sources for feedback collection.
+/// All fields are optional — missing sources are gracefully skipped.
+pub struct FeedbackSources<'a> {
+    pub outcome_repo: Option<&'a storage::OutcomeRepo>,
+    pub event_log_repo: Option<&'a crate::repos::EventLogRepo>,
+    pub co_activation_repo: Option<&'a crate::repos::CoActivationRepo>,
+    pub suggestion_repo: Option<&'a storage::ReforgeSuggestionRepo>,
+    pub pool: Option<&'a sqlx::SqlitePool>,
+}
+
+/// Days elapsed since an RFC 3339 timestamp, defaulting to 7 if missing or unparseable.
+fn days_since(ts: Option<&str>) -> i64 {
+    match ts {
+        Some(s) => chrono::DateTime::parse_from_rfc3339(s)
+            .map(|dt| (Utc::now() - dt.with_timezone(&Utc)).num_days().max(1))
+            .unwrap_or(7),
+        None => 7,
+    }
+}
+
 /// Collect all inputs required for a Reforge cycle.
 ///
 /// - `last_run_at` — RFC 3339 timestamp of the previous run, or `None` for a
@@ -83,6 +105,7 @@ pub async fn collect(
     pre_read_skill_files: Option<HashMap<String, Vec<SkillFile>>>,
     mirror_repo: Option<&crate::mirror::MirrorRepo>,
     feedback_repo: Option<&storage::RetrievalFeedbackRepo>,
+    feedback_sources: Option<&FeedbackSources<'_>>,
 ) -> Option<ReforgeCollected> {
     let is_bootstrap = last_run_at.is_none();
 
@@ -180,15 +203,7 @@ pub async fn collect(
 
     // --- Retrieval precision ---
     let retrieval_precision = if let Some(fb_repo) = feedback_repo {
-        let days = match last_run_at {
-            Some(ts) => {
-                // Calculate days since last run.
-                chrono::DateTime::parse_from_rfc3339(ts)
-                    .map(|dt| (Utc::now() - dt.with_timezone(&Utc)).num_days().max(1))
-                    .unwrap_or(7)
-            }
-            None => 7,
-        };
+        let days = days_since(last_run_at);
         match fb_repo.avg_precision_since(days).await {
             Ok(avg) if avg > 0.0 => Some(avg),
             Ok(_) => None,
@@ -201,6 +216,89 @@ pub async fn collect(
         None
     };
 
+    // --- Feedback signals ---
+    let (
+        tool_failures,
+        correction_summaries,
+        behavioral_metrics,
+        graph_health,
+        previous_suggestions,
+        retrieval_precision_by_domain,
+        extraction_yield_by_domain,
+    ) = if let Some(fb) = feedback_sources {
+        let since_dt = chrono::DateTime::parse_from_rfc3339(since)
+            .map(|dt| dt.with_timezone(&chrono::Utc))
+            .unwrap_or_else(|_| chrono::Utc::now() - Duration::days(7));
+
+        let tool_failures = if let Some(repo) = fb.outcome_repo {
+            super::feedback::load_tool_failures(repo, since_dt).await
+        } else {
+            vec![]
+        };
+
+        let correction_summaries = if let Some(repo) = fb.event_log_repo {
+            super::feedback::load_correction_summaries(repo, since).await
+        } else {
+            vec![]
+        };
+
+        let behavioral_metrics = if let Some(pool) = fb.pool {
+            super::feedback::load_behavioral_metrics(pool).await
+        } else {
+            BehavioralMetrics::default()
+        };
+
+        let graph_health = super::feedback::load_graph_health(
+            fact_repo,
+            rule_repo,
+            fb.co_activation_repo.unwrap_or(
+                // Fallback: create a temporary repo from fact_repo's pool
+                &crate::repos::CoActivationRepo::new(fact_repo.pool().clone()),
+            ),
+        )
+        .await;
+
+        let previous_suggestions = if let Some(repo) = fb.suggestion_repo {
+            super::feedback::load_previous_suggestions(repo).await
+        } else {
+            vec![]
+        };
+
+        let retrieval_precision_by_domain = if let Some(repo) = feedback_repo {
+            repo.avg_precision_by_domain_since(days_since(last_run_at))
+                .await
+                .unwrap_or_default()
+        } else {
+            vec![]
+        };
+
+        let extraction_yield_by_domain = if let Some(repo) = fb.event_log_repo {
+            super::feedback::load_extraction_yield(repo, since).await
+        } else {
+            vec![]
+        };
+
+        (
+            tool_failures,
+            correction_summaries,
+            behavioral_metrics,
+            graph_health,
+            previous_suggestions,
+            retrieval_precision_by_domain,
+            extraction_yield_by_domain,
+        )
+    } else {
+        (
+            vec![],
+            vec![],
+            BehavioralMetrics::default(),
+            GraphHealthMetrics::default(),
+            vec![],
+            vec![],
+            vec![],
+        )
+    };
+
     debug!(
         sessions = sessions.len(),
         episodics = episodic_memories.len(),
@@ -208,6 +306,8 @@ pub async fn collect(
         skills = skill_files.len(),
         routing = routing_summaries.len(),
         meta_rules = pending_meta_rules.len(),
+        tool_failures = tool_failures.len(),
+        corrections = correction_summaries.len(),
         ?retrieval_precision,
         is_bootstrap,
         "Reforge collector: gathered inputs"
@@ -224,6 +324,13 @@ pub async fn collect(
         retrieval_precision,
         is_bootstrap,
         autotuner_ctx: None,
+        tool_failures,
+        correction_summaries,
+        retrieval_precision_by_domain,
+        behavioral_metrics,
+        graph_health,
+        previous_suggestions,
+        extraction_yield_by_domain,
     })
 }
 

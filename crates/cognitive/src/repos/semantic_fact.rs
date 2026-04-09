@@ -645,6 +645,35 @@ impl SemanticFactRepo {
     /// For each domain, returns the total facts created in the window,
     /// how many are still active (not superseded), and how many were
     /// "fast failures" (superseded within 7 days of creation).
+    /// Count active (non-superseded) facts.
+    pub async fn count_active(&self) -> Result<i64, sqlx::Error> {
+        let row: (i64,) =
+            sqlx::query_as("SELECT COUNT(*) FROM semantic_facts WHERE superseded_at IS NULL")
+                .fetch_one(&self.pool)
+                .await?;
+        Ok(row.0)
+    }
+
+    /// Count active facts grouped by domain.
+    pub async fn count_by_domain(&self) -> Result<Vec<(String, u32)>, sqlx::Error> {
+        let rows: Vec<(String, i64)> = sqlx::query_as(
+            "SELECT domain, COUNT(*) FROM semantic_facts WHERE superseded_at IS NULL GROUP BY domain",
+        )
+        .fetch_all(&self.pool)
+        .await?;
+        Ok(rows.into_iter().map(|(d, c)| (d, c as u32)).collect())
+    }
+
+    /// Average stability of active facts.
+    pub async fn avg_stability(&self) -> Result<f64, sqlx::Error> {
+        let row: (f64,) = sqlx::query_as(
+            "SELECT COALESCE(AVG(stability), 1.0) FROM semantic_facts WHERE superseded_at IS NULL",
+        )
+        .fetch_one(&self.pool)
+        .await?;
+        Ok(row.0)
+    }
+
     pub async fn fact_health_by_domain(
         &self,
         window_days: i64,

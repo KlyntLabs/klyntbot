@@ -544,6 +544,18 @@ fn register_cron_callbacks(
 
                         let bridge_ref = autotuner_bridge.as_deref();
 
+                        let event_log_repo = cognitive::EventLogRepo::new(pool.clone());
+                        let co_activation_repo = cognitive::CoActivationRepo::new(pool.clone());
+                        let suggestion_repo = storage::ReforgeSuggestionRepo::new(pool.clone());
+                        let feedback_sources =
+                            cognitive::services::reforge::collector::FeedbackSources {
+                                outcome_repo: Some(&repos_reforge.outcomes),
+                                event_log_repo: Some(&event_log_repo),
+                                co_activation_repo: Some(&co_activation_repo),
+                                suggestion_repo: Some(&suggestion_repo),
+                                pool: Some(&pool),
+                            };
+
                         match cognitive::services::reforge::service::run_reforge(
                             &repos_reforge.reforge_state,
                             &repos_reforge.skill_version,
@@ -558,10 +570,15 @@ fn register_cron_callbacks(
                             Some(&feedback_repo),
                             bridge_ref,
                             autotuner_ctx,
+                            Some(&feedback_sources),
                         )
                         .await
                         {
                             Some(result) => {
+                                // Clean up old suggestions (90 day retention)
+                                if let Err(e) = suggestion_repo.delete_older_than(90, chrono::Utc::now()).await {
+                                    tracing::warn!("Reforge: failed to clean up suggestions: {e}");
+                                }
                                 info!(
                                     facts_added = result.facts_added,
                                     facts_updated = result.facts_updated,

@@ -56,6 +56,29 @@ impl RetrievalFeedbackRepo {
         Ok(row.0)
     }
 
+    /// Average retrieval precision grouped by fact domain.
+    /// Joins retrieval_feedback against semantic_facts to determine domain.
+    pub async fn avg_precision_by_domain_since(
+        &self,
+        days: i64,
+    ) -> Result<Vec<(String, f64)>, sqlx::Error> {
+        let since = (chrono::Utc::now() - chrono::Duration::days(days)).to_rfc3339();
+        let rows: Vec<(String, f64)> = sqlx::query_as(
+            "SELECT f.domain, AVG(rf.precision) as avg_precision
+             FROM retrieval_feedback rf,
+                  json_each(rf.retrieved_fact_ids) je
+             JOIN semantic_facts f ON f.id = je.value
+             WHERE rf.created_at > ?1
+             GROUP BY f.domain
+             HAVING COUNT(*) >= 3
+             ORDER BY avg_precision ASC",
+        )
+        .bind(&since)
+        .fetch_all(&self.pool)
+        .await?;
+        Ok(rows)
+    }
+
     /// Count feedback entries in the past N days.
     pub async fn count_since(&self, days: i64) -> Result<i64, sqlx::Error> {
         let cutoff = (chrono::Utc::now() - chrono::Duration::days(days)).to_rfc3339();

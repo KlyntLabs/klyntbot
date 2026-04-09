@@ -160,6 +160,24 @@ impl EventLogRepo {
         .await
     }
 
+    /// List domain events of a specific type since a timestamp (RFC 3339).
+    pub async fn list_by_event_type_since(
+        &self,
+        event_type: &str,
+        since: &str,
+    ) -> Result<Vec<DomainEventRow>, sqlx::Error> {
+        sqlx::query_as::<_, DomainEventRow>(
+            "SELECT id, event_type, domain, salience, payload, timestamp
+             FROM domain_event_log
+             WHERE event_type = ?1 AND timestamp >= ?2
+             ORDER BY timestamp ASC",
+        )
+        .bind(event_type)
+        .bind(since)
+        .fetch_all(&self.pool)
+        .await
+    }
+
     /// Count domain events of a specific type since a given timestamp.
     pub async fn count_by_event_type(
         &self,
@@ -192,6 +210,28 @@ impl EventLogRepo {
         .bind(since.to_rfc3339())
         .fetch_one(&self.pool)
         .await
+    }
+
+    /// Extraction yield by domain: average facts_extracted per extraction event,
+    /// grouped by the domain of facts created in the same time window.
+    pub async fn extraction_yield_by_domain(
+        &self,
+        since: &str,
+    ) -> Result<Vec<(String, f64)>, sqlx::Error> {
+        let rows: Vec<(String, f64)> = sqlx::query_as(
+            "SELECT sf.domain, AVG(COALESCE(pe.facts_extracted, 0)) as avg_yield
+             FROM pipeline_event_log pe
+             JOIN semantic_facts sf ON sf.recorded_at >= pe.timestamp
+                AND sf.recorded_at < datetime(pe.timestamp, '+1 hour')
+             WHERE pe.event_kind = 'extraction'
+                AND pe.timestamp > ?1
+             GROUP BY sf.domain
+             HAVING COUNT(*) >= 2",
+        )
+        .bind(since)
+        .fetch_all(&self.pool)
+        .await?;
+        Ok(rows)
     }
 
     /// Delete events older than the given number of days.

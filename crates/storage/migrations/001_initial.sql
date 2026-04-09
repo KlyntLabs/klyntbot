@@ -812,3 +812,20 @@ CREATE TABLE skill_versions (
 
 CREATE INDEX idx_skill_versions_name ON skill_versions(skill_name, version);
 CREATE INDEX idx_skill_versions_lookup ON skill_versions(skill_name, file_path, version);
+
+-- ============================================================
+-- Reforge Self-Feedback: suggestions and patterns from previous cycles
+-- ============================================================
+CREATE TABLE IF NOT EXISTS reforge_suggestions (
+    id TEXT PRIMARY KEY,
+    suggestion_type TEXT NOT NULL,
+    content TEXT NOT NULL,
+    reason TEXT NOT NULL DEFAULT '',
+    confidence REAL NOT NULL DEFAULT 0.0,
+    cycle_run_at TEXT NOT NULL,
+    acted_upon INTEGER NOT NULL DEFAULT 0,
+    created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE INDEX IF NOT EXISTS idx_reforge_suggestions_type
+    ON reforge_suggestions(suggestion_type, created_at);
