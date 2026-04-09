@@ -1,5 +1,6 @@
 //! Input/output types for the Reforge cycle phases.
 
+use std::collections::HashMap;
 use std::fmt;
 
 use serde::{Deserialize, Serialize};
@@ -43,6 +44,7 @@ pub struct ReforgeCollected {
     pub skill_files: std::collections::HashMap<String, Vec<super::skill_files::SkillFile>>,
     pub retrieval_precision: Option<f64>,
     pub is_bootstrap: bool,
+    pub autotuner_ctx: Option<AutotunerContext>,
 }
 
 // ---------------------------------------------------------------------------
@@ -190,6 +192,7 @@ pub struct ReviewInput {
     pub skill_contents: Vec<SkillContent>,
     pub new_facts_summary: String,
     pub retrieval_precision: Option<f64>,
+    pub autotuner_context: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -207,6 +210,8 @@ pub struct ReviewOutput {
     pub routing_insights: Vec<String>,
     #[serde(default)]
     pub context_priority_suggestions: Vec<ContextPrioritySuggestion>,
+    #[serde(default)]
+    pub trial_suggestions: Vec<TrialSuggestion>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -241,6 +246,62 @@ pub struct NarrateInput {
 }
 
 // ---------------------------------------------------------------------------
+// Autotuner types (Phase 6)
+// ---------------------------------------------------------------------------
+
+/// A trial suggestion from the Review LLM call.
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct TrialSuggestion {
+    pub hypothesis: String,
+    #[serde(default = "default_pace")]
+    pub pace: String,
+    #[serde(default)]
+    pub param_overrides: HashMap<String, f64>,
+}
+
+fn default_pace() -> String {
+    "balanced".to_string()
+}
+
+/// Summary of a past trial outcome for experiment history context.
+#[derive(Debug, Clone, Serialize)]
+pub struct TrialOutcome {
+    pub params_summary: String,
+    pub result: String,
+    pub constraint_failures: Vec<String>,
+    pub improvement: Option<f64>,
+}
+
+/// Summary of a past experiment for LLM context.
+#[derive(Debug, Clone, Serialize)]
+pub struct TrialHistoryEntry {
+    pub experiment_id: String,
+    pub days_ago: u32,
+    pub trials: Vec<TrialOutcome>,
+}
+
+/// Snapshot of key performance metrics.
+#[derive(Debug, Clone, Serialize, Default)]
+pub struct MetricsSnapshot {
+    pub correction_rate: f64,
+    pub retrieval_precision: f64,
+    pub avg_response_time_ms: f64,
+    pub avg_tokens_per_message: f64,
+    pub routing_stability: f64,
+    pub memory_relevance: f64,
+}
+
+/// Autotuner context collected in Phase 1 for Phase 3 + Phase 6.
+#[derive(Debug, Clone, Default)]
+pub struct AutotunerContext {
+    pub champion_summary: String,
+    pub trial_history: Vec<TrialHistoryEntry>,
+    pub metrics_24h: MetricsSnapshot,
+    pub metrics_7d: MetricsSnapshot,
+    pub active_trial_count: u32,
+}
+
+// ---------------------------------------------------------------------------
 // Result
 // ---------------------------------------------------------------------------
 
@@ -255,4 +316,7 @@ pub struct ReforgeResult {
     pub narrative: String,
     pub skipped_skill_edits: Vec<String>,
     pub phase_errors: Vec<String>,
+    pub trials_created: u32,
+    pub champion_promoted: bool,
+    pub regression_detected: bool,
 }

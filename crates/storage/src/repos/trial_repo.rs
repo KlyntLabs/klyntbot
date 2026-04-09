@@ -168,6 +168,38 @@ impl TrialRepo {
         Ok(())
     }
 
+    /// Deactivate stale active trials: older than `max_age_days` with fewer
+    /// than `min_messages` shadow log entries. Returns the number expired.
+    pub async fn expire_stale(
+        &self,
+        max_age_days: u32,
+        min_messages: u32,
+    ) -> Result<u32, StorageError> {
+        let cutoff =
+            (chrono::Utc::now() - chrono::Duration::days(max_age_days as i64)).to_rfc3339();
+        let result = sqlx::query(
+            "UPDATE autotuner_trials SET status = 'completed', completed_at = datetime('now')
+             WHERE status = 'active'
+               AND created_at < ?1
+               AND (SELECT COUNT(*) FROM autotuner_shadow_log
+                    WHERE autotuner_shadow_log.trial_id = autotuner_trials.id) < ?2",
+        )
+        .bind(&cutoff)
+        .bind(min_messages)
+        .execute(&self.pool)
+        .await?;
+        Ok(result.rows_affected() as u32)
+    }
+
+    /// Count trials with status `active`.
+    pub async fn count_active(&self) -> Result<u32, StorageError> {
+        let row: (i64,) =
+            sqlx::query_as("SELECT COUNT(*) FROM autotuner_trials WHERE status = 'active'")
+                .fetch_one(&self.pool)
+                .await?;
+        Ok(row.0 as u32)
+    }
+
     /// Return all trials with status `active`.
     pub async fn get_active_trials(&self) -> Result<Vec<TrialRow>, StorageError> {
         let rows = sqlx::query_as::<_, TrialRow>(

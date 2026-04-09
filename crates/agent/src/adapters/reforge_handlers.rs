@@ -39,8 +39,13 @@ For each skill, consider:
 
 Only propose edits with clear evidence. Do not speculate.
 
+If autotuner context is provided, also suggest up to 3 parameter experiments.
+Each experiment should have a hypothesis, a pace (conservative/balanced/bold), and param_overrides (only params you want to change — the rest inherit from champion).
+Build on past experiment results: don't repeat configurations that failed. Focus on parameters related to the issues you identified.
+Only suggest experiments when you have evidence (routing problems, retrieval issues, correction patterns). If everything is working well, return an empty trial_suggestions array.
+
 Respond with JSON:
-{\"skill_edits\":[{\"skill_name\":\"...\",\"file_path\":\"...\",\"edit_type\":\"frontmatter\"|\"body_replace\"|\"body_insert\"|\"body_remove\",\"field\":null,\"new_value\":null,\"old_text\":null,\"new_text\":null,\"section\":null,\"reason\":\"...\"}],\"routing_insights\":[\"...\"],\"context_priority_suggestions\":[{\"source\":\"...\",\"suggestion\":\"...\",\"reason\":\"...\"}]}";
+{\"skill_edits\":[{\"skill_name\":\"...\",\"file_path\":\"...\",\"edit_type\":\"frontmatter\"|\"body_replace\"|\"body_insert\"|\"body_remove\",\"field\":null,\"new_value\":null,\"old_text\":null,\"new_text\":null,\"section\":null,\"reason\":\"...\"}],\"routing_insights\":[\"...\"],\"context_priority_suggestions\":[{\"source\":\"...\",\"suggestion\":\"...\",\"reason\":\"...\"}],\"trial_suggestions\":[{\"hypothesis\":\"...\",\"pace\":\"conservative\"|\"balanced\"|\"bold\",\"param_overrides\":{\"param_name\":0.0}}]}";
 
 const NARRATE_PROMPT: &str = "\
 Summarize tonight's Reforge cycle for the user in 2-3 concise paragraphs.
@@ -170,6 +175,11 @@ fn format_review_input(input: &ReviewInput) -> String {
         .unwrap();
     }
 
+    // Autotuner context
+    if let Some(ref ctx) = input.autotuner_context {
+        writeln!(&mut out, "\n## Autotuner Context\n{ctx}").unwrap();
+    }
+
     // Skill contents
     if !input.skill_contents.is_empty() {
         writeln!(
@@ -290,6 +300,7 @@ impl ReforgeHandler for NoopReforgeHandler {
             skill_edits: vec![],
             routing_insights: vec![],
             context_priority_suggestions: vec![],
+            trial_suggestions: vec![],
         })
     }
 

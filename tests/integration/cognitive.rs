@@ -950,6 +950,7 @@ impl klyntbot::cognitive::services::reforge::ReforgeHandler for MockReforgeHandl
                 skill_edits: vec![],
                 routing_insights: vec![],
                 context_priority_suggestions: vec![],
+                trial_suggestions: vec![],
             },
         )
     }
@@ -1047,6 +1048,8 @@ async fn test_reforge_cycle_end_to_end() {
         None,
         None,
         None,
+        None, // no autotuner bridge
+        None, // no autotuner context
     )
     .await;
 
@@ -1078,6 +1081,174 @@ async fn test_reforge_cycle_end_to_end() {
     );
 
     // Keep TempDir alive until end of test
+    drop(skills_tmp);
+    drop(pool);
+}
+
+// ---------------------------------------------------------------------------
+// Mock AutotunerBridge for Phase 6 integration tests
+// ---------------------------------------------------------------------------
+
+struct MockAutotunerBridge {
+    promoted: bool,
+}
+
+impl MockAutotunerBridge {
+    fn new(promoted: bool) -> Self {
+        Self { promoted }
+    }
+}
+
+#[async_trait::async_trait]
+impl klyntbot::cognitive::services::reforge::AutotunerBridge for MockAutotunerBridge {
+    async fn run_evaluation(
+        &self,
+    ) -> common::Result<klyntbot::cognitive::services::reforge::Phase6Result> {
+        Ok(klyntbot::cognitive::services::reforge::Phase6Result {
+            promoted: self.promoted,
+            promotion_summary: if self.promoted {
+                Some("Mock trial promoted".into())
+            } else {
+                None
+            },
+            regression: false,
+            evaluated_count: 2,
+            failed_constraints: vec![],
+        })
+    }
+
+    async fn create_trials(
+        &self,
+        suggestions: Vec<klyntbot::cognitive::services::reforge::ValidatedTrial>,
+    ) -> common::Result<u32> {
+        Ok(suggestions.len() as u32)
+    }
+
+    fn champion_params_map(&self) -> std::collections::HashMap<String, f64> {
+        let mut map = std::collections::HashMap::new();
+        map.insert("relevance_weight_semantic".to_string(), 0.30);
+        map.insert("min_similarity".to_string(), 0.55);
+        map.insert("vector_top_k".to_string(), 30.0);
+        map
+    }
+
+    async fn active_trial_count(&self) -> u32 {
+        2
+    }
+
+    async fn expire_stale_trials(&self) -> u32 {
+        0
+    }
+}
+
+#[tokio::test]
+async fn test_reforge_phase6_with_autotuner_bridge() {
+    use klyntbot::cognitive::repos::{EpisodicMemoryRepo, ProceduralRuleRepo, SemanticFactRepo};
+    use klyntbot::cognitive::services::reforge::service::run_reforge;
+    use klyntbot::cognitive::services::reforge::skill_files::SkillFileManager;
+    use klyntbot::cognitive::types::EpisodicMemory;
+    use klyntbot::storage::repos::{ReforgeStateRepo, SkillVersionRepo};
+    use klyntbot::storage::SessionMemoryRepo;
+    use tempfile::TempDir;
+
+    // 1. Setup: in-memory pool + cognitive migrations
+    let (pool, inner) = cognitive_pool().await;
+
+    // 2. Construct repos
+    let reforge_state_repo = ReforgeStateRepo::new(inner.clone());
+    let skill_version_repo = SkillVersionRepo::new(inner.clone());
+    let session_memory_repo = SessionMemoryRepo::new(inner.clone());
+    let fact_repo = SemanticFactRepo::new(inner.clone());
+    let episodic_repo = EpisodicMemoryRepo::new(inner.clone());
+    let rule_repo = ProceduralRuleRepo::new(inner.clone());
+
+    // 3. Seed data
+    sqlx::query("INSERT INTO sessions (key) VALUES ('phase6-test-session')")
+        .execute(&inner)
+        .await
+        .unwrap();
+    session_memory_repo
+        .upsert(
+            "phase6-test-session",
+            "User discussed routing optimization.",
+            3,
+        )
+        .await
+        .unwrap();
+
+    let episodic = EpisodicMemory {
+        id: uuid::Uuid::new_v4().to_string(),
+        domain: "system".into(),
+        content: "Autotuner integration test episodic memory.".into(),
+        summary: Some("Phase 6 test".into()),
+        importance: 0.8,
+        occurred_at: chrono::Utc::now().to_rfc3339(),
+        recorded_at: chrono::Utc::now().to_rfc3339(),
+        stability: 1.0,
+        last_accessed: None,
+        access_count: 0,
+        project_id: None,
+        scope_type: "system".into(),
+        scope_id: None,
+    };
+    episodic_repo.insert(&episodic).await.unwrap();
+
+    // 4. Skills directory
+    let skills_tmp = TempDir::new().expect("skills tempdir");
+    let skill_mgr = SkillFileManager::new(skills_tmp.path().to_path_buf());
+    skill_mgr
+        .write_file(
+            "test-skill",
+            "SKILL.md",
+            "---\nname: test-skill\nversion: 1\n---\n# Test Skill\nBody content.",
+        )
+        .expect("write test SKILL.md");
+
+    // 5. Run with MockAutotunerBridge (promoted=true)
+    let handler = MockReforgeHandler;
+    let bridge = MockAutotunerBridge::new(true);
+
+    let result = run_reforge(
+        &reforge_state_repo,
+        &skill_version_repo,
+        &session_memory_repo,
+        &fact_repo,
+        &episodic_repo,
+        &rule_repo,
+        &handler,
+        &skill_mgr,
+        None,
+        None,
+        None,
+        Some(&bridge),
+        None, // no autotuner context for this test
+    )
+    .await;
+
+    // 6. Assertions
+    assert!(result.is_some(), "run_reforge should return Some with data");
+    let r = result.unwrap();
+
+    // Phase 6 ran: champion was promoted
+    assert!(
+        r.champion_promoted,
+        "Expected champion_promoted=true from mock bridge"
+    );
+    assert!(
+        !r.regression_detected,
+        "Expected no regression from mock bridge"
+    );
+    // No trial suggestions from the MockReforgeHandler's review, so trials_created=0
+    assert_eq!(
+        r.trials_created, 0,
+        "Expected 0 trials created (mock review returns empty trial_suggestions)"
+    );
+    assert!(
+        r.phase_errors.is_empty(),
+        "Expected no phase errors, got: {:?}",
+        r.phase_errors
+    );
+
     drop(skills_tmp);
     drop(pool);
 }

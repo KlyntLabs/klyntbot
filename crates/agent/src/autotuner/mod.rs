@@ -225,6 +225,118 @@ impl AutoTunerOrchestrator {
         self.champion.read().await.clone()
     }
 
+    /// Increment the regression counter and trigger auto-rollback if the
+    /// threshold is reached. Returns `true` if rollback was performed.
+    pub async fn handle_regression(
+        &self,
+        rollback_threshold: u8,
+        domain_event_bus: Option<&Arc<DomainEventBus>>,
+    ) -> bool {
+        let mut champ = self.champion.write().await;
+        champ.consecutive_regression_days = champ.consecutive_regression_days.saturating_add(1);
+        let days = champ.consecutive_regression_days;
+        warn!(
+            consecutive_days = days,
+            rollback_threshold, "autotuner: champion regression detected"
+        );
+
+        if days < rollback_threshold {
+            // Persist updated counter.
+            if let Ok(json) = serde_json::to_value(&*champ) {
+                if let Err(e) = self.learning_state.set(CHAMPION_KEY, &json).await {
+                    error!(error = %e, "failed to persist regression counter");
+                }
+            }
+            return false;
+        }
+
+        // Auto-rollback: revert to previous champion.
+        match self.learning_state.get_value(PREVIOUS_CHAMPION_KEY).await {
+            Ok(Some(prev_json)) => {
+                if let Ok(prev_champion) = serde_json::from_value::<Champion>(prev_json) {
+                    let rolled_back_trial_id = champ.trial_id;
+
+                    // Mark the reverted trial in TrialRepo.
+                    if let Some(trial_id) = rolled_back_trial_id {
+                        if let Err(e) = self
+                            .trial_repo
+                            .update_trial_status(
+                                &trial_id.to_string(),
+                                autotuner::TrialStatus::Reverted.as_str(),
+                            )
+                            .await
+                        {
+                            error!("failed to mark trial {trial_id} as reverted: {e}");
+                        }
+                    }
+
+                    warn!(
+                        "auto-rollback triggered after {days} regression days \
+                         — reverting to previous champion"
+                    );
+
+                    // Compute event fields before overwriting.
+                    let rollback_improvement_pct =
+                        if prev_champion.baseline_metrics.correction_rate > 0.0 {
+                            (prev_champion.baseline_metrics.correction_rate
+                                - champ.baseline_metrics.correction_rate)
+                                / prev_champion.baseline_metrics.correction_rate
+                                * 100.0
+                        } else {
+                            0.0
+                        };
+                    let rollback_affected_params =
+                        autotuner::affected_param_names(&champ.params, &prev_champion.params);
+
+                    let mut restored = prev_champion;
+                    restored.consecutive_regression_days = 0;
+                    if let Ok(json) = serde_json::to_value(&restored) {
+                        if let Err(e) = self.learning_state.set(CHAMPION_KEY, &json).await {
+                            error!(error = %e, "failed to persist reverted champion");
+                        }
+                    }
+                    *champ = restored;
+
+                    // Emit domain event for rollback.
+                    if let Some(bus) = domain_event_bus {
+                        let trial_str = rolled_back_trial_id
+                            .map(|id| id.to_string())
+                            .unwrap_or_default();
+                        bus.publish(bus::DomainEvent::AutotunerDecision {
+                            trial_id: trial_str,
+                            verdict: autotuner::TrialStatus::Reverted.as_str().to_string(),
+                            improvement_pct: rollback_improvement_pct,
+                            affected_params: rollback_affected_params,
+                        });
+                    }
+
+                    return true;
+                }
+            }
+            Ok(None) => {
+                warn!("regression threshold reached but no previous champion — cannot rollback");
+            }
+            Err(e) => {
+                error!("failed to load previous champion for rollback: {e}");
+            }
+        }
+        false
+    }
+
+    /// Reset the regression counter on a healthy evaluation day.
+    pub async fn reset_regression_counter(&self) {
+        let mut champ = self.champion.write().await;
+        if champ.consecutive_regression_days > 0 {
+            info!("regression counter reset (healthy day)");
+            champ.consecutive_regression_days = 0;
+            if let Ok(json) = serde_json::to_value(&*champ) {
+                if let Err(e) = self.learning_state.set(CHAMPION_KEY, &json).await {
+                    error!(error = %e, "failed to persist regression counter reset");
+                }
+            }
+        }
+    }
+
     /// Register the nightly evaluation cycle with the CronService.
     ///
     /// Creates a [`NightlyCycle`] and registers a named handler that:

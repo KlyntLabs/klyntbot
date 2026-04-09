@@ -297,8 +297,10 @@ export function MemoryTab() {
                   imp: {m.importance.toFixed(2)}
                 </span>
               </div>
-              <p className="text-xs text-muted-foreground">{m.content}</p>
-              {m.summary && <p className="text-[11px] text-muted-foreground mt-1">{m.summary}</p>}
+              <p className="text-xs text-muted-foreground">{m.summary || m.content}</p>
+              {m.summary && m.summary !== m.content && (
+                <p className="text-[11px] text-muted-foreground/60 mt-1">{m.content}</p>
+              )}
             </div>
           ))}
           {episodic.length === 0 && (

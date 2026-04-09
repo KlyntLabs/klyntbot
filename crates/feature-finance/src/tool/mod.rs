@@ -170,8 +170,8 @@ impl Tool for FinanceTool {
                 "name": { "type": "string" },
                 "type": {
                     "type": "string",
-                    "enum": ["bank", "cash", "ewallet", "crypto_wallet", "brokerage", "other"],
-                    "description": "Account type. Use 'bank' for bank accounts, 'cash' for cash, 'ewallet' for e-wallets, 'crypto_wallet' for crypto wallets, 'brokerage' for investment/brokerage accounts, 'other' for anything else."
+                    "enum": ["bank", "cash", "ewallet", "crypto_wallet", "brokerage", "other", "expense", "income", "transfer"],
+                    "description": "For account_add: account type (bank, cash, ewallet, crypto_wallet, brokerage, other). For tx_add: transaction type (expense, income, transfer)."
                 },
                 "currency": { "type": "string" },
                 "balance": { "type": "integer" },

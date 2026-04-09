@@ -95,21 +95,7 @@ pub(super) async fn init_cron(
     let proactive_handler_out = Some(proactive_handler.clone());
     let suggestion_applier_out = suggestion_applier.clone();
 
-    register_cron_callbacks(
-        &mut cron_service,
-        repos,
-        &notification_dispatcher,
-        config,
-        bus,
-        cognitive_provider,
-        domain_event_bus,
-        tasks_config.clone(),
-        proactive_handler,
-        suggestion_applier,
-        vector_store,
-    );
-
-    // ── AutoTuner nightly cycle ───────────────────────────────────────────
+    // ── AutoTuner setup (must happen before register_cron_callbacks) ─────
     let trial_repo = storage::TrialRepo::new(repos.pool().clone());
     trial_repo
         .migrate()
@@ -146,21 +132,40 @@ pub(super) async fn init_cron(
         .with_episodic_memory_repo(episodic_memory_repo)
         .with_memory_param_sink(Arc::clone(&memory_param_sink)),
     );
-    // Disabled: autotuner nightly cycle subsumed by Reforge (Phase 6 deferred).
-    // TODO(Task 12): integrate autotuner evaluation into Reforge Phase 6.
-    // agent::autotuner::AutoTunerOrchestrator::register_nightly_cycle(
-    //     Arc::clone(&orchestrator),
-    //     &cron_service,
-    //     config.autotuner.clone(),
-    //     trial_repo,
-    //     metric_source,
-    //     Some(Arc::clone(domain_event_bus)),
-    // );
-    // info!("autotuner nightly cycle handler registered");
-    let _ = trial_repo;
-    let _ = metric_source;
-    info!("autotuner orchestrator built (nightly cycle disabled, pending Reforge Phase 6)");
+    // Build NightlyCycle + bridge for Reforge Phase 6.
+    let nightly_cycle = Arc::new(autotuner::NightlyCycle::new(
+        config.autotuner.clone(),
+        trial_repo.clone(),
+        Arc::clone(&metric_source),
+    ));
+    let autotuner_bridge: Option<Arc<dyn cognitive::services::reforge::AutotunerBridge>> =
+        Some(Arc::new(
+            agent::adapters::autotuner_bridge::AgentAutotunerBridge::new(
+                Arc::clone(&orchestrator),
+                nightly_cycle,
+                Some(Arc::clone(domain_event_bus)),
+            ),
+        ));
+    info!("autotuner orchestrator + Reforge Phase 6 bridge built");
     let autotuner = Some(orchestrator);
+
+    register_cron_callbacks(
+        &mut cron_service,
+        repos,
+        &notification_dispatcher,
+        config,
+        bus,
+        cognitive_provider,
+        domain_event_bus,
+        tasks_config.clone(),
+        proactive_handler,
+        suggestion_applier,
+        vector_store,
+        autotuner_bridge,
+        metric_source,
+        trial_repo,
+        autotuner.clone(),
+    );
 
     let cron_service = Arc::new(cron_service);
     ensure_cron_jobs(&cron_service, config)
@@ -212,6 +217,7 @@ const JOB_REFORGE_NIGHTLY: &str = "__klyntbot_reforge_nightly";
 
 /// Register individual cron handlers.
 #[allow(clippy::too_many_arguments)]
+#[allow(clippy::too_many_arguments)]
 fn register_cron_callbacks(
     cron_service: &mut CronService,
     repos: &Repos,
@@ -224,6 +230,10 @@ fn register_cron_callbacks(
     proactive_handler: Arc<dyn ProactiveHandler>,
     suggestion_applier: Option<Arc<dyn SuggestionApplier>>,
     vector_store: Option<storage::VectorStore>,
+    autotuner_bridge: Option<Arc<dyn cognitive::services::reforge::AutotunerBridge>>,
+    metric_source: Arc<dyn autotuner::MetricSource>,
+    trial_repo: storage::TrialRepo,
+    orchestrator: Option<Arc<agent::autotuner::AutoTunerOrchestrator>>,
 ) {
     let rt = tokio::runtime::Handle::current();
 
@@ -429,6 +439,10 @@ fn register_cron_callbacks(
         let cog_config = config.clone();
         let cog_provider = cognitive_provider.clone();
         let rt = rt.clone();
+        let autotuner_bridge_for_reforge = autotuner_bridge.clone();
+        let metric_source_for_reforge = metric_source;
+        let trial_repo_for_reforge = trial_repo;
+        let orchestrator_for_reforge = orchestrator.clone();
         cron_service.register_handler(
             JOB_REFORGE_NIGHTLY,
             Arc::new(move |_job: &scheduling::CronJob| {
@@ -436,6 +450,10 @@ fn register_cron_callbacks(
                 let repos_reforge = repos_reforge.clone();
                 let cog_config = cog_config.clone();
                 let cog_provider = cog_provider.clone();
+                let autotuner_bridge = autotuner_bridge_for_reforge.clone();
+                let metric_source = metric_source_for_reforge.clone();
+                let trial_repo = trial_repo_for_reforge.clone();
+                let orchestrator = orchestrator_for_reforge.clone();
                 tokio::task::block_in_place(|| {
                     rt.block_on(async move {
                         let fact_repo = cognitive::SemanticFactRepo::new(pool.clone());
@@ -468,6 +486,64 @@ fn register_cron_callbacks(
                             )
                             .await;
 
+                        // Load autotuner context for Phase 3 prompt
+                        // (metric snapshots collected here where autotuner types are available).
+                        let autotuner_ctx = if autotuner_bridge.is_some() {
+                            let now = chrono::Utc::now();
+                            let since_24h = now - chrono::Duration::hours(24);
+                            let since_7d = now - chrono::Duration::days(7);
+
+                            let m24 = metric_source
+                                .collect_metrics(since_24h, None)
+                                .await
+                                .ok()
+                                .map(|s| cognitive::services::reforge::types::MetricsSnapshot {
+                                    correction_rate: s.correction_rate,
+                                    retrieval_precision: s.retrieval_precision,
+                                    avg_response_time_ms: s.avg_response_time_ms,
+                                    avg_tokens_per_message: s.avg_tokens_per_message,
+                                    routing_stability: s.routing_stability,
+                                    memory_relevance: s.memory_relevance,
+                                })
+                                .unwrap_or_default();
+
+                            let m7d = metric_source
+                                .collect_metrics(since_7d, None)
+                                .await
+                                .ok()
+                                .map(|s| cognitive::services::reforge::types::MetricsSnapshot {
+                                    correction_rate: s.correction_rate,
+                                    retrieval_precision: s.retrieval_precision,
+                                    avg_response_time_ms: s.avg_response_time_ms,
+                                    avg_tokens_per_message: s.avg_tokens_per_message,
+                                    routing_stability: s.routing_stability,
+                                    memory_relevance: s.memory_relevance,
+                                })
+                                .unwrap_or_default();
+
+                            // Get actual champion params from the orchestrator.
+                            let champion_trial_params = match orchestrator.as_ref() {
+                                Some(orch) => {
+                                    orch.current_champion_params().await.unwrap_or_default()
+                                }
+                                None => common::TrialParams::default(),
+                            };
+
+                            Some(
+                                cognitive::services::reforge::collector::load_autotuner_context(
+                                    &trial_repo,
+                                    m24,
+                                    m7d,
+                                    &champion_trial_params,
+                                )
+                                .await,
+                            )
+                        } else {
+                            None
+                        };
+
+                        let bridge_ref = autotuner_bridge.as_deref();
+
                         match cognitive::services::reforge::service::run_reforge(
                             &repos_reforge.reforge_state,
                             &repos_reforge.skill_version,
@@ -480,6 +556,8 @@ fn register_cron_callbacks(
                             Some(pre_read_files),
                             Some(&mirror_repo),
                             Some(&feedback_repo),
+                            bridge_ref,
+                            autotuner_ctx,
                         )
                         .await
                         {

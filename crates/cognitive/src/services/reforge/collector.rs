@@ -223,7 +223,187 @@ pub async fn collect(
         skill_files,
         retrieval_precision,
         is_bootstrap,
+        autotuner_ctx: None,
     })
+}
+
+/// Load autotuner context for Phase 3 prompt and Phase 6 evaluation.
+///
+/// Called from the cron handler (which has access to the orchestrator and
+/// metric source). The cognitive crate doesn't depend on autotuner, so the
+/// caller must pass metric snapshots pre-collected from the autotuner layer.
+pub async fn load_autotuner_context(
+    trial_repo: &storage::TrialRepo,
+    metrics_24h: super::types::MetricsSnapshot,
+    metrics_7d: super::types::MetricsSnapshot,
+    champion: &common::TrialParams,
+) -> super::types::AutotunerContext {
+    // Active trial count
+    let active_trial_count = trial_repo.count_active().await.unwrap_or(0);
+
+    // Recent experiment history (last 5 completed experiments)
+    let trial_history = load_trial_history(trial_repo).await;
+
+    // Format champion params
+    let champion_summary = format_champion_params(champion);
+
+    super::types::AutotunerContext {
+        champion_summary,
+        trial_history,
+        metrics_24h,
+        metrics_7d,
+        active_trial_count,
+    }
+}
+
+async fn load_trial_history(
+    trial_repo: &storage::TrialRepo,
+) -> Vec<super::types::TrialHistoryEntry> {
+    use super::types::{TrialHistoryEntry, TrialOutcome};
+
+    let experiments = match trial_repo.get_experiments(5).await {
+        Ok(exps) => exps,
+        Err(e) => {
+            tracing::warn!("Reforge collector: failed to load experiments: {e}");
+            return vec![];
+        }
+    };
+
+    let completed_trials = match trial_repo.get_recent_completed(20).await {
+        Ok(t) => t,
+        Err(e) => {
+            tracing::warn!("Reforge collector: failed to load completed trials: {e}");
+            return vec![];
+        }
+    };
+
+    let now = chrono::Utc::now();
+
+    experiments
+        .into_iter()
+        .filter_map(|exp| {
+            let days_ago = chrono::DateTime::parse_from_rfc3339(&exp.created_at)
+                .ok()
+                .map(|dt| (now - dt.with_timezone(&chrono::Utc)).num_days().max(0) as u32)
+                .unwrap_or(0);
+
+            let trials: Vec<TrialOutcome> = completed_trials
+                .iter()
+                .filter(|t| t.experiment_id == exp.id)
+                .map(|t| {
+                    let result_status = t.status.clone();
+                    let params_summary = serde_json::from_str::<common::TrialParams>(&t.params)
+                        .ok()
+                        .map(|p| format_champion_params(&p))
+                        .unwrap_or_else(|| "(parse error)".to_string());
+
+                    // Parse constraint failures from result JSON
+                    let (constraint_failures, improvement) = t
+                        .result
+                        .as_deref()
+                        .and_then(|r| serde_json::from_str::<serde_json::Value>(r).ok())
+                        .map(|v| {
+                            let failures = v
+                                .get("constraint_failures")
+                                .and_then(|f| f.as_array())
+                                .map(|arr| {
+                                    arr.iter()
+                                        .filter_map(|s| s.as_str().map(String::from))
+                                        .collect()
+                                })
+                                .unwrap_or_default();
+                            let imp = v.get("correction_rate").and_then(|c| c.as_f64());
+                            (failures, imp)
+                        })
+                        .unwrap_or_default();
+
+                    TrialOutcome {
+                        params_summary,
+                        result: result_status,
+                        constraint_failures,
+                        improvement,
+                    }
+                })
+                .collect();
+
+            if trials.is_empty() {
+                return None;
+            }
+
+            Some(TrialHistoryEntry {
+                experiment_id: exp.id,
+                days_ago,
+                trials,
+            })
+        })
+        .collect()
+}
+
+/// Format champion params as a grouped string for the LLM prompt.
+pub fn format_champion_params(params: &common::TrialParams) -> String {
+    use std::fmt::Write;
+    let mut out = String::new();
+
+    // Helper macro to format optional params
+    macro_rules! fmt_opt {
+        ($out:expr, $name:literal, $val:expr) => {
+            if let Some(v) = $val {
+                write!($out, "{}={:.2}, ", $name, *v as f64).unwrap();
+            }
+        };
+    }
+
+    out.push_str("routing: ");
+    fmt_opt!(out, "skill_keyword_weight", &params.skill_keyword_weight);
+    fmt_opt!(out, "skill_semantic_weight", &params.skill_semantic_weight);
+    fmt_opt!(
+        out,
+        "activation_threshold",
+        &params.skill_activation_threshold
+    );
+    fmt_opt!(
+        out,
+        "heuristic_confidence",
+        &params.heuristic_confidence_threshold
+    );
+
+    out.push_str("\nretrieval: ");
+    fmt_opt!(out, "semantic", &params.relevance_weight_semantic);
+    fmt_opt!(
+        out,
+        "retrievability",
+        &params.relevance_weight_retrievability
+    );
+    fmt_opt!(out, "situation", &params.relevance_weight_situation);
+    fmt_opt!(out, "importance", &params.relevance_weight_importance);
+    fmt_opt!(out, "frequency", &params.relevance_weight_frequency);
+    fmt_opt!(out, "temporal", &params.relevance_weight_temporal);
+    fmt_opt!(out, "hierarchy", &params.relevance_weight_hierarchy);
+    fmt_opt!(
+        out,
+        "path_coherence",
+        &params.relevance_weight_path_coherence
+    );
+    fmt_opt!(out, "community", &params.relevance_weight_community);
+    fmt_opt!(out, "cross_note", &params.relevance_weight_cross_note);
+
+    out.push_str("\nmemory: ");
+    fmt_opt!(out, "vector_top_k", &params.vector_top_k.map(|v| v as f64));
+    fmt_opt!(out, "min_similarity", &params.min_similarity);
+    fmt_opt!(
+        out,
+        "fsrs_desired_retention",
+        &params.fsrs_desired_retention
+    );
+
+    out.push_str("\nrewriting: ");
+    fmt_opt!(
+        out,
+        "rewrite_confidence",
+        &params.rewrite_confidence_threshold
+    );
+
+    out
 }
 
 /// Aggregate routing snapshots into per-skill summaries.
