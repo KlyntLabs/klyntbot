@@ -87,6 +87,11 @@ pub struct CognitiveConfig {
     #[serde(default = "default_w_temporal")]
     pub relevance_weight_temporal: f64,
 
+    /// Relevance weight for conversation recall support (default: 0.08).
+    /// Facts corroborated by conversation evidence score higher.
+    #[serde(default = "default_w_recall_support")]
+    pub relevance_weight_recall_support: f64,
+
     /// Whether InsightForge multi-dimensional retrieval is enabled (default: true).
     #[serde(default = "default_insight_forge_enabled")]
     pub insight_forge_enabled: bool,
@@ -146,6 +151,7 @@ impl Default for CognitiveConfig {
             relevance_weight_frequency: default_w_frequency(),
             relevance_weight_situation: default_w_situation(),
             relevance_weight_temporal: default_w_temporal(),
+            relevance_weight_recall_support: default_w_recall_support(),
             insight_forge_enabled: default_insight_forge_enabled(),
             insight_forge_max_sub_queries: default_insight_forge_max_sub_queries(),
             insight_forge_per_source_limit: default_insight_forge_per_source_limit(),
@@ -200,6 +206,9 @@ fn default_w_situation() -> f64 {
 }
 fn default_w_temporal() -> f64 {
     0.05
+}
+fn default_w_recall_support() -> f64 {
+    0.08
 }
 fn default_insight_forge_enabled() -> bool {
     true

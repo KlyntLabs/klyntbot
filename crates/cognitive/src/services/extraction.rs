@@ -33,6 +33,26 @@ pub struct BatchExtractionResult {
     pub extractions: Vec<BatchExtraction>,
     /// Indices of observations that used heuristic fallback (LLM failed).
     pub fallback_indices: Vec<usize>,
+    /// Entities discovered across all observations in the batch.
+    pub entities: Vec<ExtractedEntity>,
+    /// Relationships between discovered entities.
+    pub relationships: Vec<ExtractedRelationship>,
+}
+
+/// An entity extracted alongside facts from an observation.
+#[derive(Debug, Clone)]
+pub struct ExtractedEntity {
+    pub name: String,
+    pub entity_type: String,
+    pub description: Option<String>,
+}
+
+/// A relationship between two extracted entities.
+#[derive(Debug, Clone)]
+pub struct ExtractedRelationship {
+    pub source_name: String,
+    pub target_name: String,
+    pub relationship_type: String,
 }
 
 /// Trait for fact extraction from observations.
@@ -155,6 +175,8 @@ mod tests {
                 },
             ],
             fallback_indices: vec![1],
+            entities: Vec::new(),
+            relationships: Vec::new(),
         };
         assert_eq!(result.extractions.len(), 2);
         assert_eq!(result.extractions[0].facts.len(), 1);

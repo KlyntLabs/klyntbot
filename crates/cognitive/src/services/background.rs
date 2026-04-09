@@ -527,6 +527,17 @@ impl BackgroundConsolidationService {
                         }
                     }
 
+                    // Persist LLM-extracted entities and relationships (weak — low initial strength)
+                    if !result.entities.is_empty() || !result.relationships.is_empty() {
+                        let entity_repo = crate::repos::EntityRepo::new(repo.pool().clone());
+                        crate::pipeline::writer::persist_entities(
+                            &entity_repo,
+                            &result.entities,
+                            &result.relationships,
+                        )
+                        .await;
+                    }
+
                     // Prefetch existing facts + batch consolidation
                     let candidates =
                         prefetch_existing(&result.extractions, &to_extract, &repo).await;

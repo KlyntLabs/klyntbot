@@ -60,6 +60,7 @@ pub struct CognitiveRetrievalConfig {
     pub relevance_weight_path_coherence: f64,
     pub relevance_weight_community: f64,
     pub relevance_weight_cross_note: f64,
+    pub relevance_weight_recall_support: f64,
 }
 
 impl Default for CognitiveRetrievalConfig {
@@ -81,6 +82,7 @@ impl Default for CognitiveRetrievalConfig {
             relevance_weight_path_coherence: 0.05,
             relevance_weight_community: 0.15,
             relevance_weight_cross_note: 0.10,
+            relevance_weight_recall_support: 0.08,
         }
     }
 }

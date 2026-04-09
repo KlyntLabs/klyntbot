@@ -24,7 +24,10 @@ pub use conversation_recall::{
     ConversationRecallService, RecallConfig, RecallMetadata, RecallResult,
 };
 pub use embedder::{SemanticFactEmbedder, TextEmbedder};
-pub use extraction::{BatchExtraction, BatchExtractionResult, ExtractedFact, ExtractionHandler};
+pub use extraction::{
+    BatchExtraction, BatchExtractionResult, ExtractedEntity, ExtractedFact, ExtractedRelationship,
+    ExtractionHandler,
+};
 pub use memory_retriever::UnifiedMemoryService;
 pub use repos::event_log::{DomainEventRow, PipelineEventRecord, PipelineEventRow};
 pub use repos::persona_accuracy::alignment_to_fsrs_rating;
@@ -32,7 +35,8 @@ pub use repos::semantic_fact::DomainHealthRow;
 pub use repos::AtomExtractionCache;
 pub use repos::{
     cognitive_migrations, AccumulatedObservationRepo, AnnotationRepo, CoActivationRepo,
-    EpisodicMemoryRepo, EventLogRepo, FailedObservationRepo, ProceduralRuleRepo, SemanticFactRepo,
+    EpisodicMemoryRepo, EventLogRepo, FactChangelogRepo, FailedObservationRepo, ProceduralRuleRepo,
+    SemanticFactRepo,
 };
 pub use repos::{BlackboardEntry, BlackboardRepo, NewBlackboardEntry};
 pub use repos::{

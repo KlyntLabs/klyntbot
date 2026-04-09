@@ -17,9 +17,9 @@ use super::SignalSender;
 use crate::repos::procedural_rule::word_overlap_ratio;
 
 /// Minimum messages in a cluster to promote a signal.
-const CLUSTER_THRESHOLD: usize = 3;
+const CLUSTER_THRESHOLD: usize = 2;
 /// Minimum distinct sessions required across cluster members.
-const SESSION_THRESHOLD: usize = 2;
+const SESSION_THRESHOLD: usize = 1;
 /// Flush (and cluster) the buffer every N buffered messages.
 const BUFFER_FLUSH_SIZE: usize = 20;
 /// Word-overlap ratio above which two messages are considered similar.
@@ -207,19 +207,23 @@ mod tests {
     }
 
     #[test]
-    fn test_session_threshold_enforcement() {
-        // All 4 messages from the same session — should NOT be promoted.
+    fn test_single_session_now_promotes() {
+        // With SESSION_THRESHOLD=1, single-session clusters meeting the
+        // message count threshold are now promoted (lowered for faster knowledge promotion).
+        // Messages share enough words for Jaccard > 0.5 to cluster together.
         let messages = vec![
-            msg("How do I handle errors in Rust", "s1"),
-            msg("Error handling in Rust with Result types", "s1"),
-            msg("Rust error handling patterns best practices", "s1"),
-            msg("Rust Result and Option error management", "s1"),
+            msg("Rust error handling best practices for Result types", "s1"),
+            msg("Rust error handling best practices with Option types", "s1"),
+            msg(
+                "Rust error handling best practices using unwrap safely",
+                "s1",
+            ),
         ];
         let clusters = cluster_messages(&messages);
         let largest = clusters.iter().max_by_key(|c| c.len()).unwrap();
-        // Cluster size would be ≥3 but sessions.len() == 1 < SESSION_THRESHOLD.
         let sessions: HashSet<&str> = largest.iter().map(|m| m.session_key.as_str()).collect();
         assert_eq!(sessions.len(), 1);
-        assert!(sessions.len() < SESSION_THRESHOLD);
+        assert!(largest.len() >= CLUSTER_THRESHOLD);
+        assert!(sessions.len() >= SESSION_THRESHOLD);
     }
 }

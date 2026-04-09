@@ -16,7 +16,7 @@ cargo clippy --workspace --all-targets --all-features  # Lint (must be 0 warning
 cargo fmt --all --check                            # Check formatting
 ```
 
-Root facade crate has 4 test binaries in `tests/`: `integration/` (cross-crate via facade), `e2e/` (agent loop + reminders), `unit/` (config, providers), `plugins.rs` (WASM, needs `--features plugin-integration` + pre-built plugin). Shared fixtures in `tests/common/`. All tests use ephemeral SQLite (`StoragePool::connect_in_memory()`). No external DB needed.
+Root facade crate has 5 test binaries in `tests/`: `integration/` (cross-crate via facade), `e2e/` (agent loop + reminders), `unit/` (config, providers), `plugins.rs` (WASM, needs `--features plugin-integration` + pre-built plugin), `simulation/` (scenario-based agent smoke tests). Shared fixtures in `tests/common/`. All tests use ephemeral SQLite (`StoragePool::connect_in_memory()`). No external DB needed.
 
 ## Desktop UI (desktop-ui/)
 
@@ -58,15 +58,15 @@ Browser-only dev: run `cd desktop-ui && bun run dev` then `cargo tauri dev` (whi
 
 Rust personal AI agent — single binary connecting 6+ chat platforms to LLMs with task/project management and persistent memory. All state in SQLite + LanceDB.
 
-### Workspace (34 crates, 9 layers)
+### Workspace (37 crates, 9 layers)
 
 ```
 L0: common, platform-macos — KlyntbotError, MessageRole, ChannelName, ChatId, SessionKey; macOS native APIs (pasteboard, window mgmt)
 L1: config, bus, tools-core, tools-core-macros, analytics — Config (camelCase JSON), message bus, Tool/FeaturePackage traits, derive macros, FIRE/Monte Carlo analytics
 L2: storage               — SqlitePool, migrations, *Repo structs, *Row types
 L3: providers, session, scheduling, context_engine, skill-system — LLM clients, session persistence, cron, token budgets, skill discovery/routing
-L4: tools, feature-tasks, feature-finance, feature-notes, feature-productivity, feature-coaching, feature-insights, feature-launcher, feature-learning (flashcard generation), activity-log, plugin-runtime, autotuner — 20+ tools, feature packages, WASM plugins, self-optimization experiments
-L5: channels, agent, cognitive — Platform integrations (Telegram/Discord/Slack/Email), agent runtime, cognitive memory (episodic/semantic extraction, spaced repetition via FSRS5, salience decay, reflection)
+L4: tools, feature-tasks, feature-finance, feature-notes, feature-productivity, feature-coaching, feature-insights, feature-launcher, feature-learning (flashcard generation), feature-language-learning (pronunciation, practice sessions, exam tracking), activity-log, plugin-runtime, autotuner, voice-engine, simulator — 20+ tools, feature packages, WASM plugins, self-optimization experiments, voice synthesis, agent simulation
+L5: channels, agent, cognitive — Platform integrations (Telegram/Discord/Slack/Email), agent runtime, cognitive memory (episodic/semantic extraction, spaced repetition via FSRS5, salience decay, reflection, reforge)
 L6: mcp                   — MCP server/client
 L7: app-core, desktop-shared, desktop — Application core (shared handlers), Tauri desktop app
 L8: klyntbot, klyntbot-server — Re-export facade, standalone MCP server binary
@@ -89,7 +89,7 @@ Dependencies flow strictly upward. `plugin-sdk` and `tests/fixtures/hello_plugin
 
 ### Skill system & MCP
 
-Five built-in orchestrator skills in `skills/`: general, task-management, finance-management, automation, communication. Each has `SKILL.md` (Agent Skills spec YAML frontmatter) + `references/` folder. Compiled via `include_str!` in `skill-system` crate. `SkillRouter` selects orchestrator per-message via keyword + semantic scoring. MCP tool names: `mcp_{server}_{tool}` (see `mcp::sanitize`). MCP access controlled per-skill via `mcp_tools` field (`["*"]` = all, `[]` = none). Task-management skill has `mcp_tools: ["google-calendar"]`.
+Five built-in orchestrator skills in `skills/`: task-management, finance-management, automation, learning, notebook. Each has `SKILL.md` (Agent Skills spec YAML frontmatter) + `references/` folder. Compiled via `include_str!` in `skill-system` crate. `SkillRouter` selects orchestrator per-message via keyword + semantic scoring. MCP tool names: `mcp_{server}_{tool}` (see `mcp::sanitize`). MCP access controlled per-skill via `mcp_tools` field (`["*"]` = all, `[]` = none). Task-management skill has `mcp_tools: ["google-calendar"]`.
 
 **Progressive skill loading:** Orchestrator skills inject their full body on first activation (deduplicated per session). Activated (non-orchestrator) skills inject a summary only — the agent calls `skill_reference` tool to load full instructions when needed. Always-loaded references are filtered by message relevance (single-token refs always load, multi-token refs need a keyword match). This reduces token usage for simple messages.
 
@@ -143,6 +143,10 @@ Klyntbot exposes tools to external AI clients (Claude Code, Cursor, etc.) via MC
 **MCP:** `MirrorTool` (multi-action, read-only) registered post-init via `agent.tool_registry()`. Actions: `get_state`, `get_narratives`, `get_routing_history`, `get_brain_versions`, `get_meta_rules`.
 
 **Cron:** `JOB_MIRROR_WEEKLY_NARRATIVE` (Sunday 10am UTC), `JOB_MIRROR_CLEANUP` (Sunday 4am UTC — cleans snapshots, snippets, trial previews older than 90 days).
+
+### Reforge — strategy reflection
+
+`crates/cognitive/src/services/reforge/` — nightly self-improvement cycle that reviews the agent's strategy files (`skills/*.md`), collects behavioral feedback (tool failures, user corrections, retrieval precision), and generates targeted rewrite suggestions via LLM. Phases: Collect → Review → Synthesize → Apply. The `feedback.rs` module loads signals from event logs and semantic fact repos. High-confidence patterns and suggestions are persisted to `reforge_suggestions` table for cross-session continuity. Triggered by cron, orchestrated by `ReforgeService::run_reforge()`.
 
 ### Agent runtime
 

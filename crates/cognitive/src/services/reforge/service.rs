@@ -254,26 +254,6 @@ pub async fn run_reforge(
         result.phase_errors.push(format!("narrative_store: {e}"));
     }
 
-    // 5d. Record run in reforge_state.
-    let stats_json = serde_json::json!({
-        "facts_added": result.facts_added,
-        "facts_updated": result.facts_updated,
-        "facts_stale_flagged": result.facts_stale_flagged,
-        "rules_added": result.rules_added,
-        "rules_reinforced": result.rules_reinforced,
-        "skills_edited": result.skills_edited,
-        "skipped_skill_edits": result.skipped_skill_edits.len(),
-        "phase_errors": result.phase_errors.len(),
-        "trials_created": result.trials_created,
-        "champion_promoted": result.champion_promoted,
-        "regression_detected": result.regression_detected,
-        "suggestions_persisted": result.suggestions_persisted,
-        "patterns_persisted": result.patterns_persisted,
-    });
-    if let Err(e) = reforge_state_repo.record_run(&stats_json.to_string()).await {
-        warn!("Reforge: failed to record run: {e}");
-    }
-
     // ------------------------------------------------------------------
     // Phase 6: Optimize
     // ------------------------------------------------------------------
@@ -323,6 +303,7 @@ pub async fn run_reforge(
     // Phase 7: Compact
     // ------------------------------------------------------------------
     info!("Reforge Phase 7: Compact");
+    let mut compaction_stats: Option<serde_json::Value> = None;
     match crate::services::compaction::run_compaction(
         fact_repo,
         episodic_repo,
@@ -341,11 +322,38 @@ pub async fn run_reforge(
                 rules_deactivated = cr.rules_deactivated,
                 "Reforge Phase 7 complete"
             );
+            compaction_stats = Some(serde_json::json!({
+                "facts_archived": cr.facts_archived,
+                "episodic_deleted": cr.episodic_deleted,
+                "low_stability_archived": cr.low_stability_archived,
+                "rules_deactivated": cr.rules_deactivated,
+            }));
         }
         Err(e) => {
             warn!("Reforge Phase 7 failed: {e}");
             result.phase_errors.push(format!("compact: {e}"));
         }
+    }
+
+    // Record run in reforge_state (after all phases, including compaction).
+    let stats_json = serde_json::json!({
+        "facts_added": result.facts_added,
+        "facts_updated": result.facts_updated,
+        "facts_stale_flagged": result.facts_stale_flagged,
+        "rules_added": result.rules_added,
+        "rules_reinforced": result.rules_reinforced,
+        "skills_edited": result.skills_edited,
+        "skipped_skill_edits": result.skipped_skill_edits.len(),
+        "phase_errors": result.phase_errors.len(),
+        "trials_created": result.trials_created,
+        "champion_promoted": result.champion_promoted,
+        "regression_detected": result.regression_detected,
+        "suggestions_persisted": result.suggestions_persisted,
+        "patterns_persisted": result.patterns_persisted,
+        "compaction": compaction_stats,
+    });
+    if let Err(e) = reforge_state_repo.record_run(&stats_json.to_string()).await {
+        warn!("Reforge: failed to record run: {e}");
     }
 
     info!(

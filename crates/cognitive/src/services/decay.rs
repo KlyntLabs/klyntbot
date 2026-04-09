@@ -12,7 +12,7 @@ pub fn retrievability(elapsed_days: f64, stability: f64) -> f64 {
     (0.9_f64.ln() * elapsed_days / stability).exp()
 }
 
-/// Configurable relevance weights for the 10-factor scoring formula.
+/// Configurable relevance weights for the 11-factor scoring formula.
 #[derive(Debug, Clone, Copy)]
 pub struct RelevanceWeights {
     pub semantic: f64,
@@ -25,6 +25,7 @@ pub struct RelevanceWeights {
     pub path_coherence: f64,
     pub community: f64,
     pub cross_note: f64,
+    pub recall_support: f64,
 }
 
 impl Default for RelevanceWeights {
@@ -37,9 +38,10 @@ impl Default for RelevanceWeights {
             situation: 0.15,
             temporal: 0.02,
             hierarchy: 0.10,
-            path_coherence: 0.05,
+            path_coherence: 0.02,
             community: 0.15,
-            cross_note: 0.10,
+            cross_note: 0.05,
+            recall_support: 0.08,
         }
     }
 }
@@ -58,6 +60,7 @@ pub fn relevance_score(
     path_coherence: f64,
     community_score: f64,
     cross_note_boost: f64,
+    recall_support: f64,
     weights: &RelevanceWeights,
 ) -> f64 {
     (semantic_similarity * weights.semantic
@@ -69,7 +72,8 @@ pub fn relevance_score(
         + hierarchy_score * weights.hierarchy
         + path_coherence * weights.path_coherence
         + community_score * weights.community
-        + cross_note_boost * weights.cross_note)
+        + cross_note_boost * weights.cross_note
+        + recall_support * weights.recall_support)
         .clamp(0.0, 1.0)
 }
 
@@ -126,6 +130,7 @@ mod tests {
         path_coherence: 0.0,
         community: 0.0,
         cross_note: 0.0,
+        recall_support: 0.0,
     };
     const MAX_S: f64 = 30.0;
 
@@ -164,16 +169,16 @@ mod tests {
 
     #[test]
     fn test_relevance_score_combines_factors() {
-        let score = relevance_score(0.8, 0.9, 0.7, 0.5, 0.6, 0.5, 0.0, 0.5, 0.0, 0.0, &W);
+        let score = relevance_score(0.8, 0.9, 0.7, 0.5, 0.6, 0.5, 0.0, 0.5, 0.0, 0.0, 0.0, &W);
         assert!(score > 0.0 && score <= 1.0);
     }
 
     #[test]
     fn test_relevance_score_clamps() {
-        let score = relevance_score(1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 0.0, 0.5, 0.0, 0.0, &W);
+        let score = relevance_score(1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 0.0, 0.5, 0.0, 0.0, 0.0, &W);
         assert!((score - 1.0).abs() < f64::EPSILON);
 
-        let score = relevance_score(0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.5, 0.0, 0.0, &W);
+        let score = relevance_score(0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.5, 0.0, 0.0, 0.0, &W);
         assert!((score - 0.0).abs() < f64::EPSILON);
     }
 
@@ -190,8 +195,11 @@ mod tests {
             path_coherence: 0.0,
             community: 0.0,
             cross_note: 0.0,
+            recall_support: 0.0,
         };
-        let score = relevance_score(0.8, 0.1, 0.1, 0.1, 0.1, 0.0, 0.0, 0.5, 0.0, 0.0, &custom);
+        let score = relevance_score(
+            0.8, 0.1, 0.1, 0.1, 0.1, 0.0, 0.0, 0.5, 0.0, 0.0, 0.0, &custom,
+        );
         assert!((score - 0.8).abs() < f64::EPSILON);
     }
 
@@ -282,8 +290,11 @@ mod tests {
             path_coherence: 0.10,
             community: 0.0,
             cross_note: 0.0,
+            recall_support: 0.0,
         };
-        let score = relevance_score(0.8, 0.9, 0.7, 0.5, 0.6, 0.4, 1.0, 0.8, 0.0, 0.0, &weights);
+        let score = relevance_score(
+            0.8, 0.9, 0.7, 0.5, 0.6, 0.4, 1.0, 0.8, 0.0, 0.0, 0.0, &weights,
+        );
         // 0.25*0.8 + 0.15*0.9 + 0.10*0.7 + 0.05*0.5 + 0.20*0.6 + 0.05*0.4 + 0.10*1.0 + 0.10*0.8 = 0.75
         assert!((score - 0.75).abs() < 0.001);
     }
@@ -291,7 +302,9 @@ mod tests {
     #[test]
     fn test_extended_score_backward_compat_non_note() {
         let weights = RelevanceWeights::default();
-        let score = relevance_score(0.8, 0.9, 0.7, 0.5, 0.6, 0.4, 0.0, 0.5, 0.0, 0.0, &weights);
+        let score = relevance_score(
+            0.8, 0.9, 0.7, 0.5, 0.6, 0.4, 0.0, 0.5, 0.0, 0.0, 0.0, &weights,
+        );
         assert!(score > 0.0 && score <= 1.0);
     }
 
@@ -308,8 +321,11 @@ mod tests {
             path_coherence: 0.0,
             community: 0.5,
             cross_note: 0.5,
+            recall_support: 0.0,
         };
-        let score = relevance_score(0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.8, 0.6, &weights);
+        let score = relevance_score(
+            0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.8, 0.6, 0.0, &weights,
+        );
         // 0.5*0.8 + 0.5*0.6 = 0.7
         assert!((score - 0.7).abs() < 0.001);
     }

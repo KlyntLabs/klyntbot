@@ -49,6 +49,7 @@ pub struct RetrievalParams {
     pub relevance_weight_path_coherence: f64,
     pub relevance_weight_community: f64,
     pub relevance_weight_cross_note: f64,
+    pub relevance_weight_recall_support: f64,
     /// Optional scope chain for filtering. When set, only facts matching
     /// these scopes are considered. When empty, all scopes are included (backwards-compatible).
     pub scope_chain: Vec<(String, Option<String>)>,
@@ -72,6 +73,7 @@ impl RetrievalParams {
             relevance_weight_path_coherence: 0.05,
             relevance_weight_community: 0.15,
             relevance_weight_cross_note: 0.10,
+            relevance_weight_recall_support: 0.08,
             scope_chain: Vec::new(),
         }
     }
@@ -113,6 +115,7 @@ pub async fn retrieve_relevant_facts(
         path_coherence: params.relevance_weight_path_coherence,
         community: params.relevance_weight_community,
         cross_note: params.relevance_weight_cross_note,
+        recall_support: params.relevance_weight_recall_support,
     };
 
     debug!(
@@ -294,6 +297,7 @@ async fn vector_path(
         };
         let cross_note = scoring::convergence_score(&fact);
         // community_score (co-activation) computed in second pass
+        // recall_support computed post-hoc in UnifiedMemoryService
         let score = relevance_score(
             similarity,
             r,
@@ -305,6 +309,7 @@ async fn vector_path(
             0.5,
             0.0,
             cross_note,
+            0.0,
             weights,
         );
         scored.push(ScoredFact {
@@ -353,6 +358,7 @@ async fn fallback_path(
         };
         let cross_note = scoring::convergence_score(&fact);
         // community_score (co-activation) computed in second pass
+        // recall_support computed post-hoc in UnifiedMemoryService
         let score = relevance_score(
             0.5,
             r,
@@ -364,6 +370,7 @@ async fn fallback_path(
             0.5,
             0.0,
             cross_note,
+            0.0,
             weights,
         );
         scored.push(ScoredFact {

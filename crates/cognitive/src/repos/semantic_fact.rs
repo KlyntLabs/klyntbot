@@ -2,6 +2,7 @@
 
 use sqlx::SqlitePool;
 
+use crate::repos::fact_changelog::FactChangelogRepo;
 use crate::types::SemanticFact;
 
 /// Per-domain fact health statistics for the Knowledge Trust score.
@@ -35,11 +36,20 @@ impl DomainHealthRow {
 #[derive(Debug, Clone)]
 pub struct SemanticFactRepo {
     pool: SqlitePool,
+    changelog: Option<FactChangelogRepo>,
 }
 
 impl SemanticFactRepo {
     pub fn new(pool: SqlitePool) -> Self {
-        Self { pool }
+        Self {
+            pool,
+            changelog: None,
+        }
+    }
+
+    pub fn with_changelog(mut self, changelog: FactChangelogRepo) -> Self {
+        self.changelog = Some(changelog);
+        self
     }
 
     /// Access the underlying pool (needed by sibling repos in the same service).
@@ -99,6 +109,19 @@ impl SemanticFactRepo {
         .bind(&fact.scope_id)
         .execute(&self.pool)
         .await?;
+        if let Some(ref cl) = self.changelog {
+            let spo = format!("{} {} {}", fact.subject, fact.predicate, fact.object);
+            let _ = cl
+                .record(
+                    &fact.id,
+                    super::fact_changelog::FactChangeType::Create,
+                    None,
+                    None,
+                    Some(&spo),
+                    Some(&fact.source),
+                )
+                .await;
+        }
         Ok(())
     }
 
@@ -222,6 +245,18 @@ impl SemanticFactRepo {
         .bind(new_id)
         .execute(&self.pool)
         .await?;
+        if let Some(ref cl) = self.changelog {
+            let _ = cl
+                .record(
+                    old_id,
+                    super::fact_changelog::FactChangeType::Supersede,
+                    Some("superseded_by"),
+                    None,
+                    Some(new_id),
+                    None,
+                )
+                .await;
+        }
         Ok(())
     }
 

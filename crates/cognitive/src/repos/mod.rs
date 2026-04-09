@@ -9,6 +9,7 @@ pub mod deck_preference;
 pub mod entity;
 pub mod episodic_memory;
 pub mod event_log;
+pub mod fact_changelog;
 pub mod failed_observation;
 pub mod flashcard;
 pub mod gt_link;
@@ -38,6 +39,7 @@ pub use entity::{
 };
 pub use episodic_memory::EpisodicMemoryRepo;
 pub use event_log::EventLogRepo;
+pub use fact_changelog::FactChangelogRepo;
 pub use failed_observation::FailedObservationRepo;
 pub use flashcard::{
     CardType, DeckSummary, FlashcardRepo, FlashcardRow, NewFlashcard, ReviewLogEntry, ReviewQuality,
@@ -86,15 +88,14 @@ pub fn cognitive_migrations() -> Vec<FeatureMigration> {
     vec![
         FeatureMigration {
             feature_name: "cognitive".to_string(),
-            version: 15,
-            description: "Cognitive tables + squads + scope columns + persona skill fields + blackboard + persona accuracy + coaching intervention log + knowledge atoms + atom extraction cache + action_url on coaching_intervention_log + active recall (deck_preferences, review_sessions, flashcard new columns) + co_activation"
-                .to_string(),
+            version: 1,
+            description: "Core cognitive tables".to_string(),
             sql: include_str!("../../migrations/001_cognitive_tables.sql").to_string(),
         },
         FeatureMigration {
-            feature_name: "cognitive".to_string(),
-            version: 7,
-            description: "Add BookIndex tree nodes and GT-Link tables".to_string(),
+            feature_name: "cognitive_book_index".to_string(),
+            version: 1,
+            description: "BookIndex tree nodes and GT-Link tables".to_string(),
             sql: include_str!("../../migrations/002_book_index_tables.sql").to_string(),
         },
         FeatureMigration {
@@ -105,8 +106,8 @@ pub fn cognitive_migrations() -> Vec<FeatureMigration> {
         },
         FeatureMigration {
             feature_name: "cognitive_mirror".to_string(),
-            version: 4,
-            description: "Mirror Phase 1-4 tables (routing snapshots, trend narratives, snippets, meta_rules, brain_versions, trial_previews)"
+            version: 1,
+            description: "Mirror tables (routing snapshots, trend narratives, snippets, meta_rules, brain_versions, trial_previews)"
                 .to_string(),
             sql: include_str!("../../migrations/003_mirror_tables.sql").to_string(),
         },

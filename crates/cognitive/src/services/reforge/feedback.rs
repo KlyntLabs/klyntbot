@@ -171,14 +171,13 @@ pub async fn load_graph_health(
     rule_repo: &crate::repos::ProceduralRuleRepo,
     co_activation_repo: &crate::repos::CoActivationRepo,
 ) -> GraphHealthMetrics {
-    let (active_facts, active_rules, co_activation_pairs, facts_per_domain, avg_fact_stability) =
-        tokio::join!(
-            fact_repo.count_active(),
-            rule_repo.count_all_active(),
-            co_activation_repo.count_all(),
-            fact_repo.count_by_domain(),
-            fact_repo.avg_stability(),
-        );
+    let (active_facts, active_rules, co_activation_pairs, facts_per_domain, avg_fact_stability) = tokio::join!(
+        fact_repo.count_active(),
+        rule_repo.count_all_active(),
+        co_activation_repo.count_all(),
+        fact_repo.count_by_domain(),
+        fact_repo.avg_stability(),
+    );
 
     GraphHealthMetrics {
         active_facts: active_facts.unwrap_or(0) as u32,

@@ -21,4 +21,4 @@ pub use consolidator::{
 pub use recall_collector::RecallCollector;
 pub use session_collector::SessionCollector;
 pub use signal::{CognitiveSignal, SignalContext, SignalSource};
-pub use writer::execute_promotions;
+pub use writer::{execute_promotions, persist_entities};

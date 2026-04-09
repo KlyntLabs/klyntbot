@@ -137,3 +137,52 @@ pub async fn execute_promotions(
     }
     info!("Writer: {facts} facts, {rules} rules, {episodes} episodes");
 }
+
+/// Persist extracted entities and relationships via EntityRepo.
+///
+/// Upserts entities (deduplicating by name+type), then upserts relationships
+/// between resolved entities. Failures are logged and skipped (non-fatal).
+pub async fn persist_entities(
+    entity_repo: &crate::repos::EntityRepo,
+    entities: &[crate::extraction::ExtractedEntity],
+    relationships: &[crate::extraction::ExtractedRelationship],
+) {
+    use std::collections::HashMap;
+
+    let mut name_to_id: HashMap<String, String> = HashMap::new();
+    for entity in entities {
+        let new_entity = crate::repos::entity::NewEntity {
+            name: entity.name.clone(),
+            entity_type: entity.entity_type.clone(),
+            description: entity.description.clone(),
+            source: "extracted".to_string(),
+            source_id: None,
+            metadata: None,
+        };
+        match entity_repo.upsert_entity(&new_entity).await {
+            Ok(row) => {
+                name_to_id.insert(entity.name.to_lowercase(), row.id);
+            }
+            Err(e) => {
+                debug!("Failed to upsert entity '{}': {e}", entity.name);
+            }
+        }
+    }
+
+    for rel in relationships {
+        let source_id = name_to_id.get(&rel.source_name.to_lowercase());
+        let target_id = name_to_id.get(&rel.target_name.to_lowercase());
+        if let (Some(src), Some(tgt)) = (source_id, target_id) {
+            let new_rel = crate::repos::entity::NewRelationship {
+                source_entity_id: src.clone(),
+                target_entity_id: tgt.clone(),
+                relationship_type: rel.relationship_type.clone(),
+                evidence: None,
+                source: "extracted".to_string(),
+            };
+            if let Err(e) = entity_repo.upsert_relationship(&new_rel).await {
+                debug!("Failed to upsert relationship: {e}");
+            }
+        }
+    }
+}

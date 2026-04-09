@@ -576,7 +576,10 @@ fn register_cron_callbacks(
                         {
                             Some(result) => {
                                 // Clean up old suggestions (90 day retention)
-                                if let Err(e) = suggestion_repo.delete_older_than(90, chrono::Utc::now()).await {
+                                if let Err(e) = suggestion_repo
+                                    .delete_older_than(90, chrono::Utc::now())
+                                    .await
+                                {
                                     tracing::warn!("Reforge: failed to clean up suggestions: {e}");
                                 }
                                 info!(

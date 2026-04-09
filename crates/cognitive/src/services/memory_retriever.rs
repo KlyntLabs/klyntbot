@@ -171,6 +171,7 @@ impl UnifiedMemoryService {
             relevance_weight_path_coherence: self.config.relevance_weight_path_coherence,
             relevance_weight_community: self.config.relevance_weight_community,
             relevance_weight_cross_note: self.config.relevance_weight_cross_note,
+            relevance_weight_recall_support: self.config.relevance_weight_recall_support,
             scope_chain,
         };
 
@@ -188,6 +189,7 @@ impl UnifiedMemoryService {
                 self.config.relevance_weight_path_coherence,
                 self.config.relevance_weight_community,
                 self.config.relevance_weight_cross_note,
+                self.config.relevance_weight_recall_support,
             ];
             let w = champion.resolve_full_relevance_weights(&defaults);
             params.relevance_weight_semantic = w[0];
@@ -200,6 +202,7 @@ impl UnifiedMemoryService {
             params.relevance_weight_path_coherence = w[7];
             params.relevance_weight_community = w[8];
             params.relevance_weight_cross_note = w[9];
+            params.relevance_weight_recall_support = w[10];
         }
 
         params
@@ -331,7 +334,7 @@ impl UnifiedMemoryService {
         query: &str,
         vector_top_k: usize,
         min_similarity: f64,
-        relevance_weights: [f64; 10],
+        relevance_weights: [f64; 11],
     ) -> common::Result<Vec<ScoredFact>> {
         if !self.config.dynamic_facts_enabled || query.is_empty() {
             return Ok(Vec::new());
@@ -354,6 +357,7 @@ impl UnifiedMemoryService {
             relevance_weight_path_coherence: relevance_weights[7],
             relevance_weight_community: relevance_weights[8],
             relevance_weight_cross_note: relevance_weights[9],
+            relevance_weight_recall_support: relevance_weights[10],
             scope_chain: Vec::new(),
         };
 
@@ -449,11 +453,27 @@ impl UnifiedMemoryService {
 impl MemoryRetriever for UnifiedMemoryService {
     async fn retrieve(&self, query: &str, limit: usize) -> Vec<MemoryEntry> {
         // 1. Fetch concurrently
-        let (facts_raw, recalls_raw, episodes_raw) = tokio::join!(
+        let (mut facts_raw, recalls_raw, episodes_raw) = tokio::join!(
             self.fetch_facts(query, limit),
             self.fetch_recalls(query, limit),
             self.fetch_episodes(query, 5)
         );
+
+        // Cross-retrieval: boost facts corroborated by conversation evidence
+        if !recalls_raw.is_empty() && !facts_raw.is_empty() {
+            let weight = self.config.relevance_weight_recall_support;
+            if weight > 0.0 {
+                let recall_texts: Vec<&str> =
+                    recalls_raw.iter().map(|(_, _, c)| c.as_str()).collect();
+                for (_, score, content, _) in &mut facts_raw {
+                    let support = recall_support_score(content, &recall_texts);
+                    *score += support * weight;
+                }
+                // Re-sort after boosting
+                facts_raw
+                    .sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
+            }
+        }
 
         if facts_raw.is_empty() && recalls_raw.is_empty() && episodes_raw.is_empty() {
             return Vec::new();
@@ -590,6 +610,26 @@ fn content_overlaps(recall_content: &str, fact_predicates: &HashSet<String>) -> 
         pred.split('_')
             .all(|word| !word.is_empty() && recall_lower.contains(word))
     })
+}
+
+/// Compute recall support score for a fact based on conversation evidence.
+///
+/// Returns the best Jaccard word-overlap between the fact's content and any
+/// conversation recall snippet, scaled to [0.0, 1.0]. Jaccard >= 0.50 saturates at 1.0.
+fn recall_support_score(fact_content: &str, recall_contents: &[&str]) -> f64 {
+    use crate::repos::procedural_rule::word_overlap_ratio;
+
+    if recall_contents.is_empty() {
+        return 0.0;
+    }
+
+    let best = recall_contents
+        .iter()
+        .map(|recall| word_overlap_ratio(fact_content, recall))
+        .fold(0.0_f64, f64::max);
+
+    // Jaccard >= 0.50 saturates at 1.0; below 0.15 yields 0.0
+    ((best - 0.15) / 0.35).clamp(0.0, 1.0)
 }
 
 /// Heuristically detect which facts the LLM referenced in its response.
@@ -778,5 +818,43 @@ mod tests {
         assert!(referenced.contains(&"f2".to_string()));
         // "afternoon" and "breaks" don't appear
         assert!(!referenced.contains(&"f3".to_string()));
+    }
+
+    #[test]
+    fn test_recall_support_score_no_recalls() {
+        assert_eq!(recall_support_score("user peak hours 10am", &[]), 0.0);
+    }
+
+    #[test]
+    fn test_recall_support_score_strong_overlap() {
+        let fact = "user prefers peak hours between 10am and 12pm";
+        let recalls = &["user mentioned peak hours are between 10am and 12pm"];
+        let score = recall_support_score(fact, recalls);
+        assert!(
+            score > 0.3,
+            "Strong overlap should give high support, got {score}"
+        );
+    }
+
+    #[test]
+    fn test_recall_support_score_no_overlap() {
+        let fact = "user prefers peak hours between 10am and 12pm";
+        let recalls = &["schedule the deployment for Friday afternoon"];
+        let score = recall_support_score(fact, recalls);
+        assert!(
+            score < 0.1,
+            "No overlap should give near-zero support, got {score}"
+        );
+    }
+
+    #[test]
+    fn test_recall_support_score_partial_overlap() {
+        let fact = "user favorite language rust for backend";
+        let recalls = &["started learning rust for backend development recently"];
+        let score = recall_support_score(fact, recalls);
+        assert!(
+            score > 0.0,
+            "Partial overlap should give some support, got {score}"
+        );
     }
 }

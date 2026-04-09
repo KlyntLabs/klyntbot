@@ -89,6 +89,8 @@ impl HeuristicExtractionHandler {
         cognitive::BatchExtractionResult {
             extractions,
             fallback_indices: Vec::new(), // Heuristic IS the fallback
+            entities: Vec::new(),
+            relationships: Vec::new(),
         }
     }
 }
@@ -183,8 +185,12 @@ Rules:\n\
 - Questions (e.g., 'What is my name?') are NOT facts — return empty array for questions\n\
 - Be specific in predicates — use snake_case names like \"name\", \"occupation\", \"favorite_language\"\n\
 - Be concise in objects — just the value, not the full sentence\n\n\
+Additionally, extract named entities (people, organizations, projects, technologies, places) \
+and relationships between them. Only extract entities that are explicitly mentioned — do not infer.\n\n\
 Respond with JSON in this exact format:\n\
-{\"facts\": [{\"domain\": \"identity\", \"subject\": \"user\", \"predicate\": \"name\", \"object\": \"Jayden\", \"confidence\": 1.0, \"source\": \"user_stated\"}]}";
+{\"facts\": [{\"domain\": \"identity\", \"subject\": \"user\", \"predicate\": \"name\", \"object\": \"Jayden\", \"confidence\": 1.0, \"source\": \"user_stated\"}], \
+\"entities\": [{\"name\": \"Klynt\", \"type\": \"project\", \"description\": \"AI assistant project\"}], \
+\"relationships\": [{\"source\": \"Jayden\", \"target\": \"Klynt\", \"type\": \"works_on\"}]}";
 
 /// LLM-backed fact extraction with heuristic fallback.
 pub struct LlmExtractionHandler {
@@ -212,6 +218,10 @@ struct BatchExtractionLlmResult {
 struct ObservationExtraction {
     observation_index: usize,
     facts: Vec<ExtractedFactJson>,
+    #[serde(default)]
+    entities: Vec<ExtractedEntityJson>,
+    #[serde(default)]
+    relationships: Vec<ExtractedRelationshipJson>,
 }
 
 #[derive(serde::Deserialize)]
@@ -222,6 +232,23 @@ struct ExtractedFactJson {
     object: String,
     confidence: f64,
     source: String,
+}
+
+#[derive(serde::Deserialize)]
+struct ExtractedEntityJson {
+    name: String,
+    #[serde(rename = "type")]
+    entity_type: String,
+    #[serde(default)]
+    description: Option<String>,
+}
+
+#[derive(serde::Deserialize)]
+struct ExtractedRelationshipJson {
+    source: String,
+    target: String,
+    #[serde(rename = "type")]
+    relationship_type: String,
 }
 
 impl LlmExtractionHandler {
@@ -243,6 +270,8 @@ impl ExtractionHandler for LlmExtractionHandler {
             return Ok(cognitive::BatchExtractionResult {
                 extractions: Vec::new(),
                 fallback_indices: Vec::new(),
+                entities: Vec::new(),
+                relationships: Vec::new(),
             });
         }
 
@@ -276,29 +305,50 @@ impl ExtractionHandler for LlmExtractionHandler {
                 let content = response.content.unwrap_or_default();
                 match serde_json::from_str::<BatchExtractionLlmResult>(&content) {
                     Ok(result) => {
+                        let mut entities = Vec::new();
+                        let mut relationships = Vec::new();
                         let extractions = result
                             .results
                             .into_iter()
                             .filter(|r| r.observation_index > 0) // skip invalid 0 indices (prompt is 1-based)
-                            .map(|r| cognitive::BatchExtraction {
-                                observation_index: r.observation_index - 1, // 1-based to 0-based
-                                facts: r
-                                    .facts
-                                    .into_iter()
-                                    .map(|f| ExtractedFact {
-                                        domain: f.domain,
-                                        subject: f.subject,
-                                        predicate: f.predicate,
-                                        object: f.object,
-                                        confidence: f.confidence,
-                                        source: f.source,
-                                    })
-                                    .collect(),
+                            .map(|r| {
+                                // Aggregate entities and relationships from each observation
+                                for e in &r.entities {
+                                    entities.push(cognitive::ExtractedEntity {
+                                        name: e.name.clone(),
+                                        entity_type: e.entity_type.clone(),
+                                        description: e.description.clone(),
+                                    });
+                                }
+                                for rel in &r.relationships {
+                                    relationships.push(cognitive::ExtractedRelationship {
+                                        source_name: rel.source.clone(),
+                                        target_name: rel.target.clone(),
+                                        relationship_type: rel.relationship_type.clone(),
+                                    });
+                                }
+                                cognitive::BatchExtraction {
+                                    observation_index: r.observation_index - 1, // 1-based to 0-based
+                                    facts: r
+                                        .facts
+                                        .into_iter()
+                                        .map(|f| ExtractedFact {
+                                            domain: f.domain,
+                                            subject: f.subject,
+                                            predicate: f.predicate,
+                                            object: f.object,
+                                            confidence: f.confidence,
+                                            source: f.source,
+                                        })
+                                        .collect(),
+                                }
                             })
                             .collect();
                         Ok(cognitive::BatchExtractionResult {
                             extractions,
                             fallback_indices: Vec::new(),
+                            entities,
+                            relationships,
                         })
                     }
                     Err(e) => {

@@ -700,3 +700,22 @@ CREATE TABLE IF NOT EXISTS co_activation (
 );
 CREATE INDEX IF NOT EXISTS idx_co_activation_a ON co_activation(fact_id_a);
 CREATE INDEX IF NOT EXISTS idx_co_activation_b ON co_activation(fact_id_b);
+
+-- Temporal fact changelog: append-only log of every fact mutation.
+-- Audit trail for Reforge analysis and debugging. Pruned by cron.
+CREATE TABLE IF NOT EXISTS fact_changelog (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    fact_id TEXT NOT NULL,
+    change_type TEXT NOT NULL,
+    field_changed TEXT,
+    old_value TEXT,
+    new_value TEXT,
+    source TEXT,
+    changed_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE INDEX IF NOT EXISTS idx_fact_changelog_fact_id
+    ON fact_changelog(fact_id, changed_at);
+
+CREATE INDEX IF NOT EXISTS idx_fact_changelog_type
+    ON fact_changelog(change_type, changed_at);

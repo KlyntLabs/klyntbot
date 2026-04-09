@@ -63,6 +63,9 @@ pub struct TrialParams {
     pub relevance_weight_cross_note: Option<f64>,
     pub community_top_k: Option<usize>,
     pub community_min_similarity: Option<f64>,
+
+    // Phase 6: Recall support
+    pub relevance_weight_recall_support: Option<f64>,
 }
 
 impl TrialParams {
@@ -87,10 +90,10 @@ impl TrialParams {
         }
     }
 
-    /// Resolve all 10 relevance weights to a normalized array that sums to 1.0.
+    /// Resolve all 11 relevance weights to a normalized array that sums to 1.0.
     /// Returns [semantic, retrievability, importance, frequency, situation, temporal,
-    ///          hierarchy, path_coherence, community, cross_note].
-    pub fn resolve_full_relevance_weights(&self, defaults: &[f64; 10]) -> [f64; 10] {
+    ///          hierarchy, path_coherence, community, cross_note, recall_support].
+    pub fn resolve_full_relevance_weights(&self, defaults: &[f64; 11]) -> [f64; 11] {
         let raw = [
             self.relevance_weight_semantic.unwrap_or(defaults[0]),
             self.relevance_weight_retrievability.unwrap_or(defaults[1]),
@@ -102,6 +105,7 @@ impl TrialParams {
             self.relevance_weight_path_coherence.unwrap_or(defaults[7]),
             self.relevance_weight_community.unwrap_or(defaults[8]),
             self.relevance_weight_cross_note.unwrap_or(defaults[9]),
+            self.relevance_weight_recall_support.unwrap_or(defaults[10]),
         ];
         let sum: f64 = raw.iter().sum();
         if sum > 0.0 {
@@ -229,12 +233,14 @@ mod tests {
             relevance_weight_community: Some(0.25),
             ..Default::default()
         };
-        let defaults = [0.20, 0.10, 0.08, 0.05, 0.15, 0.02, 0.10, 0.05, 0.15, 0.10];
+        let defaults = [
+            0.20, 0.10, 0.08, 0.05, 0.15, 0.02, 0.10, 0.05, 0.15, 0.10, 0.08,
+        ];
         let weights = params.resolve_full_relevance_weights(&defaults);
         let sum: f64 = weights.iter().sum();
         assert!(
             (sum - 1.0).abs() < 1e-10,
-            "All 10 weights must sum to 1.0, got {sum}"
+            "All 11 weights must sum to 1.0, got {sum}"
         );
     }
 }
