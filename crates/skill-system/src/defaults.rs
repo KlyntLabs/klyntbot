@@ -62,9 +62,7 @@ pub fn compiled_skill_defaults() -> HashMap<String, Vec<(&'static str, &'static 
             ),
             (
                 "references/portfolio-analysis.md",
-                include_str!(
-                    "../../../skills/finance-management/references/portfolio-analysis.md"
-                ),
+                include_str!("../../../skills/finance-management/references/portfolio-analysis.md"),
             ),
             (
                 "references/spending-intelligence.md",
