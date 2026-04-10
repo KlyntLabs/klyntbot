@@ -49,8 +49,5 @@
 - **Impact**: Auditability — trace source confidence chains
 - **Details**: `fact_changelog` exists for mutations. Missing: full provenance chain (conversation → extraction → consolidation → promotion → usage in decision).
 
-### 7. Co-Activation Expiration
-- **Status**: PARTIAL
-- **Effort**: Small
-- **Impact**: Prevent stale Hebbian pairs from accumulating
-- **Details**: `decay_all()` exists and runs nightly. Missing: age-based pruning for pairs with `last_fired` older than N days regardless of strength.
+### ~~7. Co-Activation Expiration~~ DONE
+- `expire_stale(90 days)` added to `CoActivationRepo`, wired into compaction step 8a (runs every cycle, before weekly decay).

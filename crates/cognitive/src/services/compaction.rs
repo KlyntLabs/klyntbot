@@ -37,6 +37,8 @@ const SESSION_MEMORY_MAX_DAYS: i64 = 90;
 const CO_ACTIVATION_DECAY_FACTOR: f64 = 0.95;
 /// Minimum co-activation strength to survive pruning.
 const CO_ACTIVATION_MIN_STRENGTH: f64 = 0.1;
+/// Delete co-activation pairs not fired in this many days, regardless of strength.
+const CO_ACTIVATION_MAX_AGE_DAYS: i64 = 90;
 
 /// Result of a compaction run.
 #[derive(Debug, Clone, Default)]
@@ -49,6 +51,7 @@ pub struct CompactionResult {
     pub failed_obs_deleted: u64,
     pub session_memory_deleted: u64,
     pub co_activation_pruned: u64,
+    pub co_activation_expired: u64,
 }
 
 /// Run the full compaction cycle.
@@ -104,8 +107,16 @@ pub async fn run_compaction(
         }
     }
 
-    // 8. Weekly co-activation decay (Sundays only)
+    // 8. Co-activation maintenance
     if let Some(ca) = co_activation_repo {
+        // 8a. Expire stale pairs (runs every cycle)
+        let expired = ca.expire_stale(CO_ACTIVATION_MAX_AGE_DAYS).await?;
+        result.co_activation_expired = expired;
+        if expired > 0 {
+            info!("Compaction: expired {expired} stale co-activation pairs (>{CO_ACTIVATION_MAX_AGE_DAYS}d)");
+        }
+
+        // 8b. Weekly strength decay (Sundays only)
         if chrono::Utc::now().weekday() == chrono::Weekday::Sun {
             let pruned = ca
                 .decay_all(CO_ACTIVATION_DECAY_FACTOR, CO_ACTIVATION_MIN_STRENGTH)

@@ -78,6 +78,18 @@ impl CoActivationRepo {
         Ok(total)
     }
 
+    /// Delete pairs whose `last_fired` is older than `max_age_days`, regardless of strength.
+    pub async fn expire_stale(&self, max_age_days: i64) -> Result<u64, sqlx::Error> {
+        let result = sqlx::query(
+            "DELETE FROM co_activation \
+             WHERE julianday('now') - julianday(last_fired) > ?1",
+        )
+        .bind(max_age_days)
+        .execute(&self.pool)
+        .await?;
+        Ok(result.rows_affected())
+    }
+
     /// Multiply all strengths by `factor` and delete pairs below `min_strength`.
     pub async fn decay_all(&self, factor: f64, min_strength: f64) -> Result<u64, sqlx::Error> {
         sqlx::query("UPDATE co_activation SET strength = strength * ?1")
@@ -170,6 +182,36 @@ mod tests {
         repo.record_co_retrieval(&["only_one".into()])
             .await
             .unwrap();
+        assert_eq!(repo.count_all().await.unwrap(), 0);
+    }
+
+    #[tokio::test]
+    async fn test_expire_stale_keeps_recent() {
+        let pool = cognitive_test_pool().await;
+        let repo = CoActivationRepo::new(pool);
+        repo.record_co_retrieval(&["a".into(), "b".into()])
+            .await
+            .unwrap();
+        // Just created — should not expire with a 90-day window
+        let expired = repo.expire_stale(90).await.unwrap();
+        assert_eq!(expired, 0);
+        assert_eq!(repo.count_all().await.unwrap(), 1);
+    }
+
+    #[tokio::test]
+    async fn test_expire_stale_removes_old() {
+        let pool = cognitive_test_pool().await;
+        let repo = CoActivationRepo::new(pool.clone());
+        repo.record_co_retrieval(&["a".into(), "b".into()])
+            .await
+            .unwrap();
+        // Backdate last_fired to 100 days ago
+        sqlx::query("UPDATE co_activation SET last_fired = datetime('now', '-100 days')")
+            .execute(&pool)
+            .await
+            .unwrap();
+        let expired = repo.expire_stale(90).await.unwrap();
+        assert_eq!(expired, 1);
         assert_eq!(repo.count_all().await.unwrap(), 0);
     }
 }
