@@ -64,6 +64,8 @@ pub struct AgentRuntime {
     context_update_queue: Option<Arc<bus::ContextUpdateQueue>>,
     memory_service: Option<Arc<cognitive::UnifiedMemoryService>>,
     feedback_repo: Option<storage::RetrievalFeedbackRepo>,
+    strategy_repo: Option<storage::StrategyRepo>,
+    warning_repo: Option<storage::ResponseWarningRepo>,
 }
 
 impl AgentRuntime {
@@ -93,6 +95,8 @@ impl AgentRuntime {
             context_update_queue: None,
             memory_service: None,
             feedback_repo: None,
+            strategy_repo: None,
+            warning_repo: None,
         }
     }
 
@@ -160,6 +164,16 @@ impl AgentRuntime {
         self
     }
 
+    pub fn with_strategy_repo(mut self, repo: storage::StrategyRepo) -> Self {
+        self.strategy_repo = Some(repo);
+        self
+    }
+
+    pub fn with_warning_repo(mut self, repo: storage::ResponseWarningRepo) -> Self {
+        self.warning_repo = Some(repo);
+        self
+    }
+
     // ── Accessors ───────────────────────────────────────────────
 
     pub fn tool_registry(&self) -> Option<&Arc<RwLock<tools::registry::ToolRegistry>>> {
@@ -207,11 +221,14 @@ impl AgentRuntime {
         let assembled = self.context_engine.assemble(context_request).await;
         let assemble_ms = assemble_start.elapsed().as_millis() as u64;
 
+        let context_fill_tokens = assembled.token_count;
+        let context_fill_budget = self.context_window;
+
         if let Some(ref tx) = event_tx {
             let _ = tx
                 .send(AgentEvent::ContextAssembled {
-                    total_tokens: assembled.token_count,
-                    budget: self.context_window,
+                    total_tokens: context_fill_tokens,
+                    budget: context_fill_budget,
                     duration_ms: assemble_ms,
                 })
                 .await;
@@ -313,6 +330,76 @@ impl AgentRuntime {
                 pipeline_elapsed_ms,
             )
             .await;
+        }
+
+        // Persist strategy record + validation warnings (fire-and-forget, off hot path)
+        if let Some(ref strategy_repo) = self.strategy_repo {
+            let strategy_repo = strategy_repo.clone();
+            let warning_repo = self.warning_repo.clone();
+            let chat_id = ctx.chat_id.to_string();
+            let budget_exhausted = loop_result.budget_exhausted;
+            let turns = loop_result.turns;
+            let tool_calls = loop_result.tool_calls.clone();
+            let mode = mode_name.clone();
+            let warnings = validation.warnings.clone();
+            let context_fill_pct =
+                Some(context_fill_tokens as f64 / context_fill_budget as f64 * 100.0);
+
+            tokio::spawn(async move {
+                let request_id = uuid::Uuid::new_v4().to_string();
+                let row = storage::StrategyRecordRow {
+                    id: uuid::Uuid::new_v4(),
+                    timestamp: chrono::Utc::now(),
+                    request_id: request_id.clone(),
+                    predicted_strategy: mode.clone(),
+                    actual_strategy: mode.clone(),
+                    escalation_count: 0,
+                    iterations_used: turns as i32,
+                    max_iterations: 0,
+                    success: !budget_exhausted,
+                    user_satisfaction: None,
+                    response_time_ms: pipeline_elapsed_ms as i64,
+                    chat_id: Some(chat_id.clone()),
+                    tool_name: tool_calls.first().cloned(),
+                    tool_success: None,
+                    tool_duration_ms: None,
+                    complexity_signals: serde_json::json!({}),
+                    execution_mode: Some(mode),
+                    retrieved_memory_count: None,
+                    rewrite_triggered: 0,
+                    rewrite_source: None,
+                    budget_exhausted,
+                    turns_used: turns as i32,
+                    loop_detected: false,
+                    loop_tools: None,
+                    context_fill_pct,
+                };
+                if let Err(e) = strategy_repo.create(&row).await {
+                    tracing::debug!("Failed to record strategy: {e}");
+                }
+
+                if let Some(ref warning_repo) = warning_repo {
+                    for warning in &warnings {
+                        let (wtype, detail) = match warning {
+                            crate::output::validator::ValidationWarning::LengthTruncated {
+                                original_chars,
+                            } => (
+                                "length_truncated",
+                                Some(format!("original_chars={original_chars}")),
+                            ),
+                            crate::output::validator::ValidationWarning::PotentialSystemLeak {
+                                pattern,
+                            } => ("system_leak", Some(pattern.clone())),
+                            crate::output::validator::ValidationWarning::LowQuality { reason } => {
+                                ("low_quality", Some(reason.clone()))
+                            }
+                        };
+                        let _ = warning_repo
+                            .insert(&request_id, wtype, detail.as_deref(), Some(&chat_id))
+                            .await;
+                    }
+                }
+            });
         }
 
         let final_content = std::mem::take(&mut validation.filtered_content);

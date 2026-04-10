@@ -47,6 +47,8 @@ CREATE TABLE IF NOT EXISTS autotuner_shadow_log (
     control_orchestrator       TEXT    NOT NULL,
     control_mode               TEXT    NOT NULL,
     user_corrected             INTEGER NOT NULL DEFAULT 0,
+    tokens_used                INTEGER,
+    response_time_ms           INTEGER,
     created_at                 TEXT    NOT NULL DEFAULT (datetime('now'))
 );
 
@@ -283,6 +285,30 @@ impl TrialRepo {
         .bind(control_mode)
         .bind(chat_id)
         .bind(message_id)
+        .execute(&self.pool)
+        .await?;
+        Ok(())
+    }
+
+    /// Update the most recent shadow log entry for a chat with execution metrics.
+    pub async fn update_shadow_log_metrics(
+        &self,
+        chat_id: &str,
+        tokens_used: u32,
+        response_time_ms: u64,
+    ) -> Result<(), sqlx::Error> {
+        sqlx::query(
+            "UPDATE autotuner_shadow_log
+             SET tokens_used = ?1, response_time_ms = ?2
+             WHERE id = (
+                 SELECT id FROM autotuner_shadow_log
+                 WHERE chat_id = ?3
+                 ORDER BY created_at DESC LIMIT 1
+             )",
+        )
+        .bind(tokens_used as i64)
+        .bind(response_time_ms as i64)
+        .bind(chat_id)
         .execute(&self.pool)
         .await?;
         Ok(())

@@ -120,6 +120,18 @@ impl AccumulatedObservationRepo {
         Ok(result.rows_affected())
     }
 
+    /// Increment the near-miss counter for a given event type key.
+    pub async fn increment_near_miss(&self, key: &str) -> Result<(), sqlx::Error> {
+        sqlx::query(
+            "UPDATE accumulated_observations SET near_miss_count = near_miss_count + 1
+             WHERE event_type_key = ?1",
+        )
+        .bind(key)
+        .execute(&self.pool)
+        .await?;
+        Ok(())
+    }
+
     /// Delete all observations for an event type (after promotion).
     pub async fn delete_by_key(&self, event_type_key: &str) {
         if let Err(e) =

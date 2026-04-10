@@ -210,6 +210,88 @@ pub async fn load_previous_suggestions(
     }
 }
 
+/// Load runtime signal summaries from strategy_records since last run.
+pub async fn load_runtime_signals(
+    pool: &sqlx::SqlitePool,
+    since: &str,
+) -> super::types::RuntimeSignalSummary {
+    let row: Option<(i64, f64, i64, f64)> = sqlx::query_as(
+        "SELECT
+            COALESCE(SUM(CASE WHEN budget_exhausted = 1 THEN 1 ELSE 0 END), 0),
+            COALESCE(AVG(turns_used), 0),
+            COALESCE(SUM(CASE WHEN loop_detected = 1 THEN 1 ELSE 0 END), 0),
+            COALESCE(AVG(context_fill_pct), 0)
+         FROM strategy_records WHERE timestamp > ?1",
+    )
+    .bind(since)
+    .fetch_optional(pool)
+    .await
+    .ok()
+    .flatten();
+
+    match row {
+        Some((exhaustions, avg_turns, loops, fill)) => super::types::RuntimeSignalSummary {
+            budget_exhaustions: exhaustions as u32,
+            avg_turns,
+            loop_detections: loops as u32,
+            avg_context_fill_pct: fill,
+        },
+        None => super::types::RuntimeSignalSummary::default(),
+    }
+}
+
+/// Load validation warning counts since last run.
+pub async fn load_validation_warnings(pool: &sqlx::SqlitePool, since: &str) -> Vec<(String, i64)> {
+    sqlx::query_as(
+        "SELECT warning_type, COUNT(*) FROM response_warnings
+         WHERE created_at > ?1 GROUP BY warning_type",
+    )
+    .bind(since)
+    .fetch_all(pool)
+    .await
+    .unwrap_or_default()
+}
+
+/// Load near-miss accumulation count.
+pub async fn load_near_miss_count(pool: &sqlx::SqlitePool) -> u32 {
+    let row: Option<(i64,)> = sqlx::query_as(
+        "SELECT COALESCE(SUM(near_miss_count), 0) FROM accumulated_observations WHERE near_miss_count > 0",
+    )
+    .fetch_optional(pool)
+    .await
+    .ok()
+    .flatten();
+    row.map(|r| r.0 as u32).unwrap_or(0)
+}
+
+/// Load coaching behavioral outcome summary.
+pub async fn load_coaching_behavioral(
+    pool: &sqlx::SqlitePool,
+) -> Option<super::types::CoachingBehavioralSummary> {
+    let row: Option<(i64, i64, i64, i64)> = sqlx::query_as(
+        "SELECT COALESCE(SUM(behavioral_positive), 0), COALESCE(SUM(behavioral_negative), 0),
+                COALESCE(SUM(times_accepted), 0), COALESCE(SUM(times_used), 0)
+         FROM coaching_strategies",
+    )
+    .fetch_optional(pool)
+    .await
+    .ok()
+    .flatten();
+
+    row.map(|(pos, neg, accepted, used)| {
+        let acceptance_rate = if used > 0 {
+            accepted as f64 / used as f64
+        } else {
+            0.0
+        };
+        super::types::CoachingBehavioralSummary {
+            total_positive: pos as u32,
+            total_negative: neg as u32,
+            acceptance_rate,
+        }
+    })
+}
+
 /// Load extraction yield by domain from pipeline_event_log.
 pub async fn load_extraction_yield(
     event_log_repo: &crate::repos::EventLogRepo,

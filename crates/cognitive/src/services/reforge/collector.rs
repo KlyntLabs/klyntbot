@@ -314,6 +314,8 @@ pub async fn collect(
         "Reforge collector: gathered inputs"
     );
 
+    let feedback_pool = feedback_sources.and_then(|f| f.pool);
+
     let pending_medium_count =
         if let Some(Some(density_repo)) = feedback_sources.map(|f| f.density_repo) {
             density_repo
@@ -344,6 +346,27 @@ pub async fn collect(
         extraction_yield_by_domain,
         pending_enrichment_turns: pending_medium_count,
         graph_consolidation_needed: pending_medium_count > 5,
+        runtime_signal_summary: if let Some(pool) = feedback_pool {
+            Some(super::feedback::load_runtime_signals(pool, since).await)
+        } else {
+            None
+        },
+        validation_warning_counts: if let Some(pool) = feedback_pool {
+            super::feedback::load_validation_warnings(pool, since).await
+        } else {
+            Vec::new()
+        },
+        near_miss_patterns: if let Some(pool) = feedback_pool {
+            super::feedback::load_near_miss_count(pool).await
+        } else {
+            0
+        },
+        coaching_behavioral: if let Some(pool) = feedback_pool {
+            super::feedback::load_coaching_behavioral(pool).await
+        } else {
+            None
+        },
+        distraction_rules_to_promote: 0,
     })
 }
 

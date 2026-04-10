@@ -21,6 +21,7 @@ impl RetrievalFeedbackRepo {
         retrieved_ids: &[String],
         referenced_ids: &[String],
         session_key: &str,
+        score_breakdown: Option<&str>,
     ) -> Result<(), sqlx::Error> {
         if retrieved_ids.is_empty() {
             return Ok(());
@@ -31,14 +32,15 @@ impl RetrievalFeedbackRepo {
         let referenced_json = serde_json::to_string(referenced_ids).unwrap_or_default();
 
         sqlx::query(
-            "INSERT INTO retrieval_feedback (id, retrieved_fact_ids, referenced_fact_ids, precision, session_key)
-             VALUES (?1, ?2, ?3, ?4, ?5)",
+            "INSERT INTO retrieval_feedback (id, retrieved_fact_ids, referenced_fact_ids, precision, session_key, score_breakdown)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
         )
         .bind(&id)
         .bind(&retrieved_json)
         .bind(&referenced_json)
         .bind(precision)
         .bind(session_key)
+        .bind(score_breakdown)
         .execute(&self.pool)
         .await?;
         Ok(())

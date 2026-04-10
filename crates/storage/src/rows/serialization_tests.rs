@@ -460,6 +460,11 @@ mod tests {
                     retrieved_memory_count: None,
                     rewrite_triggered: 0,
                     rewrite_source: None,
+                    budget_exhausted: false,
+                    turns_used: 0,
+                    loop_detected: false,
+                    loop_tools: None,
+                    context_fill_pct: None,
                 })
                 .unwrap(),
             ),

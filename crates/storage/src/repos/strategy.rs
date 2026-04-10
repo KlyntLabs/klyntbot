@@ -49,8 +49,10 @@ impl StrategyRepo {
                                            tool_name, tool_success, tool_duration_ms,
                                            complexity_signals, execution_mode,
                                            retrieved_memory_count,
-                                           rewrite_triggered, rewrite_source)
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19, ?20)
+                                           rewrite_triggered, rewrite_source,
+                                           budget_exhausted, turns_used, loop_detected,
+                                           loop_tools, context_fill_pct)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19, ?20, ?21, ?22, ?23, ?24, ?25)
              RETURNING *",
         )
         .bind(row.id)
@@ -73,6 +75,11 @@ impl StrategyRepo {
         .bind(row.retrieved_memory_count)
         .bind(row.rewrite_triggered)
         .bind(&row.rewrite_source)
+        .bind(row.budget_exhausted)
+        .bind(row.turns_used)
+        .bind(row.loop_detected)
+        .bind(&row.loop_tools)
+        .bind(row.context_fill_pct)
         .fetch_one(&self.pool)
         .await?;
         Ok(result)
@@ -396,6 +403,11 @@ mod tests {
             retrieved_memory_count: None,
             rewrite_triggered: 0,
             rewrite_source: None,
+            budget_exhausted: false,
+            turns_used: 0,
+            loop_detected: false,
+            loop_tools: None,
+            context_fill_pct: None,
         };
 
         let created = repo.create(&row).await.unwrap();
@@ -431,6 +443,11 @@ mod tests {
             retrieved_memory_count: None,
             rewrite_triggered: 0,
             rewrite_source: None,
+            budget_exhausted: false,
+            turns_used: 0,
+            loop_detected: false,
+            loop_tools: None,
+            context_fill_pct: None,
         };
 
         let created = repo.create(&row).await.unwrap();
@@ -466,6 +483,11 @@ mod tests {
             retrieved_memory_count: None,
             rewrite_triggered: 0,
             rewrite_source: None,
+            budget_exhausted: false,
+            turns_used: 0,
+            loop_detected: false,
+            loop_tools: None,
+            context_fill_pct: None,
         };
         repo.create(&row).await.unwrap();
 
@@ -524,6 +546,11 @@ mod tests {
             retrieved_memory_count: None,
             rewrite_triggered: 0,
             rewrite_source: None,
+            budget_exhausted: false,
+            turns_used: 0,
+            loop_detected: false,
+            loop_tools: None,
+            context_fill_pct: None,
         };
         let newer = StrategyRecordRow {
             id: uuid::Uuid::new_v4(),
@@ -546,6 +573,11 @@ mod tests {
             retrieved_memory_count: None,
             rewrite_triggered: 0,
             rewrite_source: None,
+            budget_exhausted: false,
+            turns_used: 0,
+            loop_detected: false,
+            loop_tools: None,
+            context_fill_pct: None,
         };
 
         repo.create(&older).await.unwrap();
@@ -594,6 +626,11 @@ mod tests {
             retrieved_memory_count: None,
             rewrite_triggered: 0,
             rewrite_source: None,
+            budget_exhausted: false,
+            turns_used: 0,
+            loop_detected: false,
+            loop_tools: None,
+            context_fill_pct: None,
         };
         repo.create(&row).await.unwrap();
         assert_eq!(repo.count_all().await.unwrap(), 1);
@@ -634,6 +671,11 @@ mod tests {
                 retrieved_memory_count: None,
                 rewrite_triggered: 0,
                 rewrite_source: None,
+                budget_exhausted: false,
+                turns_used: 0,
+                loop_detected: false,
+                loop_tools: None,
+                context_fill_pct: None,
             };
             repo.create(&row).await.unwrap();
         }
@@ -677,6 +719,11 @@ mod tests {
                 retrieved_memory_count: None,
                 rewrite_triggered: 0,
                 rewrite_source: None,
+                budget_exhausted: false,
+                turns_used: 0,
+                loop_detected: false,
+                loop_tools: None,
+                context_fill_pct: None,
             };
             repo.create(&row).await.unwrap();
         }
@@ -727,6 +774,11 @@ mod tests {
             retrieved_memory_count: None,
             rewrite_triggered: 0,
             rewrite_source: None,
+            budget_exhausted: false,
+            turns_used: 0,
+            loop_detected: false,
+            loop_tools: None,
+            context_fill_pct: None,
         };
         repo.create(&row).await.unwrap();
 
@@ -762,6 +814,11 @@ mod tests {
             retrieved_memory_count: Some(3),
             rewrite_triggered: 0,
             rewrite_source: None,
+            budget_exhausted: false,
+            turns_used: 0,
+            loop_detected: false,
+            loop_tools: None,
+            context_fill_pct: None,
         };
         repo.create(&with_mem).await.unwrap();
 
@@ -787,6 +844,11 @@ mod tests {
             retrieved_memory_count: Some(0),
             rewrite_triggered: 0,
             rewrite_source: None,
+            budget_exhausted: false,
+            turns_used: 0,
+            loop_detected: false,
+            loop_tools: None,
+            context_fill_pct: None,
         };
         repo.create(&without_mem).await.unwrap();
 
@@ -812,6 +874,11 @@ mod tests {
             retrieved_memory_count: None,
             rewrite_triggered: 0,
             rewrite_source: None,
+            budget_exhausted: false,
+            turns_used: 0,
+            loop_detected: false,
+            loop_tools: None,
+            context_fill_pct: None,
         };
         repo.create(&legacy).await.unwrap();
 

@@ -92,7 +92,7 @@ pub fn cognitive_migrations() -> Vec<FeatureMigration> {
     vec![
         FeatureMigration {
             feature_name: "cognitive".to_string(),
-            version: 3,
+            version: 4,
             description: "Core cognitive tables".to_string(),
             sql: include_str!("../../migrations/001_cognitive_tables.sql").to_string(),
         },

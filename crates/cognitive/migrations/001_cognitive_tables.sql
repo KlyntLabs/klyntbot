@@ -102,7 +102,9 @@ CREATE TABLE IF NOT EXISTS coaching_strategies (
     avg_improvement_magnitude REAL,
     confidence      REAL NOT NULL DEFAULT 0.5,
     last_used       TEXT,
-    created_at      TEXT NOT NULL DEFAULT (datetime('now'))
+    created_at      TEXT NOT NULL DEFAULT (datetime('now')),
+    behavioral_positive INTEGER DEFAULT 0,
+    behavioral_negative INTEGER DEFAULT 0
 );
 
 CREATE UNIQUE INDEX IF NOT EXISTS idx_coaching_strategies_type_domain
@@ -159,7 +161,8 @@ CREATE TABLE IF NOT EXISTS accumulated_observations (
     importance      REAL NOT NULL,
     source_event    TEXT NOT NULL,
     observed_at     TEXT NOT NULL,
-    day_key         TEXT NOT NULL
+    day_key         TEXT NOT NULL,
+    near_miss_count INTEGER DEFAULT 0
 );
 
 CREATE INDEX IF NOT EXISTS idx_accum_event_type ON accumulated_observations(event_type_key);

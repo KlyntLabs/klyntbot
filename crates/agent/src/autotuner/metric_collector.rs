@@ -279,6 +279,11 @@ mod tests {
             retrieved_memory_count: Some(3),
             rewrite_triggered: 0,
             rewrite_source: None,
+            budget_exhausted: false,
+            turns_used: 0,
+            loop_detected: false,
+            loop_tools: None,
+            context_fill_pct: None,
         };
         strategy_repo.create(&strategy_row).await.unwrap();
 
@@ -303,6 +308,11 @@ mod tests {
             retrieved_memory_count: Some(0),
             rewrite_triggered: 0,
             rewrite_source: None,
+            budget_exhausted: false,
+            turns_used: 0,
+            loop_detected: false,
+            loop_tools: None,
+            context_fill_pct: None,
         };
         strategy_repo.create(&strategy_row_no_mem).await.unwrap();
 

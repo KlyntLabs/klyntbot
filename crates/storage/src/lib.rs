@@ -44,6 +44,9 @@ pub use rows::trial::{ExperimentRow, ShadowLogRow, TrialRow};
 // ── Reforge ────────────────────────────────────────────────────────
 pub use repos::ReforgeSuggestionRepo;
 
+// ── Response warnings ─────────────────────────────────────────────
+pub use repos::{ResponseWarningRepo, ResponseWarningRow};
+
 // ── Agent / Learning ────────────────────────────────────────────────
 pub use repos::RetrievalFeedbackRepo;
 pub use repos::StatusWorkflowRepo;

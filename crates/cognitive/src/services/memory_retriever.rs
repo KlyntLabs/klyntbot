@@ -135,7 +135,7 @@ impl UnifiedMemoryService {
         let referenced = detect_referenced_facts(response_text, &facts);
         let retrieved_ids: Vec<String> = facts.iter().map(|(id, _, _)| id.clone()).collect();
         if let Err(e) = feedback_repo
-            .insert(&retrieved_ids, &referenced, session_key)
+            .insert(&retrieved_ids, &referenced, session_key, None)
             .await
         {
             tracing::debug!("Failed to record retrieval feedback: {e}");

@@ -191,8 +191,8 @@ impl AutoTunerHook for AutoTunerHookImpl {
         chat_id: &str,
         orchestrator_name: &str,
         execution_mode: &str,
-        _tokens_used: u32,
-        _response_time_ms: u64,
+        tokens_used: u32,
+        response_time_ms: u64,
     ) {
         if !self.orchestrator.is_active() {
             return;
@@ -203,6 +203,13 @@ impl AutoTunerHook for AutoTunerHookImpl {
             .await
         {
             tracing::warn!(error = %e, "Failed to update shadow log ground truth");
+        }
+        if let Err(e) = self
+            .trial_repo
+            .update_shadow_log_metrics(chat_id, tokens_used, response_time_ms)
+            .await
+        {
+            tracing::debug!("Failed to update shadow log metrics: {e}");
         }
     }
 

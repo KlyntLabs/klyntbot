@@ -55,6 +55,12 @@ pub struct ReforgeCollected {
     // Phase B2: Enrichment context
     pub pending_enrichment_turns: u32,
     pub graph_consolidation_needed: bool,
+    // Phase C: Deep signals
+    pub runtime_signal_summary: Option<RuntimeSignalSummary>,
+    pub validation_warning_counts: Vec<(String, i64)>,
+    pub near_miss_patterns: u32,
+    pub coaching_behavioral: Option<CoachingBehavioralSummary>,
+    pub distraction_rules_to_promote: u32,
 }
 
 // ---------------------------------------------------------------------------
@@ -364,6 +370,27 @@ pub struct ReforgeSuggestion {
     pub reason: String,
     pub confidence: f64,
     pub cycle_run_at: String,
+}
+
+// ---------------------------------------------------------------------------
+// Phase C: Deep signal types
+// ---------------------------------------------------------------------------
+
+/// Summary of agent runtime signals since last Reforge run.
+#[derive(Debug, Clone, Serialize, Default)]
+pub struct RuntimeSignalSummary {
+    pub budget_exhaustions: u32,
+    pub avg_turns: f64,
+    pub loop_detections: u32,
+    pub avg_context_fill_pct: f64,
+}
+
+/// Summary of coaching behavioral outcomes.
+#[derive(Debug, Clone, Serialize, Default)]
+pub struct CoachingBehavioralSummary {
+    pub total_positive: u32,
+    pub total_negative: u32,
+    pub acceptance_rate: f64,
 }
 
 // ---------------------------------------------------------------------------

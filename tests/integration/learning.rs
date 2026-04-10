@@ -830,6 +830,11 @@ async fn strategy_record_round_trips_with_satisfaction_backfill() {
         retrieved_memory_count: None,
         rewrite_triggered: 0,
         rewrite_source: None,
+        budget_exhausted: false,
+        turns_used: 0,
+        loop_detected: false,
+        loop_tools: None,
+        context_fill_pct: None,
     };
     repos.strategies.create(&record).await.unwrap();
 
@@ -875,6 +880,11 @@ async fn handler_reads_strategy_records_with_tool_stats() {
         retrieved_memory_count: None,
         rewrite_triggered: 0,
         rewrite_source: None,
+        budget_exhausted: false,
+        turns_used: 0,
+        loop_detected: false,
+        loop_tools: None,
+        context_fill_pct: None,
     };
     repos.strategies.create(&row).await.unwrap();
 
@@ -943,6 +953,11 @@ async fn handler_impl_returns_status_with_outcomes() {
         retrieved_memory_count: None,
         rewrite_triggered: 0,
         rewrite_source: None,
+        budget_exhausted: false,
+        turns_used: 0,
+        loop_detected: false,
+        loop_tools: None,
+        context_fill_pct: None,
     };
     repo.create(&row).await.unwrap();
 
@@ -1001,6 +1016,11 @@ async fn handler_impl_analyze_now_with_multi_tool_aggregation() {
             retrieved_memory_count: None,
             rewrite_triggered: 0,
             rewrite_source: None,
+            budget_exhausted: false,
+            turns_used: 0,
+            loop_detected: false,
+            loop_tools: None,
+            context_fill_pct: None,
         };
         repo.create(&row).await.unwrap();
     }
@@ -1025,6 +1045,11 @@ async fn handler_impl_analyze_now_with_multi_tool_aggregation() {
         retrieved_memory_count: None,
         rewrite_triggered: 0,
         rewrite_source: None,
+        budget_exhausted: false,
+        turns_used: 0,
+        loop_detected: false,
+        loop_tools: None,
+        context_fill_pct: None,
     };
     repo.create(&shell_row).await.unwrap();
 

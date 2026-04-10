@@ -108,6 +108,23 @@ impl LearnedRuleRepo {
         Ok(())
     }
 
+    /// List distraction rules with confidence above threshold and sufficient hits.
+    pub async fn list_high_confidence(
+        &self,
+        min_confidence: f64,
+        min_hits: i32,
+    ) -> Result<Vec<LearnedRule>, sqlx::Error> {
+        sqlx::query_as::<_, LearnedRule>(
+            "SELECT * FROM distraction_learned_rules
+             WHERE confidence >= ?1 AND hit_count >= ?2
+             ORDER BY confidence DESC",
+        )
+        .bind(min_confidence)
+        .bind(min_hits)
+        .fetch_all(&self.pool)
+        .await
+    }
+
     pub async fn delete(&self, id: i64) -> common::Result<()> {
         sqlx::query("DELETE FROM distraction_learned_rules WHERE id = ?")
             .bind(id)

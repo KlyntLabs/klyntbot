@@ -48,6 +48,11 @@ pub struct StrategyRecordRow {
     pub rewrite_triggered: i32,
     /// Source of the rewrite: "heuristic" or "llm", or None if not triggered.
     pub rewrite_source: Option<String>,
+    pub budget_exhausted: bool,
+    pub turns_used: i32,
+    pub loop_detected: bool,
+    pub loop_tools: Option<String>,
+    pub context_fill_pct: Option<f64>,
 }
 
 /// Row struct for the `enrichment_feedback` table.

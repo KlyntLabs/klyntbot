@@ -201,7 +201,12 @@ CREATE TABLE strategy_records (
     execution_mode     TEXT,
     retrieved_memory_count INTEGER,
     rewrite_triggered  INTEGER DEFAULT 0,
-    rewrite_source     TEXT
+    rewrite_source     TEXT,
+    budget_exhausted   INTEGER DEFAULT 0,
+    turns_used         INTEGER DEFAULT 0,
+    loop_detected      INTEGER DEFAULT 0,
+    loop_tools         TEXT,
+    context_fill_pct   REAL
 );
 CREATE INDEX idx_strategy_records_chat_id ON strategy_records(chat_id);
 CREATE INDEX idx_strategy_records_timestamp ON strategy_records(timestamp);
@@ -778,7 +783,8 @@ CREATE TABLE IF NOT EXISTS retrieval_feedback (
     referenced_fact_ids TEXT NOT NULL,
     precision REAL NOT NULL,
     session_key TEXT NOT NULL,
-    created_at TEXT NOT NULL DEFAULT (datetime('now'))
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    score_breakdown TEXT           -- JSON: per-component scores for the top-K facts
 );
 CREATE INDEX IF NOT EXISTS idx_retrieval_feedback_session ON retrieval_feedback(session_key);
 CREATE INDEX IF NOT EXISTS idx_retrieval_feedback_created ON retrieval_feedback(created_at);
@@ -829,3 +835,18 @@ CREATE TABLE IF NOT EXISTS reforge_suggestions (
 
 CREATE INDEX IF NOT EXISTS idx_reforge_suggestions_type
     ON reforge_suggestions(suggestion_type, created_at);
+
+-- ============================================================
+-- Response validation warnings from the agent output validator.
+-- ============================================================
+CREATE TABLE IF NOT EXISTS response_warnings (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    request_id TEXT NOT NULL,
+    warning_type TEXT NOT NULL,
+    detail TEXT,
+    chat_id TEXT,
+    created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE INDEX IF NOT EXISTS idx_response_warnings_created
+    ON response_warnings(created_at);
