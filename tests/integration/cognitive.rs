@@ -470,6 +470,7 @@ async fn test_batch_pipeline_processes_domain_events_end_to_end() {
             session_memory_repo: None,
             intelligence_mode: config::schema::IntelligenceMode::Standard,
             deep_handler: None,
+            density_repo: None,
         },
     );
 
@@ -1051,6 +1052,10 @@ async fn test_reforge_cycle_end_to_end() {
         None, // no autotuner bridge
         None, // no autotuner context
         None, // no feedback sources
+        None, // no graph enrichment handler
+        None, // no density repo
+        None, // no entity repo
+        None, // no snapshot repo
     )
     .await;
 
@@ -1224,6 +1229,10 @@ async fn test_reforge_phase6_with_autotuner_bridge() {
         Some(&bridge),
         None, // no autotuner context for this test
         None, // no feedback sources
+        None, // no graph enrichment handler
+        None, // no density repo
+        None, // no entity repo
+        None, // no snapshot repo
     )
     .await;
 
@@ -1353,6 +1362,7 @@ async fn test_reforge_with_feedback_signals() {
         co_activation_repo: Some(&co_activation_repo),
         suggestion_repo: Some(&suggestion_repo),
         pool: Some(&inner),
+        density_repo: None,
     };
 
     let result = run_reforge(
@@ -1370,6 +1380,10 @@ async fn test_reforge_with_feedback_signals() {
         None,
         None,
         Some(&feedback_sources),
+        None, // no graph enrichment handler
+        None, // no density repo
+        None, // no entity repo
+        None, // no snapshot repo
     )
     .await;
 

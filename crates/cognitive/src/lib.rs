@@ -35,8 +35,8 @@ pub use repos::semantic_fact::DomainHealthRow;
 pub use repos::AtomExtractionCache;
 pub use repos::{
     cognitive_migrations, AccumulatedObservationRepo, AnnotationRepo, CoActivationRepo,
-    EpisodicMemoryRepo, EventLogRepo, FactChangelogRepo, FailedObservationRepo, ProceduralRuleRepo,
-    SemanticFactRepo,
+    ConversationDensityRepo, EntityRepo, EpisodicMemoryRepo, EventLogRepo, FactChangelogRepo,
+    FailedObservationRepo, KnowledgeSnapshotRepo, ProceduralRuleRepo, SemanticFactRepo,
 };
 pub use repos::{BlackboardEntry, BlackboardRepo, NewBlackboardEntry};
 pub use repos::{

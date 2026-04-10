@@ -227,6 +227,8 @@ pub struct BackgroundServiceConfig {
     pub intelligence_mode: config::schema::IntelligenceMode,
     /// Optional LLM handler for Deep Mode consolidation.
     pub deep_handler: Option<Arc<dyn crate::pipeline::DeepConsolidationHandler>>,
+    /// Optional density repo for value-density scoring.
+    pub density_repo: Option<crate::repos::ConversationDensityRepo>,
 }
 
 /// Background service that processes domain events into cognitive memory.
@@ -260,6 +262,7 @@ impl BackgroundConsolidationService {
             session_memory_repo,
             intelligence_mode,
             deep_handler,
+            density_repo,
         } = config;
         // ── Spawn unified pipeline collectors ─────────────────────────
         let mut _collector_handles: Vec<JoinHandle<()>> = Vec::new();
@@ -536,6 +539,30 @@ impl BackgroundConsolidationService {
                             &result.relationships,
                         )
                         .await;
+                    }
+
+                    // Compute value-density for each observation in the batch
+                    if let Some(ref density_repo) = density_repo {
+                        for obs in &to_extract {
+                            let score = crate::services::value_density::score_turn(
+                                &obs.content,
+                                None, // Known entities not available here yet
+                            );
+                            let id = format!("vd-{:x}", {
+                                use std::hash::{Hash, Hasher};
+                                let mut h = std::collections::hash_map::DefaultHasher::new();
+                                obs.content.hash(&mut h);
+                                obs.timestamp.hash(&mut h);
+                                h.finish()
+                            });
+                            let preview = common::helpers::truncate_at_boundary(&obs.content, 100);
+                            if let Err(e) = density_repo
+                                .insert(&id, &session_start, preview, &score)
+                                .await
+                            {
+                                debug!("Failed to store density score: {e}");
+                            }
+                        }
                     }
 
                     // Prefetch existing facts + batch consolidation

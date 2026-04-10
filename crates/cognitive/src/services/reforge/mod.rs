@@ -65,3 +65,19 @@ pub struct ValidatedTrial {
     pub pace: String,
     pub params: HashMap<String, f64>,
 }
+
+// ---------------------------------------------------------------------------
+// GraphEnrichmentHandler — Phase 6.5 dependency inversion
+// ---------------------------------------------------------------------------
+
+/// Bridge trait for LLM-based graph enrichment in Phase 6.5.
+/// Implemented in the agent crate.
+#[async_trait]
+pub trait GraphEnrichmentHandler: Send + Sync {
+    /// Run batch entity resolution and relationship discovery.
+    /// Single LLM call processes all duplicate candidates and turn previews.
+    async fn enrich_graph(
+        &self,
+        input: &crate::services::graph_enrichment::GraphEnrichmentInput,
+    ) -> common::Result<crate::services::graph_enrichment::GraphEnrichmentOutput>;
+}

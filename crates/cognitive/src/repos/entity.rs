@@ -76,6 +76,11 @@ impl EntityRepo {
         Self { pool }
     }
 
+    /// Access the underlying pool (needed by Reforge Phase 6.5 snapshot queries).
+    pub fn pool(&self) -> &SqlitePool {
+        &self.pool
+    }
+
     /// Upsert an entity by case-insensitive name + entity_type.
     /// If it already exists, increment `mention_count` and update `last_seen_at`.
     /// Returns the entity row (existing or newly created).
@@ -463,6 +468,34 @@ impl EntityRepo {
             .await
     }
 
+    /// Find entity pairs that are likely duplicates based on name similarity.
+    ///
+    /// Returns pairs of (entity_a_id, entity_b_id, entity_a_name, entity_b_name)
+    /// where names share a common type and one name contains the other.
+    /// Used by Reforge Phase 6.5 for batch entity resolution.
+    pub async fn find_duplicate_candidates(
+        &self,
+        limit: u32,
+    ) -> Result<Vec<(String, String, String, String)>, sqlx::Error> {
+        let rows: Vec<(String, String, String, String)> = sqlx::query_as(
+            r#"
+            SELECT a.id, b.id, a.name, b.name
+            FROM entities a
+            JOIN entities b ON a.entity_type = b.entity_type
+                AND a.id < b.id
+                AND (
+                    LOWER(TRIM(a.name)) LIKE '%' || LOWER(TRIM(b.name)) || '%'
+                    OR LOWER(TRIM(b.name)) LIKE '%' || LOWER(TRIM(a.name)) || '%'
+                )
+            LIMIT ?1
+            "#,
+        )
+        .bind(limit)
+        .fetch_all(&self.pool)
+        .await?;
+        Ok(rows)
+    }
+
     /// Get entities linked to a note via `source_id`.
     pub async fn get_entities_for_note(
         &self,
@@ -752,5 +785,39 @@ mod tests {
         assert_eq!(rels.len(), 1);
         assert_eq!(rels[0].source_entity_id, alice.id);
         assert_eq!(rels[0].target_entity_id, bob.id);
+    }
+
+    #[tokio::test]
+    async fn test_find_duplicate_candidates() {
+        let pool = crate::repos::cognitive_test_pool().await;
+        let repo = EntityRepo::new(pool);
+
+        repo.upsert_entity(&NewEntity {
+            name: "Rust".to_string(),
+            entity_type: "technology".to_string(),
+            description: Some("Programming language".to_string()),
+            source: "test".to_string(),
+            source_id: None,
+            metadata: None,
+        })
+        .await
+        .unwrap();
+        repo.upsert_entity(&NewEntity {
+            name: "Rust Lang".to_string(),
+            entity_type: "technology".to_string(),
+            description: Some("The Rust programming language".to_string()),
+            source: "test".to_string(),
+            source_id: None,
+            metadata: None,
+        })
+        .await
+        .unwrap();
+
+        let candidates = repo.find_duplicate_candidates(50).await.unwrap();
+        // "Rust" is contained in "Rust Lang" — should appear as duplicate candidate
+        assert!(
+            !candidates.is_empty(),
+            "Should find Rust/Rust Lang as duplicates"
+        );
     }
 }

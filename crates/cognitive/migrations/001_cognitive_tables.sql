@@ -719,3 +719,34 @@ CREATE INDEX IF NOT EXISTS idx_fact_changelog_fact_id
 
 CREATE INDEX IF NOT EXISTS idx_fact_changelog_type
     ON fact_changelog(change_type, changed_at);
+
+-- Conversation turn value-density scores.
+-- Populated in real-time by background pipeline; queried by Reforge Phase 6.5.
+CREATE TABLE IF NOT EXISTS conversation_density (
+    id TEXT PRIMARY KEY,
+    session_key TEXT NOT NULL,
+    content_preview TEXT NOT NULL,
+    density_score REAL NOT NULL,
+    tier TEXT NOT NULL,          -- 'high', 'medium', 'low'
+    entity_signal REAL NOT NULL,
+    action_signal REAL NOT NULL,
+    decision_signal REAL NOT NULL,
+    novelty_signal REAL NOT NULL,
+    enriched INTEGER NOT NULL DEFAULT 0,  -- 1 after graph enrichment processed this turn
+    computed_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE INDEX IF NOT EXISTS idx_conversation_density_tier
+    ON conversation_density(tier, enriched, computed_at);
+
+-- Nightly knowledge graph snapshots for trend analysis.
+CREATE TABLE IF NOT EXISTS knowledge_snapshots (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    fact_count INTEGER NOT NULL,
+    entity_count INTEGER NOT NULL,
+    relationship_count INTEGER NOT NULL,
+    domain_summary TEXT,       -- JSON: {"work": 42, "finance": 15, ...}
+    top_entities TEXT,         -- JSON: [{"name": "Rust", "mentions": 30}, ...]
+    graph_metrics TEXT,        -- JSON: {"orphan_rate": 0.12, "avg_degree": 2.3, ...}
+    snapshot_at TEXT NOT NULL DEFAULT (datetime('now'))
+);

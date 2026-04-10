@@ -1,12 +1,13 @@
 //! Phase orchestrator for the Reforge cycle.
 //!
-//! `run_reforge` drives all 7 phases: Collect → Synthesize → Review →
-//! Narrate → Apply → Optimize → Compact.  Each phase is isolated so that
+//! `run_reforge` drives all 8 phases: Collect → Synthesize → Review →
+//! Narrate → Apply → Optimize → Graph Consolidation → Compact.  Each phase is isolated so that
 //! a single failure does not abort the remaining phases.
 
 use std::collections::HashMap;
 
 use chrono::Utc;
+use sqlx;
 use tracing::{debug, info, warn};
 
 use crate::repos::{EpisodicMemoryRepo, ProceduralRuleRepo, SemanticFactRepo};
@@ -40,6 +41,10 @@ pub async fn run_reforge(
     autotuner_bridge: Option<&dyn super::AutotunerBridge>,
     autotuner_ctx: Option<AutotunerContext>,
     feedback_sources: Option<&super::collector::FeedbackSources<'_>>,
+    graph_enrichment_handler: Option<&dyn super::GraphEnrichmentHandler>,
+    density_repo: Option<&crate::repos::ConversationDensityRepo>,
+    entity_repo: Option<&crate::repos::EntityRepo>,
+    snapshot_repo: Option<&crate::repos::KnowledgeSnapshotRepo>,
 ) -> Option<ReforgeResult> {
     let mut result = ReforgeResult::default();
 
@@ -297,6 +302,135 @@ pub async fn run_reforge(
         }
     } else {
         debug!("Reforge Phase 6: skipped (no autotuner bridge)");
+    }
+
+    // ------------------------------------------------------------------
+    // Phase 6.5: Graph Consolidation
+    // ------------------------------------------------------------------
+    if let (Some(enricher), Some(density_repo), Some(entity_repo)) =
+        (graph_enrichment_handler, density_repo, entity_repo)
+    {
+        info!("Reforge Phase 6.5: Graph Consolidation");
+
+        // Step 1: Load medium-density turns queued since last cycle
+        let pending_turns = match density_repo.load_pending_medium(50).await {
+            Ok(turns) => turns,
+            Err(e) => {
+                warn!("Reforge Phase 6.5: failed to load pending turns: {e}");
+                result
+                    .phase_errors
+                    .push(format!("graph_consolidation/load: {e}"));
+                Vec::new()
+            }
+        };
+
+        // Step 2: Find duplicate entity candidates
+        let dup_candidates = match entity_repo.find_duplicate_candidates(30).await {
+            Ok(dups) => dups,
+            Err(e) => {
+                warn!("Reforge Phase 6.5: failed to find duplicates: {e}");
+                Vec::new()
+            }
+        };
+
+        // Step 3: Run LLM enrichment (single call) if there's work to do
+        if !pending_turns.is_empty() || !dup_candidates.is_empty() {
+            let input = crate::services::graph_enrichment::GraphEnrichmentInput {
+                turn_previews: pending_turns
+                    .iter()
+                    .map(|t| t.content_preview.clone())
+                    .collect(),
+                duplicate_candidates: dup_candidates
+                    .iter()
+                    .map(|(a_id, b_id, a_name, b_name)| {
+                        crate::services::graph_enrichment::DuplicateCandidate {
+                            entity_a_id: a_id.clone(),
+                            entity_b_id: b_id.clone(),
+                            entity_a_name: a_name.clone(),
+                            entity_b_name: b_name.clone(),
+                        }
+                    })
+                    .collect(),
+            };
+
+            match enricher.enrich_graph(&input).await {
+                Ok(output) => {
+                    // Apply merge decisions
+                    for decision in &output.merge_decisions {
+                        if decision.should_merge {
+                            if let Err(e) = entity_repo
+                                .merge_entities(&decision.entity_a_id, &decision.entity_b_id)
+                                .await
+                            {
+                                debug!("Phase 6.5: merge failed: {e}");
+                            } else {
+                                result.entities_merged += 1;
+                            }
+                        }
+                    }
+
+                    // Apply discovered relationships
+                    for rel in &output.discovered_relationships {
+                        let source_entities = entity_repo
+                            .find_by_name(&rel.source_entity_name)
+                            .await
+                            .unwrap_or_default();
+                        let target_entities = entity_repo
+                            .find_by_name(&rel.target_entity_name)
+                            .await
+                            .unwrap_or_default();
+
+                        if let (Some(src), Some(tgt)) =
+                            (source_entities.first(), target_entities.first())
+                        {
+                            let new_rel = crate::repos::entity::NewRelationship {
+                                source_entity_id: src.id.clone(),
+                                target_entity_id: tgt.id.clone(),
+                                relationship_type: rel.relationship_type.clone(),
+                                evidence: None,
+                                source: "reforge_phase_6.5".to_string(),
+                            };
+                            if entity_repo.upsert_relationship(&new_rel).await.is_ok() {
+                                result.relationships_discovered += 1;
+                            }
+                        }
+                    }
+
+                    // Mark processed turns as enriched
+                    let turn_ids: Vec<String> =
+                        pending_turns.iter().map(|t| t.id.clone()).collect();
+                    if let Err(e) = density_repo.mark_enriched(&turn_ids).await {
+                        debug!("Phase 6.5: mark_enriched failed: {e}");
+                    }
+
+                    info!(
+                        merged = result.entities_merged,
+                        relationships = result.relationships_discovered,
+                        turns_processed = pending_turns.len(),
+                        "Reforge Phase 6.5 complete"
+                    );
+                }
+                Err(e) => {
+                    warn!("Reforge Phase 6.5 enrichment failed: {e}");
+                    result
+                        .phase_errors
+                        .push(format!("graph_consolidation/enrich: {e}"));
+                }
+            }
+        } else {
+            debug!("Reforge Phase 6.5: nothing to consolidate");
+        }
+
+        // Step 4: Record knowledge snapshot
+        if let Some(snapshot_repo) = snapshot_repo {
+            if let Err(e) = record_knowledge_snapshot(entity_repo, fact_repo, snapshot_repo).await {
+                debug!("Phase 6.5: snapshot failed: {e}");
+            } else {
+                result.snapshot_recorded = true;
+            }
+        }
+    } else {
+        debug!("Reforge Phase 6.5: skipped (missing repos or handler)");
     }
 
     // ------------------------------------------------------------------
@@ -1185,6 +1319,80 @@ async fn create_trials_from_suggestions(
             0
         }
     }
+}
+
+// ---------------------------------------------------------------------------
+// Phase 6.5 helpers
+// ---------------------------------------------------------------------------
+
+/// Record a nightly knowledge graph snapshot.
+async fn record_knowledge_snapshot(
+    entity_repo: &crate::repos::EntityRepo,
+    fact_repo: &SemanticFactRepo,
+    snapshot_repo: &crate::repos::KnowledgeSnapshotRepo,
+) -> common::Result<()> {
+    let facts = fact_repo.count_active().await.unwrap_or(0) as u32;
+
+    let entity_count: (i64,) = sqlx::query_as("SELECT COUNT(*) FROM entities")
+        .fetch_one(entity_repo.pool())
+        .await
+        .unwrap_or((0,));
+    let rel_count: (i64,) = sqlx::query_as("SELECT COUNT(*) FROM entity_relationships")
+        .fetch_one(entity_repo.pool())
+        .await
+        .unwrap_or((0,));
+
+    let domain_counts = fact_repo.count_by_domain().await.unwrap_or_default();
+    let domain_json = serde_json::to_string(
+        &domain_counts
+            .into_iter()
+            .collect::<std::collections::HashMap<_, _>>(),
+    )
+    .ok();
+
+    let orphan_count: (i64,) = sqlx::query_as(
+        "SELECT COUNT(*) FROM entities e
+         WHERE NOT EXISTS (
+             SELECT 1 FROM entity_relationships r
+             WHERE r.source_entity_id = e.id OR r.target_entity_id = e.id
+         )",
+    )
+    .fetch_one(entity_repo.pool())
+    .await
+    .unwrap_or((0,));
+
+    let ec = entity_count.0 as u32;
+    let rc = rel_count.0 as u32;
+    let orphan_rate = if ec > 0 {
+        orphan_count.0 as f64 / ec as f64
+    } else {
+        0.0
+    };
+    let avg_degree = if ec > 0 {
+        rc as f64 * 2.0 / ec as f64
+    } else {
+        0.0
+    };
+
+    let metrics = serde_json::json!({
+        "orphan_rate": orphan_rate,
+        "avg_degree": avg_degree,
+        "orphan_count": orphan_count.0,
+    });
+
+    snapshot_repo
+        .insert(
+            facts,
+            ec,
+            rc,
+            domain_json.as_deref(),
+            None,
+            Some(&metrics.to_string()),
+        )
+        .await
+        .map_err(|e| common::KlyntbotError::Storage(e.to_string()))?;
+
+    Ok(())
 }
 
 // ---------------------------------------------------------------------------

@@ -71,6 +71,7 @@ pub struct FeedbackSources<'a> {
     pub co_activation_repo: Option<&'a crate::repos::CoActivationRepo>,
     pub suggestion_repo: Option<&'a storage::ReforgeSuggestionRepo>,
     pub pool: Option<&'a sqlx::SqlitePool>,
+    pub density_repo: Option<&'a crate::repos::ConversationDensityRepo>,
 }
 
 /// Days elapsed since an RFC 3339 timestamp, defaulting to 7 if missing or unparseable.
@@ -313,6 +314,16 @@ pub async fn collect(
         "Reforge collector: gathered inputs"
     );
 
+    let pending_medium_count =
+        if let Some(Some(density_repo)) = feedback_sources.map(|f| f.density_repo) {
+            density_repo
+                .count_pending_by_tier("medium", since)
+                .await
+                .unwrap_or(0)
+        } else {
+            0
+        };
+
     Some(ReforgeCollected {
         sessions,
         episodic_memories,
@@ -331,6 +342,8 @@ pub async fn collect(
         graph_health,
         previous_suggestions,
         extraction_yield_by_domain,
+        pending_enrichment_turns: pending_medium_count,
+        graph_consolidation_needed: pending_medium_count > 5,
     })
 }
 

@@ -547,6 +547,9 @@ fn register_cron_callbacks(
                         let event_log_repo = cognitive::EventLogRepo::new(pool.clone());
                         let co_activation_repo = cognitive::CoActivationRepo::new(pool.clone());
                         let suggestion_repo = storage::ReforgeSuggestionRepo::new(pool.clone());
+                        let density_repo = cognitive::ConversationDensityRepo::new(pool.clone());
+                        let entity_repo = cognitive::EntityRepo::new(pool.clone());
+                        let snapshot_repo = cognitive::KnowledgeSnapshotRepo::new(pool.clone());
                         let feedback_sources =
                             cognitive::services::reforge::collector::FeedbackSources {
                                 outcome_repo: Some(&repos_reforge.outcomes),
@@ -554,6 +557,7 @@ fn register_cron_callbacks(
                                 co_activation_repo: Some(&co_activation_repo),
                                 suggestion_repo: Some(&suggestion_repo),
                                 pool: Some(&pool),
+                                density_repo: Some(&density_repo),
                             };
 
                         match cognitive::services::reforge::service::run_reforge(
@@ -571,6 +575,10 @@ fn register_cron_callbacks(
                             bridge_ref,
                             autotuner_ctx,
                             Some(&feedback_sources),
+                            None, // graph_enrichment_handler — TODO: wire LlmGraphEnrichmentHandler
+                            Some(&density_repo),
+                            Some(&entity_repo),
+                            Some(&snapshot_repo),
                         )
                         .await
                         {

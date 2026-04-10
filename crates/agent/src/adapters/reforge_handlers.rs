@@ -59,6 +59,20 @@ Summarize tonight's Reforge cycle for the user in 2-3 concise paragraphs.
 Include: what was learned, what changed (facts, rules, skills), and any notable patterns.
 Be conversational, not clinical. Address the user directly.";
 
+const GRAPH_ENRICHMENT_PROMPT: &str = "\
+You are a knowledge graph maintenance agent. Given conversation excerpts and \
+candidate duplicate entity pairs, make decisions about entity merging and \
+discover relationships.\n\n\
+For duplicate candidates, decide if two entities refer to the same real-world thing. \
+Consider: name similarity, type match, context clues.\n\n\
+For conversation excerpts, extract any relationships between mentioned entities.\n\n\
+Respond with JSON:\n\
+{\"merge_decisions\": [{\"entity_a_id\": \"...\", \"entity_b_id\": \"...\", \
+\"should_merge\": true, \"canonical_name\": \"Preferred Name\", \
+\"reason\": \"Same entity, different casing\"}], \
+\"relationships\": [{\"source\": \"Entity A\", \"target\": \"Entity B\", \
+\"type\": \"works_on\", \"strength\": 0.7}]}";
+
 // ---------------------------------------------------------------------------
 // Input formatters
 // ---------------------------------------------------------------------------
@@ -297,6 +311,131 @@ impl ReforgeHandler for LlmReforgeHandler {
 
         let response = self.provider.chat(&messages, None, &text_params).await?;
         Ok(response.content.unwrap_or_default())
+    }
+}
+
+// ---------------------------------------------------------------------------
+// LlmGraphEnrichmentHandler — JSON types
+// ---------------------------------------------------------------------------
+
+#[derive(serde::Deserialize)]
+struct EnrichmentResponse {
+    #[serde(default)]
+    merge_decisions: Vec<MergeDecisionJson>,
+    #[serde(default)]
+    relationships: Vec<DiscoveredRelationshipJson>,
+}
+
+#[derive(serde::Deserialize)]
+struct MergeDecisionJson {
+    entity_a_id: String,
+    entity_b_id: String,
+    should_merge: bool,
+    canonical_name: Option<String>,
+    reason: String,
+}
+
+#[derive(serde::Deserialize)]
+struct DiscoveredRelationshipJson {
+    source: String,
+    target: String,
+    #[serde(rename = "type")]
+    relationship_type: String,
+    #[serde(default = "default_rel_strength")]
+    strength: f64,
+}
+
+fn default_rel_strength() -> f64 {
+    0.5
+}
+
+// ---------------------------------------------------------------------------
+// LlmGraphEnrichmentHandler
+// ---------------------------------------------------------------------------
+
+/// LLM-backed graph enrichment for Reforge Phase 6.5.
+pub struct LlmGraphEnrichmentHandler {
+    provider: DynProvider,
+    params: ChatParams,
+}
+
+impl LlmGraphEnrichmentHandler {
+    pub fn new(provider: DynProvider, params: ChatParams) -> Self {
+        Self {
+            provider,
+            params: params.with_response_format(ResponseFormat::JsonObject),
+        }
+    }
+}
+
+#[async_trait]
+impl cognitive::services::reforge::GraphEnrichmentHandler for LlmGraphEnrichmentHandler {
+    async fn enrich_graph(
+        &self,
+        input: &cognitive::services::graph_enrichment::GraphEnrichmentInput,
+    ) -> common::Result<cognitive::services::graph_enrichment::GraphEnrichmentOutput> {
+        use cognitive::services::graph_enrichment::*;
+
+        // Build the user message with context
+        let mut user_msg = String::new();
+        if !input.duplicate_candidates.is_empty() {
+            user_msg.push_str("## Duplicate Candidates\n");
+            for c in &input.duplicate_candidates {
+                user_msg.push_str(&format!(
+                    "- ({}) \"{}\" vs ({}) \"{}\"\n",
+                    c.entity_a_id, c.entity_a_name, c.entity_b_id, c.entity_b_name
+                ));
+            }
+        }
+        if !input.turn_previews.is_empty() {
+            user_msg.push_str("\n## Conversation Excerpts\n");
+            for (i, preview) in input.turn_previews.iter().enumerate() {
+                user_msg.push_str(&format!("{}: {}\n", i + 1, preview));
+            }
+        }
+
+        if user_msg.is_empty() {
+            return Ok(GraphEnrichmentOutput::default());
+        }
+
+        let messages = vec![
+            Message::system(GRAPH_ENRICHMENT_PROMPT),
+            Message::user(user_msg),
+        ];
+
+        let response = self.provider.chat(&messages, None, &self.params).await?;
+        let content = response.content.unwrap_or_default();
+        let text = content.trim();
+
+        // Parse response JSON
+        let parsed: EnrichmentResponse = serde_json::from_str(text).unwrap_or(EnrichmentResponse {
+            merge_decisions: Vec::new(),
+            relationships: Vec::new(),
+        });
+
+        Ok(GraphEnrichmentOutput {
+            merge_decisions: parsed
+                .merge_decisions
+                .into_iter()
+                .map(|d| MergeDecision {
+                    entity_a_id: d.entity_a_id,
+                    entity_b_id: d.entity_b_id,
+                    should_merge: d.should_merge,
+                    canonical_name: d.canonical_name,
+                    reason: d.reason,
+                })
+                .collect(),
+            discovered_relationships: parsed
+                .relationships
+                .into_iter()
+                .map(|r| DiscoveredRelationship {
+                    source_entity_name: r.source,
+                    target_entity_name: r.target,
+                    relationship_type: r.relationship_type,
+                    strength: r.strength,
+                })
+                .collect(),
+        })
     }
 }
 

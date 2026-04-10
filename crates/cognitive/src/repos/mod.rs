@@ -6,6 +6,7 @@ pub mod book_tree;
 pub mod co_activation;
 pub mod community;
 pub mod deck_preference;
+pub mod enrichment;
 pub mod entity;
 pub mod episodic_memory;
 pub mod event_log;
@@ -34,6 +35,9 @@ pub use book_tree::SqliteBookTreeRepo;
 pub use co_activation::CoActivationRepo;
 pub use community::{CommunityMemberRow, CommunityRepo, CommunityRow};
 pub use deck_preference::{DeckPreferenceRepo, DeckPreferenceRow};
+pub use enrichment::{
+    ConversationDensityRepo, ConversationDensityRow, KnowledgeSnapshotRepo, KnowledgeSnapshotRow,
+};
 pub use entity::{
     EntityRepo, EntityRow, GraphNeighborhood, NewEntity, NewRelationship, RelationshipRow,
 };
@@ -88,7 +92,7 @@ pub fn cognitive_migrations() -> Vec<FeatureMigration> {
     vec![
         FeatureMigration {
             feature_name: "cognitive".to_string(),
-            version: 1,
+            version: 2,
             description: "Core cognitive tables".to_string(),
             sql: include_str!("../../migrations/001_cognitive_tables.sql").to_string(),
         },

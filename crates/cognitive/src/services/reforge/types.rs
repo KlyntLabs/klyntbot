@@ -52,6 +52,9 @@ pub struct ReforgeCollected {
     pub graph_health: GraphHealthMetrics,
     pub previous_suggestions: Vec<ReforgeSuggestion>,
     pub extraction_yield_by_domain: Vec<(String, f64)>,
+    // Phase B2: Enrichment context
+    pub pending_enrichment_turns: u32,
+    pub graph_consolidation_needed: bool,
 }
 
 // ---------------------------------------------------------------------------
@@ -383,4 +386,8 @@ pub struct ReforgeResult {
     pub regression_detected: bool,
     pub suggestions_persisted: u32,
     pub patterns_persisted: u32,
+    // Phase B2: Graph consolidation
+    pub entities_merged: u32,
+    pub relationships_discovered: u32,
+    pub snapshot_recorded: bool,
 }
