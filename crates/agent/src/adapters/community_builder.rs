@@ -168,20 +168,21 @@ impl CommunityBuilder {
             let top_member_ids: Vec<&str> =
                 members.iter().take(5).map(|(id, _)| id.as_str()).collect();
 
-            let mut name_parts = Vec::new();
             let mut summary_parts = Vec::new();
             let mut source_notes: HashSet<String> = HashSet::new();
             let mut representative_paths = Vec::new();
+            let mut domain_counts: HashMap<String, usize> = HashMap::new();
 
             for node_id in &top_member_ids {
                 if let Ok(Some(node)) = self.tree_repo.get_node(node_id).await {
-                    // Short title for community name
-                    let title = node.title.as_deref().unwrap_or("Untitled").trim();
-                    name_parts.push(common::truncate_at_boundary(title, 30).to_string());
                     // Longer text for summary
                     let text = node.title.as_deref().unwrap_or(&node.content);
                     summary_parts.push(common::truncate_at_boundary(text, 100).to_string());
                     source_notes.insert(node.source_id.clone());
+
+                    // Track domains from source_type for naming
+                    let domain = node.source_type.as_str();
+                    *domain_counts.entry(domain.to_string()).or_insert(0) += 1;
 
                     if representative_paths.len() < 3 {
                         if let Ok(ancestors) = self.tree_repo.get_path_to_root(node_id).await {
@@ -199,15 +200,6 @@ impl CommunityBuilder {
             }
 
             let summary = summary_parts.join("; ");
-            let name = if name_parts.len() <= 3 {
-                name_parts.join(" & ")
-            } else {
-                format!(
-                    "{} (+{} more)",
-                    name_parts[..2].join(" & "),
-                    members.len() - 2
-                )
-            };
 
             let top_member_node_ids: Vec<&str> =
                 members.iter().map(|(id, _)| id.as_str()).collect();
@@ -215,6 +207,10 @@ impl CommunityBuilder {
                 .community_repo
                 .get_top_entities_for_members(&top_member_node_ids)
                 .await;
+
+            // Build a human-readable community name from entities + domains.
+            // Priority: top entity names (short, meaningful) > domain labels > member count fallback.
+            let name = build_community_name(&top_entities, &domain_counts, members.len());
 
             let stability = compute_stability(
                 self.community_repo
@@ -371,6 +367,85 @@ fn compute_stability(existing: Option<CommunityRow>, new_member_count: usize) ->
     }
 }
 
+/// Build a human-readable community name from entity names and domain distribution.
+///
+/// Strategy:
+/// 1. Filter entity names to short, meaningful labels (skip raw sentences, UUIDs, generic terms)
+/// 2. If 1-3 good entities → join them: "Klynt & Rust & Sarah"
+/// 3. If entities + dominant domain → "Klynt & Rust (Work)"
+/// 4. If no good entities → use domain labels: "Work & Finance"
+/// 5. Append member count for disambiguation when name is generic
+fn build_community_name(
+    top_entities: &[String],
+    domain_counts: &HashMap<String, usize>,
+    member_count: usize,
+) -> String {
+    // Filter entities: keep short, meaningful names (not raw sentences or generic terms)
+    let skip_terms: &[&str] = &["user", "untitled", "general", "system"];
+    let good_entities: Vec<&str> = top_entities
+        .iter()
+        .map(|e| e.as_str())
+        .filter(|e| {
+            let lower = e.to_lowercase();
+            e.len() > 1
+                && e.len() < 40
+                && !e.contains('[')
+                && !e.contains(':')
+                && !skip_terms.contains(&lower.as_str())
+                && !e.chars().all(|c| c.is_ascii_hexdigit() || c == '-') // skip UUIDs
+        })
+        .take(3)
+        .collect();
+
+    // Get dominant domain(s) sorted by count
+    let mut domains: Vec<(&String, &usize)> = domain_counts.iter().collect();
+    domains.sort_by(|a, b| b.1.cmp(a.1));
+    let top_domains: Vec<&str> = domains
+        .iter()
+        .take(2)
+        .map(|(d, _)| capitalize_domain(d))
+        .collect();
+
+    if !good_entities.is_empty() {
+        let entity_part = good_entities.join(" & ");
+        if top_domains.len() == 1 && member_count > 3 {
+            // "Klynt & Rust (Work)" — domain context for larger communities
+            format!("{entity_part} ({domain})", domain = top_domains[0])
+        } else {
+            entity_part
+        }
+    } else if !top_domains.is_empty() {
+        let domain_part = top_domains.join(" & ");
+        if member_count > 5 {
+            format!("{domain_part} ({member_count} nodes)")
+        } else {
+            domain_part
+        }
+    } else {
+        format!("Cluster ({member_count} nodes)")
+    }
+}
+
+/// Capitalize a domain slug into a display label.
+fn capitalize_domain(domain: &str) -> &'static str {
+    match domain {
+        "cognitive" | "memory" => "Memory",
+        "work" => "Work",
+        "finance" => "Finance",
+        "identity" => "Identity",
+        "energy" => "Energy",
+        "learning" => "Learning",
+        "preferences" => "Preferences",
+        "productivity" => "Productivity",
+        "coaching" => "Coaching",
+        "skill" => "Skills",
+        "note" => "Notes",
+        "task" => "Tasks",
+        "okr" => "Goals",
+        _ => "General",
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -510,5 +585,53 @@ mod tests {
         };
         let s = compute_stability(Some(prev), 0);
         assert!(s >= 0.0, "Stability should not go below 0.0");
+    }
+
+    #[test]
+    fn community_name_from_entities() {
+        let entities = vec!["Klynt".into(), "Rust".into(), "Sarah".into()];
+        let domains = HashMap::new();
+        let name = build_community_name(&entities, &domains, 5);
+        assert_eq!(name, "Klynt & Rust & Sarah");
+    }
+
+    #[test]
+    fn community_name_entities_with_domain() {
+        let entities = vec!["Klynt".into(), "Buildkite".into()];
+        let mut domains = HashMap::new();
+        domains.insert("task".to_string(), 4);
+        let name = build_community_name(&entities, &domains, 6);
+        assert_eq!(name, "Klynt & Buildkite (Tasks)");
+    }
+
+    #[test]
+    fn community_name_no_entities_uses_domains() {
+        let entities: Vec<String> = vec![];
+        let mut domains = HashMap::new();
+        domains.insert("finance".to_string(), 3);
+        domains.insert("note".to_string(), 2);
+        let name = build_community_name(&entities, &domains, 4);
+        assert_eq!(name, "Finance & Notes");
+    }
+
+    #[test]
+    fn community_name_filters_junk_entities() {
+        let entities = vec![
+            "user".into(),
+            "[user]: I said something long".into(),
+            "080d6b21-abcd-1234".into(),
+            "Klynt".into(),
+        ];
+        let domains = HashMap::new();
+        let name = build_community_name(&entities, &domains, 3);
+        assert_eq!(name, "Klynt");
+    }
+
+    #[test]
+    fn community_name_fallback() {
+        let entities: Vec<String> = vec![];
+        let domains = HashMap::new();
+        let name = build_community_name(&entities, &domains, 7);
+        assert_eq!(name, "Cluster (7 nodes)");
     }
 }

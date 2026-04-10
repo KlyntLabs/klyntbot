@@ -50,7 +50,19 @@ impl HeuristicExtractionHandler {
                         content.hash(&mut h);
                         h.finish() & 0xFFFF
                     });
-                    vec![fact(od, &predicate, 0.8, "user_stated")]
+                    // Truncate to first sentence or 150 chars — don't store entire messages as facts
+                    let object = match content.find(|c: char| c == '.' || c == '!') {
+                        Some(i) if i < 150 => content[..=i].to_string(),
+                        _ => common::helpers::truncate_at_boundary(content, 150).to_string(),
+                    };
+                    vec![ExtractedFact {
+                        domain: od.into(),
+                        subject: "user".into(),
+                        predicate,
+                        object,
+                        confidence: 0.8,
+                        source: "user_stated".into(),
+                    }]
                 }
             }
             "BudgetAlert" => vec![fact("finance", "budget_pressure", 0.9, "observed")],
