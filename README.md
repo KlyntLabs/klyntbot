@@ -1,18 +1,26 @@
 # Klyntbot
 
-A Rust-based personal AI agent platform that connects multiple chat platforms to LLM providers with task management, persistent memory, and extensibility via WASM plugins and MCP.
+A Rust-based personal AI agent that connects multiple chat platforms to LLM providers with cognitive memory, budget-aware execution, and extensibility via WASM plugins and MCP.
+
+## What Makes This Different
+
+This is not an LLM wrapper. Klyntbot is a full agent runtime with:
+
+- **Budget-aware execution** — Every LLM interaction runs within explicit token/turn budgets (Normal/DeepThink/Ultra depth modes) with mid-loop compression, live context refresh, and graceful degradation
+- **Cognitive memory** — Bi-temporal semantic facts with FSRS5 spaced-repetition decay and 12-factor relevance scoring. Memories strengthen with use and fade naturally — no manual curation
+- **Self-reflection** — Mirror system watches the agent's own behavior patterns; Reforge reviews strategy files nightly and suggests improvements
+- **37-crate layered architecture** — 9 strictly-layered tiers with upward-only dependencies. Each feature is a self-contained package with its own tools, migrations, config, and health checks
 
 ## Highlights
 
-- **Multi-platform** — Telegram, Discord, Slack, Email (IMAP/SMTP), CLI, WebSocket, and a native desktop app
-- **12 LLM providers** — Anthropic, OpenAI, DeepSeek, Gemini, OpenRouter, Groq, and more
-- **Intelligent routing** — Intent analysis selects Direct (single LLM call) or Reactive (ReAct tool-use loop) execution
-- **20+ built-in tools** — File I/O, web search, shell exec, cron scheduling, and more
-- **Feature packages** — Todo (OKR + PARA), finance (FIRE tracking), notes, productivity coaching
-- **Cognitive memory** — Bi-temporal semantic facts with FSRS spaced-repetition decay, FTS5 + vector hybrid search
-- **Extensible** — WASM plugins (Extism), MCP client/server (rmcp), custom agent profiles with skills
-- **Desktop app** — Tauri 2 + React 19 with glassmorphism UI, multi-window (main, launcher, tray, distraction overlay)
-- **Local-first** — All data in SQLite + LanceDB. No cloud dependency for storage
+- **Multi-platform** — Telegram, Discord, Slack, Email (IMAP/SMTP), and a native desktop app (Tauri 2)
+- **LLM providers** — Anthropic (native), OpenAI-compatible (GPT-4, DeepSeek-R1, Kimi, local llama.cpp, any compatible endpoint)
+- **20+ built-in tools** — Tasks (agentic execution, decomposition, forecasting), finance (FIRE/Monte Carlo), notes, productivity coaching, and more
+- **Feature packages** — Tasks (14+ actions), Finance (40+ actions), Notes, Productivity, Coaching, Insights, Learning, Language Learning, Launcher
+- **Cognitive memory** — Bi-temporal semantic facts, episodic memories, procedural rules, knowledge graph, FSRS5 decay
+- **Extensible** — WASM plugins (Extism), MCP client/server, custom skills with tool/MCP authorization
+- **Desktop app** — Tauri 2 + React 19 with OKLch theming, glassmorphism UI, multi-window
+- **Local-first** — All data in SQLite (WAL) + LanceDB (vectors). No cloud dependency for storage
 
 ## Quick Start
 
@@ -20,7 +28,7 @@ A Rust-based personal AI agent platform that connects multiple chat platforms to
 
 | Tool | Version | Install |
 |------|---------|---------|
-| Rust (stable) | >= 1.75 | `rustup install stable` |
+| Rust (stable) | >= 1.93 | `rustup install stable` |
 | cargo-nextest | latest | `cargo install cargo-nextest` |
 | bun | latest | `curl -fsSL https://bun.sh/install \| bash` |
 | cargo-tauri | v2 | `cargo install tauri-cli@^2` |
@@ -47,17 +55,17 @@ Create `~/.klyntbot/config.json` with at least one provider:
 }
 ```
 
-See the [Configuration Reference](docs/configuration/reference.md) for all options.
+Environment variable overrides: `KLYNTBOT_SECTION__SUBSECTION__FIELD` (e.g., `KLYNTBOT_PROVIDERS__ANTHROPIC__API_KEY=sk-ant-...`).
 
 ### Run
 
 **Browser dev mode** (recommended for UI work):
 
 ```bash
-# Terminal 1
-cargo run -p dev-api
+# Terminal 1 — Rust backend + dev HTTP server on :3456
+cargo tauri dev
 
-# Terminal 2
+# Terminal 2 — Vite dev server on :1420
 cd desktop-ui && bun run dev
 # Open http://localhost:1420
 ```
@@ -68,45 +76,13 @@ cd desktop-ui && bun run dev
 cargo tauri dev
 ```
 
-See the [Getting Started Guide](docs/development/getting-started.md) for details.
-
-## Architecture
-
-Klyntbot is a 26-crate Rust workspace organized in 9 strictly-layered tiers. Dependencies flow upward only — no circular dependencies.
-
-```
-L0  common                          Foundation types, errors
-L1  config, bus, tools-core         Config, messaging, tool abstractions
-L2  storage, domain                 SQLite, LanceDB, domain models
-L3  providers, session, scheduling  LLM clients, persistence, cron
-    context_engine
-L4  tools, feature-*, plugin-runtime Built-in tools, features, WASM
-L5  channels, agent, cognitive      Platform adapters, runtime, memory
-L6  mcp                            MCP server/client
-L7  app-core, desktop-shared,      Application layer, Tauri desktop
-    desktop
-L8  klyntbot                       Re-export facade
-```
-
-### Agent Runtime Pipeline
-
-```
-Message → AgentManager (profile selection)
-        → IntentAnalyzer (heuristic + LLM classifier)
-        → ContextEngine (token budget allocation)
-        → Tool Filtering (per-agent allowlists)
-        → ExecutionRouter (Direct or Reactive)
-        → ResponseValidator → CostTracker
-        → Response
-```
-
-See the [Architecture Overview](docs/architecture/overview.md) for the full picture.
+**Dev/prod isolation**: Set `KLYNTBOT_HOME=~/.klyntbot-dev` (via `.env` file or env var) to run a dev instance with separate config + data from production.
 
 ## Build & Test
 
 ```bash
 cargo build --workspace                              # Build all crates
-cargo nextest run --workspace                        # Run all tests
+cargo nextest run --workspace                        # Run all tests (parallel)
 cargo nextest run -p agent                           # Single crate
 cargo nextest run -E 'test(session_persistence)'     # Pattern match
 cargo test --workspace --doc                         # Doctests only
@@ -124,24 +100,43 @@ bun install              # Always bun, never npm
 bun run dev              # Vite dev server (port 1420)
 bun run build            # Production build
 bun run lint:fix         # Biome 2.0 auto-fix
+bun run test             # Vitest
 ```
 
-## Project Structure
+## Architecture
+
+Klyntbot is a 37-crate Rust workspace organized in 9 strictly-layered tiers. Dependencies flow upward only.
 
 ```
-klyntbot/
-├── agents/              # Agent profiles (AGENT.md + skills/)
-│   ├── general/         #   Default agent
-│   ├── task/            #   Task management agent
-│   ├── finance/         #   Finance agent
-│   ├── automation/      #   Automation agent
-│   └── communication/   #   Communication agent
-├── crates/              # 26 Rust crates (see architecture docs)
-├── desktop-ui/          # React 19 frontend (Tailwind v4, Vite 6)
-├── workspace/           # Agent runtime workspace files
-├── docs/                # Technical documentation
-├── Cargo.toml           # Workspace root
-└── CLAUDE.md            # AI assistant instructions
+L0  common, platform-macos          Foundation types, errors, macOS APIs
+L1  config, bus, tools-core,        Config (hot-reload), messaging, tool framework,
+    tools-core-macros, analytics    derive macros, FIRE analytics
+L2  storage                         SQLite (WAL), LanceDB vectors, 25+ repos
+L3  providers, session, scheduling, LLM clients, persistence, cron,
+    context_engine, skill-system    token budgets, skill routing
+L4  tools, feature-*, plugin-       20+ tools, 9 feature packages, WASM,
+    runtime, autotuner, voice-      self-optimization, voice, simulation
+    engine, simulator, activity-log
+L5  channels, agent, cognitive      Platform adapters, agent runtime, memory
+L6  mcp                             MCP client/server
+L7  app-core, desktop-shared,       Business logic, IPC types, Tauri desktop
+    desktop
+L8  klyntbot, klyntbot-server       Re-export facade, MCP server binary
+```
+
+### Agent Runtime Pipeline
+
+```
+Message → Session (load/create)
+        → ContextEngine (budget-aware assembly)
+        → Execute Loop (LLM↔tool cycles, depth-gated)
+           ├── Mid-loop compression (at 70% context)
+           ├── Live context refresh (cognitive updates)
+           ├── Fabrication detection
+           └── Streaming events (content, tools, budget)
+        → Response validation
+        → Recording (async: usage, feedback, learning)
+        → Response
 ```
 
 ## Documentation
@@ -150,83 +145,62 @@ klyntbot/
 
 | Document | Description |
 |----------|-------------|
-| [Architecture Overview](docs/architecture/overview.md) | System architecture, crate layers, message flow, design patterns |
-| [Crate Dependency Map](docs/architecture/crate-dependency-map.md) | All 26 crates with purpose, layer, and dependency relationships |
-| [Agent Runtime](docs/architecture/agent-runtime.md) | Intent analysis, context assembly, execution routing pipeline |
-| [Tools System](docs/architecture/tools-system.md) | Tool trait, derive macros, feature packages, registry |
-| [Storage](docs/architecture/storage.md) | SQLite schema, LanceDB vectors, migrations, repo pattern |
-| [Desktop App](docs/architecture/desktop-app.md) | Tauri setup, dual-mode IPC, AppCore pattern, streaming |
-| [Channels](docs/architecture/channels.md) | Platform integrations, Channel trait, message bus |
-| [MCP](docs/architecture/mcp.md) | MCP client/server, tool namespacing, security |
-| [Context Engine](docs/architecture/context-engine.md) | Token budgets, context sources, history compression |
-| [Cognitive Memory](docs/architecture/cognitive-memory.md) | Semantic memory, FSRS decay, consolidation pipeline |
-| [Plugins](docs/architecture/plugins.md) | WASM plugin system (Extism), SDK, permissions |
-| [Scheduling](docs/architecture/scheduling.md) | CronService, job types, persistence |
-| [Architecture Decisions](docs/architecture/decisions.md) | 10 ADRs documenting key design choices |
+| [Architecture Overview](docs/architecture/README.md) | System diagram, crate hierarchy, message flow, design principles |
+| [Agent Runtime](docs/architecture/agent-runtime.md) | Execution pipeline, budget system, execute loop, compression, streaming |
+| [Cognitive Memory](docs/architecture/cognitive-memory.md) | Memory types, FSRS5 decay, 12-factor relevance, mirror, reforge |
+| [Context Engine](docs/architecture/context-engine.md) | Token budgets, context sources, history compression, memory retrieval |
+| [Core Infrastructure](docs/architecture/core-infrastructure.md) | Foundation crates: errors, config, bus, storage, tool framework |
+| [Features](docs/architecture/features.md) | Feature packages: tasks, finance, notes, productivity, coaching |
+| [Channels](docs/architecture/channels.md) | Platform integrations: Telegram, Discord, Slack, Email |
+| [Desktop App](docs/architecture/desktop-app.md) | Tauri 2, AppCore, React 19 frontend, dev server |
+| [Skill System](docs/architecture/skill-system.md) | Skills, MCP integration, WASM plugins |
 
-### Configuration
+## Project Structure
 
-| Document | Description |
-|----------|-------------|
-| [Configuration Reference](docs/configuration/reference.md) | Complete config.json reference — all 24 sections, env vars |
-| [Agent Profiles](docs/configuration/agent-profiles.md) | AGENT.md format, skills, tool allowlists, matching |
-
-### Development
-
-| Document | Description |
-|----------|-------------|
-| [Getting Started](docs/development/getting-started.md) | Prerequisites, setup, dev modes, first run |
-| [Testing](docs/development/testing.md) | Test strategy, patterns, nextest, clippy |
-
-### Frontend
-
-| Document | Description |
-|----------|-------------|
-| [Frontend Architecture](docs/frontend/architecture.md) | React structure, routing, hooks, IPC, streaming |
-| [Design System](docs/frontend/design-system.md) | Theme tokens, glassmorphism, Tailwind v4 conventions |
-
-### Operations
-
-| Document | Description |
-|----------|-------------|
-| [Security](docs/operations/security.md) | Secret handling, permissions, sandboxing, input sanitization |
-| [Troubleshooting](docs/operations/troubleshooting.md) | Common issues, gotchas, debugging tips |
+```
+klyntbot/
+├── crates/              # 37 Rust crates (see architecture docs)
+│   ├── agent/           #   Agent runtime, execution engine
+│   ├── cognitive/       #   Memory, mirror, reforge
+│   ├── app-core/        #   Transport-agnostic business logic
+│   ├── desktop/         #   Tauri 2 desktop adapter
+│   ├── channels/        #   Telegram, Discord, Slack, Email
+│   ├── providers/       #   LLM provider abstraction
+│   ├── feature-*/       #   Feature packages (tasks, finance, ...)
+│   └── ...              #   Storage, config, bus, tools, MCP, ...
+├── desktop-ui/          # React 19 frontend (Tailwind v4, Vite 6)
+├── skills/              # Built-in orchestrator skills
+├── docs/                # Architecture documentation
+├── tests/               # Integration, e2e, simulation tests
+├── Cargo.toml           # Workspace root
+└── CLAUDE.md            # AI assistant instructions
+```
 
 ## Tech Stack
 
 ### Backend (Rust)
 
-- **Async runtime**: tokio 1.49
-- **Database**: sqlx (SQLite, WAL mode, FTS5)
-- **Vectors**: LanceDB + fastembed (384-dim embeddings)
-- **LLM**: Custom provider abstraction (12 providers)
-- **MCP**: rmcp 0.17
-- **WASM**: Extism 1.x
-- **HTTP**: axum 0.8
-- **Desktop**: Tauri 2
+| Component | Technology |
+|-----------|-----------|
+| Async runtime | tokio |
+| Database | sqlx (SQLite, WAL mode, FTS5) |
+| Vectors | LanceDB + fastembed (384-dim) |
+| LLM providers | Custom abstraction (Anthropic, OpenAI-compat) |
+| MCP | rmcp |
+| WASM plugins | Extism |
+| HTTP | axum |
+| Desktop | Tauri 2 |
 
 ### Frontend (TypeScript)
 
-- **Framework**: React 19
-- **Routing**: React Router 7
-- **Styling**: Tailwind v4 (CSS-first)
-- **Rich text**: TipTap 3
-- **Charts**: Recharts 3
-- **Build**: Vite 6, Biome 2.0
-
-## Configuration
-
-Config file: `~/.klyntbot/config.json` (camelCase JSON, all fields optional)
-
-Environment variable overrides: `KLYNTBOT_SECTION__SUBSECTION__FIELD`
-
-```bash
-KLYNTBOT_AGENTS__DEFAULTS__MODEL=anthropic/claude-sonnet-4-20250514
-KLYNTBOT_PROVIDERS__ANTHROPIC__API_KEY=sk-ant-...
-KLYNTBOT_CHANNELS__TELEGRAM__TOKEN=bot...
-```
-
-See [Configuration Reference](docs/configuration/reference.md) for the complete guide.
+| Component | Technology |
+|-----------|-----------|
+| Framework | React 19 |
+| Routing | React Router 7 |
+| Styling | Tailwind v4 (CSS-first, OKLch color space) |
+| Rich text | TipTap 3 |
+| Visualization | d3-force, three.js, Recharts |
+| Build | Vite 6, Biome 2.0 |
 
 ## License
 
