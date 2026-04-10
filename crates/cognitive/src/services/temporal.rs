@@ -9,7 +9,7 @@ use std::collections::HashMap;
 use chrono::{DateTime, Utc};
 use serde::Serialize;
 
-use crate::repos::SemanticFactRepo;
+use crate::repos::{FactChangelogRepo, SemanticFactRepo};
 use crate::types::SemanticFact;
 
 /// A fact together with a flag indicating whether it lives in the archive.
@@ -36,15 +36,44 @@ pub struct ChangeSummary {
     pub by_domain: HashMap<String, usize>,
 }
 
+/// A knowledge diff between two timestamps.
+#[derive(Debug, Clone, Serialize)]
+pub struct KnowledgeDiff {
+    pub period: (String, String),
+    pub added: Vec<SemanticFact>,
+    pub updated: Vec<(SemanticFact, SemanticFact)>,
+    pub removed: Vec<SemanticFact>,
+    pub by_domain: HashMap<String, usize>,
+}
+
+/// A decision point — a fact that changed value multiple times.
+#[derive(Debug, Clone, Serialize)]
+pub struct DecisionPoint {
+    pub subject: String,
+    pub predicate: String,
+    pub version_count: usize,
+    pub latest_value: Option<String>,
+    pub earliest_value: Option<String>,
+}
+
 /// Service for temporal queries over the semantic fact store.
 #[derive(Clone)]
 pub struct TemporalService {
     fact_repo: SemanticFactRepo,
+    changelog_repo: Option<FactChangelogRepo>,
 }
 
 impl TemporalService {
     pub fn new(fact_repo: SemanticFactRepo) -> Self {
-        Self { fact_repo }
+        Self {
+            fact_repo,
+            changelog_repo: None,
+        }
+    }
+
+    pub fn with_changelog(mut self, repo: FactChangelogRepo) -> Self {
+        self.changelog_repo = Some(repo);
+        self
     }
 
     /// Return all versions of the fact identified by `subject` + `predicate`,
@@ -146,6 +175,114 @@ impl TemporalService {
             superseded_facts,
             by_domain,
         })
+    }
+
+    /// Return the state of a fact at a given point in time.
+    pub async fn facts_as_of(
+        &self,
+        subject: &str,
+        predicate: &str,
+        as_of: &str,
+    ) -> Result<Option<FactVersion>, sqlx::Error> {
+        let history = self.get_fact_history(subject, predicate).await?;
+        for version in &history {
+            if version.fact.valid_from.as_str() <= as_of {
+                if let Some(ref superseded_at) = version.fact.superseded_at {
+                    if superseded_at.as_str() <= as_of {
+                        continue;
+                    }
+                }
+                return Ok(Some(version.clone()));
+            }
+        }
+        Ok(None)
+    }
+
+    /// Find when a subject+predicate combination was first mentioned.
+    pub async fn first_mention(
+        &self,
+        subject: &str,
+        predicate: &str,
+    ) -> Result<Option<String>, sqlx::Error> {
+        let history = self.get_fact_history(subject, predicate).await?;
+        Ok(history.last().map(|v| v.fact.valid_from.clone()))
+    }
+
+    /// Find competing truths — active facts with the same subject+predicate
+    /// but different objects.
+    pub async fn competing_truths(
+        &self,
+        subject: &str,
+        predicate: &str,
+    ) -> Result<Vec<SemanticFact>, sqlx::Error> {
+        self.fact_repo
+            .find_by_subject_predicate(subject, predicate)
+            .await
+    }
+
+    /// Compute a knowledge diff between two timestamps.
+    pub async fn knowledge_diff(
+        &self,
+        from: &str,
+        to: &str,
+        domains: Option<&[&str]>,
+    ) -> Result<KnowledgeDiff, sqlx::Error> {
+        let from_dt = chrono::DateTime::parse_from_rfc3339(from)
+            .map(|d| d.with_timezone(&Utc))
+            .map_err(|_| {
+                sqlx::Error::Protocol(format!("invalid RFC3339 'from' timestamp: {from}"))
+            })?;
+
+        let summary = self.change_summary(from_dt, domains).await?;
+
+        Ok(KnowledgeDiff {
+            period: (from.to_string(), to.to_string()),
+            added: summary.new_facts,
+            updated: summary.updated_facts,
+            removed: summary.superseded_facts,
+            by_domain: summary.by_domain,
+        })
+    }
+
+    /// Find decision points — facts with multiple historical values.
+    ///
+    /// Looks back 180 days to avoid loading the entire superseded history.
+    pub async fn decision_points(
+        &self,
+        domain: Option<&str>,
+        limit: usize,
+    ) -> Result<Vec<DecisionPoint>, sqlx::Error> {
+        let since = (Utc::now() - chrono::Duration::days(180))
+            .format("%Y-%m-%dT%H:%M:%SZ")
+            .to_string();
+        let domain_arr: Option<Vec<&str>> = domain.map(|d| vec![d]);
+        let superseded = self
+            .fact_repo
+            .list_superseded_since(&since, domain_arr.as_deref().map(|s| s.as_ref()))
+            .await?;
+
+        let mut seen: HashMap<(String, String), Vec<SemanticFact>> = HashMap::new();
+        for fact in superseded {
+            seen.entry((fact.subject.clone(), fact.predicate.clone()))
+                .or_default()
+                .push(fact);
+        }
+
+        let mut points: Vec<DecisionPoint> = seen
+            .into_iter()
+            .filter(|(_, versions)| versions.len() >= 2)
+            .map(|((subject, predicate), versions)| DecisionPoint {
+                subject,
+                predicate,
+                version_count: versions.len(),
+                latest_value: versions.first().map(|f| f.object.clone()),
+                earliest_value: versions.last().map(|f| f.object.clone()),
+            })
+            .collect();
+
+        points.sort_by(|a, b| b.version_count.cmp(&a.version_count));
+        points.truncate(limit);
+        Ok(points)
     }
 }
 
@@ -269,6 +406,71 @@ mod tests {
             summary.by_domain.contains_key("productivity"),
             "productivity domain should be counted"
         );
+    }
+
+    #[tokio::test]
+    async fn test_facts_as_of() {
+        let (_pool, service) = setup().await;
+        let repo = service.fact_repo.clone();
+
+        let f1 = make_fact("asof1", "work", "user", "role", "2026-01-01", "2026-01-01");
+        repo.upsert(&f1).await.unwrap();
+
+        let result = service
+            .facts_as_of("user", "role", "2026-06-01")
+            .await
+            .unwrap();
+        assert!(result.is_some(), "Should find fact valid at 2026-06-01");
+
+        let result = service
+            .facts_as_of("user", "role", "2025-01-01")
+            .await
+            .unwrap();
+        assert!(result.is_none(), "Should not find fact before valid_from");
+    }
+
+    #[tokio::test]
+    async fn test_first_mention() {
+        let (_pool, service) = setup().await;
+        let repo = service.fact_repo.clone();
+
+        let f1 = make_fact("fm1", "work", "user", "lang", "2026-01-15", "2026-01-15");
+        let f2 = make_fact("fm2", "work", "user", "lang", "2026-03-01", "2026-03-01");
+        repo.upsert(&f1).await.unwrap();
+        repo.upsert(&f2).await.unwrap();
+
+        let mention = service.first_mention("user", "lang").await.unwrap();
+        assert_eq!(mention, Some("2026-01-15".to_string()));
+    }
+
+    #[tokio::test]
+    async fn test_competing_truths() {
+        let (_pool, service) = setup().await;
+        let repo = service.fact_repo.clone();
+
+        let mut f1 = make_fact(
+            "ct1",
+            "work",
+            "user",
+            "fav_lang",
+            "2026-01-01",
+            "2026-01-01",
+        );
+        f1.object = "Python".to_string();
+        let mut f2 = make_fact(
+            "ct2",
+            "work",
+            "user",
+            "fav_lang",
+            "2026-02-01",
+            "2026-02-01",
+        );
+        f2.object = "Rust".to_string();
+        repo.upsert(&f1).await.unwrap();
+        repo.upsert(&f2).await.unwrap();
+
+        let truths = service.competing_truths("user", "fav_lang").await.unwrap();
+        assert_eq!(truths.len(), 2, "Should find 2 competing truths");
     }
 
     #[tokio::test]

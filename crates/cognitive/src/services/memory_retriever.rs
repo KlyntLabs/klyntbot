@@ -55,6 +55,7 @@ pub struct UnifiedMemoryService {
     co_activation_repo: Option<CoActivationRepo>,
     depth_cache: KnowledgeDepthCache,
     community_cache: CommunityCache,
+    entity_repo: Option<crate::repos::EntityRepo>,
     /// Last-retrieved fact metadata: (id, subject, predicate) for feedback detection.
     last_retrieved_facts: Arc<Mutex<Vec<(String, String, String)>>>,
 }
@@ -70,6 +71,7 @@ impl UnifiedMemoryService {
             situation: None,
             champion_overrides: None,
             co_activation_repo: None,
+            entity_repo: None,
             depth_cache: KnowledgeDepthCache::new(60),
             community_cache: CommunityCache::new(300), // 5-minute TTL
             last_retrieved_facts: Arc::new(Mutex::new(Vec::new())),
@@ -111,6 +113,11 @@ impl UnifiedMemoryService {
 
     pub fn with_co_activation_repo(mut self, repo: CoActivationRepo) -> Self {
         self.co_activation_repo = Some(repo);
+        self
+    }
+
+    pub fn with_entity_repo(mut self, repo: crate::repos::EntityRepo) -> Self {
+        self.entity_repo = Some(repo);
         self
     }
 
@@ -172,6 +179,7 @@ impl UnifiedMemoryService {
             relevance_weight_community: self.config.relevance_weight_community,
             relevance_weight_cross_note: self.config.relevance_weight_cross_note,
             relevance_weight_recall_support: self.config.relevance_weight_recall_support,
+            relevance_weight_graph_path_boost: self.config.relevance_weight_graph_path_boost,
             scope_chain,
         };
 
@@ -190,6 +198,7 @@ impl UnifiedMemoryService {
                 self.config.relevance_weight_community,
                 self.config.relevance_weight_cross_note,
                 self.config.relevance_weight_recall_support,
+                self.config.relevance_weight_graph_path_boost,
             ];
             let w = champion.resolve_full_relevance_weights(&defaults);
             params.relevance_weight_semantic = w[0];
@@ -203,6 +212,7 @@ impl UnifiedMemoryService {
             params.relevance_weight_community = w[8];
             params.relevance_weight_cross_note = w[9];
             params.relevance_weight_recall_support = w[10];
+            params.relevance_weight_graph_path_boost = w[11];
         }
 
         params
@@ -334,7 +344,7 @@ impl UnifiedMemoryService {
         query: &str,
         vector_top_k: usize,
         min_similarity: f64,
-        relevance_weights: [f64; 11],
+        relevance_weights: [f64; 12],
     ) -> common::Result<Vec<ScoredFact>> {
         if !self.config.dynamic_facts_enabled || query.is_empty() {
             return Ok(Vec::new());
@@ -358,6 +368,7 @@ impl UnifiedMemoryService {
             relevance_weight_community: relevance_weights[8],
             relevance_weight_cross_note: relevance_weights[9],
             relevance_weight_recall_support: relevance_weights[10],
+            relevance_weight_graph_path_boost: relevance_weights[11],
             scope_chain: Vec::new(),
         };
 
@@ -472,6 +483,32 @@ impl MemoryRetriever for UnifiedMemoryService {
                 // Re-sort after boosting
                 facts_raw
                     .sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
+            }
+        }
+
+        // 1c. Graph-aware retrieval: boost facts connected to query entity neighborhood
+        if let Some(ref entity_repo) = self.entity_repo {
+            let weight = self.config.relevance_weight_graph_path_boost;
+            if weight > 0.0 && !facts_raw.is_empty() {
+                let fact_refs: Vec<(&str, &str)> = facts_raw
+                    .iter()
+                    .map(|(id, _, content, _)| (id.as_str(), content.as_str()))
+                    .collect();
+                let boosts = crate::services::graph_retrieval::compute_graph_boosts(
+                    entity_repo,
+                    query,
+                    &fact_refs,
+                )
+                .await;
+                if !boosts.is_empty() {
+                    for (id, score, _, _) in &mut facts_raw {
+                        if let Some(&boost) = boosts.get(id) {
+                            *score += boost * weight;
+                        }
+                    }
+                    facts_raw
+                        .sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
+                }
             }
         }
 

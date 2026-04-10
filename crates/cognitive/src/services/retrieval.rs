@@ -50,6 +50,7 @@ pub struct RetrievalParams {
     pub relevance_weight_community: f64,
     pub relevance_weight_cross_note: f64,
     pub relevance_weight_recall_support: f64,
+    pub relevance_weight_graph_path_boost: f64,
     /// Optional scope chain for filtering. When set, only facts matching
     /// these scopes are considered. When empty, all scopes are included (backwards-compatible).
     pub scope_chain: Vec<(String, Option<String>)>,
@@ -74,6 +75,7 @@ impl RetrievalParams {
             relevance_weight_community: 0.15,
             relevance_weight_cross_note: 0.10,
             relevance_weight_recall_support: 0.08,
+            relevance_weight_graph_path_boost: 0.06,
             scope_chain: Vec::new(),
         }
     }
@@ -116,6 +118,7 @@ pub async fn retrieve_relevant_facts(
         community: params.relevance_weight_community,
         cross_note: params.relevance_weight_cross_note,
         recall_support: params.relevance_weight_recall_support,
+        graph_path_boost: params.relevance_weight_graph_path_boost,
     };
 
     debug!(
@@ -310,6 +313,7 @@ async fn vector_path(
             0.0,
             cross_note,
             0.0,
+            0.0,
             weights,
         );
         scored.push(ScoredFact {
@@ -370,6 +374,7 @@ async fn fallback_path(
             0.5,
             0.0,
             cross_note,
+            0.0,
             0.0,
             weights,
         );

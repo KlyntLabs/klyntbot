@@ -24,7 +24,7 @@ pub mod system;
 // ── Module re-exports (backward-compatible paths) ───────────────────────────
 pub use domain::{
     agent_task_tool, annotate, area_tool, context_request, cron_tool, docs, learning_tool,
-    memory_tool, mirror, okr_tool, project_tool, skill_reference, spawn,
+    memory_tool, mirror, okr_tool, project_tool, skill_reference, spawn, temporal,
 };
 pub use embedding::{embedding_engine, embedding_store};
 pub use system::{ask_user, browser, filesystem, glob_tool, grep, message, web};
@@ -93,6 +93,9 @@ pub use docs::{ContentRegistryHandler, DocsTool};
 
 // Mirror
 pub use mirror::MirrorTool;
+
+// Temporal
+pub use temporal::TemporalTool;
 
 // Skill reference
 pub use skill_reference::{SkillReferenceIndex, SkillReferenceTool};

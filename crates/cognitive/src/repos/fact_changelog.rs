@@ -99,6 +99,40 @@ impl FactChangelogRepo {
         .await
     }
 
+    /// Find the earliest changelog entry for a fact — when it was first created.
+    pub async fn first_mention(
+        &self,
+        fact_id: &str,
+    ) -> Result<Option<ChangelogEntry>, sqlx::Error> {
+        sqlx::query_as::<_, ChangelogEntry>(
+            "SELECT * FROM fact_changelog WHERE fact_id = ?1 AND change_type = 'create'
+             ORDER BY changed_at ASC LIMIT 1",
+        )
+        .bind(fact_id)
+        .fetch_optional(&self.pool)
+        .await
+    }
+
+    /// Find all changelog entries for facts matching a subject+predicate pattern.
+    pub async fn history_by_subject_predicate(
+        &self,
+        subject: &str,
+        predicate: &str,
+        limit: u32,
+    ) -> Result<Vec<ChangelogEntry>, sqlx::Error> {
+        sqlx::query_as::<_, ChangelogEntry>(
+            "SELECT cl.* FROM fact_changelog cl
+             JOIN semantic_facts f ON cl.fact_id = f.id
+             WHERE f.subject = ?1 AND f.predicate = ?2
+             ORDER BY cl.changed_at DESC LIMIT ?3",
+        )
+        .bind(subject)
+        .bind(predicate)
+        .bind(limit)
+        .fetch_all(&self.pool)
+        .await
+    }
+
     pub async fn prune(&self, max_age_days: u32) -> Result<u64, sqlx::Error> {
         let result =
             sqlx::query("DELETE FROM fact_changelog WHERE changed_at < datetime('now', ?1)")

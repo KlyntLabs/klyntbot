@@ -66,6 +66,9 @@ pub struct TrialParams {
 
     // Phase 6: Recall support
     pub relevance_weight_recall_support: Option<f64>,
+
+    // Phase 7: Graph path boost
+    pub relevance_weight_graph_path_boost: Option<f64>,
 }
 
 impl TrialParams {
@@ -90,10 +93,10 @@ impl TrialParams {
         }
     }
 
-    /// Resolve all 11 relevance weights to a normalized array that sums to 1.0.
+    /// Resolve all 12 relevance weights to a normalized array that sums to 1.0.
     /// Returns [semantic, retrievability, importance, frequency, situation, temporal,
-    ///          hierarchy, path_coherence, community, cross_note, recall_support].
-    pub fn resolve_full_relevance_weights(&self, defaults: &[f64; 11]) -> [f64; 11] {
+    ///          hierarchy, path_coherence, community, cross_note, recall_support, graph_path_boost].
+    pub fn resolve_full_relevance_weights(&self, defaults: &[f64; 12]) -> [f64; 12] {
         let raw = [
             self.relevance_weight_semantic.unwrap_or(defaults[0]),
             self.relevance_weight_retrievability.unwrap_or(defaults[1]),
@@ -106,6 +109,8 @@ impl TrialParams {
             self.relevance_weight_community.unwrap_or(defaults[8]),
             self.relevance_weight_cross_note.unwrap_or(defaults[9]),
             self.relevance_weight_recall_support.unwrap_or(defaults[10]),
+            self.relevance_weight_graph_path_boost
+                .unwrap_or(defaults[11]),
         ];
         let sum: f64 = raw.iter().sum();
         if sum > 0.0 {
@@ -234,13 +239,13 @@ mod tests {
             ..Default::default()
         };
         let defaults = [
-            0.20, 0.10, 0.08, 0.05, 0.15, 0.02, 0.10, 0.05, 0.15, 0.10, 0.08,
+            0.20, 0.10, 0.08, 0.05, 0.15, 0.02, 0.10, 0.05, 0.15, 0.10, 0.08, 0.06,
         ];
         let weights = params.resolve_full_relevance_weights(&defaults);
         let sum: f64 = weights.iter().sum();
         assert!(
             (sum - 1.0).abs() < 1e-10,
-            "All 11 weights must sum to 1.0, got {sum}"
+            "All 12 weights must sum to 1.0, got {sum}"
         );
     }
 }

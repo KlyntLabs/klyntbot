@@ -190,6 +190,7 @@ fn default_exposed_tools() -> Vec<String> {
         "learning",
         "cron",
         "mirror",
+        "temporal",
     ]
     .map(String::from)
     .to_vec()

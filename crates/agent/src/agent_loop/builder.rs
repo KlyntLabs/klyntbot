@@ -358,6 +358,9 @@ impl AgentLoopBuilder {
                     relevance_weight_recall_support: config
                         .cognitive
                         .relevance_weight_recall_support,
+                    relevance_weight_graph_path_boost: config
+                        .cognitive
+                        .relevance_weight_graph_path_boost,
                 };
 
                 // Hoist for UnifiedMemoryService wiring below
@@ -711,6 +714,10 @@ impl AgentLoopBuilder {
             if let Some(ref pool) = self.pool {
                 retriever = retriever
                     .with_co_activation_repo(cognitive::CoActivationRepo::new(pool.clone()));
+            }
+            // Wire entity graph for graph-aware retrieval boost
+            if let Some(ref pool) = self.pool {
+                retriever = retriever.with_entity_repo(cognitive::EntityRepo::new(pool.clone()));
             }
             let memory_service = Arc::new(retriever);
             memory_service_for_shadow = Some(Arc::clone(&memory_service));
@@ -1711,6 +1718,7 @@ impl AgentLoopBuilder {
                         0.15_f64, // relevance_weight_community
                         0.10_f64, // relevance_weight_cross_note
                         config.cognitive.relevance_weight_recall_support, // recall_support
+                        config.cognitive.relevance_weight_graph_path_boost, // graph_path_boost
                     ];
                     let shadow_retriever = Arc::new(
                         crate::autotuner::shadow_retriever::AgentShadowRetriever::new(

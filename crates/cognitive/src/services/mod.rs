@@ -15,6 +15,7 @@ pub mod decay;
 pub mod extraction;
 pub mod fsrs5;
 pub mod graph_enrichment;
+pub mod graph_retrieval;
 pub mod louvain;
 pub mod memory_promotion;
 pub mod memory_retriever;

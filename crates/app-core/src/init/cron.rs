@@ -575,7 +575,11 @@ fn register_cron_callbacks(
                             bridge_ref,
                             autotuner_ctx,
                             Some(&feedback_sources),
-                            None, // graph_enrichment_handler — TODO: wire LlmGraphEnrichmentHandler
+                            crate::handlers::cognitive::build_graph_enrichment_handler(
+                                &cog_provider,
+                                &cog_config,
+                            )
+                            .as_deref(),
                             Some(&density_repo),
                             Some(&entity_repo),
                             Some(&snapshot_repo),

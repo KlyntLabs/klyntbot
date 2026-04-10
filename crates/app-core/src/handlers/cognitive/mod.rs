@@ -22,3 +22,18 @@ pub(crate) fn build_reforge_handler(
         Box::new(agent::adapters::reforge_handlers::NoopReforgeHandler)
     }
 }
+
+/// Build a [`GraphEnrichmentHandler`] for Phase 6.5 graph consolidation.
+///
+/// Returns `None` when no cognitive provider is configured.
+pub(crate) fn build_graph_enrichment_handler(
+    cognitive_provider: &Option<providers::DynProvider>,
+    config: &config::Config,
+) -> Option<Box<dyn cognitive::services::reforge::GraphEnrichmentHandler>> {
+    cognitive_provider.as_ref().map(|cp| {
+        let params = providers::cognitive_chat_params(config, 4096);
+        Box::new(
+            agent::adapters::reforge_handlers::LlmGraphEnrichmentHandler::new(cp.clone(), params),
+        ) as Box<dyn cognitive::services::reforge::GraphEnrichmentHandler>
+    })
+}

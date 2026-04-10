@@ -16,11 +16,11 @@ use common::TrialParams;
 /// parameter variants without affecting live behaviour.
 pub struct AgentShadowRetriever {
     memory_service: Arc<UnifiedMemoryService>,
-    config_defaults: [f64; 11], // 11 default relevance weights from CognitiveConfig
+    config_defaults: [f64; 12], // 12 default relevance weights from CognitiveConfig
 }
 
 impl AgentShadowRetriever {
-    pub fn new(memory_service: Arc<UnifiedMemoryService>, config_defaults: [f64; 11]) -> Self {
+    pub fn new(memory_service: Arc<UnifiedMemoryService>, config_defaults: [f64; 12]) -> Self {
         Self {
             memory_service,
             config_defaults,

@@ -18,6 +18,7 @@ pub struct ConversationDensityRow {
     pub decision_signal: f64,
     pub novelty_signal: f64,
     pub enriched: bool,
+    pub promoted_at: Option<String>,
     pub computed_at: String,
 }
 
@@ -80,6 +81,42 @@ impl ConversationDensityRepo {
         sqlx::query_as::<_, ConversationDensityRow>(
             "SELECT * FROM conversation_density
              WHERE tier = 'medium' AND enriched = 0
+             ORDER BY density_score DESC
+             LIMIT ?1",
+        )
+        .bind(limit)
+        .fetch_all(&self.pool)
+        .await
+    }
+
+    /// Mark a conversation turn as promoted to the knowledge graph.
+    pub async fn promote(&self, id: &str) -> Result<(), sqlx::Error> {
+        sqlx::query("UPDATE conversation_density SET promoted_at = datetime('now') WHERE id = ?1")
+            .bind(id)
+            .execute(&self.pool)
+            .await?;
+        Ok(())
+    }
+
+    /// Check if a conversation turn has been promoted.
+    pub async fn is_promoted(&self, id: &str) -> Result<bool, sqlx::Error> {
+        let row: (i64,) = sqlx::query_as(
+            "SELECT COUNT(*) FROM conversation_density WHERE id = ?1 AND promoted_at IS NOT NULL",
+        )
+        .bind(id)
+        .fetch_one(&self.pool)
+        .await?;
+        Ok(row.0 > 0)
+    }
+
+    /// Load high-density turns that haven't been promoted yet.
+    pub async fn load_unpromoted_high(
+        &self,
+        limit: u32,
+    ) -> Result<Vec<ConversationDensityRow>, sqlx::Error> {
+        sqlx::query_as::<_, ConversationDensityRow>(
+            "SELECT * FROM conversation_density
+             WHERE tier = 'high' AND promoted_at IS NULL
              ORDER BY density_score DESC
              LIMIT ?1",
         )
@@ -230,6 +267,36 @@ mod tests {
         assert!(
             pending.is_empty(),
             "Enriched turns should not appear in pending"
+        );
+    }
+
+    #[tokio::test]
+    async fn density_promote_and_check() {
+        let pool = setup().await;
+        let repo = ConversationDensityRepo::new(pool);
+
+        let score = crate::services::value_density::DensityScore {
+            total: 0.85,
+            entity_signal: 0.8,
+            action_signal: 0.7,
+            decision_signal: 0.6,
+            novelty_signal: 0.5,
+            tier: crate::services::value_density::DensityTier::High,
+        };
+        repo.insert("p1", "sess1", "important content", &score)
+            .await
+            .unwrap();
+
+        assert!(!repo.is_promoted("p1").await.unwrap());
+
+        repo.promote("p1").await.unwrap();
+
+        assert!(repo.is_promoted("p1").await.unwrap());
+
+        let unpromoted = repo.load_unpromoted_high(10).await.unwrap();
+        assert!(
+            unpromoted.is_empty(),
+            "Promoted turns should not appear in unpromoted list"
         );
     }
 

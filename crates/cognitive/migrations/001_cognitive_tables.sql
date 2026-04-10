@@ -733,6 +733,7 @@ CREATE TABLE IF NOT EXISTS conversation_density (
     decision_signal REAL NOT NULL,
     novelty_signal REAL NOT NULL,
     enriched INTEGER NOT NULL DEFAULT 0,  -- 1 after graph enrichment processed this turn
+    promoted_at TEXT,             -- ISO timestamp when promoted to knowledge graph (nullable)
     computed_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
