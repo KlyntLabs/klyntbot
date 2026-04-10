@@ -13,7 +13,8 @@ CREATE TABLE IF NOT EXISTS communities (
     representative_paths TEXT,
     source_note_count INTEGER DEFAULT 0,
     created_at TEXT NOT NULL DEFAULT (datetime('now')),
-    updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+    updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+    last_restructured_at TEXT      -- timestamp of last merge/split by Reforge
 );
 
 CREATE TABLE IF NOT EXISTS community_members (

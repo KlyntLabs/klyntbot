@@ -1056,6 +1056,9 @@ async fn test_reforge_cycle_end_to_end() {
         None, // no density repo
         None, // no entity repo
         None, // no snapshot repo
+        None, // no community intelligence handler
+        None, // no community repo
+        None, // no co_activation repo for split
     )
     .await;
 
@@ -1233,6 +1236,9 @@ async fn test_reforge_phase6_with_autotuner_bridge() {
         None, // no density repo
         None, // no entity repo
         None, // no snapshot repo
+        None, // no community intelligence handler
+        None, // no community repo
+        None, // no co_activation repo for split
     )
     .await;
 
@@ -1384,6 +1390,9 @@ async fn test_reforge_with_feedback_signals() {
         None, // no density repo
         None, // no entity repo
         None, // no snapshot repo
+        None, // no community intelligence handler
+        None, // no community repo
+        None, // no co_activation repo for split
     )
     .await;
 

@@ -235,6 +235,7 @@ impl CommunityBuilder {
                 source_note_count: Some(source_notes.len() as i64),
                 created_at: now.clone(),
                 updated_at: now.clone(),
+                last_restructured_at: None,
             };
 
             // 6. Persist community and members
@@ -493,6 +494,7 @@ mod tests {
             source_note_count: None,
             created_at: String::new(),
             updated_at: String::new(),
+            last_restructured_at: None,
         };
         let s = compute_stability(Some(prev), 7);
         assert!(
@@ -515,6 +517,7 @@ mod tests {
             source_note_count: None,
             created_at: String::new(),
             updated_at: String::new(),
+            last_restructured_at: None,
         };
         let s = compute_stability(Some(prev), 5);
         assert!(
@@ -537,6 +540,7 @@ mod tests {
             source_note_count: None,
             created_at: String::new(),
             updated_at: String::new(),
+            last_restructured_at: None,
         };
         // Lost 5 out of 10 → loss_ratio = 0.5, decay = 0.8 * (1 - 0.5 * 0.3) = 0.8 * 0.85 = 0.68
         let s = compute_stability(Some(prev), 5);
@@ -560,6 +564,7 @@ mod tests {
             source_note_count: None,
             created_at: String::new(),
             updated_at: String::new(),
+            last_restructured_at: None,
         };
         let s = compute_stability(Some(prev), 10);
         assert!(
@@ -582,6 +587,7 @@ mod tests {
             source_note_count: None,
             created_at: String::new(),
             updated_at: String::new(),
+            last_restructured_at: None,
         };
         let s = compute_stability(Some(prev), 0);
         assert!(s >= 0.0, "Stability should not go below 0.0");

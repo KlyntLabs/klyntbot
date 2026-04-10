@@ -81,3 +81,18 @@ pub trait GraphEnrichmentHandler: Send + Sync {
         input: &crate::services::graph_enrichment::GraphEnrichmentInput,
     ) -> common::Result<crate::services::graph_enrichment::GraphEnrichmentOutput>;
 }
+
+// ---------------------------------------------------------------------------
+// CommunityIntelligenceHandler — Phase 6.5 community naming/merge/split
+// ---------------------------------------------------------------------------
+
+/// Bridge trait for LLM-based community intelligence in Phase 6.5.
+/// Implemented in the agent crate.
+#[async_trait]
+pub trait CommunityIntelligenceHandler: Send + Sync {
+    /// Name communities, suggest merges and splits in a single LLM call.
+    async fn analyze_communities(
+        &self,
+        input: &crate::services::community_intelligence::CommunityIntelligenceInput,
+    ) -> common::Result<crate::services::community_intelligence::CommunityIntelligenceOutput>;
+}

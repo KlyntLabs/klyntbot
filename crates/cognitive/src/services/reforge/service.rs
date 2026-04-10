@@ -45,6 +45,9 @@ pub async fn run_reforge(
     density_repo: Option<&crate::repos::ConversationDensityRepo>,
     entity_repo: Option<&crate::repos::EntityRepo>,
     snapshot_repo: Option<&crate::repos::KnowledgeSnapshotRepo>,
+    community_intelligence_handler: Option<&dyn super::CommunityIntelligenceHandler>,
+    community_repo: Option<&crate::repos::CommunityRepo>,
+    co_activation_repo_for_split: Option<&crate::repos::CoActivationRepo>,
 ) -> Option<ReforgeResult> {
     let mut result = ReforgeResult::default();
 
@@ -434,6 +437,71 @@ pub async fn run_reforge(
     }
 
     // ------------------------------------------------------------------
+    // Phase 6.5b: Community Intelligence — LLM naming, merge, split
+    // ------------------------------------------------------------------
+    if let (Some(ci_handler), Some(community_repo)) =
+        (community_intelligence_handler, community_repo)
+    {
+        match crate::services::community_intelligence::build_intelligence_input(community_repo)
+            .await
+        {
+            Ok(input) if !input.communities.is_empty() => {
+                match ci_handler.analyze_communities(&input).await {
+                    Ok(output) => {
+                        let (renamed, merged, split_count) = if let Some(co_act) =
+                            co_activation_repo_for_split
+                        {
+                            crate::services::community_intelligence::apply_intelligence(
+                                &output,
+                                community_repo,
+                                co_act,
+                            )
+                            .await
+                        } else {
+                            // No co-activation repo — can rename/merge but not split
+                            let no_splits =
+                                    crate::services::community_intelligence::CommunityIntelligenceOutput {
+                                        names: output.names.clone(),
+                                        merges: output.merges.clone(),
+                                        splits: Vec::new(),
+                                    };
+                            let fallback_co_act =
+                                crate::repos::CoActivationRepo::new(community_repo.pool().clone());
+                            crate::services::community_intelligence::apply_intelligence(
+                                &no_splits,
+                                community_repo,
+                                &fallback_co_act,
+                            )
+                            .await
+                        };
+                        result.communities_renamed = renamed;
+                        result.communities_merged = merged;
+                        result.communities_split = split_count;
+                        info!(
+                            renamed,
+                            merged,
+                            split = split_count,
+                            "Phase 6.5b: community intelligence complete"
+                        );
+                    }
+                    Err(e) => {
+                        warn!("Phase 6.5b community intelligence failed: {e}");
+                        result
+                            .phase_errors
+                            .push(format!("community_intelligence: {e}"));
+                    }
+                }
+            }
+            Ok(_) => {
+                debug!("Phase 6.5b: no active communities for intelligence");
+            }
+            Err(e) => {
+                debug!("Phase 6.5b: failed to build community input: {e}");
+            }
+        }
+    }
+
+    // ------------------------------------------------------------------
     // Phase 7: Compact
     // ------------------------------------------------------------------
     info!("Reforge Phase 7: Compact");
@@ -484,6 +552,9 @@ pub async fn run_reforge(
         "regression_detected": result.regression_detected,
         "suggestions_persisted": result.suggestions_persisted,
         "patterns_persisted": result.patterns_persisted,
+        "communities_renamed": result.communities_renamed,
+        "communities_merged": result.communities_merged,
+        "communities_split": result.communities_split,
         "compaction": compaction_stats,
     });
     if let Err(e) = reforge_state_repo.record_run(&stats_json.to_string()).await {

@@ -417,4 +417,8 @@ pub struct ReforgeResult {
     pub entities_merged: u32,
     pub relationships_discovered: u32,
     pub snapshot_recorded: bool,
+    // Community intelligence
+    pub communities_renamed: u32,
+    pub communities_merged: u32,
+    pub communities_split: u32,
 }

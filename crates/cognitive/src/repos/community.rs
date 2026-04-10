@@ -14,6 +14,7 @@ pub struct CommunityRow {
     pub source_note_count: Option<i64>,
     pub created_at: String,
     pub updated_at: String,
+    pub last_restructured_at: Option<String>,
 }
 
 #[derive(Debug, Clone, sqlx::FromRow)]
@@ -39,12 +40,12 @@ impl CommunityRepo {
 
     pub async fn upsert_community(&self, community: &CommunityRow) -> Result<()> {
         sqlx::query(
-            "INSERT INTO communities (id, name, summary, member_count, modularity_score, stability, top_entities, representative_paths, source_note_count, created_at, updated_at)
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11)
+            "INSERT INTO communities (id, name, summary, member_count, modularity_score, stability, top_entities, representative_paths, source_note_count, created_at, updated_at, last_restructured_at)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12)
              ON CONFLICT(id) DO UPDATE SET
                name = ?2, summary = ?3, member_count = ?4, modularity_score = ?5,
                stability = ?6, top_entities = ?7, representative_paths = ?8,
-               source_note_count = ?9, updated_at = ?11",
+               source_note_count = ?9, updated_at = ?11, last_restructured_at = ?12",
         )
         .bind(&community.id)
         .bind(&community.name)
@@ -57,6 +58,7 @@ impl CommunityRepo {
         .bind(community.source_note_count)
         .bind(&community.created_at)
         .bind(&community.updated_at)
+        .bind(&community.last_restructured_at)
         .execute(&self.pool)
         .await
         .map_err(map_sqlx)?;
@@ -152,6 +154,69 @@ impl CommunityRepo {
         .map_err(map_sqlx)
     }
 
+    pub fn pool(&self) -> &SqlitePool {
+        &self.pool
+    }
+
+    /// Rename a community (called by Reforge after LLM naming).
+    pub async fn rename(&self, id: &str, new_name: &str) -> Result<()> {
+        sqlx::query("UPDATE communities SET name = ?1, updated_at = datetime('now') WHERE id = ?2")
+            .bind(new_name)
+            .bind(id)
+            .execute(&self.pool)
+            .await
+            .map_err(map_sqlx)?;
+        Ok(())
+    }
+
+    /// Merge community `absorb_id` into `into_id`.
+    /// Moves all members, updates counts, deletes the absorbed community.
+    pub async fn merge_communities(&self, absorb_id: &str, into_id: &str) -> Result<()> {
+        let mut tx = self.pool.begin().await.map_err(map_sqlx)?;
+
+        // Move members from absorbed → target (ignore duplicates)
+        sqlx::query(
+            "UPDATE OR IGNORE community_members SET community_id = ?1
+             WHERE community_id = ?2",
+        )
+        .bind(into_id)
+        .bind(absorb_id)
+        .execute(&mut *tx)
+        .await
+        .map_err(map_sqlx)?;
+
+        // Delete any remaining members of absorbed (duplicates that couldn't move)
+        sqlx::query("DELETE FROM community_members WHERE community_id = ?1")
+            .bind(absorb_id)
+            .execute(&mut *tx)
+            .await
+            .map_err(map_sqlx)?;
+
+        // Update target member count
+        sqlx::query(
+            "UPDATE communities SET
+                member_count = (SELECT COUNT(*) FROM community_members WHERE community_id = ?1),
+                stability = 0.5,
+                last_restructured_at = datetime('now'),
+                updated_at = datetime('now')
+             WHERE id = ?1",
+        )
+        .bind(into_id)
+        .execute(&mut *tx)
+        .await
+        .map_err(map_sqlx)?;
+
+        // Delete absorbed community
+        sqlx::query("DELETE FROM communities WHERE id = ?1")
+            .bind(absorb_id)
+            .execute(&mut *tx)
+            .await
+            .map_err(map_sqlx)?;
+
+        tx.commit().await.map_err(map_sqlx)?;
+        Ok(())
+    }
+
     pub async fn delete_community(&self, id: &str) -> Result<()> {
         sqlx::query("DELETE FROM communities WHERE id = ?1")
             .bind(id)
@@ -211,6 +276,7 @@ mod tests {
             source_note_count: Some(3),
             created_at: "2026-03-28T00:00:00".into(),
             updated_at: "2026-03-28T00:00:00".into(),
+            last_restructured_at: None,
         };
 
         repo.upsert_community(&community).await.unwrap();
@@ -244,6 +310,7 @@ mod tests {
             source_note_count: None,
             created_at: "2026-03-28T00:00:00".into(),
             updated_at: "2026-03-28T00:00:00".into(),
+            last_restructured_at: None,
         };
         repo.upsert_community(&community).await.unwrap();
 
@@ -273,6 +340,7 @@ mod tests {
                 source_note_count: None,
                 created_at: "2026-03-28T00:00:00".into(),
                 updated_at: "2026-03-28T00:00:00".into(),
+                last_restructured_at: None,
             };
             repo.upsert_community(&c).await.unwrap();
         }
@@ -299,6 +367,7 @@ mod tests {
                 source_note_count: None,
                 created_at: "2026-03-28T00:00:00".into(),
                 updated_at: "2026-03-28T00:00:00".into(),
+                last_restructured_at: None,
             };
             repo.upsert_community(&c).await.unwrap();
         }
@@ -335,6 +404,7 @@ mod tests {
                 source_note_count: None,
                 created_at: "2026-03-28T00:00:00".into(),
                 updated_at: "2026-03-28T00:00:00".into(),
+                last_restructured_at: None,
             };
             repo.upsert_community(&c).await.unwrap();
             repo.set_members(id, &[("n1".to_string(), 0.5)])

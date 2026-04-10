@@ -104,7 +104,7 @@ pub fn cognitive_migrations() -> Vec<FeatureMigration> {
         },
         FeatureMigration {
             feature_name: "cognitive_community".to_string(),
-            version: 1,
+            version: 2,
             description: "Community graph tables for Louvain community detection".to_string(),
             sql: include_str!("../../migrations/004_community_graph.sql").to_string(),
         },

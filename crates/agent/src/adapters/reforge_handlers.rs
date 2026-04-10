@@ -440,6 +440,127 @@ impl cognitive::services::reforge::GraphEnrichmentHandler for LlmGraphEnrichment
 }
 
 // ---------------------------------------------------------------------------
+// CommunityIntelligenceHandler — JSON types
+// ---------------------------------------------------------------------------
+
+const COMMUNITY_INTELLIGENCE_PROMPT: &str = "\
+You are a knowledge graph curator. Review these communities and:\n\
+1. Generate a short (2-4 word) noun-phrase label for each\n\
+2. Identify pairs that should MERGE (same topic, fragmented)\n\
+3. Identify any that should SPLIT (multiple unrelated topics)\n\n\
+Rules:\n\
+- Labels must be unique, human-readable noun phrases\n\
+- Only merge when communities clearly overlap (>50% entity similarity)\n\
+- Only split when a community has 2+ clearly distinct domains\n\
+- Prefer stability: don't merge/split unless evidence is strong\n\
+- Skip merge/split for communities younger than 3 days\n\n\
+Respond with JSON:\n\
+{\"names\": [{\"id\": \"...\", \"label\": \"...\"}], \
+\"merges\": [{\"absorb\": \"...\", \"into\": \"...\", \"reason\": \"...\"}], \
+\"splits\": [{\"id\": \"...\", \"reason\": \"...\"}]}";
+
+#[derive(serde::Deserialize)]
+struct CommunityIntelligenceResponse {
+    #[serde(default)]
+    names: Vec<CommunityNameJson>,
+    #[serde(default)]
+    merges: Vec<CommunityMergeJson>,
+    #[serde(default)]
+    splits: Vec<CommunitySplitJson>,
+}
+
+#[derive(serde::Deserialize)]
+struct CommunityNameJson {
+    id: String,
+    label: String,
+}
+
+#[derive(serde::Deserialize)]
+struct CommunityMergeJson {
+    absorb: String,
+    into: String,
+    reason: String,
+}
+
+#[derive(serde::Deserialize)]
+struct CommunitySplitJson {
+    id: String,
+    reason: String,
+}
+
+#[async_trait]
+impl cognitive::services::reforge::CommunityIntelligenceHandler for LlmGraphEnrichmentHandler {
+    async fn analyze_communities(
+        &self,
+        input: &cognitive::services::community_intelligence::CommunityIntelligenceInput,
+    ) -> common::Result<cognitive::services::community_intelligence::CommunityIntelligenceOutput>
+    {
+        use cognitive::services::community_intelligence::*;
+
+        if input.communities.is_empty() {
+            return Ok(CommunityIntelligenceOutput::default());
+        }
+
+        // Build compact community list for the prompt
+        let mut user_msg = String::from("Communities:\n");
+        for c in &input.communities {
+            user_msg.push_str(&format!(
+                "- id={}, name=\"{}\", entities=[{}], members={}, age={}d\n",
+                c.id,
+                c.current_name,
+                c.entities.join(", "),
+                c.member_count,
+                c.age_days,
+            ));
+        }
+
+        let messages = vec![
+            Message::system(COMMUNITY_INTELLIGENCE_PROMPT),
+            Message::user(user_msg),
+        ];
+
+        let response = self.provider.chat(&messages, None, &self.params).await?;
+        let content = response.content.unwrap_or_default();
+        let text = content.trim();
+
+        let parsed: CommunityIntelligenceResponse =
+            serde_json::from_str(text).unwrap_or(CommunityIntelligenceResponse {
+                names: Vec::new(),
+                merges: Vec::new(),
+                splits: Vec::new(),
+            });
+
+        Ok(CommunityIntelligenceOutput {
+            names: parsed
+                .names
+                .into_iter()
+                .map(|n| CommunityRename {
+                    community_id: n.id,
+                    label: n.label,
+                })
+                .collect(),
+            merges: parsed
+                .merges
+                .into_iter()
+                .map(|m| CommunityMerge {
+                    absorb_id: m.absorb,
+                    into_id: m.into,
+                    reason: m.reason,
+                })
+                .collect(),
+            splits: parsed
+                .splits
+                .into_iter()
+                .map(|s| CommunitySplit {
+                    community_id: s.id,
+                    reason: s.reason,
+                })
+                .collect(),
+        })
+    }
+}
+
+// ---------------------------------------------------------------------------
 // NoopReforgeHandler
 // ---------------------------------------------------------------------------
 

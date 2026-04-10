@@ -583,6 +583,13 @@ fn register_cron_callbacks(
                             Some(&density_repo),
                             Some(&entity_repo),
                             Some(&snapshot_repo),
+                            crate::handlers::cognitive::build_community_intelligence_handler(
+                                &cog_provider,
+                                &cog_config,
+                            )
+                            .as_deref(),
+                            Some(&cognitive::CommunityRepo::new(pool.clone())),
+                            Some(&co_activation_repo),
                         )
                         .await
                         {

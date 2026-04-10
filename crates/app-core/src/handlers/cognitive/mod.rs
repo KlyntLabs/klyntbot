@@ -37,3 +37,18 @@ pub(crate) fn build_graph_enrichment_handler(
         ) as Box<dyn cognitive::services::reforge::GraphEnrichmentHandler>
     })
 }
+
+/// Build a [`CommunityIntelligenceHandler`] for Phase 6.5 community naming/merge/split.
+///
+/// Returns `None` when no cognitive provider is configured.
+pub(crate) fn build_community_intelligence_handler(
+    cognitive_provider: &Option<providers::DynProvider>,
+    config: &config::Config,
+) -> Option<Box<dyn cognitive::services::reforge::CommunityIntelligenceHandler>> {
+    cognitive_provider.as_ref().map(|cp| {
+        let params = providers::cognitive_chat_params(config, 4096);
+        Box::new(
+            agent::adapters::reforge_handlers::LlmGraphEnrichmentHandler::new(cp.clone(), params),
+        ) as Box<dyn cognitive::services::reforge::CommunityIntelligenceHandler>
+    })
+}
