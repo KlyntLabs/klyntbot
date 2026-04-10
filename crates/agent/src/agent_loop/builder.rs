@@ -450,6 +450,7 @@ impl AgentLoopBuilder {
                             )),
                             intelligence_mode: config.cognitive.intelligence_mode,
                             density_repo: Some(cognitive::ConversationDensityRepo::new(pool.clone())),
+                            pending_repo: Some(cognitive::repos::PendingMemoryRepo::new(pool.clone())),
                             deep_handler: self.cognitive_provider.as_ref().map(|cp| {
                                 let params = providers::cognitive_chat_params(&config, 4096);
                                 Arc::new(

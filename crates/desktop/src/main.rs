@@ -1113,6 +1113,10 @@ fn run_desktop_app() {
             commands::mirror::revert_brain_version,
             commands::mirror::kill_trial,
             commands::mirror::continue_trial,
+            // Pending Memory
+            commands::pending_memory::list_pending_memories,
+            commands::pending_memory::approve_pending_memory,
+            commands::pending_memory::dismiss_pending_memory,
             // Reforge
             commands::reforge::reforge_state,
             commands::reforge::reforge_skill_names,

@@ -916,7 +916,7 @@ fn register_cron_callbacks(
                         };
 
                         // Prune low-salience semantic facts
-                        let fact_repo = cognitive::SemanticFactRepo::new(cog_pool);
+                        let fact_repo = cognitive::SemanticFactRepo::new(cog_pool.clone());
                         let pruned = match fact_repo.prune_low_salience(0.05, 180).await {
                             Ok(n) => n,
                             Err(e) => {
@@ -925,8 +925,18 @@ fn register_cron_callbacks(
                             }
                         };
 
+                        // Clean stale pending memories (unreviewed for >30 days)
+                        let pending_repo = cognitive::repos::PendingMemoryRepo::new(cog_pool);
+                        let pending_cleaned = match pending_repo.cleanup_older_than(30).await {
+                            Ok(n) => n,
+                            Err(e) => {
+                                warn!(error = %e, "Pending memory cleanup failed");
+                                0
+                            }
+                        };
+
                         Ok(Some(format!(
-                            "Analytics: {cleaned} records cleaned, {pruned} facts pruned"
+                            "Analytics: {cleaned} records cleaned, {pruned} facts pruned, {pending_cleaned} stale pending memories removed"
                         )))
                     })
                 })

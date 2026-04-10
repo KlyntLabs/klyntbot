@@ -230,6 +230,16 @@ impl StrategyRepo {
         Ok(count)
     }
 
+    /// Count strategy records since a given timestamp.
+    pub async fn count_since(&self, since: DateTime<Utc>) -> Result<i64, StorageError> {
+        let (count,): (i64,) =
+            sqlx::query_as("SELECT COUNT(*) FROM strategy_records WHERE timestamp >= ?1")
+                .bind(since)
+                .fetch_one(&self.pool)
+                .await?;
+        Ok(count)
+    }
+
     /// Get stats since a given date: total records, accuracy, avg response time, avg satisfaction.
     pub async fn get_stats_since(
         &self,

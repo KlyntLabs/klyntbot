@@ -239,6 +239,8 @@ pub struct TrialEarlySignals {
     pub correction_rate_delta: f64,
     pub confidence_trend: TrendDirection,
     pub dominant_skill_shift: Option<String>,
+    #[serde(default)]
+    pub messages_scored: u32,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]

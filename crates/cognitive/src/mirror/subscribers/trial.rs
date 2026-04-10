@@ -87,7 +87,7 @@ impl TrialPreviewSubscriber {
                 TrialEarlySignals::default()
             };
 
-            let messages_scored = 0; // TODO: get from evaluator in Phase 5
+            let messages_scored = signals.messages_scored;
             let recommendation = compute_recommendation(&signals, messages_scored);
 
             let narrative = format!(
@@ -170,6 +170,7 @@ mod tests {
             correction_rate_delta: -0.15,
             confidence_trend: TrendDirection::Falling,
             dominant_skill_shift: None,
+            messages_scored: 0,
         };
         assert_eq!(
             compute_recommendation(&signals, 20),
@@ -183,6 +184,7 @@ mod tests {
             correction_rate_delta: 0.05,
             confidence_trend: TrendDirection::Rising,
             dominant_skill_shift: None,
+            messages_scored: 0,
         };
         assert_eq!(
             compute_recommendation(&signals, 20),
@@ -196,6 +198,7 @@ mod tests {
             correction_rate_delta: 0.02,
             confidence_trend: TrendDirection::Stable,
             dominant_skill_shift: None,
+            messages_scored: 0,
         };
         assert_eq!(
             compute_recommendation(&signals, 3),

@@ -1135,6 +1135,7 @@ mod tests {
                 correction_rate_delta: -0.15,
                 confidence_trend: TrendDirection::Falling,
                 dominant_skill_shift: Some("finance-management".to_string()),
+                messages_scored: 0,
             },
             recommendation,
             narrative: "Correction rate worsened 15% vs champion".to_string(),

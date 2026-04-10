@@ -130,6 +130,8 @@ pub struct AppCore {
     pub deadline_scheduler: Option<Arc<scheduling::DeadlineScheduler>>,
     /// Mirror self-reflection facade (None when cognitive provider is unavailable).
     pub mirror_facade: Option<Arc<cognitive::mirror::MirrorFacade>>,
+    /// Pending memory repo for user-confirmable facts (None when cognitive unavailable).
+    pub pending_memory_repo: Option<cognitive::repos::PendingMemoryRepo>,
     /// Join handles for MirrorEngine background subscribers — kept alive for app lifetime.
     pub _mirror_handles: Option<Vec<tokio::task::JoinHandle<()>>>,
     /// Cancellation token for the MirrorEngine background subscribers.
@@ -292,6 +294,51 @@ impl AppCore {
         self.mirror_facade
             .as_deref()
             .ok_or_else(|| ApiError::new("NOT_AVAILABLE", "Mirror facade not available"))
+    }
+
+    /// Return pending memory repo or a "not available" error.
+    pub fn pending_memory_repo(&self) -> Result<&cognitive::repos::PendingMemoryRepo, ApiError> {
+        self.pending_memory_repo
+            .as_ref()
+            .ok_or_else(|| ApiError::new("NOT_AVAILABLE", "Pending memory repo not available"))
+    }
+
+    /// Approve a pending memory: deserialize fact, upsert to semantic_facts, remove from pending.
+    pub async fn approve_pending_memory(&self, id: &str) -> Result<(), ApiError> {
+        let repo = self.pending_memory_repo()?;
+        let row = repo
+            .get(id)
+            .await
+            .map_err(|e| ApiError::new("DB_ERROR", format!("failed to fetch pending memory: {e}")))?
+            .ok_or_else(|| {
+                ApiError::new("NOT_FOUND", format!("pending memory '{id}' not found"))
+            })?;
+
+        let fact: cognitive::types::SemanticFact =
+            serde_json::from_str(&row.fact_json).map_err(|e| {
+                ApiError::new("INVALID_DATA", format!("failed to deserialize fact: {e}"))
+            })?;
+
+        let fact_repo = cognitive::repos::SemanticFactRepo::new(self.storage_pool.inner().clone());
+        fact_repo
+            .upsert(&fact)
+            .await
+            .map_err(|e| ApiError::new("DB_ERROR", format!("failed to upsert fact: {e}")))?;
+
+        repo.remove(id).await.map_err(|e| {
+            ApiError::new("DB_ERROR", format!("failed to remove pending memory: {e}"))
+        })?;
+
+        Ok(())
+    }
+
+    /// Dismiss a pending memory (discard without persisting the fact).
+    pub async fn dismiss_pending_memory(&self, id: &str) -> Result<(), ApiError> {
+        let repo = self.pending_memory_repo()?;
+        repo.remove(id).await.map_err(|e| {
+            ApiError::new("DB_ERROR", format!("failed to remove pending memory: {e}"))
+        })?;
+        Ok(())
     }
 
     /// Return voice service or a "feature disabled" error.

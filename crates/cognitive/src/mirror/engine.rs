@@ -45,6 +45,7 @@ impl MirrorEngine {
         autotuner_bridge: Option<Arc<dyn AutotunerBridge>>,
         episodic_repo: Option<EpisodicMemoryRepo>,
         rule_repo: Option<ProceduralRuleRepo>,
+        trial_evaluator: Option<Arc<dyn crate::mirror::types::EarlyTrialEvaluator>>,
     ) -> (MirrorFacade, Vec<JoinHandle<()>>, CancellationToken) {
         let shutdown = CancellationToken::new();
 
@@ -61,7 +62,7 @@ impl MirrorEngine {
         let trial_sub = Arc::new(TrialPreviewSubscriber::new(
             trial_repo,
             active_timers.clone(),
-            None, // evaluator wired in Phase 5
+            trial_evaluator,
         ));
 
         let handles = vec![
@@ -104,7 +105,8 @@ mod tests {
         let repo = crate::mirror::test_mirror_repo().await;
         let bus = Arc::new(bus::DomainEventBus::new(16));
 
-        let (facade, handles, shutdown) = MirrorEngine::start(repo, bus, None, None, None, None);
+        let (facade, handles, shutdown) =
+            MirrorEngine::start(repo, bus, None, None, None, None, None);
 
         // Facade is usable.
         let state = facade.get_state().await.unwrap();
@@ -123,7 +125,7 @@ mod tests {
         let bus = Arc::new(bus::DomainEventBus::new(16));
 
         let (_facade, handles, shutdown) =
-            MirrorEngine::start(repo, Arc::clone(&bus), None, None, None, None);
+            MirrorEngine::start(repo, Arc::clone(&bus), None, None, None, None, None);
 
         // Publish a SkillRouted event — the subscriber should accumulate it.
         bus.publish(bus::DomainEvent::SkillRouted {
@@ -150,7 +152,7 @@ mod tests {
 
         assert_eq!(bus.subscriber_count(), 0);
         let (_facade, handles, shutdown) =
-            MirrorEngine::start(repo, Arc::clone(&bus), None, None, None, None);
+            MirrorEngine::start(repo, Arc::clone(&bus), None, None, None, None, None);
         // Four subscribers (routing + meta_rule + config_archiver + trial_preview).
         assert_eq!(bus.subscriber_count(), 4);
 

@@ -1859,7 +1859,8 @@ impl SimulationHarness {
         if !candidates.is_empty() {
             match self.consolidation_handler.decide_batch(&candidates).await {
                 Ok(ops) => {
-                    cognitive::execute_memory_ops(&ops, &candidates, &self.fact_repo, None).await;
+                    cognitive::execute_memory_ops(&ops, &candidates, &self.fact_repo, None, None)
+                        .await;
 
                     // Contradiction detection: mirror the logic from
                     // cognitive::services::background that checks Update/Add ops

@@ -385,6 +385,14 @@ impl AppCore {
         )
         .await;
 
+        let pending_memory_repo = {
+            let repo = ::cognitive::repos::PendingMemoryRepo::new(storage_pool.inner().clone());
+            if let Err(e) = repo.migrate().await {
+                tracing::warn!("Pending memory migration failed: {e}");
+            }
+            Some(repo)
+        };
+
         // ── Phase 9: Mirror self-reflection layer ────────────────────────
         let (mirror_facade, mirror_handles, mirror_shutdown) = {
             let mirror_repo = ::cognitive::mirror::MirrorRepo::new(storage_pool.clone());
@@ -413,6 +421,11 @@ impl AppCore {
             let rule_repo = Some(::cognitive::ProceduralRuleRepo::new(
                 storage_pool.inner().clone(),
             ));
+            let trial_evaluator: Option<Arc<dyn ::cognitive::mirror::EarlyTrialEvaluator>> = Some(
+                Arc::new(crate::adapters::trial_evaluator::AppTrialEvaluator::new(
+                    ::storage::StrategyRepo::new(storage_pool.inner().clone()),
+                )),
+            );
             let (facade, handles, shutdown) = ::cognitive::mirror::MirrorEngine::start(
                 mirror_repo,
                 Arc::clone(&domain_event_bus),
@@ -420,6 +433,7 @@ impl AppCore {
                 autotuner_bridge,
                 episodic_repo,
                 rule_repo,
+                trial_evaluator,
             );
 
             // Bootstrap brain version 1 on first run
@@ -657,6 +671,7 @@ impl AppCore {
             autotuner,
             deadline_scheduler: Some(deadline_scheduler),
             mirror_facade,
+            pending_memory_repo,
             _mirror_handles: mirror_handles,
             _mirror_shutdown: mirror_shutdown,
             _config_watcher_token: Some(config_watcher_token),

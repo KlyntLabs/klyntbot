@@ -229,6 +229,9 @@ pub struct BackgroundServiceConfig {
     pub deep_handler: Option<Arc<dyn crate::pipeline::DeepConsolidationHandler>>,
     /// Optional density repo for value-density scoring.
     pub density_repo: Option<crate::repos::ConversationDensityRepo>,
+    /// Optional pending memory repo — low-confidence facts are routed here
+    /// instead of being inserted directly into semantic_facts.
+    pub pending_repo: Option<crate::repos::PendingMemoryRepo>,
 }
 
 /// Background service that processes domain events into cognitive memory.
@@ -263,6 +266,7 @@ impl BackgroundConsolidationService {
             intelligence_mode,
             deep_handler,
             density_repo,
+            pending_repo,
         } = config;
         // ── Spawn unified pipeline collectors ─────────────────────────
         let mut _collector_handles: Vec<JoinHandle<()>> = Vec::new();
@@ -598,6 +602,7 @@ impl BackgroundConsolidationService {
                             &candidates,
                             &repo,
                             embedder.as_deref(),
+                            pending_repo.as_ref(),
                         )
                         .await;
 

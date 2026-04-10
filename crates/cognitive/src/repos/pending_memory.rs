@@ -42,6 +42,13 @@ impl PendingMemoryRepo {
         Ok(())
     }
 
+    pub async fn get(&self, id: &str) -> Result<Option<PendingMemoryRow>, sqlx::Error> {
+        sqlx::query_as::<_, PendingMemoryRow>("SELECT * FROM pending_memories WHERE id = ?1")
+            .bind(id)
+            .fetch_optional(&self.pool)
+            .await
+    }
+
     pub async fn list_pending(&self, limit: i64) -> Vec<PendingMemoryRow> {
         sqlx::query_as::<_, PendingMemoryRow>(
             "SELECT * FROM pending_memories ORDER BY created_at DESC LIMIT ?1",
@@ -60,6 +67,18 @@ impl PendingMemoryRepo {
             .execute(&self.pool)
             .await?;
         Ok(())
+    }
+
+    /// Delete pending entries older than `days` days. Returns count deleted.
+    pub async fn cleanup_older_than(&self, days: i64) -> Result<u64, sqlx::Error> {
+        let result = sqlx::query(
+            "DELETE FROM pending_memories \
+             WHERE julianday('now') - julianday(created_at) > ?1",
+        )
+        .bind(days)
+        .execute(&self.pool)
+        .await?;
+        Ok(result.rows_affected())
     }
 }
 

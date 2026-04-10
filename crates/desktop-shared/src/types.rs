@@ -60,6 +60,7 @@ pub enum EntityKind {
     Conversation,
     MirrorSnippet,
     BrainVersion,
+    PendingMemory,
 }
 
 impl EntityKind {
@@ -87,6 +88,7 @@ impl EntityKind {
             "conversation" => Some(Self::Conversation),
             "mirrorsnippet" | "mirror_snippet" => Some(Self::MirrorSnippet),
             "brainversion" | "brain_version" => Some(Self::BrainVersion),
+            "pending_memory" | "pendingmemory" => Some(Self::PendingMemory),
             _ => None,
         }
     }

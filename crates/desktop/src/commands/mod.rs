@@ -23,6 +23,7 @@ pub mod mirror;
 pub mod morning_briefing;
 pub mod notes;
 pub mod objectives;
+pub mod pending_memory;
 pub mod permissions;
 pub mod practice;
 pub mod productivity;

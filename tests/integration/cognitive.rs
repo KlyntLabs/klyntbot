@@ -209,7 +209,7 @@ async fn test_consolidation_add_new_fact() {
         existing: vec![],
     }];
     let ops = handler.decide_batch(&candidates).await.unwrap();
-    execute_memory_ops(&ops, &candidates, &repo, None).await;
+    execute_memory_ops(&ops, &candidates, &repo, None, None).await;
 
     assert!(matches!(ops[0], MemoryOp::Add { ref id } if id == "f1"));
 
@@ -234,7 +234,7 @@ async fn test_consolidation_update_on_changed_value() {
         existing: vec![old.clone()],
     }];
     let ops = handler.decide_batch(&candidates).await.unwrap();
-    execute_memory_ops(&ops, &candidates, &repo, None).await;
+    execute_memory_ops(&ops, &candidates, &repo, None, None).await;
 
     assert!(matches!(ops[0], MemoryOp::Update { .. }));
 
@@ -304,7 +304,7 @@ async fn test_full_pipeline_event_to_retrieval() {
     assert!(ops.iter().any(|op| matches!(op, MemoryOp::Add { .. })));
 
     // 3. Execute ops into storage
-    execute_memory_ops(&ops, &candidates, &repo, None).await;
+    execute_memory_ops(&ops, &candidates, &repo, None, None).await;
 
     // 4. Retrieve the stored fact
     let results = retrieve_relevant_facts(
@@ -359,7 +359,7 @@ async fn test_full_pipeline_update_replaces_old_fact() {
         })
         .collect();
     let ops1 = consolidation.decide_batch(&candidates1).await.unwrap();
-    execute_memory_ops(&ops1, &candidates1, &repo, None).await;
+    execute_memory_ops(&ops1, &candidates1, &repo, None, None).await;
 
     // Second fact (same predicate "stated" → triggers UPDATE in heuristic handler)
     let obs2 = test_observation("UserStatedFact", "Actually I prefer afternoons", 1.0);
@@ -396,7 +396,7 @@ async fn test_full_pipeline_update_replaces_old_fact() {
     assert!(ops2.iter().any(|op| matches!(op, MemoryOp::Update { .. })));
 
     // Execute the update
-    execute_memory_ops(&ops2, &candidates2, &repo, None).await;
+    execute_memory_ops(&ops2, &candidates2, &repo, None, None).await;
 
     // Only the new fact should be active
     let results = retrieve_relevant_facts(
@@ -471,6 +471,7 @@ async fn test_batch_pipeline_processes_domain_events_end_to_end() {
             intelligence_mode: config::schema::IntelligenceMode::Standard,
             deep_handler: None,
             density_repo: None,
+            pending_repo: None,
         },
     );
 
@@ -1410,4 +1411,58 @@ async fn test_reforge_with_feedback_signals() {
 
     drop(skills_tmp);
     drop(pool);
+}
+
+// ── Pending memory approve flow ────────────────────────────────
+
+#[tokio::test]
+async fn test_pending_memory_approve_flow() {
+    use klyntbot::cognitive::repos::PendingMemoryRepo;
+
+    // Setup: in-memory pool with cognitive migrations
+    let (_, inner) = cognitive_pool().await;
+    let fact_repo = SemanticFactRepo::new(inner.clone());
+    let pending_repo = PendingMemoryRepo::new(inner.clone());
+    pending_repo.migrate().await.unwrap();
+
+    // Create a test fact with low confidence (pending candidate)
+    let base = test_fact("pending-test-1", "might_prefer", "dark mode");
+    let fact = SemanticFact {
+        id: "pending-test-1".into(),
+        confidence: 0.3,
+        domain: "test".into(),
+        subject: "user".into(),
+        predicate: "might_prefer".into(),
+        object: "dark mode".into(),
+        ..base
+    };
+
+    // Insert to pending
+    pending_repo.insert(&fact, "low_confidence").await.unwrap();
+
+    // Verify it's pending
+    let pending = pending_repo.list_pending(10).await;
+    assert_eq!(pending.len(), 1);
+    assert_eq!(pending[0].id, "pending-test-1");
+    assert_eq!(pending[0].reason, "low_confidence");
+
+    // Simulate approval: deserialize, upsert into semantic_facts, remove from pending
+    let approved: SemanticFact = serde_json::from_str(&pending[0].fact_json).unwrap();
+    fact_repo.upsert(&approved).await.unwrap();
+    pending_repo.remove("pending-test-1").await.unwrap();
+
+    // Verify it's now in semantic_facts
+    let stored = fact_repo.get("pending-test-1").await.unwrap();
+    assert!(
+        stored.is_some(),
+        "Approved fact should be in semantic_facts"
+    );
+    assert_eq!(stored.unwrap().object, "dark mode");
+
+    // Verify pending queue is empty
+    let remaining = pending_repo.list_pending(10).await;
+    assert!(
+        remaining.is_empty(),
+        "Pending queue should be empty after approval"
+    );
 }
