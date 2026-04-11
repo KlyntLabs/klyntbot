@@ -265,6 +265,24 @@ export interface DelegationCompletedPayload {
   durationMs: number;
 }
 
+// ── Enhancement Trace Events ─────────────────────────────────
+
+export interface EnhancementStage {
+  name: string;
+  status: "ran" | "skipped" | "failed";
+  statusDetail?: string;
+  latencyMs: number;
+  llmCalls: number;
+  outputSummary: string;
+}
+
+export interface RetrievalEnhancedPayload {
+  sessionKey: string;
+  stages: EnhancementStage[];
+  totalLatencyMs: number;
+  totalLlmCalls: number;
+}
+
 // ── Transparency Data (per-message) ──────────────────────────
 
 export interface TransparencyData {
@@ -294,6 +312,11 @@ export interface TransparencyData {
   learning?: { eventType: string; detail: string }[];
   delegations?: DelegationInfo[];
   plan?: PlanData;
+  enhancement?: {
+    stages: EnhancementStage[];
+    totalLatencyMs: number;
+    totalLlmCalls: number;
+  };
 }
 
 // ── Interaction (ask_user) ───────────────────────────────────

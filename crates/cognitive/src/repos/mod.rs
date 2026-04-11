@@ -6,6 +6,7 @@ pub mod book_tree;
 pub mod co_activation;
 pub mod community;
 pub mod deck_preference;
+pub mod enhancement_trace;
 pub mod enrichment;
 pub mod entity;
 pub mod episodic_memory;
@@ -35,6 +36,7 @@ pub use book_tree::SqliteBookTreeRepo;
 pub use co_activation::CoActivationRepo;
 pub use community::{CommunityMemberRow, CommunityRepo, CommunityRow};
 pub use deck_preference::{DeckPreferenceRepo, DeckPreferenceRow};
+pub use enhancement_trace::EnhancementTraceRepo;
 pub use enrichment::{
     ConversationDensityRepo, ConversationDensityRow, KnowledgeSnapshotRepo, KnowledgeSnapshotRow,
 };

@@ -69,6 +69,18 @@ pub struct TrialParams {
 
     // Phase 7: Graph path boost
     pub relevance_weight_graph_path_boost: Option<f64>,
+
+    // Phase 8: Query Enhancement Pipeline
+    /// PRF minimum score threshold (bounds [0.3, 0.9]).
+    pub prf_score_threshold: Option<f64>,
+    /// PRF max expansion terms (bounds [2, 8]).
+    pub prf_max_expansion_terms: Option<usize>,
+    /// Heuristic rerank term-overlap weight (bounds [0.01, 0.15]).
+    pub rerank_term_overlap_weight: Option<f64>,
+    /// Multi-query max variants (bounds [1, 5]).
+    pub multi_query_max_variants: Option<usize>,
+    /// Override Normal mode latency budget in ms (bounds [50, 300]).
+    pub enhancement_budget_latency_ms: Option<u64>,
 }
 
 impl TrialParams {

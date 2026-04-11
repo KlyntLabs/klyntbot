@@ -1,7 +1,25 @@
 import { formatDuration, formatTokens, groupBy, qualifiedToolName } from "@shared/lib/utils";
 import type { DelegationInfo, TransparencyData } from "@shared/types";
-import { Bot, Brain, ChevronDown, Cpu, Database, FileText, Package } from "lucide-react";
+import {
+  Bot,
+  Brain,
+  Check,
+  ChevronDown,
+  Cpu,
+  Database,
+  FileText,
+  Minus,
+  Package,
+  Sparkles,
+  X,
+} from "lucide-react";
 import { useMemo, useState } from "react";
+
+const STAGE_STATUS_ICON = {
+  ran: Check,
+  skipped: Minus,
+  failed: X,
+} as const;
 
 interface CollapsibleBoxProps {
   title: string;
@@ -173,6 +191,7 @@ export function TransparencyPanel({ transparency }: TransparencyPanelProps) {
     learning,
     tools,
     toolTokensTotal,
+    enhancement,
   } = transparency;
 
   const hasMemory = memoryAccesses && memoryAccesses.length > 0;
@@ -182,6 +201,7 @@ export function TransparencyPanel({ transparency }: TransparencyPanelProps) {
   const hasDelegations = delegations && delegations.length > 0;
   const hasLearning = learning && learning.length > 0;
   const hasTools = tools && tools.length > 0;
+  const hasEnhancement = enhancement && enhancement.stages.length > 0;
 
   // Group tools by agent when delegations exist
   const toolsByAgent = useMemo(
@@ -201,7 +221,7 @@ export function TransparencyPanel({ transparency }: TransparencyPanelProps) {
     [hasSkills, skills, agentSelected?.name],
   );
 
-  if (!hasMemory && !hasExecution && !hasTools) return null;
+  if (!hasMemory && !hasExecution && !hasTools && !hasEnhancement) return null;
 
   return (
     <div className="w-56 space-y-2">
@@ -277,6 +297,50 @@ export function TransparencyPanel({ transparency }: TransparencyPanelProps) {
                 detail={ma.resultsCount > 0 ? `${ma.resultsCount} hits` : undefined}
               />
             ))}
+          </CollapsibleBox>
+        </div>
+      )}
+
+      {/* Enhancement — query pipeline trace, collapsed by default */}
+      {hasEnhancement && enhancement && (
+        <div className="glass-bubble overflow-hidden">
+          <CollapsibleBox title="Enhancement" icon={Sparkles} defaultOpen={false}>
+            {enhancement.stages.map((stage) => {
+              const StatusIcon = STAGE_STATUS_ICON[stage.status] ?? Minus;
+              const iconColor =
+                stage.status === "ran"
+                  ? "text-brand"
+                  : stage.status === "failed"
+                    ? "text-destructive"
+                    : "text-dim";
+              return (
+                <div
+                  key={`enh-${stage.name}`}
+                  className="flex items-center gap-1.5 text-muted-foreground"
+                  title={stage.statusDetail ?? stage.outputSummary}
+                >
+                  <StatusIcon className={`size-3 shrink-0 ${iconColor}`} strokeWidth={1.5} />
+                  <span
+                    className={
+                      stage.status === "ran"
+                        ? "text-foreground font-medium"
+                        : "text-muted-foreground"
+                    }
+                  >
+                    {stage.name}
+                  </span>
+                  <span className="ml-auto text-dim">
+                    {stage.status === "ran" ? formatDuration(stage.latencyMs) : stage.status}
+                  </span>
+                </div>
+              );
+            })}
+            <div className="pt-1 mt-1 border-t border-border flex justify-between text-dim">
+              <span>Total</span>
+              <span>
+                {formatDuration(enhancement.totalLatencyMs)} · {enhancement.totalLlmCalls} LLM
+              </span>
+            </div>
           </CollapsibleBox>
         </div>
       )}

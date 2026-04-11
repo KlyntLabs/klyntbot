@@ -36,6 +36,8 @@ pub struct ContextRequest {
     pub session_key: Option<String>,
     /// Contextual signals for query rewriting (active skill, task, situation, etc.)
     pub retrieval_context: Option<crate::rewriter::RetrievalContext>,
+    /// Enhancement budget derived from depth mode (defaults to Normal).
+    pub enhancement_budget: crate::enhancement::EnhancementBudget,
 }
 
 /// The assembled context ready to send to the LLM.
@@ -60,4 +62,6 @@ pub struct AssembledContext {
     pub rewrite_triggered: bool,
     /// Source of the rewrite: "heuristic" or "llm", or None if not triggered.
     pub rewrite_source: Option<String>,
+    /// Enhancement pipeline trace (None if pipeline not configured).
+    pub enhancement_trace: Option<crate::enhancement::EnhancementTrace>,
 }

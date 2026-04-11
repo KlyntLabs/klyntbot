@@ -31,6 +31,7 @@ import type {
   PersonaSegment,
   PlanGeneratedPayload,
   PlanStepCompletedPayload,
+  RetrievalEnhancedPayload,
   SkillLoadedPayload,
   SubagentSpawnedPayload,
   ToolEndPayload,
@@ -67,6 +68,7 @@ const SSE_AGENT_EVENTS = [
   "agent:consensus_reached",
   "agent:pipeline_started",
   "agent:context_assembled",
+  "agent:retrieval_enhanced",
   "agent:memory_promoted",
   "entity:updated",
 ] as const;
@@ -333,6 +335,7 @@ class ChatStreamStore {
       this.onClassificationComplete(p),
     );
     on<ContextAssembledPayload>("agent:context_assembled", (p) => this.onContextAssembled(p));
+    on<RetrievalEnhancedPayload>("agent:retrieval_enhanced", (p) => this.onRetrievalEnhanced(p));
     on<ExecutionStartedPayload>("agent:execution_started", (p) => this.onExecutionStarted(p));
     on<IterationStartPayload>("agent:iteration_start", (p) => this.onIterationStart(p));
     on<UsageReportPayload>("agent:usage_report", (p) => this.onUsageReport(p));
@@ -381,6 +384,9 @@ class ChatStreamStore {
       );
       register<ContextAssembledPayload>("agent:context_assembled", (p) =>
         this.onContextAssembled(p),
+      );
+      register<RetrievalEnhancedPayload>("agent:retrieval_enhanced", (p) =>
+        this.onRetrievalEnhanced(p),
       );
       register<ExecutionStartedPayload>("agent:execution_started", (p) =>
         this.onExecutionStarted(p),
@@ -602,6 +608,21 @@ class ChatStreamStore {
       transparency: {
         ...s.transparency,
         contextTokens: payload.totalTokens,
+      },
+    }));
+  }
+
+  private onRetrievalEnhanced(payload: RetrievalEnhancedPayload): void {
+    if (!this.isActive(payload.sessionKey)) return;
+    this.updateState(payload.sessionKey, (s) => ({
+      ...s,
+      transparency: {
+        ...s.transparency,
+        enhancement: {
+          stages: payload.stages,
+          totalLatencyMs: payload.totalLatencyMs,
+          totalLlmCalls: payload.totalLlmCalls,
+        },
       },
     }));
   }

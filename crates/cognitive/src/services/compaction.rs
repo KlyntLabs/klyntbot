@@ -9,8 +9,8 @@ use chrono::Datelike;
 use tracing::{debug, info, warn};
 
 use crate::repos::{
-    AccumulatedObservationRepo, CoActivationRepo, EpisodicMemoryRepo, FailedObservationRepo,
-    ProceduralRuleRepo, SemanticFactRepo,
+    AccumulatedObservationRepo, CoActivationRepo, EnhancementTraceRepo, EpisodicMemoryRepo,
+    FailedObservationRepo, ProceduralRuleRepo, SemanticFactRepo,
 };
 
 /// Default: archive superseded facts older than this many days.
@@ -39,6 +39,8 @@ const CO_ACTIVATION_DECAY_FACTOR: f64 = 0.95;
 const CO_ACTIVATION_MIN_STRENGTH: f64 = 0.1;
 /// Delete co-activation pairs not fired in this many days, regardless of strength.
 const CO_ACTIVATION_MAX_AGE_DAYS: i64 = 90;
+/// Delete enhancement trace records older than this many days.
+const ENHANCEMENT_TRACE_MAX_DAYS: i64 = 7;
 
 /// Result of a compaction run.
 #[derive(Debug, Clone, Default)]
@@ -52,6 +54,7 @@ pub struct CompactionResult {
     pub session_memory_deleted: u64,
     pub co_activation_pruned: u64,
     pub co_activation_expired: u64,
+    pub enhancement_traces_deleted: u64,
 }
 
 /// Run the full compaction cycle.
@@ -63,6 +66,7 @@ pub async fn run_compaction(
     failed_repo: Option<&FailedObservationRepo>,
     session_mem_repo: Option<&storage::SessionMemoryRepo>,
     co_activation_repo: Option<&CoActivationRepo>,
+    enhancement_trace_repo: Option<&EnhancementTraceRepo>,
 ) -> Result<CompactionResult, sqlx::Error> {
     let mut result = run_compaction_with_params(
         fact_repo,
@@ -128,9 +132,24 @@ pub async fn run_compaction(
         }
     }
 
+    // 9. Clean old enhancement trace records
+    if let Some(etr) = enhancement_trace_repo {
+        match etr.delete_older_than(ENHANCEMENT_TRACE_MAX_DAYS).await {
+            Ok(deleted) => {
+                result.enhancement_traces_deleted = deleted;
+                if deleted > 0 {
+                    info!("Compaction: deleted {deleted} old enhancement trace records");
+                }
+            }
+            Err(e) => {
+                warn!("Compaction: failed to clean enhancement traces: {e}");
+            }
+        }
+    }
+
     debug!(
-        "Compaction complete (extended): {} accum_obs deleted, {} failed_obs deleted, {} session_mem deleted, {} co-activation pruned",
-        result.accumulated_obs_deleted, result.failed_obs_deleted, result.session_memory_deleted, result.co_activation_pruned
+        "Compaction complete (extended): {} accum_obs deleted, {} failed_obs deleted, {} session_mem deleted, {} co-activation pruned, {} enhancement_traces deleted",
+        result.accumulated_obs_deleted, result.failed_obs_deleted, result.session_memory_deleted, result.co_activation_pruned, result.enhancement_traces_deleted
     );
 
     Ok(result)
@@ -303,9 +322,18 @@ mod tests {
         let fact_repo = SemanticFactRepo::new(pool.clone());
         let episodic_repo = EpisodicMemoryRepo::new(pool);
 
-        let result = run_compaction(&fact_repo, &episodic_repo, None, None, None, None, None)
-            .await
-            .unwrap();
+        let result = run_compaction(
+            &fact_repo,
+            &episodic_repo,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+        )
+        .await
+        .unwrap();
         assert_eq!(result.facts_archived, 0);
         assert_eq!(result.episodic_deleted, 0);
         assert_eq!(result.low_stability_archived, 0);
@@ -338,6 +366,7 @@ mod tests {
             &fact_repo,
             &episodic_repo,
             Some(&rule_repo),
+            None,
             None,
             None,
             None,
@@ -376,6 +405,7 @@ mod tests {
             None,
             None,
             None,
+            None,
         )
         .await
         .unwrap();
@@ -405,6 +435,7 @@ mod tests {
             None,
             None,
             Some(&failed_repo),
+            None,
             None,
             None,
         )

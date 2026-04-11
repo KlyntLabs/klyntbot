@@ -414,6 +414,7 @@ pub enum AgentEvent {
     ToolEnd { name, success, duration_ms, result: Option<String>, agent: Option<String> },
     IterationStart { iteration, max },
     ContextAssembled { total_tokens, budget, duration_ms },
+    RetrievalEnhanced { stages: Vec<StageTrace>, total_latency_ms, total_llm_calls },
     ExecutionStarted { engine, max_iterations },
     Done { content, message_id: Option<String> },
     ConfidenceAssessed { score, action },
@@ -428,6 +429,7 @@ The frontend uses these events to render:
 - **Tool activity** — `ToolStart`/`ToolEnd` show which tools are running and their results
 - **Completion** — `Done` carries the final content and persisted message ID
 - **Cost tracking** — `UsageReport` shows token counts, cache hits, and estimated cost
+- **Enhancement trace** — `RetrievalEnhanced` emits the query pipeline's per-stage latency and status; rendered in `TransparencyPanel`'s "Enhancement" section
 
 ---
 

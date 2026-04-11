@@ -22,6 +22,7 @@ impl AppCore {
             None,
             None,
             None,
+            None,
         )
         .await
         .map_err(map_cognitive_err)?;

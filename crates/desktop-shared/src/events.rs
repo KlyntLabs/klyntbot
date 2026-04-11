@@ -36,6 +36,7 @@ pub const AGENT_ENTITY_CREATED: &str = "agent:entity_created";
 pub const AGENT_INTERACTION_REQUEST: &str = "agent:interaction_request";
 pub const AGENT_PIPELINE_STARTED: &str = "agent:pipeline_started";
 pub const AGENT_CONTEXT_ASSEMBLED: &str = "agent:context_assembled";
+pub const AGENT_RETRIEVAL_ENHANCED: &str = "agent:retrieval_enhanced";
 pub const AGENT_CLASSIFICATION_COMPLETE: &str = "agent:classification_complete";
 pub const AGENT_EXECUTION_STARTED: &str = "agent:execution_started";
 pub const AGENT_ITERATION_START: &str = "agent:iteration_start";
@@ -202,6 +203,27 @@ pub struct ContextAssembledPayload {
     pub session_key: String,
     pub total_tokens: usize,
     pub duration_ms: u64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct EnhancementStagePayload {
+    pub name: String,
+    pub status: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub status_detail: Option<String>,
+    pub latency_ms: u64,
+    pub llm_calls: u32,
+    pub output_summary: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RetrievalEnhancedPayload {
+    pub session_key: String,
+    pub stages: Vec<EnhancementStagePayload>,
+    pub total_latency_ms: u64,
+    pub total_llm_calls: u32,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -475,6 +497,16 @@ pub struct TransparencyData {
     pub delegations: Vec<TransparencyDelegation>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub plan: Option<TransparencyPlan>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub enhancement: Option<TransparencyEnhancement>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct TransparencyEnhancement {
+    pub stages: Vec<EnhancementStagePayload>,
+    pub total_latency_ms: u64,
+    pub total_llm_calls: u32,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

@@ -49,6 +49,15 @@ pub enum AgentEvent {
         duration_ms: u64,
     },
 
+    /// Query enhancement pipeline completed — emits the trace for observability.
+    RetrievalEnhanced {
+        stages: Vec<context_engine::enhancement::StageTrace>,
+        #[serde(rename = "totalLatencyMs")]
+        total_latency_ms: u64,
+        #[serde(rename = "totalLlmCalls")]
+        total_llm_calls: u32,
+    },
+
     /// Execution engine selected and starting.
     ExecutionStarted {
         engine: String,

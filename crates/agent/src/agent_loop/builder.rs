@@ -691,6 +691,7 @@ impl AgentLoopBuilder {
         // ── Wire memory retrieval + InsightForge ─────────────────────
         let mut tree_builder_token: Option<CancellationToken> = None;
         let mut memory_service_for_shadow: Option<Arc<cognitive::UnifiedMemoryService>> = None;
+        let mut memory_retriever_for_prf: Option<Arc<dyn context_engine::MemoryRetriever>> = None;
         let context_engine = if let Some(fact_repo) = cognitive_fact_repo {
             let mut retriever = cognitive::UnifiedMemoryService::new(fact_repo)
                 .with_recall_opt(recall_service.clone())
@@ -1082,6 +1083,9 @@ impl AgentLoopBuilder {
                 }
             });
 
+            // Capture retriever clone for PRF pipeline stage (used after the if-let block)
+            memory_retriever_for_prf = Some(Arc::clone(&retriever));
+
             context_engine
                 .with_memory_retriever(retriever)
                 .with_insight_forge(forge)
@@ -1089,12 +1093,12 @@ impl AgentLoopBuilder {
             context_engine
         };
 
-        // Phase 2: Wire LLM provider + config model for query rewriting fallback
+        // Phase 2: Wire query rewriter (backward-compat fallback) + enhancement pipeline
         let rewriter_provider = self.cognitive_provider.clone();
         let rewriter_model = config.agents.rewriter_model.clone();
         let mut query_rewriter = crate::adapters::query_rewriter::ContextualQueryRewriter::new(
-            rewriter_provider,
-            rewriter_model,
+            rewriter_provider.clone(),
+            rewriter_model.clone(),
             800, // 800ms hard cap per spec
         );
 
@@ -1105,8 +1109,101 @@ impl AgentLoopBuilder {
             }
         }
 
+        // Keep old rewriter as fallback — assembler prefers pipeline when available
         let query_rewriter: Arc<dyn context_engine::QueryRewriter> = Arc::new(query_rewriter);
-        let context_engine = context_engine.with_query_rewriter(query_rewriter);
+        let mut context_engine = context_engine.with_query_rewriter(query_rewriter);
+
+        // Phase 4: Build query enhancement pipeline (when enabled)
+        let qe = &config.cognitive.query_enhancement;
+        if qe.enabled {
+            // Stage 1: Signal Enrichment (wraps the existing heuristic rewriter)
+            let signal_rewriter = crate::adapters::query_rewriter::ContextualQueryRewriter::new(
+                rewriter_provider.clone(),
+                rewriter_model.clone(),
+                800,
+            );
+            let signal_stage =
+                crate::adapters::signal_enrichment::SignalEnrichmentStage::new(signal_rewriter);
+
+            let mut query_stages: Vec<Arc<dyn context_engine::enhancement::QueryStage>> =
+                vec![Arc::new(signal_stage)];
+
+            // Stage 2: PRF (needs memory retriever — only if available)
+            if qe.prf.enabled {
+                if let Some(ref retriever) = memory_retriever_for_prf {
+                    let prf_config = context_engine::enhancement::prf::PrfConfig {
+                        initial_fetch_limit: qe.prf.initial_fetch_limit,
+                        min_score_threshold: qe.prf.min_score_threshold,
+                        max_expansion_terms: qe.prf.max_expansion_terms,
+                    };
+                    let prf_stage = context_engine::enhancement::prf::PrfStage::new(
+                        Arc::clone(retriever),
+                        prf_config,
+                    );
+                    query_stages.push(Arc::new(prf_stage));
+                } else {
+                    tracing::debug!(
+                        "PRF stage enabled but no memory retriever available — skipping"
+                    );
+                }
+            }
+
+            // Stage 3: Multi-Query (LLM, Deep+ only — budget gates at runtime)
+            if qe.multi_query.enabled {
+                let mq_model = qe
+                    .multi_query
+                    .model
+                    .clone()
+                    .or_else(|| rewriter_model.clone());
+                let multi_query = crate::adapters::multi_query::MultiQueryStage::new(
+                    rewriter_provider.clone(),
+                    mq_model,
+                );
+                query_stages.push(Arc::new(multi_query));
+            }
+
+            let query_pipeline = Arc::new(context_engine::enhancement::QueryPipeline::new(
+                query_stages,
+            ));
+
+            // Ranking stages
+            let mut ranking_stages: Vec<Arc<dyn context_engine::enhancement::RankingStage>> =
+                vec![];
+
+            if qe.reranking.enabled {
+                let heuristic = context_engine::enhancement::heuristic_rerank::HeuristicRerankStage::new(
+                    context_engine::enhancement::heuristic_rerank::HeuristicRerankConfig::default(),
+                );
+                ranking_stages.push(Arc::new(heuristic));
+
+                let llm_model = qe
+                    .reranking
+                    .llm_rerank_model
+                    .clone()
+                    .or_else(|| rewriter_model.clone());
+                let llm_rerank = crate::adapters::llm_rerank::LlmRerankStage::new(
+                    rewriter_provider.clone(),
+                    llm_model,
+                    qe.reranking.llm_rerank_top_n,
+                );
+                ranking_stages.push(Arc::new(llm_rerank));
+            }
+
+            let ranking_pipeline = Arc::new(context_engine::enhancement::RankingPipeline::new(
+                ranking_stages,
+            ));
+
+            context_engine = context_engine
+                .with_query_pipeline(query_pipeline)
+                .with_ranking_pipeline(ranking_pipeline);
+
+            tracing::info!(
+                prf = qe.prf.enabled && memory_retriever_for_prf.is_some(),
+                multi_query = qe.multi_query.enabled,
+                reranking = qe.reranking.enabled,
+                "Query enhancement pipeline wired"
+            );
+        }
 
         let context_engine = Arc::new(context_engine);
 

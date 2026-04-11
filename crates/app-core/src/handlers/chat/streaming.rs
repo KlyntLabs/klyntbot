@@ -1244,6 +1244,36 @@ pub async fn relay_chat_stream(
                             }
                         );
                     }
+                    AgentEvent::RetrievalEnhanced { stages, total_latency_ms, total_llm_calls } => {
+                        let stage_payloads: Vec<events::EnhancementStagePayload> = stages
+                            .iter()
+                            .map(|s| {
+                                let (status, detail) = s.status.to_parts();
+                                events::EnhancementStagePayload {
+                                    name: s.name.to_string(),
+                                    status: status.to_string(),
+                                    status_detail: detail.map(String::from),
+                                    latency_ms: s.latency_ms,
+                                    llm_calls: s.llm_calls,
+                                    output_summary: s.output_summary.clone(),
+                                }
+                            })
+                            .collect();
+                        transparency.enhancement = Some(events::TransparencyEnhancement {
+                            stages: stage_payloads.clone(),
+                            total_latency_ms,
+                            total_llm_calls,
+                        });
+                        emit!(
+                            events::AGENT_RETRIEVAL_ENHANCED,
+                            events::RetrievalEnhancedPayload {
+                                session_key: sk.clone(),
+                                stages: stage_payloads,
+                                total_latency_ms,
+                                total_llm_calls,
+                            }
+                        );
+                    }
                     AgentEvent::IterationStart { iteration, max } => {
                         if let Some(ref mut exec) = transparency.execution {
                             exec.iterations = iteration as u32;

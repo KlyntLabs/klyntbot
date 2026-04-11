@@ -36,3 +36,9 @@ pub use rewriter::{
     ActiveTaskContext, ActiveView, CorrectionContext, QueryRewriter, RetrievalContext,
     RewriteResult, RewriteSource, UserSituationSnapshot,
 };
+
+pub mod enhancement;
+pub use enhancement::{
+    EnhancementBudget, EnhancementOutput, EnhancementTrace, QueryBundle, QueryPipeline,
+    QuerySource, QueryStage, RankingPipeline, RankingStage, StageStatus, StageTrace,
+};

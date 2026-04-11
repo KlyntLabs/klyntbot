@@ -135,7 +135,6 @@ impl InsightForge {
         total_limit: usize,
         session_key: Option<&str>,
     ) -> Vec<MemoryEntry> {
-        let start = std::time::Instant::now();
         let limit = total_limit.min(self.config.total_limit);
 
         // 1. Circuit breaker check.
@@ -174,12 +173,93 @@ impl InsightForge {
             sub_queries.insert(1.min(sub_queries.len()), result.enriched_query.clone());
         }
 
-        // 3. Fan-out: for each sub-query, search all sources in parallel.
+        self.fan_out_and_merge(
+            &sub_queries,
+            limit,
+            session_key,
+            query,
+            enriched.map(|r| r.enriched_query.clone()),
+        )
+        .await
+    }
+
+    /// Retrieve context entries using a pre-built [`QueryBundle`] from the
+    /// enhancement pipeline.
+    ///
+    /// Similar to [`retrieve_with_enrichment`](Self::retrieve_with_enrichment),
+    /// but instead of relying on the query rewriter, the caller provides an
+    /// already-enhanced `QueryBundle` whose variants are appended to the
+    /// decomposed sub-queries (deduplicated).
+    pub async fn retrieve_with_bundle(
+        &self,
+        bundle: &crate::enhancement::QueryBundle,
+        total_limit: usize,
+        session_key: Option<&str>,
+    ) -> Vec<MemoryEntry> {
+        let limit = total_limit.min(self.config.total_limit);
+
+        // Circuit breaker check.
+        if let Some(sk) = session_key {
+            if self.circuit_breaker.is_open(sk) {
+                debug!("InsightForge circuit open for session, falling back");
+                return self.fallback(&bundle.primary, limit).await;
+            }
+        }
+
+        // Decompose the primary query with timeout.
+        let mut sub_queries = {
+            let decompose_fut = self.decomposer.decompose(&bundle.primary, None);
+            let timeout = tokio::time::timeout(
+                std::time::Duration::from_millis(self.config.decomposer_timeout_ms),
+                decompose_fut,
+            );
+            match timeout.await {
+                Ok(subs) => {
+                    let mut subs = subs;
+                    subs.truncate(self.config.max_sub_queries);
+                    subs
+                }
+                Err(_) => {
+                    warn!("InsightForge decomposer timed out, falling back");
+                    if let Some(sk) = session_key {
+                        self.circuit_breaker.record_failure(sk);
+                    }
+                    return self.fallback(&bundle.primary, limit).await;
+                }
+            }
+        };
+
+        // Append bundle variants (deduplicated), allowing up to 3 extra beyond max_sub_queries.
+        for variant in &bundle.variants {
+            if !sub_queries.contains(variant) {
+                sub_queries.push(variant.clone());
+            }
+        }
+        sub_queries.truncate(self.config.max_sub_queries + bundle.variants.len().min(3));
+
+        self.fan_out_and_merge(&sub_queries, limit, session_key, &bundle.primary, None)
+            .await
+    }
+
+    /// Shared fan-out + RRF merge + source budget logic.
+    ///
+    /// For each sub-query, searches all sources in parallel (each with a
+    /// per-source timeout), then merges via RRF and applies source budget
+    /// allocation (max 60% per source).
+    async fn fan_out_and_merge(
+        &self,
+        sub_queries: &[String],
+        limit: usize,
+        session_key: Option<&str>,
+        audit_query: &str,
+        audit_enriched_query: Option<String>,
+    ) -> Vec<MemoryEntry> {
+        let start = std::time::Instant::now();
+
         tracing::debug!(
             sub_query_count = sub_queries.len(),
             sub_queries = ?sub_queries,
-            has_enrichment = enriched.is_some(),
-            "📡 InsightForge: fan-out sub-queries"
+            "InsightForge: fan-out sub-queries"
         );
         let per_source_limit = self.config.per_source_limit;
         let per_source_timeout =
@@ -187,7 +267,7 @@ impl InsightForge {
 
         let mut all_ranked_lists: Vec<Vec<MemoryEntry>> = Vec::new();
 
-        for sub_query in &sub_queries {
+        for sub_query in sub_queries {
             let mut handles = Vec::new();
 
             // Memory retriever search.
@@ -234,17 +314,17 @@ impl InsightForge {
                     crate::MemorySource::EpisodicMemory => "episodic".to_string(),
                     crate::MemorySource::Domain { name } => name.clone(),
                 }, e.score)).collect::<Vec<_>>(),
-                "📊 InsightForge: sub-query results"
+                "InsightForge: sub-query results"
             );
             all_ranked_lists.push(sub_query_results);
         }
 
-        // 4. RRF merge across sub-queries.
+        // RRF merge across sub-queries.
         let merged = self.rrf_merge(&all_ranked_lists, limit);
         tracing::debug!(
             merged_count = merged.len(),
             top_entries = ?merged.iter().take(5).map(|e| format!("[{:?}] {}", e.source, &e.content[..e.content.len().min(60)])).collect::<Vec<_>>(),
-            "📋 InsightForge: merged results (top 5)"
+            "InsightForge: merged results (top 5)"
         );
 
         // Budget allocation: ensure no single source provides more than 60% of results.
@@ -277,11 +357,12 @@ impl InsightForge {
         // Audit trail logging (guarded to avoid allocations when debug is off)
         if tracing::enabled!(tracing::Level::DEBUG) {
             let elapsed_ms = start.elapsed().as_millis() as u64;
+            let _ = session_key; // suppress unused warning in non-debug builds
             let source_names: Vec<String> = source_counts.keys().cloned().collect();
             let audit = audit::RetrievalAuditEntry {
-                query: query.to_string(),
-                enriched_query: enriched.map(|r| r.enriched_query.clone()),
-                sub_queries,
+                query: audit_query.to_string(),
+                enriched_query: audit_enriched_query,
+                sub_queries: sub_queries.to_vec(),
                 sources_queried: source_names,
                 results_per_source: source_counts,
                 final_results: budgeted.len(),

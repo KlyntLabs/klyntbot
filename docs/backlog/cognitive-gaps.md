@@ -6,13 +6,13 @@
 
 ## Medium Priority
 
-### 1. Implement Heuristic Query Rewriter
-- **Status**: STUBBED
-- **Effort**: Medium
-- **Impact**: Reduce LLM calls, lower latency on retrieval
-- **Details**: `QueryRewriter` adapter heuristic path always returns `None`. Rules for active task boosting, skill-aware enrichment not implemented.
-- **What exists**: `crates/agent/src/adapters/query_rewriter.rs`, `RewriteResult` types, `RetrievalContext` input
-- **What's needed**: Implement heuristic rules using RetrievalContext fields
+### 1. Query Enhancement Pipeline
+- **Status**: SPEC COMPLETE
+- **Effort**: Large
+- **Impact**: Multi-stage retrieval improvement — PRF, multi-query, reranking, budget-gated by depth mode
+- **Details**: Existing `ContextualQueryRewriter` heuristic path works (backlog was stale). Upgraded scope: two-pipeline design (QueryPipeline + RankingPipeline), `EnhancementBudget` cost model, 5 stages gated by DepthMode. Normal mode adds zero LLM calls; Deep adds 2.
+- **Spec**: `docs/superpowers/specs/2026-04-10-query-enhancement-pipeline-design.md`
+- **What's needed**: Implementation plan + execution
 
 ### 2. Add Abstractive History Summarization
 - **Status**: UNWIRED

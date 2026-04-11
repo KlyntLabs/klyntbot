@@ -292,6 +292,29 @@ pub async fn load_coaching_behavioral(
     })
 }
 
+/// Load enhancement pipeline aggregate metrics for Reforge analysis.
+pub async fn collect_enhancement_signals(
+    trace_repo: &crate::repos::EnhancementTraceRepo,
+    since: &str,
+) -> Vec<super::types::EnhancementSignal> {
+    match trace_repo.load_aggregates_since(since).await {
+        Ok(aggregates) => aggregates
+            .into_iter()
+            .map(|a| super::types::EnhancementSignal {
+                depth_mode: a.depth_mode,
+                total_runs: a.total_runs as u32,
+                avg_latency_ms: a.avg_latency_ms,
+                avg_llm_calls: a.avg_llm_calls,
+                avg_confidence: a.avg_confidence,
+            })
+            .collect(),
+        Err(e) => {
+            tracing::warn!("Reforge feedback: failed to load enhancement signals: {e}");
+            vec![]
+        }
+    }
+}
+
 /// Load extraction yield by domain from pipeline_event_log.
 pub async fn load_extraction_yield(
     event_log_repo: &crate::repos::EventLogRepo,

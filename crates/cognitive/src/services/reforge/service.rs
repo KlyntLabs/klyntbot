@@ -514,6 +514,7 @@ pub async fn run_reforge(
         None,
         Some(session_memory_repo),
         None,
+        None,
     )
     .await
     {

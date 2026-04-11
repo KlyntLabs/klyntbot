@@ -215,10 +215,11 @@ impl AgentRuntime {
             context_window: self.context_window,
             session_key: Some(common::SessionKey::new(&ctx.channel, &ctx.chat_id).to_string()),
             retrieval_context,
+            enhancement_budget: context_engine::EnhancementBudget::default(),
         };
 
         let assemble_start = Instant::now();
-        let assembled = self.context_engine.assemble(context_request).await;
+        let mut assembled = self.context_engine.assemble(context_request).await;
         let assemble_ms = assemble_start.elapsed().as_millis() as u64;
 
         let context_fill_tokens = assembled.token_count;
@@ -232,6 +233,18 @@ impl AgentRuntime {
                     duration_ms: assemble_ms,
                 })
                 .await;
+
+            if let Some(trace) = assembled.enhancement_trace.take() {
+                if !trace.stages.is_empty() {
+                    let _ = tx
+                        .send(AgentEvent::RetrievalEnhanced {
+                            stages: trace.stages,
+                            total_latency_ms: trace.total_latency_ms,
+                            total_llm_calls: trace.total_llm_calls,
+                        })
+                        .await;
+                }
+            }
         }
 
         // Emit learning context summaries

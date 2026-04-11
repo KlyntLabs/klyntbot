@@ -394,6 +394,20 @@ pub struct CoachingBehavioralSummary {
 }
 
 // ---------------------------------------------------------------------------
+// Enhancement pipeline signal
+// ---------------------------------------------------------------------------
+
+/// Aggregated enhancement pipeline metrics grouped by depth_mode for Reforge analysis.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct EnhancementSignal {
+    pub depth_mode: String,
+    pub total_runs: u32,
+    pub avg_latency_ms: f64,
+    pub avg_llm_calls: f64,
+    pub avg_confidence: f64,
+}
+
+// ---------------------------------------------------------------------------
 // Result
 // ---------------------------------------------------------------------------
 

@@ -133,6 +133,10 @@ pub struct CognitiveConfig {
     /// Whether the cognitive pipeline uses heuristic-first (Standard) or full-LLM (Deep) processing.
     #[serde(default)]
     pub intelligence_mode: IntelligenceMode,
+
+    /// Query enhancement pipeline configuration.
+    #[serde(default)]
+    pub query_enhancement: QueryEnhancementConfig,
 }
 
 impl Default for CognitiveConfig {
@@ -167,6 +171,7 @@ impl Default for CognitiveConfig {
             atom_extraction: AtomExtractionConfig::default(),
             confirm_threshold: 0.0,
             intelligence_mode: IntelligenceMode::Standard,
+            query_enhancement: QueryEnhancementConfig::default(),
         }
     }
 }
@@ -361,4 +366,113 @@ impl Default for AtomExtractionConfig {
             max_tokens: default_extraction_max_tokens(),
         }
     }
+}
+
+// -- Query Enhancement Pipeline config --
+
+/// Configuration for the query enhancement pipeline.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct QueryEnhancementConfig {
+    #[serde(default = "super::core::default_true")]
+    pub enabled: bool,
+    #[serde(default)]
+    pub prf: PrfEnhancementConfig,
+    #[serde(default)]
+    pub multi_query: MultiQueryEnhancementConfig,
+    #[serde(default)]
+    pub reranking: RerankingEnhancementConfig,
+}
+
+impl Default for QueryEnhancementConfig {
+    fn default() -> Self {
+        Self {
+            enabled: true,
+            prf: PrfEnhancementConfig::default(),
+            multi_query: MultiQueryEnhancementConfig::default(),
+            reranking: RerankingEnhancementConfig::default(),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PrfEnhancementConfig {
+    #[serde(default = "super::core::default_true")]
+    pub enabled: bool,
+    #[serde(default = "default_prf_fetch_limit")]
+    pub initial_fetch_limit: usize,
+    #[serde(default = "default_prf_score_threshold")]
+    pub min_score_threshold: f64,
+    #[serde(default = "default_prf_max_terms")]
+    pub max_expansion_terms: usize,
+}
+
+impl Default for PrfEnhancementConfig {
+    fn default() -> Self {
+        Self {
+            enabled: true,
+            initial_fetch_limit: default_prf_fetch_limit(),
+            min_score_threshold: default_prf_score_threshold(),
+            max_expansion_terms: default_prf_max_terms(),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MultiQueryEnhancementConfig {
+    #[serde(default = "super::core::default_true")]
+    pub enabled: bool,
+    #[serde(default = "default_multi_query_variants")]
+    pub max_variants: usize,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub model: Option<String>,
+}
+
+impl Default for MultiQueryEnhancementConfig {
+    fn default() -> Self {
+        Self {
+            enabled: true,
+            max_variants: default_multi_query_variants(),
+            model: None,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RerankingEnhancementConfig {
+    #[serde(default = "super::core::default_true")]
+    pub enabled: bool,
+    #[serde(default = "default_rerank_top_n")]
+    pub llm_rerank_top_n: usize,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub llm_rerank_model: Option<String>,
+}
+
+impl Default for RerankingEnhancementConfig {
+    fn default() -> Self {
+        Self {
+            enabled: true,
+            llm_rerank_top_n: default_rerank_top_n(),
+            llm_rerank_model: None,
+        }
+    }
+}
+
+fn default_prf_fetch_limit() -> usize {
+    3
+}
+fn default_prf_score_threshold() -> f64 {
+    0.6
+}
+fn default_prf_max_terms() -> usize {
+    5
+}
+fn default_multi_query_variants() -> usize {
+    3
+}
+fn default_rerank_top_n() -> usize {
+    10
 }

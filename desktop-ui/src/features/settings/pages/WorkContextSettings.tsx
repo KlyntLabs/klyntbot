@@ -16,6 +16,16 @@ interface WorkContextData {
   resourceWeight?: number;
 }
 
+// Mirrors crates/config/src/schema/cognitive.rs — only the fields we expose in the UI.
+interface CognitiveData {
+  queryEnhancement?: {
+    enabled?: boolean;
+    prf?: { enabled?: boolean; minScoreThreshold?: number; maxExpansionTerms?: number };
+    multiQuery?: { enabled?: boolean; maxVariants?: number };
+    reranking?: { enabled?: boolean; llmRerankTopN?: number };
+  };
+}
+
 type Preset = "light" | "balanced" | "deep";
 
 const PRESETS: Record<Preset, { semantic: number; temporal: number; resource: number }> = {
@@ -42,11 +52,15 @@ export function WorkContextSettings() {
     { section: "workContext" },
     {},
   );
+  const { data: cognitive, refetch: refetchCognitive } = useQuery<CognitiveData>(
+    "config_get_section",
+    { section: "cognitive" },
+    {},
+  );
 
   const [edits, setEdits] = useState<Record<string, unknown>>({});
+  const [qeEdits, setQeEdits] = useState<Record<string, unknown>>({});
   const [saving, setSaving] = useState(false);
-
-  // ── Helpers ──────────────────────────────────────────────────────
 
   const val = <T,>(key: string, fallback: T): T => {
     if (key in edits) return edits[key] as T;
@@ -57,15 +71,62 @@ export function WorkContextSettings() {
     setEdits((prev) => ({ ...prev, [key]: value }));
   };
 
+  // Query-enhancement uses flat dotted keys ("prf.enabled") matching the
+  // convention in PersonalizationSettings.tsx. Nested structure is rebuilt at save.
+  const qeVal = <T,>(dottedKey: string, fallback: T): T => {
+    if (dottedKey in qeEdits) return qeEdits[dottedKey] as T;
+    const parts = dottedKey.split(".");
+    let node: unknown = cognitive?.queryEnhancement;
+    for (const p of parts) {
+      if (node && typeof node === "object" && p in node) {
+        node = (node as Record<string, unknown>)[p];
+      } else {
+        return fallback;
+      }
+    }
+    return (node as T) ?? fallback;
+  };
+
+  const setQeEdit = (dottedKey: string, value: unknown) => {
+    setQeEdits((prev) => ({ ...prev, [dottedKey]: value }));
+  };
+
   const isDirty = Object.keys(edits).length > 0;
+  const qeIsDirty = Object.keys(qeEdits).length > 0;
 
   const save = async () => {
-    if (!isDirty) return;
+    if (!isDirty && !qeIsDirty) return;
     setSaving(true);
     try {
-      await ipc("config_update_section", { section: "workContext", patch: edits });
+      const calls: Promise<unknown>[] = [];
+      if (isDirty) {
+        calls.push(ipc("config_update_section", { section: "workContext", patch: edits }));
+      }
+      if (qeIsDirty) {
+        // Rebuild nested shape from flat dotted keys
+        const qePatch: Record<string, unknown> = {};
+        for (const [key, value] of Object.entries(qeEdits)) {
+          const parts = key.split(".");
+          let node = qePatch;
+          for (let i = 0; i < parts.length - 1; i++) {
+            const p = parts[i];
+            if (!(p in node) || typeof node[p] !== "object") node[p] = {};
+            node = node[p] as Record<string, unknown>;
+          }
+          node[parts[parts.length - 1]] = value;
+        }
+        calls.push(
+          ipc("config_update_section", {
+            section: "cognitive",
+            patch: { queryEnhancement: qePatch },
+          }),
+        );
+      }
+      await Promise.all(calls);
       setEdits({});
-      refetch();
+      setQeEdits({});
+      if (isDirty) refetch();
+      if (qeIsDirty) refetchCognitive();
     } catch {
       toast.show("Failed to save settings");
     } finally {
@@ -187,7 +248,149 @@ export function WorkContextSettings() {
           </div>
         </SettingsCard>
 
-        {isDirty && <SaveButton onClick={save} saving={saving} />}
+        <SettingsCard title="Query Enhancement">
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <div>
+                <span className="text-xs text-muted-foreground">Enable query enhancement</span>
+                <p className="text-[11px] text-dim">
+                  Multi-stage retrieval pipeline that enriches queries and reranks results
+                </p>
+              </div>
+              <Toggle checked={qeVal("enabled", true)} onChange={(v) => setQeEdit("enabled", v)} />
+            </div>
+
+            <div className="pt-2 border-t border-border">
+              <div className="flex items-center justify-between">
+                <div>
+                  <span className="text-xs text-muted-foreground">Pseudo-relevance feedback</span>
+                  <p className="text-[11px] text-dim">
+                    Heuristic expansion using terms from initial retrieval results
+                  </p>
+                </div>
+                <Toggle
+                  checked={qeVal("prf.enabled", true)}
+                  onChange={(v) => setQeEdit("prf.enabled", v)}
+                />
+              </div>
+
+              <label className="block mt-3">
+                <span className="block text-[11px] text-muted-foreground mb-0.5">
+                  PRF score threshold
+                </span>
+                <p className="text-[11px] text-dim mb-1">
+                  Minimum score for a fact to contribute expansion terms
+                </p>
+                <input
+                  type="number"
+                  min={0.3}
+                  max={0.9}
+                  step={0.05}
+                  value={qeVal("prf.minScoreThreshold", 0.6)}
+                  onChange={(e) => {
+                    const n = Number.parseFloat(e.target.value);
+                    if (!Number.isNaN(n)) setQeEdit("prf.minScoreThreshold", n);
+                  }}
+                  className={`${INPUT_CLASS} w-24`}
+                />
+              </label>
+
+              <label className="block mt-3">
+                <span className="block text-[11px] text-muted-foreground mb-0.5">
+                  PRF max expansion terms
+                </span>
+                <p className="text-[11px] text-dim mb-1">
+                  How many terms to extract from initial results
+                </p>
+                <input
+                  type="number"
+                  min={2}
+                  max={8}
+                  value={qeVal("prf.maxExpansionTerms", 5)}
+                  onChange={(e) => {
+                    const n = Number.parseInt(e.target.value, 10);
+                    if (!Number.isNaN(n)) setQeEdit("prf.maxExpansionTerms", n);
+                  }}
+                  className={`${INPUT_CLASS} w-24`}
+                />
+              </label>
+            </div>
+
+            <div className="pt-2 border-t border-border">
+              <div className="flex items-center justify-between">
+                <div>
+                  <span className="text-xs text-muted-foreground">
+                    Multi-query expansion (Deep+)
+                  </span>
+                  <p className="text-[11px] text-dim">
+                    LLM generates query variants — only runs in DeepThink/Ultra modes
+                  </p>
+                </div>
+                <Toggle
+                  checked={qeVal("multiQuery.enabled", true)}
+                  onChange={(v) => setQeEdit("multiQuery.enabled", v)}
+                />
+              </div>
+
+              <label className="block mt-3">
+                <span className="block text-[11px] text-muted-foreground mb-0.5">
+                  Multi-query max variants
+                </span>
+                <p className="text-[11px] text-dim mb-1">
+                  Number of alternative query formulations to generate
+                </p>
+                <input
+                  type="number"
+                  min={1}
+                  max={5}
+                  value={qeVal("multiQuery.maxVariants", 3)}
+                  onChange={(e) => {
+                    const n = Number.parseInt(e.target.value, 10);
+                    if (!Number.isNaN(n)) setQeEdit("multiQuery.maxVariants", n);
+                  }}
+                  className={`${INPUT_CLASS} w-24`}
+                />
+              </label>
+            </div>
+
+            <div className="pt-2 border-t border-border">
+              <div className="flex items-center justify-between">
+                <div>
+                  <span className="text-xs text-muted-foreground">Result reranking</span>
+                  <p className="text-[11px] text-dim">
+                    Heuristic rerank always runs; LLM rerank only in DeepThink/Ultra modes
+                  </p>
+                </div>
+                <Toggle
+                  checked={qeVal("reranking.enabled", true)}
+                  onChange={(v) => setQeEdit("reranking.enabled", v)}
+                />
+              </div>
+
+              <label className="block mt-3">
+                <span className="block text-[11px] text-muted-foreground mb-0.5">
+                  LLM rerank top-N
+                </span>
+                <p className="text-[11px] text-dim mb-1">
+                  How many top results to send to the LLM for pairwise reranking
+                </p>
+                <input
+                  type="number"
+                  min={5}
+                  max={20}
+                  value={qeVal("reranking.llmRerankTopN", 10)}
+                  onChange={(e) => {
+                    const n = Number.parseInt(e.target.value, 10);
+                    if (!Number.isNaN(n)) setQeEdit("reranking.llmRerankTopN", n);
+                  }}
+                  className={`${INPUT_CLASS} w-24`}
+                />
+              </label>
+            </div>
+          </div>
+        </SettingsCard>
+
+        {(isDirty || qeIsDirty) && <SaveButton onClick={save} saving={saving} />}
       </div>
     </div>
   );

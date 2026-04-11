@@ -23,6 +23,16 @@ use crate::{BudgetAllocator, BudgetConfig, CompressorConfig, HistoryCompressor, 
 use cache::{ContextCache, DEFAULT_CACHE_CAPACITY};
 use types::DEFAULT_MEMORY_RETRIEVAL_LIMIT;
 
+/// Result of memory retrieval: formatted text, entry count, rewrite_triggered,
+/// rewrite_source, and optional enhancement trace.
+type MemoryRetrievalResult = (
+    String,
+    usize,
+    bool,
+    Option<String>,
+    Option<crate::enhancement::EnhancementTrace>,
+);
+
 /// Orchestrates budget allocation, history compression, memory retrieval,
 /// and system prompt assembly via pluggable context sources.
 pub struct ContextEngine {
@@ -39,6 +49,10 @@ pub struct ContextEngine {
     insight_forge: Option<Arc<crate::insight_forge::InsightForge>>,
     /// Optional query rewriter for contextual query enrichment.
     query_rewriter: Option<Arc<dyn crate::rewriter::QueryRewriter>>,
+    /// Optional query enhancement pipeline.
+    query_pipeline: Option<Arc<crate::enhancement::QueryPipeline>>,
+    /// Optional ranking pipeline.
+    ranking_pipeline: Option<Arc<crate::enhancement::RankingPipeline>>,
 }
 
 impl Default for ContextEngine {
@@ -54,6 +68,8 @@ impl Default for ContextEngine {
             sources: Vec::new(),
             insight_forge: None,
             query_rewriter: None,
+            query_pipeline: None,
+            ranking_pipeline: None,
         }
     }
 }
@@ -76,6 +92,8 @@ impl ContextEngine {
             sources: self.sources,
             insight_forge: self.insight_forge,
             query_rewriter: self.query_rewriter,
+            query_pipeline: self.query_pipeline,
+            ranking_pipeline: self.ranking_pipeline,
         }
     }
 
@@ -144,6 +162,23 @@ impl ContextEngine {
         }
     }
 
+    /// Wire a query enhancement pipeline for retrieval augmentation.
+    /// Returns `self` for chaining.
+    pub fn with_query_pipeline(mut self, pipeline: Arc<crate::enhancement::QueryPipeline>) -> Self {
+        self.query_pipeline = Some(pipeline);
+        self
+    }
+
+    /// Wire a ranking pipeline for post-retrieval re-ranking.
+    /// Returns `self` for chaining.
+    pub fn with_ranking_pipeline(
+        mut self,
+        pipeline: Arc<crate::enhancement::RankingPipeline>,
+    ) -> Self {
+        self.ranking_pipeline = Some(pipeline);
+        self
+    }
+
     /// Build the system prompt by iterating registered context sources.
     ///
     /// Each source is queried for its section; non-empty sections are
@@ -193,7 +228,7 @@ impl ContextEngine {
         message: &str,
         session_key: Option<String>,
         retrieval_context: Option<crate::RetrievalContext>,
-    ) -> Option<(String, usize, bool, Option<String>)> {
+    ) -> Option<MemoryRetrievalResult> {
         let request = ContextRequest {
             message_text: message.to_string(),
             history: vec![],
@@ -203,6 +238,7 @@ impl ContextEngine {
             context_window: 0,
             session_key,
             retrieval_context,
+            enhancement_budget: crate::enhancement::EnhancementBudget::default(),
         };
         self.retrieve_memory(&request).await
     }
@@ -214,7 +250,7 @@ impl ContextEngine {
     pub async fn assemble_with_prefetched(
         &self,
         request: ContextRequest,
-        prefetched_memory: Option<(String, usize, bool, Option<String>)>,
+        prefetched_memory: Option<MemoryRetrievalResult>,
     ) -> AssembledContext {
         let cache_key = Self::compute_cache_key(&request);
         {
@@ -284,7 +320,7 @@ impl ContextEngine {
     async fn assemble_uncached_with_memory(
         &self,
         request: &ContextRequest,
-        prefetched: Option<(String, usize, bool, Option<String>)>,
+        prefetched: Option<MemoryRetrievalResult>,
     ) -> AssembledContext {
         let mut allocator = BudgetAllocator::new(BudgetConfig::standard(request.context_window));
 
@@ -304,20 +340,25 @@ impl ContextEngine {
         // 3. Retrieve memories and allocate budget (Priority::RetrievedMemory)
         // Skip memory retrieval only for Clarification mode (no RAG needed).
         // DirectResponse still needs retrieval for personalized conversational answers.
-        let (memory_content, retrieved_memory_count, rewrite_triggered, rewrite_source) =
-            match &request.strategy {
-                ExecutionStrategy::Clarification { .. } => (None, 0, false, None),
-                _ => {
-                    if let Some((text, count, rw, src)) = prefetched {
-                        (Some(text), count, rw, src)
-                    } else {
-                        match self.retrieve_memory(request).await {
-                            Some((text, count, rw, src)) => (Some(text), count, rw, src),
-                            None => (None, 0, false, None),
-                        }
+        let (
+            memory_content,
+            retrieved_memory_count,
+            rewrite_triggered,
+            rewrite_source,
+            enhancement_trace,
+        ) = match &request.strategy {
+            ExecutionStrategy::Clarification { .. } => (None, 0, false, None, None),
+            _ => {
+                if let Some((text, count, rw, src, trace)) = prefetched {
+                    (Some(text), count, rw, src, trace)
+                } else {
+                    match self.retrieve_memory(request).await {
+                        Some((text, count, rw, src, trace)) => (Some(text), count, rw, src, trace),
+                        None => (None, 0, false, None, None),
                     }
                 }
-            };
+            }
+        };
         let memory_tokens = memory_content
             .as_deref()
             .map(|c| self.estimate_text(c))
@@ -428,17 +469,77 @@ impl ContextEngine {
             retrieved_memory_count,
             rewrite_triggered,
             rewrite_source,
+            enhancement_trace,
         }
     }
 
     /// Retrieve relevant memories for the request via embedding-based retrieval.
-    /// Returns (formatted text, entry count, rewrite_triggered, rewrite_source).
-    async fn retrieve_memory(
-        &self,
-        request: &ContextRequest,
-    ) -> Option<(String, usize, bool, Option<String>)> {
+    ///
+    /// Returns `(formatted_text, entry_count, rewrite_triggered, rewrite_source, enhancement_trace)`.
+    /// When the enhancement pipeline is configured it takes precedence over the
+    /// legacy query-rewriter path.
+    async fn retrieve_memory(&self, request: &ContextRequest) -> Option<MemoryRetrievalResult> {
         let retriever = self.memory_retriever.as_ref()?;
 
+        // ── NEW PATH: Enhancement pipeline ──────────────────────────
+        if let Some(ref pipeline) = self.query_pipeline {
+            let ctx = request
+                .retrieval_context
+                .as_ref()
+                .cloned()
+                .unwrap_or_default();
+
+            // Run query pipeline.
+            let output = pipeline
+                .enhance(&request.message_text, &ctx, &request.enhancement_budget)
+                .await;
+            let mut trace = output.trace;
+
+            // Retrieve using InsightForge with bundle (preferred) or plain retriever.
+            let entries = if let Some(ref forge) = self.insight_forge {
+                if forge.should_activate(&request.strategy, &request.message_text) {
+                    forge
+                        .retrieve_with_bundle(
+                            &output.query,
+                            self.memory_retrieval_limit,
+                            request.session_key.as_deref(),
+                        )
+                        .await
+                } else {
+                    retriever
+                        .retrieve(&request.message_text, self.memory_retrieval_limit)
+                        .await
+                }
+            } else {
+                retriever
+                    .retrieve(&output.query.primary, self.memory_retrieval_limit)
+                    .await
+            };
+
+            // Run ranking pipeline if configured.
+            let entries = if let Some(ref ranking) = self.ranking_pipeline {
+                ranking
+                    .rerank(
+                        &output.query,
+                        entries,
+                        &request.enhancement_budget,
+                        &mut trace,
+                    )
+                    .await
+            } else {
+                entries
+            };
+
+            if entries.is_empty() {
+                return None;
+            }
+
+            let text = Self::format_memory_entries(&entries);
+            let entry_count = entries.len();
+            return Some((text, entry_count, false, None, Some(trace)));
+        }
+
+        // ── EXISTING PATH: rewrite_or_spawn dance (backward compat) ─
         // Phase 2: Background race — heuristic immediate, LLM races with InsightForge
         let (enriched, late_rx) = match (&self.query_rewriter, &request.retrieval_context) {
             (Some(rewriter), Some(ctx)) => {
@@ -536,9 +637,16 @@ impl ContextEngine {
         }
 
         let entry_count = entries.len();
+        let text = Self::format_memory_entries(&entries);
 
+        Some((text, entry_count, rewrite_triggered, rewrite_source, None))
+    }
+
+    /// Format a list of `MemoryEntry` items into the `[Relevant Context]`
+    /// prompt text, grouped by source type.
+    fn format_memory_entries(entries: &[crate::memory_retriever::MemoryEntry]) -> String {
         let (facts, rest): (Vec<_>, Vec<_>) = entries
-            .into_iter()
+            .iter()
             .partition(|e| matches!(e.source, MemorySource::CognitiveFact));
         let (recalls, domain): (Vec<_>, Vec<_>) = rest
             .into_iter()
@@ -576,7 +684,7 @@ impl ContextEngine {
             }
         }
 
-        Some((text, entry_count, rewrite_triggered, rewrite_source))
+        text
     }
 
     fn estimate_text(&self, text: &str) -> usize {
@@ -687,6 +795,7 @@ mod tests {
             context_window,
             session_key: None,
             retrieval_context: None,
+            enhancement_budget: crate::enhancement::EnhancementBudget::default(),
         }
     }
 
@@ -773,6 +882,7 @@ mod tests {
             context_window: 128_000,
             session_key: None,
             retrieval_context: None,
+            enhancement_budget: crate::enhancement::EnhancementBudget::default(),
         };
         let result = engine.assemble(request).await;
         // Should have at least the system message
@@ -830,6 +940,7 @@ mod tests {
             context_window: 128_000,
             session_key: None,
             retrieval_context: None,
+            enhancement_budget: crate::enhancement::EnhancementBudget::default(),
         };
         let result = engine.assemble(request).await;
         // ZeroCounter returns 0 for all text → token_count for user + system messages = 0
@@ -861,6 +972,7 @@ mod tests {
             context_window: 128_000,
             session_key: None,
             retrieval_context: None,
+            enhancement_budget: crate::enhancement::EnhancementBudget::default(),
         };
 
         let doubled = engine.assemble(make_req()).await;
@@ -917,6 +1029,7 @@ mod tests {
             context_window: 128_000,
             session_key: None,
             retrieval_context: None,
+            enhancement_budget: crate::enhancement::EnhancementBudget::default(),
         };
 
         let result = engine.assemble(request).await;
@@ -967,6 +1080,7 @@ mod tests {
             context_window: 128_000,
             session_key: None,
             retrieval_context: None,
+            enhancement_budget: crate::enhancement::EnhancementBudget::default(),
         };
 
         let result = engine.assemble(request).await;
@@ -999,6 +1113,7 @@ mod tests {
             context_window: 128_000,
             session_key: None,
             retrieval_context: None,
+            enhancement_budget: crate::enhancement::EnhancementBudget::default(),
         };
 
         let result = engine.assemble(request).await;
@@ -1024,6 +1139,7 @@ mod tests {
             context_window: 4096,
             session_key: None,
             retrieval_context: None,
+            enhancement_budget: crate::enhancement::EnhancementBudget::default(),
         };
         let key1 = ContextEngine::compute_cache_key(&req);
         let key2 = ContextEngine::compute_cache_key(&req);
@@ -1047,6 +1163,7 @@ mod tests {
             context_window: 128_000,
             session_key: None,
             retrieval_context: None,
+            enhancement_budget: crate::enhancement::EnhancementBudget::default(),
         };
 
         let result = engine.assemble(request).await;
@@ -1083,6 +1200,7 @@ mod tests {
             context_window: 1000, // very small window — ~850 input budget
             session_key: None,
             retrieval_context: None,
+            enhancement_budget: crate::enhancement::EnhancementBudget::default(),
         };
         let result = engine.assemble(request).await;
 
@@ -1158,6 +1276,7 @@ mod tests {
             context_window: 50,
             session_key: None,
             retrieval_context: None,
+            enhancement_budget: crate::enhancement::EnhancementBudget::default(),
         };
 
         engine.assemble(request).await;
@@ -1217,6 +1336,7 @@ mod tests {
             retrieved_memory_count: 0,
             rewrite_triggered: false,
             rewrite_source: None,
+            enhancement_trace: None,
         };
         initial.inventory.upsert(ContextInventoryItem {
             source_name: "deferred_test".into(),
@@ -1257,6 +1377,7 @@ mod tests {
             retrieved_memory_count: 0,
             rewrite_triggered: false,
             rewrite_source: None,
+            enhancement_trace: None,
         };
 
         let ctx = test_source_context();
@@ -1291,6 +1412,7 @@ mod tests {
             context_window: 128_000,
             session_key: None,
             retrieval_context: None,
+            enhancement_budget: crate::enhancement::EnhancementBudget::default(),
         };
 
         let result = engine.assemble(request).await;
@@ -1338,6 +1460,7 @@ mod tests {
             retrieved_memory_count: 0,
             rewrite_triggered: false,
             rewrite_source: None,
+            enhancement_trace: None,
         };
 
         let ctx = test_source_context();
@@ -1355,6 +1478,7 @@ mod tests {
             context_window: 128_000,
             session_key: None,
             retrieval_context: None,
+            enhancement_budget: crate::enhancement::EnhancementBudget::default(),
         }
     }
 
