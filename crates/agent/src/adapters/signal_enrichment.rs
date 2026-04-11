@@ -1,9 +1,9 @@
-//! Signal enrichment stage — wraps the existing ContextualQueryRewriter
-//! heuristic logic as a QueryStage.
+//! Signal enrichment stage — wraps `ContextualQueryRewriter`'s heuristic
+//! signal-based query enrichment as a `QueryStage`.
 
 use async_trait::async_trait;
 use context_engine::enhancement::{EnhancementBudget, QueryBundle, QuerySource, QueryStage};
-use context_engine::rewriter::{QueryRewriter, RetrievalContext};
+use context_engine::rewriter::RetrievalContext;
 
 use super::query_rewriter::ContextualQueryRewriter;
 
@@ -29,7 +29,6 @@ impl QueryStage for SignalEnrichmentStage {
         context: &RetrievalContext,
         _budget: &EnhancementBudget,
     ) -> common::Result<QueryBundle> {
-        // Use the existing heuristic rewrite logic via the QueryRewriter trait
         let result = self.rewriter.rewrite(&input.original, context).await;
         match result {
             Some(r) => Ok(QueryBundle {

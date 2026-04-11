@@ -5,8 +5,7 @@
 //! Phase 1: heuristic templates. Phase 2: LLM fallback for Low-specificity queries
 //! where heuristics have insufficient context.
 
-use async_trait::async_trait;
-use context_engine::rewriter::{QueryRewriter, RetrievalContext, RewriteResult, RewriteSource};
+use context_engine::rewriter::{RetrievalContext, RewriteResult, RewriteSource};
 use tracing::debug;
 
 // ---------------------------------------------------------------------------
@@ -504,7 +503,7 @@ impl ContextualQueryRewriter {
     /// Sends a compact prompt with the user's query and available context to a
     /// lightweight LLM, returning an enriched query. Times out after `timeout_ms`
     /// to avoid blocking the main retrieval path.
-    pub(crate) async fn llm_rewrite(
+    async fn llm_rewrite(
         &self,
         original: &str,
         context: &RetrievalContext,
@@ -619,9 +618,14 @@ impl ContextualQueryRewriter {
     }
 }
 
-#[async_trait]
-impl QueryRewriter for ContextualQueryRewriter {
-    async fn rewrite(&self, original: &str, context: &RetrievalContext) -> Option<RewriteResult> {
+impl ContextualQueryRewriter {
+    /// Evaluate the query and return an enriched version (heuristic signal
+    /// enrichment, with optional LLM fallback for Low-specificity queries).
+    pub async fn rewrite(
+        &self,
+        original: &str,
+        context: &RetrievalContext,
+    ) -> Option<RewriteResult> {
         let specificity = query_specificity(original);
         debug!(
             query = original,
@@ -684,65 +688,6 @@ impl QueryRewriter for ContextualQueryRewriter {
         }
 
         result
-    }
-
-    async fn rewrite_or_spawn(
-        &self,
-        original: &str,
-        context: &RetrievalContext,
-        late_tx: Option<tokio::sync::oneshot::Sender<RewriteResult>>,
-    ) -> Option<RewriteResult> {
-        let specificity = query_specificity(original);
-
-        debug!(
-            query = original,
-            ?specificity,
-            skill = context.active_skill.as_deref().unwrap_or("none"),
-            "🔍 QueryRewriter: evaluating (race mode)"
-        );
-
-        let params = self.resolve_params(context);
-
-        match specificity {
-            Specificity::High => {
-                debug!(original = original, "⏭️ QueryRewriter: skipped (High)");
-                None
-            }
-            Specificity::Medium => self.heuristic_rewrite(original, context, &params),
-            Specificity::Low => {
-                // Try heuristic first (instant)
-                if let Some(heuristic) = self.heuristic_rewrite(original, context, &params) {
-                    debug!(
-                        enriched = heuristic.enriched_query.as_str(),
-                        "✅ Heuristic enriched (race mode)"
-                    );
-                    return Some(heuristic);
-                }
-                // Heuristic failed — spawn LLM in background if channel + provider available
-                if let (Some(tx), Some(provider)) = (late_tx, self.llm_provider.as_ref()) {
-                    let provider = provider.clone();
-                    let model = self.rewriter_model.clone();
-                    let timeout_ms = self.timeout_ms;
-                    let original_owned = original.to_string();
-                    let context_clone = context.clone();
-                    debug!(
-                        query = original,
-                        "🚀 QueryRewriter: LLM spawned in background"
-                    );
-                    tokio::spawn(async move {
-                        // Construct a temporary rewriter just for the LLM call
-                        let rewriter =
-                            ContextualQueryRewriter::new(Some(provider), model, timeout_ms);
-                        if let Some(result) =
-                            rewriter.llm_rewrite(&original_owned, &context_clone).await
-                        {
-                            let _ = tx.send(result); // Ignore error if receiver dropped
-                        }
-                    });
-                }
-                None // Return None immediately — InsightForge starts without enrichment
-            }
-        }
     }
 }
 
@@ -1250,71 +1195,6 @@ mod tests {
             "Should be in 0.6–0.85 range, got {}",
             r_rich.confidence
         );
-    }
-
-    // Race pattern tests
-
-    #[tokio::test]
-    async fn rewrite_or_spawn_returns_heuristic_immediately() {
-        let provider: providers::DynProvider =
-            std::sync::Arc::new(MockRewriteProvider::slow("LLM result", 5000));
-        let rewriter = ContextualQueryRewriter::new(Some(provider), None, 800);
-        let ctx = RetrievalContext {
-            active_skill: Some("finance-management".into()),
-            active_task: Some(ActiveTaskContext {
-                title: "Budget review".into(),
-                project_name: None,
-                domain: Some("finance".into()),
-            }),
-            ..Default::default()
-        };
-        let (tx, _rx) = tokio::sync::oneshot::channel();
-        let result = rewriter
-            .rewrite_or_spawn("how are we doing?", &ctx, Some(tx))
-            .await;
-        assert!(result.is_some());
-        assert_eq!(result.unwrap().source, RewriteSource::Heuristic);
-    }
-
-    #[tokio::test]
-    async fn llm_background_race_discards_late() {
-        // LLM is very slow (5s) — simulates InsightForge finishing first.
-        // The oneshot channel should be droppable without error.
-        let provider: providers::DynProvider =
-            std::sync::Arc::new(MockRewriteProvider::slow("late result", 5000));
-        let rewriter = ContextualQueryRewriter::new(Some(provider), None, 5000);
-        let ctx = RetrievalContext::default(); // no heuristic signals → LLM spawned
-        let (tx, mut rx) = tokio::sync::oneshot::channel();
-        let result = rewriter
-            .rewrite_or_spawn("what was that?", &ctx, Some(tx))
-            .await;
-        assert!(result.is_none()); // Heuristic failed, LLM spawned in background
-
-        // Simulate InsightForge finishing first — try_recv immediately (LLM still running)
-        assert!(
-            rx.try_recv().is_err(),
-            "LLM should not have finished yet (5s delay)"
-        );
-        // Dropping rx here is safe — the spawned task's tx.send() will get Err but not panic
-    }
-
-    #[tokio::test]
-    async fn rewrite_or_spawn_fires_llm_in_background() {
-        let provider: providers::DynProvider =
-            std::sync::Arc::new(MockRewriteProvider::new("auth middleware refactoring"));
-        let rewriter = ContextualQueryRewriter::new(Some(provider), None, 800);
-        let ctx = RetrievalContext::default();
-        let (tx, rx) = tokio::sync::oneshot::channel();
-        let result = rewriter
-            .rewrite_or_spawn("what was that?", &ctx, Some(tx))
-            .await;
-        assert!(result.is_none()); // Heuristic failed, LLM spawned
-                                   // Wait for background LLM
-        let llm_result = tokio::time::timeout(std::time::Duration::from_secs(2), rx).await;
-        assert!(llm_result.is_ok());
-        let r = llm_result.unwrap().unwrap();
-        assert!(r.enriched_query.contains("auth middleware"));
-        assert_eq!(r.source, RewriteSource::Llm);
     }
 
     // Champion override tests

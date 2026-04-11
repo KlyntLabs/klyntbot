@@ -49,10 +49,9 @@ impl StrategyRepo {
                                            tool_name, tool_success, tool_duration_ms,
                                            complexity_signals, execution_mode,
                                            retrieved_memory_count,
-                                           rewrite_triggered, rewrite_source,
                                            budget_exhausted, turns_used, loop_detected,
                                            loop_tools, context_fill_pct)
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19, ?20, ?21, ?22, ?23, ?24, ?25)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19, ?20, ?21, ?22, ?23)
              RETURNING *",
         )
         .bind(row.id)
@@ -73,8 +72,6 @@ impl StrategyRepo {
         .bind(&row.complexity_signals)
         .bind(&row.execution_mode)
         .bind(row.retrieved_memory_count)
-        .bind(row.rewrite_triggered)
-        .bind(&row.rewrite_source)
         .bind(row.budget_exhausted)
         .bind(row.turns_used)
         .bind(row.loop_detected)
@@ -321,48 +318,6 @@ impl StrategyRepo {
         }
     }
 
-    /// Fraction of messages where rewrite_triggered = 1, since `since`.
-    pub async fn rewrite_trigger_rate_since(
-        &self,
-        since: DateTime<Utc>,
-    ) -> Result<f64, StorageError> {
-        let row: (i64, i64) = sqlx::query_as(
-            "SELECT COUNT(*) as total,
-                    SUM(CASE WHEN rewrite_triggered = 1 THEN 1 ELSE 0 END) as triggered
-             FROM strategy_records
-             WHERE timestamp >= ?1",
-        )
-        .bind(since)
-        .fetch_one(&self.pool)
-        .await?;
-        Ok(if row.0 == 0 {
-            0.0
-        } else {
-            row.1 as f64 / row.0 as f64
-        })
-    }
-
-    /// Fraction of rewritten messages where retrieved_memory_count > 0.
-    pub async fn rewrite_engagement_rate_since(
-        &self,
-        since: DateTime<Utc>,
-    ) -> Result<f64, StorageError> {
-        let row: (i64, i64) = sqlx::query_as(
-            "SELECT COUNT(*) as total,
-                    SUM(CASE WHEN retrieved_memory_count > 0 THEN 1 ELSE 0 END) as engaged
-             FROM strategy_records
-             WHERE timestamp >= ?1 AND rewrite_triggered = 1",
-        )
-        .bind(since)
-        .fetch_one(&self.pool)
-        .await?;
-        Ok(if row.0 == 0 {
-            0.0
-        } else {
-            row.1 as f64 / row.0 as f64
-        })
-    }
-
     delete_older_than_impl!("strategy_records", "timestamp");
 
     /// Get per-tool stats (only for records where tool_name is non-null).
@@ -411,8 +366,6 @@ mod tests {
             complexity_signals: serde_json::Value::Null,
             execution_mode: None,
             retrieved_memory_count: None,
-            rewrite_triggered: 0,
-            rewrite_source: None,
             budget_exhausted: false,
             turns_used: 0,
             loop_detected: false,
@@ -451,8 +404,6 @@ mod tests {
             complexity_signals: serde_json::Value::Null,
             execution_mode: None,
             retrieved_memory_count: None,
-            rewrite_triggered: 0,
-            rewrite_source: None,
             budget_exhausted: false,
             turns_used: 0,
             loop_detected: false,
@@ -491,8 +442,6 @@ mod tests {
             complexity_signals: serde_json::Value::Null,
             execution_mode: None,
             retrieved_memory_count: None,
-            rewrite_triggered: 0,
-            rewrite_source: None,
             budget_exhausted: false,
             turns_used: 0,
             loop_detected: false,
@@ -554,8 +503,6 @@ mod tests {
             complexity_signals: serde_json::Value::Null,
             execution_mode: None,
             retrieved_memory_count: None,
-            rewrite_triggered: 0,
-            rewrite_source: None,
             budget_exhausted: false,
             turns_used: 0,
             loop_detected: false,
@@ -581,8 +528,6 @@ mod tests {
             complexity_signals: serde_json::Value::Null,
             execution_mode: None,
             retrieved_memory_count: None,
-            rewrite_triggered: 0,
-            rewrite_source: None,
             budget_exhausted: false,
             turns_used: 0,
             loop_detected: false,
@@ -634,8 +579,6 @@ mod tests {
             complexity_signals: serde_json::Value::Null,
             execution_mode: None,
             retrieved_memory_count: None,
-            rewrite_triggered: 0,
-            rewrite_source: None,
             budget_exhausted: false,
             turns_used: 0,
             loop_detected: false,
@@ -679,8 +622,6 @@ mod tests {
                 complexity_signals: serde_json::Value::Null,
                 execution_mode: None,
                 retrieved_memory_count: None,
-                rewrite_triggered: 0,
-                rewrite_source: None,
                 budget_exhausted: false,
                 turns_used: 0,
                 loop_detected: false,
@@ -727,8 +668,6 @@ mod tests {
                 complexity_signals: serde_json::Value::Null,
                 execution_mode: None,
                 retrieved_memory_count: None,
-                rewrite_triggered: 0,
-                rewrite_source: None,
                 budget_exhausted: false,
                 turns_used: 0,
                 loop_detected: false,
@@ -782,8 +721,6 @@ mod tests {
             complexity_signals: serde_json::Value::Null,
             execution_mode: None,
             retrieved_memory_count: None,
-            rewrite_triggered: 0,
-            rewrite_source: None,
             budget_exhausted: false,
             turns_used: 0,
             loop_detected: false,
@@ -822,8 +759,6 @@ mod tests {
             complexity_signals: serde_json::Value::Null,
             execution_mode: None,
             retrieved_memory_count: Some(3),
-            rewrite_triggered: 0,
-            rewrite_source: None,
             budget_exhausted: false,
             turns_used: 0,
             loop_detected: false,
@@ -852,8 +787,6 @@ mod tests {
             complexity_signals: serde_json::Value::Null,
             execution_mode: None,
             retrieved_memory_count: Some(0),
-            rewrite_triggered: 0,
-            rewrite_source: None,
             budget_exhausted: false,
             turns_used: 0,
             loop_detected: false,
@@ -882,8 +815,6 @@ mod tests {
             complexity_signals: serde_json::Value::Null,
             execution_mode: None,
             retrieved_memory_count: None,
-            rewrite_triggered: 0,
-            rewrite_source: None,
             budget_exhausted: false,
             turns_used: 0,
             loop_detected: false,

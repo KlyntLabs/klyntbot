@@ -57,10 +57,6 @@ pub struct ConstraintEvaluator {
     max_correction_rate_increase: f64,
     /// promotion_accuracy must not drop by more than this absolute amount.
     max_promotion_accuracy_drop: f64,
-
-    // Phase 3 constraint
-    /// rewrite_engagement_rate must not decrease by more than this absolute amount.
-    max_rewrite_engagement_drop: f64,
 }
 
 impl ConstraintEvaluator {
@@ -75,7 +71,6 @@ impl ConstraintEvaluator {
             max_retrieval_precision_drop: config.max_retrieval_precision_drop,
             max_correction_rate_increase: config.max_correction_rate_increase,
             max_promotion_accuracy_drop: config.max_promotion_accuracy_drop,
-            max_rewrite_engagement_drop: config.max_rewrite_engagement_drop,
         }
     }
 
@@ -222,22 +217,6 @@ impl ConstraintEvaluator {
                         "correction_rate regressed by {:.1}% but max allowed is {:.1}%",
                         increase * 100.0,
                         self.max_correction_rate_increase * 100.0,
-                    ),
-                });
-            }
-        }
-
-        // --- Phase 3: Rewrite engagement must not drop > threshold ---
-        if baseline.rewrite_engagement_rate > 0.0 {
-            let engagement_drop = baseline.rewrite_engagement_rate - trial.rewrite_engagement_rate;
-            if engagement_drop > self.max_rewrite_engagement_drop {
-                failures.push(ConstraintFailure {
-                    metric: "rewrite_engagement_rate".into(),
-                    threshold: self.max_rewrite_engagement_drop,
-                    actual: engagement_drop,
-                    description: format!(
-                        "Rewrite engagement dropped by {engagement_drop:.4} (max allowed: {:.4})",
-                        self.max_rewrite_engagement_drop
                     ),
                 });
             }
@@ -553,53 +532,6 @@ mod tests {
                 .any(|f| f.metric == "promotion_accuracy"),
             "Expected promotion_accuracy failure, got: {:?}",
             verdict.failures,
-        );
-    }
-
-    #[test]
-    fn fails_when_rewrite_engagement_drops() {
-        let evaluator = default_evaluator();
-        let b = TrialResult {
-            rewrite_engagement_rate: 0.80,
-            ..baseline()
-        };
-
-        // Drops from 0.80 to 0.60 = 0.20 drop, max allowed 0.10
-        let trial = TrialResult {
-            correction_rate: 0.18,
-            rewrite_engagement_rate: 0.60,
-            ..b.clone()
-        };
-
-        let verdict = evaluator.evaluate(&trial, &b);
-        assert!(
-            verdict
-                .failures
-                .iter()
-                .any(|f| f.metric == "rewrite_engagement_rate"),
-            "Expected rewrite_engagement_rate failure, got: {:?}",
-            verdict.failures,
-        );
-    }
-
-    #[test]
-    fn passes_rewrite_engagement_when_baseline_is_zero() {
-        let evaluator = default_evaluator();
-        let b = baseline(); // rewrite_engagement_rate defaults to 0.0
-
-        let trial = TrialResult {
-            correction_rate: 0.18,
-            rewrite_engagement_rate: 0.50,
-            ..b.clone()
-        };
-
-        let verdict = evaluator.evaluate(&trial, &b);
-        assert!(
-            !verdict
-                .failures
-                .iter()
-                .any(|f| f.metric == "rewrite_engagement_rate"),
-            "Should not fail rewrite engagement when baseline is 0.0",
         );
     }
 }

@@ -17,9 +17,8 @@ pub struct ContextEngine {
     cache: Arc<Mutex<ContextCache>>,
     sources: Vec<Box<dyn ContextSource>>,
     insight_forge: Option<Arc<InsightForge>>,
-    query_rewriter: Option<Arc<dyn QueryRewriter>>,       // legacy, kept for backward compat
-    query_pipeline: Option<Arc<QueryPipeline>>,            // preferred: multi-stage enhancement
-    ranking_pipeline: Option<Arc<RankingPipeline>>,        // result reranking
+    query_pipeline: Option<Arc<QueryPipeline>>,      // multi-stage query enhancement
+    ranking_pipeline: Option<Arc<RankingPipeline>>,  // result reranking
 }
 ```
 
@@ -32,7 +31,6 @@ pub struct ContextEngine {
 | `cache` | Bounded LRU cache keyed by SHA-256 of request inputs |
 | `sources` | Pluggable system prompt builders, sorted by priority descending |
 | `insight_forge` | Multi-dimensional retrieval with query decomposition and Reciprocal Rank Fusion |
-| `query_rewriter` | Legacy single-stage rewriter — used as fallback when `query_pipeline` is not wired |
 | `query_pipeline` | Multi-stage query enhancement (signal enrichment → PRF → multi-query) gated by `EnhancementBudget` |
 | `ranking_pipeline` | Result reranking stages (heuristic → LLM) applied after retrieval |
 
@@ -81,8 +79,6 @@ pub struct AssembledContext {
     pub budget_remaining: usize,         // Tokens available for on-demand expansion
     pub version: u32,                    // Incremented on each expand() call
     pub retrieved_memory_count: usize,   // For autotuner memory_relevance metric
-    pub rewrite_triggered: bool,         // Whether query rewriting fired (legacy)
-    pub rewrite_source: Option<String>,  // "heuristic" or "llm" (legacy)
     pub enhancement_trace: Option<EnhancementTrace>, // Per-stage pipeline trace
 }
 ```
@@ -317,7 +313,7 @@ The budget is derived from the user's `DepthMode`: `Normal` (0 LLM calls), `Deep
 
 | Stage | Type | When it runs | What it does |
 |---|---|---|---|
-| `SignalEnrichment` | Heuristic | always | Wraps the legacy `ContextualQueryRewriter` — injects correction/view/task/skill/recent-msg signals |
+| `SignalEnrichment` | Heuristic | always | Wraps `ContextualQueryRewriter` — injects correction/view/task/skill/recent-msg signals |
 | `PseudoRelevanceFeedback` | Heuristic | Normal+ | Retrieves top-3 results (score ≥ 0.6), extracts discriminative terms, appends as query variant |
 | `MultiQuery` | LLM | Deep+ only (budget-gated) | LLM generates up to 3 query variants for fan-out retrieval |
 
@@ -342,7 +338,6 @@ pub struct RetrievalContext {
     pub situation: Option<UserSituationSnapshot>, // Energy, focus, deadline pressure
     pub active_view: Option<ActiveView>,          // Current UI dashboard
     pub recent_correction: Option<CorrectionContext>,
-    pub hierarchical_intent: Option<HierarchicalIntent>,
 }
 ```
 
@@ -466,7 +461,7 @@ flowchart TD
    - If `query_pipeline` is wired, run it to produce a `QueryBundle` (signal enrichment → PRF → multi-query, each budget-gated)
    - Call `InsightForge::retrieve_with_bundle()` to decompose, fan out, and RRF-merge results
    - If `ranking_pipeline` is wired, run reranking stages (heuristic → LLM, budget-gated)
-   - Legacy fallback: when no pipeline is configured, the old `query_rewriter` path with `rewrite_or_spawn` is used instead
+   - When no pipeline is configured, fall through to plain `MemoryRetriever::retrieve()` with the raw query
    - Format results into structured sections, allocate under `Priority::RetrievedMemory`
    - Capture `EnhancementTrace` on `AssembledContext.enhancement_trace` for observability
 
@@ -488,7 +483,7 @@ flowchart TD
 
 ### Prefetch Optimization
 
-The `prefetch_memory()` method runs memory retrieval independently, returning `(formatted_text, entry_count, rewrite_triggered, rewrite_source, enhancement_trace)`. This lets callers overlap retrieval with intent classification:
+The `prefetch_memory()` method runs memory retrieval independently, returning `(formatted_text, entry_count, enhancement_trace)`. This lets callers overlap retrieval with intent classification:
 
 ```rust
 // In the agent runtime:
@@ -533,7 +528,7 @@ It checks budget before cloning, increments the context version, and updates the
 | `crates/context_engine/src/memory_retriever.rs` | `MemoryRetriever` trait, `MemoryEntry`, `MemorySource` |
 | `crates/context_engine/src/insight_forge/` | `InsightForge`, `QueryDecomposer`, `DomainSearcher`, `retrieve_with_bundle`, RRF merge, circuit breaker |
 | `crates/context_engine/src/enhancement/` | `QueryPipeline`, `RankingPipeline`, `QueryBundle`, `EnhancementBudget`, `EnhancementTrace`, `PrfStage`, `HeuristicRerankStage` |
-| `crates/context_engine/src/rewriter.rs` | `QueryRewriter` trait (legacy), `RetrievalContext`, `RewriteResult` |
+| `crates/context_engine/src/rewriter.rs` | `RetrievalContext`, `CorrectionContext`, `ActiveTaskContext`, `RewriteResult` — contextual signal types used by the enhancement pipeline |
 | `crates/context_engine/src/token_counter.rs` | `TokenCounter` trait, `AnthropicTokenCounter`, `TiktokenCounter`, `CharTokenCounter` |
 | `crates/context_engine/src/inventory.rs` | `ContextInventory`, deferred/loaded tracking, prompt formatting |
 | `crates/context_engine/src/ttl_cache.rs` | `TtlCache` for individual context sources |

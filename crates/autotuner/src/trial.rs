@@ -77,9 +77,6 @@ pub struct TrialResult {
     pub promotion_accuracy: f64,
     // Phase 3
     pub knowledge_retention_score: f64,
-    // Phase 3: Query rewriting
-    pub rewrite_trigger_rate: f64,
-    pub rewrite_engagement_rate: f64,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

@@ -1093,35 +1093,25 @@ impl AgentLoopBuilder {
             context_engine
         };
 
-        // Phase 2: Wire query rewriter (backward-compat fallback) + enhancement pipeline
-        let rewriter_provider = self.cognitive_provider.clone();
-        let rewriter_model = config.agents.rewriter_model.clone();
-        let mut query_rewriter = crate::adapters::query_rewriter::ContextualQueryRewriter::new(
-            rewriter_provider.clone(),
-            rewriter_model.clone(),
-            800, // 800ms hard cap per spec
-        );
-
-        // Phase 3: Wire autotuner champion overrides for rewrite params
-        if let Some(ref orchestrator) = self.autotuner {
-            if let Some(sink) = orchestrator.memory_param_sink() {
-                query_rewriter = query_rewriter.with_champion_overrides(sink);
-            }
-        }
-
-        // Keep old rewriter as fallback — assembler prefers pipeline when available
-        let query_rewriter: Arc<dyn context_engine::QueryRewriter> = Arc::new(query_rewriter);
-        let mut context_engine = context_engine.with_query_rewriter(query_rewriter);
-
-        // Phase 4: Build query enhancement pipeline (when enabled)
+        // Build the query enhancement pipeline.
         let qe = &config.cognitive.query_enhancement;
-        if qe.enabled {
-            // Stage 1: Signal Enrichment (wraps the existing heuristic rewriter)
-            let signal_rewriter = crate::adapters::query_rewriter::ContextualQueryRewriter::new(
+        let context_engine = if qe.enabled {
+            let rewriter_provider = self.cognitive_provider.clone();
+            let rewriter_model = config.agents.rewriter_model.clone();
+
+            // Stage 1: Signal Enrichment — wraps ContextualQueryRewriter for
+            // heuristic signal-based query enrichment. Autotuner champion
+            // overrides are wired onto this rewriter so A/B trials apply.
+            let mut signal_rewriter = crate::adapters::query_rewriter::ContextualQueryRewriter::new(
                 rewriter_provider.clone(),
                 rewriter_model.clone(),
-                800,
+                800, // 800ms hard cap per spec
             );
+            if let Some(ref orchestrator) = self.autotuner {
+                if let Some(sink) = orchestrator.memory_param_sink() {
+                    signal_rewriter = signal_rewriter.with_champion_overrides(sink);
+                }
+            }
             let signal_stage =
                 crate::adapters::signal_enrichment::SignalEnrichmentStage::new(signal_rewriter);
 
@@ -1193,17 +1183,19 @@ impl AgentLoopBuilder {
                 ranking_stages,
             ));
 
-            context_engine = context_engine
-                .with_query_pipeline(query_pipeline)
-                .with_ranking_pipeline(ranking_pipeline);
-
             tracing::info!(
                 prf = qe.prf.enabled && memory_retriever_for_prf.is_some(),
                 multi_query = qe.multi_query.enabled,
                 reranking = qe.reranking.enabled,
                 "Query enhancement pipeline wired"
             );
-        }
+
+            context_engine
+                .with_query_pipeline(query_pipeline)
+                .with_ranking_pipeline(ranking_pipeline)
+        } else {
+            context_engine
+        };
 
         let context_engine = Arc::new(context_engine);
 

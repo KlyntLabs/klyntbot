@@ -458,8 +458,6 @@ mod tests {
                     complexity_signals: serde_json::json!({}),
                     execution_mode: None,
                     retrieved_memory_count: None,
-                    rewrite_triggered: 0,
-                    rewrite_source: None,
                     budget_exhausted: false,
                     turns_used: 0,
                     loop_detected: false,

@@ -119,14 +119,6 @@ below; unsafe suggestions are silently discarded by the evaluator.\n\n",
     if let Some(sat) = ctx.champion_metrics.user_satisfaction {
         prompt.push_str(&format!("- user_satisfaction:        {sat:.4}\n"));
     }
-    prompt.push_str(&format!(
-        "- rewrite_trigger_rate:     {:.4}  (fraction of messages rewritten)\n",
-        ctx.champion_metrics.rewrite_trigger_rate
-    ));
-    prompt.push_str(&format!(
-        "- rewrite_engagement_rate:  {:.4}  (fraction of rewrites that retrieved memories)\n",
-        ctx.champion_metrics.rewrite_engagement_rate
-    ));
     prompt.push('\n');
 
     // ---- 3. Recent trial history -------------------------------------------
@@ -210,8 +202,7 @@ below; unsafe suggestions are silently discarded by the evaluator.\n\n",
 - `avg_tokens_per_message` must not increase by **> 8%** relative to champion\n\
 - `avg_response_time_ms` must not increase by **> 15%** relative to champion\n\
 - `routing_stability` must not decrease by **> 10%** relative to champion\n\
-- `memory_relevance` must not decrease by **> 5%** relative to champion\n\
-- `rewrite_engagement_rate` must not decrease by **> 10%** absolute from champion\n\n\
+- `memory_relevance` must not decrease by **> 5%** relative to champion\n\n\
 Design your variants to satisfy these constraints. Include your constraint reasoning \
 in the `constraint_reasoning` field of each variant.\n\n",
     );

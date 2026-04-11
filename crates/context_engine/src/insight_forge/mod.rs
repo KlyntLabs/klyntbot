@@ -108,36 +108,18 @@ impl InsightForge {
 
     /// Retrieve context entries via multi-dimensional search.
     ///
-    /// Delegates to [`retrieve_with_enrichment`](Self::retrieve_with_enrichment)
-    /// without any enriched query.
+    /// 1. Checks the circuit breaker — falls back to plain memory retrieval if open.
+    /// 2. Decomposes the query with a timeout — falls back on timeout.
+    /// 3. For each sub-query, searches all sources in parallel (each with a per-source timeout).
+    /// 4. Merges results via RRF, deduplicates, re-normalises scores to 0.0–1.0.
     pub async fn retrieve(
         &self,
         query: &str,
         total_limit: usize,
         session_key: Option<&str>,
     ) -> Vec<MemoryEntry> {
-        self.retrieve_with_enrichment(query, None, total_limit, session_key)
-            .await
-    }
-
-    /// Retrieve context entries via multi-dimensional search, optionally
-    /// injecting an enriched query from the query rewriter.
-    ///
-    /// 1. Checks the circuit breaker — falls back to plain memory retrieval if open.
-    /// 2. Decomposes the query with a timeout — falls back on timeout.
-    /// 3. If an enriched query is provided, inserts it into the sub-query list.
-    /// 4. For each sub-query, searches all sources in parallel (each with a per-source timeout).
-    /// 5. Merges results via RRF, deduplicates, re-normalises scores to 0.0–1.0.
-    pub async fn retrieve_with_enrichment(
-        &self,
-        query: &str,
-        enriched: Option<&crate::rewriter::RewriteResult>,
-        total_limit: usize,
-        session_key: Option<&str>,
-    ) -> Vec<MemoryEntry> {
         let limit = total_limit.min(self.config.total_limit);
 
-        // 1. Circuit breaker check.
         if let Some(sk) = session_key {
             if self.circuit_breaker.is_open(sk) {
                 debug!("InsightForge circuit open for session, falling back");
@@ -145,16 +127,14 @@ impl InsightForge {
             }
         }
 
-        // 2. Decompose with timeout.
-        let mut sub_queries = {
+        let sub_queries = {
             let decompose_fut = self.decomposer.decompose(query, None);
             let timeout = tokio::time::timeout(
                 std::time::Duration::from_millis(self.config.decomposer_timeout_ms),
                 decompose_fut,
             );
             match timeout.await {
-                Ok(subs) => {
-                    let mut subs = subs;
+                Ok(mut subs) => {
                     subs.truncate(self.config.max_sub_queries);
                     subs
                 }
@@ -168,26 +148,14 @@ impl InsightForge {
             }
         };
 
-        // 2b. Inject enriched query from the rewriter (if available).
-        if let Some(result) = enriched {
-            sub_queries.insert(1.min(sub_queries.len()), result.enriched_query.clone());
-        }
-
-        self.fan_out_and_merge(
-            &sub_queries,
-            limit,
-            session_key,
-            query,
-            enriched.map(|r| r.enriched_query.clone()),
-        )
-        .await
+        self.fan_out_and_merge(&sub_queries, limit, session_key, query, None)
+            .await
     }
 
     /// Retrieve context entries using a pre-built [`QueryBundle`] from the
     /// enhancement pipeline.
     ///
-    /// Similar to [`retrieve_with_enrichment`](Self::retrieve_with_enrichment),
-    /// but instead of relying on the query rewriter, the caller provides an
+    /// Similar to [`retrieve`](Self::retrieve), but the caller provides an
     /// already-enhanced `QueryBundle` whose variants are appended to the
     /// decomposed sub-queries (deduplicated).
     pub async fn retrieve_with_bundle(

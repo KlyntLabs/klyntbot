@@ -23,15 +23,9 @@ use crate::{BudgetAllocator, BudgetConfig, CompressorConfig, HistoryCompressor, 
 use cache::{ContextCache, DEFAULT_CACHE_CAPACITY};
 use types::DEFAULT_MEMORY_RETRIEVAL_LIMIT;
 
-/// Result of memory retrieval: formatted text, entry count, rewrite_triggered,
-/// rewrite_source, and optional enhancement trace.
-type MemoryRetrievalResult = (
-    String,
-    usize,
-    bool,
-    Option<String>,
-    Option<crate::enhancement::EnhancementTrace>,
-);
+/// Result of memory retrieval: formatted text, entry count, and optional
+/// enhancement trace produced by the query pipeline.
+type MemoryRetrievalResult = (String, usize, Option<crate::enhancement::EnhancementTrace>);
 
 /// Orchestrates budget allocation, history compression, memory retrieval,
 /// and system prompt assembly via pluggable context sources.
@@ -47,11 +41,9 @@ pub struct ContextEngine {
     sources: Vec<Box<dyn ContextSource>>,
     /// Optional InsightForge for multi-dimensional retrieval.
     insight_forge: Option<Arc<crate::insight_forge::InsightForge>>,
-    /// Optional query rewriter for contextual query enrichment.
-    query_rewriter: Option<Arc<dyn crate::rewriter::QueryRewriter>>,
-    /// Optional query enhancement pipeline.
+    /// Optional query enhancement pipeline (signal enrichment, PRF, multi-query).
     query_pipeline: Option<Arc<crate::enhancement::QueryPipeline>>,
-    /// Optional ranking pipeline.
+    /// Optional ranking pipeline (heuristic + LLM reranking).
     ranking_pipeline: Option<Arc<crate::enhancement::RankingPipeline>>,
 }
 
@@ -67,7 +59,6 @@ impl Default for ContextEngine {
             cache: Arc::new(Mutex::new(ContextCache::new(DEFAULT_CACHE_CAPACITY))),
             sources: Vec::new(),
             insight_forge: None,
-            query_rewriter: None,
             query_pipeline: None,
             ranking_pipeline: None,
         }
@@ -91,7 +82,6 @@ impl ContextEngine {
             cache: self.cache,
             sources: self.sources,
             insight_forge: self.insight_forge,
-            query_rewriter: self.query_rewriter,
             query_pipeline: self.query_pipeline,
             ranking_pipeline: self.ranking_pipeline,
         }
@@ -139,16 +129,6 @@ impl ContextEngine {
     pub fn with_sources(mut self, mut sources: Vec<Box<dyn ContextSource>>) -> Self {
         sources.sort_by_key(|s| std::cmp::Reverse(s.priority()));
         self.sources = sources;
-        self
-    }
-
-    /// Wire a query rewriter for contextual query enrichment.
-    /// Returns `self` for chaining.
-    pub fn with_query_rewriter(
-        mut self,
-        rewriter: Arc<dyn crate::rewriter::QueryRewriter>,
-    ) -> Self {
-        self.query_rewriter = Some(rewriter);
         self
     }
 
@@ -340,21 +320,15 @@ impl ContextEngine {
         // 3. Retrieve memories and allocate budget (Priority::RetrievedMemory)
         // Skip memory retrieval only for Clarification mode (no RAG needed).
         // DirectResponse still needs retrieval for personalized conversational answers.
-        let (
-            memory_content,
-            retrieved_memory_count,
-            rewrite_triggered,
-            rewrite_source,
-            enhancement_trace,
-        ) = match &request.strategy {
-            ExecutionStrategy::Clarification { .. } => (None, 0, false, None, None),
+        let (memory_content, retrieved_memory_count, enhancement_trace) = match &request.strategy {
+            ExecutionStrategy::Clarification { .. } => (None, 0, None),
             _ => {
-                if let Some((text, count, rw, src, trace)) = prefetched {
-                    (Some(text), count, rw, src, trace)
+                if let Some((text, count, trace)) = prefetched {
+                    (Some(text), count, trace)
                 } else {
                     match self.retrieve_memory(request).await {
-                        Some((text, count, rw, src, trace)) => (Some(text), count, rw, src, trace),
-                        None => (None, 0, false, None, None),
+                        Some((text, count, trace)) => (Some(text), count, trace),
+                        None => (None, 0, None),
                     }
                 }
             }
@@ -467,36 +441,29 @@ impl ContextEngine {
             budget_remaining,
             version: 0,
             retrieved_memory_count,
-            rewrite_triggered,
-            rewrite_source,
             enhancement_trace,
         }
     }
 
     /// Retrieve relevant memories for the request via embedding-based retrieval.
     ///
-    /// Returns `(formatted_text, entry_count, rewrite_triggered, rewrite_source, enhancement_trace)`.
-    /// When the enhancement pipeline is configured it takes precedence over the
-    /// legacy query-rewriter path.
+    /// Runs the query enhancement pipeline (if configured) to produce a
+    /// `QueryBundle`, then fans out through `InsightForge` or falls back to
+    /// plain `MemoryRetriever::retrieve()` when no pipeline is wired.
+    /// Returns `(formatted_text, entry_count, enhancement_trace)`.
     async fn retrieve_memory(&self, request: &ContextRequest) -> Option<MemoryRetrievalResult> {
         let retriever = self.memory_retriever.as_ref()?;
 
-        // ── NEW PATH: Enhancement pipeline ──────────────────────────
-        if let Some(ref pipeline) = self.query_pipeline {
-            let ctx = request
-                .retrieval_context
-                .as_ref()
-                .cloned()
-                .unwrap_or_default();
+        let (entries, trace) = if let Some(ref pipeline) = self.query_pipeline {
+            let default_ctx = crate::rewriter::RetrievalContext::default();
+            let ctx = request.retrieval_context.as_ref().unwrap_or(&default_ctx);
 
-            // Run query pipeline.
             let output = pipeline
-                .enhance(&request.message_text, &ctx, &request.enhancement_budget)
+                .enhance(&request.message_text, ctx, &request.enhancement_budget)
                 .await;
             let mut trace = output.trace;
 
-            // Retrieve using InsightForge with bundle (preferred) or plain retriever.
-            let entries = if let Some(ref forge) = self.insight_forge {
+            let raw_entries = if let Some(ref forge) = self.insight_forge {
                 if forge.should_activate(&request.strategy, &request.message_text) {
                     forge
                         .retrieve_with_bundle(
@@ -507,7 +474,7 @@ impl ContextEngine {
                         .await
                 } else {
                     retriever
-                        .retrieve(&request.message_text, self.memory_retrieval_limit)
+                        .retrieve(&output.query.primary, self.memory_retrieval_limit)
                         .await
                 }
             } else {
@@ -516,130 +483,35 @@ impl ContextEngine {
                     .await
             };
 
-            // Run ranking pipeline if configured.
-            let entries = if let Some(ref ranking) = self.ranking_pipeline {
+            let ranked = if let Some(ref ranking) = self.ranking_pipeline {
                 ranking
                     .rerank(
                         &output.query,
-                        entries,
+                        raw_entries,
                         &request.enhancement_budget,
                         &mut trace,
                     )
                     .await
             } else {
-                entries
+                raw_entries
             };
 
-            if entries.is_empty() {
-                return None;
-            }
-
-            let text = Self::format_memory_entries(&entries);
-            let entry_count = entries.len();
-            return Some((text, entry_count, false, None, Some(trace)));
-        }
-
-        // ── EXISTING PATH: rewrite_or_spawn dance (backward compat) ─
-        // Phase 2: Background race — heuristic immediate, LLM races with InsightForge
-        let (enriched, late_rx) = match (&self.query_rewriter, &request.retrieval_context) {
-            (Some(rewriter), Some(ctx)) => {
-                let (tx, rx) = tokio::sync::oneshot::channel();
-                let result = rewriter
-                    .rewrite_or_spawn(&request.message_text, ctx, Some(tx))
-                    .await;
-                if result.is_some() {
-                    (result, None) // Heuristic hit — no need for background channel
-                } else {
-                    (None, Some(rx)) // LLM may be running in background
-                }
-            }
-            _ => (None, None),
-        };
-
-        // Track rewrite metadata for instrumentation (mut: updated if late LLM arrives)
-        let mut rewrite_triggered = enriched.is_some();
-        let mut rewrite_source = enriched.as_ref().map(|r| match r.source {
-            crate::rewriter::RewriteSource::Heuristic => "heuristic".to_string(),
-            crate::rewriter::RewriteSource::Llm => "llm".to_string(),
-        });
-
-        if let Some(ref e) = enriched {
-            tracing::debug!(
-                enriched_query = e.enriched_query.as_str(),
-                confidence = e.confidence,
-                "🧠 ContextEngine: passing enriched query to InsightForge"
-            );
-        }
-
-        // Use InsightForge if available and appropriate
-        let entries = if let Some(ref forge) = self.insight_forge {
-            if forge.should_activate(&request.strategy, &request.message_text) {
-                let forge_result = forge
-                    .retrieve_with_enrichment(
-                        &request.message_text,
-                        enriched.as_ref(),
-                        self.memory_retrieval_limit,
-                        request.session_key.as_deref(),
-                    )
-                    .await;
-
-                // Check if background LLM finished during InsightForge execution
-                if let Some(mut late_rx) = late_rx {
-                    match late_rx.try_recv() {
-                        Ok(llm_result) => {
-                            // Update instrumentation to capture the late LLM rewrite
-                            rewrite_triggered = true;
-                            rewrite_source = Some("llm".to_string());
-                            tracing::debug!(
-                                enriched = llm_result.enriched_query.as_str(),
-                                "🏁 LLM finished during InsightForge — supplementary search"
-                            );
-                            // Quick supplementary retrieval with the LLM-enriched query
-                            let supplement = retriever
-                                .retrieve(
-                                    &llm_result.enriched_query,
-                                    self.memory_retrieval_limit / 2,
-                                )
-                                .await;
-                            let existing_ids: std::collections::HashSet<String> =
-                                forge_result.iter().map(|e| e.id.clone()).collect();
-                            let mut merged = forge_result;
-                            for entry in supplement {
-                                if !existing_ids.contains(&entry.id) {
-                                    merged.push(entry);
-                                }
-                            }
-                            merged.truncate(self.memory_retrieval_limit);
-                            merged
-                        }
-                        Err(_) => {
-                            tracing::debug!(
-                                "⏱️ LLM didn't finish during InsightForge — using original results"
-                            );
-                            forge_result
-                        }
-                    }
-                } else {
-                    forge_result
-                }
-            } else {
-                retriever
-                    .retrieve(&request.message_text, self.memory_retrieval_limit)
-                    .await
-            }
+            (ranked, Some(trace))
         } else {
-            retriever
+            // No pipeline wired — plain retrieval path.
+            let entries = retriever
                 .retrieve(&request.message_text, self.memory_retrieval_limit)
-                .await
+                .await;
+            (entries, None)
         };
+
         if entries.is_empty() {
             return None;
         }
 
-        let entry_count = entries.len();
         let text = Self::format_memory_entries(&entries);
-
-        Some((text, entry_count, rewrite_triggered, rewrite_source, None))
+        let entry_count = entries.len();
+        Some((text, entry_count, trace))
     }
 
     /// Format a list of `MemoryEntry` items into the `[Relevant Context]`
@@ -1334,8 +1206,6 @@ mod tests {
             budget_remaining: 5000,
             version: 0,
             retrieved_memory_count: 0,
-            rewrite_triggered: false,
-            rewrite_source: None,
             enhancement_trace: None,
         };
         initial.inventory.upsert(ContextInventoryItem {
@@ -1375,8 +1245,6 @@ mod tests {
             budget_remaining: 5000,
             version: 0,
             retrieved_memory_count: 0,
-            rewrite_triggered: false,
-            rewrite_source: None,
             enhancement_trace: None,
         };
 
@@ -1458,8 +1326,6 @@ mod tests {
             budget_remaining: 5,
             version: 0,
             retrieved_memory_count: 0,
-            rewrite_triggered: false,
-            rewrite_source: None,
             enhancement_trace: None,
         };
 

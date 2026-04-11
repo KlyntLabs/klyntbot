@@ -379,8 +379,6 @@ impl AgentRuntime {
                     complexity_signals: serde_json::json!({}),
                     execution_mode: Some(mode),
                     retrieved_memory_count: None,
-                    rewrite_triggered: 0,
-                    rewrite_source: None,
                     budget_exhausted,
                     turns_used: turns as i32,
                     loop_detected: false,
@@ -489,7 +487,6 @@ impl AgentRuntime {
                 None
             },
             recent_correction: None,
-            hierarchical_intent: None,
         })
     }
 

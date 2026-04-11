@@ -161,9 +161,6 @@ impl MetricSource for SimMetricSource {
             promotion_accuracy,
             knowledge_retention_score: knowledge_retention,
             user_satisfaction: None,
-            // Query rewriting is not simulated — 0.0 is correct.
-            rewrite_trigger_rate: 0.0,
-            rewrite_engagement_rate: 0.0,
         })
     }
 }
