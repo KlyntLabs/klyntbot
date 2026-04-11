@@ -1,5 +1,6 @@
 use serde::{Deserialize, Serialize};
 use std::fmt;
+use std::sync::RwLock;
 
 /// Identifies which pipeline stage produced or transformed a query.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -33,7 +34,7 @@ impl fmt::Display for QuerySource {
 }
 
 /// The query representation that flows through the enhancement pipeline.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct QueryBundle {
     /// The raw user query, unchanged throughout the pipeline.
     pub original: String,
@@ -225,5 +226,38 @@ impl EnhancementOutput {
             query: QueryBundle::passthrough(query),
             trace: EnhancementTrace::default(),
         }
+    }
+}
+
+/// A snapshot of the most recent enhancement run, captured for inspection
+/// via MCP / debug tooling.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct EnhancementTraceSnapshot {
+    pub query: QueryBundle,
+    pub trace: EnhancementTrace,
+    pub captured_at: chrono::DateTime<chrono::Utc>,
+}
+
+/// Process-wide store for the most recent enhancement trace. The
+/// [`crate::enhancement::QueryPipeline`] writes here on every `enhance()`
+/// call; consumers (e.g. the `memory` MCP tool) read snapshots for debugging.
+#[derive(Default)]
+pub struct LatestEnhancementTrace {
+    inner: RwLock<Option<EnhancementTraceSnapshot>>,
+}
+
+impl LatestEnhancementTrace {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    pub fn set(&self, snapshot: EnhancementTraceSnapshot) {
+        if let Ok(mut guard) = self.inner.write() {
+            *guard = Some(snapshot);
+        }
+    }
+
+    pub fn get(&self) -> Option<EnhancementTraceSnapshot> {
+        self.inner.read().ok().and_then(|g| g.clone())
     }
 }

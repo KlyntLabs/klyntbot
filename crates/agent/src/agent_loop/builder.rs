@@ -1093,6 +1093,11 @@ impl AgentLoopBuilder {
             context_engine
         };
 
+        // Shared store for the latest enhancement trace, written by the
+        // QueryPipeline and read by the `memory` MCP tool.
+        let latest_enhancement_trace =
+            Arc::new(context_engine::enhancement::LatestEnhancementTrace::new());
+
         // Build the query enhancement pipeline.
         let qe = &config.cognitive.query_enhancement;
         let context_engine = if qe.enabled {
@@ -1152,9 +1157,10 @@ impl AgentLoopBuilder {
                 query_stages.push(Arc::new(multi_query));
             }
 
-            let query_pipeline = Arc::new(context_engine::enhancement::QueryPipeline::new(
-                query_stages,
-            ));
+            let query_pipeline = Arc::new(
+                context_engine::enhancement::QueryPipeline::new(query_stages)
+                    .with_latest_trace_store(Arc::clone(&latest_enhancement_trace)),
+            );
 
             // Ranking stages
             let mut ranking_stages: Vec<Arc<dyn context_engine::enhancement::RankingStage>> =
@@ -1389,6 +1395,9 @@ impl AgentLoopBuilder {
                 if let Some(ref domain_bus) = self.domain_event_bus {
                     memory_tool = memory_tool.with_domain_bus(Arc::clone(domain_bus));
                 }
+
+                memory_tool =
+                    memory_tool.with_enhancement_trace_store(Arc::clone(&latest_enhancement_trace));
 
                 tool_registry.register(memory_tool);
             }

@@ -11,7 +11,7 @@
 - `EnhancementBudget` cost model wired through `DepthMode`; `QueryEnhancementConfig` in `crates/config/src/schema/cognitive.rs`; assembler calls `retrieve_with_bundle()`; builder wires both pipelines.
 - Observability: `EnhancementTraceRepo` persists traces, `AgentEvent::RetrievalEnhanced` emitted on SSE, Reforge `collect_enhancement_signals()` consumes 7-day window, autotuner `TrialParams` extended with PRF/rerank/budget knobs.
 - **Follow-ups (small):**
-  - MCP `get_last_enhancement_trace` action on the `memory` tool — not yet wired in `crates/tools/src/domain/memory_tool.rs`.
+  - ~~MCP `get_last_enhancement_trace` action on the `memory` tool~~ DONE (2026-04-11). `LatestEnhancementTrace` shared store in `context_engine::enhancement`; `QueryPipeline` publishes per enhance(); `MemoryTool` reads via `with_enhancement_trace_store()`.
   - Desktop UI Query Enhancement settings group under the existing Cognitive tab — not yet built.
   - Spec/code drift: autotuner has `rerank_term_overlap_weight` instead of the spec's `rerank_co_activation_weight`. Decide whether to add the co-activation knob or update the spec.
 

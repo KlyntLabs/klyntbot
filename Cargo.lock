@@ -13921,6 +13921,7 @@ dependencies = [
  "cognitive",
  "common",
  "config",
+ "context_engine",
  "cron",
  "fastembed",
  "globset",

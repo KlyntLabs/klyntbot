@@ -7,7 +7,10 @@ use crate::memory_retriever::MemoryEntry;
 use crate::rewriter::RetrievalContext;
 
 use super::traits::{QueryStage, RankingStage};
-use super::types::{EnhancementBudget, EnhancementOutput, EnhancementTrace, QueryBundle};
+use super::types::{
+    EnhancementBudget, EnhancementOutput, EnhancementTrace, EnhancementTraceSnapshot,
+    LatestEnhancementTrace, QueryBundle,
+};
 
 // ---------------------------------------------------------------------------
 // QueryPipeline
@@ -17,12 +20,24 @@ use super::types::{EnhancementBudget, EnhancementOutput, EnhancementTrace, Query
 /// enhanced [`QueryBundle`] ready for retrieval.
 pub struct QueryPipeline {
     stages: Vec<Arc<dyn QueryStage>>,
+    latest_trace: Option<Arc<LatestEnhancementTrace>>,
 }
 
 impl QueryPipeline {
     /// Create a new pipeline with the given stages (run in order).
     pub fn new(stages: Vec<Arc<dyn QueryStage>>) -> Self {
-        Self { stages }
+        Self {
+            stages,
+            latest_trace: None,
+        }
+    }
+
+    /// Attach a shared latest-trace store. Each `enhance()` call publishes
+    /// its trace snapshot to the store, allowing external inspection (e.g.
+    /// the `memory` MCP tool's `get_last_enhancement_trace` action).
+    pub fn with_latest_trace_store(mut self, store: Arc<LatestEnhancementTrace>) -> Self {
+        self.latest_trace = Some(store);
+        self
     }
 
     /// Enhance the query by running all registered stages sequentially.
@@ -57,6 +72,16 @@ impl QueryPipeline {
                     trace.record_failure(stage.name(), elapsed_ms, err_str);
                     bundle = prev_bundle;
                 }
+            }
+        }
+
+        if let Some(store) = &self.latest_trace {
+            if !trace.stages.is_empty() {
+                store.set(EnhancementTraceSnapshot {
+                    query: bundle.clone(),
+                    trace: trace.clone(),
+                    captured_at: chrono::Utc::now(),
+                });
             }
         }
 

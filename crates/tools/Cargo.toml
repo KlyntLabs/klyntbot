@@ -16,6 +16,7 @@ tools-core.workspace = true
 config.workspace = true
 storage.workspace = true
 cognitive.workspace = true
+context_engine.workspace = true
 bus.workspace = true
 async-trait.workspace = true
 serde_json = { workspace = true }

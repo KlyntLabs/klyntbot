@@ -5,6 +5,7 @@
 
 use async_trait::async_trait;
 use bus::DomainEventBus;
+use context_engine::enhancement::LatestEnhancementTrace;
 use serde_json::{json, Value};
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -29,6 +30,8 @@ pub struct MemoryTool {
     embedding_store: Option<storage::VectorStore>,
     /// Domain event bus for publishing facts
     domain_bus: Option<Arc<DomainEventBus>>,
+    /// Shared store of the most recent query enhancement trace.
+    enhancement_trace: Option<Arc<LatestEnhancementTrace>>,
 }
 
 impl MemoryTool {
@@ -42,6 +45,7 @@ impl MemoryTool {
             todo_embedding_handler: None,
             embedding_store: None,
             domain_bus: None,
+            enhancement_trace: None,
         }
     }
 
@@ -89,6 +93,13 @@ impl MemoryTool {
         self.domain_bus = Some(bus);
         self
     }
+
+    /// Inject the shared store that holds the most recent query enhancement
+    /// trace. Required for the `get_last_enhancement_trace` action.
+    pub fn with_enhancement_trace_store(mut self, store: Arc<LatestEnhancementTrace>) -> Self {
+        self.enhancement_trace = Some(store);
+        self
+    }
 }
 
 impl Default for MemoryTool {
@@ -104,7 +115,7 @@ impl Tool for MemoryTool {
     }
 
     fn description(&self) -> &str {
-        "Search past conversations using semantic similarity and record user facts. Actions: search_conversations (search conversation history), search_all (unified search across todos and conversations), purge (clear embeddings), status (show memory stats), record_fact (record a fact about the user into the cognitive pipeline)."
+        "Search past conversations using semantic similarity and record user facts. Actions: search_conversations (search conversation history), search_all (unified search across todos and conversations), purge (clear embeddings), status (show memory stats), record_fact (record a fact about the user into the cognitive pipeline), get_last_enhancement_trace (inspect the most recent query enhancement pipeline run)."
     }
 
     fn metadata(&self) -> tools_core::ToolMetadata {
@@ -128,7 +139,7 @@ impl Tool for MemoryTool {
             "properties": {
                 "action": {
                     "type": "string",
-                    "enum": ["search_conversations", "search_all", "purge", "status", "record_fact"],
+                    "enum": ["search_conversations", "search_all", "purge", "status", "record_fact", "get_last_enhancement_trace"],
                     "description": "Action to perform"
                 },
                 "query": {
@@ -185,6 +196,7 @@ impl Tool for MemoryTool {
             "purge" => self.purge_embeddings(&args).await,
             "status" => self.show_status().await,
             "record_fact" => self.record_fact(&args).await,
+            "get_last_enhancement_trace" => self.get_last_enhancement_trace().await,
             _ => Err(common::KlyntbotError::Tool(
                 common::ToolError::InvalidParams(format!("Unknown action: {}", action)),
             )),
@@ -531,6 +543,23 @@ impl MemoryTool {
         Ok(format!("Recorded: \"{fact}\" (domain: {domain})"))
     }
 
+    /// Return a JSON-encoded snapshot of the most recent query enhancement
+    /// pipeline run, or a notice if none has been captured yet.
+    async fn get_last_enhancement_trace(&self) -> Result<String> {
+        let store = self.enhancement_trace.as_ref().ok_or_else(|| {
+            common::ToolError::InvalidParams("Enhancement trace store not configured".to_string())
+        })?;
+
+        match store.get() {
+            Some(snapshot) => serde_json::to_string_pretty(&snapshot).map_err(|e| {
+                common::KlyntbotError::Tool(common::ToolError::InvalidParams(format!(
+                    "failed to serialize enhancement trace: {e}"
+                )))
+            }),
+            None => Ok("No enhancement trace captured yet.".to_string()),
+        }
+    }
+
     /// Show conversation recall status.
     async fn show_status(&self) -> Result<String> {
         let handler = self.conversation_handler.as_ref().ok_or_else(|| {
@@ -633,7 +662,8 @@ mod tests {
                 "search_all",
                 "purge",
                 "status",
-                "record_fact"
+                "record_fact",
+                "get_last_enhancement_trace"
             ])
         );
     }
@@ -643,14 +673,84 @@ mod tests {
         let tool = MemoryTool::new();
         let params = tool.parameters();
 
-        // Verify all 5 actions are in the enum
         let actions = params["properties"]["action"]["enum"].as_array().unwrap();
-        assert_eq!(actions.len(), 5);
+        assert_eq!(actions.len(), 6);
         assert!(actions.contains(&json!("search_conversations")));
         assert!(actions.contains(&json!("search_all")));
         assert!(actions.contains(&json!("purge")));
         assert!(actions.contains(&json!("status")));
         assert!(actions.contains(&json!("record_fact")));
+        assert!(actions.contains(&json!("get_last_enhancement_trace")));
+    }
+
+    #[tokio::test]
+    async fn get_last_enhancement_trace_returns_snapshot() {
+        use context_engine::enhancement::{
+            EnhancementTrace, EnhancementTraceSnapshot, LatestEnhancementTrace, QueryBundle,
+            QuerySource,
+        };
+
+        let store = Arc::new(LatestEnhancementTrace::new());
+        let mut bundle = QueryBundle::passthrough("what's my next task?");
+        bundle.primary = "what's my next task? (skill: tasks)".to_string();
+        bundle.variants = vec!["upcoming todos".to_string()];
+        bundle.confidence = 0.75;
+        bundle.sources.push(QuerySource::SignalEnrichment);
+
+        store.set(EnhancementTraceSnapshot {
+            query: bundle,
+            trace: EnhancementTrace::default(),
+            captured_at: chrono::Utc::now(),
+        });
+
+        let tool = MemoryTool::new().with_enhancement_trace_store(Arc::clone(&store));
+        let ctx = RoutingContext::new(
+            common::ChannelName::new("cli"),
+            common::ChatId::new("test".to_string()),
+        );
+
+        let result = tool
+            .execute(json!({"action": "get_last_enhancement_trace"}), &ctx)
+            .await
+            .unwrap();
+
+        assert!(result.contains("what's my next task?"));
+        assert!(result.contains("upcoming todos"));
+        assert!(result.contains("confidence"));
+    }
+
+    #[tokio::test]
+    async fn get_last_enhancement_trace_when_empty() {
+        use context_engine::enhancement::LatestEnhancementTrace;
+
+        let store = Arc::new(LatestEnhancementTrace::new());
+        let tool = MemoryTool::new().with_enhancement_trace_store(store);
+        let ctx = RoutingContext::new(
+            common::ChannelName::new("cli"),
+            common::ChatId::new("test".to_string()),
+        );
+
+        let result = tool
+            .execute(json!({"action": "get_last_enhancement_trace"}), &ctx)
+            .await
+            .unwrap();
+
+        assert!(result.contains("No enhancement trace captured yet"));
+    }
+
+    #[tokio::test]
+    async fn get_last_enhancement_trace_requires_store() {
+        let tool = MemoryTool::new();
+        let ctx = RoutingContext::new(
+            common::ChannelName::new("cli"),
+            common::ChatId::new("test".to_string()),
+        );
+
+        let result = tool
+            .execute(json!({"action": "get_last_enhancement_trace"}), &ctx)
+            .await;
+
+        assert!(result.is_err());
     }
 
     #[tokio::test]
