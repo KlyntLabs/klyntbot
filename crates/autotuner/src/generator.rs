@@ -191,7 +191,12 @@ below; unsafe suggestions are silently discarded by the evaluator.\n\n",
 | relevance_weight_community     | 0.00  | 0.30  | 0.01  | community_membership weight in 10-factor model |\n\
 | relevance_weight_cross_note    | 0.00  | 0.20  | 0.01  | cross_note_boost weight |\n\
 | community_top_k                | 3     | 15    | 1     | top-k for community_embeddings search |\n\
-| community_min_similarity       | 0.30  | 0.70  | 0.05  | min cosine similarity for communities |\n\n",
+| community_min_similarity       | 0.30  | 0.70  | 0.05  | min cosine similarity for communities |\n\
+| prf_score_threshold            | 0.30  | 0.90  | 0.05  | Query enhancement: min score for a retrieved entry to contribute PRF terms |\n\
+| prf_max_expansion_terms        | 2     | 8     | 1     | Query enhancement: max terms appended to the query by PRF |\n\
+| rerank_term_overlap_weight     | 0.01  | 0.15  | 0.01  | Query enhancement: weight applied to query-term overlap in heuristic rerank |\n\
+| multi_query_max_variants       | 1     | 5     | 1     | Query enhancement: number of LLM-generated query variants |\n\
+| enhancement_budget_latency_ms  | 50    | 300   | 10    | Query enhancement: Normal-mode pipeline latency budget override (ms) |\n\n",
     );
 
     // ---- 9. Promotion constraints ------------------------------------------

@@ -1,4 +1,5 @@
 use std::collections::HashSet;
+use std::sync::Arc;
 
 use async_trait::async_trait;
 
@@ -38,12 +39,40 @@ impl Default for HeuristicRerankConfig {
 /// score. Zero LLM cost — purely lexical.
 pub struct HeuristicRerankStage {
     config: HeuristicRerankConfig,
+    champion_overrides: Option<Arc<std::sync::RwLock<Option<common::TrialParams>>>>,
 }
 
 impl HeuristicRerankStage {
     /// Create a new heuristic rerank stage with the given config.
     pub fn new(config: HeuristicRerankConfig) -> Self {
-        Self { config }
+        Self {
+            config,
+            champion_overrides: None,
+        }
+    }
+
+    /// Attach an autotuner champion-override sink. When present,
+    /// `TrialParams.rerank_term_overlap_weight` overrides the configured
+    /// term-overlap weight per call.
+    pub fn with_champion_overrides(
+        mut self,
+        sink: Arc<std::sync::RwLock<Option<common::TrialParams>>>,
+    ) -> Self {
+        self.champion_overrides = Some(sink);
+        self
+    }
+
+    fn resolved_term_overlap_weight(&self) -> f64 {
+        if let Some(sink) = &self.champion_overrides {
+            if let Ok(guard) = sink.read() {
+                if let Some(params) = guard.as_ref() {
+                    if let Some(v) = params.rerank_term_overlap_weight {
+                        return v;
+                    }
+                }
+            }
+        }
+        self.config.term_overlap_weight
     }
 }
 
@@ -71,12 +100,13 @@ impl RankingStage for HeuristicRerankStage {
         }
 
         let query_term_count = query_terms.len() as f64;
+        let term_overlap_weight = self.resolved_term_overlap_weight();
 
         for entry in &mut candidates {
             let content_terms: HashSet<String> = tokenize(&entry.content).into_iter().collect();
             let intersection_count = query_terms.intersection(&content_terms).count() as f64;
             let overlap_ratio = intersection_count / query_term_count;
-            let boost = overlap_ratio * self.config.term_overlap_weight;
+            let boost = overlap_ratio * term_overlap_weight;
             entry.score = (entry.score + boost).min(1.0);
         }
 
@@ -169,6 +199,35 @@ mod tests {
             result[0].score <= 1.0,
             "score must not exceed 1.0, got {}",
             result[0].score
+        );
+    }
+
+    #[tokio::test]
+    async fn test_heuristic_rerank_champion_override_weight() {
+        // Config default weight 0.05 gives ~0.025 boost on half-overlap.
+        // Override pushes it to 0.5 → ~0.25 boost, enough to surpass a
+        // much-stronger-initial-score non-overlapping entry.
+        let stage = HeuristicRerankStage::new(HeuristicRerankConfig::default())
+            .with_champion_overrides(Arc::new(std::sync::RwLock::new(Some(
+                common::TrialParams {
+                    rerank_term_overlap_weight: Some(0.5),
+                    ..Default::default()
+                },
+            ))));
+        let query = make_query("budget finance");
+        let candidates = vec![
+            make_entry("a", "budget quarterly", 0.50), // overlaps "budget"
+            make_entry("b", "weather forecast", 0.70), // no overlap
+        ];
+
+        let result = stage
+            .rerank(&query, candidates, &default_budget())
+            .await
+            .unwrap();
+
+        assert_eq!(
+            result[0].id, "a",
+            "overridden weight 0.5 should push 'a' past 'b'"
         );
     }
 

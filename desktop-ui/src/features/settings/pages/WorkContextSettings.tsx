@@ -4,6 +4,7 @@ import { useQuery } from "@shared/hooks/useQuery";
 import { useToastContext } from "@shared/hooks/useToast";
 import { SaveButton, Toggle } from "@shared/ui";
 import { useState } from "react";
+import { COGNITIVE_MODELS } from "../shared/cognitive-models";
 
 // ── Types ────────────────────────────────────────────────────────────
 
@@ -20,11 +21,32 @@ interface WorkContextData {
 interface CognitiveData {
   queryEnhancement?: {
     enabled?: boolean;
-    prf?: { enabled?: boolean; minScoreThreshold?: number; maxExpansionTerms?: number };
-    multiQuery?: { enabled?: boolean; maxVariants?: number };
-    reranking?: { enabled?: boolean; llmRerankTopN?: number };
+    prf?: {
+      enabled?: boolean;
+      initialFetchLimit?: number;
+      minScoreThreshold?: number;
+      maxExpansionTerms?: number;
+    };
+    multiQuery?: { enabled?: boolean; maxVariants?: number; model?: string };
+    reranking?: { enabled?: boolean; llmRerankTopN?: number; llmRerankModel?: string };
+    budgetOverrides?: {
+      normal?: { maxLatencyMs?: number; maxLlmCalls?: number };
+      deepThink?: { maxLatencyMs?: number; maxLlmCalls?: number };
+      ultra?: { maxLatencyMs?: number; maxLlmCalls?: number };
+    };
   };
 }
+
+interface AgentsData {
+  defaults?: { provider?: string };
+}
+
+type DepthModeKey = "normal" | "deepThink" | "ultra";
+const DEPTH_MODES: { key: DepthModeKey; label: string }[] = [
+  { key: "normal", label: "Normal" },
+  { key: "deepThink", label: "DeepThink" },
+  { key: "ultra", label: "Ultra" },
+];
 
 type Preset = "light" | "balanced" | "deep";
 
@@ -57,6 +79,9 @@ export function WorkContextSettings() {
     { section: "cognitive" },
     {},
   );
+  const { data: agents } = useQuery<AgentsData>("config_get_section", { section: "agents" }, {});
+  const providerName = agents?.defaults?.provider ?? "anthropic";
+  const cognitiveModelOptions = COGNITIVE_MODELS[providerName] ?? [];
 
   const [edits, setEdits] = useState<Record<string, unknown>>({});
   const [qeEdits, setQeEdits] = useState<Record<string, unknown>>({});
@@ -276,6 +301,26 @@ export function WorkContextSettings() {
 
               <label className="block mt-3">
                 <span className="block text-[11px] text-muted-foreground mb-0.5">
+                  PRF initial fetch limit
+                </span>
+                <p className="text-[11px] text-dim mb-1">
+                  How many facts to fetch for term extraction
+                </p>
+                <input
+                  type="number"
+                  min={2}
+                  max={10}
+                  value={qeVal("prf.initialFetchLimit", 3)}
+                  onChange={(e) => {
+                    const n = Number.parseInt(e.target.value, 10);
+                    if (!Number.isNaN(n)) setQeEdit("prf.initialFetchLimit", n);
+                  }}
+                  className={`${INPUT_CLASS} w-24`}
+                />
+              </label>
+
+              <label className="block mt-3">
+                <span className="block text-[11px] text-muted-foreground mb-0.5">
                   PRF score threshold
                 </span>
                 <p className="text-[11px] text-dim mb-1">
@@ -351,6 +396,28 @@ export function WorkContextSettings() {
                   className={`${INPUT_CLASS} w-24`}
                 />
               </label>
+
+              <label className="block mt-3">
+                <span className="block text-[11px] text-muted-foreground mb-0.5">
+                  Multi-query model override
+                </span>
+                <p className="text-[11px] text-dim mb-1">
+                  Leave unset to inherit the rewriter model
+                </p>
+                <select
+                  value={qeVal("multiQuery.model", "") as string}
+                  onChange={(e) => setQeEdit("multiQuery.model", e.target.value || null)}
+                  className={`${INPUT_CLASS} w-full`}
+                >
+                  <option value="">(default)</option>
+                  {cognitiveModelOptions.map((opt) => (
+                    <option key={opt.value} value={opt.value}>
+                      {opt.label}
+                      {opt.recommended ? " (recommended)" : ""}
+                    </option>
+                  ))}
+                </select>
+              </label>
             </div>
 
             <div className="pt-2 border-t border-border">
@@ -386,6 +453,89 @@ export function WorkContextSettings() {
                   className={`${INPUT_CLASS} w-24`}
                 />
               </label>
+
+              <label className="block mt-3">
+                <span className="block text-[11px] text-muted-foreground mb-0.5">
+                  LLM rerank model override
+                </span>
+                <p className="text-[11px] text-dim mb-1">
+                  Leave unset to inherit the rewriter model
+                </p>
+                <select
+                  value={qeVal("reranking.llmRerankModel", "") as string}
+                  onChange={(e) => setQeEdit("reranking.llmRerankModel", e.target.value || null)}
+                  className={`${INPUT_CLASS} w-full`}
+                >
+                  <option value="">(default)</option>
+                  {cognitiveModelOptions.map((opt) => (
+                    <option key={opt.value} value={opt.value}>
+                      {opt.label}
+                      {opt.recommended ? " (recommended)" : ""}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            </div>
+
+            <div className="pt-2 border-t border-border">
+              <div>
+                <span className="text-xs text-muted-foreground">Budget overrides</span>
+                <p className="text-[11px] text-dim">
+                  Per-depth-mode latency + LLM call ceilings. Leave blank for defaults.
+                </p>
+              </div>
+
+              {DEPTH_MODES.map(({ key, label }) => (
+                <div key={key} className="mt-3 space-y-2">
+                  <span className="block text-[11px] text-muted-foreground">{label}</span>
+                  <div className="flex gap-3">
+                    <label className="block flex-1">
+                      <span className="block text-[11px] text-dim mb-0.5">max latency (ms)</span>
+                      <input
+                        type="number"
+                        min={50}
+                        max={5000}
+                        placeholder="default"
+                        value={qeVal(`budgetOverrides.${key}.maxLatencyMs`, "") ?? ""}
+                        onChange={(e) => {
+                          const raw = e.target.value;
+                          if (raw === "") {
+                            setQeEdit(`budgetOverrides.${key}.maxLatencyMs`, null);
+                            return;
+                          }
+                          const n = Number.parseInt(raw, 10);
+                          if (!Number.isNaN(n)) {
+                            setQeEdit(`budgetOverrides.${key}.maxLatencyMs`, n);
+                          }
+                        }}
+                        className={`${INPUT_CLASS} w-full`}
+                      />
+                    </label>
+                    <label className="block flex-1">
+                      <span className="block text-[11px] text-dim mb-0.5">max LLM calls</span>
+                      <input
+                        type="number"
+                        min={0}
+                        max={10}
+                        placeholder="default"
+                        value={qeVal(`budgetOverrides.${key}.maxLlmCalls`, "") ?? ""}
+                        onChange={(e) => {
+                          const raw = e.target.value;
+                          if (raw === "") {
+                            setQeEdit(`budgetOverrides.${key}.maxLlmCalls`, null);
+                            return;
+                          }
+                          const n = Number.parseInt(raw, 10);
+                          if (!Number.isNaN(n)) {
+                            setQeEdit(`budgetOverrides.${key}.maxLlmCalls`, n);
+                          }
+                        }}
+                        className={`${INPUT_CLASS} w-full`}
+                      />
+                    </label>
+                  </div>
+                </div>
+              ))}
             </div>
           </div>
         </SettingsCard>

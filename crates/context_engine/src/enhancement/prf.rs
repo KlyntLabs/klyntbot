@@ -46,12 +46,44 @@ impl Default for PrfConfig {
 pub struct PrfStage {
     retriever: Arc<dyn MemoryRetriever>,
     config: PrfConfig,
+    champion_overrides: Option<Arc<std::sync::RwLock<Option<common::TrialParams>>>>,
 }
 
 impl PrfStage {
     /// Create a new PRF stage with the given retriever and config.
     pub fn new(retriever: Arc<dyn MemoryRetriever>, config: PrfConfig) -> Self {
-        Self { retriever, config }
+        Self {
+            retriever,
+            config,
+            champion_overrides: None,
+        }
+    }
+
+    /// Attach an autotuner champion-override sink. When present, trial
+    /// params override the corresponding fields on `PrfConfig` per call.
+    pub fn with_champion_overrides(
+        mut self,
+        sink: Arc<std::sync::RwLock<Option<common::TrialParams>>>,
+    ) -> Self {
+        self.champion_overrides = Some(sink);
+        self
+    }
+
+    fn resolved_config(&self) -> PrfConfig {
+        let mut cfg = self.config.clone();
+        if let Some(sink) = &self.champion_overrides {
+            if let Ok(guard) = sink.read() {
+                if let Some(params) = guard.as_ref() {
+                    if let Some(v) = params.prf_score_threshold {
+                        cfg.min_score_threshold = v;
+                    }
+                    if let Some(v) = params.prf_max_expansion_terms {
+                        cfg.max_expansion_terms = v;
+                    }
+                }
+            }
+        }
+        cfg
     }
 }
 
@@ -72,16 +104,18 @@ impl QueryStage for PrfStage {
             return Ok(input);
         }
 
+        let cfg = self.resolved_config();
+
         // Initial retrieval pass.
         let entries = self
             .retriever
-            .retrieve(&input.primary, self.config.initial_fetch_limit)
+            .retrieve(&input.primary, cfg.initial_fetch_limit)
             .await;
 
         // Filter to strong results only.
         let strong: Vec<&MemoryEntry> = entries
             .iter()
-            .filter(|e| e.score >= self.config.min_score_threshold)
+            .filter(|e| e.score >= cfg.min_score_threshold)
             .collect();
 
         if strong.is_empty() {
@@ -89,8 +123,7 @@ impl QueryStage for PrfStage {
         }
 
         // Extract discriminative terms from the strong results.
-        let terms =
-            extract_discriminative_terms(&strong, &input.primary, self.config.max_expansion_terms);
+        let terms = extract_discriminative_terms(&strong, &input.primary, cfg.max_expansion_terms);
 
         if terms.is_empty() {
             return Ok(input);
@@ -342,6 +375,39 @@ mod tests {
                 .sources
                 .contains(&QuerySource::PseudoRelevanceFeedback),
             "PseudoRelevanceFeedback source should be recorded"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_prf_champion_override_raises_threshold() {
+        // Results score 0.7; default threshold 0.6 would accept, but the
+        // champion override pushes the threshold to 0.8 → passthrough.
+        let retriever = Arc::new(MockRetriever {
+            entries: vec![
+                make_entry("1", "quarterly finance report budget overrun", 0.75),
+                make_entry("2", "quarterly review finance targets budget", 0.70),
+            ],
+        });
+
+        let stage = PrfStage::new(retriever, PrfConfig::default()).with_champion_overrides(
+            Arc::new(std::sync::RwLock::new(Some(common::TrialParams {
+                prf_score_threshold: Some(0.80),
+                ..Default::default()
+            }))),
+        );
+
+        let output = stage
+            .transform(
+                QueryBundle::passthrough("show me budget"),
+                &make_context(),
+                &EnhancementBudget::normal(),
+            )
+            .await
+            .unwrap();
+
+        assert!(
+            output.variants.is_empty(),
+            "champion override 0.80 should reject 0.75/0.70 results"
         );
     }
 

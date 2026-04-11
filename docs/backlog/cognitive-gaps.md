@@ -11,9 +11,10 @@
 - `EnhancementBudget` cost model wired through `DepthMode`; `QueryEnhancementConfig` in `crates/config/src/schema/cognitive.rs`; assembler calls `retrieve_with_bundle()`; builder wires both pipelines.
 - Observability: `EnhancementTraceRepo` persists traces, `AgentEvent::RetrievalEnhanced` emitted on SSE, Reforge `collect_enhancement_signals()` consumes 7-day window, autotuner `TrialParams` extended with PRF/rerank/budget knobs.
 - **Follow-ups (small):**
-  - ~~MCP `get_last_enhancement_trace` action on the `memory` tool~~ DONE (2026-04-11). `LatestEnhancementTrace` shared store in `context_engine::enhancement`; `QueryPipeline` publishes per enhance(); `MemoryTool` reads via `with_enhancement_trace_store()`.
-  - Desktop UI Query Enhancement settings group under the existing Cognitive tab — not yet built.
-  - Spec/code drift: autotuner has `rerank_term_overlap_weight` instead of the spec's `rerank_co_activation_weight`. Decide whether to add the co-activation knob or update the spec.
+  - ~~MCP `get_last_enhancement_trace` action on the `memory` tool~~ DONE (2026-04-11).
+  - ~~Desktop UI Query Enhancement settings group~~ DONE (2026-04-11). Lives in the existing Work Contexts page; now exposes PRF fetch limit, multi-query + LLM-rerank model dropdowns, and per-depth-mode budget overrides (backed by a new `cognitive.queryEnhancement.budgetOverrides` config section).
+  - ~~Autotuner Phase 8 wiring~~ DONE (2026-04-11). All 5 Phase 8 `TrialParams` (`prf_score_threshold`, `prf_max_expansion_terms`, `rerank_term_overlap_weight`, `multi_query_max_variants`, `enhancement_budget_latency_ms`) now flow end-to-end: stages read champion overrides, the trial generator advertises the bounds, runtime applies budget overrides per depth mode. Spec §11.1 renamed to reflect shipped code.
+- **Future spec (carved out):** Heuristic rerank §3.4 originally described three signals (co-activation, term-overlap, recency). Only term-overlap is implemented; adding co-activation + recency needs `MemoryEntry` timestamps and a `CoActivationRepo` injection — will need its own spec.
 
 ### 2. Add Abstractive History Summarization
 - **Status**: UNWIRED

@@ -5,6 +5,7 @@ edition = "2021"
 
 [dependencies]
 common = { path = "../common" }
+config = { path = "../config" }
 providers = { path = "../providers" }
 serde = { workspace = true }
 serde_json = { workspace = true }

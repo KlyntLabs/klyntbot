@@ -591,19 +591,21 @@ The autotuner already tunes 3 rewriter params via `TrialParams`. We extend with 
 pub struct TrialParams {
     // ... existing fields ...
 
-    // Phase 4: Query Enhancement Pipeline params
+    // Phase 8: Query Enhancement Pipeline params
     /// PRF minimum score threshold (bounds [0.3, 0.9]).
     pub prf_score_threshold: Option<f64>,
     /// PRF max expansion terms (bounds [2, 8]).
     pub prf_max_expansion_terms: Option<usize>,
-    /// Heuristic rerank co-activation weight (bounds [0.02, 0.2]).
-    pub rerank_co_activation_weight: Option<f64>,
+    /// Heuristic rerank term-overlap weight (bounds [0.01, 0.15]).
+    pub rerank_term_overlap_weight: Option<f64>,
     /// Multi-query max variants (bounds [1, 5]).
     pub multi_query_max_variants: Option<usize>,
     /// Override Normal mode latency budget (bounds [50, 300]).
     pub enhancement_budget_latency_ms: Option<u64>,
 }
 ```
+
+> **Drift note (2026-04-11):** The original spec named this knob `rerank_co_activation_weight` to match §3.4's three-signal design (co-activation, term-overlap, recency). The shipped `HeuristicRerankStage` only implements term-overlap, so the autotuner knob is named to reflect reality. Adding co-activation + recency signals requires `MemoryEntry` timestamp support and injecting `CoActivationRepo` into the rerank stage — tracked as a separate future spec.
 
 **How it works:**
 1. Autotuner generates trial parameter sets with varied enhancement pipeline values

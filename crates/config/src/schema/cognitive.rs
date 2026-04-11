@@ -382,6 +382,8 @@ pub struct QueryEnhancementConfig {
     pub multi_query: MultiQueryEnhancementConfig,
     #[serde(default)]
     pub reranking: RerankingEnhancementConfig,
+    #[serde(default)]
+    pub budget_overrides: BudgetOverrides,
 }
 
 impl Default for QueryEnhancementConfig {
@@ -391,8 +393,31 @@ impl Default for QueryEnhancementConfig {
             prf: PrfEnhancementConfig::default(),
             multi_query: MultiQueryEnhancementConfig::default(),
             reranking: RerankingEnhancementConfig::default(),
+            budget_overrides: BudgetOverrides::default(),
         }
     }
+}
+
+/// Per-depth-mode budget overrides for the query enhancement pipeline.
+/// Any `None` falls back to the hardcoded default for that `DepthMode`.
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct BudgetOverrides {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub normal: Option<DepthBudgetOverride>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub deep_think: Option<DepthBudgetOverride>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub ultra: Option<DepthBudgetOverride>,
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DepthBudgetOverride {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub max_latency_ms: Option<u64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub max_llm_calls: Option<u32>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

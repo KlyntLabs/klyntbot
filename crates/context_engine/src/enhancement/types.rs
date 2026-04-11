@@ -106,6 +106,25 @@ impl EnhancementBudget {
             max_expansion_tokens: 400,
         }
     }
+
+    /// Apply a config-supplied `DepthBudgetOverride` onto this budget, replacing
+    /// any fields the override sets.
+    pub fn apply_depth_override(&mut self, ovr: &config::schema::DepthBudgetOverride) {
+        if let Some(v) = ovr.max_latency_ms {
+            self.max_latency_ms = v;
+        }
+        if let Some(v) = ovr.max_llm_calls {
+            self.max_llm_calls = v;
+        }
+    }
+
+    /// Apply autotuner champion trial-param overrides. Currently only the
+    /// Normal-mode `enhancement_budget_latency_ms` is tunable.
+    pub fn apply_trial_params(&mut self, params: &common::TrialParams) {
+        if let Some(v) = params.enhancement_budget_latency_ms {
+            self.max_latency_ms = v;
+        }
+    }
 }
 
 /// Outcome of a single pipeline stage execution.

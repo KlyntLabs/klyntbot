@@ -1123,6 +1123,11 @@ impl AgentLoopBuilder {
             let mut query_stages: Vec<Arc<dyn context_engine::enhancement::QueryStage>> =
                 vec![Arc::new(signal_stage)];
 
+            let memory_param_sink = self
+                .autotuner
+                .as_ref()
+                .and_then(|orch| orch.memory_param_sink());
+
             // Stage 2: PRF (needs memory retriever — only if available)
             if qe.prf.enabled {
                 if let Some(ref retriever) = memory_retriever_for_prf {
@@ -1131,10 +1136,13 @@ impl AgentLoopBuilder {
                         min_score_threshold: qe.prf.min_score_threshold,
                         max_expansion_terms: qe.prf.max_expansion_terms,
                     };
-                    let prf_stage = context_engine::enhancement::prf::PrfStage::new(
+                    let mut prf_stage = context_engine::enhancement::prf::PrfStage::new(
                         Arc::clone(retriever),
                         prf_config,
                     );
+                    if let Some(ref sink) = memory_param_sink {
+                        prf_stage = prf_stage.with_champion_overrides(Arc::clone(sink));
+                    }
                     query_stages.push(Arc::new(prf_stage));
                 } else {
                     tracing::debug!(
@@ -1150,10 +1158,14 @@ impl AgentLoopBuilder {
                     .model
                     .clone()
                     .or_else(|| rewriter_model.clone());
-                let multi_query = crate::adapters::multi_query::MultiQueryStage::new(
+                let mut multi_query = crate::adapters::multi_query::MultiQueryStage::new(
                     rewriter_provider.clone(),
                     mq_model,
+                    qe.multi_query.max_variants,
                 );
+                if let Some(ref sink) = memory_param_sink {
+                    multi_query = multi_query.with_champion_overrides(Arc::clone(sink));
+                }
                 query_stages.push(Arc::new(multi_query));
             }
 
@@ -1167,9 +1179,12 @@ impl AgentLoopBuilder {
                 vec![];
 
             if qe.reranking.enabled {
-                let heuristic = context_engine::enhancement::heuristic_rerank::HeuristicRerankStage::new(
+                let mut heuristic = context_engine::enhancement::heuristic_rerank::HeuristicRerankStage::new(
                     context_engine::enhancement::heuristic_rerank::HeuristicRerankConfig::default(),
                 );
+                if let Some(ref sink) = memory_param_sink {
+                    heuristic = heuristic.with_champion_overrides(Arc::clone(sink));
+                }
                 ranking_stages.push(Arc::new(heuristic));
 
                 let llm_model = qe
@@ -1770,7 +1785,16 @@ impl AgentLoopBuilder {
             },
             Arc::clone(&hot_config),
         )
-        .with_tool_registry(Arc::clone(&tool_registry));
+        .with_tool_registry(Arc::clone(&tool_registry))
+        .with_enhancement_budget_overrides(
+            config.cognitive.query_enhancement.budget_overrides.clone(),
+        );
+
+        if let Some(ref orchestrator) = self.autotuner {
+            if let Some(sink) = orchestrator.memory_param_sink() {
+                runtime = runtime.with_enhancement_param_sink(sink);
+            }
+        }
 
         if let Some(recorder) = interaction_recorder {
             runtime = runtime.with_interaction_recorder(recorder);

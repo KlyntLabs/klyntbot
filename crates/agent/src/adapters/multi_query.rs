@@ -4,6 +4,7 @@
 //! or when no provider is configured, the bundle passes through unchanged.
 //! On LLM error or timeout the stage degrades gracefully and returns the input.
 
+use std::sync::Arc;
 use std::time::Duration;
 
 use async_trait::async_trait;
@@ -15,16 +16,51 @@ use tracing::debug;
 // MultiQueryStage
 // ---------------------------------------------------------------------------
 
-/// Generates 3 alternative query variants via an LLM call and appends them to
+/// Generates alternative query variants via an LLM call and appends them to
 /// the bundle's `variants` list, enabling fan-out retrieval.
 pub struct MultiQueryStage {
     provider: Option<providers::DynProvider>,
     model: Option<String>,
+    max_variants: usize,
+    champion_overrides: Option<Arc<std::sync::RwLock<Option<common::TrialParams>>>>,
 }
 
 impl MultiQueryStage {
-    pub fn new(provider: Option<providers::DynProvider>, model: Option<String>) -> Self {
-        Self { provider, model }
+    pub fn new(
+        provider: Option<providers::DynProvider>,
+        model: Option<String>,
+        max_variants: usize,
+    ) -> Self {
+        Self {
+            provider,
+            model,
+            max_variants,
+            champion_overrides: None,
+        }
+    }
+
+    /// Attach an autotuner champion-override sink. When present,
+    /// `TrialParams.multi_query_max_variants` overrides the configured
+    /// variant count per call.
+    pub fn with_champion_overrides(
+        mut self,
+        sink: Arc<std::sync::RwLock<Option<common::TrialParams>>>,
+    ) -> Self {
+        self.champion_overrides = Some(sink);
+        self
+    }
+
+    fn resolved_max_variants(&self) -> usize {
+        if let Some(sink) = &self.champion_overrides {
+            if let Ok(guard) = sink.read() {
+                if let Some(params) = guard.as_ref() {
+                    if let Some(v) = params.multi_query_max_variants {
+                        return v;
+                    }
+                }
+            }
+        }
+        self.max_variants
     }
 }
 
@@ -32,9 +68,9 @@ impl MultiQueryStage {
 // Prompt builder
 // ---------------------------------------------------------------------------
 
-fn build_prompt(bundle: &QueryBundle, context: &RetrievalContext) -> String {
+fn build_prompt(bundle: &QueryBundle, context: &RetrievalContext, n: usize) -> String {
     let mut prompt = format!(
-        "Generate 3 different search queries to find information relevant to: \"{primary}\"\n\
+        "Generate {n} different search queries to find information relevant to: \"{primary}\"\n\
          Each query should approach from a different angle.\n\
          Return one query per line, nothing else.",
         primary = bundle.primary,
@@ -83,14 +119,22 @@ impl QueryStage for MultiQueryStage {
             }
         };
 
-        let prompt = build_prompt(&input, context);
+        let max_variants = self.resolved_max_variants();
+        if max_variants == 0 {
+            debug!("MultiQueryStage: skipping — resolved max_variants == 0");
+            return Ok(input);
+        }
+
+        let prompt = build_prompt(&input, context, max_variants);
         let messages = vec![providers::Message::user(prompt)];
         let model_name = self
             .model
             .clone()
             .unwrap_or_else(|| provider.default_model().to_string());
+        // 20 tokens/line is a generous ceiling for short search queries.
+        let max_tokens = ((max_variants * 20) as u32).max(40);
         let params = providers::ChatParams::new(model_name)
-            .with_max_tokens(60)
+            .with_max_tokens(max_tokens)
             .with_temperature(0.7);
 
         let timeout_ms = budget.max_latency_ms.min(500);
@@ -119,7 +163,7 @@ impl QueryStage for MultiQueryStage {
                         stripped.to_string()
                     })
                     .filter(|s| s.len() >= 5 && s.len() <= 200)
-                    .take(3)
+                    .take(max_variants)
                     .collect();
 
                 if variants.is_empty() {

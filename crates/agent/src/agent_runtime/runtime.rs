@@ -66,6 +66,8 @@ pub struct AgentRuntime {
     feedback_repo: Option<storage::RetrievalFeedbackRepo>,
     strategy_repo: Option<storage::StrategyRepo>,
     warning_repo: Option<storage::ResponseWarningRepo>,
+    enhancement_budget_overrides: config::schema::BudgetOverrides,
+    enhancement_param_sink: Option<Arc<std::sync::RwLock<Option<common::TrialParams>>>>,
 }
 
 impl AgentRuntime {
@@ -97,6 +99,8 @@ impl AgentRuntime {
             feedback_repo: None,
             strategy_repo: None,
             warning_repo: None,
+            enhancement_budget_overrides: config::schema::BudgetOverrides::default(),
+            enhancement_param_sink: None,
         }
     }
 
@@ -174,6 +178,22 @@ impl AgentRuntime {
         self
     }
 
+    pub fn with_enhancement_budget_overrides(
+        mut self,
+        overrides: config::schema::BudgetOverrides,
+    ) -> Self {
+        self.enhancement_budget_overrides = overrides;
+        self
+    }
+
+    pub fn with_enhancement_param_sink(
+        mut self,
+        sink: Arc<std::sync::RwLock<Option<common::TrialParams>>>,
+    ) -> Self {
+        self.enhancement_param_sink = Some(sink);
+        self
+    }
+
     // ── Accessors ───────────────────────────────────────────────
 
     pub fn tool_registry(&self) -> Option<&Arc<RwLock<tools::registry::ToolRegistry>>> {
@@ -206,6 +226,8 @@ impl AgentRuntime {
         // ── Phase 1: Prepare ─────────────────────────────────────
         let retrieval_context = self.build_retrieval_context(&history).await;
 
+        let enhancement_budget = self.build_enhancement_budget(depth);
+
         let context_request = ContextRequest {
             message_text: message.to_string(),
             history,
@@ -215,7 +237,7 @@ impl AgentRuntime {
             context_window: self.context_window,
             session_key: Some(common::SessionKey::new(&ctx.channel, &ctx.chat_id).to_string()),
             retrieval_context,
-            enhancement_budget: context_engine::EnhancementBudget::default(),
+            enhancement_budget,
         };
 
         let assemble_start = Instant::now();
@@ -427,6 +449,33 @@ impl AgentRuntime {
     }
 
     // ── Helpers ──────────────────────────────────────────────────
+
+    fn build_enhancement_budget(&self, depth: DepthMode) -> context_engine::EnhancementBudget {
+        let mut budget = match depth {
+            DepthMode::Normal => context_engine::EnhancementBudget::normal(),
+            DepthMode::DeepThink => context_engine::EnhancementBudget::deep_think(),
+            DepthMode::Ultra => context_engine::EnhancementBudget::ultra(),
+        };
+
+        let depth_override = match depth {
+            DepthMode::Normal => self.enhancement_budget_overrides.normal.as_ref(),
+            DepthMode::DeepThink => self.enhancement_budget_overrides.deep_think.as_ref(),
+            DepthMode::Ultra => self.enhancement_budget_overrides.ultra.as_ref(),
+        };
+        if let Some(ovr) = depth_override {
+            budget.apply_depth_override(ovr);
+        }
+
+        if let Some(sink) = &self.enhancement_param_sink {
+            if let Ok(guard) = sink.read() {
+                if let Some(params) = guard.as_ref() {
+                    budget.apply_trial_params(params);
+                }
+            }
+        }
+
+        budget
+    }
 
     async fn build_retrieval_context(
         &self,
