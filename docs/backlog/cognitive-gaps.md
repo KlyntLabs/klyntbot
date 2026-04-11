@@ -2,17 +2,18 @@
 
 > Identified: 2026-04-10
 > Source: Deep codebase scan + competitive analysis
-> Last updated: 2026-04-10
+> Last updated: 2026-04-11
 
 ## Medium Priority
 
-### 1. Query Enhancement Pipeline
-- **Status**: SPEC COMPLETE
-- **Effort**: Large
-- **Impact**: Multi-stage retrieval improvement — PRF, multi-query, reranking, budget-gated by depth mode
-- **Details**: Existing `ContextualQueryRewriter` heuristic path works (backlog was stale). Upgraded scope: two-pipeline design (QueryPipeline + RankingPipeline), `EnhancementBudget` cost model, 5 stages gated by DepthMode. Normal mode adds zero LLM calls; Deep adds 2.
-- **Spec**: `docs/superpowers/specs/2026-04-10-query-enhancement-pipeline-design.md`
-- **What's needed**: Implementation plan + execution
+### ~~1. Query Enhancement Pipeline~~ DONE (with minor follow-ups)
+- Two-pipeline design shipped: `QueryPipeline` + `RankingPipeline` in `crates/context_engine/src/enhancement/`, with all 5 stages (`SignalEnrichmentStage`, `PrfStage`, `MultiQueryStage`, `HeuristicRerankStage`, `LlmRerankStage`).
+- `EnhancementBudget` cost model wired through `DepthMode`; `QueryEnhancementConfig` in `crates/config/src/schema/cognitive.rs`; assembler calls `retrieve_with_bundle()`; builder wires both pipelines.
+- Observability: `EnhancementTraceRepo` persists traces, `AgentEvent::RetrievalEnhanced` emitted on SSE, Reforge `collect_enhancement_signals()` consumes 7-day window, autotuner `TrialParams` extended with PRF/rerank/budget knobs.
+- **Follow-ups (small):**
+  - MCP `get_last_enhancement_trace` action on the `memory` tool — not yet wired in `crates/tools/src/domain/memory_tool.rs`.
+  - Desktop UI Query Enhancement settings group under the existing Cognitive tab — not yet built.
+  - Spec/code drift: autotuner has `rerank_term_overlap_weight` instead of the spec's `rerank_co_activation_weight`. Decide whether to add the co-activation knob or update the spec.
 
 ### 2. Add Abstractive History Summarization
 - **Status**: UNWIRED
