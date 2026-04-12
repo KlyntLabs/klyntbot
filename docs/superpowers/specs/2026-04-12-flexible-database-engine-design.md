@@ -66,6 +66,29 @@ CREATE TABLE database_fields (
     UNIQUE(database_id, slug)
 );
 
+-- Views per database (table, board, calendar, list, gallery, timeline)
+CREATE TABLE database_views (
+    id           TEXT PRIMARY KEY,
+    database_id  TEXT NOT NULL REFERENCES databases(id),
+    name         TEXT NOT NULL,
+    view_type    TEXT NOT NULL,
+    config_json  TEXT NOT NULL,
+    position     INTEGER NOT NULL,
+    is_default   INTEGER DEFAULT 0,
+    created_at   TEXT NOT NULL,
+    updated_at   TEXT NOT NULL
+);
+
+-- Custom dashboards with widgets querying any database
+CREATE TABLE dashboards (
+    id          TEXT PRIMARY KEY,
+    name        TEXT NOT NULL,
+    config_json TEXT NOT NULL,
+    position    INTEGER NOT NULL,
+    created_at  TEXT NOT NULL,
+    updated_at  TEXT NOT NULL
+);
+
 -- Cross-database entity relations
 CREATE TABLE entity_relations (
     id            TEXT PRIMARY KEY,
@@ -461,21 +484,22 @@ All cross-domain scenarios work naturally:
 
 ```
 NEW:
-  crates/database-engine/          — Schema registry, dynamic tables, field types, query builder
+  crates/database-engine/          — Schema registry, dynamic tables, field types, query builder, views
     src/schema.rs                  — DatabaseSchema, FieldDefinition, FieldType
     src/entity.rs                  — Entity (dynamic property map)
     src/query.rs                   — Dynamic SQL builder
     src/evolution.rs               — Schema evolution (add/remove/modify fields)
     src/relations.rs               — Cross-database entity relations
+    src/views.rs                   — View and dashboard definitions
     src/templates.rs               — Template loading and instantiation
-    migrations/                    — Foundation tables
+    migrations/                    — Foundation tables (databases, fields, views, dashboards, relations, evolutions, autonomy)
 
   crates/database-tool/            — Unified tool exposed to AI
     src/tool.rs                    — DatabaseTool (replaces TaskTool, FinanceTool)
     src/actions/                   — CRUD, search, schema ops, AI-powered actions
     src/handlers.rs                — Generic handler traits
 
-  templates/                       — Built-in template bundles
+  templates/                       — Built-in template bundles (marketplace-ready)
     task-management/
       manifest.json + skill/
     finance/
@@ -567,7 +591,423 @@ One `DatabaseView` component renders any database based on its schema.
 }
 ```
 
-## 12. What Doesn't Change
+## 12. Frontend Architecture
+
+### 12.1 Design Principle
+
+Every database — including Tasks and Finance — renders through the same generic components. No feature-specific React components for data display. The UI is fully schema-driven: read the `DatabaseSchema`, render the fields, let the user configure views.
+
+### 12.2 What Gets Removed
+
+```
+REMOVED (feature-specific UI):
+  features/tasks/          — 58 files, ~5,750 LOC (IssueLine, IssueBoard, SidebarProperties, etc.)
+  features/finance/        — 25+ files, ~3,000 LOC (HealthScoreRing, SpendingHeatmap, NetWorthCard, etc.)
+  shared/types/tasks.ts    — fixed Task interface
+  shared/types/finance.ts  — fixed FinanceAccount, Transaction, etc.
+
+KEPT (specialized systems, not database views):
+  features/notes/          — TipTap editor, Vim mode, graph visualization (document system, not rows)
+  features/productivity/   — Real-time activity timeline, focus timer (engine output, not user data)
+  features/coaching/       — Intervention cards (behavioral system, not database)
+  features/dashboard/      — Becomes the custom dashboard builder (see 12.8)
+  features/chat/           — Agent conversation (unchanged)
+  features/settings/       — App configuration (unchanged)
+  features/brain/          — Mirror/Reforge UI (unchanged)
+```
+
+### 12.3 Core TypeScript Types
+
+```typescript
+// Replaces Task, FinanceAccount, and all fixed entity types
+interface Entity {
+  id: string;
+  databaseId: string;
+  fields: Record<string, unknown>;  // slug → value
+  createdAt: string;
+  updatedAt: string;
+}
+
+interface DatabaseSchema {
+  id: string;
+  name: string;
+  slug: string;
+  icon?: string;
+  description?: string;
+  templateId?: string;
+  fields: FieldDefinition[];
+  views: ViewDefinition[];
+}
+
+interface FieldDefinition {
+  id: string;
+  name: string;
+  slug: string;
+  fieldType: FieldType;
+  options?: unknown;       // type-specific config (select choices, number format, etc.)
+  position: number;
+  required: boolean;
+  hidden: boolean;
+  aiManaged: boolean;
+  defaultValue?: unknown;
+}
+
+type FieldType =
+  | "text" | "number" | "select" | "multi_select" | "date"
+  | "checkbox" | "url" | "email" | "phone" | "relation"
+  | "rollup" | "formula" | "created_time" | "last_edited"
+  | "files" | "person";
+
+interface ViewDefinition {
+  id: string;
+  name: string;
+  viewType: ViewType;
+  config: ViewConfig;       // filters, sorts, visible fields, grouping, etc.
+  position: number;
+  isDefault: boolean;
+}
+
+type ViewType = "table" | "board" | "calendar" | "list" | "gallery" | "timeline";
+
+interface ViewConfig {
+  filters?: FilterRule[];
+  sorts?: SortRule[];
+  visibleFields?: string[];  // field IDs to show (order matters)
+  groupBy?: string;          // field ID for board/timeline grouping
+  calendarField?: string;    // field ID for calendar date source
+  galleryField?: string;     // field ID for gallery cover image
+  cardFields?: string[];     // field IDs shown on board/gallery cards
+  layout?: Record<string, unknown>;  // view-specific layout options
+}
+```
+
+### 12.4 View System — 6 View Types
+
+Each database can have multiple named views. Users create/switch views via tabs (like Notion).
+
+**Table View** — spreadsheet-style with sortable/resizable columns
+- Builds on existing `DataTable` composite (7,653 LOC, already supports dynamic columns)
+- Each column rendered by `FieldRenderer` based on field type
+- Inline editing via `FieldEditor`
+- Column reorder via drag-and-drop
+- Column visibility toggle
+
+**Board View** — kanban grouped by any select field
+- User picks which select field to group by (e.g., Status, Priority)
+- Cards show configurable `cardFields`
+- Drag-and-drop between columns updates the grouping field value
+- Swimlanes for optional secondary grouping
+
+**Calendar View** — monthly/weekly view by any date field
+- User picks which date field to display
+- Entities shown as events on the calendar
+- Drag to reschedule updates the date field
+- Reuses existing calendar infrastructure from dashboard feature
+
+**List View** — compact single-column list
+- Title + configurable inline fields
+- Checkbox for select fields marked as `lifecycle: true` (from skill schema_hints)
+- Grouped by any field or ungrouped
+
+**Gallery View** — card grid
+- Cover image from files field (or first text field as preview)
+- Configurable card fields
+- Filterable/sortable
+
+**Timeline View** — Gantt-style horizontal timeline
+- Requires two date fields (start + end) or one date field
+- Entities as horizontal bars
+- Drag to reschedule
+- Grouped by any select field
+
+### 12.5 View Storage
+
+```sql
+CREATE TABLE database_views (
+    id           TEXT PRIMARY KEY,
+    database_id  TEXT NOT NULL REFERENCES databases(id),
+    name         TEXT NOT NULL,
+    view_type    TEXT NOT NULL,
+    config_json  TEXT NOT NULL,      -- ViewConfig serialized
+    position     INTEGER NOT NULL,
+    is_default   INTEGER DEFAULT 0,
+    created_at   TEXT NOT NULL,
+    updated_at   TEXT NOT NULL
+);
+```
+
+Templates seed default views. For example, the Task Management template creates:
+- "All Tasks" (table view, all fields visible)
+- "Board" (board view, grouped by status)
+- "Calendar" (calendar view, by due_date)
+
+Users add/remove/configure views freely. AI can suggest views via schema evolution.
+
+### 12.6 Component Architecture
+
+```
+features/database/                    — THE universal database feature
+├── pages/
+│   └── DatabasePage.tsx              — loads schema + active view, renders ViewShell
+│
+├── components/
+│   ├── ViewShell.tsx                 — view tabs + toolbar + active view renderer
+│   ├── ViewToolbar.tsx               — filter bar, sort, search, group-by, new entity button
+│   ├── ViewTabBar.tsx                — view tabs with add/rename/delete
+│   │
+│   ├── views/
+│   │   ├── TableView.tsx             — schema-driven DataTable
+│   │   ├── BoardView.tsx             — kanban with dnd-kit
+│   │   ├── CalendarView.tsx          — monthly/weekly calendar
+│   │   ├── ListView.tsx              — compact list
+│   │   ├── GalleryView.tsx           — card grid
+│   │   └── TimelineView.tsx          — Gantt-style timeline
+│   │
+│   ├── fields/
+│   │   ├── FieldRenderer.tsx         — display any field type (read-only)
+│   │   ├── FieldEditor.tsx           — edit any field type (inline or modal)
+│   │   ├── renderers/
+│   │   │   ├── TextRenderer.tsx
+│   │   │   ├── NumberRenderer.tsx
+│   │   │   ├── SelectRenderer.tsx
+│   │   │   ├── MultiSelectRenderer.tsx
+│   │   │   ├── DateRenderer.tsx
+│   │   │   ├── CheckboxRenderer.tsx
+│   │   │   ├── UrlRenderer.tsx
+│   │   │   ├── RelationRenderer.tsx
+│   │   │   ├── FormulaRenderer.tsx
+│   │   │   └── FilesRenderer.tsx
+│   │   └── editors/
+│   │       ├── TextEditor.tsx
+│   │       ├── NumberEditor.tsx
+│   │       ├── SelectEditor.tsx       — dropdown with option management
+│   │       ├── MultiSelectEditor.tsx  — tag-style multi-select
+│   │       ├── DateEditor.tsx         — date picker
+│   │       ├── RelationEditor.tsx     — entity picker across databases
+│   │       └── ... (one per editable type)
+│   │
+│   ├── entity/
+│   │   ├── EntityDetail.tsx          — full entity view (slide panel or page)
+│   │   ├── PropertyList.tsx          — all fields rendered dynamically
+│   │   └── CreateEntityModal.tsx     — dynamic form from schema
+│   │
+│   ├── schema/
+│   │   ├── SchemaEditor.tsx          — add/remove/reorder fields (Notion property panel)
+│   │   ├── FieldTypeSelector.tsx     — dropdown of 16 field types
+│   │   └── FieldConfigEditor.tsx     — per-type config (select options, number format, etc.)
+│   │
+│   └── suggestions/
+│       ├── SchemaSuggestionBar.tsx   — AI schema evolution suggestions
+│       └── SuggestionCard.tsx        — accept/dismiss AI-proposed changes
+│
+├── hooks/
+│   ├── useDatabase.ts                — fetch schema, fields, views
+│   ├── useEntities.ts                — query entities with filters/sorts
+│   ├── useEntity.ts                  — single entity CRUD
+│   ├── useViews.ts                   — view CRUD
+│   └── useSchemaSuggestions.ts       — AI evolution suggestions
+│
+└── lib/
+    ├── query-builder.ts              — build filter/sort params from ViewConfig
+    ├── field-utils.ts                — format, validate, compare field values
+    └── view-defaults.ts              — default ViewConfig per view type
+```
+
+### 12.7 Sidebar — Dynamic Navigation
+
+```tsx
+// Sidebar items built from:
+// 1. Fixed system items (Chat, Dashboard, Notes, Brain, Settings, etc.)
+// 2. Dynamic database items from db_list query
+// 3. User can reorder, pin, group into sections
+
+const { data: databases } = useQuery("db_list");
+
+const sidebarItems = [
+  // Fixed
+  { type: "fixed", label: "Chat", icon: MessageSquare, href: "/chat" },
+  { type: "fixed", label: "Dashboard", icon: LayoutDashboard, href: "/dashboard" },
+  { type: "separator" },
+
+  // Dynamic — one entry per database
+  ...databases.map(db => ({
+    type: "database",
+    label: db.name,
+    icon: db.icon || Database,
+    href: `/db/${db.id}`,
+  })),
+  { type: "separator" },
+
+  // Fixed system
+  { type: "fixed", label: "Notes", icon: FileText, href: "/notes" },
+  { type: "fixed", label: "Brain", icon: Brain, href: "/brain" },
+  { type: "fixed", label: "Settings", icon: Settings, href: "/settings" },
+];
+```
+
+Users can create new databases directly from the sidebar ("+ New Database" button).
+
+### 12.8 Custom Dashboards
+
+Users build dashboards by placing **widgets** that query data from any database.
+
+```typescript
+interface DashboardDefinition {
+  id: string;
+  name: string;
+  widgets: WidgetDefinition[];
+}
+
+interface WidgetDefinition {
+  id: string;
+  widgetType: WidgetType;
+  databaseId: string;        // which database to query
+  config: WidgetConfig;       // query + display options
+  position: GridPosition;     // row, col, width, height
+}
+
+type WidgetType =
+  | "count"        // single number (e.g., "12 open tasks")
+  | "list"         // filtered entity list
+  | "chart_bar"    // bar chart by field
+  | "chart_pie"    // pie chart by select field
+  | "chart_line"   // line chart over time
+  | "progress"     // progress toward a numeric target
+  | "heatmap"      // activity heatmap by date field
+  | "table"        // mini table view
+  | "metric"       // computed metric (sum, avg, min, max of a number field)
+  | "calendar"     // mini calendar view
+  | "custom"       // marketplace widget (loaded from template)
+
+interface WidgetConfig {
+  title: string;
+  filters?: FilterRule[];
+  groupBy?: string;           // field slug for chart grouping
+  valueField?: string;        // field slug for aggregation
+  dateField?: string;         // field slug for time-based widgets
+  aggregation?: "count" | "sum" | "avg" | "min" | "max";
+  limit?: number;
+  colorField?: string;        // field slug for color coding
+}
+```
+
+**Storage:**
+
+```sql
+CREATE TABLE dashboards (
+    id         TEXT PRIMARY KEY,
+    name       TEXT NOT NULL,
+    config_json TEXT NOT NULL,    -- DashboardDefinition serialized
+    position   INTEGER NOT NULL,  -- sidebar order
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+);
+```
+
+**Example: User builds a "Work Overview" dashboard with:**
+- Count widget: "Open Tasks" → database=tasks, filter=status!="done", aggregation=count
+- Bar chart: "Tasks by Priority" → database=tasks, groupBy=priority, aggregation=count
+- List widget: "Due This Week" → database=tasks, filter=due_date between this week, sort=due_date ASC
+- Metric widget: "Monthly Spend" → database=transactions, filter=date=this month, valueField=amount, aggregation=sum
+- Progress widget: "Savings Goal" → database=goals, filter=name="Emergency Fund", valueField=current_amount, target from field
+
+Dashboards are sharable in the marketplace — a "Freelancer Dashboard" template might include widgets configured for a freelancer project tracker, invoice tracker, and client database.
+
+### 12.9 Routing
+
+```tsx
+// New routes
+{ path: "/db/:databaseId",              element: <DatabasePage /> },
+{ path: "/db/:databaseId/:entityId",    element: <EntityDetailPage /> },
+{ path: "/dashboard",                   element: <DashboardPage /> },
+{ path: "/dashboard/:dashboardId",      element: <DashboardPage /> },
+
+// Kept routes
+{ path: "/chat",      element: <ChatPage /> },
+{ path: "/notes",     element: <KnowledgeBasePage /> },
+{ path: "/brain",     element: <BrainPage /> },
+{ path: "/settings",  element: <SettingsPage /> },
+
+// Removed routes (replaced by /db/:id)
+// /tasks, /finance/*, /project/:id (projects become a database)
+```
+
+### 12.10 Template Manifest — View Definitions
+
+Templates include default views so databases are immediately usable:
+
+```json
+{
+  "name": "Task Management",
+  "databases": [{
+    "name": "Tasks",
+    "slug": "tasks",
+    "fields": [ ... ],
+    "views": [
+      {
+        "name": "All Tasks",
+        "viewType": "table",
+        "isDefault": true,
+        "config": {
+          "visibleFields": ["title", "status", "priority", "due_date", "tags"],
+          "sorts": [{ "field": "created_at", "direction": "desc" }]
+        }
+      },
+      {
+        "name": "Board",
+        "viewType": "board",
+        "config": {
+          "groupBy": "status",
+          "cardFields": ["priority", "due_date", "tags"]
+        }
+      },
+      {
+        "name": "Calendar",
+        "viewType": "calendar",
+        "config": {
+          "calendarField": "due_date",
+          "cardFields": ["title", "priority", "status"]
+        }
+      }
+    ]
+  }],
+  "dashboards": [
+    {
+      "name": "Task Overview",
+      "widgets": [
+        { "widgetType": "count", "databaseSlug": "tasks",
+          "config": { "title": "Open Tasks", "filters": [{"field": "status", "op": "not_in", "value": ["done"]}] } },
+        { "widgetType": "chart_pie", "databaseSlug": "tasks",
+          "config": { "title": "By Priority", "groupBy": "priority" } }
+      ]
+    }
+  ]
+}
+```
+
+### 12.11 Marketplace Impact
+
+Templates are fully self-contained bundles:
+
+```
+template-freelancer-project-tracker/
+├── manifest.json          — databases, fields, views, dashboards, relations
+└── skill/
+    ├── SKILL.md           — AI behavior for this domain
+    └── references/
+        └── workflows.md   — domain-specific workflows
+```
+
+A marketplace entry = one downloadable bundle. Installing it:
+1. Creates databases with fields from manifest
+2. Creates views from manifest
+3. Creates dashboard widgets from manifest
+4. Installs skill to `~/.klyntbot/skills/db-{id}/`
+5. AI immediately understands the domain via the skill
+
+Users can fork and customize any template. AI evolves the fork independently via Reforge.
+
+## 13. What Doesn't Change
 
 | System | Why |
 |--------|-----|
