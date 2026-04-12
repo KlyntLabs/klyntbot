@@ -228,6 +228,14 @@ impl AgentRuntime {
 
         let enhancement_budget = self.build_enhancement_budget(depth);
 
+        // Map DepthMode to tier0_count for tiered history compression
+        let tier0_cfg = self.context_engine.tier0_config();
+        let tier0 = match depth {
+            DepthMode::Normal => tier0_cfg.normal,
+            DepthMode::DeepThink => tier0_cfg.deep_think,
+            DepthMode::Ultra => tier0_cfg.ultra,
+        };
+
         let context_request = ContextRequest {
             message_text: message.to_string(),
             history,
@@ -238,7 +246,7 @@ impl AgentRuntime {
             session_key: Some(common::SessionKey::new(&ctx.channel, &ctx.chat_id).to_string()),
             retrieval_context,
             enhancement_budget,
-            tier0_count: None,
+            tier0_count: Some(tier0),
         };
 
         let assemble_start = Instant::now();
@@ -267,6 +275,18 @@ impl AgentRuntime {
                         })
                         .await;
                 }
+            }
+
+            if let Some(stats) = assembled.compression_stats.take() {
+                let _ = tx
+                    .send(AgentEvent::ContextTieredCompressed {
+                        tier0_kept: stats.tier0_kept,
+                        tier1_tokens: stats.tier1_tokens,
+                        tier2_tokens: stats.tier2_tokens,
+                        cognitive_scoring_used: stats.cognitive_scoring_used,
+                        delta_only: stats.delta_only,
+                    })
+                    .await;
             }
         }
 

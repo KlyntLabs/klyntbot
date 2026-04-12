@@ -63,4 +63,16 @@ pub struct AssembledContext {
     pub retrieved_memory_count: usize,
     /// Enhancement pipeline trace (None if pipeline not configured).
     pub enhancement_trace: Option<crate::enhancement::EnhancementTrace>,
+    /// Tiered compression stats (None if no compression happened).
+    pub compression_stats: Option<CompressionStats>,
+}
+
+/// Stats from tiered history compression, for event emission.
+#[derive(Debug, Clone)]
+pub struct CompressionStats {
+    pub tier0_kept: usize,
+    pub tier1_tokens: usize,
+    pub tier2_tokens: usize,
+    pub cognitive_scoring_used: bool,
+    pub delta_only: bool,
 }

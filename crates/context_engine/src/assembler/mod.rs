@@ -1,7 +1,7 @@
 mod cache;
 mod types;
 
-pub use types::{AssembledContext, ContextRequest, ExecutionStrategy};
+pub use types::{AssembledContext, CompressionStats, ContextRequest, ExecutionStrategy};
 
 use std::sync::Arc;
 
@@ -76,6 +76,11 @@ impl ContextEngine {
             token_counter: counter,
             ..self
         }
+    }
+
+    /// Get the tier0 config for depth-mode mapping.
+    pub fn tier0_config(&self) -> &config::schema::TierZeroConfig {
+        &self.compressor.config().tier0_messages
     }
 
     /// Wire a memory scorer for cognitive-aware tier assignment.
@@ -406,6 +411,29 @@ impl ContextEngine {
             )));
         }
 
+        // Compute compression stats for event emission
+        let compression_stats = if !summaries.is_empty() {
+            let tier1_tokens: usize = summaries
+                .iter()
+                .filter(|s| s.tier == crate::CompressionTier::Detailed)
+                .map(|s| s.token_count)
+                .sum();
+            let tier2_tokens: usize = summaries
+                .iter()
+                .filter(|s| s.tier == crate::CompressionTier::Condensed)
+                .map(|s| s.token_count)
+                .sum();
+            Some(types::CompressionStats {
+                tier0_kept: recent_messages.len(),
+                tier1_tokens,
+                tier2_tokens,
+                cognitive_scoring_used: self.compressor.config().use_cognitive_scoring,
+                delta_only: false,
+            })
+        } else {
+            None
+        };
+
         // Recent messages verbatim
         messages.extend(recent_messages);
 
@@ -448,6 +476,7 @@ impl ContextEngine {
             version: 0,
             retrieved_memory_count,
             enhancement_trace,
+            compression_stats,
         }
     }
 
@@ -1139,11 +1168,21 @@ mod tests {
         let engine =
             ContextEngine::new(HistoryCompressionConfig::default()).with_summary_provider(provider);
 
-        // 20 turns (40 messages) to ensure some get compressed past tier0_count=8
+        // 20 turns with substantial content to exceed the hybrid extractive-first
+        // threshold (turns must be > 30 tokens for LLM to be invoked).
         let mut history = Vec::new();
         for i in 0..20 {
-            history.push(Message::user(format!("User message {}", i)));
-            history.push(Message::assistant(format!("Response {}", i)));
+            history.push(Message::user(format!(
+                "User message {} with enough content to exceed the minimum token threshold \
+                 for hybrid extractive-first optimization in tiered compression",
+                i
+            )));
+            history.push(Message::assistant(format!(
+                "This is a detailed assistant response {} that includes reasoning, decisions, \
+                 and action items that should be preserved by the tiered compression system \
+                 rather than being reduced to a simple extractive snippet",
+                i
+            )));
         }
 
         let request = ContextRequest {
@@ -1216,6 +1255,7 @@ mod tests {
             version: 0,
             retrieved_memory_count: 0,
             enhancement_trace: None,
+            compression_stats: None,
         };
         initial.inventory.upsert(ContextInventoryItem {
             source_name: "deferred_test".into(),
@@ -1255,6 +1295,7 @@ mod tests {
             version: 0,
             retrieved_memory_count: 0,
             enhancement_trace: None,
+            compression_stats: None,
         };
 
         let ctx = test_source_context();
@@ -1339,6 +1380,7 @@ mod tests {
             version: 0,
             retrieved_memory_count: 0,
             enhancement_trace: None,
+            compression_stats: None,
         };
 
         let ctx = test_source_context();

@@ -12,7 +12,9 @@ pub mod ttl_cache;
 
 pub use ttl_cache::TtlCache;
 
-pub use assembler::{AssembledContext, ContextEngine, ContextRequest, ExecutionStrategy};
+pub use assembler::{
+    AssembledContext, CompressionStats, ContextEngine, ContextRequest, ExecutionStrategy,
+};
 pub use budget::{BudgetAllocator, BudgetConfig, BudgetReport, Priority};
 pub use history_compressor::{
     first_snippet, AssignedTier, CompressedHistory, CompressionTier, ConversationTurn, TierSummary,

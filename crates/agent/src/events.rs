@@ -63,6 +63,9 @@ pub enum AgentEvent {
         /// Whether cognitive scoring was used for tier assignment.
         #[serde(rename = "cognitiveScoringUsed")]
         cognitive_scoring_used: bool,
+        /// Whether delta-only compression was used.
+        #[serde(rename = "deltaOnly")]
+        delta_only: bool,
     },
 
     /// Query enhancement pipeline completed — emits the trace for observability.

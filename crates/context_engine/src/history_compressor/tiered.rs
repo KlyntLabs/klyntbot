@@ -284,7 +284,9 @@ impl TieredHistoryCompressor {
 
     /// Compress a chunk of turns at a given tier.
     ///
-    /// Uses hybrid extractive-first: if extractive fits the budget, skip LLM.
+    /// Hybrid extractive-first: compute extractive summaries, and only call the
+    /// LLM for turns where the extractive version exceeds a per-turn token
+    /// threshold (the original turn tokens × the tier's target ratio).
     async fn compress_chunk(
         &self,
         turns: &[ConversationTurn],
@@ -294,25 +296,56 @@ impl TieredHistoryCompressor {
             CompressionTier::Detailed => DEFAULT_SNIPPET_LENGTH,
             CompressionTier::Condensed => 100,
         };
+        let target_ratio = match tier {
+            CompressionTier::Detailed => self.config.tier1_ratio,
+            CompressionTier::Condensed => self.config.tier2_ratio,
+        };
+
+        // Step 1: Compute extractive summaries for all turns
+        let extractive: Vec<String> = turns
+            .iter()
+            .map(|t| extractive_turn_summary(&t.messages, snippet_len))
+            .collect();
 
         let final_texts: Vec<String> = if let Some(provider) = &self.summary_provider {
-            let segments: Vec<Vec<Message>> = turns.iter().map(|t| t.messages.clone()).collect();
-            let results = provider.summarize_batch(segments, tier).await;
+            // Step 2: Identify which turns need LLM (extractive exceeds target ratio)
+            let mut needs_llm = Vec::new();
+            for (i, turn) in turns.iter().enumerate() {
+                let extractive_tokens = self.token_counter.estimate_text(&extractive[i]);
+                let target_tokens = (turn.token_count as f32 * target_ratio) as usize;
+                if extractive_tokens > target_tokens && turn.token_count > 30 {
+                    needs_llm.push(i);
+                }
+            }
 
-            // Use LLM result if successful, compute extractive only as fallback
-            results
-                .into_iter()
-                .enumerate()
-                .map(|(i, result)| match result {
-                    Ok(text) if !text.is_empty() => text,
-                    _ => extractive_turn_summary(&turns[i].messages, snippet_len),
-                })
-                .collect()
+            if needs_llm.is_empty() {
+                // Extractive fits for all turns — skip LLM entirely
+                extractive
+            } else {
+                // Only send turns that need LLM compression
+                let segments: Vec<Vec<Message>> = needs_llm
+                    .iter()
+                    .map(|&i| turns[i].messages.clone())
+                    .collect();
+                let results = provider.summarize_batch(segments, tier).await;
+
+                // Merge: LLM results for turns that needed it, extractive for the rest
+                let mut llm_iter = results.into_iter();
+                (0..turns.len())
+                    .map(|i| {
+                        if needs_llm.contains(&i) {
+                            match llm_iter.next() {
+                                Some(Ok(text)) if !text.is_empty() => text,
+                                _ => extractive[i].clone(),
+                            }
+                        } else {
+                            extractive[i].clone()
+                        }
+                    })
+                    .collect()
+            }
         } else {
-            turns
-                .iter()
-                .map(|t| extractive_turn_summary(&t.messages, snippet_len))
-                .collect()
+            extractive
         };
 
         // Build TierSummary for each turn
@@ -461,8 +494,17 @@ mod tests {
     fn make_history(n: usize) -> Vec<Message> {
         let mut msgs = Vec::new();
         for i in 0..n {
-            msgs.push(Message::user(format!("User message {}", i)));
-            msgs.push(Message::assistant(format!("Assistant response {}", i)));
+            msgs.push(Message::user(format!(
+                "User message {} with enough content to exceed the minimum token threshold \
+                 for the hybrid extractive-first optimization in tiered compression",
+                i
+            )));
+            msgs.push(Message::assistant(format!(
+                "Assistant response {} with detailed reasoning and decisions that should be \
+                 preserved by the tiered compression system rather than being reduced to a \
+                 simple extractive snippet of the original content",
+                i
+            )));
         }
         msgs
     }
