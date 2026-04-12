@@ -259,3 +259,31 @@ export type {
   FabricNote,
   FabricTreeNode,
 } from "./fabric";
+
+// ── Database Types ───────────────────────────────────────────
+
+export type {
+  CreateDatabaseInput,
+  CreateEntityInput,
+  CreateFieldInput,
+  Dashboard,
+  DatabaseSchema,
+  Entity,
+  EntityRelation,
+  FieldDefinition,
+  FieldType,
+  FilterOp,
+  FilterRule,
+  GridPosition,
+  QueryParams,
+  QueryResult,
+  SchemaEvolution,
+  SortDirection,
+  SortRule,
+  UpdateEntityInput,
+  ViewConfig,
+  ViewDefinition,
+  ViewType,
+  WidgetDefinition,
+  WidgetType,
+} from "./database";

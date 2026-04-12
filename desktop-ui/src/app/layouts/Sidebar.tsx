@@ -1,3 +1,4 @@
+import { useDatabases } from "@features/database/hooks/useDatabase";
 import { KlyntLogo } from "@shared/components/ui/KlyntLogo";
 import { useAmbientSignals } from "@shared/hooks/useAmbientSignals";
 import { ipc } from "@shared/hooks/useIpc";
@@ -6,18 +7,20 @@ import {
   Brain,
   CheckSquare,
   Cpu,
+  Database,
   FileText,
   GraduationCap,
   LayoutDashboard,
   MessageCircle,
   MessageSquare,
+  Plus,
   Settings,
   Sparkles,
   Timer,
   Wallet,
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
-import { useNavigate } from "react-router";
+import { useLocation, useNavigate } from "react-router";
 
 interface SidebarProps {
   active: SidebarItem;
@@ -42,9 +45,11 @@ const items: { key: SidebarItem; icon: typeof MessageSquare; path?: string; bott
 
 export function Sidebar({ active, onNavigate, isChatOpen, onToggleChat }: SidebarProps) {
   const navigate = useNavigate();
+  const location = useLocation();
   const [dueCount, setDueCount] = useState(0);
   const dueCountRef = useRef(0);
   const { badgeCount, isPulsing } = useAmbientSignals();
+  const { data: databases } = useDatabases();
 
   useEffect(() => {
     const fetchDue = () => {
@@ -116,6 +121,45 @@ export function Sidebar({ active, onNavigate, isChatOpen, onToggleChat }: Sideba
           </button>
         );
       })}
+
+      {/* Database Items */}
+      {databases && databases.length > 0 && (
+        <>
+          <div className="w-5 border-t border-border my-1" />
+          {databases.map((db) => {
+            const isActive = location.pathname === `/db/${db.id}`;
+            return (
+              <button
+                type="button"
+                key={db.id}
+                onClick={() => navigate(`/db/${db.id}`)}
+                title={db.name}
+                aria-label={db.name}
+                className={`w-8 h-8 rounded-xl flex items-center justify-center transition-all duration-200 ${
+                  isActive
+                    ? "glass-button-active text-brand"
+                    : "text-muted-foreground hover:text-foreground hover:bg-accent"
+                }`}
+              >
+                {db.icon ? (
+                  <span className="text-sm leading-none">{db.icon}</span>
+                ) : (
+                  <Database className="w-[17px] h-[17px]" strokeWidth={1.5} aria-hidden="true" />
+                )}
+              </button>
+            );
+          })}
+          <button
+            type="button"
+            onClick={() => navigate("/db/new")}
+            title="New Database"
+            aria-label="New Database"
+            className="w-8 h-8 rounded-xl flex items-center justify-center transition-all duration-200 text-muted-foreground hover:text-foreground hover:bg-accent"
+          >
+            <Plus className="w-[17px] h-[17px]" strokeWidth={1.5} aria-hidden="true" />
+          </button>
+        </>
+      )}
 
       <div className="flex-1" />
 

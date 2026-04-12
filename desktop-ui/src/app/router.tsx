@@ -359,6 +359,11 @@ export const router = createHashRouter([
           </SettingsLayout>
         ),
       },
+      {
+        path: "db/:databaseId",
+        lazy: () =>
+          import("@features/database/pages/DatabasePage").then((m) => ({ Component: m.default })),
+      },
       { path: "/projects", element: <ProjectsListPage /> },
       { path: "/project/:id", element: <ProjectDetailPage /> },
       { path: "/project/:id/:tab", element: <ProjectDetailPage /> },
