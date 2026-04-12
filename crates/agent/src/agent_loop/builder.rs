@@ -88,6 +88,7 @@ pub struct AgentLoopBuilder {
     hot_config: Option<Arc<RwLock<config::HotConfig>>>,
     context_update_queue: Option<Arc<bus::ContextUpdateQueue>>,
     embedding_engine: Option<Arc<tools::EmbeddingEngine>>,
+    entity_store: Option<Arc<entity_store::store::EntityStore>>,
 }
 
 impl AgentLoopBuilder {
@@ -111,10 +112,16 @@ impl AgentLoopBuilder {
             hot_config: None,
             context_update_queue: None,
             embedding_engine: None,
+            entity_store: None,
         }
     }
     pub fn with_embedding_engine(mut self, engine: Arc<tools::EmbeddingEngine>) -> Self {
         self.embedding_engine = Some(engine);
+        self
+    }
+
+    pub fn with_entity_store(mut self, store: Arc<entity_store::store::EntityStore>) -> Self {
+        self.entity_store = Some(store);
         self
     }
 
@@ -1630,6 +1637,12 @@ impl AgentLoopBuilder {
         tool_registry.register(tools::SkillReferenceTool::new(Arc::clone(
             &skill_reference_index,
         )));
+
+        // ── Database tool (entity store) ─────────────────────────────────
+        if let Some(ref entity_store) = self.entity_store {
+            tool_registry.register(database_tool::DatabaseTool::new(Arc::clone(entity_store)));
+            info!("Database tool registered");
+        }
 
         // ── Reminder engine ───────────────────────────────────────────────
         let reminder_engine = if let Some(ref dispatcher) = notification_dispatcher {

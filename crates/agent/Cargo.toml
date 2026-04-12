@@ -29,6 +29,8 @@ scheduling.workspace = true
 skill-system.workspace = true
 context_engine.workspace = true
 storage.workspace = true
+entity-store.workspace = true
+database-tool.workspace = true
 sqlx.workspace = true
 tokio = { workspace = true }
 tracing.workspace = true

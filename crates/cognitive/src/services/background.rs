@@ -1313,6 +1313,35 @@ async fn event_to_observation(
         | DomainEvent::MemoryPromoted { .. }
         | DomainEvent::CrossDomainDotReady { .. }
         | DomainEvent::MemoryPendingConfirmation { .. } => None,
+        // Entity store events
+        DomainEvent::EntityCreated {
+            database_id,
+            entity_id,
+        } => Some(Observation {
+            domain: "entity_store".into(),
+            content: format!("Entity {entity_id} created in database {database_id}"),
+            importance: 0.3,
+            source_event: "EntityCreated".into(),
+            timestamp: now,
+        }),
+        DomainEvent::EntityUpdated {
+            database_id,
+            entity_id,
+            ..
+        } => Some(Observation {
+            domain: "entity_store".into(),
+            content: format!("Entity {entity_id} updated in database {database_id}"),
+            importance: 0.2,
+            source_event: "EntityUpdated".into(),
+            timestamp: now,
+        }),
+        DomainEvent::EntityDeleted { .. }
+        | DomainEvent::DatabaseCreated { .. }
+        | DomainEvent::DatabaseDeleted { .. }
+        | DomainEvent::SchemaFieldAdded { .. }
+        | DomainEvent::SchemaFieldRemoved { .. }
+        | DomainEvent::SchemaEvolutionProposed { .. }
+        | DomainEvent::SchemaEvolutionApplied { .. } => None,
         _ => {
             // TaskCreated, TaskDeferred, GoalProgress, ActivitySessionCompleted,
             // and lower-priority agentic events (Accumulate-level).
@@ -1405,6 +1434,15 @@ fn event_type_key(event: &DomainEvent) -> String {
         DomainEvent::MirrorTrialKilled { .. } => "MirrorTrialKilled".into(),
         DomainEvent::MirrorSnippetCreated { .. } => "MirrorSnippetCreated".into(),
         DomainEvent::NoteEditingFinished { .. } => "NoteEditingFinished".into(),
+        DomainEvent::EntityCreated { .. } => "EntityCreated".into(),
+        DomainEvent::EntityUpdated { .. } => "EntityUpdated".into(),
+        DomainEvent::EntityDeleted { .. } => "EntityDeleted".into(),
+        DomainEvent::DatabaseCreated { .. } => "DatabaseCreated".into(),
+        DomainEvent::DatabaseDeleted { .. } => "DatabaseDeleted".into(),
+        DomainEvent::SchemaFieldAdded { .. } => "SchemaFieldAdded".into(),
+        DomainEvent::SchemaFieldRemoved { .. } => "SchemaFieldRemoved".into(),
+        DomainEvent::SchemaEvolutionProposed { .. } => "SchemaEvolutionProposed".into(),
+        DomainEvent::SchemaEvolutionApplied { .. } => "SchemaEvolutionApplied".into(),
         _ => "Unknown".into(),
     }
 }

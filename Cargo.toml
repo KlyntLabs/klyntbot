@@ -38,6 +38,8 @@ members = [
     "crates/simulator",
     "crates/voice-engine",
     "crates/feature-language-learning",
+    "crates/entity-store",
+    "crates/database-tool",
 ]
 
 [workspace.package]
@@ -82,6 +84,8 @@ autotuner = { path = "crates/autotuner" }
 simulator = { path = "crates/simulator" }
 voice-engine = { path = "crates/voice-engine" }
 feature-language-learning = { path = "crates/feature-language-learning" }
+entity-store = { path = "crates/entity-store" }
+database-tool = { path = "crates/database-tool" }
 extism = "1"
 mcp = { path = "crates/mcp" }
 rmcp = { version = "0.17", default-features = false }
@@ -193,6 +197,8 @@ feature-coaching.workspace = true
 storage.workspace = true
 plugin-runtime.workspace = true
 mcp.workspace = true
+entity-store.workspace = true
+database-tool.workspace = true
 
 [dev-dependencies]
 tempfile.workspace = true

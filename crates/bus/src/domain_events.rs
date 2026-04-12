@@ -579,6 +579,48 @@ pub enum DomainEvent {
         sender: String,
         preview: String,
     },
+
+    // -- Entity Store --
+    EntityCreated {
+        database_id: String,
+        entity_id: String,
+    },
+    EntityUpdated {
+        database_id: String,
+        entity_id: String,
+        changed_fields: Vec<String>,
+    },
+    EntityDeleted {
+        database_id: String,
+        entity_id: String,
+    },
+    DatabaseCreated {
+        database_id: String,
+        name: String,
+    },
+    DatabaseDeleted {
+        database_id: String,
+    },
+    SchemaFieldAdded {
+        database_id: String,
+        field_id: String,
+        field_name: String,
+    },
+    SchemaFieldRemoved {
+        database_id: String,
+        field_id: String,
+    },
+    SchemaEvolutionProposed {
+        database_id: String,
+        evolution_id: String,
+        action_type: String,
+        confidence: f64,
+    },
+    SchemaEvolutionApplied {
+        database_id: String,
+        evolution_id: String,
+        auto_applied: bool,
+    },
 }
 
 impl DomainEvent {
@@ -677,6 +719,15 @@ impl DomainEvent {
             Self::FocusSessionSuspended { .. } => "FocusSessionSuspended",
             Self::CronCatchUpReady { .. } => "CronCatchUpReady",
             Self::WakePanelReady { .. } => "WakePanelReady",
+            Self::EntityCreated { .. } => "EntityCreated",
+            Self::EntityUpdated { .. } => "EntityUpdated",
+            Self::EntityDeleted { .. } => "EntityDeleted",
+            Self::DatabaseCreated { .. } => "DatabaseCreated",
+            Self::DatabaseDeleted { .. } => "DatabaseDeleted",
+            Self::SchemaFieldAdded { .. } => "SchemaFieldAdded",
+            Self::SchemaFieldRemoved { .. } => "SchemaFieldRemoved",
+            Self::SchemaEvolutionProposed { .. } => "SchemaEvolutionProposed",
+            Self::SchemaEvolutionApplied { .. } => "SchemaEvolutionApplied",
         }
     }
 
@@ -778,6 +829,16 @@ impl DomainEvent {
             | Self::FocusSessionSuspended { .. }
             | Self::CronCatchUpReady { .. }
             | Self::WakePanelReady { .. } => "lifecycle",
+
+            Self::EntityCreated { .. }
+            | Self::EntityUpdated { .. }
+            | Self::EntityDeleted { .. }
+            | Self::DatabaseCreated { .. }
+            | Self::DatabaseDeleted { .. }
+            | Self::SchemaFieldAdded { .. }
+            | Self::SchemaFieldRemoved { .. }
+            | Self::SchemaEvolutionProposed { .. }
+            | Self::SchemaEvolutionApplied { .. } => "entity_store",
         }
     }
 }

@@ -100,6 +100,8 @@ pub struct AppCore {
     pub embedding_engine: Option<Arc<tools::embedding_engine::EmbeddingEngine>>,
     /// LanceDB vector store for semantic similarity search (None when unavailable).
     pub vector_store: Option<VectorStore>,
+    /// Entity store for flexible database operations (None until initialized).
+    pub entity_store: Option<Arc<entity_store::store::EntityStore>>,
     /// Launcher search engine (None when launcher feature is disabled).
     pub launcher_engine: Option<Arc<LauncherSearchEngine>>,
     /// Proactive suggestion handler (None when tasks AI is not configured).

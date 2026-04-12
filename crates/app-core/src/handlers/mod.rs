@@ -9,6 +9,7 @@ pub mod coaching;
 pub mod cognitive;
 pub mod columns;
 pub mod cron;
+pub mod database;
 pub mod distraction;
 pub mod entities;
 pub mod entity_links;

@@ -10,6 +10,8 @@ pub use cognitive;
 pub use common;
 pub use config;
 pub use context_engine;
+pub use database_tool;
+pub use entity_store;
 pub use feature_coaching;
 pub use mcp;
 pub use providers;

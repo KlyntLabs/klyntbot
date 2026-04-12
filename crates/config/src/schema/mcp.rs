@@ -191,6 +191,7 @@ fn default_exposed_tools() -> Vec<String> {
         "cron",
         "mirror",
         "temporal",
+        "database",
     ]
     .map(String::from)
     .to_vec()

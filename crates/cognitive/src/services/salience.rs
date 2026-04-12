@@ -150,6 +150,17 @@ pub fn evaluate_salience(event: &DomainEvent) -> SalienceVerdict {
         DomainEvent::TaskFocusChanged { .. } => SalienceVerdict::Discard,
         DomainEvent::RecurringTemplateAdvanced { .. } => SalienceVerdict::Discard,
 
+        // Entity store events
+        DomainEvent::EntityCreated { .. } => SalienceVerdict::Accumulate,
+        DomainEvent::EntityUpdated { .. } => SalienceVerdict::Accumulate,
+        DomainEvent::EntityDeleted { .. } => SalienceVerdict::Discard,
+        DomainEvent::DatabaseCreated { .. } => SalienceVerdict::Discard,
+        DomainEvent::DatabaseDeleted { .. } => SalienceVerdict::Discard,
+        DomainEvent::SchemaFieldAdded { .. } => SalienceVerdict::Discard,
+        DomainEvent::SchemaFieldRemoved { .. } => SalienceVerdict::Discard,
+        DomainEvent::SchemaEvolutionProposed { .. } => SalienceVerdict::Discard,
+        DomainEvent::SchemaEvolutionApplied { .. } => SalienceVerdict::Accumulate,
+
         // Catch-all for new variants not yet classified
         _ => SalienceVerdict::Accumulate,
     }

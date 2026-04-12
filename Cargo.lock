@@ -67,7 +67,9 @@ dependencies = [
  "common",
  "config",
  "context_engine",
+ "database-tool",
  "dirs",
+ "entity-store",
  "feature-coaching",
  "feature-finance",
  "feature-language-learning",
@@ -304,8 +306,10 @@ dependencies = [
  "config",
  "context_engine",
  "dashmap",
+ "database-tool",
  "desktop-shared",
  "dirs",
+ "entity-store",
  "feature-coaching",
  "feature-finance",
  "feature-insights",
@@ -3239,6 +3243,20 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d7a1e2f27636f116493b8b860f5546edb47c8d8f8ea73e1d2a20be88e28d1fea"
 
 [[package]]
+name = "database-tool"
+version = "0.1.0"
+dependencies = [
+ "async-trait",
+ "bus",
+ "common",
+ "entity-store",
+ "serde",
+ "serde_json",
+ "tools-core",
+ "tracing",
+]
+
+[[package]]
 name = "datafusion"
 version = "51.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3965,6 +3983,7 @@ dependencies = [
  "dashmap",
  "desktop-shared",
  "dirs",
+ "entity-store",
  "feature-coaching",
  "feature-launcher",
  "feature-notes",
@@ -4300,6 +4319,24 @@ name = "endi"
 version = "1.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "66b7e2430c6dff6a955451e2cfc438f09cea1965a9d6f87f7e3b90decc014099"
+
+[[package]]
+name = "entity-store"
+version = "0.1.0"
+dependencies = [
+ "async-trait",
+ "bus",
+ "chrono",
+ "common",
+ "serde",
+ "serde_json",
+ "sqlx",
+ "storage",
+ "tokio",
+ "tools-core",
+ "tracing",
+ "uuid",
+]
 
 [[package]]
 name = "enum-as-inner"
@@ -7044,6 +7081,8 @@ dependencies = [
  "common",
  "config",
  "context_engine",
+ "database-tool",
+ "entity-store",
  "extism",
  "feature-coaching",
  "feature-finance",

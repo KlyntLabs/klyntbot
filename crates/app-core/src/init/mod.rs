@@ -629,6 +629,7 @@ impl AppCore {
             note_embedding_handler,
             embedding_engine: appcore_embedding_engine,
             vector_store: appcore_vector_store,
+            entity_store: None,
             launcher_engine,
             proactive_handler,
             suggestion_applier,

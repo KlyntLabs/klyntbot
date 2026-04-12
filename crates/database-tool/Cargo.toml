@@ -1,0 +1,14 @@
+[package]
+name = "database-tool"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+entity-store = { workspace = true }
+tools-core = { workspace = true }
+common = { workspace = true }
+bus = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+async-trait = { workspace = true }
+tracing = { workspace = true }
