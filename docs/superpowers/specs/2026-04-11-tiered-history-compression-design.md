@@ -24,7 +24,7 @@ An `LlmSummaryProvider` exists and is wired into the builder (`builder.rs:550`),
 
 ## 2. Solution: 3-Tier Cognitive-Aware Compression
 
-Replace the binary compressor with a tiered system where older messages get progressively more compressed, guided by cognitive relevance scoring.
+Replace the old binary compressor entirely with a unified tiered system. There is no backward-compatibility mode — the old `HistoryCompressor`, `CompressorConfig`, and `CompressorMode` enum are deleted and consolidated into `TieredHistoryCompressor`.
 
 ```
 ┌─────────────────────────────────────────────────────┐
@@ -45,21 +45,36 @@ Replace the binary compressor with a tiered system where older messages get prog
               AssembledContext.messages
 ```
 
-### 2.1 Pipeline (within `assemble_uncached_with_memory`)
+### 2.1 What Gets Deleted
+
+| Old code | Replacement |
+|----------|-------------|
+| `HistoryCompressor` struct | `TieredHistoryCompressor` |
+| `CompressorConfig` struct | `HistoryCompressionConfig` (in `config` crate) |
+| `CompressorMode` enum (`Extractive` / `Abstractive`) | Deleted — tiered is the only mode |
+| `SummaryProvider` trait | `SummaryProvider` kept but now always receives a `CompressionTier` |
+| `history_compressor/mod.rs` (old impl) | Rewritten as thin re-export module |
+| `history_compressor/types.rs` (old types) | Replaced with new types (`ConversationTurn`, `TierSummary`, `CompressionTier`, `CompressedHistory`) |
+| `history_compressor/snippet.rs` (`first_snippet`) | Kept — used internally for extractive fallback and hybrid optimization |
+
+The extractive snippet logic (`first_snippet()`) survives as an internal helper for the hybrid extractive-first optimization (Section 5.5) and LLM failure fallback (Section 5.6). It is no longer a user-facing compression mode.
+
+### 2.2 Pipeline (within `assemble_uncached_with_memory`)
 
 1. Allocate system prompt + tools + memory (unchanged).
 2. **Microcompact** stale tool results in older messages.
 3. **Group** messages by conversation turn (not fixed-5).
 4. **Score** each turn group via cognitive relevance (optional).
 5. **Assign tiers** based on recency + score.
-6. **Compress** Tier 1 (structured LLM) and Tier 2 (aggressive LLM or extractive).
+6. **Compress** Tier 1 (structured LLM) and Tier 2 (aggressive LLM or extractive fallback).
 7. **Delta optimization** — skip re-compression of already-summarized prefix.
 
-### 2.2 Early Exit
+### 2.3 Early Exit
 
 ```rust
-if history.len() <= config.tier0_messages * 2 {
-    return original_history; // no compression needed
+if turns.len() <= config.tier0_messages(depth_mode) {
+    // All turns fit in Tier 0 — return history verbatim, no compression
+    return CompressedHistory::verbatim(history);
 }
 ```
 
@@ -188,7 +203,7 @@ No extra text.
 
 ### 5.3 Integration with LlmSummaryProvider
 
-Extend existing provider with a `CompressionTier` parameter:
+The existing `LlmSummaryProvider` is updated (not extended) to always accept a tier:
 
 ```rust
 pub enum CompressionTier {
@@ -210,6 +225,19 @@ impl LlmSummaryProvider {
 }
 ```
 
+The old single-prompt `build_batch_prompt(segments)` signature is removed. `SummaryProvider::summarize_batch` gains a `tier: CompressionTier` parameter:
+
+```rust
+#[async_trait]
+pub trait SummaryProvider: Send + Sync {
+    async fn summarize_batch(
+        &self,
+        segments: Vec<Vec<Message>>,
+        tier: CompressionTier,
+    ) -> Vec<Result<String, String>>;
+}
+```
+
 Prompts stored as constants in `crates/context_engine/src/history_compressor/prompts.rs`.
 
 ### 5.4 Max Tokens Per LLM Call
@@ -222,7 +250,7 @@ Prompts stored as constants in `crates/context_engine/src/history_compressor/pro
 Before calling the LLM, check if extractive summaries already fit within the tier's token budget:
 
 ```rust
-let extractive = Self::extractive_summary_with_length(chunk, snippet_len);
+let extractive = first_snippet_summary(chunk, snippet_len);
 let extractive_tokens = token_counter.estimate_text(&extractive);
 
 if extractive_tokens <= tier_budget {
@@ -235,21 +263,19 @@ Saves 40–60% of LLM calls for sessions where history isn't very long. Very sho
 
 ### 5.6 Fallback
 
-On LLM failure, fall back to extractive per-segment (existing behavior in `compress_async`). The pipeline never breaks.
+On LLM failure, fall back to extractive per-segment. The pipeline never breaks.
 
 ## 6. Delta Compaction (Anchored Summarization)
 
 ### 6.1 Persistent Storage
 
-New columns on `sessions` table:
+New columns on `sessions` table (in-place migration, pre-release):
 
 ```sql
 ALTER TABLE sessions ADD COLUMN compressed_prefix TEXT;
 ALTER TABLE sessions ADD COLUMN compressed_through_idx INTEGER;
 ALTER TABLE sessions ADD COLUMN compressed_at TEXT;
 ```
-
-Pre-release: in-place migration, no versioned migration needed.
 
 ### 6.2 TierSummary (Persisted as JSON)
 
@@ -328,36 +354,40 @@ Added to `CognitiveConfig` as `history_compression: HistoryCompressionConfig`:
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct HistoryCompressionConfig {
-    #[serde(default = "default_true")]
-    pub enabled: bool,
-
-    #[serde(default)]
-    pub mode: CompressionMode,  // "extractive" | "tiered"
-
+    /// Override model for summarization LLM calls.
+    /// None = use agents.defaults.model.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub model: Option<String>,
 
+    /// Use cognitive 12-factor scoring for tier promotion.
     #[serde(default = "default_true")]
     pub use_cognitive_scoring: bool,
 
+    /// Only compress new messages on session resume.
     #[serde(default = "default_true")]
     pub delta_only_on_resume: bool,
 
+    /// Tier 0 verbatim message count per depth mode.
     #[serde(default)]
     pub tier0_messages: TierZeroConfig,
 
+    /// Target compression ratio for Tier 1 summaries.
     #[serde(default = "default_tier1_ratio")]
     pub tier1_ratio: f32,  // 0.35
 
+    /// Target compression ratio for Tier 2 summaries.
     #[serde(default = "default_tier2_ratio")]
     pub tier2_ratio: f32,  // 0.12
 
+    /// Cognitive score threshold for promoting old turns to Tier 1.
     #[serde(default = "default_high_threshold")]
     pub high_relevance_threshold: f64,  // 0.70
 
+    /// Cognitive score threshold for keeping turns in Tier 1 vs Tier 2.
     #[serde(default = "default_low_threshold")]
     pub low_relevance_threshold: f64,  // 0.40
 
+    /// Turns from current end before Tier 1 demotes to Tier 2.
     #[serde(default = "default_demotion_threshold")]
     pub tier1_demotion_threshold: usize,  // 30
 }
@@ -372,15 +402,10 @@ pub struct TierZeroConfig {
     #[serde(default = "default_16")]
     pub ultra: usize,      // 16
 }
-
-#[derive(Debug, Clone, Default, Serialize, Deserialize)]
-#[serde(rename_all = "lowercase")]
-pub enum CompressionMode {
-    #[default]
-    Extractive,
-    Tiered,
-}
 ```
+
+No `enabled` field — compression always runs (with early exit for short sessions).
+No `mode` field — tiered is the only behavior.
 
 ### 8.2 JSON Example
 
@@ -388,8 +413,6 @@ pub enum CompressionMode {
 {
   "cognitive": {
     "historyCompression": {
-      "enabled": true,
-      "mode": "tiered",
       "model": "claude-haiku-4-5-20251001",
       "useCognitiveScoring": true,
       "deltaOnlyOnResume": true,
@@ -420,20 +443,33 @@ pub enum CompressionMode {
 
 | File | Change |
 |------|--------|
-| `context_engine/src/history_compressor/mod.rs` | Re-export tiered compressor, `ConversationTurn`, `TierSummary` |
-| `context_engine/src/history_compressor/types.rs` | Add `CompressionTier`, `TierSummary` |
-| `context_engine/src/assembler/mod.rs` | Route to tiered compressor when `mode == Tiered`; pass `MemoryScorer` |
-| `context_engine/src/lib.rs` | Re-export new public types |
-| `agent/src/adapters/llm_summary.rs` | Add `CompressionTier` param to `build_batch_prompt`, two prompt variants |
-| `agent/src/agent_loop/builder.rs` | Wire `MemoryScorer` + `HistoryCompressionConfig` into `ContextEngine` |
-| `config/src/schema/cognitive.rs` | `HistoryCompressionConfig`, `TierZeroConfig`, `CompressionMode` |
-| `session/src/manager.rs` | `save_compressed_prefix()`, `load_compressed_prefix()` methods |
-| `storage` crate | Migration: 3 new columns on `sessions` |
-| `bus/src/events.rs` | `AgentEvent::ContextTieredCompressed` variant |
+| `context_engine/src/history_compressor/mod.rs` | Delete old `HistoryCompressor` impl; re-export `TieredHistoryCompressor` as the public API |
+| `context_engine/src/history_compressor/types.rs` | Delete `CompressorConfig`, `CompressorMode`; replace with `ConversationTurn`, `TierSummary`, `CompressionTier`, `CompressedHistory` |
+| `context_engine/src/history_compressor/snippet.rs` | Kept as-is — internal helper for extractive fallback |
+| `context_engine/src/summary_provider.rs` | Add `tier: CompressionTier` parameter to `summarize_batch` |
+| `context_engine/src/assembler/mod.rs` | Replace `HistoryCompressor` usage with `TieredHistoryCompressor`; accept `MemoryScorer` |
+| `context_engine/src/lib.rs` | Update re-exports: remove old types, add new |
+| `agent/src/adapters/llm_summary.rs` | Update `build_batch_prompt` to accept `CompressionTier`; add two prompt constants; remove old generic prompt |
+| `agent/src/agent_loop/builder.rs` | Wire `MemoryScorer` + `HistoryCompressionConfig` into `ContextEngine`; use config model override for `LlmSummaryProvider` |
+| `config/src/schema/cognitive.rs` | Add `HistoryCompressionConfig`, `TierZeroConfig` |
+| `session/src/manager.rs` | Add `save_compressed_prefix()`, `load_compressed_prefix()` methods |
+| `storage` crate | In-place migration: 3 new columns on `sessions` |
+| `bus/src/events.rs` | Add `AgentEvent::ContextTieredCompressed` variant |
 
-### 9.3 Unchanged
+### 9.3 Deleted Code
 
-- Existing `HistoryCompressor` — `mode: "extractive"` routes to it.
+| Code | Reason |
+|------|--------|
+| `HistoryCompressor` struct (`history_compressor/mod.rs`) | Replaced by `TieredHistoryCompressor` |
+| `CompressorConfig` struct (`history_compressor/types.rs`) | Replaced by `HistoryCompressionConfig` in `config` crate |
+| `CompressorMode` enum (`Extractive` / `Abstractive`) | No mode switch — tiered is the only behavior |
+| `HistoryCompressor::compress()` (sync method) | Replaced by `TieredHistoryCompressor::compress_async()` |
+| `HistoryCompressor::extractive_summary()` (public) | `first_snippet` kept as internal helper; public extractive API removed |
+| Old `compress_async` impl | Replaced entirely by tiered pipeline |
+| All old `HistoryCompressor` tests | Rewritten for tiered behavior |
+
+### 9.4 Unchanged
+
 - `MidLoopCompressor` — continues to handle in-loop tool-result compression.
 - `LiveContextRefresher` — unchanged, injects updates post-assembly.
 - Budget waterfall priorities — `CompressedHistory` stays lowest priority.
@@ -458,27 +494,25 @@ Emitted after successful tiered compression in the assembler.
 
 ### 11.1 Unit Tests
 
-- **Grouping** (`grouping.rs`): turn boundary detection, preamble handling, tool-call pairing.
-- **Tier assignment** (`tiered.rs`): pure recency fallback, cognitive promotion, DepthMode interaction.
-- **Prompts** (`llm_summary.rs`): Tier 1 vs Tier 2 prompt selection, max-token scaling.
-- **Delta merge** (`tiered.rs`): resume with existing prefix, demotion, invalidation.
+- **Grouping** (`grouping.rs`): turn boundary detection with `Message::User` splits, preamble handling for leading system messages, tool-call + tool-result pairing stays together, `ContextUpdate` attachment.
+- **Tier assignment** (`tiered.rs`): pure recency fallback (no scorer), cognitive promotion of old high-score turns, DepthMode tier0_count variation, demotion threshold boundary.
+- **Prompts** (`llm_summary.rs`): Tier 1 vs Tier 2 prompt selection, max-token scaling per tier.
+- **Delta merge** (`tiered.rs`): resume with existing prefix, Tier 1 → Tier 2 demotion using persisted cognitive_score, invalidation clears prefix.
+- **Hybrid extractive-first** (`tiered.rs`): extractive fits budget → no LLM call; exceeds budget → LLM called.
 
 ### 11.2 Integration Tests
 
-- Assemble with `mode: "tiered"` + mock `SummaryProvider` + mock `MemoryScorer` → verify 3-tier output.
-- Delta resume: assemble → persist → add messages → re-assemble → verify only delta compressed.
+- Assemble with mock `SummaryProvider` + mock `MemoryScorer` → verify 3-tier output structure.
+- Delta resume: assemble → persist prefix → add messages → re-assemble → verify only delta compressed.
 - Hybrid extractive-first: verify LLM not called when extractive fits budget.
-- Fallback: LLM failure → extractive per-segment.
-
-### 11.3 Existing Tests
-
-All existing `HistoryCompressor` tests remain green — `mode: "extractive"` is unchanged.
+- Fallback: LLM failure → extractive per-segment, pipeline completes successfully.
+- Short session early exit: fewer turns than `tier0_count` → no compression, all verbatim.
 
 ## 12. Non-Goals
 
 - **Desktop UI toggle** — config.json edit is sufficient for now.
 - **Autotuner integration** — no `TrialParams` for compression in this spec.
-- **Per-session mode override** — same mode for all sessions.
+- **Per-session config override** — same config for all sessions.
 - **Multi-modal compression** — text only.
 - **Observability dashboard** — streaming event + logs are sufficient.
 
