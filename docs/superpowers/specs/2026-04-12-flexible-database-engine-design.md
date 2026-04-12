@@ -1,8 +1,8 @@
-# Flexible Database Engine — Self-Evolving Entity Platform
+# Entity Store — Self-Evolving Entity Platform
 
 **Date:** 2026-04-12
 **Status:** Approved
-**Scope:** Replace fixed-schema feature crates with a Notion-like flexible database engine that self-evolves through AI-user collaboration.
+**Scope:** Replace fixed-schema feature crates with a Notion-like entity store that self-evolves through AI-user collaboration.
 
 ---
 
@@ -27,7 +27,7 @@ Reposition the platform from a fixed-schema task manager into a self-evolving wo
 | Relations | **Explicit + AI-inferred** | User-defined + cognitive system detects implicit connections |
 | AI autonomy | **Confidence-tiered** | Low-risk auto-applied, medium suggested, high requires approval. Autotuner calibrates thresholds per-database |
 | Templates | **Schema + Skill bundle** | Simple, portable, marketplace-ready. No learned-behavior leakage |
-| Architecture | **Hybrid Schema** | Dynamic SQLite tables with real typed columns via ALTER TABLE |
+| Architecture | **Hybrid Schema (EntityStore)** | Dynamic SQLite tables with real typed columns via ALTER TABLE |
 | Backward compat | **None needed** | Pre-release — clean replacement, no data migration |
 
 ## 3. Core Data Model
@@ -484,7 +484,7 @@ All cross-domain scenarios work naturally:
 
 ```
 NEW:
-  crates/database-engine/          — Schema registry, dynamic tables, field types, query builder, views
+  crates/entity-store/             — Schema registry, dynamic tables, field types, query builder, views
     src/schema.rs                  — DatabaseSchema, FieldDefinition, FieldType
     src/entity.rs                  — Entity (dynamic property map)
     src/query.rs                   — Dynamic SQL builder
