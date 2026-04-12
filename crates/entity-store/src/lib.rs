@@ -4,6 +4,7 @@ pub mod evolution;
 pub mod query;
 pub mod relations;
 pub mod schema_ops;
+pub mod skill_binding;
 pub mod store;
 pub mod templates;
 pub mod types;

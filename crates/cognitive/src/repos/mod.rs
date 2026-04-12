@@ -117,6 +117,12 @@ pub fn cognitive_migrations() -> Vec<FeatureMigration> {
                 .to_string(),
             sql: include_str!("../../migrations/003_mirror_tables.sql").to_string(),
         },
+        FeatureMigration {
+            feature_name: "cognitive_mirror_schema".to_string(),
+            version: 1,
+            description: "Mirror schema observations for field usage tracking".to_string(),
+            sql: include_str!("../../migrations/005_mirror_schema_observations.sql").to_string(),
+        },
     ]
 }
 

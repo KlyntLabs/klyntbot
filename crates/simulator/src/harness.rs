@@ -2162,6 +2162,13 @@ impl SimulationHarness {
                 {
                     debug!(error = %e, "MirrorCleanup: failed to clean trial previews");
                 }
+                if let Err(e) = self
+                    .mirror_repo
+                    .cleanup_old_schema_observations(max_age_days)
+                    .await
+                {
+                    debug!(error = %e, "MirrorCleanup: failed to clean schema observations");
+                }
             }
             CronTrigger::CrossDomainInsight => {
                 debug!(trigger = "CrossDomainInsight", %simulated_now, "Executing cron");

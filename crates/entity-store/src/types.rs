@@ -257,6 +257,30 @@ pub struct CreateFieldInput {
     pub position: Option<i32>,
 }
 
+/// Format an entity's fields as a pipe-separated string for display.
+/// Skips null values. Optionally resolves slugs to display names using field definitions.
+pub fn format_entity_fields(
+    fields: &HashMap<String, serde_json::Value>,
+    field_defs: Option<&[FieldDefinition]>,
+) -> String {
+    fields
+        .iter()
+        .filter(|(_, v)| !v.is_null())
+        .map(|(k, v)| {
+            let label = field_defs
+                .and_then(|defs| defs.iter().find(|f| f.slug == *k))
+                .map(|f| f.name.as_str())
+                .unwrap_or(k.as_str());
+            let val = match v {
+                serde_json::Value::String(s) => s.clone(),
+                other => other.to_string(),
+            };
+            format!("{label}: {val}")
+        })
+        .collect::<Vec<_>>()
+        .join(" | ")
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

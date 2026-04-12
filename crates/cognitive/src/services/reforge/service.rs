@@ -48,6 +48,8 @@ pub async fn run_reforge(
     community_intelligence_handler: Option<&dyn super::CommunityIntelligenceHandler>,
     community_repo: Option<&crate::repos::CommunityRepo>,
     co_activation_repo_for_split: Option<&crate::repos::CoActivationRepo>,
+    schema_evolution_handler: Option<&dyn super::SchemaEvolutionHandler>,
+    schema_pool: Option<&sqlx::SqlitePool>,
 ) -> Option<ReforgeResult> {
     let mut result = ReforgeResult::default();
 
@@ -151,6 +153,35 @@ pub async fn run_reforge(
                     warn!("Reforge: failed to persist cross-session pattern: {e}");
                 } else {
                     result.patterns_persisted += 1;
+                }
+            }
+        }
+    }
+
+    // ------------------------------------------------------------------
+    // Phase 2.5: Schema Evolution (per-database)
+    // ------------------------------------------------------------------
+    if let (Some(handler_se), Some(pool)) = (schema_evolution_handler, schema_pool) {
+        info!("Reforge Phase 2.5: Schema Evolution");
+        let observations = super::schema_evolution::collect_schema_observations(pool).await;
+        for (database_id, field_usage) in observations {
+            let input = super::schema_evolution::SchemaEvolutionInput {
+                database_id: database_id.clone(),
+                database_name: database_id.clone(), // Enriched by handler
+                fields: field_usage,
+                skill_content: None,
+            };
+            match handler_se.propose_schema_evolution(&input).await {
+                Ok(output) => {
+                    debug!(
+                        database_id = %database_id,
+                        proposals = output.proposals.len(),
+                        "Phase 2.5: schema evolution proposals"
+                    );
+                    result.schema_proposals += output.proposals.len();
+                }
+                Err(e) => {
+                    warn!("Phase 2.5 failed for {database_id}: {e}");
                 }
             }
         }

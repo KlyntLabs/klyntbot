@@ -551,6 +551,13 @@ impl AgentLoopBuilder {
             None
         };
 
+        // Database context source — injects active entities from flexible databases.
+        if let Some(ref store) = self.entity_store {
+            sources.push(Box::new(
+                crate::context_sources::DatabaseContextSource::new(Arc::clone(store)),
+            ));
+        }
+
         // Sort by priority (descending) — ensures correct ordering in prompt
         sources.sort_by_key(|s| std::cmp::Reverse(s.priority()));
 
@@ -772,6 +779,12 @@ impl AgentLoopBuilder {
             forge.add_searcher(Arc::new(crate::domain_searchers::FinanceSearcher::new(
                 repos.clone(),
             )));
+
+            if let Some(ref store) = self.entity_store {
+                forge.add_searcher(Arc::new(crate::domain_searchers::DatabaseSearcher::new(
+                    Arc::clone(store),
+                )));
+            }
 
             // NoteTreeNavigator with optional community search (Phase 2)
             if config.cognitive.book_index.enabled {

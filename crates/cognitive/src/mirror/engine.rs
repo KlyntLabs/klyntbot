@@ -12,7 +12,7 @@ use tokio_util::sync::CancellationToken;
 
 use crate::mirror::{
     AutotunerBridge, ConfigArchiver, MetaRuleDetector, MirrorFacade, MirrorRepo, NarrativeHandler,
-    RoutingMirrorSubscriber, TrialPreviewSubscriber,
+    RoutingMirrorSubscriber, SchemaMirrorSubscriber, TrialPreviewSubscriber,
 };
 use crate::repos::{EpisodicMemoryRepo, ProceduralRuleRepo};
 
@@ -65,11 +65,14 @@ impl MirrorEngine {
             trial_evaluator,
         ));
 
+        let schema_sub = SchemaMirrorSubscriber::new(repo.pool().clone());
+
         let handles = vec![
             tokio::spawn(routing_sub.run(bus.subscribe(), shutdown.clone())),
             tokio::spawn(meta_rule_detector.run(bus.subscribe(), shutdown.clone())),
             tokio::spawn(config_archiver.run(bus.subscribe(), shutdown.clone())),
             tokio::spawn(trial_sub.run(bus.subscribe(), shutdown.clone())),
+            tokio::spawn(schema_sub.run(bus.subscribe(), shutdown.clone())),
         ];
 
         let mut facade = MirrorFacade::new(repo);
@@ -153,8 +156,8 @@ mod tests {
         assert_eq!(bus.subscriber_count(), 0);
         let (_facade, handles, shutdown) =
             MirrorEngine::start(repo, Arc::clone(&bus), None, None, None, None, None);
-        // Four subscribers (routing + meta_rule + config_archiver + trial_preview).
-        assert_eq!(bus.subscriber_count(), 4);
+        // Five subscribers (routing + meta_rule + config_archiver + trial_preview + schema).
+        assert_eq!(bus.subscriber_count(), 5);
 
         shutdown.cancel();
         for handle in handles {

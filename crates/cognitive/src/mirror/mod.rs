@@ -9,7 +9,8 @@ pub use facade::MirrorFacade;
 pub use narratives::{snippet_from_alert, NarrativeHandler};
 pub use repo::MirrorRepo;
 pub use subscribers::{
-    ConfigArchiver, MetaRuleDetector, RoutingMirrorSubscriber, TrialPreviewSubscriber,
+    ConfigArchiver, MetaRuleDetector, RoutingMirrorSubscriber, SchemaMirrorSubscriber,
+    TrialPreviewSubscriber,
 };
 pub use types::{
     AutotunerBridge, BrainVersion, EarlyTrialEvaluator, FeedbackTarget, GeneratedNarrative,

@@ -133,10 +133,23 @@ pub(crate) fn community_embedding_schema() -> Schema {
     ])
 }
 
+pub(crate) fn database_entity_schema() -> Schema {
+    Schema::new(vec![
+        Field::new("id", DataType::Utf8, false),
+        vector_field(),
+        Field::new("database_id", DataType::Utf8, false),
+        Field::new("field_context", DataType::Utf8, false),
+        Field::new("updated_at", DataType::Utf8, false),
+    ])
+}
+
 /// Map a table name to its Arrow schema.
 ///
 /// Returns `None` if the table name is not recognized.
 pub(crate) fn schema_for_table(name: &str) -> Option<Schema> {
+    if name.starts_with("db_") && name.ends_with("_embeddings") {
+        return Some(database_entity_schema());
+    }
     match name {
         "todo_embeddings" => Some(todo_schema()),
         "task_embeddings" => Some(task_embedding_schema()),

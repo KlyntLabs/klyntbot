@@ -435,4 +435,6 @@ pub struct ReforgeResult {
     pub communities_renamed: u32,
     pub communities_merged: u32,
     pub communities_split: u32,
+    // Phase 2.5: Schema evolution
+    pub schema_proposals: usize,
 }

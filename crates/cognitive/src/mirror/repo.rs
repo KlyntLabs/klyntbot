@@ -269,7 +269,7 @@ impl MirrorRepo {
         Self { pool }
     }
 
-    fn db(&self) -> &sqlx::SqlitePool {
+    pub fn pool(&self) -> &sqlx::SqlitePool {
         self.pool.inner()
     }
 
@@ -301,7 +301,7 @@ impl MirrorRepo {
         .bind(snap.avg_routing_confidence)
         .bind(snap.low_confidence_count as i64)
         .bind(user_feedback)
-        .execute(self.db())
+        .execute(self.pool())
         .await
         .map_err(|e| common::KlyntbotError::Storage(e.to_string()))?;
         Ok(())
@@ -311,7 +311,7 @@ impl MirrorRepo {
         let row = sqlx::query_as::<_, RoutingSnapshotRow>(
             "SELECT * FROM mirror_routing_snapshots ORDER BY captured_at DESC LIMIT 1",
         )
-        .fetch_optional(self.db())
+        .fetch_optional(self.pool())
         .await
         .map_err(|e| common::KlyntbotError::Storage(e.to_string()))?;
         row.map(RoutingSnapshot::try_from).transpose()
@@ -323,7 +323,7 @@ impl MirrorRepo {
             "SELECT * FROM mirror_routing_snapshots WHERE captured_at >= ?1 ORDER BY captured_at DESC",
         )
         .bind(cutoff.to_rfc3339())
-        .fetch_all(self.db())
+        .fetch_all(self.pool())
         .await
         .map_err(|e| common::KlyntbotError::Storage(e.to_string()))?;
         rows.into_iter().map(RoutingSnapshot::try_from).collect()
@@ -360,7 +360,7 @@ impl MirrorRepo {
         .bind(action_json)
         .bind(user_feedback)
         .bind(snippet.dismissed_at.map(|d| d.to_rfc3339()))
-        .execute(self.db())
+        .execute(self.pool())
         .await
         .map_err(|e| common::KlyntbotError::Storage(e.to_string()))?;
         Ok(())
@@ -370,7 +370,7 @@ impl MirrorRepo {
         let rows = sqlx::query_as::<_, SnippetRow>(
             "SELECT * FROM mirror_snippets WHERE dismissed_at IS NULL ORDER BY created_at DESC LIMIT 20",
         )
-        .fetch_all(self.db())
+        .fetch_all(self.pool())
         .await
         .map_err(|e| common::KlyntbotError::Storage(e.to_string()))?;
         rows.into_iter().map(NarrativeSnippet::try_from).collect()
@@ -407,7 +407,7 @@ impl MirrorRepo {
         .bind(meta_rule_updates_json)
         .bind(&narrative.full_narrative)
         .bind(user_feedback)
-        .execute(self.db())
+        .execute(self.pool())
         .await
         .map_err(|e| common::KlyntbotError::Storage(e.to_string()))?;
         Ok(())
@@ -417,7 +417,7 @@ impl MirrorRepo {
         let row = sqlx::query_as::<_, TrendNarrativeRow>(
             "SELECT * FROM mirror_trend_narratives ORDER BY generated_at DESC LIMIT 1",
         )
-        .fetch_optional(self.db())
+        .fetch_optional(self.pool())
         .await
         .map_err(|e| common::KlyntbotError::Storage(e.to_string()))?;
         row.map(TrendNarrative::try_from).transpose()
@@ -428,7 +428,7 @@ impl MirrorRepo {
             "SELECT * FROM mirror_trend_narratives ORDER BY generated_at DESC LIMIT ?1",
         )
         .bind(limit as i64)
-        .fetch_all(self.db())
+        .fetch_all(self.pool())
         .await
         .map_err(|e| common::KlyntbotError::Storage(e.to_string()))?;
         rows.into_iter().map(TrendNarrative::try_from).collect()
@@ -460,7 +460,7 @@ impl MirrorRepo {
         sqlx::query(sql)
             .bind(feedback_json)
             .bind(id_str)
-            .execute(self.db())
+            .execute(self.pool())
             .await
             .map_err(|e| common::KlyntbotError::Storage(e.to_string()))?;
         Ok(())
@@ -478,9 +478,20 @@ impl MirrorRepo {
             "DELETE FROM mirror_routing_snapshots WHERE captured_at < ?1 AND window_hours = 1",
         )
         .bind(cutoff.to_rfc3339())
-        .execute(self.db())
+        .execute(self.pool())
         .await
         .map_err(|e| common::KlyntbotError::Storage(e.to_string()))?;
+        Ok(result.rows_affected())
+    }
+
+    /// Delete schema observations older than `max_age_days`.
+    pub async fn cleanup_old_schema_observations(&self, max_age_days: u32) -> Result<u64> {
+        let cutoff = Utc::now() - chrono::Duration::days(max_age_days as i64);
+        let result = sqlx::query("DELETE FROM mirror_schema_observations WHERE last_used_at < ?1")
+            .bind(cutoff.to_rfc3339())
+            .execute(self.pool())
+            .await
+            .map_err(|e| common::KlyntbotError::Storage(e.to_string()))?;
         Ok(result.rows_affected())
     }
 
@@ -488,7 +499,7 @@ impl MirrorRepo {
         let cutoff = Utc::now() - chrono::Duration::days(max_age_days as i64);
         let result = sqlx::query("DELETE FROM mirror_snippets WHERE created_at < ?1")
             .bind(cutoff.to_rfc3339())
-            .execute(self.db())
+            .execute(self.pool())
             .await
             .map_err(|e| common::KlyntbotError::Storage(e.to_string()))?;
         Ok(result.rows_affected())
@@ -519,7 +530,7 @@ impl MirrorRepo {
         .bind(rule.signal_count as i64)
         .bind(rule.created_at.to_rfc3339())
         .bind(rule.updated_at.to_rfc3339())
-        .execute(self.db())
+        .execute(self.pool())
         .await
         .map_err(|e| common::KlyntbotError::Storage(e.to_string()))?;
         Ok(())
@@ -528,7 +539,7 @@ impl MirrorRepo {
     pub async fn get_meta_rule_by_id(&self, id: Uuid) -> Result<Option<MetaRule>> {
         let row = sqlx::query_as::<_, MetaRuleRow>("SELECT * FROM mirror_meta_rules WHERE id = ?1")
             .bind(id.to_string())
-            .fetch_optional(self.db())
+            .fetch_optional(self.pool())
             .await
             .map_err(|e| common::KlyntbotError::Storage(e.to_string()))?;
         row.map(MetaRule::try_from).transpose()
@@ -540,7 +551,7 @@ impl MirrorRepo {
             "SELECT * FROM mirror_meta_rules WHERE status = ?1 ORDER BY created_at DESC",
         )
         .bind(status_str)
-        .fetch_all(self.db())
+        .fetch_all(self.pool())
         .await
         .map_err(|e| common::KlyntbotError::Storage(e.to_string()))?;
         rows.into_iter().map(MetaRule::try_from).collect()
@@ -552,7 +563,7 @@ impl MirrorRepo {
             .bind(status_str)
             .bind(Utc::now().to_rfc3339())
             .bind(id.to_string())
-            .execute(self.db())
+            .execute(self.pool())
             .await
             .map_err(|e| common::KlyntbotError::Storage(e.to_string()))?;
         Ok(())
@@ -565,7 +576,7 @@ impl MirrorRepo {
         )
         .bind(Utc::now().to_rfc3339())
         .bind(id.to_string())
-        .execute(self.db())
+        .execute(self.pool())
         .await
         .map_err(|e| common::KlyntbotError::Storage(e.to_string()))?;
         Ok(())
@@ -580,7 +591,7 @@ impl MirrorRepo {
         .bind(decay_factor)
         .bind(Utc::now().to_rfc3339())
         .bind(id.to_string())
-        .execute(self.db())
+        .execute(self.pool())
         .await
         .map_err(|e| common::KlyntbotError::Storage(e.to_string()))?;
         Ok(())
@@ -609,7 +620,7 @@ impl MirrorRepo {
         .bind(v.parent_version.map(|p| p as i64))
         .bind(metrics_json)
         .bind(v.reverted as i64)
-        .execute(self.db())
+        .execute(self.pool())
         .await
         .map_err(|e| common::KlyntbotError::Storage(e.to_string()))?;
         Ok(())
@@ -619,7 +630,7 @@ impl MirrorRepo {
         let row = sqlx::query_as::<_, BrainVersionRow>(
             "SELECT * FROM mirror_brain_versions ORDER BY version DESC LIMIT 1",
         )
-        .fetch_optional(self.db())
+        .fetch_optional(self.pool())
         .await
         .map_err(|e| common::KlyntbotError::Storage(e.to_string()))?;
         row.map(BrainVersion::try_from).transpose()
@@ -629,7 +640,7 @@ impl MirrorRepo {
         let rows = sqlx::query_as::<_, BrainVersionRow>(
             "SELECT * FROM mirror_brain_versions ORDER BY version DESC LIMIT 50",
         )
-        .fetch_all(self.db())
+        .fetch_all(self.pool())
         .await
         .map_err(|e| common::KlyntbotError::Storage(e.to_string()))?;
         rows.into_iter().map(BrainVersion::try_from).collect()
@@ -640,7 +651,7 @@ impl MirrorRepo {
             "SELECT * FROM mirror_brain_versions WHERE version = ?1",
         )
         .bind(version as i64)
-        .fetch_optional(self.db())
+        .fetch_optional(self.pool())
         .await
         .map_err(|e| common::KlyntbotError::Storage(e.to_string()))?;
         row.map(BrainVersion::try_from).transpose()
@@ -649,7 +660,7 @@ impl MirrorRepo {
     pub async fn get_next_version_number(&self) -> Result<u32> {
         let row: (i64,) =
             sqlx::query_as("SELECT COALESCE(MAX(version), 0) FROM mirror_brain_versions")
-                .fetch_one(self.db())
+                .fetch_one(self.pool())
                 .await
                 .map_err(|e| common::KlyntbotError::Storage(e.to_string()))?;
         Ok((row.0 + 1) as u32)
@@ -658,7 +669,7 @@ impl MirrorRepo {
     pub async fn mark_versions_reverted_after(&self, target_version: u32) -> Result<()> {
         sqlx::query("UPDATE mirror_brain_versions SET reverted = 1 WHERE version > ?1")
             .bind(target_version as i64)
-            .execute(self.db())
+            .execute(self.pool())
             .await
             .map_err(|e| common::KlyntbotError::Storage(e.to_string()))?;
         Ok(())
@@ -687,7 +698,7 @@ impl MirrorRepo {
         .bind(early_signals_json)
         .bind(recommendation)
         .bind(&preview.narrative)
-        .execute(self.db())
+        .execute(self.pool())
         .await
         .map_err(|e| common::KlyntbotError::Storage(e.to_string()))?;
         Ok(())
@@ -697,7 +708,7 @@ impl MirrorRepo {
         let rows = sqlx::query_as::<_, TrialPreviewRow>(
             "SELECT * FROM mirror_trial_previews ORDER BY preview_at DESC LIMIT 10",
         )
-        .fetch_all(self.db())
+        .fetch_all(self.pool())
         .await
         .map_err(|e| common::KlyntbotError::Storage(e.to_string()))?;
         rows.into_iter().map(TrialPreview::try_from).collect()
@@ -711,7 +722,7 @@ impl MirrorRepo {
             "SELECT * FROM mirror_trial_previews WHERE trial_id = ?1",
         )
         .bind(trial_id)
-        .fetch_optional(self.db())
+        .fetch_optional(self.pool())
         .await
         .map_err(|e| common::KlyntbotError::Storage(e.to_string()))?;
         row.map(TrialPreview::try_from).transpose()
@@ -721,7 +732,7 @@ impl MirrorRepo {
         let cutoff = Utc::now() - chrono::Duration::days(max_age_days as i64);
         let result = sqlx::query("DELETE FROM mirror_trial_previews WHERE preview_at < ?1")
             .bind(cutoff.to_rfc3339())
-            .execute(self.db())
+            .execute(self.pool())
             .await
             .map_err(|e| common::KlyntbotError::Storage(e.to_string()))?;
         Ok(result.rows_affected())
@@ -904,7 +915,7 @@ mod tests {
         )
         .bind(old_id.to_string())
         .bind(old_time.to_rfc3339())
-        .execute(repo.db())
+        .execute(repo.pool())
         .await
         .unwrap();
 
@@ -928,7 +939,7 @@ mod tests {
         )
         .bind(old_snippet_id.to_string())
         .bind(old_snippet_time.to_rfc3339())
-        .execute(repo.db())
+        .execute(repo.pool())
         .await
         .unwrap();
 

@@ -25,6 +25,7 @@ mod cognitive;
 mod community;
 mod conv;
 mod crud;
+mod database_entity;
 mod entity_embedding;
 mod maintenance;
 pub(crate) mod schemas;

@@ -4,7 +4,10 @@ use std::time::SystemTime;
 
 use serde::Deserialize;
 
-use crate::types::{KlyntbotMeta, SkillMetadata, SkillPackage, SkillScope, SkillType};
+use crate::types::{
+    ContextRules, KlyntbotMeta, SalienceDeclaration, SchemaHint, SkillMetadata, SkillPackage,
+    SkillScope, SkillType,
+};
 
 #[derive(Deserialize)]
 struct RawFrontmatter {
@@ -39,6 +42,12 @@ struct RawKlyntbotMeta {
     triggers: Vec<String>,
     #[serde(default)]
     summary: Option<String>,
+    #[serde(default)]
+    schema_hints: Option<HashMap<String, SchemaHint>>,
+    #[serde(default)]
+    salience: Option<SalienceDeclaration>,
+    #[serde(default)]
+    context_rules: Option<ContextRules>,
 }
 
 pub fn parse_skill_md(
@@ -217,6 +226,9 @@ fn parse_metadata_block(
             invokes: raw_km.invokes,
             triggers: raw_km.triggers,
             summary: raw_km.summary,
+            schema_hints: raw_km.schema_hints,
+            salience: raw_km.salience,
+            context_rules: raw_km.context_rules,
         })
     });
 
@@ -455,6 +467,81 @@ Body.
         let pkg = parse_skill_md(content, PathBuf::from("/tmp/test"), SkillScope::BuiltIn).unwrap();
         let meta = pkg.metadata.klyntbot;
         assert!(meta.is_none() || meta.unwrap().triggers.is_empty());
+    }
+
+    #[test]
+    fn test_parse_schema_hints_and_salience() {
+        let content = r#"---
+name: db-tasks
+description: Task management database skill.
+metadata:
+  klyntbot:
+    type: skill
+    tools: [database]
+    schema_hints:
+      status:
+        lifecycle: true
+        completion_values: ["done", "completed"]
+        active_values: ["todo", "doing"]
+      due_date:
+        temporal: true
+        urgency_source: true
+      priority:
+        ranking: true
+    salience:
+      extract_on:
+        - field: status
+          to_values: ["done"]
+          importance: 0.7
+      accumulate_on:
+        - event: entity_created
+          importance: 0.3
+    context_rules:
+      active_filter: "status NOT IN ('done', 'archived')"
+      sort_by: "due_date ASC"
+      max_items: 15
+      format: "{title} — {status}, due {due_date}"
+---
+
+You manage the tasks database.
+"#;
+        let pkg =
+            parse_skill_md(content, PathBuf::from("skills/db-tasks"), SkillScope::User).unwrap();
+        let meta = pkg.metadata.klyntbot.as_ref().unwrap();
+
+        // schema_hints
+        let hints = meta.schema_hints.as_ref().unwrap();
+        assert_eq!(hints.len(), 3);
+        let status_hint = &hints["status"];
+        assert_eq!(status_hint.lifecycle, Some(true));
+        assert_eq!(status_hint.completion_values.as_ref().unwrap().len(), 2);
+        let due_hint = &hints["due_date"];
+        assert_eq!(due_hint.temporal, Some(true));
+        assert_eq!(due_hint.urgency_source, Some(true));
+
+        // salience
+        let sal = meta.salience.as_ref().unwrap();
+        assert_eq!(sal.extract_on.len(), 1);
+        assert_eq!(sal.extract_on[0].field.as_deref(), Some("status"));
+        assert_eq!(sal.accumulate_on.len(), 1);
+        assert_eq!(
+            sal.accumulate_on[0].event.as_deref(),
+            Some("entity_created")
+        );
+
+        // context_rules
+        let ctx = meta.context_rules.as_ref().unwrap();
+        assert_eq!(ctx.max_items, Some(15));
+        assert!(ctx.active_filter.as_ref().unwrap().contains("NOT IN"));
+        assert_eq!(
+            ctx.format.as_deref(),
+            Some("{title} — {status}, due {due_date}")
+        );
+
+        // accessor methods
+        assert!(pkg.schema_hints().is_some());
+        assert!(pkg.salience_declaration().is_some());
+        assert!(pkg.context_rules().is_some());
     }
 
     #[test]

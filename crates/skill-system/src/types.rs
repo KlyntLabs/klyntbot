@@ -3,6 +3,8 @@ use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::SystemTime;
 
+use serde::{Deserialize, Serialize};
+
 const MCP_WILDCARD: &str = "*";
 const ASK_USER_TOOL_NAME: &str = "ask_user";
 
@@ -99,6 +101,21 @@ impl SkillPackage {
             .map(|k| k.triggers.as_slice())
             .unwrap_or(&[])
     }
+
+    /// Schema hints for field semantics.
+    pub fn schema_hints(&self) -> Option<&HashMap<String, SchemaHint>> {
+        self.metadata.klyntbot.as_ref()?.schema_hints.as_ref()
+    }
+
+    /// Salience declaration for event classification.
+    pub fn salience_declaration(&self) -> Option<&SalienceDeclaration> {
+        self.metadata.klyntbot.as_ref()?.salience.as_ref()
+    }
+
+    /// Context injection rules.
+    pub fn context_rules(&self) -> Option<&ContextRules> {
+        self.metadata.klyntbot.as_ref()?.context_rules.as_ref()
+    }
 }
 
 #[derive(Debug, Clone, Default)]
@@ -123,6 +140,66 @@ pub struct KlyntbotMeta {
     pub triggers: Vec<String>,
     /// Short summary for progressive skill loading (Tier 1 catalog).
     pub summary: Option<String>,
+    /// Per-field semantic hints for AI subsystems.
+    pub schema_hints: Option<HashMap<String, SchemaHint>>,
+    /// Salience classification rules for entity events.
+    pub salience: Option<SalienceDeclaration>,
+    /// Context injection rules for prompt assembly.
+    pub context_rules: Option<ContextRules>,
+}
+
+/// Hints about a field's semantic role — used by AI subsystems (salience, context, reforge).
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct SchemaHint {
+    #[serde(default)]
+    pub lifecycle: Option<bool>,
+    #[serde(default)]
+    pub completion_values: Option<Vec<String>>,
+    #[serde(default)]
+    pub active_values: Option<Vec<String>>,
+    #[serde(default)]
+    pub temporal: Option<bool>,
+    #[serde(default)]
+    pub urgency_source: Option<bool>,
+    #[serde(default)]
+    pub ranking: Option<bool>,
+    #[serde(default)]
+    pub behavioral: Option<bool>,
+    #[serde(default)]
+    pub grouping: Option<bool>,
+    #[serde(default)]
+    pub budget_field: Option<bool>,
+}
+
+/// Salience declarations — tells the cognitive system how to classify entity events.
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct SalienceDeclaration {
+    #[serde(default)]
+    pub extract_on: Vec<SalienceRule>,
+    #[serde(default)]
+    pub accumulate_on: Vec<SalienceRule>,
+}
+
+/// A single salience rule matching a field change or event type.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SalienceRule {
+    #[serde(default)]
+    pub field: Option<String>,
+    #[serde(default)]
+    pub event: Option<String>,
+    #[serde(default)]
+    pub to_values: Option<Vec<String>>,
+    #[serde(default)]
+    pub importance: Option<f64>,
+}
+
+/// Rules for context injection — how to select and format active entities for the LLM prompt.
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct ContextRules {
+    pub active_filter: Option<String>,
+    pub sort_by: Option<String>,
+    pub max_items: Option<usize>,
+    pub format: Option<String>,
 }
 
 #[derive(Debug, Clone)]

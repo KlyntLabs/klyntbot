@@ -590,6 +590,8 @@ fn register_cron_callbacks(
                             .as_deref(),
                             Some(&cognitive::CommunityRepo::new(pool.clone())),
                             Some(&co_activation_repo),
+                            None, // schema_evolution_handler
+                            None, // schema_pool
                         )
                         .await
                         {

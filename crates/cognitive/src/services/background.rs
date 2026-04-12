@@ -1313,12 +1313,12 @@ async fn event_to_observation(
         | DomainEvent::MemoryPromoted { .. }
         | DomainEvent::CrossDomainDotReady { .. }
         | DomainEvent::MemoryPendingConfirmation { .. } => None,
-        // Entity store events
+        // Entity store events — domain scoped to database_id for per-database fact extraction
         DomainEvent::EntityCreated {
             database_id,
             entity_id,
         } => Some(Observation {
-            domain: "entity_store".into(),
+            domain: database_id.clone(),
             content: format!("Entity {entity_id} created in database {database_id}"),
             importance: 0.3,
             source_event: "EntityCreated".into(),
@@ -1327,10 +1327,13 @@ async fn event_to_observation(
         DomainEvent::EntityUpdated {
             database_id,
             entity_id,
-            ..
+            changed_fields,
         } => Some(Observation {
-            domain: "entity_store".into(),
-            content: format!("Entity {entity_id} updated in database {database_id}"),
+            domain: database_id.clone(),
+            content: format!(
+                "Entity {entity_id} updated in database {database_id}: changed fields [{}]",
+                changed_fields.join(", ")
+            ),
             importance: 0.2,
             source_event: "EntityUpdated".into(),
             timestamp: now,

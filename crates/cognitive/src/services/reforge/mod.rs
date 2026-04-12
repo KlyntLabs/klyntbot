@@ -1,8 +1,11 @@
 pub mod collector;
 pub mod feedback;
+pub mod schema_evolution;
 pub mod service;
 pub mod skill_files;
 pub mod types;
+
+pub use schema_evolution::SchemaEvolutionHandler;
 
 use std::collections::HashMap;
 
