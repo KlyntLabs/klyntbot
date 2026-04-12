@@ -96,6 +96,21 @@ pub async fn db_add_field(
 }
 
 #[tauri::command]
+pub async fn db_modify_field(
+    state: State<'_, Arc<AppCore>>,
+    database_id: String,
+    field_id: String,
+    name: Option<String>,
+    options: Option<Value>,
+    required: Option<bool>,
+    position: Option<i32>,
+) -> Result<FieldDefinition, ApiError> {
+    state
+        .db_modify_field(database_id, field_id, name, options, required, position)
+        .await
+}
+
+#[tauri::command]
 pub async fn db_remove_field(
     state: State<'_, Arc<AppCore>>,
     database_id: String,
@@ -115,6 +130,7 @@ pub(crate) const DEV_COMMANDS: &[&str] = &[
     "db_update_entity",
     "db_delete_entity",
     "db_add_field",
+    "db_modify_field",
     "db_remove_field",
 ];
 
@@ -172,6 +188,18 @@ pub(crate) async fn dispatch_dev(
             let field_type = try_field!(dev::get_str(body, "fieldType"));
             let options: Option<serde_json::Value> = dev::get(body, "options");
             dev::val(core.db_add_field(db_id, name, field_type, options).await)
+        }
+        "db_modify_field" => {
+            let db_id = try_field!(dev::get_str(body, "databaseId"));
+            let field_id = try_field!(dev::get_str(body, "fieldId"));
+            let name: Option<String> = dev::get(body, "name");
+            let options: Option<serde_json::Value> = dev::get(body, "options");
+            let required: Option<bool> = dev::get(body, "required");
+            let position: Option<i32> = dev::get(body, "position");
+            dev::val(
+                core.db_modify_field(db_id, field_id, name, options, required, position)
+                    .await,
+            )
         }
         "db_remove_field" => {
             let db_id = try_field!(dev::get_str(body, "databaseId"));

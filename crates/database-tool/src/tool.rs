@@ -43,7 +43,7 @@ impl Tool for DatabaseTool {
                     "enum": [
                         "create_database", "list_databases", "get_schema", "delete_database",
                         "create", "get", "list", "update", "delete",
-                        "add_field", "remove_field",
+                        "add_field", "modify_field", "remove_field",
                         "search",
                         "link", "unlink", "list_relations",
                         "create_view", "update_view", "delete_view", "list_views"
@@ -56,7 +56,9 @@ impl Tool for DatabaseTool {
                 "description": { "type": "string" },
                 "icon": { "type": "string" },
                 "fields": { "type": "object", "description": "Entity field values as key-value pairs" },
+                "field_id": { "type": "string", "description": "Field ID (for modify_field, remove_field)" },
                 "field_type": { "type": "string", "description": "Field type (text, number, select, etc.)" },
+                "position": { "type": "integer", "description": "Field position" },
                 "options": { "type": "object", "description": "Field type-specific options" },
                 "required": { "type": "boolean" },
                 "query": { "type": "string", "description": "Search query" },
@@ -91,6 +93,7 @@ impl Tool for DatabaseTool {
             "update" => actions::entity_crud::update_entity(&self.store, &p, &args).await,
             "delete" => actions::entity_crud::delete_entity(&self.store, &p).await,
             "add_field" => actions::field_ops::add_field(&self.store, &p, &args).await,
+            "modify_field" => actions::field_ops::modify_field(&self.store, &p, &args).await,
             "remove_field" => actions::field_ops::remove_field(&self.store, &p).await,
             "search" => actions::search::search(&self.store, &p).await,
             "link" => actions::relation_ops::link(&self.store, &p).await,

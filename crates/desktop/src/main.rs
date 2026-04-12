@@ -1186,6 +1186,7 @@ fn run_desktop_app() {
             commands::database::db_update_entity,
             commands::database::db_delete_entity,
             commands::database::db_add_field,
+            commands::database::db_modify_field,
             commands::database::db_remove_field,
             commands::window::resize_window,
             commands::window::open_url,

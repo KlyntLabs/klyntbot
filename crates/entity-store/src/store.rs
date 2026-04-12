@@ -565,6 +565,70 @@ impl EntityStore {
         field_from_row(row)
     }
 
+    /// Modify a field's metadata (name, options, required, position). Does NOT change the column type.
+    pub async fn modify_field(
+        &self,
+        database_id: &str,
+        field_id: &str,
+        name: Option<String>,
+        options: Option<serde_json::Value>,
+        required: Option<bool>,
+        position: Option<i32>,
+    ) -> Result<FieldDefinition> {
+        let field = self.get_field(field_id).await?;
+        if field.database_id != database_id {
+            return Err(common::KlyntbotError::Storage(
+                "Field does not belong to this database".into(),
+            ));
+        }
+
+        let mut sets = Vec::new();
+        if name.is_some() {
+            sets.push("name = ?".to_string());
+        }
+        if options.is_some() {
+            sets.push("options_json = ?".to_string());
+        }
+        if required.is_some() {
+            sets.push("required = ?".to_string());
+        }
+        if position.is_some() {
+            sets.push("position = ?".to_string());
+        }
+
+        if sets.is_empty() {
+            return Ok(field);
+        }
+
+        let sql = format!(
+            "UPDATE database_fields SET {} WHERE id = ?",
+            sets.join(", ")
+        );
+        let mut q = sqlx::query(&sql);
+
+        if let Some(ref n) = name {
+            q = q.bind(n);
+        }
+        if let Some(ref o) = options {
+            let json_str = serde_json::to_string(o)?;
+            q = q.bind(json_str);
+        }
+        if let Some(r) = required {
+            q = q.bind(r);
+        }
+        if let Some(p) = position {
+            q = q.bind(p);
+        }
+        q = q.bind(field_id);
+
+        q.execute(&self.pool)
+            .await
+            .map_err(|e| common::KlyntbotError::Storage(format!("Failed to modify field: {e}")))?;
+
+        self.invalidate_cache(database_id);
+        self.get_field(field_id).await
+    }
+
     pub async fn list_fields(&self, database_id: &str) -> Result<Vec<FieldDefinition>> {
         let rows: Vec<FieldRow> = sqlx::query_as(
             "SELECT * FROM database_fields WHERE database_id = ? ORDER BY position ASC",
@@ -977,6 +1041,49 @@ mod tests {
 
         let fields = store.list_fields(&db.id).await.unwrap();
         assert!(fields.is_empty());
+    }
+
+    #[tokio::test]
+    async fn test_modify_field() {
+        let store = setup().await;
+        let db = store.create_database(test_input("Modify")).await.unwrap();
+
+        let field = store
+            .add_field(
+                &db.id,
+                CreateFieldInput {
+                    name: "Status".into(),
+                    slug: None,
+                    field_type: FieldType::Select,
+                    options: Some(serde_json::json!({"choices": ["open", "closed"]})),
+                    required: Some(false),
+                    default_value: None,
+                    position: None,
+                },
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(field.name, "Status");
+        assert!(!field.required);
+
+        let modified = store
+            .modify_field(
+                &db.id,
+                &field.id,
+                Some("State".into()),
+                Some(serde_json::json!({"choices": ["open", "closed", "in_progress"]})),
+                Some(true),
+                None,
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(modified.name, "State");
+        assert!(modified.required);
+        let opts = modified.options.unwrap();
+        let choices = opts["choices"].as_array().unwrap();
+        assert_eq!(choices.len(), 3);
     }
 
     // -------------------------------------------------------------------

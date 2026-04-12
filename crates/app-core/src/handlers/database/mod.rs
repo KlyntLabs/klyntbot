@@ -141,6 +141,22 @@ impl AppCore {
             .map_err(Into::into)
     }
 
+    pub async fn db_modify_field(
+        &self,
+        database_id: String,
+        field_id: String,
+        name: Option<String>,
+        options: Option<Value>,
+        required: Option<bool>,
+        position: Option<i32>,
+    ) -> Result<FieldDefinition, ApiError> {
+        let store = self.require_entity_store()?;
+        store
+            .modify_field(&database_id, &field_id, name, options, required, position)
+            .await
+            .map_err(Into::into)
+    }
+
     pub async fn db_remove_field(
         &self,
         database_id: String,

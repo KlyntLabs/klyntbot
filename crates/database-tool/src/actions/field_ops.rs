@@ -37,6 +37,27 @@ pub async fn add_field(
     ))
 }
 
+pub async fn modify_field(
+    store: &EntityStore,
+    p: &ParamExtractor<'_>,
+    args: &Value,
+) -> Result<String> {
+    let db_id = p.required_str("database_id")?;
+    let field_id = p.required_str("field_id")?;
+    let name = p.optional_str("name")?.map(String::from);
+    let options = args.get("options").cloned();
+    let required = p.optional_bool("required")?;
+    let position = p.optional_i64("position")?.map(|v| v as i32);
+
+    let field = store
+        .modify_field(db_id, field_id, name, options, required, position)
+        .await?;
+    Ok(format!(
+        "Modified field '{}' (id: {})",
+        field.name, field.id
+    ))
+}
+
 pub async fn remove_field(store: &EntityStore, p: &ParamExtractor<'_>) -> Result<String> {
     let db_id = p.required_str("database_id")?;
     let field_id = p.required_str("field_id")?;
