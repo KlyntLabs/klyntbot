@@ -887,7 +887,8 @@ mod tests {
     #[tokio::test]
     async fn context_engine_without_rewriter_works() {
         // ContextEngine with no rewriter should work exactly as before
-        let engine = context_engine::ContextEngine::new();
+        let engine =
+            context_engine::ContextEngine::new(config::schema::HistoryCompressionConfig::default());
         // Just verify it can be constructed without a rewriter — the default is None
         // The actual retrieval flow is tested via the existing ContextEngine tests
         drop(engine);

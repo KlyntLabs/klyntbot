@@ -479,4 +479,54 @@ impl SessionRepo {
             .await?;
         Ok(result.rows_affected())
     }
+
+    /// Save the compressed history prefix for a session.
+    pub async fn save_compressed_prefix(
+        &self,
+        session_key: &str,
+        prefix_json: &str,
+        through_idx: i64,
+    ) -> Result<(), StorageError> {
+        sqlx::query(
+            "UPDATE sessions SET compressed_prefix = ?1, compressed_through_idx = ?2, \
+             compressed_at = strftime('%Y-%m-%dT%H:%M:%SZ', 'now') WHERE key = ?3",
+        )
+        .bind(prefix_json)
+        .bind(through_idx)
+        .bind(session_key)
+        .execute(&self.pool)
+        .await?;
+        Ok(())
+    }
+
+    /// Load the compressed history prefix for a session.
+    /// Returns (prefix_json, through_idx) or None if not set.
+    pub async fn load_compressed_prefix(
+        &self,
+        session_key: &str,
+    ) -> Result<Option<(String, i64)>, StorageError> {
+        let row: Option<(Option<String>, Option<i64>)> = sqlx::query_as(
+            "SELECT compressed_prefix, compressed_through_idx FROM sessions WHERE key = ?1",
+        )
+        .bind(session_key)
+        .fetch_optional(&self.pool)
+        .await?;
+
+        Ok(row.and_then(|(prefix, idx)| match (prefix, idx) {
+            (Some(p), Some(i)) => Some((p, i)),
+            _ => None,
+        }))
+    }
+
+    /// Clear the compressed prefix (e.g., on message edit/delete).
+    pub async fn clear_compressed_prefix(&self, session_key: &str) -> Result<(), StorageError> {
+        sqlx::query(
+            "UPDATE sessions SET compressed_prefix = NULL, compressed_through_idx = NULL, \
+             compressed_at = NULL WHERE key = ?1",
+        )
+        .bind(session_key)
+        .execute(&self.pool)
+        .await?;
+        Ok(())
+    }
 }

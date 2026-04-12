@@ -547,15 +547,23 @@ impl AgentLoopBuilder {
         // Sort by priority (descending) — ensures correct ordering in prompt
         sources.sort_by_key(|s| std::cmp::Reverse(s.priority()));
 
+        // Determine summarization model: config override or default
+        let summary_model = config
+            .cognitive
+            .history_compression
+            .model
+            .clone()
+            .unwrap_or_else(|| config.agents.defaults.model.clone());
         let summary_provider = Arc::new(crate::adapters::llm_summary::LlmSummaryProvider::new(
             provider.clone(),
-            config.agents.defaults.model.clone(),
+            summary_model,
         ));
         let token_counter = context_engine::token_counter_for_model(&config.agents.defaults.model);
-        let context_engine = context_engine::ContextEngine::new()
-            .with_sources(sources)
-            .with_token_counter(Arc::clone(&token_counter))
-            .with_summary_provider(summary_provider);
+        let context_engine =
+            context_engine::ContextEngine::new(config.cognitive.history_compression.clone())
+                .with_sources(sources)
+                .with_token_counter(Arc::clone(&token_counter))
+                .with_summary_provider(summary_provider);
 
         // ── Session manager (SQL-backed) ──────────────────────────────────
         let session_manager = SessionManager::from_repo(
@@ -1085,6 +1093,18 @@ impl AgentLoopBuilder {
 
             // Capture retriever clone for PRF pipeline stage (used after the if-let block)
             memory_retriever_for_prf = Some(Arc::clone(&retriever));
+
+            // Wire cognitive memory scorer for tiered compression
+            let context_engine = if config.cognitive.history_compression.use_cognitive_scoring {
+                let scorer = Arc::new(
+                    crate::adapters::memory_scorer_impl::CognitiveMemoryScorer::new(Arc::clone(
+                        &retriever,
+                    )),
+                );
+                context_engine.with_memory_scorer(scorer)
+            } else {
+                context_engine
+            };
 
             context_engine
                 .with_memory_retriever(retriever)

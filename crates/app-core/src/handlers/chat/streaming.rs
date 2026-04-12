@@ -1589,6 +1589,15 @@ pub async fn relay_chat_stream(
                             "mid-loop context compression applied"
                         );
                     }
+                    AgentEvent::ContextTieredCompressed { tier0_kept, tier1_tokens, tier2_tokens, cognitive_scoring_used } => {
+                        tracing::info!(
+                            tier0_kept,
+                            tier1_tokens,
+                            tier2_tokens,
+                            cognitive_scoring_used,
+                            "tiered history compression applied"
+                        );
+                    }
                     AgentEvent::LoopDetected { iteration, tools_summary, suggestion } => {
                         tracing::info!(
                             iteration,

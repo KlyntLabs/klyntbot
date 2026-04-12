@@ -6,7 +6,7 @@
 use std::fmt::Write;
 
 use async_trait::async_trait;
-use context_engine::SummaryProvider;
+use context_engine::{CompressionTier, SummaryProvider, TIER1_INSTRUCTIONS, TIER2_INSTRUCTIONS};
 use providers::{ChatParams, Message, UserContent};
 use tracing::warn;
 
@@ -49,17 +49,22 @@ impl LlmSummaryProvider {
 
     /// Build a prompt that asks the LLM to summarize multiple segments at once,
     /// returning a JSON array of summary strings.
-    fn build_batch_prompt(segments: &[Vec<Message>]) -> String {
+    fn build_batch_prompt(segments: &[Vec<Message>], tier: CompressionTier) -> String {
+        let instructions = match tier {
+            CompressionTier::Detailed => TIER1_INSTRUCTIONS,
+            CompressionTier::Condensed => TIER2_INSTRUCTIONS,
+        };
+
         let mut prompt = format!(
-            "Summarize each numbered conversation segment in 2-3 sentences, \
-             preserving key facts, decisions, and action items.\n\n\
-             Return ONLY a JSON array of exactly {} strings, one summary per segment.\n",
+            "{}\n\nReturn ONLY a JSON array of exactly {} strings, one summary per turn.\n\
+             No extra text.\n",
+            instructions,
             segments.len()
         );
         for (i, segment) in segments.iter().enumerate() {
             let _ = write!(
                 prompt,
-                "\n=== Segment {} ===\n{}\n",
+                "\n=== Turn {} ===\n{}\n",
                 i + 1,
                 Self::format_segment(segment)
             );
@@ -75,11 +80,18 @@ impl LlmSummaryProvider {
     }
 
     /// Execute a single LLM call covering one sub-batch of segments.
-    async fn call_batch(&self, segments: &[Vec<Message>]) -> Vec<Result<String, String>> {
+    async fn call_batch(
+        &self,
+        segments: &[Vec<Message>],
+        tier: CompressionTier,
+    ) -> Vec<Result<String, String>> {
         let n = segments.len();
-        let prompt = Self::build_batch_prompt(segments);
+        let prompt = Self::build_batch_prompt(segments, tier);
         let request_messages = vec![Message::user(prompt)];
-        let max_tokens = (100 * n).max(256) as u32;
+        let max_tokens = match tier {
+            CompressionTier::Detailed => (150 * n).max(256) as u32,
+            CompressionTier::Condensed => (60 * n).max(128) as u32,
+        };
         let params = ChatParams::new(&self.model).with_max_tokens(max_tokens);
 
         match self.provider.chat(&request_messages, None, &params).await {
@@ -110,7 +122,11 @@ impl LlmSummaryProvider {
 
 #[async_trait]
 impl SummaryProvider for LlmSummaryProvider {
-    async fn summarize_batch(&self, segments: Vec<Vec<Message>>) -> Vec<Result<String, String>> {
+    async fn summarize_batch(
+        &self,
+        segments: Vec<Vec<Message>>,
+        tier: CompressionTier,
+    ) -> Vec<Result<String, String>> {
         if segments.is_empty() {
             return vec![];
         }
@@ -118,7 +134,7 @@ impl SummaryProvider for LlmSummaryProvider {
         // Split into sub-batches and run in parallel
         let futures = segments
             .chunks(MAX_SEGMENTS_PER_CALL)
-            .map(|batch| self.call_batch(batch));
+            .map(|batch| self.call_batch(batch, tier));
         let results = futures_util::future::join_all(futures).await;
         results.into_iter().flatten().collect()
     }
@@ -161,11 +177,20 @@ mod tests {
             vec![Message::user("Hello"), Message::assistant("Hi!")],
             vec![Message::user("Bye"), Message::assistant("Goodbye!")],
         ];
-        let prompt = LlmSummaryProvider::build_batch_prompt(&segments);
+        let prompt = LlmSummaryProvider::build_batch_prompt(&segments, CompressionTier::Detailed);
         assert!(prompt.contains("exactly 2 strings"));
-        assert!(prompt.contains("=== Segment 1 ==="));
-        assert!(prompt.contains("=== Segment 2 ==="));
+        assert!(prompt.contains("=== Turn 1 ==="));
+        assert!(prompt.contains("=== Turn 2 ==="));
         assert!(prompt.contains("User: Hello"));
-        assert!(prompt.contains("Assistant: Goodbye!"));
+        assert!(prompt.contains("Decisions made")); // Tier 1 specific
+    }
+
+    #[test]
+    fn build_batch_prompt_tier2_uses_condensed_instructions() {
+        let segments = vec![vec![Message::user("Test"), Message::assistant("Reply")]];
+        let prompt = LlmSummaryProvider::build_batch_prompt(&segments, CompressionTier::Condensed);
+        assert!(prompt.contains("ONLY"));
+        assert!(prompt.contains("UNRESOLVED"));
+        assert!(!prompt.contains("Decisions made"));
     }
 }

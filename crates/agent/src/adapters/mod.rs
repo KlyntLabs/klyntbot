@@ -22,6 +22,7 @@ pub mod learning;
 pub mod learning_tree_builder;
 pub mod llm_rerank;
 pub mod llm_summary;
+pub mod memory_scorer_impl;
 pub mod mirror_handlers;
 pub mod multi_query;
 pub mod note_embedding;

@@ -95,7 +95,7 @@ async fn test_context_engine(workspace: std::path::PathBuf) -> ContextEngine {
         Box::new(ConfidenceSource::new(0.7)),
     ];
 
-    ContextEngine::new().with_sources(sources)
+    ContextEngine::new(config::schema::HistoryCompressionConfig::default()).with_sources(sources)
 }
 
 fn test_source_ctx() -> SourceContext {

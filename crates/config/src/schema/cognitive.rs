@@ -1,5 +1,7 @@
 use serde::{Deserialize, Serialize};
 
+use super::history_compression::HistoryCompressionConfig;
+
 /// Controls whether the cognitive pipeline uses heuristic-first (Standard)
 /// or full-LLM (Deep) processing.
 #[derive(Debug, Clone, Copy, Default, Serialize, Deserialize, PartialEq)]
@@ -137,6 +139,10 @@ pub struct CognitiveConfig {
     /// Query enhancement pipeline configuration.
     #[serde(default)]
     pub query_enhancement: QueryEnhancementConfig,
+
+    /// Tiered history compression configuration.
+    #[serde(default)]
+    pub history_compression: HistoryCompressionConfig,
 }
 
 impl Default for CognitiveConfig {
@@ -172,6 +178,7 @@ impl Default for CognitiveConfig {
             confirm_threshold: 0.0,
             intelligence_mode: IntelligenceMode::Standard,
             query_enhancement: QueryEnhancementConfig::default(),
+            history_compression: HistoryCompressionConfig::default(),
         }
     }
 }

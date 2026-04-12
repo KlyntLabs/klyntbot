@@ -131,7 +131,10 @@ CREATE TABLE sessions (
     project_id        TEXT REFERENCES projects(id),
     conversation_type TEXT DEFAULT 'general',
     pinned            INTEGER DEFAULT 0,
-    squad_id          TEXT
+    squad_id          TEXT,
+    compressed_prefix      TEXT,
+    compressed_through_idx INTEGER,
+    compressed_at          TEXT
 );
 CREATE INDEX IF NOT EXISTS idx_sessions_squad ON sessions(squad_id);
 

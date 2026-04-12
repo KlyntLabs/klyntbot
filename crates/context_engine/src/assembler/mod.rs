@@ -18,7 +18,9 @@ use crate::summary_provider::SummaryProvider;
 use crate::token_counter::{default_token_counter, TokenCounter};
 use common::helpers::tool_def_name;
 
-use crate::{BudgetAllocator, BudgetConfig, CompressorConfig, HistoryCompressor, Priority};
+use crate::memory_scorer::MemoryScorer;
+use crate::{BudgetAllocator, BudgetConfig, Priority, TieredHistoryCompressor};
+pub use config::schema::HistoryCompressionConfig;
 
 use cache::{ContextCache, DEFAULT_CACHE_CAPACITY};
 use types::DEFAULT_MEMORY_RETRIEVAL_LIMIT;
@@ -30,7 +32,7 @@ type MemoryRetrievalResult = (String, usize, Option<crate::enhancement::Enhancem
 /// Orchestrates budget allocation, history compression, memory retrieval,
 /// and system prompt assembly via pluggable context sources.
 pub struct ContextEngine {
-    compressor: HistoryCompressor,
+    compressor: TieredHistoryCompressor,
     token_counter: Arc<dyn TokenCounter>,
     memory_retriever: Option<Arc<dyn MemoryRetriever>>,
     /// Maximum number of memory entries to retrieve per query.
@@ -47,12 +49,11 @@ pub struct ContextEngine {
     ranking_pipeline: Option<Arc<crate::enhancement::RankingPipeline>>,
 }
 
-impl Default for ContextEngine {
-    fn default() -> Self {
+impl ContextEngine {
+    pub fn new(config: HistoryCompressionConfig) -> Self {
         let counter = default_token_counter();
-        let config = CompressorConfig::default();
         Self {
-            compressor: HistoryCompressor::from_config(Arc::clone(&counter), config),
+            compressor: TieredHistoryCompressor::new(Arc::clone(&counter), config),
             token_counter: counter,
             memory_retriever: None,
             memory_retrieval_limit: DEFAULT_MEMORY_RETRIEVAL_LIMIT,
@@ -63,37 +64,25 @@ impl Default for ContextEngine {
             ranking_pipeline: None,
         }
     }
-}
-
-impl ContextEngine {
-    pub fn new() -> Self {
-        Self::default()
-    }
 
     /// Override the token counter (e.g., with a provider-specific estimator).
     /// Returns `self` for chaining.
     pub fn with_token_counter(self, counter: Arc<dyn TokenCounter>) -> Self {
-        let config = CompressorConfig::default();
         Self {
-            compressor: HistoryCompressor::from_config(Arc::clone(&counter), config),
+            compressor: TieredHistoryCompressor::new(
+                Arc::clone(&counter),
+                self.compressor.config().clone(),
+            ),
             token_counter: counter,
-            memory_retriever: self.memory_retriever,
-            memory_retrieval_limit: self.memory_retrieval_limit,
-            cache: self.cache,
-            sources: self.sources,
-            insight_forge: self.insight_forge,
-            query_pipeline: self.query_pipeline,
-            ranking_pipeline: self.ranking_pipeline,
+            ..self
         }
     }
 
-    /// Override the compressor configuration.
+    /// Wire a memory scorer for cognitive-aware tier assignment.
     /// Returns `self` for chaining.
-    pub fn with_compressor_config(self, config: CompressorConfig) -> Self {
-        Self {
-            compressor: HistoryCompressor::from_config(Arc::clone(&self.token_counter), config),
-            ..self
-        }
+    pub fn with_memory_scorer(mut self, scorer: Arc<dyn MemoryScorer>) -> Self {
+        self.compressor = self.compressor.with_memory_scorer(scorer);
+        self
     }
 
     /// Set the maximum number of memory entries to retrieve per query.
@@ -117,7 +106,7 @@ impl ContextEngine {
     /// Set a `SummaryProvider` for abstractive history compression.
     /// Returns `self` for chaining.
     pub fn with_summary_provider(mut self, provider: Arc<dyn SummaryProvider>) -> Self {
-        self.compressor = self.compressor.with_summary_provider(provider);
+        self.compressor = self.compressor.with_summary_provider(provider.clone());
         self
     }
 
@@ -219,6 +208,7 @@ impl ContextEngine {
             session_key,
             retrieval_context,
             enhancement_budget: crate::enhancement::EnhancementBudget::default(),
+            tier0_count: None,
         };
         self.retrieve_memory(&request).await
     }
@@ -343,9 +333,12 @@ impl ContextEngine {
 
         // 4. Compress history to fit remaining budget (token-aware)
         let history_budget = allocator.remaining();
+        let tier0_count = request
+            .tier0_count
+            .unwrap_or(self.compressor.config().tier0_messages.normal);
         let compressed = self
             .compressor
-            .compress_async(&request.history, history_budget)
+            .compress(&request.history, history_budget, tier0_count)
             .await;
 
         // Post-compression budget enforcement: if recent messages alone
@@ -395,9 +388,22 @@ impl ContextEngine {
             messages.push(Message::system(mem_text));
         }
 
-        // Summaries as system-level context (if any)
-        for summary in &summaries {
-            messages.push(Message::system(&summary.content));
+        // Preamble (system messages that precede conversation)
+        for msg in &compressed.preamble {
+            messages.push(msg.clone());
+        }
+
+        // Tier 1 + Tier 2 summaries as system-level context
+        if !summaries.is_empty() {
+            let summary_text = summaries
+                .iter()
+                .map(|s| s.content.as_str())
+                .collect::<Vec<_>>()
+                .join("\n\n---\n\n");
+            messages.push(Message::system(&format!(
+                "Earlier in this conversation:\n\n{}",
+                summary_text
+            )));
         }
 
         // Recent messages verbatim
@@ -668,12 +674,13 @@ mod tests {
             session_key: None,
             retrieval_context: None,
             enhancement_budget: crate::enhancement::EnhancementBudget::default(),
+            tier0_count: None,
         }
     }
 
     #[tokio::test]
     async fn test_direct_response_minimal_context() {
-        let engine = ContextEngine::new();
+        let engine = ContextEngine::new(HistoryCompressionConfig::default());
         let request = make_request(ExecutionStrategy::DirectResponse, 5, 128_000);
         let result = engine.assemble(request).await;
 
@@ -699,7 +706,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_tool_assisted_includes_tools() {
-        let engine = ContextEngine::new();
+        let engine = ContextEngine::new(HistoryCompressionConfig::default());
         let request = make_request(
             ExecutionStrategy::ToolAssisted { max_iterations: 5 },
             3,
@@ -723,7 +730,7 @@ mod tests {
     #[tokio::test]
     async fn test_context_fits_within_window() {
         let window = 4_000; // small window
-        let engine = ContextEngine::new();
+        let engine = ContextEngine::new(HistoryCompressionConfig::default());
         let request = make_request(
             ExecutionStrategy::ToolAssisted { max_iterations: 3 },
             2,
@@ -743,7 +750,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_empty_history_assembles() {
-        let engine = ContextEngine::new();
+        let engine = ContextEngine::new(HistoryCompressionConfig::default());
         let request = ContextRequest {
             message_text: "hello".to_string(),
             history: vec![],
@@ -755,6 +762,7 @@ mod tests {
             session_key: None,
             retrieval_context: None,
             enhancement_budget: crate::enhancement::EnhancementBudget::default(),
+            tier0_count: None,
         };
         let result = engine.assemble(request).await;
         // Should have at least the system message
@@ -764,7 +772,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_clarification_strategy_no_tools() {
-        let engine = ContextEngine::new();
+        let engine = ContextEngine::new(HistoryCompressionConfig::default());
         let request = make_request(
             ExecutionStrategy::Clarification {
                 reason: "Ambiguous request".to_string(),
@@ -799,7 +807,8 @@ mod tests {
             }
         }
 
-        let engine = ContextEngine::new().with_token_counter(Arc::new(ZeroCounter));
+        let engine = ContextEngine::new(HistoryCompressionConfig::default())
+            .with_token_counter(Arc::new(ZeroCounter));
         // Use only user messages — assistant messages add a fixed +20 overhead
         // that is per-message (not text-based) and thus not affected by the counter.
         let request = ContextRequest {
@@ -813,6 +822,7 @@ mod tests {
             session_key: None,
             retrieval_context: None,
             enhancement_budget: crate::enhancement::EnhancementBudget::default(),
+            tier0_count: None,
         };
         let result = engine.assemble(request).await;
         // ZeroCounter returns 0 for all text → token_count for user + system messages = 0
@@ -831,8 +841,9 @@ mod tests {
             }
         }
 
-        let engine = ContextEngine::new().with_token_counter(Arc::new(DoubleCounter));
-        let base_engine = ContextEngine::new();
+        let engine = ContextEngine::new(HistoryCompressionConfig::default())
+            .with_token_counter(Arc::new(DoubleCounter));
+        let base_engine = ContextEngine::new(HistoryCompressionConfig::default());
 
         let make_req = || ContextRequest {
             message_text: "test".to_string(),
@@ -845,6 +856,7 @@ mod tests {
             session_key: None,
             retrieval_context: None,
             enhancement_budget: crate::enhancement::EnhancementBudget::default(),
+            tier0_count: None,
         };
 
         let doubled = engine.assemble(make_req()).await;
@@ -889,7 +901,8 @@ mod tests {
             ],
         });
 
-        let engine = ContextEngine::new().with_memory_retriever(retriever);
+        let engine = ContextEngine::new(HistoryCompressionConfig::default())
+            .with_memory_retriever(retriever);
         let request = ContextRequest {
             message_text: "what do I work on?".into(),
             history: vec![],
@@ -902,6 +915,7 @@ mod tests {
             session_key: None,
             retrieval_context: None,
             enhancement_budget: crate::enhancement::EnhancementBudget::default(),
+            tier0_count: None,
         };
 
         let result = engine.assemble(request).await;
@@ -942,7 +956,8 @@ mod tests {
             ],
         });
 
-        let engine = ContextEngine::new().with_memory_retriever(retriever);
+        let engine = ContextEngine::new(HistoryCompressionConfig::default())
+            .with_memory_retriever(retriever);
         let request = ContextRequest {
             message_text: "hi there".into(),
             history: vec![],
@@ -953,6 +968,7 @@ mod tests {
             session_key: None,
             retrieval_context: None,
             enhancement_budget: crate::enhancement::EnhancementBudget::default(),
+            tier0_count: None,
         };
 
         let result = engine.assemble(request).await;
@@ -973,7 +989,8 @@ mod tests {
             entries: vec![("Some memory".into(), 0.90, MemorySource::CognitiveFact)],
         });
 
-        let engine = ContextEngine::new().with_memory_retriever(retriever);
+        let engine = ContextEngine::new(HistoryCompressionConfig::default())
+            .with_memory_retriever(retriever);
         let request = ContextRequest {
             message_text: "what?".into(),
             history: vec![],
@@ -986,6 +1003,7 @@ mod tests {
             session_key: None,
             retrieval_context: None,
             enhancement_budget: crate::enhancement::EnhancementBudget::default(),
+            tier0_count: None,
         };
 
         let result = engine.assemble(request).await;
@@ -1012,6 +1030,7 @@ mod tests {
             session_key: None,
             retrieval_context: None,
             enhancement_budget: crate::enhancement::EnhancementBudget::default(),
+            tier0_count: None,
         };
         let key1 = ContextEngine::compute_cache_key(&req);
         let key2 = ContextEngine::compute_cache_key(&req);
@@ -1023,7 +1042,8 @@ mod tests {
     #[tokio::test]
     async fn test_empty_memory_retriever_no_extra_message() {
         let retriever = Arc::new(MockRetriever { entries: vec![] });
-        let engine = ContextEngine::new().with_memory_retriever(retriever);
+        let engine = ContextEngine::new(HistoryCompressionConfig::default())
+            .with_memory_retriever(retriever);
 
         let request = ContextRequest {
             message_text: "hello".into(),
@@ -1036,6 +1056,7 @@ mod tests {
             session_key: None,
             retrieval_context: None,
             enhancement_budget: crate::enhancement::EnhancementBudget::default(),
+            tier0_count: None,
         };
 
         let result = engine.assemble(request).await;
@@ -1050,7 +1071,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_token_budget_truncates_long_messages() {
-        let engine = ContextEngine::new();
+        let engine = ContextEngine::new(HistoryCompressionConfig::default());
         // Create history with very long messages that would blow a small budget
         let mut history = Vec::new();
         for i in 0..10 {
@@ -1073,6 +1094,7 @@ mod tests {
             session_key: None,
             retrieval_context: None,
             enhancement_budget: crate::enhancement::EnhancementBudget::default(),
+            tier0_count: None,
         };
         let result = engine.assemble(request).await;
 
@@ -1088,9 +1110,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_abstractive_compression_used_when_provider_wired() {
-        use crate::history_compressor::CompressorMode;
         use crate::summary_provider::SummaryProvider;
-        use crate::CompressorConfig;
 
         struct TrackingProvider {
             called: std::sync::Arc<std::sync::atomic::AtomicBool>,
@@ -1101,6 +1121,7 @@ mod tests {
             async fn summarize_batch(
                 &self,
                 segments: Vec<Vec<Message>>,
+                _tier: crate::history_compressor::CompressionTier,
             ) -> Vec<std::result::Result<String, String>> {
                 self.called.store(true, std::sync::atomic::Ordering::SeqCst);
                 segments
@@ -1115,25 +1136,14 @@ mod tests {
             called: called.clone(),
         });
 
-        let config = CompressorConfig {
-            mode: CompressorMode::Abstractive,
-            min_recent_messages: 2,
-            chunk_size: 3,
-            ..Default::default()
-        };
+        let engine =
+            ContextEngine::new(HistoryCompressionConfig::default()).with_summary_provider(provider);
 
-        let engine = ContextEngine::new()
-            .with_compressor_config(config)
-            .with_summary_provider(provider);
-
-        // 20 messages to ensure some get compressed
+        // 20 turns (40 messages) to ensure some get compressed past tier0_count=8
         let mut history = Vec::new();
         for i in 0..20 {
-            if i % 2 == 0 {
-                history.push(Message::user(format!("User message {}", i)));
-            } else {
-                history.push(Message::assistant(format!("Response {}", i)));
-            }
+            history.push(Message::user(format!("User message {}", i)));
+            history.push(Message::assistant(format!("Response {}", i)));
         }
 
         let request = ContextRequest {
@@ -1142,20 +1152,18 @@ mod tests {
             system_prompt: "System.".to_string(),
             strategy: ExecutionStrategy::DirectResponse,
             tool_definitions: vec![],
-            // Small enough to force compression: available_input ≈ 43,
-            // system ≈ 2 tokens, history_budget ≈ 41, which is less than
-            // all 20 messages (~70 tokens total).
-            context_window: 50,
+            context_window: 128_000,
             session_key: None,
             retrieval_context: None,
             enhancement_budget: crate::enhancement::EnhancementBudget::default(),
+            tier0_count: Some(8),
         };
 
         engine.assemble(request).await;
 
         assert!(
             called.load(std::sync::atomic::Ordering::SeqCst),
-            "SummaryProvider should have been called via compress_async"
+            "SummaryProvider should have been called during tiered compression"
         );
     }
 
@@ -1191,7 +1199,8 @@ mod tests {
 
     #[tokio::test]
     async fn test_expand_loads_deferred_source() {
-        let engine = ContextEngine::new().with_sources(vec![Box::new(DeferredSource)]);
+        let engine = ContextEngine::new(HistoryCompressionConfig::default())
+            .with_sources(vec![Box::new(DeferredSource)]);
 
         let mut initial = AssembledContext {
             messages: vec![Message::system("System prompt.")],
@@ -1231,7 +1240,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_expand_rejects_unknown_source() {
-        let engine = ContextEngine::new();
+        let engine = ContextEngine::new(HistoryCompressionConfig::default());
         let initial = AssembledContext {
             messages: vec![],
             token_count: 0,
@@ -1270,7 +1279,8 @@ mod tests {
             ],
         });
 
-        let engine = ContextEngine::new().with_memory_retriever(retriever);
+        let engine = ContextEngine::new(HistoryCompressionConfig::default())
+            .with_memory_retriever(retriever);
         let request = ContextRequest {
             message_text: "what editor do I use?".into(),
             history: vec![],
@@ -1281,6 +1291,7 @@ mod tests {
             session_key: None,
             retrieval_context: None,
             enhancement_budget: crate::enhancement::EnhancementBudget::default(),
+            tier0_count: None,
         };
 
         let result = engine.assemble(request).await;
@@ -1311,7 +1322,8 @@ mod tests {
 
     #[tokio::test]
     async fn test_expand_rejects_insufficient_budget() {
-        let engine = ContextEngine::new().with_sources(vec![Box::new(DeferredSource)]);
+        let engine = ContextEngine::new(HistoryCompressionConfig::default())
+            .with_sources(vec![Box::new(DeferredSource)]);
 
         let initial = AssembledContext {
             messages: vec![Message::system("System prompt.")],
@@ -1345,6 +1357,7 @@ mod tests {
             session_key: None,
             retrieval_context: None,
             enhancement_budget: crate::enhancement::EnhancementBudget::default(),
+            tier0_count: None,
         }
     }
 

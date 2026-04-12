@@ -238,6 +238,7 @@ impl AgentRuntime {
             session_key: Some(common::SessionKey::new(&ctx.channel, &ctx.chat_id).to_string()),
             retrieval_context,
             enhancement_budget,
+            tier0_count: None,
         };
 
         let assemble_start = Instant::now();
@@ -678,7 +679,9 @@ mod tests {
             Arc::clone(&registry),
         ));
 
-        let context_engine = Arc::new(context_engine::ContextEngine::new());
+        let context_engine = Arc::new(context_engine::ContextEngine::new(
+            config::schema::HistoryCompressionConfig::default(),
+        ));
         let pool = storage::StoragePool::connect_in_memory().await.unwrap();
         let usage_repo = storage::UsageRepo::new(pool.inner().clone());
         let cost_tracker = Arc::new(CostTracker::from_repo(usage_repo));

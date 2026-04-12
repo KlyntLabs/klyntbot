@@ -254,8 +254,10 @@ impl AgentHarness {
                 feature_productivity::repos::ProductivityRepos::new(inner_pool.clone()),
             )),
         ];
-        let context_engine =
-            Arc::new(context_engine::ContextEngine::new().with_sources(context_sources));
+        let context_engine = Arc::new(
+            context_engine::ContextEngine::new(config::schema::HistoryCompressionConfig::default())
+                .with_sources(context_sources),
+        );
 
         // Build cost tracker
         let usage_repo = storage::UsageRepo::new(inner_pool);

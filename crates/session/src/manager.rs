@@ -560,6 +560,35 @@ impl SessionManager {
             .collect();
         Ok(sessions)
     }
+
+    /// Save compressed history prefix for delta compaction.
+    pub async fn save_compressed_prefix(
+        &self,
+        session_key: &str,
+        prefix_json: &str,
+        through_idx: i64,
+    ) -> Result<()> {
+        self.sql_repo
+            .save_compressed_prefix(session_key, prefix_json, through_idx)
+            .await
+            .map_err(|e| KlyntbotError::Storage(e.to_string()))
+    }
+
+    /// Load compressed history prefix for delta compaction.
+    pub async fn load_compressed_prefix(&self, session_key: &str) -> Result<Option<(String, i64)>> {
+        self.sql_repo
+            .load_compressed_prefix(session_key)
+            .await
+            .map_err(|e| KlyntbotError::Storage(e.to_string()))
+    }
+
+    /// Clear compressed prefix (invalidation).
+    pub async fn clear_compressed_prefix(&self, session_key: &str) -> Result<()> {
+        self.sql_repo
+            .clear_compressed_prefix(session_key)
+            .await
+            .map_err(|e| KlyntbotError::Storage(e.to_string()))
+    }
 }
 
 /// Session information for listing

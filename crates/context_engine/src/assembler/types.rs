@@ -38,6 +38,9 @@ pub struct ContextRequest {
     pub retrieval_context: Option<crate::rewriter::RetrievalContext>,
     /// Enhancement budget derived from depth mode (defaults to Normal).
     pub enhancement_budget: crate::enhancement::EnhancementBudget,
+    /// Number of recent turns to keep verbatim (from DepthMode).
+    /// None = use the engine's compression config default.
+    pub tier0_count: Option<usize>,
 }
 
 /// The assembled context ready to send to the LLM.

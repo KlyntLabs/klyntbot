@@ -16,13 +16,9 @@
   - ~~Autotuner Phase 8 wiring~~ DONE (2026-04-11). All 5 Phase 8 `TrialParams` (`prf_score_threshold`, `prf_max_expansion_terms`, `rerank_term_overlap_weight`, `multi_query_max_variants`, `enhancement_budget_latency_ms`) now flow end-to-end: stages read champion overrides, the trial generator advertises the bounds, runtime applies budget overrides per depth mode. Spec §11.1 renamed to reflect shipped code.
 - **Future spec (carved out):** Heuristic rerank §3.4 originally described three signals (co-activation, term-overlap, recency). Only term-overlap is implemented; adding co-activation + recency needs `MemoryEntry` timestamps and a `CoActivationRepo` injection — will need its own spec.
 
-### 2. Add Abstractive History Summarization
-- **Status**: UNWIRED
-- **Effort**: Medium
-- **Impact**: Better compressed conversation context vs. extractive snippets
-- **Details**: `SummaryProvider` trait defined but never implemented. History compression only uses extractive (first 150 chars).
-- **What exists**: `crates/context_engine/src/summary_provider.rs` (trait), `HistoryCompressor`
-- **What's needed**: LLM-backed `SummaryProvider` impl, wire into compressor
+### ~~2. Tiered History Compression~~ DONE
+- `TieredHistoryCompressor` replaces the old `HistoryCompressor`. Groups messages into conversation turns, optionally scores via cognitive relevance (`MemoryScorer` trait), assigns tiers (Verbatim/Detailed/Condensed), and compresses with tier-specific LLM prompts. `LlmSummaryProvider` now accepts a `CompressionTier` parameter for differentiated prompts. Hybrid extractive-first: skips LLM when extractive fits; falls back on LLM failure. Tool-result microcompaction pre-pass reduces stale read_file/bash/grep results before tier compression. Delta compaction (`compress_with_delta`) reuses existing compressed prefix on session resume, only processing new messages. Tier 1 demotion re-compresses old detailed summaries to condensed when they age past the threshold. `HistoryCompressionConfig` in `config.json` → `cognitive.historyCompression`; `ContextTieredCompressed` event emitted for observability. Compressed prefix persisted in sessions table (`compressed_prefix`, `compressed_through_idx`, `compressed_at` columns). `CognitiveMemoryScorer` adapter wraps `MemoryRetriever` for cognitive-aware tier promotion.
+- **Spec**: `docs/superpowers/specs/2026-04-11-tiered-history-compression-design.md`
 
 ### 3. Agent-Initiated Memory Operations (Letta-style)
 - **Status**: NOT STARTED

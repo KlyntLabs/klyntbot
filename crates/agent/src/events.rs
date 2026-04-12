@@ -49,6 +49,22 @@ pub enum AgentEvent {
         duration_ms: u64,
     },
 
+    /// Tiered history compression completed during context assembly.
+    ContextTieredCompressed {
+        /// Number of turns kept verbatim (Tier 0).
+        #[serde(rename = "tier0Kept")]
+        tier0_kept: usize,
+        /// Total tokens in Tier 1 (detailed) summaries.
+        #[serde(rename = "tier1Tokens")]
+        tier1_tokens: usize,
+        /// Total tokens in Tier 2 (condensed) summaries.
+        #[serde(rename = "tier2Tokens")]
+        tier2_tokens: usize,
+        /// Whether cognitive scoring was used for tier assignment.
+        #[serde(rename = "cognitiveScoringUsed")]
+        cognitive_scoring_used: bool,
+    },
+
     /// Query enhancement pipeline completed — emits the trace for observability.
     RetrievalEnhanced {
         stages: Vec<context_engine::enhancement::StageTrace>,
