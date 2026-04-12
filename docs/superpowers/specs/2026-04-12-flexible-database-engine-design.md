@@ -1,0 +1,581 @@
+# Flexible Database Engine — Self-Evolving Entity Platform
+
+**Date:** 2026-04-12
+**Status:** Approved
+**Scope:** Replace fixed-schema feature crates with a Notion-like flexible database engine that self-evolves through AI-user collaboration.
+
+---
+
+## 1. Vision
+
+Reposition the platform from a fixed-schema task manager into a self-evolving workspace where:
+
+- Users can create **any database** (tasks, finance, apartment hunting, job applications — anything)
+- Each database has a **fully customizable schema** (add/remove/modify fields freely, like Notion)
+- The AI **learns and evolves** each database's schema and behavior over time through Reforge, Mirror, and Autotuner
+- Built-in features (Tasks, Finance) ship as **templates** — same flexible foundation, mature starting skills
+- A future **marketplace** lets users share templates (schema + skill bundles)
+
+## 2. Key Decisions
+
+| Decision | Choice | Rationale |
+|----------|--------|-----------|
+| Existing features + user-created | **Both** | Full migration + user can create new databases from scratch |
+| Data model | **Entity-centric** | More powerful for AI reasoning than database-centric |
+| AI bootstrap | **Skills as seed intelligence** | Templates ship with skills so AI isn't "dumb" on day one |
+| Field types | **Notion-parity** (~16 types) | Proven UX, path to AI-native types later |
+| Relations | **Explicit + AI-inferred** | User-defined + cognitive system detects implicit connections |
+| AI autonomy | **Confidence-tiered** | Low-risk auto-applied, medium suggested, high requires approval. Autotuner calibrates thresholds per-database |
+| Templates | **Schema + Skill bundle** | Simple, portable, marketplace-ready. No learned-behavior leakage |
+| Architecture | **Hybrid Schema** | Dynamic SQLite tables with real typed columns via ALTER TABLE |
+| Backward compat | **None needed** | Pre-release — clean replacement, no data migration |
+
+## 3. Core Data Model
+
+### 3.1 Foundation Tables
+
+```sql
+-- Registry of all databases
+CREATE TABLE databases (
+    id           TEXT PRIMARY KEY,
+    name         TEXT NOT NULL,
+    slug         TEXT UNIQUE NOT NULL,
+    icon         TEXT,
+    description  TEXT,
+    template_id  TEXT,
+    skill_id     TEXT,
+    created_at   TEXT NOT NULL,
+    updated_at   TEXT NOT NULL
+);
+
+-- Field definitions — the schema of each database
+CREATE TABLE database_fields (
+    id           TEXT PRIMARY KEY,
+    database_id  TEXT NOT NULL REFERENCES databases(id),
+    name         TEXT NOT NULL,
+    slug         TEXT NOT NULL,
+    field_type   TEXT NOT NULL,
+    options_json TEXT,
+    position     INTEGER NOT NULL,
+    required     INTEGER DEFAULT 0,
+    hidden       INTEGER DEFAULT 0,
+    ai_managed   INTEGER DEFAULT 0,
+    ai_config    TEXT,
+    default_value TEXT,
+    created_at   TEXT NOT NULL,
+    UNIQUE(database_id, slug)
+);
+
+-- Cross-database entity relations
+CREATE TABLE entity_relations (
+    id            TEXT PRIMARY KEY,
+    source_id     TEXT NOT NULL,
+    source_db_id  TEXT NOT NULL,
+    target_id     TEXT NOT NULL,
+    target_db_id  TEXT NOT NULL,
+    relation_type TEXT DEFAULT 'related',
+    inferred      INTEGER DEFAULT 0,
+    confidence    REAL,
+    created_at    TEXT NOT NULL
+);
+```
+
+### 3.2 Dynamic Tables
+
+Each database gets a real SQLite table with typed columns:
+
+```sql
+-- On database creation (slug="tasks"):
+CREATE TABLE db_tasks (
+    id         TEXT PRIMARY KEY,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+);
+
+-- On field addition (name="Due Date", type=date, slug="due_date"):
+ALTER TABLE db_tasks ADD COLUMN due_date TEXT;
+```
+
+Every dynamic table always has `id`, `created_at`, `updated_at`. All other columns are user/AI-defined.
+
+**Terminology:** The model is entity-centric (entities are the universal primitive), but organized into databases (the user-facing container). A "database" is a schema + collection of entities. An "entity" is a row in a database with dynamic properties. Users think in databases; the AI reasons about entities.
+
+### 3.3 Field Type System
+
+| Field Type | SQLite Type | Value Format |
+|-----------|-------------|--------------|
+| text | TEXT | plain string |
+| number | REAL | numeric |
+| select | TEXT | single option string |
+| multi_select | TEXT | JSON array of strings |
+| date | TEXT | ISO 8601 |
+| checkbox | INTEGER | 0 or 1 |
+| url | TEXT | URL string |
+| email | TEXT | email string |
+| phone | TEXT | phone string |
+| relation | TEXT | JSON array of entity IDs |
+| rollup | *(computed)* | evaluated at query time (aggregates over a relation field) |
+| formula | TEXT | expression string (evaluated in Rust, not SQL — supports field references and basic math) |
+| created_time | TEXT | auto-set, immutable |
+| last_edited | TEXT | auto-updated |
+| files | TEXT | JSON array of file refs |
+| person | TEXT | user identifier |
+
+### 3.4 Query Generation
+
+The system generates SQL dynamically from `database_fields` metadata:
+
+```sql
+-- "show me tasks due this week with high priority"
+SELECT id, title, due_date, priority, status
+FROM db_tasks
+WHERE due_date BETWEEN '2026-04-12' AND '2026-04-18'
+  AND priority = 'high'
+ORDER BY due_date ASC
+```
+
+No JOINs for field access. No json_extract. Native SQL on real columns.
+
+## 4. AI Evolution Loop
+
+### 4.1 Three-Layer Architecture
+
+```
+MIRROR (Observe)
+  → Watches per-database field usage patterns
+  → Tracks which fields are filled, filtered, sorted, ignored
+  → Emits SchemaObservation events
+
+REFORGE (Reason)
+  → Analyzes observations + skill knowledge
+  → Detects unused fields, missing fields, type mismatches, relation opportunities
+  → Rewrites database skills based on learnings
+  → Emits SchemaEvolution proposals
+
+AUTOTUNER (Act)
+  → Applies confidence-tiered autonomy:
+    Low-risk  (auto):    reorder fields, hide unused, adjust select options, update skill
+    Medium-risk (suggest): add field, create relation, change field config
+    High-risk (approve):  remove field, change field type, merge/split databases
+  → Thresholds self-calibrate per-database based on user acceptance rates
+```
+
+### 4.2 Schema Evolution Storage
+
+```sql
+CREATE TABLE schema_evolutions (
+    id            TEXT PRIMARY KEY,
+    database_id   TEXT NOT NULL REFERENCES databases(id),
+    action_type   TEXT NOT NULL,
+    action_json   TEXT NOT NULL,
+    confidence    REAL NOT NULL,
+    reasoning     TEXT NOT NULL,
+    status        TEXT NOT NULL,
+    source        TEXT NOT NULL,
+    created_at    TEXT NOT NULL,
+    resolved_at   TEXT
+);
+
+CREATE TABLE schema_autonomy (
+    database_id      TEXT PRIMARY KEY REFERENCES databases(id),
+    auto_threshold   REAL DEFAULT 0.9,
+    suggest_threshold REAL DEFAULT 0.6,
+    acceptance_rate  REAL DEFAULT 0.5,
+    total_proposed   INTEGER DEFAULT 0,
+    total_accepted   INTEGER DEFAULT 0,
+    updated_at       TEXT NOT NULL
+);
+```
+
+### 4.3 New Domain Events
+
+```
+SchemaFieldUsed { database_id, field_id, usage_type }
+SchemaFieldIgnored { database_id, field_id, days_unused }
+SchemaPatternDetected { database_id, pattern_type, evidence }
+EntityRelationInferred { source_db, target_db, confidence, evidence }
+SchemaEvolutionProposed { database_id, action, confidence, reasoning }
+SchemaEvolutionApplied { database_id, action, auto_applied }
+SchemaEvolutionSuggested { database_id, suggestion_id }
+```
+
+### 4.4 Concrete Example
+
+User creates "Job Applications" from template. Template seeds fields: Company, Role, Status (select: Applied/Interview/Offer/Rejected), Salary, Applied Date, Notes.
+
+**Week 1 — Mirror observes:** User always fills Company, Role, Status. Never uses Notes. Types "LinkedIn" in conversations. Asks "which companies haven't responded?"
+
+**Week 2 — Reforge reasons:** Notes unused 14 days → propose hide (0.85). User mentions source channel → propose add Source field (0.72). Response timing questions → propose add Last Contact Date (0.68). Rewrites skill to ask about source on creation.
+
+**Week 2 — Autotuner acts:** Hide Notes: 0.85 < auto_threshold 0.9 → suggest (approved). Add Source: 0.72 → suggest (approved). After 3 acceptances, auto_threshold drops → next similar action auto-applies.
+
+## 5. Cognitive Memory Integration
+
+### 5.1 Per-Database Embeddings
+
+Each database gets its own embedding table in LanceDB:
+
+```
+db_{database_id}_embeddings
+  (id, entity_id, vector[384], field_context, updated_at)
+
+db_schema_embeddings
+  (id, database_id, field_id, vector[384], description, updated_at)
+```
+
+Entity embedding text is composed from field values:
+```
+"Job Applications entity: Company is Anthropic. Role is Backend Engineer.
+ Status is Interview. Salary is 180000."
+```
+
+Schema embeddings enable cross-database field discovery ("Due Date" in Tasks ↔ "Deadline" in Job Applications).
+
+### 5.2 Skill-Driven Salience
+
+Replace hardcoded salience match arms with skill declarations:
+
+```yaml
+# In the database's skill frontmatter:
+salience:
+  extract_on:
+    - field: status
+      to_values: ["Offer", "Rejected"]
+      importance: 0.9
+  accumulate_on:
+    - event: entity_created
+      importance: 0.3
+    - field: notes
+      importance: 0.2
+```
+
+The generic salience engine reads the skill to classify events. Reforge evolves these declarations based on user behavior.
+
+### 5.3 Fact Extraction
+
+Semantic facts get `domain = database_id`. The existing extraction pipeline (episodic → semantic → consolidation) works unchanged — facts from all databases flow into the same Synthesize phase.
+
+The `cognitive_bridge.rs` functions (extract_energy_profile, extract_estimation_bias, etc.) are replaced by a single schema-aware extractor that reads the skill for domain context.
+
+### 5.4 Unified Retrieval
+
+Replace `TaskSearcher`, `NoteSearcher`, `FinanceSearcher` with a single `DatabaseSearcher` that:
+1. Embeds the query
+2. Searches relevant database embedding tables (all or filtered)
+3. Keyword search on dynamic tables using schema-aware column selection
+4. RRF merge (same hybrid strategy as today)
+5. Returns results with database name, field labels, and values
+
+### 5.5 Context Injection
+
+Replace `TodoSource` and other feature-specific context sources with `DatabaseContextSource`:
+- Iterates all user databases
+- Reads each skill's `context_rules` to determine active/relevant items
+- Queries dynamic tables with skill-defined filters
+- Formats with field labels
+- Token-budget aware: prioritizes most-used databases (from Mirror data)
+
+### 5.6 Per-Database Brain Versioning
+
+```sql
+CREATE TABLE database_brain_versions (
+    version       INTEGER,
+    database_id   TEXT NOT NULL REFERENCES databases(id),
+    skill_version TEXT NOT NULL,
+    schema_hash   TEXT NOT NULL,
+    params_json   TEXT NOT NULL,
+    metrics_json  TEXT NOT NULL,
+    promoted_at   TEXT NOT NULL,
+    reason        TEXT NOT NULL,
+    parent_version INTEGER,
+    reverted      INTEGER DEFAULT 0,
+    PRIMARY KEY (database_id, version)
+);
+```
+
+Each database has an independent evolution timeline. Revert one database's brain without affecting others.
+
+## 6. Skill Integration
+
+### 6.1 Database-Skill Binding
+
+Every database has exactly one skill at `~/.klyntbot/skills/db-{database_id}/SKILL.md`.
+
+### 6.2 Skill Frontmatter Extensions
+
+```yaml
+metadata:
+  klyntbot:
+    # Existing fields (type, tools, triggers, summary, etc.)
+
+    # NEW: Schema-aware fields
+    schema_hints:
+      status:
+        lifecycle: true
+        completion_values: ["done", "completed"]
+        active_values: ["todo", "doing"]
+      due_date:
+        temporal: true
+        urgency_source: true
+      priority:
+        ranking: true
+
+    # NEW: Salience declarations
+    salience:
+      extract_on:
+        - field: status
+          to_values: ["done"]
+          importance: 0.7
+      accumulate_on:
+        - event: entity_created
+          importance: 0.3
+
+    # NEW: Context injection rules
+    context_rules:
+      active_filter: "status NOT IN ('done', 'archived')"
+      sort_by: "due_date ASC"
+      max_items: 15
+      format: "{title} — {status}, due {due_date}"
+```
+
+### 6.3 Three Skill Origins
+
+**From Template:** Mature skill shipped with the template. Knows field semantics, behavioral patterns, suggestions.
+
+**From Scratch:** Auto-generated minimal skill from schema. Lists fields, basic context rules, generic salience. Functional but basic.
+
+**Reforge Evolution:** Nightly cycle rewrites skill based on observed usage. Adds schema_hints, adjusts salience declarations, enriches behavioral instructions. The skill becomes a living document unique to each user.
+
+### 6.4 Skill Hot-Reload on Schema Change
+
+When a field is added/removed (by user or AI):
+1. ALTER TABLE or mark field hidden
+2. Update `database_fields` table
+3. Update skill body (field list, context_rules format string)
+4. Record version via `skill_version_repo`
+5. Trigger `SkillStore.reload()`
+
+### 6.5 Workspace Orchestrator
+
+A system-level skill for cross-database queries:
+
+```yaml
+name: workspace
+description: Cross-database queries and connections
+metadata:
+  klyntbot:
+    type: orchestrator
+    triggers: ["across all", "connect", "between", "compare"]
+    always_skills: [database-list]
+```
+
+Auto-updated when databases are created/deleted.
+
+## 7. AI Subsystem Adaptations
+
+### 7.1 Mirror — Add SchemaMirrorSubscriber
+
+New subscriber listens for `EntityCreated`, `EntityUpdated`, `EntityFieldAccessed` events. Tracks per-database field usage patterns in `mirror_schema_observations` table:
+
+```sql
+CREATE TABLE mirror_schema_observations (
+    id           TEXT PRIMARY KEY,
+    database_id  TEXT NOT NULL,
+    field_id     TEXT NOT NULL,
+    usage_type   TEXT NOT NULL,
+    count         INTEGER DEFAULT 1,
+    last_used_at TEXT NOT NULL,
+    UNIQUE(database_id, field_id, usage_type)
+);
+```
+
+No changes to: routing subscriber, meta-rule detector, brain versioning, trial preview, facade API, weekly narratives.
+
+### 7.2 Reforge — Add Phase 2.5 (Schema Evolution)
+
+Insert between Synthesize and Review:
+1. Read `mirror_schema_observations` (field usage)
+2. Read `database_fields` (current schema)
+3. Read database skill (domain context)
+4. LLM call: "Given schema, usage, skill — what fields should be added/removed/modified?"
+5. Output `SchemaEvolutionProposal` structs
+6. Phase 5 (Apply) executes via Autotuner confidence tiers
+
+Skill rewriting in existing Phase 5b handles updating skills when schemas change.
+
+### 7.3 Autotuner — Per-Database Parameter Overrides
+
+Extend `TrialParams` with `Map<database_id, database_overrides>` for per-database retrieval tuning (vector_top_k, min_similarity, relevance weights).
+
+Champion params become `global_params + per_database_overrides`. Constraint evaluation stays the same.
+
+### 7.4 Cognitive Memory — Generalize Three Hardcoded Points
+
+**A. Salience:** Replace hardcoded event→verdict match arms with skill-driven classification via `schema_hints` and `salience` declarations.
+
+**B. Importance:** Replace hardcoded per-event importance values with skill-defined `importance_map`.
+
+**C. Fact domain:** Set `SemanticFact.domain = database_id`. Scope chain: `system → database → entity`.
+
+Everything else in the cognitive pipeline is already generic (FSRS, relevance scoring, consolidation, compaction).
+
+## 8. Cross-Domain
+
+All cross-domain scenarios work naturally:
+
+| Scenario | Mechanism |
+|----------|-----------|
+| Cross-DB semantic search | Retrieval searches all embedding tables, ranks by relevance |
+| Cross-DB fact extraction | Reforge Synthesize reads all domains in same pass |
+| Cross-DB entity relations | `entity_relations` table + Reforge Phase 6.5 graph consolidation |
+| Cross-DB context injection | `DatabaseContextSource` iterates all databases |
+| Cross-DB AI reasoning | LLM sees all database context in same prompt |
+| Cross-DB skill routing | Workspace orchestrator skill handles multi-database queries |
+| Cross-DB autotuner | Metrics are per-message, not per-database |
+
+## 9. Feature Migration Plan
+
+### 9.1 Tier 1: Full Migration to Flexible Database
+
+| Current Crate | Becomes |
+|--------------|---------|
+| `feature-tasks` (43 fixed columns, 9 tables) | Template: "Task Management" |
+| `feature-finance` (9 sub-repos, 10 tables) | Templates: "Accounts", "Transactions", "Budgets", etc. |
+| `feature-learning` (235 lines, no tables) | Deleted — inline prompt building into app-core |
+
+### 9.2 Tier 2: Kept as Specialized System
+
+| Crate | Why | Integration |
+|-------|-----|-------------|
+| `feature-notes` | Long-form documents, wiki-link graph, FTS5, versioning, structural hole detection. Not a "row of fields" problem. | Links to flexible database entities via `entity_relations`. Note metadata could use flexible fields. |
+
+### 9.3 Tier 3: Kept as Engines (Not Databases)
+
+| Crate | Why | Integration |
+|-------|-----|-------------|
+| `feature-productivity` | Real-time OS monitoring, 4-tier rule engine, time-series bucketing, auto-focus FSM, distraction detection, nudge system. Signal processing pipeline, not user data. | Feeds computed metrics into cognitive system. Daily summaries surface as context. |
+| `feature-coaching` | Behavioral intervention engine — signal accumulation, trigger evaluation, dismissal backoff, receptivity adjustment. Stateful event processor with 2 small tables. | Reads `UserSituation` which incorporates flexible database activity signals. |
+| `feature-language-learning` | Audio analysis pipeline — phoneme FSRS-5, tone analysis, adaptive feedback. Hooks into voice-engine transcription. 80% algorithm, 20% storage. | Flashcard generation can source from any flexible database. |
+
+### 9.4 New Crate Structure
+
+```
+NEW:
+  crates/database-engine/          — Schema registry, dynamic tables, field types, query builder
+    src/schema.rs                  — DatabaseSchema, FieldDefinition, FieldType
+    src/entity.rs                  — Entity (dynamic property map)
+    src/query.rs                   — Dynamic SQL builder
+    src/evolution.rs               — Schema evolution (add/remove/modify fields)
+    src/relations.rs               — Cross-database entity relations
+    src/templates.rs               — Template loading and instantiation
+    migrations/                    — Foundation tables
+
+  crates/database-tool/            — Unified tool exposed to AI
+    src/tool.rs                    — DatabaseTool (replaces TaskTool, FinanceTool)
+    src/actions/                   — CRUD, search, schema ops, AI-powered actions
+    src/handlers.rs                — Generic handler traits
+
+  templates/                       — Built-in template bundles
+    task-management/
+      manifest.json + skill/
+    finance/
+      manifest.json + skill/
+
+REMOVED:
+  crates/feature-tasks/
+  crates/feature-finance/
+  crates/feature-learning/
+
+KEPT (unchanged):
+  crates/feature-notes/
+  crates/feature-productivity/
+  crates/feature-coaching/
+  crates/feature-language-learning/
+
+ADAPTED:
+  crates/agent/src/handlers/       — Generic handler implementations
+  crates/agent/src/adapters/       — DatabaseEmbeddingAdapter
+  crates/agent/src/context_sources/— DatabaseContextSource
+  crates/agent/src/domain_searchers/— DatabaseSearcher
+  crates/cognitive/src/mirror/     — SchemaMirrorSubscriber
+  crates/cognitive/src/services/reforge/ — Phase 2.5 schema evolution
+  crates/app-core/                 — Generic db_* Tauri commands
+```
+
+## 10. Tool & MCP Surface
+
+### 10.1 Unified Database Tool
+
+One tool replaces all migrated feature tools:
+
+```
+Actions:
+  Database management:  create_database, list_databases, get_schema, add_field, remove_field, modify_field
+  Entity CRUD:          create, get, list, update, delete, search
+  Relations:            link, unlink, list_relations
+  AI-powered:           suggest_fields, evolve_schema (skill-delegated)
+```
+
+### 10.2 MCP Exposure
+
+```rust
+fn default_exposed_tools() -> Vec<String> {
+    vec!["database", "agent", "memory", "cron", "mirror", "notes", ...]
+}
+```
+
+External clients call `mcp__klyntbot__database` with `database_id` parameter.
+
+### 10.3 Desktop Commands
+
+Generic `db_*` commands replace all feature-specific Tauri commands:
+
+```
+db_list, db_get_schema, db_query, db_create_entity, db_update_entity,
+db_delete_entity, db_add_field, db_remove_field, db_get_suggestions, etc.
+```
+
+One `DatabaseView` component renders any database based on its schema.
+
+## 11. Template Format
+
+```json
+{
+  "name": "Task Management",
+  "description": "Personal task tracking with priorities, deadlines, and focus management",
+  "icon": "✓",
+  "version": "1.0.0",
+  "databases": [
+    {
+      "name": "Tasks",
+      "slug": "tasks",
+      "fields": [
+        { "name": "Title", "slug": "title", "type": "text", "required": true },
+        { "name": "Status", "slug": "status", "type": "select",
+          "options": ["todo", "doing", "done", "someday"] },
+        { "name": "Priority", "slug": "priority", "type": "select",
+          "options": ["low", "medium", "high", "urgent"] },
+        { "name": "Due Date", "slug": "due_date", "type": "date" },
+        { "name": "Tags", "slug": "tags", "type": "multi_select" },
+        { "name": "Estimated Minutes", "slug": "estimated_minutes", "type": "number" },
+        { "name": "Parent", "slug": "parent_id", "type": "relation", "target": "self" }
+      ]
+    }
+  ],
+  "relations": [],
+  "skill_dir": "skill/"
+}
+```
+
+## 12. What Doesn't Change
+
+| System | Why |
+|--------|-----|
+| Mirror routing/meta-rule/narratives | Operates on skill/routing data, database-agnostic |
+| Reforge Phases 1,3,4,5,6,7 | Fact/rule extraction, skill rewriting, compaction — all generic |
+| Autotuner constraint evaluator | Math on metrics, entity-agnostic |
+| FSRS-5 spaced repetition | Pure math on stability/retrievability |
+| Relevance scoring (14 weights) | Already parameterized and autotuner-tuned |
+| LanceDB vector store | Already decoupled from SQLite |
+| Skill progressive loading | Tier 1 listing + Tier 2 on-demand body |
+| MCP stdio transport | Tool names change, protocol unchanged |
