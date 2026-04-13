@@ -26,9 +26,10 @@ export function BoardView({
   const options: string[] = Array.isArray(groupField.options) ? groupField.options : [];
   const columns = [...options, "\u2014"]; // em dash for entities without a value
 
-  const displayFields = cardFields
-    ? schema.fields.filter((f) => cardFields.includes(f.slug) && f.slug !== groupByField)
-    : schema.fields.filter((f) => !f.hidden && f.slug !== groupByField).slice(0, 3);
+  const displayFields =
+    cardFields && cardFields.length > 0
+      ? schema.fields.filter((f) => cardFields.includes(f.slug) && f.slug !== groupByField)
+      : schema.fields.filter((f) => !f.hidden && f.slug !== groupByField).slice(0, 3);
 
   const groupedEntities = new Map<string, Entity[]>();
   for (const col of columns) {

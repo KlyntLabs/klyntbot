@@ -1,4 +1,5 @@
 import { useSchemaSuggestions } from "@features/database/hooks/useSchemaSuggestions";
+import { emitDatabaseUpdated } from "@features/database/lib/schema-utils";
 import { useMutation } from "@shared/hooks/useMutation";
 import { SuggestionCard } from "./SuggestionCard";
 
@@ -15,13 +16,13 @@ export function SchemaSuggestionBar({ databaseId }: SchemaSuggestionBarProps) {
   if (!suggestions || suggestions.length === 0) return null;
 
   const handleAccept = async (id: string) => {
-    await resolveSuggestion({ database_id: databaseId, evolution_id: id, action: "accept" });
-    window.dispatchEvent(new CustomEvent("database:updated"));
+    await resolveSuggestion({ databaseId, evolutionId: id, action: "accept" });
+    emitDatabaseUpdated();
   };
 
   const handleDismiss = async (id: string) => {
-    await resolveSuggestion({ database_id: databaseId, evolution_id: id, action: "dismiss" });
-    window.dispatchEvent(new CustomEvent("database:updated"));
+    await resolveSuggestion({ databaseId, evolutionId: id, action: "dismiss" });
+    emitDatabaseUpdated();
   };
 
   return (

@@ -18,9 +18,10 @@ export function TableView({
   onSortChange,
   onEntityClick,
 }: TableViewProps) {
-  const columns = visibleFields
-    ? schema.fields.filter((f) => visibleFields.includes(f.slug) && !f.hidden)
-    : schema.fields.filter((f) => !f.hidden);
+  const columns =
+    visibleFields && visibleFields.length > 0
+      ? schema.fields.filter((f) => visibleFields.includes(f.slug) && !f.hidden)
+      : schema.fields.filter((f) => !f.hidden);
 
   const toggleSort = (slug: string) => {
     if (!onSortChange) return;

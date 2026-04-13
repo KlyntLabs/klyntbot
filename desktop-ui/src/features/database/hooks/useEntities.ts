@@ -5,7 +5,15 @@ import type { QueryParams, QueryResult } from "@shared/types";
 export function useEntities(databaseId: string | undefined, params?: QueryParams) {
   return useQuery<QueryResult>(
     "db_query",
-    databaseId ? { database_id: databaseId, params: params ?? {} } : null,
+    databaseId
+      ? {
+          databaseId,
+          filters: params?.filters,
+          sorts: params?.sorts,
+          limit: params?.limit,
+          offset: params?.offset,
+        }
+      : null,
     { invalidateOn: [DATABASE_UPDATED_EVENT] },
   );
 }

@@ -13,9 +13,9 @@ export function useCreateView(databaseId: string) {
   const mutate = useCallback(
     async (name: string, viewType: ViewType, config?: ViewConfig) => {
       const result = await rawMutate({
-        database_id: databaseId,
+        databaseId,
         name,
-        view_type: viewType,
+        viewType,
         config: config ?? {},
       });
       if (result) emitDatabaseUpdated();
@@ -37,8 +37,8 @@ export function useUpdateView(databaseId: string) {
   const mutate = useCallback(
     async (viewId: string, updates: Partial<ViewDefinition>) => {
       const result = await rawMutate({
-        database_id: databaseId,
-        view_id: viewId,
+        databaseId,
+        viewId,
         ...updates,
       });
       if (result) emitDatabaseUpdated();
@@ -59,7 +59,7 @@ export function useDeleteView(databaseId: string) {
 
   const mutate = useCallback(
     async (viewId: string) => {
-      await rawMutate({ database_id: databaseId, view_id: viewId });
+      await rawMutate({ databaseId, viewId });
       emitDatabaseUpdated();
     },
     [databaseId, rawMutate],

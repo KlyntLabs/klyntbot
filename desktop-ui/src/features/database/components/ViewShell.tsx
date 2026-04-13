@@ -32,20 +32,17 @@ export function ViewShell({
   onEntityClick,
   onNewEntity,
 }: ViewShellProps) {
+  const views = schema.views ?? [];
   const [activeViewId, setActiveViewId] = useState<string | undefined>(
-    schema.views.find((v) => v.isDefault)?.id ?? schema.views[0]?.id,
+    views.find((v) => v.isDefault)?.id ?? views[0]?.id,
   );
 
-  const activeView = schema.views.find((v) => v.id === activeViewId) ?? schema.views[0];
+  const activeView = views.find((v) => v.id === activeViewId) ?? views[0];
 
   return (
     <div className="flex h-full flex-col">
-      {schema.views.length > 0 && (
-        <ViewTabBar
-          views={schema.views}
-          activeViewId={activeViewId}
-          onViewSelect={setActiveViewId}
-        />
+      {views.length > 0 && (
+        <ViewTabBar views={views} activeViewId={activeViewId} onViewSelect={setActiveViewId} />
       )}
       <ViewToolbar
         searchQuery={searchQuery}

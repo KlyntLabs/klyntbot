@@ -9,9 +9,7 @@ export function useDatabases() {
 }
 
 export function useDatabase(databaseId: string | undefined) {
-  return useQuery<DatabaseSchema>(
-    "db_get_schema",
-    databaseId ? { database_id: databaseId } : null,
-    { invalidateOn: [DATABASE_UPDATED_EVENT] },
-  );
+  return useQuery<DatabaseSchema>("db_get_schema", databaseId ? { databaseId } : null, {
+    invalidateOn: [DATABASE_UPDATED_EVENT],
+  });
 }

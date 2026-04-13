@@ -12,7 +12,7 @@ export function useCreateEntity(databaseId: string) {
 
   const mutate = useCallback(
     async (input: CreateEntityInput) => {
-      const result = await rawMutate({ database_id: databaseId, input });
+      const result = await rawMutate({ databaseId, fields: input.fields });
       if (result) emitDatabaseUpdated();
       return result;
     },
@@ -31,7 +31,7 @@ export function useUpdateEntity(databaseId: string) {
 
   const mutate = useCallback(
     async (entityId: string, input: UpdateEntityInput) => {
-      const result = await rawMutate({ database_id: databaseId, entity_id: entityId, input });
+      const result = await rawMutate({ databaseId, entityId, fields: input.fields });
       if (result) emitDatabaseUpdated();
       return result;
     },
@@ -50,7 +50,7 @@ export function useDeleteEntity(databaseId: string) {
 
   const mutate = useCallback(
     async (entityId: string) => {
-      await rawMutate({ database_id: databaseId, entity_id: entityId });
+      await rawMutate({ databaseId, entityId });
       emitDatabaseUpdated();
     },
     [databaseId, rawMutate],

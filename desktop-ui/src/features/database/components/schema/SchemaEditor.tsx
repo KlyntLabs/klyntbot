@@ -22,8 +22,9 @@ export function SchemaEditor({ schema, onClose }: SchemaEditorProps) {
   const handleAddField = async () => {
     if (!newFieldName.trim()) return;
     await addField({
-      database_id: schema.id,
-      input: { name: newFieldName, field_type: newFieldType },
+      databaseId: schema.id,
+      name: newFieldName,
+      fieldType: newFieldType,
     });
     setNewFieldName("");
     setAddingField(false);
@@ -31,7 +32,7 @@ export function SchemaEditor({ schema, onClose }: SchemaEditorProps) {
   };
 
   const handleRemoveField = async (fieldId: string) => {
-    await removeField({ database_id: schema.id, field_id: fieldId });
+    await removeField({ databaseId: schema.id, fieldId });
     emitDatabaseUpdated();
   };
 

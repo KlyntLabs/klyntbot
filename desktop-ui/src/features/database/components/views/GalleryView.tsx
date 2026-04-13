@@ -12,9 +12,10 @@ interface GalleryViewProps {
 export function GalleryView({ schema, entities, cardFields, onEntityClick }: GalleryViewProps) {
   const titleField = getTitleField(schema);
 
-  const displayFields = cardFields
-    ? schema.fields.filter((f) => cardFields.includes(f.slug))
-    : schema.fields.filter((f) => !f.hidden && f !== titleField).slice(0, 4);
+  const displayFields =
+    cardFields && cardFields.length > 0
+      ? schema.fields.filter((f) => cardFields.includes(f.slug))
+      : schema.fields.filter((f) => !f.hidden && f !== titleField).slice(0, 4);
 
   return (
     <div className="grid grid-cols-2 gap-4 p-4 sm:grid-cols-3 lg:grid-cols-4">

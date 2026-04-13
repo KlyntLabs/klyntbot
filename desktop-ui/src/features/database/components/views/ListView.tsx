@@ -12,9 +12,10 @@ interface ListViewProps {
 export function ListView({ schema, entities, cardFields, onEntityClick }: ListViewProps) {
   const titleField = getTitleField(schema);
 
-  const inlineFields = cardFields
-    ? schema.fields.filter((f) => cardFields.includes(f.slug))
-    : schema.fields.filter((f) => !f.hidden && f !== titleField).slice(0, 3);
+  const inlineFields =
+    cardFields && cardFields.length > 0
+      ? schema.fields.filter((f) => cardFields.includes(f.slug))
+      : schema.fields.filter((f) => !f.hidden && f !== titleField).slice(0, 3);
 
   return (
     <div className="divide-y divide-border">
