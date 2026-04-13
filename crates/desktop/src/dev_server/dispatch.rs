@@ -46,9 +46,6 @@ pub(super) async fn dispatch(
     }
 
     // ── Per-module dispatch (co-located with Tauri commands) ─────────
-    if let Some(r) = commands::tasks::dispatch_dev(cmd, core, &body).await {
-        return into_api_result(r);
-    }
     if let Some(r) = commands::projects::dispatch_dev(cmd, core, &body).await {
         return into_api_result(r);
     }
@@ -100,9 +97,7 @@ pub(super) async fn dispatch(
     if let Some(r) = commands::status::dispatch_dev(cmd, core, &body).await {
         return into_api_result(r);
     }
-    if let Some(r) = commands::finance::dispatch_dev(cmd, core, &body).await {
-        return into_api_result(r);
-    }
+
     if let Some(r) = commands::notes::dispatch_dev(cmd, core, &body).await {
         return into_api_result(r);
     }
@@ -122,9 +117,6 @@ pub(super) async fn dispatch(
         return into_api_result(r);
     }
     if let Some(r) = commands::workflows::dispatch_dev(cmd, core, &body).await {
-        return into_api_result(r);
-    }
-    if let Some(r) = commands::columns::dispatch_dev(cmd, core, &body).await {
         return into_api_result(r);
     }
     if let Some(r) = commands::cognitive::dispatch_dev(cmd, core, &body).await {

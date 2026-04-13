@@ -1,4 +1,0 @@
-/* tasks component scope — inherits all colors from global theme tokens */
-.tasks-scope {
-  --radius: 0.5rem;
-}

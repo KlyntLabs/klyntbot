@@ -208,13 +208,11 @@ mod tests {
     fn dev_command_names() -> BTreeSet<String> {
         use crate::commands;
         let modules: &[&[&str]] = &[
-            commands::tasks::DEV_COMMANDS,
             commands::projects::DEV_COMMANDS,
             commands::areas::DEV_COMMANDS,
             commands::objectives::DEV_COMMANDS,
             commands::key_results::DEV_COMMANDS,
             commands::status::DEV_COMMANDS,
-            commands::finance::DEV_COMMANDS,
             commands::notes::DEV_COMMANDS,
             commands::productivity::DEV_COMMANDS,
             commands::distraction::DEV_COMMANDS,
@@ -222,7 +220,6 @@ mod tests {
             commands::chat::DEV_COMMANDS,
             commands::groups::DEV_COMMANDS,
             commands::workflows::DEV_COMMANDS,
-            commands::columns::DEV_COMMANDS,
             commands::cognitive::DEV_COMMANDS,
             commands::timeline::DEV_COMMANDS,
             commands::cron::DEV_COMMANDS,

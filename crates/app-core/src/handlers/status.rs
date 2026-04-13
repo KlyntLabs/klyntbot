@@ -18,7 +18,7 @@ impl AppCore {
         let summary = self.repos.tasks.summary().await.map_err(map_storage_err)?;
 
         let focus_task = match focused.first() {
-            Some(row) => Some(super::tasks::row_to_task(&self.repos, row).await?),
+            Some(row) => Some(super::task_converters::row_to_task(&self.repos, row.clone()).await?),
             None => None,
         };
 

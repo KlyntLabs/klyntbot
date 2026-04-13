@@ -1,28 +1,138 @@
 use std::sync::Arc;
 
-/// Map a difficulty estimate (1–5) to initial FSRS-5 `(stability, difficulty)` parameters.
-///
-/// Higher difficulty estimates produce lower initial stability and higher FSRS difficulty,
-/// which causes the scheduler to review the card more aggressively at the start.
-fn difficulty_to_fsrs(estimate: Option<i32>) -> (f64, f64) {
-    match estimate.unwrap_or(3) {
-        1 => (4.0, 3.0), // Easy recall: high stability, low difficulty
-        2 => (3.0, 4.0),
-        3 => (2.0, 5.0), // Default
-        4 => (1.2, 6.5),
-        _ => (0.8, 8.0), // Hard synthesis: low stability, high difficulty
-    }
-}
-
+use common::helpers::strip_llm_fences;
+use common::truncate_chars;
 use desktop_shared::commands::{
     FlashcardGenerateParams, FlashcardGenerateResponse, FlashcardResponse,
     FlashcardSaveGeneratedParams, GeneratedCardPreview,
 };
 use desktop_shared::errors::ApiError;
+use serde::{Deserialize, Serialize};
 use storage::VectorStore;
 use tools::embedding_engine::EmbeddingEngine;
+use tracing::warn;
 
 use crate::state::AppCore;
+
+// ── Card generation types (inlined from feature-learning) ───────────────────
+
+/// A single card produced by the LLM card generator.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub(crate) struct GeneratedCard {
+    pub front: String,
+    pub back: String,
+    pub card_type: String,
+    pub tags: Vec<String>,
+    pub source_context: Option<String>,
+    pub cloze_data: Option<serde_json::Value>,
+    pub vocab_data: Option<serde_json::Value>,
+    pub difficulty_estimate: Option<i32>,
+    pub prerequisite_concepts: Option<Vec<String>>,
+}
+
+/// Context assembled for card generation — passed to the prompt builder.
+struct CardGenerationContext {
+    note_content: String,
+    note_title: String,
+    existing_cards_summary: Option<String>,
+}
+
+// ── Card generation helpers (inlined from feature-learning) ─────────────────
+
+/// Build the system + user messages for card generation.
+fn build_generation_prompt(ctx: &CardGenerationContext) -> (String, String) {
+    let system = r#"You are a flashcard generation assistant for spaced repetition learning. Generate high-quality, self-contained flashcards from the provided content.
+
+Rules:
+1. Generate 5-15 cards depending on content density
+2. Use varied card types:
+   - "basic" for concept questions and understanding checks (most common)
+   - "cloze" for definitions, key facts, and fill-in-the-blank — use {{c1::hidden}} syntax in the front field
+   - "vocabulary" for foreign language words — populate vocab_data with word, reading, meaning, example_sentence, part_of_speech
+3. Each card MUST be self-contained (understandable without the source note)
+4. Prefer testing understanding and application over rote memorization
+5. source_context is a 1-2 sentence excerpt from the note that the card tests — include it for every card
+6. Tags: 1-3 lowercase hyphenated concepts (e.g., "machine-learning", "te-form", "photosynthesis")
+7. For cloze cards: front contains the text with {{c1::hidden}} markers, back is the full revealed text
+8. For vocabulary cards: front is the word (with reading if applicable), back is the meaning + example
+
+For each card, also include:
+- "difficulty_estimate": integer 1-5 (1=recall a single fact, 2=understand a concept, 3=apply knowledge, 4=analyze relationships, 5=synthesize multiple concepts)
+- "prerequisite_concepts": array of 0-3 strings naming concepts the learner should already know to answer this card
+
+Respond ONLY with a JSON array. No markdown fences, no explanation, no preamble."#.to_string();
+
+    let mut user = String::new();
+
+    if let Some(ref existing) = ctx.existing_cards_summary {
+        user.push_str(
+            "The user already has these flashcards from this note. Do NOT generate duplicates:\n",
+        );
+        user.push_str(existing);
+        user.push_str("\n\n");
+    }
+
+    user.push_str(&format!("--- BEGIN NOTE: {} ---\n", ctx.note_title));
+    user.push_str(&ctx.note_content);
+    user.push_str("\n--- END NOTE ---");
+
+    (system, user)
+}
+
+/// Parse the LLM response JSON into a list of generated cards.
+fn parse_generated_cards(response: &str) -> Result<Vec<GeneratedCard>, String> {
+    let cleaned = strip_llm_fences(response);
+
+    let cards: Vec<GeneratedCard> = serde_json::from_str(cleaned)
+        .map_err(|e| format!("Failed to parse card generation response: {e}"))?;
+
+    let valid: Vec<GeneratedCard> = cards
+        .into_iter()
+        .filter(|c| {
+            let ok = !c.front.trim().is_empty() && !c.back.trim().is_empty();
+            if !ok {
+                warn!("Skipping generated card with empty front or back");
+            }
+            ok
+        })
+        .collect();
+
+    if valid.is_empty() {
+        return Err("No valid cards generated".to_string());
+    }
+
+    Ok(valid)
+}
+
+/// Build a summary of existing cards for duplicate avoidance.
+fn summarize_existing_cards(cards: &[(String, String)]) -> Option<String> {
+    if cards.is_empty() {
+        return None;
+    }
+
+    let summary: Vec<String> = cards
+        .iter()
+        .take(30)
+        .map(|(front, back)| {
+            let front_truncated = truncate_chars(front, 80, "…");
+            let back_truncated = truncate_chars(back, 80, "…");
+            format!("- Q: {} → A: {}", front_truncated, back_truncated)
+        })
+        .collect();
+
+    Some(summary.join("\n"))
+}
+
+/// Map a difficulty estimate (1–5) to initial FSRS-5 `(stability, difficulty)` parameters.
+fn difficulty_to_fsrs(estimate: Option<i32>) -> (f64, f64) {
+    match estimate.unwrap_or(3) {
+        1 => (4.0, 3.0),
+        2 => (3.0, 4.0),
+        3 => (2.0, 5.0),
+        4 => (1.2, 6.5),
+        _ => (0.8, 8.0),
+    }
+}
 
 /// Embed both front and back of a batch of flashcard rows into `flashcard_embeddings`.
 ///
@@ -130,18 +240,18 @@ impl AppCore {
                 .iter()
                 .map(|c| (c.front.clone(), c.back.clone()))
                 .collect();
-            feature_learning::summarize_existing_cards(&pairs)
+            summarize_existing_cards(&pairs)
         } else {
             None
         };
 
         // Build prompt
-        let ctx = feature_learning::CardGenerationContext {
+        let ctx = CardGenerationContext {
             note_content,
             note_title: note_title.clone(),
             existing_cards_summary: existing_summary,
         };
-        let (system_prompt, user_prompt) = feature_learning::build_generation_prompt(&ctx);
+        let (system_prompt, user_prompt) = build_generation_prompt(&ctx);
 
         // Call LLM
         let config = self.config.read().await;
@@ -167,8 +277,8 @@ impl AppCore {
             .ok_or_else(|| ApiError::new("LLM_ERROR", "Empty response from LLM"))?;
 
         // Parse response
-        let generated = feature_learning::parse_generated_cards(&response_text)
-            .map_err(|e| ApiError::new("PARSE_ERROR", e))?;
+        let generated =
+            parse_generated_cards(&response_text).map_err(|e| ApiError::new("PARSE_ERROR", e))?;
 
         // Convert to preview type
         let cards: Vec<GeneratedCardPreview> = generated

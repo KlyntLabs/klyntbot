@@ -12,9 +12,6 @@ const AutomationsPage = lazy(() =>
   import("../features/automations").then((m) => ({ default: m.AutomationsPage })),
 );
 
-// ── Tasks Feature ─────────────────────────────────────────────────
-const TasksPage = lazy(() => import("../features/tasks").then((m) => ({ default: m.TasksPage })));
-
 // ── Chat Feature ──────────────────────────────────────────────────
 const ChatPage = lazy(() => import("../features/chat").then((m) => ({ default: m.ChatPage })));
 
@@ -30,20 +27,6 @@ const KnowledgeHealthPage = lazy(() =>
 );
 const FocusedReviewPage = lazy(() =>
   import("../features/learn").then((m) => ({ default: m.FocusedReview })),
-);
-
-// ── Finance Feature ──────────────────────────────────────────────
-const FinanceOverviewPage = lazy(() =>
-  import("../features/finance").then((m) => ({ default: m.FinanceOverviewPage })),
-);
-const CashFlowPage = lazy(() =>
-  import("../features/finance").then((m) => ({ default: m.CashFlowPage })),
-);
-const InvestmentsPage = lazy(() =>
-  import("../features/finance").then((m) => ({ default: m.InvestmentsPage })),
-);
-const TargetsPage = lazy(() =>
-  import("../features/finance").then((m) => ({ default: m.TargetsPage })),
 );
 
 // ── Mirror Feature ───────────────────────────────────────────
@@ -218,7 +201,6 @@ export const router = createHashRouter([
       // System page (contexts, categories, inference, debug tabs)
       { path: "/system", element: <SystemPage /> },
       { path: "/system/:tab", element: <SystemPage /> },
-      { path: "/tasks", element: <TasksPage /> },
       { path: "/chat", element: <ChatPage /> },
       { path: "/notes", element: <KnowledgeBasePage /> },
       { path: "/learn", element: <LearnPage /> },
@@ -227,16 +209,6 @@ export const router = createHashRouter([
       { path: "/brain", element: <MirrorPage /> },
       { path: "/automations", element: <AutomationsPage /> },
       { path: "/categories", element: <Navigate to="/system/categories" replace /> },
-      { path: "/finance", element: <CashFlowPage /> },
-      { path: "/finance/overview", element: <FinanceOverviewPage /> },
-      { path: "/finance/cashflow", element: <Navigate to="/finance" replace /> },
-      { path: "/finance/accounts", element: <Navigate to="/finance" replace /> },
-      { path: "/finance/transactions", element: <Navigate to="/finance" replace /> },
-      { path: "/finance/budgets", element: <Navigate to="/finance" replace /> },
-      { path: "/finance/investments", element: <InvestmentsPage /> },
-      { path: "/finance/targets", element: <TargetsPage /> },
-      { path: "/finance/goals", element: <Navigate to="/finance/targets" replace /> },
-      { path: "/finance/liabilities", element: <Navigate to="/finance/targets" replace /> },
       {
         path: "/coaching",
         element: (

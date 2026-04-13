@@ -1,12 +1,8 @@
 pub mod database_searcher;
-pub mod finance_searcher;
 pub mod note_searcher;
-pub mod task_searcher;
 
 pub use database_searcher::DatabaseSearcher;
-pub use finance_searcher::FinanceSearcher;
 pub use note_searcher::NoteSearcher;
-pub use task_searcher::TaskSearcher;
 
 /// Shared stop words for domain searcher keyword extraction.
 const SEARCHER_STOP_WORDS: &[&str] = &[

@@ -19,7 +19,6 @@ pub mod confidence;
 pub mod content_registry;
 pub mod context_sources;
 pub mod engines;
-pub mod enrichment;
 pub mod events;
 #[cfg(test)]
 mod events_tests;
@@ -37,13 +36,10 @@ pub use agent_profile::skill_loader;
 
 // ── Module re-exports (backward-compatible paths) ────────────────────────────
 pub use adapters::{
-    agent_task, cognitive_embedder, cognitive_handlers, conversation_recall, cron, finance,
+    agent_task, cognitive_embedder, cognitive_handlers, conversation_recall, cron,
     learning as learning_handler, llm_summary, mirror_handlers, productivity, progress,
-    task_embedding,
 };
-pub use services::{
-    memory_maintenance, notifications, recurring_tasks, reminders, session_cleanup,
-};
+pub use services::{memory_maintenance, notifications, reminders, session_cleanup};
 
 // ── Type re-exports ──────────────────────────────────────────────────────────
 pub use agent_loop::{AgentLoop, StreamingHandle};
@@ -53,16 +49,14 @@ pub use confidence::{ConfidenceAssessment, ConfidenceEvaluator, DecisionAction, 
 pub use context_sources::ConfidenceSource;
 pub use conversation_recall::ConversationRecallHandlerImpl;
 pub use cron::CronHandlerAdapter;
-pub use enrichment::EnrichmentEngine;
 pub use events::AgentEvent;
 pub use execution::{CycleOutcome, ExecutionCore, ExecutionParams, ToolExecutionResult};
-pub use finance::FinanceHandlerImpl;
+
 pub use learning::LearningService;
 pub use learning_handler::LearningHandlerImpl;
 pub use notifications::NotificationDispatcher;
 pub use persona::{PersonaChain, PersonaManager, PersonaScope};
 pub use productivity::ProductivityHandlerImpl;
 pub use progress::ProgressHandlerImpl;
-pub use recurring_tasks::RecurringTaskSpawner;
 pub use reminders::ReminderEngine;
 pub use subagent::{SubagentManager, SubagentProfile};

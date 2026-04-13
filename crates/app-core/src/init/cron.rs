@@ -1,8 +1,6 @@
 use std::sync::Arc;
 
 use bus::{DomainEventBus, MessageBus};
-use feature_tasks::handlers::suggestion_applier::SuggestionApplier;
-use feature_tasks::{DecompositionHandler, ForecastHandler, ProactiveHandler, TasksConfig};
 use scheduling::CronService;
 use storage::Repos;
 use tracing::{info, warn};
@@ -11,14 +9,8 @@ use tracing::{info, warn};
 pub(super) struct CronResult {
     pub cron_service: Arc<CronService>,
     pub notification_dispatcher: Arc<agent::NotificationDispatcher>,
-    pub proactive_handler: Option<Arc<dyn feature_tasks::ProactiveHandler>>,
-    pub suggestion_applier: Option<Arc<dyn SuggestionApplier>>,
-    pub decomposition_handler: Option<Arc<dyn DecompositionHandler>>,
-    pub forecast_handler: Option<Arc<dyn ForecastHandler>>,
     pub autotuner: Option<Arc<agent::autotuner::AutoTunerOrchestrator>>,
 }
-
-pub const JOB_PROACTIVE_SCAN: &str = "proactive_scan";
 
 /// Initialize cron service, register callbacks, and ensure default jobs.
 #[allow(clippy::too_many_arguments)]
@@ -30,7 +22,6 @@ pub(super) async fn init_cron(
     cognitive_provider: Option<providers::DynProvider>,
     provider: providers::DynProvider,
     domain_event_bus: &Arc<DomainEventBus>,
-    tasks_config: TasksConfig,
     vector_store: Option<storage::VectorStore>,
 ) -> Result<CronResult, String> {
     // 6. Cron service — set callbacks BEFORE wrapping in Arc
@@ -52,48 +43,7 @@ pub(super) async fn init_cron(
         ),
     });
 
-    // Build AI decomposition and forecast handlers.
-    let decomposition_handler: Option<Arc<dyn DecompositionHandler>> = {
-        let task_repo = repos.tasks.clone();
-        Some(Arc::new(agent::handlers::LlmDecompositionHandler::new(
-            provider.clone(),
-            config.agents.defaults.model.clone(),
-            task_repo,
-            Some(Arc::clone(domain_event_bus)),
-        )))
-    };
-    let forecast_handler: Option<Arc<dyn ForecastHandler>> = {
-        let task_repo = repos.tasks.clone();
-        Some(Arc::new(agent::handlers::LlmForecastHandler::new(
-            provider.clone(),
-            config.agents.defaults.model.clone(),
-            task_repo,
-        )))
-    };
-
-    // Build the proactive handler and applier for the cron job.
-    // Uses its own LlmProactiveHandler instance (domain_bus=None — event emission
-    // happens in run_proactive_scan after persist, not inside the handler).
-    let autotuner_provider = provider.clone();
-    let proactive_handler: Arc<dyn ProactiveHandler> = {
-        let task_repo = repos.tasks.clone();
-        Arc::new(agent::handlers::LlmProactiveHandler::new(
-            provider,
-            config.agents.defaults.model.clone(),
-            task_repo,
-            tasks_config.clone(),
-        ))
-    };
-    let suggestion_applier: Option<Arc<dyn SuggestionApplier>> = {
-        let task_repo = repos.tasks.clone();
-        Some(Arc::new(agent::handlers::TaskSuggestionApplier::new(
-            task_repo,
-        )))
-    };
-
-    // Clone handlers before they're moved into cron closures so AppCore can hold refs too.
-    let proactive_handler_out = Some(proactive_handler.clone());
-    let suggestion_applier_out = suggestion_applier.clone();
+    let autotuner_provider = provider;
 
     // ── AutoTuner setup (must happen before register_cron_callbacks) ─────
     let trial_repo = storage::TrialRepo::new(repos.pool().clone());
@@ -157,9 +107,6 @@ pub(super) async fn init_cron(
         bus,
         cognitive_provider,
         domain_event_bus,
-        tasks_config.clone(),
-        proactive_handler,
-        suggestion_applier,
         vector_store,
         autotuner_bridge,
         metric_source,
@@ -177,10 +124,6 @@ pub(super) async fn init_cron(
     Ok(CronResult {
         cron_service,
         notification_dispatcher,
-        proactive_handler: proactive_handler_out,
-        suggestion_applier: suggestion_applier_out,
-        decomposition_handler,
-        forecast_handler,
         autotuner,
     })
 }
@@ -193,12 +136,8 @@ const JOB_DAILY_DIGEST: &str = "todo_daily_digest";
 const JOB_OVERDUE_CHECK: &str = "todo_overdue_check";
 const JOB_WEEKLY_REPORT: &str = "__klyntbot_weekly_report";
 const JOB_DAILY_PLANNING: &str = "__klyntbot_daily_planning";
-const JOB_FINANCE_DAILY_REVIEW: &str = "__klyntbot_finance_daily_review";
 const JOB_ATOM_DECAY: &str = "__klyntbot_atom_decay_daily";
 const JOB_ATOM_EXTRACTION_CATCHALL: &str = "__klyntbot_atom_extraction_catchall";
-const JOB_FINANCE_BUDGET_CHECK: &str = "__klyntbot_finance_budget_check";
-const JOB_FINANCE_PRICE_REFRESH: &str = "__klyntbot_finance_price_refresh";
-const JOB_FINANCE_HEALTH_CHECK: &str = "__klyntbot_finance_health_check";
 const JOB_MORNING_BRIEFING: &str = "__klyntbot_morning_briefing";
 const JOB_WEEKLY_KNOWLEDGE_DIGEST: &str = "__klyntbot_weekly_knowledge_digest";
 
@@ -226,9 +165,6 @@ fn register_cron_callbacks(
     bus: &Arc<MessageBus>,
     cognitive_provider: Option<providers::DynProvider>,
     domain_event_bus: &Arc<DomainEventBus>,
-    tasks_config: TasksConfig,
-    proactive_handler: Arc<dyn ProactiveHandler>,
-    suggestion_applier: Option<Arc<dyn SuggestionApplier>>,
     vector_store: Option<storage::VectorStore>,
     autotuner_bridge: Option<Arc<dyn cognitive::services::reforge::AutotunerBridge>>,
     metric_source: Arc<dyn autotuner::MetricSource>,
@@ -376,20 +312,6 @@ fn register_cron_callbacks(
                             "Generate weekly progress report using the weekly-report skill",
                         ),
                         JOB_DAILY_PLANNING => ("daily_planning", "/daily-planning"),
-                        JOB_FINANCE_DAILY_REVIEW => (
-                            "finance_daily_review",
-                            "Run finance daily review and send summary",
-                        ),
-                        JOB_FINANCE_BUDGET_CHECK => (
-                            "finance_budget_check",
-                            "Check budget thresholds and send alerts",
-                        ),
-                        JOB_FINANCE_PRICE_REFRESH => {
-                            ("finance_price_refresh", "Refresh investment prices")
-                        }
-                        JOB_FINANCE_HEALTH_CHECK => {
-                            ("finance_health_check", "Run finance data health check")
-                        }
                         _ => return Ok(None),
                     };
                     // chat_id must be "channel:id" format for process_system_message routing.
@@ -741,43 +663,6 @@ fn register_cron_callbacks(
         );
     }
 
-    // ── proactive_scan ───────────────────────────────────────────────────
-    if tasks_config.proactive_suggestions {
-        let handler = proactive_handler.clone();
-        let repos_clone = repos.clone();
-        let bus_clone = Some(Arc::clone(domain_event_bus));
-        let cfg = tasks_config.clone();
-        let applier = suggestion_applier.clone();
-        let rt = rt.clone();
-        cron_service.register_handler(
-            JOB_PROACTIVE_SCAN,
-            Arc::new(move |_job: &scheduling::CronJob| {
-                let handler = handler.clone();
-                let repos = repos_clone.clone();
-                let bus = bus_clone.clone();
-                let cfg = cfg.clone();
-                let applier = applier.clone();
-                tokio::task::block_in_place(|| {
-                    rt.block_on(async move {
-                        match crate::handlers::tasks::proactive::run_proactive_scan(
-                            &handler, &repos, &bus, &cfg, &applier,
-                        )
-                        .await
-                        {
-                            Ok(n) => Ok(Some(format!(
-                                "Proactive scan complete: {n} suggestions generated"
-                            ))),
-                            Err(e) => {
-                                warn!("Proactive scan failed: {e}");
-                                Ok(None)
-                            }
-                        }
-                    })
-                })
-            }),
-        );
-    }
-
     // ── session_cleanup ───────────────────────────────────────────────────
     {
         let session_repo = storage::SessionRepo::new(repos.pool().clone());
@@ -1003,36 +888,6 @@ fn register_cron_callbacks(
             }),
         );
     }
-
-    // ── recurring_tasks ───────────────────────────────────────────────────
-    {
-        let todo_repo = repos.tasks.clone();
-        let timezone = config.timezone.clone();
-        let rt = rt.clone();
-        cron_service.register_handler(
-            JOB_RECURRING_TASKS,
-            Arc::new(move |_job: &scheduling::CronJob| {
-                let todo_repo = todo_repo.clone();
-                let timezone = timezone.clone();
-                tokio::task::block_in_place(|| {
-                    rt.block_on(async move {
-                        match agent::services::recurring_tasks::RecurringTaskSpawner::check_and_spawn_static(
-                            &todo_repo,
-                            &timezone,
-                        )
-                        .await
-                        {
-                            Ok(()) => Ok(Some("Recurring task check complete".to_string())),
-                            Err(e) => {
-                                warn!("Recurring task check failed: {e}");
-                                Ok(Some(format!("Recurring task check failed: {e}")))
-                            }
-                        }
-                    })
-                })
-            }),
-        );
-    }
 }
 
 /// Register default cron jobs (idempotent — skips existing).
@@ -1068,18 +923,6 @@ async fn ensure_cron_jobs(
     // This keeps a fresh install clean.
 
     // ── Protected system jobs (AI background work, infrastructure) ────────
-
-    // Finance price refresh (system — must run automatically when enabled)
-    if config.finance.enabled && config.finance.price_refresh.enabled {
-        ensure_job!(
-            JOB_FINANCE_PRICE_REFRESH,
-            scheduling::CronSchedule::Every {
-                every_ms: config.finance.price_refresh.interval_hours as u64 * 60 * 60 * 1000,
-            },
-            "Refresh investment prices",
-            system.clone()
-        );
-    }
 
     // Disabled: autotuner nightly subsumed by Reforge (Phase 6 deferred).
     // TODO(Task 12): integrate autotuner evaluation into Reforge Phase 6.
@@ -1203,14 +1046,6 @@ async fn set_default_intent_windows(cron_service: &scheduling::CronService) {
                 trigger: IntentTrigger::UserIdle { min_idle_secs: 300 },
                 tolerance: Duration::from_secs(14400),
                 catch_up: CatchUpPriority::WhenIdle,
-            },
-        ),
-        (
-            JOB_PROACTIVE_SCAN,
-            IntentWindow {
-                trigger: IntentTrigger::MinActiveMinutes { minutes: 5 },
-                tolerance: Duration::from_secs(3600),
-                catch_up: CatchUpPriority::WhenPresent,
             },
         ),
         (

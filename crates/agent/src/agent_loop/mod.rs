@@ -52,7 +52,6 @@ pub struct AgentLoop {
     pub(crate) running: Arc<AtomicBool>,
     pub(crate) last_active_channel: Option<LastActiveChannel>,
     pub(crate) reminder_engine: Option<Arc<RwLock<super::ReminderEngine>>>,
-    pub(crate) recurring_task_spawner: Option<Arc<RwLock<super::RecurringTaskSpawner>>>,
     /// Held for lifetime; shared with notification targets
     pub(crate) _notification_dispatcher: Option<Arc<super::NotificationDispatcher>>,
     /// Conversation recall handler for semantic memory
@@ -390,12 +389,6 @@ impl AgentLoop {
         if let Some(engine) = &self.reminder_engine {
             let mut engine_guard = engine.write().await;
             engine_guard.stop().await;
-        }
-
-        // Stop the recurring task spawner
-        if let Some(spawner) = &self.recurring_task_spawner {
-            let mut spawner_guard = spawner.write().await;
-            spawner_guard.stop().await;
         }
 
         // Stop the learning background service

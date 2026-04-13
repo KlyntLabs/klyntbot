@@ -2,7 +2,7 @@ use desktop_shared::commands::{KeyResultCreateParams, KeyResultResponse, KeyResu
 use desktop_shared::types::EntityKind;
 use storage::KeyResultRow;
 
-use super::tasks::kr_to_response;
+use super::task_converters::kr_to_response;
 use crate::errors::{map_storage_err, parse_date};
 use crate::state::{AppCore, EntityUpdate, HandlerResult};
 

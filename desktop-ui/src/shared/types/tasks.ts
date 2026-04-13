@@ -1,4 +1,4 @@
-import type { ColumnType, StatusLabel } from "./common";
+import type { StatusLabel } from "./common";
 
 // ── Task Core Types ─────────────────────────────────────────
 
@@ -109,24 +109,6 @@ export interface Area {
   icon: string | null;
   projectCount: number;
   taskCount: number;
-}
-
-// ── Custom Columns ──────────────────────────────────────────
-
-export interface CustomColumn {
-  id: string;
-  projectId: string;
-  name: string;
-  columnType: ColumnType;
-  options: string[] | null;
-  position: number;
-  width: number;
-}
-
-export interface CustomColumnValue {
-  taskId: string;
-  columnId: string;
-  value: unknown;
 }
 
 // ── Task Mutation Parameters ────────────────────────────────
@@ -246,32 +228,4 @@ export interface KeyResultUpdateParams {
   description?: string | null;
   status?: string;
   dueDate?: string | null;
-}
-
-// ── Custom Column Mutation Parameters ───────────────────────
-
-export interface ColumnCreateParams {
-  projectId: string;
-  name: string;
-  columnType: ColumnType;
-  options?: string[];
-  width?: number;
-}
-
-export interface ColumnUpdateParams {
-  id: string;
-  name?: string;
-  options?: string[] | null;
-  width?: number;
-}
-
-export interface ColumnReorderParams {
-  projectId: string;
-  ids: string[];
-}
-
-export interface ColumnValueSetParams {
-  taskId: string;
-  columnId: string;
-  value: unknown;
 }

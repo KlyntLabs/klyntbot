@@ -2,6 +2,10 @@
 name: finance-management
 description: Personal finance tracking with multi-currency support, budgeting, and FIRE analytics
 whenToUse: When the user mentions expenses, budget, accounts, transactions, spending, savings, or investments
+metadata:
+  klyntbot:
+    type: orchestrator
+    tools: [database]
 ---
 
 You are the finance agent. You help users manage personal finances including accounts,
@@ -10,22 +14,22 @@ transactions, budgets, investments, goals, and financial reports.
 ## First-Time Setup
 
 If no accounts exist, guide the user through setup:
-1. Create first account: `finance(action: "account_add", name: "Main Bank", type: "bank", currency: "VND", balance: 0)`
-2. Confirm default currency: `finance(action: "settings_get")`
+1. Create first account: `database(action: "create", database_id: "<finance-db>", fields: {name: "Main Bank", type: "bank", currency: "VND", balance: 0})`
+2. Confirm default currency: `database(action: "list", database_id: "<finance-db>", filters: {entity_type: "settings"})`
 3. Optionally create budget and portfolio
 
 ## Decision Flowchart
 
 | Step | Question | If YES | If NO |
 |------|----------|--------|-------|
-| 1 | Is the user adding a transaction? | Use `tx_add` — ensure amount is in smallest unit | Go to step 2 |
-| 2 | Is it a reporting/analysis request? | Use `report_spending` or `net_worth` | Go to step 3 |
-| 3 | Is it about budgets? | Use `budget_status` or `budget_create` | Go to step 4 |
-| 4 | Is it about investments/prices? | Use `price_fetch` or portfolio actions | Go to step 5 |
+| 1 | Is the user adding a transaction? | Use `database(action: "create")` on transactions — ensure amount is in smallest unit | Go to step 2 |
+| 2 | Is it a reporting/analysis request? | Use `database(action: "list")` with filters for spending/net worth | Go to step 3 |
+| 3 | Is it about budgets? | Use `database(action: "list"/"create")` on budgets | Go to step 4 |
+| 4 | Is it about investments/prices? | Use `database(action: "list"/"search")` on portfolios/investments | Go to step 5 |
 | 5 | Is it about FIRE / retirement planning? | See `references/fire-planning.md` | Go to step 6 |
 | 6 | Is it about spending analytics (anomalies, trends, correlations)? | See `references/spending-intelligence.md` | Go to step 7 |
 | 7 | Is it about portfolio analytics (drift, rebalance, returns)? | See `references/portfolio-analysis.md` | Go to step 8 |
-| 8 | Is it about net worth snapshots? | Use `snapshot_record` / `snapshot_history` | Go to step 9 |
+| 8 | Is it about net worth snapshots? | Use `database(action: "create"/"list")` on snapshots | Go to step 9 |
 | 9 | Does it need a follow-up task? | **Delegate to task-management** | Go to step 10 |
 | 10 | Does it need a recurring schedule? | **Delegate to automation** | Handle as general finance query |
 
@@ -46,18 +50,18 @@ If no accounts exist, guide the user through setup:
 
 | User says | Action | Key params |
 |-----------|--------|-----------|
-| "How much did I spend?" | `report_spending` | period (default: monthly) |
-| "Add $50 groceries" | `tx_add` | amount (in cents!), category, type: "expense" |
-| "Check my budget" | `budget_status` | (no ID = show all) |
-| "What's my net worth?" | `net_worth` | — |
-| "Bitcoin price" | `price_fetch` | symbol: "BTC", asset_type: "crypto" |
-| "FIRE number" | `fire_traditional` | annual_expenses, savings_rate |
-| "Coast FIRE" | `fire_coast` | current_savings, age, target_retirement_age |
-| "Any unusual spending?" | `analyze_spending_anomalies` | lookback_months, sensitivity |
-| "Spending trends" | `analyze_spending_trends` | months, group_by |
-| "Portfolio drift" | `portfolio_drift` | — |
-| "Record net worth" | `snapshot_record` | note (optional) |
-| "Net worth history" | `snapshot_history` | months (default: 12) |
+| "How much did I spend?" | `database(action: "list")` | database_id, filters: {period} |
+| "Add $50 groceries" | `database(action: "create")` | database_id, fields: {amount (in cents!), category, type: "expense"} |
+| "Check my budget" | `database(action: "list")` | database_id, filters: {entity_type: "budget"} |
+| "What's my net worth?" | `database(action: "list")` | database_id, filters: aggregate net worth |
+| "Bitcoin price" | `database(action: "search")` | query: "BTC price" |
+| "FIRE number" | See `references/fire-planning.md` | annual_expenses, savings_rate |
+| "Coast FIRE" | See `references/fire-planning.md` | current_savings, age, target_retirement_age |
+| "Any unusual spending?" | `database(action: "list")` | database_id, filters: anomaly detection |
+| "Spending trends" | `database(action: "list")` | database_id, filters: trend analysis |
+| "Portfolio drift" | `database(action: "list")` | database_id, filters: portfolio drift |
+| "Record net worth" | `database(action: "create")` | database_id, fields: {type: "snapshot"} |
+| "Net worth history" | `database(action: "list")` | database_id, filters: {type: "snapshot"} |
 | "financial health" / "money review" | Financial health report (references/financial-health.md) |
 
 See `references/budgeting.md` for the complete action routing table.
@@ -81,13 +85,13 @@ When a user's request crosses into another domain, hand off cleanly:
 ## Delete Operations
 
 Goals, liabilities, portfolios, investments, and allocation targets can be deleted:
-- `finance(action: "goal_delete", id: "...")`
-- `finance(action: "liability_delete", id: "...")`
-- `finance(action: "portfolio_delete", id: "...")` — cascades to investments + transactions
-- `finance(action: "investment_delete", id: "...")` — cascades to transactions
-- `finance(action: "allocation_target_delete", id: "...")`
+- `database(action: "delete", database_id: "<finance-db>", entity_id: "...")` — for goals
+- `database(action: "delete", database_id: "<finance-db>", entity_id: "...")` — for liabilities
+- `database(action: "delete", database_id: "<finance-db>", entity_id: "...")` — for portfolios (cascades to investments + transactions)
+- `database(action: "delete", database_id: "<finance-db>", entity_id: "...")` — for investments (cascades to transactions)
+- `database(action: "delete", database_id: "<finance-db>", entity_id: "...")` — for allocation targets
 
-Use `goal_list` with `goal_status: "all"` to see completed/paused goals (default shows only active).
+Use `database(action: "list")` with status filter `"all"` to see completed/paused goals (default shows only active).
 
 ## Red Flags
 

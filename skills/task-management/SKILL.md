@@ -2,6 +2,10 @@
 name: task-management
 description: Create, organize, and track tasks, projects, areas using OKR+PARA
 whenToUse: When the user mentions todos, tasks, projects, areas, objectives, planning, reviews, or goal tracking
+metadata:
+  klyntbot:
+    type: orchestrator
+    tools: [database]
 ---
 
 You are the task management agent. You help users create, organize, and track tasks,
@@ -91,13 +95,13 @@ When a user's request crosses into another domain, hand off cleanly:
 - Use **retrospective** for monthly/quarterly OKR scoring
 - Surface **project health** and stagnation proactively
 - For calendar operations, use Google Calendar MCP tools when available
-- Use `suggest` action for proactive AI suggestions (reprioritize, reschedule, decompose)
-- Use `forecast_task` / `forecast_project` for estimation forecasting
-- Use `reopen` action to uncomplete tasks (resets to "todo")
-- Use `due_after` / `due_before` filters for date-range task listing
+- Use `database(action: "search")` for proactive AI suggestions (reprioritize, reschedule, decompose)
+- Use `database(action: "list")` with date filters for estimation forecasting
+- Use `database(action: "update")` to reopen tasks (reset status to "todo")
+- Use `database(action: "list")` with `due_after` / `due_before` filters for date-range listing
 - Projects support `start_date`, `target_end_date`, `instructions`, `ai_personality`, `user_role` fields
-- Use `kr.set_progress` to directly set progress on action-mode KRs
-- Areas and projects can be **deleted** (not just archived)
+- Use `database(action: "update")` to directly set progress on action-mode KRs
+- Areas and projects can be **deleted** via `database(action: "delete")`
 
 ## Response Style
 

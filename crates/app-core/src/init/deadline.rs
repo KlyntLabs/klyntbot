@@ -219,28 +219,13 @@ async fn handle_focus_expire(
 }
 
 async fn handle_spawn_recurring(
-    repo: &storage::TaskRepo,
-    timezone: &str,
+    _repo: &storage::TaskRepo,
+    _timezone: &str,
     template_id: &str,
-    domain_event_bus: &DomainEventBus,
+    _domain_event_bus: &DomainEventBus,
 ) {
-    match agent::RecurringTaskSpawner::check_and_spawn_static(repo, timezone).await {
-        Ok(()) => {
-            debug!("deadline: recurring spawn check complete for template {template_id}");
-
-            // Re-read the template to get the updated next_instance_date and re-schedule.
-            if let Ok(Some(tpl)) = repo.get(template_id).await {
-                let next_date = tpl.next_instance_date.map(|d| d.to_rfc3339());
-                domain_event_bus.publish(DomainEvent::RecurringTemplateAdvanced {
-                    template_id: template_id.to_string(),
-                    next_instance_date: next_date,
-                });
-            }
-        }
-        Err(e) => {
-            warn!("deadline: recurring spawn failed for template {template_id}: {e}");
-        }
-    }
+    // Recurring task spawning removed with feature-tasks crate.
+    debug!("deadline: recurring spawn skipped for template {template_id} (feature-tasks removed)");
 }
 
 // ---------------------------------------------------------------------------

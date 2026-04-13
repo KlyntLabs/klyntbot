@@ -94,13 +94,6 @@ impl SimulationHarness {
         let trial_repo = storage::TrialRepo::new(inner_pool.clone());
         trial_repo.migrate().await?;
 
-        // Run feature-tasks migration so the `tasks` table exists for
-        // task-related domain entity rows and metrics.
-        sqlx::query(feature_tasks::TasksFeature::migration_sql())
-            .execute(&inner_pool)
-            .await
-            .map_err(|e| common::KlyntbotError::Storage(format!("tasks migration failed: {e}")))?;
-
         // Run additional feature migrations needed for agent-path tool execution.
         if scenario.simulation.agent_mode {
             // Notes tables
@@ -109,13 +102,6 @@ impl SimulationHarness {
                 .await
                 .map_err(|e| {
                     common::KlyntbotError::Storage(format!("notes migration failed: {e}"))
-                })?;
-            // Finance tables
-            sqlx::query(feature_finance::FinanceFeature::migration_sql())
-                .execute(&inner_pool)
-                .await
-                .map_err(|e| {
-                    common::KlyntbotError::Storage(format!("finance migration failed: {e}"))
                 })?;
             // Activity log tables
             for m in activity_log::ActivityLog::migrations_static() {

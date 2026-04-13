@@ -101,18 +101,13 @@ pub(super) async fn init_storage(
     .map_err(|e| format!("notes migration failed: {e}"))?;
     let note_repo = NoteRepo::new(notes_pool);
 
-    // Run tasks feature migrations.
+    // Run entity-store feature migrations.
     StoragePool::run_feature_migrations(
         storage_pool.inner(),
-        &[tools_core::FeatureMigration {
-            feature_name: "tasks".to_string(),
-            version: 1,
-            description: "Create agentic task tables".to_string(),
-            sql: feature_tasks::TasksFeature::migration_sql().to_string(),
-        }],
+        &entity_store::EntityStoreFeature::migrations(),
     )
     .await
-    .map_err(|e| format!("tasks migration failed: {e}"))?;
+    .map_err(|e| format!("entity-store migration failed: {e}"))?;
 
     // Run language-learning feature migrations.
     StoragePool::run_feature_migrations(
@@ -121,14 +116,6 @@ pub(super) async fn init_storage(
     )
     .await
     .map_err(|e| format!("language-learning migration failed: {e}"))?;
-
-    // Run finance feature migrations.
-    StoragePool::run_feature_migrations(
-        storage_pool.inner(),
-        &feature_finance::FinanceFeature::migrations_static(),
-    )
-    .await
-    .map_err(|e| format!("finance migration failed: {e}"))?;
 
     // 3. Create LLM provider (graceful — falls back to noop for setup wizard).
     // Use the "full" variant to get the inner ProviderManager (when a fallback is configured)

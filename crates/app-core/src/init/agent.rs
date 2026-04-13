@@ -41,6 +41,7 @@ pub(super) async fn init_agent(
     hot_config: Arc<RwLock<config::HotConfig>>,
     context_update_queue: Option<Arc<bus::ContextUpdateQueue>>,
     embedding_engine: Option<Arc<tools::EmbeddingEngine>>,
+    entity_store: Option<Arc<entity_store::store::EntityStore>>,
 ) -> Result<AgentResult, String> {
     // 7. Load personas
     let data_dir = config.data_dir_path();
@@ -109,6 +110,10 @@ pub(super) async fn init_agent(
 
     if let Some(queue) = context_update_queue {
         builder = builder.with_context_update_queue(queue);
+    }
+
+    if let Some(store) = entity_store {
+        builder = builder.with_entity_store(store);
     }
 
     let mut agent_loop_raw = builder

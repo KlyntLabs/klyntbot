@@ -1,0 +1,50 @@
+{
+  "name": "Task Management",
+  "description": "Personal task tracking with priorities, deadlines, and focus management",
+  "icon": "✓",
+  "version": "1.0.0",
+  "databases": [
+    {
+      "name": "Tasks",
+      "slug": "tasks",
+      "fields": [
+        { "name": "Title", "slug": "title", "type": "text", "required": true },
+        { "name": "Description", "slug": "description", "type": "text" },
+        { "name": "Status", "slug": "status", "type": "select", "options": ["todo", "doing", "done", "someday"] },
+        { "name": "Priority", "slug": "priority", "type": "select", "options": ["low", "medium", "high", "urgent"] },
+        { "name": "Due Date", "slug": "due_date", "type": "date" },
+        { "name": "Tags", "slug": "tags", "type": "multi_select" },
+        { "name": "Energy Level", "slug": "energy_level", "type": "select", "options": ["low", "medium", "high", "deep"] },
+        { "name": "Estimated Minutes", "slug": "estimated_minutes", "type": "number" },
+        { "name": "Actual Minutes", "slug": "actual_minutes", "type": "number" },
+        { "name": "Parent", "slug": "parent_id", "type": "relation", "target": "self" }
+      ],
+      "views": [
+        { "name": "All Tasks", "viewType": "table", "is_default": true },
+        { "name": "Board", "viewType": "board", "config": { "groupBy": "status" } },
+        { "name": "Calendar", "viewType": "calendar", "config": { "calendarField": "due_date" } }
+      ]
+    }
+  ],
+  "relations": [],
+  "dashboards": [
+    {
+      "name": "Task Overview",
+      "widgets": [
+        {
+          "widgetType": "count",
+          "databaseSlug": "tasks",
+          "config": { "title": "Open Tasks", "filters": [{ "field": "status", "op": "neq", "value": "done" }] },
+          "position": { "row": 0, "col": 0, "width": 1, "height": 1 }
+        },
+        {
+          "widgetType": "chart_pie",
+          "databaseSlug": "tasks",
+          "config": { "title": "By Priority", "groupBy": "priority" },
+          "position": { "row": 0, "col": 1, "width": 2, "height": 1 }
+        }
+      ]
+    }
+  ],
+  "skill_dir": "skill/"
+}

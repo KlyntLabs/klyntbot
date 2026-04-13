@@ -282,11 +282,6 @@ mod tests {
         storage::StoragePool::run_feature_migrations(&inner, &cognitive::cognitive_migrations())
             .await
             .expect("cognitive migrations");
-        // Run feature-tasks migration so task INSERTs succeed.
-        sqlx::query(feature_tasks::TasksFeature::migration_sql())
-            .execute(&inner)
-            .await
-            .expect("tasks migration");
         // Seed parent rows for FK constraints.
         sqlx::query(
             "INSERT OR IGNORE INTO areas (id, name, color, status) \

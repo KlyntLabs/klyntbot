@@ -104,14 +104,6 @@ pub struct AppCore {
     pub entity_store: Option<Arc<entity_store::store::EntityStore>>,
     /// Launcher search engine (None when launcher feature is disabled).
     pub launcher_engine: Option<Arc<LauncherSearchEngine>>,
-    /// Proactive suggestion handler (None when tasks AI is not configured).
-    pub proactive_handler: Option<Arc<dyn feature_tasks::ProactiveHandler>>,
-    /// Suggestion applier handler (None when tasks AI is not configured).
-    pub suggestion_applier: Option<Arc<dyn feature_tasks::SuggestionApplier>>,
-    /// Decomposition handler (None when tasks AI is not configured).
-    pub decomposition_handler: Option<Arc<dyn feature_tasks::DecompositionHandler>>,
-    /// Forecast handler (None when tasks AI is not configured).
-    pub forecast_handler: Option<Arc<dyn feature_tasks::ForecastHandler>>,
     /// Insight service for versioned insight reviews (None when cognitive feature unavailable).
     pub insight_service: Option<Arc<feature_insights::InsightService>>,
     /// Flashcard repo for FSRS spaced repetition (None when cognitive feature unavailable).
@@ -357,36 +349,6 @@ impl AppCore {
         self.voice_conversation_manager.as_ref().ok_or_else(|| {
             ApiError::new("VOICE_NOT_AVAILABLE", "Voice conversation not initialized")
         })
-    }
-
-    /// Return proactive handler or a "not initialized" error.
-    pub fn proactive_handler(&self) -> Result<&dyn feature_tasks::ProactiveHandler, ApiError> {
-        self.proactive_handler
-            .as_deref()
-            .ok_or_else(|| ApiError::new("INTERNAL", "ProactiveHandler not initialized"))
-    }
-
-    /// Return suggestion applier or a "not initialized" error.
-    pub fn suggestion_applier(&self) -> Result<&dyn feature_tasks::SuggestionApplier, ApiError> {
-        self.suggestion_applier
-            .as_deref()
-            .ok_or_else(|| ApiError::new("INTERNAL", "SuggestionApplier not initialized"))
-    }
-
-    /// Return decomposition handler or a "not initialized" error.
-    pub fn decomposition_handler(
-        &self,
-    ) -> Result<&dyn feature_tasks::DecompositionHandler, ApiError> {
-        self.decomposition_handler
-            .as_deref()
-            .ok_or_else(|| ApiError::new("INTERNAL", "DecompositionHandler not initialized"))
-    }
-
-    /// Return forecast handler or a "not initialized" error.
-    pub fn forecast_handler(&self) -> Result<&dyn feature_tasks::ForecastHandler, ApiError> {
-        self.forecast_handler
-            .as_deref()
-            .ok_or_else(|| ApiError::new("INTERNAL", "ForecastHandler not initialized"))
     }
 
     /// Cross-domain check from string domain name (used by Tauri commands).

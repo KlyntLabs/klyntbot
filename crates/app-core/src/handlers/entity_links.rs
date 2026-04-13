@@ -5,7 +5,7 @@ use storage::EntityLinkRow;
 use tracing::warn;
 
 use super::project_sources::source_row_to_response;
-use super::tasks::priority_label;
+use super::task_converters::priority_label;
 
 use crate::errors::map_storage_err;
 use crate::state::{AppCore, HandlerResult};

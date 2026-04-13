@@ -16,7 +16,7 @@ members = [
     "crates/storage",
     "crates/tools-core",
     "crates/tools-core-macros",
-    "crates/feature-finance",
+
     "crates/analytics",
     "crates/plugin-runtime",
     "crates/mcp",
@@ -29,10 +29,8 @@ members = [
     "crates/feature-insights",
     "crates/app-core",
     "crates/activity-log",
-    "crates/feature-tasks",
     "crates/feature-launcher",
     "crates/klyntbot-server",
-    "crates/feature-learning",
     "crates/platform-macos",
     "crates/autotuner",
     "crates/simulator",
@@ -64,7 +62,7 @@ context_engine = { path = "crates/context_engine" }
 storage = { path = "crates/storage" }
 tools-core = { path = "crates/tools-core" }
 tools-core-macros = { path = "crates/tools-core-macros" }
-feature-finance = { path = "crates/feature-finance" }
+
 feature-notes = { path = "crates/feature-notes" }
 feature-productivity = { path = "crates/feature-productivity" }
 plugin-runtime = { path = "crates/plugin-runtime" }
@@ -75,9 +73,7 @@ desktop-shared = { path = "crates/desktop-shared" }
 desktop = { path = "crates/desktop" }
 app-core = { path = "crates/app-core" }
 activity-log = { path = "crates/activity-log" }
-feature-tasks = { path = "crates/feature-tasks" }
 feature-launcher = { path = "crates/feature-launcher" }
-feature-learning = { path = "crates/feature-learning" }
 klyntbot-server = { path = "crates/klyntbot-server" }
 platform-macos = { path = "crates/platform-macos" }
 autotuner = { path = "crates/autotuner" }
@@ -209,7 +205,6 @@ chrono.workspace = true
 tokio.workspace = true
 tokio-util.workspace = true
 uuid.workspace = true
-feature-finance.workspace = true
 plugin-runtime.workspace = true
 tools-core.workspace = true
 extism.workspace = true

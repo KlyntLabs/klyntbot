@@ -176,13 +176,11 @@ fn default_localhost() -> String {
 }
 fn default_exposed_tools() -> Vec<String> {
     [
-        "tasks",
         "project",
         "area",
         "notes",
         "memory",
         "okr",
-        "finance",
         "productivity",
         "work_context",
         "agent",

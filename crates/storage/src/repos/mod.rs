@@ -6,7 +6,6 @@ pub mod brain_signal;
 pub mod coaching_intervention_log;
 pub mod coaching_strategy;
 pub mod cron;
-pub mod custom_column;
 pub mod decision_log;
 pub mod dnd_override;
 pub mod entity_link_repo;
@@ -51,7 +50,6 @@ pub use brain_signal::{BrainSignalFeedbackRepo, BrainSignalFeedbackRow};
 pub use coaching_intervention_log::{CoachingInterventionLogRepo, InterventionLogRow};
 pub use coaching_strategy::{CoachingStrategyRepo, CoachingStrategyRow, UpsertCoachingStrategy};
 pub use cron::CronRepo;
-pub use custom_column::CustomColumnRepo;
 pub use decision_log::DecisionLogRepo;
 pub use dnd_override::{DndOverrideRepo, DndOverrideRow};
 pub use entity_link_repo::EntityLinkRepo;
@@ -139,7 +137,6 @@ pub struct Repos {
     pub interaction_log: InteractionLogRepo,
     pub status_workflows: StatusWorkflowRepo,
     pub task_groups: TaskGroupRepo,
-    pub custom_columns: CustomColumnRepo,
     pub entity_links: EntityLinkRepo,
     pub project_sources: ProjectSourceRepo,
     pub tasks: TaskRepo,
@@ -172,7 +169,6 @@ impl Repos {
             interaction_log: InteractionLogRepo::new(db.clone()),
             status_workflows: StatusWorkflowRepo::new(db.clone()),
             task_groups: TaskGroupRepo::new(db.clone()),
-            custom_columns: CustomColumnRepo::new(db.clone()),
             entity_links: EntityLinkRepo::new(db.clone()),
             project_sources: ProjectSourceRepo::new(db.clone()),
             tasks: TaskRepo::new(db.clone()),

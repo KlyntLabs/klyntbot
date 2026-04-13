@@ -25,8 +25,8 @@ pub use vector_store::{sanitize_predicate_value, CognitiveFactParams, VectorStor
 pub use repos::{DndOverrideRepo, DndOverrideRow};
 
 // ── Actions / Tasks / Projects ──────────────────────────────────────
-pub use repos::{CustomColumnRepo, ItemSummary, TaskGroupRepo};
 pub use repos::{EntityLinkRepo, ProjectSourceRepo};
+pub use repos::{ItemSummary, TaskGroupRepo};
 pub use repos::{ProjectFilter, ProjectPatch, ProjectRepo, ProjectWithStats};
 pub use repos::{TaskFilter, TaskPatch, TaskRepo, TaskSummary, TimeEntryWithTask};
 
@@ -69,7 +69,6 @@ pub use repos::{
 pub use rows::agent_task::AgentTaskRow;
 pub use rows::area::AreaRow;
 pub use rows::cron::CronJobRow;
-pub use rows::custom_column::{CustomColumnRow, CustomColumnValueRow};
 pub use rows::entity_link::EntityLinkRow;
 pub use rows::finance::FinanceInvestmentTxRow;
 pub use rows::key_result::KeyResultRow;

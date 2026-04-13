@@ -3,7 +3,6 @@
 export type {
   ApiError,
   AppInfoResponse,
-  ColumnType,
   CronJob,
   CronJobCreateParams,
   CronJobState,
@@ -90,12 +89,6 @@ export type {
   Area,
   AreaCreateParams,
   AreaUpdateParams,
-  ColumnCreateParams,
-  ColumnReorderParams,
-  ColumnUpdateParams,
-  ColumnValueSetParams,
-  CustomColumn,
-  CustomColumnValue,
   KeyResult,
   KeyResultCreateParams,
   KeyResultUpdateParams,
@@ -111,35 +104,6 @@ export type {
   TaskUpdateParams,
   TodayTask,
 } from "./tasks";
-
-// ── Finance Types ─────────────────────────────────────────
-
-export type {
-  DailySpending,
-  FinanceAccount,
-  FinanceAccountCreateParams,
-  FinanceAllocationTarget,
-  FinanceAllocationTargetUpsertParams,
-  FinanceBudgetCreateParams,
-  FinanceBudgetUsage,
-  FinanceCategoryReport,
-  FinanceDailySpendingResponse,
-  FinanceGoal,
-  FinanceGoalCreateParams,
-  FinanceInvestment,
-  FinanceInvestmentCreateParams,
-  FinanceInvestmentTx,
-  FinanceInvestmentTxCreateParams,
-  FinanceLiability,
-  FinanceLiabilityCreateParams,
-  FinanceNetWorth,
-  FinancePeriodSummary,
-  FinancePortfolio,
-  FinancePortfolioCreateParams,
-  FinanceTransaction,
-  FinanceTransactionCreateParams,
-  FinanceTrendPoint,
-} from "./finance";
 
 // ── Productivity Types ────────────────────────────────────
 

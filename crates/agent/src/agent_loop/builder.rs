@@ -773,13 +773,6 @@ impl AgentLoopBuilder {
                 context_engine::InsightForge::new(forge_config, decomposer, Arc::clone(&retriever));
 
             // Register domain searchers
-            forge.add_searcher(Arc::new(crate::domain_searchers::TaskSearcher::new(
-                repos.clone(),
-            )));
-            forge.add_searcher(Arc::new(crate::domain_searchers::FinanceSearcher::new(
-                repos.clone(),
-            )));
-
             if let Some(ref store) = self.entity_store {
                 forge.add_searcher(Arc::new(crate::domain_searchers::DatabaseSearcher::new(
                     Arc::clone(store),
@@ -910,27 +903,6 @@ impl AgentLoopBuilder {
                             }
                         });
                         info!("CommunityBuilder subscriber started");
-
-                        // FinanceTreeBuilder subscriber (event-driven finance tree + LanceDB embed)
-                        let finance_tree_builder = Arc::new(
-                            crate::adapters::finance_tree_builder::FinanceTreeBuilder::new(
-                                tree_repo.clone(),
-                                Arc::new(vs.clone()),
-                                text_embedder.clone(),
-                                self.context_update_queue.clone(),
-                                self.domain_event_bus.clone(),
-                            ),
-                        );
-                        let finance_tree_rx = domain_bus.subscribe();
-                        let finance_tree_shutdown = tree_builder_parent_token.child_token();
-                        let _finance_tree_handle = tokio::spawn({
-                            let builder = Arc::clone(&finance_tree_builder);
-                            let shutdown = finance_tree_shutdown.clone();
-                            async move {
-                                builder.run(finance_tree_rx, shutdown).await;
-                            }
-                        });
-                        info!("FinanceTreeBuilder subscriber started");
 
                         // ProductivityTreeBuilder subscriber (event-driven productivity tree + LanceDB embed)
                         let productivity_tree_builder =
@@ -1263,61 +1235,14 @@ impl AgentLoopBuilder {
         // Outputs for MemoryTool — populated inside the pool block if embedding is enabled
         let todo_embedding_handler: Option<Arc<dyn tools::EmbeddingHandler>>;
 
-        // ── Feature-tasks tool (requires real pool) ───────────────────────
+        // ── Pool-dependent tools ─────────────────────────────────────────
         if self.pool.is_some() {
-            let pool_ref = storage_pool.inner();
-            let task_repo = storage::TaskRepo::new(pool_ref.clone());
-            let task_repo_for_handlers = task_repo.clone();
-            let area_repo = storage::AreaRepo::new(pool_ref.clone());
-            let mut task_tool = feature_tasks::TaskTool::new(
-                task_repo,
-                config.todo.focus.max_slots,
-                config.todo.focus.deadline_hours,
-                config.timezone.clone(),
-            )
-            .with_area_repo(area_repo);
-
-            // Set enrichment threshold from config
-            task_tool =
-                task_tool.with_enrichment_threshold(config.todo.enrichment.auto_apply_threshold);
-
-            // Enrichment engine — directly implements feature_tasks::EnrichmentHandler
-            if config.todo.enrichment.enabled {
-                let mut enrichment_engine =
-                    super::super::enrichment::EnrichmentEngine::new(config.todo.enrichment.clone());
-                if config.todo.enrichment.use_llm {
-                    enrichment_engine = enrichment_engine
-                        .with_provider(provider.clone(), config.agents.defaults.model.clone());
-                }
-                let enrichment_engine = Arc::new(enrichment_engine);
-                task_tool = task_tool.with_enrichment_handler(
-                    enrichment_engine as Arc<dyn feature_tasks::EnrichmentHandler>,
-                );
-            }
-
-            // Task embedding (semantic search)
+            // Task embedding for MemoryTool semantic search
             if let (true, Some(vs)) = (config.todo.search.enabled, self.vector_store.clone()) {
-                let task_embed_impl =
-                    Arc::new(crate::adapters::task_embedding::TaskEmbeddingAdapter::new(
-                        Arc::clone(&embedding_engine),
-                        vs.clone(),
-                    ));
-
                 let memory_embed_impl = Arc::new(tools::EmbeddingEngineImpl::new(
                     Arc::clone(&embedding_engine),
-                    vs.clone(),
+                    vs,
                 ));
-
-                task_tool = task_tool
-                    .with_embedding_handler(
-                        Arc::clone(&task_embed_impl) as Arc<dyn feature_tasks::EmbeddingHandler>
-                    )
-                    .with_embedding_store(vs)
-                    .with_search_config(
-                        config.todo.search.semantic_threshold,
-                        config.todo.search.rrf_k,
-                    );
-
                 todo_embedding_handler =
                     Some(Arc::clone(&memory_embed_impl) as Arc<dyn tools::EmbeddingHandler>);
             } else {
@@ -1331,69 +1256,8 @@ impl AgentLoopBuilder {
                     repos.objectives.clone(),
                     repos.tasks.clone(),
                 ));
-            task_tool = task_tool.with_progress_handler(Arc::clone(&progress_handler));
 
-            // Wire DomainEventBus for task lifecycle events
-            if let Some(ref domain_bus) = self.domain_event_bus {
-                task_tool = task_tool.with_domain_bus(Arc::clone(domain_bus));
-            }
-
-            // ── Phase 2: Agentic Intelligence handlers ────────────────────
-            let decomp_handler = Arc::new(crate::handlers::LlmDecompositionHandler::new(
-                provider.clone(),
-                config.agents.defaults.model.clone(),
-                task_repo_for_handlers.clone(),
-                self.domain_event_bus.clone(),
-            ));
-            task_tool = task_tool.with_decomposition_handler(
-                decomp_handler as Arc<dyn feature_tasks::DecompositionHandler>,
-            );
-
-            let exec_handler = Arc::new(crate::handlers::LlmTaskExecutionHandler::new(
-                task_repo_for_handlers.clone(),
-                self.domain_event_bus.clone(),
-            ));
-            task_tool = task_tool.with_execution_handler(
-                exec_handler as Arc<dyn feature_tasks::TaskExecutionHandler>,
-            );
-
-            let plan_handler = Arc::new(crate::handlers::LlmDayPlanningHandler::new(
-                provider.clone(),
-                config.agents.defaults.model.clone(),
-                self.domain_event_bus.clone(),
-            ));
-            task_tool = task_tool
-                .with_planning_handler(plan_handler as Arc<dyn feature_tasks::DayPlanningHandler>);
-
-            // ── Phase 3: Proactive Ecosystem handlers ───────────────────────
-            let proactive_handler = Arc::new(crate::handlers::LlmProactiveHandler::new(
-                provider.clone(),
-                config.agents.defaults.model.clone(),
-                task_repo_for_handlers.clone(),
-                feature_tasks::TasksConfig::default(),
-            ));
-            task_tool = task_tool.with_proactive_handler(
-                proactive_handler as Arc<dyn feature_tasks::ProactiveHandler>,
-            );
-
-            let suggestion_applier = Arc::new(crate::handlers::TaskSuggestionApplier::new(
-                task_repo_for_handlers.clone(),
-            ));
-            task_tool = task_tool.with_suggestion_applier(
-                suggestion_applier as Arc<dyn feature_tasks::SuggestionApplier>,
-            );
-
-            let forecast_handler = Arc::new(crate::handlers::LlmForecastHandler::new(
-                provider.clone(),
-                config.agents.defaults.model.clone(),
-                task_repo_for_handlers,
-            ));
-            task_tool = task_tool
-                .with_forecast_handler(forecast_handler as Arc<dyn feature_tasks::ForecastHandler>);
-
-            tool_registry.register(task_tool);
-
-            // ── OKR tool (needs same progress handler) ────────────────────
+            // ── OKR tool (needs progress handler) ────────────────────────
             tool_registry.register(
                 OkrTool::new(repos.objectives.clone(), repos.key_results.clone())
                     .with_progress_handler(Arc::clone(&progress_handler)),
@@ -1455,49 +1319,6 @@ impl AgentLoopBuilder {
                     memory_tool.with_enhancement_trace_store(Arc::clone(&latest_enhancement_trace));
 
                 tool_registry.register(memory_tool);
-            }
-        }
-
-        // ── Finance tool (requires real pool) ─────────────────────────────
-        if let Some(pool) = &self.pool {
-            if config.finance.enabled {
-                let cache_ttl = config.finance.price_refresh.cache_ttl_minutes;
-                let finance_storage = storage::FinanceStorage::from_pool(pool);
-                let rate_cache = feature_finance::rate_cache::RateCache::new(
-                    finance_storage.exchange_rates.clone(),
-                    i64::from(cache_ttl),
-                );
-                let mut price_service =
-                    feature_finance::PriceService::with_rate_cache(cache_ttl, rate_cache.clone());
-
-                // Apply config exchange rate overrides
-                if let Some(ref overrides) = config.finance.exchange_rates {
-                    price_service.set_exchange_rate_overrides(overrides.clone());
-                }
-
-                let finance_handler_impl =
-                    Arc::new(crate::adapters::finance::FinanceHandlerImpl::new(
-                        repos.clone(),
-                        price_service.clone(),
-                        config.finance.clone(),
-                    ));
-
-                let mut finance_tool = feature_finance::FinanceTool::new(
-                    finance_storage,
-                    price_service,
-                    config.finance.default_currency.clone(),
-                )
-                .with_rate_cache(rate_cache)
-                .with_finance_handler(
-                    Arc::clone(&finance_handler_impl) as Arc<dyn feature_finance::FinanceHandler>
-                );
-
-                // Wire DomainEventBus for transaction and budget events
-                if let Some(ref domain_bus) = self.domain_event_bus {
-                    finance_tool = finance_tool.with_domain_bus(Arc::clone(domain_bus));
-                }
-
-                tool_registry.register(finance_tool);
             }
         }
 
@@ -1669,15 +1490,6 @@ impl AgentLoopBuilder {
         } else {
             None
         };
-
-        // ── Recurring task spawner ────────────────────────────────────────
-        let mut recurring_spawner = super::super::RecurringTaskSpawner::new(
-            repos.tasks.clone(),
-            config.timezone.clone(),
-            std::time::Duration::from_secs(60),
-        );
-        recurring_spawner.start();
-        let recurring_task_spawner = Some(Arc::new(RwLock::new(recurring_spawner)));
 
         // ── Learning service ──────────────────────────────────────────────
         let learning_service = if let Some(ref store) = outcome_store {
@@ -1938,7 +1750,6 @@ impl AgentLoopBuilder {
             running: Arc::new(AtomicBool::new(false)),
             last_active_channel: self.notification_handle,
             reminder_engine,
-            recurring_task_spawner,
             _notification_dispatcher: notification_dispatcher,
             conversation_recall_handler,
             learning_service,

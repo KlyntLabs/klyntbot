@@ -308,16 +308,6 @@ impl AgentHarness {
     ) {
         let repos = storage::Repos::from_pool(pool);
 
-        // Tasks tool (wired directly, not via FeaturePackage)
-        let task_tool = feature_tasks::TaskTool::new(
-            repos.tasks.clone(),
-            3,  // max_focus_slots
-            24, // focus_deadline_hours
-            "UTC".to_string(),
-        )
-        .with_area_repo(repos.areas.clone());
-        registry.register(task_tool);
-
         // OKR tool
         registry.register(tools::OkrTool::new(
             repos.objectives.clone(),
@@ -341,16 +331,6 @@ impl AgentHarness {
         // Notes tool
         let note_repo = feature_notes::repo::NoteRepo::new(inner_pool.clone());
         registry.register(feature_notes::tool::NotesTool::new(note_repo));
-
-        // Finance tool (simplified — no price service in simulation)
-        let finance_storage = storage::FinanceStorage::from_pool(inner_pool);
-        let finance_tool = feature_finance::FinanceTool::new(
-            finance_storage,
-            feature_finance::PriceService::new(60),
-            "VND".to_string(),
-        )
-        .with_domain_bus(Arc::clone(bus));
-        registry.register(finance_tool);
 
         // Work context tool
         registry.register(activity_log::WorkContextTool::new(pool.clone()));

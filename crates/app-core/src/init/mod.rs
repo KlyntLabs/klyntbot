@@ -151,14 +151,48 @@ impl AppCore {
             let _ = repos.dnd_override.clear().await;
         }
 
+        // ── Entity store + default templates ─────────────────────────────
+        let entity_store = {
+            let store = entity_store::store::EntityStore::new(storage_pool.inner().clone())
+                .with_event_bus(Arc::clone(&domain_event_bus));
+            let store = Arc::new(store);
+
+            // Install default templates on first run (empty databases table).
+            match store.list_databases().await {
+                Ok(dbs) if dbs.is_empty() => {
+                    info!("first run detected — installing default templates");
+                    let task_manifest: entity_store::templates::TemplateManifest =
+                        serde_json::from_str(include_str!(
+                            "../../../../templates/task-management/manifest.json"
+                        ))
+                        .expect("task-management manifest is valid JSON");
+                    if let Err(e) =
+                        entity_store::templates::install_template(&store, &task_manifest).await
+                    {
+                        warn!("failed to install task-management template: {e}");
+                    }
+                    let finance_manifest: entity_store::templates::TemplateManifest =
+                        serde_json::from_str(include_str!(
+                            "../../../../templates/finance/manifest.json"
+                        ))
+                        .expect("finance manifest is valid JSON");
+                    if let Err(e) =
+                        entity_store::templates::install_template(&store, &finance_manifest).await
+                    {
+                        warn!("failed to install finance template: {e}");
+                    }
+                }
+                Ok(_) => {}
+                Err(e) => warn!("failed to check entity databases: {e}"),
+            }
+
+            Some(store)
+        };
+
         // ── Phase 2: Cron ────────────────────────────────────────────────
         let cron::CronResult {
             cron_service,
             notification_dispatcher,
-            proactive_handler,
-            suggestion_applier,
-            decomposition_handler,
-            forecast_handler,
             autotuner,
         } = cron::init_cron(
             &config,
@@ -168,7 +202,6 @@ impl AppCore {
             cognitive_provider.clone(),
             provider.clone(),
             &domain_event_bus,
-            feature_tasks::TasksConfig::default(),
             vector_store.clone(),
         )
         .await?;
@@ -280,6 +313,7 @@ impl AppCore {
             Arc::clone(&hot_config),
             Some(Arc::clone(&context_update_queue)),
             appcore_embedding_engine.clone(),
+            entity_store.clone(),
         )
         .await?;
 
@@ -629,12 +663,8 @@ impl AppCore {
             note_embedding_handler,
             embedding_engine: appcore_embedding_engine,
             vector_store: appcore_vector_store,
-            entity_store: None,
+            entity_store,
             launcher_engine,
-            proactive_handler,
-            suggestion_applier,
-            decomposition_handler,
-            forecast_handler,
             insight_service: {
                 let insight_repo =
                     feature_insights::InsightReviewRepo::new(storage_pool.inner().clone());

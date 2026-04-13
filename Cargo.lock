@@ -71,11 +71,9 @@ dependencies = [
  "dirs",
  "entity-store",
  "feature-coaching",
- "feature-finance",
  "feature-language-learning",
  "feature-notes",
  "feature-productivity",
- "feature-tasks",
  "futures-util",
  "mcp",
  "mime_guess",
@@ -311,14 +309,11 @@ dependencies = [
  "dirs",
  "entity-store",
  "feature-coaching",
- "feature-finance",
  "feature-insights",
  "feature-language-learning",
  "feature-launcher",
- "feature-learning",
  "feature-notes",
  "feature-productivity",
- "feature-tasks",
  "futures-util",
  "notify",
  "notify-debouncer-mini",
@@ -4669,30 +4664,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "feature-finance"
-version = "0.1.0"
-dependencies = [
- "analytics",
- "async-trait",
- "bus",
- "chrono",
- "common",
- "dashmap",
- "reqwest 0.13.2",
- "rust_decimal",
- "serde",
- "serde_json",
- "sqlx",
- "storage",
- "tempfile",
- "tokio",
- "tools-core",
- "tracing",
- "urlencoding",
- "uuid",
-]
-
-[[package]]
 name = "feature-insights"
 version = "0.1.0"
 dependencies = [
@@ -4764,17 +4735,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "feature-learning"
-version = "0.1.0"
-dependencies = [
- "common",
- "serde",
- "serde_json",
- "tokio",
- "tracing",
-]
-
-[[package]]
 name = "feature-notes"
 version = "0.1.0"
 dependencies = [
@@ -4813,27 +4773,6 @@ dependencies = [
  "tokio",
  "tokio-util",
  "tools-core",
- "tracing",
- "uuid",
-]
-
-[[package]]
-name = "feature-tasks"
-version = "0.1.0"
-dependencies = [
- "async-trait",
- "bus",
- "chrono",
- "common",
- "futures-util",
- "rrule",
- "serde",
- "serde_json",
- "sqlx",
- "storage",
- "tokio",
- "tools-core",
- "tools-core-macros",
  "tracing",
  "uuid",
 ]
@@ -7085,7 +7024,6 @@ dependencies = [
  "entity-store",
  "extism",
  "feature-coaching",
- "feature-finance",
  "mcp",
  "plugin-runtime",
  "providers",
@@ -11226,19 +11164,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "4e27ee8bb91ca0adcf0ecb116293afa12d393f9c2b9b9cd54d33e8078fe19839"
 
 [[package]]
-name = "rrule"
-version = "0.14.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "720acfb4980b9d8a6a430f6d7a11933e701ebbeba5eee39cc9d8c5f932aaff74"
-dependencies = [
- "chrono",
- "chrono-tz",
- "log",
- "regex",
- "thiserror 2.0.18",
-]
-
-[[package]]
 name = "rsa"
 version = "0.9.10"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -12182,11 +12107,8 @@ dependencies = [
  "config",
  "context_engine",
  "feature-coaching",
- "feature-finance",
- "feature-learning",
  "feature-notes",
  "feature-productivity",
- "feature-tasks",
  "providers",
  "rand 0.9.2",
  "rand_chacha 0.9.0",

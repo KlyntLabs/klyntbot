@@ -1,0 +1,53 @@
+{
+  "name": "Finance",
+  "description": "Personal finance tracking — accounts, transactions, and budgets",
+  "icon": "💰",
+  "version": "1.0.0",
+  "databases": [
+    {
+      "name": "Accounts",
+      "slug": "accounts",
+      "fields": [
+        { "name": "Name", "slug": "name", "type": "text", "required": true },
+        { "name": "Type", "slug": "type", "type": "select", "options": ["checking", "savings", "credit", "investment", "cash"] },
+        { "name": "Balance", "slug": "balance", "type": "number" },
+        { "name": "Currency", "slug": "currency", "type": "select", "options": ["USD", "EUR", "GBP", "JPY", "AUD", "CAD"] },
+        { "name": "Institution", "slug": "institution", "type": "text" }
+      ],
+      "views": [
+        { "name": "All Accounts", "viewType": "table", "is_default": true }
+      ]
+    },
+    {
+      "name": "Transactions",
+      "slug": "transactions",
+      "fields": [
+        { "name": "Date", "slug": "date", "type": "date", "required": true },
+        { "name": "Amount", "slug": "amount", "type": "number", "required": true },
+        { "name": "Category", "slug": "category", "type": "select", "options": ["food", "transport", "housing", "utilities", "entertainment", "health", "shopping", "income", "transfer", "other"] },
+        { "name": "Description", "slug": "description", "type": "text" },
+        { "name": "Account", "slug": "account_id", "type": "relation" }
+      ],
+      "views": [
+        { "name": "All Transactions", "viewType": "table", "is_default": true },
+        { "name": "Calendar", "viewType": "calendar", "config": { "calendarField": "date" } }
+      ]
+    },
+    {
+      "name": "Budgets",
+      "slug": "budgets",
+      "fields": [
+        { "name": "Category", "slug": "category", "type": "select", "options": ["food", "transport", "housing", "utilities", "entertainment", "health", "shopping", "other"] },
+        { "name": "Monthly Limit", "slug": "monthly_limit", "type": "number", "required": true },
+        { "name": "Period", "slug": "period", "type": "select", "options": ["monthly", "weekly", "yearly"] }
+      ],
+      "views": [
+        { "name": "All Budgets", "viewType": "table", "is_default": true }
+      ]
+    }
+  ],
+  "relations": [
+    { "source_db_slug": "transactions", "target_db_slug": "accounts", "relation_type": "belongs_to" }
+  ],
+  "skill_dir": "skill/"
+}
