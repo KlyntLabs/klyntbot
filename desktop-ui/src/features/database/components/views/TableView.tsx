@@ -1,4 +1,5 @@
 import { FieldRenderer } from "@features/database/components/fields/FieldRenderer";
+import { getTitleField } from "@features/database/lib/schema-utils";
 import type { DatabaseSchema, Entity, SortRule } from "@shared/types";
 
 interface TableViewProps {
@@ -18,6 +19,7 @@ export function TableView({
   onSortChange,
   onEntityClick,
 }: TableViewProps) {
+  const titleField = getTitleField(schema);
   const columns =
     visibleFields && visibleFields.length > 0
       ? schema.fields.filter((f) => visibleFields.includes(f.slug) && !f.hidden)
@@ -38,49 +40,52 @@ export function TableView({
   const sortIndicator = (slug: string) => {
     const rule = sorts?.find((s) => s.field === slug);
     if (!rule) return null;
-    return rule.direction === "asc" ? " \u2191" : " \u2193";
+    return <span className="ml-1 text-brand">{rule.direction === "asc" ? "↑" : "↓"}</span>;
   };
 
   return (
-    <div className="overflow-x-auto">
-      <table className="w-full border-collapse text-sm">
-        <thead>
-          <tr className="border-b border-border">
+    <table className="w-full table-fixed text-sm">
+      <thead>
+        <tr className="border-b border-border">
+          {columns.map((field) => (
+            <th
+              key={field.id}
+              onClick={() => toggleSort(field.slug)}
+              className="overflow-hidden text-ellipsis whitespace-nowrap px-4 py-1.5 text-left text-xs font-light text-muted-foreground cursor-pointer hover:bg-accent select-none transition-colors"
+            >
+              {field.name}
+              {sortIndicator(field.slug)}
+            </th>
+          ))}
+        </tr>
+      </thead>
+      <tbody>
+        {entities.map((entity) => (
+          <tr
+            key={entity.id}
+            onClick={() => onEntityClick?.(entity)}
+            className="group border-b border-border/30 cursor-pointer hover:bg-accent transition-colors"
+          >
             {columns.map((field) => (
-              <th
+              <td
                 key={field.id}
-                onClick={() => toggleSort(field.slug)}
-                className="px-3 py-2 text-left text-xs font-medium text-muted uppercase tracking-wide cursor-pointer hover:bg-surface-hover select-none"
+                className={`overflow-hidden text-ellipsis whitespace-nowrap px-4 py-1.5 text-foreground ${
+                  titleField?.slug === field.slug ? "font-medium" : "font-light"
+                }`}
               >
-                {field.name}
-                {sortIndicator(field.slug)}
-              </th>
+                <FieldRenderer field={field} value={entity.fields[field.slug]} />
+              </td>
             ))}
           </tr>
-        </thead>
-        <tbody>
-          {entities.map((entity) => (
-            <tr
-              key={entity.id}
-              onClick={() => onEntityClick?.(entity)}
-              className="border-b border-border/50 cursor-pointer hover:bg-surface-hover transition-colors"
-            >
-              {columns.map((field) => (
-                <td key={field.id} className="px-3 py-2 max-w-[200px]">
-                  <FieldRenderer field={field} value={entity.fields[field.slug]} />
-                </td>
-              ))}
-            </tr>
-          ))}
-          {entities.length === 0 && (
-            <tr>
-              <td colSpan={columns.length} className="px-3 py-8 text-center text-muted">
-                No entities yet
-              </td>
-            </tr>
-          )}
-        </tbody>
-      </table>
-    </div>
+        ))}
+        {entities.length === 0 && (
+          <tr>
+            <td colSpan={columns.length} className="px-3 py-12 text-center text-muted-foreground">
+              No entities yet. Click <span className="text-brand">+ New</span> to create one.
+            </td>
+          </tr>
+        )}
+      </tbody>
+    </table>
   );
 }

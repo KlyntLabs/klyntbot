@@ -41,15 +41,19 @@ export function ViewShell({
 
   return (
     <div className="flex h-full flex-col">
-      {views.length > 0 && (
-        <ViewTabBar views={views} activeViewId={activeViewId} onViewSelect={setActiveViewId} />
-      )}
-      <ViewToolbar
-        searchQuery={searchQuery}
-        onSearchChange={onSearchChange}
-        onNewEntity={onNewEntity}
-        entityCount={totalCount}
-      />
+      <div className="shrink-0 px-12">
+        <div className="flex items-center gap-2">
+          {views.length > 0 && (
+            <ViewTabBar views={views} activeViewId={activeViewId} onViewSelect={setActiveViewId} />
+          )}
+        </div>
+        <ViewToolbar
+          searchQuery={searchQuery}
+          onSearchChange={onSearchChange}
+          onNewEntity={onNewEntity}
+          entityCount={totalCount}
+        />
+      </div>
       <div className="flex-1 overflow-y-auto">
         {activeView ? (
           <ActiveViewRenderer

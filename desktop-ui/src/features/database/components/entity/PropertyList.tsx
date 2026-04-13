@@ -16,7 +16,7 @@ export function PropertyList({ schema, entity, editing, onChange }: PropertyList
     <div className="space-y-3">
       {visibleFields.map((field) => (
         <div key={field.id} className="flex flex-col gap-1">
-          <span className="text-xs font-medium text-muted uppercase tracking-wide">
+          <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
             {field.name}
             {field.required && <span className="text-red-400 ml-0.5">*</span>}
           </span>

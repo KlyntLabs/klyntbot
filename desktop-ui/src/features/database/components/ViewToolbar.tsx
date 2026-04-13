@@ -1,3 +1,6 @@
+import { Button } from "@shared/ui/Button";
+import { Input } from "@shared/ui/Input";
+
 interface ViewToolbarProps {
   searchQuery: string;
   onSearchChange: (query: string) => void;
@@ -12,23 +15,20 @@ export function ViewToolbar({
   entityCount,
 }: ViewToolbarProps) {
   return (
-    <div className="flex items-center gap-3 border-b border-border px-4 py-2">
-      <input
-        type="text"
+    <div className="flex items-center gap-3 py-2">
+      <Input
         value={searchQuery}
         onChange={(e) => onSearchChange(e.target.value)}
-        placeholder="Search\u2026"
-        className="w-48 rounded border border-border bg-surface-base px-2 py-1 text-sm outline-none focus:border-accent"
+        placeholder="Filter…"
+        className="w-52"
       />
-      {entityCount != null && <span className="text-xs text-muted">{entityCount} items</span>}
+      {entityCount != null && (
+        <span className="text-xs text-muted-foreground tabular-nums">{entityCount} items</span>
+      )}
       <div className="flex-1" />
-      <button
-        type="button"
-        onClick={onNewEntity}
-        className="rounded bg-accent px-3 py-1 text-sm text-white hover:bg-accent/90"
-      >
+      <Button variant="primary" size="sm" onClick={onNewEntity}>
         + New
-      </button>
+      </Button>
     </div>
   );
 }
