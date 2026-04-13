@@ -1,6 +1,8 @@
 import { emitDatabaseUpdated } from "@features/database/lib/schema-utils";
 import { useMutation } from "@shared/hooks/useMutation";
 import type { DatabaseSchema, FieldDefinition, FieldType } from "@shared/types";
+import { Button } from "@shared/ui/Button";
+import { Input } from "@shared/ui/Input";
 import { useState } from "react";
 import { FieldTypeSelector } from "./FieldTypeSelector";
 
@@ -37,61 +39,77 @@ export function SchemaEditor({ schema, onClose }: SchemaEditorProps) {
   };
 
   return (
-    <div className="h-full w-80 overflow-y-auto border-l border-border bg-surface-base">
+    <div className="h-full w-80 overflow-y-auto border-l border-border bg-card">
       <div className="flex items-center justify-between border-b border-border px-4 py-3">
-        <h3 className="text-sm font-semibold">Properties</h3>
-        <button type="button" onClick={onClose} className="text-muted hover:text-foreground">
-          \u2715
+        <h3 className="text-[13px] font-semibold text-foreground">Properties</h3>
+        <button
+          type="button"
+          onClick={onClose}
+          className="rounded-md p-1 text-muted-foreground hover:bg-accent hover:text-foreground transition-colors cursor-pointer"
+        >
+          <svg
+            className="h-4 w-4"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+            strokeWidth={1.5}
+          >
+            <path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12" />
+          </svg>
         </button>
       </div>
-      <div className="space-y-1 p-3">
+      <div className="space-y-0.5 p-3">
         {schema.fields.map((field) => (
           <div
             key={field.id}
-            className="group flex items-center gap-2 rounded px-2 py-1.5 hover:bg-surface-hover"
+            className="group flex items-center gap-2 rounded-lg px-2.5 py-2 hover:bg-accent transition-colors"
           >
-            <span className="w-16 truncate text-xs text-muted">
-              {fieldTypeLabel(field.fieldType)}
+            <span className="w-5 shrink-0 text-center text-[13px] text-dim">
+              {fieldTypeIcon(field.fieldType)}
             </span>
-            <span className="flex-1 truncate text-sm">{field.name}</span>
+            <span className="flex-1 truncate text-[13px] text-foreground">{field.name}</span>
             {!field.aiManaged && (
               <button
                 type="button"
                 onClick={() => handleRemoveField(field.id)}
-                className="text-xs text-red-400 opacity-0 group-hover:opacity-100"
+                className="rounded p-0.5 text-muted-foreground opacity-0 transition-opacity hover:text-destructive group-hover:opacity-100 cursor-pointer"
               >
-                \u2715
+                <svg
+                  className="h-3.5 w-3.5"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                  strokeWidth={1.5}
+                >
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12" />
+                </svg>
               </button>
             )}
           </div>
         ))}
       </div>
       {addingField ? (
-        <div className="space-y-2 border-t border-border p-3">
-          <input
-            type="text"
+        <div className="space-y-2.5 border-t border-border p-3">
+          <Input
             value={newFieldName}
             onChange={(e) => setNewFieldName(e.target.value)}
             placeholder="Field name"
-            className="w-full rounded border border-border bg-surface-base px-2 py-1 text-sm outline-none focus:border-accent"
+            className="w-full"
           />
           <FieldTypeSelector value={newFieldType} onChange={setNewFieldType} />
           <div className="flex gap-2">
-            <button
-              type="button"
+            <Button
+              variant="primary"
+              size="sm"
               onClick={handleAddField}
-              disabled={loading || !newFieldName.trim()}
-              className="rounded bg-accent px-3 py-1 text-xs text-white hover:bg-accent/90 disabled:opacity-50"
+              loading={loading}
+              disabled={!newFieldName.trim()}
             >
               Add
-            </button>
-            <button
-              type="button"
-              onClick={() => setAddingField(false)}
-              className="rounded px-3 py-1 text-xs text-muted hover:bg-surface-hover"
-            >
+            </Button>
+            <Button variant="ghost" size="sm" onClick={() => setAddingField(false)}>
               Cancel
-            </button>
+            </Button>
           </div>
         </div>
       ) : (
@@ -99,9 +117,18 @@ export function SchemaEditor({ schema, onClose }: SchemaEditorProps) {
           <button
             type="button"
             onClick={() => setAddingField(true)}
-            className="w-full rounded px-3 py-1.5 text-left text-sm text-muted hover:bg-surface-hover"
+            className="flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-left text-[13px] text-muted-foreground hover:bg-accent hover:text-foreground transition-colors cursor-pointer"
           >
-            + Add property
+            <svg
+              className="h-3.5 w-3.5"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+              strokeWidth={1.5}
+            >
+              <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+            </svg>
+            Add property
           </button>
         </div>
       )}
@@ -109,24 +136,24 @@ export function SchemaEditor({ schema, onClose }: SchemaEditorProps) {
   );
 }
 
-function fieldTypeLabel(ft: FieldType): string {
-  const labels: Record<FieldType, string> = {
+function fieldTypeIcon(ft: FieldType): string {
+  const icons: Record<FieldType, string> = {
     text: "Aa",
     number: "#",
-    select: "\u25BE",
-    multi_select: "\u229E",
-    date: "\uD83D\uDCC5",
-    checkbox: "\u2611",
-    url: "\uD83D\uDD17",
-    email: "\u2709",
-    phone: "\uD83D\uDCDE",
-    relation: "\u2194",
-    rollup: "\u03A3",
-    formula: "\u0192",
-    created_time: "\u23F1",
-    last_edited: "\u270E",
-    files: "\uD83D\uDCCE",
-    person: "\uD83D\uDC64",
+    select: "▾",
+    multi_select: "⊞",
+    date: "◷",
+    checkbox: "☑",
+    url: "↗",
+    email: "✉",
+    phone: "☏",
+    relation: "↔",
+    rollup: "Σ",
+    formula: "ƒ",
+    created_time: "◷",
+    last_edited: "✎",
+    files: "⎘",
+    person: "⊙",
   };
-  return labels[ft] ?? ft;
+  return icons[ft] ?? ft;
 }

@@ -42,16 +42,16 @@ export function BoardView({
   }
 
   return (
-    <div className="flex gap-4 overflow-x-auto p-4">
+    <div className="flex gap-3 overflow-x-auto px-10 pt-3 pb-6">
       {columns.map((col) => {
         const items = groupedEntities.get(col) ?? [];
         return (
-          <div key={col} className="flex w-64 shrink-0 flex-col">
-            <div className="mb-2 flex items-center gap-2">
-              <h3 className="text-sm font-semibold">{col}</h3>
-              <span className="text-xs text-muted">{items.length}</span>
+          <div key={col} className="flex w-72 shrink-0 flex-col">
+            <div className="mb-2 flex items-center gap-2 px-1">
+              <h3 className="text-[13px] font-semibold text-foreground">{col}</h3>
+              <span className="text-[12px] text-foreground/55 tabular-nums">{items.length}</span>
             </div>
-            <div className="flex flex-1 flex-col gap-2">
+            <div className="flex flex-1 flex-col gap-2 rounded-lg bg-accent/20 p-2">
               {items.map((entity) => {
                 const title = getEntityTitle(schema, entity.fields);
                 return (
@@ -59,23 +59,24 @@ export function BoardView({
                     key={entity.id}
                     type="button"
                     onClick={() => onEntityClick?.(entity)}
-                    className="w-full cursor-pointer rounded-lg border border-border bg-surface-base p-3 text-left shadow-sm transition-colors hover:bg-surface-hover"
+                    className="w-full cursor-pointer rounded-md border border-border bg-background p-3 text-left shadow-sm transition-all hover:border-border/80 hover:shadow-md"
                   >
-                    <p className="mb-1 text-sm font-medium">{title}</p>
+                    <p className="mb-1.5 text-[13px] font-medium text-foreground leading-snug">
+                      {title}
+                    </p>
                     {displayFields.map((field) => (
-                      <div
-                        key={field.id}
-                        className="mt-1 flex items-center gap-1 text-xs text-muted"
-                      >
-                        <span className="shrink-0">{field.name}:</span>
-                        <FieldRenderer field={field} value={entity.fields[field.slug]} />
+                      <div key={field.id} className="mt-1.5 flex items-center gap-1.5 text-[12px]">
+                        <span className="shrink-0 text-foreground/55">{field.name}</span>
+                        <span className="min-w-0 text-foreground/85">
+                          <FieldRenderer field={field} value={entity.fields[field.slug]} />
+                        </span>
                       </div>
                     ))}
                   </button>
                 );
               })}
               {items.length === 0 && (
-                <div className="rounded-lg border border-dashed border-border p-4 text-center text-xs text-muted">
+                <div className="rounded-md border border-dashed border-border/60 p-4 text-center text-[12px] text-foreground/50">
                   No items
                 </div>
               )}

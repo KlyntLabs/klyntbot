@@ -45,66 +45,97 @@ export function CalendarView({ schema, entities, dateField, onEntityClick }: Cal
   }
 
   return (
-    <div className="p-4">
-      <div className="mb-4 flex items-center justify-between">
-        <button
-          type="button"
-          onClick={() => setCurrentMonth(subMonths(currentMonth, 1))}
-          className="rounded px-2 py-1 text-sm hover:bg-surface-hover"
-        >
-          &larr;
-        </button>
-        <h3 className="text-lg font-semibold">{format(currentMonth, "MMMM yyyy")}</h3>
-        <button
-          type="button"
-          onClick={() => setCurrentMonth(addMonths(currentMonth, 1))}
-          className="rounded px-2 py-1 text-sm hover:bg-surface-hover"
-        >
-          &rarr;
-        </button>
-      </div>
-      <div className="grid grid-cols-7 gap-px overflow-hidden rounded bg-border">
-        {["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].map((d) => (
-          <div
-            key={d}
-            className="bg-surface-base px-2 py-1 text-center text-xs font-medium text-muted"
+    <div className="flex h-full w-full flex-col px-10 pt-3 pb-6">
+      <div className="mb-3 flex shrink-0 items-center gap-2">
+        <h3 className="text-[15px] font-semibold text-foreground">
+          {format(currentMonth, "MMMM yyyy")}
+        </h3>
+        <div className="ml-auto flex items-center gap-1">
+          <button
+            type="button"
+            onClick={() => setCurrentMonth(subMonths(currentMonth, 1))}
+            className="rounded-md px-2 py-1 text-[13px] text-foreground/70 hover:bg-accent hover:text-foreground transition-colors"
           >
-            {d}
-          </div>
-        ))}
-        {days.map((day) => {
-          const key = format(day, "yyyy-MM-dd");
-          const dayEntities = entityByDate.get(key) ?? [];
-          const inMonth = isSameMonth(day, currentMonth);
-          return (
+            &larr;
+          </button>
+          <button
+            type="button"
+            onClick={() => setCurrentMonth(new Date())}
+            className="rounded-md px-2.5 py-1 text-[13px] text-foreground/70 hover:bg-accent hover:text-foreground transition-colors"
+          >
+            Today
+          </button>
+          <button
+            type="button"
+            onClick={() => setCurrentMonth(addMonths(currentMonth, 1))}
+            className="rounded-md px-2 py-1 text-[13px] text-foreground/70 hover:bg-accent hover:text-foreground transition-colors"
+          >
+            &rarr;
+          </button>
+        </div>
+      </div>
+      <div className="flex min-h-0 w-full flex-1 flex-col overflow-hidden rounded-lg border border-border">
+        <div className="grid shrink-0 grid-cols-7 border-b border-border bg-accent/20">
+          {["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].map((d) => (
             <div
-              key={key}
-              className={`min-h-[80px] bg-surface-base p-1 ${
-                !inMonth ? "opacity-40" : ""
-              } ${isToday(day) ? "ring-1 ring-accent ring-inset" : ""}`}
+              key={d}
+              className="px-2 py-1.5 text-center text-[11px] font-semibold uppercase tracking-wide text-foreground/60"
             >
-              <div className="mb-1 text-xs text-muted">{format(day, "d")}</div>
-              <div className="space-y-0.5">
-                {dayEntities.slice(0, 3).map((entity) => {
-                  const title = getEntityTitle(schema, entity.fields);
-                  return (
-                    <button
-                      key={entity.id}
-                      type="button"
-                      onClick={() => onEntityClick?.(entity)}
-                      className="w-full cursor-pointer truncate rounded bg-accent/10 px-1 py-0.5 text-left text-xs hover:bg-accent/20"
-                    >
-                      {title}
-                    </button>
-                  );
-                })}
-                {dayEntities.length > 3 && (
-                  <div className="text-xs text-muted">+{dayEntities.length - 3} more</div>
-                )}
-              </div>
+              {d}
             </div>
-          );
-        })}
+          ))}
+        </div>
+        <div
+          className="grid min-h-0 w-full flex-1 grid-cols-7 bg-border/60"
+          style={{ gridAutoRows: "minmax(100px, 1fr)", gap: "1px" }}
+        >
+          {days.map((day) => {
+            const key = format(day, "yyyy-MM-dd");
+            const dayEntities = entityByDate.get(key) ?? [];
+            const inMonth = isSameMonth(day, currentMonth);
+            const today = isToday(day);
+            return (
+              <div
+                key={key}
+                className={`flex flex-col bg-background p-1.5 ${
+                  !inMonth ? "bg-background/40" : ""
+                }`}
+              >
+                <div
+                  className={`mb-1 text-[12px] tabular-nums ${
+                    today
+                      ? "inline-flex h-5 w-5 items-center justify-center rounded-full bg-brand font-semibold text-primary-foreground"
+                      : inMonth
+                        ? "text-foreground/80"
+                        : "text-foreground/35"
+                  }`}
+                >
+                  {format(day, "d")}
+                </div>
+                <div className="flex flex-col gap-0.5">
+                  {dayEntities.slice(0, 3).map((entity) => {
+                    const title = getEntityTitle(schema, entity.fields);
+                    return (
+                      <button
+                        key={entity.id}
+                        type="button"
+                        onClick={() => onEntityClick?.(entity)}
+                        className="w-full cursor-pointer truncate rounded bg-brand/15 px-1.5 py-0.5 text-left text-[11px] font-medium text-foreground hover:bg-brand/25 transition-colors"
+                      >
+                        {title}
+                      </button>
+                    );
+                  })}
+                  {dayEntities.length > 3 && (
+                    <div className="px-1.5 text-[11px] text-foreground/55">
+                      +{dayEntities.length - 3} more
+                    </div>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
       </div>
     </div>
   );

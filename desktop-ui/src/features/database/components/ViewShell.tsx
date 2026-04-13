@@ -40,13 +40,12 @@ export function ViewShell({
   const activeView = views.find((v) => v.id === activeViewId) ?? views[0];
 
   return (
-    <div className="flex h-full flex-col">
-      <div className="shrink-0 px-12">
-        <div className="flex items-center gap-2">
-          {views.length > 0 && (
-            <ViewTabBar views={views} activeViewId={activeViewId} onViewSelect={setActiveViewId} />
-          )}
-        </div>
+    <div className="flex min-h-0 flex-1 flex-col">
+      {/* View tabs + toolbar with page-level horizontal padding */}
+      <div className="shrink-0 px-10">
+        {views.length > 0 && (
+          <ViewTabBar views={views} activeViewId={activeViewId} onViewSelect={setActiveViewId} />
+        )}
         <ViewToolbar
           searchQuery={searchQuery}
           onSearchChange={onSearchChange}
@@ -54,7 +53,9 @@ export function ViewShell({
           entityCount={totalCount}
         />
       </div>
-      <div className="flex-1 overflow-y-auto">
+
+      {/* Scrollable content — full bleed for table, padded for others */}
+      <div className="min-h-0 flex-1 overflow-y-auto">
         {activeView ? (
           <ActiveViewRenderer
             view={activeView}

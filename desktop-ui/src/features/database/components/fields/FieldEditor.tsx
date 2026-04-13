@@ -1,4 +1,5 @@
 import type { FieldDefinition } from "@shared/types";
+import { Input } from "@shared/ui/Input";
 
 interface FieldEditorProps {
   field: FieldDefinition;
@@ -14,36 +15,36 @@ export function FieldEditor({ field, value, onChange }: FieldEditorProps) {
     case "person":
     case "url":
       return (
-        <input
+        <Input
           type={field.fieldType === "email" ? "email" : field.fieldType === "url" ? "url" : "text"}
           value={String(value ?? "")}
           onChange={(e) => onChange(e.target.value)}
-          className="w-full rounded border border-border bg-surface-base px-2 py-1 text-sm outline-none focus:border-accent"
           placeholder={field.name}
+          className="w-full"
         />
       );
 
     case "number":
       return (
-        <input
+        <Input
           type="number"
           value={value != null ? Number(value) : ""}
           onChange={(e) => onChange(e.target.value ? Number(e.target.value) : null)}
-          className="w-full rounded border border-border bg-surface-base px-2 py-1 text-sm tabular-nums outline-none focus:border-accent"
           placeholder={field.name}
+          className="w-full tabular-nums"
         />
       );
 
     case "checkbox":
       return (
-        <label className="flex items-center gap-2 cursor-pointer">
+        <label className="flex items-center gap-2 cursor-pointer py-0.5">
           <input
             type="checkbox"
             checked={Boolean(value)}
             onChange={(e) => onChange(e.target.checked)}
-            className="rounded border-border"
+            className="h-4 w-4 rounded border-border accent-brand cursor-pointer"
           />
-          <span className="text-sm">{field.name}</span>
+          <span className="text-[13px] text-foreground">{field.name}</span>
         </label>
       );
 
@@ -55,11 +56,11 @@ export function FieldEditor({ field, value, onChange }: FieldEditorProps) {
 
     case "date":
       return (
-        <input
+        <Input
           type="date"
           value={dateToInputValue(value)}
           onChange={(e) => onChange(e.target.value ? new Date(e.target.value).toISOString() : null)}
-          className="w-full rounded border border-border bg-surface-base px-2 py-1 text-sm outline-none focus:border-accent"
+          className="w-full"
         />
       );
 
@@ -70,7 +71,7 @@ export function FieldEditor({ field, value, onChange }: FieldEditorProps) {
     case "last_edited":
     case "files":
       return (
-        <span className="text-muted text-sm italic">
+        <span className="text-muted-foreground text-[13px] italic">
           {field.fieldType === "created_time" || field.fieldType === "last_edited"
             ? "Auto-managed"
             : `${field.fieldType} (not editable inline)`}
@@ -79,12 +80,12 @@ export function FieldEditor({ field, value, onChange }: FieldEditorProps) {
 
     default:
       return (
-        <input
+        <Input
           type="text"
           value={String(value ?? "")}
           onChange={(e) => onChange(e.target.value)}
-          className="w-full rounded border border-border bg-surface-base px-2 py-1 text-sm outline-none focus:border-accent"
           placeholder={field.name}
+          className="w-full"
         />
       );
   }
@@ -104,7 +105,7 @@ function SelectEditor({
     <select
       value={String(value ?? "")}
       onChange={(e) => onChange(e.target.value || null)}
-      className="w-full rounded border border-border bg-surface-base px-2 py-1 text-sm outline-none focus:border-accent"
+      className="w-full rounded-lg border border-border bg-accent px-3 py-1.5 text-[13px] text-foreground outline-none transition-colors hover:border-border focus:border-brand/50 cursor-pointer"
     >
       <option value="">—</option>
       {options.map((opt) => (
@@ -134,16 +135,16 @@ function MultiSelectEditor({
   };
 
   return (
-    <div className="flex flex-wrap gap-1">
+    <div className="flex flex-wrap gap-1.5">
       {options.map((opt) => (
         <button
           key={opt}
           type="button"
           onClick={() => toggle(opt)}
-          className={`rounded-full px-2 py-0.5 text-xs font-medium transition-colors ${
+          className={`rounded-md px-2.5 py-1 text-[12px] font-medium transition-colors cursor-pointer ${
             selected.includes(opt)
-              ? "bg-accent text-white"
-              : "bg-surface-raised text-muted hover:bg-surface-hover"
+              ? "bg-brand/20 text-brand border border-brand/30"
+              : "bg-accent text-muted-foreground border border-border hover:text-foreground"
           }`}
         >
           {opt}

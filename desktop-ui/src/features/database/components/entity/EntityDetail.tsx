@@ -35,8 +35,25 @@ export function EntityDetail({ schema, entity, onClose }: EntityDetailProps) {
 
   return (
     <div className="flex h-full flex-col">
-      <div className="flex items-center justify-between border-b border-border px-4 py-3">
-        <h2 className="text-lg font-semibold text-foreground truncate">{title}</h2>
+      {/* Header */}
+      <div className="flex items-center justify-between border-b border-border px-5 py-3">
+        <div className="flex items-center gap-2 min-w-0">
+          <button
+            type="button"
+            onClick={onClose}
+            className="shrink-0 rounded-md p-1 text-muted-foreground hover:bg-accent hover:text-foreground transition-colors cursor-pointer"
+          >
+            <svg
+              className="h-4 w-4"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+              strokeWidth={1.5}
+            >
+              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
         <div className="flex items-center gap-1.5">
           {editing ? (
             <>
@@ -57,6 +74,19 @@ export function EntityDetail({ schema, entity, onClose }: EntityDetailProps) {
           ) : (
             <>
               <Button variant="ghost" size="sm" onClick={() => setEditing(true)}>
+                <svg
+                  className="h-3.5 w-3.5"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                  strokeWidth={1.5}
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d="m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L10.582 16.07a4.5 4.5 0 0 1-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 0 1 1.13-1.897l8.932-8.931Zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0 1 15.75 21H5.25A2.25 2.25 0 0 1 3 18.75V8.25A2.25 2.25 0 0 1 5.25 6H10"
+                  />
+                </svg>
                 Edit
               </Button>
               <Button variant="destructive" size="sm" onClick={handleDelete}>
@@ -64,12 +94,16 @@ export function EntityDetail({ schema, entity, onClose }: EntityDetailProps) {
               </Button>
             </>
           )}
-          <Button variant="ghost" size="xs" onClick={onClose}>
-            ✕
-          </Button>
         </div>
       </div>
-      <div className="flex-1 overflow-y-auto p-4">
+
+      {/* Title area */}
+      <div className="px-5 pt-5 pb-2">
+        <h2 className="text-xl font-semibold text-foreground leading-tight">{title}</h2>
+      </div>
+
+      {/* Properties */}
+      <div className="flex-1 overflow-y-auto px-5 pb-5">
         <PropertyList
           schema={schema}
           entity={editing ? { ...entity, fields: draft } : entity}
@@ -77,7 +111,9 @@ export function EntityDetail({ schema, entity, onClose }: EntityDetailProps) {
           onChange={handleChange}
         />
       </div>
-      <div className="border-t border-border px-4 py-2 text-xs text-dim">
+
+      {/* Footer */}
+      <div className="border-t border-border px-5 py-2.5 text-[11px] text-dim">
         Created {new Date(entity.createdAt).toLocaleString()} · Updated{" "}
         {new Date(entity.updatedAt).toLocaleString()}
       </div>

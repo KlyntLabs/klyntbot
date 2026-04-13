@@ -18,7 +18,7 @@ export function ListView({ schema, entities, cardFields, onEntityClick }: ListVi
       : schema.fields.filter((f) => !f.hidden && f !== titleField).slice(0, 3);
 
   return (
-    <div className="divide-y divide-border">
+    <div className="w-full divide-y divide-border/40">
       {entities.map((entity) => {
         const title = getEntityTitle(schema, entity.fields);
         return (
@@ -26,12 +26,12 @@ export function ListView({ schema, entities, cardFields, onEntityClick }: ListVi
             key={entity.id}
             type="button"
             onClick={() => onEntityClick?.(entity)}
-            className="flex w-full cursor-pointer items-center gap-3 px-4 py-2.5 text-left transition-colors hover:bg-surface-hover"
+            className="flex w-full cursor-pointer items-center gap-3 px-10 py-2.5 text-left transition-colors hover:bg-accent/60"
           >
-            <span className="flex-1 truncate text-sm font-medium">{title}</span>
-            <div className="flex shrink-0 items-center gap-3 text-xs text-muted">
+            <span className="flex-1 truncate text-[13px] font-medium text-foreground">{title}</span>
+            <div className="flex shrink-0 items-center gap-3 text-[12px] text-foreground/70">
               {inlineFields.map((field) => (
-                <span key={field.id} className="max-w-[120px] truncate">
+                <span key={field.id} className="max-w-[140px] truncate">
                   <FieldRenderer field={field} value={entity.fields[field.slug]} />
                 </span>
               ))}
@@ -40,7 +40,7 @@ export function ListView({ schema, entities, cardFields, onEntityClick }: ListVi
         );
       })}
       {entities.length === 0 && (
-        <div className="px-4 py-8 text-center text-muted">No entities yet</div>
+        <div className="px-10 py-16 text-center text-[13px] text-foreground/60">No items yet</div>
       )}
     </div>
   );

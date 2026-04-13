@@ -41,23 +41,44 @@ export default function DatabasePage() {
     : entities;
 
   return (
-    <div className="flex h-full">
-      <div className="flex flex-1 flex-col overflow-hidden">
-        <div className="shrink-0 px-12 pt-10 pb-1">
+    <div className="flex h-full w-full min-w-0 flex-1">
+      <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
+        {/* Page header — Notion-style generous whitespace */}
+        <div className="shrink-0 px-10 pt-10 pb-2">
           <div className="flex items-center gap-3">
-            {schema.icon && <span className="text-4xl">{schema.icon}</span>}
-            <h1 className="text-3xl font-bold text-foreground">{schema.name}</h1>
+            {schema.icon && (
+              <span className="text-4xl leading-none select-none">{schema.icon}</span>
+            )}
+            <h1 className="text-[32px] font-bold text-foreground leading-tight tracking-tight">
+              {schema.name}
+            </h1>
           </div>
         </div>
-        <div className="flex shrink-0 items-center gap-2 px-12 py-1">
+
+        {/* Sub-header controls */}
+        <div className="flex shrink-0 items-center gap-1 px-10 pb-1">
           <button
             type="button"
             onClick={() => setShowSchema(!showSchema)}
-            className="rounded-lg px-2 py-1 text-sm text-muted-foreground hover:bg-accent hover:text-foreground transition-colors"
+            className="flex items-center gap-1.5 rounded-md px-2 py-1 text-[13px] text-foreground/70 hover:bg-accent hover:text-foreground transition-colors"
           >
+            <svg
+              className="h-3.5 w-3.5"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+              strokeWidth={1.5}
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                d="M10.5 6h9.75M10.5 6a1.5 1.5 0 1 1-3 0m3 0a1.5 1.5 0 1 0-3 0M3.75 6H7.5m3 12h9.75m-9.75 0a1.5 1.5 0 0 1-3 0m3 0a1.5 1.5 0 0 0-3 0m-3.75 0H7.5m9-6h3.75m-3.75 0a1.5 1.5 0 0 1-3 0m3 0a1.5 1.5 0 0 0-3 0m-9.75 0h9.75"
+              />
+            </svg>
             Properties
           </button>
         </div>
+
         <ViewShell
           schema={schema}
           entities={filtered}
@@ -74,7 +95,7 @@ export default function DatabasePage() {
       {showSchema && <SchemaEditor schema={schema} onClose={() => setShowSchema(false)} />}
 
       {selectedEntity && (
-        <div className="fixed inset-y-0 right-0 z-40 w-96 border-l border-border bg-background shadow-xl">
+        <div className="fixed inset-y-0 right-0 z-40 w-[420px] border-l border-border bg-background shadow-2xl animate-[slideInRight_200ms_ease-out]">
           <EntityDetail
             schema={schema}
             entity={selectedEntity}
