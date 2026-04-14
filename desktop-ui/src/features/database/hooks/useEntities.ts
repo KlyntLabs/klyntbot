@@ -15,6 +15,7 @@ export function useEntities(databaseId: string | undefined, params?: QueryParams
           offset: params?.offset,
         }
       : null,
+    undefined,
     { invalidateOn: [DATABASE_UPDATED_EVENT] },
   );
 }

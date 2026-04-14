@@ -1,6 +1,5 @@
 import type { DatabaseSchema, Entity, SortRule, ViewDefinition } from "@shared/types";
 import { useState } from "react";
-import { ViewTabBar } from "./ViewTabBar";
 import { ViewToolbar } from "./ViewToolbar";
 import { BoardView } from "./views/BoardView";
 import { CalendarView } from "./views/CalendarView";
@@ -8,6 +7,8 @@ import { GalleryView } from "./views/GalleryView";
 import { ListView } from "./views/ListView";
 import { TableView } from "./views/TableView";
 import { TimelineView } from "./views/TimelineView";
+import { ViewConfigPanel } from "./views/ViewConfigPanel";
+import { ViewSwitcher } from "./views/ViewSwitcher";
 
 interface ViewShellProps {
   schema: DatabaseSchema;
@@ -19,6 +20,8 @@ interface ViewShellProps {
   onSearchChange: (query: string) => void;
   onEntityClick: (entity: Entity) => void;
   onNewEntity: () => void;
+  activeViewId?: string;
+  onActiveViewChange?: (id: string) => void;
 }
 
 export function ViewShell({
@@ -31,52 +34,70 @@ export function ViewShell({
   onSearchChange,
   onEntityClick,
   onNewEntity,
+  activeViewId: controlledActiveId,
+  onActiveViewChange,
 }: ViewShellProps) {
   const views = schema.views ?? [];
-  const [activeViewId, setActiveViewId] = useState<string | undefined>(
+  const [internalActiveId, setInternalActiveId] = useState<string | undefined>(
     views.find((v) => v.isDefault)?.id ?? views[0]?.id,
   );
+  const [configViewId, setConfigViewId] = useState<string | null>(null);
 
+  const activeViewId = controlledActiveId ?? internalActiveId;
+  const setActiveViewId = (id: string) => {
+    setInternalActiveId(id);
+    onActiveViewChange?.(id);
+  };
   const activeView = views.find((v) => v.id === activeViewId) ?? views[0];
+  const configView = configViewId ? views.find((v) => v.id === configViewId) : null;
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col">
-      {/* View tabs + toolbar with page-level horizontal padding */}
-      <div className="shrink-0 flex items-center justify-between gap-3 border-b border-border px-4">
-        {views.length > 0 && (
-          <ViewTabBar views={views} activeViewId={activeViewId} onViewSelect={setActiveViewId} />
-        )}
-        <div className="ml-auto py-1.5">
-          <ViewToolbar
-            searchQuery={searchQuery}
-            onSearchChange={onSearchChange}
-            onNewEntity={onNewEntity}
-            entityCount={totalCount}
-          />
+    <div className="flex min-h-0 flex-1">
+      <div className="flex min-h-0 flex-1 flex-col">
+        <div className="shrink-0 flex items-center justify-between gap-3 border-b border-border px-4">
+          {views.length > 0 && (
+            <ViewSwitcher
+              schema={schema}
+              views={views}
+              activeViewId={activeViewId}
+              onViewSelect={setActiveViewId}
+              onConfigView={(v) => setConfigViewId(v.id)}
+            />
+          )}
+          <div className="ml-auto py-1.5">
+            <ViewToolbar
+              searchQuery={searchQuery}
+              onSearchChange={onSearchChange}
+              onNewEntity={onNewEntity}
+              entityCount={totalCount}
+            />
+          </div>
+        </div>
+
+        <div className="min-h-0 flex-1 overflow-y-auto">
+          {activeView ? (
+            <ActiveViewRenderer
+              view={activeView}
+              schema={schema}
+              entities={entities}
+              sorts={sorts}
+              onSortChange={onSortChange}
+              onEntityClick={onEntityClick}
+            />
+          ) : (
+            <TableView
+              schema={schema}
+              entities={entities}
+              sorts={sorts}
+              onSortChange={onSortChange}
+              onEntityClick={onEntityClick}
+            />
+          )}
         </div>
       </div>
-
-      {/* Scrollable content — full bleed for table, padded for others */}
-      <div className="min-h-0 flex-1 overflow-y-auto">
-        {activeView ? (
-          <ActiveViewRenderer
-            view={activeView}
-            schema={schema}
-            entities={entities}
-            sorts={sorts}
-            onSortChange={onSortChange}
-            onEntityClick={onEntityClick}
-          />
-        ) : (
-          <TableView
-            schema={schema}
-            entities={entities}
-            sorts={sorts}
-            onSortChange={onSortChange}
-            onEntityClick={onEntityClick}
-          />
-        )}
-      </div>
+      {configView && (
+        <ViewConfigPanel schema={schema} view={configView} onClose={() => setConfigViewId(null)} />
+      )}
     </div>
   );
 }

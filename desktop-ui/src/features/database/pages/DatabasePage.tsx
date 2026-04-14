@@ -17,9 +17,18 @@ export default function DatabasePage() {
   const [selectedEntity, setSelectedEntity] = useState<Entity | null>(null);
   const [showCreate, setShowCreate] = useState(false);
   const [showSchema, setShowSchema] = useState(false);
+  const [activeViewId, setActiveViewId] = useState<string | undefined>();
+
+  const views = schema?.views ?? [];
+  const activeView =
+    views.find((v) => v.id === activeViewId) ?? views.find((v) => v.isDefault) ?? views[0];
+
+  const effectiveSorts = sorts.length > 0 ? sorts : (activeView?.config.sorts ?? []);
+  const effectiveFilter = activeView?.config.filter;
 
   const { data: queryResult } = useEntities(databaseId, {
-    sorts,
+    sorts: effectiveSorts,
+    filter: effectiveFilter,
     limit: 100,
   });
 
@@ -85,6 +94,8 @@ export default function DatabasePage() {
           onSearchChange={setSearchQuery}
           onEntityClick={setSelectedEntity}
           onNewEntity={() => setShowCreate(true)}
+          activeViewId={activeView?.id}
+          onActiveViewChange={setActiveViewId}
         />
       </div>
 
