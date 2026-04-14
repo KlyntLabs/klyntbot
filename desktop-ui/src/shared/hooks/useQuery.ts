@@ -54,6 +54,23 @@ function evictCache() {
 // Listener set for cache invalidation — hooks subscribe to get notified when their cache entry is cleared.
 const invalidationListeners = new Set<(prefix: string) => void>();
 
+// Per-key subscribers for live data push (optimistic updates).
+const dataSubscribers = new Map<string, Set<(data: unknown) => void>>();
+
+/**
+ * Imperatively update cache entries whose key starts with `cmdPrefix` and
+ * notify all mounted hooks reading that key. Use for optimistic updates.
+ */
+export function updateQueryCache<T>(cmdPrefix: string, updater: (data: T) => T) {
+  for (const [k, entry] of cache) {
+    if (!k.startsWith(cmdPrefix) || entry.data === undefined) continue;
+    const next = updater(entry.data as T);
+    if (next === entry.data) continue;
+    cache.set(k, { ...entry, data: next, timestamp: Date.now() });
+    dataSubscribers.get(k)?.forEach((cb) => cb(next));
+  }
+}
+
 function cacheKey(cmd: string, args?: Record<string, unknown> | null): string | null {
   if (args === null) return null;
   return args === undefined ? cmd : `${cmd}:${JSON.stringify(args)}`;
@@ -175,9 +192,12 @@ export function useQuery<T>(
 
       promise
         .then((result) => {
+          const prev = cache.get(k)?.data;
           cache.set(k, { data: result, timestamp: Date.now() });
           evictCache();
-          setData(result);
+          // Skip setState if the refetched value is reference-identical to the
+          // cached value (e.g. after an optimistic update wrote the same shape).
+          if (result !== prev) setData(result);
         })
         .catch((e) => {
           // Clear failed promise but keep stale data
@@ -208,6 +228,23 @@ export function useQuery<T>(
     const isStale = !entry || Date.now() - entry.timestamp > staleTimeRef.current;
     if (isStale) doFetch();
   }, [doFetch, argsKey]);
+
+  // Subscribe to imperative cache updates (optimistic updates)
+  useEffect(() => {
+    const k = argsKey;
+    if (!k) return;
+    const listener = (d: unknown) => setData(d as T);
+    let set = dataSubscribers.get(k);
+    if (!set) {
+      set = new Set();
+      dataSubscribers.set(k, set);
+    }
+    set.add(listener);
+    return () => {
+      set?.delete(listener);
+      if (set?.size === 0) dataSubscribers.delete(k);
+    };
+  }, [argsKey]);
 
   // Re-fetch when cache is externally invalidated for this command
   useEffect(() => {

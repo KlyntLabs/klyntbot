@@ -1,5 +1,4 @@
 import { useUpdateView } from "@features/database/hooks/useViews";
-import { Checkbox } from "@shared/ui/Checkbox";
 import type {
   DatabaseSchema,
   FilterGroup,
@@ -7,6 +6,7 @@ import type {
   ViewConfig,
   ViewDefinition,
 } from "@shared/types";
+import { Checkbox } from "@shared/ui/Checkbox";
 import { Plus, X } from "lucide-react";
 import { useEffect, useState } from "react";
 import { FilterBuilder } from "./filter/FilterBuilder";
@@ -93,16 +93,17 @@ export function ViewConfigPanel({ schema, view, onClose }: ViewConfigPanelProps)
           </Section>
         )}
 
-        {(view.viewType === "calendar" || view.viewType === "timeline") && dateFields.length > 0 && (
-          <Section label={view.viewType === "timeline" ? "Start date" : "Date field"}>
-            <FieldSelect
-              schema={schema}
-              value={config.calendarField}
-              onChange={(v) => updateConfig({ calendarField: v })}
-              allowedTypes={["date"]}
-            />
-          </Section>
-        )}
+        {(view.viewType === "calendar" || view.viewType === "timeline") &&
+          dateFields.length > 0 && (
+            <Section label={view.viewType === "timeline" ? "Start date" : "Date field"}>
+              <FieldSelect
+                schema={schema}
+                value={config.calendarField}
+                onChange={(v) => updateConfig({ calendarField: v })}
+                allowedTypes={["date"]}
+              />
+            </Section>
+          )}
 
         <Section label="Sort">
           <SortEditor
@@ -232,9 +233,7 @@ function SortEditor({ schema, sorts, onChange }: SortEditorProps) {
       ))}
       <button
         type="button"
-        onClick={() =>
-          onChange([...sorts, { field: fields[0]?.slug ?? "", direction: "asc" }])
-        }
+        onClick={() => onChange([...sorts, { field: fields[0]?.slug ?? "", direction: "asc" }])}
         className="flex items-center gap-1 rounded px-1.5 py-0.5 text-[12px] text-foreground/60 hover:bg-accent hover:text-foreground"
       >
         <Plus className="h-3 w-3" /> Add sort

@@ -1,6 +1,19 @@
+import {
+  closestCenter,
+  DndContext,
+  type DragEndEvent,
+  PointerSensor,
+  useSensor,
+  useSensors,
+} from "@dnd-kit/core";
+import { SortableContext, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import { FieldRenderer } from "@features/database/components/fields/FieldRenderer";
+import { useEntityReorder } from "@features/database/hooks/useEntityReorder";
+import { computeReorderAnchors } from "@features/database/lib/ordering";
 import { getTitleField } from "@features/database/lib/schema-utils";
+import { useSortableEntity } from "@features/database/lib/useSortableEntity";
 import type { DatabaseSchema, Entity, FieldDefinition, SortRule } from "@shared/types";
+import { useMemo } from "react";
 
 interface TableViewProps {
   schema: DatabaseSchema;
@@ -11,7 +24,6 @@ interface TableViewProps {
   onEntityClick?: (entity: Entity) => void;
 }
 
-/** Compute proportional column widths based on field type — title field gets more room */
 function getColumnStyle(field: FieldDefinition, isTitleField: boolean): React.CSSProperties {
   if (isTitleField) return { width: "22%", minWidth: 180 };
   switch (field.fieldType) {
@@ -41,6 +53,19 @@ export function TableView({
   onEntityClick,
 }: TableViewProps) {
   const titleField = getTitleField(schema);
+  const reorder = useEntityReorder(schema.id);
+  const orderedIds = useMemo(() => entities.map((e) => e.id), [entities]);
+
+  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }));
+
+  const handleDragEnd = ({ active, over }: DragEndEvent) => {
+    if (!over) return;
+    const anchors = computeReorderAnchors(orderedIds, String(active.id), String(over.id));
+    if (!anchors) return;
+    if ((sorts?.length ?? 0) > 0) onSortChange?.([]);
+    void reorder.mutate({ entityId: String(active.id), ...anchors });
+  };
+
   const columns =
     visibleFields && visibleFields.length > 0
       ? schema.fields.filter((f) => visibleFields.includes(f.slug) && !f.hidden)
@@ -70,6 +95,8 @@ export function TableView({
         stroke="currentColor"
         viewBox="0 0 24 24"
         strokeWidth={2}
+        role="img"
+        aria-label="sort direction"
       >
         <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 15.75l7.5-7.5 7.5 7.5" />
       </svg>
@@ -79,7 +106,6 @@ export function TableView({
   return (
     <div className="w-full overflow-x-auto">
       <table className="w-full table-fixed text-[13px]">
-        {/* Column sizing via colgroup */}
         <colgroup>
           {columns.map((field) => (
             <col key={field.id} style={getColumnStyle(field, titleField?.slug === field.slug)} />
@@ -105,59 +131,72 @@ export function TableView({
           </tr>
         </thead>
 
-        <tbody>
-          {entities.map((entity) => (
-            <tr
-              key={entity.id}
-              onClick={() => onEntityClick?.(entity)}
-              className="group border-b border-border/40 cursor-pointer transition-colors hover:bg-accent/60"
-            >
-              {columns.map((field, i) => {
-                const isTitle = titleField?.slug === field.slug;
-                return (
-                  <td
-                    key={field.id}
-                    className={`overflow-hidden text-ellipsis whitespace-nowrap py-2 ${
-                      i === 0 ? "pl-4 pr-3" : "px-3"
-                    } ${i === columns.length - 1 ? "pr-4" : ""} ${
-                      isTitle ? "font-medium text-foreground" : "font-normal text-foreground/85"
-                    }`}
-                  >
-                    <FieldRenderer field={field} value={entity.fields[field.slug]} />
+        <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+          <SortableContext items={orderedIds} strategy={verticalListSortingStrategy}>
+            <tbody>
+              {entities.map((entity) => (
+                <SortableRow
+                  key={entity.id}
+                  entity={entity}
+                  columns={columns}
+                  titleSlug={titleField?.slug}
+                  onClick={() => onEntityClick?.(entity)}
+                />
+              ))}
+              {entities.length === 0 && (
+                <tr>
+                  <td colSpan={columns.length} className="py-20 text-center">
+                    <div className="flex flex-col items-center gap-3">
+                      <p className="text-[14px] font-medium text-foreground">No items yet</p>
+                      <p className="text-[13px] text-foreground/60">
+                        Click <span className="text-brand font-medium">+ New</span> to create your
+                        first entry
+                      </p>
+                    </div>
                   </td>
-                );
-              })}
-            </tr>
-          ))}
-
-          {entities.length === 0 && (
-            <tr>
-              <td colSpan={columns.length} className="py-20 text-center">
-                <div className="flex flex-col items-center gap-3">
-                  <svg
-                    className="h-10 w-10 text-foreground/30"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                    strokeWidth={1.25}
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      d="M19.5 14.25v-2.625a3.375 3.375 0 0 0-3.375-3.375h-1.5A1.125 1.125 0 0 1 13.5 7.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H8.25m2.25 0H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 0 0-9-9Z"
-                    />
-                  </svg>
-                  <p className="text-[14px] font-medium text-foreground">No items yet</p>
-                  <p className="text-[13px] text-foreground/60">
-                    Click <span className="text-brand font-medium">+ New</span> to create your first
-                    entry
-                  </p>
-                </div>
-              </td>
-            </tr>
-          )}
-        </tbody>
+                </tr>
+              )}
+            </tbody>
+          </SortableContext>
+        </DndContext>
       </table>
     </div>
+  );
+}
+
+interface SortableRowProps {
+  entity: Entity;
+  columns: FieldDefinition[];
+  titleSlug: string | undefined;
+  onClick: () => void;
+}
+
+function SortableRow({ entity, columns, titleSlug, onClick }: SortableRowProps) {
+  const { setNodeRef, style, dragProps } = useSortableEntity(entity.id);
+  return (
+    <tr
+      ref={setNodeRef}
+      style={style}
+      data-entity-id={entity.id}
+      onClick={onClick}
+      className="group border-b border-border/40 cursor-pointer transition-colors hover:bg-accent/60"
+      {...dragProps}
+    >
+      {columns.map((field, i) => {
+        const isTitle = titleSlug === field.slug;
+        return (
+          <td
+            key={field.id}
+            className={`overflow-hidden text-ellipsis whitespace-nowrap py-2 ${
+              i === 0 ? "pl-4 pr-3" : "px-3"
+            } ${i === columns.length - 1 ? "pr-4" : ""} ${
+              isTitle ? "font-medium text-foreground" : "font-normal text-foreground/85"
+            }`}
+          >
+            <FieldRenderer field={field} value={entity.fields[field.slug]} />
+          </td>
+        );
+      })}
+    </tr>
   );
 }

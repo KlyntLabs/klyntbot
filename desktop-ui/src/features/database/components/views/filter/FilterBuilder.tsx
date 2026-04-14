@@ -80,9 +80,7 @@ export function FilterBuilder({ schema, value, onChange }: FilterBuilderProps) {
 
   return (
     <div className="space-y-2">
-      {!isEmpty && (
-        <GroupEditor schema={schema} group={group} onChange={update} depth={0} isRoot />
-      )}
+      {!isEmpty && <GroupEditor schema={schema} group={group} onChange={update} depth={0} isRoot />}
       {isEmpty && (
         <button
           type="button"
@@ -273,8 +271,7 @@ function RuleValueInput({
   useEffect(() => {
     setLocal(String(value ?? ""));
   }, [value]);
-  const inputType =
-    fieldType === "number" ? "number" : fieldType === "date" ? "date" : "text";
+  const inputType = fieldType === "number" ? "number" : fieldType === "date" ? "date" : "text";
   return (
     <input
       type={inputType}
