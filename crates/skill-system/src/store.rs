@@ -8,7 +8,7 @@ use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 
 use common::ConfigError;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use tracing::{debug, warn};
 
 /// Maximum description length in the skill listing (tokens budget).
@@ -49,7 +49,7 @@ const DEFAULT_SKILLS: &[(&str, &str)] = &[
 // ── Types ────────────────────────────────────────────────────
 
 /// YAML frontmatter fields parsed from a skill file.
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SkillFrontmatter {
     pub name: String,
