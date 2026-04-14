@@ -1,5 +1,6 @@
 //! skills-registry: resolve SkillSources into SkillPackages (fetch + parse).
 
+pub mod diff;
 pub mod fetcher;
 pub mod package;
 pub mod source;

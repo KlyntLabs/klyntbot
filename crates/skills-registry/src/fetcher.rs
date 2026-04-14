@@ -40,9 +40,12 @@ impl Fetcher {
 
     pub async fn fetch(&self, source: &SkillSource) -> Result<SkillPackage> {
         match source {
-            SkillSource::Github { owner, repo, subpath, r#ref } => {
-                self.fetch_github(owner, repo, subpath, r#ref).await
-            }
+            SkillSource::Github {
+                owner,
+                repo,
+                subpath,
+                r#ref,
+            } => self.fetch_github(owner, repo, subpath, r#ref).await,
             SkillSource::LocalPath { path } => self.fetch_local(path.clone()).await,
             SkillSource::SkillsSh { slug } => {
                 // Resolve slug → Github source (slugs follow owner/repo/subpath).
@@ -50,9 +53,12 @@ impl Fetcher {
                     .map_err(|e| KlyntbotError::Storage(format!("bad skills.sh slug: {e}")))?;
                 // Flatten to avoid recursive async fn — SkillsSh must resolve to Github.
                 match github {
-                    SkillSource::Github { owner, repo, subpath, r#ref } => {
-                        self.fetch_github(&owner, &repo, &subpath, &r#ref).await
-                    }
+                    SkillSource::Github {
+                        owner,
+                        repo,
+                        subpath,
+                        r#ref,
+                    } => self.fetch_github(&owner, &repo, &subpath, &r#ref).await,
                     _ => Err(KlyntbotError::Storage(
                         "skills.sh slug must resolve to a github source".into(),
                     )),
@@ -102,7 +108,10 @@ impl Fetcher {
             .await
             .unwrap_or_default()
             .into_iter()
-            .map(|(path, content)| ReferenceFile { path: PathBuf::from(path), content })
+            .map(|(path, content)| ReferenceFile {
+                path: PathBuf::from(path),
+                content,
+            })
             .collect();
 
         let templates_raw = self
@@ -179,8 +188,10 @@ impl Fetcher {
                 resp.status()
             )));
         }
-        let json: Value =
-            resp.json().await.map_err(|e| KlyntbotError::Storage(e.to_string()))?;
+        let json: Value = resp
+            .json()
+            .await
+            .map_err(|e| KlyntbotError::Storage(e.to_string()))?;
         json.get("sha")
             .and_then(|v| v.as_str())
             .map(String::from)
@@ -188,7 +199,10 @@ impl Fetcher {
     }
 
     async fn fetch_raw(&self, owner: &str, repo: &str, sha: &str, path: &str) -> Result<String> {
-        let url = format!("{}/{}/{}/{}/{}", self.github_raw_base, owner, repo, sha, path);
+        let url = format!(
+            "{}/{}/{}/{}/{}",
+            self.github_raw_base, owner, repo, sha, path
+        );
         let resp = self
             .http
             .get(&url)
@@ -201,7 +215,9 @@ impl Fetcher {
                 resp.status()
             )));
         }
-        resp.text().await.map_err(|e| KlyntbotError::Storage(e.to_string()))
+        resp.text()
+            .await
+            .map_err(|e| KlyntbotError::Storage(e.to_string()))
     }
 
     /// List files in a directory via the GitHub contents API.
@@ -232,8 +248,10 @@ impl Fetcher {
                 resp.status()
             )));
         }
-        let items: Vec<Value> =
-            resp.json().await.map_err(|e| KlyntbotError::Storage(e.to_string()))?;
+        let items: Vec<Value> = resp
+            .json()
+            .await
+            .map_err(|e| KlyntbotError::Storage(e.to_string()))?;
         let mut out = Vec::new();
         for item in items {
             let Some(kind) = item.get("type").and_then(|v| v.as_str()) else {
@@ -259,15 +277,16 @@ impl Fetcher {
 
     async fn fetch_local(&self, path: PathBuf) -> Result<SkillPackage> {
         let skill_md_path = path.join("SKILL.md");
-        let skill_md = tokio::fs::read_to_string(&skill_md_path).await.map_err(|e| {
-            KlyntbotError::Storage(format!("read {}: {e}", skill_md_path.display()))
-        })?;
+        let skill_md = tokio::fs::read_to_string(&skill_md_path)
+            .await
+            .map_err(|e| {
+                KlyntbotError::Storage(format!("read {}: {e}", skill_md_path.display()))
+            })?;
         let (frontmatter, _) = split_frontmatter(&skill_md)
             .map_err(|e| KlyntbotError::Storage(format!("split_frontmatter: {e}")))?;
-        let klyntbot_meta =
-            parse_skill_md(&skill_md, skill_md_path.clone(), SkillScope::User)
-                .ok()
-                .and_then(|pkg| pkg.metadata.klyntbot.clone());
+        let klyntbot_meta = parse_skill_md(&skill_md, skill_md_path.clone(), SkillScope::User)
+            .ok()
+            .and_then(|pkg| pkg.metadata.klyntbot.clone());
         let semver = None;
 
         // Best-effort local references + templates.
@@ -275,15 +294,18 @@ impl Fetcher {
             .await
             .unwrap_or_default()
             .into_iter()
-            .map(|(p, c)| ReferenceFile { path: p, content: c })
+            .map(|(p, c)| ReferenceFile {
+                path: p,
+                content: c,
+            })
             .collect();
 
         let mut templates = Vec::new();
         if let Ok(tpls) = collect_local_files(&path.join("templates")).await {
             for (p, c) in tpls {
                 if p.extension().and_then(|e| e.to_str()) == Some("json") {
-                    let manifest: Value =
-                        serde_json::from_str(&c).map_err(|e| KlyntbotError::Storage(e.to_string()))?;
+                    let manifest: Value = serde_json::from_str(&c)
+                        .map_err(|e| KlyntbotError::Storage(e.to_string()))?;
                     templates.push(TemplateFile {
                         name: p
                             .file_name()
@@ -369,7 +391,9 @@ mod tests {
 
         let f = Fetcher::new();
         let pkg = f
-            .fetch(&SkillSource::LocalPath { path: tmp.path().to_path_buf() })
+            .fetch(&SkillSource::LocalPath {
+                path: tmp.path().to_path_buf(),
+            })
             .await
             .unwrap();
         assert_eq!(pkg.name, "demo");
@@ -385,17 +409,17 @@ mod tests {
         Mock::given(method("GET"))
             .and(path("/repos/ow/re/commits/HEAD"))
             .respond_with(
-                ResponseTemplate::new(200)
-                    .set_body_json(serde_json::json!({"sha":"deadbeef"})),
+                ResponseTemplate::new(200).set_body_json(serde_json::json!({"sha":"deadbeef"})),
             )
             .mount(&api)
             .await;
 
         Mock::given(method("GET"))
             .and(path("/ow/re/deadbeef/skill-a/SKILL.md"))
-            .respond_with(ResponseTemplate::new(200).set_body_string(
-                "---\nname: skill-a\ndescription: d\n---\nbody",
-            ))
+            .respond_with(
+                ResponseTemplate::new(200)
+                    .set_body_string("---\nname: skill-a\ndescription: d\n---\nbody"),
+            )
             .mount(&raw)
             .await;
 

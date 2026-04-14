@@ -51,12 +51,17 @@ impl UpdatesFetcher {
                 resp.status()
             )));
         }
-        let items: Vec<Value> =
-            resp.json().await.map_err(|e| KlyntbotError::Storage(e.to_string()))?;
+        let items: Vec<Value> = resp
+            .json()
+            .await
+            .map_err(|e| KlyntbotError::Storage(e.to_string()))?;
         let mut out = Vec::new();
         for item in items {
-            let sha =
-                item.get("sha").and_then(|v| v.as_str()).unwrap_or("").to_string();
+            let sha = item
+                .get("sha")
+                .and_then(|v| v.as_str())
+                .unwrap_or("")
+                .to_string();
             if sha == installed_sha {
                 break;
             }
@@ -70,7 +75,12 @@ impl UpdatesFetcher {
                 .and_then(|v| v.as_str())
                 .unwrap_or("")
                 .to_string();
-            out.push(AvailableVersion { sha, tag: None, message, date });
+            out.push(AvailableVersion {
+                sha,
+                tag: None,
+                message,
+                date,
+            });
         }
         Ok(out)
     }

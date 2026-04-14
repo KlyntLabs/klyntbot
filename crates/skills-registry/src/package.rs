@@ -2,8 +2,8 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::path::PathBuf;
 
-use skill_system::types::{KlyntbotMeta, SkillScope};
 use skill_system::store::SkillFrontmatter;
+use skill_system::types::{KlyntbotMeta, SkillScope};
 
 use crate::source::SkillSource;
 

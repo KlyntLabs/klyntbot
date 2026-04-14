@@ -1,11 +1,16 @@
-use std::path::PathBuf;
 use serde::{Deserialize, Serialize};
+use std::path::PathBuf;
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(tag = "kind", rename_all = "camelCase")]
 pub enum SkillSource {
     #[serde(rename_all = "camelCase")]
-    Github { owner: String, repo: String, subpath: String, r#ref: GitRef },
+    Github {
+        owner: String,
+        repo: String,
+        subpath: String,
+        r#ref: GitRef,
+    },
     #[serde(rename_all = "camelCase")]
     SkillsSh { slug: String },
     #[serde(rename_all = "camelCase")]
@@ -38,7 +43,9 @@ impl SkillSource {
 fn parse_github_path(path: &str) -> Result<SkillSource, ParseError> {
     let parts: Vec<&str> = path.split('/').filter(|p| !p.is_empty()).collect();
     if parts.len() < 2 {
-        return Err(ParseError::BadFormat("expected owner/repo[/subpath]".into()));
+        return Err(ParseError::BadFormat(
+            "expected owner/repo[/subpath]".into(),
+        ));
     }
     let owner = parts[0].to_string();
     let repo = parts[1].to_string();
@@ -65,7 +72,12 @@ mod tests {
     fn parse_owner_repo_subpath() {
         let s = SkillSource::parse_shorthand("anthropics/skills/frontend-design").unwrap();
         match s {
-            SkillSource::Github { owner, repo, subpath, r#ref } => {
+            SkillSource::Github {
+                owner,
+                repo,
+                subpath,
+                r#ref,
+            } => {
                 assert_eq!(owner, "anthropics");
                 assert_eq!(repo, "skills");
                 assert_eq!(subpath, "frontend-design");
@@ -79,7 +91,12 @@ mod tests {
     fn parse_full_github_url() {
         let s = SkillSource::parse_shorthand("https://github.com/anthropics/skills/").unwrap();
         match s {
-            SkillSource::Github { owner, repo, subpath, .. } => {
+            SkillSource::Github {
+                owner,
+                repo,
+                subpath,
+                ..
+            } => {
                 assert_eq!(owner, "anthropics");
                 assert_eq!(repo, "skills");
                 assert_eq!(subpath, "");
