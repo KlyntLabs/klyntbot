@@ -44,7 +44,11 @@ export function ViewConfigPanel({ schema, view, onClose }: ViewConfigPanelProps)
     updateConfig({ visibleFields: Array.from(next) });
   };
 
-  const selectFields = schema.fields.filter((f) => !f.hidden && f.fieldType === "select");
+  const groupableTypes = ["select", "multi_select", "checkbox"];
+  const groupableFields = schema.fields.filter(
+    (f) => !f.hidden && groupableTypes.includes(f.fieldType),
+  );
+  const canGroup = ["board", "table", "list", "gallery"].includes(view.viewType);
   const dateFields = schema.fields.filter((f) => !f.hidden && f.fieldType === "date");
 
   return (
@@ -82,13 +86,13 @@ export function ViewConfigPanel({ schema, view, onClose }: ViewConfigPanelProps)
           />
         </Section>
 
-        {view.viewType === "board" && selectFields.length > 0 && (
+        {canGroup && groupableFields.length > 0 && (
           <Section label="Group by">
             <FieldSelect
               schema={schema}
               value={config.groupBy}
-              onChange={(v) => updateConfig({ groupBy: v })}
-              allowedTypes={["select"]}
+              onChange={(v) => updateConfig({ groupBy: v || undefined })}
+              allowedTypes={groupableTypes}
             />
           </Section>
         )}

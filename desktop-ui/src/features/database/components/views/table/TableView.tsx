@@ -7,16 +7,25 @@ import {
   useSensors,
 } from "@dnd-kit/core";
 import { SortableContext, verticalListSortingStrategy } from "@dnd-kit/sortable";
+import { useCollapsedGroups } from "@features/database/hooks/useCollapsedGroups";
 import { useEntityReorder } from "@features/database/hooks/useEntityReorder";
+import { groupEntities } from "@features/database/lib/grouping";
 import { computeReorderAnchors } from "@features/database/lib/ordering";
 import type { DatabaseSchema, Entity, SortRule, ViewDefinition } from "@shared/types";
+import type { Row } from "@tanstack/react-table";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { useMemo, useRef } from "react";
+import { GroupHeader } from "../GroupHeader";
 import { TableBodyRow } from "./TableBodyRow";
 import { TableHeaderRow } from "./TableHeaderRow";
 import { useTableColumns } from "./useTableColumns";
 
 const ROW_HEIGHT = 36;
+const HEADER_HEIGHT = 32;
+
+type FlatItem =
+  | { type: "header"; key: string; label: string; count: number; collapsed: boolean }
+  | { type: "row"; row: Row<Entity> };
 
 interface Props {
   schema: DatabaseSchema;
@@ -34,10 +43,42 @@ export function TableView({ schema, view, entities, sorts, onSortChange, onEntit
   const rows = table.getRowModel().rows;
   const orderedIds = useMemo(() => rows.map((r) => r.original.id), [rows]);
 
+  const groupBy = view.config.groupBy;
+  const grouped = Boolean(groupBy);
+  const buckets = useMemo(
+    () => groupEntities(entities, schema, groupBy),
+    [entities, schema, groupBy],
+  );
+  const { collapsed, toggle } = useCollapsedGroups(schema.id, view);
+
+  const rowById = useMemo(() => new Map(rows.map((r) => [r.original.id, r])), [rows]);
+
+  const items = useMemo<FlatItem[]>(() => {
+    if (!grouped) return rows.map((row) => ({ type: "row" as const, row }));
+    const out: FlatItem[] = [];
+    for (const g of buckets) {
+      const isCollapsed = collapsed.has(g.key);
+      out.push({
+        type: "header",
+        key: g.key,
+        label: g.label,
+        count: g.entities.length,
+        collapsed: isCollapsed,
+      });
+      if (!isCollapsed) {
+        for (const entity of g.entities) {
+          const row = rowById.get(entity.id);
+          if (row) out.push({ type: "row", row });
+        }
+      }
+    }
+    return out;
+  }, [grouped, buckets, rows, rowById, collapsed]);
+
   const virtualizer = useVirtualizer({
-    count: rows.length,
+    count: items.length,
     getScrollElement: () => parentRef.current,
-    estimateSize: () => ROW_HEIGHT,
+    estimateSize: (index) => (items[index]?.type === "header" ? HEADER_HEIGHT : ROW_HEIGHT),
     overscan: 8,
   });
 
@@ -68,15 +109,35 @@ export function TableView({ schema, view, entities, sorts, onSortChange, onEntit
       <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={onDragEnd}>
         <SortableContext items={orderedIds} strategy={verticalListSortingStrategy}>
           <div style={{ height: virtualizer.getTotalSize(), position: "relative" }}>
-            {virtualizer.getVirtualItems().map((vRow) => {
-              const row = rows[vRow.index];
+            {virtualizer.getVirtualItems().map((vi) => {
+              const item = items[vi.index];
+              if (!item) return null;
+              if (item.type === "header") {
+                return (
+                  <div
+                    key={`h:${item.key}`}
+                    className="absolute left-0 top-0 w-full"
+                    style={{
+                      transform: `translateY(${vi.start}px)`,
+                      height: HEADER_HEIGHT,
+                    }}
+                  >
+                    <GroupHeader
+                      label={item.label}
+                      count={item.count}
+                      collapsed={item.collapsed}
+                      onToggle={() => toggle(item.key)}
+                    />
+                  </div>
+                );
+              }
               return (
                 <TableBodyRow
-                  key={row.id}
-                  row={row}
+                  key={item.row.id}
+                  row={item.row}
                   schema={schema}
-                  top={vRow.start}
-                  onClick={() => onEntityClick(row.original)}
+                  top={vi.start}
+                  onClick={() => onEntityClick(item.row.original)}
                 />
               );
             })}

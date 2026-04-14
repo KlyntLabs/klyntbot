@@ -144,6 +144,7 @@ function ActiveViewRenderer({
       return (
         <ListView
           schema={schema}
+          view={view}
           entities={entities}
           cardFields={view.config.cardFields}
           onEntityClick={onEntityClick}
@@ -153,6 +154,7 @@ function ActiveViewRenderer({
       return (
         <GalleryView
           schema={schema}
+          view={view}
           entities={entities}
           cardFields={view.config.cardFields}
           onEntityClick={onEntityClick}
