@@ -147,6 +147,10 @@ pub struct AppCore {
     pub brain_voice: Option<crate::brain_voice::BrainVoice>,
     /// Onboarding journey milestone tracker.
     pub journey_tracker: Option<crate::journey::JourneyTracker>,
+    /// Skills installer (None when entity_store not yet initialized).
+    pub installer: Option<std::sync::Arc<skills_installer::Installer>>,
+    /// Skills adapter (None when no cognitive provider configured).
+    pub adapter: Option<std::sync::Arc<skills_adapter::Adapter>>,
 }
 
 impl AppCore {

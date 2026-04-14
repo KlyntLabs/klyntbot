@@ -40,6 +40,7 @@ pub mod voice;
 pub mod voice_conversation;
 mod voice_conversation_commands;
 pub mod voice_echo;
+pub mod skills;
 pub mod work_context;
 pub mod workflows;
 pub mod workspace;

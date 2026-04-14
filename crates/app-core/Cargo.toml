@@ -49,6 +49,9 @@ voice-engine = { workspace = true }
 entity-store = { workspace = true }
 database-tool = { workspace = true }
 skills-marketplace = { workspace = true }
+skills-registry = { workspace = true }
+skills-installer = { workspace = true }
+skills-adapter = { workspace = true }
 
 [features]
 default = []

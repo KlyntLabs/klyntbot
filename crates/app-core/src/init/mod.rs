@@ -492,6 +492,26 @@ impl AppCore {
             (Some(Arc::new(facade)), Some(handles), Some(shutdown))
         };
 
+        // ── Skills installer + adapter ────────────────────────────────────
+        let installer = if let Some(ref es) = entity_store {
+            let skills_dir = config.data_dir_path().join("skills");
+            let fetcher = Arc::new(::skills_registry::Fetcher::new());
+            let installer = Arc::new(::skills_installer::Installer {
+                skills_dir,
+                fetcher,
+                repo: ::skills_marketplace::InstalledSkillsRepo::new(storage_pool.inner().clone()),
+                entity_store: Arc::clone(es),
+                skill_store: agent.skill_store(),
+                event_bus: Arc::clone(&domain_event_bus),
+            });
+            info!("Skills installer ready");
+            Some(installer)
+        } else {
+            None
+        };
+
+        let adapter: Option<Arc<::skills_adapter::Adapter>> = None; // wired in Task 14
+
         // ── Workspace skill auto-updater ───────────────────────────────────
         // Keeps skills/workspace/SKILL.md's database list fresh on create/delete.
         if let Some(ref es) = entity_store {
@@ -731,6 +751,8 @@ impl AppCore {
             voice_loop_handle: None,
             brain_voice,
             journey_tracker: Some(journey_tracker),
+            installer,
+            adapter,
         };
 
         // ── Voice service initialization ────────────────────────────────
