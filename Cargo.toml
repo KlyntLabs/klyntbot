@@ -38,6 +38,7 @@ members = [
     "crates/feature-language-learning",
     "crates/entity-store",
     "crates/database-tool",
+    "crates/skills-marketplace",
 ]
 
 [workspace.package]
@@ -82,6 +83,7 @@ voice-engine = { path = "crates/voice-engine" }
 feature-language-learning = { path = "crates/feature-language-learning" }
 entity-store = { path = "crates/entity-store" }
 database-tool = { path = "crates/database-tool" }
+skills-marketplace = { path = "crates/skills-marketplace" }
 extism = "1"
 mcp = { path = "crates/mcp" }
 rmcp = { version = "0.17", default-features = false }
