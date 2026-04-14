@@ -2,13 +2,13 @@
 
 **Date:** 2026-04-14
 **Status:** Approved (pending user review of this document)
-**Scope:** Replace string-keyed Tauri IPC with generated typed bindings (specta + tauri-specta), and build push-based TanStack Query invalidation on top of the resulting typed event channel.
+**Scope:** Replace string-keyed Tauri IPC with generated typed bindings (specta + tauri-specta), migrate the FE from custom `useQuery`/`useMutation` hooks to `@tanstack/react-query`, and build push-based invalidation on top of the resulting typed event channel.
 
 ## Motivation
 
-The desktop UI currently calls into Rust via `ipc("command_name", args)` — a string-keyed dispatch with hand-written TS types that drift from Rust DTOs. Mutations manually invalidate query keys in `onSuccess`, which means every consumer must know which keys to touch, and mutations triggered outside the UI (agent loop, cron, channels) leave caches stale until the next poll.
+The desktop UI currently calls into Rust via `ipc("command_name", args)` — a string-keyed dispatch with hand-written TS types that drift from Rust DTOs. A custom `useQuery`/`useMutation` layer (in `desktop-ui/src/shared/hooks/`) implements a homegrown `Map<string, CacheEntry>` cache with string-prefix entity inference and event-based invalidation. It works, but has no devtools, no suspense, no request dedup across components for non-identical keys, no optimistic update primitives, and the entity inference is string-matched on command names (`task_`, `note_`, …).
 
-This spec addresses both problems in a single initiative because the solutions share infrastructure: typed events are the substrate for push invalidation, and the same codegen pipeline produces both typed commands and typed events.
+This spec addresses all three problems in a single initiative because they share infrastructure: typed events are the substrate for push invalidation, the codegen pipeline produces typed commands and events, and `@tanstack/react-query` is the cache that consumes both.
 
 ## Non-goals
 
@@ -28,7 +28,7 @@ This spec addresses both problems in a single initiative because the solutions s
 
 ## Architecture
 
-Two phases, sequenced within the same initiative.
+Three phases, sequenced within the same initiative.
 
 ### Phase 1 — Typed bindings (schema sharing)
 
@@ -40,7 +40,21 @@ Two phases, sequenced within the same initiative.
 - Big-bang sweep: every `useQuery("tasks_list", ...)` becomes `useQuery(commands.tasks.list, ...)`. String-keyed `ipc()` is deleted in the same PR series.
 - Dev-server handlers continue using the same DTOs (no change required); an integration test ensures every command exported by tauri-specta has a dev-server route.
 
-### Phase 2 — Push invalidation (built on Phase 1's typed events)
+### Phase 2 — TanStack Query migration
+
+- Add `@tanstack/react-query` + `@tanstack/react-query-devtools` to `desktop-ui`.
+- `QueryClient` instantiated once in `App.tsx`, wrapped in `QueryClientProvider`. Default `staleTime: 30_000` matches current custom hook behavior.
+- Replace `useQuery` and `useMutation` exports in `desktop-ui/src/shared/hooks/` with thin wrappers that curry TanStack Query's primitives and pre-fill `queryFn` using the typed dispatch adapter:
+  ```typescript
+  export function useCommand<TArgs, TResult>(cmd: TypedCommand<TArgs, TResult>, args: TArgs, opts?) {
+    return useTanstackQuery({ queryKey: [cmd.name, args], queryFn: () => cmd(args), staleTime: 30_000, ...opts });
+  }
+  ```
+- Call sites do not change API surface (`useQuery(cmd, args)` still works) — only the underlying implementation.
+- The homegrown `Map<string, CacheEntry>` cache, `invalidateOn: string[]`, `inferEntityKind()`, and `entity:updated` event emission inside `useMutation` are all deleted. Invalidation moves entirely to Phase 3's event-driven registry.
+- React Query Devtools mounted in dev builds only (`import.meta.env.DEV`).
+
+### Phase 3 — Push invalidation (built on Phases 1 & 2)
 
 - New Rust type in `desktop-shared`:
   ```rust
