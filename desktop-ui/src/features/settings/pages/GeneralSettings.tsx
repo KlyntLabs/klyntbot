@@ -1,23 +1,10 @@
-import { AutoTunerPanel } from "@features/autotuner";
 import { SettingsCard } from "@shared/composites";
 import { ipc } from "@shared/hooks/useIpc";
 import { useQuery } from "@shared/hooks/useQuery";
-import { useToastContext } from "@shared/hooks/useToast";
 import type { AgentStatus, AppInfoResponse } from "@shared/types";
 import { SaveButton, ShortcutRecorder } from "@shared/ui";
 import { useMemo, useState } from "react";
 import { PermissionsCard } from "../components/PermissionsCard";
-
-interface AgentDefaults {
-  model?: string;
-  provider?: string;
-  temperature?: number;
-  maxTokens?: number;
-}
-
-interface AgentsConfig {
-  defaults?: AgentDefaults;
-}
 
 const SHORTCUT_DEFAULTS = {
   launcher: "alt+space",
@@ -25,7 +12,6 @@ const SHORTCUT_DEFAULTS = {
 };
 
 export function GeneralSettings() {
-  const toast = useToastContext();
   const { data: appInfo } = useQuery<AppInfoResponse>("app_info", undefined, {
     version: "...",
     dataDir: "...",
@@ -37,14 +23,6 @@ export function GeneralSettings() {
     activeTaskCount: 0,
     focusTask: null,
   });
-
-  const { data: agentsConfig, refetch } = useQuery<AgentsConfig>(
-    "config_get_section",
-    { section: "agents" },
-    { defaults: {} },
-  );
-
-  // ── Shortcuts ─────────────────────────────────────
 
   const { data: shortcutsConfig, refetch: refetchShortcuts } = useQuery<typeof SHORTCUT_DEFAULTS>(
     "shortcuts_get",
@@ -85,42 +63,6 @@ export function GeneralSettings() {
       setSavingShortcuts(false);
     }
   };
-
-  // ── Agent defaults ────────────────────────────────
-
-  const defaults = agentsConfig.defaults ?? {};
-  const [model, setModel] = useState<string | null>(null);
-  const [temperature, setTemperature] = useState<string | null>(null);
-  const [maxTokens, setMaxTokens] = useState<string | null>(null);
-  const [saving, setSaving] = useState(false);
-
-  const currentModel = model ?? defaults.model ?? "";
-  const currentTemp = temperature ?? String(defaults.temperature ?? 0.7);
-  const currentMaxTokens = maxTokens ?? String(defaults.maxTokens ?? 8192);
-
-  const handleSaveDefaults = async () => {
-    setSaving(true);
-    try {
-      const patch: Record<string, unknown> = {
-        defaults: {
-          ...(model !== null && { model }),
-          ...(temperature !== null && { temperature: Number.parseFloat(temperature) }),
-          ...(maxTokens !== null && { maxTokens: Number.parseInt(maxTokens, 10) }),
-        },
-      };
-      await ipc("config_update_section", { section: "agents", patch });
-      refetch();
-      setModel(null);
-      setTemperature(null);
-      setMaxTokens(null);
-    } catch {
-      toast.show("Failed to save agent defaults");
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const hasChanges = model !== null || temperature !== null || maxTokens !== null;
 
   return (
     <div>
@@ -188,61 +130,7 @@ export function GeneralSettings() {
           </div>
         </SettingsCard>
 
-        <SettingsCard title="Agent defaults">
-          <div className="space-y-3">
-            <label className="block">
-              <span className="block text-xs text-muted-foreground mb-1">Default model</span>
-              <input
-                type="text"
-                value={currentModel}
-                onChange={(e) => setModel(e.target.value)}
-                placeholder="e.g. anthropic/claude-opus-4-5"
-                className="w-full px-3 py-1.5 text-[13px] text-foreground bg-accent border border-border rounded-lg focus:outline-none focus:border-brand/50 transition-colors placeholder:text-dim"
-              />
-            </label>
-
-            <div className="flex gap-3">
-              <label className="flex-1">
-                <span className="block text-xs text-muted-foreground mb-1">Temperature</span>
-                <input
-                  type="number"
-                  value={currentTemp}
-                  onChange={(e) => setTemperature(e.target.value)}
-                  step="0.1"
-                  min="0"
-                  max="2"
-                  className="w-full px-3 py-1.5 text-[13px] text-foreground bg-accent border border-border rounded-lg focus:outline-none focus:border-brand/50 transition-colors"
-                />
-              </label>
-              <label className="flex-1">
-                <span className="block text-xs text-muted-foreground mb-1">Max tokens</span>
-                <input
-                  type="number"
-                  value={currentMaxTokens}
-                  onChange={(e) => setMaxTokens(e.target.value)}
-                  step="256"
-                  min="256"
-                  className="w-full px-3 py-1.5 text-[13px] text-foreground bg-accent border border-border rounded-lg focus:outline-none focus:border-brand/50 transition-colors"
-                />
-              </label>
-            </div>
-
-            {hasChanges && (
-              <div className="flex justify-end">
-                <SaveButton onClick={handleSaveDefaults} saving={saving} />
-              </div>
-            )}
-          </div>
-        </SettingsCard>
-
         <PermissionsCard />
-
-        <SettingsCard title="AI Self-Improvement">
-          <p className="text-xs text-muted-foreground mb-3">
-            AutoTuner continuously learns your preferences and optimizes response quality.
-          </p>
-          <AutoTunerPanel />
-        </SettingsCard>
       </div>
     </div>
   );

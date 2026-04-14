@@ -29,24 +29,8 @@ const FocusedReviewPage = lazy(() =>
   import("../features/learn").then((m) => ({ default: m.FocusedReview })),
 );
 
-// ── Mirror Feature ───────────────────────────────────────────
-const MirrorPage = lazy(() =>
-  import("../features/mirror").then((m) => ({ default: m.MirrorPage })),
-);
-
-// ── Coaching Feature ────────────────────────────────────────
-const CoachingLayout = lazy(() =>
-  import("../features/coaching").then((m) => ({ default: m.CoachingLayout })),
-);
-const CoachingOverviewPage = lazy(() =>
-  import("../features/coaching").then((m) => ({ default: m.CoachingOverviewPage })),
-);
-const CoachingPatternsPage = lazy(() =>
-  import("../features/coaching").then((m) => ({ default: m.PatternsPage })),
-);
-const CoachingHistoryPage = lazy(() =>
-  import("../features/coaching").then((m) => ({ default: m.HistoryPage })),
-);
+// ── Brain Feature (consolidated) ─────────────────────────────
+const BrainPage = lazy(() => import("../features/brain").then((m) => ({ default: m.BrainPage })));
 
 // ── Projects Feature ─────────────────────────────────────────────
 const ProjectDetailPage = lazy(() =>
@@ -54,11 +38,6 @@ const ProjectDetailPage = lazy(() =>
 );
 const ProjectsListPage = lazy(() =>
   import("../features/projects").then((m) => ({ default: m.ProjectsListPage })),
-);
-
-// ── System Feature ───────────────────────────────────────────────
-const SystemPage = lazy(() =>
-  import("../features/system").then((m) => ({ default: m.SystemPage })),
 );
 
 // ── Dashboard Feature ────────────────────────────────────────────
@@ -84,6 +63,12 @@ const SettingsLayout = lazy(() =>
 );
 const GeneralSettings = lazy(() =>
   import("../features/settings").then((m) => ({ default: m.GeneralSettings })),
+);
+const AiSettings = lazy(() =>
+  import("../features/settings").then((m) => ({ default: m.AiSettings })),
+);
+const CategoriesSettings = lazy(() =>
+  import("../features/settings").then((m) => ({ default: m.CategoriesSettings })),
 );
 const ConfigurationSettings = lazy(() =>
   import("../features/settings").then((m) => ({ default: m.ConfigurationSettings })),
@@ -198,48 +183,47 @@ export const router = createHashRouter([
           </DashboardLayout>
         ),
       },
-      // System page (contexts, categories, inference, debug tabs)
-      { path: "/system", element: <SystemPage /> },
-      { path: "/system/:tab", element: <SystemPage /> },
       { path: "/chat", element: <ChatPage /> },
       { path: "/notes", element: <KnowledgeBasePage /> },
       { path: "/learn", element: <LearnPage /> },
       { path: "/learn/knowledge", element: <KnowledgeHealthPage /> },
       { path: "/learn/review/:topicId?", element: <FocusedReviewPage /> },
-      { path: "/brain", element: <MirrorPage /> },
+      { path: "/brain", element: <BrainPage /> },
+      { path: "/brain/:section", element: <BrainPage /> },
       { path: "/automations", element: <AutomationsPage /> },
-      { path: "/categories", element: <Navigate to="/system/categories" replace /> },
-      {
-        path: "/coaching",
-        element: (
-          <CoachingLayout>
-            <CoachingOverviewPage />
-          </CoachingLayout>
-        ),
-      },
-      {
-        path: "/coaching/patterns",
-        element: (
-          <CoachingLayout>
-            <CoachingPatternsPage />
-          </CoachingLayout>
-        ),
-      },
-      {
-        path: "/coaching/history",
-        element: (
-          <CoachingLayout>
-            <CoachingHistoryPage />
-          </CoachingLayout>
-        ),
-      },
-      { path: "/debug", element: <Navigate to="/system/events" replace /> },
+      { path: "/categories", element: <Navigate to="/settings/categories" replace /> },
+      { path: "/coaching", element: <Navigate to="/brain/coaching" replace /> },
+      { path: "/coaching/*", element: <Navigate to="/brain/coaching" replace /> },
+      { path: "/system", element: <Navigate to="/brain/contexts" replace /> },
+      { path: "/system/memory", element: <Navigate to="/brain/memory" replace /> },
+      { path: "/system/contexts", element: <Navigate to="/brain/contexts" replace /> },
+      { path: "/system/events", element: <Navigate to="/brain" replace /> },
+      { path: "/system/pipeline", element: <Navigate to="/brain" replace /> },
+      { path: "/system/inference", element: <Navigate to="/brain/contexts" replace /> },
+      { path: "/system/categories", element: <Navigate to="/settings/categories" replace /> },
+      { path: "/debug", element: <Navigate to="/brain" replace /> },
       { path: "/settings", element: <Navigate to="/settings/general" replace /> },
       {
         path: "/settings/general",
         element: (
           <SettingsLayout>
             <GeneralSettings />
+          </SettingsLayout>
+        ),
+      },
+      {
+        path: "/settings/ai",
+        element: (
+          <SettingsLayout>
+            <AiSettings />
+          </SettingsLayout>
+        ),
+      },
+      {
+        path: "/settings/categories",
+        element: (
+          <SettingsLayout>
+            <CategoriesSettings />
           </SettingsLayout>
         ),
       },

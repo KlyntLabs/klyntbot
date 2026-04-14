@@ -7,11 +7,13 @@ import {
   Cable,
   Container,
   GitBranch,
+  Grid3x3,
   ListChecks,
   Mic,
   Plug,
   Rocket,
   SlidersHorizontal,
+  Sparkles,
   User,
   Wrench,
 } from "lucide-react";
@@ -23,6 +25,7 @@ interface SettingsLayoutProps {
 
 const sections = [
   { label: "General", path: "/settings/general", icon: SlidersHorizontal },
+  { label: "AI", path: "/settings/ai", icon: Sparkles },
   { label: "Configuration", path: "/settings/configuration", icon: Wrench },
   { label: "Personalization", path: "/settings/personalization", icon: User },
   { label: "Voice", path: "/settings/voice", icon: Mic },
@@ -31,6 +34,7 @@ const sections = [
   { label: "Environments", path: "/settings/environments", icon: Container },
   { label: "Tasks & Notifications", path: "/settings/tasks", icon: ListChecks },
   { label: "Work Contexts", path: "/settings/work-contexts", icon: BrainCircuit },
+  { label: "Categories", path: "/settings/categories", icon: Grid3x3 },
   { label: "Launcher", path: "/settings/launcher", icon: Rocket },
   { label: "Integrations", path: "/settings/integrations", icon: Cable },
   { label: "Archived threads", path: "/settings/archived", icon: Archive },

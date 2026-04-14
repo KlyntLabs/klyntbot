@@ -5,7 +5,9 @@ export { McpServerIcon } from "./components/mcp/McpServerIcon";
 export { recommendedServers } from "./components/mcp/recommendedServers";
 export { PermissionsCard } from "./components/PermissionsCard";
 export { SettingsLayout } from "./components/SettingsLayout";
+export { AiSettings } from "./pages/AiSettings";
 export { ArchivedSettings } from "./pages/ArchivedSettings";
+export { CategoriesSettings } from "./pages/CategoriesSettings";
 export { ConfigurationSettings } from "./pages/ConfigurationSettings";
 export { EnvironmentsSettings } from "./pages/EnvironmentsSettings";
 // Pages
