@@ -224,6 +224,23 @@ export type {
   FabricTreeNode,
 } from "./fabric";
 
+// ── Skills Types ─────────────────────────────────────────────────
+
+export type {
+  AvailableVersion,
+  DiffLine,
+  DiffResult,
+  FileWrite,
+  FrontmatterChange,
+  InstalledSkill,
+  InstallPlan,
+  SkillBrowseRow,
+  SkillSourceType,
+  TemplatePreview,
+  UninstallMode,
+  UpgradePlan,
+} from "./skills";
+
 // ── Database Types ───────────────────────────────────────────
 
 export type {
