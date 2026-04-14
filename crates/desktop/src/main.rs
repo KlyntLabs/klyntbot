@@ -1110,6 +1110,8 @@ fn run_desktop_app() {
             commands::database::db_create_entity,
             commands::database::db_update_entity,
             commands::database::db_delete_entity,
+            commands::database::db_reorder_entity,
+            commands::database::db_reorder_views,
             commands::database::db_add_field,
             commands::database::db_modify_field,
             commands::database::db_remove_field,

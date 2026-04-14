@@ -91,6 +91,9 @@ pub struct Entity {
     pub id: String,
     pub database_id: String,
     pub fields: HashMap<String, serde_json::Value>,
+    /// Fractional index key for user ordering. Lexicographic sort.
+    #[serde(default)]
+    pub position: String,
     pub created_at: String,
     pub updated_at: String,
 }
@@ -126,8 +129,12 @@ pub struct ViewDefinition {
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ViewConfig {
+    /// Legacy flat filter list (kept for backwards compat; prefer `filter` for nested groups).
     #[serde(default)]
     pub filters: Vec<FilterRule>,
+    /// Nested filter tree (Notion-style nested AND/OR). Takes precedence over `filters` when present.
+    #[serde(default)]
+    pub filter: Option<FilterGroup>,
     #[serde(default)]
     pub sorts: Vec<SortRule>,
     #[serde(default)]
@@ -148,6 +155,31 @@ pub struct FilterRule {
     pub field: String,
     pub op: FilterOp,
     pub value: serde_json::Value,
+}
+
+/// Nested filter node — either a leaf rule or a logical group of nodes.
+/// Used for Notion-style nested AND/OR filter composition (max depth 3 enforced at query time).
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(tag = "kind", rename_all = "snake_case")]
+pub enum FilterNode {
+    Rule(FilterRule),
+    Group(FilterGroup),
+}
+
+/// Logical AND/OR grouping of filter nodes.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct FilterGroup {
+    pub op: LogicOp,
+    #[serde(default)]
+    pub nodes: Vec<FilterNode>,
+}
+
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum LogicOp {
+    And,
+    Or,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]

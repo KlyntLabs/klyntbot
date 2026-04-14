@@ -14,7 +14,9 @@ use tracing::{debug, warn};
 /// Maximum description length in the skill listing (tokens budget).
 const MAX_DESCRIPTION_CHARS: usize = 250;
 
-/// Default skills embedded in the binary, installed on first run.
+/// Default skills embedded in the binary. Paths are relative to the skills dir.
+/// Any entry missing from disk at load time is written; existing files are never
+/// overwritten so user edits persist across upgrades.
 const DEFAULT_SKILLS: &[(&str, &str)] = &[
     (
         "task-management.md",
@@ -35,6 +37,12 @@ const DEFAULT_SKILLS: &[(&str, &str)] = &[
     (
         "learning.md",
         include_str!("../../../skills/learning/SKILL.md"),
+    ),
+    // Workspace lives in a subdir — the WorkspaceSkillSubscriber looks for
+    // `workspace/SKILL.md` when regenerating the known-databases block.
+    (
+        "workspace/SKILL.md",
+        include_str!("../../../skills/workspace/SKILL.md"),
     ),
 ];
 
@@ -83,14 +91,9 @@ impl SkillStore {
             })?;
         }
 
-        // Install defaults if empty
-        let has_skills = std::fs::read_dir(skills_dir)
-            .map(|mut d| d.any(|e| e.is_ok()))
-            .unwrap_or(false);
-
-        if !has_skills {
-            Self::install_defaults(skills_dir)?;
-        }
+        // Install any missing default skills (idempotent). Existing files are
+        // never overwritten, so user-edited skills survive upgrades.
+        Self::install_defaults(skills_dir)?;
 
         // Load all .md files
         let mut entries = HashMap::new();
@@ -216,8 +219,21 @@ impl SkillStore {
     }
 
     fn install_defaults(skills_dir: &Path) -> common::Result<()> {
-        for (filename, content) in DEFAULT_SKILLS {
-            let path = skills_dir.join(filename);
+        for (rel_path, content) in DEFAULT_SKILLS {
+            let path = skills_dir.join(rel_path);
+            if path.exists() {
+                continue;
+            }
+            if let Some(parent) = path.parent() {
+                if parent != skills_dir {
+                    std::fs::create_dir_all(parent).map_err(|e| {
+                        skill_err(&format!(
+                            "Failed to create skill dir {}: {e}",
+                            parent.display()
+                        ))
+                    })?;
+                }
+            }
             std::fs::write(&path, content).map_err(|e| {
                 skill_err(&format!(
                     "Failed to write default skill {}: {e}",
@@ -263,6 +279,31 @@ pub fn split_frontmatter(content: &str) -> common::Result<(SkillFrontmatter, Str
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn install_defaults_is_idempotent_and_installs_workspace_subdir() {
+        let tmp = tempfile::tempdir().unwrap();
+        let store = SkillStore::load(tmp.path()).unwrap();
+        assert!(
+            store.get("workspace").is_some(),
+            "workspace skill should be installed"
+        );
+        let ws_path = tmp.path().join("workspace").join("SKILL.md");
+        assert!(ws_path.is_file(), "workspace/SKILL.md should exist on disk");
+
+        // User edits the skill — must survive a reload.
+        std::fs::write(
+            &ws_path,
+            "---\nname: workspace\ndescription: edited\n---\nuser body\n",
+        )
+        .unwrap();
+        let reloaded = SkillStore::load(tmp.path()).unwrap();
+        let body = reloaded.get_body("workspace").unwrap();
+        assert!(
+            body.contains("user body"),
+            "user edits must not be overwritten"
+        );
+    }
 
     #[test]
     fn parse_skill_frontmatter() {

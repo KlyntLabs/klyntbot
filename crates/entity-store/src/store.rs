@@ -255,6 +255,7 @@ impl EntityStore {
         let id: String = row
             .try_get("id")
             .map_err(|e| common::KlyntbotError::Storage(e.to_string()))?;
+        let position: String = row.try_get("position").unwrap_or_default();
         let created_at: String = row
             .try_get("created_at")
             .map_err(|e| common::KlyntbotError::Storage(e.to_string()))?;
@@ -273,6 +274,7 @@ impl EntityStore {
             id,
             database_id: database_id.to_string(),
             fields: fields_map,
+            position,
             created_at,
             updated_at,
         })
@@ -724,14 +726,32 @@ impl EntityStore {
             }
         }
 
+        // Compute a fractional index position that sorts after the current last row.
+        let last_position: Option<(String,)> = sqlx::query_as(&format!(
+            "SELECT position FROM [{}] ORDER BY position DESC LIMIT 1",
+            table
+        ))
+        .fetch_optional(&self.pool)
+        .await
+        .map_err(|e| common::KlyntbotError::Storage(e.to_string()))?;
+        let prev_key = last_position.and_then(|(p,)| if p.is_empty() { None } else { Some(p) });
+        let position = lexicon_fractional_index::key_between(&prev_key, &None)
+            .map_err(|e| common::KlyntbotError::Storage(format!("fractional key error: {e}")))?;
+
         // Build column list and values
         let mut columns = vec![
             "id".to_string(),
+            "position".to_string(),
             "created_at".to_string(),
             "updated_at".to_string(),
         ];
-        let mut placeholders = vec!["?".to_string(), "?".to_string(), "?".to_string()];
-        let mut values: Vec<String> = vec![entity_id.clone(), now.clone(), now.clone()];
+        let mut placeholders = vec![
+            "?".to_string(),
+            "?".to_string(),
+            "?".to_string(),
+            "?".to_string(),
+        ];
+        let mut values: Vec<String> = vec![entity_id.clone(), position, now.clone(), now.clone()];
 
         for field_def in &db.fields {
             if !field_def.field_type.is_editable() {
@@ -833,6 +853,98 @@ impl EntityStore {
             .await
     }
 
+    /// Reorder an entity by setting its fractional position between two neighbors.
+    /// Pass the IDs of the entities that should end up immediately before and after.
+    /// Either may be `None` to signal "start" or "end" of the list.
+    pub async fn reorder_entity(
+        &self,
+        database_id: &str,
+        entity_id: &str,
+        before_id: Option<&str>,
+        after_id: Option<&str>,
+    ) -> Result<Entity> {
+        let db = self.get_schema_cached(database_id).await?;
+        let table = format!("db_{}", db.slug);
+
+        let before_pos = if let Some(id) = before_id {
+            let row: Option<(String,)> =
+                sqlx::query_as(&format!("SELECT position FROM [{}] WHERE id = ?", table))
+                    .bind(id)
+                    .fetch_optional(&self.pool)
+                    .await
+                    .map_err(|e| common::KlyntbotError::Storage(e.to_string()))?;
+            row.map(|(p,)| p).filter(|p| !p.is_empty())
+        } else {
+            None
+        };
+        let after_pos = if let Some(id) = after_id {
+            let row: Option<(String,)> =
+                sqlx::query_as(&format!("SELECT position FROM [{}] WHERE id = ?", table))
+                    .bind(id)
+                    .fetch_optional(&self.pool)
+                    .await
+                    .map_err(|e| common::KlyntbotError::Storage(e.to_string()))?;
+            row.map(|(p,)| p).filter(|p| !p.is_empty())
+        } else {
+            None
+        };
+
+        let new_key = lexicon_fractional_index::key_between(&before_pos, &after_pos)
+            .map_err(|e| common::KlyntbotError::Storage(format!("fractional key error: {e}")))?;
+        let now = chrono::Utc::now().to_rfc3339();
+        sqlx::query(&format!(
+            "UPDATE [{}] SET position = ?, updated_at = ? WHERE id = ?",
+            table
+        ))
+        .bind(&new_key)
+        .bind(&now)
+        .bind(entity_id)
+        .execute(&self.pool)
+        .await
+        .map_err(|e| common::KlyntbotError::Storage(format!("Failed to reorder entity: {e}")))?;
+
+        self.emit(bus::DomainEvent::EntityUpdated {
+            database_id: database_id.to_string(),
+            entity_id: entity_id.to_string(),
+            changed_fields: vec!["position".to_string()],
+        });
+
+        self.get_entity_with_schema(database_id, entity_id, &db)
+            .await
+    }
+
+    /// Reorder all views for a database by setting their position to match the given order.
+    pub async fn reorder_views(
+        &self,
+        database_id: &str,
+        view_ids: Vec<String>,
+    ) -> Result<Vec<ViewDefinition>> {
+        let now = chrono::Utc::now().to_rfc3339();
+        for (idx, view_id) in view_ids.iter().enumerate() {
+            sqlx::query(
+                "UPDATE database_views SET position = ?, updated_at = ? WHERE id = ? AND database_id = ?",
+            )
+            .bind(idx as i32)
+            .bind(&now)
+            .bind(view_id)
+            .bind(database_id)
+            .execute(&self.pool)
+            .await
+            .map_err(|e| common::KlyntbotError::Storage(format!("Failed to reorder view: {e}")))?;
+        }
+        self.list_views(database_id).await
+    }
+
+    /// Ensure all existing entity tables have the `position` column and backfill missing keys.
+    /// Called once at startup to bring legacy databases up to current schema.
+    pub async fn ensure_ready(&self) -> Result<()> {
+        let dbs = self.list_databases().await?;
+        for db in dbs {
+            crate::schema_ops::ensure_position_column(&self.pool, &db.slug).await?;
+        }
+        Ok(())
+    }
+
     pub async fn delete_entity(&self, database_id: &str, entity_id: &str) -> Result<()> {
         let db = self.get_schema_cached(database_id).await?;
         let table = format!("db_{}", db.slug);
@@ -906,6 +1018,7 @@ impl EntityStore {
             let id: String = row
                 .try_get("id")
                 .map_err(|e| common::KlyntbotError::Storage(e.to_string()))?;
+            let position: String = row.try_get("position").unwrap_or_default();
             let created_at: String = row
                 .try_get("created_at")
                 .map_err(|e| common::KlyntbotError::Storage(e.to_string()))?;
@@ -924,6 +1037,7 @@ impl EntityStore {
                 id,
                 database_id: database_id.to_string(),
                 fields: fields_map,
+                position,
                 created_at,
                 updated_at,
             });
@@ -1291,5 +1405,106 @@ mod tests {
             .await
             .unwrap();
         assert_eq!(entity.fields["status"], serde_json::json!("open"));
+    }
+
+    #[tokio::test]
+    async fn test_entity_position_is_assigned_on_create() {
+        let store = setup().await;
+        let db = store.create_database(test_input("Ranked")).await.unwrap();
+        store
+            .add_field(
+                &db.id,
+                CreateFieldInput {
+                    name: "Title".into(),
+                    slug: None,
+                    field_type: FieldType::Text,
+                    options: None,
+                    required: None,
+                    default_value: None,
+                    position: None,
+                },
+            )
+            .await
+            .unwrap();
+
+        let mut positions = Vec::new();
+        for i in 0..3 {
+            let mut fields = std::collections::HashMap::new();
+            fields.insert("title".to_string(), serde_json::json!(format!("Item {i}")));
+            let e = store.create_entity(&db.id, fields).await.unwrap();
+            assert!(!e.position.is_empty(), "position should be non-empty");
+            positions.push(e.position);
+        }
+        // Positions must be strictly increasing lexicographically
+        assert!(positions[0] < positions[1]);
+        assert!(positions[1] < positions[2]);
+    }
+
+    #[tokio::test]
+    async fn test_reorder_entity_between_neighbors() {
+        let store = setup().await;
+        let db = store.create_database(test_input("DragDrop")).await.unwrap();
+        store
+            .add_field(
+                &db.id,
+                CreateFieldInput {
+                    name: "Title".into(),
+                    slug: None,
+                    field_type: FieldType::Text,
+                    options: None,
+                    required: None,
+                    default_value: None,
+                    position: None,
+                },
+            )
+            .await
+            .unwrap();
+
+        let mut ids = Vec::new();
+        for i in 0..3 {
+            let mut fields = std::collections::HashMap::new();
+            fields.insert("title".to_string(), serde_json::json!(format!("{i}")));
+            let e = store.create_entity(&db.id, fields).await.unwrap();
+            ids.push(e.id);
+        }
+        // Move the last item between the first two.
+        let moved = store
+            .reorder_entity(&db.id, &ids[2], Some(&ids[0]), Some(&ids[1]))
+            .await
+            .unwrap();
+        // Fetch all and confirm order by position.
+        let first = store.get_entity(&db.id, &ids[0]).await.unwrap();
+        let second = store.get_entity(&db.id, &ids[1]).await.unwrap();
+        assert!(first.position < moved.position);
+        assert!(moved.position < second.position);
+    }
+
+    #[tokio::test]
+    async fn test_reorder_views_batch() {
+        let store = setup().await;
+        let db = store
+            .create_database(test_input("ViewOrder"))
+            .await
+            .unwrap();
+        let v1 = store
+            .create_view(&db.id, "A", ViewType::Table, ViewConfig::default(), false)
+            .await
+            .unwrap();
+        let v2 = store
+            .create_view(&db.id, "B", ViewType::Board, ViewConfig::default(), false)
+            .await
+            .unwrap();
+        let v3 = store
+            .create_view(&db.id, "C", ViewType::List, ViewConfig::default(), false)
+            .await
+            .unwrap();
+        // Reverse order: v3, v2, v1
+        let reordered = store
+            .reorder_views(&db.id, vec![v3.id.clone(), v2.id.clone(), v1.id.clone()])
+            .await
+            .unwrap();
+        assert_eq!(reordered[0].id, v3.id);
+        assert_eq!(reordered[1].id, v2.id);
+        assert_eq!(reordered[2].id, v1.id);
     }
 }

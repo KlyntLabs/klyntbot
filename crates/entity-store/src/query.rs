@@ -13,13 +13,20 @@ use common::Result;
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct QueryParams {
+    /// Flat filter list (legacy; AND-combined with `filter` tree).
     #[serde(default)]
     pub filters: Vec<FilterRule>,
+    /// Nested filter tree (Notion-style AND/OR groups).
+    #[serde(default)]
+    pub filter: Option<FilterGroup>,
     #[serde(default)]
     pub sorts: Vec<SortRule>,
     pub limit: Option<i64>,
     pub offset: Option<i64>,
 }
+
+/// Maximum nesting depth for filter groups (matches Notion's limit).
+const MAX_FILTER_DEPTH: usize = 3;
 
 /// Result of a query — entities plus total count (before limit/offset).
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -42,6 +49,13 @@ pub async fn query_entities(
     // Build WHERE clause
     let mut where_parts = Vec::new();
     let mut bind_values: Vec<String> = Vec::new();
+
+    // Build SQL for the nested filter tree (if any).
+    if let Some(ref tree) = params.filter {
+        if let Some(sql) = build_filter_group(tree, &field_map, &mut bind_values, 0) {
+            where_parts.push(sql);
+        }
+    }
 
     for filter in &params.filters {
         // Allow filtering on built-in columns too
@@ -127,16 +141,18 @@ pub async fn query_entities(
         format!(" WHERE {}", where_parts.join(" AND "))
     };
 
-    // Build ORDER BY
+    // Build ORDER BY — default to user-ordering (position ASC) with created_at tiebreaker.
     let order_by = if params.sorts.is_empty() {
-        " ORDER BY created_at DESC".to_string()
+        " ORDER BY position ASC, created_at ASC".to_string()
     } else {
         let parts: Vec<String> = params
             .sorts
             .iter()
             .filter(|s| {
-                matches!(s.field.as_str(), "id" | "created_at" | "updated_at")
-                    || field_map.contains_key(s.field.as_str())
+                matches!(
+                    s.field.as_str(),
+                    "id" | "position" | "created_at" | "updated_at"
+                ) || field_map.contains_key(s.field.as_str())
             })
             .map(|s| {
                 let dir = match s.direction {
@@ -191,6 +207,7 @@ pub async fn query_entities(
         let id: String = row
             .try_get("id")
             .map_err(|e| common::KlyntbotError::Storage(e.to_string()))?;
+        let position: String = row.try_get("position").unwrap_or_default();
         let created_at: String = row
             .try_get("created_at")
             .map_err(|e| common::KlyntbotError::Storage(e.to_string()))?;
@@ -209,12 +226,125 @@ pub async fn query_entities(
             id,
             database_id: schema.id.clone(),
             fields,
+            position,
             created_at,
             updated_at,
         });
     }
 
     Ok(QueryResult { entities, total })
+}
+
+/// Recursively build WHERE-clause SQL for a filter group. Returns None for empty groups
+/// (callers should omit them rather than emit `()` which SQLite rejects).
+fn build_filter_group(
+    group: &FilterGroup,
+    field_map: &HashMap<&str, &FieldDefinition>,
+    bind_values: &mut Vec<String>,
+    depth: usize,
+) -> Option<String> {
+    if depth >= MAX_FILTER_DEPTH {
+        return None;
+    }
+    let mut parts = Vec::with_capacity(group.nodes.len());
+    for node in &group.nodes {
+        match node {
+            FilterNode::Rule(rule) => {
+                if let Some(sql) = build_rule_sql(rule, field_map, bind_values) {
+                    parts.push(sql);
+                }
+            }
+            FilterNode::Group(sub) => {
+                if let Some(sql) = build_filter_group(sub, field_map, bind_values, depth + 1) {
+                    parts.push(sql);
+                }
+            }
+        }
+    }
+    if parts.is_empty() {
+        return None;
+    }
+    let joiner = match group.op {
+        LogicOp::And => " AND ",
+        LogicOp::Or => " OR ",
+    };
+    Some(format!("({})", parts.join(joiner)))
+}
+
+/// Build SQL for a single FilterRule. Returns None if the rule references an unknown field.
+fn build_rule_sql(
+    filter: &FilterRule,
+    field_map: &HashMap<&str, &FieldDefinition>,
+    bind_values: &mut Vec<String>,
+) -> Option<String> {
+    let is_builtin = matches!(
+        filter.field.as_str(),
+        "id" | "position" | "created_at" | "updated_at"
+    );
+    if !is_builtin && !field_map.contains_key(filter.field.as_str()) {
+        return None;
+    }
+    let col = format!("[{}]", filter.field);
+    Some(match filter.op {
+        FilterOp::Eq => {
+            bind_values.push(value_to_sql_string(&filter.value));
+            format!("{col} = ?")
+        }
+        FilterOp::Neq => {
+            bind_values.push(value_to_sql_string(&filter.value));
+            format!("{col} != ?")
+        }
+        FilterOp::Gt => {
+            bind_values.push(value_to_sql_string(&filter.value));
+            format!("{col} > ?")
+        }
+        FilterOp::Gte => {
+            bind_values.push(value_to_sql_string(&filter.value));
+            format!("{col} >= ?")
+        }
+        FilterOp::Lt => {
+            bind_values.push(value_to_sql_string(&filter.value));
+            format!("{col} < ?")
+        }
+        FilterOp::Lte => {
+            bind_values.push(value_to_sql_string(&filter.value));
+            format!("{col} <= ?")
+        }
+        FilterOp::Contains => {
+            let s = value_to_sql_string(&filter.value);
+            bind_values.push(format!("%{s}%"));
+            format!("{col} LIKE ?")
+        }
+        FilterOp::NotContains => {
+            let s = value_to_sql_string(&filter.value);
+            bind_values.push(format!("%{s}%"));
+            format!("{col} NOT LIKE ?")
+        }
+        FilterOp::IsEmpty => format!("({col} IS NULL OR {col} = '')"),
+        FilterOp::IsNotEmpty => format!("({col} IS NOT NULL AND {col} != '')"),
+        FilterOp::In => {
+            let arr = filter.value.as_array()?;
+            if arr.is_empty() {
+                return Some("0".to_string());
+            }
+            let placeholders: Vec<&str> = arr.iter().map(|_| "?").collect();
+            for v in arr {
+                bind_values.push(value_to_sql_string(v));
+            }
+            format!("{col} IN ({})", placeholders.join(", "))
+        }
+        FilterOp::NotIn => {
+            let arr = filter.value.as_array()?;
+            if arr.is_empty() {
+                return Some("1".to_string());
+            }
+            let placeholders: Vec<&str> = arr.iter().map(|_| "?").collect();
+            for v in arr {
+                bind_values.push(value_to_sql_string(v));
+            }
+            format!("{col} NOT IN ({})", placeholders.join(", "))
+        }
+    })
 }
 
 fn value_to_sql_string(val: &serde_json::Value) -> String {
@@ -370,6 +500,54 @@ mod tests {
         assert_eq!(result.total, 4); // total is unaffected by limit
         assert_eq!(result.entities.len(), 2);
         assert_eq!(result.entities[0].fields["score"], serde_json::json!(30.0));
+    }
+
+    #[tokio::test]
+    async fn test_query_nested_filter_and_or() {
+        // (name = "Alpha") OR (score > 20 AND score <= 30) → Alpha + Gamma
+        let store = setup().await;
+        let schema = setup_with_entities(&store).await;
+
+        let filter = FilterGroup {
+            op: LogicOp::Or,
+            nodes: vec![
+                FilterNode::Rule(FilterRule {
+                    field: "name".into(),
+                    op: FilterOp::Eq,
+                    value: serde_json::json!("Alpha"),
+                }),
+                FilterNode::Group(FilterGroup {
+                    op: LogicOp::And,
+                    nodes: vec![
+                        FilterNode::Rule(FilterRule {
+                            field: "score".into(),
+                            op: FilterOp::Gt,
+                            value: serde_json::json!(20),
+                        }),
+                        FilterNode::Rule(FilterRule {
+                            field: "score".into(),
+                            op: FilterOp::Lte,
+                            value: serde_json::json!(30),
+                        }),
+                    ],
+                }),
+            ],
+        };
+        let params = QueryParams {
+            filter: Some(filter),
+            ..Default::default()
+        };
+        let result = query_entities(store.pool(), &schema, &params)
+            .await
+            .unwrap();
+        assert_eq!(result.total, 2);
+        let names: std::collections::HashSet<_> = result
+            .entities
+            .iter()
+            .map(|e| e.fields["name"].as_str().unwrap().to_string())
+            .collect();
+        assert!(names.contains("Alpha"));
+        assert!(names.contains("Gamma"));
     }
 
     #[tokio::test]

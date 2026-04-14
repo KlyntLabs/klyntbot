@@ -57,6 +57,7 @@ impl AppCore {
         &self,
         database_id: String,
         filters: Option<Value>,
+        filter: Option<Value>,
         sorts: Option<Value>,
         limit: Option<i64>,
         offset: Option<i64>,
@@ -70,6 +71,7 @@ impl AppCore {
             filters: filters
                 .and_then(|f| serde_json::from_value(f).ok())
                 .unwrap_or_default(),
+            filter: filter.and_then(|f| serde_json::from_value(f).ok()),
             sorts: sorts
                 .and_then(|s| serde_json::from_value(s).ok())
                 .unwrap_or_default(),
@@ -122,6 +124,27 @@ impl AppCore {
         let store = self.require_entity_store()?;
         store
             .delete_entity(&database_id, &entity_id)
+            .await
+            .map_err(Into::into)
+    }
+
+    /// Reorder an entity to sit between `before_id` and `after_id` (either may be None
+    /// to signal start or end of the list). Returns the updated entity.
+    pub async fn db_reorder_entity(
+        &self,
+        database_id: String,
+        entity_id: String,
+        before_id: Option<String>,
+        after_id: Option<String>,
+    ) -> Result<Entity, ApiError> {
+        let store = self.require_entity_store()?;
+        store
+            .reorder_entity(
+                &database_id,
+                &entity_id,
+                before_id.as_deref(),
+                after_id.as_deref(),
+            )
             .await
             .map_err(Into::into)
     }
@@ -232,6 +255,19 @@ impl AppCore {
         let store = self.require_entity_store()?;
         store
             .delete_view(&database_id, &view_id)
+            .await
+            .map_err(Into::into)
+    }
+
+    /// Reorder views for a database. `view_ids` must list all view ids in the desired order.
+    pub async fn db_reorder_views(
+        &self,
+        database_id: String,
+        view_ids: Vec<String>,
+    ) -> Result<Vec<ViewDefinition>, ApiError> {
+        let store = self.require_entity_store()?;
+        store
+            .reorder_views(&database_id, view_ids)
             .await
             .map_err(Into::into)
     }

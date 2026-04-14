@@ -41,6 +41,7 @@ impl DatabaseContextSource {
         for db in &databases {
             let params = entity_store::query::QueryParams {
                 filters: vec![],
+                filter: None,
                 sorts: vec![entity_store::SortRule {
                     field: "created_at".into(),
                     direction: entity_store::SortDirection::Desc,

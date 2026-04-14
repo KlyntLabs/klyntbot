@@ -65,6 +65,7 @@ pub async fn list_entities(
 
     let params = query::QueryParams {
         filters,
+        filter: None,
         sorts,
         limit: p.optional_i64("limit")?,
         offset: p.optional_i64("offset")?,

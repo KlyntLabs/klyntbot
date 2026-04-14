@@ -4325,6 +4325,7 @@ dependencies = [
  "bus",
  "chrono",
  "common",
+ "lexicon_fractional_index",
  "serde",
  "serde_json",
  "sqlx",
@@ -7789,6 +7790,12 @@ checksum = "409851a618475d2d5796377cad353802345cba92c867d9fbcde9cf4eac4e14df"
 dependencies = [
  "lexical-util",
 ]
+
+[[package]]
+name = "lexicon_fractional_index"
+version = "0.0.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b14c52534dd690e23b687bdbbbe300d7ec5c45f25e9261f72b70751af67067d3"
 
 [[package]]
 name = "libappindicator"

@@ -157,6 +157,11 @@ impl AppCore {
                 .with_event_bus(Arc::clone(&domain_event_bus));
             let store = Arc::new(store);
 
+            // Backfill `position` column on any existing entity tables.
+            if let Err(e) = store.ensure_ready().await {
+                warn!("entity_store ensure_ready failed: {e}");
+            }
+
             // Install default templates on first run (empty databases table).
             match store.list_databases().await {
                 Ok(dbs) if dbs.is_empty() => {

@@ -54,19 +54,69 @@ pub fn slugify(name: &str) -> String {
     result
 }
 
-/// Create a dynamic entity table: db_{slug} with id, created_at, updated_at.
+/// Create a dynamic entity table: db_{slug} with id, position, created_at, updated_at.
 pub async fn create_entity_table(pool: &SqlitePool, slug: &str) -> Result<()> {
     validate_slug(slug)?;
     let table = format!("db_{slug}");
     let sql = format!(
         "CREATE TABLE IF NOT EXISTS [{table}] (\
          id TEXT PRIMARY KEY, \
+         position TEXT NOT NULL DEFAULT '', \
          created_at TEXT NOT NULL, \
          updated_at TEXT NOT NULL)"
     );
     sqlx::query(&sql).execute(pool).await.map_err(|e| {
         common::KlyntbotError::Storage(format!("Failed to create table {table}: {e}"))
     })?;
+    let idx_sql =
+        format!("CREATE INDEX IF NOT EXISTS [idx_{slug}_position] ON [{table}](position)");
+    sqlx::query(&idx_sql).execute(pool).await.map_err(|e| {
+        common::KlyntbotError::Storage(format!("Failed to create position index on {table}: {e}"))
+    })?;
+    Ok(())
+}
+
+/// Ensure an existing entity table has the `position` column. Backfills existing rows with
+/// fractional index keys ordered by created_at so drag-reordering works against legacy data.
+pub async fn ensure_position_column(pool: &SqlitePool, slug: &str) -> Result<()> {
+    validate_slug(slug)?;
+    let table = format!("db_{slug}");
+    let cols: Vec<(i32, String, String, i32, Option<String>, i32)> =
+        sqlx::query_as(&format!("PRAGMA table_info([{table}])"))
+            .fetch_all(pool)
+            .await
+            .map_err(|e| common::KlyntbotError::Storage(e.to_string()))?;
+    if cols.iter().any(|c| c.1 == "position") {
+        return Ok(());
+    }
+    let alter = format!("ALTER TABLE [{table}] ADD COLUMN position TEXT NOT NULL DEFAULT ''");
+    sqlx::query(&alter).execute(pool).await.map_err(|e| {
+        common::KlyntbotError::Storage(format!("Failed to add position column to {table}: {e}"))
+    })?;
+    let idx_sql =
+        format!("CREATE INDEX IF NOT EXISTS [idx_{slug}_position] ON [{table}](position)");
+    sqlx::query(&idx_sql)
+        .execute(pool)
+        .await
+        .map_err(|e| common::KlyntbotError::Storage(e.to_string()))?;
+    // Backfill: assign ascending fractional keys by created_at order.
+    let ids: Vec<(String,)> =
+        sqlx::query_as(&format!("SELECT id FROM [{table}] ORDER BY created_at ASC"))
+            .fetch_all(pool)
+            .await
+            .map_err(|e| common::KlyntbotError::Storage(e.to_string()))?;
+    let mut prev: Option<String> = None;
+    for (id,) in ids {
+        let key = lexicon_fractional_index::key_between(&prev, &None)
+            .map_err(|e| common::KlyntbotError::Storage(format!("fractional key error: {e}")))?;
+        sqlx::query(&format!("UPDATE [{table}] SET position = ? WHERE id = ?"))
+            .bind(&key)
+            .bind(&id)
+            .execute(pool)
+            .await
+            .map_err(|e| common::KlyntbotError::Storage(e.to_string()))?;
+        prev = Some(key);
+    }
     Ok(())
 }
 

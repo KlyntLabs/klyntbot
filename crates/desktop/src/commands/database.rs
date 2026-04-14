@@ -47,12 +47,13 @@ pub async fn db_query(
     state: State<'_, Arc<AppCore>>,
     database_id: String,
     filters: Option<Value>,
+    filter: Option<Value>,
     sorts: Option<Value>,
     limit: Option<i64>,
     offset: Option<i64>,
 ) -> Result<Value, ApiError> {
     state
-        .db_query(database_id, filters, sorts, limit, offset)
+        .db_query(database_id, filters, filter, sorts, limit, offset)
         .await
 }
 
@@ -82,6 +83,28 @@ pub async fn db_delete_entity(
     entity_id: String,
 ) -> Result<(), ApiError> {
     state.db_delete_entity(database_id, entity_id).await
+}
+
+#[tauri::command]
+pub async fn db_reorder_entity(
+    state: State<'_, Arc<AppCore>>,
+    database_id: String,
+    entity_id: String,
+    before_id: Option<String>,
+    after_id: Option<String>,
+) -> Result<Entity, ApiError> {
+    state
+        .db_reorder_entity(database_id, entity_id, before_id, after_id)
+        .await
+}
+
+#[tauri::command]
+pub async fn db_reorder_views(
+    state: State<'_, Arc<AppCore>>,
+    database_id: String,
+    view_ids: Vec<String>,
+) -> Result<Vec<ViewDefinition>, ApiError> {
+    state.db_reorder_views(database_id, view_ids).await
 }
 
 #[tauri::command]
@@ -195,6 +218,8 @@ pub(crate) const DEV_COMMANDS: &[&str] = &[
     "db_create_entity",
     "db_update_entity",
     "db_delete_entity",
+    "db_reorder_entity",
+    "db_reorder_views",
     "db_add_field",
     "db_modify_field",
     "db_remove_field",
@@ -233,10 +258,14 @@ pub(crate) async fn dispatch_dev(
         "db_query" => {
             let id = try_field!(dev::get_str(body, "databaseId"));
             let filters: Option<serde_json::Value> = dev::get(body, "filters");
+            let filter: Option<serde_json::Value> = dev::get(body, "filter");
             let sorts: Option<serde_json::Value> = dev::get(body, "sorts");
             let limit: Option<i64> = dev::get(body, "limit");
             let offset: Option<i64> = dev::get(body, "offset");
-            dev::val(core.db_query(id, filters, sorts, limit, offset).await)
+            dev::val(
+                core.db_query(id, filters, filter, sorts, limit, offset)
+                    .await,
+            )
         }
         "db_create_entity" => {
             let db_id = try_field!(dev::get_str(body, "databaseId"));
@@ -253,6 +282,21 @@ pub(crate) async fn dispatch_dev(
             let db_id = try_field!(dev::get_str(body, "databaseId"));
             let entity_id = try_field!(dev::get_str(body, "entityId"));
             dev::val(core.db_delete_entity(db_id, entity_id).await)
+        }
+        "db_reorder_entity" => {
+            let db_id = try_field!(dev::get_str(body, "databaseId"));
+            let entity_id = try_field!(dev::get_str(body, "entityId"));
+            let before_id: Option<String> = dev::get(body, "beforeId");
+            let after_id: Option<String> = dev::get(body, "afterId");
+            dev::val(
+                core.db_reorder_entity(db_id, entity_id, before_id, after_id)
+                    .await,
+            )
+        }
+        "db_reorder_views" => {
+            let db_id = try_field!(dev::get_str(body, "databaseId"));
+            let view_ids: Vec<String> = dev::get(body, "viewIds").unwrap_or_default();
+            dev::val(core.db_reorder_views(db_id, view_ids).await)
         }
         "db_add_field" => {
             let db_id = try_field!(dev::get_str(body, "databaseId"));

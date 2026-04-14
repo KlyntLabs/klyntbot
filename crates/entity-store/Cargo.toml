@@ -17,6 +17,7 @@ async-trait.workspace = true
 chrono = { workspace = true }
 tracing.workspace = true
 uuid = { workspace = true }
+lexicon_fractional_index = "0.0.3"
 
 [dev-dependencies]
 tokio = { workspace = true, features = ["macros", "test-util"] }
