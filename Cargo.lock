@@ -325,6 +325,7 @@ dependencies = [
  "session",
  "shellexpand",
  "skill-system",
+ "skills-marketplace",
  "sqlx",
  "storage",
  "tempfile",
@@ -633,6 +634,16 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "516b6b4f0e40d50dcda9365d53964ec74560ad4284da2e7fc97122cd83174516"
 dependencies = [
  "stable_deref_trait",
+]
+
+[[package]]
+name = "assert-json-diff"
+version = "2.0.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "47e4f2b81832e72834d7518d8487a0396a28cc408186a2e8854c0f98011faf12"
+dependencies = [
+ "serde",
+ "serde_json",
 ]
 
 [[package]]
@@ -3852,6 +3863,24 @@ dependencies = [
  "regex",
  "sqlparser",
 ]
+
+[[package]]
+name = "deadpool"
+version = "0.12.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0be2b1d1d6ec8d846f05e137292d0b89133caf95ef33695424c09568bdd39b1b"
+dependencies = [
+ "deadpool-runtime",
+ "lazy_static",
+ "num_cpus",
+ "tokio",
+]
+
+[[package]]
+name = "deadpool-runtime"
+version = "0.1.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "092966b41edc516079bdf31ec78a2e0588d1d0c08f78b91d8307215928642b2b"
 
 [[package]]
 name = "debugid"
@@ -12175,6 +12204,64 @@ dependencies = [
 ]
 
 [[package]]
+name = "skills-installer"
+version = "0.1.0"
+dependencies = [
+ "bus",
+ "chrono",
+ "common",
+ "entity-store",
+ "serde",
+ "serde_json",
+ "skill-system",
+ "skills-marketplace",
+ "skills-registry",
+ "sqlx",
+ "storage",
+ "tempfile",
+ "thiserror 2.0.18",
+ "tokio",
+ "tracing",
+]
+
+[[package]]
+name = "skills-marketplace"
+version = "0.1.0"
+dependencies = [
+ "chrono",
+ "common",
+ "serde",
+ "serde_json",
+ "sqlx",
+ "storage",
+ "tempfile",
+ "thiserror 2.0.18",
+ "tokio",
+ "tools-core",
+]
+
+[[package]]
+name = "skills-registry"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "common",
+ "hex",
+ "reqwest 0.13.2",
+ "serde",
+ "serde_json",
+ "serde_yaml",
+ "sha2",
+ "similar",
+ "skill-system",
+ "tempfile",
+ "thiserror 2.0.18",
+ "tokio",
+ "tracing",
+ "wiremock",
+]
+
+[[package]]
 name = "slab"
 version = "0.4.12"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -15969,6 +16056,29 @@ checksum = "3f3fd376f71958b862e7afb20cfe5a22830e1963462f3a17f49d82a6c1d1f42d"
 dependencies = [
  "bitflags 2.10.0",
  "windows-sys 0.59.0",
+]
+
+[[package]]
+name = "wiremock"
+version = "0.6.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "08db1edfb05d9b3c1542e521aea074442088292f00b5f28e435c714a98f85031"
+dependencies = [
+ "assert-json-diff",
+ "base64 0.22.1",
+ "deadpool",
+ "futures",
+ "http 1.4.0",
+ "http-body-util",
+ "hyper",
+ "hyper-util",
+ "log",
+ "once_cell",
+ "regex",
+ "serde",
+ "serde_json",
+ "tokio",
+ "url",
 ]
 
 [[package]]

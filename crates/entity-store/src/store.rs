@@ -446,6 +446,19 @@ impl EntityStore {
         Ok(())
     }
 
+    pub async fn rename_database(&self, id: &str, new_name: &str) -> Result<()> {
+        let now = chrono::Utc::now().to_rfc3339();
+        sqlx::query("UPDATE databases SET name = ?, updated_at = ? WHERE id = ?")
+            .bind(new_name)
+            .bind(&now)
+            .bind(id)
+            .execute(&self.pool)
+            .await
+            .map_err(|e| common::KlyntbotError::Storage(e.to_string()))?;
+        self.invalidate_cache(id);
+        Ok(())
+    }
+
     // -----------------------------------------------------------------------
     // Field CRUD
     // -----------------------------------------------------------------------

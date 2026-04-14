@@ -621,6 +621,26 @@ pub enum DomainEvent {
         evolution_id: String,
         auto_applied: bool,
     },
+
+    // -- Skills marketplace --
+    SkillInstalled {
+        name: String,
+        source: String,
+        version: String,
+    },
+    SkillUpgraded {
+        name: String,
+        from_version: String,
+        to_version: String,
+    },
+    SkillUninstalled {
+        name: String,
+        mode: String,
+    },
+    SkillAdapted {
+        name: String,
+        adapter_model: String,
+    },
 }
 
 impl DomainEvent {
@@ -728,6 +748,10 @@ impl DomainEvent {
             Self::SchemaFieldRemoved { .. } => "SchemaFieldRemoved",
             Self::SchemaEvolutionProposed { .. } => "SchemaEvolutionProposed",
             Self::SchemaEvolutionApplied { .. } => "SchemaEvolutionApplied",
+            Self::SkillInstalled { .. } => "SkillInstalled",
+            Self::SkillUpgraded { .. } => "SkillUpgraded",
+            Self::SkillUninstalled { .. } => "SkillUninstalled",
+            Self::SkillAdapted { .. } => "SkillAdapted",
         }
     }
 
@@ -839,6 +863,11 @@ impl DomainEvent {
             | Self::SchemaFieldRemoved { .. }
             | Self::SchemaEvolutionProposed { .. }
             | Self::SchemaEvolutionApplied { .. } => "entity_store",
+
+            Self::SkillInstalled { .. }
+            | Self::SkillUpgraded { .. }
+            | Self::SkillUninstalled { .. }
+            | Self::SkillAdapted { .. } => "skills",
         }
     }
 }

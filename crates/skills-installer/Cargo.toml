@@ -1,0 +1,26 @@
+[package]
+name = "skills-installer"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[dependencies]
+common = { workspace = true }
+skills-marketplace = { workspace = true }
+skills-registry = { workspace = true }
+skill-system = { workspace = true }
+entity-store = { workspace = true }
+bus = { workspace = true }
+serde = { workspace = true, features = ["derive"] }
+serde_json = { workspace = true }
+sqlx = { workspace = true }
+tokio = { workspace = true, features = ["fs"] }
+chrono = { workspace = true }
+tracing = { workspace = true }
+thiserror = { workspace = true }
+
+[dev-dependencies]
+tempfile = { workspace = true }
+storage = { workspace = true }
+tokio = { workspace = true, features = ["macros", "rt-multi-thread"] }
