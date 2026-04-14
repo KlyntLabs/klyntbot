@@ -36,6 +36,7 @@ pub mod retention_history;
 pub mod review_stats;
 pub mod settings;
 pub mod shortcuts;
+pub mod skills;
 pub mod squads;
 pub mod status;
 pub mod timeline;

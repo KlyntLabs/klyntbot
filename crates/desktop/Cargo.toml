@@ -32,6 +32,9 @@ tools = { workspace = true }
 tools-core = { workspace = true }
 voice-engine = { workspace = true }
 entity-store = { workspace = true }
+skills-marketplace = { workspace = true }
+skills-registry = { workspace = true }
+skills-installer = { workspace = true }
 tauri = { version = "2", features = ["macos-private-api", "tray-icon", "image-png"] }
 tauri-plugin-global-shortcut = "2"
 tauri-plugin-notification = "2"

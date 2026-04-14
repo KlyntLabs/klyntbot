@@ -44,6 +44,17 @@ pub fn require<T: serde::de::DeserializeOwned>(body: &Value, key: &str) -> Resul
         .ok_or_else(|| ApiError::new("VALIDATION", format!("missing required field: {key}")))
 }
 
+/// Deserialize a required structured field from the body.
+pub fn require_de<T: serde::de::DeserializeOwned>(
+    body: &Value,
+    field: &str,
+) -> Result<T, ApiError> {
+    let v = body
+        .get(field)
+        .ok_or_else(|| ApiError::new("VALIDATION", format!("missing field {field}")))?;
+    serde_json::from_value(v.clone()).map_err(|e| ApiError::new("VALIDATION", e.to_string()))
+}
+
 /// Early-return with `Some(Err(e))` from a `dispatch_dev` function.
 macro_rules! try_field {
     ($expr:expr) => {
