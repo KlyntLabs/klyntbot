@@ -109,6 +109,13 @@ pub(super) async fn init_storage(
     .await
     .map_err(|e| format!("entity-store migration failed: {e}"))?;
 
+    storage::StoragePool::run_feature_migrations(
+        storage_pool.inner(),
+        &skills_marketplace::SkillsMarketplaceFeature::migrations(),
+    )
+    .await
+    .map_err(|e| format!("skills-marketplace migrations: {e}"))?;
+
     // Run language-learning feature migrations.
     StoragePool::run_feature_migrations(
         storage_pool.inner(),
