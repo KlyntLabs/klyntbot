@@ -99,7 +99,6 @@ pub async fn ensure_position_column(pool: &SqlitePool, slug: &str) -> Result<()>
         .execute(pool)
         .await
         .map_err(|e| common::KlyntbotError::Storage(e.to_string()))?;
-    // Backfill: assign ascending fractional keys by created_at order.
     let ids: Vec<(String,)> =
         sqlx::query_as(&format!("SELECT id FROM [{table}] ORDER BY created_at ASC"))
             .fetch_all(pool)
@@ -107,8 +106,7 @@ pub async fn ensure_position_column(pool: &SqlitePool, slug: &str) -> Result<()>
             .map_err(|e| common::KlyntbotError::Storage(e.to_string()))?;
     let mut prev: Option<String> = None;
     for (id,) in ids {
-        let key = lexicon_fractional_index::key_between(&prev, &None)
-            .map_err(|e| common::KlyntbotError::Storage(format!("fractional key error: {e}")))?;
+        let key = crate::store::fractional_key(&prev, &None)?;
         sqlx::query(&format!("UPDATE [{table}] SET position = ? WHERE id = ?"))
             .bind(&key)
             .bind(&id)

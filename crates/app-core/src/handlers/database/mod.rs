@@ -128,8 +128,6 @@ impl AppCore {
             .map_err(Into::into)
     }
 
-    /// Reorder an entity to sit between `before_id` and `after_id` (either may be None
-    /// to signal start or end of the list). Returns the updated entity.
     pub async fn db_reorder_entity(
         &self,
         database_id: String,
@@ -259,7 +257,6 @@ impl AppCore {
             .map_err(Into::into)
     }
 
-    /// Reorder views for a database. `view_ids` must list all view ids in the desired order.
     pub async fn db_reorder_views(
         &self,
         database_id: String,

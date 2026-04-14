@@ -117,6 +117,11 @@ fn field_type_to_db(ft: &FieldType) -> String {
 // Value conversion helpers
 // ---------------------------------------------------------------------------
 
+pub(crate) fn fractional_key(prev: &Option<String>, next: &Option<String>) -> Result<String> {
+    lexicon_fractional_index::key_between(prev, next)
+        .map_err(|e| common::KlyntbotError::Storage(format!("fractional key error: {e}")))
+}
+
 pub(crate) fn json_value_to_sql(val: &serde_json::Value) -> String {
     match val {
         serde_json::Value::Null => String::new(),
@@ -232,6 +237,16 @@ impl EntityStore {
     /// Invalidate cache for a database (call after schema changes).
     fn invalidate_cache(&self, database_id: &str) {
         self.schema_cache.lock().unwrap().remove(database_id);
+    }
+
+    async fn fetch_position(&self, table: &str, entity_id: &str) -> Result<Option<String>> {
+        let row: Option<(String,)> =
+            sqlx::query_as(&format!("SELECT position FROM [{table}] WHERE id = ?"))
+                .bind(entity_id)
+                .fetch_optional(&self.pool)
+                .await
+                .map_err(|e| common::KlyntbotError::Storage(e.to_string()))?;
+        Ok(row.map(|(p,)| p).filter(|p| !p.is_empty()))
     }
 
     /// Get a single entity using an already-loaded schema (avoids redundant DB lookup).
@@ -726,19 +741,15 @@ impl EntityStore {
             }
         }
 
-        // Compute a fractional index position that sorts after the current last row.
         let last_position: Option<(String,)> = sqlx::query_as(&format!(
-            "SELECT position FROM [{}] ORDER BY position DESC LIMIT 1",
-            table
+            "SELECT position FROM [{table}] ORDER BY position DESC LIMIT 1"
         ))
         .fetch_optional(&self.pool)
         .await
         .map_err(|e| common::KlyntbotError::Storage(e.to_string()))?;
         let prev_key = last_position.and_then(|(p,)| if p.is_empty() { None } else { Some(p) });
-        let position = lexicon_fractional_index::key_between(&prev_key, &None)
-            .map_err(|e| common::KlyntbotError::Storage(format!("fractional key error: {e}")))?;
+        let position = fractional_key(&prev_key, &None)?;
 
-        // Build column list and values
         let mut columns = vec![
             "id".to_string(),
             "position".to_string(),
@@ -853,9 +864,8 @@ impl EntityStore {
             .await
     }
 
-    /// Reorder an entity by setting its fractional position between two neighbors.
-    /// Pass the IDs of the entities that should end up immediately before and after.
-    /// Either may be `None` to signal "start" or "end" of the list.
+    /// Reorder an entity between two neighbors. `before_id` / `after_id` may be None for
+    /// "start" / "end" of the list.
     pub async fn reorder_entity(
         &self,
         database_id: &str,
@@ -866,35 +876,19 @@ impl EntityStore {
         let db = self.get_schema_cached(database_id).await?;
         let table = format!("db_{}", db.slug);
 
-        let before_pos = if let Some(id) = before_id {
-            let row: Option<(String,)> =
-                sqlx::query_as(&format!("SELECT position FROM [{}] WHERE id = ?", table))
-                    .bind(id)
-                    .fetch_optional(&self.pool)
-                    .await
-                    .map_err(|e| common::KlyntbotError::Storage(e.to_string()))?;
-            row.map(|(p,)| p).filter(|p| !p.is_empty())
-        } else {
-            None
+        let before_pos = match before_id {
+            Some(id) => self.fetch_position(&table, id).await?,
+            None => None,
         };
-        let after_pos = if let Some(id) = after_id {
-            let row: Option<(String,)> =
-                sqlx::query_as(&format!("SELECT position FROM [{}] WHERE id = ?", table))
-                    .bind(id)
-                    .fetch_optional(&self.pool)
-                    .await
-                    .map_err(|e| common::KlyntbotError::Storage(e.to_string()))?;
-            row.map(|(p,)| p).filter(|p| !p.is_empty())
-        } else {
-            None
+        let after_pos = match after_id {
+            Some(id) => self.fetch_position(&table, id).await?,
+            None => None,
         };
 
-        let new_key = lexicon_fractional_index::key_between(&before_pos, &after_pos)
-            .map_err(|e| common::KlyntbotError::Storage(format!("fractional key error: {e}")))?;
+        let new_key = fractional_key(&before_pos, &after_pos)?;
         let now = chrono::Utc::now().to_rfc3339();
         sqlx::query(&format!(
-            "UPDATE [{}] SET position = ?, updated_at = ? WHERE id = ?",
-            table
+            "UPDATE [{table}] SET position = ?, updated_at = ? WHERE id = ?"
         ))
         .bind(&new_key)
         .bind(&now)
@@ -913,13 +907,17 @@ impl EntityStore {
             .await
     }
 
-    /// Reorder all views for a database by setting their position to match the given order.
     pub async fn reorder_views(
         &self,
         database_id: &str,
         view_ids: Vec<String>,
     ) -> Result<Vec<ViewDefinition>> {
         let now = chrono::Utc::now().to_rfc3339();
+        let mut tx = self
+            .pool
+            .begin()
+            .await
+            .map_err(|e| common::KlyntbotError::Storage(e.to_string()))?;
         for (idx, view_id) in view_ids.iter().enumerate() {
             sqlx::query(
                 "UPDATE database_views SET position = ?, updated_at = ? WHERE id = ? AND database_id = ?",
@@ -928,19 +926,24 @@ impl EntityStore {
             .bind(&now)
             .bind(view_id)
             .bind(database_id)
-            .execute(&self.pool)
+            .execute(&mut *tx)
             .await
             .map_err(|e| common::KlyntbotError::Storage(format!("Failed to reorder view: {e}")))?;
         }
+        tx.commit()
+            .await
+            .map_err(|e| common::KlyntbotError::Storage(e.to_string()))?;
         self.list_views(database_id).await
     }
 
-    /// Ensure all existing entity tables have the `position` column and backfill missing keys.
-    /// Called once at startup to bring legacy databases up to current schema.
+    /// Startup hook: ensures each existing entity table has a `position` column and backfills it.
     pub async fn ensure_ready(&self) -> Result<()> {
-        let dbs = self.list_databases().await?;
-        for db in dbs {
-            crate::schema_ops::ensure_position_column(&self.pool, &db.slug).await?;
+        let slugs: Vec<(String,)> = sqlx::query_as("SELECT slug FROM databases")
+            .fetch_all(&self.pool)
+            .await
+            .map_err(|e| common::KlyntbotError::Storage(e.to_string()))?;
+        for (slug,) in slugs {
+            crate::schema_ops::ensure_position_column(&self.pool, &slug).await?;
         }
         Ok(())
     }

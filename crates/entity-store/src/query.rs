@@ -13,10 +13,8 @@ use common::Result;
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct QueryParams {
-    /// Flat filter list (legacy; AND-combined with `filter` tree).
     #[serde(default)]
     pub filters: Vec<FilterRule>,
-    /// Nested filter tree (Notion-style AND/OR groups).
     #[serde(default)]
     pub filter: Option<FilterGroup>,
     #[serde(default)]
@@ -25,8 +23,12 @@ pub struct QueryParams {
     pub offset: Option<i64>,
 }
 
-/// Maximum nesting depth for filter groups (matches Notion's limit).
+/// Matches Notion's 3-level nesting limit.
 const MAX_FILTER_DEPTH: usize = 3;
+
+fn is_builtin_column(name: &str) -> bool {
+    matches!(name, "id" | "position" | "created_at" | "updated_at")
+}
 
 /// Result of a query — entities plus total count (before limit/offset).
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -46,11 +48,9 @@ pub async fn query_entities(
     let field_map: HashMap<&str, &FieldDefinition> =
         schema.fields.iter().map(|f| (f.slug.as_str(), f)).collect();
 
-    // Build WHERE clause
     let mut where_parts = Vec::new();
     let mut bind_values: Vec<String> = Vec::new();
 
-    // Build SQL for the nested filter tree (if any).
     if let Some(ref tree) = params.filter {
         if let Some(sql) = build_filter_group(tree, &field_map, &mut bind_values, 0) {
             where_parts.push(sql);
@@ -58,80 +58,8 @@ pub async fn query_entities(
     }
 
     for filter in &params.filters {
-        // Allow filtering on built-in columns too
-        let is_builtin = matches!(filter.field.as_str(), "id" | "created_at" | "updated_at");
-        if !is_builtin && !field_map.contains_key(filter.field.as_str()) {
-            continue; // skip unknown fields
-        }
-
-        let col = format!("[{}]", filter.field);
-        match filter.op {
-            FilterOp::Eq => {
-                where_parts.push(format!("{col} = ?"));
-                bind_values.push(value_to_sql_string(&filter.value));
-            }
-            FilterOp::Neq => {
-                where_parts.push(format!("{col} != ?"));
-                bind_values.push(value_to_sql_string(&filter.value));
-            }
-            FilterOp::Gt => {
-                where_parts.push(format!("{col} > ?"));
-                bind_values.push(value_to_sql_string(&filter.value));
-            }
-            FilterOp::Gte => {
-                where_parts.push(format!("{col} >= ?"));
-                bind_values.push(value_to_sql_string(&filter.value));
-            }
-            FilterOp::Lt => {
-                where_parts.push(format!("{col} < ?"));
-                bind_values.push(value_to_sql_string(&filter.value));
-            }
-            FilterOp::Lte => {
-                where_parts.push(format!("{col} <= ?"));
-                bind_values.push(value_to_sql_string(&filter.value));
-            }
-            FilterOp::Contains => {
-                where_parts.push(format!("{col} LIKE ?"));
-                let s = value_to_sql_string(&filter.value);
-                bind_values.push(format!("%{s}%"));
-            }
-            FilterOp::NotContains => {
-                where_parts.push(format!("{col} NOT LIKE ?"));
-                let s = value_to_sql_string(&filter.value);
-                bind_values.push(format!("%{s}%"));
-            }
-            FilterOp::IsEmpty => {
-                where_parts.push(format!("({col} IS NULL OR {col} = '')"));
-            }
-            FilterOp::IsNotEmpty => {
-                where_parts.push(format!("({col} IS NOT NULL AND {col} != '')"));
-            }
-            FilterOp::In => {
-                if let Some(arr) = filter.value.as_array() {
-                    if arr.is_empty() {
-                        where_parts.push("0".to_string()); // always false
-                    } else {
-                        let placeholders: Vec<&str> = arr.iter().map(|_| "?").collect();
-                        where_parts.push(format!("{col} IN ({})", placeholders.join(", ")));
-                        for v in arr {
-                            bind_values.push(value_to_sql_string(v));
-                        }
-                    }
-                }
-            }
-            FilterOp::NotIn => {
-                if let Some(arr) = filter.value.as_array() {
-                    if arr.is_empty() {
-                        // no exclusions — always true, skip
-                    } else {
-                        let placeholders: Vec<&str> = arr.iter().map(|_| "?").collect();
-                        where_parts.push(format!("{col} NOT IN ({})", placeholders.join(", ")));
-                        for v in arr {
-                            bind_values.push(value_to_sql_string(v));
-                        }
-                    }
-                }
-            }
+        if let Some(sql) = build_rule_sql(filter, &field_map, &mut bind_values) {
+            where_parts.push(sql);
         }
     }
 
@@ -141,19 +69,13 @@ pub async fn query_entities(
         format!(" WHERE {}", where_parts.join(" AND "))
     };
 
-    // Build ORDER BY — default to user-ordering (position ASC) with created_at tiebreaker.
     let order_by = if params.sorts.is_empty() {
         " ORDER BY position ASC, created_at ASC".to_string()
     } else {
         let parts: Vec<String> = params
             .sorts
             .iter()
-            .filter(|s| {
-                matches!(
-                    s.field.as_str(),
-                    "id" | "position" | "created_at" | "updated_at"
-                ) || field_map.contains_key(s.field.as_str())
-            })
+            .filter(|s| is_builtin_column(&s.field) || field_map.contains_key(s.field.as_str()))
             .map(|s| {
                 let dir = match s.direction {
                     SortDirection::Asc => "ASC",
@@ -169,7 +91,6 @@ pub async fn query_entities(
         }
     };
 
-    // Count query
     let count_sql = format!("SELECT COUNT(*) as cnt FROM [{table}]{where_clause}");
     let mut count_query = sqlx::query(&count_sql);
     for v in &bind_values {
@@ -184,7 +105,6 @@ pub async fn query_entities(
         .map(|v| v as i64)
         .map_err(|e| common::KlyntbotError::Storage(e.to_string()))?;
 
-    // Select query
     let mut select_sql = format!("SELECT * FROM [{table}]{where_clause}{order_by}");
     if let Some(limit) = params.limit {
         select_sql.push_str(&format!(" LIMIT {limit}"));
@@ -235,8 +155,7 @@ pub async fn query_entities(
     Ok(QueryResult { entities, total })
 }
 
-/// Recursively build WHERE-clause SQL for a filter group. Returns None for empty groups
-/// (callers should omit them rather than emit `()` which SQLite rejects).
+/// Returns None for empty groups — SQLite rejects `()` as a WHERE clause.
 fn build_filter_group(
     group: &FilterGroup,
     field_map: &HashMap<&str, &FieldDefinition>,
@@ -271,17 +190,12 @@ fn build_filter_group(
     Some(format!("({})", parts.join(joiner)))
 }
 
-/// Build SQL for a single FilterRule. Returns None if the rule references an unknown field.
 fn build_rule_sql(
     filter: &FilterRule,
     field_map: &HashMap<&str, &FieldDefinition>,
     bind_values: &mut Vec<String>,
 ) -> Option<String> {
-    let is_builtin = matches!(
-        filter.field.as_str(),
-        "id" | "position" | "created_at" | "updated_at"
-    );
-    if !is_builtin && !field_map.contains_key(filter.field.as_str()) {
+    if !is_builtin_column(&filter.field) && !field_map.contains_key(filter.field.as_str()) {
         return None;
     }
     let col = format!("[{}]", filter.field);
