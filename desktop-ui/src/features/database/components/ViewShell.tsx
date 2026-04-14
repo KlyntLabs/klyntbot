@@ -5,8 +5,8 @@ import { BoardView } from "./views/BoardView";
 import { CalendarView } from "./views/CalendarView";
 import { GalleryView } from "./views/GalleryView";
 import { ListView } from "./views/ListView";
-import { TableView } from "./views/TableView";
 import { TimelineView } from "./views/TimelineView";
+import { TableView } from "./views/table/TableView";
 import { ViewConfigPanel } from "./views/ViewConfigPanel";
 import { ViewSwitcher } from "./views/ViewSwitcher";
 
@@ -75,17 +75,9 @@ export function ViewShell({
         </div>
 
         <div className="min-h-0 flex-1 overflow-y-auto">
-          {activeView ? (
+          {activeView && (
             <ActiveViewRenderer
               view={activeView}
-              schema={schema}
-              entities={entities}
-              sorts={sorts}
-              onSortChange={onSortChange}
-              onEntityClick={onEntityClick}
-            />
-          ) : (
-            <TableView
               schema={schema}
               entities={entities}
               sorts={sorts}
@@ -122,8 +114,8 @@ function ActiveViewRenderer({
       return (
         <TableView
           schema={schema}
+          view={view}
           entities={entities}
-          visibleFields={view.config.visibleFields}
           sorts={sorts}
           onSortChange={onSortChange}
           onEntityClick={onEntityClick}
