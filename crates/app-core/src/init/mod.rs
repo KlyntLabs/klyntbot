@@ -505,32 +505,36 @@ impl AppCore {
                 event_bus: Arc::clone(&domain_event_bus),
             });
             info!("Skills installer ready");
+            ::skills_installer::seed_bundled(&installer.repo).await.ok();
             Some(installer)
         } else {
             None
         };
 
-        let adapter: Option<Arc<::skills_adapter::Adapter>> = cognitive_provider.as_ref().map(|cp| {
-            let bridge: Arc<dyn ::skills_adapter::AdapterProvider> = Arc::new(
-                crate::adapters::skill_adapter_bridge::CognitiveProviderAdapter {
-                    provider: Arc::clone(cp),
-                    model: config
+        let adapter: Option<Arc<::skills_adapter::Adapter>> =
+            cognitive_provider.as_ref().map(|cp| {
+                let bridge: Arc<dyn ::skills_adapter::AdapterProvider> = Arc::new(
+                    crate::adapters::skill_adapter_bridge::CognitiveProviderAdapter {
+                        provider: Arc::clone(cp),
+                        model: config
+                            .cognitive
+                            .model
+                            .clone()
+                            .unwrap_or_else(|| config.agents.defaults.model.clone()),
+                    },
+                );
+                Arc::new(::skills_adapter::Adapter {
+                    provider: bridge,
+                    cache: ::skills_marketplace::AdaptedSkillsRepo::new(
+                        storage_pool.inner().clone(),
+                    ),
+                    model_name: config
                         .cognitive
                         .model
                         .clone()
                         .unwrap_or_else(|| config.agents.defaults.model.clone()),
-                },
-            );
-            Arc::new(::skills_adapter::Adapter {
-                provider: bridge,
-                cache: ::skills_marketplace::AdaptedSkillsRepo::new(storage_pool.inner().clone()),
-                model_name: config
-                    .cognitive
-                    .model
-                    .clone()
-                    .unwrap_or_else(|| config.agents.defaults.model.clone()),
-            })
-        });
+                })
+            });
 
         // ── Workspace skill auto-updater ───────────────────────────────────
         // Keeps skills/workspace/SKILL.md's database list fresh on create/delete.
