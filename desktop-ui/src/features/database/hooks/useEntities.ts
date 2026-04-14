@@ -9,6 +9,7 @@ export function useEntities(databaseId: string | undefined, params?: QueryParams
       ? {
           databaseId,
           filters: params?.filters,
+          filter: params?.filter,
           sorts: params?.sorts,
           limit: params?.limit,
           offset: params?.offset,

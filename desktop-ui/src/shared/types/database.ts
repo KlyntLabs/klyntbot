@@ -58,6 +58,17 @@ export interface FilterRule {
   value: unknown;
 }
 
+export type LogicOp = "and" | "or";
+
+export type FilterNode =
+  | { kind: "rule"; field: string; op: FilterOp; value: unknown }
+  | { kind: "group"; op: LogicOp; nodes: FilterNode[] };
+
+export interface FilterGroup {
+  op: LogicOp;
+  nodes: FilterNode[];
+}
+
 export type SortDirection = "asc" | "desc";
 
 export interface SortRule {
@@ -67,6 +78,7 @@ export interface SortRule {
 
 export interface ViewConfig {
   filters?: FilterRule[];
+  filter?: FilterGroup;
   sorts?: SortRule[];
   visibleFields?: string[];
   groupBy?: string;
@@ -74,6 +86,10 @@ export interface ViewConfig {
   galleryField?: string;
   cardFields?: string[];
   layout?: Record<string, unknown>;
+  collapsedGroups?: string[];
+  columnWidths?: Record<string, number>;
+  columnOrder?: string[];
+  columnVisibility?: Record<string, boolean>;
 }
 
 export interface ViewDefinition {
@@ -110,6 +126,7 @@ export interface Entity {
   id: string;
   databaseId: string;
   fields: Record<string, unknown>;
+  position: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -186,6 +203,7 @@ export interface SchemaEvolution {
 
 export interface QueryParams {
   filters?: FilterRule[];
+  filter?: FilterGroup;
   sorts?: SortRule[];
   limit?: number;
   offset?: number;
