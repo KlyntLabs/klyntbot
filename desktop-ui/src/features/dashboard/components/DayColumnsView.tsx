@@ -7,7 +7,6 @@ import type {
   TimelineEntry,
   TimelineSummary,
 } from "@shared/types";
-import { ChevronDown, ChevronUp } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTimelineDrag } from "../hooks/useTimelineDrag";
 import { type LayerKey, useEnabledLayers, useSidebarOpen } from "../lib/layers";
@@ -17,7 +16,6 @@ import { CalendarTrack } from "./CalendarTrack";
 import { ContextRibbon } from "./ContextRibbon";
 import { DraggableTaskBlock } from "./DraggableTaskBlock";
 import { DueTodayTray } from "./DueTodayTray";
-import { ActivityFeed } from "./productivity/ActivityFeed";
 import { SummaryPanel } from "./SummaryPanel";
 
 const DEFAULT_HOUR_HEIGHT = 60;
@@ -128,7 +126,6 @@ export function DayColumnsView({
   const sidebarOpen = useSidebarOpen();
   const [selectedEntry, setSelectedEntry] = useState<TimelineEntry | null>(null);
   const [selectedSession, setSelectedSession] = useState<SessionBlock | null>(null);
-  const [feedExpanded, setFeedExpanded] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
 
   // Dynamic zoom state
@@ -514,32 +511,6 @@ export function DayColumnsView({
             </div>
           </div>
         </div>
-
-        {/* Collapsible activity feed — only for today */}
-        {isToday && (
-          <div
-            className="border-t border-border transition-[max-height] duration-300 ease-in-out"
-            style={{ maxHeight: feedExpanded ? 260 : 36, overflow: "hidden" }}
-          >
-            <button
-              type="button"
-              onClick={() => setFeedExpanded(!feedExpanded)}
-              className="flex items-center gap-2 px-3 py-2 text-xs text-muted-foreground hover:text-foreground transition-colors w-full"
-            >
-              {feedExpanded ? (
-                <ChevronDown className="size-3.5" />
-              ) : (
-                <ChevronUp className="size-3.5" />
-              )}
-              Live Activity Feed
-            </button>
-            {feedExpanded && (
-              <div className="overflow-y-auto" style={{ maxHeight: 224 }}>
-                <ActivityFeed />
-              </div>
-            )}
-          </div>
-        )}
       </div>
 
       {sidebarOpen && (

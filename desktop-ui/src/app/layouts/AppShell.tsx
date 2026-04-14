@@ -48,14 +48,10 @@ export function AppShell() {
   const activeSidebarItem = useMemo((): SidebarItem => {
     const path = location.pathname;
     if (path.startsWith("/chat")) return "Chat";
-    if (path.startsWith("/tasks") || path.startsWith("/task/")) return "Tasks";
     if (path.startsWith("/notes")) return "Notes";
     if (path.startsWith("/learn")) return "Learn";
-    if (path.startsWith("/finance")) return "Finance";
-    if (path.startsWith("/coaching")) return "Coaching";
     if (path.startsWith("/brain")) return "Brain";
     if (path.startsWith("/automations")) return "Automations";
-    if (path.startsWith("/system")) return "System";
     if (path.startsWith("/settings")) return "Settings";
     return "Dashboard";
   }, [location.pathname]);
@@ -63,13 +59,7 @@ export function AppShell() {
   // Derive chat context from current route (detail pages handled by usePageContext inside SidebarChat)
   const viewContext = useMemo(() => {
     const path = location.pathname;
-    const search = new URLSearchParams(location.search);
 
-    if (path.startsWith("/tasks")) {
-      const tab = search.get("tab");
-      if (tab) return { entityKind: `tasks.${tab.toLowerCase()}` };
-      return { entityKind: "tasks" };
-    }
     if (
       path.startsWith("/day/") ||
       path.startsWith("/week/") ||
@@ -80,9 +70,8 @@ export function AppShell() {
     }
     if (path.startsWith("/chat")) return { entityKind: "chat" };
     if (path.startsWith("/notes")) return { entityKind: "notes" };
-    if (path.startsWith("/system")) return { entityKind: "system" };
     return undefined;
-  }, [location.pathname, location.search]);
+  }, [location.pathname]);
 
   const toggleChat = useCallback(() => setIsChatOpen((p) => !p), []);
   const closeChat = useCallback(() => setIsChatOpen(false), []);

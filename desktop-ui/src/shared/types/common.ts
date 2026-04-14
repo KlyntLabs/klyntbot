@@ -56,16 +56,12 @@ export type Tab = "All" | string;
 export type SidebarItem =
   | "Dashboard"
   | "Chat"
-  | "Tasks"
   | "OKR"
   | "Calendar"
   | "Notes"
   | "Learn"
-  | "Finance"
-  | "Coaching"
   | "Brain"
   | "Automations"
-  | "System"
   | "Settings";
 export type ViewMode = "table" | "board" | "tree";
 

@@ -42,7 +42,7 @@ export function ViewShell({
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       {/* View tabs + toolbar with page-level horizontal padding */}
-      <div className="shrink-0 px-10">
+      <div className="shrink-0 px-4">
         {views.length > 0 && (
           <ViewTabBar views={views} activeViewId={activeViewId} onViewSelect={setActiveViewId} />
         )}

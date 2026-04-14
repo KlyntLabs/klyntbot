@@ -5,7 +5,6 @@ import { ipc } from "@shared/hooks/useIpc";
 import type { SidebarItem } from "@shared/types";
 import {
   Brain,
-  CheckSquare,
   Database,
   FileText,
   GraduationCap,
@@ -15,7 +14,6 @@ import {
   Plus,
   Settings,
   Timer,
-  Wallet,
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router";
@@ -30,10 +28,8 @@ interface SidebarProps {
 const items: { key: SidebarItem; icon: typeof MessageSquare; path?: string; bottom?: boolean }[] = [
   { key: "Chat", icon: MessageSquare, path: "/chat" },
   { key: "Dashboard", icon: LayoutDashboard, path: "/" },
-  { key: "Tasks", icon: CheckSquare, path: "/tasks" },
   { key: "Notes", icon: FileText, path: "/notes" },
   { key: "Learn", icon: GraduationCap, path: "/learn" },
-  { key: "Finance", icon: Wallet, path: "/finance" },
   { key: "Brain", icon: Brain, path: "/brain" },
   { key: "Automations", icon: Timer, path: "/automations" },
   { key: "Settings", icon: Settings, path: "/settings", bottom: true },

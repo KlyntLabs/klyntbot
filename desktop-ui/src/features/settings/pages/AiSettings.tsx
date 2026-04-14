@@ -307,9 +307,7 @@ export function AiSettings() {
                   }
                   className="w-full accent-brand"
                 />
-                <span className="text-2xs text-dim">
-                  {agentVal("temperature", 0.7).toFixed(1)}
-                </span>
+                <span className="text-2xs text-dim">{agentVal("temperature", 0.7).toFixed(1)}</span>
               </label>
               <label className="flex-1">
                 <span className="block text-[11px] text-muted-foreground mb-1">Max tokens</span>
