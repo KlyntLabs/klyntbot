@@ -107,6 +107,8 @@ pub enum ViewType {
     List,
     Gallery,
     Timeline,
+    Chart,
+    Feed,
 }
 
 /// A named view configuration for a database.

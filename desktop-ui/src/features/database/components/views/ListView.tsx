@@ -1,15 +1,9 @@
-import {
-  closestCenter,
-  DndContext,
-  type DragEndEvent,
-  PointerSensor,
-  useSensor,
-  useSensors,
-} from "@dnd-kit/core";
+import { closestCenter, DndContext, type DragEndEvent } from "@dnd-kit/core";
 import { SortableContext, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import { FieldRenderer } from "@features/database/components/fields/FieldRenderer";
 import { useCollapsedGroups } from "@features/database/hooks/useCollapsedGroups";
 import { useEntityReorder } from "@features/database/hooks/useEntityReorder";
+import { useEntityDndSensors } from "@features/database/lib/dndConfig";
 import { groupEntities } from "@features/database/lib/grouping";
 import { computeReorderAnchors } from "@features/database/lib/ordering";
 import { getEntityTitle, getTitleField } from "@features/database/lib/schema-utils";
@@ -30,7 +24,7 @@ export function ListView({ schema, entities, view, cardFields, onEntityClick }: 
   const titleField = getTitleField(schema);
   const reorder = useEntityReorder(schema.id);
   const orderedIds = useMemo(() => entities.map((e) => e.id), [entities]);
-  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }));
+  const sensors = useEntityDndSensors();
 
   const inlineFields =
     cardFields && cardFields.length > 0

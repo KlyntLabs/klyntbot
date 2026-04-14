@@ -1,14 +1,8 @@
-import {
-  closestCenter,
-  DndContext,
-  type DragEndEvent,
-  PointerSensor,
-  useSensor,
-  useSensors,
-} from "@dnd-kit/core";
+import { closestCenter, DndContext, type DragEndEvent } from "@dnd-kit/core";
 import { SortableContext, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import { useCollapsedGroups } from "@features/database/hooks/useCollapsedGroups";
 import { useEntityReorder } from "@features/database/hooks/useEntityReorder";
+import { useEntityDndSensors } from "@features/database/lib/dndConfig";
 import { groupEntities } from "@features/database/lib/grouping";
 import { computeReorderAnchors } from "@features/database/lib/ordering";
 import type { DatabaseSchema, Entity, SortRule, ViewDefinition } from "@shared/types";
@@ -82,7 +76,7 @@ export function TableView({ schema, view, entities, sorts, onSortChange, onEntit
     overscan: 8,
   });
 
-  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }));
+  const sensors = useEntityDndSensors();
   const reorder = useEntityReorder(schema.id);
   const onDragEnd = ({ active, over }: DragEndEvent) => {
     if (!over) return;

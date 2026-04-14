@@ -11,6 +11,8 @@ const ICON_PATHS: Record<ViewType, string> = {
     "M3.75 6A2.25 2.25 0 0 1 6 3.75h2.25A2.25 2.25 0 0 1 10.5 6v2.25a2.25 2.25 0 0 1-2.25 2.25H6a2.25 2.25 0 0 1-2.25-2.25V6ZM3.75 15.75A2.25 2.25 0 0 1 6 13.5h2.25a2.25 2.25 0 0 1 2.25 2.25V18a2.25 2.25 0 0 1-2.25 2.25H6A2.25 2.25 0 0 1 3.75 18v-2.25ZM13.5 6a2.25 2.25 0 0 1 2.25-2.25H18A2.25 2.25 0 0 1 20.25 6v2.25A2.25 2.25 0 0 1 18 10.5h-2.25a2.25 2.25 0 0 1-2.25-2.25V6ZM13.5 15.75a2.25 2.25 0 0 1 2.25-2.25H18a2.25 2.25 0 0 1 2.25 2.25V18A2.25 2.25 0 0 1 18 20.25h-2.25a2.25 2.25 0 0 1-2.25-2.25v-2.25Z",
   timeline:
     "M3.75 12h16.5m-16.5 3.75h16.5M3.75 19.5h16.5M5.625 4.5h12.75c.621 0 1.125.504 1.125 1.125v1.5c0 .621-.504 1.125-1.125 1.125H5.625a1.125 1.125 0 0 1-1.125-1.125v-1.5c0-.621.504-1.125 1.125-1.125Z",
+  chart: "M3 3v18h18M7 14v4M11 9v9M15 11v7M19 6v12",
+  feed: "M4 5h16M4 12h16M4 19h10",
 };
 
 export function ViewTypeIcon({ type, className }: { type: ViewType; className?: string }) {
@@ -35,6 +37,17 @@ export const VIEW_TYPE_LABELS: Record<ViewType, string> = {
   list: "List",
   gallery: "Gallery",
   timeline: "Timeline",
+  chart: "Chart",
+  feed: "Feed",
 };
 
-export const VIEW_TYPES: ViewType[] = ["table", "board", "calendar", "list", "gallery", "timeline"];
+export const VIEW_TYPES: ViewType[] = [
+  "table",
+  "board",
+  "calendar",
+  "list",
+  "gallery",
+  "timeline",
+  "chart",
+  "feed",
+];

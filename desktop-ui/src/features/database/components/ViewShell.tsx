@@ -1,13 +1,18 @@
+import { EmptyState } from "@shared/composites/EmptyState";
 import type { DatabaseSchema, Entity, SortRule, ViewDefinition } from "@shared/types";
+import { Plus } from "lucide-react";
 import { useState } from "react";
 import { ViewToolbar } from "./ViewToolbar";
 import { BoardView } from "./views/BoardView";
 import { CalendarView } from "./views/CalendarView";
+import { ChartView } from "./views/ChartView";
+import { FeedView } from "./views/FeedView";
 import { GalleryView } from "./views/GalleryView";
 import { ListView } from "./views/ListView";
 import { TimelineView } from "./views/TimelineView";
 import { TableView } from "./views/table/TableView";
 import { ViewConfigPanel } from "./views/ViewConfigPanel";
+import { ViewLoadingSkeleton } from "./views/ViewLoadingSkeleton";
 import { ViewSwitcher } from "./views/ViewSwitcher";
 
 interface ViewShellProps {
@@ -22,6 +27,7 @@ interface ViewShellProps {
   onNewEntity: () => void;
   activeViewId?: string;
   onActiveViewChange?: (id: string) => void;
+  entitiesLoading?: boolean;
 }
 
 export function ViewShell({
@@ -36,6 +42,7 @@ export function ViewShell({
   onNewEntity,
   activeViewId: controlledActiveId,
   onActiveViewChange,
+  entitiesLoading,
 }: ViewShellProps) {
   const views = schema.views ?? [];
   const [internalActiveId, setInternalActiveId] = useState<string | undefined>(
@@ -75,16 +82,35 @@ export function ViewShell({
         </div>
 
         <div className="min-h-0 flex-1 overflow-y-auto">
-          {activeView && (
-            <ActiveViewRenderer
-              view={activeView}
-              schema={schema}
-              entities={entities}
-              sorts={sorts}
-              onSortChange={onSortChange}
-              onEntityClick={onEntityClick}
-            />
-          )}
+          {activeView &&
+            (entities.length > 0 ? (
+              <ActiveViewRenderer
+                view={activeView}
+                schema={schema}
+                entities={entities}
+                sorts={sorts}
+                onSortChange={onSortChange}
+                onEntityClick={onEntityClick}
+              />
+            ) : entitiesLoading ? (
+              <ViewLoadingSkeleton viewType={activeView.viewType} />
+            ) : (
+              <EmptyState
+                icon={<Plus className="h-10 w-10" />}
+                title="No items yet"
+                description="Get started by creating your first entry."
+                action={
+                  <button
+                    type="button"
+                    onClick={onNewEntity}
+                    className="inline-flex items-center gap-1 rounded-md bg-brand px-3 py-1.5 text-[13px] font-medium text-white shadow-sm hover:opacity-90"
+                  >
+                    <Plus className="h-3.5 w-3.5" />
+                    New entry
+                  </button>
+                }
+              />
+            ))}
         </div>
       </div>
       {configView && (
@@ -169,6 +195,12 @@ function ActiveViewRenderer({
           endField={view.config.layout?.endField as string | undefined}
           onEntityClick={onEntityClick}
         />
+      );
+    case "chart":
+      return <ChartView schema={schema} view={view} entities={entities} />;
+    case "feed":
+      return (
+        <FeedView schema={schema} view={view} entities={entities} onEntityClick={onEntityClick} />
       );
   }
 }

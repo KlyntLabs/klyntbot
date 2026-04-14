@@ -1,11 +1,22 @@
 import { createContext, useCallback, useContext, useEffect, useRef, useState } from "react";
 
-export type ToastVariant = "error" | "success";
+export type ToastVariant = "error" | "success" | "info";
+
+export interface ToastAction {
+  label: string;
+  onClick: () => void;
+}
 
 export interface Toast {
   id: number;
   message: string;
   variant: ToastVariant;
+  action?: ToastAction;
+}
+
+export interface ShowOptions {
+  variant?: ToastVariant;
+  action?: ToastAction;
 }
 
 /**
@@ -25,9 +36,14 @@ export function useToast(duration = 4000) {
   );
 
   const show = useCallback(
-    (message: string, variant: ToastVariant = "error") => {
+    (message: string, optsOrVariant?: ShowOptions | ToastVariant) => {
+      const opts: ShowOptions =
+        typeof optsOrVariant === "string" ? { variant: optsOrVariant } : (optsOrVariant ?? {});
       const id = nextId.current++;
-      setToasts((prev) => [...prev, { id, message, variant }]);
+      setToasts((prev) => [
+        ...prev,
+        { id, message, variant: opts.variant ?? "error", action: opts.action },
+      ]);
       const timer = setTimeout(() => {
         setToasts((prev) => prev.filter((t) => t.id !== id));
         timers.current.delete(timer);
@@ -47,7 +63,7 @@ export function useToast(duration = 4000) {
 // ── Context for shared toast (e.g. SettingsLayout) ───────────────────
 
 interface ToastActions {
-  show: (message: string, variant?: ToastVariant) => void;
+  show: (message: string, optsOrVariant?: ShowOptions | ToastVariant) => void;
 }
 
 const ToastContext = createContext<ToastActions | null>(null);

@@ -1,3 +1,4 @@
+import { useReducedMotion } from "@shared/hooks/useReducedMotion";
 import { cn } from "@shared/lib/utils";
 
 export interface SkeletonProps {
@@ -5,5 +6,6 @@ export interface SkeletonProps {
 }
 
 export function Skeleton({ className }: SkeletonProps) {
-  return <div className={cn("animate-pulse rounded-lg bg-accent", className)} />;
+  const reduced = useReducedMotion();
+  return <div className={cn(reduced ? "" : "animate-pulse", "rounded-lg bg-accent", className)} />;
 }

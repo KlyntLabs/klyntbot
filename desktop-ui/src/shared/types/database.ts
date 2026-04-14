@@ -36,7 +36,25 @@ export interface FieldDefinition {
 
 // ── View Types ─────────────────────────────────────────────
 
-export type ViewType = "table" | "board" | "calendar" | "list" | "gallery" | "timeline";
+export type ViewType =
+  | "table"
+  | "board"
+  | "calendar"
+  | "list"
+  | "gallery"
+  | "timeline"
+  | "chart"
+  | "feed";
+
+export type ChartType = "bar" | "line" | "pie";
+export type ChartAggregation = "count" | "sum" | "avg";
+
+export interface ChartConfig {
+  chartType: ChartType;
+  xAxis: string;
+  aggregation: ChartAggregation;
+  yField?: string;
+}
 
 export type FilterOp =
   | "eq"

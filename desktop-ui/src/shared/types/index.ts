@@ -227,6 +227,9 @@ export type {
 // ── Database Types ───────────────────────────────────────────
 
 export type {
+  ChartAggregation,
+  ChartConfig,
+  ChartType,
   CreateDatabaseInput,
   CreateEntityInput,
   CreateFieldInput,

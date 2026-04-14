@@ -6,6 +6,12 @@ interface Props {
   onDismiss: (id: number) => void;
 }
 
+const VARIANT_CLASSES: Record<Toast["variant"], string> = {
+  error: "bg-red-950/90 border-red-800/50 text-red-200",
+  success: "bg-emerald-950/90 border-emerald-800/50 text-emerald-200",
+  info: "bg-surface-base border-border text-foreground",
+};
+
 /**
  * Renders a stack of toast notifications at the bottom-right of the viewport.
  */
@@ -19,13 +25,23 @@ export function ToastContainer({ toasts, onDismiss }: Props) {
           key={toast.id}
           role="alert"
           className={cn(
-            "flex items-start gap-2 px-4 py-3 rounded-lg shadow-lg border text-sm animate-[slideIn_0.2s_ease-out]",
-            toast.variant === "error"
-              ? "bg-red-950/90 border-red-800/50 text-red-200"
-              : "bg-emerald-950/90 border-emerald-800/50 text-emerald-200",
+            "flex items-center gap-2 px-4 py-3 rounded-lg shadow-lg border text-sm animate-[slideIn_0.2s_ease-out]",
+            VARIANT_CLASSES[toast.variant],
           )}
         >
           <span className="flex-1">{toast.message}</span>
+          {toast.action && (
+            <button
+              type="button"
+              onClick={() => {
+                toast.action?.onClick();
+                onDismiss(toast.id);
+              }}
+              className="rounded px-2 py-0.5 text-[12px] font-medium text-brand hover:underline"
+            >
+              {toast.action.label}
+            </button>
+          )}
           <button
             type="button"
             onClick={() => onDismiss(toast.id)}

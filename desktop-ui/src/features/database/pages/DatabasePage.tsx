@@ -26,7 +26,7 @@ export default function DatabasePage() {
   const effectiveSorts = sorts.length > 0 ? sorts : (activeView?.config.sorts ?? []);
   const effectiveFilter = activeView?.config.filter;
 
-  const { data: queryResult } = useEntities(databaseId, {
+  const { data: queryResult, loading: entitiesLoading } = useEntities(databaseId, {
     sorts: effectiveSorts,
     filter: effectiveFilter,
     limit: 100,
@@ -96,6 +96,7 @@ export default function DatabasePage() {
           onNewEntity={() => setShowCreate(true)}
           activeViewId={activeView?.id}
           onActiveViewChange={setActiveViewId}
+          entitiesLoading={entitiesLoading}
         />
       </div>
 

@@ -1,7 +1,9 @@
 import { useReorderViews } from "@features/database/hooks/useReorderViews";
 import { useCreateView, useDeleteView, useUpdateView } from "@features/database/hooks/useViews";
 import { defaultViewConfig, defaultViewName } from "@features/database/lib/view-defaults";
+import { ToastContainer } from "@shared/components/ToastContainer";
 import { useClickOutside } from "@shared/hooks/useClickOutside";
+import { useToast } from "@shared/hooks/useToast";
 import type { DatabaseSchema, ViewDefinition, ViewType } from "@shared/types";
 import { MoreHorizontal, Plus } from "lucide-react";
 import { useRef, useState } from "react";
@@ -31,6 +33,7 @@ export function ViewSwitcher({
   const deleteView = useDeleteView(schema.id);
   const reorderViews = useReorderViews(schema.id);
   const updateView = useUpdateView(schema.id);
+  const toast = useToast();
 
   useClickOutside(pickerRef, () => setPickerOpen(false), pickerOpen);
 
@@ -69,7 +72,19 @@ export function ViewSwitcher({
             setRenamingId(null);
           }}
           onDuplicate={() => createView.mutate(`${view.name} copy`, view.viewType, view.config)}
-          onDelete={() => deleteView.mutate(view.id)}
+          onDelete={async () => {
+            const snapshot = view;
+            await deleteView.mutate(view.id);
+            toast.show(`Deleted "${snapshot.name}"`, {
+              variant: "info",
+              action: {
+                label: "Undo",
+                onClick: () => {
+                  void createView.mutate(snapshot.name, snapshot.viewType, snapshot.config);
+                },
+              },
+            });
+          }}
           onConfig={() => onConfigView?.(view)}
           onMoveLeft={() => handleMove(view.id, -1)}
           onMoveRight={() => handleMove(view.id, 1)}
@@ -90,6 +105,7 @@ export function ViewSwitcher({
           </div>
         )}
       </div>
+      <ToastContainer toasts={toast.toasts} onDismiss={toast.dismiss} />
     </div>
   );
 }

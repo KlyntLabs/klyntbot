@@ -1,16 +1,9 @@
-import {
-  closestCorners,
-  DndContext,
-  type DragEndEvent,
-  PointerSensor,
-  useDroppable,
-  useSensor,
-  useSensors,
-} from "@dnd-kit/core";
+import { closestCorners, DndContext, type DragEndEvent, useDroppable } from "@dnd-kit/core";
 import { SortableContext, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import { FieldRenderer } from "@features/database/components/fields/FieldRenderer";
 import { useUpdateEntity } from "@features/database/hooks/useEntity";
 import { useEntityReorder } from "@features/database/hooks/useEntityReorder";
+import { useEntityDndSensors } from "@features/database/lib/dndConfig";
 import { getEntityTitle } from "@features/database/lib/schema-utils";
 import { useSortableEntity } from "@features/database/lib/useSortableEntity";
 import { tagColor } from "@shared/lib/tagColor";
@@ -41,7 +34,7 @@ export function BoardView({
   const groupField = schema.fields.find((f) => f.slug === groupByField);
   const reorder = useEntityReorder(schema.id);
   const { mutate: updateEntity } = useUpdateEntity(schema.id);
-  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }));
+  const sensors = useEntityDndSensors();
 
   const entityById = useMemo(() => {
     const m = new Map<string, Entity>();

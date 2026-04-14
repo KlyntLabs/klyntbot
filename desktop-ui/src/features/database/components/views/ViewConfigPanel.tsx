@@ -1,5 +1,7 @@
 import { useUpdateView } from "@features/database/hooks/useViews";
+import { getChartConfig, withChartConfig } from "@features/database/lib/view-defaults";
 import type {
+  ChartConfig,
   DatabaseSchema,
   FilterGroup,
   SortRule,
@@ -93,6 +95,16 @@ export function ViewConfigPanel({ schema, view, onClose }: ViewConfigPanelProps)
               value={config.groupBy}
               onChange={(v) => updateConfig({ groupBy: v || undefined })}
               allowedTypes={groupableTypes}
+            />
+          </Section>
+        )}
+
+        {view.viewType === "chart" && (
+          <Section label="Chart">
+            <ChartConfigEditor
+              schema={schema}
+              config={getChartConfig(view.config)}
+              onChange={(chart) => updateConfig(withChartConfig(view.config, chart))}
             />
           </Section>
         )}
@@ -242,6 +254,60 @@ function SortEditor({ schema, sorts, onChange }: SortEditorProps) {
       >
         <Plus className="h-3 w-3" /> Add sort
       </button>
+    </div>
+  );
+}
+
+interface ChartConfigEditorProps {
+  schema: DatabaseSchema;
+  config: ChartConfig | undefined;
+  onChange: (next: ChartConfig) => void;
+}
+
+const SELECT_CLASS =
+  "w-full rounded-md border border-border bg-background px-2 py-1 text-[13px] outline-none";
+
+function ChartConfigEditor({ schema, config, onChange }: ChartConfigEditorProps) {
+  const fields = schema.fields.filter((f) => !f.hidden);
+  const xAxis = config?.xAxis ?? fields[0]?.slug ?? "";
+  const chartType = config?.chartType ?? "bar";
+  const aggregation = config?.aggregation ?? "count";
+  const patch = (p: Partial<ChartConfig>) => onChange({ chartType, xAxis, aggregation, ...p });
+  return (
+    <div className="space-y-2">
+      <select
+        value={chartType}
+        onChange={(e) => patch({ chartType: e.target.value as ChartConfig["chartType"] })}
+        className={SELECT_CLASS}
+      >
+        <option value="bar">Bar</option>
+        <option value="line">Line</option>
+        <option value="pie">Pie</option>
+      </select>
+      <select
+        value={xAxis}
+        onChange={(e) => patch({ xAxis: e.target.value })}
+        className={SELECT_CLASS}
+      >
+        {fields.map((f) => (
+          <option key={f.slug} value={f.slug}>
+            {f.name}
+          </option>
+        ))}
+      </select>
+      <select
+        value={aggregation}
+        onChange={(e) => patch({ aggregation: e.target.value as ChartConfig["aggregation"] })}
+        className={SELECT_CLASS}
+      >
+        <option value="count">Count</option>
+        <option value="sum" disabled>
+          Sum (coming soon)
+        </option>
+        <option value="avg" disabled>
+          Average (coming soon)
+        </option>
+      </select>
     </div>
   );
 }
