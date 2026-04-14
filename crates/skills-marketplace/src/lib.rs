@@ -22,7 +22,7 @@ impl SkillsMarketplaceFeature {
 }
 
 #[cfg(test)]
-pub(crate) mod test_helpers {
+pub mod test_helpers {
     pub async fn setup_pool() -> sqlx::SqlitePool {
         let pool = storage::StoragePool::connect_in_memory().await.unwrap();
         let sql = include_str!("../migrations/001_skills_marketplace.sql");

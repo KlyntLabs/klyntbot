@@ -1,0 +1,25 @@
+[package]
+name = "skills-adapter"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[dependencies]
+common = { workspace = true }
+providers = { workspace = true }
+skills-registry = { workspace = true }
+skills-marketplace = { workspace = true }
+entity-store = { workspace = true }
+serde = { workspace = true, features = ["derive"] }
+serde_json = { workspace = true }
+async-trait = { workspace = true }
+tracing = { workspace = true }
+sha2 = { workspace = true }
+hex = "0.4"
+
+[dev-dependencies]
+tokio = { workspace = true, features = ["macros", "rt-multi-thread"] }
+storage = { workspace = true }
+skill-system = { workspace = true }
+sqlx = { workspace = true }

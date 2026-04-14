@@ -41,6 +41,7 @@ members = [
     "crates/skills-marketplace",
     "crates/skills-registry",
     "crates/skills-installer",
+    "crates/skills-adapter",
 ]
 
 [workspace.package]
@@ -88,6 +89,7 @@ database-tool = { path = "crates/database-tool" }
 skills-marketplace = { path = "crates/skills-marketplace" }
 skills-registry = { path = "crates/skills-registry" }
 skills-installer = { path = "crates/skills-installer" }
+skills-adapter = { path = "crates/skills-adapter" }
 extism = "1"
 mcp = { path = "crates/mcp" }
 rmcp = { version = "0.17", default-features = false }
