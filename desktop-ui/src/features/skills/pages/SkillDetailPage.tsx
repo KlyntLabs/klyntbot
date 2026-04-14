@@ -4,6 +4,7 @@ import { useParams } from "react-router";
 import { InstallCta } from "../components/InstallCta";
 import { SkillDetailSidebar } from "../components/SkillDetailSidebar";
 import { SkillMarkdown } from "../components/SkillMarkdown";
+import { UninstallDialog } from "../components/UninstallDialog";
 import { useSkillDetail } from "../hooks/useSkillDetail";
 
 export function SkillDetailPage() {
@@ -11,6 +12,7 @@ export function SkillDetailPage() {
   const decoded = source ? decodeURIComponent(source) : "";
   const [skillMd, setSkillMd] = useState<string | null>(null);
   const [loadErr, setLoadErr] = useState<string | null>(null);
+  const [uninstallOpen, setUninstallOpen] = useState(false);
   const name = decoded.split("/").slice(-1)[0] ?? "";
   const { installed } = useSkillDetail(name);
 
@@ -28,9 +30,18 @@ export function SkillDetailPage() {
         <h1 className="text-2xl font-semibold text-foreground mb-4">{name}</h1>
         <div className="mb-6 flex gap-2">
           {installed ? (
-            <span className="px-3 py-1.5 text-sm text-brand border border-brand rounded">
-              Installed · v{installed.installedVersion}
-            </span>
+            <>
+              <span className="px-3 py-1.5 text-sm text-brand border border-brand rounded">
+                Installed · v{installed.installedVersion}
+              </span>
+              <button
+                type="button"
+                onClick={() => setUninstallOpen(true)}
+                className="px-3 py-1.5 text-sm text-red-400 border border-red-400 rounded"
+              >
+                Uninstall
+              </button>
+            </>
           ) : (
             <InstallCta sourceRef={decoded} />
           )}
@@ -43,6 +54,9 @@ export function SkillDetailPage() {
         )}
       </div>
       <SkillDetailSidebar sourceRef={decoded} installed={installed} />
+      {installed && uninstallOpen && (
+        <UninstallDialog skill={installed} onClose={() => setUninstallOpen(false)} />
+      )}
     </div>
   );
 }
