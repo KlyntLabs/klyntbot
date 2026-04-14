@@ -58,7 +58,7 @@ export function HealthStrip() {
       />
       <MetricCard
         label="Coaching"
-        value={situation.focusState !== undefined ? "Active" : "Idle"}
+        value={situation.focusState != null ? "Active" : "Idle"}
         sub={`${pendingCount} pending`}
         valueClass="text-info"
       />

@@ -2,7 +2,6 @@ import { useQuery } from "@shared/hooks/useQuery";
 import { Boxes, Brain, Crosshair, Eye } from "lucide-react";
 import type { ReactNode } from "react";
 import { useNavigate, useParams } from "react-router";
-import { ActivityStream } from "./components/ActivityStream";
 import { BrainCard } from "./components/BrainCard";
 import { CoachingDetail } from "./components/CoachingDetail";
 import { ContextsDetail } from "./components/ContextsDetail";
@@ -11,6 +10,13 @@ import { MemoryDetail } from "./components/MemoryDetail";
 import { MirrorDetail } from "./components/MirrorDetail";
 
 type BrainSection = "memory" | "coaching" | "mirror" | "contexts";
+
+const DETAIL_RENDERERS: Record<BrainSection, () => ReactNode> = {
+  memory: () => <MemoryDetail />,
+  coaching: () => <CoachingDetail />,
+  mirror: () => <MirrorDetail />,
+  contexts: () => <ContextsDetail />,
+};
 
 interface MemoryStats {
   activeFacts: number;
@@ -29,12 +35,50 @@ interface CoachingSituation {
   energyLevel?: number;
   focusState?: number;
   deadlinePressure?: number;
+  distractionRisk?: number;
   coachingReceptivity?: number;
 }
 
+function MiniGauge({ label, value, color }: { label: string; value?: number; color: string }) {
+  const pct = typeof value === "number" ? Math.round(value * 100) : 0;
+  const hasValue = typeof value === "number";
+  return (
+    <div className="flex flex-col items-center gap-1">
+      <div className="relative size-12">
+        <svg className="size-12 -rotate-90" viewBox="0 0 36 36" aria-hidden="true">
+          <circle
+            className="text-white/[0.08]"
+            strokeWidth="3"
+            stroke="currentColor"
+            fill="none"
+            r="15.5"
+            cx="18"
+            cy="18"
+          />
+          <circle
+            className={color}
+            strokeWidth="3"
+            stroke="currentColor"
+            fill="none"
+            r="15.5"
+            cx="18"
+            cy="18"
+            strokeDasharray={`${pct} 100`}
+            strokeLinecap="round"
+          />
+        </svg>
+        <span className="absolute inset-0 flex items-center justify-center text-[10px] text-muted-foreground font-mono">
+          {hasValue ? `${pct}%` : "—"}
+        </span>
+      </div>
+      <span className="text-2xs text-dim text-center leading-tight">{label}</span>
+    </div>
+  );
+}
+
 interface InferenceStats {
-  activeContexts: number;
-  archivedContexts: number;
+  activeContextCount: number;
+  archivedContextCount: number;
   assignmentRate: number;
 }
 
@@ -63,17 +107,10 @@ export function BrainPage() {
   const { data: situation } = useQuery<CoachingSituation>("coaching_situation", undefined, {});
 
   const { data: inferenceStats } = useQuery<InferenceStats>("get_inference_stats", undefined, {
-    activeContexts: 0,
-    archivedContexts: 0,
+    activeContextCount: 0,
+    archivedContextCount: 0,
     assignmentRate: 0,
   });
-
-  const DETAIL_RENDERERS: Record<BrainSection, () => ReactNode> = {
-    memory: () => <MemoryDetail />,
-    coaching: () => <CoachingDetail />,
-    mirror: () => <MirrorDetail />,
-    contexts: () => <ContextsDetail />,
-  };
 
   const cards: {
     id: BrainSection;
@@ -113,20 +150,12 @@ export function BrainPage() {
       icon: <Crosshair className="size-4 text-info" strokeWidth={1.5} />,
       accentClass: "bg-info/15",
       summary: (
-        <div className="flex items-center gap-4">
-          {[
-            { label: "Energy", value: situation.energyLevel },
-            { label: "Focus", value: situation.focusState },
-            { label: "Deadline", value: situation.deadlinePressure },
-            { label: "Receptive", value: situation.coachingReceptivity },
-          ].map((g) => (
-            <div key={g.label} className="text-center">
-              <div className="size-9 rounded-full border-2 border-info/40 flex items-center justify-center text-2xs font-semibold text-info">
-                {g.value ?? "—"}
-              </div>
-              <p className="text-2xs text-dim mt-1">{g.label}</p>
-            </div>
-          ))}
+        <div className="flex items-center gap-3">
+          <MiniGauge label="Energy" value={situation.energyLevel} color="text-brand" />
+          <MiniGauge label="Focus" value={situation.focusState} color="text-brand" />
+          <MiniGauge label="Deadline" value={situation.deadlinePressure} color="text-destructive" />
+          <MiniGauge label="Distraction" value={situation.distractionRisk} color="text-brand" />
+          <MiniGauge label="Receptive" value={situation.coachingReceptivity} color="text-success" />
         </div>
       ),
     },
@@ -163,13 +192,13 @@ export function BrainPage() {
         <div className="flex gap-5 text-xs">
           <span>
             <span className="text-lg font-semibold text-warning">
-              {inferenceStats.activeContexts}
+              {inferenceStats.activeContextCount}
             </span>{" "}
             <span className="text-muted-foreground">active</span>
           </span>
           <span>
             <span className="text-lg font-semibold text-dim">
-              {inferenceStats.archivedContexts}
+              {inferenceStats.archivedContextCount}
             </span>{" "}
             <span className="text-muted-foreground">archived</span>
           </span>
@@ -188,7 +217,7 @@ export function BrainPage() {
 
   return (
     <div className="flex-1 flex flex-col min-w-0 min-h-0 overflow-y-auto">
-      <div className="flex flex-col gap-5 p-6 max-w-4xl w-full mx-auto">
+      <div className="flex flex-col gap-5 p-6 w-full">
         {!expanded && <HealthStrip />}
 
         {expandedCard ? (
@@ -221,8 +250,6 @@ export function BrainPage() {
             ))}
           </div>
         )}
-
-        {!expanded && <ActivityStream />}
       </div>
     </div>
   );

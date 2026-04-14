@@ -1,4 +1,3 @@
-export { CoachingLayout } from "./components/CoachingLayout";
 export { InterventionRow } from "./components/InterventionRow";
 export { MicroReviewPrompt } from "./components/MicroReviewPrompt";
 export { PatternCard } from "./components/PatternCard";

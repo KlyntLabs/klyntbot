@@ -1,1 +1,2 @@
-export { SystemPage } from "./pages/SystemPage";
+export { CategoriesTab } from "./components/tabs/CategoriesTab";
+export { ContextsTab } from "./components/tabs/ContextsTab";
