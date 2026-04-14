@@ -320,6 +320,18 @@ export const router = createHashRouter([
         lazy: () =>
           import("@features/database/pages/DatabasePage").then((m) => ({ Component: m.default })),
       },
+      {
+        path: "skills",
+        lazy: async () => ({
+          Component: (await import("@features/skills/pages/SkillsListPage")).SkillsListPage,
+        }),
+      },
+      {
+        path: "skills/:source",
+        lazy: async () => ({
+          Component: (await import("@features/skills/pages/SkillDetailPage")).SkillDetailPage,
+        }),
+      },
       { path: "/projects", element: <ProjectsListPage /> },
       { path: "/project/:id", element: <ProjectDetailPage /> },
       { path: "/project/:id/:tab", element: <ProjectDetailPage /> },

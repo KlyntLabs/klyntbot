@@ -13,6 +13,7 @@ import {
   MessageSquare,
   Plus,
   Settings,
+  Store,
   Timer,
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
@@ -32,6 +33,7 @@ const items: { key: SidebarItem; icon: typeof MessageSquare; path?: string; bott
   { key: "Learn", icon: GraduationCap, path: "/learn" },
   { key: "Brain", icon: Brain, path: "/brain" },
   { key: "Automations", icon: Timer, path: "/automations" },
+  { key: "Skills", icon: Store, path: "/skills" },
   { key: "Settings", icon: Settings, path: "/settings", bottom: true },
 ];
 
