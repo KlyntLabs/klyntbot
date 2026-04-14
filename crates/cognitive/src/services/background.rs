@@ -133,17 +133,31 @@ async fn collect_batch(
 }
 
 /// Split a batch of domain events into extraction vs accumulation buckets.
+///
+/// For entity events, if both an `EntityStore` and `SkillStore` are provided,
+/// the resolver in [`crate::services::entity_salience`] may override the
+/// static verdict/importance based on the database's SKILL.md rules.
 async fn classify_batch(
     events: Vec<DomainEvent>,
     session_repo: &Option<storage::SessionRepo>,
+    entity_store: Option<&Arc<entity_store::store::EntityStore>>,
+    skill_store: Option<&Arc<tokio::sync::RwLock<skill_system::SkillStore>>>,
 ) -> (Vec<Observation>, Vec<(String, Observation)>) {
     let mut to_extract = Vec::new();
     let mut to_accumulate = Vec::new();
 
     for event in events {
-        let verdict = evaluate_salience(&event);
         let key = event_type_key(&event);
-        if let Some(obs) = event_to_observation(&event, session_repo).await {
+        let skill_override = resolve_skill_salience(&event, entity_store, skill_store).await;
+        let verdict = skill_override
+            .as_ref()
+            .map(|r| r.verdict.clone())
+            .unwrap_or_else(|| evaluate_salience(&event));
+
+        if let Some(mut obs) = event_to_observation(&event, session_repo).await {
+            if let Some(resolved) = skill_override {
+                obs.importance = resolved.importance;
+            }
             match verdict {
                 SalienceVerdict::Extract => to_extract.push(obs),
                 SalienceVerdict::Accumulate => to_accumulate.push((key, obs)),
@@ -152,6 +166,103 @@ async fn classify_batch(
         }
     }
     (to_extract, to_accumulate)
+}
+
+/// For entity events, look up the database's skill and resolve salience against its rules.
+async fn resolve_skill_salience(
+    event: &DomainEvent,
+    entity_store: Option<&Arc<entity_store::store::EntityStore>>,
+    skill_store: Option<&Arc<tokio::sync::RwLock<skill_system::SkillStore>>>,
+) -> Option<crate::services::entity_salience::ResolvedSalience> {
+    use crate::services::entity_salience::{resolve_entity_salience, EntityEventKind};
+
+    // Short-circuit before any await for non-entity events (hot path).
+    let (database_id, entity_id, changed, kind) = match event {
+        DomainEvent::EntityCreated {
+            database_id,
+            entity_id,
+        } => (
+            database_id.clone(),
+            Some(entity_id.clone()),
+            Vec::new(),
+            EntityEventKind::Created,
+        ),
+        DomainEvent::EntityUpdated {
+            database_id,
+            entity_id,
+            changed_fields,
+        } => (
+            database_id.clone(),
+            Some(entity_id.clone()),
+            changed_fields.clone(),
+            EntityEventKind::Updated,
+        ),
+        DomainEvent::EntityDeleted { database_id, .. } => (
+            database_id.clone(),
+            None,
+            Vec::new(),
+            EntityEventKind::Deleted,
+        ),
+        _ => return None,
+    };
+
+    let (es, ss) = match (entity_store, skill_store) {
+        (Some(a), Some(b)) => (a, b),
+        _ => return None,
+    };
+
+    let schema = match es.get_database(&database_id).await {
+        Ok(s) => s,
+        Err(e) => {
+            debug!(database_id = %database_id, error = %e, "skill salience: get_database failed");
+            return None;
+        }
+    };
+
+    let skill_name = schema.skill_id.as_ref()?;
+    let skill_path = {
+        let store = ss.read().await;
+        store.get(skill_name).map(|e| e.path.clone())
+    }?;
+    // Re-parse SKILL.md — SkillEntry carries only minimal frontmatter, so the
+    // full klyntbot metadata needs a fresh parse. Entity events are low-frequency;
+    // promote to a cached SkillStore::get_salience() if profiling flags this.
+    let content = match tokio::fs::read_to_string(&skill_path).await {
+        Ok(c) => c,
+        Err(e) => {
+            warn!(path = %skill_path.display(), error = %e, "skill salience: SKILL.md read failed");
+            return None;
+        }
+    };
+    let pkg = match skill_system::parser::parse_skill_md(
+        &content,
+        skill_path.clone(),
+        skill_system::types::SkillScope::User,
+    ) {
+        Ok(p) => p,
+        Err(e) => {
+            warn!(path = %skill_path.display(), error = %e, "skill salience: parse failed");
+            return None;
+        }
+    };
+    let decl = pkg.salience_declaration()?.clone();
+
+    // Fetch current field values for value-match rules (best-effort).
+    let field_values = match entity_id {
+        Some(ref eid) => es
+            .get_entity(&database_id, eid)
+            .await
+            .map(|e| e.fields)
+            .unwrap_or_default(),
+        None => std::collections::HashMap::new(),
+    };
+
+    Some(resolve_entity_salience(
+        Some(&decl),
+        kind,
+        &changed,
+        &field_values,
+    ))
 }
 
 /// For each extracted fact, concurrently look up existing similar facts from the repo.
@@ -232,6 +343,10 @@ pub struct BackgroundServiceConfig {
     /// Optional pending memory repo — low-confidence facts are routed here
     /// instead of being inserted directly into semantic_facts.
     pub pending_repo: Option<crate::repos::PendingMemoryRepo>,
+    /// Optional entity store — enables skill-driven salience for entity events.
+    pub entity_store: Option<Arc<entity_store::store::EntityStore>>,
+    /// Optional skill store — read per-database salience rules at classification time.
+    pub skill_store: Option<Arc<tokio::sync::RwLock<skill_system::SkillStore>>>,
 }
 
 /// Background service that processes domain events into cognitive memory.
@@ -267,6 +382,8 @@ impl BackgroundConsolidationService {
             deep_handler,
             density_repo,
             pending_repo,
+            entity_store,
+            skill_store,
         } = config;
         // ── Spawn unified pipeline collectors ─────────────────────────
         let mut _collector_handles: Vec<JoinHandle<()>> = Vec::new();
@@ -392,7 +509,13 @@ impl BackgroundConsolidationService {
                     }
                 }
 
-                let (mut to_extract, to_accumulate) = classify_batch(batch, &session_repo).await;
+                let (mut to_extract, to_accumulate) = classify_batch(
+                    batch,
+                    &session_repo,
+                    entity_store.as_ref(),
+                    skill_store.as_ref(),
+                )
+                .await;
 
                 // Prepend DLQ retries at indices 0..dlq_count, then promotions, then new events
                 let dlq_ids_this_batch = std::mem::take(&mut dlq_reprocess_ids);

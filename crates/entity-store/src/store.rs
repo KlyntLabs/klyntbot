@@ -657,6 +657,44 @@ impl EntityStore {
         rows.into_iter().map(view_from_row).collect()
     }
 
+    pub async fn create_view(
+        &self,
+        database_id: &str,
+        name: &str,
+        view_type: ViewType,
+        config: ViewConfig,
+        is_default: bool,
+    ) -> Result<ViewDefinition> {
+        crate::views::create_view(&self.pool, database_id, name, view_type, config, is_default)
+            .await
+    }
+
+    pub async fn update_view(
+        &self,
+        database_id: &str,
+        view_id: &str,
+        name: Option<&str>,
+        config: Option<ViewConfig>,
+    ) -> Result<ViewDefinition> {
+        let existing = crate::views::get_view(&self.pool, view_id).await?;
+        if existing.database_id != database_id {
+            return Err(common::KlyntbotError::Storage(format!(
+                "View {view_id} does not belong to database {database_id}"
+            )));
+        }
+        crate::views::update_view(&self.pool, view_id, name, config).await
+    }
+
+    pub async fn delete_view(&self, database_id: &str, view_id: &str) -> Result<()> {
+        let existing = crate::views::get_view(&self.pool, view_id).await?;
+        if existing.database_id != database_id {
+            return Err(common::KlyntbotError::Storage(format!(
+                "View {view_id} does not belong to database {database_id}"
+            )));
+        }
+        crate::views::delete_view(&self.pool, view_id).await
+    }
+
     // -----------------------------------------------------------------------
     // Entity CRUD
     // -----------------------------------------------------------------------

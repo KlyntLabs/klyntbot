@@ -13,6 +13,7 @@ pub mod consolidation;
 pub mod context_source;
 pub mod conversation_recall;
 pub mod decay;
+pub mod entity_salience;
 pub mod extraction;
 pub mod fsrs5;
 pub mod graph_enrichment;

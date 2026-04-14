@@ -10,6 +10,8 @@ common = { workspace = true }
 storage = { workspace = true }
 bus = { workspace = true }
 feature-notes = { workspace = true }
+skill-system = { workspace = true }
+entity-store = { workspace = true }
 context_engine = { workspace = true }
 chrono = { workspace = true }
 dashmap = { workspace = true }

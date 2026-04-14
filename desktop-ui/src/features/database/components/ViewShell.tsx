@@ -42,16 +42,18 @@ export function ViewShell({
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       {/* View tabs + toolbar with page-level horizontal padding */}
-      <div className="shrink-0 px-4">
+      <div className="shrink-0 flex items-center justify-between gap-3 border-b border-border px-4">
         {views.length > 0 && (
           <ViewTabBar views={views} activeViewId={activeViewId} onViewSelect={setActiveViewId} />
         )}
-        <ViewToolbar
-          searchQuery={searchQuery}
-          onSearchChange={onSearchChange}
-          onNewEntity={onNewEntity}
-          entityCount={totalCount}
-        />
+        <div className="ml-auto py-1.5">
+          <ViewToolbar
+            searchQuery={searchQuery}
+            onSearchChange={onSearchChange}
+            onNewEntity={onNewEntity}
+            entityCount={totalCount}
+          />
+        </div>
       </div>
 
       {/* Scrollable content — full bleed for table, padded for others */}

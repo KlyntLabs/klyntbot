@@ -1,8 +1,18 @@
 use desktop_shared::errors::ApiError;
 use entity_store::{
-    CreateDatabaseInput, CreateFieldInput, DatabaseSchema, Entity, FieldDefinition,
+    evolution::{self, SchemaEvolution},
+    CreateDatabaseInput, CreateFieldInput, DatabaseSchema, Entity, FieldDefinition, ViewConfig,
+    ViewDefinition, ViewType,
 };
+use serde::Deserialize;
 use serde_json::Value;
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum ResolveAction {
+    Accept,
+    Dismiss,
+}
 
 use crate::state::AppCore;
 
@@ -167,6 +177,97 @@ impl AppCore {
             .remove_field(&database_id, &field_id, false)
             .await
             .map_err(Into::into)
+    }
+
+    // ── Views ──────────────────────────────────────────────
+
+    pub async fn db_list_views(
+        &self,
+        database_id: String,
+    ) -> Result<Vec<ViewDefinition>, ApiError> {
+        let store = self.require_entity_store()?;
+        store.list_views(&database_id).await.map_err(Into::into)
+    }
+
+    pub async fn db_create_view(
+        &self,
+        database_id: String,
+        name: String,
+        view_type: ViewType,
+        config: Option<ViewConfig>,
+        is_default: Option<bool>,
+    ) -> Result<ViewDefinition, ApiError> {
+        let store = self.require_entity_store()?;
+        store
+            .create_view(
+                &database_id,
+                &name,
+                view_type,
+                config.unwrap_or_default(),
+                is_default.unwrap_or(false),
+            )
+            .await
+            .map_err(Into::into)
+    }
+
+    pub async fn db_update_view(
+        &self,
+        database_id: String,
+        view_id: String,
+        name: Option<String>,
+        config: Option<ViewConfig>,
+    ) -> Result<ViewDefinition, ApiError> {
+        let store = self.require_entity_store()?;
+        store
+            .update_view(&database_id, &view_id, name.as_deref(), config)
+            .await
+            .map_err(Into::into)
+    }
+
+    pub async fn db_delete_view(
+        &self,
+        database_id: String,
+        view_id: String,
+    ) -> Result<(), ApiError> {
+        let store = self.require_entity_store()?;
+        store
+            .delete_view(&database_id, &view_id)
+            .await
+            .map_err(Into::into)
+    }
+
+    // ── Schema Suggestions ────────────────────────────────
+
+    pub async fn db_get_suggestions(
+        &self,
+        database_id: String,
+    ) -> Result<Vec<SchemaEvolution>, ApiError> {
+        let store = self.require_entity_store()?;
+        evolution::list_pending_evolutions(store.pool(), &database_id)
+            .await
+            .map_err(Into::into)
+    }
+
+    pub async fn db_resolve_suggestion(
+        &self,
+        database_id: String,
+        evolution_id: String,
+        action: ResolveAction,
+    ) -> Result<(), ApiError> {
+        let store = self.require_entity_store()?;
+        let pool = store.pool();
+        let status = match action {
+            ResolveAction::Accept => evolution::STATUS_ACCEPTED,
+            ResolveAction::Dismiss => evolution::STATUS_DISMISSED,
+        };
+        evolution::resolve_evolution(pool, &evolution_id, status)
+            .await
+            .map_err(ApiError::from)?;
+        match action {
+            ResolveAction::Accept => evolution::record_acceptance(pool, &database_id).await,
+            ResolveAction::Dismiss => evolution::record_dismissal(pool, &database_id).await,
+        }
+        .map_err(Into::into)
     }
 
     fn require_entity_store(&self) -> Result<&entity_store::store::EntityStore, ApiError> {

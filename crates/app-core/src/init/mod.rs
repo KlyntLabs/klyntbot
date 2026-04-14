@@ -488,6 +488,20 @@ impl AppCore {
             (Some(Arc::new(facade)), Some(handles), Some(shutdown))
         };
 
+        // ── Workspace skill auto-updater ───────────────────────────────────
+        // Keeps skills/workspace/SKILL.md's database list fresh on create/delete.
+        if let Some(ref es) = entity_store {
+            let subscriber = ::cognitive::mirror::subscribers::WorkspaceSkillSubscriber::new(
+                config.data_dir_path().join("skills"),
+                Arc::clone(es),
+                agent.skill_store(),
+            );
+            let rx = domain_event_bus.subscribe();
+            let child_shutdown = shutdown_token.child_token();
+            tokio::spawn(async move { subscriber.run(rx, child_shutdown).await });
+            info!("WorkspaceSkillSubscriber started");
+        }
+
         // ── Journey tracker (needed by BrainVoice) ──────────────────────────
         let journey_tracker = crate::journey::JourneyTracker::new(storage_pool.clone());
 

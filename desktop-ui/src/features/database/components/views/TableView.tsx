@@ -93,8 +93,8 @@ export function TableView({
                 key={field.id}
                 onClick={() => toggleSort(field.slug)}
                 className={`whitespace-nowrap py-2 text-left text-[12px] font-medium text-foreground/70 cursor-pointer select-none transition-colors hover:bg-accent hover:text-foreground ${
-                  i === 0 ? "pl-10 pr-3" : "px-3"
-                } ${i === columns.length - 1 ? "pr-10" : ""}`}
+                  i === 0 ? "pl-4 pr-3" : "px-3"
+                } ${i === columns.length - 1 ? "pr-4" : ""}`}
               >
                 <span className="inline-flex items-center">
                   {field.name}
@@ -118,8 +118,8 @@ export function TableView({
                   <td
                     key={field.id}
                     className={`overflow-hidden text-ellipsis whitespace-nowrap py-2 ${
-                      i === 0 ? "pl-10 pr-3" : "px-3"
-                    } ${i === columns.length - 1 ? "pr-10" : ""} ${
+                      i === 0 ? "pl-4 pr-3" : "px-3"
+                    } ${i === columns.length - 1 ? "pr-4" : ""} ${
                       isTitle ? "font-medium text-foreground" : "font-normal text-foreground/85"
                     }`}
                   >

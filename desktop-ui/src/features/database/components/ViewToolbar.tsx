@@ -14,7 +14,7 @@ export function ViewToolbar({
   entityCount,
 }: ViewToolbarProps) {
   return (
-    <div className="flex items-center gap-3 py-2.5">
+    <div className="flex items-center gap-3">
       {/* Search — lightweight inline filter, Notion-style */}
       <div className="relative">
         <svg
@@ -42,8 +42,6 @@ export function ViewToolbar({
       {entityCount != null && (
         <span className="text-[12px] text-foreground/55 tabular-nums">{entityCount} items</span>
       )}
-
-      <div className="flex-1" />
 
       <Button variant="primary" size="sm" onClick={onNewEntity}>
         <svg

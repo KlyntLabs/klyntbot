@@ -468,6 +468,8 @@ impl AgentLoopBuilder {
                                 )
                                     as Arc<dyn cognitive::pipeline::DeepConsolidationHandler>
                             }),
+                            entity_store: self.entity_store.clone(),
+                            skill_store: Some(Arc::clone(&skill_store)),
                         },
                     );
                     info!("Cognitive background consolidation service started");

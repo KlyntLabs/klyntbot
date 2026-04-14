@@ -45,7 +45,7 @@ export function CalendarView({ schema, entities, dateField, onEntityClick }: Cal
   }
 
   return (
-    <div className="flex h-full w-full flex-col px-10 pt-3 pb-6">
+    <div className="flex h-full w-full flex-col px-4 pt-3 pb-6">
       <div className="mb-3 flex shrink-0 items-center gap-2">
         <h3 className="text-[15px] font-semibold text-foreground">
           {format(currentMonth, "MMMM yyyy")}

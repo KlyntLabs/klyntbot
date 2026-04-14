@@ -76,7 +76,7 @@ interface ViewTabBarProps {
 
 export function ViewTabBar({ views, activeViewId, onViewSelect, onAddView }: ViewTabBarProps) {
   return (
-    <div className="flex items-center gap-0.5 border-b border-border">
+    <div className="flex items-center gap-0.5">
       {views.map((view) => {
         const isActive = activeViewId === view.id;
         return (

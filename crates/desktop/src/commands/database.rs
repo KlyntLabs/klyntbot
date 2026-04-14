@@ -1,5 +1,7 @@
+use ::app_core::handlers::database::ResolveAction;
 use desktop_shared::errors::ApiError;
-use entity_store::{DatabaseSchema, Entity, FieldDefinition};
+use entity_store::evolution::SchemaEvolution;
+use entity_store::{DatabaseSchema, Entity, FieldDefinition, ViewConfig, ViewDefinition, ViewType};
 use serde_json::Value;
 use std::sync::Arc;
 use tauri::State;
@@ -119,6 +121,70 @@ pub async fn db_remove_field(
     state.db_remove_field(database_id, field_id).await
 }
 
+#[tauri::command]
+pub async fn db_list_views(
+    state: State<'_, Arc<AppCore>>,
+    database_id: String,
+) -> Result<Vec<ViewDefinition>, ApiError> {
+    state.db_list_views(database_id).await
+}
+
+#[tauri::command]
+pub async fn db_create_view(
+    state: State<'_, Arc<AppCore>>,
+    database_id: String,
+    name: String,
+    view_type: ViewType,
+    config: Option<ViewConfig>,
+    is_default: Option<bool>,
+) -> Result<ViewDefinition, ApiError> {
+    state
+        .db_create_view(database_id, name, view_type, config, is_default)
+        .await
+}
+
+#[tauri::command]
+pub async fn db_update_view(
+    state: State<'_, Arc<AppCore>>,
+    database_id: String,
+    view_id: String,
+    name: Option<String>,
+    config: Option<ViewConfig>,
+) -> Result<ViewDefinition, ApiError> {
+    state
+        .db_update_view(database_id, view_id, name, config)
+        .await
+}
+
+#[tauri::command]
+pub async fn db_delete_view(
+    state: State<'_, Arc<AppCore>>,
+    database_id: String,
+    view_id: String,
+) -> Result<(), ApiError> {
+    state.db_delete_view(database_id, view_id).await
+}
+
+#[tauri::command]
+pub async fn db_get_suggestions(
+    state: State<'_, Arc<AppCore>>,
+    database_id: String,
+) -> Result<Vec<SchemaEvolution>, ApiError> {
+    state.db_get_suggestions(database_id).await
+}
+
+#[tauri::command]
+pub async fn db_resolve_suggestion(
+    state: State<'_, Arc<AppCore>>,
+    database_id: String,
+    evolution_id: String,
+    action: ResolveAction,
+) -> Result<(), ApiError> {
+    state
+        .db_resolve_suggestion(database_id, evolution_id, action)
+        .await
+}
+
 #[cfg(test)]
 pub(crate) const DEV_COMMANDS: &[&str] = &[
     "db_list",
@@ -132,6 +198,12 @@ pub(crate) const DEV_COMMANDS: &[&str] = &[
     "db_add_field",
     "db_modify_field",
     "db_remove_field",
+    "db_list_views",
+    "db_create_view",
+    "db_update_view",
+    "db_delete_view",
+    "db_get_suggestions",
+    "db_resolve_suggestion",
 ];
 
 #[cfg(debug_assertions)]
@@ -205,6 +277,66 @@ pub(crate) async fn dispatch_dev(
             let db_id = try_field!(dev::get_str(body, "databaseId"));
             let field_id = try_field!(dev::get_str(body, "fieldId"));
             dev::val(core.db_remove_field(db_id, field_id).await)
+        }
+        "db_list_views" => {
+            let db_id = try_field!(dev::get_str(body, "databaseId"));
+            dev::val(core.db_list_views(db_id).await)
+        }
+        "db_create_view" => {
+            let db_id = try_field!(dev::get_str(body, "databaseId"));
+            let name = try_field!(dev::get_str(body, "name"));
+            let view_type_str = try_field!(dev::get_str(body, "viewType"));
+            let view_type: ViewType = match serde_json::from_value(serde_json::json!(view_type_str))
+            {
+                Ok(v) => v,
+                Err(e) => {
+                    return Some(Err(ApiError::new(
+                        "VALIDATION",
+                        format!("Invalid viewType: {e}"),
+                    )))
+                }
+            };
+            let config: Option<ViewConfig> = dev::get(body, "config");
+            let is_default: Option<bool> = dev::get(body, "isDefault");
+            dev::val(
+                core.db_create_view(db_id, name, view_type, config, is_default)
+                    .await,
+            )
+        }
+        "db_update_view" => {
+            let db_id = try_field!(dev::get_str(body, "databaseId"));
+            let view_id = try_field!(dev::get_str(body, "viewId"));
+            let name: Option<String> = dev::get(body, "name");
+            let config: Option<ViewConfig> = dev::get(body, "config");
+            dev::val(core.db_update_view(db_id, view_id, name, config).await)
+        }
+        "db_delete_view" => {
+            let db_id = try_field!(dev::get_str(body, "databaseId"));
+            let view_id = try_field!(dev::get_str(body, "viewId"));
+            dev::val(core.db_delete_view(db_id, view_id).await)
+        }
+        "db_get_suggestions" => {
+            let db_id = try_field!(dev::get_str(body, "databaseId"));
+            dev::val(core.db_get_suggestions(db_id).await)
+        }
+        "db_resolve_suggestion" => {
+            let db_id = try_field!(dev::get_str(body, "databaseId"));
+            let evolution_id = try_field!(dev::get_str(body, "evolutionId"));
+            let action_str = try_field!(dev::get_str(body, "action"));
+            let action: ResolveAction = match serde_json::from_value(serde_json::json!(action_str))
+            {
+                Ok(a) => a,
+                Err(e) => {
+                    return Some(Err(ApiError::new(
+                        "VALIDATION",
+                        format!("Invalid action: {e}"),
+                    )))
+                }
+            };
+            dev::val(
+                core.db_resolve_suggestion(db_id, evolution_id, action)
+                    .await,
+            )
         }
         _ => return None,
     })

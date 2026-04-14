@@ -26,7 +26,7 @@ export function ListView({ schema, entities, cardFields, onEntityClick }: ListVi
             key={entity.id}
             type="button"
             onClick={() => onEntityClick?.(entity)}
-            className="flex w-full cursor-pointer items-center gap-3 px-10 py-2.5 text-left transition-colors hover:bg-accent/60"
+            className="flex w-full cursor-pointer items-center gap-3 px-4 py-2.5 text-left transition-colors hover:bg-accent/60"
           >
             <span className="flex-1 truncate text-[13px] font-medium text-foreground">{title}</span>
             <div className="flex shrink-0 items-center gap-3 text-[12px] text-foreground/70">
@@ -40,7 +40,7 @@ export function ListView({ schema, entities, cardFields, onEntityClick }: ListVi
         );
       })}
       {entities.length === 0 && (
-        <div className="px-10 py-16 text-center text-[13px] text-foreground/60">No items yet</div>
+        <div className="px-4 py-16 text-center text-[13px] text-foreground/60">No items yet</div>
       )}
     </div>
   );
