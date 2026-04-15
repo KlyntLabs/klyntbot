@@ -140,17 +140,14 @@ impl Installer {
         let (owner, repo, subpath) = parse_github_ref(&row.source_ref)
             .ok_or_else(|| KlyntbotError::Storage("only github upgrades supported".into()))?;
 
-        let current = self
+        let current_pkg = self
             .fetcher
-            .fetch(&SkillSource::Github {
-                owner: owner.clone(),
-                repo: repo.clone(),
-                subpath: subpath.clone(),
-                r#ref: GitRef::Commit {
-                    sha: row.installed_sha.clone(),
-                },
+            .fetch(&SkillSource::LocalPath {
+                path: self.skills_dir.join(&row.name),
             })
-            .await?;
+            .await
+            .ok();
+
         let target = self
             .fetcher
             .fetch(&SkillSource::Github {
@@ -163,14 +160,20 @@ impl Installer {
             })
             .await?;
 
-        let diff = skills_registry::diff::diff_packages(&current, &target);
+        let diff = if let Some(ref current) = current_pkg {
+            skills_registry::diff::diff_packages(current, &target)
+        } else {
+            skills_registry::diff::DiffResult::default()
+        };
 
-        let current_tpls: std::collections::HashSet<_> =
-            current.templates.iter().map(|t| t.name.clone()).collect();
+        let current_tpl_names: std::collections::HashSet<_> = current_pkg
+            .as_ref()
+            .map(|c| c.templates.iter().map(|t| t.name.clone()).collect())
+            .unwrap_or_default();
         let new_bootstraps: Vec<crate::plan::TemplatePreview> = target
             .templates
             .iter()
-            .filter(|t| !current_tpls.contains(&t.name))
+            .filter(|t| !current_tpl_names.contains(&t.name))
             .map(|t| crate::plan::TemplatePreview {
                 template_name: t.name.clone(),
                 database_name: t.name.clone(),
@@ -184,6 +187,7 @@ impl Installer {
             to_sha: target_sha.into(),
             diff,
             new_bootstraps,
+            target_package: target,
         })
     }
 
@@ -191,20 +195,8 @@ impl Installer {
         let row = self.repo.get(&plan.name).await?.ok_or_else(|| {
             KlyntbotError::Storage(format!("skill '{}' not installed", plan.name))
         })?;
-        let (owner, repo, subpath) = parse_github_ref(&row.source_ref)
-            .ok_or_else(|| KlyntbotError::Storage("only github upgrades supported".into()))?;
 
-        let target = self
-            .fetcher
-            .fetch(&SkillSource::Github {
-                owner,
-                repo,
-                subpath,
-                r#ref: GitRef::Commit {
-                    sha: plan.to_sha.clone(),
-                },
-            })
-            .await?;
+        let target = plan.target_package;
 
         let dir = self.skills_dir.join(&plan.name);
         let mut written = Vec::new();
@@ -286,8 +278,14 @@ fn source_ref_string(s: &SkillSource) -> String {
             owner,
             repo,
             subpath,
-            ..
-        } => format!("{owner}/{repo}/{subpath}"),
+            r#ref,
+        } => {
+            let base = format!("{owner}/{repo}/{subpath}");
+            match r#ref {
+                GitRef::Commit { sha } => format!("{base}@{sha}"),
+                _ => base,
+            }
+        }
         SkillSource::SkillsSh { slug } => slug.clone(),
         SkillSource::LocalPath { path } => path.display().to_string(),
         SkillSource::Bundled { name } => format!("bundled:{name}"),
@@ -407,10 +405,12 @@ async fn write_package(
     Ok(())
 }
 
+/// Parse a stored source_ref back into (owner, repo, subpath, optional_sha).
+/// Format: `owner/repo/subpath[@sha]` — the `@sha` suffix is optional (older rows omit it).
 fn parse_github_ref(s: &str) -> Option<(String, String, String)> {
-    let parts: Vec<&str> = s.split('/').collect();
-    if parts.len() < 2 {
-        return None;
+    let (path_part, _sha) = s.split_once('@').unwrap_or((s, ""));
+    match SkillSource::parse_shorthand(path_part) {
+        Ok(SkillSource::Github { owner, repo, subpath, .. }) => Some((owner, repo, subpath)),
+        _ => None,
     }
-    Some((parts[0].into(), parts[1].into(), parts[2..].join("/")))
 }

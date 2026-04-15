@@ -12273,6 +12273,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "common",
+ "futures-util",
  "hex",
  "reqwest 0.13.2",
  "serde",

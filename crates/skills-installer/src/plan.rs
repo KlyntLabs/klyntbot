@@ -42,4 +42,6 @@ pub struct UpgradePlan {
     pub to_sha: String,
     pub diff: skills_registry::diff::DiffResult,
     pub new_bootstraps: Vec<TemplatePreview>,
+    /// The fetched target package — embedded so `apply_upgrade` doesn't need to re-fetch.
+    pub target_package: SkillPackage,
 }

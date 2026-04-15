@@ -3,7 +3,7 @@ use serde_json::Value;
 use std::path::PathBuf;
 
 use skill_system::store::SkillFrontmatter;
-use skill_system::types::{KlyntbotMeta, SkillScope};
+use skill_system::types::KlyntbotMeta;
 
 use crate::source::SkillSource;
 
@@ -36,18 +36,3 @@ pub struct TemplateFile {
     pub manifest: Value,
 }
 
-impl SkillPackage {
-    pub fn is_klyntbot_native(&self) -> bool {
-        self.klyntbot_meta.is_some()
-    }
-
-    pub fn bootstraps_databases(&self) -> usize {
-        // KlyntbotMeta does not carry a `custom` bag; always 0 for now.
-        0
-    }
-
-    #[allow(dead_code)]
-    fn _silence_unused(s: SkillScope) -> SkillScope {
-        s
-    }
-}

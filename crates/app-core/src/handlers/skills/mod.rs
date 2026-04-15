@@ -2,13 +2,27 @@ use std::sync::Arc;
 
 use desktop_shared::errors::ApiError;
 use serde::{Deserialize, Serialize};
-use serde_json::Value;
 
 use skills_installer::{InstallPlan, UninstallMode, UpgradePlan};
 use skills_marketplace::InstalledSkill;
-use skills_registry::{AvailableVersion, GitRef, SkillPackage, SkillSource};
+use skills_registry::{AvailableVersion, GitRef, SkillPackage, SkillSource, TemplateFile};
 
 use crate::state::AppCore;
+
+// TODO(marketplace-registry): replace with a live skills.sh registry query.
+const CURATED_SKILLS: &[(&str, &str)] = &[
+    ("reading-list", "klynt-skills/official/reading-list"),
+    ("pkm-notebook", "klynt-skills/official/pkm-notebook"),
+];
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AdaptPreviewResponse {
+    pub adapted_skill_md: String,
+    pub generated_templates: Vec<TemplateFile>,
+    pub rationale: String,
+    pub adapter_model: String,
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -50,10 +64,7 @@ impl AppCore {
         // MVP: curated featured list + installed skills. Live skills.sh proxy comes later.
         let inst = self.require_installer()?;
         let installed = inst.repo.list().await.map_err(ApiError::from)?;
-        let curated: Vec<(&str, &str)> = vec![
-            ("reading-list", "klynt-skills/official/reading-list"),
-            ("pkm-notebook", "klynt-skills/official/pkm-notebook"),
-        ];
+        let curated = CURATED_SKILLS;
         let mut out: Vec<SkillBrowseRow> = Vec::new();
         for (i, (name, src)) in curated.iter().enumerate() {
             out.push(SkillBrowseRow {
@@ -149,7 +160,10 @@ impl AppCore {
         Ok(())
     }
 
-    pub async fn skill_adapt_preview(&self, shorthand: String) -> Result<Value, ApiError> {
+    pub async fn skill_adapt_preview(
+        &self,
+        shorthand: String,
+    ) -> Result<AdaptPreviewResponse, ApiError> {
         let inst = self.require_installer()?;
         let adapter = self.require_adapter()?;
         let source = SkillSource::parse_shorthand(&shorthand)
@@ -168,12 +182,11 @@ impl AppCore {
             .adapt(&pkg, &existing_dbs)
             .await
             .map_err(ApiError::from)?;
-        Ok(serde_json::to_value(serde_json::json!({
-            "adaptedSkillMd": out.adapted_skill_md,
-            "generatedTemplates": out.generated_templates,
-            "rationale": out.rationale,
-            "adapterModel": out.adapter_model,
-        }))
-        .unwrap())
+        Ok(AdaptPreviewResponse {
+            adapted_skill_md: out.adapted_skill_md,
+            generated_templates: out.generated_templates,
+            rationale: out.rationale,
+            adapter_model: out.adapter_model,
+        })
     }
 }

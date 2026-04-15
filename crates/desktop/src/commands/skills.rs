@@ -1,8 +1,7 @@
 use std::sync::Arc;
 
-use app_core::handlers::skills::SkillBrowseRow;
+use app_core::handlers::skills::{AdaptPreviewResponse, SkillBrowseRow};
 use desktop_shared::errors::ApiError;
-use serde_json::Value;
 use tauri::State;
 
 use skills_installer::{InstallPlan, UninstallMode, UpgradePlan};
@@ -88,7 +87,7 @@ pub async fn skill_toggle_enabled(
 pub async fn skill_adapt_preview(
     state: State<'_, Arc<AppCore>>,
     shorthand: String,
-) -> Result<Value, ApiError> {
+) -> Result<AdaptPreviewResponse, ApiError> {
     state.skill_adapt_preview(shorthand).await
 }
 

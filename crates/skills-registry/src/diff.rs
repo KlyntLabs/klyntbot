@@ -3,7 +3,7 @@ use similar::{ChangeTag, TextDiff};
 
 use crate::SkillPackage;
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct DiffResult {
     pub body_lines: Vec<DiffLine>,

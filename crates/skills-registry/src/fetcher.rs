@@ -1,6 +1,7 @@
 use std::path::PathBuf;
 
-use common::{KlyntbotError, Result};
+use common::{KlyntbotError, Result, shared_http_client};
+use futures_util::future::try_join_all;
 use serde_json::Value;
 use tracing::debug;
 
@@ -10,6 +11,8 @@ use skill_system::types::SkillScope;
 
 use crate::package::{ReferenceFile, TemplateFile};
 use crate::{GitRef, SkillPackage, SkillSource};
+
+const USER_AGENT: &str = "klyntbot-skills-registry";
 
 pub struct Fetcher {
     http: reqwest::Client,
@@ -29,10 +32,7 @@ impl Fetcher {
 
     pub fn with_bases(api: String, raw: String) -> Self {
         Self {
-            http: reqwest::Client::builder()
-                .user_agent("klyntbot-skills-registry")
-                .build()
-                .expect("reqwest client"),
+            http: shared_http_client(),
             github_api_base: api,
             github_raw_base: raw,
         }
@@ -88,25 +88,32 @@ impl Fetcher {
         };
         let skill_md = self.fetch_raw(owner, repo, &sha, &skill_path).await?;
 
-        let (frontmatter, _body) = split_frontmatter(&skill_md)
+        let parsed = parse_skill_md(&skill_md, PathBuf::from(&skill_path), SkillScope::User).ok();
+        let (frontmatter, _) = split_frontmatter(&skill_md)
             .map_err(|e| KlyntbotError::Storage(format!("split_frontmatter: {e}")))?;
-
-        let klyntbot_meta = parse_skill_md(&skill_md, PathBuf::from(&skill_path), SkillScope::User)
-            .ok()
-            .and_then(|pkg| pkg.metadata.klyntbot.clone());
+        let klyntbot_meta = parsed.and_then(|p| p.metadata.klyntbot);
 
         let semver = None;
 
-        // Fetch references/ and templates/ directory listings (optional — may 404).
-        let references = self
-            .fetch_dir_files(
-                owner,
-                repo,
-                &sha,
-                &format!("{}/references", trim_trailing(subpath)),
-            )
-            .await
-            .unwrap_or_default()
+        let base = trim_trailing(subpath);
+        let (refs_raw, templates_raw) = tokio::try_join!(
+            async {
+                Ok::<_, common::KlyntbotError>(
+                    self.fetch_dir_files(owner, repo, &sha, &format!("{base}/references"))
+                        .await
+                        .unwrap_or_default(),
+                )
+            },
+            async {
+                Ok::<_, common::KlyntbotError>(
+                    self.fetch_dir_files(owner, repo, &sha, &format!("{base}/templates"))
+                        .await
+                        .unwrap_or_default(),
+                )
+            }
+        )?;
+
+        let references = refs_raw
             .into_iter()
             .map(|(path, content)| ReferenceFile {
                 path: PathBuf::from(path),
@@ -114,15 +121,7 @@ impl Fetcher {
             })
             .collect();
 
-        let templates_raw = self
-            .fetch_dir_files(
-                owner,
-                repo,
-                &sha,
-                &format!("{}/templates", trim_trailing(subpath)),
-            )
-            .await
-            .unwrap_or_default();
+        let templates_raw = templates_raw;
         let mut templates = Vec::new();
         for (path, content) in templates_raw {
             if path.ends_with(".json") {
@@ -179,6 +178,7 @@ impl Fetcher {
         let resp = self
             .http
             .get(url)
+            .header("User-Agent", USER_AGENT)
             .send()
             .await
             .map_err(|e| KlyntbotError::Storage(format!("github GET {url}: {e}")))?;
@@ -206,6 +206,7 @@ impl Fetcher {
         let resp = self
             .http
             .get(&url)
+            .header("User-Agent", USER_AGENT)
             .send()
             .await
             .map_err(|e| KlyntbotError::Storage(format!("raw GET {url}: {e}")))?;
@@ -236,6 +237,7 @@ impl Fetcher {
         let resp = self
             .http
             .get(&url)
+            .header("User-Agent", USER_AGENT)
             .send()
             .await
             .map_err(|e| KlyntbotError::Storage(format!("contents {url}: {e}")))?;
@@ -252,25 +254,31 @@ impl Fetcher {
             .json()
             .await
             .map_err(|e| KlyntbotError::Storage(e.to_string()))?;
-        let mut out = Vec::new();
-        for item in items {
-            let Some(kind) = item.get("type").and_then(|v| v.as_str()) else {
-                continue;
-            };
-            let Some(name) = item.get("name").and_then(|v| v.as_str()) else {
-                continue;
-            };
-            if kind != "file" {
-                continue;
-            }
-            let full_path = if dir.is_empty() {
-                name.to_string()
-            } else {
-                format!("{dir}/{name}")
-            };
-            let content = self.fetch_raw(owner, repo, sha, &full_path).await?;
-            out.push((name.to_string(), content));
-        }
+        let file_items: Vec<(String, String)> = items
+            .iter()
+            .filter_map(|item| {
+                let kind = item.get("type").and_then(|v| v.as_str())?;
+                let name = item.get("name").and_then(|v| v.as_str())?;
+                if kind != "file" {
+                    return None;
+                }
+                let full_path = if dir.is_empty() {
+                    name.to_string()
+                } else {
+                    format!("{dir}/{name}")
+                };
+                Some((name.to_string(), full_path))
+            })
+            .collect();
+
+        let out: Vec<(String, String)> = try_join_all(file_items.into_iter().map(
+            |(name, full_path)| async move {
+                let content = self.fetch_raw(owner, repo, sha, &full_path).await?;
+                Ok::<_, KlyntbotError>((name, content))
+            },
+        ))
+        .await?;
+
         debug!(dir = %dir, count = out.len(), "fetched dir files");
         Ok(out)
     }
