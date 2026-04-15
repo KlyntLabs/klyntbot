@@ -152,11 +152,10 @@ impl AppCore {
             .set_enabled(&name, enabled)
             .await
             .map_err(ApiError::from)?;
-        inst.skill_store
-            .write()
-            .await
-            .reload()
-            .map_err(|e| ApiError::new("STORAGE_ERROR", e.to_string()))?;
+        // The skill file on disk hasn't changed — a filesystem `reload()` would
+        // be a no-op here. Push the updated `enabled` state from the DB into
+        // the in-memory `SkillStore` so listing/routing/reference reflect it.
+        inst.refresh_disabled().await.map_err(ApiError::from)?;
         Ok(())
     }
 

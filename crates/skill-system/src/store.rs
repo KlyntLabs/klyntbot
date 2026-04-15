@@ -4,7 +4,7 @@
 //! The frontmatter is always available; the full body is loaded on demand
 //! via the `skill_reference` tool.
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
 
 use common::ConfigError;
@@ -73,6 +73,10 @@ pub struct SkillEntry {
 pub struct SkillStore {
     entries: HashMap<String, SkillEntry>,
     skills_dir: PathBuf,
+    // Names of skills toggled off via the marketplace DB. Filtered out of all
+    // public read paths so disabled skills don't appear in the system prompt,
+    // aren't routable, and can't be loaded via `skill_reference`.
+    disabled: HashSet<String>,
 }
 
 // ── Implementation ───────────────────────────────────────────
@@ -136,23 +140,38 @@ impl SkillStore {
         Ok(Self {
             entries,
             skills_dir: skills_dir.to_path_buf(),
+            disabled: HashSet::new(),
         })
     }
 
-    /// Reload all skills from disk (for hot-reload).
+    /// Reload all skills from disk (for hot-reload). Preserves the `disabled`
+    /// overlay — rename/add/remove on disk doesn't change enabled state.
     pub fn reload(&mut self) -> common::Result<()> {
         let reloaded = Self::load(&self.skills_dir)?;
         self.entries = reloaded.entries;
         Ok(())
     }
 
-    /// Get a skill entry by name.
+    /// Replace the set of disabled skill names. Called by the installer after
+    /// reading the authoritative `enabled` flag from `installed_skills`.
+    pub fn set_disabled(&mut self, disabled: HashSet<String>) {
+        self.disabled = disabled;
+    }
+
+    /// Get a skill entry by name. Returns `None` for disabled skills.
     pub fn get(&self, name: &str) -> Option<&SkillEntry> {
+        if self.disabled.contains(name) {
+            return None;
+        }
         self.entries.get(name)
     }
 
-    /// Get the full body of a skill (for skill_reference tool).
+    /// Get the full body of a skill (for skill_reference tool). Returns `None`
+    /// for disabled skills so the agent can't load them on demand.
     pub fn get_body(&self, name: &str) -> Option<&str> {
+        if self.disabled.contains(name) {
+            return None;
+        }
         self.entries.get(name).map(|e| e.body.as_str())
     }
 
@@ -163,7 +182,11 @@ impl SkillStore {
             "Available skills (use skill_reference tool to load full instructions):".to_string(),
         ];
 
-        let mut sorted: Vec<_> = self.entries.values().collect();
+        let mut sorted: Vec<_> = self
+            .entries
+            .values()
+            .filter(|e| !self.disabled.contains(&e.frontmatter.name))
+            .collect();
         sorted.sort_by(|a, b| a.frontmatter.name.cmp(&b.frontmatter.name));
 
         for entry in sorted {
@@ -187,14 +210,21 @@ impl SkillStore {
     }
 
     /// List all skill names (for skill_reference tool's available list).
+    /// Excludes disabled skills.
     pub fn names(&self) -> Vec<&str> {
-        self.entries.keys().map(|s| s.as_str()).collect()
+        self.entries
+            .keys()
+            .filter(|name| !self.disabled.contains(*name))
+            .map(|s| s.as_str())
+            .collect()
     }
 
     /// Build a reference index mapping skill name → full body.
+    /// Excludes disabled skills so the agent runtime doesn't surface them.
     pub fn build_reference_index(&self) -> HashMap<String, String> {
         self.entries
             .iter()
+            .filter(|(name, _)| !self.disabled.contains(*name))
             .map(|(name, entry)| (name.clone(), entry.body.clone()))
             .collect()
     }
@@ -349,9 +379,53 @@ mod tests {
         let store = SkillStore {
             entries,
             skills_dir: PathBuf::from("/tmp"),
+            disabled: HashSet::new(),
         };
         let listing = store.format_listing();
         assert!(listing.contains("test: Test skill — When testing"));
+    }
+
+    #[test]
+    fn disabled_skills_are_hidden_from_public_reads() {
+        let mut entries = HashMap::new();
+        for name in ["alpha", "beta"] {
+            entries.insert(
+                name.to_string(),
+                SkillEntry {
+                    frontmatter: SkillFrontmatter {
+                        name: name.to_string(),
+                        description: format!("{name} desc"),
+                        when_to_use: None,
+                        references: vec![],
+                    },
+                    body: format!("{name} body"),
+                    path: PathBuf::from(format!("{name}.md")),
+                },
+            );
+        }
+        let mut store = SkillStore {
+            entries,
+            skills_dir: PathBuf::from("/tmp"),
+            disabled: HashSet::new(),
+        };
+
+        store.set_disabled(HashSet::from(["beta".to_string()]));
+
+        let listing = store.format_listing();
+        assert!(listing.contains("alpha"));
+        assert!(!listing.contains("beta"));
+
+        let names = store.names();
+        assert!(names.contains(&"alpha"));
+        assert!(!names.contains(&"beta"));
+
+        assert!(store.get("alpha").is_some());
+        assert!(store.get("beta").is_none());
+        assert!(store.get_body("beta").is_none());
+
+        let index = store.build_reference_index();
+        assert!(index.contains_key("alpha"));
+        assert!(!index.contains_key("beta"));
     }
 
     #[test]

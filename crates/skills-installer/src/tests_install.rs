@@ -207,6 +207,49 @@ async fn uninstall_delete_databases_removes_everything() {
 }
 
 #[tokio::test]
+async fn refresh_disabled_hides_toggled_off_skills_from_store() {
+    let (tmp, inst) = setup().await;
+    let source = write_local_skill(tmp.path(), "---\nname: dz\ndescription: d\n---\nbody", None);
+    let plan = inst.preview_install(&source, None).await.unwrap();
+    inst.apply_install(plan).await.unwrap();
+
+    // Sanity: newly installed skill is visible.
+    {
+        let store = inst.skill_store.read().await;
+        assert!(store.get("dz").is_some(), "enabled skill should be visible");
+        assert!(store.names().contains(&"dz"));
+    }
+
+    // Toggle off in the DB, then sync the overlay.
+    inst.repo.set_enabled("dz", false).await.unwrap();
+    inst.refresh_disabled().await.unwrap();
+
+    {
+        let store = inst.skill_store.read().await;
+        assert!(
+            store.get("dz").is_none(),
+            "disabled skill must be hidden from get()"
+        );
+        assert!(
+            !store.names().contains(&"dz"),
+            "disabled skill must be hidden from names()"
+        );
+        assert!(
+            !store.format_listing().contains("dz"),
+            "disabled skill must not appear in system-prompt listing"
+        );
+    }
+
+    // Toggle back on.
+    inst.repo.set_enabled("dz", true).await.unwrap();
+    inst.refresh_disabled().await.unwrap();
+    {
+        let store = inst.skill_store.read().await;
+        assert!(store.get("dz").is_some(), "re-enabled skill returns");
+    }
+}
+
+#[tokio::test]
 async fn uninstall_archive_renames_database() {
     let (tmp, inst) = setup().await;
     let tpl = r#"{

@@ -22,6 +22,21 @@ pub struct Installer {
 }
 
 impl Installer {
+    /// Refresh the `disabled` overlay on the shared `SkillStore` from the
+    /// `installed_skills` table. Call after toggling an `enabled` flag, and at
+    /// startup, so `format_listing`, `names`, `get`, `get_body`, and
+    /// `build_reference_index` filter out disabled skills.
+    pub async fn refresh_disabled(&self) -> Result<()> {
+        let installed = self.repo.list().await?;
+        let disabled: std::collections::HashSet<String> = installed
+            .into_iter()
+            .filter(|s| !s.enabled)
+            .map(|s| s.name)
+            .collect();
+        self.skill_store.write().await.set_disabled(disabled);
+        Ok(())
+    }
+
     pub async fn preview_install(
         &self,
         source: &SkillSource,
@@ -410,7 +425,12 @@ async fn write_package(
 fn parse_github_ref(s: &str) -> Option<(String, String, String)> {
     let (path_part, _sha) = s.split_once('@').unwrap_or((s, ""));
     match SkillSource::parse_shorthand(path_part) {
-        Ok(SkillSource::Github { owner, repo, subpath, .. }) => Some((owner, repo, subpath)),
+        Ok(SkillSource::Github {
+            owner,
+            repo,
+            subpath,
+            ..
+        }) => Some((owner, repo, subpath)),
         _ => None,
     }
 }

@@ -506,6 +506,9 @@ impl AppCore {
             });
             info!("Skills installer ready");
             ::skills_installer::seed_bundled(&installer.repo).await.ok();
+            if let Err(e) = installer.refresh_disabled().await {
+                tracing::warn!(error = %e, "failed to load disabled skill set — all installed skills will be treated as enabled");
+            }
             Some(installer)
         } else {
             None
