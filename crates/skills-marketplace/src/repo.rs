@@ -30,7 +30,11 @@ impl TryFrom<InstalledRow> for InstalledSkill {
             "skills_sh" => SourceType::SkillsSh,
             "local" => SourceType::Local,
             "bundled" => SourceType::Bundled,
-            other => return Err(KlyntbotError::Storage(format!("unknown source_type {other}"))),
+            other => {
+                return Err(KlyntbotError::Storage(format!(
+                    "unknown source_type {other}"
+                )))
+            }
         };
         let bootstrapped: Vec<String> = r
             .bootstrapped_databases
@@ -89,23 +93,21 @@ impl InstalledSkillsRepo {
     }
 
     pub async fn get(&self, name: &str) -> Result<Option<InstalledSkill>> {
-        let row: Option<InstalledRow> = sqlx::query_as(
-            "SELECT * FROM installed_skills WHERE name = ?",
-        )
-        .bind(name)
-        .fetch_optional(&self.pool)
-        .await
-        .map_err(map_err)?;
+        let row: Option<InstalledRow> =
+            sqlx::query_as("SELECT * FROM installed_skills WHERE name = ?")
+                .bind(name)
+                .fetch_optional(&self.pool)
+                .await
+                .map_err(map_err)?;
         row.map(InstalledSkill::try_from).transpose()
     }
 
     pub async fn list(&self) -> Result<Vec<InstalledSkill>> {
-        let rows: Vec<InstalledRow> = sqlx::query_as(
-            "SELECT * FROM installed_skills ORDER BY name ASC",
-        )
-        .fetch_all(&self.pool)
-        .await
-        .map_err(map_err)?;
+        let rows: Vec<InstalledRow> =
+            sqlx::query_as("SELECT * FROM installed_skills ORDER BY name ASC")
+                .fetch_all(&self.pool)
+                .await
+                .map_err(map_err)?;
         rows.into_iter().map(InstalledSkill::try_from).collect()
     }
 
@@ -263,7 +265,9 @@ mod tests {
             updated_at: "t".into(),
         };
         repo.insert(&skill).await.unwrap();
-        repo.update_version("x", "1.0.1", "bbb", &["dbA".into()]).await.unwrap();
+        repo.update_version("x", "1.0.1", "bbb", &["dbA".into()])
+            .await
+            .unwrap();
         let fetched = repo.get("x").await.unwrap().unwrap();
         assert_eq!(fetched.installed_version, "1.0.1");
         assert_eq!(fetched.installed_sha, "bbb");

@@ -75,10 +75,7 @@ impl AppCore {
                     installs: None,
                     is_klynt_native: !s.is_adapted,
                     is_installed: true,
-                    is_bundled: matches!(
-                        s.source_type,
-                        skills_marketplace::SourceType::Bundled
-                    ),
+                    is_bundled: matches!(s.source_type, skills_marketplace::SourceType::Bundled),
                 });
             }
         }
@@ -93,7 +90,9 @@ impl AppCore {
         let inst = self.require_installer()?;
         let source = SkillSource::parse_shorthand(&shorthand)
             .map_err(|e| ApiError::new("VALIDATION", e.to_string()))?;
-        inst.preview_install(&source, version).await.map_err(Into::into)
+        inst.preview_install(&source, version)
+            .await
+            .map_err(Into::into)
     }
 
     pub async fn skill_install_apply(&self, plan: InstallPlan) -> Result<InstalledSkill, ApiError> {
@@ -136,13 +135,12 @@ impl AppCore {
             .map_err(Into::into)
     }
 
-    pub async fn skill_toggle_enabled(
-        &self,
-        name: String,
-        enabled: bool,
-    ) -> Result<(), ApiError> {
+    pub async fn skill_toggle_enabled(&self, name: String, enabled: bool) -> Result<(), ApiError> {
         let inst = self.require_installer()?;
-        inst.repo.set_enabled(&name, enabled).await.map_err(ApiError::from)?;
+        inst.repo
+            .set_enabled(&name, enabled)
+            .await
+            .map_err(ApiError::from)?;
         inst.skill_store
             .write()
             .await
@@ -166,7 +164,10 @@ impl AppCore {
             .into_iter()
             .map(|d| (d.name, d.slug))
             .collect::<Vec<_>>();
-        let out = adapter.adapt(&pkg, &existing_dbs).await.map_err(ApiError::from)?;
+        let out = adapter
+            .adapt(&pkg, &existing_dbs)
+            .await
+            .map_err(ApiError::from)?;
         Ok(serde_json::to_value(serde_json::json!({
             "adaptedSkillMd": out.adapted_skill_md,
             "generatedTemplates": out.generated_templates,

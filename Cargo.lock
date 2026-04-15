@@ -325,7 +325,10 @@ dependencies = [
  "session",
  "shellexpand",
  "skill-system",
+ "skills-adapter",
+ "skills-installer",
  "skills-marketplace",
+ "skills-registry",
  "sqlx",
  "storage",
  "tempfile",
@@ -4027,6 +4030,9 @@ dependencies = [
  "serde",
  "serde_json",
  "session",
+ "skills-installer",
+ "skills-marketplace",
+ "skills-registry",
  "storage",
  "tauri",
  "tauri-build",
@@ -12199,6 +12205,27 @@ dependencies = [
  "serde_json",
  "serde_yaml",
  "tempfile",
+ "tokio",
+ "tracing",
+]
+
+[[package]]
+name = "skills-adapter"
+version = "0.1.0"
+dependencies = [
+ "async-trait",
+ "common",
+ "entity-store",
+ "hex",
+ "providers",
+ "serde",
+ "serde_json",
+ "sha2",
+ "skill-system",
+ "skills-marketplace",
+ "skills-registry",
+ "sqlx",
+ "storage",
  "tokio",
  "tracing",
 ]
