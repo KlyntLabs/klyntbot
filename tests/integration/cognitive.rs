@@ -472,6 +472,8 @@ async fn test_batch_pipeline_processes_domain_events_end_to_end() {
             deep_handler: None,
             density_repo: None,
             pending_repo: None,
+            entity_store: None,
+            skill_store: None,
         },
     );
 
