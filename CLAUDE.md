@@ -156,6 +156,30 @@ Klyntbot exposes tools to external AI clients (Claude Code, Cursor, etc.) via MC
 
 **Live context refresh:** During Reactive execution, the `LiveContextRefresher` drains a shared `ContextUpdateQueue` (in the `bus` crate) at each iteration boundary. Context updates (e.g., newly promoted memories) are injected as `Message::ContextUpdate` entries with XML-tagged content. Token budget is respected — standard updates can use up to 80% of remaining context (20% reserved for LLM response); high-priority updates can use 90% (10% reserved). Emits `AgentEvent::ContextReassembled` for transparency. Set `pause_context_updates: true` on `ExecutionParams` for frozen-context mode. Phase 1 producer: cognitive background service pushes on memory promotion.
 
+## Behavioral Guidelines
+
+### Think before coding
+
+- State assumptions explicitly. If uncertain, ask — don't guess silently.
+- If multiple interpretations exist, present them. Don't pick one without saying so.
+- If a simpler approach exists, say so. Push back when warranted.
+
+### Surgical changes
+
+- Don't "improve" adjacent code, comments, or formatting. Match existing style.
+- Don't refactor things that aren't broken. If you notice unrelated dead code, mention it — don't delete it.
+- Remove imports/variables/functions that YOUR changes made unused. Don't remove pre-existing dead code unless asked.
+- **The test:** every changed line should trace directly to the user's request.
+
+### Goal-driven execution
+
+For multi-step tasks, state a brief plan with verification:
+```
+1. [Step] → verify: [check]
+2. [Step] → verify: [check]
+```
+Transform vague tasks into verifiable goals — "fix the bug" → "write a test that reproduces it, then make it pass".
+
 ## Workflow
 
 **Parallel sessions:** This workspace benefits from parallel Claude Code sessions. Use separate terminal tabs for independent crate work. For isolated changes, `git worktree` creates parallel checkouts without branch conflicts.
