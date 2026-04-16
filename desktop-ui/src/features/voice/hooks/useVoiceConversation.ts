@@ -39,6 +39,7 @@ export function useVoiceConversation() {
   const [modelLoading, setModelLoading] = useState(false);
 
   const continueTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const ttsFadeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Handle incoming voice events
   const handleEvent = useCallback((payload: Record<string, unknown>) => {
@@ -136,7 +137,11 @@ export function useVoiceConversation() {
         stopTtsAudio();
         clearTtsQueue();
         // Delay clearing so CSS can animate a 300ms fade-out on the speaking visual
-        setTimeout(() => setTtsAudio(null), 300);
+        if (ttsFadeTimerRef.current) clearTimeout(ttsFadeTimerRef.current);
+        ttsFadeTimerRef.current = setTimeout(() => {
+          setTtsAudio(null);
+          ttsFadeTimerRef.current = null;
+        }, 300);
         break;
       case "continueAvailable":
         setContinueAvailable(true);

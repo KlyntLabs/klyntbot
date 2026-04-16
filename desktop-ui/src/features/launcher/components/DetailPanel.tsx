@@ -147,7 +147,6 @@ function TaskDetail({ item, kind }: { item: LauncherItem; kind: KindOf<"task"> }
       <div className="text-base text-foreground font-medium">{item.title}</div>
       <div className="flex items-center gap-2">
         <StatusBadge status={kind.status} />
-        {item.subtitle && <span className="text-xs text-muted-foreground">{item.subtitle}</span>}
       </div>
       {item.subtitle && <DetailField label="Description" value={item.subtitle} />}
       <KindTag label="Task" />

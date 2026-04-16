@@ -1,5 +1,5 @@
 import { useMutation } from "@shared/hooks/useMutation";
-import { useQuery } from "@shared/hooks/useQuery";
+import { invalidateQueries, useQuery } from "@shared/hooks/useQuery";
 import { GitBranch, RotateCcw } from "lucide-react";
 import { useState } from "react";
 
@@ -15,7 +15,7 @@ export interface BrainVersion {
 }
 
 export function BrainTimeline() {
-  const { data: versions, refetch } = useQuery<BrainVersion[]>("get_brain_versions", undefined, []);
+  const { data: versions } = useQuery<BrainVersion[]>("get_brain_versions", undefined, []);
   const { mutate: revert, loading } = useMutation<BrainVersion, { version: number }>(
     "revert_brain_version",
   );
@@ -26,7 +26,7 @@ export function BrainTimeline() {
   const handleRevert = async (version: number) => {
     await revert({ version });
     setConfirmVersion(null);
-    refetch();
+    invalidateQueries("get_brain_versions");
   };
 
   return (

@@ -1,4 +1,5 @@
 import { useMutation } from "@shared/hooks/useMutation";
+import { invalidateQueries } from "@shared/hooks/useQuery";
 import { useAutoTunerStatus } from "../hooks/useAutoTunerStatus";
 
 const PACES = [
@@ -8,7 +9,7 @@ const PACES = [
 ] as const;
 
 export function ExperimentPaceControl() {
-  const { data: status, refetch } = useAutoTunerStatus();
+  const { data: status } = useAutoTunerStatus();
   const { mutate: setPace } = useMutation<void, { pace: string }>("autotuner_set_pace");
 
   const currentPace = status?.experimentPace ?? "balanced";
@@ -16,7 +17,7 @@ export function ExperimentPaceControl() {
   const handleSetPace = async (pace: string) => {
     if (pace === currentPace) return;
     await setPace({ pace });
-    refetch();
+    invalidateQueries("autotuner_");
   };
 
   return (

@@ -646,45 +646,33 @@ export function AutomationsPage() {
   const handleEnable = useCallback(
     async (id: string, enabled: boolean) => {
       const result = await enableJob({ id, enabled });
-      if (result) {
-        invalidateQueries("cron_");
-        refetch();
-      }
+      if (result) invalidateQueries("cron_");
     },
-    [enableJob, refetch],
+    [enableJob],
   );
 
   const handleRun = useCallback(
     async (id: string) => {
       const result = await runJob({ id });
-      if (result !== undefined) {
-        invalidateQueries("cron_");
-        refetch();
-      }
+      if (result !== undefined) invalidateQueries("cron_");
     },
-    [runJob, refetch],
+    [runJob],
   );
 
   const handleDelete = useCallback(
     async (id: string) => {
       const result = await deleteJob({ id });
-      if (result) {
-        invalidateQueries("cron_");
-        refetch();
-      }
+      if (result) invalidateQueries("cron_");
     },
-    [deleteJob, refetch],
+    [deleteJob],
   );
 
   const handleUpdate = useCallback(
     async (id: string, field: Partial<CronJobUpdateParams>) => {
       const result = await updateJob({ id, ...field });
-      if (result) {
-        invalidateQueries("cron_");
-        refetch();
-      }
+      if (result) invalidateQueries("cron_");
     },
-    [updateJob, refetch],
+    [updateJob],
   );
 
   const columns: DataTableColumn<CronJob>[] = useMemo(
