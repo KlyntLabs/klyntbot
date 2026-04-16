@@ -15,6 +15,7 @@ pub mod memory;
 pub mod notify;
 pub mod ports;
 pub mod prompts;
+pub mod time;
 pub mod types;
 
 // ── Re-exports: domain types ────────────────────────────────────────────
