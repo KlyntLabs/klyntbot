@@ -61,9 +61,6 @@ export function useAmbientSignals(): AmbientSignalState {
 
     switch (payload.mode) {
       case "pulse":
-        triggerPulse();
-        break;
-
       case "merged":
         triggerPulse();
         break;
@@ -74,7 +71,6 @@ export function useAmbientSignals(): AmbientSignalState {
         break;
 
       case "deferred":
-        // Focus just ended — clear deferred flag and trigger pulse
         setIsFocusDeferred(false);
         triggerPulse();
         break;

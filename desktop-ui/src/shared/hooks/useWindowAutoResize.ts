@@ -5,8 +5,8 @@ import { type RefObject, useCallback, useEffect, useRef } from "react";
 
 /**
  * Auto-resize a Tauri window to match its content element's height.
- * Uses both ResizeObserver and MutationObserver (with rAF debounce)
- * to catch layout shifts from data loads.
+ * ResizeObserver fires on any layout-affecting change, including content
+ * loads — no MutationObserver needed.
  */
 export function useWindowAutoResize(
   contentRef: RefObject<HTMLDivElement | null>,
@@ -42,14 +42,10 @@ export function useWindowAutoResize(
     const ro = new ResizeObserver(() => debouncedSync());
     ro.observe(el);
 
-    const mo = new MutationObserver(() => debouncedSync());
-    mo.observe(el, { childList: true, subtree: true });
-
     syncSize();
     return () => {
       cancelAnimationFrame(rafId.current);
       ro.disconnect();
-      mo.disconnect();
     };
   }, [contentRef, syncSize, debouncedSync]);
 }

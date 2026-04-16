@@ -1,5 +1,5 @@
 import type { ApiError } from "@shared/types";
-import { useCallback, useMemo, useRef, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import { parseApiError } from "../lib/errors";
 import { ipc } from "./useIpc";
 
@@ -49,7 +49,6 @@ export function useMutation<T = void, P = Record<string, unknown>>(
         ? { [wrapKeyRef.current]: params }
         : (params as Record<string, unknown>);
       const result = await ipc<T>(cmdRef.current, args);
-      // Emit browser-side entity event so useEvent listeners fire in dev mode
       const entityKind = inferEntityKind(cmdRef.current);
       if (entityKind && MUTATING_VERBS.some((v) => cmdRef.current.includes(v))) {
         window.dispatchEvent(new CustomEvent("entity:updated", { detail: { entityKind } }));
@@ -63,5 +62,5 @@ export function useMutation<T = void, P = Record<string, unknown>>(
     }
   }, []);
 
-  return useMemo(() => ({ mutate, loading, error }), [mutate, loading, error]);
+  return { mutate, loading, error };
 }

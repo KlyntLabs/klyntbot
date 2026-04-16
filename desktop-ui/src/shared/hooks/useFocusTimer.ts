@@ -117,11 +117,12 @@ export function useFocusTimer() {
 
   // Local 1-second countdown
   const [localTick, setLocalTick] = useState(0);
+  const isRunning = !!serverState && !serverState.paused;
   useEffect(() => {
-    if (!serverState || serverState.paused) return;
+    if (!isRunning) return;
     const id = setInterval(() => setLocalTick((t) => t + 1), 1000);
     return () => clearInterval(id);
-  }, [serverState, serverState?.paused]);
+  }, [isRunning]);
 
   // Reset local tick when server state updates
   // biome-ignore lint/correctness/useExhaustiveDependencies: receivedAt is an intentional trigger
@@ -359,9 +360,9 @@ export function useFocusTimer() {
     applyPreset,
     dismissCoaching: useCallback(() => setCoaching(null), []),
     dismissDndHint: useCallback(() => setDndHint(null), []),
-    selectTask: (id: string | null, title: string | null) => {
+    selectTask: useCallback((id: string | null, title: string | null) => {
       setSelectedTask(id && title ? { id, title } : null);
-    },
+    }, []),
     selectedTaskId: selectedTask?.id ?? null,
     selectedTaskTitle: selectedTask?.title ?? null,
   };

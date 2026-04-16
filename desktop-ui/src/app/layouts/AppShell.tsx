@@ -1,12 +1,12 @@
 import { BrainEventBridge } from "@app/BrainEventBridge";
 import { BrainOrb } from "@shared/components/BrainOrb";
 import { SidebarChat } from "@shared/components/chat/SidebarChat";
-import { KlyntLogo } from "@shared/components/ui/KlyntLogo";
 import { useActiveView } from "@shared/hooks/useActiveView";
 import { useEvent } from "@shared/hooks/useEvent";
 import { ipc } from "@shared/hooks/useIpc";
 import { useUpdateChecker } from "@shared/hooks/useUpdateChecker";
 import type { AppInfoResponse, SidebarItem } from "@shared/types";
+import { KlyntLogo } from "@shared/ui/KlyntLogo";
 import { ArrowDownCircle } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Navigate, Outlet, useLocation, useNavigate } from "react-router";

@@ -55,7 +55,7 @@ export function formatDayLabel(dateStr: string): string {
   return d.toLocaleDateString("en-US", { weekday: "short" });
 }
 
-const LONG_MONTHS = [
+export const LONG_MONTHS = [
   "January",
   "February",
   "March",

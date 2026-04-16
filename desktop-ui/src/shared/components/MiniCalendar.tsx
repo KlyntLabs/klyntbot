@@ -1,4 +1,4 @@
-import { toLocalISO } from "@shared/lib/dates";
+import { LONG_MONTHS, toLocalISO } from "@shared/lib/dates";
 import { cn } from "@shared/lib/utils";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
@@ -12,20 +12,6 @@ interface MiniCalendarProps {
 }
 
 const WEEKDAYS = ["Mo", "Tu", "We", "Th", "Fr", "Sa", "Su"];
-const MONTH_NAMES = [
-  "January",
-  "February",
-  "March",
-  "April",
-  "May",
-  "June",
-  "July",
-  "August",
-  "September",
-  "October",
-  "November",
-  "December",
-];
 
 /** Add `n` days to a date (local). */
 function addDays(d: Date, n: number): Date {
@@ -153,7 +139,7 @@ export function MiniCalendar({
           <ChevronLeft className="size-3.5" strokeWidth={1.5} />
         </button>
         <span className="text-xs font-medium text-muted-foreground">
-          {MONTH_NAMES[viewMonth]} {viewYear}
+          {LONG_MONTHS[viewMonth]} {viewYear}
         </span>
         <button
           type="button"
@@ -190,7 +176,7 @@ export function MiniCalendar({
               type="button"
               key={iso}
               onClick={() => onSelect(iso)}
-              aria-label={`${d.getDate()} ${MONTH_NAMES[d.getMonth()]} ${d.getFullYear()}`}
+              aria-label={`${d.getDate()} ${LONG_MONTHS[d.getMonth()]} ${d.getFullYear()}`}
               className={cn(
                 "h-8 w-full flex items-center justify-center text-[11px] font-medium rounded-lg border transition-all",
                 isSelected

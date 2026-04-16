@@ -16,7 +16,7 @@ export function BrainOrb() {
   const { current, badgeCount, isPulsing, isFocusDeferred, badgeSignals, acknowledge, clearBadge } =
     useAmbientSignals();
   const { isComplete, markComplete } = useJourney();
-  const { data: itemCount } = useQuery<number>("journey_item_count", {});
+  const { data: itemCount } = useQuery<number>("journey_item_count", undefined);
   const navigate = useNavigate();
 
   const [tooltipVisible, setTooltipVisible] = useState(false);

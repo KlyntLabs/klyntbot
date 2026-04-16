@@ -1,7 +1,7 @@
-import { KlyntLogo } from "@shared/components/ui/KlyntLogo";
 import { useAmbientSignals } from "@shared/hooks/useAmbientSignals";
 import { ipc } from "@shared/hooks/useIpc";
 import type { SidebarItem } from "@shared/types";
+import { KlyntLogo } from "@shared/ui/KlyntLogo";
 import {
   Brain,
   CheckSquare,
