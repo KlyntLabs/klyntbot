@@ -1,25 +1,11 @@
 import { useQuery } from "@shared/hooks/useQuery";
-import { formatHumanDuration, todayISO, toLocalISO } from "@shared/lib/dates";
+import { formatHumanDuration, SHORT_MONTHS, todayISO, toLocalISO } from "@shared/lib/dates";
 import { cn } from "@shared/lib/utils";
 import { EMPTY_TIMELINE_RESPONSE } from "@shared/types";
 import { useMemo } from "react";
 import { useNavigate, useParams } from "react-router";
 import { SummaryPanel } from "./SummaryPanel";
 
-const MONTH_NAMES = [
-  "Jan",
-  "Feb",
-  "Mar",
-  "Apr",
-  "May",
-  "Jun",
-  "Jul",
-  "Aug",
-  "Sep",
-  "Oct",
-  "Nov",
-  "Dec",
-];
 const DAY_LABELS = ["M", "", "W", "", "F", "", ""];
 
 function buildMonthGrid(year: number, month: number): (string | null)[][] {
@@ -91,11 +77,11 @@ export function YearHeatmapView() {
         <div className="grid grid-cols-3 gap-4">
           {Array.from({ length: 12 }, (_, monthIdx) => {
             const weeks = buildMonthGrid(year, monthIdx);
-            const monthName = MONTH_NAMES[monthIdx];
+            const monthName = SHORT_MONTHS[monthIdx];
             return (
               <div key={monthName}>
                 <div className="text-xs font-medium text-muted-foreground mb-1.5">
-                  {MONTH_NAMES[monthIdx]}
+                  {SHORT_MONTHS[monthIdx]}
                 </div>
 
                 {/* Day-of-week labels */}

@@ -18,6 +18,8 @@ interface GroupedThreads {
   general: ChatThread[];
 }
 
+type ProviderStatus = "ok" | "fallback" | "offline";
+
 export function ChatPage() {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -103,10 +105,9 @@ export function ChatPage() {
     return () => window.removeEventListener("voice:event", handler);
   }, []);
 
-  // ── Provider degradation status ───────────────────────────────────────
-  const [providerStatus, setProviderStatus] = useState<"ok" | "fallback" | "offline">("ok");
-  useEvent<{ level: string }>("provider:degraded", (payload) => {
-    setProviderStatus(payload.level as "fallback" | "offline");
+  const [providerStatus, setProviderStatus] = useState<ProviderStatus>("ok");
+  useEvent<{ level: ProviderStatus }>("provider:degraded", (payload) => {
+    setProviderStatus(payload.level);
     // Auto-reset after 30s if it was just a blip
     setTimeout(() => setProviderStatus("ok"), 30_000);
   });

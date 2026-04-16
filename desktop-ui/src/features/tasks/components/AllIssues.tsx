@@ -24,9 +24,8 @@ export default function AllIssues({ tasksData }: AllIssuesProps) {
   const handleUpdateStatus = useCallback(
     async (issueId: string, status: string, statusLabelId: string | null) => {
       await updateTask.mutate({ id: issueId, status, statusLabelId });
-      tasksData.refetch();
     },
-    [updateTask, tasksData],
+    [updateTask],
   );
 
   if (isSearchOpen) {

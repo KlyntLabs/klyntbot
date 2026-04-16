@@ -2,6 +2,7 @@ import { useAutoResizeTextarea } from "@shared/hooks/useAutoResizeTextarea";
 import { useClickOutside } from "@shared/hooks/useClickOutside";
 import { useEvent } from "@shared/hooks/useEvent";
 import { ipc } from "@shared/hooks/useIpc";
+import { cn } from "@shared/lib/utils";
 import { ChevronDown, Mic, Plus, Send, Users } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
@@ -123,11 +124,12 @@ export function ChatInput({
             type="button"
             aria-label={isDictating ? "Stop dictation" : "Voice input"}
             onClick={isDictating ? stopDictation : startDictation}
-            className={`size-8 flex items-center justify-center transition-colors shrink-0 rounded-lg ${
+            className={cn(
+              "size-8 flex items-center justify-center transition-colors shrink-0 rounded-lg",
               isDictating
                 ? "text-destructive animate-pulse bg-destructive/10"
-                : "text-muted-foreground hover:text-foreground hover:bg-accent"
-            }`}
+                : "text-muted-foreground hover:text-foreground hover:bg-accent",
+            )}
           >
             <Mic className="size-4" strokeWidth={1.5} />
           </button>
@@ -146,9 +148,10 @@ export function ChatInput({
           <button
             type="button"
             onClick={handleModeClick}
-            className={`glass-button flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-light ${
-              currentSquad ? "text-purple-400" : "text-muted-foreground"
-            }`}
+            className={cn(
+              "glass-button flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-light",
+              currentSquad ? "text-purple-400" : "text-muted-foreground",
+            )}
           >
             {currentSquad ? (
               <>
@@ -162,7 +165,7 @@ export function ChatInput({
               </>
             )}
             <ChevronDown
-              className={`size-3 transition-transform ${popup ? "rotate-180" : ""}`}
+              className={cn("size-3 transition-transform", popup && "rotate-180")}
               strokeWidth={1.5}
             />
           </button>
@@ -189,11 +192,12 @@ export function ChatInput({
                 type="button"
                 role="menuitem"
                 onClick={() => handleSquadSelect(squad.id)}
-                className={`flex items-center gap-2 w-full px-2.5 py-[5px] rounded-md text-left transition-colors ${
+                className={cn(
+                  "flex items-center gap-2 w-full px-2.5 py-[5px] rounded-md text-left transition-colors",
                   squad.id === squadId
                     ? "bg-purple-500/20 text-purple-300"
-                    : "text-muted-foreground hover:bg-white/[0.06] hover:text-foreground"
-                }`}
+                    : "text-muted-foreground hover:bg-white/[0.06] hover:text-foreground",
+                )}
               >
                 <span className="text-xs leading-none shrink-0">{squad.icon}</span>
                 <span className="text-[11px] font-medium truncate flex-1">{squad.name}</span>
@@ -222,11 +226,12 @@ export function ChatInput({
               type="button"
               role="menuitem"
               onClick={handleDefaultSelect}
-              className={`flex items-center gap-2 w-full px-2.5 py-[5px] rounded-md text-left transition-colors ${
+              className={cn(
+                "flex items-center gap-2 w-full px-2.5 py-[5px] rounded-md text-left transition-colors",
                 !squadId
                   ? "bg-brand/15 text-foreground"
-                  : "text-muted-foreground hover:bg-white/[0.06] hover:text-foreground"
-              }`}
+                  : "text-muted-foreground hover:bg-white/[0.06] hover:text-foreground",
+              )}
             >
               <Users className="size-3 shrink-0" strokeWidth={1.5} />
               <span className="text-[11px] font-medium">KlyntBot</span>

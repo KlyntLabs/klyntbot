@@ -1,6 +1,6 @@
 import { MiniCalendar } from "@shared/components/MiniCalendar";
 import { useClickOutside } from "@shared/hooks/useClickOutside";
-import { todayISO, toLocalISO } from "@shared/lib/dates";
+import { formatFullDate, formatMonthLabel, todayISO, toLocalISO } from "@shared/lib/dates";
 import { cn } from "@shared/lib/utils";
 import { Calendar, ChevronLeft, ChevronRight, Layers, PanelRight } from "lucide-react";
 import { type ReactNode, useCallback, useEffect, useRef, useState } from "react";
@@ -30,21 +30,13 @@ function getViewMode(pathname: string): ViewMode {
 
 function formatDateDisplay(mode: ViewMode, param: string): string {
   if (mode === "year") return param;
+  if (mode === "day") return formatFullDate(param);
+  if (mode === "month") return formatMonthLabel(param.slice(0, 7));
+  // Week mode keeps en-dash separator that diverges from formatWeekRange's hyphen.
   const date = new Date(`${param}T00:00:00`);
-  if (mode === "day") {
-    return date.toLocaleDateString("en-US", {
-      weekday: "long",
-      month: "long",
-      day: "numeric",
-      year: "numeric",
-    });
-  }
-  if (mode === "week") {
-    const end = new Date(date);
-    end.setDate(end.getDate() + 6);
-    return `${date.toLocaleDateString("en-US", { month: "short", day: "numeric" })} – ${end.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}`;
-  }
-  return date.toLocaleDateString("en-US", { month: "long", year: "numeric" });
+  const end = new Date(date);
+  end.setDate(end.getDate() + 6);
+  return `${date.toLocaleDateString("en-US", { month: "short", day: "numeric" })} – ${end.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}`;
 }
 
 export function DashboardLayout({ children }: { children: ReactNode }) {

@@ -1,3 +1,4 @@
+import { groupBy } from "@shared/lib/group-by";
 import type { StatusLabel, TimelineEntry } from "@shared/types/common";
 import type { Area, Project, Task } from "@shared/types/tasks";
 import { Folder, type LucideProps } from "lucide-react";
@@ -435,15 +436,7 @@ export function searchIssues(issues: Issue[], query: string): Issue[] {
 // ── Group by status ───────────────────────────────────────
 
 export function groupIssuesByStatus(issueList: Issue[]): Record<string, Issue[]> {
-  return issueList.reduce(
-    (acc, issue) => {
-      const statusId = issue.status.id;
-      if (!acc[statusId]) acc[statusId] = [];
-      acc[statusId].push(issue);
-      return acc;
-    },
-    {} as Record<string, Issue[]>,
-  );
+  return groupBy(issueList, (issue) => issue.status.id);
 }
 
 export function sortIssuesByPriority(issueList: Issue[]): Issue[] {
