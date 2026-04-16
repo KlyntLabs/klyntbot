@@ -17,7 +17,7 @@ tracing.workspace = true
 chrono = { workspace = true }
 uuid = { workspace = true }
 sqlx.workspace = true
-serde_yml = "0.0.12"
+serde-saphyr = "0.0.23"
 
 [dev-dependencies]
 tokio = { workspace = true, features = ["macros", "test-util"] }

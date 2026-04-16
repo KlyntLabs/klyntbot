@@ -109,7 +109,7 @@ impl VectorStore {
         let reader = RecordBatchIterator::new(vec![Ok(batch)].into_iter(), schema);
 
         // Insert new row FIRST (safe: crash here = no change).
-        tbl.add(Box::new(reader))
+        tbl.add(Box::new(reader) as super::BatchReader)
             .execute()
             .await
             .map_err(|e| StorageError::Vector(format!("LanceDB add to {table}: {e}")))?;
@@ -199,7 +199,7 @@ impl VectorStore {
         let reader = RecordBatchIterator::new(vec![Ok(batch)].into_iter(), schema);
 
         // Single bulk insert
-        tbl.add(Box::new(reader))
+        tbl.add(Box::new(reader) as super::BatchReader)
             .execute()
             .await
             .map_err(|e| StorageError::Vector(format!("LanceDB batch add to {table}: {e}")))?;

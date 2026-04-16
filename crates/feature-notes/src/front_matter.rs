@@ -97,7 +97,7 @@ pub fn parse(content: &str) -> ParsedMarkdown {
         String::new()
     };
 
-    match serde_yml::from_str::<NoteFrontMatter>(yaml_str) {
+    match serde_saphyr::from_str::<NoteFrontMatter>(yaml_str) {
         Ok(fm) => ParsedMarkdown {
             front_matter: Some(fm),
             body,
@@ -115,7 +115,7 @@ pub fn parse(content: &str) -> ParsedMarkdown {
 ///
 /// Output format: `---\n{yaml}---\n\n{body}`
 pub fn serialize(front_matter: &NoteFrontMatter, body: &str) -> String {
-    let yaml = serde_yml::to_string(front_matter).unwrap_or_default();
+    let yaml = serde_saphyr::to_string(front_matter).unwrap_or_default();
     format!("---\n{yaml}---\n\n{body}")
 }
 

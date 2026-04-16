@@ -15,6 +15,9 @@ use lancedb::{Connection, Table};
 
 use crate::error::StorageError;
 
+/// Boxed record-batch reader accepted by lancedb 0.27+ write APIs.
+pub(crate) type BatchReader = Box<dyn arrow_array::RecordBatchReader + Send>;
+
 /// Index cache: 32 MB is enough for hot partitions across 12 tables in a single-user app.
 /// Default is 6 GiB (designed for cloud/server).
 const LANCE_INDEX_CACHE_BYTES: usize = 32 * 1024 * 1024;
@@ -160,7 +163,7 @@ impl VectorStore {
         );
         let tbl = self
             .db
-            .create_table(name, Box::new(reader))
+            .create_table(name, Box::new(reader) as BatchReader)
             .execute()
             .await
             .map_err(|e| StorageError::Vector(format!("LanceDB create table {name}: {e}")))?;

@@ -307,7 +307,10 @@ async fn test_dedup_removes_duplicates() {
         )
         .unwrap();
         let reader = RecordBatchIterator::new(vec![Ok(batch)].into_iter(), schema);
-        tbl.add(Box::new(reader)).execute().await.unwrap();
+        tbl.add(Box::new(reader) as super::BatchReader)
+            .execute()
+            .await
+            .unwrap();
     }
 
     assert_eq!(store.count("todo_embeddings").await.unwrap(), 2);
