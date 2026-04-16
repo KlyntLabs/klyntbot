@@ -94,24 +94,20 @@ export function InsightChatInput({
             />
           ))}
 
-          {/* Live persona messages from debate stream */}
-          {isStreaming && personaMessages.length > 0 && (
-            <>
-              {personaMessages.map((pm) => {
-                const color = getPersonaColor(pm.personaId);
-                return (
-                  <div key={pm.personaId} className={`rounded-lg px-3 py-2 ${color.bg}`}>
-                    <div className={`text-[9px] font-medium mb-1 ${color.label}`}>
-                      {pm.personaName}
-                    </div>
-                    <div className="text-[11px] leading-relaxed text-muted-foreground">
-                      <MarkdownContent content={pm.content} />
-                    </div>
+          {isStreaming &&
+            personaMessages.map((pm) => {
+              const color = getPersonaColor(pm.personaId);
+              return (
+                <div key={pm.personaId} className={`rounded-lg px-3 py-2 ${color.bg}`}>
+                  <div className={`text-[9px] font-medium mb-1 ${color.label}`}>
+                    {pm.personaName}
                   </div>
-                );
-              })}
-            </>
-          )}
+                  <div className="text-[11px] leading-relaxed text-muted-foreground">
+                    <MarkdownContent content={pm.content} />
+                  </div>
+                </div>
+              );
+            })}
 
           {/* Streaming indicator */}
           {isStreaming && personaMessages.length === 0 && (

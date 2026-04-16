@@ -68,7 +68,7 @@ const TABS: { id: TabId; label: string }[] = [
   { id: "assessment", label: "Self-Assessment" },
   { id: "concept-map", label: "Concept Map" },
   { id: "perspectives", label: "Perspectives" },
-  { id: "practice" as TabId, label: "Practice" },
+  { id: "practice", label: "Practice" },
 ];
 
 // ---------------------------------------------------------------------------

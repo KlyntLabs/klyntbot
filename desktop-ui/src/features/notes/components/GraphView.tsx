@@ -503,13 +503,14 @@ export function GraphView({
 
   // ── Viewport bounds update (for minimap) ───────────────────────────
 
+  const { getViewportBounds } = forceGraph;
   useEffect(() => {
     if (!minimapVisible || !settings.showMinimap) return;
     const interval = setInterval(() => {
-      setViewportBounds(forceGraph.getViewportBounds());
+      setViewportBounds(getViewportBounds());
     }, 500);
     return () => clearInterval(interval);
-  }, [minimapVisible, settings.showMinimap, forceGraph.getViewportBounds]);
+  }, [minimapVisible, settings.showMinimap, getViewportBounds]);
 
   // ── Legend interactions ────────────────────────────────────────────
 

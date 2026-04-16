@@ -71,7 +71,7 @@ export function GraphBrainView({
     const linkIds = elements.links
       .map(
         (l) =>
-          `${typeof l.source === "string" ? l.source : (l.source as never as ForceNode).id}-${typeof l.target === "string" ? l.target : (l.target as never as ForceNode).id}`,
+          `${typeof l.source === "string" ? l.source : (l.source as ForceNode).id}-${typeof l.target === "string" ? l.target : (l.target as ForceNode).id}`,
       )
       .sort()
       .join(",");
@@ -109,10 +109,8 @@ export function GraphBrainView({
   useEffect(() => {
     const adj = new Map<string, Set<string>>();
     for (const link of elements.links) {
-      const sId =
-        typeof link.source === "string" ? link.source : (link.source as never as ForceNode).id;
-      const tId =
-        typeof link.target === "string" ? link.target : (link.target as never as ForceNode).id;
+      const sId = typeof link.source === "string" ? link.source : (link.source as ForceNode).id;
+      const tId = typeof link.target === "string" ? link.target : (link.target as ForceNode).id;
       if (!adj.has(sId)) adj.set(sId, new Set());
       if (!adj.has(tId)) adj.set(tId, new Set());
       adj.get(sId)?.add(tId);

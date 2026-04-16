@@ -1,3 +1,11 @@
+import {
+  formatMonthLabel,
+  shiftDate,
+  shiftMonth,
+  todayISO,
+  toLocalISO,
+  weekStartISO,
+} from "@shared/lib/dates";
 import { useCallback, useMemo, useState } from "react";
 import { useSearchParams } from "react-router";
 
@@ -16,48 +24,21 @@ export interface PeriodState {
   selectedDay: string | null;
 }
 
-function _todayISO(): string {
-  const d = new Date();
-  return toISO(d);
-}
-
-function toISO(d: Date): string {
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, "0");
-  const day = String(d.getDate()).padStart(2, "0");
-  return `${y}-${m}-${day}`;
-}
-
 function defaultPeriodForMode(mode: PeriodMode): string {
-  const today = new Date();
-  const y = today.getFullYear();
-  const m = String(today.getMonth() + 1).padStart(2, "0");
-  const d = String(today.getDate()).padStart(2, "0");
+  const today = todayISO();
   switch (mode) {
     case "year":
-      return String(y);
+      return today.slice(0, 4);
     case "month":
-      return `${y}-${m}`;
-    case "week": {
-      // Return ISO week start (Monday) as YYYY-MM-DD
-      const monday = getMondayOfDate(today);
-      return toISO(monday);
-    }
+      return today.slice(0, 7);
+    case "week":
+      return weekStartISO(today);
     case "day":
-      return `${y}-${m}-${d}`;
+      return today;
   }
 }
 
-function getMondayOfDate(d: Date): Date {
-  const day = d.getDay(); // 0=Sun, 1=Mon, ...
-  const diff = day === 0 ? -6 : 1 - day;
-  const monday = new Date(d);
-  monday.setDate(d.getDate() + diff);
-  return monday;
-}
-
 function parseDateISO(iso: string): Date {
-  // Parse as local date (not UTC) by splitting
   const [y, m, day] = iso.split("-").map(Number);
   return new Date(y, m - 1, day);
 }
@@ -65,20 +46,20 @@ function parseDateISO(iso: string): Date {
 function computeRange(mode: PeriodMode, period: string): { dateFrom: string; dateTo: string } {
   switch (mode) {
     case "year": {
-      const y = period; // "2026"
+      const y = period;
       return { dateFrom: `${y}-01-01`, dateTo: `${y}-12-31` };
     }
     case "month": {
       const [y, m] = period.split("-").map(Number);
       const firstDay = new Date(y, m - 1, 1);
-      const lastDay = new Date(y, m, 0); // day 0 of next month = last day of this month
-      return { dateFrom: toISO(firstDay), dateTo: toISO(lastDay) };
+      const lastDay = new Date(y, m, 0);
+      return { dateFrom: toLocalISO(firstDay), dateTo: toLocalISO(lastDay) };
     }
     case "week": {
       const monday = parseDateISO(period);
       const sunday = new Date(monday);
       sunday.setDate(monday.getDate() + 6);
-      return { dateFrom: toISO(monday), dateTo: toISO(sunday) };
+      return { dateFrom: toLocalISO(monday), dateTo: toLocalISO(sunday) };
     }
     case "day":
       return { dateFrom: period, dateTo: period };
@@ -89,14 +70,8 @@ function computeLabel(mode: PeriodMode, period: string): string {
   switch (mode) {
     case "year":
       return period;
-    case "month": {
-      const [y, m] = period.split("-").map(Number);
-      const d = new Date(y, m - 1, 1);
-      return new Intl.DateTimeFormat("en-US", {
-        month: "long",
-        year: "numeric",
-      }).format(d);
-    }
+    case "month":
+      return formatMonthLabel(period);
     case "week": {
       const monday = parseDateISO(period);
       const sunday = new Date(monday);
@@ -110,7 +85,6 @@ function computeLabel(mode: PeriodMode, period: string): string {
         day: "numeric",
         year: "numeric",
       }).format(sunday);
-      // "Mar 10 – Mar 16, 2026" → normalize to "Mar 10–16, 2026" if same month
       if (monday.getMonth() === sunday.getMonth()) {
         const month = new Intl.DateTimeFormat("en-US", {
           month: "short",
@@ -133,27 +107,17 @@ function computeLabel(mode: PeriodMode, period: string): string {
 
 function shiftPeriod(mode: PeriodMode, period: string, delta: number): string {
   switch (mode) {
-    case "year": {
-      const y = Number(period) + delta;
-      return String(y);
-    }
-    case "month": {
-      const [y, m] = period.split("-").map(Number);
-      const d = new Date(y, m - 1 + delta, 1);
-      const ny = d.getFullYear();
-      const nm = String(d.getMonth() + 1).padStart(2, "0");
-      return `${ny}-${nm}`;
-    }
+    case "year":
+      return String(Number(period) + delta);
+    case "month":
+      return shiftMonth(period, delta);
     case "week": {
       const monday = parseDateISO(period);
       monday.setDate(monday.getDate() + delta * 7);
-      return toISO(monday);
+      return toLocalISO(monday);
     }
-    case "day": {
-      const d = parseDateISO(period);
-      d.setDate(d.getDate() + delta);
-      return toISO(d);
-    }
+    case "day":
+      return shiftDate(period, delta);
   }
 }
 
@@ -167,10 +131,10 @@ function adaptPeriodToMode(
   // pushing week mode into the previous month).
   const { dateFrom, dateTo } = computeRange(currentMode, currentPeriod);
   const today = new Date();
-  const todayISO = toISO(today);
+  const todayIso = toLocalISO(today);
 
   let refDate: Date;
-  if (todayISO >= dateFrom && todayISO <= dateTo) {
+  if (todayIso >= dateFrom && todayIso <= dateTo) {
     refDate = today;
   } else {
     switch (currentMode) {
@@ -183,9 +147,8 @@ function adaptPeriodToMode(
         break;
       }
       case "week":
-        // Wednesday (mid-week) — offset +3 from Monday
         refDate = parseDateISO(currentPeriod);
-        refDate.setDate(refDate.getDate() + 3);
+        refDate.setDate(refDate.getDate() + 3); // Wednesday
         break;
       case "day":
         refDate = parseDateISO(currentPeriod);
@@ -193,18 +156,16 @@ function adaptPeriodToMode(
     }
   }
 
-  const y = refDate.getFullYear();
-  const mo = String(refDate.getMonth() + 1).padStart(2, "0");
-  const d = String(refDate.getDate()).padStart(2, "0");
+  const refIso = toLocalISO(refDate);
   switch (newMode) {
     case "year":
-      return String(y);
+      return refIso.slice(0, 4);
     case "month":
-      return `${y}-${mo}`;
+      return refIso.slice(0, 7);
     case "week":
-      return toISO(getMondayOfDate(refDate));
+      return weekStartISO(refIso);
     case "day":
-      return `${y}-${mo}-${d}`;
+      return refIso;
   }
 }
 

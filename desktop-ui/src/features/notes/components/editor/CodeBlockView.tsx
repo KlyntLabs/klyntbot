@@ -1,6 +1,6 @@
 import { NodeViewContent, type NodeViewProps, NodeViewWrapper } from "@tiptap/react";
 import { Check, Copy, X } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 const LANGUAGE_LABELS: Record<string, string> = {
   js: "JavaScript",
@@ -63,13 +63,22 @@ function getLanguageLabel(lang: string | null | undefined): string {
 
 export function CodeBlockView({ node, updateAttributes, deleteNode, editor }: NodeViewProps) {
   const [copied, setCopied] = useState(false);
+  const copyResetRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const language = node.attrs.language as string | null;
+
+  useEffect(
+    () => () => {
+      if (copyResetRef.current) clearTimeout(copyResetRef.current);
+    },
+    [],
+  );
 
   const handleCopy = () => {
     const text = node.textContent;
     navigator.clipboard.writeText(text);
     setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+    if (copyResetRef.current) clearTimeout(copyResetRef.current);
+    copyResetRef.current = setTimeout(() => setCopied(false), 2000);
   };
 
   const handleDelete = () => {

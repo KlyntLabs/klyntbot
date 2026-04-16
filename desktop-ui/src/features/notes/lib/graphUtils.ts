@@ -3,7 +3,9 @@
  */
 
 // Cache parsed RGB triples so we only parse each hex string once.
-// Only the alpha varies per call, so caching the [r, g, b] is sufficient.
+// Capped to avoid unbounded growth — graphs with many distinct node colors
+// recycle the cache rather than accumulating entries for the process lifetime.
+const RGB_CACHE_MAX = 256;
 const rgbCache = new Map<string, [number, number, number]>();
 
 function parseRgb(hex: string): [number, number, number] {
@@ -14,6 +16,7 @@ function parseRgb(hex: string): [number, number, number] {
   const g = Number.parseInt(hex.slice(3, 5), 16);
   const b = Number.parseInt(hex.slice(5, 7), 16);
   const triple: [number, number, number] = [r, g, b];
+  if (rgbCache.size >= RGB_CACHE_MAX) rgbCache.clear();
   rgbCache.set(hex, triple);
   return triple;
 }

@@ -1,4 +1,4 @@
-import { useCallback, useRef } from "react";
+import { useCallback, useEffect, useRef } from "react";
 import type { ForceGraphMethods } from "react-force-graph-3d";
 import { Color, Mesh, MeshStandardMaterial, OctahedronGeometry, SphereGeometry } from "three";
 import { UnrealBloomPass } from "three/examples/jsm/postprocessing/UnrealBloomPass.js";
@@ -168,6 +168,13 @@ export function useBrainView({ settings }: UseBrainViewParams) {
       rotationTimerRef.current = setTimeout(startIdleRotation, 5000);
     }
   }, [settings.idleRotation, startIdleRotation, stopIdleRotation]);
+
+  useEffect(
+    () => () => {
+      if (rotationTimerRef.current) clearTimeout(rotationTimerRef.current);
+    },
+    [],
+  );
 
   return {
     graphRef,
