@@ -89,7 +89,7 @@ Dependencies flow strictly upward. `plugin-sdk` and `tests/fixtures/hello_plugin
 
 ### Skill system & MCP
 
-Five built-in orchestrator skills in `skills/`: task-management, finance-management, automation, learning, notebook. Each has `SKILL.md` (Agent Skills spec YAML frontmatter) + `references/` folder. Compiled via `include_str!` in `skill-system` crate. `SkillRouter` selects orchestrator per-message via keyword + semantic scoring. MCP tool names: `mcp_{server}_{tool}` (see `mcp::sanitize`). MCP access controlled per-skill via `mcp_tools` field (`["*"]` = all, `[]` = none). Task-management skill has `mcp_tools: ["google-calendar"]`.
+Five built-in orchestrator skills in `skills/`: task-management, finance-management, automation, learning, notebook. Each has `SKILL.md` (Agent Skills spec YAML frontmatter); some have `references/` folders. Compiled via `include_str!` in `skill-system` crate. `SkillRouter` selects orchestrator per-message via keyword + semantic scoring. MCP tool names: `mcp_{server}_{tool}` (see `mcp::sanitize`). MCP access controlled per-skill via `mcp_tools` field (`["*"]` = all, `[]` = none). Task-management skill has `mcp_tools: ["google-calendar"]`.
 
 **Progressive skill loading:** Orchestrator skills inject their full body on first activation (deduplicated per session). Activated (non-orchestrator) skills inject a summary only — the agent calls `skill_reference` tool to load full instructions when needed. Always-loaded references are filtered by message relevance (single-token refs always load, multi-token refs need a keyword match). This reduces token usage for simple messages.
 
@@ -101,60 +101,29 @@ Klyntbot exposes tools to external AI clients (Claude Code, Cursor, etc.) via MC
 
 **Architecture:** `ToolRegistryBridge` translates MCP calls → internal `Tool::execute()`. The `agent` tool delegates natural language to the full AI pipeline via `AgentBridge`. Tool names must match the `ToolRegistry` key exactly (e.g. `tasks` not `task`, `notes` not `note`).
 
-**Currently exposed tools:** `tasks`, `project`, `area`, `notes`, `memory`, `okr`, `finance`, `productivity`, `work_context`, `agent`, `annotate`, `learning`, `cron`, `mirror` — configured in `default_exposed_tools()` at `crates/config/src/schema/mcp.rs`.
+**Currently exposed tools:** `tasks`, `project`, `area`, `notes`, `memory`, `okr`, `finance`, `productivity`, `work_context`, `agent`, `annotate`, `learning`, `cron`, `mirror`, `temporal` — configured in `default_exposed_tools()` at `crates/config/src/schema/mcp.rs`.
 
-**To expose a new feature tool via MCP:**
+**To expose a new tool via MCP:** (1) `#[derive(Tool)]` in a `feature-*` crate, register via `FeaturePackage::tools()`. (2) Add registry name to `default_exposed_tools()` in `crates/config/src/schema/mcp.rs`. (3) Verify: `cargo nextest run -p klyntbot-server`. Common mistake: plural/singular mismatch (`tasks` vs `task`). (4) Rebuild: `cargo build -p klyntbot-mcp`. Users can override the whitelist in `config.json` → `mcp.server.exposedTools`.
 
-1. **Implement the tool** — `#[derive(Tool)]` in a `feature-*` crate, register in `ToolRegistry` via `FeaturePackage::tools()`. The tool's `name()` return value is the registry key.
-2. **Add to default whitelist** — append the tool's registry name to `default_exposed_tools()` in `crates/config/src/schema/mcp.rs`. This controls which tools MCP clients can discover and call.
-3. **Verify the name matches** — run `cargo nextest run -p klyntbot-server` to confirm the tool appears in `list_tools` and passes the whitelist. Common mistake: the tool registers as plural (`tasks`) but you added singular (`task`).
-4. **Test via Claude Code** — rebuild the MCP binary (`cargo build -p klyntbot-mcp`), then in Claude Code call the tool: `mcp__klyntbot__<tool_name>`. No Claude Code config changes needed — it auto-discovers tools via `tools/list`.
-5. **Override per-user** — users can customize the whitelist in `config.json` → `mcp.server.exposedTools`. If a user has overridden this array, new defaults won't take effect until they add the tool manually.
+**Debug CLI:** `klyntbot-mcp tools --list` | `klyntbot-mcp tools --schema <name>`.
 
-**Debug CLI:** `klyntbot-mcp tools --list` (list all exposed tools), `klyntbot-mcp tools --schema <name>` (show tool schema). Useful for verifying tool registration.
+### Cognitive subsystems
 
-**Claude Code MCP config** (`~/.claude.json`):
-```json
-{
-  "mcpServers": {
-    "klyntbot": {
-      "command": "<path>/target/debug/klyntbot-mcp",
-      "args": ["serve", "--stdio"],
-      "env": { "KLYNTBOT_HOME": "~/.klyntbot-dev" }
-    }
-  }
-}
-```
+**Tray countdown** (`tray_countdown.rs`): Live menu bar countdown to next calendar event/task deadline. Coordinates with focus timer via `FOCUS_ACTIVE` atomic flag. Uses `tauri::async_runtime::spawn` (not `tokio::spawn`) — starts during Tauri `setup` hook before tokio runtime is available.
 
-### Tray countdown
+**Mirror** (`crates/cognitive/src/mirror/`): Event-driven self-reflection. Four subscribers (routing snapshots, meta-rule detection, config archiving, trial preview). `MirrorEngine::start()` returns `(MirrorFacade, Vec<JoinHandle>, CancellationToken)` — handles must be stored in `AppCore` (not dropped). `MirrorFacade` stored as `Option<Arc<MirrorFacade>>` in `AppCore`. MCP: `MirrorTool` (multi-action, read-only) registered post-init. 6 tables in `003_mirror_tables.sql`.
 
-`tray_countdown.rs` shows the next upcoming calendar event or task deadline in the macOS menu bar with a live countdown (e.g. "« 24:57 · Standup"). Only shows items due today (local timezone). Polls the DB every 30s, ticks every 1s. Coordinates with the focus timer via `FOCUS_ACTIVE` atomic flag — when a focus session is running, the focus timer owns the tray title and the countdown yields. On focus end, `notify_focus_ended()` clears the flag and the countdown resumes. Uses `tauri::async_runtime::spawn` (not `tokio::spawn`) because it starts during Tauri's `setup` hook before the tokio runtime is available.
-
-### Mirror self-reflection layer
-
-`crates/cognitive/src/mirror/` — event-driven self-awareness system. Four subscribers watch domain events reactively, a facade provides the public API, cron jobs handle weekly narrative generation and retention cleanup.
-
-**Subscribers:** `RoutingMirrorSubscriber` (hourly routing snapshots + drift detection), `MetaRuleDetector` (correction streaks → pending rule proposals), `ConfigArchiver` (autotuner promotions → brain version timeline), `TrialPreviewSubscriber` (4h early trial evaluation + kill/continue). All started by `MirrorEngine::start()` which returns `(MirrorFacade, Vec<JoinHandle>, CancellationToken)`.
-
-**MirrorFacade:** Public API for state queries, user actions (approve/dismiss rules, kill/continue trials, revert brain versions), weekly narrative generation, and conversational mirror responses. Wired with optional `EpisodicMemoryRepo` (cross-feature memory ripple) and `Arc<DomainEventBus>` (auto-note on trial kill). Stored as `Option<Arc<MirrorFacade>>` in `AppCore`.
-
-**Storage:** 6 tables in `crates/cognitive/migrations/003_mirror_tables.sql` (routing_snapshots, trend_narratives, snippets, meta_rules, brain_versions, trial_previews). Migration version managed via `cognitive_mirror` feature migration.
-
-**MCP:** `MirrorTool` (multi-action, read-only) registered post-init via `agent.tool_registry()`. Actions: `get_state`, `get_narratives`, `get_routing_history`, `get_brain_versions`, `get_meta_rules`.
-
-**Cron:** `JOB_MIRROR_WEEKLY_NARRATIVE` (Sunday 10am UTC), `JOB_MIRROR_CLEANUP` (Sunday 4am UTC — cleans snapshots, snippets, trial previews older than 90 days).
-
-### Reforge — strategy reflection
-
-`crates/cognitive/src/services/reforge/` — nightly self-improvement cycle that reviews the agent's strategy files (`skills/*.md`), collects behavioral feedback (tool failures, user corrections, retrieval precision), and generates targeted rewrite suggestions via LLM. Phases: Collect → Review → Synthesize → Apply. The `feedback.rs` module loads signals from event logs and semantic fact repos. High-confidence patterns and suggestions are persisted to `reforge_suggestions` table for cross-session continuity. Triggered by cron, orchestrated by `ReforgeService::run_reforge()`.
+**Reforge** (`crates/cognitive/src/services/reforge/`): Nightly self-improvement cycle. Reviews strategy files, collects behavioral feedback, generates rewrite suggestions via LLM. Phases: Collect → Review → Synthesize → Apply. Persists to `reforge_suggestions` table.
 
 ### Agent runtime
 
-`AgentRuntime` → `SkillCatalog` + `SkillRouter` → `IntentAnalyzer` → `ContextEngine` → `ExecutionRouter` → `CostTracker`. Two execution modes: **Direct** (single LLM call, no tools) and **Reactive** (ReAct loop with tool calls, synthesizes at max_iterations). Code in `crates/agent/src/agent_runtime/` and `crates/agent/src/intent_pipeline/`. Skill types in `crates/skill-system/`.
+`AgentRuntime` → `SkillCatalog` + `SkillRouter` → `IntentAnalyzer` → `ContextEngine` → `ExecutionRouter` → `CostTracker`. Two execution modes: **Direct** (single LLM call, no tools) and **Reactive** (ReAct loop with tool calls, synthesizes at max_iterations). Code in `crates/agent/src/agent_runtime/` and `crates/agent/src/intent_pipeline/`. Execution loop internals in `crates/agent/src/execution/`. Skill types in `crates/skill-system/`.
 
-**Mid-loop context compression:** During Reactive execution, the `MidLoopCompressor` checks token usage after each iteration. When accumulated message tokens exceed 70% of the context window, older `Message::Tool` results are replaced with extractive summaries (first 150 chars + metadata). System messages and recent iterations (last 8 messages) are always preserved verbatim. Emits `AgentEvent::ContextCompressed` for UI transparency.
+**Mid-loop context compression:** `MidLoopCompressor` (in `crates/agent/src/execution/`) triggers when message tokens exceed 70% of context window. Replaces older `Message::Tool` results with extractive summaries. Preserves system messages and last 8 messages verbatim. Emits `AgentEvent::ContextCompressed`.
 
-**Live context refresh:** During Reactive execution, the `LiveContextRefresher` drains a shared `ContextUpdateQueue` (in the `bus` crate) at each iteration boundary. Context updates (e.g., newly promoted memories) are injected as `Message::ContextUpdate` entries with XML-tagged content. Token budget is respected — standard updates can use up to 80% of remaining context (20% reserved for LLM response); high-priority updates can use 90% (10% reserved). Emits `AgentEvent::ContextReassembled` for transparency. Set `pause_context_updates: true` on `ExecutionParams` for frozen-context mode. Phase 1 producer: cognitive background service pushes on memory promotion.
+**Tiered History Compression (THC):** `TieredHistoryCompressor` (in `crates/context_engine/src/history_compressor/`) operates at the context-engine level before messages enter the LLM. Groups messages into `ConversationTurn`s, optionally scores via `MemoryScorer`, assigns tiers (Verbatim / Detailed / Condensed), and compresses with tier-specific prompts. Extractive-first: falls back to snippet extraction when LLM summaries aren't needed or fail. Configured via `HistoryCompressionConfig`.
+
+**Live context refresh:** `LiveContextRefresher` (in `crates/agent/src/execution/`) drains `ContextUpdateQueue` (in `bus` crate) at each iteration boundary. Injects `Message::ContextUpdate` entries. Token budget: standard 80%, high-priority 90%. Set `pause_context_updates: true` on `ExecutionParams` for frozen-context mode.
 
 ## Behavioral Guidelines
 
@@ -210,5 +179,5 @@ Transform vague tasks into verifiable goals — "fix the bug" → "write a test 
 - **`email` feature** (on by default) gates IMAP/SMTP deps in `channels` crate.
 - **`tauri.conf.json` uses `bun`** in `beforeBuildCommand`. Ensure `bun` is installed globally.
 - **Timestamps are UTC, display in local time** — Rust stores `chrono::Utc::now().to_rfc3339()`. For user-facing display strings formatted in Rust (e.g. `due_display` in `TodayTaskResponse`), convert to local first via `d.with_timezone(&chrono::Local)`. In the frontend, never `.slice()` ISO strings — parse via `new Date(iso)` and use `toLocaleTimeString()`. Shared helper: `formatTime()` in `desktop-ui/src/shared/lib/dates.ts`.
-- **`MirrorEngine::start` takes `Arc<DomainEventBus>`** — not `&DomainEventBus`. The bus is cloned into the facade for `MirrorTrialKilled` event emission. Signature: `start(repo, bus: Arc<DomainEventBus>, narrative_handler, autotuner_bridge, episodic_repo)`. Handles and shutdown token must be stored in `AppCore` (not dropped).
+- **`MirrorEngine::start` takes `Arc<DomainEventBus>`** — not `&DomainEventBus`. Signature: `start(repo, bus: Arc<DomainEventBus>, narrative_handler, autotuner_bridge, episodic_repo)`.
 - **Pre-release — no user data to migrate.** All schema changes can be made directly (alter tables, drop and recreate) without writing migration scripts. No need for backwards-compatible migrations until first release. When a migration is consolidated, update the `FeatureMigration` version and SQL in-place rather than adding incremental migration files. After first release, all schema changes require proper versioned migrations with `INSERT OR IGNORE` for idempotency.
