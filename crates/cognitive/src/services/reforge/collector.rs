@@ -133,7 +133,7 @@ pub async fn collect(
         .map(|r| SessionContext {
             session_key: r.session_key,
             scratchpad: r.content,
-            updated_at: r.updated_at,
+            updated_at: r.updated_at.to_string(),
             turn_count: r.turn_count,
         })
         .collect();

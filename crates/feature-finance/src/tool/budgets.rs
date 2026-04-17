@@ -3,6 +3,7 @@
 //! Handles: budget_create, budget_list, budget_status, budget_update, budget_delete.
 
 use chrono::{Local, Utc};
+use common::time::bridge::{chrono_date_to_jiff, chrono_to_jiff};
 use serde_json::json;
 use uuid::Uuid;
 
@@ -106,12 +107,12 @@ impl FinanceTool {
             category: category.map(|s| s.to_string()),
             method: method.as_str().to_string(),
             jar_type: jar_type.map(|j| j.as_str().to_string()),
-            start_date,
-            end_date,
+            start_date: chrono_date_to_jiff(start_date).into(),
+            end_date: end_date.map(|d| chrono_date_to_jiff(d).into()),
             is_active: true,
             alert_threshold,
-            created_at: now,
-            updated_at: now,
+            created_at: chrono_to_jiff(now).into(),
+            updated_at: chrono_to_jiff(now).into(),
             base_amount: conv.base_amount,
             base_currency: conv.base_currency,
             exchange_rate: conv.exchange_rate,

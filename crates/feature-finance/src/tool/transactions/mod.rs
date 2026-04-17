@@ -6,6 +6,7 @@ mod recurring;
 mod transfer;
 
 use chrono::{Local, Utc};
+use common::time::bridge::{chrono_date_to_jiff, chrono_to_jiff};
 use serde_json::json;
 
 use bus::DomainEvent;
@@ -139,12 +140,12 @@ impl FinanceTool {
             subcategory,
             counterparty,
             notes,
-            tx_date,
+            tx_date: chrono_date_to_jiff(tx_date).into(),
             transfer_id: None,
             is_recurring: false,
             recurring_rule: None,
-            created_at: now,
-            updated_at: now,
+            created_at: chrono_to_jiff(now).into(),
+            updated_at: chrono_to_jiff(now).into(),
             base_amount: conv.base_amount,
             base_currency: conv.base_currency,
             exchange_rate: conv.exchange_rate,
@@ -279,8 +280,8 @@ impl FinanceTool {
             account_id: account_id.map(|s| s.to_string()),
             tx_type: tx_type_str,
             category: category.map(|s| s.to_string()),
-            date_from,
-            date_to,
+            date_from: date_from.map(|d| chrono_date_to_jiff(d).into()),
+            date_to: date_to.map(|d| chrono_date_to_jiff(d).into()),
             limit: Some(limit.unwrap_or(50)),
             ..Default::default()
         };
@@ -351,7 +352,7 @@ impl FinanceTool {
             subcategory: subcategory.map(|s| Some(s.to_string())),
             counterparty: counterparty.map(|s| Some(s.to_string())),
             notes: notes.map(|s| Some(s.to_string())),
-            tx_date,
+            tx_date: tx_date.map(|d| chrono_date_to_jiff(d).into()),
             base_amount: None,
             base_currency: None,
             exchange_rate: None,
@@ -531,8 +532,8 @@ impl FinanceTool {
             query: query.map(|s| s.to_string()),
             amount_min,
             amount_max,
-            date_from,
-            date_to,
+            date_from: date_from.map(|d| chrono_date_to_jiff(d).into()),
+            date_to: date_to.map(|d| chrono_date_to_jiff(d).into()),
             limit: Some(50),
             ..Default::default()
         };

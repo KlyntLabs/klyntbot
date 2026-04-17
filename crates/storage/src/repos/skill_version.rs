@@ -109,7 +109,7 @@ mod tests {
             diff: Some(format!("diff v{version}")),
             source: source.to_string(),
             reason: Some(format!("reason v{version}")),
-            created_at: chrono::Utc::now().to_rfc3339(),
+            created_at: jiff::Timestamp::now().to_string(),
         }
     }
 

@@ -198,7 +198,7 @@ impl Repos {
     /// - `tool_usage`: 90 days
     /// - `enrichment_feedback`: 90 days
     pub async fn cleanup_analytics(&self) -> Result<u64, crate::error::StorageError> {
-        let now = chrono::Utc::now();
+        let now = jiff::Timestamp::now();
 
         let (a, b, c, d, e) = futures_util::try_join!(
             self.strategies.delete_older_than(90, now),

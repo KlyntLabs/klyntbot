@@ -48,7 +48,7 @@ impl RetrievalFeedbackRepo {
 
     /// Average precision over the past N days.
     pub async fn avg_precision_since(&self, days: i64) -> Result<f64, sqlx::Error> {
-        let cutoff = (chrono::Utc::now() - chrono::Duration::days(days)).to_rfc3339();
+        let cutoff = (jiff::Timestamp::now() - jiff::SignedDuration::from_hours(days * 24)).as_millisecond();
         let row: (f64,) = sqlx::query_as(
             "SELECT COALESCE(AVG(precision), 0.0) FROM retrieval_feedback WHERE created_at >= ?1",
         )
@@ -64,7 +64,7 @@ impl RetrievalFeedbackRepo {
         &self,
         days: i64,
     ) -> Result<Vec<(String, f64)>, sqlx::Error> {
-        let since = (chrono::Utc::now() - chrono::Duration::days(days)).to_rfc3339();
+        let since = (jiff::Timestamp::now() - jiff::SignedDuration::from_hours(days * 24)).as_millisecond();
         let rows: Vec<(String, f64)> = sqlx::query_as(
             "SELECT f.domain, AVG(rf.precision) as avg_precision
              FROM retrieval_feedback rf,
@@ -83,7 +83,7 @@ impl RetrievalFeedbackRepo {
 
     /// Count feedback entries in the past N days.
     pub async fn count_since(&self, days: i64) -> Result<i64, sqlx::Error> {
-        let cutoff = (chrono::Utc::now() - chrono::Duration::days(days)).to_rfc3339();
+        let cutoff = (jiff::Timestamp::now() - jiff::SignedDuration::from_hours(days * 24)).as_millisecond();
         let row: (i64,) =
             sqlx::query_as("SELECT COUNT(*) FROM retrieval_feedback WHERE created_at >= ?1")
                 .bind(&cutoff)

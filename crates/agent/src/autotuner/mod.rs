@@ -772,7 +772,7 @@ async fn run_llm_generation(orch: &AutoTunerOrchestrator) -> common::Result<Vec<
     };
 
     // ── Build enriched context from real data (fall back to placeholders) ──
-    let seven_days_ago = chrono::Utc::now() - chrono::Duration::days(7);
+    let seven_days_ago = common::time::bridge::chrono_to_jiff(chrono::Utc::now() - chrono::Duration::days(7));
 
     let trend_summary = if let Some(ref strategy_repo) = orch.strategy_repo {
         let stats = strategy_repo

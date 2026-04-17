@@ -1,5 +1,4 @@
 use super::*;
-use chrono::Utc;
 
 use crate::rows::task::{
     TaskDecompositionRow, TaskEstimationRow, TaskExecutionRow, TaskRow, TaskSuggestionRow,
@@ -26,26 +25,26 @@ async fn create_test_tables(db: &sqlx::SqlitePool) {
                 group_id             TEXT,
                 priority             INTEGER,
                 position             INTEGER NOT NULL DEFAULT 0,
-                due_date             TEXT,
+                due_date             INTEGER,
                 tags                 TEXT NOT NULL DEFAULT '[]',
                 status               TEXT NOT NULL DEFAULT 'todo',
                 task_type            TEXT NOT NULL DEFAULT 'manual',
-                focused_at           TEXT,
-                focus_deadline       TEXT,
+                focused_at           INTEGER,
+                focus_deadline       INTEGER,
                 focus_expired_count  INTEGER NOT NULL DEFAULT 0,
-                created_at           TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
-                updated_at           TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
-                completed_at         TEXT,
+                created_at           INTEGER NOT NULL DEFAULT (unixepoch('now') * 1000),
+                updated_at           INTEGER NOT NULL DEFAULT (unixepoch('now') * 1000),
+                completed_at         INTEGER,
                 completed            INTEGER NOT NULL DEFAULT 0,
                 total_tracked_secs   INTEGER NOT NULL DEFAULT 0,
                 estimated_minutes    INTEGER,
                 actual_minutes       INTEGER,
                 calendar_event_uid   TEXT,
-                last_reminded_at     TEXT,
+                last_reminded_at     INTEGER,
                 recurrence_rule      TEXT,
                 recurrence_parent_id TEXT,
                 is_template          INTEGER NOT NULL DEFAULT 0,
-                next_instance_date   TEXT,
+                next_instance_date   INTEGER,
                 acceptance_criteria  TEXT,
                 agent_config         TEXT,
                 execution_state      TEXT NOT NULL DEFAULT 'idle',
@@ -54,8 +53,8 @@ async fn create_test_tables(db: &sqlx::SqlitePool) {
                 energy_level         TEXT DEFAULT 'medium',
                 estimated_focus_blocks INTEGER,
                 complexity_score     INTEGER,
-                scheduled_start      TEXT,
-                scheduled_end        TEXT
+                scheduled_start      INTEGER,
+                scheduled_end        INTEGER
             )
             "#,
     )
@@ -75,7 +74,7 @@ async fn create_test_tables(db: &sqlx::SqlitePool) {
                 actor_type    TEXT NOT NULL DEFAULT 'user',
                 actor_id      TEXT,
                 summary       TEXT,
-                created_at    TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now'))
+                created_at    INTEGER NOT NULL DEFAULT (unixepoch('now') * 1000)
             )
             "#,
     )
@@ -90,8 +89,8 @@ async fn create_test_tables(db: &sqlx::SqlitePool) {
                 task_id        TEXT NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
                 status         TEXT NOT NULL DEFAULT 'pending',
                 agent_profile  TEXT,
-                started_at     TEXT,
-                completed_at   TEXT,
+                started_at     INTEGER,
+                completed_at   INTEGER,
                 duration_secs  INTEGER,
                 tokens_used    INTEGER,
                 cost_usd       REAL,
@@ -101,7 +100,7 @@ async fn create_test_tables(db: &sqlx::SqlitePool) {
                 artifacts      TEXT,
                 metrics        TEXT,
                 retry_count    INTEGER NOT NULL DEFAULT 0,
-                created_at     TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now'))
+                created_at     INTEGER NOT NULL DEFAULT (unixepoch('now') * 1000)
             )
             "#,
     )
@@ -121,8 +120,8 @@ async fn create_test_tables(db: &sqlx::SqlitePool) {
                 action_payload  TEXT,
                 status          TEXT NOT NULL DEFAULT 'pending',
                 trigger         TEXT,
-                created_at      TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
-                resolved_at     TEXT
+                created_at      INTEGER NOT NULL DEFAULT (unixepoch('now') * 1000),
+                resolved_at     INTEGER
             )
             "#,
     )
@@ -140,7 +139,7 @@ async fn create_test_tables(db: &sqlx::SqlitePool) {
                 title           TEXT,
                 tags            TEXT NOT NULL DEFAULT '[]',
                 source          TEXT NOT NULL DEFAULT 'user',
-                created_at      TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now'))
+                created_at      INTEGER NOT NULL DEFAULT (unixepoch('now') * 1000)
             )
             "#,
     )
@@ -154,8 +153,8 @@ async fn create_test_tables(db: &sqlx::SqlitePool) {
                 id            TEXT PRIMARY KEY,
                 task_id       TEXT NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
                 source        TEXT NOT NULL DEFAULT 'focus',
-                started_at    TEXT NOT NULL,
-                ended_at      TEXT,
+                started_at    INTEGER NOT NULL,
+                ended_at      INTEGER,
                 duration_secs INTEGER,
                 energy_level  TEXT,
                 note          TEXT
@@ -193,7 +192,7 @@ async fn create_test_tables(db: &sqlx::SqlitePool) {
                 energy_level      TEXT,
                 tags              TEXT NOT NULL DEFAULT '[]',
                 project_id        TEXT,
-                completed_at      TEXT NOT NULL
+                completed_at      INTEGER NOT NULL
             )
             "#,
     )
@@ -210,8 +209,8 @@ async fn create_test_tables(db: &sqlx::SqlitePool) {
                 confidence REAL NOT NULL DEFAULT 0.0,
                 status     TEXT NOT NULL DEFAULT 'pending',
                 reasoning  TEXT,
-                created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
-                applied_at TEXT
+                created_at INTEGER NOT NULL DEFAULT (unixepoch('now') * 1000),
+                applied_at INTEGER
             )
             "#,
     )
@@ -238,7 +237,7 @@ async fn setup_repo() -> TaskRepo {
 
 /// Helper to create a minimal TaskRow for tests.
 fn make_task(id: &str, title: &str) -> TaskRow {
-    let now = Utc::now();
+    let now: crate::sqlite_types::SqlTs = jiff::Timestamp::now().into();
     TaskRow {
         id: id.to_string(),
         title: title.to_string(),
@@ -690,7 +689,7 @@ async fn test_time_entries() {
     let task = make_task("te1", "Time test");
     repo.add(&task).await.unwrap();
 
-    let now = Utc::now();
+    let now = jiff::Timestamp::now();
     let entry = repo
         .add_time_entry(
             "te1",
@@ -724,7 +723,7 @@ async fn test_executions() {
     let task = make_task("ex1", "Exec test");
     repo.add(&task).await.unwrap();
 
-    let now = Utc::now();
+    let now: crate::sqlite_types::SqlTs = jiff::Timestamp::now().into();
     let exec_row = TaskExecutionRow {
         id: "exec-1".to_string(),
         task_id: "ex1".to_string(),
@@ -769,7 +768,7 @@ async fn test_suggestions() {
     let task = make_task("sug1", "Suggestion test");
     repo.add(&task).await.unwrap();
 
-    let now = Utc::now();
+    let now: crate::sqlite_types::SqlTs = jiff::Timestamp::now().into();
     let suggestion = TaskSuggestionRow {
         id: "s1".to_string(),
         task_id: Some("sug1".to_string()),
@@ -806,7 +805,7 @@ async fn test_estimation_stats() {
     let task = make_task("est1", "Estimation test");
     repo.add(&task).await.unwrap();
 
-    let now = Utc::now();
+    let now: crate::sqlite_types::SqlTs = jiff::Timestamp::now().into();
     let est1 = TaskEstimationRow {
         id: "e1".to_string(),
         task_id: "est1".to_string(),
@@ -876,7 +875,7 @@ async fn test_summary_and_overdue() {
 
     // Overdue: task with past due date and not completed
     let mut overdue_task = make_task("sum4", "Overdue task");
-    overdue_task.due_date = Some(Utc::now() - chrono::Duration::days(1));
+    overdue_task.due_date = Some(crate::sqlite_types::SqlTs::from(jiff::Timestamp::now() - jiff::SignedDuration::from_hours(24)));
     repo.add(&overdue_task).await.unwrap();
 
     let overdue = repo.overdue().await.unwrap();
@@ -907,7 +906,7 @@ async fn test_get_execution() {
         artifacts: None,
         metrics: None,
         retry_count: 0,
-        created_at: Utc::now(),
+        created_at: jiff::Timestamp::now().into(),
     };
     repo.create_execution(&exec_row).await.unwrap();
 
@@ -933,7 +932,7 @@ async fn test_decomposition_crud() {
         confidence: 0.85,
         status: "pending".to_string(),
         reasoning: Some("test".to_string()),
-        created_at: Utc::now(),
+        created_at: jiff::Timestamp::now().into(),
         applied_at: None,
     };
     let created = repo.create_decomposition(&row).await.unwrap();
@@ -970,7 +969,7 @@ async fn test_expire_suggestions() {
         action_payload: None,
         status: "pending".to_string(),
         trigger: None,
-        created_at: Utc::now(),
+        created_at: jiff::Timestamp::now().into(),
         resolved_at: None,
     };
     repo.create_suggestion(&sugg).await.unwrap();

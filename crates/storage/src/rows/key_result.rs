@@ -1,6 +1,6 @@
 //! Row struct for the `key_results` table.
 
-use chrono::{DateTime, Utc};
+use crate::sqlite_types::SqlTs;
 use serde::Serialize;
 use sqlx::FromRow;
 
@@ -17,8 +17,8 @@ pub struct KeyResultRow {
     pub current_value: f64,
     pub unit: Option<String>,
     pub progress: f64,
-    pub due_date: Option<DateTime<Utc>>,
-    pub created_at: DateTime<Utc>,
-    pub updated_at: DateTime<Utc>,
-    pub completed_at: Option<DateTime<Utc>>,
+    pub due_date: Option<SqlTs>,
+    pub created_at: SqlTs,
+    pub updated_at: SqlTs,
+    pub completed_at: Option<SqlTs>,
 }

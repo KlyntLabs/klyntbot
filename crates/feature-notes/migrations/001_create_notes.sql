@@ -6,8 +6,8 @@ CREATE TABLE IF NOT EXISTS notebooks (
     icon        TEXT,
     color       TEXT,
     sort_order  INTEGER NOT NULL DEFAULT 0,
-    created_at  TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
-    updated_at  TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now'))
+    created_at  INTEGER NOT NULL DEFAULT (unixepoch('now') * 1000),
+    updated_at  INTEGER NOT NULL DEFAULT (unixepoch('now') * 1000)
 );
 
 CREATE INDEX IF NOT EXISTS idx_notebooks_parent_id ON notebooks(parent_id);
@@ -23,13 +23,13 @@ CREATE TABLE IF NOT EXISTS notes (
     archived    INTEGER NOT NULL DEFAULT 0,
     icon        TEXT,
     color       TEXT,
-    embedding_updated_at TEXT,
+    embedding_updated_at INTEGER,
     split_content   TEXT,
     split_mode      TEXT,
     perspective_config TEXT,
     last_visited_at TEXT,
-    created_at  TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
-    updated_at  TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now'))
+    created_at  INTEGER NOT NULL DEFAULT (unixepoch('now') * 1000),
+    updated_at  INTEGER NOT NULL DEFAULT (unixepoch('now') * 1000)
 );
 
 CREATE INDEX IF NOT EXISTS idx_notes_notebook_id ON notes(notebook_id);
@@ -68,7 +68,7 @@ CREATE TABLE IF NOT EXISTS note_versions (
     id         TEXT PRIMARY KEY,
     note_id    TEXT NOT NULL REFERENCES notes(id) ON DELETE CASCADE,
     body       TEXT NOT NULL,
-    created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now'))
+    created_at INTEGER NOT NULL DEFAULT (unixepoch('now') * 1000)
 );
 
 CREATE INDEX IF NOT EXISTS idx_note_versions_note_id ON note_versions(note_id);
@@ -101,7 +101,7 @@ CREATE TABLE IF NOT EXISTS inbox_items (
     id         TEXT PRIMARY KEY,
     content    TEXT NOT NULL,
     status     TEXT NOT NULL DEFAULT 'pending',
-    created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now'))
+    created_at INTEGER NOT NULL DEFAULT (unixepoch('now') * 1000)
 );
 
 CREATE INDEX IF NOT EXISTS idx_inbox_items_status ON inbox_items(status);

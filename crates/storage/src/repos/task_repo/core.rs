@@ -81,8 +81,8 @@ impl TaskRepo {
         .bind(row.complexity_score)
         .bind(row.completed)
         .bind(&row.objective_id)
-        .bind(row.scheduled_start.map(|dt| dt.to_rfc3339()))
-        .bind(row.scheduled_end.map(|dt| dt.to_rfc3339()))
+        .bind(row.scheduled_start)
+        .bind(row.scheduled_end)
         .fetch_one(&self.pool)
         .await?;
 
@@ -117,7 +117,7 @@ impl TaskRepo {
                 tags               = COALESCE(?9, tags),
                 status             = COALESCE(?10, status),
                 completed_at       = CASE
-                    WHEN ?10 = 'done' AND completed_at IS NULL THEN datetime('now')
+                    WHEN ?10 = 'done' AND completed_at IS NULL THEN (unixepoch('now') * 1000)
                     WHEN ?10 IS NOT NULL AND ?10 != 'done' THEN NULL
                     ELSE completed_at
                 END,
@@ -144,7 +144,7 @@ impl TaskRepo {
                 objective_id       = CASE WHEN ?46 THEN ?47 ELSE objective_id END,
                 scheduled_start    = CASE WHEN ?48 THEN ?49 ELSE scheduled_start END,
                 scheduled_end      = CASE WHEN ?50 THEN ?51 ELSE scheduled_end END,
-                updated_at         = datetime('now')
+                updated_at         = (unixepoch('now') * 1000)
             WHERE id = ?1
             RETURNING *
             "#,
@@ -156,15 +156,15 @@ impl TaskRepo {
         .bind(patch.priority.is_some()) // ?5
         .bind(patch.priority.unwrap_or_default()) // ?6
         .bind(patch.due_date.is_some()) // ?7
-        .bind(patch.due_date.unwrap_or_default()) // ?8
+        .bind(patch.due_date.unwrap_or_default().map(|t| t.as_millisecond())) // ?8
         .bind(patch.tags.as_ref().map(sqlx::types::Json)) // ?9
         .bind(&patch.status) // ?10
         .bind(patch.calendar_event_uid.is_some()) // ?11
         .bind(patch.calendar_event_uid.as_ref().and_then(|v| v.as_deref())) // ?12
         .bind(patch.next_instance_date.is_some()) // ?13
-        .bind(patch.next_instance_date.unwrap_or_default()) // ?14
+        .bind(patch.next_instance_date.unwrap_or_default().map(|t| t.as_millisecond())) // ?14
         .bind(patch.last_reminded_at.is_some()) // ?15
-        .bind(patch.last_reminded_at.unwrap_or_default()) // ?16
+        .bind(patch.last_reminded_at.unwrap_or_default().map(|t| t.as_millisecond())) // ?16
         .bind(patch.estimated_minutes.is_some()) // ?17
         .bind(patch.estimated_minutes.unwrap_or_default()) // ?18
         .bind(patch.recurrence_rule.is_some()) // ?19
@@ -207,9 +207,9 @@ impl TaskRepo {
         .bind(patch.objective_id.is_some()) // ?46
         .bind(patch.objective_id.as_ref().and_then(|v| v.as_deref())) // ?47
         .bind(patch.scheduled_start.is_some()) // ?48
-        .bind(patch.scheduled_start.unwrap_or_default()) // ?49
+        .bind(patch.scheduled_start.unwrap_or_default().map(|t| t.as_millisecond())) // ?49
         .bind(patch.scheduled_end.is_some()) // ?50
-        .bind(patch.scheduled_end.unwrap_or_default()) // ?51
+        .bind(patch.scheduled_end.unwrap_or_default().map(|t| t.as_millisecond())) // ?51
         .fetch_optional(&self.pool)
         .await?
         .ok_or_not_found(&format!("task {}", patch.id))?;
@@ -279,12 +279,12 @@ impl TaskRepo {
 
         if let Some(ref after) = filter.due_after {
             qb.push(" AND due_date >= ");
-            qb.push_bind(after);
+            qb.push_bind(after.as_millisecond());
         }
 
         if let Some(ref before) = filter.due_before {
             qb.push(" AND due_date < ");
-            qb.push_bind(before);
+            qb.push_bind(before.as_millisecond());
         }
 
         if let Some(ref group) = filter.status_group {

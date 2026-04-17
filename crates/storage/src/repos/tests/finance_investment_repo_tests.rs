@@ -2,8 +2,7 @@
 
 #[cfg(test)]
 mod tests {
-    use chrono::{NaiveDate, Utc};
-
+    
     use crate::repos::finance_investment_repo::FinanceInvestmentRepo;
     use crate::rows::finance::{FinanceInvestmentRow, FinanceInvestmentTxRow, FinancePortfolioRow};
     use crate::StoragePool;
@@ -20,7 +19,7 @@ mod tests {
     }
 
     fn sample_portfolio(id: &str, name: &str) -> FinancePortfolioRow {
-        let now = Utc::now();
+        let now: crate::sqlite_types::SqlTs = jiff::Timestamp::now().into();
         FinancePortfolioRow {
             id: id.to_string(),
             name: name.to_string(),
@@ -32,7 +31,7 @@ mod tests {
     }
 
     fn sample_investment(id: &str, portfolio_id: &str) -> FinanceInvestmentRow {
-        let now = Utc::now();
+        let now: crate::sqlite_types::SqlTs = jiff::Timestamp::now().into();
         FinanceInvestmentRow {
             id: id.to_string(),
             portfolio_id: portfolio_id.to_string(),
@@ -44,7 +43,7 @@ mod tests {
             currency: "VND".to_string(),
             current_price: None,
             current_value: None,
-            purchase_date: Some(NaiveDate::from_ymd_opt(2025, 1, 15).unwrap()),
+            purchase_date: Some(crate::sqlite_types::SqlDate::from(jiff::civil::Date::new(2025, 1, 15).unwrap())),
             asset_class: None,
             notes: None,
             created_at: now,
@@ -59,7 +58,7 @@ mod tests {
     }
 
     fn sample_inv_tx(id: &str, investment_id: &str, tx_type: &str) -> FinanceInvestmentTxRow {
-        let now = Utc::now();
+        let now: crate::sqlite_types::SqlTs = jiff::Timestamp::now().into();
         FinanceInvestmentTxRow {
             id: id.to_string(),
             investment_id: investment_id.to_string(),
@@ -69,7 +68,7 @@ mod tests {
             total_amount: 500_000,
             currency: "VND".to_string(),
             fees: 0,
-            tx_date: chrono::Local::now().date_naive(),
+            tx_date: crate::sqlite_types::SqlDate::from(jiff::Zoned::now().date()),
             notes: None,
             created_at: now,
             base_total_amount: 0,

@@ -4,7 +4,7 @@
 //! analyze_recurring_charges, analyze_category_correlation.
 
 use chrono::{Duration, Local};
-use common::{Decimal, Result, ToolError};
+use common::{time::bridge::chrono_date_to_jiff, Decimal, Result, ToolError};
 use serde_json::json;
 use storage::rows::finance::FinanceTransactionFilter;
 use tools_core::ParamExtractor;
@@ -39,8 +39,8 @@ impl FinanceTool {
         let date_from = today - Duration::days(lookback_months * 30);
 
         let filter = FinanceTransactionFilter {
-            date_from: Some(date_from),
-            date_to: Some(today),
+            date_from: Some(chrono_date_to_jiff(date_from).into()),
+            date_to: Some(chrono_date_to_jiff(today).into()),
             limit: Some(10_000),
             ..Default::default()
         };
@@ -56,7 +56,7 @@ impl FinanceTool {
                     _ => return None, // skip transfers
                 };
                 Some(SpendingRecord {
-                    date: common::time::bridge::chrono_date_to_jiff(row.tx_date),
+                    date: *row.tx_date,
                     amount: Decimal::new(row.amount, 0),
                     tx_type,
                     category: row.category,

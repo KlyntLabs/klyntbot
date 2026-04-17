@@ -39,7 +39,7 @@ impl TaskRepo {
     /// Resolve a suggestion by updating its status and resolved_at timestamp.
     pub async fn resolve_suggestion(&self, id: &str, status: &str) -> Result<bool, StorageError> {
         let result = sqlx::query(
-            "UPDATE task_suggestions SET status = ?2, resolved_at = datetime('now') WHERE id = ?1",
+            "UPDATE task_suggestions SET status = ?2, resolved_at = (unixepoch('now') * 1000) WHERE id = ?1",
         )
         .bind(id)
         .bind(status)
@@ -88,7 +88,7 @@ impl TaskRepo {
     /// Expire all pending suggestions for a task.
     pub async fn expire_suggestions_for_task(&self, task_id: &str) -> Result<u64, StorageError> {
         let result = sqlx::query(
-            "UPDATE task_suggestions SET status = 'expired', resolved_at = datetime('now') WHERE task_id = ?1 AND status = 'pending'",
+            "UPDATE task_suggestions SET status = 'expired', resolved_at = (unixepoch('now') * 1000) WHERE task_id = ?1 AND status = 'pending'",
         )
         .bind(task_id)
         .execute(&self.pool)

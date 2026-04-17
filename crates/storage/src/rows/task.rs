@@ -2,7 +2,7 @@
 //! `task_decompositions`, `task_estimation_history`, `task_attachments`, `task_time_entries`,
 //! and `task_dependencies` tables.
 
-use chrono::{DateTime, Utc};
+use crate::sqlite_types::SqlTs;
 use serde::Serialize;
 use sqlx::FromRow;
 
@@ -18,24 +18,24 @@ pub struct TaskRow {
     pub key_result_id: Option<String>,
     pub parent_id: Option<String>,
     pub priority: Option<i16>,
-    pub due_date: Option<DateTime<Utc>>,
+    pub due_date: Option<SqlTs>,
     #[sqlx(json)]
     pub tags: Vec<String>,
     pub status: String,
-    pub focused_at: Option<DateTime<Utc>>,
-    pub focus_deadline: Option<DateTime<Utc>>,
+    pub focused_at: Option<SqlTs>,
+    pub focus_deadline: Option<SqlTs>,
     pub focus_expired_count: i32,
-    pub created_at: DateTime<Utc>,
-    pub updated_at: DateTime<Utc>,
-    pub completed_at: Option<DateTime<Utc>>,
+    pub created_at: SqlTs,
+    pub updated_at: SqlTs,
+    pub completed_at: Option<SqlTs>,
     pub total_tracked_secs: i64,
     pub estimated_minutes: Option<i32>,
     pub calendar_event_uid: Option<String>,
-    pub last_reminded_at: Option<DateTime<Utc>>,
+    pub last_reminded_at: Option<SqlTs>,
     pub recurrence_rule: Option<String>,
     pub recurrence_parent_id: Option<String>,
     pub is_template: bool,
-    pub next_instance_date: Option<DateTime<Utc>>,
+    pub next_instance_date: Option<SqlTs>,
     pub status_label_id: Option<String>,
     pub position: i32,
     pub group_id: Option<String>,
@@ -51,8 +51,8 @@ pub struct TaskRow {
     pub complexity_score: Option<i32>,
     pub completed: bool,
     pub objective_id: Option<String>,
-    pub scheduled_start: Option<DateTime<Utc>>,
-    pub scheduled_end: Option<DateTime<Utc>>,
+    pub scheduled_start: Option<SqlTs>,
+    pub scheduled_end: Option<SqlTs>,
 }
 
 /// Row struct for the `task_activity` table.
@@ -68,7 +68,7 @@ pub struct TaskActivityRow {
     pub actor_type: String,
     pub actor_id: Option<String>,
     pub summary: Option<String>,
-    pub created_at: DateTime<Utc>,
+    pub created_at: SqlTs,
 }
 
 /// Row struct for the `task_executions` table.
@@ -79,8 +79,8 @@ pub struct TaskExecutionRow {
     pub task_id: String,
     pub status: String,
     pub agent_profile: Option<String>,
-    pub started_at: Option<DateTime<Utc>>,
-    pub completed_at: Option<DateTime<Utc>>,
+    pub started_at: Option<SqlTs>,
+    pub completed_at: Option<SqlTs>,
     pub duration_secs: Option<i64>,
     pub tokens_used: Option<i64>,
     pub cost_usd: Option<f64>,
@@ -90,7 +90,7 @@ pub struct TaskExecutionRow {
     pub artifacts: Option<String>,
     pub metrics: Option<String>,
     pub retry_count: i32,
-    pub created_at: DateTime<Utc>,
+    pub created_at: SqlTs,
 }
 
 /// Row struct for the `task_suggestions` table.
@@ -106,8 +106,8 @@ pub struct TaskSuggestionRow {
     pub action_payload: Option<String>,
     pub status: String,
     pub trigger: Option<String>,
-    pub created_at: DateTime<Utc>,
-    pub resolved_at: Option<DateTime<Utc>>,
+    pub created_at: SqlTs,
+    pub resolved_at: Option<SqlTs>,
 }
 
 /// Row struct for the `task_decompositions` table.
@@ -120,8 +120,8 @@ pub struct TaskDecompositionRow {
     pub confidence: f64,
     pub status: String,
     pub reasoning: Option<String>,
-    pub created_at: DateTime<Utc>,
-    pub applied_at: Option<DateTime<Utc>>,
+    pub created_at: SqlTs,
+    pub applied_at: Option<SqlTs>,
 }
 
 /// Row struct for the `task_estimation_history` table.
@@ -138,7 +138,7 @@ pub struct TaskEstimationRow {
     #[sqlx(json)]
     pub tags: Vec<String>,
     pub project_id: Option<String>,
-    pub completed_at: DateTime<Utc>,
+    pub completed_at: SqlTs,
 }
 
 /// Row struct for the `task_attachments` table.
@@ -152,7 +152,7 @@ pub struct TaskAttachmentRow {
     pub title: Option<String>,
     #[sqlx(json)]
     pub tags: Vec<String>,
-    pub created_at: DateTime<Utc>,
+    pub created_at: SqlTs,
     pub source: String,
 }
 
@@ -163,8 +163,8 @@ pub struct TaskTimeEntryRow {
     pub id: uuid::Uuid,
     pub task_id: String,
     pub source: String,
-    pub started_at: DateTime<Utc>,
-    pub ended_at: Option<DateTime<Utc>>,
+    pub started_at: SqlTs,
+    pub ended_at: Option<SqlTs>,
     pub duration_secs: Option<i64>,
     pub note: Option<String>,
     pub energy_level: Option<String>,

@@ -98,17 +98,17 @@ macro_rules! focus_impl {
                 &self,
                 id: &str,
                 max_slots: i64,
-                deadline: Option<chrono::DateTime<chrono::Utc>>,
+                deadline: Option<jiff::Timestamp>,
             ) -> Result<bool, $crate::error::StorageError> {
                 let result = sqlx::query(concat!(
                     "UPDATE ", $table,
-                    " SET focused_at = datetime('now'), focus_deadline = ?3, updated_at = datetime('now')",
+                    " SET focused_at = (unixepoch('now') * 1000), focus_deadline = ?3, updated_at = (unixepoch('now') * 1000)",
                     " WHERE id = ?1 AND focused_at IS NULL",
                     " AND (SELECT COUNT(*) FROM ", $table, " WHERE focused_at IS NOT NULL) < ?2",
                 ))
                 .bind(id)
                 .bind(max_slots)
-                .bind(deadline)
+                .bind(deadline.map(|t| t.as_millisecond()))
                 .execute(&self.pool)
                 .await?;
                 Ok(result.rows_affected() > 0)
@@ -118,7 +118,7 @@ macro_rules! focus_impl {
             pub async fn unfocus(&self, id: &str) -> Result<bool, $crate::error::StorageError> {
                 let result = sqlx::query(concat!(
                     "UPDATE ", $table,
-                    " SET focused_at = NULL, focus_deadline = NULL, updated_at = datetime('now') WHERE id = ?1",
+                    " SET focused_at = NULL, focus_deadline = NULL, updated_at = (unixepoch('now') * 1000) WHERE id = ?1",
                 ))
                 .bind(id)
                 .execute(&self.pool)
@@ -149,11 +149,11 @@ macro_rules! delete_older_than_impl {
         pub async fn delete_older_than(
             &self,
             days: i64,
-            now: chrono::DateTime<chrono::Utc>,
+            now: jiff::Timestamp,
         ) -> Result<u64, $crate::error::StorageError> {
-            let cutoff = now - chrono::Duration::days(days);
+            let cutoff = now - jiff::SignedDuration::from_hours(days * 24);
             let result = sqlx::query(concat!("DELETE FROM ", $table, " WHERE ", $ts_col, " < ?1"))
-                .bind(cutoff)
+                .bind(cutoff.as_millisecond())
                 .execute(&self.pool)
                 .await?;
             Ok(result.rows_affected())

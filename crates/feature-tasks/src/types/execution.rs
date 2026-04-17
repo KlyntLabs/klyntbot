@@ -1,6 +1,7 @@
 //! Execution runtime types and activity audit log.
 
 use chrono::{DateTime, Utc};
+use common::time::bridge::jiff_to_chrono;
 use serde::{Deserialize, Serialize};
 use std::fmt;
 use std::str::FromStr;
@@ -83,8 +84,8 @@ impl From<TaskExecutionRow> for TaskExecution {
             task_id: row.task_id,
             status: row.status.parse::<ExecutionStatus>().unwrap_or_default(),
             agent_profile: row.agent_profile,
-            started_at: row.started_at,
-            completed_at: row.completed_at,
+            started_at: row.started_at.map(|ts| jiff_to_chrono(*ts)),
+            completed_at: row.completed_at.map(|ts| jiff_to_chrono(*ts)),
             duration_secs: row.duration_secs,
             tokens_used: row.tokens_used,
             cost_usd: row.cost_usd,
@@ -101,7 +102,7 @@ impl From<TaskExecutionRow> for TaskExecution {
                 .as_deref()
                 .and_then(|s| serde_json::from_str(s).ok()),
             retry_count: row.retry_count,
-            created_at: row.created_at,
+            created_at: jiff_to_chrono(*row.created_at),
         }
     }
 }
@@ -324,7 +325,7 @@ impl From<TaskActivityRow> for TaskActivity {
                 .unwrap_or(ActorType::System),
             actor_id: row.actor_id,
             summary: row.summary,
-            created_at: row.created_at,
+            created_at: jiff_to_chrono(*row.created_at),
         }
     }
 }

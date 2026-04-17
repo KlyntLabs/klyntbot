@@ -25,7 +25,7 @@ impl DndOverrideRepo {
         original_state: &str,
         session_id: Option<&str>,
     ) -> Result<(), StorageError> {
-        let now = chrono::Utc::now().to_rfc3339();
+        let now = crate::sqlite_types::SqlTs(jiff::Timestamp::now());
         sqlx::query(
             "INSERT OR REPLACE INTO dnd_override (id, original_state, overridden_at, session_id)
              VALUES (1, ?1, ?2, ?3)",

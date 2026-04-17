@@ -10,7 +10,7 @@ use tokio::sync::Mutex as TokioMutex;
 use tracing::{debug, error, warn};
 use uuid::Uuid;
 
-use common::{KlyntbotError, Result};
+use common::{time::bridge::{chrono_to_jiff, jiff_to_chrono}, KlyntbotError, Result};
 
 /// Generate a unique message ID (UUID v4)
 fn generate_message_id() -> String {
@@ -261,7 +261,7 @@ impl SessionManager {
                 id: m.id.to_string(),
                 role: m.role,
                 content: m.content,
-                timestamp: m.timestamp,
+                timestamp: jiff_to_chrono(*m.timestamp),
                 request_id: m.request_id,
                 tool_calls: m.tool_calls,
                 metadata: m.metadata,
@@ -271,8 +271,8 @@ impl SessionManager {
         Session {
             key: row.key,
             messages,
-            created_at: row.created_at,
-            updated_at: row.updated_at,
+            created_at: jiff_to_chrono(*row.created_at),
+            updated_at: jiff_to_chrono(*row.updated_at),
             metadata,
             squad_id: row.squad_id,
             correction_cooldown: 0,
@@ -418,7 +418,7 @@ impl SessionManager {
                 ids.push(Uuid::parse_str(&msg.id).unwrap_or_else(|_| Uuid::new_v4()));
                 roles.push(msg.role.clone());
                 contents.push(msg.content.clone());
-                timestamps.push(msg.timestamp);
+                timestamps.push(chrono_to_jiff(msg.timestamp));
                 request_ids.push(msg.request_id.clone());
                 tool_calls_list.push(msg.tool_calls.clone());
                 metadata_list.push(msg.metadata.clone());
@@ -553,8 +553,8 @@ impl SessionManager {
             .into_iter()
             .map(|r| SessionInfo {
                 key: r.key,
-                created_at: r.created_at,
-                updated_at: r.updated_at,
+                created_at: jiff_to_chrono(*r.created_at),
+                updated_at: jiff_to_chrono(*r.updated_at),
                 message_count: r.message_count as usize,
             })
             .collect();

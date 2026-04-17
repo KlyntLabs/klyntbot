@@ -9,6 +9,7 @@ mod domain;
 pub use domain::*;
 
 use chrono::NaiveDate;
+use common::time::bridge::chrono_date_to_jiff;
 use storage::rows::finance::FinanceInvestmentFilter;
 
 // ============================================================
@@ -35,8 +36,8 @@ impl FinanceTransactionFilter {
             account_id: self.account_id.clone(),
             tx_type: self.tx_type.map(|t| t.as_str().to_string()),
             category: self.category.clone(),
-            date_from: self.date_from,
-            date_to: self.date_to,
+            date_from: self.date_from.map(|d| chrono_date_to_jiff(d).into()),
+            date_to: self.date_to.map(|d| chrono_date_to_jiff(d).into()),
             amount_min: self.amount_min,
             amount_max: self.amount_max,
             query: self.query.clone(),

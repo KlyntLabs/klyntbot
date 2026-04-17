@@ -54,7 +54,7 @@ fn entry_to_row(entry: &DecisionLogEntry) -> Result<storage::DecisionLogRow, ser
         user_message_preview: entry.user_message_preview.clone(),
         assessment: serde_json::to_value(&entry.assessment)?,
         outcome: entry.outcome.clone(),
-        created_at: entry.created_at,
+        created_at: common::time::bridge::chrono_to_jiff(entry.created_at).into(),
     })
 }
 
@@ -68,7 +68,7 @@ fn row_to_entry(row: storage::DecisionLogRow) -> Result<DecisionLogEntry, serde_
         user_message_preview: row.user_message_preview,
         assessment: serde_json::from_value(row.assessment)?,
         outcome: row.outcome,
-        created_at: row.created_at,
+        created_at: common::time::bridge::jiff_to_chrono(*row.created_at),
     })
 }
 

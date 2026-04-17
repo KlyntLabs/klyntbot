@@ -1,6 +1,7 @@
 //! Recurring transaction handler for `FinanceTool`.
 
 use chrono::{Local, Utc};
+use common::time::bridge::{chrono_date_to_jiff, chrono_to_jiff};
 use serde_json::json;
 
 use crate::currency::ensure_base_amount;
@@ -98,12 +99,12 @@ impl FinanceTool {
             subcategory: None,
             counterparty: counterparty.map(|s| s.to_string()),
             notes: notes.map(|s| s.to_string()),
-            tx_date: today,
+            tx_date: chrono_date_to_jiff(today).into(),
             transfer_id: None,
             is_recurring: true,
             recurring_rule: Some(recurring_rule.to_string()),
-            created_at: now,
-            updated_at: now,
+            created_at: chrono_to_jiff(now).into(),
+            updated_at: chrono_to_jiff(now).into(),
             base_amount: conv.base_amount,
             base_currency: conv.base_currency,
             exchange_rate: conv.exchange_rate,

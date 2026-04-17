@@ -17,7 +17,6 @@ mod time_entries;
 #[cfg(test)]
 mod tests;
 
-use chrono::{DateTime, Utc};
 use serde::Serialize;
 use sqlx::SqlitePool;
 
@@ -32,8 +31,8 @@ pub struct TaskFilter {
     pub unassigned: bool,
     pub root_only: bool,
     pub priority_min: Option<i16>,
-    pub due_after: Option<DateTime<Utc>>,
-    pub due_before: Option<DateTime<Utc>>,
+    pub due_after: Option<jiff::Timestamp>,
+    pub due_before: Option<jiff::Timestamp>,
     pub limit: Option<i64>,
     pub templates_only: bool,
     pub status_group: Option<String>,
@@ -51,12 +50,12 @@ pub struct TaskPatch {
     pub title: Option<String>,
     pub description: Option<Option<String>>,
     pub priority: Option<Option<i16>>,
-    pub due_date: Option<Option<DateTime<Utc>>>,
+    pub due_date: Option<Option<jiff::Timestamp>>,
     pub tags: Option<Vec<String>>,
     pub status: Option<String>,
     pub calendar_event_uid: Option<Option<String>>,
-    pub next_instance_date: Option<Option<DateTime<Utc>>>,
-    pub last_reminded_at: Option<Option<DateTime<Utc>>>,
+    pub next_instance_date: Option<Option<jiff::Timestamp>>,
+    pub last_reminded_at: Option<Option<jiff::Timestamp>>,
     pub estimated_minutes: Option<Option<i32>>,
     pub recurrence_rule: Option<Option<String>>,
     pub area_id: Option<String>,
@@ -75,8 +74,8 @@ pub struct TaskPatch {
     pub completed: Option<bool>,
     pub actual_minutes: Option<Option<i32>>,
     pub objective_id: Option<Option<String>>,
-    pub scheduled_start: Option<Option<DateTime<Utc>>>,
-    pub scheduled_end: Option<Option<DateTime<Utc>>>,
+    pub scheduled_start: Option<Option<jiff::Timestamp>>,
+    pub scheduled_end: Option<Option<jiff::Timestamp>>,
 }
 
 /// A time entry joined with the parent task's title, for timeline display.
@@ -86,8 +85,8 @@ pub struct TimeEntryWithTask {
     pub id: uuid::Uuid,
     pub task_id: String,
     pub task_title: String,
-    pub started_at: DateTime<Utc>,
-    pub ended_at: Option<DateTime<Utc>>,
+    pub started_at: crate::sqlite_types::SqlTs,
+    pub ended_at: Option<crate::sqlite_types::SqlTs>,
     pub duration_secs: Option<i64>,
     pub note: Option<String>,
 }

@@ -4,6 +4,7 @@
 //! liability_add, liability_list, liability_update, net_worth.
 
 use chrono::{Datelike, NaiveDate, Utc};
+use common::time::bridge::{chrono_date_to_jiff, chrono_to_jiff};
 use serde_json::json;
 
 use crate::currency::ensure_base_amount;
@@ -92,13 +93,13 @@ impl FinanceTool {
             current_amount,
             currency: currency.to_uppercase(),
             status: "active".to_string(),
-            deadline,
+            deadline: deadline.map(|d| chrono_date_to_jiff(d).into()),
             monthly_contribution,
             expected_return_rate,
             inflation_rate,
             notes: notes.map(|s| s.to_string()),
-            created_at: now,
-            updated_at: now,
+            created_at: chrono_to_jiff(now).into(),
+            updated_at: chrono_to_jiff(now).into(),
             base_target_amount: conv.base_amount,
             base_current_amount,
             base_currency: conv.base_currency,
@@ -210,7 +211,7 @@ impl FinanceTool {
             monthly_contribution: monthly_contribution.map(Some),
             expected_return_rate: expected_return_rate.map(Some),
             inflation_rate: inflation_rate.map(Some),
-            deadline: deadline.map(Some),
+            deadline: deadline.map(|d| Some(chrono_date_to_jiff(d).into())),
             status: status.map(|s| s.as_str().to_string()),
             base_target_amount: None,
             base_current_amount: None,
@@ -287,7 +288,7 @@ impl FinanceTool {
                 let cats = self
                     .storage
                     .transactions
-                    .sum_by_category(date_from, today, "expense", &self.default_currency)
+                    .sum_by_category(chrono_date_to_jiff(date_from), chrono_date_to_jiff(today), "expense", &self.default_currency)
                     .await?;
                 cats.iter().map(|(_, total)| total).sum()
             }
@@ -453,10 +454,10 @@ impl FinanceTool {
             currency: currency.to_uppercase(),
             interest_rate,
             monthly_payment,
-            due_date,
+            due_date: due_date.map(|d| chrono_date_to_jiff(d).into()),
             notes: notes.map(|s| s.to_string()),
-            created_at: now,
-            updated_at: now,
+            created_at: chrono_to_jiff(now).into(),
+            updated_at: chrono_to_jiff(now).into(),
             base_principal: conv.base_amount,
             base_remaining,
             base_currency: conv.base_currency,

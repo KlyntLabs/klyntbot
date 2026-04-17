@@ -2,8 +2,7 @@
 
 #[cfg(test)]
 mod tests {
-    use chrono::Utc;
-
+    
     use crate::repos::finance_liability_repo::FinanceLiabilityRepo;
     use crate::rows::finance::{FinanceLiabilityPatch, FinanceLiabilityRow};
     use crate::StoragePool;
@@ -25,7 +24,7 @@ mod tests {
         principal: i64,
         remaining: i64,
     ) -> FinanceLiabilityRow {
-        let now = Utc::now();
+        let now: crate::sqlite_types::SqlTs = jiff::Timestamp::now().into();
         FinanceLiabilityRow {
             id: id.to_string(),
             name: format!("Liability {id}"),

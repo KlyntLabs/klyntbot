@@ -38,7 +38,7 @@ impl SessionMemoryRepo {
     ) -> Result<(), StorageError> {
         sqlx::query(
             "INSERT INTO session_memory (session_key, content, turn_count, updated_at)
-             VALUES (?1, ?2, ?3, strftime('%Y-%m-%dT%H:%M:%SZ', 'now'))
+             VALUES (?1, ?2, ?3, (unixepoch('now') * 1000))
              ON CONFLICT(session_key) DO UPDATE SET
                  content    = excluded.content,
                  turn_count = excluded.turn_count,
@@ -78,7 +78,7 @@ impl SessionMemoryRepo {
     /// Delete session memory entries not updated within `days` days.
     /// Returns the number of rows removed.
     pub async fn delete_older_than(&self, days: i64) -> Result<u64, StorageError> {
-        let cutoff = (chrono::Utc::now() - chrono::Duration::days(days)).to_rfc3339();
+        let cutoff = (jiff::Timestamp::now() - jiff::SignedDuration::from_hours(days * 24)).as_millisecond();
         let result = sqlx::query("DELETE FROM session_memory WHERE updated_at < ?1")
             .bind(&cutoff)
             .execute(&self.pool)
@@ -155,7 +155,7 @@ mod tests {
         // Insert an old session memory directly with an old updated_at
         sqlx::query(
             "INSERT INTO session_memory (session_key, content, turn_count, updated_at) \
-             VALUES ('old-session', 'old content', 1, '2020-01-01T00:00:00Z')",
+             VALUES ('old-session', 'old content', 1, 0)",
         )
         .execute(&inner)
         .await

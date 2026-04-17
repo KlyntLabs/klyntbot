@@ -1,6 +1,6 @@
 //! Row struct for the `agent_tasks` table.
 
-use chrono::{DateTime, Utc};
+use crate::sqlite_types::SqlTs;
 use serde::Serialize;
 use sqlx::FromRow;
 
@@ -17,6 +17,6 @@ pub struct AgentTaskRow {
     pub result: Option<String>,
     pub error: Option<String>,
     pub blocked_by: String, // JSON array of task IDs
-    pub created_at: DateTime<Utc>,
-    pub updated_at: DateTime<Utc>,
+    pub created_at: SqlTs,
+    pub updated_at: SqlTs,
 }

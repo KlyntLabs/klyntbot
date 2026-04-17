@@ -73,7 +73,7 @@ impl FinanceBudgetRepo {
                 base_amount   = COALESCE(?, base_amount),
                 base_currency = COALESCE(?, base_currency),
                 exchange_rate = COALESCE(?, exchange_rate),
-                updated_at    = datetime('now')
+                updated_at    = (unixepoch('now') * 1000)
             WHERE id = ?
             RETURNING *
             "#,

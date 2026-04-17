@@ -88,7 +88,7 @@ impl AreaRepo {
                 color       = COALESCE(?5, color),
                 icon        = CASE WHEN ?6 THEN ?7 ELSE icon END,
                 status      = COALESCE(?8, status),
-                updated_at  = datetime('now')
+                updated_at  = (unixepoch('now') * 1000)
             WHERE id = ?1
             RETURNING *
             "#,
@@ -120,7 +120,7 @@ impl AreaRepo {
     pub async fn reorder(&self, id: &str, position: i32) -> Result<AreaRow, StorageError> {
         let row = sqlx::query_as::<_, AreaRow>(
             r#"
-            UPDATE areas SET position = ?2, updated_at = datetime('now')
+            UPDATE areas SET position = ?2, updated_at = (unixepoch('now') * 1000)
             WHERE id = ?1
             RETURNING *
             "#,
@@ -187,8 +187,8 @@ mod tests {
             icon: None,
             position: 0,
             status: "active".to_string(),
-            created_at: chrono::Utc::now(),
-            updated_at: chrono::Utc::now(),
+            created_at: jiff::Timestamp::now().into(),
+            updated_at: jiff::Timestamp::now().into(),
         }
     }
 

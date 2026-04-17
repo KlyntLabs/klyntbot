@@ -1,6 +1,6 @@
 //! Row structs for the `custom_columns` and `custom_column_values` tables.
 
-use chrono::{DateTime, Utc};
+use crate::sqlite_types::SqlTs;
 use serde::Serialize;
 use sqlx::FromRow;
 
@@ -15,7 +15,7 @@ pub struct CustomColumnRow {
     pub options_json: Option<String>,
     pub position: i32,
     pub width: Option<i32>,
-    pub created_at: DateTime<Utc>,
+    pub created_at: SqlTs,
 }
 
 /// Row struct for the `custom_column_values` table.

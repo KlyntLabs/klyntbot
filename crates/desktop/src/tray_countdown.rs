@@ -173,12 +173,13 @@ async fn query_next_item(app: &AppHandle) -> Option<NextItem> {
 
     let next_task = core.next_upcoming_task().await.and_then(|t| {
         let due = t.due_date?;
-        if due >= end_of_today {
+        let due_chrono = common::time::bridge::jiff_to_chrono(*due);
+        if due_chrono >= end_of_today {
             return None;
         }
         Some(NextItem {
             title: t.title,
-            time: due,
+            time: due_chrono,
         })
     });
 

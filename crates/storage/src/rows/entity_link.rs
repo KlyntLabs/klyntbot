@@ -1,4 +1,4 @@
-use chrono::{DateTime, Utc};
+use crate::sqlite_types::SqlTs;
 use serde::{Deserialize, Serialize};
 use sqlx::FromRow;
 
@@ -12,5 +12,5 @@ pub struct EntityLinkRow {
     pub target_id: String,
     pub link_type: String,
     pub metadata: Option<String>,
-    pub created_at: DateTime<Utc>,
+    pub created_at: SqlTs,
 }

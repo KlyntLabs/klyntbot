@@ -19,8 +19,8 @@ impl AppCore {
             ..Default::default()
         };
         let due_today_filter = TaskFilter {
-            due_after: Some(start_of_today),
-            due_before: Some(start_of_tomorrow),
+            due_after: Some(common::time::bridge::chrono_to_jiff(start_of_today)),
+            due_before: Some(common::time::bridge::chrono_to_jiff(start_of_tomorrow)),
             ..Default::default()
         };
         let (doing, due_today, overdue) = tokio::try_join!(
@@ -41,8 +41,9 @@ impl AppCore {
 
         // Sort: overdue first, then by priority (P1 first), then by due_date
         all_rows.sort_by(|a, b| {
-            let a_overdue = a.due_date.is_some_and(|d| d < now) as u8;
-            let b_overdue = b.due_date.is_some_and(|d| d < now) as u8;
+            let now_jiff = common::time::bridge::chrono_to_jiff(now);
+            let a_overdue = a.due_date.is_some_and(|d| *d < now_jiff) as u8;
+            let b_overdue = b.due_date.is_some_and(|d| *d < now_jiff) as u8;
             b_overdue
                 .cmp(&a_overdue)
                 .then(a.priority.unwrap_or(99).cmp(&b.priority.unwrap_or(99)))
@@ -60,7 +61,7 @@ impl AppCore {
     pub async fn next_upcoming_task(&self) -> Option<TaskRow> {
         let now = chrono::Utc::now();
         let filter = TaskFilter {
-            due_after: Some(now),
+            due_after: Some(common::time::bridge::chrono_to_jiff(now)),
             limit: Some(1),
             ..Default::default()
         };

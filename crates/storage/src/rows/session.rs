@@ -1,6 +1,6 @@
 //! Row structs for `sessions` and `session_messages` tables.
 
-use chrono::{DateTime, Utc};
+use crate::sqlite_types::SqlTs;
 use serde::Serialize;
 use sqlx::FromRow;
 
@@ -10,8 +10,8 @@ use sqlx::FromRow;
 pub struct SessionRow {
     pub key: String,
     pub metadata: serde_json::Value,
-    pub created_at: DateTime<Utc>,
-    pub updated_at: DateTime<Utc>,
+    pub created_at: SqlTs,
+    pub updated_at: SqlTs,
     pub project_id: Option<String>,
     pub conversation_type: Option<String>,
     pub pinned: bool,
@@ -26,7 +26,7 @@ pub struct SessionMessageRow {
     pub session_key: String,
     pub role: String,
     pub content: String,
-    pub timestamp: DateTime<Utc>,
+    pub timestamp: SqlTs,
     pub request_id: Option<String>,
     pub tool_calls: Option<serde_json::Value>,
     pub metadata: Option<serde_json::Value>,
@@ -39,8 +39,8 @@ pub struct SessionMessageRow {
 pub struct SessionListRow {
     pub key: String,
     pub metadata: serde_json::Value,
-    pub created_at: DateTime<Utc>,
-    pub updated_at: DateTime<Utc>,
+    pub created_at: SqlTs,
+    pub updated_at: SqlTs,
     pub message_count: i64,
     pub project_id: Option<String>,
     pub conversation_type: Option<String>,

@@ -94,7 +94,7 @@ impl TaskRepo {
         let row = sqlx::query_as::<_, TaskRow>(
             r#"
             UPDATE tasks
-            SET parent_id = ?2, project_id = ?3, updated_at = datetime('now')
+            SET parent_id = ?2, project_id = ?3, updated_at = (unixepoch('now') * 1000)
             WHERE id = ?1
             RETURNING *
             "#,
@@ -148,7 +148,7 @@ impl TaskRepo {
                 SELECT t.id FROM tasks t
                 INNER JOIN subtree s ON t.parent_id = s.id
             )
-            UPDATE tasks SET completed = 1, status = 'done', completed_at = datetime('now'), updated_at = datetime('now')
+            UPDATE tasks SET completed = 1, status = 'done', completed_at = (unixepoch('now') * 1000), updated_at = (unixepoch('now') * 1000)
             WHERE id IN (SELECT id FROM subtree) AND completed = 0
             "#,
         )

@@ -453,26 +453,26 @@ mod tests {
                 group_id TEXT,
                 priority INTEGER,
                 position INTEGER NOT NULL DEFAULT 0,
-                due_date TEXT,
+                due_date INTEGER,
                 tags TEXT NOT NULL DEFAULT '[]',
                 status TEXT NOT NULL DEFAULT 'todo',
                 task_type TEXT NOT NULL DEFAULT 'manual',
-                focused_at TEXT,
-                focus_deadline TEXT,
+                focused_at INTEGER,
+                focus_deadline INTEGER,
                 focus_expired_count INTEGER NOT NULL DEFAULT 0,
-                created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
-                updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
-                completed_at TEXT,
+                created_at INTEGER NOT NULL DEFAULT (unixepoch('now') * 1000),
+                updated_at INTEGER NOT NULL DEFAULT (unixepoch('now') * 1000),
+                completed_at INTEGER,
                 completed INTEGER NOT NULL DEFAULT 0,
                 total_tracked_secs INTEGER NOT NULL DEFAULT 0,
                 estimated_minutes INTEGER,
                 actual_minutes INTEGER,
                 calendar_event_uid TEXT,
-                last_reminded_at TEXT,
+                last_reminded_at INTEGER,
                 recurrence_rule TEXT,
                 recurrence_parent_id TEXT,
                 is_template INTEGER NOT NULL DEFAULT 0,
-                next_instance_date TEXT,
+                next_instance_date INTEGER,
                 acceptance_criteria TEXT,
                 agent_config TEXT,
                 execution_state TEXT NOT NULL DEFAULT 'idle',
@@ -481,8 +481,8 @@ mod tests {
                 energy_level TEXT DEFAULT 'medium',
                 estimated_focus_blocks INTEGER,
                 complexity_score INTEGER,
-                scheduled_start TEXT,
-                scheduled_end TEXT
+                scheduled_start INTEGER,
+                scheduled_end INTEGER
             )",
         )
         .execute(pool.inner())
@@ -573,7 +573,7 @@ mod tests {
         let todo_label = &custom_labels[1]; // "Todo" label
 
         // Create the area row needed for the action's foreign key
-        let now = chrono::Utc::now();
+        let now: crate::sqlite_types::SqlTs = jiff::Timestamp::now().into();
         let area_row = crate::AreaRow {
             id: "default".into(),
             name: "Default".into(),

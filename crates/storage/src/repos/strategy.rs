@@ -1,6 +1,5 @@
 //! Strategy repository — strategy_records table.
 
-use chrono::{DateTime, Utc};
 use serde::Serialize;
 use sqlx::SqlitePool;
 use uuid::Uuid;
@@ -95,7 +94,7 @@ impl StrategyRepo {
     pub async fn list_by_strategy(
         &self,
         strategy: &str,
-        since: DateTime<Utc>,
+        since: jiff::Timestamp,
     ) -> Result<Vec<StrategyRecordRow>, StorageError> {
         let rows = sqlx::query_as::<_, StrategyRecordRow>(
             "SELECT * FROM strategy_records
@@ -103,7 +102,7 @@ impl StrategyRepo {
              ORDER BY timestamp DESC",
         )
         .bind(strategy)
-        .bind(since)
+        .bind(crate::sqlite_types::SqlTs::from(since))
         .fetch_all(&self.pool)
         .await?;
         Ok(rows)
@@ -113,7 +112,7 @@ impl StrategyRepo {
     pub async fn get_accuracy(
         &self,
         strategy: &str,
-        since: DateTime<Utc>,
+        since: jiff::Timestamp,
     ) -> Result<Option<f32>, StorageError> {
         let row: (i64, i64) = sqlx::query_as(
             "SELECT COUNT(*),
@@ -122,7 +121,7 @@ impl StrategyRepo {
              WHERE predicted_strategy = ?1 AND timestamp >= ?2",
         )
         .bind(strategy)
-        .bind(since)
+        .bind(crate::sqlite_types::SqlTs::from(since))
         .fetch_one(&self.pool)
         .await?;
 
@@ -138,7 +137,7 @@ impl StrategyRepo {
     /// Returns per-strategy accuracy, sample count, and average escalations.
     pub async fn get_strategy_summaries(
         &self,
-        since: DateTime<Utc>,
+        since: jiff::Timestamp,
     ) -> Result<Vec<StrategySummaryRow>, StorageError> {
         let rows = sqlx::query_as::<_, StrategySummaryRow>(
             "SELECT predicted_strategy,
@@ -151,7 +150,7 @@ impl StrategyRepo {
              GROUP BY predicted_strategy
              ORDER BY sample_count DESC",
         )
-        .bind(since)
+        .bind(crate::sqlite_types::SqlTs::from(since))
         .fetch_all(&self.pool)
         .await?;
         Ok(rows)
@@ -160,16 +159,16 @@ impl StrategyRepo {
     /// List all records within a date range.
     pub async fn list_by_date_range(
         &self,
-        from: DateTime<Utc>,
-        to: DateTime<Utc>,
+        from: jiff::Timestamp,
+        to: jiff::Timestamp,
     ) -> Result<Vec<StrategyRecordRow>, StorageError> {
         let rows = sqlx::query_as::<_, StrategyRecordRow>(
             "SELECT * FROM strategy_records
              WHERE timestamp >= ?1 AND timestamp <= ?2
              ORDER BY timestamp DESC",
         )
-        .bind(from)
-        .bind(to)
+        .bind(crate::sqlite_types::SqlTs::from(from))
+        .bind(crate::sqlite_types::SqlTs::from(to))
         .fetch_all(&self.pool)
         .await?;
         Ok(rows)
@@ -197,7 +196,7 @@ impl StrategyRepo {
     pub async fn set_satisfaction_for_chat(
         &self,
         chat_id: &str,
-        since: DateTime<Utc>,
+        since: jiff::Timestamp,
         satisfaction: f32,
     ) -> Result<bool, StorageError> {
         // SQLite doesn't support UPDATE...ORDER BY...LIMIT in standard syntax.
@@ -212,7 +211,7 @@ impl StrategyRepo {
         )
         .bind(satisfaction)
         .bind(chat_id)
-        .bind(since.to_rfc3339())
+        .bind(since.as_millisecond())
         .execute(&self.pool)
         .await?;
 
@@ -228,10 +227,10 @@ impl StrategyRepo {
     }
 
     /// Count strategy records since a given timestamp.
-    pub async fn count_since(&self, since: DateTime<Utc>) -> Result<i64, StorageError> {
+    pub async fn count_since(&self, since: jiff::Timestamp) -> Result<i64, StorageError> {
         let (count,): (i64,) =
             sqlx::query_as("SELECT COUNT(*) FROM strategy_records WHERE timestamp >= ?1")
-                .bind(since)
+                .bind(crate::sqlite_types::SqlTs::from(since))
                 .fetch_one(&self.pool)
                 .await?;
         Ok(count)
@@ -240,7 +239,7 @@ impl StrategyRepo {
     /// Get stats since a given date: total records, accuracy, avg response time, avg satisfaction.
     pub async fn get_stats_since(
         &self,
-        since: DateTime<Utc>,
+        since: jiff::Timestamp,
     ) -> Result<OverallStats, StorageError> {
         let row: (i64, i64, i64, Option<f64>) = sqlx::query_as(
             "SELECT COUNT(*),
@@ -250,7 +249,7 @@ impl StrategyRepo {
              FROM strategy_records
              WHERE timestamp >= ?1",
         )
-        .bind(since)
+        .bind(crate::sqlite_types::SqlTs::from(since))
         .fetch_one(&self.pool)
         .await?;
 
@@ -299,7 +298,7 @@ impl StrategyRepo {
     /// field populated (non-NULL). Returns `None` if no records have the field set.
     pub async fn memory_relevance_since(
         &self,
-        since: DateTime<Utc>,
+        since: jiff::Timestamp,
     ) -> Result<Option<f64>, StorageError> {
         let row: (i64, i64) = sqlx::query_as(
             "SELECT COUNT(*),
@@ -307,7 +306,7 @@ impl StrategyRepo {
              FROM strategy_records
              WHERE timestamp >= ?1 AND retrieved_memory_count IS NOT NULL",
         )
-        .bind(since)
+        .bind(crate::sqlite_types::SqlTs::from(since))
         .fetch_one(&self.pool)
         .await?;
 
@@ -349,7 +348,7 @@ mod tests {
 
         let row = StrategyRecordRow {
             id: uuid::Uuid::new_v4(),
-            timestamp: chrono::Utc::now(),
+            timestamp: jiff::Timestamp::now().into(),
             request_id: "req-1".to_string(),
             predicted_strategy: "DirectResponse".to_string(),
             actual_strategy: "ToolAssisted".to_string(),
@@ -387,7 +386,7 @@ mod tests {
 
         let row = StrategyRecordRow {
             id: uuid::Uuid::new_v4(),
-            timestamp: chrono::Utc::now(),
+            timestamp: jiff::Timestamp::now().into(),
             request_id: "req-2".to_string(),
             predicted_strategy: "DirectResponse".to_string(),
             actual_strategy: "DirectResponse".to_string(),
@@ -420,12 +419,12 @@ mod tests {
         let pool = crate::StoragePool::connect_in_memory().await.unwrap();
         let repo = StrategyRepo::new(pool.inner().clone());
 
-        let now = chrono::Utc::now();
+        let now = jiff::Timestamp::now();
 
         // Create a record with chat_id
         let row = StrategyRecordRow {
             id: uuid::Uuid::new_v4(),
-            timestamp: now,
+            timestamp: crate::sqlite_types::SqlTs::from(now),
             request_id: "req-sat".to_string(),
             predicted_strategy: "DirectResponse".to_string(),
             actual_strategy: "DirectResponse".to_string(),
@@ -451,7 +450,7 @@ mod tests {
         repo.create(&row).await.unwrap();
 
         // Set satisfaction
-        let since = now - chrono::Duration::minutes(5);
+        let since = now - jiff::SignedDuration::from_mins(5);
         let updated = repo
             .set_satisfaction_for_chat("tg:123", since, 1.0)
             .await
@@ -468,7 +467,7 @@ mod tests {
         let pool = crate::StoragePool::connect_in_memory().await.unwrap();
         let repo = StrategyRepo::new(pool.inner().clone());
 
-        let since = chrono::Utc::now() - chrono::Duration::minutes(5);
+        let since = jiff::Timestamp::now() - jiff::SignedDuration::from_mins(5);
         let updated = repo
             .set_satisfaction_for_chat("nonexistent", since, 1.0)
             .await
@@ -481,12 +480,12 @@ mod tests {
         let pool = crate::StoragePool::connect_in_memory().await.unwrap();
         let repo = StrategyRepo::new(pool.inner().clone());
 
-        let now = chrono::Utc::now();
+        let now = jiff::Timestamp::now();
 
         // Create two records for the same chat — older and newer
         let older = StrategyRecordRow {
             id: uuid::Uuid::new_v4(),
-            timestamp: now - chrono::Duration::seconds(30),
+            timestamp: crate::sqlite_types::SqlTs::from(now - jiff::SignedDuration::from_secs(30)),
             request_id: "req-old".to_string(),
             predicted_strategy: "DirectResponse".to_string(),
             actual_strategy: "DirectResponse".to_string(),
@@ -511,7 +510,7 @@ mod tests {
         };
         let newer = StrategyRecordRow {
             id: uuid::Uuid::new_v4(),
-            timestamp: now,
+            timestamp: crate::sqlite_types::SqlTs::from(now),
             request_id: "req-new".to_string(),
             predicted_strategy: "ToolAssisted".to_string(),
             actual_strategy: "ToolAssisted".to_string(),
@@ -539,7 +538,7 @@ mod tests {
         repo.create(&newer).await.unwrap();
 
         // Set satisfaction — should only update the newer record
-        let since = now - chrono::Duration::minutes(5);
+        let since = now - jiff::SignedDuration::from_mins(5);
         let updated = repo
             .set_satisfaction_for_chat("tg:456", since, 0.0)
             .await
@@ -562,7 +561,7 @@ mod tests {
 
         let row = StrategyRecordRow {
             id: uuid::Uuid::new_v4(),
-            timestamp: chrono::Utc::now(),
+            timestamp: jiff::Timestamp::now().into(),
             request_id: "req-cnt".to_string(),
             predicted_strategy: "DirectResponse".to_string(),
             actual_strategy: "DirectResponse".to_string(),
@@ -594,7 +593,7 @@ mod tests {
         let pool = crate::StoragePool::connect_in_memory().await.unwrap();
         let repo = StrategyRepo::new(pool.inner().clone());
 
-        let now = chrono::Utc::now();
+        let now = jiff::Timestamp::now();
         for (i, (pred, actual, sat)) in [
             ("DirectResponse", "DirectResponse", Some(1.0f32)),
             ("ToolAssisted", "ToolAssisted", None),
@@ -605,7 +604,7 @@ mod tests {
         {
             let row = StrategyRecordRow {
                 id: uuid::Uuid::new_v4(),
-                timestamp: now + chrono::Duration::seconds(i as i64),
+                timestamp: crate::sqlite_types::SqlTs::from(now + jiff::SignedDuration::from_secs(i as i64)),
                 request_id: format!("req-{}", i),
                 predicted_strategy: pred.to_string(),
                 actual_strategy: actual.to_string(),
@@ -651,7 +650,7 @@ mod tests {
         ] {
             let row = StrategyRecordRow {
                 id: uuid::Uuid::new_v4(),
-                timestamp: chrono::Utc::now(),
+                timestamp: jiff::Timestamp::now().into(),
                 request_id: uuid::Uuid::new_v4().to_string(),
                 predicted_strategy: "ToolAssisted".to_string(),
                 actual_strategy: "ToolAssisted".to_string(),
@@ -688,7 +687,7 @@ mod tests {
     async fn test_memory_relevance_since_empty() {
         let pool = crate::StoragePool::connect_in_memory().await.unwrap();
         let repo = StrategyRepo::new(pool.inner().clone());
-        let since = chrono::Utc::now() - chrono::Duration::hours(1);
+        let since = jiff::Timestamp::now() - jiff::SignedDuration::from_hours(1);
 
         // No records at all → None
         let result = repo.memory_relevance_since(since).await.unwrap();
@@ -699,12 +698,12 @@ mod tests {
     async fn test_memory_relevance_since_all_null() {
         let pool = crate::StoragePool::connect_in_memory().await.unwrap();
         let repo = StrategyRepo::new(pool.inner().clone());
-        let since = chrono::Utc::now() - chrono::Duration::hours(1);
+        let since = jiff::Timestamp::now() - jiff::SignedDuration::from_hours(1);
 
         // Record with retrieved_memory_count = NULL (legacy data) → None
         let row = StrategyRecordRow {
             id: uuid::Uuid::new_v4(),
-            timestamp: chrono::Utc::now(),
+            timestamp: jiff::Timestamp::now().into(),
             request_id: "req-null".to_string(),
             predicted_strategy: "DirectResponse".to_string(),
             actual_strategy: "DirectResponse".to_string(),
@@ -737,12 +736,12 @@ mod tests {
     async fn test_memory_relevance_since_mixed() {
         let pool = crate::StoragePool::connect_in_memory().await.unwrap();
         let repo = StrategyRepo::new(pool.inner().clone());
-        let since = chrono::Utc::now() - chrono::Duration::hours(1);
+        let since = jiff::Timestamp::now() - jiff::SignedDuration::from_hours(1);
 
         // Record with memories retrieved
         let with_mem = StrategyRecordRow {
             id: uuid::Uuid::new_v4(),
-            timestamp: chrono::Utc::now(),
+            timestamp: jiff::Timestamp::now().into(),
             request_id: "req-mem".to_string(),
             predicted_strategy: "DirectResponse".to_string(),
             actual_strategy: "DirectResponse".to_string(),
@@ -770,7 +769,7 @@ mod tests {
         // Record without memories
         let without_mem = StrategyRecordRow {
             id: uuid::Uuid::new_v4(),
-            timestamp: chrono::Utc::now(),
+            timestamp: jiff::Timestamp::now().into(),
             request_id: "req-no-mem".to_string(),
             predicted_strategy: "DirectResponse".to_string(),
             actual_strategy: "DirectResponse".to_string(),
@@ -798,7 +797,7 @@ mod tests {
         // Record with NULL (legacy) — should be excluded from computation
         let legacy = StrategyRecordRow {
             id: uuid::Uuid::new_v4(),
-            timestamp: chrono::Utc::now(),
+            timestamp: jiff::Timestamp::now().into(),
             request_id: "req-legacy".to_string(),
             predicted_strategy: "DirectResponse".to_string(),
             actual_strategy: "DirectResponse".to_string(),

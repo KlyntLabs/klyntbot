@@ -8,8 +8,8 @@ CREATE TABLE IF NOT EXISTS finance_accounts (
     institution  TEXT,
     notes        TEXT,
     is_archived  INTEGER NOT NULL DEFAULT 0,
-    created_at     TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
-    updated_at     TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
+    created_at     INTEGER NOT NULL DEFAULT (unixepoch('now') * 1000),
+    updated_at     INTEGER NOT NULL DEFAULT (unixepoch('now') * 1000),
     base_balance   INTEGER NOT NULL DEFAULT 0,
     base_currency  TEXT NOT NULL DEFAULT 'USD',
     exchange_rate  REAL NOT NULL DEFAULT 1.0
@@ -32,8 +32,8 @@ CREATE TABLE IF NOT EXISTS finance_transactions (
     transfer_id    TEXT,
     is_recurring   INTEGER NOT NULL DEFAULT 0,
     recurring_rule TEXT,
-    created_at     TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
-    updated_at     TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
+    created_at     INTEGER NOT NULL DEFAULT (unixepoch('now') * 1000),
+    updated_at     INTEGER NOT NULL DEFAULT (unixepoch('now') * 1000),
     base_amount    INTEGER NOT NULL DEFAULT 0,
     base_currency  TEXT NOT NULL DEFAULT 'USD',
     exchange_rate  REAL NOT NULL DEFAULT 1.0
@@ -58,8 +58,8 @@ CREATE TABLE IF NOT EXISTS finance_budgets (
     end_date        TEXT,
     is_active       INTEGER NOT NULL DEFAULT 1,
     alert_threshold INTEGER NOT NULL DEFAULT 80,
-    created_at      TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
-    updated_at      TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
+    created_at      INTEGER NOT NULL DEFAULT (unixepoch('now') * 1000),
+    updated_at      INTEGER NOT NULL DEFAULT (unixepoch('now') * 1000),
     base_amount     INTEGER NOT NULL DEFAULT 0,
     base_currency   TEXT NOT NULL DEFAULT 'USD',
     exchange_rate   REAL NOT NULL DEFAULT 1.0
@@ -73,8 +73,8 @@ CREATE TABLE IF NOT EXISTS finance_portfolios (
     name        TEXT NOT NULL,
     description TEXT,
     currency    TEXT NOT NULL,
-    created_at  TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
-    updated_at  TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now'))
+    created_at  INTEGER NOT NULL DEFAULT (unixepoch('now') * 1000),
+    updated_at  INTEGER NOT NULL DEFAULT (unixepoch('now') * 1000)
 );
 
 CREATE TABLE IF NOT EXISTS finance_investments (
@@ -91,8 +91,8 @@ CREATE TABLE IF NOT EXISTS finance_investments (
     purchase_date TEXT,
     asset_class   TEXT,
     notes         TEXT,
-    created_at         TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
-    updated_at         TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
+    created_at         INTEGER NOT NULL DEFAULT (unixepoch('now') * 1000),
+    updated_at         INTEGER NOT NULL DEFAULT (unixepoch('now') * 1000),
     market_currency    TEXT,
     base_cost_basis    INTEGER NOT NULL DEFAULT 0,
     base_current_value INTEGER NOT NULL DEFAULT 0,
@@ -115,7 +115,7 @@ CREATE TABLE IF NOT EXISTS finance_investment_transactions (
     fees           INTEGER NOT NULL DEFAULT 0,
     tx_date        TEXT NOT NULL DEFAULT (date('now')),
     notes          TEXT,
-    created_at         TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
+    created_at         INTEGER NOT NULL DEFAULT (unixepoch('now') * 1000),
     base_total_amount  INTEGER NOT NULL DEFAULT 0,
     base_currency      TEXT NOT NULL DEFAULT 'USD',
     exchange_rate      REAL NOT NULL DEFAULT 1.0
@@ -137,8 +137,8 @@ CREATE TABLE IF NOT EXISTS finance_goals (
     expected_return_rate REAL,
     inflation_rate       REAL,
     notes                TEXT,
-    created_at           TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
-    updated_at           TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
+    created_at           INTEGER NOT NULL DEFAULT (unixepoch('now') * 1000),
+    updated_at           INTEGER NOT NULL DEFAULT (unixepoch('now') * 1000),
     base_target_amount   INTEGER NOT NULL DEFAULT 0,
     base_current_amount  INTEGER NOT NULL DEFAULT 0,
     base_currency        TEXT NOT NULL DEFAULT 'USD',
@@ -156,10 +156,10 @@ CREATE TABLE IF NOT EXISTS finance_liabilities (
     currency        TEXT NOT NULL,
     interest_rate   REAL,
     monthly_payment INTEGER,
-    due_date        TEXT,
+    due_date        INTEGER,
     notes           TEXT,
-    created_at      TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
-    updated_at      TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
+    created_at      INTEGER NOT NULL DEFAULT (unixepoch('now') * 1000),
+    updated_at      INTEGER NOT NULL DEFAULT (unixepoch('now') * 1000),
     base_principal  INTEGER NOT NULL DEFAULT 0,
     base_remaining  INTEGER NOT NULL DEFAULT 0,
     base_currency   TEXT NOT NULL DEFAULT 'USD',
@@ -186,8 +186,8 @@ CREATE TABLE IF NOT EXISTS finance_allocation_targets (
     asset_class TEXT NOT NULL,
     target_weight TEXT NOT NULL,
     tolerance_band TEXT NOT NULL DEFAULT '0.05',
-    created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
-    updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
+    created_at INTEGER NOT NULL DEFAULT (unixepoch('now') * 1000),
+    updated_at INTEGER NOT NULL DEFAULT (unixepoch('now') * 1000),
     UNIQUE(portfolio_id, asset_class)
 );
 
@@ -201,7 +201,7 @@ CREATE TABLE IF NOT EXISTS finance_net_worth_snapshots (
     liabilities_total INTEGER NOT NULL,
     net_worth INTEGER NOT NULL,
     breakdown TEXT NOT NULL,
-    created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
+    created_at INTEGER NOT NULL DEFAULT (unixepoch('now') * 1000),
     UNIQUE(snapshot_date, currency)
 );
 CREATE INDEX IF NOT EXISTS idx_net_worth_snapshots_date ON finance_net_worth_snapshots(snapshot_date);

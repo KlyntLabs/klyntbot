@@ -144,7 +144,7 @@ pub(super) async fn init_storage(
                         warn!("circuit breaker table init failed (non-fatal): {e}");
                     } else {
                         if let Ok(Some(dt)) = storage::circuit_breaker::load(&storage_pool).await {
-                            manager.restore_circuit_state(dt).await;
+                            manager.restore_circuit_state(common::time::bridge::jiff_to_chrono(dt)).await;
                         }
 
                         // Callback: persist each circuit-open event for future restarts.
@@ -153,7 +153,7 @@ pub(super) async fn init_storage(
                             let pool = pool.clone();
                             tokio::spawn(async move {
                                 if let Err(e) =
-                                    storage::circuit_breaker::save(&pool, open_until).await
+                                    storage::circuit_breaker::save(&pool, common::time::bridge::chrono_to_jiff(open_until)).await
                                 {
                                     tracing::warn!("circuit breaker persist failed: {e}");
                                 }

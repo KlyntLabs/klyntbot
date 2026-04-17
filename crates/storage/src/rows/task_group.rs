@@ -1,6 +1,6 @@
 //! Row struct for the `task_groups` table.
 
-use chrono::{DateTime, Utc};
+use crate::sqlite_types::SqlTs;
 use serde::Serialize;
 use sqlx::FromRow;
 
@@ -13,5 +13,5 @@ pub struct TaskGroupRow {
     pub name: String,
     pub color: Option<String>,
     pub position: i32,
-    pub created_at: DateTime<Utc>,
+    pub created_at: SqlTs,
 }

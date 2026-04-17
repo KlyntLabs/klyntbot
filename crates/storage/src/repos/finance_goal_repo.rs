@@ -81,7 +81,7 @@ impl FinanceGoalRepo {
                 base_current_amount  = COALESCE(?, base_current_amount),
                 base_currency        = COALESCE(?, base_currency),
                 exchange_rate        = COALESCE(?, exchange_rate),
-                updated_at           = datetime('now')
+                updated_at           = (unixepoch('now') * 1000)
             WHERE id = ?
             RETURNING *
             "#,
@@ -148,7 +148,7 @@ impl FinanceGoalRepo {
         let row = sqlx::query_as::<_, FinanceGoalRow>(
             r#"
             UPDATE finance_goals
-            SET current_amount = ?, updated_at = datetime('now')
+            SET current_amount = ?, updated_at = (unixepoch('now') * 1000)
             WHERE id = ?
             RETURNING *
             "#,

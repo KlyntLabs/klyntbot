@@ -1,6 +1,6 @@
 //! Row struct for the `projects` table.
 
-use chrono::{DateTime, Utc};
+use crate::sqlite_types::SqlTs;
 use serde::Serialize;
 use sqlx::FromRow;
 
@@ -16,8 +16,8 @@ pub struct ProjectRow {
     #[sqlx(json)]
     pub tags: Vec<String>,
     pub status: String,
-    pub created_at: DateTime<Utc>,
-    pub updated_at: DateTime<Utc>,
+    pub created_at: SqlTs,
+    pub updated_at: SqlTs,
     pub workflow_id: Option<String>,
     pub instructions: Option<String>,
     pub ai_personality: Option<String>,

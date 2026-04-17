@@ -99,7 +99,7 @@ impl AppCore {
                 confidence: result.confidence,
                 status: "pending".to_string(),
                 reasoning: Some(result.reasoning.clone()),
-                created_at: chrono::Utc::now(),
+                created_at: common::time::bridge::chrono_to_jiff(chrono::Utc::now()).into(),
                 applied_at: None,
             };
 

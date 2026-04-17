@@ -63,13 +63,14 @@ impl FinanceHandler for FinanceHandlerImpl {
 
         // Section 2: Yesterday's spending (top categories)
         let yesterday = chrono::Local::now().date_naive() - chrono::Duration::days(1);
+        let yesterday_jiff = common::time::bridge::chrono_date_to_jiff(yesterday);
         let spending = self
             .repos
             .finance
             .transactions
             .sum_by_category(
-                yesterday,
-                yesterday,
+                yesterday_jiff,
+                yesterday_jiff,
                 "expense",
                 &self.config.default_currency,
             )
@@ -92,7 +93,7 @@ impl FinanceHandler for FinanceHandlerImpl {
             .filter(|g| {
                 g.deadline
                     .map(|d| {
-                        let days_left = (d - today).num_days();
+                        let days_left = (common::time::bridge::jiff_date_to_chrono(*d) - today).num_days();
                         (0..=7).contains(&days_left)
                     })
                     .unwrap_or(false)
@@ -101,7 +102,7 @@ impl FinanceHandler for FinanceHandlerImpl {
         if !approaching.is_empty() {
             let mut goal_lines = vec!["### Goals Approaching Deadline".to_string()];
             for g in &approaching {
-                let days = (g.deadline.unwrap() - today).num_days();
+                let days = (common::time::bridge::jiff_date_to_chrono(*g.deadline.unwrap()) - today).num_days();
                 let pct = if g.target_amount > 0 {
                     (g.current_amount as f64 / g.target_amount as f64) * 100.0
                 } else {
@@ -235,9 +236,10 @@ impl FinanceHandler for FinanceHandlerImpl {
         // Check stale investment prices
         let investments = self.repos.finance.investments.list_with_symbols().await?;
         let stale_threshold = chrono::Local::now() - chrono::Duration::hours(24);
+        let stale_threshold_jiff = common::time::bridge::chrono_to_jiff(stale_threshold.to_utc());
         let stale_count = investments
             .iter()
-            .filter(|inv| inv.updated_at < stale_threshold.to_utc())
+            .filter(|inv| *inv.updated_at < stale_threshold_jiff)
             .count();
         if stale_count > 0 {
             issues.push(format!(
@@ -251,7 +253,7 @@ impl FinanceHandler for FinanceHandlerImpl {
         let today = chrono::Local::now().date_naive();
         let overdue = goals
             .iter()
-            .filter(|g| g.deadline.map(|d| d < today).unwrap_or(false))
+            .filter(|g| g.deadline.map(|d| common::time::bridge::jiff_date_to_chrono(*d) < today).unwrap_or(false))
             .count();
         if overdue > 0 {
             issues.push(format!(
@@ -295,7 +297,12 @@ impl FinanceHandler for FinanceHandlerImpl {
             .repos
             .finance
             .transactions
-            .sum_by_category(date_from, date_to, "expense", currency)
+            .sum_by_category(
+                common::time::bridge::chrono_date_to_jiff(date_from),
+                common::time::bridge::chrono_date_to_jiff(date_to),
+                "expense",
+                currency,
+            )
             .await?;
 
         let total: i64 = rows.iter().map(|(_, amount)| amount).sum();

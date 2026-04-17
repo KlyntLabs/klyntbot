@@ -2,8 +2,7 @@
 
 #[cfg(test)]
 mod tests {
-    use chrono::{NaiveDate, Utc};
-
+    
     use crate::repos::finance_account_repo::FinanceAccountRepo;
     use crate::repos::finance_transaction_repo::FinanceTransactionRepo;
     use crate::rows::finance::{
@@ -37,7 +36,7 @@ mod tests {
     }
 
     fn sample_account(id: &str) -> FinanceAccountRow {
-        let now = Utc::now();
+        let now: crate::sqlite_types::SqlTs = jiff::Timestamp::now().into();
         FinanceAccountRow {
             id: id.to_string(),
             name: "Test Account".to_string(),
@@ -56,7 +55,7 @@ mod tests {
     }
 
     fn sample_tx(id: &str, account_id: &str, tx_type: &str, amount: i64) -> FinanceTransactionRow {
-        let now = Utc::now();
+        let now: crate::sqlite_types::SqlTs = jiff::Timestamp::now().into();
         FinanceTransactionRow {
             id: id.to_string(),
             account_id: account_id.to_string(),
@@ -67,7 +66,7 @@ mod tests {
             subcategory: None,
             counterparty: None,
             notes: None,
-            tx_date: chrono::Local::now().date_naive(),
+            tx_date: crate::sqlite_types::SqlDate::from(jiff::Zoned::now().date()),
             transfer_id: None,
             is_recurring: false,
             recurring_rule: None,
@@ -267,18 +266,18 @@ mod tests {
         let id_feb = unique_id("feb");
         let id_mar = unique_id("mar");
         let mut tx_jan = sample_tx(&id_jan, &acct_id, "expense", 1000);
-        tx_jan.tx_date = NaiveDate::from_ymd_opt(2026, 1, 15).unwrap();
+        tx_jan.tx_date = crate::sqlite_types::SqlDate::from(jiff::civil::Date::new(2026, 1, 15).unwrap());
         let mut tx_feb = sample_tx(&id_feb, &acct_id, "expense", 2000);
-        tx_feb.tx_date = NaiveDate::from_ymd_opt(2026, 2, 10).unwrap();
+        tx_feb.tx_date = crate::sqlite_types::SqlDate::from(jiff::civil::Date::new(2026, 2, 10).unwrap());
         let mut tx_mar = sample_tx(&id_mar, &acct_id, "expense", 3000);
-        tx_mar.tx_date = NaiveDate::from_ymd_opt(2026, 3, 5).unwrap();
+        tx_mar.tx_date = crate::sqlite_types::SqlDate::from(jiff::civil::Date::new(2026, 3, 5).unwrap());
         repos.transactions.add(&tx_jan).await.unwrap();
         repos.transactions.add(&tx_feb).await.unwrap();
         repos.transactions.add(&tx_mar).await.unwrap();
         let filter = FinanceTransactionFilter {
             account_id: Some(acct_id.clone()),
-            date_from: Some(NaiveDate::from_ymd_opt(2026, 2, 1).unwrap()),
-            date_to: Some(NaiveDate::from_ymd_opt(2026, 2, 28).unwrap()),
+            date_from: Some(crate::sqlite_types::SqlDate::from(jiff::civil::Date::new(2026, 2, 1).unwrap())),
+            date_to: Some(crate::sqlite_types::SqlDate::from(jiff::civil::Date::new(2026, 2, 28).unwrap())),
             limit: Some(100),
             ..Default::default()
         };
@@ -286,7 +285,7 @@ mod tests {
         assert_eq!(result.len(), 1);
         assert_eq!(
             result[0].tx_date,
-            NaiveDate::from_ymd_opt(2026, 2, 10).unwrap()
+            crate::sqlite_types::SqlDate::from(jiff::civil::Date::new(2026, 2, 10).unwrap())
         );
         for id in &[&id_jan, &id_feb, &id_mar] {
             let _ = repos.transactions.delete(id).await;
@@ -408,29 +407,29 @@ mod tests {
         };
         let acct_id = unique_id("a");
         repos.accounts.add(&sample_account(&acct_id)).await.unwrap();
-        let feb1 = NaiveDate::from_ymd_opt(2026, 2, 1).unwrap();
-        let feb28 = NaiveDate::from_ymd_opt(2026, 2, 28).unwrap();
-        let feb15 = NaiveDate::from_ymd_opt(2026, 2, 15).unwrap();
+        let feb1 = jiff::civil::Date::new(2026, 2, 1).unwrap();
+        let feb28 = jiff::civil::Date::new(2026, 2, 28).unwrap();
+        let feb15 = jiff::civil::Date::new(2026, 2, 15).unwrap();
         let cat_food = unique_cat("food");
         let cat_transport = unique_cat("transport");
         let food_ids: Vec<_> = (0..3).map(|i| unique_id(&format!("sf{i}"))).collect();
         for id in &food_ids {
             let mut tx = sample_tx(id, &acct_id, "expense", 100_000);
             tx.category = Some(cat_food.clone());
-            tx.tx_date = feb15;
+            tx.tx_date = crate::sqlite_types::SqlDate::from(feb15);
             repos.transactions.add(&tx).await.unwrap();
         }
         let tr_ids: Vec<_> = (0..2).map(|i| unique_id(&format!("st{i}"))).collect();
         for id in &tr_ids {
             let mut tx = sample_tx(id, &acct_id, "expense", 50_000);
             tx.category = Some(cat_transport.clone());
-            tx.tx_date = feb15;
+            tx.tx_date = crate::sqlite_types::SqlDate::from(feb15);
             repos.transactions.add(&tx).await.unwrap();
         }
         let inc_id = unique_id("si");
         let mut tx_inc = sample_tx(&inc_id, &acct_id, "income", 500_000);
         tx_inc.category = Some(cat_food.clone());
-        tx_inc.tx_date = feb15;
+        tx_inc.tx_date = crate::sqlite_types::SqlDate::from(feb15);
         repos.transactions.add(&tx_inc).await.unwrap();
         let sums = repos
             .transactions
@@ -464,9 +463,9 @@ mod tests {
             let base_month = 2i32;
             let month = (base_month - month_offset - 1).rem_euclid(12) + 1;
             let actual_year = 2026i32 + (base_month - month_offset - 1).div_euclid(12);
-            let date = NaiveDate::from_ymd_opt(actual_year, month as u32, 15).unwrap();
+            let date = jiff::civil::Date::new(actual_year as i16, month as i8, 15).unwrap();
             let mut tx = sample_tx(&id, &acct_id, "expense", 10_000 * (month_offset as i64 + 1));
-            tx.tx_date = date;
+            tx.tx_date = crate::sqlite_types::SqlDate::from(date);
             repos.transactions.add(&tx).await.unwrap();
             tx_ids.push(id);
         }
@@ -605,10 +604,10 @@ mod tests {
         repos.accounts.add(&sample_account(&acct_id)).await.unwrap();
         let id = unique_id("fut");
         let mut row = sample_tx(&id, &acct_id, "expense", 50_000);
-        let future_date = chrono::Local::now().date_naive() + chrono::Duration::days(30);
-        row.tx_date = future_date;
+        let future_date = jiff::Zoned::now().date().checked_add(jiff::Span::new().days(30)).unwrap();
+        row.tx_date = crate::sqlite_types::SqlDate::from(future_date);
         let inserted = repos.transactions.add(&row).await.unwrap();
-        assert_eq!(inserted.tx_date, future_date);
+        assert_eq!(inserted.tx_date, crate::sqlite_types::SqlDate::from(future_date));
         let _ = repos.transactions.delete(&id).await;
         let _ = repos.accounts.delete(&acct_id).await;
     }

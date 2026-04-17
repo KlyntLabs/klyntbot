@@ -1,6 +1,5 @@
 //! Outcome repository — learning_outcomes + enrichment_feedback tables.
 
-use chrono::{DateTime, Utc};
 use sqlx::SqlitePool;
 
 use crate::error::StorageError;
@@ -52,16 +51,16 @@ impl OutcomeRepo {
     /// List outcomes within a date range.
     pub async fn list_by_date_range(
         &self,
-        from: DateTime<Utc>,
-        to: DateTime<Utc>,
+        from: jiff::Timestamp,
+        to: jiff::Timestamp,
     ) -> Result<Vec<OutcomeRow>, StorageError> {
         let rows = sqlx::query_as::<_, OutcomeRow>(
             "SELECT * FROM learning_outcomes
              WHERE created_at >= ?1 AND created_at <= ?2
              ORDER BY created_at DESC",
         )
-        .bind(from)
-        .bind(to)
+        .bind(crate::sqlite_types::SqlTs::from(from))
+        .bind(crate::sqlite_types::SqlTs::from(to))
         .fetch_all(&self.pool)
         .await?;
         Ok(rows)
@@ -79,13 +78,13 @@ impl OutcomeRepo {
     }
 
     /// Count outcomes (total, success) for aggregate stats.
-    pub async fn count_stats(&self, since: DateTime<Utc>) -> Result<(i64, i64), StorageError> {
+    pub async fn count_stats(&self, since: jiff::Timestamp) -> Result<(i64, i64), StorageError> {
         let row: (i64, i64) = sqlx::query_as(
             "SELECT COUNT(*),
                     COALESCE(SUM(CASE WHEN success THEN 1 ELSE 0 END), 0)
              FROM learning_outcomes WHERE created_at >= ?1",
         )
-        .bind(since)
+        .bind(crate::sqlite_types::SqlTs::from(since))
         .fetch_one(&self.pool)
         .await?;
         Ok(row)
@@ -94,7 +93,7 @@ impl OutcomeRepo {
     /// Aggregate tool failure stats grouped by tool name since a timestamp.
     pub async fn tool_failure_stats_since(
         &self,
-        since: DateTime<Utc>,
+        since: jiff::Timestamp,
     ) -> Result<Vec<ToolFailureStatsRow>, StorageError> {
         let rows = sqlx::query_as::<_, ToolFailureStatsRow>(
             "SELECT tool_name,
@@ -108,7 +107,7 @@ impl OutcomeRepo {
              ORDER BY failure_count DESC
              LIMIT 20",
         )
-        .bind(since.to_rfc3339())
+        .bind(since.to_string())
         .fetch_all(&self.pool)
         .await?;
         Ok(rows)
@@ -120,11 +119,11 @@ impl OutcomeRepo {
     pub async fn delete_enrichment_feedback_older_than(
         &self,
         days: i64,
-        now: chrono::DateTime<chrono::Utc>,
+        now: jiff::Timestamp,
     ) -> Result<u64, StorageError> {
-        let cutoff = now - chrono::Duration::days(days);
+        let cutoff = now - jiff::SignedDuration::from_hours((days) * 24);
         let result = sqlx::query("DELETE FROM enrichment_feedback WHERE timestamp < ?1")
-            .bind(cutoff)
+            .bind(cutoff.as_millisecond())
             .execute(&self.pool)
             .await?;
         Ok(result.rows_affected())
@@ -154,7 +153,7 @@ impl OutcomeRepo {
         .bind(actual_value)
         .bind(accepted)
         .bind(confidence)
-        .bind(Utc::now())
+        .bind(jiff::Timestamp::now().as_millisecond())
         .fetch_one(&self.pool)
         .await?;
         Ok(row)

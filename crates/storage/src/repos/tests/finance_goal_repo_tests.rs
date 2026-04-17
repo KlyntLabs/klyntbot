@@ -2,8 +2,7 @@
 
 #[cfg(test)]
 mod tests {
-    use chrono::Utc;
-
+    
     use crate::repos::finance_goal_repo::FinanceGoalRepo;
     use crate::rows::finance::{FinanceGoalPatch, FinanceGoalRow};
     use crate::StoragePool;
@@ -20,7 +19,7 @@ mod tests {
     }
 
     fn sample_goal(id: &str, goal_type: &str, target: i64) -> FinanceGoalRow {
-        let now = Utc::now();
+        let now: crate::sqlite_types::SqlTs = jiff::Timestamp::now().into();
         FinanceGoalRow {
             id: id.to_string(),
             name: format!("Goal {id}"),

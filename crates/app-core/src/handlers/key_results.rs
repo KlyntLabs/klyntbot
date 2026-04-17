@@ -12,7 +12,7 @@ impl AppCore {
         params: KeyResultCreateParams,
     ) -> HandlerResult<KeyResultResponse> {
         let id = uuid::Uuid::new_v4().to_string();
-        let now = chrono::Utc::now();
+        let now: storage::SqlTs = common::time::bridge::chrono_to_jiff(chrono::Utc::now()).into();
 
         let row = KeyResultRow {
             id: id.clone(),
@@ -66,7 +66,7 @@ impl AppCore {
         &self,
         params: KeyResultUpdateParams,
     ) -> HandlerResult<KeyResultResponse> {
-        let due_date = params.due_date.map(|opt| opt.and_then(|d| parse_date(&d)));
+        let due_date = params.due_date.map(|opt| opt.and_then(|d| parse_date(&d)).map(|d| common::time::bridge::chrono_to_jiff(d)));
 
         let updated = self
             .repos

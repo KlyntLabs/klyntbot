@@ -88,7 +88,7 @@ impl KeyResultRepo {
         title: Option<&str>,
         description: Option<Option<&str>>,
         status: Option<&str>,
-        due_date: Option<Option<chrono::DateTime<chrono::Utc>>>,
+        due_date: Option<Option<jiff::Timestamp>>,
     ) -> Result<KeyResultRow, StorageError> {
         let row = sqlx::query_as::<_, KeyResultRow>(
             r#"
@@ -98,11 +98,11 @@ impl KeyResultRepo {
                 status      = COALESCE(?5, status),
                 due_date    = CASE WHEN ?6 THEN ?7 ELSE due_date END,
                 completed_at = CASE
-                    WHEN ?5 IN ('completed', 'abandoned') AND completed_at IS NULL THEN datetime('now')
+                    WHEN ?5 IN ('completed', 'abandoned') AND completed_at IS NULL THEN (unixepoch('now') * 1000)
                     WHEN ?5 IS NOT NULL AND ?5 NOT IN ('completed', 'abandoned') THEN NULL
                     ELSE completed_at
                 END,
-                updated_at  = datetime('now')
+                updated_at  = (unixepoch('now') * 1000)
             WHERE id = ?1
             RETURNING *
             "#,
@@ -113,7 +113,7 @@ impl KeyResultRepo {
         .bind(description.unwrap_or_default())
         .bind(status)
         .bind(due_date.is_some())
-        .bind(due_date.unwrap_or_default())
+        .bind(due_date.unwrap_or_default().map(|t| t.as_millisecond()))
         .fetch_optional(&self.pool)
         .await?
         .ok_or_not_found(&format!("key_result {id}"))?;
@@ -143,7 +143,7 @@ impl KeyResultRepo {
                     THEN MIN(100.0, MAX(0.0, ?2 / target_value * 100.0))
                     ELSE progress
                 END,
-                updated_at = datetime('now')
+                updated_at = (unixepoch('now') * 1000)
             WHERE id = ?1
             RETURNING *
             "#,
@@ -159,7 +159,7 @@ impl KeyResultRepo {
     /// Update progress directly (used for action-tracking mode).
     pub async fn update_progress(&self, id: &str, progress: f64) -> Result<(), StorageError> {
         sqlx::query(
-            "UPDATE key_results SET progress = ?2, updated_at = datetime('now') WHERE id = ?1",
+            "UPDATE key_results SET progress = ?2, updated_at = (unixepoch('now') * 1000) WHERE id = ?1",
         )
         .bind(id)
         .bind(progress)
@@ -207,8 +207,8 @@ mod tests {
                 icon: None,
                 position: 0,
                 status: "active".into(),
-                created_at: chrono::Utc::now(),
-                updated_at: chrono::Utc::now(),
+                created_at: jiff::Timestamp::now().into(),
+                updated_at: jiff::Timestamp::now().into(),
             })
             .await
             .unwrap();
@@ -222,8 +222,8 @@ mod tests {
                 color: "orange".into(),
                 tags: vec![],
                 status: "active".into(),
-                created_at: chrono::Utc::now(),
-                updated_at: chrono::Utc::now(),
+                created_at: jiff::Timestamp::now().into(),
+                updated_at: jiff::Timestamp::now().into(),
                 workflow_id: None,
                 instructions: None,
                 ai_personality: None,
@@ -245,8 +245,8 @@ mod tests {
                 priority: None,
                 due_date: None,
                 progress: 0.0,
-                created_at: chrono::Utc::now(),
-                updated_at: chrono::Utc::now(),
+                created_at: jiff::Timestamp::now().into(),
+                updated_at: jiff::Timestamp::now().into(),
                 completed_at: None,
             })
             .await
@@ -269,8 +269,8 @@ mod tests {
             unit: Some("%".to_string()),
             progress: 0.0,
             due_date: None,
-            created_at: chrono::Utc::now(),
-            updated_at: chrono::Utc::now(),
+            created_at: jiff::Timestamp::now().into(),
+            updated_at: jiff::Timestamp::now().into(),
             completed_at: None,
         }
     }

@@ -1,7 +1,7 @@
 //! Update, complete, and delete action handlers.
 
 use chrono::Utc;
-use common::{Result, ToolError};
+use common::{time::bridge::chrono_to_jiff, Result, ToolError};
 use tools_core::ParamExtractor;
 use tracing::warn;
 
@@ -35,7 +35,7 @@ impl TaskTool {
                 if s.is_empty() || s == "null" {
                     None
                 } else {
-                    common::parse_datetime(s, &self.timezone)
+                    common::parse_datetime(s, &self.timezone).map(chrono_to_jiff)
                 }
             }),
             tags: p.optional_array("tags")?.map(|arr| {
@@ -74,14 +74,14 @@ impl TaskTool {
                 if s.is_empty() || s == "null" {
                     None
                 } else {
-                    common::parse_datetime(s, &self.timezone)
+                    common::parse_datetime(s, &self.timezone).map(chrono_to_jiff)
                 }
             }),
             scheduled_end: p.optional_str("scheduled_end")?.map(|s| {
                 if s.is_empty() || s == "null" {
                     None
                 } else {
-                    common::parse_datetime(s, &self.timezone)
+                    common::parse_datetime(s, &self.timezone).map(chrono_to_jiff)
                 }
             }),
         };
@@ -217,7 +217,7 @@ impl TaskTool {
                                 energy_level: task.energy_level.as_ref().map(|e| e.to_string()),
                                 tags: task.tags.clone(),
                                 project_id: task.project_id.clone(),
-                                completed_at: Utc::now(),
+                                completed_at: chrono_to_jiff(Utc::now()).into(),
                             };
                             if let Err(e) = self.repo.record_estimation(&estimation).await {
                                 warn!("Failed to record estimation history: {}", e);

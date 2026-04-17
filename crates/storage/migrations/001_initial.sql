@@ -12,8 +12,8 @@ CREATE TABLE areas (
     icon        TEXT,
     position    INTEGER NOT NULL DEFAULT 0,
     status      TEXT NOT NULL DEFAULT 'active',
-    created_at  TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
-    updated_at  TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now'))
+    created_at  INTEGER NOT NULL DEFAULT (unixepoch('now') * 1000),
+    updated_at  INTEGER NOT NULL DEFAULT (unixepoch('now') * 1000)
 );
 
 -- ============================================================
@@ -24,8 +24,8 @@ CREATE TABLE IF NOT EXISTS status_workflows (
     name              TEXT NOT NULL,
     is_template       INTEGER NOT NULL DEFAULT 0,
     is_global_default INTEGER NOT NULL DEFAULT 0,
-    created_at        TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
-    updated_at        TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now'))
+    created_at        INTEGER NOT NULL DEFAULT (unixepoch('now') * 1000),
+    updated_at        INTEGER NOT NULL DEFAULT (unixepoch('now') * 1000)
 );
 
 -- ============================================================
@@ -38,7 +38,7 @@ CREATE TABLE IF NOT EXISTS status_labels (
     color        TEXT NOT NULL DEFAULT '#6b7280',
     status_group TEXT NOT NULL CHECK(status_group IN ('not_started', 'active', 'done', 'stuck')),
     position     INTEGER NOT NULL DEFAULT 0,
-    created_at   TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now'))
+    created_at   INTEGER NOT NULL DEFAULT (unixepoch('now') * 1000)
 );
 CREATE INDEX idx_status_labels_workflow_id ON status_labels(workflow_id);
 
@@ -53,8 +53,8 @@ CREATE TABLE projects (
     color       TEXT NOT NULL DEFAULT 'orange',
     tags        TEXT NOT NULL DEFAULT '[]',
     status      TEXT NOT NULL DEFAULT 'active',
-    created_at  TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
-    updated_at  TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
+    created_at  INTEGER NOT NULL DEFAULT (unixepoch('now') * 1000),
+    updated_at  INTEGER NOT NULL DEFAULT (unixepoch('now') * 1000),
     instructions    TEXT,
     ai_personality  TEXT,
     user_role       TEXT,
@@ -76,11 +76,11 @@ CREATE TABLE objectives (
     description  TEXT,
     status       TEXT NOT NULL DEFAULT 'active',
     priority     INTEGER,
-    due_date     TEXT,
+    due_date     INTEGER,
     progress     REAL NOT NULL DEFAULT 0.0,
-    created_at   TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
-    updated_at   TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
-    completed_at TEXT
+    created_at   INTEGER NOT NULL DEFAULT (unixepoch('now') * 1000),
+    updated_at   INTEGER NOT NULL DEFAULT (unixepoch('now') * 1000),
+    completed_at INTEGER
 );
 CREATE INDEX idx_objectives_project_id ON objectives(project_id);
 CREATE INDEX idx_objectives_status ON objectives(status);
@@ -99,10 +99,10 @@ CREATE TABLE key_results (
     current_value REAL NOT NULL DEFAULT 0.0,
     unit          TEXT,
     progress      REAL NOT NULL DEFAULT 0.0,
-    due_date      TEXT,
-    created_at    TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
-    updated_at    TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
-    completed_at  TEXT
+    due_date      INTEGER,
+    created_at    INTEGER NOT NULL DEFAULT (unixepoch('now') * 1000),
+    updated_at    INTEGER NOT NULL DEFAULT (unixepoch('now') * 1000),
+    completed_at  INTEGER
 );
 CREATE INDEX idx_key_results_objective_id ON key_results(objective_id);
 CREATE INDEX idx_key_results_status ON key_results(status);
@@ -116,7 +116,7 @@ CREATE TABLE IF NOT EXISTS task_groups (
     name        TEXT NOT NULL,
     color       TEXT,
     position    INTEGER NOT NULL DEFAULT 0,
-    created_at  TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now'))
+    created_at  INTEGER NOT NULL DEFAULT (unixepoch('now') * 1000)
 );
 CREATE INDEX idx_task_groups_project_id ON task_groups(project_id);
 
@@ -126,15 +126,15 @@ CREATE INDEX idx_task_groups_project_id ON task_groups(project_id);
 CREATE TABLE sessions (
     key        TEXT PRIMARY KEY,
     metadata   TEXT NOT NULL DEFAULT '{}',
-    created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
-    updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
+    created_at INTEGER NOT NULL DEFAULT (unixepoch('now') * 1000),
+    updated_at INTEGER NOT NULL DEFAULT (unixepoch('now') * 1000),
     project_id        TEXT REFERENCES projects(id),
     conversation_type TEXT DEFAULT 'general',
     pinned            INTEGER DEFAULT 0,
     squad_id          TEXT,
     compressed_prefix      TEXT,
     compressed_through_idx INTEGER,
-    compressed_at          TEXT
+    compressed_at          INTEGER
 );
 CREATE INDEX IF NOT EXISTS idx_sessions_squad ON sessions(squad_id);
 
@@ -146,7 +146,7 @@ CREATE TABLE session_messages (
     session_key TEXT NOT NULL REFERENCES sessions(key) ON DELETE CASCADE,
     role        TEXT NOT NULL,
     content     TEXT NOT NULL,
-    timestamp   TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
+    timestamp   INTEGER NOT NULL DEFAULT (unixepoch('now') * 1000),
     request_id  TEXT,
     tool_calls  TEXT,
     metadata    TEXT,
@@ -161,7 +161,7 @@ CREATE TABLE session_memory (
     session_key TEXT PRIMARY KEY REFERENCES sessions(key) ON DELETE CASCADE,
     content     TEXT NOT NULL DEFAULT '',
     turn_count  INTEGER NOT NULL DEFAULT 0,
-    updated_at  TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now'))
+    updated_at  INTEGER NOT NULL DEFAULT (unixepoch('now') * 1000)
 );
 
 -- ============================================================
@@ -177,7 +177,7 @@ CREATE TABLE learning_outcomes (
     confidence_score       REAL,
     confidence_dimensions  TEXT,
     execution_mode         TEXT NOT NULL DEFAULT '"chat"',
-    created_at             TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now'))
+    created_at             INTEGER NOT NULL DEFAULT (unixepoch('now') * 1000)
 );
 CREATE INDEX idx_learning_outcomes_created_at ON learning_outcomes(created_at);
 
@@ -186,7 +186,7 @@ CREATE INDEX idx_learning_outcomes_created_at ON learning_outcomes(created_at);
 -- ============================================================
 CREATE TABLE strategy_records (
     id                 TEXT PRIMARY KEY,
-    timestamp          TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
+    timestamp          INTEGER NOT NULL DEFAULT (unixepoch('now') * 1000),
     request_id         TEXT NOT NULL,
     predicted_strategy TEXT NOT NULL,
     actual_strategy    TEXT NOT NULL,
@@ -223,7 +223,7 @@ CREATE TABLE enrichment_feedback (
     actual_value    TEXT,
     accepted        INTEGER NOT NULL,
     confidence      REAL NOT NULL,
-    timestamp       TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now'))
+    timestamp       INTEGER NOT NULL DEFAULT (unixepoch('now') * 1000)
 );
 
 -- ============================================================
@@ -231,7 +231,7 @@ CREATE TABLE enrichment_feedback (
 -- ============================================================
 CREATE TABLE usage_records (
     id                 TEXT PRIMARY KEY,
-    timestamp          TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
+    timestamp          INTEGER NOT NULL DEFAULT (unixepoch('now') * 1000),
     request_id         TEXT NOT NULL,
     model              TEXT NOT NULL,
     provider           TEXT NOT NULL,
@@ -298,7 +298,7 @@ CREATE TABLE calendar_event_cache (
     source      TEXT NOT NULL DEFAULT 'CalDAV',
     etag        TEXT,
     status      TEXT,
-    cached_at   TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
+    cached_at   TEXT NOT NULL DEFAULT (unixepoch('now') * 1000),
     PRIMARY KEY (uid, provider_id)
 );
 CREATE INDEX idx_calendar_event_cache_provider ON calendar_event_cache(provider_id);
@@ -311,7 +311,7 @@ CREATE INDEX idx_calendar_event_cache_uid ON calendar_event_cache(uid);
 CREATE TABLE learning_state (
     key        TEXT PRIMARY KEY,
     value      TEXT NOT NULL DEFAULT '{}',
-    updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now'))
+    updated_at INTEGER NOT NULL DEFAULT (unixepoch('now') * 1000)
 );
 
 -- ============================================================
@@ -325,7 +325,7 @@ CREATE TABLE decision_log (
     user_message_preview  TEXT NOT NULL DEFAULT '',
     assessment            TEXT NOT NULL DEFAULT '{}',
     outcome               TEXT,
-    created_at            TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now'))
+    created_at            INTEGER NOT NULL DEFAULT (unixepoch('now') * 1000)
 );
 CREATE INDEX idx_decision_log_session ON decision_log(session_key);
 CREATE INDEX idx_decision_log_created ON decision_log(created_at DESC);
@@ -342,8 +342,8 @@ CREATE TABLE finance_accounts (
     institution  TEXT,
     notes        TEXT,
     is_archived  INTEGER NOT NULL DEFAULT 0,
-    created_at     TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
-    updated_at     TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
+    created_at     INTEGER NOT NULL DEFAULT (unixepoch('now') * 1000),
+    updated_at     INTEGER NOT NULL DEFAULT (unixepoch('now') * 1000),
     base_balance   INTEGER NOT NULL DEFAULT 0,
     base_currency  TEXT NOT NULL DEFAULT 'USD',
     exchange_rate  REAL NOT NULL DEFAULT 1.0
@@ -368,8 +368,8 @@ CREATE TABLE finance_transactions (
     transfer_id    TEXT,
     is_recurring   INTEGER NOT NULL DEFAULT 0,
     recurring_rule TEXT,
-    created_at     TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
-    updated_at     TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
+    created_at     INTEGER NOT NULL DEFAULT (unixepoch('now') * 1000),
+    updated_at     INTEGER NOT NULL DEFAULT (unixepoch('now') * 1000),
     base_amount    INTEGER NOT NULL DEFAULT 0,
     base_currency  TEXT NOT NULL DEFAULT 'USD',
     exchange_rate  REAL NOT NULL DEFAULT 1.0
@@ -396,8 +396,8 @@ CREATE TABLE finance_budgets (
     end_date        TEXT,
     is_active       INTEGER NOT NULL DEFAULT 1,
     alert_threshold INTEGER NOT NULL DEFAULT 80,
-    created_at      TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
-    updated_at      TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
+    created_at      INTEGER NOT NULL DEFAULT (unixepoch('now') * 1000),
+    updated_at      INTEGER NOT NULL DEFAULT (unixepoch('now') * 1000),
     base_amount     INTEGER NOT NULL DEFAULT 0,
     base_currency   TEXT NOT NULL DEFAULT 'USD',
     exchange_rate   REAL NOT NULL DEFAULT 1.0
@@ -413,8 +413,8 @@ CREATE TABLE finance_portfolios (
     name        TEXT NOT NULL,
     description TEXT,
     currency    TEXT NOT NULL,
-    created_at  TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
-    updated_at  TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now'))
+    created_at  INTEGER NOT NULL DEFAULT (unixepoch('now') * 1000),
+    updated_at  INTEGER NOT NULL DEFAULT (unixepoch('now') * 1000)
 );
 
 -- ============================================================
@@ -434,8 +434,8 @@ CREATE TABLE finance_investments (
     purchase_date TEXT,
     asset_class   TEXT,
     notes         TEXT,
-    created_at         TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
-    updated_at         TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
+    created_at         INTEGER NOT NULL DEFAULT (unixepoch('now') * 1000),
+    updated_at         INTEGER NOT NULL DEFAULT (unixepoch('now') * 1000),
     market_currency    TEXT,
     base_cost_basis    INTEGER NOT NULL DEFAULT 0,
     base_current_value INTEGER NOT NULL DEFAULT 0,
@@ -460,7 +460,7 @@ CREATE TABLE finance_investment_transactions (
     fees           INTEGER NOT NULL DEFAULT 0,
     tx_date        TEXT NOT NULL DEFAULT (date('now')),
     notes          TEXT,
-    created_at         TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
+    created_at         INTEGER NOT NULL DEFAULT (unixepoch('now') * 1000),
     base_total_amount  INTEGER NOT NULL DEFAULT 0,
     base_currency      TEXT NOT NULL DEFAULT 'USD',
     exchange_rate      REAL NOT NULL DEFAULT 1.0
@@ -484,8 +484,8 @@ CREATE TABLE finance_goals (
     expected_return_rate REAL,
     inflation_rate       REAL,
     notes                TEXT,
-    created_at           TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
-    updated_at           TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
+    created_at           INTEGER NOT NULL DEFAULT (unixepoch('now') * 1000),
+    updated_at           INTEGER NOT NULL DEFAULT (unixepoch('now') * 1000),
     base_target_amount   INTEGER NOT NULL DEFAULT 0,
     base_current_amount  INTEGER NOT NULL DEFAULT 0,
     base_currency        TEXT NOT NULL DEFAULT 'USD',
@@ -505,10 +505,10 @@ CREATE TABLE finance_liabilities (
     currency        TEXT NOT NULL,
     interest_rate   REAL,
     monthly_payment INTEGER,
-    due_date        TEXT,
+    due_date        INTEGER,
     notes           TEXT,
-    created_at      TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
-    updated_at      TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
+    created_at      INTEGER NOT NULL DEFAULT (unixepoch('now') * 1000),
+    updated_at      INTEGER NOT NULL DEFAULT (unixepoch('now') * 1000),
     base_principal  INTEGER NOT NULL DEFAULT 0,
     base_remaining  INTEGER NOT NULL DEFAULT 0,
     base_currency   TEXT NOT NULL DEFAULT 'USD',
@@ -538,8 +538,8 @@ CREATE TABLE IF NOT EXISTS finance_allocation_targets (
     asset_class TEXT NOT NULL,
     target_weight TEXT NOT NULL,
     tolerance_band TEXT NOT NULL DEFAULT '0.05',
-    created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
-    updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
+    created_at INTEGER NOT NULL DEFAULT (unixepoch('now') * 1000),
+    updated_at INTEGER NOT NULL DEFAULT (unixepoch('now') * 1000),
     UNIQUE(portfolio_id, asset_class)
 );
 
@@ -555,7 +555,7 @@ CREATE TABLE IF NOT EXISTS finance_net_worth_snapshots (
     liabilities_total INTEGER NOT NULL,
     net_worth INTEGER NOT NULL,
     breakdown TEXT NOT NULL,
-    created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
+    created_at INTEGER NOT NULL DEFAULT (unixepoch('now') * 1000),
     UNIQUE(snapshot_date, currency)
 );
 CREATE INDEX IF NOT EXISTS idx_net_worth_snapshots_date ON finance_net_worth_snapshots(snapshot_date);
@@ -568,7 +568,7 @@ CREATE TABLE IF NOT EXISTS _feature_migrations (
     feature_name TEXT NOT NULL,
     version      INTEGER NOT NULL,
     description  TEXT NOT NULL DEFAULT '',
-    applied_at   TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
+    applied_at   INTEGER NOT NULL DEFAULT (unixepoch('now') * 1000),
     PRIMARY KEY (feature_name, version)
 );
 
@@ -586,8 +586,8 @@ CREATE TABLE agent_tasks (
     result          TEXT,
     error           TEXT,
     blocked_by      TEXT NOT NULL DEFAULT '[]',
-    created_at      TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
-    updated_at      TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now'))
+    created_at      INTEGER NOT NULL DEFAULT (unixepoch('now') * 1000),
+    updated_at      INTEGER NOT NULL DEFAULT (unixepoch('now') * 1000)
 );
 CREATE INDEX idx_agent_tasks_session ON agent_tasks(session_key);
 CREATE INDEX idx_agent_tasks_status ON agent_tasks(status);
@@ -606,7 +606,7 @@ CREATE TABLE tool_usage (
     success         INTEGER NOT NULL DEFAULT 1,
     duration_ms     INTEGER,
     error_message   TEXT,
-    created_at      TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now'))
+    created_at      INTEGER NOT NULL DEFAULT (unixepoch('now') * 1000)
 );
 CREATE INDEX idx_tool_usage_tool ON tool_usage(tool_name);
 CREATE INDEX idx_tool_usage_created ON tool_usage(created_at);
@@ -622,7 +622,7 @@ CREATE TABLE entity_links (
     target_id   TEXT NOT NULL,
     link_type   TEXT NOT NULL DEFAULT 'related',
     metadata    TEXT,
-    created_at  TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
+    created_at  INTEGER NOT NULL DEFAULT (unixepoch('now') * 1000),
     UNIQUE(source_kind, source_id, target_kind, target_id, link_type)
 );
 
@@ -643,8 +643,8 @@ CREATE TABLE project_sources (
     embedding_id TEXT,
     metadata    TEXT,
     tags        TEXT DEFAULT '[]',
-    created_at  TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
-    updated_at  TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now'))
+    created_at  INTEGER NOT NULL DEFAULT (unixepoch('now') * 1000),
+    updated_at  INTEGER NOT NULL DEFAULT (unixepoch('now') * 1000)
 );
 
 CREATE INDEX idx_project_sources_project ON project_sources(project_id);
@@ -659,8 +659,8 @@ CREATE TABLE IF NOT EXISTS session_context (
     project_id   TEXT,
     is_ephemeral INTEGER NOT NULL DEFAULT 0,
     is_pinned    INTEGER NOT NULL DEFAULT 0,
-    created_at   TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
-    updated_at   TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now'))
+    created_at   INTEGER NOT NULL DEFAULT (unixepoch('now') * 1000),
+    updated_at   INTEGER NOT NULL DEFAULT (unixepoch('now') * 1000)
 );
 
 CREATE INDEX IF NOT EXISTS idx_session_context_area ON session_context(area_id);
@@ -737,7 +737,7 @@ CREATE TABLE IF NOT EXISTS custom_columns (
     options_json TEXT,
     position INTEGER NOT NULL DEFAULT 0,
     width INTEGER DEFAULT 150,
-    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+    created_at INTEGER NOT NULL DEFAULT (unixepoch('now') * 1000)
 );
 
 CREATE TABLE IF NOT EXISTS custom_column_values (
@@ -753,7 +753,7 @@ CREATE TABLE IF NOT EXISTS brain_signal_feedback (
     signal_type TEXT NOT NULL,
     entity_pair TEXT NOT NULL,
     action      TEXT NOT NULL,
-    timestamp   TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now'))
+    timestamp   INTEGER NOT NULL DEFAULT (unixepoch('now') * 1000)
 );
 
 CREATE INDEX IF NOT EXISTS idx_brain_signal_entity_pair ON brain_signal_feedback(entity_pair, timestamp);
@@ -762,7 +762,7 @@ CREATE INDEX IF NOT EXISTS idx_brain_signal_entity_pair ON brain_signal_feedback
 CREATE TABLE IF NOT EXISTS user_preferences (
     key        TEXT PRIMARY KEY,
     value      TEXT NOT NULL,
-    updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now'))
+    updated_at INTEGER NOT NULL DEFAULT (unixepoch('now') * 1000)
 );
 CREATE INDEX IF NOT EXISTS idx_brain_signal_action ON brain_signal_feedback(action, timestamp);
 
@@ -773,7 +773,7 @@ CREATE TABLE IF NOT EXISTS cross_domain_insights (
     insight_text TEXT NOT NULL,
     dot_refs    TEXT NOT NULL,
     surfaced    INTEGER NOT NULL DEFAULT 0,
-    created_at  TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now'))
+    created_at  INTEGER NOT NULL DEFAULT (unixepoch('now') * 1000)
 );
 
 -- ── Retrieval feedback ─────────────────────────────────────────
@@ -814,7 +814,7 @@ CREATE TABLE skill_versions (
     diff        TEXT,
     source      TEXT NOT NULL,
     reason      TEXT,
-    created_at  TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now'))
+    created_at  INTEGER NOT NULL DEFAULT (unixepoch('now') * 1000)
 );
 
 CREATE INDEX idx_skill_versions_name ON skill_versions(skill_name, version);

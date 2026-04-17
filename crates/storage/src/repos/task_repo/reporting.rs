@@ -45,7 +45,7 @@ impl TaskRepo {
         let rows = sqlx::query_as::<_, TaskRow>(
             r#"
             SELECT * FROM tasks
-            WHERE due_date < datetime('now')
+            WHERE due_date < (unixepoch('now') * 1000)
               AND completed = 0
               AND is_template = FALSE
             ORDER BY due_date
@@ -77,7 +77,7 @@ impl TaskRepo {
             String,
             String,
             Option<i16>,
-            Option<chrono::DateTime<chrono::Utc>>,
+            Option<crate::sqlite_types::SqlTs>,
             String,
         )> = sqlx::query_as(
             r#"

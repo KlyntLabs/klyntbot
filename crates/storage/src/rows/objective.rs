@@ -1,6 +1,6 @@
 //! Row struct for the `objectives` table.
 
-use chrono::{DateTime, Utc};
+use crate::sqlite_types::SqlTs;
 use serde::Serialize;
 use sqlx::FromRow;
 
@@ -13,9 +13,9 @@ pub struct ObjectiveRow {
     pub description: Option<String>,
     pub status: String,
     pub priority: Option<i16>,
-    pub due_date: Option<DateTime<Utc>>,
+    pub due_date: Option<SqlTs>,
     pub progress: f64,
-    pub created_at: DateTime<Utc>,
-    pub updated_at: DateTime<Utc>,
-    pub completed_at: Option<DateTime<Utc>>,
+    pub created_at: SqlTs,
+    pub updated_at: SqlTs,
+    pub completed_at: Option<SqlTs>,
 }

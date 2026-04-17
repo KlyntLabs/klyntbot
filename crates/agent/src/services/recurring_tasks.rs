@@ -97,7 +97,8 @@ impl RecurringTaskSpawner {
             };
 
             // Check if an instance is due
-            if !rrule_utils::should_spawn_instance(tpl_row.next_instance_date, now) {
+            let next_instance_date_chrono = tpl_row.next_instance_date.map(|ts| common::time::bridge::jiff_to_chrono(*ts));
+            if !rrule_utils::should_spawn_instance(next_instance_date_chrono, now) {
                 continue;
             }
 
@@ -110,7 +111,7 @@ impl RecurringTaskSpawner {
             instance.tags = tpl_row.tags.clone();
             instance.project_id = tpl_row.project_id.clone();
             instance.recurrence_parent_id = Some(tpl_row.id.clone());
-            instance.due_date = tpl_row.next_instance_date;
+            instance.due_date = next_instance_date_chrono;
 
             let instance_id = instance.id.clone();
             let instance_row: storage::TaskRow = (&instance).into();
@@ -120,7 +121,7 @@ impl RecurringTaskSpawner {
             let next = rrule_utils::next_occurrence(&rule, now)?;
             let patch = storage::TaskPatch {
                 id: tpl_row.id.clone(),
-                next_instance_date: Some(next),
+                next_instance_date: Some(next.map(common::time::bridge::chrono_to_jiff)),
                 ..Default::default()
             };
             if let Err(e) = repo.update(&patch).await {

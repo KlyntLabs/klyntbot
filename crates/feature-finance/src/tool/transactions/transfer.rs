@@ -1,6 +1,7 @@
 //! Transfer transaction handler for `FinanceTool`.
 
 use chrono::{NaiveDate, Utc};
+use common::time::bridge::{chrono_date_to_jiff, chrono_to_jiff};
 use serde_json::json;
 
 use crate::currency::ensure_base_amount;
@@ -80,12 +81,12 @@ impl FinanceTool {
             subcategory: subcategory.map(|s| s.to_string()),
             counterparty: counterparty.map(|s| s.to_string()),
             notes: notes.map(|s| s.to_string()),
-            tx_date,
+            tx_date: chrono_date_to_jiff(tx_date).into(),
             transfer_id: Some(transfer_id.clone()),
             is_recurring: false,
             recurring_rule: None,
-            created_at: now,
-            updated_at: now,
+            created_at: chrono_to_jiff(now).into(),
+            updated_at: chrono_to_jiff(now).into(),
             base_amount: conv.base_amount,
             base_currency: conv.base_currency.clone(),
             exchange_rate: conv.exchange_rate,
@@ -101,12 +102,12 @@ impl FinanceTool {
             subcategory: subcategory.map(|s| s.to_string()),
             counterparty: counterparty.map(|s| s.to_string()),
             notes: notes.map(|s| s.to_string()),
-            tx_date,
+            tx_date: chrono_date_to_jiff(tx_date).into(),
             transfer_id: Some(transfer_id.clone()),
             is_recurring: false,
             recurring_rule: None,
-            created_at: now,
-            updated_at: now,
+            created_at: chrono_to_jiff(now).into(),
+            updated_at: chrono_to_jiff(now).into(),
             base_amount: conv.base_amount,
             base_currency: conv.base_currency,
             exchange_rate: conv.exchange_rate,

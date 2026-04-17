@@ -87,8 +87,8 @@ pub async fn build_dashboard_data(
         ..Default::default()
     };
     let due_today_filter = storage::repos::TaskFilter {
-        due_after: Some(start_of_today),
-        due_before: Some(start_of_tomorrow),
+        due_after: Some(common::time::bridge::chrono_to_jiff(start_of_today)),
+        due_before: Some(common::time::bridge::chrono_to_jiff(start_of_tomorrow)),
         ..Default::default()
     };
     let (doing, due_today) = tokio::try_join!(
@@ -108,7 +108,7 @@ pub async fn build_dashboard_data(
             title: t.title.clone(),
             status: t.status.clone(),
             project_name: t.project_id.clone(),
-            due_date: t.due_date.map(|d| d.to_rfc3339()),
+            due_date: t.due_date.map(|d| common::time::bridge::jiff_to_chrono(*d).to_rfc3339()),
         })
         .collect();
 

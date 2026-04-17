@@ -57,7 +57,7 @@ impl FinanceAccountRepo {
         &self,
         patch: &FinanceAccountPatch,
     ) -> Result<FinanceAccountRow, crate::error::StorageError> {
-        let now = chrono::Utc::now();
+        let now: crate::sqlite_types::SqlTs = jiff::Timestamp::now().into();
         let row = sqlx::query_as::<_, FinanceAccountRow>(
             r#"
             UPDATE finance_accounts SET
@@ -187,7 +187,7 @@ impl FinanceAccountRepo {
         id: &str,
         delta: i64,
     ) -> Result<FinanceAccountRow, crate::error::StorageError> {
-        let now = chrono::Utc::now();
+        let now: crate::sqlite_types::SqlTs = jiff::Timestamp::now().into();
         let row = sqlx::query_as::<_, FinanceAccountRow>(
             r#"
             UPDATE finance_accounts

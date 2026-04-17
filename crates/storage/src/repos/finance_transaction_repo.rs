@@ -1,6 +1,6 @@
 //! Repository for the `finance_transactions` table.
 
-use chrono::NaiveDate;
+use jiff::civil::Date;
 
 use crate::rows::finance::{
     FinanceTransactionFilter, FinanceTransactionPatch, FinanceTransactionRow,
@@ -79,7 +79,7 @@ impl FinanceTransactionRepo {
                 base_amount   = COALESCE(?, base_amount),
                 base_currency = COALESCE(?, base_currency),
                 exchange_rate = COALESCE(?, exchange_rate),
-                updated_at    = datetime('now')
+                updated_at    = (unixepoch('now') * 1000)
             WHERE id = ?
             RETURNING *
             "#,
@@ -218,8 +218,8 @@ impl FinanceTransactionRepo {
     /// Returns `(category, total)` pairs in the user's base currency, sorted by total descending.
     pub async fn sum_by_category(
         &self,
-        date_from: NaiveDate,
-        date_to: NaiveDate,
+        date_from: Date,
+        date_to: Date,
         tx_type: &str,
         base_currency: &str,
     ) -> Result<Vec<(String, i64)>, crate::error::StorageError> {
@@ -236,8 +236,8 @@ impl FinanceTransactionRepo {
             ORDER BY total DESC
             "#,
         )
-        .bind(date_from)
-        .bind(date_to)
+        .bind(date_from.to_string())
+        .bind(date_to.to_string())
         .bind(tx_type)
         .bind(base_currency)
         .fetch_all(&self.pool)
@@ -281,8 +281,8 @@ impl FinanceTransactionRepo {
     /// Returns `(date_str, total_spending, tx_count)` triples ordered by date ascending.
     pub async fn daily_spending(
         &self,
-        date_from: NaiveDate,
-        date_to: NaiveDate,
+        date_from: Date,
+        date_to: Date,
         base_currency: &str,
     ) -> Result<Vec<(String, i64, i32)>, crate::error::StorageError> {
         let rows: Vec<(String, i64, i32)> = sqlx::query_as(
@@ -301,8 +301,8 @@ impl FinanceTransactionRepo {
             ORDER BY tx_date
             "#,
         )
-        .bind(date_from)
-        .bind(date_to)
+        .bind(date_from.to_string())
+        .bind(date_to.to_string())
         .bind(base_currency)
         .fetch_all(&self.pool)
         .await?;
@@ -314,8 +314,8 @@ impl FinanceTransactionRepo {
     pub async fn sum_by_type_in_range(
         &self,
         tx_type: &str,
-        date_from: NaiveDate,
-        date_to: NaiveDate,
+        date_from: Date,
+        date_to: Date,
         base_currency: &str,
     ) -> Result<i64, crate::error::StorageError> {
         let (total,): (i64,) = sqlx::query_as(
@@ -330,8 +330,8 @@ impl FinanceTransactionRepo {
             "#,
         )
         .bind(tx_type)
-        .bind(date_from)
-        .bind(date_to)
+        .bind(date_from.to_string())
+        .bind(date_to.to_string())
         .bind(base_currency)
         .fetch_one(&self.pool)
         .await?;

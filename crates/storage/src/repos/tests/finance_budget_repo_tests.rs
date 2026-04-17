@@ -2,8 +2,7 @@
 
 #[cfg(test)]
 mod tests {
-    use chrono::{Datelike, Local, NaiveDate, Utc};
-
+    
     use crate::repos::finance_account_repo::FinanceAccountRepo;
     use crate::repos::finance_budget_repo::FinanceBudgetRepo;
     use crate::repos::finance_transaction_repo::FinanceTransactionRepo;
@@ -40,15 +39,15 @@ mod tests {
     }
 
     /// Return the first day of the current month (local time).
-    fn current_month_start() -> NaiveDate {
-        let today = Local::now().date_naive();
-        NaiveDate::from_ymd_opt(today.year(), today.month(), 1).unwrap()
+    fn current_month_start() -> jiff::civil::Date {
+        let today = jiff::Zoned::now().date();
+        jiff::civil::Date::new(today.year(), today.month(), 1).unwrap()
     }
 
     /// Return a date in the middle of the current month (local time).
-    fn mid_current_month() -> NaiveDate {
-        let today = Local::now().date_naive();
-        NaiveDate::from_ymd_opt(today.year(), today.month(), 15.min(today.day())).unwrap()
+    fn mid_current_month() -> jiff::civil::Date {
+        let today = jiff::Zoned::now().date();
+        jiff::civil::Date::new(today.year(), today.month(), 15.min(today.day())).unwrap()
     }
 
     fn sample_budget(
@@ -57,7 +56,7 @@ mod tests {
         amount: i64,
         category: Option<&str>,
     ) -> FinanceBudgetRow {
-        let now = Utc::now();
+        let now: crate::sqlite_types::SqlTs = jiff::Timestamp::now().into();
         FinanceBudgetRow {
             id: id.to_string(),
             name: name.to_string(),
@@ -67,7 +66,7 @@ mod tests {
             category: category.map(|s| s.to_string()),
             method: "standard".to_string(),
             jar_type: None,
-            start_date: current_month_start(),
+            start_date: crate::sqlite_types::SqlDate::from(current_month_start()),
             end_date: None,
             is_active: true,
             alert_threshold: 80,
@@ -80,7 +79,7 @@ mod tests {
     }
 
     fn sample_account(id: &str) -> FinanceAccountRow {
-        let now = Utc::now();
+        let now: crate::sqlite_types::SqlTs = jiff::Timestamp::now().into();
         FinanceAccountRow {
             id: id.to_string(),
             name: "Test Account".to_string(),
@@ -104,9 +103,9 @@ mod tests {
         tx_type: &str,
         amount: i64,
         category: &str,
-        tx_date: NaiveDate,
+        tx_date: jiff::civil::Date,
     ) -> FinanceTransactionRow {
-        let now = Utc::now();
+        let now: crate::sqlite_types::SqlTs = jiff::Timestamp::now().into();
         FinanceTransactionRow {
             id: id.to_string(),
             account_id: account_id.to_string(),
@@ -117,7 +116,7 @@ mod tests {
             subcategory: None,
             counterparty: None,
             notes: None,
-            tx_date,
+            tx_date: crate::sqlite_types::SqlDate::from(tx_date),
             transfer_id: None,
             is_recurring: false,
             recurring_rule: None,

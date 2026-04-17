@@ -7,6 +7,7 @@ mod pricing;
 mod summary;
 
 use chrono::{Local, Utc};
+use common::time::bridge::{chrono_date_to_jiff, chrono_to_jiff};
 use serde_json::json;
 use uuid::Uuid;
 
@@ -71,8 +72,8 @@ impl FinanceTool {
             name: name.to_string(),
             description: description.map(|s| s.to_string()),
             currency,
-            created_at: now,
-            updated_at: now,
+            created_at: chrono_to_jiff(now).into(),
+            updated_at: chrono_to_jiff(now).into(),
         };
 
         let inserted = self.storage.investments.add_portfolio(&row).await?;
@@ -206,11 +207,11 @@ impl FinanceTool {
             currency: currency.to_string(),
             current_price: None,
             current_value: None,
-            purchase_date,
+            purchase_date: purchase_date.map(|d| chrono_date_to_jiff(d).into()),
             asset_class: None,
             notes: notes.map(|s| s.to_string()),
-            created_at: now,
-            updated_at: now,
+            created_at: chrono_to_jiff(now).into(),
+            updated_at: chrono_to_jiff(now).into(),
             market_currency: market_currency.map(|s| s.to_string()),
             base_cost_basis: inv_conv.base_cost_basis,
             base_current_value: inv_conv.base_current_value,
@@ -375,9 +376,9 @@ impl FinanceTool {
             total_amount,
             currency,
             fees,
-            tx_date,
+            tx_date: chrono_date_to_jiff(tx_date).into(),
             notes: notes.map(|s| s.to_string()),
-            created_at: now,
+            created_at: chrono_to_jiff(now).into(),
             base_total_amount: tx_conv.base_amount,
             base_currency: tx_conv.base_currency,
             exchange_rate: tx_conv.exchange_rate,
@@ -477,8 +478,8 @@ impl FinanceTool {
         let portfolio_id = p.required_str("portfolio_id")?;
         let start_date_str = p.required_str("start_date")?;
         let end_date_str = p.required_str("end_date")?;
-        let start_date = super::parse_date(start_date_str)?;
-        let end_date = super::parse_date(end_date_str)?;
+        let start_date = chrono_date_to_jiff(super::parse_date(start_date_str)?);
+        let end_date = chrono_date_to_jiff(super::parse_date(end_date_str)?);
 
         // Compute portfolio start and end value from investments
         let filter = storage::rows::finance::FinanceInvestmentFilter {
@@ -508,7 +509,7 @@ impl FinanceTool {
                 .list_investment_txs(&inv.id)
                 .await?;
             for tx in &txs {
-                if tx.tx_date >= start_date && tx.tx_date <= end_date {
+                if *tx.tx_date >= start_date && *tx.tx_date <= end_date {
                     let amount = match tx.tx_type.as_str() {
                         "buy" => common::Decimal::new(tx.total_amount, 0),
                         "sell" => common::Decimal::new(-tx.total_amount, 0),
@@ -516,7 +517,7 @@ impl FinanceTool {
                     };
                     if amount != common::Decimal::ZERO {
                         cash_flows.push(analytics::InvestmentCashFlow {
-                            date: common::time::bridge::chrono_date_to_jiff(tx.tx_date),
+                            date: *tx.tx_date,
                             amount,
                             holding_symbol: inv.symbol.clone(),
                         });
@@ -529,8 +530,8 @@ impl FinanceTool {
             start_value,
             end_value,
             &cash_flows,
-            common::time::bridge::chrono_date_to_jiff(start_date),
-            common::time::bridge::chrono_date_to_jiff(end_date),
+            start_date,
+            end_date,
         );
         Ok(serde_json::to_string_pretty(&result).unwrap())
     }
@@ -569,7 +570,7 @@ impl FinanceTool {
                 .filter_map(|tx| {
                     tx.price_per_unit.map(|price| {
                         (
-                            common::time::bridge::chrono_date_to_jiff(tx.tx_date),
+                            *tx.tx_date,
                             common::Decimal::new(price, 0),
                         )
                     })

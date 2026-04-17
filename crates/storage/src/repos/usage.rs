@@ -1,6 +1,5 @@
 //! Usage repository — usage_records table.
 
-use chrono::{DateTime, Datelike, NaiveTime, Utc};
 use sqlx::SqlitePool;
 
 use crate::error::StorageError;
@@ -47,7 +46,7 @@ impl UsageRepo {
     /// Returns (model, total_tokens, total_cost).
     pub async fn aggregate_by_model(
         &self,
-        since: DateTime<Utc>,
+        since: jiff::Timestamp,
     ) -> Result<Vec<(String, i64, f64)>, StorageError> {
         let rows: Vec<ModelAggregate> = sqlx::query_as(
             "SELECT model,
@@ -58,7 +57,7 @@ impl UsageRepo {
              GROUP BY model
              ORDER BY total_cost DESC",
         )
-        .bind(since)
+        .bind(crate::sqlite_types::SqlTs::from(since))
         .fetch_all(&self.pool)
         .await?;
         Ok(rows
@@ -77,7 +76,7 @@ impl UsageRepo {
     /// Returns (date_string, total_cost).
     pub async fn aggregate_by_day(
         &self,
-        since: DateTime<Utc>,
+        since: jiff::Timestamp,
     ) -> Result<Vec<(String, f64)>, StorageError> {
         let rows: Vec<DayAggregate> = sqlx::query_as(
             "SELECT strftime('%Y-%m-%d', timestamp) AS day,
@@ -87,7 +86,7 @@ impl UsageRepo {
              GROUP BY day
              ORDER BY day ASC",
         )
-        .bind(since)
+        .bind(crate::sqlite_types::SqlTs::from(since))
         .fetch_all(&self.pool)
         .await?;
         Ok(rows
@@ -98,33 +97,38 @@ impl UsageRepo {
 
     /// Get total estimated cost for the current calendar month (UTC).
     pub async fn total_cost_current_month(&self) -> Result<f64, StorageError> {
-        let now = Utc::now();
-        let first_of_month = now.date_naive().with_day(1).unwrap_or(now.date_naive());
-        let month_start = first_of_month.and_time(NaiveTime::MIN);
-        let month_start_utc = DateTime::<Utc>::from_naive_utc_and_offset(month_start, Utc);
-        let (_, cost) = self.totals_since(month_start_utc).await?;
+        let now = jiff::Timestamp::now();
+        let today = now.to_zoned(jiff::tz::TimeZone::UTC).date();
+        let month_start_date = jiff::civil::Date::new(today.year(), today.month(), 1)
+            .expect("valid date");
+        let month_start = month_start_date
+            .at(0, 0, 0, 0)
+            .to_zoned(jiff::tz::TimeZone::UTC)
+            .expect("UTC always valid")
+            .timestamp();
+        let (_, cost) = self.totals_since(month_start).await?;
         Ok(cost)
     }
 
     /// Get total tokens (prompt + completion) since a timestamp.
-    pub async fn total_tokens_since(&self, since: DateTime<Utc>) -> Result<i64, StorageError> {
+    pub async fn total_tokens_since(&self, since: jiff::Timestamp) -> Result<i64, StorageError> {
         Ok(sqlx::query_scalar::<_, i64>(
             "SELECT COALESCE(SUM(prompt_tokens + completion_tokens), 0)
              FROM usage_records WHERE timestamp >= ?1",
         )
-        .bind(since)
+        .bind(crate::sqlite_types::SqlTs::from(since))
         .fetch_one(&self.pool)
         .await?)
     }
 
     /// Get total request count and cost since a timestamp.
-    pub async fn totals_since(&self, since: DateTime<Utc>) -> Result<(i64, f64), StorageError> {
+    pub async fn totals_since(&self, since: jiff::Timestamp) -> Result<(i64, f64), StorageError> {
         let row: TotalAggregate = sqlx::query_as(
             "SELECT COUNT(*) AS total_requests,
                     COALESCE(SUM(estimated_cost_usd), 0) AS total_cost
              FROM usage_records WHERE timestamp >= ?1",
         )
-        .bind(since)
+        .bind(crate::sqlite_types::SqlTs::from(since))
         .fetch_one(&self.pool)
         .await?;
         Ok((
@@ -163,14 +167,14 @@ mod tests {
         let pool = crate::StoragePool::connect_in_memory().await.unwrap();
         let repo = UsageRepo::new(pool.inner().clone());
 
-        let now = Utc::now();
-        let old = now - chrono::Duration::hours(2);
-        let recent = now - chrono::Duration::minutes(30);
+        let now = jiff::Timestamp::now();
+        let old = now - jiff::SignedDuration::from_hours(2);
+        let recent = now - jiff::SignedDuration::from_mins(30);
 
         // Insert an old record (before the "since" cutoff)
         repo.create(&UsageRecordRow {
             id: uuid::Uuid::new_v4(),
-            timestamp: old,
+            timestamp: crate::sqlite_types::SqlTs::from(old),
             request_id: "req-old".to_string(),
             model: "gpt-4o".to_string(),
             provider: "openai".to_string(),
@@ -188,7 +192,7 @@ mod tests {
         // Insert a recent record (after the "since" cutoff)
         repo.create(&UsageRecordRow {
             id: uuid::Uuid::new_v4(),
-            timestamp: recent,
+            timestamp: crate::sqlite_types::SqlTs::from(recent),
             request_id: "req-recent".to_string(),
             model: "gpt-4o".to_string(),
             provider: "openai".to_string(),
@@ -204,17 +208,17 @@ mod tests {
         .unwrap();
 
         // Query since 1 hour ago — should only include the recent record
-        let since = now - chrono::Duration::hours(1);
+        let since = now - jiff::SignedDuration::from_hours(1);
         let total = repo.total_tokens_since(since).await.unwrap();
         assert_eq!(total, 300); // 200 + 100
 
         // Query since 3 hours ago — should include both records
-        let since_all = now - chrono::Duration::hours(3);
+        let since_all = now - jiff::SignedDuration::from_hours(3);
         let total_all = repo.total_tokens_since(since_all).await.unwrap();
         assert_eq!(total_all, 450); // (100+50) + (200+100)
 
         // Query since the future — should return 0
-        let future = now + chrono::Duration::hours(1);
+        let future = now + jiff::SignedDuration::from_hours(1);
         let total_future = repo.total_tokens_since(future).await.unwrap();
         assert_eq!(total_future, 0);
     }

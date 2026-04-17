@@ -1,6 +1,7 @@
 //! Health check action handler for `FinanceTool`.
 
 use chrono::{Duration, Local};
+use common::time::bridge::{jiff_date_to_chrono, jiff_to_chrono};
 use serde_json::json;
 
 use common::Result;
@@ -70,7 +71,7 @@ impl FinanceTool {
         let stale_threshold = Local::now() - Duration::hours(24);
         let stale_count = investments
             .iter()
-            .filter(|inv| inv.updated_at < stale_threshold.to_utc())
+            .filter(|inv| jiff_to_chrono(*inv.updated_at) < stale_threshold.to_utc())
             .count();
         if stale_count > 0 {
             issues.push(Issue {
@@ -109,7 +110,7 @@ impl FinanceTool {
         let today = Local::now().date_naive();
         let overdue_goals: Vec<_> = goals
             .iter()
-            .filter(|g| g.deadline.map(|d| d < today).unwrap_or(false))
+            .filter(|g| g.deadline.as_ref().map(|d| jiff_date_to_chrono(**d) < today).unwrap_or(false))
             .collect();
         if !overdue_goals.is_empty() {
             issues.push(Issue {

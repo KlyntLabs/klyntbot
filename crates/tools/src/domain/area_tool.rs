@@ -4,6 +4,7 @@
 
 use async_trait::async_trait;
 use chrono::Utc;
+use common::time::bridge::{chrono_to_jiff, jiff_to_chrono};
 use serde_json::Value;
 
 use crate::params::ParamExtractor;
@@ -102,8 +103,8 @@ impl Tool for AreaTool {
                     icon: p.optional_str("icon")?.map(String::from),
                     position: 0,
                     status: "active".to_string(),
-                    created_at: now,
-                    updated_at: now,
+                    created_at: chrono_to_jiff(now).into(),
+                    updated_at: chrono_to_jiff(now).into(),
                 };
 
                 let created = self.area_repo.create(&row).await?;
@@ -178,7 +179,7 @@ impl Tool for AreaTool {
                 output.push_str(&format!("Projects: {}\n", project_count));
                 output.push_str(&format!("Actions: {}\n", action_count));
                 output.push_str(&format!("Position: {}\n", area.position));
-                output.push_str(&format!("Created: {}\n", area.created_at));
+                output.push_str(&format!("Created: {}\n", jiff_to_chrono(*area.created_at)));
 
                 Ok(output)
             }

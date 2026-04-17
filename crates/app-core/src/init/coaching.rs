@@ -232,8 +232,8 @@ pub(super) async fn build_situation_inputs(
     // Tasks due within 24h
     let tomorrow = now + Duration::hours(24);
     let filter = storage::TaskFilter {
-        due_after: Some(now),
-        due_before: Some(tomorrow),
+        due_after: Some(common::time::bridge::chrono_to_jiff(now)),
+        due_before: Some(common::time::bridge::chrono_to_jiff(tomorrow)),
         ..Default::default()
     };
     if let Ok(upcoming) = repos.tasks.list(&filter).await {

@@ -1,6 +1,6 @@
 //! Row structs for the `status_workflows` and `status_labels` tables.
 
-use chrono::{DateTime, Utc};
+use crate::sqlite_types::SqlTs;
 use serde::Serialize;
 use sqlx::FromRow;
 
@@ -12,8 +12,8 @@ pub struct StatusWorkflowRow {
     pub name: String,
     pub is_template: bool,
     pub is_global_default: bool,
-    pub created_at: DateTime<Utc>,
-    pub updated_at: DateTime<Utc>,
+    pub created_at: SqlTs,
+    pub updated_at: SqlTs,
 }
 
 /// Row struct for the `status_labels` table.
@@ -26,5 +26,5 @@ pub struct StatusLabelRow {
     pub color: String,
     pub status_group: String,
     pub position: i32,
-    pub created_at: DateTime<Utc>,
+    pub created_at: SqlTs,
 }

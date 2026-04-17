@@ -1,6 +1,5 @@
 //! Repository for autotuner experiment and trial tables.
 
-use chrono::{DateTime, Utc};
 use sqlx::SqlitePool;
 
 use crate::error::StorageError;
@@ -178,7 +177,7 @@ impl TrialRepo {
         min_messages: u32,
     ) -> Result<u32, StorageError> {
         let cutoff =
-            (chrono::Utc::now() - chrono::Duration::days(max_age_days as i64)).to_rfc3339();
+            (jiff::Timestamp::now() - jiff::SignedDuration::from_hours((max_age_days as i64) * 24)).to_string();
         let result = sqlx::query(
             "UPDATE autotuner_trials SET status = 'completed', completed_at = datetime('now')
              WHERE status = 'active'
@@ -345,10 +344,10 @@ impl TrialRepo {
     pub async fn shadow_log_agreement_rate(
         &self,
         trial_id: Option<&str>,
-        since: DateTime<Utc>,
+        since: jiff::Timestamp,
     ) -> Result<f64, StorageError> {
         // Format as YYYY-MM-DD HH:MM:SS to match SQLite's datetime() output.
-        let since_str = since.format("%Y-%m-%d %H:%M:%S").to_string();
+        let since_str = since.to_string().get(..19).unwrap_or("").replace('T', " ");
         let (total, agreed): (i64, i64) = if let Some(tid) = trial_id {
             sqlx::query_as::<_, (i64, i64)>(
                 "SELECT COUNT(*) AS total,
@@ -385,9 +384,9 @@ impl TrialRepo {
     pub async fn correction_rate_for_trial(
         &self,
         trial_id: &str,
-        since: DateTime<Utc>,
+        since: jiff::Timestamp,
     ) -> Result<(i64, i64), StorageError> {
-        let since_str = since.format("%Y-%m-%d %H:%M:%S").to_string();
+        let since_str = since.to_string().get(..19).unwrap_or("").replace('T', " ");
         sqlx::query_as::<_, (i64, i64)>(
             "SELECT COUNT(*) AS total,
                     COALESCE(SUM(CASE WHEN user_corrected = 1 THEN 1 ELSE 0 END), 0) AS corrected
@@ -405,8 +404,8 @@ impl TrialRepo {
 
     /// Count trials that reached a terminal status (completed, promoted, or
     /// reverted) since the given timestamp.
-    pub async fn count_trials_since(&self, since: DateTime<Utc>) -> Result<i64, StorageError> {
-        let since_str = since.format("%Y-%m-%d %H:%M:%S").to_string();
+    pub async fn count_trials_since(&self, since: jiff::Timestamp) -> Result<i64, StorageError> {
+        let since_str = since.to_string().get(..19).unwrap_or("").replace('T', " ");
         Ok(sqlx::query_scalar::<_, i64>(
             "SELECT COUNT(*) FROM autotuner_trials
              WHERE status IN ('completed', 'promoted', 'reverted')
@@ -456,9 +455,9 @@ impl TrialRepo {
     pub async fn retrieval_precision_for_trial(
         &self,
         trial_id: &str,
-        since: DateTime<Utc>,
+        since: jiff::Timestamp,
     ) -> Result<f64, StorageError> {
-        let since_str = since.format("%Y-%m-%d %H:%M:%S").to_string();
+        let since_str = since.to_string().get(..19).unwrap_or("").replace('T', " ");
         let result = sqlx::query_as::<_, (f64,)>(
             "SELECT COALESCE(AVG(CASE WHEN variant_retrieved_count > 0
                 THEN CAST(overlap_count AS REAL) / variant_retrieved_count
@@ -477,9 +476,9 @@ impl TrialRepo {
     pub async fn avg_memory_freshness_for_trial(
         &self,
         trial_id: &str,
-        since: DateTime<Utc>,
+        since: jiff::Timestamp,
     ) -> Result<f64, StorageError> {
-        let since_str = since.format("%Y-%m-%d %H:%M:%S").to_string();
+        let since_str = since.to_string().get(..19).unwrap_or("").replace('T', " ");
         let result = sqlx::query_as::<_, (f64,)>(
             "SELECT COALESCE(AVG(variant_avg_age_days), 0.0)
              FROM autotuner_shadow_retrieval_log
@@ -493,8 +492,8 @@ impl TrialRepo {
     }
 
     /// Count trials that were promoted since the given timestamp.
-    pub async fn count_promoted_since(&self, since: DateTime<Utc>) -> Result<i64, StorageError> {
-        let since_str = since.format("%Y-%m-%d %H:%M:%S").to_string();
+    pub async fn count_promoted_since(&self, since: jiff::Timestamp) -> Result<i64, StorageError> {
+        let since_str = since.to_string().get(..19).unwrap_or("").replace('T', " ");
         Ok(sqlx::query_scalar::<_, i64>(
             "SELECT COUNT(*) FROM autotuner_trials
              WHERE status = 'promoted' AND completed_at >= ?1",
@@ -507,7 +506,6 @@ impl TrialRepo {
 
 #[cfg(test)]
 mod tests {
-    use chrono::Utc;
 
     use super::*;
 
@@ -634,7 +632,7 @@ mod tests {
         // Verify via agreement rate — predicted_mode="direct" vs control_mode="reactive"
         // means 0% agreement
         let rate = repo
-            .shadow_log_agreement_rate(Some("trial-gt"), Utc::now() - chrono::Duration::hours(1))
+            .shadow_log_agreement_rate(Some("trial-gt"), jiff::Timestamp::now() - jiff::SignedDuration::from_hours(1))
             .await
             .unwrap();
         assert!(
@@ -686,7 +684,7 @@ mod tests {
         let repo = setup().await;
 
         let rate = repo
-            .shadow_log_agreement_rate(None, Utc::now() - chrono::Duration::hours(1))
+            .shadow_log_agreement_rate(None, jiff::Timestamp::now() - jiff::SignedDuration::from_hours(1))
             .await
             .unwrap();
 
@@ -751,7 +749,7 @@ mod tests {
             .await
             .unwrap();
 
-        let since = Utc::now() - chrono::Duration::hours(1);
+        let since = jiff::Timestamp::now() - jiff::SignedDuration::from_hours(1);
         let (total, corrected) = repo
             .correction_rate_for_trial("trial-cr", since)
             .await
@@ -765,7 +763,7 @@ mod tests {
     async fn correction_rate_for_trial_empty_returns_zero() {
         let repo = setup().await;
 
-        let since = Utc::now() - chrono::Duration::hours(1);
+        let since = jiff::Timestamp::now() - jiff::SignedDuration::from_hours(1);
         let (total, corrected) = repo
             .correction_rate_for_trial("nonexistent-trial", since)
             .await
@@ -779,7 +777,7 @@ mod tests {
     async fn count_trials_and_promoted_empty() {
         let repo = setup().await;
 
-        let since = Utc::now() - chrono::Duration::days(7);
+        let since = jiff::Timestamp::now() - jiff::SignedDuration::from_hours((7) * 24);
         let total = repo.count_trials_since(since).await.unwrap();
         let promoted = repo.count_promoted_since(since).await.unwrap();
 

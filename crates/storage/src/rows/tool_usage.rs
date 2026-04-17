@@ -1,6 +1,6 @@
 //! Row struct for the `tool_usage` table.
 
-use chrono::{DateTime, Utc};
+use crate::sqlite_types::SqlTs;
 use serde::Serialize;
 use sqlx::FromRow;
 
@@ -17,7 +17,7 @@ pub struct ToolUsageRow {
     pub success: bool,
     pub duration_ms: Option<i64>,
     pub error_message: Option<String>,
-    pub created_at: DateTime<Utc>,
+    pub created_at: SqlTs,
 }
 
 /// Aggregated tool usage stats.

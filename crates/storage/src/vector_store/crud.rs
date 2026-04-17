@@ -90,7 +90,7 @@ impl VectorStore {
             .map_err(|e| StorageError::Vector(format!("build vector array: {e}")))?,
         ) as ArrayRef;
 
-        let now = chrono::Utc::now().to_rfc3339();
+        let now = jiff::Timestamp::now().to_string();
         // Extract timestamp column name before schema is consumed below.
         let ts_col_name = schema
             .fields()
@@ -152,7 +152,7 @@ impl VectorStore {
             .map(|f| f.name().clone())
             .unwrap_or_else(|| "updated_at".into());
 
-        let now = chrono::Utc::now().to_rfc3339();
+        let now = jiff::Timestamp::now().to_string();
         let n = items.len();
 
         // Build column arrays for all items at once

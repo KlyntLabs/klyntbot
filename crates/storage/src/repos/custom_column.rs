@@ -262,7 +262,7 @@ mod tests {
             options_json: None,
             position: 0,
             width: Some(120),
-            created_at: chrono::Utc::now(),
+            created_at: jiff::Timestamp::now().into(),
         };
         let created = repo.create_column(&row).await.unwrap();
         assert_eq!(created.id, "col_1");
@@ -276,7 +276,7 @@ mod tests {
             options_json: Some(r#"["Low","Medium","High"]"#.into()),
             position: 1,
             width: None,
-            created_at: chrono::Utc::now(),
+            created_at: jiff::Timestamp::now().into(),
         };
         repo.create_column(&row2).await.unwrap();
 
@@ -298,7 +298,7 @@ mod tests {
             options_json: None,
             position: 0,
             width: None,
-            created_at: chrono::Utc::now(),
+            created_at: jiff::Timestamp::now().into(),
         };
         repo.create_column(&row).await.unwrap();
 
@@ -322,7 +322,7 @@ mod tests {
             options_json: None,
             position: 0,
             width: Some(100),
-            created_at: chrono::Utc::now(),
+            created_at: jiff::Timestamp::now().into(),
         };
         repo.create_column(&row).await.unwrap();
 
@@ -360,7 +360,7 @@ mod tests {
             options_json: None,
             position: 0,
             width: None,
-            created_at: chrono::Utc::now(),
+            created_at: jiff::Timestamp::now().into(),
         };
         repo.create_column(&row).await.unwrap();
 
@@ -384,7 +384,7 @@ mod tests {
                 options_json: None,
                 position: i as i32,
                 width: None,
-                created_at: chrono::Utc::now(),
+                created_at: jiff::Timestamp::now().into(),
             };
             repo.create_column(&row).await.unwrap();
         }
@@ -416,7 +416,7 @@ mod tests {
             options_json: None,
             position: 0,
             width: None,
-            created_at: chrono::Utc::now(),
+            created_at: jiff::Timestamp::now().into(),
         };
         repo.create_column(&col).await.unwrap();
 
@@ -461,7 +461,7 @@ mod tests {
             options_json: None,
             position: 0,
             width: None,
-            created_at: chrono::Utc::now(),
+            created_at: jiff::Timestamp::now().into(),
         };
         repo.create_column(&col).await.unwrap();
 
@@ -503,7 +503,7 @@ mod tests {
             options_json: None,
             position: 0,
             width: None,
-            created_at: chrono::Utc::now(),
+            created_at: jiff::Timestamp::now().into(),
         };
         repo.create_column(&col).await.unwrap();
 

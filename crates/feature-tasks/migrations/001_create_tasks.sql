@@ -20,26 +20,26 @@ CREATE TABLE IF NOT EXISTS tasks (
     group_id             TEXT REFERENCES task_groups(id) ON DELETE SET NULL,
     priority             INTEGER,
     position             INTEGER NOT NULL DEFAULT 0,
-    due_date             TEXT,
+    due_date             INTEGER,
     tags                 TEXT NOT NULL DEFAULT '[]',
     status               TEXT NOT NULL DEFAULT 'todo',
     task_type            TEXT NOT NULL DEFAULT 'manual',
-    focused_at           TEXT,
-    focus_deadline       TEXT,
+    focused_at           INTEGER,
+    focus_deadline       INTEGER,
     focus_expired_count  INTEGER NOT NULL DEFAULT 0,
-    created_at           TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
-    updated_at           TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
-    completed_at         TEXT,
+    created_at           INTEGER NOT NULL DEFAULT (unixepoch('now') * 1000),
+    updated_at           INTEGER NOT NULL DEFAULT (unixepoch('now') * 1000),
+    completed_at         INTEGER,
     completed            INTEGER NOT NULL DEFAULT 0,
     total_tracked_secs   INTEGER NOT NULL DEFAULT 0,
     estimated_minutes    INTEGER,
     actual_minutes       INTEGER,
     calendar_event_uid   TEXT,
-    last_reminded_at     TEXT,
+    last_reminded_at     INTEGER,
     recurrence_rule      TEXT,
     recurrence_parent_id TEXT,
     is_template          INTEGER NOT NULL DEFAULT 0,
-    next_instance_date   TEXT,
+    next_instance_date   INTEGER,
     acceptance_criteria  TEXT,
     agent_config         TEXT,
     execution_state      TEXT NOT NULL DEFAULT 'idle',
@@ -48,8 +48,8 @@ CREATE TABLE IF NOT EXISTS tasks (
     energy_level         TEXT DEFAULT 'medium',
     estimated_focus_blocks INTEGER,
     complexity_score     INTEGER,
-    scheduled_start      TEXT,
-    scheduled_end        TEXT
+    scheduled_start      INTEGER,
+    scheduled_end        INTEGER
 );
 
 CREATE INDEX IF NOT EXISTS idx_tasks_status ON tasks(status);
@@ -80,7 +80,7 @@ CREATE TABLE IF NOT EXISTS task_activity (
     actor_type    TEXT NOT NULL DEFAULT 'user',
     actor_id      TEXT,
     summary       TEXT,
-    created_at    TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now'))
+    created_at    INTEGER NOT NULL DEFAULT (unixepoch('now') * 1000)
 );
 
 CREATE INDEX IF NOT EXISTS idx_task_activity_task_id ON task_activity(task_id);
@@ -94,8 +94,8 @@ CREATE TABLE IF NOT EXISTS task_executions (
     task_id        TEXT NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
     status         TEXT NOT NULL DEFAULT 'pending',
     agent_profile  TEXT,
-    started_at     TEXT,
-    completed_at   TEXT,
+    started_at     INTEGER,
+    completed_at   INTEGER,
     duration_secs  INTEGER,
     tokens_used    INTEGER,
     cost_usd       REAL,
@@ -105,7 +105,7 @@ CREATE TABLE IF NOT EXISTS task_executions (
     artifacts      TEXT,
     metrics        TEXT,
     retry_count    INTEGER NOT NULL DEFAULT 0,
-    created_at     TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now'))
+    created_at     INTEGER NOT NULL DEFAULT (unixepoch('now') * 1000)
 );
 
 CREATE INDEX IF NOT EXISTS idx_task_executions_task_id ON task_executions(task_id);
@@ -123,8 +123,8 @@ CREATE TABLE IF NOT EXISTS task_suggestions (
     action_payload  TEXT,
     status          TEXT NOT NULL DEFAULT 'pending',
     trigger         TEXT,
-    created_at      TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
-    resolved_at     TEXT
+    created_at      INTEGER NOT NULL DEFAULT (unixepoch('now') * 1000),
+    resolved_at     INTEGER
 );
 
 CREATE INDEX IF NOT EXISTS idx_task_suggestions_task_id ON task_suggestions(task_id);
@@ -141,7 +141,7 @@ CREATE TABLE IF NOT EXISTS task_attachments (
     title           TEXT,
     tags            TEXT NOT NULL DEFAULT '[]',
     source          TEXT NOT NULL DEFAULT 'user',
-    created_at      TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now'))
+    created_at      INTEGER NOT NULL DEFAULT (unixepoch('now') * 1000)
 );
 
 CREATE INDEX IF NOT EXISTS idx_task_attachments_task_id ON task_attachments(task_id);
@@ -153,8 +153,8 @@ CREATE TABLE IF NOT EXISTS task_time_entries (
     id            TEXT PRIMARY KEY,
     task_id       TEXT NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
     source        TEXT NOT NULL DEFAULT 'focus',
-    started_at    TEXT NOT NULL,
-    ended_at      TEXT,
+    started_at    INTEGER NOT NULL,
+    ended_at      INTEGER,
     duration_secs INTEGER,
     energy_level  TEXT,
     note          TEXT
@@ -186,8 +186,8 @@ CREATE TABLE IF NOT EXISTS task_decompositions (
     confidence  REAL NOT NULL DEFAULT 0.0,
     status      TEXT NOT NULL DEFAULT 'pending',
     reasoning   TEXT,
-    created_at  TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ', 'now')),
-    applied_at  TEXT
+    created_at  INTEGER NOT NULL DEFAULT (unixepoch('now') * 1000),
+    applied_at  INTEGER
 );
 
 CREATE INDEX IF NOT EXISTS idx_task_decompositions_task_id ON task_decompositions(task_id);
@@ -205,7 +205,7 @@ CREATE TABLE IF NOT EXISTS task_estimation_history (
     energy_level      TEXT,
     tags              TEXT NOT NULL DEFAULT '[]',
     project_id        TEXT,
-    completed_at      TEXT NOT NULL
+    completed_at      INTEGER NOT NULL
 );
 
 CREATE INDEX IF NOT EXISTS idx_task_estimation_history_task_id ON task_estimation_history(task_id);
@@ -220,7 +220,7 @@ CREATE TRIGGER IF NOT EXISTS trg_tasks_updated_at
 AFTER UPDATE ON tasks
 FOR EACH ROW
 BEGIN
-    UPDATE tasks SET updated_at = strftime('%Y-%m-%dT%H:%M:%SZ', 'now')
+    UPDATE tasks SET updated_at = (unixepoch('now') * 1000)
     WHERE id = NEW.id;
 END;
 
@@ -230,7 +230,7 @@ AFTER UPDATE OF completed ON tasks
 FOR EACH ROW
 WHEN NEW.completed = 1 AND OLD.completed = 0
 BEGIN
-    UPDATE tasks SET completed_at = strftime('%Y-%m-%dT%H:%M:%SZ', 'now')
+    UPDATE tasks SET completed_at = (unixepoch('now') * 1000)
     WHERE id = NEW.id;
 END;
 
@@ -241,9 +241,6 @@ FOR EACH ROW
 WHEN NEW.completed_at IS NOT NULL AND OLD.completed_at IS NULL AND NEW.started_at IS NOT NULL
 BEGIN
     UPDATE task_executions
-    SET duration_secs = CAST(
-        (julianday(NEW.completed_at) - julianday(NEW.started_at)) * 86400.0
-        AS INTEGER
-    )
+    SET duration_secs = (NEW.completed_at - NEW.started_at) / 1000
     WHERE id = NEW.id;
 END;

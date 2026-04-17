@@ -7,8 +7,7 @@ mod tests {
     use crate::repos::finance_account_repo::FinanceAccountRepo;
     use crate::rows::finance::{FinanceAccountPatch, FinanceAccountRow};
     use crate::StoragePool;
-    use chrono::Utc;
-
+    
     async fn test_account_repo() -> Option<FinanceAccountRepo> {
         let dir = tempfile::tempdir().ok()?;
         let pool = StoragePool::connect(dir.path()).await.ok()?;
@@ -17,7 +16,7 @@ mod tests {
     }
 
     fn sample_account(id: &str, name: &str, account_type: &str) -> FinanceAccountRow {
-        let now = Utc::now();
+        let now: crate::sqlite_types::SqlTs = jiff::Timestamp::now().into();
         FinanceAccountRow {
             id: id.to_string(),
             name: name.to_string(),

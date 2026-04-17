@@ -1,7 +1,7 @@
 use std::collections::BTreeMap;
 
-use jiff::civil::Date;
 use common::Decimal;
+use jiff::civil::Date;
 use rust_decimal::prelude::*;
 
 use crate::types::CorrelationMatrix;

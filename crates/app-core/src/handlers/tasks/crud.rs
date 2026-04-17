@@ -43,7 +43,7 @@ impl AppCore {
 
     pub async fn task_create(&self, params: TaskCreateParams) -> HandlerResult<TaskResponse> {
         let id = uuid::Uuid::new_v4().to_string();
-        let now = chrono::Utc::now();
+        let now: storage::SqlTs = common::time::bridge::chrono_to_jiff(chrono::Utc::now()).into();
 
         let area_id = match (&params.area_id, &params.parent_id) {
             (Some(aid), _) => aid.clone(),
@@ -107,7 +107,7 @@ impl AppCore {
             key_result_id: None,
             parent_id: params.parent_id.clone(),
             priority: params.priority,
-            due_date: params.due_date.and_then(|d| parse_date(&d)),
+            due_date: params.due_date.and_then(|d| parse_date(&d)).map(|d| common::time::bridge::chrono_to_jiff(d).into()),
             tags: params.tags.unwrap_or_default(),
             status: "todo".to_string(),
             focused_at: None,
@@ -168,7 +168,7 @@ impl AppCore {
             if created.due_date.is_some() {
                 bus.publish(bus::DomainEvent::TaskDueDateChanged {
                     task_id: id.clone(),
-                    due_date: created.due_date.map(|d| d.to_rfc3339()),
+                    due_date: created.due_date.map(|d| common::time::bridge::jiff_to_chrono(*d).to_rfc3339()),
                 });
             }
         }
@@ -204,7 +204,7 @@ impl AppCore {
             description: params.description,
             priority: params.priority,
             status: params.status,
-            due_date: params.due_date.map(|opt| opt.and_then(|d| parse_date(&d))),
+            due_date: params.due_date.map(|opt| opt.and_then(|d| parse_date(&d)).map(|d| common::time::bridge::chrono_to_jiff(d))),
             tags: params.tags,
             area_id: params.area_id,
             project_id: params.project_id,
@@ -218,10 +218,10 @@ impl AppCore {
             estimated_minutes: params.estimated_minutes,
             scheduled_start: params
                 .scheduled_start
-                .map(|opt| opt.and_then(|d| common::parse_datetime(&d, "UTC"))),
+                .map(|opt| opt.and_then(|d| common::parse_datetime(&d, "UTC")).map(|d| common::time::bridge::chrono_to_jiff(d))),
             scheduled_end: params
                 .scheduled_end
-                .map(|opt| opt.and_then(|d| common::parse_datetime(&d, "UTC"))),
+                .map(|opt| opt.and_then(|d| common::parse_datetime(&d, "UTC")).map(|d| common::time::bridge::chrono_to_jiff(d))),
             ..Default::default()
         };
 
@@ -298,12 +298,12 @@ impl AppCore {
                     let changed = match (old_due, new_due) {
                         (None, None) => false,
                         (Some(_), None) | (None, Some(_)) => true,
-                        (Some(a), Some(b)) => a != *b,
+                        (Some(a), Some(b)) => *a != *b,
                     };
                     if changed {
                         bus.publish(bus::DomainEvent::TaskDueDateChanged {
                             task_id: task_id.clone(),
-                            due_date: new_due.map(|d| d.to_rfc3339()),
+                            due_date: new_due.map(|d| common::time::bridge::jiff_to_chrono(d).to_rfc3339()),
                         });
                     }
                 }
@@ -498,7 +498,7 @@ impl AppCore {
             .add_time_entry(
                 &task_id,
                 "user",
-                started_at,
+                common::time::bridge::chrono_to_jiff(started_at),
                 duration_secs,
                 note.as_deref(),
                 None,

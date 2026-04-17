@@ -78,7 +78,7 @@ impl AppCore {
         params: ProjectCreateParams,
     ) -> HandlerResult<ProjectResponse> {
         let id = uuid::Uuid::new_v4().to_string();
-        let now = chrono::Utc::now();
+        let now: storage::SqlTs = common::time::bridge::chrono_to_jiff(chrono::Utc::now()).into();
 
         let row = ProjectRow {
             id: id.clone(),

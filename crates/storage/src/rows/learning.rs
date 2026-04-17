@@ -1,7 +1,7 @@
 //! Row structs for `learning_outcomes`, `strategy_records`,
 //! and `enrichment_feedback` tables.
 
-use chrono::{DateTime, Utc};
+use crate::sqlite_types::SqlTs;
 use serde::Serialize;
 use sqlx::FromRow;
 
@@ -18,7 +18,7 @@ pub struct OutcomeRow {
     pub confidence_score: Option<f32>,
     pub confidence_dimensions: Option<serde_json::Value>,
     pub execution_mode: serde_json::Value,
-    pub created_at: DateTime<Utc>,
+    pub created_at: SqlTs,
 }
 
 /// Row struct for the `strategy_records` table.
@@ -26,7 +26,7 @@ pub struct OutcomeRow {
 #[serde(rename_all = "camelCase")]
 pub struct StrategyRecordRow {
     pub id: uuid::Uuid,
-    pub timestamp: DateTime<Utc>,
+    pub timestamp: SqlTs,
     pub request_id: String,
     pub predicted_strategy: String,
     pub actual_strategy: String,
@@ -62,7 +62,7 @@ pub struct EnrichmentFeedbackRow {
     pub actual_value: Option<String>,
     pub accepted: bool,
     pub confidence: f64,
-    pub timestamp: DateTime<Utc>,
+    pub timestamp: SqlTs,
 }
 
 /// Row struct for the `learning_state` key-value table.
@@ -71,7 +71,7 @@ pub struct EnrichmentFeedbackRow {
 pub struct LearningStateRow {
     pub key: String,
     pub value: serde_json::Value,
-    pub updated_at: DateTime<Utc>,
+    pub updated_at: SqlTs,
 }
 
 /// Aggregated strategy performance summary (from GROUP BY query).
@@ -107,5 +107,5 @@ pub struct DecisionLogRow {
     pub user_message_preview: String,
     pub assessment: serde_json::Value,
     pub outcome: Option<String>,
-    pub created_at: DateTime<Utc>,
+    pub created_at: SqlTs,
 }

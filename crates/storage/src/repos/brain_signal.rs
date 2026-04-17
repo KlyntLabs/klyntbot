@@ -49,14 +49,15 @@ impl BrainSignalFeedbackRepo {
         entity_pair: &str,
         hours: i64,
     ) -> Result<bool, StorageError> {
+        let cutoff = jiff::Timestamp::now().as_millisecond() - hours * 3_600_000;
         let count: (i64,) = sqlx::query_as(
             "SELECT COUNT(*) FROM brain_signal_feedback
              WHERE entity_pair = ?1
                AND action = 'surfaced'
-               AND timestamp > strftime('%Y-%m-%dT%H:%M:%SZ', 'now', ?2)",
+               AND timestamp > ?2",
         )
         .bind(entity_pair)
-        .bind(format!("-{hours} hours"))
+        .bind(cutoff)
         .fetch_one(&self.pool)
         .await?;
         Ok(count.0 > 0)
@@ -68,14 +69,15 @@ impl BrainSignalFeedbackRepo {
         entity_pair: &str,
         days: i64,
     ) -> Result<bool, StorageError> {
+        let cutoff = jiff::Timestamp::now().as_millisecond() - days * 86_400_000;
         let count: (i64,) = sqlx::query_as(
             "SELECT COUNT(*) FROM brain_signal_feedback
              WHERE entity_pair = ?1
                AND action = 'dismissed'
-               AND timestamp > strftime('%Y-%m-%dT%H:%M:%SZ', 'now', ?2)",
+               AND timestamp > ?2",
         )
         .bind(entity_pair)
-        .bind(format!("-{days} days"))
+        .bind(cutoff)
         .fetch_one(&self.pool)
         .await?;
         Ok(count.0 > 0)
@@ -83,12 +85,13 @@ impl BrainSignalFeedbackRepo {
 
     /// Count the number of dismissals recorded in the last `hours` hours (across all entity pairs).
     pub async fn dismissal_count_since(&self, hours: i64) -> Result<i64, StorageError> {
+        let cutoff = jiff::Timestamp::now().as_millisecond() - hours * 3_600_000;
         let count: (i64,) = sqlx::query_as(
             "SELECT COUNT(*) FROM brain_signal_feedback
              WHERE action = 'dismissed'
-               AND timestamp > strftime('%Y-%m-%dT%H:%M:%SZ', 'now', ?1)",
+               AND timestamp > ?1",
         )
-        .bind(format!("-{hours} hours"))
+        .bind(cutoff)
         .fetch_one(&self.pool)
         .await?;
         Ok(count.0)

@@ -50,7 +50,7 @@ impl AppCore {
                     .and_then(|a| serde_json::to_string(a).ok()),
                 status: "pending".to_string(),
                 trigger: candidate.trigger.as_ref().map(|t| format!("{t:?}")),
-                created_at: Utc::now(),
+                created_at: common::time::bridge::chrono_to_jiff(Utc::now()).into(),
                 resolved_at: None,
             };
 
@@ -149,6 +149,6 @@ fn suggestion_row_to_response(row: &TaskSuggestionRow) -> SuggestionResponse {
         description: row.description.clone(),
         confidence: row.confidence,
         status: row.status.clone(),
-        created_at: row.created_at.to_rfc3339(),
+        created_at: common::time::bridge::jiff_to_chrono(*row.created_at).to_rfc3339(),
     }
 }

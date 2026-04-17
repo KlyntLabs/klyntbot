@@ -259,7 +259,7 @@ impl VoiceConversationManager {
         if let Ok(sessions) = self
             .repos
             .sessions
-            .list_sessions_since(Utc::now() - Duration::minutes(warm_chat_min as i64))
+            .list_sessions_since(common::time::bridge::chrono_to_jiff(Utc::now() - Duration::minutes(warm_chat_min as i64)))
             .await
         {
             if let Some(session) = sessions.first() {

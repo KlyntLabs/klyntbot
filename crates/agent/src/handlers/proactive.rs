@@ -153,7 +153,8 @@ impl ProactiveHandler for LlmProactiveHandler {
 
         let mut all_suggestions = Vec::new();
         let now = Utc::now();
-        let stale_cutoff = now - Duration::days(self.tasks_config.stale_task_days as i64);
+        let stale_cutoff_chrono = now - Duration::days(self.tasks_config.stale_task_days as i64);
+        let stale_cutoff = common::time::bridge::chrono_to_jiff(stale_cutoff_chrono);
 
         // --- TaskOverdue ---
         for row in &tasks {
@@ -169,7 +170,7 @@ impl ProactiveHandler for LlmProactiveHandler {
         }
 
         // --- TaskStale ---
-        for row in tasks.iter().filter(|r| r.updated_at < stale_cutoff) {
+        for row in tasks.iter().filter(|r| *r.updated_at < stale_cutoff) {
             let task = Task::from(row.clone());
             let mut c = self
                 .evaluate_task(&task, &SuggestionTrigger::TaskStale)
@@ -204,7 +205,7 @@ impl ProactiveHandler for LlmProactiveHandler {
             if blocker_rows.is_empty() {
                 continue;
             }
-            let has_stale_blocker = blocker_rows.iter().any(|b| b.updated_at < stale_cutoff);
+            let has_stale_blocker = blocker_rows.iter().any(|b| *b.updated_at < stale_cutoff);
             if has_stale_blocker {
                 let task = Task::from(row.clone());
                 let mut c = self

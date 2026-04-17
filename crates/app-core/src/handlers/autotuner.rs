@@ -66,14 +66,15 @@ impl AppCore {
             };
 
             // ── Brain growth: 7-day feedback loop stats ──────────────
-            let seven_days_ago = chrono::Utc::now() - chrono::Duration::days(7);
+            let seven_days_ago_chrono = chrono::Utc::now() - chrono::Duration::days(7);
+            let seven_days_ago = common::time::bridge::chrono_to_jiff(seven_days_ago_chrono);
             let trial_repo = orch.trial_repo();
 
             let (corrections_7d, trials_7d, promoted_7d, total_messages) = tokio::join!(
                 async {
                     match &self.event_log_repo {
                         Some(repo) => repo
-                            .count_by_event_type("UserCorrectedAI", seven_days_ago)
+                            .count_by_event_type("UserCorrectedAI", seven_days_ago_chrono)
                             .await
                             .unwrap_or(0),
                         None => 0,

@@ -1,6 +1,5 @@
 //! Session repository — sessions + session_messages tables.
 
-use chrono::Utc;
 use sqlx::SqlitePool;
 
 use crate::error::{OptionExt, StorageError};
@@ -27,7 +26,7 @@ impl SessionRepo {
         metadata: &serde_json::Value,
         squad_id: Option<&str>,
     ) -> Result<SessionRow, StorageError> {
-        let now = Utc::now();
+        let now: crate::sqlite_types::SqlTs = jiff::Timestamp::now().into();
         let row = sqlx::query_as::<_, SessionRow>(
             "INSERT INTO sessions (key, metadata, created_at, updated_at, squad_id)
              VALUES (?1, ?2, ?3, ?4, ?5)
@@ -53,7 +52,7 @@ impl SessionRepo {
         key: &str,
         metadata: &serde_json::Value,
     ) -> Result<SessionRow, StorageError> {
-        let now = Utc::now();
+        let now: crate::sqlite_types::SqlTs = jiff::Timestamp::now().into();
         let row = sqlx::query_as::<_, SessionRow>(
             "INSERT INTO sessions (key, metadata, conversation_type, created_at, updated_at)
              VALUES (?1, ?2, 'voice', ?3, ?4)
@@ -121,7 +120,7 @@ impl SessionRepo {
         metadata: Option<&serde_json::Value>,
         persona_id: Option<&str>,
     ) -> Result<SessionMessageRow, StorageError> {
-        let now = Utc::now();
+        let now: crate::sqlite_types::SqlTs = jiff::Timestamp::now().into();
 
         // Touch session updated_at
         sqlx::query("UPDATE sessions SET updated_at = ?1 WHERE key = ?2")
@@ -162,7 +161,7 @@ impl SessionRepo {
         ids: &[uuid::Uuid],
         roles: &[String],
         contents: &[String],
-        timestamps: &[chrono::DateTime<Utc>],
+        timestamps: &[jiff::Timestamp],
         request_ids: &[Option<String>],
         tool_calls_list: &[Option<serde_json::Value>],
         metadata_list: &[Option<serde_json::Value>],
@@ -171,7 +170,7 @@ impl SessionRepo {
         if ids.is_empty() {
             return Ok(0);
         }
-        let now = Utc::now();
+        let now: crate::sqlite_types::SqlTs = jiff::Timestamp::now().into();
 
         // Touch session updated_at once
         sqlx::query("UPDATE sessions SET updated_at = ?1 WHERE key = ?2")
@@ -195,7 +194,7 @@ impl SessionRepo {
                     .push_bind(session_key)
                     .push_bind(&roles[i])
                     .push_bind(&contents[i])
-                    .push_bind(timestamps[i])
+                    .push_bind(timestamps[i].as_millisecond())
                     .push_bind(request_ids[i].as_deref())
                     .push_bind(&tool_calls_list[i])
                     .push_bind(&metadata_list[i])
@@ -279,7 +278,7 @@ impl SessionRepo {
 
     /// Rename a session by updating the title in its metadata JSON.
     pub async fn rename_session(&self, key: &str, new_title: &str) -> Result<bool, StorageError> {
-        let now = Utc::now();
+        let now: crate::sqlite_types::SqlTs = jiff::Timestamp::now().into();
         let result = sqlx::query(
             "UPDATE sessions
              SET metadata = json_set(metadata, '$.title', ?2),
@@ -307,7 +306,7 @@ impl SessionRepo {
     /// List sessions updated since a cutoff date, ordered by updated_at descending.
     pub async fn list_sessions_since(
         &self,
-        since: chrono::DateTime<Utc>,
+        since: jiff::Timestamp,
     ) -> Result<Vec<SessionListRow>, StorageError> {
         let rows = sqlx::query_as::<_, SessionListRow>(
             "SELECT s.key, s.metadata, s.created_at, s.updated_at,
@@ -322,7 +321,7 @@ impl SessionRepo {
              WHERE s.updated_at >= ?1
              ORDER BY s.updated_at DESC",
         )
-        .bind(since)
+        .bind(crate::sqlite_types::SqlTs::from(since))
         .fetch_all(&self.pool)
         .await?;
         Ok(rows)
@@ -472,9 +471,9 @@ impl SessionRepo {
     ///
     /// Returns the number of sessions deleted (messages are cascade-deleted by the DB).
     pub async fn delete_stale_sessions(&self, ttl_days: u32) -> Result<u64, StorageError> {
-        let cutoff = Utc::now() - chrono::Duration::days(ttl_days as i64);
+        let cutoff = jiff::Timestamp::now() - jiff::SignedDuration::from_hours((ttl_days as i64) * 24);
         let result = sqlx::query("DELETE FROM sessions WHERE updated_at < ?1")
-            .bind(cutoff)
+            .bind(cutoff.as_millisecond())
             .execute(&self.pool)
             .await?;
         Ok(result.rows_affected())

@@ -45,7 +45,7 @@ fn outcome_to_row(outcome: &OutcomeRecord) -> Result<storage::OutcomeRow> {
         confidence_score: outcome.confidence_score,
         confidence_dimensions,
         execution_mode,
-        created_at: outcome.created_at,
+        created_at: common::time::bridge::chrono_to_jiff(outcome.created_at).into(),
     })
 }
 
@@ -68,7 +68,7 @@ fn row_to_outcome(row: storage::OutcomeRow) -> Result<OutcomeRecord> {
         confidence_score: row.confidence_score,
         confidence_dimensions,
         execution_mode,
-        created_at: row.created_at,
+        created_at: common::time::bridge::jiff_to_chrono(*row.created_at),
     })
 }
 
@@ -143,7 +143,7 @@ impl OutcomeStore {
     pub async fn outcomes_since(&self, cutoff: DateTime<Utc>) -> Result<Vec<OutcomeRecord>> {
         match &self.backend {
             Backend::Sqlite(repo) => {
-                let rows = repo.list_by_date_range(cutoff, Utc::now()).await?;
+                let rows = repo.list_by_date_range(common::time::bridge::chrono_to_jiff(cutoff), common::time::bridge::chrono_to_jiff(Utc::now())).await?;
                 rows.into_iter()
                     .map(row_to_outcome)
                     .collect::<Result<Vec<_>>>()
@@ -181,7 +181,7 @@ impl OutcomeStore {
                         actual_value: r.actual_value,
                         accepted: r.accepted,
                         confidence: r.confidence,
-                        timestamp: r.timestamp,
+                        timestamp: common::time::bridge::jiff_to_chrono(*r.timestamp),
                     })
                     .collect())
             }

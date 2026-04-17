@@ -3,6 +3,7 @@
 //! Handles: account_add, account_list, account_update, account_delete.
 
 use chrono::Utc;
+use common::time::bridge::chrono_to_jiff;
 use serde_json::json;
 
 use crate::currency::ensure_base_amount;
@@ -78,8 +79,8 @@ impl FinanceTool {
             institution: institution.map(|s| s.to_string()),
             notes: notes.map(|s| s.to_string()),
             is_archived: false,
-            created_at: now,
-            updated_at: now,
+            created_at: chrono_to_jiff(now).into(),
+            updated_at: chrono_to_jiff(now).into(),
             base_balance: conv.base_amount,
             base_currency: conv.base_currency,
             exchange_rate: conv.exchange_rate,

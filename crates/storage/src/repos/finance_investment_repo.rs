@@ -166,7 +166,7 @@ impl FinanceInvestmentRepo {
                 base_currency      = COALESCE(?, base_currency),
                 purchase_rate      = COALESCE(?, purchase_rate),
                 market_rate        = COALESCE(?, market_rate),
-                updated_at         = datetime('now')
+                updated_at         = (unixepoch('now') * 1000)
             WHERE id = ?
             RETURNING *
             "#,
@@ -208,7 +208,7 @@ impl FinanceInvestmentRepo {
             UPDATE finance_investments
             SET current_price = ?, current_value = ?,
                 base_current_value = ?, market_rate = ?,
-                updated_at = datetime('now')
+                updated_at = (unixepoch('now') * 1000)
             WHERE id = ?
             RETURNING *
             "#,

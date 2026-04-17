@@ -52,6 +52,8 @@ impl MetricSource for AgentMetricCollector {
         trial_id: Option<Uuid>,
     ) -> common::Result<MetricSnapshot> {
         let trial_id_str = trial_id.as_ref().map(|u| u.to_string());
+        let since_chrono = since;
+        let since = common::time::bridge::chrono_to_jiff(since);
 
         let (
             stats,
@@ -67,11 +69,11 @@ impl MetricSource for AgentMetricCollector {
         ) = tokio::join!(
             self.strategy_repo.get_stats_since(since),
             self.event_log_repo
-                .count_by_event_type("UserCorrectedAI", since),
+                .count_by_event_type("UserCorrectedAI", since_chrono),
             self.event_log_repo.count_by_event_type_and_data(
                 "UserCorrectedAI",
                 "memory_miss",
-                since
+                since_chrono
             ),
             async {
                 let tokens = self.usage_repo.total_tokens_since(since).await.unwrap_or(0);

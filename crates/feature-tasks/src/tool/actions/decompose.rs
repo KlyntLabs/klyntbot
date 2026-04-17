@@ -1,6 +1,6 @@
 //! Decompose action: AI-powered subtask generation.
 
-use common::Result;
+use common::{time::bridge::chrono_to_jiff, Result};
 use tools_core::ParamExtractor;
 use tracing::info;
 
@@ -118,7 +118,7 @@ impl TaskTool {
                 confidence: result.confidence,
                 status: "pending".to_string(),
                 reasoning: Some(result.reasoning.clone()),
-                created_at: chrono::Utc::now(),
+                created_at: chrono_to_jiff(chrono::Utc::now()).into(),
                 applied_at: None,
             };
             self.repo.create_decomposition(&decomp_row).await?;

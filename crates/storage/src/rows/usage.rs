@@ -1,6 +1,6 @@
 //! Row struct for the `usage_records` table.
 
-use chrono::{DateTime, Utc};
+use crate::sqlite_types::SqlTs;
 use serde::Serialize;
 use sqlx::FromRow;
 
@@ -9,7 +9,7 @@ use sqlx::FromRow;
 #[serde(rename_all = "camelCase")]
 pub struct UsageRecordRow {
     pub id: uuid::Uuid,
-    pub timestamp: DateTime<Utc>,
+    pub timestamp: SqlTs,
     pub request_id: String,
     pub model: String,
     pub provider: String,

@@ -1,6 +1,7 @@
 //! Planning, forecast, shared, and attachment types.
 
 use chrono::{DateTime, NaiveTime, Utc};
+use common::time::bridge::jiff_to_chrono;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use storage::rows::task::*;
@@ -325,7 +326,7 @@ impl From<TaskEstimationRow> for EstimationRecord {
                 .as_deref()
                 .and_then(|s| s.parse::<EnergyLevel>().ok()),
             tags: row.tags,
-            completed_at: row.completed_at,
+            completed_at: jiff_to_chrono(*row.completed_at),
         }
     }
 }
@@ -385,7 +386,7 @@ impl From<TaskAttachmentRow> for Attachment {
             title: row.title,
             value: row.value,
             tags: row.tags,
-            created_at: row.created_at,
+            created_at: jiff_to_chrono(*row.created_at),
         }
     }
 }
@@ -417,8 +418,8 @@ impl From<TaskTimeEntryRow> for TimeEntry {
     fn from(row: TaskTimeEntryRow) -> Self {
         Self {
             id: row.id.to_string(),
-            started_at: row.started_at,
-            ended_at: row.ended_at,
+            started_at: jiff_to_chrono(*row.started_at),
+            ended_at: row.ended_at.map(|ts| jiff_to_chrono(*ts)),
             duration_secs: row.duration_secs,
             note: row.note,
             energy_level: row

@@ -5,7 +5,8 @@
 
 #[cfg(test)]
 mod tests {
-    use chrono::{NaiveDate, Utc};
+    use crate::sqlite_types::{SqlDate, SqlTs};
+use jiff::{civil::Date, Timestamp};
     use uuid::Uuid;
 
     use crate::repos::project_repo::ProjectWithStats;
@@ -56,8 +57,8 @@ mod tests {
             color: "#ff0000".to_string(),
             tags: vec![],
             status: "active".to_string(),
-            created_at: Utc::now(),
-            updated_at: Utc::now(),
+            created_at: SqlTs::from(Timestamp::now()),
+            updated_at: SqlTs::from(Timestamp::now()),
             workflow_id: None,
             instructions: None,
             ai_personality: None,
@@ -73,8 +74,8 @@ mod tests {
     /// Verifies every row type serializes to camelCase JSON (no underscored keys).
     #[test]
     fn all_row_types_serialize_to_camel_case() {
-        let now = Utc::now();
-        let today = NaiveDate::from_ymd_opt(2026, 1, 1).unwrap();
+        let now: SqlTs = Timestamp::now().into();
+        let today: SqlDate = Date::new(2026, 1, 1).unwrap().into();
 
         let rows: Vec<(&str, serde_json::Value)> = vec![
             (

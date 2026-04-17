@@ -106,7 +106,7 @@ impl ProjectRepo {
                 start_date      = CASE WHEN ?17 THEN ?18 ELSE start_date END,
                 target_end_date = CASE WHEN ?19 THEN ?20 ELSE target_end_date END,
                 settings        = CASE WHEN ?21 THEN ?22 ELSE settings END,
-                updated_at      = datetime('now')
+                updated_at      = (unixepoch('now') * 1000)
             WHERE id = ?1
             RETURNING *
             "#,
@@ -240,7 +240,7 @@ impl ProjectRepo {
         instructions: &str,
     ) -> Result<bool, StorageError> {
         let result = sqlx::query(
-            "UPDATE projects SET instructions = ?2, updated_at = datetime('now') WHERE id = ?1",
+            "UPDATE projects SET instructions = ?2, updated_at = (unixepoch('now') * 1000) WHERE id = ?1",
         )
         .bind(id)
         .bind(instructions)
@@ -252,7 +252,7 @@ impl ProjectRepo {
     /// Update only the user_role field on a project.
     pub async fn update_user_role(&self, id: &str, role: &str) -> Result<bool, StorageError> {
         let result = sqlx::query(
-            "UPDATE projects SET user_role = ?2, updated_at = datetime('now') WHERE id = ?1",
+            "UPDATE projects SET user_role = ?2, updated_at = (unixepoch('now') * 1000) WHERE id = ?1",
         )
         .bind(id)
         .bind(role)

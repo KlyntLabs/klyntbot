@@ -1,8 +1,8 @@
 //! Input types for the analytics crate.
 //! These are lightweight structs that feature-finance converts storage Row types into.
 
-use jiff::civil::Date;
 use common::Decimal;
+use jiff::civil::Date;
 
 /// A financial transaction for spending analysis.
 #[derive(Debug, Clone)]

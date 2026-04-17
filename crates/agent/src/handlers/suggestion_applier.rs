@@ -58,7 +58,7 @@ impl SuggestionApplier for TaskSuggestionApplier {
                 self.repo
                     .update(&TaskPatch {
                         id: tid.into(),
-                        due_date: Some(Some(dt.with_timezone(&chrono::Utc))),
+                        due_date: Some(Some(common::time::bridge::chrono_to_jiff(dt.with_timezone(&chrono::Utc)))),
                         ..Default::default()
                     })
                     .await?;

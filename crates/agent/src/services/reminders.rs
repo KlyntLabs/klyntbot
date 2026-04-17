@@ -122,7 +122,7 @@ impl ReminderEngine {
                 // Update last_reminded_at via SQL
                 let patch = storage::TaskPatch {
                     id: todo.id.clone(),
-                    last_reminded_at: Some(Some(Utc::now())),
+                    last_reminded_at: Some(Some(common::time::bridge::chrono_to_jiff(Utc::now()))),
                     ..Default::default()
                 };
                 let _ = repo.update(&patch).await;

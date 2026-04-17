@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use chrono::Utc;
-use common::TrialParams;
+use common::{time::bridge::chrono_to_jiff, TrialParams};
 use config::AutoTunerConfig;
 use storage::TrialRepo;
 use tracing::{debug, info, warn};
@@ -206,7 +206,7 @@ impl NightlyCycle {
         // Collect diagnostic health report
         let match_rate = self
             .repo
-            .shadow_log_agreement_rate(None, Utc::now() - chrono::Duration::hours(24))
+            .shadow_log_agreement_rate(None, chrono_to_jiff(Utc::now() - chrono::Duration::hours(24)))
             .await
             .unwrap_or(1.0);
         let health = AutotunerHealth::diagnose(completed_count, match_rate, promotion.is_some());

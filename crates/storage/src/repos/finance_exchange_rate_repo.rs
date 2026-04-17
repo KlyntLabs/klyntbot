@@ -1,6 +1,5 @@
 //! Repository for the `finance_exchange_rates` table (composite PK, no `id` column).
 
-use chrono::Utc;
 use sqlx::SqlitePool;
 
 use crate::error::StorageError;
@@ -20,7 +19,7 @@ impl FinanceExchangeRateRepo {
 
     /// Insert or update a single exchange rate.
     pub async fn upsert(&self, from: &str, to: &str, rate: f64) -> Result<(), StorageError> {
-        let now = Utc::now().to_rfc3339();
+        let now = crate::sqlite_types::SqlTs(jiff::Timestamp::now());
         sqlx::query(
             r#"
             INSERT INTO finance_exchange_rates (from_currency, to_currency, rate, fetched_at)
@@ -91,7 +90,7 @@ impl FinanceExchangeRateRepo {
         base: &str,
         rates: &[(&str, f64)],
     ) -> Result<(), StorageError> {
-        let now = Utc::now().to_rfc3339();
+        let now = crate::sqlite_types::SqlTs(jiff::Timestamp::now());
         for (target, rate) in rates {
             sqlx::query(
                 r#"
@@ -132,7 +131,7 @@ impl FinanceExchangeRateRepo {
 
     /// Set a sentinel row (for tracking metadata like last-fetch timestamps).
     pub async fn set_sentinel(&self, from: &str, to: &str, rate: f64) -> Result<(), StorageError> {
-        let now = Utc::now().to_rfc3339();
+        let now = crate::sqlite_types::SqlTs(jiff::Timestamp::now());
         sqlx::query(
             r#"
             INSERT INTO finance_exchange_rates (from_currency, to_currency, rate, fetched_at)

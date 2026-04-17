@@ -252,7 +252,7 @@ fn register_cron_callbacks(
                         let focused: Vec<storage::TaskRow> = todo_repo.list_focused().await?;
                         for task in &focused {
                             if let Some(deadline) = task.focus_deadline {
-                                let remaining = deadline - chrono::Utc::now();
+                                let remaining = common::time::bridge::jiff_to_chrono(*deadline) - chrono::Utc::now();
                                 let hours_left = remaining.num_hours();
                                 if hours_left <= 1 && hours_left > 0 {
                                     dispatcher
@@ -336,7 +336,8 @@ fn register_cron_callbacks(
                         let now = chrono::Utc::now();
                         let mut expired_count = 0u32;
                         for task in &focused {
-                            if task.focus_deadline.map(|d| d < now).unwrap_or(false) {
+                            let now_jiff = common::time::bridge::chrono_to_jiff(now);
+                            if task.focus_deadline.map(|d| *d < now_jiff).unwrap_or(false) {
                                 let _ = todo_repo.unfocus(&task.id).await;
                                 expired_count += 1;
                             }
@@ -596,7 +597,7 @@ fn register_cron_callbacks(
                             Some(result) => {
                                 // Clean up old suggestions (90 day retention)
                                 if let Err(e) = suggestion_repo
-                                    .delete_older_than(90, chrono::Utc::now())
+                                    .delete_older_than(90, common::time::bridge::chrono_to_jiff(chrono::Utc::now()))
                                     .await
                                 {
                                     tracing::warn!("Reforge: failed to clean up suggestions: {e}");

@@ -148,7 +148,7 @@ async fn handle_task_reminder(
     // Mark as reminded.
     let patch = storage::TaskPatch {
         id: task_id.to_string(),
-        last_reminded_at: Some(Some(Utc::now())),
+        last_reminded_at: Some(Some(common::time::bridge::chrono_to_jiff(Utc::now()))),
         ..Default::default()
     };
     if let Err(e) = repo.update(&patch).await {
@@ -200,7 +200,7 @@ async fn handle_focus_expire(
     };
 
     match task.focus_deadline {
-        Some(deadline) if deadline <= Utc::now() => {
+        Some(deadline) if common::time::bridge::jiff_to_chrono(*deadline) <= Utc::now() => {
             // Unfocus the task.
             if let Err(e) = repo.unfocus(task_id).await {
                 warn!("deadline: failed to unfocus task {task_id}: {e}");
@@ -230,7 +230,7 @@ async fn handle_spawn_recurring(
 
             // Re-read the template to get the updated next_instance_date and re-schedule.
             if let Ok(Some(tpl)) = repo.get(template_id).await {
-                let next_date = tpl.next_instance_date.map(|d| d.to_rfc3339());
+                let next_date = tpl.next_instance_date.map(|d| common::time::bridge::jiff_to_chrono(*d).to_rfc3339());
                 domain_event_bus.publish(DomainEvent::RecurringTemplateAdvanced {
                     template_id: template_id.to_string(),
                     next_instance_date: next_date,
@@ -407,7 +407,8 @@ fn spawn_startup_population(
                     if task.last_reminded_at.is_some() {
                         continue;
                     }
-                    let remind_at = due - Duration::hours(2);
+                    let due_chrono = common::time::bridge::jiff_to_chrono(*due);
+                    let remind_at = due_chrono - Duration::hours(2);
                     if remind_at > now {
                         scheduler
                             .schedule(
@@ -429,9 +430,10 @@ fn spawn_startup_population(
             let now = Utc::now();
             for task in &focused {
                 if let Some(deadline) = task.focus_deadline {
+                    let deadline_chrono = common::time::bridge::jiff_to_chrono(*deadline);
                     // Schedule warnings at 6h, 3h, 1h before expiry.
                     for hours in [6u32, 3, 1] {
-                        let warn_at = deadline - Duration::hours(hours as i64);
+                        let warn_at = deadline_chrono - Duration::hours(hours as i64);
                         if warn_at > now {
                             scheduler
                                 .schedule(
@@ -447,10 +449,10 @@ fn spawn_startup_population(
                     }
 
                     // Schedule expire action.
-                    if deadline > now {
+                    if deadline_chrono > now {
                         scheduler
                             .schedule(
-                                deadline,
+                                deadline_chrono,
                                 DeadlineAction::FocusExpire {
                                     task_id: task.id.clone(),
                                 },
@@ -468,10 +470,11 @@ fn spawn_startup_population(
             let _ = deadline_hours; // available if needed for future use
             for tpl in &templates {
                 if let Some(next) = tpl.next_instance_date {
-                    if next > now {
+                    let next_chrono = common::time::bridge::jiff_to_chrono(*next);
+                    if next_chrono > now {
                         scheduler
                             .schedule(
-                                next,
+                                next_chrono,
                                 DeadlineAction::SpawnRecurring {
                                     template_id: tpl.id.clone(),
                                 },

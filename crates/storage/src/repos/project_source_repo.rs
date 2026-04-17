@@ -80,7 +80,7 @@ impl ProjectSourceRepo {
     /// Update the content of a source.
     pub async fn update_content(&self, id: &str, content: &str) -> Result<bool, StorageError> {
         let result = sqlx::query(
-            "UPDATE project_sources SET content = ?2, updated_at = datetime('now') WHERE id = ?1",
+            "UPDATE project_sources SET content = ?2, updated_at = (unixepoch('now') * 1000) WHERE id = ?1",
         )
         .bind(id)
         .bind(content)
@@ -111,8 +111,8 @@ mod tests {
                 icon: None,
                 position: 0,
                 status: "active".into(),
-                created_at: chrono::Utc::now(),
-                updated_at: chrono::Utc::now(),
+                created_at: jiff::Timestamp::now().into(),
+                updated_at: jiff::Timestamp::now().into(),
             })
             .await
             .unwrap();
@@ -126,8 +126,8 @@ mod tests {
                 color: "blue".into(),
                 tags: vec![],
                 status: "active".into(),
-                created_at: chrono::Utc::now(),
-                updated_at: chrono::Utc::now(),
+                created_at: jiff::Timestamp::now().into(),
+                updated_at: jiff::Timestamp::now().into(),
                 workflow_id: None,
                 instructions: None,
                 ai_personality: None,

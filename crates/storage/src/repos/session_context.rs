@@ -1,6 +1,5 @@
 //! Repository for the `session_context` table.
 
-use chrono::Utc;
 use sqlx::SqlitePool;
 
 use crate::error::StorageError;
@@ -33,7 +32,7 @@ impl SessionContextRepo {
         &self,
         params: SessionContextParams<'_>,
     ) -> Result<SessionContextRow, StorageError> {
-        let now = Utc::now();
+        let now: crate::sqlite_types::SqlTs = jiff::Timestamp::now().into();
         let row = sqlx::query_as::<_, SessionContextRow>(
             "INSERT INTO session_context
                  (session_key, context_type, entity_kind, entity_id, area_id, project_id, is_ephemeral, created_at, updated_at)
@@ -83,7 +82,7 @@ impl SessionContextRepo {
         area_id: Option<&str>,
         project_id: Option<&str>,
     ) -> Result<Option<SessionContextRow>, StorageError> {
-        let now = Utc::now();
+        let now: crate::sqlite_types::SqlTs = jiff::Timestamp::now().into();
         let row = sqlx::query_as::<_, SessionContextRow>(
             "UPDATE session_context SET
                  context_type = COALESCE(?2, context_type),
@@ -144,12 +143,12 @@ impl SessionContextRepo {
 
     /// Delete ephemeral (non-pinned) session contexts older than `days`.
     pub async fn cleanup_old_ephemeral(&self, days: i64) -> Result<u64, StorageError> {
-        let cutoff = Utc::now() - chrono::Duration::days(days);
+        let cutoff = jiff::Timestamp::now() - jiff::SignedDuration::from_hours((days) * 24);
         let result = sqlx::query(
             "DELETE FROM session_context
              WHERE is_ephemeral = 1 AND is_pinned = 0 AND updated_at < ?1",
         )
-        .bind(cutoff)
+        .bind(cutoff.as_millisecond())
         .execute(&self.pool)
         .await?;
         Ok(result.rows_affected())
@@ -157,7 +156,7 @@ impl SessionContextRepo {
 
     /// Pin a session context (makes ephemeral sessions visible in the thread list).
     pub async fn pin(&self, session_key: &str) -> Result<bool, StorageError> {
-        let now = Utc::now();
+        let now: crate::sqlite_types::SqlTs = jiff::Timestamp::now().into();
         let result = sqlx::query(
             "UPDATE session_context SET is_pinned = 1, updated_at = ?2 WHERE session_key = ?1",
         )
@@ -436,9 +435,9 @@ mod tests {
         .await
         .unwrap();
 
-        // Make e1 old by manually setting updated_at
+        // Make e1 old by manually setting updated_at (0 = epoch, far in the past)
         sqlx::query(
-            "UPDATE session_context SET updated_at = '2020-01-01T00:00:00Z' WHERE session_key = ?1",
+            "UPDATE session_context SET updated_at = 0 WHERE session_key = ?1",
         )
         .bind("test:e1")
         .execute(&repo.pool)

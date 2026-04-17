@@ -405,7 +405,7 @@ impl AgentRuntime {
                 let request_id = uuid::Uuid::new_v4().to_string();
                 let row = storage::StrategyRecordRow {
                     id: uuid::Uuid::new_v4(),
-                    timestamp: chrono::Utc::now(),
+                    timestamp: common::time::bridge::chrono_to_jiff(chrono::Utc::now()).into(),
                     request_id: request_id.clone(),
                     predicted_strategy: mode.clone(),
                     actual_strategy: mode.clone(),

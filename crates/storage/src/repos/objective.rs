@@ -87,7 +87,7 @@ impl ObjectiveRepo {
         description: Option<Option<&str>>,
         status: Option<&str>,
         priority: Option<Option<i16>>,
-        due_date: Option<Option<chrono::DateTime<chrono::Utc>>>,
+        due_date: Option<Option<jiff::Timestamp>>,
     ) -> Result<ObjectiveRow, StorageError> {
         let row = sqlx::query_as::<_, ObjectiveRow>(
             r#"
@@ -98,11 +98,11 @@ impl ObjectiveRepo {
                 priority    = CASE WHEN ?6 THEN ?7 ELSE priority END,
                 due_date    = CASE WHEN ?8 THEN ?9 ELSE due_date END,
                 completed_at = CASE
-                    WHEN ?5 IN ('completed', 'abandoned') AND completed_at IS NULL THEN datetime('now')
+                    WHEN ?5 IN ('completed', 'abandoned') AND completed_at IS NULL THEN (unixepoch('now') * 1000)
                     WHEN ?5 IS NOT NULL AND ?5 NOT IN ('completed', 'abandoned') THEN NULL
                     ELSE completed_at
                 END,
-                updated_at  = datetime('now')
+                updated_at  = (unixepoch('now') * 1000)
             WHERE id = ?1
             RETURNING *
             "#,
@@ -115,7 +115,7 @@ impl ObjectiveRepo {
         .bind(priority.is_some())
         .bind(priority.unwrap_or_default())
         .bind(due_date.is_some())
-        .bind(due_date.unwrap_or_default())
+        .bind(due_date.unwrap_or_default().map(|t| t.as_millisecond()))
         .fetch_optional(&self.pool)
         .await?
         .ok_or_not_found(&format!("objective {id}"))?;
@@ -135,7 +135,7 @@ impl ObjectiveRepo {
         let row: (f64,) = sqlx::query_as(
             "UPDATE objectives SET \
                 progress = COALESCE((SELECT AVG(progress) FROM key_results WHERE objective_id = ?1), 0.0), \
-                updated_at = datetime('now') \
+                updated_at = (unixepoch('now') * 1000) \
              WHERE id = ?1 \
              RETURNING progress",
         )
@@ -170,8 +170,8 @@ mod tests {
                 icon: None,
                 position: 0,
                 status: "active".into(),
-                created_at: chrono::Utc::now(),
-                updated_at: chrono::Utc::now(),
+                created_at: crate::sqlite_types::SqlTs::from(jiff::Timestamp::now()),
+                updated_at: crate::sqlite_types::SqlTs::from(jiff::Timestamp::now()),
             })
             .await
             .unwrap();
@@ -186,8 +186,8 @@ mod tests {
                 color: "orange".into(),
                 tags: vec![],
                 status: "active".into(),
-                created_at: chrono::Utc::now(),
-                updated_at: chrono::Utc::now(),
+                created_at: crate::sqlite_types::SqlTs::from(jiff::Timestamp::now()),
+                updated_at: crate::sqlite_types::SqlTs::from(jiff::Timestamp::now()),
                 workflow_id: None,
                 instructions: None,
                 ai_personality: None,
@@ -213,8 +213,8 @@ mod tests {
             priority: None,
             due_date: None,
             progress: 0.0,
-            created_at: chrono::Utc::now(),
-            updated_at: chrono::Utc::now(),
+            created_at: crate::sqlite_types::SqlTs::from(jiff::Timestamp::now()),
+            updated_at: crate::sqlite_types::SqlTs::from(jiff::Timestamp::now()),
             completed_at: None,
         }
     }

@@ -1,10 +1,10 @@
 //! Task time entry operations.
 
-use chrono::{DateTime, Utc};
 
 use super::TaskRepo;
 use crate::error::StorageError;
 use crate::rows::task::TaskTimeEntryRow;
+use crate::sqlite_types::SqlTs;
 
 impl TaskRepo {
     /// Add a time entry.
@@ -12,12 +12,13 @@ impl TaskRepo {
         &self,
         task_id: &str,
         source: &str,
-        started_at: DateTime<Utc>,
+        started_at: jiff::Timestamp,
         duration_secs: Option<i64>,
         note: Option<&str>,
         energy_level: Option<&str>,
     ) -> Result<TaskTimeEntryRow, StorageError> {
-        let ended_at = duration_secs.map(|d| started_at + chrono::Duration::seconds(d));
+        let ended_at: Option<SqlTs> =
+            duration_secs.map(|d| (started_at + jiff::SignedDuration::from_secs(d)).into());
         let id = uuid::Uuid::new_v4();
         let mut tx = self.pool.begin().await?;
 
@@ -31,7 +32,7 @@ impl TaskRepo {
         .bind(id)
         .bind(task_id)
         .bind(source)
-        .bind(started_at)
+        .bind(SqlTs::from(started_at))
         .bind(ended_at)
         .bind(duration_secs)
         .bind(note)
@@ -41,7 +42,7 @@ impl TaskRepo {
 
         if let Some(secs) = duration_secs {
             sqlx::query(
-                "UPDATE tasks SET total_tracked_secs = total_tracked_secs + ?2, updated_at = datetime('now') WHERE id = ?1",
+                "UPDATE tasks SET total_tracked_secs = total_tracked_secs + ?2, updated_at = (unixepoch('now') * 1000) WHERE id = ?1",
             )
             .bind(task_id)
             .bind(secs)
@@ -60,18 +61,20 @@ impl TaskRepo {
         entry_id: uuid::Uuid,
     ) -> Result<TaskTimeEntryRow, StorageError> {
         let mut tx = self.pool.begin().await?;
+        let now_ms = jiff::Timestamp::now().as_millisecond();
 
         let row = sqlx::query_as::<_, TaskTimeEntryRow>(
             r#"
             UPDATE task_time_entries
-            SET ended_at = datetime('now'),
-                duration_secs = (unixepoch('now') - unixepoch(started_at))
+            SET ended_at = ?3,
+                duration_secs = (?3 - started_at) / 1000
             WHERE id = ?1 AND task_id = ?2 AND ended_at IS NULL
             RETURNING *
             "#,
         )
         .bind(entry_id)
         .bind(task_id)
+        .bind(now_ms)
         .fetch_optional(&mut *tx)
         .await?
         .ok_or_else(|| {
@@ -80,7 +83,7 @@ impl TaskRepo {
 
         if let Some(secs) = row.duration_secs {
             sqlx::query(
-                "UPDATE tasks SET total_tracked_secs = total_tracked_secs + ?2, updated_at = datetime('now') WHERE id = ?1",
+                "UPDATE tasks SET total_tracked_secs = total_tracked_secs + ?2, updated_at = (unixepoch('now') * 1000) WHERE id = ?1",
             )
             .bind(task_id)
             .bind(secs)
@@ -114,9 +117,9 @@ impl TaskRepo {
         start_date: &str,
         end_date: &str,
     ) -> Result<Vec<super::TimeEntryWithTask>, StorageError> {
-        // Use next-day midnight as exclusive upper bound to avoid sub-second edge cases.
-        let start_bound = format!("{start_date}T00:00:00Z");
-        let end_bound = next_day_midnight(end_date);
+        // Convert date strings to epoch ms bounds.
+        let start_ms = date_str_to_ms(start_date, false);
+        let end_ms = date_str_to_ms(end_date, true); // next-day exclusive
         let rows = sqlx::query_as::<_, super::TimeEntryWithTask>(
             r#"
             SELECT te.id, te.task_id, t.title AS task_title,
@@ -128,8 +131,8 @@ impl TaskRepo {
             ORDER BY te.started_at ASC
             "#,
         )
-        .bind(&start_bound)
-        .bind(&end_bound)
+        .bind(start_ms)
+        .bind(end_ms)
         .fetch_all(&self.pool)
         .await?;
         Ok(rows)
@@ -142,8 +145,8 @@ impl TaskRepo {
         start_date: &str,
         end_date: &str,
     ) -> Result<Vec<crate::rows::task::TaskRow>, StorageError> {
-        let start_bound = format!("{start_date}T00:00:00Z");
-        let end_bound = next_day_midnight(end_date);
+        let start_ms = date_str_to_ms(start_date, false);
+        let end_ms = date_str_to_ms(end_date, true);
         let rows = sqlx::query_as::<_, crate::rows::task::TaskRow>(
             r#"
             SELECT * FROM tasks
@@ -156,21 +159,28 @@ impl TaskRepo {
             ORDER BY COALESCE(scheduled_start, due_date, created_at) ASC
             "#,
         )
-        .bind(&start_bound)
-        .bind(&end_bound)
+        .bind(start_ms)
+        .bind(end_ms)
         .fetch_all(&self.pool)
         .await?;
         Ok(rows)
     }
 }
 
-/// Compute next-day midnight for exclusive upper bounds: "2026-03-16" → "2026-03-17T00:00:00Z".
-fn next_day_midnight(date: &str) -> String {
-    if let Ok(d) = chrono::NaiveDate::parse_from_str(date, "%Y-%m-%d") {
-        let next = d + chrono::Duration::days(1);
-        format!("{next}T00:00:00Z")
+/// Convert a `YYYY-MM-DD` date string to epoch milliseconds.
+/// If `next_day` is true, returns the start of the following day (exclusive upper bound).
+fn date_str_to_ms(date: &str, next_day: bool) -> i64 {
+    let d: jiff::civil::Date = date
+        .parse()
+        .unwrap_or_else(|_| jiff::Timestamp::now().to_zoned(jiff::tz::TimeZone::UTC).date());
+    let d = if next_day {
+        d.checked_add(jiff::Span::new().days(1)).unwrap_or(d)
     } else {
-        // Fallback: append end-of-day (caller's original behavior)
-        format!("{date}T23:59:59Z")
-    }
+        d
+    };
+    d.at(0, 0, 0, 0)
+        .to_zoned(jiff::tz::TimeZone::UTC)
+        .expect("UTC never fails for civil datetime")
+        .timestamp()
+        .as_millisecond()
 }

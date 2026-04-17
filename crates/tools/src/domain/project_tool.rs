@@ -3,6 +3,7 @@
 
 use async_trait::async_trait;
 use chrono::Utc;
+use common::time::bridge::chrono_to_jiff;
 use serde_json::Value;
 
 use crate::params::ParamExtractor;
@@ -142,8 +143,8 @@ impl Tool for ProjectTool {
                     color: p.optional_str("color")?.unwrap_or("blue").to_string(),
                     tags: p.string_array_or_empty("tags")?,
                     status: "active".to_string(),
-                    created_at: now,
-                    updated_at: now,
+                    created_at: chrono_to_jiff(now).into(),
+                    updated_at: chrono_to_jiff(now).into(),
                     workflow_id: None,
                     instructions: None,
                     ai_personality: None,

@@ -84,8 +84,8 @@ impl AppCore {
         params: FinanceGoalCreateParams,
     ) -> HandlerResult<FinanceGoalRow> {
         let id = uuid::Uuid::new_v4().to_string();
-        let now = chrono::Utc::now();
-        let deadline = params.deadline.and_then(|d| parse_naive_date(&d));
+        let now: storage::SqlTs = common::time::bridge::chrono_to_jiff(chrono::Utc::now()).into();
+        let deadline: Option<storage::SqlDate> = params.deadline.and_then(|d| parse_naive_date(&d)).map(|d| common::time::bridge::chrono_date_to_jiff(d).into());
         let currency = match params.currency {
             Some(c) => c,
             None => self.default_currency().await,
@@ -125,9 +125,9 @@ impl AppCore {
         &self,
         params: FinanceGoalUpdateParams,
     ) -> HandlerResult<FinanceGoalRow> {
-        let deadline = params
+        let deadline: Option<Option<storage::SqlDate>> = params
             .deadline
-            .map(|opt| opt.and_then(|d| parse_naive_date(&d)));
+            .map(|opt| opt.and_then(|d| parse_naive_date(&d)).map(|d| common::time::bridge::chrono_date_to_jiff(d).into()));
         let patch = FinanceGoalPatch {
             id: params.id.clone(),
             current_amount: params.current_amount,
@@ -162,8 +162,8 @@ impl AppCore {
         params: FinanceLiabilityCreateParams,
     ) -> HandlerResult<FinanceLiabilityRow> {
         let id = uuid::Uuid::new_v4().to_string();
-        let now = chrono::Utc::now();
-        let due_date = params.due_date.and_then(|d| parse_naive_date(&d));
+        let now: storage::SqlTs = common::time::bridge::chrono_to_jiff(chrono::Utc::now()).into();
+        let due_date: Option<storage::SqlDate> = params.due_date.and_then(|d| parse_naive_date(&d)).map(|d| common::time::bridge::chrono_date_to_jiff(d).into());
         let currency = match params.currency {
             Some(c) => c,
             None => self.default_currency().await,
@@ -266,7 +266,12 @@ impl AppCore {
             .repos
             .finance
             .transactions
-            .sum_by_category(from, to, tx_type, &self.default_currency().await)
+            .sum_by_category(
+                common::time::bridge::chrono_date_to_jiff(from),
+                common::time::bridge::chrono_date_to_jiff(to),
+                tx_type,
+                &self.default_currency().await,
+            )
             .await
             .map_err(map_storage_err)?;
 
@@ -346,7 +351,11 @@ impl AppCore {
             .repos
             .finance
             .transactions
-            .daily_spending(from, to, &self.default_currency().await)
+            .daily_spending(
+                common::time::bridge::chrono_date_to_jiff(from),
+                common::time::bridge::chrono_date_to_jiff(to),
+                &self.default_currency().await,
+            )
             .await
             .map_err(map_storage_err)?;
 
@@ -376,15 +385,17 @@ impl AppCore {
 
         let currency = self.default_currency().await;
 
+        let from_jiff = common::time::bridge::chrono_date_to_jiff(from);
+        let to_jiff = common::time::bridge::chrono_date_to_jiff(to);
         let (income, spending) = tokio::try_join!(
             self.repos
                 .finance
                 .transactions
-                .sum_by_type_in_range("income", from, to, &currency),
+                .sum_by_type_in_range("income", from_jiff, to_jiff, &currency),
             self.repos
                 .finance
                 .transactions
-                .sum_by_type_in_range("expense", from, to, &currency),
+                .sum_by_type_in_range("expense", from_jiff, to_jiff, &currency),
         )
         .map_err(map_storage_err)?;
 

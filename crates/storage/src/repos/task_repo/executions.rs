@@ -60,7 +60,7 @@ impl TaskRepo {
                 output_summary = COALESCE(?3, output_summary),
                 error_message = COALESCE(?4, error_message),
                 metrics = COALESCE(?5, metrics),
-                completed_at = CASE WHEN ?2 IN ('completed', 'failed') THEN datetime('now') ELSE completed_at END
+                completed_at = CASE WHEN ?2 IN ('completed', 'failed') THEN (unixepoch('now') * 1000) ELSE completed_at END
             WHERE id = ?1
             RETURNING *
             "#,

@@ -1,4 +1,4 @@
-use chrono::{DateTime, Utc};
+use crate::sqlite_types::SqlTs;
 use serde::{Deserialize, Serialize};
 use sqlx::FromRow;
 
@@ -15,6 +15,6 @@ pub struct ProjectSourceRow {
     pub embedding_id: Option<String>,
     pub metadata: Option<String>,
     pub tags: String,
-    pub created_at: DateTime<Utc>,
-    pub updated_at: DateTime<Utc>,
+    pub created_at: SqlTs,
+    pub updated_at: SqlTs,
 }

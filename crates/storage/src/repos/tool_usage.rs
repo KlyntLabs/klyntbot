@@ -1,6 +1,5 @@
 //! Repository for the `tool_usage` table.
 
-use chrono::Utc;
 use sqlx::SqlitePool;
 
 use crate::error::StorageError;
@@ -48,7 +47,7 @@ impl ToolUsageRepo {
         days: Option<i64>,
     ) -> Result<Vec<ToolUsageStatsRow>, StorageError> {
         let rows = if let Some(d) = days {
-            let cutoff = Utc::now() - chrono::Duration::days(d);
+            let cutoff = jiff::Timestamp::now() - jiff::SignedDuration::from_hours((d) * 24);
             sqlx::query_as::<_, ToolUsageStatsRow>(
                 r#"
                 SELECT tool_name,
@@ -61,7 +60,7 @@ impl ToolUsageRepo {
                 ORDER BY call_count DESC
                 "#,
             )
-            .bind(cutoff)
+            .bind(cutoff.as_millisecond())
             .fetch_all(&self.pool)
             .await?
         } else {

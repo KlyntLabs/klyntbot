@@ -33,11 +33,11 @@ impl FinanceAllocationRepo {
             r#"
             INSERT INTO finance_allocation_targets
                 (id, portfolio_id, asset_class, target_weight, tolerance_band, created_at, updated_at)
-            VALUES (?1, ?2, ?3, ?4, ?5, strftime('%Y-%m-%dT%H:%M:%SZ', 'now'), strftime('%Y-%m-%dT%H:%M:%SZ', 'now'))
+            VALUES (?1, ?2, ?3, ?4, ?5, (unixepoch('now') * 1000), (unixepoch('now') * 1000))
             ON CONFLICT(portfolio_id, asset_class) DO UPDATE SET
                 target_weight = excluded.target_weight,
                 tolerance_band = excluded.tolerance_band,
-                updated_at = strftime('%Y-%m-%dT%H:%M:%SZ', 'now')
+                updated_at = (unixepoch('now') * 1000)
             RETURNING *
             "#,
         )

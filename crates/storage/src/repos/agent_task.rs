@@ -3,7 +3,6 @@
 use crate::error::OptionExt;
 use crate::rows::agent_task::AgentTaskRow;
 use crate::StorageError;
-use chrono::Utc;
 use sqlx::SqlitePool;
 use uuid::Uuid;
 
@@ -42,7 +41,7 @@ impl AgentTaskRepo {
     }
 
     pub async fn claim(&self, task_id: &str, agent_id: &str) -> Result<AgentTaskRow, StorageError> {
-        let now = Utc::now();
+        let now: crate::sqlite_types::SqlTs = jiff::Timestamp::now().into();
         sqlx::query_as::<_, AgentTaskRow>(
             "UPDATE agent_tasks
              SET owner_agent_id = ?1, status = 'claimed', updated_at = ?3
@@ -66,7 +65,7 @@ impl AgentTaskRepo {
         result: Option<&str>,
         error: Option<&str>,
     ) -> Result<AgentTaskRow, StorageError> {
-        let now = Utc::now();
+        let now: crate::sqlite_types::SqlTs = jiff::Timestamp::now().into();
         sqlx::query_as::<_, AgentTaskRow>(
             "UPDATE agent_tasks
              SET status = ?1, result = ?2, error = ?3, updated_at = ?5

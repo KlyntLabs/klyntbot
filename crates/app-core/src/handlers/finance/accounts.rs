@@ -20,7 +20,7 @@ impl AppCore {
         params: FinanceAccountCreateParams,
     ) -> HandlerResult<FinanceAccountRow> {
         let id = uuid::Uuid::new_v4().to_string();
-        let now = chrono::Utc::now();
+        let now: storage::SqlTs = common::time::bridge::chrono_to_jiff(chrono::Utc::now()).into();
         let currency = match params.currency {
             Some(c) => c,
             None => self.default_currency().await,

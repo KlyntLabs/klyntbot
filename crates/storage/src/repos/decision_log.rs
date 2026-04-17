@@ -1,6 +1,5 @@
 //! Decision log repository — decision_log table.
 
-use chrono::{DateTime, Utc};
 use sqlx::SqlitePool;
 
 use crate::error::StorageError;
@@ -52,16 +51,16 @@ impl DecisionLogRepo {
     /// List entries within a date range.
     pub async fn list_by_date_range(
         &self,
-        from: DateTime<Utc>,
-        to: DateTime<Utc>,
+        from: jiff::Timestamp,
+        to: jiff::Timestamp,
     ) -> Result<Vec<DecisionLogRow>, StorageError> {
         let rows = sqlx::query_as::<_, DecisionLogRow>(
             "SELECT * FROM decision_log
              WHERE created_at >= ?1 AND created_at <= ?2
              ORDER BY created_at DESC",
         )
-        .bind(from)
-        .bind(to)
+        .bind(crate::sqlite_types::SqlTs::from(from))
+        .bind(crate::sqlite_types::SqlTs::from(to))
         .fetch_all(&self.pool)
         .await?;
         Ok(rows)

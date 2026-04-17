@@ -4,6 +4,7 @@
 //! report_net_worth_history, daily_review.
 
 use chrono::{Datelike, Duration, Local, NaiveDate};
+use common::time::bridge::chrono_date_to_jiff;
 use serde_json::json;
 
 use common::{Result, ToolError};
@@ -107,7 +108,7 @@ impl FinanceTool {
         let mut rows = self
             .storage
             .transactions
-            .sum_by_category(date_from, date_to, "expense", &self.default_currency)
+            .sum_by_category(chrono_date_to_jiff(date_from), chrono_date_to_jiff(date_to), "expense", &self.default_currency)
             .await?;
 
         if let Some(cat) = category {
@@ -143,7 +144,7 @@ impl FinanceTool {
         let mut rows = self
             .storage
             .transactions
-            .sum_by_category(date_from, date_to, "income", &self.default_currency)
+            .sum_by_category(chrono_date_to_jiff(date_from), chrono_date_to_jiff(date_to), "income", &self.default_currency)
             .await?;
 
         if let Some(cat) = category {

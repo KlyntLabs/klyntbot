@@ -6,6 +6,7 @@
 
 use async_trait::async_trait;
 use chrono::Utc;
+use common::time::bridge::{chrono_to_jiff, jiff_to_chrono};
 use serde_json::Value;
 use std::sync::Arc;
 
@@ -120,10 +121,10 @@ impl Tool for OkrTool {
                     description: p.optional_str("description")?.map(String::from),
                     status: "active".to_string(),
                     priority: p.optional_u64("priority")?.map(|v| v as i16),
-                    due_date,
+                    due_date: due_date.map(|dt| chrono_to_jiff(dt).into()),
                     progress: 0.0,
-                    created_at: now,
-                    updated_at: now,
+                    created_at: chrono_to_jiff(now).into(),
+                    updated_at: chrono_to_jiff(now).into(),
                     completed_at: None,
                 };
 
@@ -192,12 +193,12 @@ impl Tool for OkrTool {
                     output.push_str(&format!("Priority: {}\n", p));
                 }
                 if let Some(due) = obj.due_date {
-                    output.push_str(&format!("Due: {}\n", due));
+                    output.push_str(&format!("Due: {}\n", jiff_to_chrono(*due)));
                 }
-                output.push_str(&format!("Created: {}\n", obj.created_at));
-                output.push_str(&format!("Updated: {}\n", obj.updated_at));
+                output.push_str(&format!("Created: {}\n", jiff_to_chrono(*obj.created_at)));
+                output.push_str(&format!("Updated: {}\n", jiff_to_chrono(*obj.updated_at)));
                 if let Some(completed) = obj.completed_at {
-                    output.push_str(&format!("Completed: {}\n", completed));
+                    output.push_str(&format!("Completed: {}\n", jiff_to_chrono(*completed)));
                 }
 
                 if !krs.is_empty() {
@@ -223,7 +224,7 @@ impl Tool for OkrTool {
                             let dt = s.parse::<chrono::DateTime<Utc>>().map_err(|e| {
                                 ToolError::InvalidParams(format!("Invalid due_date: {e}"))
                             })?;
-                            Some(Some(dt))
+                            Some(Some(chrono_to_jiff(dt)))
                         }
                         None => Some(None), // explicitly clear
                     }
@@ -294,9 +295,9 @@ impl Tool for OkrTool {
                     current_value: 0.0,
                     unit: p.optional_str("unit")?.map(String::from),
                     progress: 0.0,
-                    due_date,
-                    created_at: now,
-                    updated_at: now,
+                    due_date: due_date.map(|dt| chrono_to_jiff(dt).into()),
+                    created_at: chrono_to_jiff(now).into(),
+                    updated_at: chrono_to_jiff(now).into(),
                     completed_at: None,
                 };
 
@@ -410,7 +411,7 @@ impl Tool for OkrTool {
                             let dt = s.parse::<chrono::DateTime<Utc>>().map_err(|e| {
                                 ToolError::InvalidParams(format!("Invalid due_date: {e}"))
                             })?;
-                            Some(Some(dt))
+                            Some(Some(chrono_to_jiff(dt)))
                         }
                         None => Some(None),
                     }
