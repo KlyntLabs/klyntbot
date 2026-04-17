@@ -1,4 +1,3 @@
-use chrono::{NaiveDate, NaiveTime, Utc};
 use tracing::info;
 
 use crate::repos::{ForecastRepo, IntelligenceSessionRepo};
@@ -22,12 +21,16 @@ impl PredictiveEngine {
 
     /// Generate energy forecasts for the next day based on the last 14 days of sessions.
     /// Produces hourly energy predictions grouped into time windows.
-    pub async fn forecast_next_day(&self, date: NaiveDate) -> common::Result<Vec<Forecast>> {
-        let start = (date - chrono::Duration::days(14))
-            .format("%Y-%m-%d")
+    pub async fn forecast_next_day(
+        &self,
+        date: jiff::civil::Date,
+    ) -> common::Result<Vec<Forecast>> {
+        let start = date
+            .checked_sub(jiff::Span::new().days(14))
+            .unwrap_or(date)
             .to_string()
             + "T00:00:00Z";
-        let end = date.format("%Y-%m-%d").to_string() + "T23:59:59Z";
+        let end = date.to_string() + "T23:59:59Z";
 
         let sessions = self.session_repo.list_range(&start, &end).await?;
         if sessions.is_empty() {
@@ -67,10 +70,11 @@ impl PredictiveEngine {
         }
 
         // Find peak and valley windows (top-2 peaks, bottom-2 valleys)
-        let forecast_date = (date + chrono::Duration::days(1))
-            .format("%Y-%m-%d")
+        let forecast_date = date
+            .checked_add(jiff::Span::new().days(1))
+            .unwrap_or(date)
             .to_string();
-        let now = Utc::now().to_rfc3339();
+        let now = jiff::Timestamp::now().to_string();
 
         let mut forecasts = Vec::new();
 
@@ -113,7 +117,7 @@ impl PredictiveEngine {
 
     /// Get the predicted energy level for the current time by interpolating forecasts.
     pub async fn current_energy(&self) -> common::Result<Option<f64>> {
-        let today = Utc::now().format("%Y-%m-%d").to_string();
+        let today = jiff::Timestamp::now().strftime("%Y-%m-%d").to_string();
         let forecasts = self.forecast_repo.list_for_date(&today).await?;
 
         let energy_forecasts: Vec<&Forecast> = forecasts
@@ -125,7 +129,8 @@ impl PredictiveEngine {
             return Ok(None);
         }
 
-        let now_hour = Utc::now().hour_minute_frac();
+        let now_zoned = jiff::Zoned::now();
+        let now_hour = now_zoned.hour() as f64 + now_zoned.minute() as f64 / 60.0;
         let mut best: Option<(f64, f64)> = None; // (distance, energy)
 
         for f in &energy_forecasts {
@@ -188,8 +193,9 @@ impl PredictiveEngine {
             return Ok(None);
         }
 
-        let report_date =
-            NaiveDate::parse_from_str(date, "%Y-%m-%d").unwrap_or_else(|_| Utc::now().date_naive());
+        let report_date = date
+            .parse::<jiff::civil::Date>()
+            .unwrap_or_else(|_| jiff::Zoned::now().date());
 
         Ok(Some(AccuracyReport {
             forecast_date: report_date,
@@ -266,23 +272,10 @@ fn parse_hour(iso: &str) -> Option<usize> {
 }
 
 fn parse_time_frac(time_str: &str) -> f64 {
-    NaiveTime::parse_from_str(time_str, "%H:%M")
+    jiff::civil::Time::strptime("%H:%M", time_str)
         .map(|t| t.hour() as f64 + t.minute() as f64 / 60.0)
         .unwrap_or(0.0)
 }
-
-trait HourMinuteFrac {
-    fn hour_minute_frac(&self) -> f64;
-}
-
-impl<Tz: chrono::TimeZone> HourMinuteFrac for chrono::DateTime<Tz> {
-    fn hour_minute_frac(&self) -> f64 {
-        use chrono::Timelike;
-        self.hour() as f64 + self.minute() as f64 / 60.0
-    }
-}
-
-use chrono::Timelike;
 
 #[cfg(test)]
 mod tests {
@@ -340,9 +333,8 @@ mod tests {
         let repo = IntelligenceSessionRepo::new(pool.clone());
         // Seed 7 days of sessions with morning peak (9-12) and afternoon peak (14-17)
         for day_offset in 0..7 {
-            let date = NaiveDate::from_ymd_opt(2026, 3, 2 + day_offset)
+            let date = jiff::civil::Date::new(2026, 3, 2 + day_offset as i8)
                 .unwrap()
-                .format("%Y-%m-%d")
                 .to_string();
             // Morning session
             let s1 = make_session(
@@ -373,7 +365,7 @@ mod tests {
             ForecastRepo::new(pool.clone()),
         );
 
-        let date = NaiveDate::from_ymd_opt(2026, 3, 9).unwrap();
+        let date = jiff::civil::Date::new(2026, 3, 9).unwrap();
         let forecasts = engine.forecast_next_day(date).await.unwrap();
 
         assert!(
@@ -394,10 +386,10 @@ mod tests {
         let pool = setup_pool().await;
 
         let forecast_repo = ForecastRepo::new(pool.clone());
-        let today = Utc::now().format("%Y-%m-%d").to_string();
+        let today = jiff::Timestamp::now().strftime("%Y-%m-%d").to_string();
 
         // Seed a forecast for the current hour
-        let current_hour = Utc::now().hour();
+        let current_hour = jiff::Zoned::now().hour() as u32;
         let forecast = Forecast {
             id: "ce-test-1".to_string(),
             forecast_date: today,
@@ -411,7 +403,7 @@ mod tests {
             user_overrode: false,
             actual_value: None,
             prediction_error: None,
-            created_at: Utc::now().to_rfc3339(),
+            created_at: jiff::Timestamp::now().to_string(),
         };
         forecast_repo.create(&forecast).await.unwrap();
 
@@ -491,7 +483,7 @@ mod tests {
             user_overrode: false,
             actual_value: None,
             prediction_error: None,
-            created_at: Utc::now().to_rfc3339(),
+            created_at: jiff::Timestamp::now().to_string(),
         };
         let f_low = Forecast {
             id: "pb-2".to_string(),
@@ -506,7 +498,7 @@ mod tests {
             user_overrode: false,
             actual_value: None,
             prediction_error: None,
-            created_at: Utc::now().to_rfc3339(),
+            created_at: jiff::Timestamp::now().to_string(),
         };
         let f_med = Forecast {
             id: "pb-3".to_string(),
@@ -521,7 +513,7 @@ mod tests {
             user_overrode: false,
             actual_value: None,
             prediction_error: None,
-            created_at: Utc::now().to_rfc3339(),
+            created_at: jiff::Timestamp::now().to_string(),
         };
 
         forecast_repo.create(&f_high).await.unwrap();

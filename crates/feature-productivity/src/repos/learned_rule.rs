@@ -1,8 +1,9 @@
-use chrono::{DateTime, Utc};
+use jiff::Timestamp;
 use serde::{Deserialize, Serialize};
 use sqlx::SqlitePool;
+use tracing::warn;
 
-#[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct LearnedRule {
     pub id: Option<i64>,
@@ -11,8 +12,49 @@ pub struct LearnedRule {
     pub classification: String,
     pub confidence: f64,
     pub hit_count: i64,
-    pub last_used_at: DateTime<Utc>,
-    pub created_at: DateTime<Utc>,
+    pub last_used_at: Timestamp,
+    pub created_at: Timestamp,
+}
+
+#[derive(sqlx::FromRow)]
+struct LearnedRuleRow {
+    id: Option<i64>,
+    pattern: String,
+    pattern_type: String,
+    classification: String,
+    confidence: f64,
+    hit_count: i64,
+    last_used_at: String,
+    created_at: String,
+}
+
+impl From<LearnedRuleRow> for LearnedRule {
+    fn from(row: LearnedRuleRow) -> Self {
+        let last_used_at = row
+            .last_used_at
+            .parse::<Timestamp>()
+            .unwrap_or_else(|_| {
+                warn!(raw = %row.last_used_at, "unparseable last_used_at in distraction_learned_rules");
+                Timestamp::now()
+            });
+        let created_at = row
+            .created_at
+            .parse::<Timestamp>()
+            .unwrap_or_else(|_| {
+                warn!(raw = %row.created_at, "unparseable created_at in distraction_learned_rules");
+                Timestamp::now()
+            });
+        Self {
+            id: row.id,
+            pattern: row.pattern,
+            pattern_type: row.pattern_type,
+            classification: row.classification,
+            confidence: row.confidence,
+            hit_count: row.hit_count,
+            last_used_at,
+            created_at,
+        }
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -26,13 +68,13 @@ impl LearnedRuleRepo {
     }
 
     pub async fn list_all(&self) -> common::Result<Vec<LearnedRule>> {
-        let rules = sqlx::query_as::<_, LearnedRule>(
+        let rows = sqlx::query_as::<_, LearnedRuleRow>(
             "SELECT * FROM distraction_learned_rules ORDER BY hit_count DESC LIMIT 500",
         )
         .fetch_all(&self.pool)
         .await
         .map_err(|e| common::KlyntbotError::Storage(e.to_string()))?;
-        Ok(rules)
+        Ok(rows.into_iter().map(LearnedRule::from).collect())
     }
 
     pub async fn find_by_pattern(
@@ -40,7 +82,7 @@ impl LearnedRuleRepo {
         pattern: &str,
         pattern_type: &str,
     ) -> common::Result<Option<LearnedRule>> {
-        let rule = sqlx::query_as::<_, LearnedRule>(
+        let row = sqlx::query_as::<_, LearnedRuleRow>(
             "SELECT * FROM distraction_learned_rules WHERE pattern = ? AND pattern_type = ?",
         )
         .bind(pattern)
@@ -48,7 +90,7 @@ impl LearnedRuleRepo {
         .fetch_optional(&self.pool)
         .await
         .map_err(|e| common::KlyntbotError::Storage(e.to_string()))?;
-        Ok(rule)
+        Ok(row.map(LearnedRule::from))
     }
 
     pub async fn insert(&self, rule: &LearnedRule) -> common::Result<i64> {
@@ -60,8 +102,8 @@ impl LearnedRuleRepo {
         .bind(&rule.classification)
         .bind(rule.confidence)
         .bind(rule.hit_count)
-        .bind(rule.last_used_at)
-        .bind(rule.created_at)
+        .bind(rule.last_used_at.to_string())
+        .bind(rule.created_at.to_string())
         .fetch_one(&self.pool)
         .await
         .map_err(|e| common::KlyntbotError::Storage(e.to_string()))?;
@@ -69,7 +111,7 @@ impl LearnedRuleRepo {
     }
 
     pub async fn record_hit(&self, id: i64) -> common::Result<()> {
-        let now = Utc::now();
+        let now = Timestamp::now().to_string();
         sqlx::query(
             "UPDATE distraction_learned_rules SET hit_count = hit_count + 1, confidence = MIN(1.0, confidence + 0.1), last_used_at = ? WHERE id = ?",
         )
@@ -88,7 +130,7 @@ impl LearnedRuleRepo {
         pattern_type: &str,
         classification: &str,
     ) -> common::Result<()> {
-        let now = Utc::now();
+        let now = Timestamp::now().to_string();
         sqlx::query(
             "INSERT INTO distraction_learned_rules (pattern, pattern_type, classification, confidence, hit_count, last_used_at, created_at)
              VALUES (?, ?, ?, 0.5, 1, ?, ?)
@@ -100,8 +142,8 @@ impl LearnedRuleRepo {
         .bind(pattern)
         .bind(pattern_type)
         .bind(classification)
-        .bind(now)
-        .bind(now)
+        .bind(&now)
+        .bind(&now)
         .execute(&self.pool)
         .await
         .map_err(|e| common::KlyntbotError::Storage(e.to_string()))?;
@@ -114,7 +156,7 @@ impl LearnedRuleRepo {
         min_confidence: f64,
         min_hits: i32,
     ) -> Result<Vec<LearnedRule>, sqlx::Error> {
-        sqlx::query_as::<_, LearnedRule>(
+        let rows = sqlx::query_as::<_, LearnedRuleRow>(
             "SELECT * FROM distraction_learned_rules
              WHERE confidence >= ?1 AND hit_count >= ?2
              ORDER BY confidence DESC",
@@ -122,7 +164,8 @@ impl LearnedRuleRepo {
         .bind(min_confidence)
         .bind(min_hits)
         .fetch_all(&self.pool)
-        .await
+        .await?;
+        Ok(rows.into_iter().map(LearnedRule::from).collect())
     }
 
     pub async fn delete(&self, id: i64) -> common::Result<()> {
@@ -156,7 +199,7 @@ mod tests {
     async fn insert_and_find() {
         let pool = setup_pool().await;
         let repo = LearnedRuleRepo::new(pool);
-        let now = Utc::now();
+        let now = Timestamp::now();
         let rule = LearnedRule {
             id: None,
             pattern: "react tutorial".into(),
@@ -182,7 +225,7 @@ mod tests {
     async fn record_hit_increments() {
         let pool = setup_pool().await;
         let repo = LearnedRuleRepo::new(pool);
-        let now = Utc::now();
+        let now = Timestamp::now();
         let rule = LearnedRule {
             id: None,
             pattern: "rust docs".into(),
@@ -209,7 +252,7 @@ mod tests {
     async fn delete_removes_rule() {
         let pool = setup_pool().await;
         let repo = LearnedRuleRepo::new(pool);
-        let now = Utc::now();
+        let now = Timestamp::now();
         let rule = LearnedRule {
             id: None,
             pattern: "temp".into(),
@@ -233,7 +276,7 @@ mod tests {
     async fn list_all_ordered_by_hit_count() {
         let pool = setup_pool().await;
         let repo = LearnedRuleRepo::new(pool);
-        let now = Utc::now();
+        let now = Timestamp::now();
 
         let low = LearnedRule {
             id: None,

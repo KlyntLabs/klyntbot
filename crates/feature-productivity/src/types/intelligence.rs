@@ -1,4 +1,4 @@
-use chrono::{DateTime, NaiveDate, Utc};
+use jiff::Timestamp;
 use serde::{Deserialize, Serialize};
 
 // -- Intelligence Layer Types -------------------------------------------------
@@ -168,10 +168,10 @@ pub struct TrackingRule {
     pub source: RuleSource,
     pub confidence: f64,
     pub hit_count: i64,
-    pub last_hit_at: Option<DateTime<Utc>>,
+    pub last_hit_at: Option<Timestamp>,
     pub is_active: bool,
-    pub created_at: DateTime<Utc>,
-    pub updated_at: DateTime<Utc>,
+    pub created_at: Timestamp,
+    pub updated_at: Timestamp,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow)]
@@ -418,7 +418,7 @@ pub struct PrivacyRule {
     pub rule_type: String,
     pub pattern: String,
     pub match_mode: MatchMode,
-    pub created_at: DateTime<Utc>,
+    pub created_at: Timestamp,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow)]
@@ -508,7 +508,7 @@ pub struct ProductivityIntervention {
     pub message: String,
     pub suggested_action: SuggestedAction,
     pub urgency: Urgency,
-    pub timestamp: DateTime<Utc>,
+    pub timestamp: Timestamp,
 }
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize)]
@@ -551,7 +551,7 @@ pub struct ProtectedBlock {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct AccuracyReport {
-    pub forecast_date: NaiveDate,
+    pub forecast_date: jiff::civil::Date,
     pub total_forecasts: usize,
     pub evaluated: usize,
     pub mean_error: f64,

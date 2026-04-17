@@ -3,7 +3,8 @@
 
 use std::collections::HashMap;
 
-use chrono::{DateTime, NaiveDate, TimeZone, Utc};
+use chrono::{DateTime, TimeZone, Utc};
+use jiff::SignedDuration;
 
 use std::sync::Arc;
 
@@ -51,7 +52,7 @@ impl DailyAggregator {
     /// Uses pre-computed 5-minute bucket aggregation for day-level totals (fast path).
     /// Falls back to raw event queries for the detailed per-app/per-category breakdowns.
     pub async fn compute_for_date(&self, date: &str) -> common::Result<DailySummary> {
-        let naive = NaiveDate::parse_from_str(date, "%Y-%m-%d")
+        let naive = chrono::NaiveDate::parse_from_str(date, "%Y-%m-%d")
             .map_err(|e| common::ToolError::InvalidParams(format!("invalid date '{date}': {e}")))?;
 
         let start: DateTime<Utc> = Utc.from_utc_datetime(&naive.and_hms_opt(0, 0, 0).unwrap());
@@ -288,7 +289,7 @@ impl DailyAggregator {
 
     /// Compute the daily summary for today.
     pub async fn compute_today(&self) -> common::Result<DailySummary> {
-        let today = Utc::now().format("%Y-%m-%d").to_string();
+        let today = jiff::Timestamp::now().strftime("%Y-%m-%d").to_string();
         self.compute_for_date(&today).await
     }
 
@@ -344,9 +345,10 @@ impl DailyAggregator {
     ) -> common::Result<(u64, u64)> {
         let raw_cutoff = Utc::now() - chrono::Duration::days(raw_days as i64);
         let raw_purged = self.repos.events.purge_before(&raw_cutoff).await?;
-        let bucket_cutoff = (Utc::now() - chrono::Duration::days(bucket_days as i64))
-            .format("%Y-%m-%d")
-            .to_string();
+        let bucket_cutoff = (jiff::Timestamp::now()
+            - SignedDuration::from_secs(bucket_days as i64 * 86_400))
+        .strftime("%Y-%m-%d")
+        .to_string();
         let bucket_purged = self.repos.buckets.purge_before(&bucket_cutoff).await?;
         Ok((raw_purged, bucket_purged))
     }
@@ -456,7 +458,7 @@ mod tests {
         let ended = focus_mgr.end_session(Some("test".into())).await.unwrap();
         assert!(ended.is_some());
 
-        let today = Utc::now().format("%Y-%m-%d").to_string();
+        let today = jiff::Timestamp::now().strftime("%Y-%m-%d").to_string();
         let summary = aggregator.compute_for_date(&today).await.unwrap();
         assert_eq!(summary.focus_sessions_count, 1);
     }
@@ -572,7 +574,7 @@ mod tests {
         let repos = ProductivityRepos::new(pool);
         let aggregator = DailyAggregator::new(repos);
 
-        let today = Utc::now().format("%Y-%m-%d").to_string();
+        let today = jiff::Timestamp::now().strftime("%Y-%m-%d").to_string();
 
         // First call computes and stores
         let s1 = aggregator.get_or_compute(&today).await.unwrap();

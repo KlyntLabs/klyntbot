@@ -136,7 +136,7 @@ impl ProductivityIntelligenceLayer {
             .await;
 
         let classified = ClassifiedTick {
-            timestamp: tick.timestamp,
+            timestamp: common::time::bridge::chrono_to_jiff(tick.timestamp),
             app_name: tick.app_name.clone(),
             category: classification.category.clone(),
             session_type: classification.session_type,
@@ -261,8 +261,6 @@ fn enum_to_snake<T: Serialize + std::fmt::Debug>(val: &T) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use chrono::Utc;
-
     async fn setup_pool() -> sqlx::SqlitePool {
         let pool = storage::StoragePool::connect_in_memory().await.unwrap();
         let inner = pool.inner().clone();
@@ -277,7 +275,7 @@ mod tests {
 
     fn make_tick(app: &str, is_idle: bool, is_context_switch: bool) -> ActivityTick {
         ActivityTick {
-            timestamp: Utc::now(),
+            timestamp: chrono::Utc::now(),
             app_name: app.to_string(),
             bundle_id: None,
             window_title: Some("test".to_string()),

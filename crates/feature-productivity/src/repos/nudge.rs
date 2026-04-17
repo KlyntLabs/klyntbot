@@ -1,4 +1,4 @@
-use chrono::Utc;
+use common::time::bridge::jiff_to_chrono;
 use sqlx::SqlitePool;
 use tracing::warn;
 
@@ -22,7 +22,7 @@ impl From<NudgeRow> for NudgeRecord {
         });
         let created_at = common::parse_datetime(&row.created_at, "UTC").unwrap_or_else(|| {
             warn!(raw = %row.created_at, "unparseable created_at in nudge_history, using now()");
-            Utc::now()
+            jiff_to_chrono(jiff::Timestamp::now())
         });
         Self {
             id: row.id,

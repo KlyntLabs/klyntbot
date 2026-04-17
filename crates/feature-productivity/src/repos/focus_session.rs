@@ -1,4 +1,6 @@
 use chrono::{DateTime, Utc};
+use common::time::bridge::jiff_to_chrono;
+use jiff::SignedDuration;
 use sqlx::SqlitePool;
 use tracing::warn;
 
@@ -42,7 +44,7 @@ impl From<SessionRow> for FocusSession {
         let started_at = common::parse_datetime(&row.started_at, "UTC")
             .unwrap_or_else(|| {
                 warn!(raw = %row.started_at, "unparseable started_at in productivity_sessions, using now()");
-                Utc::now()
+                jiff_to_chrono(jiff::Timestamp::now())
             });
         let ended_at = row
             .ended_at
@@ -197,13 +199,14 @@ impl FocusSessionRepo {
         project_id: &str,
         days: i64,
     ) -> common::Result<Option<f64>> {
-        let cutoff = chrono::Utc::now() - chrono::Duration::days(days);
+        let cutoff =
+            (jiff::Timestamp::now() - SignedDuration::from_secs(days * 86_400)).to_string();
         let row: (Option<f64>,) = sqlx::query_as(
             "SELECT AVG(quality_score) FROM productivity_sessions
              WHERE project_id = ?1 AND quality_score IS NOT NULL AND started_at >= ?2",
         )
         .bind(project_id)
-        .bind(cutoff)
+        .bind(&cutoff)
         .fetch_one(&self.pool)
         .await
         .map_err(|e| common::KlyntbotError::Storage(e.to_string()))?;

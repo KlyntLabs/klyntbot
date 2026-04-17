@@ -1,6 +1,6 @@
 //! NudgeService — background loop that sends break reminders and burnout alerts.
 
-use chrono::{DateTime, Duration, Local, NaiveTime, Utc};
+use chrono::{DateTime, Duration, Utc};
 use tokio::sync::mpsc;
 use tokio::task::JoinHandle;
 use tokio_util::sync::CancellationToken;
@@ -202,16 +202,16 @@ fn is_quiet_hours(config: &NudgeConfig) -> bool {
         return false;
     };
 
-    let Ok(start) = NaiveTime::parse_from_str(start_str, "%H:%M") else {
+    let Ok(start) = jiff::civil::Time::strptime("%H:%M", start_str) else {
         warn!("NudgeService: invalid quiet_hours_start format: {start_str:?} (expected HH:MM)");
         return false;
     };
-    let Ok(end) = NaiveTime::parse_from_str(end_str, "%H:%M") else {
+    let Ok(end) = jiff::civil::Time::strptime("%H:%M", end_str) else {
         warn!("NudgeService: invalid quiet_hours_end format: {end_str:?} (expected HH:MM)");
         return false;
     };
 
-    let now = Local::now().time();
+    let now = jiff::Zoned::now().time();
 
     if start <= end {
         // Same-day range (e.g., 09:00 – 17:00)
@@ -340,13 +340,12 @@ mod tests {
 
     #[tokio::test]
     async fn quiet_hours_suppresses_nudges() {
-        // Test the quiet hours logic directly — use local time since is_quiet_hours uses Local::now()
-        let now_time = chrono::Local::now().time();
-        let start = (now_time - chrono::Duration::minutes(30))
-            .format("%H:%M")
+        let now_time = jiff::Zoned::now().time();
+        let start = (now_time - jiff::SignedDuration::from_mins(30))
+            .strftime("%H:%M")
             .to_string();
-        let end = (now_time + chrono::Duration::minutes(30))
-            .format("%H:%M")
+        let end = (now_time + jiff::SignedDuration::from_mins(30))
+            .strftime("%H:%M")
             .to_string();
 
         let config = NudgeConfig {

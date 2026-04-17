@@ -256,7 +256,7 @@ mod tests {
     use super::*;
     use crate::repos::{PrivacyRuleRepo, RuleEvolutionLogRepo, TrackingRuleRepo};
     use crate::ProductivityFeature;
-    use chrono::Utc;
+    use jiff::Timestamp;
     use sqlx::SqlitePool;
 
     async fn setup_pool() -> SqlitePool {
@@ -282,7 +282,7 @@ mod tests {
     }
 
     fn sample_rule(id: &str, pattern: &str, category: &str) -> TrackingRule {
-        let now = Utc::now();
+        let now = Timestamp::now();
         TrackingRule {
             id: id.to_string(),
             rule_type: RuleType::App,
@@ -337,7 +337,7 @@ mod tests {
             .unwrap();
 
         let rule_repo = TrackingRuleRepo::new(pool.clone());
-        let now = Utc::now();
+        let now = Timestamp::now();
         let rule = TrackingRule {
             id: "test-url-1".to_string(),
             rule_type: RuleType::Url,
@@ -372,7 +372,7 @@ mod tests {
             .unwrap();
 
         let rule_repo = TrackingRuleRepo::new(pool.clone());
-        let now = Utc::now();
+        let now = Timestamp::now();
         let rule = TrackingRule {
             id: "test-regex-1".to_string(),
             rule_type: RuleType::Title,
@@ -407,7 +407,7 @@ mod tests {
             .unwrap();
 
         let rule_repo = TrackingRuleRepo::new(pool.clone());
-        let now = Utc::now();
+        let now = Timestamp::now();
         let low_priority = TrackingRule {
             id: "prio-low".to_string(),
             rule_type: RuleType::Url,
@@ -492,7 +492,7 @@ mod tests {
             new_category: Some("design".to_string()),
             trigger_source: Some("test".to_string()),
             evidence_count: 1,
-            created_at: Utc::now().to_rfc3339(),
+            created_at: jiff::Timestamp::now().to_string(),
         };
         engine.evolve_rule(&rule, &entry).await.unwrap();
 
@@ -512,7 +512,7 @@ mod tests {
                 rule_type: "exclude_app".to_string(),
                 pattern: "1Password".to_string(),
                 match_mode: MatchMode::Exact,
-                created_at: Utc::now(),
+                created_at: Timestamp::now(),
             })
             .await
             .unwrap();
@@ -538,7 +538,7 @@ mod tests {
                 rule_type: "redact_title".to_string(),
                 pattern: "banking".to_string(),
                 match_mode: MatchMode::Contains,
-                created_at: Utc::now(),
+                created_at: Timestamp::now(),
             })
             .await
             .unwrap();

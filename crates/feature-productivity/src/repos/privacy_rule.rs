@@ -18,8 +18,10 @@ impl From<PrivacyRuleRow> for PrivacyRule {
             warn!(raw = %row.match_mode, "unknown match_mode in privacy_rules, defaulting to Exact");
             MatchMode::Exact
         });
-        let created_at =
-            common::parse_datetime(&row.created_at, "UTC").unwrap_or_else(chrono::Utc::now);
+        let created_at = row
+            .created_at
+            .parse::<jiff::Timestamp>()
+            .unwrap_or_else(|_| jiff::Timestamp::now());
 
         Self {
             id: row.id,
@@ -62,7 +64,7 @@ impl PrivacyRuleRepo {
         .bind(&rule.rule_type)
         .bind(&rule.pattern)
         .bind(rule.match_mode.to_string())
-        .bind(rule.created_at)
+        .bind(rule.created_at.to_string())
         .execute(&self.pool)
         .await
         .map_err(|e| common::KlyntbotError::Storage(e.to_string()))?;
@@ -83,7 +85,6 @@ impl PrivacyRuleRepo {
 mod tests {
     use super::*;
     use crate::ProductivityFeature;
-    use chrono::Utc;
 
     async fn setup_pool() -> SqlitePool {
         let pool = storage::StoragePool::connect_in_memory().await.unwrap();
@@ -103,7 +104,7 @@ mod tests {
             rule_type: "exclude_app".to_string(),
             pattern: "1Password".to_string(),
             match_mode: MatchMode::Exact,
-            created_at: Utc::now(),
+            created_at: jiff::Timestamp::now(),
         }
     }
 
@@ -132,7 +133,7 @@ mod tests {
             rule_type: "redact_title".to_string(),
             pattern: "banking".to_string(),
             match_mode: MatchMode::Contains,
-            created_at: Utc::now(),
+            created_at: jiff::Timestamp::now(),
         };
         repo.create(&r1).await.unwrap();
         repo.create(&r2).await.unwrap();

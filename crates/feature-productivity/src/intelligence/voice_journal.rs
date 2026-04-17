@@ -51,7 +51,6 @@ impl VoiceJournalProcessor {
 mod tests {
     use super::*;
     use crate::ProductivityFeature;
-    use chrono::Utc;
     use sqlx::SqlitePool;
 
     async fn setup_pool() -> SqlitePool {
@@ -87,7 +86,7 @@ mod tests {
             sentiment: Some("positive".to_string()),
             session_id: None,
             processed: false,
-            created_at: Utc::now().to_rfc3339(),
+            created_at: jiff::Timestamp::now().to_string(),
         };
 
         processor.process(&entry).await.unwrap();

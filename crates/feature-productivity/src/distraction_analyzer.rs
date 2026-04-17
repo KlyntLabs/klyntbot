@@ -4,6 +4,7 @@
 use std::sync::Arc;
 
 use chrono::{DateTime, Timelike, Utc};
+use common::time::bridge::chrono_to_jiff;
 use tokio::sync::broadcast;
 use tokio::task::JoinHandle;
 use tokio_util::sync::CancellationToken;
@@ -114,7 +115,7 @@ impl DistractionAnalyzer {
                                 distraction_app: tick.app_name.clone(),
                                 distraction_category: tick.category_id.clone(),
                                 recovery_secs: None,
-                                created_at: now,
+                                created_at: chrono_to_jiff(now),
                             };
 
                             match repos.distraction_patterns.insert(&pattern).await {

@@ -3,7 +3,7 @@
 use std::sync::Arc;
 
 use async_trait::async_trait;
-use chrono::{Datelike, Duration, Utc};
+use chrono::{Duration, Utc};
 use serde_json::Value;
 
 use std::fmt::Write;
@@ -142,8 +142,12 @@ impl ProductivityTool {
                 end_date,
                 &summaries,
                 |s| {
-                    chrono::NaiveDate::parse_from_str(&s.date, "%Y-%m-%d")
-                        .map(|d| format!("{}-W{:02}", d.iso_week().year(), d.iso_week().week()))
+                    s.date
+                        .parse::<jiff::civil::Date>()
+                        .map(|d| {
+                            let w = d.iso_week_date();
+                            format!("{}-W{:02}", w.year(), w.week())
+                        })
                         .unwrap_or_else(|_| "unknown".into())
                 },
             )),

@@ -1,6 +1,6 @@
 use std::collections::VecDeque;
 
-use chrono::{DateTime, Utc};
+use jiff::Timestamp;
 
 use crate::types::*;
 
@@ -16,7 +16,7 @@ const STORM_THRESHOLD: usize = 5;
 const BREAK_REMINDER_TICKS: usize = 1080;
 
 struct InterventionRecord {
-    timestamp: DateTime<Utc>,
+    timestamp: Timestamp,
     _intervention_type: InterventionType,
 }
 
@@ -68,7 +68,7 @@ impl InterventionRouter {
 
         // Prune old interventions (keep only last hour) — only compute now() when needed
         if !self.recent_interventions.is_empty() {
-            let one_hour_ago = Utc::now() - chrono::Duration::hours(1);
+            let one_hour_ago = Timestamp::now() - jiff::SignedDuration::from_hours(1);
             while self
                 .recent_interventions
                 .front()
@@ -98,7 +98,7 @@ impl InterventionRouter {
 
     fn check_context_switch_storm(
         &mut self,
-        now: DateTime<Utc>,
+        now: Timestamp,
     ) -> Option<ProductivityIntervention> {
         let switches = self
             .recent_ticks
@@ -126,7 +126,7 @@ impl InterventionRouter {
         }
     }
 
-    fn check_break_reminder(&mut self, now: DateTime<Utc>) -> Option<ProductivityIntervention> {
+    fn check_break_reminder(&mut self, now: Timestamp) -> Option<ProductivityIntervention> {
         if self.continuous_focus_ticks >= BREAK_REMINDER_TICKS {
             let mins = self.continuous_focus_ticks * 5 / 60;
             let intervention = ProductivityIntervention {
@@ -147,7 +147,7 @@ impl InterventionRouter {
         }
     }
 
-    fn record_intervention(&mut self, timestamp: DateTime<Utc>, itype: InterventionType) {
+    fn record_intervention(&mut self, timestamp: Timestamp, itype: InterventionType) {
         self.recent_interventions.push_back(InterventionRecord {
             timestamp,
             _intervention_type: itype,
@@ -161,7 +161,7 @@ mod tests {
 
     fn make_tick(session_type: IntelligenceSessionType, is_context_switch: bool) -> ClassifiedTick {
         ClassifiedTick {
-            timestamp: Utc::now(),
+            timestamp: Timestamp::now(),
             app_name: "test".to_string(),
             category: "coding".to_string(),
             session_type,

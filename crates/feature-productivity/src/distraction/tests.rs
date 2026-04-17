@@ -4,7 +4,7 @@ use crate::config::FocusConfig;
 use crate::distraction::interceptor::{DistractionInterceptor, InterceptDecision};
 use crate::repos::learned_rule::{LearnedRule, LearnedRuleRepo};
 use crate::ProductivityFeature;
-use chrono::Utc;
+use jiff::Timestamp;
 
 async fn setup() -> (DistractionInterceptor, LearnedRuleRepo) {
     let pool = storage::StoragePool::connect_in_memory().await.unwrap();
@@ -48,7 +48,7 @@ async fn full_flow_whitelist_then_reset() {
 #[tokio::test]
 async fn learned_rule_auto_allows_after_threshold() {
     let (mut interceptor, repo) = setup().await;
-    let now = Utc::now();
+    let now = Timestamp::now();
 
     // Insert a learned rule with hit_count >= threshold (default 3)
     let rule = LearnedRule {
@@ -73,7 +73,7 @@ async fn learned_rule_auto_allows_after_threshold() {
 #[tokio::test]
 async fn learned_rule_below_threshold_still_shows_overlay() {
     let (mut interceptor, repo) = setup().await;
-    let now = Utc::now();
+    let now = Timestamp::now();
 
     let rule = LearnedRule {
         id: None,

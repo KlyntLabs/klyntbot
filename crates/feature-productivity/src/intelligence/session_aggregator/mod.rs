@@ -7,7 +7,7 @@ use types::*;
 use std::collections::{HashMap, VecDeque};
 use std::sync::Arc;
 
-use chrono::{DateTime, Utc};
+use jiff::Timestamp;
 use tracing::{debug, info};
 
 use bus::{DomainEvent, DomainEventBus};
@@ -229,7 +229,7 @@ impl SessionAggregator {
         tick: ClassifiedTick,
         category: String,
         session_type: IntelligenceSessionType,
-        since: DateTime<Utc>,
+        since: Timestamp,
         tick_count: usize,
         matching_ticks: usize,
     ) -> Option<SessionEvent> {
@@ -259,12 +259,12 @@ impl SessionAggregator {
         // Promotion check
         if new_tick_count >= BUILDING_THRESHOLD && purity >= BUILDING_PURITY_MIN {
             let session_id = uuid::Uuid::new_v4().to_string();
-            let now_str = Utc::now().to_rfc3339();
+            let now_str = Timestamp::now().to_string();
 
             let session = ProductivitySession {
                 id: session_id.clone(),
                 session_type: session_type.to_string(),
-                started_at: since.to_rfc3339(),
+                started_at: since.to_string(),
                 ended_at: None,
                 duration_secs: None,
                 dominant_category: Some(category.clone()),
@@ -346,7 +346,7 @@ impl SessionAggregator {
         session_id: String,
         session_type: IntelligenceSessionType,
         category: String,
-        started_at: DateTime<Utc>,
+        started_at: Timestamp,
         tick_count: usize,
         matching_ticks: usize,
         context_switches: i64,
@@ -440,8 +440,8 @@ impl SessionAggregator {
         session_id: String,
         session_type: IntelligenceSessionType,
         category: String,
-        started_at: DateTime<Utc>,
-        ending_since: DateTime<Utc>,
+        started_at: Timestamp,
+        ending_since: Timestamp,
         ending_ticks: usize,
         tick_count: usize,
         matching_ticks: usize,
@@ -525,15 +525,15 @@ impl SessionAggregator {
         session_id: &str,
         session_type: IntelligenceSessionType,
         _category: &str,
-        started_at: DateTime<Utc>,
-        ended_at: DateTime<Utc>,
+        started_at: Timestamp,
+        ended_at: Timestamp,
         tick_count: usize,
         matching_ticks: usize,
         context_switches: i64,
         distraction_count: i64,
         app_counts: &HashMap<String, u32>,
     ) -> Option<SessionEvent> {
-        let duration_secs = (ended_at - started_at).num_seconds();
+        let duration_secs = ended_at.as_millisecond() / 1000 - started_at.as_millisecond() / 1000;
         let purity = if tick_count > 0 {
             matching_ticks as f64 / tick_count as f64
         } else {
@@ -554,7 +554,7 @@ impl SessionAggregator {
 
         if let Err(e) = self
             .session_repo
-            .end_session(session_id, &ended_at.to_rfc3339(), duration_secs, None)
+            .end_session(session_id, &ended_at.to_string(), duration_secs, None)
             .await
         {
             tracing::error!(session_id = %session_id, "failed to end session: {e}");
@@ -587,7 +587,7 @@ impl SessionAggregator {
 
     /// Flush: end any active/ending session immediately (used on shutdown).
     pub async fn flush(&mut self) -> Option<SessionEvent> {
-        let now = Utc::now();
+        let now = Timestamp::now();
         let current_state = std::mem::replace(&mut self.state, SessionState::Idle);
         match current_state {
             SessionState::Active {
@@ -650,7 +650,7 @@ impl SessionAggregator {
 mod tests {
     use super::*;
     use crate::ProductivityFeature;
-    use chrono::Duration;
+    use jiff::SignedDuration;
     use sqlx::SqlitePool;
 
     async fn setup_pool() -> SqlitePool {
@@ -669,7 +669,7 @@ mod tests {
         Arc::new(DomainEventBus::new(64))
     }
 
-    fn focus_tick(ts: DateTime<Utc>, app: &str) -> ClassifiedTick {
+    fn focus_tick(ts: Timestamp, app: &str) -> ClassifiedTick {
         ClassifiedTick {
             timestamp: ts,
             app_name: app.to_string(),
@@ -681,7 +681,7 @@ mod tests {
         }
     }
 
-    fn meeting_tick(ts: DateTime<Utc>) -> ClassifiedTick {
+    fn meeting_tick(ts: Timestamp) -> ClassifiedTick {
         ClassifiedTick {
             timestamp: ts,
             app_name: "Zoom".to_string(),
@@ -693,7 +693,7 @@ mod tests {
         }
     }
 
-    fn idle_tick(ts: DateTime<Utc>) -> ClassifiedTick {
+    fn idle_tick(ts: Timestamp) -> ClassifiedTick {
         ClassifiedTick {
             timestamp: ts,
             app_name: "".to_string(),
@@ -705,7 +705,7 @@ mod tests {
         }
     }
 
-    fn distraction_tick(ts: DateTime<Utc>) -> ClassifiedTick {
+    fn distraction_tick(ts: Timestamp) -> ClassifiedTick {
         ClassifiedTick {
             timestamp: ts,
             app_name: "Twitter".to_string(),
@@ -726,7 +726,7 @@ mod tests {
 
         assert_eq!(agg.state_name(), "idle");
 
-        let ts = Utc::now();
+        let ts = Timestamp::now();
         let event = agg.process_tick(focus_tick(ts, "Code")).await;
         assert!(event.is_none());
         assert_eq!(agg.state_name(), "building");
@@ -740,12 +740,12 @@ mod tests {
         let repo = IntelligenceSessionRepo::new(pool.clone());
         let mut agg = SessionAggregator::new(repo, bus);
 
-        let base = Utc::now();
+        let base = Timestamp::now();
         let mut created_event = None;
 
         // Send BUILDING_THRESHOLD ticks (180 x 5s = 15 min)
         for i in 0..BUILDING_THRESHOLD {
-            let ts = base + Duration::seconds(i as i64 * 5);
+            let ts = base + SignedDuration::from_secs(i as i64 * 5);
             let event = agg.process_tick(focus_tick(ts, "Code")).await;
             if let Some(ref e) = event {
                 if matches!(e, SessionEvent::Created { .. }) {
@@ -795,11 +795,11 @@ mod tests {
         let repo = IntelligenceSessionRepo::new(pool);
         let mut agg = SessionAggregator::new(repo, bus);
 
-        let base = Utc::now();
+        let base = Timestamp::now();
 
         // Send ticks but alternate categories so purity stays below threshold
         for i in 0..BUILDING_TIMEOUT {
-            let ts = base + Duration::seconds(i as i64 * 5);
+            let ts = base + SignedDuration::from_secs(i as i64 * 5);
             // Alternate between matching and non-matching, keeping purity just below 0.75
             let tick = if i % 4 == 3 {
                 // Every 4th tick is a different category -> resets Building
@@ -822,7 +822,7 @@ mod tests {
             make_event_bus(),
         );
 
-        let base = Utc::now();
+        let base = Timestamp::now();
         // Send ticks that keep switching categories, so Building resets each time.
         // After enough resets, the building state will timeout when we send same category
         // but keep purity low. Actually this is tricky since category change resets.
@@ -845,7 +845,7 @@ mod tests {
         assert_eq!(agg2.state_name(), "building");
 
         // Change category -> resets to new Building
-        let ts2 = base + Duration::seconds(5);
+        let ts2 = base + SignedDuration::from_secs(5);
         agg2.process_tick(meeting_tick(ts2)).await;
         assert_eq!(agg2.state_name(), "building");
     }
@@ -857,17 +857,17 @@ mod tests {
         let repo = IntelligenceSessionRepo::new(pool);
         let mut agg = SessionAggregator::new(repo, bus);
 
-        let base = Utc::now();
+        let base = Timestamp::now();
 
         // Start building with focus ticks
         for i in 0..10 {
-            let ts = base + Duration::seconds(i * 5);
+            let ts = base + SignedDuration::from_secs(i * 5);
             agg.process_tick(focus_tick(ts, "Code")).await;
         }
         assert_eq!(agg.state_name(), "building");
 
         // Category change -> restarts Building with new category
-        let ts = base + Duration::seconds(50);
+        let ts = base + SignedDuration::from_secs(50);
         agg.process_tick(meeting_tick(ts)).await;
         assert_eq!(agg.state_name(), "building");
     }
@@ -879,11 +879,11 @@ mod tests {
         let repo = IntelligenceSessionRepo::new(pool);
         let mut agg = SessionAggregator::new(repo, bus);
 
-        let base = Utc::now();
+        let base = Timestamp::now();
 
         // Build up to Active state (180 focus ticks)
         for i in 0..BUILDING_THRESHOLD {
-            let ts = base + Duration::seconds(i as i64 * 5);
+            let ts = base + SignedDuration::from_secs(i as i64 * 5);
             agg.process_tick(focus_tick(ts, "Code")).await;
         }
         assert_eq!(agg.state_name(), "active");
@@ -894,7 +894,7 @@ mod tests {
         // After N distraction ticks: 180 / (180 + N) < 0.50 -> N > 180
         let offset = BUILDING_THRESHOLD as i64;
         for i in 0..181 {
-            let ts = base + Duration::seconds((offset + i) * 5);
+            let ts = base + SignedDuration::from_secs((offset + i) * 5);
             agg.process_tick(distraction_tick(ts)).await;
         }
         assert_eq!(agg.state_name(), "ending");
@@ -908,11 +908,11 @@ mod tests {
         let repo = IntelligenceSessionRepo::new(pool.clone());
         let mut agg = SessionAggregator::new(repo, bus);
 
-        let base = Utc::now();
+        let base = Timestamp::now();
 
         // Build to Active
         for i in 0..BUILDING_THRESHOLD {
-            let ts = base + Duration::seconds(i as i64 * 5);
+            let ts = base + SignedDuration::from_secs(i as i64 * 5);
             agg.process_tick(focus_tick(ts, "Code")).await;
         }
         // Drain the SessionCreated domain event
@@ -921,7 +921,7 @@ mod tests {
         // Drop purity to enter Ending
         let offset = BUILDING_THRESHOLD as i64;
         for i in 0..181 {
-            let ts = base + Duration::seconds((offset + i) * 5);
+            let ts = base + SignedDuration::from_secs((offset + i) * 5);
             agg.process_tick(distraction_tick(ts)).await;
         }
         assert_eq!(agg.state_name(), "ending");
@@ -930,7 +930,7 @@ mod tests {
         let offset2 = offset + 181;
         let mut ended_event = None;
         for i in 0..ENDING_GRACE_TICKS {
-            let ts = base + Duration::seconds((offset2 + i as i64) * 5);
+            let ts = base + SignedDuration::from_secs((offset2 + i as i64) * 5);
             let event = agg.process_tick(idle_tick(ts)).await;
             if let Some(ref e) = event {
                 if matches!(e, SessionEvent::Ended { .. }) {
@@ -965,11 +965,11 @@ mod tests {
         let repo = IntelligenceSessionRepo::new(pool);
         let mut agg = SessionAggregator::new(repo, bus);
 
-        let base = Utc::now();
+        let base = Timestamp::now();
 
         // Build to Active (180 focus ticks)
         for i in 0..BUILDING_THRESHOLD {
-            let ts = base + Duration::seconds(i as i64 * 5);
+            let ts = base + SignedDuration::from_secs(i as i64 * 5);
             agg.process_tick(focus_tick(ts, "Code")).await;
         }
         assert_eq!(agg.state_name(), "active");
@@ -977,7 +977,7 @@ mod tests {
         // Send enough distractions to enter Ending (purity < 0.50 -> need >180 distractions)
         let offset = BUILDING_THRESHOLD as i64;
         for i in 0..181 {
-            let ts = base + Duration::seconds((offset + i) * 5);
+            let ts = base + SignedDuration::from_secs((offset + i) * 5);
             agg.process_tick(distraction_tick(ts)).await;
         }
         assert_eq!(agg.state_name(), "ending");
@@ -988,7 +988,7 @@ mod tests {
         // 180 + N >= 180.5 + 0.5N -> 0.5N >= 0.5 -> N >= 1
         // But purity needs to hit exactly 0.50 with N=1: 181/362 = 0.5 — that's >= 0.50.
         let offset2 = offset + 181;
-        agg.process_tick(focus_tick(base + Duration::seconds(offset2 * 5), "Code"))
+        agg.process_tick(focus_tick(base + SignedDuration::from_secs(offset2 * 5), "Code"))
             .await;
 
         assert_eq!(agg.state_name(), "active");
@@ -1001,17 +1001,17 @@ mod tests {
         let repo = IntelligenceSessionRepo::new(pool);
         let mut agg = SessionAggregator::new(repo, bus);
 
-        let base = Utc::now();
+        let base = Timestamp::now();
 
         // Build to Active
         for i in 0..BUILDING_THRESHOLD {
-            let ts = base + Duration::seconds(i as i64 * 5);
+            let ts = base + SignedDuration::from_secs(i as i64 * 5);
             agg.process_tick(focus_tick(ts, "Code")).await;
         }
         assert_eq!(agg.state_name(), "active");
 
         // Next tick in Active should emit Updated
-        let ts = base + Duration::seconds(BUILDING_THRESHOLD as i64 * 5);
+        let ts = base + SignedDuration::from_secs(BUILDING_THRESHOLD as i64 * 5);
         let event = agg.process_tick(focus_tick(ts, "Code")).await;
         assert!(matches!(event, Some(SessionEvent::Updated { .. })));
     }
@@ -1023,11 +1023,11 @@ mod tests {
         let repo = IntelligenceSessionRepo::new(pool.clone());
         let mut agg = SessionAggregator::new(repo, bus);
 
-        let base = Utc::now();
+        let base = Timestamp::now();
 
         // Build to Active
         for i in 0..BUILDING_THRESHOLD {
-            let ts = base + Duration::seconds(i as i64 * 5);
+            let ts = base + SignedDuration::from_secs(i as i64 * 5);
             agg.process_tick(focus_tick(ts, "Code")).await;
         }
         assert_eq!(agg.state_name(), "active");
@@ -1049,11 +1049,11 @@ mod tests {
         let repo = IntelligenceSessionRepo::new(pool);
         let mut agg = SessionAggregator::new(repo, bus);
 
-        let base = Utc::now();
+        let base = Timestamp::now();
 
         // Send meeting ticks until Active
         for i in 0..BUILDING_THRESHOLD {
-            let ts = base + Duration::seconds(i as i64 * 5);
+            let ts = base + SignedDuration::from_secs(i as i64 * 5);
             agg.process_tick(meeting_tick(ts)).await;
         }
         assert_eq!(agg.state_name(), "active");
@@ -1066,9 +1066,9 @@ mod tests {
         let repo = IntelligenceSessionRepo::new(pool);
         let mut agg = SessionAggregator::new(repo, bus);
 
-        let base = Utc::now();
+        let base = Timestamp::now();
 
-        let break_tick = |ts: DateTime<Utc>| ClassifiedTick {
+        let break_tick = |ts: Timestamp| ClassifiedTick {
             timestamp: ts,
             app_name: "Safari".to_string(),
             category: "browsing".to_string(),
@@ -1079,7 +1079,7 @@ mod tests {
         };
 
         for i in 0..BUILDING_THRESHOLD {
-            let ts = base + Duration::seconds(i as i64 * 5);
+            let ts = base + SignedDuration::from_secs(i as i64 * 5);
             agg.process_tick(break_tick(ts)).await;
         }
         assert_eq!(agg.state_name(), "active");
@@ -1092,14 +1092,14 @@ mod tests {
         let repo = IntelligenceSessionRepo::new(pool);
         let mut agg = SessionAggregator::new(repo, bus);
 
-        let base = Utc::now();
+        let base = Timestamp::now();
 
         // Start building
         agg.process_tick(focus_tick(base, "Code")).await;
         assert_eq!(agg.state_name(), "building");
 
         // Idle tick resets to idle
-        agg.process_tick(idle_tick(base + Duration::seconds(5)))
+        agg.process_tick(idle_tick(base + SignedDuration::from_secs(5)))
             .await;
         assert_eq!(agg.state_name(), "idle");
     }

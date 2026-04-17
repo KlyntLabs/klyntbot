@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use chrono::{DateTime, Utc};
+use jiff::Timestamp;
 
 use crate::types::IntelligenceSessionType;
 
@@ -28,7 +28,7 @@ pub(super) const ENDING_GRACE_TICKS: usize = 24;
 /// A classified tick ready for the session FSM.
 #[derive(Debug, Clone)]
 pub struct ClassifiedTick {
-    pub timestamp: DateTime<Utc>,
+    pub timestamp: Timestamp,
     pub app_name: String,
     pub category: String,
     pub session_type: IntelligenceSessionType,
@@ -43,7 +43,7 @@ pub(super) enum SessionState {
     Building {
         category: String,
         session_type: IntelligenceSessionType,
-        since: DateTime<Utc>,
+        since: Timestamp,
         tick_count: usize,
         matching_ticks: usize,
     },
@@ -51,7 +51,7 @@ pub(super) enum SessionState {
         session_id: String,
         session_type: IntelligenceSessionType,
         category: String,
-        started_at: DateTime<Utc>,
+        started_at: Timestamp,
         tick_count: usize,
         matching_ticks: usize,
         context_switches: i64,
@@ -63,8 +63,8 @@ pub(super) enum SessionState {
         session_id: String,
         session_type: IntelligenceSessionType,
         category: String,
-        started_at: DateTime<Utc>,
-        ending_since: DateTime<Utc>,
+        started_at: Timestamp,
+        ending_since: Timestamp,
         ending_ticks: usize,
         tick_count: usize,
         matching_ticks: usize,

@@ -1,4 +1,5 @@
 use chrono::{DateTime, Utc};
+use common::time::bridge::jiff_to_chrono;
 use sqlx::SqlitePool;
 use tracing::warn;
 
@@ -20,11 +21,11 @@ impl From<TimeEntryRow> for TimeEntry {
     fn from(row: TimeEntryRow) -> Self {
         let started_at = common::parse_datetime(&row.started_at, "UTC").unwrap_or_else(|| {
             warn!(raw = %row.started_at, "unparseable started_at in time_entries");
-            Utc::now()
+            jiff_to_chrono(jiff::Timestamp::now())
         });
         let created_at = common::parse_datetime(&row.created_at, "UTC").unwrap_or_else(|| {
             warn!(raw = %row.created_at, "unparseable created_at in time_entries");
-            Utc::now()
+            jiff_to_chrono(jiff::Timestamp::now())
         });
         Self {
             id: row.id,

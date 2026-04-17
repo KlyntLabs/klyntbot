@@ -101,16 +101,16 @@ impl CategorizationService {
                     source: ClassificationSource::AiFallback,
                 };
 
-                let now = chrono::Utc::now();
-                let expires = now + chrono::Duration::hours(24);
+                let now = jiff::Timestamp::now();
+                let expires = now + jiff::SignedDuration::from_hours(24);
                 let entry = CategorizationCacheEntry {
                     cache_key: cache_key.clone(),
                     category,
                     session_type: session_type.to_string(),
                     confidence: 0.7,
                     source: "ai".to_string(),
-                    created_at: now.to_rfc3339(),
-                    expires_at: expires.to_rfc3339(),
+                    created_at: now.to_string(),
+                    expires_at: expires.to_string(),
                 };
                 let _ = self.cache_repo.upsert(&entry).await;
                 self.cache_insert(cache_key, result.clone());
@@ -177,7 +177,7 @@ mod tests {
     use super::*;
     use crate::repos::{PrivacyRuleRepo, RuleEvolutionLogRepo, TrackingRuleRepo};
     use crate::ProductivityFeature;
-    use chrono::Utc;
+    use jiff::Timestamp;
     use sqlx::SqlitePool;
 
     async fn setup_pool() -> SqlitePool {
@@ -218,7 +218,7 @@ mod tests {
 
         // Add a rule and reload
         let rule_repo = TrackingRuleRepo::new(pool.clone());
-        let now = Utc::now();
+        let now = Timestamp::now();
         let rule = TrackingRule {
             id: "cat-rule-1".to_string(),
             rule_type: RuleType::App,

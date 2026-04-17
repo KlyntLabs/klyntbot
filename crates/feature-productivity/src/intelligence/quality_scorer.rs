@@ -1,6 +1,5 @@
 use std::sync::Arc;
 
-use chrono::Utc;
 use tracing::info;
 
 use bus::{DomainEvent, DomainEventBus};
@@ -93,7 +92,7 @@ impl QualityScorer {
             .next()
             .unwrap_or("")
             .to_string();
-        let now = Utc::now().to_rfc3339();
+        let now = jiff::Timestamp::now().to_string();
         let weights_json = serde_json::to_string(&self.weights).ok();
 
         let score = QualityScore {
@@ -173,7 +172,7 @@ impl QualityScorer {
             deep_count / n
         };
 
-        let now = Utc::now().to_rfc3339();
+        let now = jiff::Timestamp::now().to_string();
         let daily = QualityScore {
             id: uuid::Uuid::new_v4().to_string(),
             score_date: date.to_string(),
@@ -220,14 +219,11 @@ fn format_components(score: &QualityScore) -> String {
 }
 
 fn next_day(date: &str) -> String {
-    use chrono::NaiveDate;
-    NaiveDate::parse_from_str(date, "%Y-%m-%d")
-        .map(|d| {
-            (d + chrono::Duration::days(1))
-                .format("%Y-%m-%d")
-                .to_string()
-        })
-        .unwrap_or_else(|_| date.to_string())
+    date.parse::<jiff::civil::Date>()
+        .ok()
+        .and_then(|d| d.checked_add(jiff::Span::new().days(1)).ok())
+        .map(|d| d.to_string())
+        .unwrap_or_else(|| date.to_string())
 }
 
 #[cfg(test)]

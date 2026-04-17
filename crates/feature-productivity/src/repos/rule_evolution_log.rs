@@ -50,7 +50,6 @@ mod tests {
     use super::*;
     use crate::types::{IntelligenceSessionType, MatchMode, RuleSource, RuleType, TrackingRule};
     use crate::ProductivityFeature;
-    use chrono::Utc;
 
     async fn setup_pool() -> SqlitePool {
         let pool = storage::StoragePool::connect_in_memory().await.unwrap();
@@ -65,7 +64,7 @@ mod tests {
     }
 
     async fn insert_tracking_rule(pool: &SqlitePool, id: &str) {
-        let now = Utc::now();
+        let now = jiff::Timestamp::now();
         let rule = TrackingRule {
             id: id.to_string(),
             rule_type: RuleType::App,
@@ -99,8 +98,8 @@ mod tests {
         .bind(rule.confidence)
         .bind(rule.hit_count)
         .bind(rule.is_active)
-        .bind(rule.created_at)
-        .bind(rule.updated_at)
+        .bind(rule.created_at.to_string())
+        .bind(rule.updated_at.to_string())
         .execute(pool)
         .await
         .unwrap();

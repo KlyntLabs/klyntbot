@@ -46,11 +46,15 @@ impl From<TrackingRuleRow> for TrackingRule {
         let last_hit_at = row
             .last_hit_at
             .as_deref()
-            .and_then(|s| common::parse_datetime(s, "UTC"));
-        let created_at =
-            common::parse_datetime(&row.created_at, "UTC").unwrap_or_else(chrono::Utc::now);
-        let updated_at =
-            common::parse_datetime(&row.updated_at, "UTC").unwrap_or_else(chrono::Utc::now);
+            .and_then(|s| s.parse::<jiff::Timestamp>().ok());
+        let created_at = row
+            .created_at
+            .parse::<jiff::Timestamp>()
+            .unwrap_or_else(|_| jiff::Timestamp::now());
+        let updated_at = row
+            .updated_at
+            .parse::<jiff::Timestamp>()
+            .unwrap_or_else(|_| jiff::Timestamp::now());
 
         Self {
             id: row.id,
@@ -121,10 +125,10 @@ impl TrackingRuleRepo {
         .bind(rule.source.to_string())
         .bind(rule.confidence)
         .bind(rule.hit_count)
-        .bind(rule.last_hit_at)
+        .bind(rule.last_hit_at.map(|t| t.to_string()))
         .bind(rule.is_active)
-        .bind(rule.created_at)
-        .bind(rule.updated_at)
+        .bind(rule.created_at.to_string())
+        .bind(rule.updated_at.to_string())
         .execute(&self.pool)
         .await
         .map_err(|e| common::KlyntbotError::Storage(e.to_string()))?;
@@ -151,9 +155,9 @@ impl TrackingRuleRepo {
         .bind(rule.source.to_string())
         .bind(rule.confidence)
         .bind(rule.hit_count)
-        .bind(rule.last_hit_at)
+        .bind(rule.last_hit_at.map(|t| t.to_string()))
         .bind(rule.is_active)
-        .bind(rule.updated_at)
+        .bind(rule.updated_at.to_string())
         .execute(&self.pool)
         .await
         .map_err(|e| common::KlyntbotError::Storage(e.to_string()))?;
@@ -184,10 +188,10 @@ impl TrackingRuleRepo {
         .bind(rule.source.to_string())
         .bind(rule.confidence)
         .bind(rule.hit_count)
-        .bind(rule.last_hit_at)
+        .bind(rule.last_hit_at.map(|t| t.to_string()))
         .bind(rule.is_active)
-        .bind(rule.created_at)
-        .bind(rule.updated_at)
+        .bind(rule.created_at.to_string())
+        .bind(rule.updated_at.to_string())
         .execute(&self.pool)
         .await
         .map_err(|e| common::KlyntbotError::Storage(e.to_string()))?;
@@ -195,12 +199,12 @@ impl TrackingRuleRepo {
     }
 
     pub async fn increment_hit(&self, id: &str) -> common::Result<()> {
-        let now = chrono::Utc::now();
+        let now = jiff::Timestamp::now().to_string();
         sqlx::query(
             "UPDATE productivity_tracking_rules SET hit_count = hit_count + 1, last_hit_at = ?2, updated_at = ?2 WHERE id = ?1",
         )
         .bind(id)
-        .bind(now)
+        .bind(&now)
         .execute(&self.pool)
         .await
         .map_err(|e| common::KlyntbotError::Storage(e.to_string()))?;
@@ -219,12 +223,12 @@ impl TrackingRuleRepo {
     }
 
     pub async fn deactivate(&self, id: &str) -> common::Result<()> {
-        let now = chrono::Utc::now();
+        let now = jiff::Timestamp::now().to_string();
         sqlx::query(
             "UPDATE productivity_tracking_rules SET is_active = FALSE, updated_at = ?2 WHERE id = ?1",
         )
         .bind(id)
-        .bind(now)
+        .bind(&now)
         .execute(&self.pool)
         .await
         .map_err(|e| common::KlyntbotError::Storage(e.to_string()))?;
@@ -236,7 +240,6 @@ impl TrackingRuleRepo {
 mod tests {
     use super::*;
     use crate::ProductivityFeature;
-    use chrono::Utc;
 
     async fn setup_pool() -> SqlitePool {
         let pool = storage::StoragePool::connect_in_memory().await.unwrap();
@@ -251,7 +254,7 @@ mod tests {
     }
 
     fn sample_rule(id: &str) -> TrackingRule {
-        let now = Utc::now();
+        let now = jiff::Timestamp::now();
         TrackingRule {
             id: id.to_string(),
             rule_type: RuleType::App,

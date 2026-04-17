@@ -1,4 +1,3 @@
-use chrono::Utc;
 use sqlx::SqlitePool;
 
 use crate::types::DistractionPattern;
@@ -21,7 +20,10 @@ struct PatternRow {
 
 impl From<PatternRow> for DistractionPattern {
     fn from(row: PatternRow) -> Self {
-        let created_at = common::parse_datetime(&row.created_at, "UTC").unwrap_or_else(Utc::now);
+        let created_at = row
+            .created_at
+            .parse::<jiff::Timestamp>()
+            .unwrap_or_else(|_| jiff::Timestamp::now());
         Self {
             id: row.id,
             date: row.date,
@@ -174,7 +176,7 @@ mod tests {
             distraction_app: "Reddit".to_string(),
             distraction_category: Some("social_media".to_string()),
             recovery_secs: None,
-            created_at: Utc::now(),
+            created_at: jiff::Timestamp::now(),
         };
 
         let id = repo.insert(&pattern).await.unwrap();
@@ -203,7 +205,7 @@ mod tests {
             distraction_app: "Twitter".to_string(),
             distraction_category: None,
             recovery_secs: None,
-            created_at: Utc::now(),
+            created_at: jiff::Timestamp::now(),
         };
 
         let id = repo.insert(&pattern).await.unwrap();
@@ -231,7 +233,7 @@ mod tests {
                 distraction_app: "Reddit".to_string(),
                 distraction_category: None,
                 recovery_secs: Some(*recovery),
-                created_at: Utc::now(),
+                created_at: jiff::Timestamp::now(),
             };
             repo.insert(&pattern).await.unwrap();
         }
@@ -261,7 +263,7 @@ mod tests {
                 distraction_app: "Reddit".to_string(),
                 distraction_category: None,
                 recovery_secs: None,
-                created_at: Utc::now(),
+                created_at: jiff::Timestamp::now(),
             };
             repo.insert(&pattern).await.unwrap();
         }

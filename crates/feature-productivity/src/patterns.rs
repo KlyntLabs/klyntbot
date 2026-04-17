@@ -1,7 +1,7 @@
 //! Productivity pattern analyzer — detects usage patterns from focus sessions
 //! and daily summaries for personalized agent context.
 
-use chrono::{DateTime, Datelike, Duration, Timelike, Utc, Weekday};
+use chrono::{DateTime, Timelike, Utc, Weekday};
 use serde::{Deserialize, Serialize};
 
 use crate::repos::ProductivityRepos;
@@ -23,7 +23,7 @@ pub struct ProductivityPatterns {
     /// Number of days analyzed.
     pub days_analyzed: usize,
     /// When this analysis was computed.
-    pub computed_at: DateTime<Utc>,
+    pub computed_at: jiff::Timestamp,
 }
 
 pub struct ProductivityPatternAnalyzer {
@@ -38,7 +38,7 @@ impl ProductivityPatternAnalyzer {
     /// Analyze the last `days` of data and return detected patterns.
     pub async fn analyze(&self, days: u32) -> common::Result<ProductivityPatterns> {
         let now = Utc::now();
-        let start = now - Duration::days(i64::from(days));
+        let start = now - chrono::Duration::days(i64::from(days));
         let start_date = start.format("%Y-%m-%d").to_string();
         let end_date = now.format("%Y-%m-%d").to_string();
 
@@ -60,7 +60,7 @@ impl ProductivityPatternAnalyzer {
             avg_context_switches,
             best_day_of_week,
             days_analyzed: summaries.len(),
-            computed_at: Utc::now(),
+            computed_at: jiff::Timestamp::now(),
         })
     }
 
@@ -142,8 +142,8 @@ impl ProductivityPatternAnalyzer {
         // Group by weekday (Mon=0, Sun=6)
         let mut day_totals: [(f64, usize); 7] = [(0.0, 0); 7];
         for s in summaries {
-            if let Ok(date) = chrono::NaiveDate::parse_from_str(&s.date, "%Y-%m-%d") {
-                let weekday = date.weekday().num_days_from_monday() as usize;
+            if let Ok(date) = s.date.parse::<jiff::civil::Date>() {
+                let weekday = date.weekday().to_monday_zero_offset() as usize;
                 day_totals[weekday].0 += s.productive_secs as f64;
                 day_totals[weekday].1 += 1;
             }
@@ -230,7 +230,7 @@ mod tests {
                 session_type: SessionType::Focus,
                 target_mins: Some(25),
                 started_at: now,
-                ended_at: Some(now + Duration::minutes(25)),
+                ended_at: Some(now + chrono::Duration::minutes(25)),
                 actual_mins: Some(25),
                 interruptions: 0,
                 distraction_events: vec![],

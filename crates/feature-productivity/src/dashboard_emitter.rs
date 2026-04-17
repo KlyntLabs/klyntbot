@@ -2,7 +2,6 @@
 //! Tauri-compatible event payloads via a callback. Tracks app switches,
 //! computes live productivity score, and monitors focus state transitions.
 
-use chrono::{DateTime, Utc};
 use tokio::sync::broadcast;
 use tokio::task::JoinHandle;
 use tokio_util::sync::CancellationToken;
@@ -46,7 +45,7 @@ struct ScoreWindow {
     neutral_secs: i64,
     distracting_secs: i64,
     context_switches: i64,
-    last_emit: DateTime<Utc>,
+    last_emit: jiff::Timestamp,
 }
 
 impl ScoreWindow {
@@ -56,7 +55,7 @@ impl ScoreWindow {
             neutral_secs: 0,
             distracting_secs: 0,
             context_switches: 0,
-            last_emit: Utc::now(),
+            last_emit: jiff::Timestamp::now(),
         }
     }
 
@@ -107,11 +106,11 @@ impl ScoreWindow {
     }
 
     fn should_emit(&self) -> bool {
-        (Utc::now() - self.last_emit).num_seconds() >= 30
+        jiff::Timestamp::now().as_second() - self.last_emit.as_second() >= 30
     }
 
     fn mark_emitted(&mut self) {
-        self.last_emit = Utc::now();
+        self.last_emit = jiff::Timestamp::now();
     }
 }
 

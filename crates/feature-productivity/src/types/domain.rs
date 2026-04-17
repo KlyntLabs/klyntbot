@@ -1,4 +1,5 @@
 use chrono::{DateTime, Utc};
+use jiff::Timestamp;
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -538,7 +539,7 @@ pub struct DistractionPattern {
     pub distraction_app: String,
     pub distraction_category: Option<String>,
     pub recovery_secs: Option<i64>,
-    pub created_at: DateTime<Utc>,
+    pub created_at: Timestamp,
 }
 
 // -- Weekly Assessment --------------------------------------------------------
