@@ -3,8 +3,8 @@
 //! Handles: analyze_spending_anomalies, analyze_spending_trends,
 //! analyze_recurring_charges, analyze_category_correlation.
 
-use chrono::{Duration, Local};
-use common::{time::bridge::chrono_date_to_jiff, Decimal, Result, ToolError};
+use common::{Decimal, Result, ToolError};
+use jiff::{Span, Zoned};
 use serde_json::json;
 use storage::rows::finance::FinanceTransactionFilter;
 use tools_core::ParamExtractor;
@@ -35,12 +35,14 @@ impl FinanceTool {
 
     /// Fetch transactions for the given lookback period and convert to SpendingRecords.
     async fn fetch_spending_records(&self, lookback_months: i64) -> Result<Vec<SpendingRecord>> {
-        let today = Local::now().date_naive();
-        let date_from = today - Duration::days(lookback_months * 30);
+        let today = Zoned::now().date();
+        let date_from = today
+            .checked_sub(Span::new().days(lookback_months * 30))
+            .unwrap();
 
         let filter = FinanceTransactionFilter {
-            date_from: Some(chrono_date_to_jiff(date_from).into()),
-            date_to: Some(chrono_date_to_jiff(today).into()),
+            date_from: Some(date_from.into()),
+            date_to: Some(today.into()),
             limit: Some(10_000),
             ..Default::default()
         };
@@ -165,7 +167,7 @@ impl FinanceTool {
         }
         config.max_lookback_days = lookback_months * 30;
 
-        let today = common::time::bridge::chrono_date_to_jiff(Local::now().date_naive());
+        let today = Zoned::now().date();
         let charges = SpendingAnalyzer::detect_recurring(&records, &config, today);
 
         let result: Vec<serde_json::Value> = charges

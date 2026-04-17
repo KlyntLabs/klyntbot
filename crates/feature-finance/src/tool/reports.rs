@@ -3,8 +3,7 @@
 //! Handles: report_spending, report_income, report_trends,
 //! report_net_worth_history, daily_review.
 
-use chrono::{Datelike, Duration, Local, NaiveDate};
-use common::time::bridge::chrono_date_to_jiff;
+use jiff::{civil::Date, Span, Zoned};
 use serde_json::json;
 
 use common::{Result, ToolError};
@@ -16,47 +15,60 @@ use super::{parse_date, FinanceTool};
 // ── Private helpers ──────────────────────────────────────────────────────────
 
 /// Derive (date_from, date_to, period_label) from a period keyword and today's date.
-fn derive_date_range(period: &str, today: NaiveDate) -> Result<(NaiveDate, NaiveDate, String)> {
+fn derive_date_range(period: &str, today: Date) -> Result<(Date, Date, String)> {
     match period {
         "month" | "monthly" => {
-            let first = NaiveDate::from_ymd_opt(today.year(), today.month(), 1).unwrap();
+            let first = Date::new(today.year(), today.month(), 1).unwrap();
             let last = if today.month() == 12 {
-                NaiveDate::from_ymd_opt(today.year() + 1, 1, 1).unwrap() - Duration::days(1)
+                Date::new(today.year() + 1, 1, 1)
+                    .unwrap()
+                    .checked_sub(Span::new().days(1))
+                    .unwrap()
             } else {
-                NaiveDate::from_ymd_opt(today.year(), today.month() + 1, 1).unwrap()
-                    - Duration::days(1)
+                Date::new(today.year(), today.month() + 1, 1)
+                    .unwrap()
+                    .checked_sub(Span::new().days(1))
+                    .unwrap()
             };
-            let label = today.format("%B %Y").to_string();
+            let label = today.strftime("%B %Y").to_string();
             Ok((first, last, label))
         }
         "week" | "weekly" => {
-            let days_from_monday = today.weekday().num_days_from_monday() as i64;
-            let first = today - Duration::days(days_from_monday);
-            let last = first + Duration::days(6);
-            let label = format!("Week of {}", first.format("%b %d, %Y"));
+            let days_from_monday = today.weekday().to_monday_zero_offset() as i64;
+            let first = today
+                .checked_sub(Span::new().days(days_from_monday))
+                .unwrap();
+            let last = first.checked_add(Span::new().days(6)).unwrap();
+            let label = format!("Week of {}", first.strftime("%b %d, %Y"));
             Ok((first, last, label))
         }
         "quarter" | "quarterly" => {
-            let quarter = (today.month() - 1) / 3;
-            let start_month = quarter * 3 + 1;
+            let quarter = (today.month() as i64 - 1) / 3;
+            let start_month = (quarter * 3 + 1) as i8;
             let end_month = start_month + 2;
-            let first = NaiveDate::from_ymd_opt(today.year(), start_month, 1).unwrap();
+            let first = Date::new(today.year(), start_month, 1).unwrap();
             let last = if end_month == 12 {
-                NaiveDate::from_ymd_opt(today.year() + 1, 1, 1).unwrap() - Duration::days(1)
+                Date::new(today.year() + 1, 1, 1)
+                    .unwrap()
+                    .checked_sub(Span::new().days(1))
+                    .unwrap()
             } else {
-                NaiveDate::from_ymd_opt(today.year(), end_month + 1, 1).unwrap() - Duration::days(1)
+                Date::new(today.year(), end_month + 1, 1)
+                    .unwrap()
+                    .checked_sub(Span::new().days(1))
+                    .unwrap()
             };
             let label = format!("Q{} {}", quarter + 1, today.year());
             Ok((first, last, label))
         }
         "year" | "yearly" | "this_year" => {
-            let first = NaiveDate::from_ymd_opt(today.year(), 1, 1).unwrap();
-            let last = NaiveDate::from_ymd_opt(today.year(), 12, 31).unwrap();
+            let first = Date::new(today.year(), 1, 1).unwrap();
+            let last = Date::new(today.year(), 12, 31).unwrap();
             let label = today.year().to_string();
             Ok((first, last, label))
         }
         "last_30_days" => {
-            let first = today - Duration::days(29);
+            let first = today.checked_sub(Span::new().days(29)).unwrap();
             let label = format!("Last 30 days ({first} to {today})");
             Ok((first, today, label))
         }
@@ -108,12 +120,7 @@ impl FinanceTool {
         let mut rows = self
             .storage
             .transactions
-            .sum_by_category(
-                chrono_date_to_jiff(date_from),
-                chrono_date_to_jiff(date_to),
-                "expense",
-                &self.default_currency,
-            )
+            .sum_by_category(date_from, date_to, "expense", &self.default_currency)
             .await?;
 
         if let Some(cat) = category {
@@ -149,12 +156,7 @@ impl FinanceTool {
         let mut rows = self
             .storage
             .transactions
-            .sum_by_category(
-                chrono_date_to_jiff(date_from),
-                chrono_date_to_jiff(date_to),
-                "income",
-                &self.default_currency,
-            )
+            .sum_by_category(date_from, date_to, "income", &self.default_currency)
             .await?;
 
         if let Some(cat) = category {
@@ -278,7 +280,7 @@ impl FinanceTool {
     // ── report_net_worth_history ─────────────────────────────────────────────
 
     async fn report_net_worth_history(&self, _p: &ParamExtractor<'_>) -> Result<String> {
-        let today = Local::now().date_naive();
+        let today = Zoned::now().date();
         let base = &self.default_currency;
 
         let (accounts_total, investments_total, liabilities_total) = tokio::try_join!(
@@ -324,10 +326,7 @@ impl FinanceTool {
     /// If both `date_from` and `date_to` are present they take precedence over
     /// the `period` keyword; otherwise `period` is required and used to derive
     /// the date range.
-    fn resolve_period_dates(
-        &self,
-        p: &ParamExtractor<'_>,
-    ) -> Result<(NaiveDate, NaiveDate, String)> {
+    fn resolve_period_dates(&self, p: &ParamExtractor<'_>) -> Result<(Date, Date, String)> {
         let date_from_str = p.optional_str("date_from")?;
         let date_to_str = p.optional_str("date_to")?;
 
@@ -338,7 +337,7 @@ impl FinanceTool {
             return Ok((date_from, date_to, label));
         }
 
-        let today = Local::now().date_naive();
+        let today = Zoned::now().date();
         let period = p.str_or("period", "monthly")?;
         derive_date_range(period, today)
     }
@@ -347,69 +346,69 @@ impl FinanceTool {
 #[cfg(test)]
 mod tests {
     use super::{change_pct, derive_date_range};
-    use chrono::NaiveDate;
+    use jiff::civil::Date;
 
     #[test]
     fn test_derive_date_range_month() {
-        let today = NaiveDate::from_ymd_opt(2026, 2, 15).unwrap();
+        let today = Date::new(2026, 2, 15).unwrap();
         let (from, to, label) = derive_date_range("month", today).unwrap();
-        assert_eq!(from, NaiveDate::from_ymd_opt(2026, 2, 1).unwrap());
-        assert_eq!(to, NaiveDate::from_ymd_opt(2026, 2, 28).unwrap());
+        assert_eq!(from, Date::new(2026, 2, 1).unwrap());
+        assert_eq!(to, Date::new(2026, 2, 28).unwrap());
         assert_eq!(label, "February 2026");
     }
 
     #[test]
     fn test_derive_date_range_monthly_alias() {
-        let today = NaiveDate::from_ymd_opt(2026, 2, 15).unwrap();
+        let today = Date::new(2026, 2, 15).unwrap();
         let (from, to, _) = derive_date_range("monthly", today).unwrap();
-        assert_eq!(from, NaiveDate::from_ymd_opt(2026, 2, 1).unwrap());
-        assert_eq!(to, NaiveDate::from_ymd_opt(2026, 2, 28).unwrap());
+        assert_eq!(from, Date::new(2026, 2, 1).unwrap());
+        assert_eq!(to, Date::new(2026, 2, 28).unwrap());
     }
 
     #[test]
     fn test_derive_date_range_week() {
         // 2026-02-15 is a Sunday
-        let today = NaiveDate::from_ymd_opt(2026, 2, 15).unwrap();
+        let today = Date::new(2026, 2, 15).unwrap();
         let (from, to, label) = derive_date_range("week", today).unwrap();
-        assert_eq!(from, NaiveDate::from_ymd_opt(2026, 2, 9).unwrap()); // Monday
-        assert_eq!(to, NaiveDate::from_ymd_opt(2026, 2, 15).unwrap()); // Sunday
+        assert_eq!(from, Date::new(2026, 2, 9).unwrap()); // Monday
+        assert_eq!(to, Date::new(2026, 2, 15).unwrap()); // Sunday
         assert!(label.starts_with("Week of"));
     }
 
     #[test]
     fn test_derive_date_range_year() {
-        let today = NaiveDate::from_ymd_opt(2026, 6, 15).unwrap();
+        let today = Date::new(2026, 6, 15).unwrap();
         let (from, to, label) = derive_date_range("year", today).unwrap();
-        assert_eq!(from, NaiveDate::from_ymd_opt(2026, 1, 1).unwrap());
-        assert_eq!(to, NaiveDate::from_ymd_opt(2026, 12, 31).unwrap());
+        assert_eq!(from, Date::new(2026, 1, 1).unwrap());
+        assert_eq!(to, Date::new(2026, 12, 31).unwrap());
         assert_eq!(label, "2026");
     }
 
     #[test]
     fn test_derive_date_range_quarter() {
-        let today = NaiveDate::from_ymd_opt(2026, 5, 20).unwrap();
+        let today = Date::new(2026, 5, 20).unwrap();
         let (from, to, label) = derive_date_range("quarter", today).unwrap();
-        assert_eq!(from, NaiveDate::from_ymd_opt(2026, 4, 1).unwrap());
-        assert_eq!(to, NaiveDate::from_ymd_opt(2026, 6, 30).unwrap());
+        assert_eq!(from, Date::new(2026, 4, 1).unwrap());
+        assert_eq!(to, Date::new(2026, 6, 30).unwrap());
         assert_eq!(label, "Q2 2026");
     }
 
     #[test]
     fn test_derive_date_range_last_30_days() {
-        let today = NaiveDate::from_ymd_opt(2026, 3, 1).unwrap();
+        let today = Date::new(2026, 3, 1).unwrap();
         let (from, _to, _) = derive_date_range("last_30_days", today).unwrap();
-        assert_eq!(from, NaiveDate::from_ymd_opt(2026, 1, 31).unwrap());
+        assert_eq!(from, Date::new(2026, 1, 31).unwrap());
     }
 
     #[test]
     fn test_derive_date_range_unknown_returns_error() {
-        let today = NaiveDate::from_ymd_opt(2026, 2, 15).unwrap();
+        let today = Date::new(2026, 2, 15).unwrap();
         assert!(derive_date_range("banana", today).is_err());
     }
 
     #[test]
     fn test_derive_date_range_custom_returns_error() {
-        let today = NaiveDate::from_ymd_opt(2026, 2, 15).unwrap();
+        let today = Date::new(2026, 2, 15).unwrap();
         assert!(derive_date_range("custom", today).is_err());
     }
 

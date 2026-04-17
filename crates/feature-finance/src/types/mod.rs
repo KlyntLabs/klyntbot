@@ -8,8 +8,7 @@ mod domain;
 
 pub use domain::*;
 
-use chrono::NaiveDate;
-use common::time::bridge::chrono_date_to_jiff;
+use jiff::civil::Date;
 use storage::rows::finance::FinanceInvestmentFilter;
 
 // ============================================================
@@ -22,8 +21,8 @@ pub struct FinanceTransactionFilter {
     pub account_id: Option<String>,
     pub tx_type: Option<TransactionType>,
     pub category: Option<String>,
-    pub date_from: Option<NaiveDate>,
-    pub date_to: Option<NaiveDate>,
+    pub date_from: Option<Date>,
+    pub date_to: Option<Date>,
     pub amount_min: Option<i64>,
     pub amount_max: Option<i64>,
     pub query: Option<String>,
@@ -36,8 +35,8 @@ impl FinanceTransactionFilter {
             account_id: self.account_id.clone(),
             tx_type: self.tx_type.map(|t| t.as_str().to_string()),
             category: self.category.clone(),
-            date_from: self.date_from.map(|d| chrono_date_to_jiff(d).into()),
-            date_to: self.date_to.map(|d| chrono_date_to_jiff(d).into()),
+            date_from: self.date_from.map(|d| d.into()),
+            date_to: self.date_to.map(|d| d.into()),
             amount_min: self.amount_min,
             amount_max: self.amount_max,
             query: self.query.clone(),

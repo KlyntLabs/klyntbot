@@ -2,8 +2,7 @@
 //!
 //! Handles: budget_create, budget_list, budget_status, budget_update, budget_delete.
 
-use chrono::{Local, Utc};
-use common::time::bridge::{chrono_date_to_jiff, chrono_to_jiff};
+use jiff::{Timestamp, Zoned};
 use serde_json::json;
 use uuid::Uuid;
 
@@ -70,7 +69,7 @@ impl FinanceTool {
             .into());
         }
 
-        let today = Local::now().date_naive();
+        let today = Zoned::now().date();
         let start_date = match p.optional_str("start_date")? {
             Some(s) => parse_date(s)?,
             None => today,
@@ -87,7 +86,7 @@ impl FinanceTool {
         }
 
         let alert_threshold = p.i64_or("alert_threshold", 80)? as i32;
-        let now = Utc::now();
+        let now = Timestamp::now();
         let id = Uuid::new_v4().to_string();
 
         let conv = ensure_base_amount(
@@ -107,12 +106,12 @@ impl FinanceTool {
             category: category.map(|s| s.to_string()),
             method: method.as_str().to_string(),
             jar_type: jar_type.map(|j| j.as_str().to_string()),
-            start_date: chrono_date_to_jiff(start_date).into(),
-            end_date: end_date.map(|d| chrono_date_to_jiff(d).into()),
+            start_date: start_date.into(),
+            end_date: end_date.map(|d| d.into()),
             is_active: true,
             alert_threshold,
-            created_at: chrono_to_jiff(now).into(),
-            updated_at: chrono_to_jiff(now).into(),
+            created_at: now.into(),
+            updated_at: now.into(),
             base_amount: conv.base_amount,
             base_currency: conv.base_currency,
             exchange_rate: conv.exchange_rate,

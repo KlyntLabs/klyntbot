@@ -24,9 +24,9 @@ use bus::DomainEventBus;
 use common::{Result, ToolError};
 use tools_core::{ConfigPersistence, ParamExtractor, RoutingContext, Tool};
 
-/// Parse a `YYYY-MM-DD` date string into a `NaiveDate`.
-pub(crate) fn parse_date(s: &str) -> Result<chrono::NaiveDate> {
-    chrono::NaiveDate::parse_from_str(s, "%Y-%m-%d")
+/// Parse a `YYYY-MM-DD` date string into a `jiff::civil::Date`.
+pub(crate) fn parse_date(s: &str) -> Result<jiff::civil::Date> {
+    jiff::civil::Date::strptime("%Y-%m-%d", s)
         .map_err(|_| ToolError::InvalidParams(format!("Invalid date format: {s}")).into())
 }
 

@@ -3,8 +3,7 @@
 //! Handles: goal_create, goal_list, goal_update, goal_fire, goal_whatif,
 //! liability_add, liability_list, liability_update, net_worth.
 
-use chrono::{Datelike, NaiveDate, Utc};
-use common::time::bridge::{chrono_date_to_jiff, chrono_to_jiff};
+use jiff::{civil::Date, Timestamp, Zoned};
 use serde_json::json;
 
 use crate::currency::ensure_base_amount;
@@ -61,7 +60,7 @@ impl FinanceTool {
         let deadline = p.optional_str("deadline")?.map(parse_date).transpose()?;
 
         if let Some(ref d) = deadline {
-            let today = Utc::now().date_naive();
+            let today = Zoned::now().date();
             if *d < today {
                 return Err(
                     ToolError::InvalidParams("Deadline must be in the future".to_string()).into(),
@@ -73,7 +72,7 @@ impl FinanceTool {
         let inflation_rate = p.optional_f64("inflation_rate")?;
         let notes = p.optional_str("notes")?;
 
-        let now = Utc::now();
+        let now = Timestamp::now();
         let id = uuid::Uuid::new_v4().to_string();
 
         let conv = ensure_base_amount(
@@ -93,13 +92,13 @@ impl FinanceTool {
             current_amount,
             currency: currency.to_uppercase(),
             status: "active".to_string(),
-            deadline: deadline.map(|d| chrono_date_to_jiff(d).into()),
+            deadline: deadline.map(|d| d.into()),
             monthly_contribution,
             expected_return_rate,
             inflation_rate,
             notes: notes.map(|s| s.to_string()),
-            created_at: chrono_to_jiff(now).into(),
-            updated_at: chrono_to_jiff(now).into(),
+            created_at: now.into(),
+            updated_at: now.into(),
             base_target_amount: conv.base_amount,
             base_current_amount,
             base_currency: conv.base_currency,
@@ -211,7 +210,7 @@ impl FinanceTool {
             monthly_contribution: monthly_contribution.map(Some),
             expected_return_rate: expected_return_rate.map(Some),
             inflation_rate: inflation_rate.map(Some),
-            deadline: deadline.map(|d| Some(chrono_date_to_jiff(d).into())),
+            deadline: deadline.map(|d| Some(d.into())),
             status: status.map(|s| s.as_str().to_string()),
             base_target_amount: None,
             base_current_amount: None,
@@ -281,19 +280,13 @@ impl FinanceTool {
         let annual_expenses: i64 = match p.optional_i64("annual_expenses")? {
             Some(v) => v,
             None => {
-                let today = Utc::now().date_naive();
-                let date_from =
-                    NaiveDate::from_ymd_opt(today.year() - 1, today.month(), today.day())
-                        .unwrap_or_else(|| today - chrono::Duration::days(365));
+                let today = Zoned::now().date();
+                let date_from = Date::new(today.year() - 1, today.month(), today.day())
+                    .unwrap_or_else(|_| today.checked_sub(jiff::Span::new().days(365)).unwrap());
                 let cats = self
                     .storage
                     .transactions
-                    .sum_by_category(
-                        chrono_date_to_jiff(date_from),
-                        chrono_date_to_jiff(today),
-                        "expense",
-                        &self.default_currency,
-                    )
+                    .sum_by_category(date_from, today, "expense", &self.default_currency)
                     .await?;
                 cats.iter().map(|(_, total)| total).sum()
             }
@@ -330,7 +323,7 @@ impl FinanceTool {
             inflation_rate,
         );
 
-        let today = Utc::now().date_naive();
+        let today = Zoned::now().date();
         let estimated_fire_date = baseline_months.map(|m| fire_date_label(today, m));
 
         let mut result = json!({
@@ -438,7 +431,7 @@ impl FinanceTool {
         let due_date = p.optional_str("due_date")?.map(parse_date).transpose()?;
         let notes = p.optional_str("notes")?;
 
-        let now = Utc::now();
+        let now = Timestamp::now();
         let id = uuid::Uuid::new_v4().to_string();
 
         let conv = ensure_base_amount(
@@ -459,10 +452,10 @@ impl FinanceTool {
             currency: currency.to_uppercase(),
             interest_rate,
             monthly_payment,
-            due_date: due_date.map(|d| chrono_date_to_jiff(d).into()),
+            due_date: due_date.map(|d| d.into()),
             notes: notes.map(|s| s.to_string()),
-            created_at: chrono_to_jiff(now).into(),
-            updated_at: chrono_to_jiff(now).into(),
+            created_at: now.into(),
+            updated_at: now.into(),
             base_principal: conv.base_amount,
             base_remaining,
             base_currency: conv.base_currency,
@@ -618,12 +611,12 @@ impl FinanceTool {
     }
 }
 
-fn fire_date_label(from: NaiveDate, months: f64) -> String {
+fn fire_date_label(from: Date, months: f64) -> String {
     let total = months as i64;
     let extra_years = total / 12;
     let extra_months = total % 12;
-    let new_month0 = from.month0() as i64 + extra_months;
+    let new_month0 = (from.month() as i64 - 1) + extra_months;
     let year = from.year() as i64 + extra_years + new_month0 / 12;
-    let month = (new_month0 % 12 + 1) as u32;
+    let month = (new_month0 % 12 + 1) as i8;
     format!("{year}-{month:02}")
 }

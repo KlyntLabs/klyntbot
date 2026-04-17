@@ -1,6 +1,6 @@
 //! Finance domain enums and structs.
 
-use chrono::{DateTime, NaiveDate, Utc};
+use jiff::{civil::Date, Timestamp};
 use serde::{Deserialize, Serialize};
 use tools_core::DomainEnum;
 
@@ -188,8 +188,8 @@ pub struct FinanceAccount {
     pub institution: Option<String>,
     pub notes: Option<String>,
     pub is_archived: bool,
-    pub created_at: DateTime<Utc>,
-    pub updated_at: DateTime<Utc>,
+    pub created_at: Timestamp,
+    pub updated_at: Timestamp,
 }
 
 /// Domain representation of a finance transaction.
@@ -204,12 +204,12 @@ pub struct FinanceTransaction {
     pub subcategory: Option<String>,
     pub counterparty: Option<String>,
     pub notes: Option<String>,
-    pub tx_date: NaiveDate,
+    pub tx_date: Date,
     pub transfer_id: Option<String>,
     pub is_recurring: bool,
     pub recurring_rule: Option<String>,
-    pub created_at: DateTime<Utc>,
-    pub updated_at: DateTime<Utc>,
+    pub created_at: Timestamp,
+    pub updated_at: Timestamp,
 }
 
 /// Domain representation of a budget.
@@ -223,12 +223,12 @@ pub struct FinanceBudget {
     pub category: Option<String>,
     pub method: BudgetMethod,
     pub jar_type: Option<JarType>,
-    pub start_date: NaiveDate,
-    pub end_date: Option<NaiveDate>,
+    pub start_date: Date,
+    pub end_date: Option<Date>,
     pub is_active: bool,
     pub alert_threshold: i32,
-    pub created_at: DateTime<Utc>,
-    pub updated_at: DateTime<Utc>,
+    pub created_at: Timestamp,
+    pub updated_at: Timestamp,
 }
 
 /// Domain representation of an investment portfolio.
@@ -238,8 +238,8 @@ pub struct FinancePortfolio {
     pub name: String,
     pub description: Option<String>,
     pub currency: String,
-    pub created_at: DateTime<Utc>,
-    pub updated_at: DateTime<Utc>,
+    pub created_at: Timestamp,
+    pub updated_at: Timestamp,
 }
 
 /// Domain representation of an investment holding.
@@ -255,11 +255,11 @@ pub struct FinanceInvestment {
     pub currency: String,
     pub current_price: Option<i64>,
     pub current_value: Option<i64>,
-    pub purchase_date: Option<NaiveDate>,
+    pub purchase_date: Option<Date>,
     pub asset_class: Option<String>,
     pub notes: Option<String>,
-    pub created_at: DateTime<Utc>,
-    pub updated_at: DateTime<Utc>,
+    pub created_at: Timestamp,
+    pub updated_at: Timestamp,
 }
 
 /// Domain representation of an investment transaction.
@@ -273,9 +273,9 @@ pub struct FinanceInvestmentTx {
     pub total_amount: i64,
     pub currency: String,
     pub fees: i64,
-    pub tx_date: NaiveDate,
+    pub tx_date: Date,
     pub notes: Option<String>,
-    pub created_at: DateTime<Utc>,
+    pub created_at: Timestamp,
 }
 
 /// Domain representation of a financial goal.
@@ -288,13 +288,13 @@ pub struct FinanceGoal {
     pub current_amount: i64,
     pub currency: String,
     pub status: GoalStatus,
-    pub deadline: Option<NaiveDate>,
+    pub deadline: Option<Date>,
     pub monthly_contribution: Option<i64>,
     pub expected_return_rate: Option<f64>,
     pub inflation_rate: Option<f64>,
     pub notes: Option<String>,
-    pub created_at: DateTime<Utc>,
-    pub updated_at: DateTime<Utc>,
+    pub created_at: Timestamp,
+    pub updated_at: Timestamp,
 }
 
 /// Domain representation of a financial liability.
@@ -308,8 +308,8 @@ pub struct FinanceLiability {
     pub currency: String,
     pub interest_rate: Option<f64>,
     pub monthly_payment: Option<i64>,
-    pub due_date: Option<NaiveDate>,
+    pub due_date: Option<Date>,
     pub notes: Option<String>,
-    pub created_at: DateTime<Utc>,
-    pub updated_at: DateTime<Utc>,
+    pub created_at: Timestamp,
+    pub updated_at: Timestamp,
 }

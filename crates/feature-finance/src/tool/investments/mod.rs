@@ -6,8 +6,7 @@
 mod pricing;
 mod summary;
 
-use chrono::{Local, Utc};
-use common::time::bridge::{chrono_date_to_jiff, chrono_to_jiff};
+use jiff::{Timestamp, Zoned};
 use serde_json::json;
 use uuid::Uuid;
 
@@ -64,7 +63,7 @@ impl FinanceTool {
             None => self.default_currency.clone(),
         };
 
-        let now = Utc::now();
+        let now = Timestamp::now();
         let id = Uuid::new_v4().to_string();
 
         let row = FinancePortfolioRow {
@@ -72,8 +71,8 @@ impl FinanceTool {
             name: name.to_string(),
             description: description.map(|s| s.to_string()),
             currency,
-            created_at: chrono_to_jiff(now).into(),
-            updated_at: chrono_to_jiff(now).into(),
+            created_at: now.into(),
+            updated_at: now.into(),
         };
 
         let inserted = self.storage.investments.add_portfolio(&row).await?;
@@ -193,7 +192,7 @@ impl FinanceTool {
         )
         .await?;
 
-        let now = Utc::now();
+        let now = Timestamp::now();
         let id = Uuid::new_v4().to_string();
 
         let row = FinanceInvestmentRow {
@@ -207,11 +206,11 @@ impl FinanceTool {
             currency: currency.to_string(),
             current_price: None,
             current_value: None,
-            purchase_date: purchase_date.map(|d| chrono_date_to_jiff(d).into()),
+            purchase_date: purchase_date.map(|d| d.into()),
             asset_class: None,
             notes: notes.map(|s| s.to_string()),
-            created_at: chrono_to_jiff(now).into(),
-            updated_at: chrono_to_jiff(now).into(),
+            created_at: now.into(),
+            updated_at: now.into(),
             market_currency: market_currency.map(|s| s.to_string()),
             base_cost_basis: inv_conv.base_cost_basis,
             base_current_value: inv_conv.base_current_value,
@@ -313,7 +312,7 @@ impl FinanceTool {
         let fees = p.i64_or("fees", 0)?;
         let notes = p.optional_str("notes")?;
 
-        let today = Local::now().date_naive();
+        let today = Zoned::now().date();
         let tx_date = match p.optional_str("date")? {
             Some(s) => parse_date(s)?,
             None => today,
@@ -343,7 +342,7 @@ impl FinanceTool {
             None => inv.currency.clone(),
         };
 
-        let now = Utc::now();
+        let now = Timestamp::now();
         let tx_id = Uuid::new_v4().to_string();
 
         // Validate sell quantity does not exceed current holding
@@ -376,9 +375,9 @@ impl FinanceTool {
             total_amount,
             currency,
             fees,
-            tx_date: chrono_date_to_jiff(tx_date).into(),
+            tx_date: tx_date.into(),
             notes: notes.map(|s| s.to_string()),
-            created_at: chrono_to_jiff(now).into(),
+            created_at: now.into(),
             base_total_amount: tx_conv.base_amount,
             base_currency: tx_conv.base_currency,
             exchange_rate: tx_conv.exchange_rate,
@@ -478,8 +477,8 @@ impl FinanceTool {
         let portfolio_id = p.required_str("portfolio_id")?;
         let start_date_str = p.required_str("start_date")?;
         let end_date_str = p.required_str("end_date")?;
-        let start_date = chrono_date_to_jiff(super::parse_date(start_date_str)?);
-        let end_date = chrono_date_to_jiff(super::parse_date(end_date_str)?);
+        let start_date = super::parse_date(start_date_str)?;
+        let end_date = super::parse_date(end_date_str)?;
 
         // Compute portfolio start and end value from investments
         let filter = storage::rows::finance::FinanceInvestmentFilter {

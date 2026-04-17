@@ -1,7 +1,6 @@
 //! Health check action handler for `FinanceTool`.
 
-use chrono::{Duration, Local};
-use common::time::bridge::{jiff_date_to_chrono, jiff_to_chrono};
+use jiff::{SignedDuration, Zoned};
 use serde_json::json;
 
 use common::Result;
@@ -68,10 +67,12 @@ impl FinanceTool {
             .list_with_symbols()
             .await
             .unwrap_or_default();
-        let stale_threshold = Local::now() - Duration::hours(24);
+        let stale_threshold = Zoned::now()
+            .checked_sub(SignedDuration::from_hours(24))
+            .unwrap();
         let stale_count = investments
             .iter()
-            .filter(|inv| jiff_to_chrono(*inv.updated_at) < stale_threshold.to_utc())
+            .filter(|inv| inv.updated_at.as_second() < stale_threshold.timestamp().as_second())
             .count();
         if stale_count > 0 {
             issues.push(Issue {
@@ -107,15 +108,10 @@ impl FinanceTool {
         }
 
         let goals = self.storage.goals.list_active().await.unwrap_or_default();
-        let today = Local::now().date_naive();
+        let today = Zoned::now().date();
         let overdue_goals: Vec<_> = goals
             .iter()
-            .filter(|g| {
-                g.deadline
-                    .as_ref()
-                    .map(|d| jiff_date_to_chrono(**d) < today)
-                    .unwrap_or(false)
-            })
+            .filter(|g| g.deadline.as_ref().map(|d| **d < today).unwrap_or(false))
             .collect();
         if !overdue_goals.is_empty() {
             issues.push(Issue {

@@ -2,7 +2,7 @@
 //!
 //! Handles: snapshot_record, snapshot_history.
 
-use chrono::{Duration, Local};
+use jiff::Zoned;
 use serde_json::json;
 
 use common::{Result, ToolError};
@@ -27,7 +27,7 @@ impl FinanceTool {
 
     /// Record a point-in-time net worth snapshot by computing current base-currency totals.
     async fn snapshot_record(&self, _p: &ParamExtractor<'_>) -> Result<String> {
-        let today = Local::now().date_naive();
+        let today = Zoned::now().date();
         let base = &self.default_currency;
 
         let (accounts_total, investments_total, liabilities_total) = tokio::try_join!(
@@ -77,8 +77,11 @@ impl FinanceTool {
 
     /// Query snapshot history by date range.
     async fn snapshot_history(&self, p: &ParamExtractor<'_>) -> Result<String> {
-        let today = Local::now().date_naive();
-        let default_start = (today - Duration::days(365)).to_string();
+        let today = Zoned::now().date();
+        let default_start = today
+            .checked_sub(jiff::Span::new().days(365))
+            .unwrap()
+            .to_string();
 
         let start_date = match p.optional_str("start_date")? {
             Some(s) => {

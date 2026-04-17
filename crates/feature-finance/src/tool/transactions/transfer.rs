@@ -1,7 +1,6 @@
 //! Transfer transaction handler for `FinanceTool`.
 
-use chrono::{NaiveDate, Utc};
-use common::time::bridge::{chrono_date_to_jiff, chrono_to_jiff};
+use jiff::{civil::Date, Timestamp};
 use serde_json::json;
 
 use crate::currency::ensure_base_amount;
@@ -19,7 +18,7 @@ impl FinanceTool {
         p: &ParamExtractor<'_>,
         account_id: &str,
         amount: i64,
-        tx_date: NaiveDate,
+        tx_date: Date,
         category: Option<&str>,
         subcategory: Option<&str>,
         counterparty: Option<&str>,
@@ -61,7 +60,7 @@ impl FinanceTool {
 
         let currency = src_row.currency.clone();
         let transfer_id = uuid::Uuid::new_v4().to_string();
-        let now = Utc::now();
+        let now = Timestamp::now();
 
         let conv = ensure_base_amount(
             amount,
@@ -81,12 +80,12 @@ impl FinanceTool {
             subcategory: subcategory.map(|s| s.to_string()),
             counterparty: counterparty.map(|s| s.to_string()),
             notes: notes.map(|s| s.to_string()),
-            tx_date: chrono_date_to_jiff(tx_date).into(),
+            tx_date: tx_date.into(),
             transfer_id: Some(transfer_id.clone()),
             is_recurring: false,
             recurring_rule: None,
-            created_at: chrono_to_jiff(now).into(),
-            updated_at: chrono_to_jiff(now).into(),
+            created_at: now.into(),
+            updated_at: now.into(),
             base_amount: conv.base_amount,
             base_currency: conv.base_currency.clone(),
             exchange_rate: conv.exchange_rate,
@@ -102,12 +101,12 @@ impl FinanceTool {
             subcategory: subcategory.map(|s| s.to_string()),
             counterparty: counterparty.map(|s| s.to_string()),
             notes: notes.map(|s| s.to_string()),
-            tx_date: chrono_date_to_jiff(tx_date).into(),
+            tx_date: tx_date.into(),
             transfer_id: Some(transfer_id.clone()),
             is_recurring: false,
             recurring_rule: None,
-            created_at: chrono_to_jiff(now).into(),
-            updated_at: chrono_to_jiff(now).into(),
+            created_at: now.into(),
+            updated_at: now.into(),
             base_amount: conv.base_amount,
             base_currency: conv.base_currency,
             exchange_rate: conv.exchange_rate,

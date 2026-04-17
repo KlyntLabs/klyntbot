@@ -1,7 +1,6 @@
 //! Recurring transaction handler for `FinanceTool`.
 
-use chrono::{Local, Utc};
-use common::time::bridge::{chrono_date_to_jiff, chrono_to_jiff};
+use jiff::{Timestamp, Zoned};
 use serde_json::json;
 
 use crate::currency::ensure_base_amount;
@@ -78,8 +77,8 @@ impl FinanceTool {
                 ToolError::ExecutionFailed(format!("Account {} not found", account_id))
             })?;
 
-        let now = Utc::now();
-        let today = Local::now().date_naive();
+        let now = Timestamp::now();
+        let today = Zoned::now().date();
 
         let conv = ensure_base_amount(
             amount,
@@ -99,12 +98,12 @@ impl FinanceTool {
             subcategory: None,
             counterparty: counterparty.map(|s| s.to_string()),
             notes: notes.map(|s| s.to_string()),
-            tx_date: chrono_date_to_jiff(today).into(),
+            tx_date: today.into(),
             transfer_id: None,
             is_recurring: true,
             recurring_rule: Some(recurring_rule.to_string()),
-            created_at: chrono_to_jiff(now).into(),
-            updated_at: chrono_to_jiff(now).into(),
+            created_at: now.into(),
+            updated_at: now.into(),
             base_amount: conv.base_amount,
             base_currency: conv.base_currency,
             exchange_rate: conv.exchange_rate,

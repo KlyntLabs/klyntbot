@@ -5,8 +5,7 @@
 mod recurring;
 mod transfer;
 
-use chrono::{Local, Utc};
-use common::time::bridge::{chrono_date_to_jiff, chrono_to_jiff};
+use jiff::{Timestamp, Zoned};
 use serde_json::json;
 
 use bus::DomainEvent;
@@ -81,7 +80,7 @@ impl FinanceTool {
 
         let tx_date = match p.optional_str("tx_date")? {
             Some(s) => parse_date(s)?,
-            None => Local::now().date_naive(),
+            None => Zoned::now().date(),
         };
 
         let category = p.optional_str("category")?.map(|s| s.to_string());
@@ -129,7 +128,7 @@ impl FinanceTool {
         )
         .await?;
 
-        let now = Utc::now();
+        let now = Timestamp::now();
         let row = FinanceTransactionRow {
             id: uuid::Uuid::new_v4().to_string(),
             account_id: account_id.to_string(),
@@ -140,12 +139,12 @@ impl FinanceTool {
             subcategory,
             counterparty,
             notes,
-            tx_date: chrono_date_to_jiff(tx_date).into(),
+            tx_date: tx_date.into(),
             transfer_id: None,
             is_recurring: false,
             recurring_rule: None,
-            created_at: chrono_to_jiff(now).into(),
-            updated_at: chrono_to_jiff(now).into(),
+            created_at: now.into(),
+            updated_at: now.into(),
             base_amount: conv.base_amount,
             base_currency: conv.base_currency,
             exchange_rate: conv.exchange_rate,
@@ -280,8 +279,8 @@ impl FinanceTool {
             account_id: account_id.map(|s| s.to_string()),
             tx_type: tx_type_str,
             category: category.map(|s| s.to_string()),
-            date_from: date_from.map(|d| chrono_date_to_jiff(d).into()),
-            date_to: date_to.map(|d| chrono_date_to_jiff(d).into()),
+            date_from: date_from.map(|d| d.into()),
+            date_to: date_to.map(|d| d.into()),
             limit: Some(limit.unwrap_or(50)),
             ..Default::default()
         };
@@ -352,7 +351,7 @@ impl FinanceTool {
             subcategory: subcategory.map(|s| Some(s.to_string())),
             counterparty: counterparty.map(|s| Some(s.to_string())),
             notes: notes.map(|s| Some(s.to_string())),
-            tx_date: tx_date.map(|d| chrono_date_to_jiff(d).into()),
+            tx_date: tx_date.map(|d| d.into()),
             base_amount: None,
             base_currency: None,
             exchange_rate: None,
@@ -532,8 +531,8 @@ impl FinanceTool {
             query: query.map(|s| s.to_string()),
             amount_min,
             amount_max,
-            date_from: date_from.map(|d| chrono_date_to_jiff(d).into()),
-            date_to: date_to.map(|d| chrono_date_to_jiff(d).into()),
+            date_from: date_from.map(|d| d.into()),
+            date_to: date_to.map(|d| d.into()),
             limit: Some(50),
             ..Default::default()
         };
@@ -633,15 +632,13 @@ mod tests {
 
     #[test]
     fn tx_add_valid_date_parsing() {
-        use chrono::NaiveDate;
-        let date = NaiveDate::parse_from_str("2026-02-19", "%Y-%m-%d").unwrap();
+        let date = jiff::civil::Date::strptime("%Y-%m-%d", "2026-02-19").unwrap();
         assert_eq!(date.to_string(), "2026-02-19");
     }
 
     #[test]
     fn tx_add_invalid_date_rejected() {
-        use chrono::NaiveDate;
-        let result = NaiveDate::parse_from_str("not-a-date", "%Y-%m-%d");
+        let result = jiff::civil::Date::strptime("%Y-%m-%d", "not-a-date");
         assert!(result.is_err(), "invalid date string should fail parsing");
     }
 

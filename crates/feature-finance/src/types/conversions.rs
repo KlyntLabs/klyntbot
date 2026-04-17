@@ -1,8 +1,5 @@
 //! Bidirectional Row ↔ Domain `From` impls (16 total).
 
-use common::time::bridge::{
-    chrono_date_to_jiff, chrono_to_jiff, jiff_date_to_chrono, jiff_to_chrono,
-};
 use storage::rows::finance::{
     FinanceAccountRow, FinanceBudgetRow, FinanceGoalRow, FinanceInvestmentRow,
     FinanceInvestmentTxRow, FinanceLiabilityRow, FinancePortfolioRow, FinanceTransactionRow,
@@ -23,8 +20,8 @@ impl From<FinanceAccountRow> for FinanceAccount {
             institution: row.institution,
             notes: row.notes,
             is_archived: row.is_archived,
-            created_at: jiff_to_chrono(*row.created_at),
-            updated_at: jiff_to_chrono(*row.updated_at),
+            created_at: *row.created_at,
+            updated_at: *row.updated_at,
         }
     }
 }
@@ -40,8 +37,8 @@ impl From<&FinanceAccount> for FinanceAccountRow {
             institution: account.institution.clone(),
             notes: account.notes.clone(),
             is_archived: account.is_archived,
-            created_at: chrono_to_jiff(account.created_at).into(),
-            updated_at: chrono_to_jiff(account.updated_at).into(),
+            created_at: account.created_at.into(),
+            updated_at: account.updated_at.into(),
             base_balance: 0,
             base_currency: "USD".to_string(),
             exchange_rate: 1.0,
@@ -63,12 +60,12 @@ impl From<FinanceTransactionRow> for FinanceTransaction {
             subcategory: row.subcategory,
             counterparty: row.counterparty,
             notes: row.notes,
-            tx_date: jiff_date_to_chrono(*row.tx_date),
+            tx_date: *row.tx_date,
             transfer_id: row.transfer_id,
             is_recurring: row.is_recurring,
             recurring_rule: row.recurring_rule,
-            created_at: jiff_to_chrono(*row.created_at),
-            updated_at: jiff_to_chrono(*row.updated_at),
+            created_at: *row.created_at,
+            updated_at: *row.updated_at,
         }
     }
 }
@@ -85,12 +82,12 @@ impl From<&FinanceTransaction> for FinanceTransactionRow {
             subcategory: tx.subcategory.clone(),
             counterparty: tx.counterparty.clone(),
             notes: tx.notes.clone(),
-            tx_date: chrono_date_to_jiff(tx.tx_date).into(),
+            tx_date: tx.tx_date.into(),
             transfer_id: tx.transfer_id.clone(),
             is_recurring: tx.is_recurring,
             recurring_rule: tx.recurring_rule.clone(),
-            created_at: chrono_to_jiff(tx.created_at).into(),
-            updated_at: chrono_to_jiff(tx.updated_at).into(),
+            created_at: tx.created_at.into(),
+            updated_at: tx.updated_at.into(),
             base_amount: 0,
             base_currency: "USD".to_string(),
             exchange_rate: 1.0,
@@ -111,12 +108,12 @@ impl From<FinanceBudgetRow> for FinanceBudget {
             category: row.category,
             method: BudgetMethod::from_str_loose(&row.method).unwrap_or_default(),
             jar_type: row.jar_type.as_deref().and_then(JarType::from_str_loose),
-            start_date: jiff_date_to_chrono(*row.start_date),
-            end_date: row.end_date.map(|d| jiff_date_to_chrono(*d)),
+            start_date: *row.start_date,
+            end_date: row.end_date.map(|d| *d),
             is_active: row.is_active,
             alert_threshold: row.alert_threshold,
-            created_at: jiff_to_chrono(*row.created_at),
-            updated_at: jiff_to_chrono(*row.updated_at),
+            created_at: *row.created_at,
+            updated_at: *row.updated_at,
         }
     }
 }
@@ -132,12 +129,12 @@ impl From<&FinanceBudget> for FinanceBudgetRow {
             category: budget.category.clone(),
             method: budget.method.as_str().to_string(),
             jar_type: budget.jar_type.map(|j| j.as_str().to_string()),
-            start_date: chrono_date_to_jiff(budget.start_date).into(),
-            end_date: budget.end_date.map(|d| chrono_date_to_jiff(d).into()),
+            start_date: budget.start_date.into(),
+            end_date: budget.end_date.map(|d| d.into()),
             is_active: budget.is_active,
             alert_threshold: budget.alert_threshold,
-            created_at: chrono_to_jiff(budget.created_at).into(),
-            updated_at: chrono_to_jiff(budget.updated_at).into(),
+            created_at: budget.created_at.into(),
+            updated_at: budget.updated_at.into(),
             base_amount: 0,
             base_currency: "USD".to_string(),
             exchange_rate: 1.0,
@@ -154,8 +151,8 @@ impl From<FinancePortfolioRow> for FinancePortfolio {
             name: row.name,
             description: row.description,
             currency: row.currency,
-            created_at: jiff_to_chrono(*row.created_at),
-            updated_at: jiff_to_chrono(*row.updated_at),
+            created_at: *row.created_at,
+            updated_at: *row.updated_at,
         }
     }
 }
@@ -167,8 +164,8 @@ impl From<&FinancePortfolio> for FinancePortfolioRow {
             name: portfolio.name.clone(),
             description: portfolio.description.clone(),
             currency: portfolio.currency.clone(),
-            created_at: chrono_to_jiff(portfolio.created_at).into(),
-            updated_at: chrono_to_jiff(portfolio.updated_at).into(),
+            created_at: portfolio.created_at.into(),
+            updated_at: portfolio.updated_at.into(),
         }
     }
 }
@@ -188,11 +185,11 @@ impl From<FinanceInvestmentRow> for FinanceInvestment {
             currency: row.currency,
             current_price: row.current_price,
             current_value: row.current_value,
-            purchase_date: row.purchase_date.map(|d| jiff_date_to_chrono(*d)),
+            purchase_date: row.purchase_date.map(|d| *d),
             asset_class: row.asset_class,
             notes: row.notes,
-            created_at: jiff_to_chrono(*row.created_at),
-            updated_at: jiff_to_chrono(*row.updated_at),
+            created_at: *row.created_at,
+            updated_at: *row.updated_at,
         }
     }
 }
@@ -210,11 +207,11 @@ impl From<&FinanceInvestment> for FinanceInvestmentRow {
             currency: inv.currency.clone(),
             current_price: inv.current_price,
             current_value: inv.current_value,
-            purchase_date: inv.purchase_date.map(|d| chrono_date_to_jiff(d).into()),
+            purchase_date: inv.purchase_date.map(|d| d.into()),
             asset_class: inv.asset_class.clone(),
             notes: inv.notes.clone(),
-            created_at: chrono_to_jiff(inv.created_at).into(),
-            updated_at: chrono_to_jiff(inv.updated_at).into(),
+            created_at: inv.created_at.into(),
+            updated_at: inv.updated_at.into(),
             market_currency: None,
             base_cost_basis: 0,
             base_current_value: 0,
@@ -238,9 +235,9 @@ impl From<FinanceInvestmentTxRow> for FinanceInvestmentTx {
             total_amount: row.total_amount,
             currency: row.currency,
             fees: row.fees,
-            tx_date: jiff_date_to_chrono(*row.tx_date),
+            tx_date: *row.tx_date,
             notes: row.notes,
-            created_at: jiff_to_chrono(*row.created_at),
+            created_at: *row.created_at,
         }
     }
 }
@@ -256,9 +253,9 @@ impl From<&FinanceInvestmentTx> for FinanceInvestmentTxRow {
             total_amount: tx.total_amount,
             currency: tx.currency.clone(),
             fees: tx.fees,
-            tx_date: chrono_date_to_jiff(tx.tx_date).into(),
+            tx_date: tx.tx_date.into(),
             notes: tx.notes.clone(),
-            created_at: chrono_to_jiff(tx.created_at).into(),
+            created_at: tx.created_at.into(),
             base_total_amount: 0,
             base_currency: "USD".to_string(),
             exchange_rate: 1.0,
@@ -278,13 +275,13 @@ impl From<FinanceGoalRow> for FinanceGoal {
             current_amount: row.current_amount,
             currency: row.currency,
             status: GoalStatus::from_str_loose(&row.status).unwrap_or_default(),
-            deadline: row.deadline.map(|d| jiff_date_to_chrono(*d)),
+            deadline: row.deadline.map(|d| *d),
             monthly_contribution: row.monthly_contribution,
             expected_return_rate: row.expected_return_rate,
             inflation_rate: row.inflation_rate,
             notes: row.notes,
-            created_at: jiff_to_chrono(*row.created_at),
-            updated_at: jiff_to_chrono(*row.updated_at),
+            created_at: *row.created_at,
+            updated_at: *row.updated_at,
         }
     }
 }
@@ -299,13 +296,13 @@ impl From<&FinanceGoal> for FinanceGoalRow {
             current_amount: goal.current_amount,
             currency: goal.currency.clone(),
             status: goal.status.as_str().to_string(),
-            deadline: goal.deadline.map(|d| chrono_date_to_jiff(d).into()),
+            deadline: goal.deadline.map(|d| d.into()),
             monthly_contribution: goal.monthly_contribution,
             expected_return_rate: goal.expected_return_rate,
             inflation_rate: goal.inflation_rate,
             notes: goal.notes.clone(),
-            created_at: chrono_to_jiff(goal.created_at).into(),
-            updated_at: chrono_to_jiff(goal.updated_at).into(),
+            created_at: goal.created_at.into(),
+            updated_at: goal.updated_at.into(),
             base_target_amount: 0,
             base_current_amount: 0,
             base_currency: "USD".to_string(),
@@ -327,10 +324,10 @@ impl From<FinanceLiabilityRow> for FinanceLiability {
             currency: row.currency,
             interest_rate: row.interest_rate,
             monthly_payment: row.monthly_payment,
-            due_date: row.due_date.map(|d| jiff_date_to_chrono(*d)),
+            due_date: row.due_date.map(|d| *d),
             notes: row.notes,
-            created_at: jiff_to_chrono(*row.created_at),
-            updated_at: jiff_to_chrono(*row.updated_at),
+            created_at: *row.created_at,
+            updated_at: *row.updated_at,
         }
     }
 }
@@ -346,10 +343,10 @@ impl From<&FinanceLiability> for FinanceLiabilityRow {
             currency: liability.currency.clone(),
             interest_rate: liability.interest_rate,
             monthly_payment: liability.monthly_payment,
-            due_date: liability.due_date.map(|d| chrono_date_to_jiff(d).into()),
+            due_date: liability.due_date.map(|d| d.into()),
             notes: liability.notes.clone(),
-            created_at: chrono_to_jiff(liability.created_at).into(),
-            updated_at: chrono_to_jiff(liability.updated_at).into(),
+            created_at: liability.created_at.into(),
+            updated_at: liability.updated_at.into(),
             base_principal: 0,
             base_remaining: 0,
             base_currency: "USD".to_string(),
