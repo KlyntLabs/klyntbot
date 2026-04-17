@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 use std::fmt;
 
-use chrono::{DateTime, Utc};
+use jiff::Zoned;
 use serde::{Deserialize, Serialize};
 
 // ── Fact triple ────────────────────────────────────────────────────────
@@ -175,7 +175,7 @@ pub enum SimulatedToolAction {
 pub struct AnnotatedMessage {
     pub content: String,
     pub phase: LifecyclePhase,
-    pub simulated_at: DateTime<Utc>,
+    pub simulated_at: Zoned,
     pub ground_truth: Option<GroundTruthAnnotation>,
     pub tool_actions: Vec<SimulatedToolAction>,
     pub is_correction: bool,

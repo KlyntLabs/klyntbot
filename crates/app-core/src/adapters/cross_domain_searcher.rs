@@ -4,7 +4,7 @@
 use std::sync::Arc;
 
 use async_trait::async_trait;
-use chrono::{DateTime, Utc};
+use jiff::Timestamp;
 use cognitive::repos::SqliteBookTreeRepo;
 use context_engine::book_index::BookTreeRepo;
 use feature_insights::cross_domain::{EntityDomain, EntityRef};
@@ -110,11 +110,11 @@ impl CrossDomainSearcherImpl {
     }
 
     /// Look up task metadata by ID. Returns (title, created_at) if found.
-    async fn lookup_task(&self, id: &str) -> Option<(String, DateTime<Utc>)> {
+    async fn lookup_task(&self, id: &str) -> Option<(String, Timestamp)> {
         match self.task_repo.get(id).await {
             Ok(Some(row)) => Some((
                 row.title,
-                common::time::bridge::jiff_to_chrono(*row.created_at),
+                *row.created_at,
             )),
             Ok(None) => {
                 debug!(id, "task not found for cross-domain hit");
@@ -128,13 +128,13 @@ impl CrossDomainSearcherImpl {
     }
 
     /// Look up note metadata by ID. Returns (title, created_at) if found.
-    async fn lookup_note(&self, id: &str) -> Option<(String, DateTime<Utc>)> {
+    async fn lookup_note(&self, id: &str) -> Option<(String, Timestamp)> {
         match self.note_repo.get_note(id).await {
             Ok(Some(row)) => {
                 let created_at = row
                     .created_at
-                    .parse::<DateTime<Utc>>()
-                    .unwrap_or_else(|_| Utc::now());
+                    .parse::<Timestamp>()
+                    .unwrap_or_else(|_| Timestamp::now());
                 Some((row.title, created_at))
             }
             Ok(None) => {
@@ -153,7 +153,7 @@ impl CrossDomainSearcherImpl {
     /// Finance nodes are stored in `book_tree_nodes` with source_type="finance".
     /// We prefer the `title` column; for leaf nodes (level 2) with no title we
     /// fall back to `content` (e.g. "$45.20 in food").
-    async fn lookup_finance_node(&self, id: &str) -> Option<(String, DateTime<Utc>)> {
+    async fn lookup_finance_node(&self, id: &str) -> Option<(String, Timestamp)> {
         match self.tree_repo.get_node(id).await {
             Ok(Some(node)) => {
                 let label = node.title.filter(|t| !t.is_empty()).unwrap_or(node.content);
@@ -161,7 +161,7 @@ impl CrossDomainSearcherImpl {
                 // The score (cosine similarity) is the primary ranking signal anyway.
                 Some((
                     label,
-                    DateTime::<Utc>::from_timestamp(0, 0).unwrap_or(Utc::now()),
+                    Timestamp::UNIX_EPOCH,
                 ))
             }
             Ok(None) => {
@@ -180,7 +180,7 @@ impl CrossDomainSearcherImpl {
         &self,
         domain: &EntityDomain,
         id: &str,
-    ) -> Option<(String, DateTime<Utc>)> {
+    ) -> Option<(String, Timestamp)> {
         match domain {
             EntityDomain::Task => self.lookup_task(id).await,
             EntityDomain::Note => self.lookup_note(id).await,

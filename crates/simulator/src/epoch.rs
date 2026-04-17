@@ -1,4 +1,5 @@
-use chrono::{DateTime, Datelike, Duration, NaiveTime, Utc, Weekday};
+use jiff::civil::{Time, Weekday};
+use jiff::{SignedDuration, Zoned};
 use serde::{Deserialize, Serialize};
 
 // ---------------------------------------------------------------------------
@@ -19,13 +20,12 @@ pub enum EpochStep {
 }
 
 impl EpochStep {
-    /// Convert the step into a `chrono::Duration`.
-    pub fn to_duration(&self) -> Duration {
+    pub fn to_duration(&self) -> SignedDuration {
         match self {
-            EpochStep::Minutes(m) => Duration::minutes(i64::from(*m)),
-            EpochStep::Hours(h) => Duration::hours(i64::from(*h)),
-            EpochStep::Day => Duration::hours(24),
-            EpochStep::Week => Duration::hours(168),
+            EpochStep::Minutes(m) => SignedDuration::from_secs(i64::from(*m) * 60),
+            EpochStep::Hours(h) => SignedDuration::from_secs(i64::from(*h) * 3600),
+            EpochStep::Day => SignedDuration::from_secs(86400),
+            EpochStep::Week => SignedDuration::from_secs(7 * 86400),
         }
     }
 
@@ -70,9 +70,9 @@ pub enum CronTrigger {
 #[derive(Debug)]
 pub struct EpochPlan {
     /// The simulated time *after* this tick.
-    pub simulated_now: DateTime<Utc>,
+    pub simulated_now: Zoned,
     /// The simulated time *before* this tick (i.e. the previous `simulated_now`).
-    pub previous: DateTime<Utc>,
+    pub previous: Zoned,
     /// Cron jobs that should fire *before* user messages in this tick.
     pub cron_pre_message: Vec<CronTrigger>,
     /// Cron jobs that should fire *after* user messages in this tick.
@@ -89,10 +89,10 @@ pub struct EpochPlan {
 /// determines which cron jobs should fire during each tick.
 #[derive(Debug)]
 pub struct SimulatedEpoch {
-    start: DateTime<Utc>,
-    end: DateTime<Utc>,
+    start: Zoned,
+    end: Zoned,
     step: EpochStep,
-    current: DateTime<Utc>,
+    current: Zoned,
 }
 
 impl SimulatedEpoch {
@@ -101,9 +101,9 @@ impl SimulatedEpoch {
     /// `start` is the initial simulated time, `end` is the terminal boundary
     /// (exclusive), and `step` is the fixed increment applied on each
     /// [`advance`](Self::advance) call.
-    pub fn new(start: DateTime<Utc>, end: DateTime<Utc>, step: EpochStep) -> Self {
+    pub fn new(start: Zoned, end: Zoned, step: EpochStep) -> Self {
         Self {
-            start,
+            start: start.clone(),
             end,
             step,
             current: start,
@@ -111,8 +111,8 @@ impl SimulatedEpoch {
     }
 
     /// The current simulated time.
-    pub fn current(&self) -> DateTime<Utc> {
-        self.current
+    pub fn current(&self) -> &Zoned {
+        &self.current
     }
 
     /// Returns `true` when the simulation has reached or passed the end time.
@@ -122,8 +122,8 @@ impl SimulatedEpoch {
 
     /// 1-based day counter since the simulation started.
     pub fn day_of_simulation(&self) -> u32 {
-        let elapsed = self.current.signed_duration_since(self.start);
-        let days = elapsed.num_seconds() / 86_400;
+        let elapsed_secs = self.current.timestamp().as_second() - self.start.timestamp().as_second();
+        let days = elapsed_secs / 86_400;
         (days as u32) + 1
     }
 
@@ -134,18 +134,18 @@ impl SimulatedEpoch {
             return None;
         }
 
-        let prev = self.current;
-        let mut next = prev + self.step.to_duration();
+        let prev = self.current.clone();
+        let mut next = prev.checked_add(self.step.to_duration()).unwrap();
 
         // Clamp to end so we never overshoot.
         if next > self.end {
-            next = self.end;
+            next = self.end.clone();
         }
 
-        self.current = next;
+        self.current = next.clone();
 
-        let cron_pre_message = collect_pre_message_crons(prev, next);
-        let cron_post_message = collect_post_message_crons(prev, next);
+        let cron_pre_message = collect_pre_message_crons(&prev, &next);
+        let cron_post_message = collect_post_message_crons(&prev, &next);
 
         Some(EpochPlan {
             simulated_now: next,
@@ -164,65 +164,57 @@ impl SimulatedEpoch {
 /// Returns `true` if the half-open interval `(prev, now]` contains a midnight
 /// crossing (i.e. the UTC clock reads 00:00:00 at some point strictly after
 /// `prev` and at or before `now`).
-pub fn crosses_midnight(prev: DateTime<Utc>, now: DateTime<Utc>) -> bool {
+pub fn crosses_midnight(prev: &Zoned, now: &Zoned) -> bool {
     crosses_daily_hour(prev, now, 0)
 }
 
-/// Returns `true` if the half-open interval `(prev, now]` contains a point at
-/// which the UTC clock reads `target_hour:00:00` on *any* day.
-pub fn crosses_daily_hour(prev: DateTime<Utc>, now: DateTime<Utc>, target_hour: u32) -> bool {
+pub fn crosses_daily_hour(prev: &Zoned, now: &Zoned, target_hour: u32) -> bool {
     if now <= prev {
         return false;
     }
 
-    let target_time = NaiveTime::from_hms_opt(target_hour, 0, 0).unwrap();
-    let first_day = prev.date_naive();
-    let last_day = now.date_naive();
+    let target_time = Time::new(target_hour as i8, 0, 0, 0).unwrap();
+    let first_day = prev.date();
+    let last_day = now.date();
 
     let mut day = first_day;
     loop {
-        let candidate = day.and_time(target_time).and_utc();
-        // Half-open: (prev, now]
-        if candidate > prev && candidate <= now {
+        let candidate = day
+            .at(target_time.hour(), target_time.minute(), 0, 0)
+            .in_tz("UTC")
+            .unwrap();
+        if &candidate > prev && &candidate <= now {
             return true;
         }
         if day >= last_day {
             break;
         }
-        day = day.succ_opt().unwrap();
+        day = day.tomorrow().unwrap();
     }
 
     false
 }
 
-/// Returns `true` if the half-open interval `(prev, now]` contains a point at
-/// which the UTC clock reads `target_hour:00:00` on a specific `weekday`.
-pub fn crosses_weekday_hour(
-    prev: DateTime<Utc>,
-    now: DateTime<Utc>,
-    weekday: Weekday,
-    target_hour: u32,
-) -> bool {
+pub fn crosses_weekday_hour(prev: &Zoned, now: &Zoned, weekday: Weekday, target_hour: u32) -> bool {
     if now <= prev {
         return false;
     }
 
-    let target_time = NaiveTime::from_hms_opt(target_hour, 0, 0).unwrap();
-    let first_day = prev.date_naive();
-    let last_day = now.date_naive();
+    let first_day = prev.date();
+    let last_day = now.date();
 
     let mut day = first_day;
     loop {
         if day.weekday() == weekday {
-            let candidate = day.and_time(target_time).and_utc();
-            if candidate > prev && candidate <= now {
+            let candidate = day.at(target_hour as i8, 0, 0, 0).in_tz("UTC").unwrap();
+            if &candidate > prev && &candidate <= now {
                 return true;
             }
         }
         if day >= last_day {
             break;
         }
-        day = day.succ_opt().unwrap();
+        day = day.tomorrow().unwrap();
     }
 
     false
@@ -232,25 +224,21 @@ pub fn crosses_weekday_hour(
 // Pre-message crons (fire before user messages in a tick)
 // ---------------------------------------------------------------------------
 
-fn collect_pre_message_crons(prev: DateTime<Utc>, now: DateTime<Utc>) -> Vec<CronTrigger> {
+fn collect_pre_message_crons(prev: &Zoned, now: &Zoned) -> Vec<CronTrigger> {
     let mut triggers = Vec::new();
 
-    // AtomDecay — daily at 03:00 UTC
     if crosses_daily_hour(prev, now, 3) {
         triggers.push(CronTrigger::AtomDecay);
     }
 
-    // AutotunerNightly — daily at 02:00 UTC
     if crosses_daily_hour(prev, now, 2) {
         triggers.push(CronTrigger::AutotunerNightly);
     }
 
-    // AnalyticsCleanup — daily on midnight crossing
     if crosses_midnight(prev, now) {
         triggers.push(CronTrigger::AnalyticsCleanup);
     }
 
-    // MemoryMaintenance — every 12h at 00:00 and 12:00 UTC
     if crosses_daily_hour(prev, now, 0) || crosses_daily_hour(prev, now, 12) {
         triggers.push(CronTrigger::MemoryMaintenance);
     }
@@ -258,24 +246,17 @@ fn collect_pre_message_crons(prev: DateTime<Utc>, now: DateTime<Utc>) -> Vec<Cro
     triggers
 }
 
-// ---------------------------------------------------------------------------
-// Post-message crons (fire after user messages in a tick)
-// ---------------------------------------------------------------------------
-
-fn collect_post_message_crons(prev: DateTime<Utc>, now: DateTime<Utc>) -> Vec<CronTrigger> {
+fn collect_post_message_crons(prev: &Zoned, now: &Zoned) -> Vec<CronTrigger> {
     let mut triggers = Vec::new();
 
-    // MirrorWeeklyNarrative — Sunday at 10:00 UTC
-    if crosses_weekday_hour(prev, now, Weekday::Sun, 10) {
+    if crosses_weekday_hour(prev, now, Weekday::Sunday, 10) {
         triggers.push(CronTrigger::MirrorWeeklyNarrative);
     }
 
-    // MirrorCleanup — Sunday at 04:00 UTC
-    if crosses_weekday_hour(prev, now, Weekday::Sun, 4) {
+    if crosses_weekday_hour(prev, now, Weekday::Sunday, 4) {
         triggers.push(CronTrigger::MirrorCleanup);
     }
 
-    // CrossDomainInsight — daily at 02:00 UTC
     if crosses_daily_hour(prev, now, 2) {
         triggers.push(CronTrigger::CrossDomainInsight);
     }
@@ -290,12 +271,11 @@ fn collect_post_message_crons(prev: DateTime<Utc>, now: DateTime<Utc>) -> Vec<Cr
 #[cfg(test)]
 mod tests {
     use super::*;
-    use chrono::TimeZone;
+    use jiff::civil::date;
     use std::collections::HashSet;
 
-    /// Helper: build a UTC datetime.
-    fn utc(y: i32, m: u32, d: u32, h: u32, min: u32) -> DateTime<Utc> {
-        Utc.with_ymd_and_hms(y, m, d, h, min, 0).unwrap()
+    fn utc(y: i16, m: i8, d: i8, h: i8, min: i8) -> Zoned {
+        date(y, m, d).at(h, min, 0, 0).in_tz("UTC").unwrap()
     }
 
     #[test]
@@ -305,13 +285,13 @@ mod tests {
         let mut epoch = SimulatedEpoch::new(start, end, EpochStep::Day);
 
         assert_eq!(epoch.day_of_simulation(), 1);
-        assert_eq!(epoch.current(), start);
+        assert_eq!(epoch.current(), &start);
 
         let plan = epoch.advance().unwrap();
         assert_eq!(plan.simulated_now, utc(2026, 3, 2, 8, 0));
         assert_eq!(plan.previous, start);
         assert_eq!(epoch.day_of_simulation(), 2);
-        assert_eq!(epoch.current(), utc(2026, 3, 2, 8, 0));
+        assert_eq!(epoch.current(), &utc(2026, 3, 2, 8, 0));
 
         let plan2 = epoch.advance().unwrap();
         assert_eq!(plan2.simulated_now, utc(2026, 3, 3, 8, 0));
@@ -377,7 +357,7 @@ mod tests {
     fn weekly_step_hits_all_crons() {
         // 2026-03-04 is a Wednesday.
         let wed = utc(2026, 3, 4, 6, 0);
-        assert_eq!(wed.weekday(), Weekday::Wed);
+        assert_eq!(wed.weekday(), Weekday::Wednesday);
 
         let end = utc(2026, 3, 18, 6, 0);
         let mut epoch = SimulatedEpoch::new(wed, end, EpochStep::Week);
@@ -465,7 +445,7 @@ mod tests {
     fn minutes_step_fires_daily_cron_once() {
         // 48 steps of 30min = 24 hours. AtomDecay at 03:00 should fire exactly once.
         let start = utc(2026, 4, 1, 0, 0);
-        let end = start + Duration::hours(24);
+        let end = start.checked_add(SignedDuration::from_secs(86400)).unwrap();
         let mut epoch = SimulatedEpoch::new(start, end, EpochStep::Minutes(30));
 
         let mut atom_decay_count = 0;
@@ -486,7 +466,7 @@ mod tests {
     fn sunday_crons_fire_on_sunday() {
         // Start Saturday 20:00, end Monday 00:00 — Sunday is fully covered.
         let start = utc(2026, 3, 7, 20, 0); // Saturday
-        assert_eq!(start.weekday(), Weekday::Sat);
+        assert_eq!(start.weekday(), Weekday::Saturday);
         let end = utc(2026, 3, 9, 20, 0);
         let mut epoch = SimulatedEpoch::new(start, end, EpochStep::Day);
 

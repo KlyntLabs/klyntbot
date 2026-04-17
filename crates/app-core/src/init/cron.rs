@@ -491,9 +491,8 @@ fn register_cron_callbacks(
                         // Load autotuner context for Phase 3 prompt
                         // (metric snapshots collected here where autotuner types are available).
                         let autotuner_ctx = if autotuner_bridge.is_some() {
-                            let now = chrono::Utc::now();
-                            let since_24h = now - chrono::Duration::hours(24);
-                            let since_7d = now - chrono::Duration::days(7);
+                            let since_24h = jiff::Timestamp::now() - jiff::SignedDuration::from_hours(24);
+                            let since_7d = jiff::Timestamp::now() - jiff::SignedDuration::from_hours(168);
 
                             let m24 = metric_source
                                 .collect_metrics(since_24h, None)

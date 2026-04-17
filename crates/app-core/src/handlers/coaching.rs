@@ -7,7 +7,6 @@
 
 use std::sync::atomic::Ordering;
 
-use chrono::Timelike;
 use desktop_shared::cognitive_commands::*;
 use desktop_shared::errors::ApiError;
 use tracing::debug;
@@ -29,7 +28,7 @@ impl AppCore {
             task_avoidance_detected: sit.task_avoidance_detected,
             hours_active_today: sit.hours_active_today,
             mins_since_break: sit.mins_since_break,
-            hour_of_day: chrono::Local::now().hour(),
+            hour_of_day: jiff::Zoned::now().hour() as u32,
             recent_context_switches: sit.recent_context_switches,
         })
     }
@@ -42,7 +41,7 @@ impl AppCore {
             .iter()
             .map(|s| SignalResponse {
                 event_type: s.event_type.clone(),
-                timestamp: s.timestamp.to_rfc3339(),
+                timestamp: s.timestamp.to_string(),
                 metadata: format!(
                     "app={} task={} cat={}",
                     s.metadata.app.as_deref().unwrap_or("-"),
@@ -58,14 +57,14 @@ impl AppCore {
                 let last = last_fired.get(*name);
                 let cooldown_remaining = last
                     .map(|t| {
-                        let elapsed = (chrono::Utc::now() - *t).num_seconds();
+                        let elapsed = jiff::Timestamp::now().duration_since(*t).as_secs() as i64;
                         (300 - elapsed).max(0)
                     })
                     .unwrap_or(0);
                 TriggerConditionResponse {
                     name: name.to_string(),
                     cooldown_remaining_secs: cooldown_remaining,
-                    last_fired: last.map(|t| t.to_rfc3339()),
+                    last_fired: last.map(|t| t.to_string()),
                 }
             })
             .collect();
@@ -139,7 +138,7 @@ impl AppCore {
         }
 
         let tracker = self.feedback_tracker()?.lock().await;
-        let now = chrono::Utc::now();
+        let now = jiff::Timestamp::now();
         Ok(tracker
             .pending_interventions()
             .iter()
@@ -149,7 +148,7 @@ impl AppCore {
                 intervention_type: p.intervention.intervention_type.to_string(),
                 message: p.intervention.message.clone(),
                 trigger_name: p.intervention.trigger_name.clone(),
-                timestamp: p.intervention.delivered_at.to_rfc3339(),
+                timestamp: p.intervention.delivered_at.to_string(),
             })
             .collect())
     }

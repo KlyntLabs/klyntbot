@@ -72,8 +72,8 @@ impl AppCore {
                 classification: r.classification,
                 confidence: r.confidence,
                 hit_count: r.hit_count,
-                last_used_at: r.last_used_at.to_rfc3339(),
-                created_at: r.created_at.to_rfc3339(),
+                last_used_at: r.last_used_at.to_string(),
+                created_at: r.created_at.to_string(),
             })
             .collect())
     }

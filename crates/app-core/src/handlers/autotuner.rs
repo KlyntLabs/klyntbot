@@ -123,7 +123,7 @@ impl AppCore {
                     trial_id: None,
                     description: "AutoTuner not enabled".into(),
                     impact: String::new(),
-                    promoted_at: chrono::Utc::now(),
+                    promoted_at: jiff::Timestamp::now(),
                     days_active: 0,
                 },
                 active_experiment: None,

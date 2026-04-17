@@ -34,9 +34,10 @@ pub async fn measure_retrievability_distribution(
         };
     }
 
-    let now = chrono::DateTime::parse_from_rfc3339(simulated_now)
-        .unwrap_or_else(|_| chrono::Utc::now().into())
-        .timestamp() as f64;
+    let now = simulated_now
+        .parse::<jiff::Timestamp>()
+        .unwrap_or_else(|_| jiff::Timestamp::now())
+        .as_second() as f64;
 
     let mut scores: Vec<f64> = rows
         .iter()

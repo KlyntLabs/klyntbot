@@ -149,7 +149,7 @@ impl AppCore {
         // Query event counts by source for last 24h
         let event_counts = activity_log::ActivityLogRepo::count_by_source_since(
             &self.storage_pool,
-            chrono::Utc::now() - chrono::Duration::hours(24),
+            jiff::Timestamp::now() - jiff::SignedDuration::from_hours(24),
         )
         .await
         .unwrap_or_default();

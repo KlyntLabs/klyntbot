@@ -8,7 +8,8 @@ use std::sync::Arc;
 use std::time::Instant;
 
 use bus::{ContextUpdateQueue, CorrectionKind, DomainEvent, DomainEventBus};
-use chrono::{Duration, TimeZone, Utc};
+use chrono::Utc;
+use jiff::Zoned;
 use rand::{Rng, SeedableRng};
 use tokio::sync::Mutex as TokioMutex;
 use tracing::{debug, info, warn};
@@ -141,7 +142,7 @@ impl SimulationHarness {
         let experiment_id = Uuid::new_v4().to_string();
         let trial_a_id = Uuid::new_v4().to_string();
         let trial_b_id = Uuid::new_v4().to_string();
-        let now_str = chrono::Utc::now().to_rfc3339();
+        let now_str = jiff::Timestamp::now().to_string();
 
         let experiment = storage::ExperimentRow {
             id: experiment_id.clone(),
@@ -196,7 +197,7 @@ impl SimulationHarness {
         let mirror_repo = cognitive::mirror::MirrorRepo::new(pool.clone());
 
         // Ensure a parent session row exists for session message persistence.
-        let now = chrono::Utc::now().to_rfc3339();
+        let now = jiff::Timestamp::now().to_string();
         let _ = sqlx::query(
             "INSERT OR IGNORE INTO sessions (key, metadata, created_at, updated_at) \
              VALUES ('sim-session', '{}', ?, ?)",
@@ -329,8 +330,9 @@ impl SimulationHarness {
 
         let total_days = self.scenario.total_days();
         let step = parse_epoch_step(&self.scenario.simulation.epoch_step);
-        let start_date = Utc.with_ymd_and_hms(2025, 1, 1, 0, 0, 0).unwrap();
-        let end_date = start_date + Duration::days(i64::from(total_days));
+        let start_date: Zoned = "2025-01-01T00:00:00Z".parse().unwrap();
+        let start_date_str = start_date.to_string();
+        let end_date = start_date.clone() + jiff::SignedDuration::from_hours(i64::from(total_days) * 24);
 
         let mut epoch = SimulatedEpoch::new(start_date, end_date, step);
         let mut persona_runner = PersonaRunner::new(self.scenario.persona.clone());
@@ -552,7 +554,7 @@ impl SimulationHarness {
 
             // PRE-MESSAGE CRONS
             for trigger in &plan.cron_pre_message {
-                self.execute_cron(trigger, plan.simulated_now).await;
+                self.execute_cron(trigger, common::time::bridge::jiff_to_chrono(plan.simulated_now.timestamp())).await;
             }
 
             // MESSAGE PHASE — for sub-day epochs, generate once per day
@@ -560,7 +562,7 @@ impl SimulationHarness {
             let mut messages = if is_sub_day {
                 if plan.day_of_simulation > current_day {
                     current_day = plan.day_of_simulation;
-                    pending_messages = persona_runner.generate_day(plan.simulated_now);
+                    pending_messages = persona_runner.generate_day(&plan.simulated_now);
                 }
                 let mut epoch_msgs = Vec::new();
                 pending_messages.retain(|m| {
@@ -573,7 +575,7 @@ impl SimulationHarness {
                 });
                 epoch_msgs
             } else {
-                persona_runner.generate_day(plan.simulated_now)
+                persona_runner.generate_day(&plan.simulated_now)
             };
 
             total_messages += messages.len() as u32;
@@ -649,7 +651,7 @@ impl SimulationHarness {
                 .bind("sim-session")
                 .bind(role)
                 .bind(&msg.content)
-                .bind(msg.simulated_at.to_rfc3339())
+                .bind(msg.simulated_at.to_string())
                 .execute(&self.inner_pool)
                 .await;
 
@@ -782,7 +784,7 @@ impl SimulationHarness {
                 let _ = trial_repo
                     .insert_shadow_log(
                         &active_id,
-                        &msg.simulated_at.to_rfc3339(),
+                        &msg.simulated_at.to_string(),
                         "sim-session",
                         &Uuid::new_v4().to_string(),
                         predicted_skill,
@@ -797,7 +799,7 @@ impl SimulationHarness {
                 let _ = trial_repo
                     .insert_shadow_log(
                         &variant_id,
-                        &msg.simulated_at.to_rfc3339(),
+                        &msg.simulated_at.to_string(),
                         "sim-session",
                         &Uuid::new_v4().to_string(),
                         predicted_skill,
@@ -852,7 +854,7 @@ impl SimulationHarness {
                 let adversarial_rate = persona_runner.current_phase_config().adversarial_rate;
                 if adversarial_rate > 0.0 {
                     if let Some(adversarial_msg) =
-                        persona_runner.generate_adversarial(msg.simulated_at, adversarial_rate)
+                        persona_runner.generate_adversarial(msg.simulated_at.clone(), adversarial_rate)
                     {
                         *msg = adversarial_msg;
                         total_adversarial += 1;
@@ -898,7 +900,7 @@ impl SimulationHarness {
                         persona_runner.current_phase_config().error_injection_rate;
                     for action in &msg.tool_actions {
                         let (exec_result, was_injected) = action_executor
-                            .execute(action, msg.simulated_at, error_injection_rate)
+                            .execute(action, common::time::bridge::jiff_to_chrono(msg.simulated_at.timestamp()), error_injection_rate)
                             .await;
                         if was_injected {
                             metrics.accumulator_mut().error_injected += 1;
@@ -940,7 +942,7 @@ impl SimulationHarness {
                         .bind(Uuid::new_v4().to_string())
                         .bind(tool_name)
                         .bind(duration_ms)
-                        .bind(msg.simulated_at.to_rfc3339())
+                        .bind(msg.simulated_at.to_string())
                         .execute(&self.inner_pool)
                         .await;
 
@@ -1304,7 +1306,7 @@ impl SimulationHarness {
                     if agent_result.error.is_none() {
                         if let Some(followup) = persona_runner.generate_followup(
                             &agent_result.response,
-                            msg.simulated_at,
+                            msg.simulated_at.clone(),
                             self.scenario.simulation.followup_rate,
                         ) {
                             total_followups += 1;
@@ -1378,7 +1380,7 @@ impl SimulationHarness {
                      VALUES (?, ?, ?, 'scripted-sim', 'simulator', ?, ?, ?, ?, ?, 'simulation', 'reactive')",
                 )
                 .bind(Uuid::new_v4().to_string())
-                .bind(msg.simulated_at.to_rfc3339())
+                .bind(msg.simulated_at.to_string())
                 .bind(&request_id)
                 .bind(prompt_tokens as i64)
                 .bind(completion_tokens as i64)
@@ -1394,7 +1396,7 @@ impl SimulationHarness {
                      (timestamp, agent_name, tool_names, channel, duration_ms) \
                      VALUES (?, 'general', ?, 'simulation', 50)",
                 )
-                .bind(msg.simulated_at.to_rfc3339())
+                .bind(msg.simulated_at.to_string())
                 .bind(&msg.topic)
                 .execute(&self.inner_pool)
                 .await;
@@ -1406,7 +1408,7 @@ impl SimulationHarness {
                      VALUES (?, ?, ?, 'reactive', 'reactive', 1, 'reactive', 'sim-session')",
                 )
                 .bind(Uuid::new_v4().to_string())
-                .bind(msg.simulated_at.to_rfc3339())
+                .bind(msg.simulated_at.to_string())
                 .bind(&request_id)
                 .execute(&self.inner_pool)
                 .await;
@@ -1457,7 +1459,7 @@ impl SimulationHarness {
                     .collect();
                 let distribution_json = serde_json::to_string(&distribution).unwrap_or_default();
                 let snapshot_id = Uuid::new_v4().to_string();
-                let captured_at = plan.simulated_now.to_rfc3339();
+                let captured_at = plan.simulated_now.to_string();
                 let total_msgs = messages.len() as i64;
                 let _ = sqlx::query(
                     r#"INSERT INTO mirror_routing_snapshots
@@ -1490,7 +1492,7 @@ impl SimulationHarness {
 
             // POST-MESSAGE CRONS
             for trigger in &plan.cron_post_message {
-                self.execute_cron(trigger, plan.simulated_now).await;
+                self.execute_cron(trigger, common::time::bridge::jiff_to_chrono(plan.simulated_now.timestamp())).await;
             }
 
             // CHECKPOINTS
@@ -1521,8 +1523,8 @@ impl SimulationHarness {
                 count_communities(&self.inner_pool).await;
             metrics.accumulator_mut().communities_discovered = total_communities;
             metrics.accumulator_mut().communities_weakened = weakened_communities;
-            let epoch_start_str = plan.previous.to_rfc3339();
-            let _epoch_end_str = plan.simulated_now.to_rfc3339();
+            let epoch_start_str = plan.previous.to_string();
+            let _epoch_end_str = plan.simulated_now.to_string();
             let brain_versions =
                 count_brain_versions_since(&self.inner_pool, &epoch_start_str).await;
             let autotuner_stats = measure_autotuner_success(&self.inner_pool).await;
@@ -1544,7 +1546,7 @@ impl SimulationHarness {
                 measure_insight_usefulness(&self.inner_pool, total_messages).await;
 
             metrics.snapshot(
-                plan.simulated_now,
+                common::time::bridge::jiff_to_chrono(plan.simulated_now.timestamp()),
                 plan.day_of_simulation,
                 knowledge_retention,
                 autotuner_stats.success_rate,
@@ -1554,8 +1556,8 @@ impl SimulationHarness {
                 wall_time_ms,
             );
 
-            let now_rfc3339 = plan.simulated_now.to_rfc3339();
-            let sim_start_str = start_date.to_rfc3339();
+            let now_rfc3339 = plan.simulated_now.to_string();
+            let sim_start_str = start_date_str.clone();
             let cumulative_outcomes = metrics.cumulative_tasks_completed() + total_facts_extracted;
             let (meta_rule_count, cost_per_outcome, cache_rate, ret_dist) = tokio::join!(
                 crate::metrics::cognitive::count_meta_rules(&self.inner_pool),
@@ -1779,7 +1781,7 @@ impl SimulationHarness {
             content: msg.content.clone(),
             importance,
             source_event,
-            timestamp: msg.simulated_at,
+            timestamp: common::time::bridge::jiff_to_chrono(msg.simulated_at.timestamp()),
         };
 
         let extraction_result = match self
@@ -1927,7 +1929,7 @@ impl SimulationHarness {
 
         // Write episodic memory for high-importance messages (feeds weekly reflection).
         if observation.importance >= 0.7 {
-            let ts = msg.simulated_at.to_rfc3339();
+            let ts = msg.simulated_at.to_string();
             let episode = cognitive::EpisodicMemory {
                 id: Uuid::new_v4().to_string(),
                 domain: msg.topic.clone(),
@@ -1981,9 +1983,8 @@ impl SimulationHarness {
                     Arc::clone(&metric_source),
                 );
                 let champion = self.champion.lock().unwrap().clone();
-                let day_approx = (simulated_now
-                    - chrono::TimeZone::with_ymd_and_hms(&Utc, 2025, 1, 1, 0, 0, 0).unwrap())
-                .num_days();
+                let epoch_start = chrono::TimeZone::with_ymd_and_hms(&Utc, 2025, 1, 1, 0, 0, 0).unwrap();
+                let day_approx = (simulated_now - epoch_start).num_days();
                 match cycle.run_evaluation_and_promotion(&champion).await {
                     Ok(result) => {
                         if let Some(ref promo) = result.promotion {
@@ -2032,7 +2033,7 @@ impl SimulationHarness {
                             // 0 correction_rate (Trial B has fewer corrections by design),
                             // causing the evaluator to skip the check on the next cycle.
                             {
-                                let since = Utc::now() - chrono::Duration::hours(24);
+                                let since = jiff::Timestamp::now() - jiff::SignedDuration::from_hours(24);
                                 if let Ok(snap) = metric_source.collect_metrics(since, None).await {
                                     let baseline = autotuner::metrics::aggregate_to_result(
                                         Uuid::nil(),
@@ -2041,7 +2042,7 @@ impl SimulationHarness {
                                     let mut champ = self.champion.lock().unwrap();
                                     champ.trial_id = Some(*trial_id);
                                     champ.params = trial_params.clone();
-                                    champ.promoted_at = simulated_now;
+                                    champ.promoted_at = common::time::bridge::chrono_to_jiff(simulated_now);
                                     champ.baseline_metrics = baseline;
                                     champ.reason_for_promotion = "Simulation promotion".to_string();
                                     champ.impact_summary = format!("Promoted at day {day_approx}");

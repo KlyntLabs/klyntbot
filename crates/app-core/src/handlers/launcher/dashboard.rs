@@ -59,13 +59,15 @@ pub async fn build_dashboard_data(
             events
                 .into_iter()
                 .filter_map(|e| {
-                    let starts_at = chrono::DateTime::parse_from_rfc3339(&e.started_at)
+                    let starts_at_chrono = chrono::DateTime::parse_from_rfc3339(&e.started_at)
                         .ok()?
-                        .with_timezone(&Utc);
-                    let ends_at = chrono::DateTime::parse_from_rfc3339(&e.ended_at)
+                        .with_timezone(&chrono::Utc);
+                    let ends_at_chrono = chrono::DateTime::parse_from_rfc3339(&e.ended_at)
                         .ok()?
-                        .with_timezone(&Utc);
-                    let minutes_until = (starts_at - now).num_minutes();
+                        .with_timezone(&chrono::Utc);
+                    let minutes_until = (starts_at_chrono - now).num_minutes();
+                    let starts_at = common::time::bridge::chrono_to_jiff(starts_at_chrono);
+                    let ends_at = common::time::bridge::chrono_to_jiff(ends_at_chrono);
                     Some(CalendarDashboard {
                         event_id: e.id,
                         title: e.title,

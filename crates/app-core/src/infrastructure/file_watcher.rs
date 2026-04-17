@@ -10,7 +10,6 @@ use activity_log::{
     normalizers::{content_hash, new_ulid},
     ActivityActor, ActivityIngestionService, ActivityLogEntry, ActivitySource,
 };
-use chrono::Utc;
 use notify_debouncer_mini::{new_debouncer, DebouncedEventKind};
 use tokio::task::JoinHandle;
 use tokio_util::sync::CancellationToken;
@@ -260,7 +259,7 @@ impl FileWatcherService {
 
         ActivityLogEntry {
             id: new_ulid(),
-            timestamp: Utc::now(),
+            timestamp: jiff::Timestamp::now(),
             source: ActivitySource::FileSystem,
             actor: ActivityActor::User,
             resource_type: Some("file".to_string()),
@@ -293,7 +292,7 @@ fn make_git_entry(
 ) -> ActivityLogEntry {
     ActivityLogEntry {
         id: new_ulid(),
-        timestamp: Utc::now(),
+        timestamp: jiff::Timestamp::now(),
         source: ActivitySource::FileSystem,
         actor: ActivityActor::User,
         resource_type: Some("repo".to_string()),

@@ -7,7 +7,7 @@
 
 use async_trait::async_trait;
 use autotuner::traits::{MetricSnapshot, MetricSource};
-use chrono::{DateTime, Utc};
+use jiff::Timestamp;
 use uuid::Uuid;
 
 /// Provides [`MetricSnapshot`]s to the autotuner's [`NightlyCycle`] by querying
@@ -29,10 +29,10 @@ impl SimMetricSource {
 impl MetricSource for SimMetricSource {
     async fn collect_metrics(
         &self,
-        since: DateTime<Utc>,
+        since: Timestamp,
         trial_id: Option<Uuid>,
     ) -> common::Result<MetricSnapshot> {
-        let since_str = since.format("%Y-%m-%d %H:%M:%S").to_string();
+        let since_str = since.strftime("%Y-%m-%d %H:%M:%S").to_string();
         let tid_str = trial_id.map(|t| t.to_string());
 
         // ── Shadow log stats (classification) ──────────────────────────

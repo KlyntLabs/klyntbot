@@ -2,7 +2,6 @@
 
 use std::collections::{BTreeMap, HashMap};
 
-use chrono::{Duration, Utc};
 use cognitive::SemanticFactRepo;
 use desktop_shared::commands::{
     ContextResumeResponse, ContextTimelineBlockResponse, DashboardIntelligenceResponse,
@@ -111,7 +110,7 @@ impl AppCore {
             };
         }
 
-        ctx.updated_at = Utc::now();
+        ctx.updated_at = jiff::Timestamp::now();
         activity_log::WorkContextRepo::update(&self.storage_pool, &ctx)
             .await
             .map_err(map_err)?;
@@ -126,7 +125,7 @@ impl AppCore {
             .ok_or_else(|| ApiError::new("NOT_FOUND", format!("work context {id} not found")))?;
 
         ctx.status = activity_log::WorkContextStatus::Archived;
-        ctx.updated_at = Utc::now();
+        ctx.updated_at = jiff::Timestamp::now();
         activity_log::WorkContextRepo::update(&self.storage_pool, &ctx)
             .await
             .map_err(map_err)?;
@@ -167,7 +166,9 @@ impl AppCore {
         date: String,
         tz_offset_mins: Option<i32>,
     ) -> Result<Vec<ContextTimelineBlockResponse>, ApiError> {
-        let (start, end) = crate::errors::parse_local_day_range(&date, tz_offset_mins)?;
+        let (start_chrono, end_chrono) = crate::errors::parse_local_day_range(&date, tz_offset_mins)?;
+        let start = common::time::bridge::chrono_to_jiff(start_chrono);
+        let end = common::time::bridge::chrono_to_jiff(end_chrono);
 
         // Fetch all events for the day
         let events =
@@ -191,7 +192,7 @@ impl AppCore {
         let mut buckets: BTreeMap<(i64, Option<String>), i64> = BTreeMap::new();
 
         for event in &events {
-            let offset = (event.timestamp - start).num_seconds();
+            let offset = event.timestamp.duration_since(start).as_secs();
             let bucket_start = (offset / bucket_secs) * bucket_secs;
             let key = (bucket_start, event.work_context_id.clone());
             *buckets.entry(key).or_insert(0) += 1;
@@ -200,8 +201,8 @@ impl AppCore {
         // Convert buckets to timeline blocks
         let mut blocks: Vec<ContextTimelineBlockResponse> = Vec::new();
         for ((bucket_offset, ctx_id), count) in &buckets {
-            let block_start = start + Duration::seconds(*bucket_offset);
-            let block_end = block_start + Duration::seconds(bucket_secs);
+            let block_start = start + jiff::SignedDuration::from_secs(*bucket_offset);
+            let block_end = block_start + jiff::SignedDuration::from_secs(bucket_secs);
 
             let (title, color, ctx_type) = ctx_id
                 .as_deref()
@@ -220,8 +221,8 @@ impl AppCore {
                 context_title: title,
                 context_color: color,
                 context_type: ctx_type,
-                start_time: block_start.to_rfc3339(),
-                end_time: block_end.to_rfc3339(),
+                start_time: block_start.to_string(),
+                end_time: block_end.to_string(),
                 event_count: *count,
                 is_idle: ctx_id.is_none() && *count <= 1,
             });
@@ -285,9 +286,8 @@ impl AppCore {
     // ── Inference Stats ───────────────────────────────────────────────
 
     pub async fn get_inference_stats(&self) -> Result<InferenceStatsResponse, ApiError> {
-        let now = Utc::now();
-        let one_hour_ago = now - Duration::hours(1);
-        let one_day_ago = now - Duration::hours(24);
+        let one_hour_ago = jiff::Timestamp::now() - jiff::SignedDuration::from_hours(1);
+        let one_day_ago = jiff::Timestamp::now() - jiff::SignedDuration::from_hours(24);
 
         let (
             active_count,
@@ -368,8 +368,10 @@ impl AppCore {
         date: &str,
         tz_offset_mins: Option<i32>,
     ) -> Result<DashboardIntelligenceResponse, ApiError> {
-        let (start, end) = crate::errors::parse_local_day_range(date, tz_offset_mins)?;
-        let yesterday_start = start - Duration::days(1);
+        let (start_chrono, end_chrono) = crate::errors::parse_local_day_range(date, tz_offset_mins)?;
+        let start = common::time::bridge::chrono_to_jiff(start_chrono);
+        let end = common::time::bridge::chrono_to_jiff(end_chrono);
+        let yesterday_start = start - jiff::SignedDuration::from_hours(24);
 
         // Fetch today's events, yesterday's events, active contexts, and semantic facts in parallel
         let fact_repo = SemanticFactRepo::new(self.repos.pool().clone());
@@ -413,7 +415,7 @@ impl AppCore {
             contexts.iter().map(|c| (c.id.clone(), c)).collect();
 
         // Find most recently active context (within 30 min)
-        let thirty_mins_ago = Utc::now() - Duration::minutes(30);
+        let thirty_mins_ago = jiff::Timestamp::now() - jiff::SignedDuration::from_mins(30);
         let active_context = contexts
             .iter()
             .filter(|c| c.last_active_at > thirty_mins_ago)

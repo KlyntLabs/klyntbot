@@ -416,9 +416,8 @@ impl AppCore {
     ) {
         if let Some(ref svc) = self.insight_service {
             let created_at = created_at_str
-                .and_then(|s| chrono::DateTime::parse_from_rfc3339(s).ok())
-                .map(|dt| dt.with_timezone(&chrono::Utc))
-                .unwrap_or_else(chrono::Utc::now);
+                .and_then(|s| s.parse::<jiff::Timestamp>().ok())
+                .unwrap_or_else(jiff::Timestamp::now);
             svc.check_cross_domain(domain, id.to_string(), title.to_string(), created_at)
                 .await;
         }

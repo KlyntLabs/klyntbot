@@ -6,7 +6,7 @@ pub use types::*;
 
 use std::collections::{HashMap, HashSet, VecDeque};
 
-use chrono::{DateTime, Duration, Utc};
+use jiff::{SignedDuration, Zoned};
 use rand::rngs::StdRng;
 use rand::{Rng, SeedableRng};
 
@@ -157,7 +157,7 @@ impl PersonaRunner {
     pub fn generate_tool_action(
         &mut self,
         topic: &str,
-        _simulated_at: DateTime<Utc>,
+        _simulated_at: &Zoned,
     ) -> Option<SimulatedToolAction> {
         match topic {
             "tasks" => {
@@ -232,7 +232,7 @@ impl PersonaRunner {
     ///    inject a correction or fact introduction, generate content from templates
     /// 4. Increment day_in_phase
     /// 5. Return the batch
-    pub fn generate_day(&mut self, simulated_date: DateTime<Utc>) -> Vec<AnnotatedMessage> {
+    pub fn generate_day(&mut self, simulated_date: &Zoned) -> Vec<AnnotatedMessage> {
         // 1. Phase transition check.
         self.check_phase_transition();
 
@@ -253,7 +253,7 @@ impl PersonaRunner {
             } else {
                 6 // noon
             };
-            let msg_time = simulated_date + Duration::hours(9 + hour_offset as i64);
+            let msg_time = simulated_date.checked_add(SignedDuration::from_secs((9 + hour_offset as i64) * 3600)).unwrap();
 
             // 3b. Sample topic.
             let topic = self.sample_topic();
@@ -277,7 +277,7 @@ impl PersonaRunner {
 
             // 3e. Decide if we generate a tool action.
             let tool_action = if self.rng.random::<f64>() < config.tool_action_rate {
-                self.generate_tool_action(&topic, msg_time)
+                self.generate_tool_action(&topic, &msg_time)
             } else {
                 None
             };
@@ -372,7 +372,7 @@ impl PersonaRunner {
                     expected_response: None,
                     expected_salience: Some("extract".to_string()),
                 };
-                let msg_time = simulated_date + Duration::hours(20);
+                let msg_time = simulated_date + SignedDuration::from_hours(20);
                 messages.push(AnnotatedMessage {
                     content: text,
                     phase,
@@ -532,7 +532,7 @@ impl PersonaRunner {
     /// Generate an adversarial message if the RNG triggers it.
     pub fn generate_adversarial(
         &mut self,
-        simulated_at: DateTime<Utc>,
+        simulated_at: Zoned,
         adversarial_rate: f64,
     ) -> Option<AnnotatedMessage> {
         if adversarial_rate <= 0.0 || self.rng.random::<f64>() >= adversarial_rate {
@@ -570,7 +570,7 @@ impl PersonaRunner {
     pub fn generate_followup(
         &mut self,
         agent_response: &str,
-        simulated_at: DateTime<Utc>,
+        simulated_at: Zoned,
         followup_rate: f64,
     ) -> Option<AnnotatedMessage> {
         if self.rng.random::<f64>() >= followup_rate {

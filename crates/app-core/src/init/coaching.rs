@@ -136,6 +136,7 @@ pub(super) async fn build_situation_inputs(
         .map(|dt| dt.and_utc())
         .unwrap_or(now);
     let thirty_min_ago = now - Duration::minutes(30);
+    let thirty_min_ago_jiff = common::time::bridge::chrono_to_jiff(thirty_min_ago);
 
     let mut inputs = SituationInputs {
         hour_of_day,
@@ -188,7 +189,7 @@ pub(super) async fn build_situation_inputs(
         {
             let recent_count = patterns
                 .iter()
-                .filter(|p| p.created_at >= thirty_min_ago)
+                .filter(|p| p.created_at >= thirty_min_ago_jiff)
                 .count();
             inputs.distraction_count_last_30min = recent_count as i32;
         }
