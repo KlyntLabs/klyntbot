@@ -7,5 +7,4 @@ mod types;
 pub use prompts::{TIER1_INSTRUCTIONS, TIER2_INSTRUCTIONS};
 pub use snippet::first_snippet;
 pub use tiered::TieredHistoryCompressor;
-pub(crate) use types::DEFAULT_SNIPPET_LENGTH;
 pub use types::{AssignedTier, CompressedHistory, CompressionTier, ConversationTurn, TierSummary};

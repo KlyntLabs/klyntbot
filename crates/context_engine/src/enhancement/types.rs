@@ -254,7 +254,7 @@ impl EnhancementOutput {
 pub struct EnhancementTraceSnapshot {
     pub query: QueryBundle,
     pub trace: EnhancementTrace,
-    pub captured_at: chrono::DateTime<chrono::Utc>,
+    pub captured_at: jiff::Timestamp,
 }
 
 /// Process-wide store for the most recent enhancement trace. The

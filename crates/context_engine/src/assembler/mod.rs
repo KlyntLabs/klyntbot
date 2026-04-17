@@ -405,7 +405,7 @@ impl ContextEngine {
                 .map(|s| s.content.as_str())
                 .collect::<Vec<_>>()
                 .join("\n\n---\n\n");
-            messages.push(Message::system(&format!(
+            messages.push(Message::system(format!(
                 "Earlier in this conversation:\n\n{}",
                 summary_text
             )));

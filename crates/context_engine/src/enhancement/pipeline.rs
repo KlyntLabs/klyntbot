@@ -80,7 +80,7 @@ impl QueryPipeline {
                 store.set(EnhancementTraceSnapshot {
                     query: bundle.clone(),
                     trace: trace.clone(),
-                    captured_at: chrono::Utc::now(),
+                    captured_at: jiff::Timestamp::now(),
                 });
             }
         }

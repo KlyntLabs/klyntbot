@@ -1,6 +1,6 @@
 //! A simple TTL cache for context source data.
 
-use chrono::{DateTime, Duration, Utc};
+use jiff::{SignedDuration, Timestamp};
 use std::sync::Mutex;
 
 /// A single-value cache with time-based expiration.
@@ -18,7 +18,7 @@ pub struct TtlCache {
 
 struct CachedEntry {
     content: String,
-    expires_at: DateTime<Utc>,
+    expires_at: Timestamp,
 }
 
 impl TtlCache {
@@ -34,7 +34,7 @@ impl TtlCache {
     pub fn get(&self) -> Option<String> {
         let guard = self.inner.lock().unwrap_or_else(|e| e.into_inner());
         guard.as_ref().and_then(|entry| {
-            if Utc::now() < entry.expires_at {
+            if Timestamp::now() < entry.expires_at {
                 Some(entry.content.clone())
             } else {
                 None
@@ -47,7 +47,7 @@ impl TtlCache {
         let mut guard = self.inner.lock().unwrap_or_else(|e| e.into_inner());
         *guard = Some(CachedEntry {
             content,
-            expires_at: Utc::now() + Duration::seconds(self.ttl_secs),
+            expires_at: Timestamp::now() + SignedDuration::from_secs(self.ttl_secs),
         });
     }
 }
