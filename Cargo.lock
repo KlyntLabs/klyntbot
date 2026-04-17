@@ -207,8 +207,8 @@ checksum = "e9d4ee0d472d1cd2e28c97dfa124b3d8d992e10eb0a035f33f5d12e3a177ba3b"
 name = "analytics"
 version = "0.1.0"
 dependencies = [
- "chrono",
  "common",
+ "jiff",
  "proptest",
  "rand 0.9.4",
  "rand_chacha 0.9.0",
@@ -4698,6 +4698,7 @@ dependencies = [
  "chrono",
  "common",
  "dashmap",
+ "jiff",
  "reqwest 0.13.2",
  "rust_decimal",
  "serde",

@@ -1,13 +1,13 @@
 //! Input types for the analytics crate.
 //! These are lightweight structs that feature-finance converts storage Row types into.
 
-use chrono::NaiveDate;
+use jiff::civil::Date;
 use common::Decimal;
 
 /// A financial transaction for spending analysis.
 #[derive(Debug, Clone)]
 pub struct SpendingRecord {
-    pub date: NaiveDate,
+    pub date: Date,
     pub amount: Decimal,
     pub tx_type: SpendingType,
     pub category: Option<String>,
@@ -35,7 +35,7 @@ pub struct Holding {
 /// An investment cash flow for returns calculation (TWR/MWR).
 #[derive(Debug, Clone)]
 pub struct InvestmentCashFlow {
-    pub date: NaiveDate,
+    pub date: Date,
     pub amount: Decimal,
     pub holding_symbol: Option<String>,
 }
@@ -45,7 +45,7 @@ pub struct InvestmentCashFlow {
 pub struct PriceSeries {
     pub symbol: String,
     pub asset_class: String,
-    pub prices: Vec<(NaiveDate, Decimal)>,
+    pub prices: Vec<(Date, Decimal)>,
 }
 
 /// Allocation target for a portfolio.

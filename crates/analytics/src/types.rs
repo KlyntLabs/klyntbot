@@ -1,7 +1,7 @@
 //! Shared output types used across analytics modules.
 
-use chrono::NaiveDate;
 use common::Decimal;
+use jiff::civil::Date;
 use serde::Serialize;
 
 /// Percentile bands from Monte Carlo or sensitivity analysis.
@@ -21,7 +21,7 @@ pub struct PercentileBands {
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct TimeSeries {
-    pub points: Vec<(NaiveDate, Decimal)>,
+    pub points: Vec<(Date, Decimal)>,
     pub label: String,
 }
 
@@ -46,7 +46,7 @@ pub enum AnomalySeverity {
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Anomaly {
-    pub date: NaiveDate,
+    pub date: Date,
     pub category: String,
     pub amount: Decimal,
     pub z_score: Decimal,

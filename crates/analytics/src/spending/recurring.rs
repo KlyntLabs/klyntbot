@@ -2,14 +2,24 @@
 
 use std::collections::BTreeMap;
 
-use chrono::NaiveDate;
 use common::Decimal;
+use jiff::{civil::Date, Span};
 use serde::Serialize;
 
 use crate::input_types::{RecurringFrequency, SpendingRecord, SpendingType};
 
 use super::anomaly::SpendingAnalyzer;
 use super::compute_median;
+
+/// Calendar days from `from` to `to` (positive if `to` is later).
+fn days_between(from: Date, to: Date) -> i64 {
+    to.to_zoned(jiff::tz::TimeZone::UTC)
+        .and_then(|zto| {
+            from.to_zoned(jiff::tz::TimeZone::UTC)
+                .map(|zfrom| (zto.timestamp().as_second() - zfrom.timestamp().as_second()) / 86400)
+        })
+        .unwrap_or(0)
+}
 
 /// Configuration for recurring charge detection.
 #[derive(Debug, Clone)]
@@ -44,7 +54,7 @@ pub struct RecurringCharge {
     /// Estimated annual cost.
     pub annual_cost: Decimal,
     /// Date of the most recent transaction.
-    pub last_date: NaiveDate,
+    pub last_date: Date,
     /// Whether the charge appears overdue based on expected interval.
     pub is_overdue: bool,
     /// Number of matching occurrences found.
@@ -59,9 +69,11 @@ impl SpendingAnalyzer {
     pub fn detect_recurring(
         txs: &[SpendingRecord],
         config: &RecurringConfig,
-        as_of: NaiveDate,
+        as_of: Date,
     ) -> Vec<RecurringCharge> {
-        let cutoff = as_of - chrono::Duration::days(config.max_lookback_days);
+        let cutoff = as_of
+            .checked_sub(Span::new().days(config.max_lookback_days))
+            .unwrap_or(as_of);
 
         // 1. Group expenses by counterparty (skip None)
         let mut by_counterparty: BTreeMap<String, Vec<&SpendingRecord>> = BTreeMap::new();
@@ -109,7 +121,7 @@ impl SpendingAnalyzer {
             // Compute inter-transaction intervals in days
             let intervals: Vec<i64> = txns
                 .windows(2)
-                .map(|pair| (pair[1].date - pair[0].date).num_days())
+                .map(|pair| days_between(pair[0].date, pair[1].date))
                 .collect();
 
             if intervals.is_empty() {
@@ -159,7 +171,7 @@ impl SpendingAnalyzer {
             let last_date = txns.last().map(|t| t.date).unwrap_or(as_of);
 
             // Is overdue: days since last > expected_interval * 1.5
-            let days_since_last = (as_of - last_date).num_days();
+            let days_since_last = days_between(last_date, as_of);
             let expected_interval = frequency_days(frequency);
             let is_overdue = days_since_last > (expected_interval * 3) / 2;
 

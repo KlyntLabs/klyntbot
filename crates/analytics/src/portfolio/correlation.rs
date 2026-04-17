@@ -1,6 +1,6 @@
 use std::collections::BTreeMap;
 
-use chrono::{Datelike, NaiveDate};
+use jiff::civil::Date;
 use common::Decimal;
 use rust_decimal::prelude::*;
 
@@ -69,11 +69,11 @@ impl super::PortfolioAnalyzer {
 
     /// Compute monthly returns from a price series.
     /// Returns a map of (year, month) -> monthly return (% change).
-    fn compute_monthly_returns(prices: &[(NaiveDate, Decimal)]) -> BTreeMap<(i32, u32), Decimal> {
+    fn compute_monthly_returns(prices: &[(Date, Decimal)]) -> BTreeMap<(i32, u32), Decimal> {
         // Group prices by (year, month), taking the last price in each month.
         let mut monthly_prices: BTreeMap<(i32, u32), Decimal> = BTreeMap::new();
         for (date, price) in prices {
-            let key = (date.year(), date.month());
+            let key = (date.year() as i32, date.month() as u32);
             // Keep the latest price per month (overwrite since we iterate chronologically).
             monthly_prices.insert(key, *price);
         }

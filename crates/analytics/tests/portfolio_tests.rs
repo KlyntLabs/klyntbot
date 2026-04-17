@@ -1,6 +1,6 @@
 use analytics::portfolio::{AssetCorrelationConfig, PortfolioAnalyzer, RebalanceStrategy};
 use analytics::{AllocationTarget, Holding, InvestmentCashFlow, PriceSeries};
-use chrono::NaiveDate;
+use jiff::civil::{date, Date};
 use rust_decimal_macros::dec;
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -202,8 +202,8 @@ fn rebalance_min_trade_filter() {
 #[test]
 fn returns_no_cash_flows() {
     // Simple 10% gain over 1 year, no cash flows.
-    let start = NaiveDate::from_ymd_opt(2024, 1, 1).unwrap();
-    let end = NaiveDate::from_ymd_opt(2025, 1, 1).unwrap();
+    let start = date(2024, 1, 1);
+    let end = date(2025, 1, 1);
 
     let result = PortfolioAnalyzer::returns(dec!(100000), dec!(110000), &[], start, end);
 
@@ -224,9 +224,9 @@ fn returns_no_cash_flows() {
 #[test]
 fn returns_with_contribution() {
     // Start 100k, contribute 10k halfway, end at 121k.
-    let start = NaiveDate::from_ymd_opt(2024, 1, 1).unwrap();
-    let mid = NaiveDate::from_ymd_opt(2024, 7, 1).unwrap();
-    let end = NaiveDate::from_ymd_opt(2025, 1, 1).unwrap();
+    let start = date(2024, 1, 1);
+    let mid = date(2024, 7, 1);
+    let end = date(2025, 1, 1);
 
     let cash_flows = vec![InvestmentCashFlow {
         date: mid,
@@ -251,8 +251,8 @@ fn returns_with_contribution() {
 #[test]
 fn returns_twr_annualized() {
     // 21% total return over 2 years → annualized ≈ 10%.
-    let start = NaiveDate::from_ymd_opt(2023, 1, 1).unwrap();
-    let end = NaiveDate::from_ymd_opt(2025, 1, 1).unwrap();
+    let start = date(2023, 1, 1);
+    let end = date(2025, 1, 1);
 
     let result = PortfolioAnalyzer::returns(dec!(100000), dec!(121000), &[], start, end);
 
@@ -285,7 +285,7 @@ fn make_price_series(
     for i in 0..months {
         let year = start_year + (i as i32 / 12);
         let month = (i % 12) as u32 + 1;
-        let date = NaiveDate::from_ymd_opt(year, month, 15).unwrap();
+        let date = Date::new(year as i16, month as i8, 15).unwrap();
 
         prices.push((
             date,
@@ -450,12 +450,12 @@ proptest! {
         n_months in 6usize..12
     ) {
         // Create two price series with enough months
-        let base_date = chrono::NaiveDate::from_ymd_opt(2024, 1, 1).unwrap();
+        let base_date = date(2024, 1, 1);
         let series1 = PriceSeries {
             symbol: "A".to_string(),
             asset_class: "stocks".to_string(),
             prices: (0..n_months).map(|m| {
-                let date = base_date + chrono::Months::new(m as u32);
+                let date = base_date.checked_add(jiff::Span::new().months(m as i64)).unwrap();
                 (date, rust_decimal::Decimal::new(100 + m as i64, 0))
             }).collect(),
         };
@@ -463,7 +463,7 @@ proptest! {
             symbol: "B".to_string(),
             asset_class: "bonds".to_string(),
             prices: (0..n_months).map(|m| {
-                let date = base_date + chrono::Months::new(m as u32);
+                let date = base_date.checked_add(jiff::Span::new().months(m as i64)).unwrap();
                 (date, rust_decimal::Decimal::new(50 + m as i64 * 2, 0))
             }).collect(),
         };

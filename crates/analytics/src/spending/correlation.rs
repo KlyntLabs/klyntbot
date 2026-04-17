@@ -42,11 +42,7 @@ impl SpendingAnalyzer {
                 continue;
             }
             if let Some(ref cat) = tx.category {
-                let month_key = format!(
-                    "{}-{:02}",
-                    chrono::Datelike::year(&tx.date),
-                    chrono::Datelike::month(&tx.date)
-                );
+                let month_key = format!("{}-{:02}", tx.date.year(), tx.date.month());
                 all_months.insert(month_key.clone());
                 *category_monthly
                     .entry(cat.clone())

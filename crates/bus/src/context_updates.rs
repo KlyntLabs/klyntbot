@@ -90,8 +90,7 @@ impl ContextUpdateQueue {
         let is_duplicate = queue.iter().any(|existing| {
             existing.reason == update.reason
                 && existing.content == update.content
-                && (update.timestamp.as_millisecond() - existing.timestamp.as_millisecond())
-                    .abs()
+                && (update.timestamp.as_millisecond() - existing.timestamp.as_millisecond()).abs()
                     < DEDUP_WINDOW_SECS * 1000
         });
         if !is_duplicate {

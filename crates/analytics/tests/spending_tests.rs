@@ -1,7 +1,7 @@
 use analytics::spending::anomaly::SpendingAnalyzer;
 use analytics::spending::{AnomalyConfig, CorrelationConfig, RecurringConfig, TrendConfig};
 use analytics::{AnomalyDirection, SpendingRecord, SpendingType, TrendDirection};
-use chrono::NaiveDate;
+use jiff::civil::{date, Date};
 use rust_decimal::Decimal;
 use rust_decimal_macros::dec;
 
@@ -15,7 +15,7 @@ fn monthly_expenses(category: &str, amounts: &[i64]) -> Vec<SpendingRecord> {
         .iter()
         .enumerate()
         .map(|(i, &amt)| SpendingRecord {
-            date: NaiveDate::from_ymd_opt(2025, (i as u32 % 12) + 1, 15).unwrap(),
+            date: Date::new((2025) as i16, ((i as u32 % 12) + 1) as i8, (15) as i8).unwrap(),
             amount: Decimal::new(amt, 0),
             tx_type: SpendingType::Expense,
             category: Some(category.to_string()),
@@ -25,7 +25,7 @@ fn monthly_expenses(category: &str, amounts: &[i64]) -> Vec<SpendingRecord> {
 }
 
 /// Build recurring expense records from a given counterparty on specific dates.
-fn recurring_expenses(counterparty: &str, amount: i64, dates: &[NaiveDate]) -> Vec<SpendingRecord> {
+fn recurring_expenses(counterparty: &str, amount: i64, dates: &[Date]) -> Vec<SpendingRecord> {
     dates
         .iter()
         .map(|&d| SpendingRecord {
@@ -48,7 +48,7 @@ fn correlated_expenses(
     let mut records = Vec::new();
     for (i, &amt) in amounts_a.iter().enumerate() {
         records.push(SpendingRecord {
-            date: NaiveDate::from_ymd_opt(2025, (i as u32 % 12) + 1, 10).unwrap(),
+            date: Date::new((2025) as i16, ((i as u32 % 12) + 1) as i8, (10) as i8).unwrap(),
             amount: Decimal::new(amt, 0),
             tx_type: SpendingType::Expense,
             category: Some(cat_a.to_string()),
@@ -57,7 +57,7 @@ fn correlated_expenses(
     }
     for (i, &amt) in amounts_b.iter().enumerate() {
         records.push(SpendingRecord {
-            date: NaiveDate::from_ymd_opt(2025, (i as u32 % 12) + 1, 20).unwrap(),
+            date: Date::new((2025) as i16, ((i as u32 % 12) + 1) as i8, (20) as i8).unwrap(),
             amount: Decimal::new(amt, 0),
             tx_type: SpendingType::Expense,
             category: Some(cat_b.to_string()),
@@ -163,7 +163,7 @@ fn anomaly_income_records_excluded() {
     // All income — should produce no anomalies even if they look anomalous.
     let txs: Vec<SpendingRecord> = (0..7)
         .map(|i| SpendingRecord {
-            date: NaiveDate::from_ymd_opt(2025, (i % 12) + 1, 15).unwrap(),
+            date: Date::new((2025) as i16, ((i % 12) + 1) as i8, (15) as i8).unwrap(),
             amount: if i == 6 { dec!(10000) } else { dec!(100) },
             tx_type: SpendingType::Income,
             category: Some("salary".to_string()),
@@ -316,12 +316,12 @@ fn trends_category_breakdown() {
 
 #[test]
 fn recurring_monthly_detected() {
-    let dates: Vec<NaiveDate> = (1..=6)
-        .map(|m| NaiveDate::from_ymd_opt(2025, m, 1).unwrap())
+    let dates: Vec<Date> = (1..=6)
+        .map(|m| Date::new((2025) as i16, (m) as i8, (1) as i8).unwrap())
         .collect();
     let txs = recurring_expenses("Netflix", 15, &dates);
     let config = RecurringConfig::default();
-    let as_of = NaiveDate::from_ymd_opt(2025, 6, 15).unwrap();
+    let as_of = date(2025, 6, 15);
     let results = SpendingAnalyzer::detect_recurring(&txs, &config, as_of);
     assert_eq!(results.len(), 1);
     let netflix = &results[0];
@@ -334,13 +334,13 @@ fn recurring_monthly_detected() {
 #[test]
 fn recurring_overdue_flagged() {
     // Monthly charge, last seen 3 months ago -> overdue.
-    let dates: Vec<NaiveDate> = (1..=4)
-        .map(|m| NaiveDate::from_ymd_opt(2025, m, 1).unwrap())
+    let dates: Vec<Date> = (1..=4)
+        .map(|m| Date::new((2025) as i16, (m) as i8, (1) as i8).unwrap())
         .collect();
     let txs = recurring_expenses("Gym", 50, &dates);
     let config = RecurringConfig::default();
     // Check as of August — last payment was April 1, ~120 days ago, expected ~30 day interval.
-    let as_of = NaiveDate::from_ymd_opt(2025, 8, 1).unwrap();
+    let as_of = date(2025, 8, 1);
     let results = SpendingAnalyzer::detect_recurring(&txs, &config, as_of);
     assert_eq!(results.len(), 1);
     assert!(results[0].is_overdue, "charge should be flagged as overdue");
@@ -349,12 +349,12 @@ fn recurring_overdue_flagged() {
 #[test]
 fn recurring_not_overdue_when_recent() {
     // Monthly charge, last seen recently -> not overdue.
-    let dates: Vec<NaiveDate> = (1..=6)
-        .map(|m| NaiveDate::from_ymd_opt(2025, m, 1).unwrap())
+    let dates: Vec<Date> = (1..=6)
+        .map(|m| Date::new((2025) as i16, (m) as i8, (1) as i8).unwrap())
         .collect();
     let txs = recurring_expenses("Spotify", 10, &dates);
     let config = RecurringConfig::default();
-    let as_of = NaiveDate::from_ymd_opt(2025, 6, 15).unwrap();
+    let as_of = date(2025, 6, 15);
     let results = SpendingAnalyzer::detect_recurring(&txs, &config, as_of);
     assert_eq!(results.len(), 1);
     assert!(
@@ -367,12 +367,12 @@ fn recurring_not_overdue_when_recent() {
 fn recurring_insufficient_occurrences_skipped() {
     // Only 2 occurrences — below min_occurrences of 3.
     let dates = vec![
-        NaiveDate::from_ymd_opt(2025, 1, 1).unwrap(),
-        NaiveDate::from_ymd_opt(2025, 2, 1).unwrap(),
+        date(2025, 1, 1),
+        date(2025, 2, 1),
     ];
     let txs = recurring_expenses("SomeService", 20, &dates);
     let config = RecurringConfig::default();
-    let as_of = NaiveDate::from_ymd_opt(2025, 3, 1).unwrap();
+    let as_of = date(2025, 3, 1);
     let results = SpendingAnalyzer::detect_recurring(&txs, &config, as_of);
     assert!(
         results.is_empty(),
@@ -383,8 +383,8 @@ fn recurring_insufficient_occurrences_skipped() {
 #[test]
 fn recurring_annual_cost_correct() {
     // Weekly charge of $10 → annual cost should be $520.
-    let dates: Vec<NaiveDate> = (0..8)
-        .map(|w| NaiveDate::from_ymd_opt(2025, 1, 1).unwrap() + chrono::Duration::days(w * 7))
+    let dates: Vec<Date> = (0..8)
+        .map(|w| date(2025, 1, 1) + jiff::Span::new().days(w * 7))
         .collect();
     let txs = recurring_expenses("WeeklyMeal", 10, &dates);
     let config = RecurringConfig {
@@ -392,7 +392,7 @@ fn recurring_annual_cost_correct() {
         amount_tolerance_pct: dec!(0.10),
         max_lookback_days: 365,
     };
-    let as_of = NaiveDate::from_ymd_opt(2025, 3, 1).unwrap();
+    let as_of = date(2025, 3, 1);
     let results = SpendingAnalyzer::detect_recurring(&txs, &config, as_of);
     assert_eq!(results.len(), 1);
     assert_eq!(results[0].frequency, analytics::RecurringFrequency::Weekly);
@@ -404,7 +404,7 @@ fn recurring_income_excluded() {
     // Income records should be excluded.
     let txs: Vec<SpendingRecord> = (1..=6)
         .map(|m| SpendingRecord {
-            date: NaiveDate::from_ymd_opt(2025, m, 1).unwrap(),
+            date: Date::new((2025) as i16, (m) as i8, (1) as i8).unwrap(),
             amount: dec!(5000),
             tx_type: SpendingType::Income,
             category: Some("salary".to_string()),
@@ -412,7 +412,7 @@ fn recurring_income_excluded() {
         })
         .collect();
     let config = RecurringConfig::default();
-    let as_of = NaiveDate::from_ymd_opt(2025, 7, 1).unwrap();
+    let as_of = date(2025, 7, 1);
     let results = SpendingAnalyzer::detect_recurring(&txs, &config, as_of);
     assert!(
         results.is_empty(),
@@ -425,7 +425,7 @@ fn recurring_no_counterparty_skipped() {
     // Records without counterparty should be ignored.
     let txs: Vec<SpendingRecord> = (1..=6)
         .map(|m| SpendingRecord {
-            date: NaiveDate::from_ymd_opt(2025, m, 1).unwrap(),
+            date: Date::new((2025) as i16, (m) as i8, (1) as i8).unwrap(),
             amount: dec!(100),
             tx_type: SpendingType::Expense,
             category: Some("misc".to_string()),
@@ -433,7 +433,7 @@ fn recurring_no_counterparty_skipped() {
         })
         .collect();
     let config = RecurringConfig::default();
-    let as_of = NaiveDate::from_ymd_opt(2025, 7, 1).unwrap();
+    let as_of = date(2025, 7, 1);
     let results = SpendingAnalyzer::detect_recurring(&txs, &config, as_of);
     assert!(results.is_empty());
 }
@@ -499,14 +499,14 @@ fn correlation_insufficient_shared_months() {
     let mut txs = Vec::new();
     for m in 1..=2 {
         txs.push(SpendingRecord {
-            date: NaiveDate::from_ymd_opt(2025, m, 10).unwrap(),
+            date: Date::new((2025) as i16, (m) as i8, (10) as i8).unwrap(),
             amount: Decimal::new(100, 0),
             tx_type: SpendingType::Expense,
             category: Some("food".to_string()),
             counterparty: None,
         });
         txs.push(SpendingRecord {
-            date: NaiveDate::from_ymd_opt(2025, m, 20).unwrap(),
+            date: Date::new((2025) as i16, (m) as i8, (20) as i8).unwrap(),
             amount: Decimal::new(50, 0),
             tx_type: SpendingType::Expense,
             category: Some("transport".to_string()),
@@ -583,7 +583,7 @@ proptest! {
         // Create expenses in two categories
         let mut txs = Vec::new();
         for m in 0..n_months {
-            let date = chrono::NaiveDate::from_ymd_opt(2025, (m as u32 % 12) + 1, 15).unwrap();
+            let date = Date::new((2025) as i16, ((m as u32 % 12) + 1) as i8, (15) as i8).unwrap();
             txs.push(SpendingRecord {
                 date,
                 amount: rust_decimal::Decimal::new(100 + m as i64 * 10, 0),

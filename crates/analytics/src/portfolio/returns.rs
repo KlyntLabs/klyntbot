@@ -1,6 +1,15 @@
-use chrono::NaiveDate;
 use common::Decimal;
+use jiff::civil::Date;
 use rust_decimal::prelude::*;
+
+fn days_between(from: Date, to: Date) -> i64 {
+    to.to_zoned(jiff::tz::TimeZone::UTC)
+        .and_then(|zto| {
+            from.to_zoned(jiff::tz::TimeZone::UTC)
+                .map(|zfrom| (zto.timestamp().as_second() - zfrom.timestamp().as_second()) / 86400)
+        })
+        .unwrap_or(0)
+}
 use serde::Serialize;
 
 use crate::InvestmentCashFlow;
@@ -25,15 +34,15 @@ impl super::PortfolioAnalyzer {
         start_value: Decimal,
         end_value: Decimal,
         cash_flows: &[InvestmentCashFlow],
-        start_date: NaiveDate,
-        end_date: NaiveDate,
+        start_date: Date,
+        end_date: Date,
     ) -> ReturnsResult {
         let twr =
             Self::modified_dietz_twr(start_value, end_value, cash_flows, start_date, end_date);
         let mwr = Self::newton_irr(start_value, end_value, cash_flows, start_date, end_date);
 
         // Annualize TWR.
-        let days = (end_date - start_date).num_days() as f64;
+        let days = days_between(start_date, end_date) as f64;
         let years = days / 365.25;
         let twr_annualized = if years > 0.0 && twr > Decimal::new(-1, 0) {
             let one = Decimal::ONE;
@@ -71,10 +80,10 @@ impl super::PortfolioAnalyzer {
         start_value: Decimal,
         end_value: Decimal,
         cash_flows: &[InvestmentCashFlow],
-        start_date: NaiveDate,
-        end_date: NaiveDate,
+        start_date: Date,
+        end_date: Date,
     ) -> Decimal {
-        let total_days = (end_date - start_date).num_days();
+        let total_days = days_between(start_date, end_date);
         if total_days <= 0 {
             return Decimal::ZERO;
         }
@@ -83,7 +92,7 @@ impl super::PortfolioAnalyzer {
         let mut total_cf = Decimal::ZERO;
 
         for cf in cash_flows {
-            let days_remaining = (end_date - cf.date).num_days();
+            let days_remaining = days_between(cf.date, end_date);
             let weight = Decimal::from_f64_retain(days_remaining as f64 / total_days as f64)
                 .unwrap_or(Decimal::ZERO);
             weighted_cf += cf.amount * weight;
@@ -103,11 +112,11 @@ impl super::PortfolioAnalyzer {
         start_value: Decimal,
         end_value: Decimal,
         cash_flows: &[InvestmentCashFlow],
-        start_date: NaiveDate,
-        end_date: NaiveDate,
+        start_date: Date,
+        end_date: Date,
     ) -> Option<Decimal> {
         // Solve: -start_value + sum(cf_i / (1+r)^t_i) + end_value / (1+r)^T = 0
-        let total_days = (end_date - start_date).num_days() as f64;
+        let total_days = days_between(start_date, end_date) as f64;
         if total_days <= 0.0 {
             return None;
         }
@@ -119,7 +128,7 @@ impl super::PortfolioAnalyzer {
             let mut dnpv = 0.0_f64;
 
             for cf in cash_flows {
-                let t = (cf.date - start_date).num_days() as f64 / 365.25;
+                let t = days_between(start_date, cf.date) as f64 / 365.25;
                 let disc = (1.0 + r).powf(t);
                 let amount = cf.amount.to_f64().unwrap_or(0.0);
                 npv += amount / disc;

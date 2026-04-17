@@ -516,7 +516,7 @@ impl FinanceTool {
                     };
                     if amount != common::Decimal::ZERO {
                         cash_flows.push(analytics::InvestmentCashFlow {
-                            date: tx.tx_date,
+                            date: common::time::bridge::chrono_date_to_jiff(tx.tx_date),
                             amount,
                             holding_symbol: inv.symbol.clone(),
                         });
@@ -529,8 +529,8 @@ impl FinanceTool {
             start_value,
             end_value,
             &cash_flows,
-            start_date,
-            end_date,
+            common::time::bridge::chrono_date_to_jiff(start_date),
+            common::time::bridge::chrono_date_to_jiff(end_date),
         );
         Ok(serde_json::to_string_pretty(&result).unwrap())
     }
@@ -564,11 +564,15 @@ impl FinanceTool {
                 .investments
                 .list_investment_txs(&inv.id)
                 .await?;
-            let prices: Vec<(chrono::NaiveDate, common::Decimal)> = txs
+            let prices: Vec<(jiff::civil::Date, common::Decimal)> = txs
                 .iter()
                 .filter_map(|tx| {
-                    tx.price_per_unit
-                        .map(|price| (tx.tx_date, common::Decimal::new(price, 0)))
+                    tx.price_per_unit.map(|price| {
+                        (
+                            common::time::bridge::chrono_date_to_jiff(tx.tx_date),
+                            common::Decimal::new(price, 0),
+                        )
+                    })
                 })
                 .collect();
 

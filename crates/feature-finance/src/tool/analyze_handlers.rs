@@ -56,7 +56,7 @@ impl FinanceTool {
                     _ => return None, // skip transfers
                 };
                 Some(SpendingRecord {
-                    date: row.tx_date,
+                    date: common::time::bridge::chrono_date_to_jiff(row.tx_date),
                     amount: Decimal::new(row.amount, 0),
                     tx_type,
                     category: row.category,
@@ -165,7 +165,7 @@ impl FinanceTool {
         }
         config.max_lookback_days = lookback_months * 30;
 
-        let today = Local::now().date_naive();
+        let today = common::time::bridge::chrono_date_to_jiff(Local::now().date_naive());
         let charges = SpendingAnalyzer::detect_recurring(&records, &config, today);
 
         let result: Vec<serde_json::Value> = charges
