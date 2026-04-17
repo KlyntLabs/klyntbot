@@ -3,7 +3,7 @@
 
 use std::collections::HashMap;
 
-use chrono::{DateTime, Utc};
+use jiff::Timestamp;
 use serde::{Deserialize, Serialize};
 use tracing::debug;
 
@@ -15,7 +15,7 @@ pub struct DeliveredIntervention {
     pub id: String,
     pub intervention_type: InterventionType,
     pub message: String,
-    pub delivered_at: DateTime<Utc>,
+    pub delivered_at: Timestamp,
     pub trigger_name: String,
     pub action_url: Option<String>,
 }
@@ -85,7 +85,7 @@ pub struct InterventionRouter {
     /// Dismissal counts per intervention type for exponential backoff.
     dismissal_counts: HashMap<String, i32>,
     /// Last dismissal time per trigger name.
-    last_dismissed: HashMap<String, DateTime<Utc>>,
+    last_dismissed: HashMap<String, Timestamp>,
 }
 
 impl InterventionRouter {
@@ -104,7 +104,7 @@ impl InterventionRouter {
             return RoutingResult::Skipped;
         }
 
-        let now = Utc::now();
+        let now = Timestamp::now();
 
         // Check dismiss cooldown with exponential backoff
         if let Some(last_dismiss) = self.last_dismissed.get(trigger_name) {
@@ -115,7 +115,7 @@ impl InterventionRouter {
                 .unwrap_or(0);
             let backoff = self.config.dismiss_cooldown_secs as f64
                 * self.config.backoff_multiplier.powi(dismiss_count);
-            let elapsed = (now - *last_dismiss).num_seconds() as f64;
+            let elapsed = (now.as_millisecond() - last_dismiss.as_millisecond()) as f64 / 1000.0;
             if elapsed < backoff {
                 return RoutingResult::RateLimited {
                     reason: format!(
@@ -127,7 +127,7 @@ impl InterventionRouter {
         }
 
         // Check hourly rate limit
-        let hour_ago = now - chrono::Duration::hours(1);
+        let hour_ago = now - jiff::SignedDuration::from_hours(1);
         let hourly_count = self
             .recent_deliveries
             .iter()
@@ -140,7 +140,7 @@ impl InterventionRouter {
         }
 
         // Check daily rate limit
-        let day_ago = now - chrono::Duration::hours(24);
+        let day_ago = now - jiff::SignedDuration::from_hours(24);
         let daily_count = self
             .recent_deliveries
             .iter()
@@ -183,7 +183,7 @@ impl InterventionRouter {
             .or_insert(0);
         *count += 1;
         self.last_dismissed
-            .insert(trigger_name.to_string(), Utc::now());
+            .insert(trigger_name.to_string(), Timestamp::now());
     }
 
     /// Reset dismissal tracking for a trigger type.
@@ -194,7 +194,7 @@ impl InterventionRouter {
 
     /// Get the count of interventions delivered in the last hour.
     pub fn hourly_count(&self) -> usize {
-        let hour_ago = Utc::now() - chrono::Duration::hours(1);
+        let hour_ago = Timestamp::now() - jiff::SignedDuration::from_hours(1);
         self.recent_deliveries
             .iter()
             .filter(|d| d.delivered_at > hour_ago)
@@ -203,7 +203,7 @@ impl InterventionRouter {
 
     /// Get the count of interventions delivered in the last 24 hours.
     pub fn daily_count(&self) -> usize {
-        let day_ago = Utc::now() - chrono::Duration::hours(24);
+        let day_ago = Timestamp::now() - jiff::SignedDuration::from_hours(24);
         self.recent_deliveries
             .iter()
             .filter(|d| d.delivered_at > day_ago)

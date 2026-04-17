@@ -3,7 +3,7 @@
 
 use std::collections::{BTreeSet, VecDeque};
 
-use chrono::{DateTime, Duration, Utc};
+use jiff::{SignedDuration, Timestamp};
 
 use crate::pattern_detector::DetectedPattern;
 
@@ -15,23 +15,25 @@ const STREAK_MILESTONES: &[i64] = &[3, 7, 14, 30, 60, 100];
 /// Counts distinct review days backwards from the most recent entry.
 /// Fires at milestones (3/7/14/30/60/100 days) and when a streak >= 3 is
 /// at risk (last review was yesterday, none today).
-pub fn detect_study_streak(reviews: &VecDeque<(DateTime<Utc>, String)>) -> Option<DetectedPattern> {
+pub fn detect_study_streak(reviews: &VecDeque<(Timestamp, String)>) -> Option<DetectedPattern> {
     if reviews.is_empty() {
         return None;
     }
 
-    let now = Utc::now();
-    let today = now.date_naive();
+    let today = Timestamp::now().to_zoned(jiff::tz::TimeZone::UTC).date();
 
     // Collect distinct review dates.
-    let review_dates: BTreeSet<_> = reviews.iter().map(|(ts, _)| ts.date_naive()).collect();
+    let review_dates: BTreeSet<_> = reviews
+        .iter()
+        .map(|(ts, _)| ts.to_zoned(jiff::tz::TimeZone::UTC).date())
+        .collect();
 
     // Count consecutive days backwards from the most recent review date.
     let most_recent = *review_dates.iter().next_back()?;
     let mut streak = 1i64;
     let mut check_date = most_recent;
     loop {
-        let prev = check_date - Duration::days(1);
+        let prev = check_date - jiff::Span::new().days(1);
         if review_dates.contains(&prev) {
             streak += 1;
             check_date = prev;
@@ -41,7 +43,7 @@ pub fn detect_study_streak(reviews: &VecDeque<(DateTime<Utc>, String)>) -> Optio
     }
 
     // Check if streak is at risk: last review was yesterday (not today) and streak >= 3.
-    let yesterday = today - Duration::days(1);
+    let yesterday = today - jiff::Span::new().days(1);
     if most_recent == yesterday && streak >= 3 {
         return Some(DetectedPattern {
             name: "study_streak_at_risk".into(),
@@ -71,14 +73,12 @@ pub fn detect_study_streak(reviews: &VecDeque<(DateTime<Utc>, String)>) -> Optio
 
 /// Detect retention decay — triggered when recent digest signals indicate
 /// fading knowledge atoms.
-pub fn detect_retention_decay(
-    digests: &VecDeque<(DateTime<Utc>, String)>,
-) -> Option<DetectedPattern> {
+pub fn detect_retention_decay(digests: &VecDeque<(Timestamp, String)>) -> Option<DetectedPattern> {
     if digests.is_empty() {
         return None;
     }
 
-    let cutoff = Utc::now() - Duration::hours(24);
+    let cutoff = Timestamp::now() - SignedDuration::from_hours(24);
     let recent: Vec<_> = digests.iter().filter(|(ts, _)| *ts > cutoff).collect();
 
     if recent.is_empty() {
@@ -100,10 +100,10 @@ pub fn detect_retention_decay(
 /// Detect learning momentum imbalance by comparing creation vs review counts
 /// in the last 7 days.
 pub fn detect_learning_momentum(
-    creations: &VecDeque<(DateTime<Utc>, String)>,
-    reviews: &VecDeque<(DateTime<Utc>, String)>,
+    creations: &VecDeque<(Timestamp, String)>,
+    reviews: &VecDeque<(Timestamp, String)>,
 ) -> Option<DetectedPattern> {
-    let cutoff = Utc::now() - Duration::days(7);
+    let cutoff = Timestamp::now() - SignedDuration::from_hours(7 * 24);
 
     let created_count = creations.iter().filter(|(ts, _)| *ts > cutoff).count();
     let reviewed_count = reviews.iter().filter(|(ts, _)| *ts > cutoff).count();
@@ -160,8 +160,8 @@ pub fn detect_learning_momentum(
 }
 
 /// Detect domain-level retention gaps via repeated digest signals.
-pub fn detect_domain_gap(digests: &VecDeque<(DateTime<Utc>, String)>) -> Option<DetectedPattern> {
-    let cutoff = Utc::now() - Duration::days(7);
+pub fn detect_domain_gap(digests: &VecDeque<(Timestamp, String)>) -> Option<DetectedPattern> {
+    let cutoff = Timestamp::now() - SignedDuration::from_hours(7 * 24);
     let recent_count = digests.iter().filter(|(ts, _)| *ts > cutoff).count();
 
     if recent_count >= 2 {
@@ -181,9 +181,9 @@ pub fn detect_domain_gap(digests: &VecDeque<(DateTime<Utc>, String)>) -> Option<
 
 /// Detect knowledge transfer events in the last 24 hours.
 pub fn detect_knowledge_transfer(
-    transfers: &VecDeque<(DateTime<Utc>, String)>,
+    transfers: &VecDeque<(Timestamp, String)>,
 ) -> Option<DetectedPattern> {
-    let cutoff = Utc::now() - Duration::hours(24);
+    let cutoff = Timestamp::now() - SignedDuration::from_hours(24);
     let recent: Vec<_> = transfers.iter().filter(|(ts, _)| *ts > cutoff).collect();
 
     if recent.is_empty() {
@@ -206,18 +206,18 @@ pub fn detect_knowledge_transfer(
 mod tests {
     use super::*;
 
-    fn make_history(days_ago: &[i64]) -> VecDeque<(DateTime<Utc>, String)> {
-        let now = Utc::now();
+    fn make_history(days_ago: &[i64]) -> VecDeque<(Timestamp, String)> {
+        let now = Timestamp::now();
         days_ago
             .iter()
-            .map(|&d| (now - Duration::days(d), "test".into()))
+            .map(|&d| (now - SignedDuration::from_hours(d * 24), "test".into()))
             .collect()
     }
 
-    fn make_recent_history(count: usize) -> VecDeque<(DateTime<Utc>, String)> {
-        let now = Utc::now();
+    fn make_recent_history(count: usize) -> VecDeque<(Timestamp, String)> {
+        let now = Timestamp::now();
         (0..count)
-            .map(|i| (now - Duration::hours(i as i64), "test".into()))
+            .map(|i| (now - SignedDuration::from_hours(i as i64), "test".into()))
             .collect()
     }
 
@@ -257,7 +257,7 @@ mod tests {
 
     #[test]
     fn test_empty_history_returns_none() {
-        let empty: VecDeque<(DateTime<Utc>, String)> = VecDeque::new();
+        let empty: VecDeque<(Timestamp, String)> = VecDeque::new();
         assert!(detect_study_streak(&empty).is_none());
         assert!(detect_retention_decay(&empty).is_none());
         assert!(detect_learning_momentum(&empty, &empty).is_none());

@@ -8,7 +8,7 @@ pub use types::{Signal, SignalMetadata, TriggerCondition, TriggerFired};
 
 use std::collections::VecDeque;
 
-use chrono::{DateTime, Utc};
+use jiff::Timestamp;
 
 use bus::DomainEvent;
 use cognitive::situation::UserSituation;
@@ -23,7 +23,7 @@ pub struct SignalAccumulator {
     /// Window duration in seconds.
     window_secs: i64,
     /// Last time each trigger condition fired (for cooldown).
-    last_fired: std::collections::HashMap<String, DateTime<Utc>>,
+    last_fired: std::collections::HashMap<String, Timestamp>,
     /// Registered trigger conditions.
     conditions: Vec<TriggerCondition>,
 }
@@ -40,15 +40,15 @@ impl SignalAccumulator {
 
     /// Add a signal from a domain event.
     pub fn push_event(&mut self, event: &DomainEvent) {
-        let now = Utc::now();
+        let now = Timestamp::now();
         let signal = event_to_signal(event, now);
         self.window.push_back(signal);
         self.prune_old(now);
     }
 
     /// Prune signals outside the window.
-    fn prune_old(&mut self, now: DateTime<Utc>) {
-        let cutoff = now - chrono::Duration::seconds(self.window_secs);
+    fn prune_old(&mut self, now: Timestamp) {
+        let cutoff = now - jiff::SignedDuration::from_secs(self.window_secs);
         while let Some(front) = self.window.front() {
             if front.timestamp < cutoff {
                 self.window.pop_front();
@@ -61,7 +61,7 @@ impl SignalAccumulator {
     /// Evaluate all trigger conditions against the current situation.
     /// Returns a list of triggers that fired.
     pub fn evaluate(&mut self, situation: &UserSituation) -> Vec<TriggerFired> {
-        let now = Utc::now();
+        let now = Timestamp::now();
         self.prune_old(now);
 
         let mut fired = Vec::new();
@@ -69,7 +69,8 @@ impl SignalAccumulator {
         for condition in &self.conditions {
             // Check cooldown
             if let Some(last) = self.last_fired.get(&condition.name) {
-                if (now - *last).num_seconds() < condition.cooldown_secs {
+                let elapsed = now.as_millisecond() - last.as_millisecond();
+                if elapsed < condition.cooldown_secs * 1000 {
                     continue;
                 }
             }
@@ -87,7 +88,7 @@ impl SignalAccumulator {
         &self,
         condition: &TriggerCondition,
         situation: &UserSituation,
-        _now: DateTime<Utc>,
+        _now: Timestamp,
     ) -> Option<TriggerFired> {
         match condition.name.as_str() {
             "low_productivity" => {
@@ -185,7 +186,7 @@ impl SignalAccumulator {
     }
 
     /// Get last fired timestamps for trigger conditions.
-    pub fn last_fired(&self) -> &std::collections::HashMap<String, DateTime<Utc>> {
+    pub fn last_fired(&self) -> &std::collections::HashMap<String, Timestamp> {
         &self.last_fired
     }
 }

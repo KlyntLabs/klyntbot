@@ -5,7 +5,7 @@ mod learning_patterns;
 
 use std::collections::{HashMap, VecDeque};
 
-use chrono::{DateTime, Timelike, Utc};
+use jiff::Timestamp;
 use serde::{Deserialize, Serialize};
 
 use crate::signal_accumulator::TriggerFired;
@@ -23,7 +23,7 @@ pub struct DetectedPattern {
 /// Tracks historical trigger data to detect recurring patterns.
 pub struct PatternDetector {
     /// Historical trigger firings: condition_name → list of (timestamp, context).
-    history: HashMap<String, VecDeque<(DateTime<Utc>, String)>>,
+    history: HashMap<String, VecDeque<(Timestamp, String)>>,
     /// Maximum history entries per condition.
     max_history: usize,
 }
@@ -42,7 +42,7 @@ impl PatternDetector {
             .history
             .entry(trigger.condition_name.clone())
             .or_default();
-        entry.push_back((Utc::now(), trigger.context.clone()));
+        entry.push_back((Timestamp::now(), trigger.context.clone()));
         if entry.len() > self.max_history {
             entry.pop_front();
         }
@@ -56,7 +56,7 @@ impl PatternDetector {
         if let Some(distractions) = self.history.get("distraction_streak") {
             let afternoon_count = distractions
                 .iter()
-                .filter(|(ts, _)| ts.with_timezone(&chrono::Local).hour() >= 15)
+                .filter(|(ts, _)| ts.to_zoned(jiff::tz::TimeZone::system()).hour() >= 15)
                 .count();
             let total = distractions.len().max(1);
             if afternoon_count >= 3 && (afternoon_count as f64 / total as f64) > 0.5 {
@@ -174,7 +174,7 @@ impl PatternDetector {
     pub fn seed_test_triggers(&mut self, condition: &str, count: usize) {
         let entry = self.history.entry(condition.to_string()).or_default();
         for _ in 0..count {
-            entry.push_back((chrono::Local::now().to_utc(), "seeded for testing".into()));
+            entry.push_back((Timestamp::now(), "seeded for testing".into()));
         }
     }
 

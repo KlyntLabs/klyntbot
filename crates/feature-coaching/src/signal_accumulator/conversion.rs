@@ -1,13 +1,13 @@
 //! Conversion from `DomainEvent` to `Signal`.
 
-use chrono::{DateTime, Utc};
+use jiff::Timestamp;
 
 use bus::DomainEvent;
 
 use super::types::{Signal, SignalMetadata};
 
 /// Convert a domain event into a signal.
-pub(super) fn event_to_signal(event: &DomainEvent, timestamp: DateTime<Utc>) -> Signal {
+pub(super) fn event_to_signal(event: &DomainEvent, timestamp: Timestamp) -> Signal {
     let (event_type, metadata) = match event {
         DomainEvent::DistractionDetected { app, .. } => (
             "DistractionDetected",

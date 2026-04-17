@@ -10,7 +10,7 @@ common = { workspace = true }
 bus = { workspace = true }
 cognitive = { workspace = true }
 storage = { workspace = true }
-chrono = { workspace = true }
+jiff = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
 serde_json = { workspace = true }
 tokio = { workspace = true }

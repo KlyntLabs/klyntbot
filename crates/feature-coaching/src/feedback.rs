@@ -6,7 +6,7 @@
 
 use std::collections::HashMap;
 
-use chrono::{DateTime, Utc};
+use jiff::Timestamp;
 use serde::{Deserialize, Serialize};
 use tracing::debug;
 
@@ -64,7 +64,7 @@ pub struct FeedbackTracker {
 #[derive(Debug, Clone)]
 pub struct PendingBehavioral {
     pub intervention: DeliveredIntervention,
-    pub expires_at: DateTime<Utc>,
+    pub expires_at: Timestamp,
 }
 
 impl FeedbackTracker {
@@ -151,7 +151,8 @@ impl FeedbackTracker {
 
         self.pending_behavioral.push(PendingBehavioral {
             intervention: intervention.clone(),
-            expires_at: Utc::now() + chrono::Duration::seconds(self.behavioral_window_secs),
+            expires_at: Timestamp::now()
+                + jiff::SignedDuration::from_secs(self.behavioral_window_secs),
         });
     }
 
@@ -220,7 +221,7 @@ impl FeedbackTracker {
     /// Check for expired behavioral monitoring windows.
     /// Returns trigger names of interventions that expired without positive signal.
     pub fn check_expired_behavioral(&mut self) -> Vec<String> {
-        let now = Utc::now();
+        let now = Timestamp::now();
         let expired: Vec<_> = self
             .pending_behavioral
             .iter()
@@ -294,7 +295,7 @@ mod tests {
             id: uuid::Uuid::new_v4().to_string(),
             intervention_type: InterventionType::ChatMessage,
             message: "test".into(),
-            delivered_at: Utc::now(),
+            delivered_at: Timestamp::now(),
             trigger_name: trigger.into(),
             action_url: None,
         }

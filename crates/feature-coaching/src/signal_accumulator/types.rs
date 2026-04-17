@@ -1,14 +1,13 @@
 //! Signal types, trigger conditions, and default condition definitions.
 
-use chrono::DateTime;
-use chrono::Utc;
+use jiff::Timestamp;
 use serde::{Deserialize, Serialize};
 
 /// A timestamped signal derived from a domain event.
 #[derive(Debug, Clone)]
 pub struct Signal {
     pub event_type: String,
-    pub timestamp: DateTime<Utc>,
+    pub timestamp: Timestamp,
     pub metadata: SignalMetadata,
 }
 

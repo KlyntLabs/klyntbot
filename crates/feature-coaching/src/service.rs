@@ -248,7 +248,7 @@ async fn build_focus_debrief(
                 id: uuid::Uuid::new_v4().to_string(),
                 intervention_type: InterventionType::ChatMessage,
                 message,
-                delivered_at: chrono::Utc::now(),
+                delivered_at: jiff::Timestamp::now(),
                 trigger_name: "focus_session_debrief".into(),
                 action_url: None,
             })
@@ -268,7 +268,7 @@ async fn build_focus_debrief(
                         "Focus session complete: {}min, quality {}%. {} interruption(s) — consider blocking distracting apps during your next session.",
                         duration_mins, quality_pct, interruptions
                     ),
-                    delivered_at: chrono::Utc::now(),
+                    delivered_at: jiff::Timestamp::now(),
                     trigger_name: "focus_session_debrief".into(),
                     action_url: None,
                 })
@@ -318,7 +318,7 @@ async fn persist_intervention(
                 intervention.intervention_type.as_str(),
                 &intervention.message,
                 &intervention.trigger_name,
-                &intervention.delivered_at.to_rfc3339(),
+                &intervention.delivered_at.to_string(),
                 intervention.action_url.as_deref(),
             )
             .await
