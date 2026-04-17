@@ -230,7 +230,9 @@ async fn handle_spawn_recurring(
 
             // Re-read the template to get the updated next_instance_date and re-schedule.
             if let Ok(Some(tpl)) = repo.get(template_id).await {
-                let next_date = tpl.next_instance_date.map(|d| common::time::bridge::jiff_to_chrono(*d).to_rfc3339());
+                let next_date = tpl
+                    .next_instance_date
+                    .map(|d| common::time::bridge::jiff_to_chrono(*d).to_rfc3339());
                 domain_event_bus.publish(DomainEvent::RecurringTemplateAdvanced {
                     template_id: template_id.to_string(),
                     next_instance_date: next_date,
@@ -305,7 +307,7 @@ async fn handle_domain_event(
                     let remind_at = due - Duration::hours(2);
                     if remind_at > Utc::now() {
                         scheduler
-                            .schedule(remind_at, DeadlineAction::TaskReminder { task_id, label })
+                            .schedule(common::time::bridge::chrono_to_jiff(remind_at), DeadlineAction::TaskReminder { task_id, label })
                             .await;
                     }
                 }
@@ -334,7 +336,7 @@ async fn handle_domain_event(
                         if warn_at > now {
                             scheduler
                                 .schedule(
-                                    warn_at,
+                                    common::time::bridge::chrono_to_jiff(warn_at),
                                     DeadlineAction::FocusWarning {
                                         task_id: task_id.clone(),
                                         hours_left: hours,
@@ -346,7 +348,7 @@ async fn handle_domain_event(
 
                     // Schedule the expire action.
                     scheduler
-                        .schedule(deadline, DeadlineAction::FocusExpire { task_id })
+                        .schedule(common::time::bridge::chrono_to_jiff(deadline), DeadlineAction::FocusExpire { task_id })
                         .await;
                 }
             }
@@ -365,7 +367,7 @@ async fn handle_domain_event(
                 if let Ok(next_date) = date_str.parse::<DateTime<Utc>>() {
                     if next_date > Utc::now() {
                         scheduler
-                            .schedule(next_date, DeadlineAction::SpawnRecurring { template_id })
+                            .schedule(common::time::bridge::chrono_to_jiff(next_date), DeadlineAction::SpawnRecurring { template_id })
                             .await;
                     }
                 }
@@ -412,7 +414,7 @@ fn spawn_startup_population(
                     if remind_at > now {
                         scheduler
                             .schedule(
-                                remind_at,
+                                common::time::bridge::chrono_to_jiff(remind_at),
                                 DeadlineAction::TaskReminder {
                                     task_id: task.id.clone(),
                                     label: task.title.clone(),
@@ -437,7 +439,7 @@ fn spawn_startup_population(
                         if warn_at > now {
                             scheduler
                                 .schedule(
-                                    warn_at,
+                                    common::time::bridge::chrono_to_jiff(warn_at),
                                     DeadlineAction::FocusWarning {
                                         task_id: task.id.clone(),
                                         hours_left: hours,
@@ -452,7 +454,7 @@ fn spawn_startup_population(
                     if deadline_chrono > now {
                         scheduler
                             .schedule(
-                                deadline_chrono,
+                                common::time::bridge::chrono_to_jiff(deadline_chrono),
                                 DeadlineAction::FocusExpire {
                                     task_id: task.id.clone(),
                                 },
@@ -474,7 +476,7 @@ fn spawn_startup_population(
                     if next_chrono > now {
                         scheduler
                             .schedule(
-                                next_chrono,
+                                common::time::bridge::chrono_to_jiff(next_chrono),
                                 DeadlineAction::SpawnRecurring {
                                     template_id: tpl.id.clone(),
                                 },
