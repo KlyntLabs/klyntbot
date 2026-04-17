@@ -585,7 +585,6 @@ impl MemoryTool {
 mod tests {
     use super::*;
     use crate::conversation_recall::ConversationRecallStatus;
-    use chrono::Utc;
 
     /// Mock handler for testing
     struct MockConversationHandler {
@@ -618,7 +617,7 @@ mod tests {
                     content_preview: "This is a test message".to_string(),
                     content_full: "This is a test message".to_string(),
                     score: 0.85,
-                    created_at: Utc::now(),
+                    created_at: chrono::Utc::now(),
                 };
                 Ok(vec![result].into_iter().take(limit).collect())
             } else {
@@ -700,7 +699,7 @@ mod tests {
         store.set(EnhancementTraceSnapshot {
             query: bundle,
             trace: EnhancementTrace::default(),
-            captured_at: common::time::bridge::chrono_to_jiff(chrono::Utc::now()),
+            captured_at: jiff::Timestamp::now(),
         });
 
         let tool = MemoryTool::new().with_enhancement_trace_store(Arc::clone(&store));

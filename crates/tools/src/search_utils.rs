@@ -42,7 +42,6 @@ mod tests {
     use std::collections::HashMap;
 
     fn mock_action(id: &str, title: &str) -> Action {
-        use chrono::Utc;
         Action {
             id: id.to_string(),
             title: title.to_string(),
@@ -53,8 +52,8 @@ mod tests {
             priority: Some(3),
             due_date: None,
             tags: Vec::new(),
-            created_at: Utc::now(),
-            updated_at: Utc::now(),
+            created_at: chrono::Utc::now(),
+            updated_at: chrono::Utc::now(),
             completed_at: None,
             focused_at: None,
             focus_deadline: None,

@@ -30,6 +30,7 @@ html2text.workspace = true
 url.workspace = true
 urlencoding.workspace = true
 chrono = { workspace = true }
+jiff = { workspace = true }
 cron.workspace = true
 uuid = { workspace = true }
 serde = { workspace = true }

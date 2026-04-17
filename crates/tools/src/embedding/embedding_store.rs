@@ -4,7 +4,7 @@
 //! The `EmbeddingStore` itself is a lightweight in-memory cache; persistence is now
 //! handled directly by `storage::VectorStore` (LanceDB).
 
-use chrono::{DateTime, Utc};
+use jiff::Timestamp;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
@@ -16,7 +16,7 @@ pub struct EmbeddingRecord {
     pub id: String,
     pub embedding: Vec<f32>,
     pub model: String,
-    pub embedded_at: DateTime<Utc>,
+    pub embedded_at: Timestamp,
 }
 
 /// In-memory embedding index.
@@ -81,7 +81,7 @@ mod tests {
             id: id.to_string(),
             embedding: vec![0.1; EMBEDDING_DIM],
             model: "test-model".to_string(),
-            embedded_at: Utc::now(),
+            embedded_at: Timestamp::now(),
         }
     }
 

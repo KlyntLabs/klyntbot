@@ -9,12 +9,12 @@
 //! Both produce 384-dimensional vectors — no schema migration when switching.
 
 use async_trait::async_trait;
-use chrono::Utc;
 #[cfg(feature = "semantic-search")]
 use fastembed::{EmbeddingModel, InitOptions, TextEmbedding};
+use jiff::Timestamp;
 use std::sync::{Arc, Mutex};
 use std::time::Instant;
-use tracing::{debug, info, warn};
+use tracing::{debug, info};
 
 use crate::embedding_store::EmbeddingRecord;
 use crate::todo_types::Todo;
@@ -436,7 +436,7 @@ impl EmbeddingHandler for EmbeddingEngineImpl {
             id: todo_id,
             embedding,
             model: model_name.to_string(),
-            embedded_at: Utc::now(),
+            embedded_at: Timestamp::now(),
         };
 
         Ok(Some(record))

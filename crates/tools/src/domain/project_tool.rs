@@ -2,8 +2,7 @@
 //! Projects belong to areas (area_id is required for create).
 
 use async_trait::async_trait;
-use chrono::Utc;
-use common::time::bridge::chrono_to_jiff;
+use jiff::Timestamp;
 use serde_json::Value;
 
 use crate::params::ParamExtractor;
@@ -133,7 +132,7 @@ impl Tool for ProjectTool {
                 let name = p.required_str("name")?;
                 let area_id = p.required_str("area_id")?;
                 let id = uuid::Uuid::new_v4().to_string();
-                let now = Utc::now();
+                let now = Timestamp::now();
 
                 let row = storage::rows::project::ProjectRow {
                     id: id.clone(),
@@ -143,8 +142,8 @@ impl Tool for ProjectTool {
                     color: p.optional_str("color")?.unwrap_or("blue").to_string(),
                     tags: p.string_array_or_empty("tags")?,
                     status: "active".to_string(),
-                    created_at: chrono_to_jiff(now).into(),
-                    updated_at: chrono_to_jiff(now).into(),
+                    created_at: now.into(),
+                    updated_at: now.into(),
                     workflow_id: None,
                     instructions: None,
                     ai_personality: None,

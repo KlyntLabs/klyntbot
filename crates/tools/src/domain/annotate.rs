@@ -95,7 +95,7 @@ impl AnnotateTool {
     #[action(name = "create")]
     async fn handle_create(&self, params: CreateParams, _ctx: &RoutingContext) -> Result<String> {
         let id = uuid::Uuid::new_v4().to_string();
-        let now = chrono::Utc::now().to_rfc3339();
+        let now = jiff::Timestamp::now().to_string();
 
         let annotation = Annotation {
             id: id.clone(),
@@ -156,7 +156,7 @@ impl AnnotateTool {
                 Some(s) => Some(s),
                 None => existing.expires_at,
             },
-            updated_at: chrono::Utc::now().to_rfc3339(),
+            updated_at: jiff::Timestamp::now().to_string(),
             ..existing
         };
 
