@@ -117,7 +117,7 @@ impl ProviderManager {
     /// Call this on startup after loading from storage. No-ops if deadline has already passed.
     pub async fn restore_circuit_state(&self, open_until_utc: Timestamp) {
         let now = Timestamp::now();
-        let remaining_ms = (open_until_utc - now).get_milliseconds();
+        let remaining_ms = open_until_utc.as_millisecond() - now.as_millisecond();
         if remaining_ms <= 0 {
             return; // already expired — treat as closed
         }
