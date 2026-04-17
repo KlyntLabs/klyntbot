@@ -417,6 +417,12 @@ mod tests {
         };
         let json = serde_json::to_value(&trigger).unwrap();
         assert_eq!(json["kind"], "first_activity_after");
+        assert_eq!(json["afterLocal"], "08:00:00");
+        let roundtrip: IntentTrigger = serde_json::from_value(json).unwrap();
+        assert!(matches!(
+            roundtrip,
+            IntentTrigger::FirstActivityAfter { after_local } if after_local == jiff::civil::Time::constant(8, 0, 0, 0)
+        ));
     }
 
     #[test]
