@@ -58,7 +58,8 @@ impl BrowserHistorySource {
             .map_err(|e| std::io::Error::other(e.to_string()))?;
 
         // Chrome stores last_visit_time as microseconds since Jan 1, 1601
-        let cutoff_us = (chrono::Utc::now() - chrono::Duration::days(max_days)).timestamp_micros()
+        let cutoff_us = (jiff::Timestamp::now() - jiff::SignedDuration::from_hours(max_days * 24))
+            .as_microsecond()
             + 11_644_473_600_000_000; // Chromium epoch offset
 
         let rows = sqlx::query_as::<_, (String, String, i64)>(
@@ -79,8 +80,8 @@ impl BrowserHistorySource {
             .filter(|(title, _, _)| !title.is_empty())
             .map(|(title, url, visit_time)| {
                 let ts_secs = (visit_time - 11_644_473_600_000_000) / 1_000_000;
-                let visited_at = chrono::DateTime::from_timestamp(ts_secs, 0)
-                    .map(|dt| dt.to_rfc3339())
+                let visited_at = jiff::Timestamp::from_second(ts_secs)
+                    .map(|ts| ts.to_string())
                     .unwrap_or_default();
                 HistoryEntry {
                     title,

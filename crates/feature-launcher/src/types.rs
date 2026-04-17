@@ -1,4 +1,4 @@
-use chrono::{DateTime, Utc};
+use jiff::Timestamp;
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 
@@ -55,7 +55,7 @@ pub enum LauncherItemKind {
     },
     Calendar {
         event_id: String,
-        starts_at: DateTime<Utc>,
+        starts_at: Timestamp,
     },
     AiChat {
         query: String,
@@ -164,8 +164,8 @@ pub struct FocusDashboard {
 pub struct CalendarDashboard {
     pub event_id: String,
     pub title: String,
-    pub starts_at: DateTime<Utc>,
-    pub ends_at: DateTime<Utc>,
+    pub starts_at: Timestamp,
+    pub ends_at: Timestamp,
     pub minutes_until: i64,
 }
 

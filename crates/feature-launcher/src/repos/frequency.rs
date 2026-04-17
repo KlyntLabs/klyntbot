@@ -1,4 +1,4 @@
-use chrono::{DateTime, Utc};
+use jiff::Timestamp;
 use sqlx::SqlitePool;
 use storage::StorageError;
 
@@ -16,7 +16,7 @@ impl FrequencyRepo {
 
     /// Record a usage event.
     pub async fn record_usage(&self, item_id: &str, kind: &str) -> Result<(), StorageError> {
-        let now = Utc::now().to_rfc3339();
+        let now = Timestamp::now().to_string();
         sqlx::query("INSERT INTO launcher_usage_log (item_id, kind, used_at) VALUES (?, ?, ?)")
             .bind(item_id)
             .bind(kind)
@@ -40,7 +40,7 @@ impl FrequencyRepo {
             .enumerate()
             .map(|(i, _)| format!("(item_id = ?{} AND kind = ?{})", i * 2 + 1, i * 2 + 2))
             .collect();
-        let cutoff = (Utc::now() - chrono::Duration::days(90)).to_rfc3339();
+        let cutoff = (Timestamp::now() - jiff::SignedDuration::from_hours(90 * 24)).to_string();
         let sql = format!(
             "SELECT item_id, kind, used_at FROM launcher_usage_log WHERE ({}) AND used_at > ?{} ORDER BY used_at DESC",
             conditions.join(" OR "),
@@ -54,7 +54,7 @@ impl FrequencyRepo {
         query = query.bind(&cutoff);
         let rows = query.fetch_all(&self.pool).await?;
 
-        let now = Utc::now();
+        let now = Timestamp::now();
         let lambda = (2.0_f64).ln() / HALF_LIFE_HOURS;
 
         let mut results = Vec::with_capacity(items.len());
@@ -66,8 +66,9 @@ impl FrequencyRepo {
                     if last_used.is_none() {
                         last_used = Some(used_at.clone());
                     }
-                    if let Ok(dt) = DateTime::parse_from_rfc3339(used_at) {
-                        let hours = (now - dt.with_timezone(&Utc)).num_seconds() as f64 / 3600.0;
+                    if let Ok(dt) = used_at.parse::<Timestamp>() {
+                        let hours = (now.as_millisecond() - dt.as_millisecond()) as f64
+                            / 3_600_000.0;
                         score += (-lambda * hours).exp();
                     }
                 }
@@ -82,7 +83,7 @@ impl FrequencyRepo {
         &self,
         limit: usize,
     ) -> Result<Vec<(String, String, f64)>, StorageError> {
-        let cutoff = (Utc::now() - chrono::Duration::days(30)).to_rfc3339();
+        let cutoff = (Timestamp::now() - jiff::SignedDuration::from_hours(30 * 24)).to_string();
         let rows = sqlx::query_as::<_, (String, String, String)>(
             "SELECT item_id, kind, used_at FROM launcher_usage_log WHERE used_at > ? ORDER BY used_at DESC LIMIT 500",
         )
@@ -90,14 +91,15 @@ impl FrequencyRepo {
         .fetch_all(&self.pool)
         .await?;
 
-        let now = Utc::now();
+        let now = Timestamp::now();
         let lambda = (2.0_f64).ln() / HALF_LIFE_HOURS;
 
         let mut scores: std::collections::HashMap<(String, String), f64> =
             std::collections::HashMap::new();
         for (item_id, kind, used_at) in &rows {
-            if let Ok(dt) = DateTime::parse_from_rfc3339(used_at) {
-                let hours = (now - dt.with_timezone(&Utc)).num_seconds() as f64 / 3600.0;
+            if let Ok(dt) = used_at.parse::<Timestamp>() {
+                let hours =
+                    (now.as_millisecond() - dt.as_millisecond()) as f64 / 3_600_000.0;
                 *scores.entry((item_id.clone(), kind.clone())).or_default() +=
                     (-lambda * hours).exp();
             }
@@ -114,7 +116,7 @@ impl FrequencyRepo {
 
     /// Prune entries older than 90 days.
     pub async fn prune_old_entries(&self) -> Result<u64, StorageError> {
-        let cutoff = (Utc::now() - chrono::Duration::days(90)).to_rfc3339();
+        let cutoff = (Timestamp::now() - jiff::SignedDuration::from_hours(90 * 24)).to_string();
         let result = sqlx::query("DELETE FROM launcher_usage_log WHERE used_at < ?")
             .bind(&cutoff)
             .execute(&self.pool)

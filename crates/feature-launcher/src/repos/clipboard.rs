@@ -1,4 +1,4 @@
-use chrono::Utc;
+use jiff::Timestamp;
 use serde::{Deserialize, Serialize};
 use sqlx::SqlitePool;
 use storage::StorageError;
@@ -32,7 +32,7 @@ impl ClipboardRepo {
         source_app: Option<&str>,
         file_path: Option<&str>,
     ) -> Result<i64, StorageError> {
-        let now = Utc::now().to_rfc3339();
+        let now = Timestamp::now().to_string();
         let preview: String = content.chars().take(200).collect();
         let result = sqlx::query(
             "INSERT INTO clipboard_history (content, content_type, source_app, preview, file_path, created_at) \
