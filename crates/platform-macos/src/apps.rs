@@ -167,9 +167,10 @@ pub fn activate_app(pid: i32) -> bool {
 
     let app = NSRunningApplication::runningApplicationWithProcessIdentifier(pid);
     match app {
-        Some(app) => unsafe {
+        #[allow(deprecated)]
+        Some(app) => {
             app.activateWithOptions(NSApplicationActivationOptions::ActivateIgnoringOtherApps)
-        },
+        }
         None => false,
     }
 }
