@@ -5,7 +5,7 @@
 //! Injected into `InsightService` as `Arc<dyn Trait>` during AppCore init.
 
 use async_trait::async_trait;
-use chrono::{DateTime, Utc};
+use jiff::Timestamp;
 
 use crate::cross_domain::{EntityDomain, EntityRef};
 
@@ -105,7 +105,7 @@ impl InsightEmbedder for NoopInsightEmbedder {
 pub struct CrossDomainVectorHit {
     pub entity: EntityRef,
     pub cosine: f64,
-    pub created_at: DateTime<Utc>,
+    pub created_at: Timestamp,
 }
 
 /// Provides cross-domain vector search for the insight heuristic.

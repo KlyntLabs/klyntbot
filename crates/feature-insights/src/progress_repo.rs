@@ -1,6 +1,6 @@
 //! Repository for the `insight_progress_snapshots` table.
 
-use chrono::Utc;
+use jiff::Timestamp;
 use sqlx::SqlitePool;
 use uuid::Uuid;
 
@@ -29,7 +29,7 @@ impl InsightProgressRepo {
         weights: &ProgressWeights,
     ) -> Result<ProgressSnapshotRow, sqlx::Error> {
         let id = Uuid::new_v4().to_string();
-        let now = Utc::now().to_rfc3339();
+        let now = Timestamp::now().to_string();
 
         let overall = weights.flashcard * flashcard_success
             + weights.drift * (1.0 - semantic_drift)

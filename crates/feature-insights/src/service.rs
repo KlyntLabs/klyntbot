@@ -7,7 +7,7 @@
 
 use std::sync::Arc;
 
-use chrono::{DateTime, Utc};
+use jiff::Timestamp;
 use sha2::{Digest, Sha256};
 
 use crate::cross_domain::{self, EntityDomain, EntityRef, HeuristicConfig, HeuristicInput};
@@ -87,7 +87,7 @@ impl InsightService {
         source_domain: EntityDomain,
         id: String,
         title: String,
-        created_at: DateTime<Utc>,
+        created_at: Timestamp,
     ) -> Option<cross_domain::CrossDomainDot> {
         if title.len() < 10 {
             return None;
@@ -105,7 +105,7 @@ impl InsightService {
             .search_other_domains(&source_domain, &source.id, &source.title)
             .await;
 
-        let vector_hits: Vec<(EntityRef, f64, DateTime<Utc>)> = hits
+        let vector_hits: Vec<(EntityRef, f64, Timestamp)> = hits
             .into_iter()
             .map(|h| (h.entity, h.cosine, h.created_at))
             .collect();

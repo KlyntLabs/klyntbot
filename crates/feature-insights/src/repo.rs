@@ -1,6 +1,6 @@
 //! Repository for the `insight_reviews` table — versioned insight storage.
 
-use chrono::Utc;
+use jiff::Timestamp;
 use sqlx::SqlitePool;
 use uuid::Uuid;
 
@@ -27,7 +27,7 @@ impl InsightReviewRepo {
         parent_insight_id: Option<&str>,
     ) -> Result<InsightReviewRow, sqlx::Error> {
         let id = Uuid::new_v4().to_string();
-        let now = Utc::now().to_rfc3339();
+        let now = Timestamp::now().to_string();
 
         // Get next version number for this note
         let max_version: Option<i64> =
@@ -108,7 +108,7 @@ impl InsightReviewRepo {
 
     /// Soft-archive an insight version (mark as superseded).
     pub async fn supersede(&self, id: &str) -> Result<(), sqlx::Error> {
-        let now = Utc::now().to_rfc3339();
+        let now = Timestamp::now().to_string();
         sqlx::query("UPDATE insight_reviews SET superseded_at = ?1 WHERE id = ?2")
             .bind(&now)
             .bind(id)

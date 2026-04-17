@@ -2,7 +2,7 @@
 //! entities from different feature domains using semantic, temporal, and
 //! frequency signals.
 
-use chrono::{DateTime, Utc};
+use jiff::Timestamp;
 use serde::Serialize;
 
 /// The feature domain an entity belongs to.
@@ -53,9 +53,9 @@ pub struct HeuristicInput {
     /// The entity we are evaluating connections for.
     pub source: EntityRef,
     /// When the source entity was created.
-    pub source_created: DateTime<Utc>,
+    pub source_created: Timestamp,
     /// Vector-search results: (candidate entity, cosine score, created timestamp).
-    pub vector_hits: Vec<(EntityRef, f64, DateTime<Utc>)>,
+    pub vector_hits: Vec<(EntityRef, f64, Timestamp)>,
     /// Frequency co-occurrence data: (entity_id, mention_count, feature_count).
     pub frequency_data: Vec<(String, u32, u32)>,
     /// Whether the source entity has meaningful content worth connecting.
@@ -140,7 +140,9 @@ pub fn evaluate_cross_domain(
         layers.push(Layer::SemanticOverlap { cosine: *cosine });
 
         // Layer 2 — temporal proximity.
-        let days_apart = (input.source_created - *target_created).num_days().abs();
+        let days_apart = ((input.source_created.as_millisecond() - target_created.as_millisecond())
+            .abs()
+            / 86_400_000) as i64;
         if days_apart <= config.max_temporal_days {
             layers.push(Layer::TemporalProximity { days_apart });
         }
@@ -260,10 +262,12 @@ fn compute_confidence(layers: &[Layer], cosine: f64) -> f64 {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use chrono::TimeZone;
-
-    fn utc(year: i32, month: u32, day: u32) -> DateTime<Utc> {
-        Utc.with_ymd_and_hms(year, month, day, 0, 0, 0).unwrap()
+    fn utc(year: i16, month: i8, day: i8) -> Timestamp {
+        jiff::civil::date(year, month, day)
+            .at(0, 0, 0, 0)
+            .in_tz("UTC")
+            .unwrap()
+            .timestamp()
     }
 
     fn default_config() -> HeuristicConfig {
