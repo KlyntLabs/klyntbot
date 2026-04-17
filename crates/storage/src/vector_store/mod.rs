@@ -175,6 +175,7 @@ impl VectorStore {
     ///
     /// Should be called after `optimize_all_tables()` so that subsequent
     /// operations get fresh handles that reflect the compacted state.
+    #[allow(dead_code)]
     pub(crate) fn invalidate_table_cache(&self) {
         self.table_cache.clear();
     }

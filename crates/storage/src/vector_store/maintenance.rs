@@ -197,7 +197,7 @@ impl VectorStore {
             {
                 for i in 0..batch.num_rows() {
                     let ts = col.value(i).to_string();
-                    if cutoff.as_ref().map_or(true, |c| ts > *c) {
+                    if cutoff.as_ref().is_none_or(|c| ts > *c) {
                         cutoff = Some(ts);
                     }
                 }

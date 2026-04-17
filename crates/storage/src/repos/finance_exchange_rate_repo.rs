@@ -32,7 +32,7 @@ impl FinanceExchangeRateRepo {
         .bind(from)
         .bind(to)
         .bind(rate)
-        .bind(&now)
+        .bind(now)
         .execute(&self.pool)
         .await?;
         Ok(())
@@ -104,7 +104,7 @@ impl FinanceExchangeRateRepo {
             .bind(base)
             .bind(target)
             .bind(rate)
-            .bind(&now)
+            .bind(now)
             .execute(&self.pool)
             .await?;
         }
@@ -144,7 +144,7 @@ impl FinanceExchangeRateRepo {
         .bind(from)
         .bind(to)
         .bind(rate)
-        .bind(&now)
+        .bind(now)
         .execute(&self.pool)
         .await?;
         Ok(())

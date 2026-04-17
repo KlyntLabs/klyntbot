@@ -132,6 +132,7 @@ impl VectorStore {
     ///
     /// Much more memory-efficient than N individual `upsert_embedding` calls,
     /// as LanceDB creates one fragment file instead of N.
+    #[allow(clippy::type_complexity)]
     pub async fn upsert_embedding_batch(
         &self,
         table: &str,

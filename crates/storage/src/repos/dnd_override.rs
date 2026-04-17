@@ -31,7 +31,7 @@ impl DndOverrideRepo {
              VALUES (1, ?1, ?2, ?3)",
         )
         .bind(original_state)
-        .bind(&now)
+        .bind(now)
         .bind(session_id)
         .execute(&self.pool)
         .await?;
