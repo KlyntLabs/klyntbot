@@ -48,12 +48,11 @@ impl AgentMetricCollector {
 impl MetricSource for AgentMetricCollector {
     async fn collect_metrics(
         &self,
-        since: DateTime<Utc>,
+        since: jiff::Timestamp,
         trial_id: Option<Uuid>,
     ) -> common::Result<MetricSnapshot> {
         let trial_id_str = trial_id.as_ref().map(|u| u.to_string());
-        let since_chrono = since;
-        let since = common::time::bridge::chrono_to_jiff(since);
+        let since_chrono = common::time::bridge::jiff_to_chrono(since);
 
         let (
             stats,
@@ -216,7 +215,7 @@ mod tests {
             cognitive::SemanticFactRepo::new(inner.clone()),
         );
 
-        let since = Utc::now() - chrono::Duration::days(1);
+        let since = common::time::bridge::chrono_to_jiff(Utc::now() - chrono::Duration::days(1));
         let snapshot = collector.collect_metrics(since, None).await.unwrap();
 
         assert_eq!(snapshot.total_messages, 0);
@@ -246,14 +245,14 @@ mod tests {
         let trial_repo = storage::TrialRepo::new(inner.clone());
         trial_repo.migrate().await.unwrap();
 
-        let since = Utc::now() - chrono::Duration::hours(1);
+        let since = common::time::bridge::chrono_to_jiff(Utc::now() - chrono::Duration::hours(1));
 
         // 1. Insert strategy records so get_stats_since returns total_records > 0.
         //    Two records: one with memories retrieved (3), one without (0).
         //    Expected memory_relevance = 1/2 = 0.5.
         let strategy_row = storage::rows::learning::StrategyRecordRow {
             id: uuid::Uuid::new_v4(),
-            timestamp: Utc::now(),
+            timestamp: storage::SqlTs(jiff::Timestamp::now()),
             request_id: "req-metric-test".to_string(),
             predicted_strategy: "DirectResponse".to_string(),
             actual_strategy: "DirectResponse".to_string(),
@@ -280,7 +279,7 @@ mod tests {
 
         let strategy_row_no_mem = storage::rows::learning::StrategyRecordRow {
             id: uuid::Uuid::new_v4(),
-            timestamp: Utc::now(),
+            timestamp: storage::SqlTs(jiff::Timestamp::now()),
             request_id: "req-metric-test-2".to_string(),
             predicted_strategy: "DirectResponse".to_string(),
             actual_strategy: "DirectResponse".to_string(),
@@ -313,7 +312,7 @@ mod tests {
                 "general",
                 "extract",
                 r#"{"msg":"no that's wrong"}"#,
-                &Utc::now().to_rfc3339(),
+                &jiff::Timestamp::now().to_string(),
             )
             .await
             .unwrap();
@@ -321,7 +320,7 @@ mod tests {
         // 3. Insert a usage record so avg_tokens_per_message > 0
         let usage_row = storage::rows::usage::UsageRecordRow {
             id: uuid::Uuid::new_v4(),
-            timestamp: Utc::now(),
+            timestamp: storage::SqlTs(jiff::Timestamp::now()),
             request_id: "req-usage-test".to_string(),
             model: "gpt-4o".to_string(),
             provider: "openai".to_string(),
@@ -341,7 +340,7 @@ mod tests {
             hypothesis: "test".to_string(),
             trend_analysis: "test".to_string(),
             recommendation_for_next: "test".to_string(),
-            created_at: Utc::now().to_rfc3339(),
+            created_at: jiff::Timestamp::now().to_string(),
         };
         trial_repo.create_experiment(&exp).await.unwrap();
 
@@ -351,7 +350,7 @@ mod tests {
             params: serde_json::to_string(&common::TrialParams::default()).unwrap(),
             generation_reasoning: "test".to_string(),
             status: "active".to_string(),
-            created_at: Utc::now().to_rfc3339(),
+            created_at: jiff::Timestamp::now().to_string(),
             completed_at: None,
             result: None,
         };
@@ -361,7 +360,7 @@ mod tests {
         trial_repo
             .insert_shadow_log(
                 "trial-metric",
-                &Utc::now().to_rfc3339(),
+                &jiff::Timestamp::now().to_string(),
                 "test-chat",
                 "",
                 "general",
@@ -378,7 +377,7 @@ mod tests {
         trial_repo
             .insert_shadow_log(
                 "trial-metric",
-                &Utc::now().to_rfc3339(),
+                &jiff::Timestamp::now().to_string(),
                 "test-chat-2",
                 "",
                 "general",

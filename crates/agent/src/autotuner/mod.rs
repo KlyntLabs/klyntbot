@@ -139,7 +139,7 @@ impl AutoTunerOrchestrator {
         let Some(champion) = self.champion.try_read().ok() else {
             return false;
         };
-        let days_since_promotion = (Utc::now() - champion.promoted_at).num_days();
+        let days_since_promotion = (jiff::Timestamp::now().as_millisecond() - champion.promoted_at.as_millisecond()) / 86_400_000;
         days_since_promotion >= 7
     }
 
@@ -210,7 +210,7 @@ impl AutoTunerOrchestrator {
     /// Build a summary for the transparency panel / events.
     pub async fn champion_summary(&self) -> ChampionSummary {
         let c = self.champion.read().await;
-        let days = (chrono::Utc::now() - c.promoted_at).num_days().max(0) as u32;
+        let days = ((jiff::Timestamp::now().as_millisecond() - c.promoted_at.as_millisecond()) / 86_400_000).max(0) as u32;
         ChampionSummary {
             trial_id: c.trial_id,
             description: c.reason_for_promotion.clone(),
@@ -444,7 +444,7 @@ impl AutoTunerOrchestrator {
                         let new_champion = Champion {
                             trial_id: Some(trial_id),
                             params,
-                            promoted_at: chrono::Utc::now(),
+                            promoted_at: common::time::bridge::chrono_to_jiff(chrono::Utc::now()),
                             baseline_metrics: trial_result,
                             reason_for_promotion: format!(
                                 "Promoted by nightly cycle (trial {trial_id})"
@@ -659,9 +659,7 @@ impl AutoTunerOrchestrator {
         let mut summaries = Vec::with_capacity(experiments.len());
         for exp in experiments {
             let id = uuid::Uuid::parse_str(&exp.id).unwrap_or_else(|_| uuid::Uuid::nil());
-            let started_at = chrono::DateTime::parse_from_rfc3339(&exp.created_at)
-                .map(|dt| dt.with_timezone(&chrono::Utc))
-                .unwrap_or_else(|_| chrono::Utc::now());
+            let started_at = exp.created_at.parse::<jiff::Timestamp>().unwrap_or_else(|_| jiff::Timestamp::now());
             summaries.push(ExperimentSummary {
                 id,
                 variant_count: 3,   // We always generate 3 variants per experiment
@@ -1032,7 +1030,7 @@ mod tests {
     #[tokio::test]
     async fn champion_summary_populates_days_active() {
         let champion = Champion {
-            promoted_at: chrono::Utc::now() - chrono::Duration::days(3),
+            promoted_at: common::time::bridge::chrono_to_jiff(chrono::Utc::now() - chrono::Duration::days(3)),
             ..Champion::default()
         };
         let orch = make_orch(champion).await;

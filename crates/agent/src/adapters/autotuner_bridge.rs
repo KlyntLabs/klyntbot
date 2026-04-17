@@ -60,7 +60,7 @@ impl AutotunerBridge for AgentAutotunerBridge {
             let new_champion = autotuner::Champion {
                 trial_id: Some(trial_id),
                 params,
-                promoted_at: chrono::Utc::now(),
+                promoted_at: common::time::bridge::chrono_to_jiff(chrono::Utc::now()),
                 baseline_metrics: trial_result.clone(),
                 reason_for_promotion: format!("Promoted by Reforge Phase 6 (trial {trial_id})"),
                 impact_summary: format!(
