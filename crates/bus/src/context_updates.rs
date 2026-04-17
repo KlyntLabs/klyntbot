@@ -7,7 +7,7 @@
 use std::collections::VecDeque;
 use std::sync::Mutex;
 
-use chrono::{DateTime, Duration, Utc};
+use jiff::Timestamp;
 use serde::Serialize;
 
 const DEDUP_WINDOW_SECS: i64 = 30;
@@ -58,7 +58,7 @@ pub struct ContextUpdate {
     pub content: Option<String>,
     pub metadata: Option<serde_json::Value>,
     pub priority: UpdatePriority,
-    pub timestamp: DateTime<Utc>,
+    pub timestamp: Timestamp,
 }
 
 pub struct ContextUpdateQueue {
@@ -90,8 +90,9 @@ impl ContextUpdateQueue {
         let is_duplicate = queue.iter().any(|existing| {
             existing.reason == update.reason
                 && existing.content == update.content
-                && (update.timestamp - existing.timestamp).abs()
-                    < Duration::seconds(DEDUP_WINDOW_SECS)
+                && (update.timestamp.as_millisecond() - existing.timestamp.as_millisecond())
+                    .abs()
+                    < DEDUP_WINDOW_SECS * 1000
         });
         if !is_duplicate {
             // Drop oldest entries if queue is too large (prevents unbounded growth).
@@ -119,6 +120,7 @@ impl Default for ContextUpdateQueue {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use jiff::SignedDuration;
 
     #[test]
     fn queue_push_and_drain() {
@@ -128,14 +130,14 @@ mod tests {
             content: Some("User likes coffee".to_string()),
             metadata: None,
             priority: UpdatePriority::Normal,
-            timestamp: chrono::Utc::now(),
+            timestamp: Timestamp::now(),
         });
         queue.push(ContextUpdate {
             reason: ContextUpdateReason::FocusSessionEnded,
             content: None,
             metadata: None,
             priority: UpdatePriority::High,
-            timestamp: chrono::Utc::now(),
+            timestamp: Timestamp::now(),
         });
         let drained = queue.drain();
         assert_eq!(drained.len(), 2);
@@ -145,7 +147,7 @@ mod tests {
     #[test]
     fn queue_deduplicates_within_window() {
         let queue = ContextUpdateQueue::new();
-        let now = chrono::Utc::now();
+        let now = Timestamp::now();
         queue.push(ContextUpdate {
             reason: ContextUpdateReason::MemoryPromoted,
             content: Some("Same fact".to_string()),
@@ -158,7 +160,7 @@ mod tests {
             content: Some("Same fact".to_string()),
             metadata: None,
             priority: UpdatePriority::Normal,
-            timestamp: now + chrono::Duration::seconds(5),
+            timestamp: now + SignedDuration::from_secs(5),
         });
         let drained = queue.drain();
         assert_eq!(drained.len(), 1);
@@ -167,7 +169,7 @@ mod tests {
     #[test]
     fn queue_allows_different_reasons() {
         let queue = ContextUpdateQueue::new();
-        let now = chrono::Utc::now();
+        let now = Timestamp::now();
         queue.push(ContextUpdate {
             reason: ContextUpdateReason::MemoryPromoted,
             content: Some("Fact A".to_string()),
@@ -188,7 +190,7 @@ mod tests {
     #[test]
     fn queue_dedup_none_content_by_reason_only() {
         let queue = ContextUpdateQueue::new();
-        let now = chrono::Utc::now();
+        let now = Timestamp::now();
         queue.push(ContextUpdate {
             reason: ContextUpdateReason::FocusSessionStarted,
             content: None,
@@ -201,7 +203,7 @@ mod tests {
             content: None,
             metadata: None,
             priority: UpdatePriority::High,
-            timestamp: now + chrono::Duration::seconds(10),
+            timestamp: now + SignedDuration::from_secs(10),
         });
         assert_eq!(queue.drain().len(), 1);
     }

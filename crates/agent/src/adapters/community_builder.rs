@@ -297,7 +297,7 @@ impl CommunityBuilder {
                         "modularity": assignment.modularity,
                     })),
                     priority: UpdatePriority::Normal,
-                    timestamp: chrono::Utc::now(),
+                    timestamp: jiff::Timestamp::now(),
                 });
             }
 
@@ -322,7 +322,7 @@ impl CommunityBuilder {
                     )),
                     metadata: None,
                     priority: UpdatePriority::Low,
-                    timestamp: chrono::Utc::now(),
+                    timestamp: jiff::Timestamp::now(),
                 });
             }
         }

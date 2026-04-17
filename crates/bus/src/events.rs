@@ -1,6 +1,6 @@
 //! Event types for the message bus.
 
-use chrono::{DateTime, Utc};
+use jiff::Timestamp;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
@@ -34,8 +34,8 @@ pub struct InboundMessage {
     pub content: String,
 
     /// Timestamp of message
-    #[serde(default = "Utc::now")]
-    pub timestamp: DateTime<Utc>,
+    #[serde(default = "Timestamp::now")]
+    pub timestamp: Timestamp,
 
     /// Media URLs (images, files, etc.)
     #[serde(default)]
@@ -63,7 +63,7 @@ impl InboundMessage {
             sender_id: sender_id.into(),
             chat_id: chat_id.into(),
             content: content.into(),
-            timestamp: Utc::now(),
+            timestamp: Timestamp::now(),
             media: Vec::new(),
             metadata: HashMap::new(),
             kind: MessageKind::Text,

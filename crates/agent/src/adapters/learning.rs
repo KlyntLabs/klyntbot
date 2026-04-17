@@ -126,7 +126,7 @@ mod tests {
         // Insert a record so get_status returns Some
         let row = storage::StrategyRecordRow {
             id: uuid::Uuid::new_v4(),
-            timestamp: chrono::Utc::now(),
+            timestamp: jiff::Timestamp::now(),
             request_id: "req-st".to_string(),
             predicted_strategy: "DirectResponse".to_string(),
             actual_strategy: "DirectResponse".to_string(),
@@ -185,7 +185,7 @@ mod tests {
 
         let row = storage::StrategyRecordRow {
             id: uuid::Uuid::new_v4(),
-            timestamp: chrono::Utc::now(),
+            timestamp: jiff::Timestamp::now(),
             request_id: "req-1".to_string(),
             predicted_strategy: "DirectResponse".to_string(),
             actual_strategy: "DirectResponse".to_string(),

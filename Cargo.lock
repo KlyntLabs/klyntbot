@@ -75,6 +75,7 @@ dependencies = [
  "feature-productivity",
  "feature-tasks",
  "futures-util",
+ "jiff",
  "mcp",
  "mime_guess",
  "plugin-runtime",
@@ -1761,8 +1762,8 @@ dependencies = [
 name = "bus"
 version = "0.1.0"
 dependencies = [
- "chrono",
  "common",
+ "jiff",
  "serde",
  "serde_json",
  "tokio",
@@ -2329,6 +2330,7 @@ dependencies = [
  "feature-notes",
  "futures-util",
  "hex",
+ "jiff",
  "petgraph 0.7.1",
  "providers",
  "serde",

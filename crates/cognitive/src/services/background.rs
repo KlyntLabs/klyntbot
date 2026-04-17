@@ -621,7 +621,7 @@ impl BackgroundConsolidationService {
                                             )),
                                             metadata: None,
                                             priority: bus::UpdatePriority::Normal,
-                                            timestamp: chrono::Utc::now(),
+                                            timestamp: jiff::Timestamp::now(),
                                         });
                                     }
                                     _ => {}

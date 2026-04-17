@@ -234,7 +234,7 @@ impl NoteTreeBuilder {
                     "embedded_count": embedded_count,
                 })),
                 priority: UpdatePriority::Low,
-                timestamp: chrono::Utc::now(),
+                timestamp: jiff::Timestamp::now(),
             });
         }
 
