@@ -1,9 +1,6 @@
 //! Show, list, summary, and tree action handlers.
 
-use common::{
-    time::bridge::{chrono_to_jiff, jiff_to_chrono},
-    Result, ToolError,
-};
+use common::{time::bridge::chrono_to_jiff, Result, ToolError};
 use futures_util::future::try_join_all;
 use tools_core::ParamExtractor;
 
@@ -184,7 +181,9 @@ impl TaskTool {
                             output.push_str(&format!(
                                 "  - {} ({})\n",
                                 summary,
-                                jiff_to_chrono(*act.created_at).format("%Y-%m-%d %H:%M")
+                                act.created_at
+                                    .to_zoned(jiff::tz::TimeZone::UTC)
+                                    .strftime("%Y-%m-%d %H:%M")
                             ));
                         }
                     }

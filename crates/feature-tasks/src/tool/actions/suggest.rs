@@ -1,6 +1,7 @@
 //! Suggest action: generate, list, apply, and dismiss proactive suggestions.
 
-use common::{time::bridge::chrono_to_jiff, Result};
+use common::Result;
+use jiff::Timestamp;
 use tools_core::ParamExtractor;
 use tracing::info;
 
@@ -40,7 +41,7 @@ impl TaskTool {
                     .and_then(|a| serde_json::to_string(a).ok()),
                 status: "pending".into(),
                 trigger: c.trigger.as_ref().map(|t| format!("{t:?}")),
-                created_at: chrono_to_jiff(chrono::Utc::now()).into(),
+                created_at: Timestamp::now().into(),
                 resolved_at: None,
             };
             self.repo.create_suggestion(&row).await?;

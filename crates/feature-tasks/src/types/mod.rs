@@ -17,8 +17,8 @@ pub use suggestion::*;
 #[cfg(test)]
 mod tests {
     use super::*;
-    use chrono::Utc;
     use storage::rows::task::*;
+    use storage::sqlite_types::SqlTs;
 
     #[test]
     fn test_task_type_default_is_manual() {
@@ -53,7 +53,7 @@ mod tests {
 
     #[test]
     fn test_task_from_row_conversion() {
-        let now = Utc::now();
+        let now = SqlTs::from(jiff::Timestamp::now());
         let row = TaskRow {
             id: "test1234".to_string(),
             title: "Test".to_string(),
@@ -243,7 +243,7 @@ mod tests {
             parent_chain: vec!["p1".to_string()],
             sibling_titles: vec!["sibling".to_string()],
             active_blockers: vec![],
-            captured_at: Utc::now(),
+            captured_at: chrono::Utc::now(),
         };
         let json = serde_json::to_string(&snap).unwrap();
         let parsed: ContextSnapshot = serde_json::from_str(&json).unwrap();
@@ -262,7 +262,7 @@ mod tests {
             energy_level: Some("high".to_string()),
             tags: vec!["dev".to_string()],
             project_id: Some("proj1".to_string()),
-            completed_at: Utc::now(),
+            completed_at: SqlTs::from(jiff::Timestamp::now()),
         };
         let record = EstimationRecord::from(row);
         assert_eq!(record.estimated_minutes, 30);

@@ -1,7 +1,7 @@
 //! Update, complete, and delete action handlers.
 
-use chrono::Utc;
 use common::{time::bridge::chrono_to_jiff, Result, ToolError};
+use jiff::Timestamp;
 use tools_core::ParamExtractor;
 use tracing::warn;
 
@@ -217,7 +217,7 @@ impl TaskTool {
                                 energy_level: task.energy_level.as_ref().map(|e| e.to_string()),
                                 tags: task.tags.clone(),
                                 project_id: task.project_id.clone(),
-                                completed_at: chrono_to_jiff(Utc::now()).into(),
+                                completed_at: Timestamp::now().into(),
                             };
                             if let Err(e) = self.repo.record_estimation(&estimation).await {
                                 warn!("Failed to record estimation history: {}", e);

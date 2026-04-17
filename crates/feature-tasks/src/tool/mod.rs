@@ -512,41 +512,41 @@ mod tests {
                 parent_id TEXT REFERENCES tasks(id) ON DELETE SET NULL,
                 status_label_id TEXT, group_id TEXT,
                 priority INTEGER, position INTEGER NOT NULL DEFAULT 0,
-                due_date TEXT, tags TEXT NOT NULL DEFAULT '[]',
+                due_date INTEGER, tags TEXT NOT NULL DEFAULT '[]',
                 status TEXT NOT NULL DEFAULT 'todo',
                 task_type TEXT NOT NULL DEFAULT 'manual',
-                focused_at TEXT, focus_deadline TEXT,
+                focused_at INTEGER, focus_deadline INTEGER,
                 focus_expired_count INTEGER NOT NULL DEFAULT 0,
-                created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ','now')),
-                updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ','now')),
-                completed_at TEXT, completed INTEGER NOT NULL DEFAULT 0,
+                created_at INTEGER NOT NULL DEFAULT (unixepoch('now') * 1000),
+                updated_at INTEGER NOT NULL DEFAULT (unixepoch('now') * 1000),
+                completed_at INTEGER, completed INTEGER NOT NULL DEFAULT 0,
                 total_tracked_secs INTEGER NOT NULL DEFAULT 0,
                 estimated_minutes INTEGER, actual_minutes INTEGER,
-                calendar_event_uid TEXT, last_reminded_at TEXT,
+                calendar_event_uid TEXT, last_reminded_at INTEGER,
                 recurrence_rule TEXT, recurrence_parent_id TEXT,
-                is_template INTEGER NOT NULL DEFAULT 0, next_instance_date TEXT,
+                is_template INTEGER NOT NULL DEFAULT 0, next_instance_date INTEGER,
                 acceptance_criteria TEXT, agent_config TEXT,
                 execution_state TEXT NOT NULL DEFAULT 'idle',
                 spawned_execution_id TEXT, context_snapshot TEXT,
                 energy_level TEXT DEFAULT 'medium',
                 estimated_focus_blocks INTEGER, complexity_score INTEGER,
-                scheduled_start TEXT, scheduled_end TEXT
+                scheduled_start INTEGER, scheduled_end INTEGER
             )"#,
             r#"CREATE TABLE IF NOT EXISTS task_activity (
                 id TEXT PRIMARY KEY, task_id TEXT NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
                 activity_type TEXT NOT NULL, field_changed TEXT, old_value TEXT, new_value TEXT,
                 actor_type TEXT NOT NULL DEFAULT 'user', actor_id TEXT, summary TEXT,
-                created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ','now'))
+                created_at INTEGER NOT NULL DEFAULT (unixepoch('now') * 1000)
             )"#,
             r#"CREATE TABLE IF NOT EXISTS task_attachments (
                 id TEXT PRIMARY KEY, task_id TEXT NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
                 attachment_type TEXT NOT NULL, value TEXT NOT NULL, title TEXT,
                 tags TEXT NOT NULL DEFAULT '[]', source TEXT NOT NULL DEFAULT 'user',
-                created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ','now'))
+                created_at INTEGER NOT NULL DEFAULT (unixepoch('now') * 1000)
             )"#,
             r#"CREATE TABLE IF NOT EXISTS task_time_entries (
                 id TEXT PRIMARY KEY, task_id TEXT NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
-                source TEXT NOT NULL DEFAULT 'focus', started_at TEXT NOT NULL, ended_at TEXT,
+                source TEXT NOT NULL DEFAULT 'focus', started_at INTEGER NOT NULL, ended_at INTEGER,
                 duration_secs INTEGER, energy_level TEXT, note TEXT
             )"#,
             r#"CREATE TABLE IF NOT EXISTS task_dependencies (
@@ -559,19 +559,19 @@ mod tests {
             r#"CREATE TABLE IF NOT EXISTS task_executions (
                 id TEXT PRIMARY KEY, task_id TEXT NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
                 status TEXT NOT NULL DEFAULT 'pending', agent_profile TEXT,
-                started_at TEXT, completed_at TEXT, duration_secs INTEGER,
+                started_at INTEGER, completed_at INTEGER, duration_secs INTEGER,
                 tokens_used INTEGER, cost_usd REAL, input_context TEXT,
                 output_summary TEXT, error_message TEXT, artifacts TEXT, metrics TEXT,
                 retry_count INTEGER NOT NULL DEFAULT 0,
-                created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ','now'))
+                created_at INTEGER NOT NULL DEFAULT (unixepoch('now') * 1000)
             )"#,
             r#"CREATE TABLE IF NOT EXISTS task_suggestions (
                 id TEXT PRIMARY KEY, task_id TEXT REFERENCES tasks(id) ON DELETE CASCADE,
                 suggestion_type TEXT NOT NULL, title TEXT NOT NULL, description TEXT,
                 confidence REAL NOT NULL DEFAULT 0.0, action_payload TEXT,
                 status TEXT NOT NULL DEFAULT 'pending', trigger TEXT,
-                created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ','now')),
-                resolved_at TEXT
+                created_at INTEGER NOT NULL DEFAULT (unixepoch('now') * 1000),
+                resolved_at INTEGER
             )"#,
             r#"CREATE TABLE IF NOT EXISTS task_estimation_history (
                 id TEXT PRIMARY KEY, task_id TEXT NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
@@ -579,14 +579,14 @@ mod tests {
                 deviation_pct REAL NOT NULL DEFAULT 0.0, complexity_score INTEGER,
                 energy_level TEXT, tags TEXT NOT NULL DEFAULT '[]',
                 project_id TEXT,
-                completed_at TEXT NOT NULL
+                completed_at INTEGER NOT NULL
             )"#,
             r#"CREATE TABLE IF NOT EXISTS task_decompositions (
                 id TEXT PRIMARY KEY, task_id TEXT NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
                 plan TEXT NOT NULL, confidence REAL NOT NULL DEFAULT 0.0,
                 status TEXT NOT NULL DEFAULT 'pending', reasoning TEXT,
-                created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%SZ','now')),
-                applied_at TEXT
+                created_at INTEGER NOT NULL DEFAULT (unixepoch('now') * 1000),
+                applied_at INTEGER
             )"#,
             "INSERT OR IGNORE INTO areas (id, name, color, status) VALUES ('test-area', 'Test Area', '#000', 'active')",
         ] {
