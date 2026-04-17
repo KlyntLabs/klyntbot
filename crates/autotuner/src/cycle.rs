@@ -1,8 +1,8 @@
 use std::sync::Arc;
 
-use chrono::Utc;
-use common::{time::bridge::chrono_to_jiff, TrialParams};
+use common::TrialParams;
 use config::AutoTunerConfig;
+use jiff::Timestamp;
 use storage::TrialRepo;
 use tracing::{debug, info, warn};
 use uuid::Uuid;
@@ -113,7 +113,7 @@ impl NightlyCycle {
         &self,
         champion: &crate::trial::Champion,
     ) -> common::Result<CycleResult> {
-        let since = Utc::now() - chrono::Duration::hours(24);
+        let since = Timestamp::now() - jiff::SignedDuration::from_secs(86400);
         let active_trials = self.repo.get_active_trials().await.map_err(|e| {
             common::KlyntbotError::Storage(format!("failed to fetch active trials: {e}"))
         })?;
@@ -208,7 +208,7 @@ impl NightlyCycle {
             .repo
             .shadow_log_agreement_rate(
                 None,
-                chrono_to_jiff(Utc::now() - chrono::Duration::hours(24)),
+                Timestamp::now() - jiff::SignedDuration::from_secs(86400),
             )
             .await
             .unwrap_or(1.0);
@@ -237,7 +237,7 @@ impl NightlyCycle {
         &self,
         champion: &crate::trial::Champion,
     ) -> common::Result<bool> {
-        let since = Utc::now() - chrono::Duration::hours(24);
+        let since = Timestamp::now() - jiff::SignedDuration::from_secs(86400);
         let current = self.metric_source.collect_metrics(since, None).await?;
 
         if current.total_messages == 0 {
@@ -322,7 +322,7 @@ fn diversity_bonus(distance: f64, max_distance: f64) -> f64 {
 #[cfg(test)]
 mod tests {
     use async_trait::async_trait;
-    use chrono::{DateTime, Utc};
+    use jiff::Timestamp;
     use uuid::Uuid;
 
     use crate::traits::{MetricSnapshot, MetricSource};
@@ -344,7 +344,7 @@ mod tests {
     impl MetricSource for MockMetricSource {
         async fn collect_metrics(
             &self,
-            _since: DateTime<Utc>,
+            _since: Timestamp,
             trial_id: Option<Uuid>,
         ) -> common::Result<MetricSnapshot> {
             match trial_id {
@@ -358,7 +358,7 @@ mod tests {
         Champion {
             trial_id: None,
             params: TrialParams::default(),
-            promoted_at: Utc::now(),
+            promoted_at: Timestamp::now(),
             baseline_metrics: TrialResult {
                 trial_id: Uuid::nil(),
                 messages_scored: 200,
@@ -405,7 +405,7 @@ mod tests {
                 hypothesis: "test".into(),
                 trend_analysis: "test".into(),
                 recommendation_for_next: "test".into(),
-                created_at: Utc::now().to_rfc3339(),
+                created_at: Timestamp::now().to_string(),
             })
             .await;
 
@@ -415,7 +415,7 @@ mod tests {
             params: serde_json::to_string(params).unwrap(),
             generation_reasoning: "test trial".into(),
             status: "active".into(),
-            created_at: Utc::now().to_rfc3339(),
+            created_at: Timestamp::now().to_string(),
             completed_at: None,
             result: None,
         })

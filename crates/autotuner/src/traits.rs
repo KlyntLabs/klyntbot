@@ -16,7 +16,7 @@ pub trait ShadowClassifier: Send + Sync {
 pub trait MetricSource: Send + Sync {
     async fn collect_metrics(
         &self,
-        since: chrono::DateTime<chrono::Utc>,
+        since: jiff::Timestamp,
         trial_id: Option<uuid::Uuid>,
     ) -> common::Result<MetricSnapshot>;
 }

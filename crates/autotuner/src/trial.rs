@@ -1,8 +1,8 @@
 use std::fmt;
 use std::str::FromStr;
 
-use chrono::{DateTime, Utc};
 use common::TrialParams;
+use jiff::Timestamp;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
@@ -54,8 +54,8 @@ pub struct Trial {
     pub params: TrialParams,
     pub generation_reasoning: String,
     pub status: TrialStatus,
-    pub created_at: DateTime<Utc>,
-    pub completed_at: Option<DateTime<Utc>>,
+    pub created_at: Timestamp,
+    pub completed_at: Option<Timestamp>,
     pub result: Option<TrialResult>,
 }
 
@@ -82,7 +82,7 @@ pub struct TrialResult {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Experiment {
     pub id: Uuid,
-    pub created_at: DateTime<Utc>,
+    pub created_at: Timestamp,
     pub hypothesis: String,
     pub trend_analysis: String,
     pub recommendation_for_next: String,
@@ -93,7 +93,7 @@ pub struct Experiment {
 pub struct Champion {
     pub trial_id: Option<Uuid>,
     pub params: TrialParams,
-    pub promoted_at: DateTime<Utc>,
+    pub promoted_at: Timestamp,
     pub baseline_metrics: TrialResult,
     pub reason_for_promotion: String,
     pub impact_summary: String,
@@ -105,7 +105,7 @@ impl Default for Champion {
         Self {
             trial_id: None,
             params: TrialParams::default(),
-            promoted_at: Utc::now(),
+            promoted_at: Timestamp::now(),
             baseline_metrics: TrialResult::default(),
             reason_for_promotion: "Using Config defaults".into(),
             impact_summary: "Baseline configuration".into(),

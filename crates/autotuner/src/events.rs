@@ -1,4 +1,4 @@
-use chrono::{DateTime, Utc};
+use jiff::Timestamp;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
@@ -37,7 +37,7 @@ pub struct ChampionSummary {
     pub trial_id: Option<Uuid>,
     pub description: String,
     pub impact: String,
-    pub promoted_at: DateTime<Utc>,
+    pub promoted_at: Timestamp,
     pub days_active: u32,
 }
 
@@ -47,7 +47,7 @@ pub struct ExperimentSummary {
     pub variant_count: u8,
     pub messages_scored: u32,
     pub hypothesis: String,
-    pub started_at: DateTime<Utc>,
+    pub started_at: Timestamp,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
