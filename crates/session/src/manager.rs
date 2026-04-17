@@ -1,8 +1,8 @@
 //! Session management for conversation history.
 
-use chrono::{DateTime, Utc};
 use dashmap::DashMap;
 use indexmap::IndexMap;
+use jiff::Timestamp;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex as StdMutex};
@@ -10,7 +10,7 @@ use tokio::sync::Mutex as TokioMutex;
 use tracing::{debug, error, warn};
 use uuid::Uuid;
 
-use common::{time::bridge::{chrono_to_jiff, jiff_to_chrono}, KlyntbotError, Result};
+use common::{KlyntbotError, Result};
 
 /// Generate a unique message ID (UUID v4)
 fn generate_message_id() -> String {
@@ -27,10 +27,10 @@ pub struct Session {
     pub messages: Vec<SessionMessage>,
 
     /// Creation timestamp
-    pub created_at: DateTime<Utc>,
+    pub created_at: Timestamp,
 
     /// Last update timestamp
-    pub updated_at: DateTime<Utc>,
+    pub updated_at: Timestamp,
 
     /// Session metadata
     #[serde(default)]
@@ -48,7 +48,7 @@ pub struct Session {
 impl Session {
     /// Create a new session
     pub fn new(key: impl Into<String>) -> Self {
-        let now = Utc::now();
+        let now = Timestamp::now();
         Self {
             key: key.into(),
             messages: Vec::new(),
@@ -76,12 +76,12 @@ impl Session {
             id: generate_message_id(),
             role: role.into(),
             content: content.into(),
-            timestamp: Utc::now(),
+            timestamp: Timestamp::now(),
             request_id,
             tool_calls: None,
             metadata: None,
         });
-        self.updated_at = Utc::now();
+        self.updated_at = Timestamp::now();
         self.trim_if_needed();
     }
 
@@ -98,12 +98,12 @@ impl Session {
             id: generate_message_id(),
             role: role.into(),
             content: content.into(),
-            timestamp: Utc::now(),
+            timestamp: Timestamp::now(),
             request_id,
             tool_calls,
             metadata,
         });
-        self.updated_at = Utc::now();
+        self.updated_at = Timestamp::now();
         self.trim_if_needed();
     }
 
@@ -116,7 +116,7 @@ impl Session {
     /// Clear all messages
     pub fn clear(&mut self) {
         self.messages.clear();
-        self.updated_at = Utc::now();
+        self.updated_at = Timestamp::now();
     }
 
     /// Trim in-memory messages if they exceed the threshold.
@@ -158,10 +158,10 @@ impl Session {
         }
 
         // Ensure timestamps are monotonically increasing
-        let mut last_ts = chrono::DateTime::<chrono::Utc>::MIN_UTC;
+        let mut last_ts = Timestamp::MIN;
         for msg in &mut self.messages {
             if msg.timestamp < last_ts {
-                msg.timestamp = last_ts + chrono::Duration::milliseconds(1);
+                msg.timestamp = last_ts + jiff::SignedDuration::from_millis(1);
                 repairs += 1;
             }
             last_ts = msg.timestamp;
@@ -189,7 +189,7 @@ pub struct SessionMessage {
     pub content: String,
 
     /// Timestamp
-    pub timestamp: DateTime<Utc>,
+    pub timestamp: Timestamp,
 
     /// Optional request ID for correlation
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -261,7 +261,7 @@ impl SessionManager {
                 id: m.id.to_string(),
                 role: m.role,
                 content: m.content,
-                timestamp: jiff_to_chrono(*m.timestamp),
+                timestamp: *m.timestamp,
                 request_id: m.request_id,
                 tool_calls: m.tool_calls,
                 metadata: m.metadata,
@@ -271,8 +271,8 @@ impl SessionManager {
         Session {
             key: row.key,
             messages,
-            created_at: jiff_to_chrono(*row.created_at),
-            updated_at: jiff_to_chrono(*row.updated_at),
+            created_at: *row.created_at,
+            updated_at: *row.updated_at,
             metadata,
             squad_id: row.squad_id,
             correction_cooldown: 0,
@@ -418,7 +418,7 @@ impl SessionManager {
                 ids.push(Uuid::parse_str(&msg.id).unwrap_or_else(|_| Uuid::new_v4()));
                 roles.push(msg.role.clone());
                 contents.push(msg.content.clone());
-                timestamps.push(chrono_to_jiff(msg.timestamp));
+                timestamps.push(msg.timestamp);
                 request_ids.push(msg.request_id.clone());
                 tool_calls_list.push(msg.tool_calls.clone());
                 metadata_list.push(msg.metadata.clone());
@@ -553,8 +553,8 @@ impl SessionManager {
             .into_iter()
             .map(|r| SessionInfo {
                 key: r.key,
-                created_at: jiff_to_chrono(*r.created_at),
-                updated_at: jiff_to_chrono(*r.updated_at),
+                created_at: *r.created_at,
+                updated_at: *r.updated_at,
                 message_count: r.message_count as usize,
             })
             .collect();
@@ -595,8 +595,8 @@ impl SessionManager {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SessionInfo {
     pub key: String,
-    pub created_at: DateTime<Utc>,
-    pub updated_at: DateTime<Utc>,
+    pub created_at: Timestamp,
+    pub updated_at: Timestamp,
     pub message_count: usize,
 }
 
@@ -944,10 +944,10 @@ mod tests {
         session.add_message("user", "third");
 
         // Manually set timestamps out of order
-        let base = Utc::now();
+        let base = Timestamp::now();
         session.messages[0].timestamp = base;
-        session.messages[1].timestamp = base - chrono::Duration::seconds(10); // out of order
-        session.messages[2].timestamp = base + chrono::Duration::seconds(10);
+        session.messages[1].timestamp = base - jiff::SignedDuration::from_secs(10); // out of order
+        session.messages[2].timestamp = base + jiff::SignedDuration::from_secs(10);
 
         let repairs = session.validate_and_repair();
         assert_eq!(repairs, 1);
