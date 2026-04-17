@@ -32,8 +32,8 @@ impl From<activity_log::WorkContext> for WorkContextResponse {
             color: c.color,
             tags: c.tags,
             confidence: c.confidence,
-            first_seen_at: c.first_seen_at.to_rfc3339(),
-            last_active_at: c.last_active_at.to_rfc3339(),
+            first_seen_at: c.first_seen_at.to_string(),
+            last_active_at: c.last_active_at.to_string(),
             total_duration_secs: c.total_duration_secs,
             event_count: c.event_count,
         }
@@ -91,7 +91,7 @@ impl From<activity_log::ActivityLogEntry> for ActivityEventResponse {
     fn from(e: activity_log::ActivityLogEntry) -> Self {
         Self {
             id: e.id,
-            timestamp: e.timestamp.to_rfc3339(),
+            timestamp: e.timestamp.to_string(),
             source: e.source.as_str().to_string(),
             actor: e.actor.as_str().to_string(),
             resource_name: e.resource_name,

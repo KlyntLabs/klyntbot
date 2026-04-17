@@ -25,7 +25,7 @@ fn to_window_input(evt: &ActivityEvent) -> activity_log::WindowEventInput {
         app_name: evt.app_name.clone(),
         window_title: evt.window_title.clone(),
         url: evt.url.clone(),
-        started_at: evt.started_at,
+        started_at: common::time::bridge::chrono_to_jiff(evt.started_at),
         duration_secs: evt.duration_secs,
         project_id: evt.project_id.clone(),
         is_idle: evt.is_idle,
