@@ -185,7 +185,9 @@ mod tests {
         let pool = setup_pool().await;
         let source = SimMetricSource::new(pool);
 
-        let since = Utc::now() - chrono::Duration::hours(24);
+        let since = Timestamp::now()
+            .checked_sub(jiff::SignedDuration::from_hours(24))
+            .unwrap();
         let snap = source.collect_metrics(since, None).await.unwrap();
 
         // With no shadow log rows, total_messages should be 0 (but we clamp
@@ -201,7 +203,9 @@ mod tests {
         let pool = sqlx::SqlitePool::connect("sqlite::memory:").await.unwrap();
         let source = SimMetricSource::new(pool);
 
-        let since = Utc::now() - chrono::Duration::hours(24);
+        let since = Timestamp::now()
+            .checked_sub(jiff::SignedDuration::from_hours(24))
+            .unwrap();
         let snap = source.collect_metrics(since, None).await.unwrap();
 
         assert_eq!(snap.total_messages, 0);

@@ -253,7 +253,9 @@ impl PersonaRunner {
             } else {
                 6 // noon
             };
-            let msg_time = simulated_date.checked_add(SignedDuration::from_secs((9 + hour_offset as i64) * 3600)).unwrap();
+            let msg_time = simulated_date
+                .checked_add(SignedDuration::from_secs((9 + hour_offset as i64) * 3600))
+                .unwrap();
 
             // 3b. Sample topic.
             let topic = self.sample_topic();
@@ -762,8 +764,11 @@ mod tests {
         }
     }
 
-    fn base_date() -> DateTime<Utc> {
-        chrono::TimeZone::with_ymd_and_hms(&Utc, 2026, 3, 1, 0, 0, 0).unwrap()
+    fn base_date() -> Zoned {
+        jiff::civil::date(2026, 3, 1)
+            .at(0, 0, 0, 0)
+            .in_tz("UTC")
+            .unwrap()
     }
 
     #[test]
@@ -771,7 +776,7 @@ mod tests {
         let persona = test_persona();
         let mut runner = PersonaRunner::new(persona);
 
-        let messages = runner.generate_day(base_date());
+        let messages = runner.generate_day(&base_date());
 
         assert!(!messages.is_empty(), "should generate at least 1 message");
         // Base is 5 for onboarding ± 2 → range [3, 7].
@@ -795,13 +800,17 @@ mod tests {
 
         // Run through 3 onboarding days.
         for i in 0..3 {
-            let date = base_date() + Duration::days(i);
-            runner.generate_day(date);
+            let date = base_date()
+                .checked_add(SignedDuration::from_hours(24 * i))
+                .unwrap();
+            runner.generate_day(&date);
         }
 
         // After 3 days, the next generate_day call should transition.
-        let date = base_date() + Duration::days(3);
-        let msgs = runner.generate_day(date);
+        let date = base_date()
+            .checked_add(SignedDuration::from_hours(24 * 3))
+            .unwrap();
+        let msgs = runner.generate_day(&date);
         assert_eq!(runner.current_phase(), LifecyclePhase::Routine);
         for msg in &msgs {
             assert_eq!(msg.phase, LifecyclePhase::Routine);
@@ -815,8 +824,8 @@ mod tests {
         let mut r1 = PersonaRunner::new(p1);
         let mut r2 = PersonaRunner::new(p2);
 
-        let msgs1 = r1.generate_day(base_date());
-        let msgs2 = r2.generate_day(base_date());
+        let msgs1 = r1.generate_day(&base_date());
+        let msgs2 = r2.generate_day(&base_date());
 
         assert_eq!(msgs1.len(), msgs2.len());
         for (a, b) in msgs1.iter().zip(msgs2.iter()) {
@@ -837,8 +846,10 @@ mod tests {
 
         let mut total_facts = 0;
         for i in 0..3 {
-            let date = base_date() + Duration::days(i);
-            let msgs = runner.generate_day(date);
+            let date = base_date()
+                .checked_add(SignedDuration::from_hours(24 * i))
+                .unwrap();
+            let msgs = runner.generate_day(&date);
             for msg in &msgs {
                 if let Some(ref gt) = msg.ground_truth {
                     if gt.introduces_fact.is_some() {

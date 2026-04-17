@@ -1,6 +1,6 @@
 //! Probabilistic failure injection for simulation.
 
-use chrono::{DateTime, Utc};
+use jiff::Timestamp;
 use rand::rngs::StdRng;
 use rand::{Rng, SeedableRng};
 
@@ -127,7 +127,7 @@ impl ErrorInjector {
     pub async fn execute(
         &self,
         action: &SimulatedToolAction,
-        simulated_now: DateTime<Utc>,
+        simulated_now: Timestamp,
         error_injection_rate: f64,
     ) -> (common::Result<()>, bool) {
         let injected = {

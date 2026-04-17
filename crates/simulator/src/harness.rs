@@ -8,8 +8,7 @@ use std::sync::Arc;
 use std::time::Instant;
 
 use bus::{ContextUpdateQueue, CorrectionKind, DomainEvent, DomainEventBus};
-use chrono::Utc;
-use jiff::Zoned;
+use jiff::{Timestamp, Zoned};
 use rand::{Rng, SeedableRng};
 use tokio::sync::Mutex as TokioMutex;
 use tracing::{debug, info, warn};
@@ -332,7 +331,8 @@ impl SimulationHarness {
         let step = parse_epoch_step(&self.scenario.simulation.epoch_step);
         let start_date: Zoned = "2025-01-01T00:00:00Z".parse().unwrap();
         let start_date_str = start_date.to_string();
-        let end_date = start_date.clone() + jiff::SignedDuration::from_hours(i64::from(total_days) * 24);
+        let end_date =
+            start_date.clone() + jiff::SignedDuration::from_hours(i64::from(total_days) * 24);
 
         let mut epoch = SimulatedEpoch::new(start_date, end_date, step);
         let mut persona_runner = PersonaRunner::new(self.scenario.persona.clone());
@@ -554,7 +554,8 @@ impl SimulationHarness {
 
             // PRE-MESSAGE CRONS
             for trigger in &plan.cron_pre_message {
-                self.execute_cron(trigger, common::time::bridge::jiff_to_chrono(plan.simulated_now.timestamp())).await;
+                self.execute_cron(trigger, plan.simulated_now.timestamp())
+                    .await;
             }
 
             // MESSAGE PHASE — for sub-day epochs, generate once per day
@@ -853,8 +854,8 @@ impl SimulationHarness {
                 // tool_actions replaces the original ones.
                 let adversarial_rate = persona_runner.current_phase_config().adversarial_rate;
                 if adversarial_rate > 0.0 {
-                    if let Some(adversarial_msg) =
-                        persona_runner.generate_adversarial(msg.simulated_at.clone(), adversarial_rate)
+                    if let Some(adversarial_msg) = persona_runner
+                        .generate_adversarial(msg.simulated_at.clone(), adversarial_rate)
                     {
                         *msg = adversarial_msg;
                         total_adversarial += 1;
@@ -900,7 +901,7 @@ impl SimulationHarness {
                         persona_runner.current_phase_config().error_injection_rate;
                     for action in &msg.tool_actions {
                         let (exec_result, was_injected) = action_executor
-                            .execute(action, common::time::bridge::jiff_to_chrono(msg.simulated_at.timestamp()), error_injection_rate)
+                            .execute(action, msg.simulated_at.timestamp(), error_injection_rate)
                             .await;
                         if was_injected {
                             metrics.accumulator_mut().error_injected += 1;
@@ -1492,7 +1493,8 @@ impl SimulationHarness {
 
             // POST-MESSAGE CRONS
             for trigger in &plan.cron_post_message {
-                self.execute_cron(trigger, common::time::bridge::jiff_to_chrono(plan.simulated_now.timestamp())).await;
+                self.execute_cron(trigger, plan.simulated_now.timestamp())
+                    .await;
             }
 
             // CHECKPOINTS
@@ -1546,7 +1548,7 @@ impl SimulationHarness {
                 measure_insight_usefulness(&self.inner_pool, total_messages).await;
 
             metrics.snapshot(
-                common::time::bridge::jiff_to_chrono(plan.simulated_now.timestamp()),
+                plan.simulated_now.timestamp(),
                 plan.day_of_simulation,
                 knowledge_retention,
                 autotuner_stats.success_rate,
@@ -1952,11 +1954,7 @@ impl SimulationHarness {
     }
 
     /// Execute a simulated cron trigger.
-    async fn execute_cron(
-        &self,
-        trigger: &CronTrigger,
-        simulated_now: chrono::DateTime<chrono::Utc>,
-    ) {
+    async fn execute_cron(&self, trigger: &CronTrigger, simulated_now: Timestamp) {
         match trigger {
             CronTrigger::AtomDecay => {
                 debug!(trigger = "AtomDecay", %simulated_now, "Executing cron");
@@ -1983,8 +1981,12 @@ impl SimulationHarness {
                     Arc::clone(&metric_source),
                 );
                 let champion = self.champion.lock().unwrap().clone();
-                let epoch_start = chrono::TimeZone::with_ymd_and_hms(&Utc, 2025, 1, 1, 0, 0, 0).unwrap();
-                let day_approx = (simulated_now - epoch_start).num_days();
+                let epoch_start = jiff::civil::date(2025, 1, 1)
+                    .at(0, 0, 0, 0)
+                    .in_tz("UTC")
+                    .unwrap()
+                    .timestamp();
+                let day_approx = (simulated_now.as_second() - epoch_start.as_second()) / 86400;
                 match cycle.run_evaluation_and_promotion(&champion).await {
                     Ok(result) => {
                         if let Some(ref promo) = result.promotion {
@@ -2008,7 +2010,7 @@ impl SimulationHarness {
                                  (SELECT MAX(version) FROM mirror_brain_versions), '{}', 0)"
                             )
                             .bind(trial_id.to_string())
-                            .bind(simulated_now.to_rfc3339())
+                            .bind(simulated_now.to_string())
                             .bind(&params_json)
                             .execute(&self.inner_pool)
                             .await {
@@ -2033,7 +2035,8 @@ impl SimulationHarness {
                             // 0 correction_rate (Trial B has fewer corrections by design),
                             // causing the evaluator to skip the check on the next cycle.
                             {
-                                let since = jiff::Timestamp::now() - jiff::SignedDuration::from_hours(24);
+                                let since =
+                                    jiff::Timestamp::now() - jiff::SignedDuration::from_hours(24);
                                 if let Ok(snap) = metric_source.collect_metrics(since, None).await {
                                     let baseline = autotuner::metrics::aggregate_to_result(
                                         Uuid::nil(),
@@ -2042,7 +2045,7 @@ impl SimulationHarness {
                                     let mut champ = self.champion.lock().unwrap();
                                     champ.trial_id = Some(*trial_id);
                                     champ.params = trial_params.clone();
-                                    champ.promoted_at = common::time::bridge::chrono_to_jiff(simulated_now);
+                                    champ.promoted_at = simulated_now;
                                     champ.baseline_metrics = baseline;
                                     champ.reason_for_promotion = "Simulation promotion".to_string();
                                     champ.impact_summary = format!("Promoted at day {day_approx}");
@@ -2061,7 +2064,7 @@ impl SimulationHarness {
 
                         if active_count == 0 {
                             let exp_id = Uuid::new_v4().to_string();
-                            let now_str = simulated_now.to_rfc3339();
+                            let now_str = simulated_now.to_string();
                             let experiment = storage::ExperimentRow {
                                 id: exp_id.clone(),
                                 hypothesis: format!("Iteration at day {day_approx}"),
@@ -2190,7 +2193,7 @@ impl SimulationHarness {
                                     );
                                     let dot_refs =
                                         serde_json::to_string(&vec![d1, d2]).unwrap_or_default();
-                                    let date = simulated_now.format("%Y-%m-%d").to_string();
+                                    let date = simulated_now.strftime("%Y-%m-%d").to_string();
                                     let _ = sqlx::query(
                                         "INSERT INTO cross_domain_insights \
                                          (date, insight_text, dot_refs) VALUES (?1, ?2, ?3)",
@@ -2260,7 +2263,7 @@ impl SimulationHarness {
                     if fact_count.0 > 0 {
                         let stability =
                             (fact_count.0 as f64 / (fact_count.0 as f64 + 5.0)).min(1.0);
-                        let now_str = simulated_now.to_rfc3339();
+                        let now_str = simulated_now.to_string();
                         let _ = sqlx::query(
                             "INSERT OR REPLACE INTO communities \
                              (id, name, summary, stability, member_count, source_note_count, \

@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 
-use chrono::Utc;
+use jiff::Timestamp;
 use serde::{Deserialize, Serialize};
 
 use crate::metrics::ground_truth::CheckpointResult;
@@ -48,7 +48,7 @@ impl SimulationReport {
     pub fn write_json(&self, dir: &Path) -> common::Result<PathBuf> {
         std::fs::create_dir_all(dir)?;
 
-        let timestamp = Utc::now().format("%Y%m%d_%H%M%S");
+        let timestamp = Timestamp::now().strftime("%Y%m%d_%H%M%S");
         let filename = format!("{}_{}.json", self.scenario, timestamp);
         let path = dir.join(filename);
 

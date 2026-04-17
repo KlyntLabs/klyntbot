@@ -5,7 +5,7 @@ pub mod ground_truth;
 pub mod memory;
 pub mod system;
 
-use chrono::{DateTime, Utc};
+use jiff::Timestamp;
 use serde::{Deserialize, Serialize};
 
 // ---------------------------------------------------------------------------
@@ -14,7 +14,7 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct MetricSnapshot {
-    pub epoch: DateTime<Utc>,
+    pub epoch: Timestamp,
     // Tier 1 — memory fidelity
     pub knowledge_retention: f64,
     pub retrieval_precision: f64,
@@ -288,7 +288,7 @@ impl MetricCollector {
     #[allow(clippy::too_many_arguments)]
     pub fn snapshot(
         &mut self,
-        epoch: DateTime<Utc>,
+        epoch: Timestamp,
         day: u32,
         knowledge_retention: f64,
         autotuner_promotion_success: f64,
@@ -783,10 +783,13 @@ impl MetricCollector {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use chrono::TimeZone;
 
-    fn utc(y: i32, m: u32, d: u32, h: u32, min: u32) -> DateTime<Utc> {
-        Utc.with_ymd_and_hms(y, m, d, h, min, 0).unwrap()
+    fn utc(y: i16, m: i8, d: i8, h: i8, min: i8) -> Timestamp {
+        jiff::civil::date(y, m, d)
+            .at(h, min, 0, 0)
+            .in_tz("UTC")
+            .unwrap()
+            .timestamp()
     }
 
     #[test]

@@ -4,7 +4,7 @@
 use std::sync::Arc;
 
 use bus::{DomainEvent, DomainEventBus};
-use chrono::{DateTime, Utc};
+use jiff::Timestamp;
 use tracing::debug;
 use uuid::Uuid;
 
@@ -44,7 +44,7 @@ impl ActionExecutor {
     pub async fn execute(
         &self,
         action: &SimulatedToolAction,
-        simulated_now: DateTime<Utc>,
+        simulated_now: Timestamp,
     ) -> common::Result<()> {
         match action {
             SimulatedToolAction::CreateTask {
@@ -68,8 +68,8 @@ impl ActionExecutor {
                 )
                 .bind(&task_id)
                 .bind(title)
-                .bind(simulated_now.to_rfc3339())
-                .bind(simulated_now.to_rfc3339())
+                .bind(simulated_now.to_string())
+                .bind(simulated_now.to_string())
                 .execute(&self.pool)
                 .await;
             }
@@ -108,8 +108,8 @@ impl ActionExecutor {
                 let _ = sqlx::query(
                     "UPDATE tasks SET status = 'completed', completed = 1, completed_at = ?, updated_at = ? WHERE title = ?",
                 )
-                .bind(simulated_now.to_rfc3339())
-                .bind(simulated_now.to_rfc3339())
+                .bind(simulated_now.to_string())
+                .bind(simulated_now.to_string())
                 .bind(task_ref)
                 .execute(&self.pool)
                 .await;
@@ -162,9 +162,9 @@ impl ActionExecutor {
                 .bind(*amount as i64)
                 .bind(category)
                 .bind(description)
-                .bind(simulated_now.format("%Y-%m-%d").to_string())
-                .bind(simulated_now.to_rfc3339())
-                .bind(simulated_now.to_rfc3339())
+                .bind(simulated_now.strftime("%Y-%m-%d").to_string())
+                .bind(simulated_now.to_string())
+                .bind(simulated_now.to_string())
                 .execute(&self.pool)
                 .await;
             }
@@ -200,7 +200,7 @@ impl ActionExecutor {
             } => {
                 // No exact DomainEvent variant for a generic productivity event.
                 // Emit a ProductivityScoreComputed as a reasonable approximation.
-                let date = simulated_now.format("%Y-%m-%d").to_string();
+                let date = simulated_now.strftime("%Y-%m-%d").to_string();
                 debug!(
                     event_type = %event_type,
                     duration_mins = ?duration_mins,
@@ -322,7 +322,7 @@ mod tests {
         };
 
         executor
-            .execute(&action, Utc::now())
+            .execute(&action, Timestamp::now())
             .await
             .expect("execute should succeed");
 
@@ -345,7 +345,7 @@ mod tests {
         };
 
         executor
-            .execute(&action, Utc::now())
+            .execute(&action, Timestamp::now())
             .await
             .expect("execute should succeed");
 
@@ -370,7 +370,7 @@ mod tests {
         };
 
         executor
-            .execute(&action, Utc::now())
+            .execute(&action, Timestamp::now())
             .await
             .expect("execute should succeed");
 
@@ -394,7 +394,7 @@ mod tests {
         };
 
         executor
-            .execute(&action, Utc::now())
+            .execute(&action, Timestamp::now())
             .await
             .expect("execute should succeed");
 
@@ -427,7 +427,7 @@ mod tests {
         };
 
         executor
-            .execute(&action, Utc::now())
+            .execute(&action, Timestamp::now())
             .await
             .expect("execute should succeed");
 
@@ -451,7 +451,7 @@ mod tests {
         };
 
         executor
-            .execute(&action, Utc::now())
+            .execute(&action, Timestamp::now())
             .await
             .expect("execute should succeed");
 

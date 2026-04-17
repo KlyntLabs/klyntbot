@@ -122,7 +122,8 @@ impl SimulatedEpoch {
 
     /// 1-based day counter since the simulation started.
     pub fn day_of_simulation(&self) -> u32 {
-        let elapsed_secs = self.current.timestamp().as_second() - self.start.timestamp().as_second();
+        let elapsed_secs =
+            self.current.timestamp().as_second() - self.start.timestamp().as_second();
         let days = elapsed_secs / 86_400;
         (days as u32) + 1
     }
@@ -282,7 +283,7 @@ mod tests {
     fn epoch_advances_by_day() {
         let start = utc(2026, 3, 1, 8, 0);
         let end = utc(2026, 3, 4, 8, 0); // 3 days
-        let mut epoch = SimulatedEpoch::new(start, end, EpochStep::Day);
+        let mut epoch = SimulatedEpoch::new(start.clone(), end, EpochStep::Day);
 
         assert_eq!(epoch.day_of_simulation(), 1);
         assert_eq!(epoch.current(), &start);
@@ -306,7 +307,7 @@ mod tests {
     fn epoch_finishes_at_end() {
         let start = utc(2026, 3, 1, 0, 0);
         let end = utc(2026, 3, 2, 0, 0); // exactly 1 day
-        let mut epoch = SimulatedEpoch::new(start, end, EpochStep::Day);
+        let mut epoch = SimulatedEpoch::new(start, end.clone(), EpochStep::Day);
 
         assert!(!epoch.is_finished());
         let plan = epoch.advance().unwrap();
@@ -410,17 +411,17 @@ mod tests {
         // Exactly ON the boundary: (prev, now] means now == target is included.
         let prev = utc(2026, 3, 1, 2, 0);
         let now = utc(2026, 3, 1, 3, 0);
-        assert!(crosses_daily_hour(prev, now, 3));
+        assert!(crosses_daily_hour(&prev, &now, 3));
 
         // prev == target is NOT included (half-open).
-        assert!(!crosses_daily_hour(prev, now, 2));
+        assert!(!crosses_daily_hour(&prev, &now, 2));
     }
 
     #[test]
     fn clamping_does_not_overshoot() {
         let start = utc(2026, 3, 1, 0, 0);
         let end = utc(2026, 3, 1, 10, 0);
-        let mut epoch = SimulatedEpoch::new(start, end, EpochStep::Day);
+        let mut epoch = SimulatedEpoch::new(start, end.clone(), EpochStep::Day);
 
         // Step is 24h but end is only 10h away — should clamp.
         let plan = epoch.advance().unwrap();

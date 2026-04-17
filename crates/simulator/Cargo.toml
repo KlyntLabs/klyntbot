@@ -26,7 +26,6 @@ tools.workspace = true
 tokio-util = { workspace = true }
 
 async-trait.workspace = true
-chrono = { workspace = true }
 jiff = { workspace = true }
 uuid = { workspace = true }
 serde = { workspace = true }
