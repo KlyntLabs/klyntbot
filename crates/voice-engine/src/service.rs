@@ -498,7 +498,7 @@ impl VoiceService {
 
         let mut capture_session = self.capture.start()?;
 
-        let session_id = format!("voice-{}", chrono::Utc::now().timestamp_millis());
+        let session_id = format!("voice-{}", jiff::Timestamp::now().as_millisecond());
 
         // Extract Send-safe pieces before wrapping the !Send CaptureSession.
         let stop_signal = capture_session.stop_signal.clone();

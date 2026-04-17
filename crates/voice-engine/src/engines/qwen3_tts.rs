@@ -18,6 +18,7 @@ use tracing::{debug, warn};
 use crate::tts::TtsEngine;
 use crate::types::*;
 
+#[allow(dead_code)]
 const QWEN3_TTS_SAMPLE_RATE: u32 = 24_000;
 #[cfg(feature = "qwen3")]
 const IDLE_UNLOAD_SECS: u64 = 300;
