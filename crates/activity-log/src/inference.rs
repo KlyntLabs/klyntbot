@@ -1,7 +1,7 @@
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 
-use chrono::{DateTime, Utc};
+use jiff::Timestamp;
 use storage::{StoragePool, VectorStore};
 use tracing::warn;
 
@@ -143,7 +143,7 @@ impl ContextInferenceEngine {
     /// Process recent unassigned events and assign them to work contexts.
     pub async fn process_recent_events(
         &self,
-        since: DateTime<Utc>,
+        since: Timestamp,
     ) -> common::Result<Vec<ContextAssignment>> {
         let events = ActivityLogRepo::query_unassigned(&self.pool, since).await?;
         if events.is_empty() {
@@ -208,7 +208,7 @@ impl ContextInferenceEngine {
         };
 
         // Phase 1: Compute semantic + temporal scores under read lock (no async I/O)
-        let now = Utc::now();
+        let now = Timestamp::now();
         let partial_scores: Vec<(&WorkContext, f64, f64)> = {
             let centroids = if use_semantic {
                 Some(self.centroids.read().await)
@@ -225,7 +225,8 @@ impl ContextInferenceEngine {
                             .unwrap_or(0.0),
                         _ => 0.0,
                     };
-                    let hours_since = (now - ctx.last_active_at).num_minutes().max(0) as f64 / 60.0;
+                    let hours_since =
+                        ((now.as_second() - ctx.last_active_at.as_second()).max(0) as f64) / 3600.0;
                     let temporal = (-self.config.temporal_decay_lambda * hours_since).exp();
                     (ctx, semantic, temporal)
                 })
@@ -271,13 +272,15 @@ impl ContextInferenceEngine {
                 let ctx = active_contexts.iter().find(|c| c.id == ctx_id);
                 match ctx {
                     Some(c) => {
-                        let gap_secs = (event.timestamp - c.last_active_at).num_seconds().max(0);
+                        let gap_secs =
+                            (event.timestamp.as_second() - c.last_active_at.as_second()).max(0);
                         gap_secs.min(30 * 60) // Cap at 30 minutes
                     }
                     None => 0,
                 }
             };
-            WorkContextRepo::update_stats(&self.pool, &ctx_id, Utc::now(), duration, 1).await?;
+            WorkContextRepo::update_stats(&self.pool, &ctx_id, Timestamp::now(), duration, 1)
+                .await?;
 
             // Link resources
             self.link_event_resources(event, &ctx_id).await?;
@@ -305,7 +308,7 @@ impl ContextInferenceEngine {
             let ctx_id = new_ulid();
             let title = infer_title(event);
             let context_type = infer_context_type(event);
-            let now = Utc::now();
+            let now = Timestamp::now();
             let new_ctx = WorkContext {
                 id: ctx_id.clone(),
                 title,
@@ -417,7 +420,7 @@ impl ContextInferenceEngine {
         // Extract resource from event and upsert + link
         if let Some(ref res_name) = event.resource_name {
             let res_id = event.resource_id.clone().unwrap_or_else(new_ulid);
-            let now = Utc::now();
+            let now = Timestamp::now();
             let resource = WorkResource {
                 id: res_id.clone(),
                 resource_type: event
@@ -894,7 +897,7 @@ mod tests {
     fn make_event(action: &str, resource_name: Option<&str>) -> ActivityLogEntry {
         ActivityLogEntry {
             id: new_ulid(),
-            timestamp: Utc::now(),
+            timestamp: Timestamp::now(),
             source: ActivitySource::OsWindow,
             actor: ActivityActor::User,
             resource_type: Some("file".to_string()),
@@ -974,7 +977,7 @@ mod tests {
             .await
             .unwrap()
             .unwrap();
-        ctx.last_active_at = Utc::now() - chrono::Duration::hours(48);
+        ctx.last_active_at = Timestamp::now() - jiff::SignedDuration::from_secs(48 * 3600);
         WorkContextRepo::update(&pool, &ctx).await.unwrap();
 
         // A similar event should prefer recency — since the existing context

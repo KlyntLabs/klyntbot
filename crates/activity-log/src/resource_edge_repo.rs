@@ -18,8 +18,8 @@ impl ResourceEdgeRepo {
         .bind(&edge.target_id)
         .bind(&edge.edge_type)
         .bind(edge.weight)
-        .bind(edge.first_seen_at.to_rfc3339())
-        .bind(edge.last_seen_at.to_rfc3339())
+        .bind(edge.first_seen_at.to_string())
+        .bind(edge.last_seen_at.to_string())
         .execute(pool.inner())
         .await
         .map_err(StorageError::from)?;
@@ -70,10 +70,10 @@ mod tests {
     use crate::types::ResourceEdge;
     use crate::work_resource_repo::tests::make_resource;
     use crate::work_resource_repo::WorkResourceRepo;
-    use chrono::Utc;
+    use jiff::Timestamp;
 
     fn make_edge(source: &str, target: &str) -> ResourceEdge {
-        let now = Utc::now();
+        let now = Timestamp::now();
         ResourceEdge {
             source_id: source.to_string(),
             target_id: target.to_string(),

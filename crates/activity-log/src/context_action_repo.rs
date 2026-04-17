@@ -1,4 +1,4 @@
-use chrono::Utc;
+use jiff::Timestamp;
 use storage::{StorageError, StoragePool};
 
 /// Links work contexts to tasks (formerly "actions" — renamed for consistency).
@@ -15,7 +15,7 @@ impl ContextTaskRepo {
         )
         .bind(context_id)
         .bind(task_id)
-        .bind(Utc::now().to_rfc3339())
+        .bind(Timestamp::now().to_string())
         .execute(pool.inner())
         .await
         .map_err(StorageError::from)?;

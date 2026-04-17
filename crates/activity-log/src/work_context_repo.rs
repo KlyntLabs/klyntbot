@@ -1,4 +1,4 @@
-use chrono::{DateTime, Utc};
+use jiff::Timestamp;
 use storage::{StorageError, StoragePool};
 
 use crate::normalizers::parse_rfc3339;
@@ -32,12 +32,12 @@ impl WorkContextRepo {
         .bind(&ctx.color)
         .bind(tags_to_json(&ctx.tags))
         .bind(ctx.confidence)
-        .bind(ctx.first_seen_at.to_rfc3339())
-        .bind(ctx.last_active_at.to_rfc3339())
+        .bind(ctx.first_seen_at.to_string())
+        .bind(ctx.last_active_at.to_string())
         .bind(ctx.total_duration_secs)
         .bind(ctx.event_count)
-        .bind(ctx.created_at.to_rfc3339())
-        .bind(ctx.updated_at.to_rfc3339())
+        .bind(ctx.created_at.to_string())
+        .bind(ctx.updated_at.to_string())
         .execute(pool.inner())
         .await
         .map_err(StorageError::from)?;
@@ -72,10 +72,10 @@ impl WorkContextRepo {
         .bind(&ctx.color)
         .bind(tags_to_json(&ctx.tags))
         .bind(ctx.confidence)
-        .bind(ctx.last_active_at.to_rfc3339())
+        .bind(ctx.last_active_at.to_string())
         .bind(ctx.total_duration_secs)
         .bind(ctx.event_count)
-        .bind(Utc::now().to_rfc3339())
+        .bind(Timestamp::now().to_string())
         .execute(pool.inner())
         .await
         .map_err(StorageError::from)?;
@@ -128,7 +128,7 @@ impl WorkContextRepo {
     pub async fn update_stats(
         pool: &StoragePool,
         id: &str,
-        last_active_at: DateTime<Utc>,
+        last_active_at: Timestamp,
         duration_increment: i64,
         event_increment: i64,
     ) -> common::Result<()> {
@@ -141,10 +141,10 @@ impl WorkContextRepo {
              WHERE id = ?1",
         )
         .bind(id)
-        .bind(last_active_at.to_rfc3339())
+        .bind(last_active_at.to_string())
         .bind(duration_increment)
         .bind(event_increment)
-        .bind(Utc::now().to_rfc3339())
+        .bind(Timestamp::now().to_string())
         .execute(pool.inner())
         .await
         .map_err(StorageError::from)?;
@@ -159,7 +159,7 @@ impl WorkContextRepo {
         sqlx::query("UPDATE work_contexts SET confidence = ?2, updated_at = ?3 WHERE id = ?1")
             .bind(id)
             .bind(confidence)
-            .bind(Utc::now().to_rfc3339())
+            .bind(Timestamp::now().to_string())
             .execute(pool.inner())
             .await
             .map_err(StorageError::from)?;
@@ -174,7 +174,7 @@ impl WorkContextRepo {
         sqlx::query("UPDATE work_contexts SET embedding_id = ?2, updated_at = ?3 WHERE id = ?1")
             .bind(id)
             .bind(embedding_id)
-            .bind(Utc::now().to_rfc3339())
+            .bind(Timestamp::now().to_string())
             .execute(pool.inner())
             .await
             .map_err(StorageError::from)?;
@@ -182,14 +182,14 @@ impl WorkContextRepo {
     }
 
     pub async fn archive_dormant(pool: &StoragePool, dormancy_days: i64) -> common::Result<u64> {
-        let now = Utc::now();
-        let cutoff = now - chrono::Duration::days(dormancy_days);
+        let now = Timestamp::now();
+        let cutoff = now - jiff::SignedDuration::from_secs(dormancy_days * 86400);
         let result = sqlx::query(
             "UPDATE work_contexts SET status = 'archived', updated_at = ?2 \
              WHERE status = 'active' AND last_active_at < ?1",
         )
-        .bind(cutoff.to_rfc3339())
-        .bind(now.to_rfc3339())
+        .bind(cutoff.to_string())
+        .bind(now.to_string())
         .execute(pool.inner())
         .await
         .map_err(StorageError::from)?;
@@ -252,7 +252,7 @@ impl WorkContextRepo {
         .bind(keep_id)
         .bind(remove_id)
         .bind(reason)
-        .bind(Utc::now().to_rfc3339())
+        .bind(Timestamp::now().to_string())
         .execute(&mut *tx)
         .await
         .map_err(StorageError::from)?;
@@ -261,13 +261,10 @@ impl WorkContextRepo {
         Ok(())
     }
 
-    pub async fn count_merges_since(
-        pool: &StoragePool,
-        since: DateTime<Utc>,
-    ) -> common::Result<i64> {
+    pub async fn count_merges_since(pool: &StoragePool, since: Timestamp) -> common::Result<i64> {
         let row: (i64,) =
             sqlx::query_as("SELECT COUNT(*) FROM context_merges WHERE merged_at >= ?1")
-                .bind(since.to_rfc3339())
+                .bind(since.to_string())
                 .fetch_one(pool.inner())
                 .await
                 .map_err(StorageError::from)?;
@@ -279,7 +276,7 @@ impl WorkContextRepo {
             "INSERT INTO inference_state (key, value) VALUES ('last_run_at', ?1) \
              ON CONFLICT(key) DO UPDATE SET value = excluded.value",
         )
-        .bind(Utc::now().to_rfc3339())
+        .bind(Timestamp::now().to_string())
         .execute(pool.inner())
         .await
         .map_err(StorageError::from)?;
@@ -387,7 +384,7 @@ pub(crate) mod tests {
     use crate::normalizers::new_ulid;
 
     pub(crate) fn make_context(title: &str) -> WorkContext {
-        let now = Utc::now();
+        let now = Timestamp::now();
         WorkContext {
             id: new_ulid(),
             title: title.to_string(),
@@ -436,7 +433,7 @@ pub(crate) mod tests {
         let pool = crate::test_pool().await;
         let ctx = make_context("Stats Test");
         WorkContextRepo::insert(&pool, &ctx).await.unwrap();
-        WorkContextRepo::update_stats(&pool, &ctx.id, Utc::now(), 300, 5)
+        WorkContextRepo::update_stats(&pool, &ctx.id, Timestamp::now(), 300, 5)
             .await
             .unwrap();
         let loaded = WorkContextRepo::get(&pool, &ctx.id).await.unwrap().unwrap();
@@ -448,7 +445,7 @@ pub(crate) mod tests {
     async fn test_archive_dormant() {
         let pool = crate::test_pool().await;
         let mut ctx = make_context("Old Context");
-        ctx.last_active_at = Utc::now() - chrono::Duration::days(30);
+        ctx.last_active_at = Timestamp::now() - jiff::SignedDuration::from_secs(30 * 86400);
         WorkContextRepo::insert(&pool, &ctx).await.unwrap();
         let archived = WorkContextRepo::archive_dormant(&pool, 7).await.unwrap();
         assert_eq!(archived, 1);
@@ -472,7 +469,7 @@ pub(crate) mod tests {
         assert!(WorkContextRepo::get(&pool, &c2.id).await.unwrap().is_none());
 
         // Merge event recorded
-        let since = Utc::now() - chrono::Duration::hours(1);
+        let since = Timestamp::now() - jiff::SignedDuration::from_secs(3600);
         let count = WorkContextRepo::count_merges_since(&pool, since)
             .await
             .unwrap();

@@ -137,7 +137,7 @@ mod tests {
     use super::*;
     use crate::normalizers::{content_hash, new_ulid, ChatMessageInput, ChatMessageNormalizer};
     use crate::types::{ActivityActor, ActivitySource};
-    use chrono::Utc;
+    use jiff::Timestamp;
 
     async fn setup() -> (StoragePool, ActivityIngestionService) {
         let pool = StoragePool::connect_in_memory().await.unwrap();
@@ -155,7 +155,7 @@ mod tests {
     fn make_entry(action: &str) -> ActivityLogEntry {
         ActivityLogEntry {
             id: new_ulid(),
-            timestamp: Utc::now(),
+            timestamp: Timestamp::now(),
             source: ActivitySource::Chat,
             actor: ActivityActor::User,
             resource_type: None,
@@ -256,8 +256,8 @@ mod tests {
         // Verify it was flagged
         let results = ActivityLogRepo::query_range(
             &_pool,
-            Utc::now() - chrono::Duration::hours(1),
-            Utc::now() + chrono::Duration::hours(1),
+            Timestamp::now() - jiff::SignedDuration::from_secs(3600),
+            Timestamp::now() + jiff::SignedDuration::from_secs(3600),
             100,
             0,
         )
@@ -277,8 +277,8 @@ mod tests {
 
         let results = ActivityLogRepo::query_range(
             &_pool,
-            Utc::now() - chrono::Duration::hours(1),
-            Utc::now() + chrono::Duration::hours(1),
+            Timestamp::now() - jiff::SignedDuration::from_secs(3600),
+            Timestamp::now() + jiff::SignedDuration::from_secs(3600),
             100,
             0,
         )

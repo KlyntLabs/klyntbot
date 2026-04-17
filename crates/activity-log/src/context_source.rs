@@ -1,6 +1,6 @@
 use async_trait::async_trait;
-use chrono::Utc;
 use context_engine::source::{ContextSource, SourceContext};
+use jiff::Timestamp;
 use storage::StoragePool;
 
 use crate::context_resource_repo::ContextResourceRepo;
@@ -37,11 +37,12 @@ impl ContextSource for WorkContextSource {
 
         let mut output = String::from("[Current Work Contexts]\n");
         for (i, ctx) in contexts.iter().enumerate() {
-            let age = Utc::now() - ctx.last_active_at;
-            let age_str = if age.num_minutes() < 60 {
-                format!("{}min ago", age.num_minutes())
+            let age_secs = (Timestamp::now().as_second() - ctx.last_active_at.as_second()).max(0);
+            let age_mins = age_secs / 60;
+            let age_str = if age_mins < 60 {
+                format!("{age_mins}min ago")
             } else {
-                format!("{}h ago", age.num_hours())
+                format!("{}h ago", age_mins / 60)
             };
             let duration_str = format!("{:.1}h today", ctx.total_duration_secs as f64 / 3600.0);
 

@@ -2,7 +2,7 @@
 
 use std::sync::Arc;
 
-use chrono::{Duration, Utc};
+use jiff::{SignedDuration, Timestamp};
 use storage::StoragePool;
 use tokio_util::sync::CancellationToken;
 
@@ -46,8 +46,8 @@ async fn test_domain_event_full_flow() {
     // Give the subscriber time to process
     tokio::time::sleep(std::time::Duration::from_millis(100)).await;
 
-    let start = Utc::now() - Duration::hours(1);
-    let end = Utc::now() + Duration::hours(1);
+    let start = Timestamp::now() - SignedDuration::from_secs(3600);
+    let end = Timestamp::now() + SignedDuration::from_secs(3600);
     let results = ActivityLogRepo::query_range(&pool, start, end, 100, 0)
         .await
         .unwrap();
@@ -87,8 +87,8 @@ async fn test_multiple_domain_events() {
 
     tokio::time::sleep(std::time::Duration::from_millis(100)).await;
 
-    let start = Utc::now() - Duration::hours(1);
-    let end = Utc::now() + Duration::hours(1);
+    let start = Timestamp::now() - SignedDuration::from_secs(3600);
+    let end = Timestamp::now() + SignedDuration::from_secs(3600);
 
     let focus =
         ActivityLogRepo::query_by_source(&pool, ActivitySource::FocusSession, start, end, 10)
@@ -131,8 +131,8 @@ async fn test_chat_message_flow() {
         .await
         .unwrap();
 
-    let start = Utc::now() - Duration::hours(1);
-    let end = Utc::now() + Duration::hours(1);
+    let start = Timestamp::now() - SignedDuration::from_secs(3600);
+    let end = Timestamp::now() + SignedDuration::from_secs(3600);
 
     let results = ActivityLogRepo::query_by_session(&pool, "telegram:user123", start, end)
         .await
@@ -155,7 +155,7 @@ async fn test_window_event_flow() {
         app_name: "Visual Studio Code".into(),
         window_title: Some("main.rs — klyntbot".into()),
         url: None,
-        started_at: Utc::now(),
+        started_at: Timestamp::now(),
         duration_secs: Some(300),
         project_id: Some("proj-klyntbot".into()),
         is_idle: false,
@@ -163,8 +163,8 @@ async fn test_window_event_flow() {
 
     svc.normalize_and_ingest(&normalizer, &input).await.unwrap();
 
-    let start = Utc::now() - Duration::hours(1);
-    let end = Utc::now() + Duration::hours(1);
+    let start = Timestamp::now() - SignedDuration::from_secs(3600);
+    let end = Timestamp::now() + SignedDuration::from_secs(3600);
 
     let results = ActivityLogRepo::query_by_project(&pool, "proj-klyntbot", start, end)
         .await
@@ -208,8 +208,8 @@ async fn test_count_by_source() {
 
     tokio::time::sleep(std::time::Duration::from_millis(100)).await;
 
-    let start = Utc::now() - Duration::hours(1);
-    let end = Utc::now() + Duration::hours(1);
+    let start = Timestamp::now() - SignedDuration::from_secs(3600);
+    let end = Timestamp::now() + SignedDuration::from_secs(3600);
 
     let counts = ActivityLogRepo::count_by_source(&pool, start, end)
         .await
@@ -260,7 +260,7 @@ async fn test_retention_cleanup() {
         note_id: "old-note".into(),
         title: "Old".into(),
     });
-    entry.timestamp = Utc::now() - Duration::days(400);
+    entry.timestamp = Timestamp::now() - SignedDuration::from_secs(400 * 86400);
     entry.content_hash = Some("unique-old".into());
     svc.ingest(entry).await.unwrap();
 
@@ -277,8 +277,8 @@ async fn test_retention_cleanup() {
         .unwrap();
     assert_eq!(deleted, 1);
 
-    let start = Utc::now() - Duration::days(500);
-    let end = Utc::now() + Duration::hours(1);
+    let start = Timestamp::now() - SignedDuration::from_secs(500 * 86400);
+    let end = Timestamp::now() + SignedDuration::from_secs(3600);
     let remaining = ActivityLogRepo::query_range(&pool, start, end, 100, 0)
         .await
         .unwrap();

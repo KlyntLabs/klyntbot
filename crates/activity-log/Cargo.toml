@@ -15,7 +15,7 @@ bus.workspace = true
 tools-core.workspace = true
 serde = { workspace = true }
 serde_json.workspace = true
-chrono = { workspace = true }
+jiff = { workspace = true }
 sqlx.workspace = true
 tokio.workspace = true
 tracing.workspace = true
@@ -26,3 +26,4 @@ ulid = { version = "1", features = ["serde"] }
 
 [dev-dependencies]
 tokio = { workspace = true, features = ["macros", "rt-multi-thread", "test-util"] }
+jiff = { workspace = true }

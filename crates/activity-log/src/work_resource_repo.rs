@@ -26,8 +26,8 @@ impl WorkResourceRepo {
         .bind(&res.resource_name)
         .bind(&res.resource_path)
         .bind(&res.resource_uri)
-        .bind(res.first_seen_at.to_rfc3339())
-        .bind(res.last_seen_at.to_rfc3339())
+        .bind(res.first_seen_at.to_string())
+        .bind(res.last_seen_at.to_string())
         .bind(res.access_count)
         .bind(&res.embedding_id)
         .execute(pool.inner())
@@ -159,10 +159,10 @@ impl From<WrRawRow> for WorkResource {
 pub(crate) mod tests {
     use super::*;
     use crate::normalizers::new_ulid;
-    use chrono::Utc;
+    use jiff::Timestamp;
 
     pub(crate) fn make_resource(name: &str, path: Option<&str>) -> WorkResource {
-        let now = Utc::now();
+        let now = Timestamp::now();
         WorkResource {
             id: new_ulid(),
             resource_type: "file".to_string(),

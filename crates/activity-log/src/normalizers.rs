@@ -1,4 +1,4 @@
-use chrono::Utc;
+use jiff::Timestamp;
 use sha2::{Digest, Sha256};
 use ulid::Ulid;
 
@@ -14,11 +14,9 @@ pub fn new_ulid() -> String {
     Ulid::new().to_string()
 }
 
-/// Parse an RFC3339 timestamp string, falling back to `Utc::now()` on failure.
-pub fn parse_rfc3339(s: &str) -> chrono::DateTime<Utc> {
-    chrono::DateTime::parse_from_rfc3339(s)
-        .map(|dt| dt.with_timezone(&Utc))
-        .unwrap_or_else(|_| Utc::now())
+/// Parse an RFC3339 timestamp string, falling back to `Timestamp::now()` on failure.
+pub fn parse_rfc3339(s: &str) -> Timestamp {
+    s.parse::<Timestamp>().unwrap_or_else(|_| Timestamp::now())
 }
 
 /// Compute SHA-256 hex digest for content dedup.
@@ -41,7 +39,7 @@ impl ActivityNormalizer for DomainEventNormalizer {
 
 /// Normalize a DomainEvent directly (avoids Any trait for Send/Sync contexts).
 pub fn normalize_domain_event(event: &bus::DomainEvent) -> ActivityLogEntry {
-    let now = Utc::now();
+    let now = Timestamp::now();
     let (source, actor, action, resource_type, resource_id, resource_name, preview, metadata) =
         match event {
             // Tasks
@@ -483,7 +481,7 @@ impl ActivityNormalizer for ChatMessageNormalizer {
 
         Some(ActivityLogEntry {
             id: new_ulid(),
-            timestamp: Utc::now(),
+            timestamp: Timestamp::now(),
             source: ActivitySource::Chat,
             actor,
             resource_type: Some("conversation".to_string()),
@@ -532,7 +530,7 @@ impl ActivityNormalizer for ToolCallNormalizer {
 
         Some(ActivityLogEntry {
             id: new_ulid(),
-            timestamp: Utc::now(),
+            timestamp: Timestamp::now(),
             source: ActivitySource::ToolCall,
             actor: ActivityActor::AiAgent,
             resource_type: Some("command".to_string()),
@@ -560,7 +558,7 @@ pub struct WindowEventInput {
     pub app_name: String,
     pub window_title: Option<String>,
     pub url: Option<String>,
-    pub started_at: chrono::DateTime<Utc>,
+    pub started_at: Timestamp,
     pub duration_secs: Option<i64>,
     pub project_id: Option<String>,
     pub is_idle: bool,
@@ -586,7 +584,7 @@ impl ActivityNormalizer for WindowEventNormalizer {
             "{}:{}:{}",
             evt.app_name,
             evt.window_title.as_deref().unwrap_or(""),
-            evt.started_at.to_rfc3339()
+            evt.started_at.to_string()
         ));
 
         let source = if evt.url.is_some() {
@@ -749,7 +747,7 @@ mod tests {
             app_name: "Visual Studio Code".into(),
             window_title: Some("main.rs — klyntbot".into()),
             url: None,
-            started_at: Utc::now(),
+            started_at: Timestamp::now(),
             duration_secs: Some(120),
             project_id: Some("proj-1".into()),
             is_idle: false,
@@ -768,7 +766,7 @@ mod tests {
             app_name: "Google Chrome".into(),
             window_title: Some("GitHub".into()),
             url: Some("https://github.com".into()),
-            started_at: Utc::now(),
+            started_at: Timestamp::now(),
             duration_secs: Some(60),
             project_id: None,
             is_idle: false,
@@ -785,7 +783,7 @@ mod tests {
             app_name: "Finder".into(),
             window_title: None,
             url: None,
-            started_at: Utc::now(),
+            started_at: Timestamp::now(),
             duration_secs: None,
             project_id: None,
             is_idle: true,

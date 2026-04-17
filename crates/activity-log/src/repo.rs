@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use chrono::{DateTime, Utc};
+use jiff::Timestamp;
 use storage::{StorageError, StoragePool};
 
 use crate::types::{ActivityActor, ActivityLogEntry, ActivitySource};
@@ -20,7 +20,7 @@ impl ActivityLogRepo {
         let metadata_str = entry.metadata.as_ref().map(|v| v.to_string());
         sqlx::query(INSERT_SQL)
             .bind(&entry.id)
-            .bind(entry.timestamp.to_rfc3339())
+            .bind(entry.timestamp.to_string())
             .bind(entry.source.as_str())
             .bind(entry.actor.as_str())
             .bind(&entry.resource_type)
@@ -54,7 +54,7 @@ impl ActivityLogRepo {
             let metadata_str = entry.metadata.as_ref().map(|v| v.to_string());
             sqlx::query(INSERT_SQL)
                 .bind(&entry.id)
-                .bind(entry.timestamp.to_rfc3339())
+                .bind(entry.timestamp.to_string())
                 .bind(entry.source.as_str())
                 .bind(entry.actor.as_str())
                 .bind(&entry.resource_type)
@@ -83,8 +83,8 @@ impl ActivityLogRepo {
 
     pub async fn query_range(
         pool: &StoragePool,
-        start: DateTime<Utc>,
-        end: DateTime<Utc>,
+        start: Timestamp,
+        end: Timestamp,
         limit: i64,
         offset: i64,
     ) -> common::Result<Vec<ActivityLogEntry>> {
@@ -94,8 +94,8 @@ impl ActivityLogRepo {
              ORDER BY timestamp DESC LIMIT ?3 OFFSET ?4"
         );
         let rows = sqlx::query_as::<_, RawRow>(&sql)
-            .bind(start.to_rfc3339())
-            .bind(end.to_rfc3339())
+            .bind(start.to_string())
+            .bind(end.to_string())
             .bind(limit)
             .bind(offset)
             .fetch_all(pool.inner())
@@ -108,8 +108,8 @@ impl ActivityLogRepo {
     pub async fn query_by_source(
         pool: &StoragePool,
         source: ActivitySource,
-        start: DateTime<Utc>,
-        end: DateTime<Utc>,
+        start: Timestamp,
+        end: Timestamp,
         limit: i64,
     ) -> common::Result<Vec<ActivityLogEntry>> {
         let sql = format!(
@@ -119,8 +119,8 @@ impl ActivityLogRepo {
         );
         let rows = sqlx::query_as::<_, RawRow>(&sql)
             .bind(source.as_str())
-            .bind(start.to_rfc3339())
-            .bind(end.to_rfc3339())
+            .bind(start.to_string())
+            .bind(end.to_string())
             .bind(limit)
             .fetch_all(pool.inner())
             .await
@@ -132,8 +132,8 @@ impl ActivityLogRepo {
     pub async fn query_by_resource(
         pool: &StoragePool,
         resource_id: &str,
-        start: DateTime<Utc>,
-        end: DateTime<Utc>,
+        start: Timestamp,
+        end: Timestamp,
     ) -> common::Result<Vec<ActivityLogEntry>> {
         let sql = format!(
             "SELECT {SELECT_COLS} FROM unified_activity_log \
@@ -142,8 +142,8 @@ impl ActivityLogRepo {
         );
         let rows = sqlx::query_as::<_, RawRow>(&sql)
             .bind(resource_id)
-            .bind(start.to_rfc3339())
-            .bind(end.to_rfc3339())
+            .bind(start.to_string())
+            .bind(end.to_string())
             .fetch_all(pool.inner())
             .await
             .map_err(StorageError::from)?;
@@ -154,8 +154,8 @@ impl ActivityLogRepo {
     pub async fn query_by_session(
         pool: &StoragePool,
         session_key: &str,
-        start: DateTime<Utc>,
-        end: DateTime<Utc>,
+        start: Timestamp,
+        end: Timestamp,
     ) -> common::Result<Vec<ActivityLogEntry>> {
         let sql = format!(
             "SELECT {SELECT_COLS} FROM unified_activity_log \
@@ -164,8 +164,8 @@ impl ActivityLogRepo {
         );
         let rows = sqlx::query_as::<_, RawRow>(&sql)
             .bind(session_key)
-            .bind(start.to_rfc3339())
-            .bind(end.to_rfc3339())
+            .bind(start.to_string())
+            .bind(end.to_string())
             .fetch_all(pool.inner())
             .await
             .map_err(StorageError::from)?;
@@ -176,8 +176,8 @@ impl ActivityLogRepo {
     pub async fn query_by_project(
         pool: &StoragePool,
         project_id: &str,
-        start: DateTime<Utc>,
-        end: DateTime<Utc>,
+        start: Timestamp,
+        end: Timestamp,
     ) -> common::Result<Vec<ActivityLogEntry>> {
         let sql = format!(
             "SELECT {SELECT_COLS} FROM unified_activity_log \
@@ -186,8 +186,8 @@ impl ActivityLogRepo {
         );
         let rows = sqlx::query_as::<_, RawRow>(&sql)
             .bind(project_id)
-            .bind(start.to_rfc3339())
-            .bind(end.to_rfc3339())
+            .bind(start.to_string())
+            .bind(end.to_string())
             .fetch_all(pool.inner())
             .await
             .map_err(StorageError::from)?;
@@ -209,16 +209,16 @@ impl ActivityLogRepo {
 
     pub async fn count_by_source(
         pool: &StoragePool,
-        start: DateTime<Utc>,
-        end: DateTime<Utc>,
+        start: Timestamp,
+        end: Timestamp,
     ) -> common::Result<HashMap<String, i64>> {
         let rows: Vec<(String, i64)> = sqlx::query_as(
             r#"SELECT source, COUNT(*) FROM unified_activity_log
                WHERE timestamp >= ?1 AND timestamp <= ?2
                GROUP BY source"#,
         )
-        .bind(start.to_rfc3339())
-        .bind(end.to_rfc3339())
+        .bind(start.to_string())
+        .bind(end.to_string())
         .fetch_all(pool.inner())
         .await
         .map_err(StorageError::from)?;
@@ -228,14 +228,14 @@ impl ActivityLogRepo {
 
     pub async fn count_by_source_since(
         pool: &StoragePool,
-        since: DateTime<Utc>,
+        since: Timestamp,
     ) -> common::Result<HashMap<String, i64>> {
-        Self::count_by_source(pool, since, Utc::now()).await
+        Self::count_by_source(pool, since, Timestamp::now()).await
     }
 
     pub async fn query_unassigned(
         pool: &StoragePool,
-        since: DateTime<Utc>,
+        since: Timestamp,
     ) -> common::Result<Vec<ActivityLogEntry>> {
         let sql = format!(
             "SELECT {SELECT_COLS} FROM unified_activity_log \
@@ -243,7 +243,7 @@ impl ActivityLogRepo {
              ORDER BY timestamp ASC LIMIT 500"
         );
         let rows = sqlx::query_as::<_, RawRow>(&sql)
-            .bind(since.to_rfc3339())
+            .bind(since.to_string())
             .fetch_all(pool.inner())
             .await
             .map_err(StorageError::from)?;
@@ -283,25 +283,22 @@ impl ActivityLogRepo {
         Ok(rows.into_iter().map(Into::into).collect())
     }
 
-    pub async fn count_since(pool: &StoragePool, since: DateTime<Utc>) -> common::Result<i64> {
+    pub async fn count_since(pool: &StoragePool, since: Timestamp) -> common::Result<i64> {
         let row: (i64,) =
             sqlx::query_as("SELECT COUNT(*) FROM unified_activity_log WHERE timestamp >= ?1")
-                .bind(since.to_rfc3339())
+                .bind(since.to_string())
                 .fetch_one(pool.inner())
                 .await
                 .map_err(StorageError::from)?;
         Ok(row.0)
     }
 
-    pub async fn count_assigned_since(
-        pool: &StoragePool,
-        since: DateTime<Utc>,
-    ) -> common::Result<i64> {
+    pub async fn count_assigned_since(pool: &StoragePool, since: Timestamp) -> common::Result<i64> {
         let row: (i64,) = sqlx::query_as(
             "SELECT COUNT(*) FROM unified_activity_log \
              WHERE work_context_id IS NOT NULL AND timestamp >= ?1",
         )
-        .bind(since.to_rfc3339())
+        .bind(since.to_string())
         .fetch_one(pool.inner())
         .await
         .map_err(StorageError::from)?;
@@ -309,9 +306,9 @@ impl ActivityLogRepo {
     }
 
     pub async fn delete_older_than(pool: &StoragePool, days: i64) -> common::Result<u64> {
-        let cutoff = Utc::now() - chrono::Duration::days(days);
+        let cutoff = Timestamp::now() - jiff::SignedDuration::from_secs(days * 86400);
         let result = sqlx::query("DELETE FROM unified_activity_log WHERE timestamp < ?1")
-            .bind(cutoff.to_rfc3339())
+            .bind(cutoff.to_string())
             .execute(pool.inner())
             .await
             .map_err(StorageError::from)?;
@@ -347,9 +344,10 @@ impl From<RawRow> for ActivityLogEntry {
     fn from(row: RawRow) -> Self {
         Self {
             id: row.id,
-            timestamp: chrono::DateTime::parse_from_rfc3339(&row.timestamp)
-                .map(|dt| dt.with_timezone(&Utc))
-                .unwrap_or_else(|_| Utc::now()),
+            timestamp: row
+                .timestamp
+                .parse::<Timestamp>()
+                .unwrap_or_else(|_| Timestamp::now()),
             source: ActivitySource::parse(&row.source).unwrap_or(ActivitySource::DomainEvent),
             actor: ActivityActor::parse(&row.actor).unwrap_or(ActivityActor::System),
             resource_type: row.resource_type,

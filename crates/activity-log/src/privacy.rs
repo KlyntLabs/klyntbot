@@ -90,12 +90,12 @@ mod tests {
     use super::*;
     use crate::normalizers::new_ulid;
     use crate::types::{ActivityActor, ActivitySource};
-    use chrono::Utc;
+    use jiff::Timestamp;
 
     fn make_entry(app: Option<&str>, resource_id: Option<&str>) -> ActivityLogEntry {
         ActivityLogEntry {
             id: new_ulid(),
-            timestamp: Utc::now(),
+            timestamp: Timestamp::now(),
             source: ActivitySource::OsWindow,
             actor: ActivityActor::User,
             resource_type: None,

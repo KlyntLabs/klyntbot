@@ -1,7 +1,7 @@
 use std::sync::Arc;
 use std::time::Duration;
 
-use chrono::Utc;
+use jiff::Timestamp;
 use storage::StoragePool;
 use tokio::task::JoinHandle;
 use tokio::time::Instant;
@@ -49,7 +49,7 @@ impl ContextInferenceLoop {
                         break;
                     }
                     _ = inference_interval.tick() => {
-                        let since = Utc::now() - chrono::Duration::minutes((interval_mins as i64) + 1);
+                        let since = Timestamp::now() - jiff::SignedDuration::from_secs(((interval_mins as i64) + 1) * 60);
                         match engine.process_recent_events(since).await {
                             Ok(assignments) => {
                                 if !assignments.is_empty() {

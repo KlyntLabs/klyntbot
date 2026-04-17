@@ -1,4 +1,4 @@
-use chrono::Utc;
+use jiff::Timestamp;
 use storage::{StorageError, StoragePool};
 
 use crate::types::WorkResource;
@@ -13,7 +13,7 @@ impl ContextResourceRepo {
         resource_id: &str,
         relevance_score: f64,
     ) -> common::Result<()> {
-        let now = Utc::now().to_rfc3339();
+        let now = Timestamp::now().to_string();
         sqlx::query(
             "INSERT INTO work_context_resources (context_id, resource_id, relevance_score, \
              first_associated_at, last_associated_at) \
@@ -114,7 +114,7 @@ impl ContextResourceRepo {
         .bind(context_id)
         .bind(resource_id)
         .bind(relevance_score)
-        .bind(Utc::now().to_rfc3339())
+        .bind(Timestamp::now().to_string())
         .execute(pool.inner())
         .await
         .map_err(StorageError::from)?;

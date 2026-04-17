@@ -1,4 +1,4 @@
-use chrono::{DateTime, Utc};
+use jiff::Timestamp;
 use serde::{Deserialize, Serialize};
 
 pub const MAX_PREVIEW_LEN: usize = 500;
@@ -8,7 +8,7 @@ pub const MAX_PREVIEW_LEN: usize = 500;
 #[serde(rename_all = "camelCase")]
 pub struct ActivityLogEntry {
     pub id: String,
-    pub timestamp: DateTime<Utc>,
+    pub timestamp: Timestamp,
     pub source: ActivitySource,
     pub actor: ActivityActor,
     pub resource_type: Option<String>,
@@ -132,12 +132,12 @@ pub struct WorkContext {
     pub color: Option<String>,
     pub tags: Vec<String>,
     pub confidence: f64,
-    pub first_seen_at: DateTime<Utc>,
-    pub last_active_at: DateTime<Utc>,
+    pub first_seen_at: Timestamp,
+    pub last_active_at: Timestamp,
     pub total_duration_secs: i64,
     pub event_count: i64,
-    pub created_at: DateTime<Utc>,
-    pub updated_at: DateTime<Utc>,
+    pub created_at: Timestamp,
+    pub updated_at: Timestamp,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -220,8 +220,8 @@ pub struct WorkResource {
     pub resource_name: String,
     pub resource_path: Option<String>,
     pub resource_uri: Option<String>,
-    pub first_seen_at: DateTime<Utc>,
-    pub last_seen_at: DateTime<Utc>,
+    pub first_seen_at: Timestamp,
+    pub last_seen_at: Timestamp,
     pub access_count: i64,
     pub embedding_id: Option<String>,
 }
@@ -233,8 +233,8 @@ pub struct ResourceEdge {
     pub target_id: String,
     pub edge_type: String,
     pub weight: f64,
-    pub first_seen_at: DateTime<Utc>,
-    pub last_seen_at: DateTime<Utc>,
+    pub first_seen_at: Timestamp,
+    pub last_seen_at: Timestamp,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
