@@ -988,8 +988,11 @@ mod tests {
         // 180 + N >= 180.5 + 0.5N -> 0.5N >= 0.5 -> N >= 1
         // But purity needs to hit exactly 0.50 with N=1: 181/362 = 0.5 — that's >= 0.50.
         let offset2 = offset + 181;
-        agg.process_tick(focus_tick(base + SignedDuration::from_secs(offset2 * 5), "Code"))
-            .await;
+        agg.process_tick(focus_tick(
+            base + SignedDuration::from_secs(offset2 * 5),
+            "Code",
+        ))
+        .await;
 
         assert_eq!(agg.state_name(), "active");
     }

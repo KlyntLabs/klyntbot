@@ -30,20 +30,14 @@ struct LearnedRuleRow {
 
 impl From<LearnedRuleRow> for LearnedRule {
     fn from(row: LearnedRuleRow) -> Self {
-        let last_used_at = row
-            .last_used_at
-            .parse::<Timestamp>()
-            .unwrap_or_else(|_| {
-                warn!(raw = %row.last_used_at, "unparseable last_used_at in distraction_learned_rules");
-                Timestamp::now()
-            });
-        let created_at = row
-            .created_at
-            .parse::<Timestamp>()
-            .unwrap_or_else(|_| {
-                warn!(raw = %row.created_at, "unparseable created_at in distraction_learned_rules");
-                Timestamp::now()
-            });
+        let last_used_at = row.last_used_at.parse::<Timestamp>().unwrap_or_else(|_| {
+            warn!(raw = %row.last_used_at, "unparseable last_used_at in distraction_learned_rules");
+            Timestamp::now()
+        });
+        let created_at = row.created_at.parse::<Timestamp>().unwrap_or_else(|_| {
+            warn!(raw = %row.created_at, "unparseable created_at in distraction_learned_rules");
+            Timestamp::now()
+        });
         Self {
             id: row.id,
             pattern: row.pattern,

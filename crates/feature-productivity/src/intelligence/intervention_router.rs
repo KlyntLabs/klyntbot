@@ -96,10 +96,7 @@ impl InterventionRouter {
         None
     }
 
-    fn check_context_switch_storm(
-        &mut self,
-        now: Timestamp,
-    ) -> Option<ProductivityIntervention> {
+    fn check_context_switch_storm(&mut self, now: Timestamp) -> Option<ProductivityIntervention> {
         let switches = self
             .recent_ticks
             .iter()
