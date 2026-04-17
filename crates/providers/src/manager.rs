@@ -5,7 +5,7 @@ use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::Arc;
 
 use async_trait::async_trait;
-use chrono::{DateTime, Utc};
+use jiff::Timestamp;
 use serde_json::Value;
 use tokio::sync::RwLock;
 
@@ -33,7 +33,7 @@ impl Default for CircuitBreakerConfig {
 
 /// Called when the circuit opens. Receives the UTC wall-clock deadline.
 /// Used by app-core to persist state across restarts.
-pub type OnCircuitOpen = Arc<dyn Fn(DateTime<Utc>) + Send + Sync>;
+pub type OnCircuitOpen = Arc<dyn Fn(Timestamp) + Send + Sync>;
 
 /// Degradation level emitted by [`OnProviderDegraded`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -57,7 +57,7 @@ pub struct ProviderManager {
     failure_count: Arc<AtomicU32>,
     circuit_open_until: Arc<RwLock<Option<tokio::time::Instant>>>,
     /// Wall-clock counterpart to `circuit_open_until` — serializable for persistence.
-    circuit_open_until_utc: Arc<RwLock<Option<DateTime<Utc>>>>,
+    circuit_open_until_utc: Arc<RwLock<Option<Timestamp>>>,
     circuit_config: CircuitBreakerConfig,
     /// Optional callback invoked when the circuit opens, for persistence.
     /// Stored behind RwLock so it can be set after Arc construction.
@@ -115,12 +115,13 @@ impl ProviderManager {
 
     /// Restore circuit breaker state from a persisted UTC deadline.
     /// Call this on startup after loading from storage. No-ops if deadline has already passed.
-    pub async fn restore_circuit_state(&self, open_until_utc: DateTime<Utc>) {
-        let remaining = open_until_utc - Utc::now();
-        if remaining.num_milliseconds() <= 0 {
+    pub async fn restore_circuit_state(&self, open_until_utc: Timestamp) {
+        let now = Timestamp::now();
+        let remaining_ms = (open_until_utc - now).get_milliseconds();
+        if remaining_ms <= 0 {
             return; // already expired — treat as closed
         }
-        let duration = std::time::Duration::from_millis(remaining.num_milliseconds() as u64);
+        let duration = std::time::Duration::from_millis(remaining_ms as u64);
         *self.circuit_open_until.write().await = Some(tokio::time::Instant::now() + duration);
         *self.circuit_open_until_utc.write().await = Some(open_until_utc);
         tracing::info!(
@@ -143,8 +144,9 @@ impl ProviderManager {
         let count = self.failure_count.fetch_add(1, Ordering::SeqCst) + 1;
         if count >= self.circuit_config.failure_threshold {
             let reset_dur = std::time::Duration::from_secs(self.circuit_config.reset_timeout_secs);
-            let open_until_utc = Utc::now()
-                + chrono::Duration::from_std(reset_dur).unwrap_or(chrono::Duration::seconds(60));
+            let jiff_dur = jiff::SignedDuration::try_from(reset_dur)
+                .unwrap_or(jiff::SignedDuration::from_secs(60));
+            let open_until_utc = Timestamp::now() + jiff_dur;
 
             *self.circuit_open_until.write().await = Some(tokio::time::Instant::now() + reset_dur);
             *self.circuit_open_until_utc.write().await = Some(open_until_utc);
