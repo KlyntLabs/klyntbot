@@ -1,6 +1,6 @@
 //! Domain models and SQLite row types for notes.
 
-use chrono::{DateTime, Utc};
+use jiff::Timestamp;
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -12,8 +12,8 @@ pub struct Notebook {
     pub icon: Option<String>,
     pub color: Option<String>,
     pub sort_order: i32,
-    pub created_at: DateTime<Utc>,
-    pub updated_at: DateTime<Utc>,
+    pub created_at: Timestamp,
+    pub updated_at: Timestamp,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -29,8 +29,8 @@ pub struct Note {
     pub icon: Option<String>,
     pub color: Option<String>,
     pub tags: Vec<String>,
-    pub created_at: DateTime<Utc>,
-    pub updated_at: DateTime<Utc>,
+    pub created_at: Timestamp,
+    pub updated_at: Timestamp,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -39,7 +39,7 @@ pub struct NoteVersion {
     pub id: String,
     pub note_id: String,
     pub body: String,
-    pub created_at: DateTime<Utc>,
+    pub created_at: Timestamp,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -150,13 +150,13 @@ impl From<NotebookRow> for Notebook {
             icon: r.icon,
             color: r.color,
             sort_order: r.sort_order,
-            created_at: r.created_at.parse().unwrap_or_else(|e| {
+            created_at: r.created_at.parse::<Timestamp>().unwrap_or_else(|e| {
                 tracing::warn!(raw = %r.created_at, error = %e, "failed to parse notebook created_at");
-                Default::default()
+                Timestamp::UNIX_EPOCH
             }),
-            updated_at: r.updated_at.parse().unwrap_or_else(|e| {
+            updated_at: r.updated_at.parse::<Timestamp>().unwrap_or_else(|e| {
                 tracing::warn!(raw = %r.updated_at, error = %e, "failed to parse notebook updated_at");
-                Default::default()
+                Timestamp::UNIX_EPOCH
             }),
         }
     }
@@ -177,13 +177,13 @@ impl Note {
             icon: row.icon,
             color: row.color,
             tags,
-            created_at: row.created_at.parse().unwrap_or_else(|e| {
+            created_at: row.created_at.parse::<Timestamp>().unwrap_or_else(|e| {
                 tracing::warn!(raw = %row.created_at, error = %e, "failed to parse note created_at");
-                Default::default()
+                Timestamp::UNIX_EPOCH
             }),
-            updated_at: row.updated_at.parse().unwrap_or_else(|e| {
+            updated_at: row.updated_at.parse::<Timestamp>().unwrap_or_else(|e| {
                 tracing::warn!(raw = %row.updated_at, error = %e, "failed to parse note updated_at");
-                Default::default()
+                Timestamp::UNIX_EPOCH
             }),
         }
     }
@@ -203,9 +203,9 @@ impl From<NoteVersionRow> for NoteVersion {
             id: r.id,
             note_id: r.note_id,
             body: r.body,
-            created_at: r.created_at.parse().unwrap_or_else(|e| {
+            created_at: r.created_at.parse::<Timestamp>().unwrap_or_else(|e| {
                 tracing::warn!(raw = %r.created_at, error = %e, "failed to parse version created_at");
-                Default::default()
+                Timestamp::UNIX_EPOCH
             }),
         }
     }

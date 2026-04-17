@@ -21,7 +21,7 @@ pub(crate) fn nullable_to_sentinel(v: Option<Option<&str>>) -> Option<&str> {
 
 /// UTC "now" as an ISO-8601 string (`YYYY-MM-DDTHH:MM:SSZ`).
 pub fn utc_now_str() -> String {
-    chrono::Utc::now().format("%Y-%m-%dT%H:%M:%SZ").to_string()
+    jiff::Timestamp::now().to_string()
 }
 
 #[derive(Debug, Clone)]
