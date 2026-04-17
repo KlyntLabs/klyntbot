@@ -22,7 +22,11 @@ impl EarlyTrialEvaluator for AppTrialEvaluator {
         since: DateTime<Utc>,
     ) -> common::Result<TrialEarlySignals> {
         let since_jiff = common::time::bridge::chrono_to_jiff(since);
-        let message_count = self.strategy_repo.count_since(since_jiff).await.unwrap_or(0);
+        let message_count = self
+            .strategy_repo
+            .count_since(since_jiff)
+            .await
+            .unwrap_or(0);
 
         // Baseline correction rate ~5%; positive delta means trial is better than baseline.
         let baseline_correction_rate = 0.05;
@@ -36,7 +40,11 @@ impl EarlyTrialEvaluator for AppTrialEvaluator {
         } else {
             // Compare first-half vs second-half activity to detect momentum.
             let midpoint = since + (Utc::now() - since) / 2;
-            let second_half = self.strategy_repo.count_since(common::time::bridge::chrono_to_jiff(midpoint)).await.unwrap_or(0);
+            let second_half = self
+                .strategy_repo
+                .count_since(common::time::bridge::chrono_to_jiff(midpoint))
+                .await
+                .unwrap_or(0);
             let first_half = message_count - second_half;
 
             if second_half > first_half + 2 {

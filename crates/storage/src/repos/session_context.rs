@@ -436,13 +436,11 @@ mod tests {
         .unwrap();
 
         // Make e1 old by manually setting updated_at (0 = epoch, far in the past)
-        sqlx::query(
-            "UPDATE session_context SET updated_at = 0 WHERE session_key = ?1",
-        )
-        .bind("test:e1")
-        .execute(&repo.pool)
-        .await
-        .unwrap();
+        sqlx::query("UPDATE session_context SET updated_at = 0 WHERE session_key = ?1")
+            .bind("test:e1")
+            .execute(&repo.pool)
+            .await
+            .unwrap();
 
         // Cleanup should only delete old ones
         let deleted = repo.cleanup_old_ephemeral(1).await.unwrap();

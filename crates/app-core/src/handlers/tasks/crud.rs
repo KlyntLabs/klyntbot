@@ -107,7 +107,10 @@ impl AppCore {
             key_result_id: None,
             parent_id: params.parent_id.clone(),
             priority: params.priority,
-            due_date: params.due_date.and_then(|d| parse_date(&d)).map(|d| common::time::bridge::chrono_to_jiff(d).into()),
+            due_date: params
+                .due_date
+                .and_then(|d| parse_date(&d))
+                .map(|d| common::time::bridge::chrono_to_jiff(d).into()),
             tags: params.tags.unwrap_or_default(),
             status: "todo".to_string(),
             focused_at: None,
@@ -168,7 +171,9 @@ impl AppCore {
             if created.due_date.is_some() {
                 bus.publish(bus::DomainEvent::TaskDueDateChanged {
                     task_id: id.clone(),
-                    due_date: created.due_date.map(|d| common::time::bridge::jiff_to_chrono(*d).to_rfc3339()),
+                    due_date: created
+                        .due_date
+                        .map(|d| common::time::bridge::jiff_to_chrono(*d).to_rfc3339()),
                 });
             }
         }
@@ -204,7 +209,10 @@ impl AppCore {
             description: params.description,
             priority: params.priority,
             status: params.status,
-            due_date: params.due_date.map(|opt| opt.and_then(|d| parse_date(&d)).map(|d| common::time::bridge::chrono_to_jiff(d))),
+            due_date: params.due_date.map(|opt| {
+                opt.and_then(|d| parse_date(&d))
+                    .map(|d| common::time::bridge::chrono_to_jiff(d))
+            }),
             tags: params.tags,
             area_id: params.area_id,
             project_id: params.project_id,
@@ -216,12 +224,14 @@ impl AppCore {
             energy_level: params.energy_level.map(Some),
             execution_state: params.execution_state,
             estimated_minutes: params.estimated_minutes,
-            scheduled_start: params
-                .scheduled_start
-                .map(|opt| opt.and_then(|d| common::parse_datetime(&d, "UTC")).map(|d| common::time::bridge::chrono_to_jiff(d))),
-            scheduled_end: params
-                .scheduled_end
-                .map(|opt| opt.and_then(|d| common::parse_datetime(&d, "UTC")).map(|d| common::time::bridge::chrono_to_jiff(d))),
+            scheduled_start: params.scheduled_start.map(|opt| {
+                opt.and_then(|d| common::parse_datetime(&d, "UTC"))
+                    .map(|d| common::time::bridge::chrono_to_jiff(d))
+            }),
+            scheduled_end: params.scheduled_end.map(|opt| {
+                opt.and_then(|d| common::parse_datetime(&d, "UTC"))
+                    .map(|d| common::time::bridge::chrono_to_jiff(d))
+            }),
             ..Default::default()
         };
 
@@ -303,7 +313,8 @@ impl AppCore {
                     if changed {
                         bus.publish(bus::DomainEvent::TaskDueDateChanged {
                             task_id: task_id.clone(),
-                            due_date: new_due.map(|d| common::time::bridge::jiff_to_chrono(d).to_rfc3339()),
+                            due_date: new_due
+                                .map(|d| common::time::bridge::jiff_to_chrono(d).to_rfc3339()),
                         });
                     }
                 }

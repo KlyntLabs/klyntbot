@@ -28,7 +28,9 @@ use sqlx::{
 
 /// Newtype wrapper: encodes/decodes `jiff::Timestamp` as an `INTEGER` column
 /// holding Unix epoch milliseconds.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, serde::Serialize, serde::Deserialize)]
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, serde::Serialize, serde::Deserialize,
+)]
 #[serde(transparent)]
 pub struct SqlTs(pub Timestamp);
 
@@ -73,10 +75,7 @@ impl std::fmt::Display for SqlTs {
 }
 
 impl<'q> Encode<'q, Sqlite> for SqlTs {
-    fn encode_by_ref(
-        &self,
-        buf: &mut Vec<SqliteArgumentValue<'q>>,
-    ) -> Result<IsNull, BoxDynError> {
+    fn encode_by_ref(&self, buf: &mut Vec<SqliteArgumentValue<'q>>) -> Result<IsNull, BoxDynError> {
         <i64 as Encode<'q, Sqlite>>::encode_by_ref(&self.0.as_millisecond(), buf)
     }
 }
@@ -85,7 +84,9 @@ impl<'q> Encode<'q, Sqlite> for SqlTs {
 
 /// Newtype wrapper: encodes/decodes `jiff::civil::Date` as a `TEXT` column
 /// in ISO `YYYY-MM-DD` format, matching SQLite's `date('now')` default.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, serde::Serialize, serde::Deserialize)]
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, serde::Serialize, serde::Deserialize,
+)]
 #[serde(transparent)]
 pub struct SqlDate(pub Date);
 
@@ -122,10 +123,7 @@ impl<'r> Decode<'r, Sqlite> for SqlDate {
 }
 
 impl<'q> Encode<'q, Sqlite> for SqlDate {
-    fn encode_by_ref(
-        &self,
-        buf: &mut Vec<SqliteArgumentValue<'q>>,
-    ) -> Result<IsNull, BoxDynError> {
+    fn encode_by_ref(&self, buf: &mut Vec<SqliteArgumentValue<'q>>) -> Result<IsNull, BoxDynError> {
         <String as Encode<'q, Sqlite>>::encode_by_ref(&self.0.to_string(), buf)
     }
 }

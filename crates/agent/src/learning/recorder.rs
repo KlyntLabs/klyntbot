@@ -143,7 +143,12 @@ impl OutcomeStore {
     pub async fn outcomes_since(&self, cutoff: DateTime<Utc>) -> Result<Vec<OutcomeRecord>> {
         match &self.backend {
             Backend::Sqlite(repo) => {
-                let rows = repo.list_by_date_range(common::time::bridge::chrono_to_jiff(cutoff), common::time::bridge::chrono_to_jiff(Utc::now())).await?;
+                let rows = repo
+                    .list_by_date_range(
+                        common::time::bridge::chrono_to_jiff(cutoff),
+                        common::time::bridge::chrono_to_jiff(Utc::now()),
+                    )
+                    .await?;
                 rows.into_iter()
                     .map(row_to_outcome)
                     .collect::<Result<Vec<_>>>()

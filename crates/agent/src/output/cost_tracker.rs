@@ -312,7 +312,8 @@ impl CostTracker {
 
     /// Generate a usage report for the last N days.
     pub async fn report(&self, days: u32) -> Result<UsageReport> {
-        let cutoff = common::time::bridge::chrono_to_jiff(Utc::now() - chrono::Duration::days(days as i64));
+        let cutoff =
+            common::time::bridge::chrono_to_jiff(Utc::now() - chrono::Duration::days(days as i64));
 
         let (total_requests_i64, total_cost) = self
             .sql_repo

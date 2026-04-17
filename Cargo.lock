@@ -2514,11 +2514,11 @@ name = "context_engine"
 version = "0.1.0"
 dependencies = [
  "async-trait",
- "chrono",
  "common",
  "config",
  "dashmap",
  "futures-util",
+ "jiff",
  "providers",
  "serde",
  "serde_json",
@@ -10374,10 +10374,10 @@ version = "0.1.0"
 dependencies = [
  "async-trait",
  "base64 0.22.1",
- "chrono",
  "common",
  "config",
  "futures-util",
+ "jiff",
  "reqwest 0.13.2",
  "serde",
  "serde_json",
@@ -11728,6 +11728,7 @@ dependencies = [
  "chrono-tz",
  "common",
  "cron",
+ "jiff",
  "serde",
  "serde_json",
  "storage",
@@ -12175,10 +12176,10 @@ dependencies = [
 name = "session"
 version = "0.1.0"
 dependencies = [
- "chrono",
  "common",
  "dashmap",
  "indexmap 2.14.0",
+ "jiff",
  "serde",
  "serde_json",
  "sqlx",
@@ -12368,7 +12369,6 @@ name = "skill-system"
 version = "0.1.0"
 dependencies = [
  "async-trait",
- "chrono",
  "common",
  "config",
  "context_engine",

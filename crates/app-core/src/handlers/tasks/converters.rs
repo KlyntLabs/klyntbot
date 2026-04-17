@@ -24,7 +24,11 @@ pub fn row_to_task_response(
         completed: row.completed,
         priority: priority_label(row.priority),
         status: row.status.clone(),
-        due_date: row.due_date.map(|d| common::time::bridge::jiff_to_chrono(*d).format("%Y-%m-%d").to_string()),
+        due_date: row.due_date.map(|d| {
+            common::time::bridge::jiff_to_chrono(*d)
+                .format("%Y-%m-%d")
+                .to_string()
+        }),
         tags: row.tags.clone(),
         project_id: row.project_id.clone(),
         area_id: row.area_id.clone(),
@@ -44,21 +48,33 @@ pub fn row_to_task_response(
         actual_minutes: row.actual_minutes,
         complexity_score: row.complexity_score,
         total_tracked_secs: Some(row.total_tracked_secs),
-        focused_at: row.focused_at.map(|dt| common::time::bridge::jiff_to_chrono(*dt).to_rfc3339()),
+        focused_at: row
+            .focused_at
+            .map(|dt| common::time::bridge::jiff_to_chrono(*dt).to_rfc3339()),
         created_at: Some(common::time::bridge::jiff_to_chrono(*row.created_at).to_rfc3339()),
         updated_at: Some(common::time::bridge::jiff_to_chrono(*row.updated_at).to_rfc3339()),
-        scheduled_start: row.scheduled_start.map(|dt| common::time::bridge::jiff_to_chrono(*dt).to_rfc3339()),
-        scheduled_end: row.scheduled_end.map(|dt| common::time::bridge::jiff_to_chrono(*dt).to_rfc3339()),
+        scheduled_start: row
+            .scheduled_start
+            .map(|dt| common::time::bridge::jiff_to_chrono(*dt).to_rfc3339()),
+        scheduled_end: row
+            .scheduled_end
+            .map(|dt| common::time::bridge::jiff_to_chrono(*dt).to_rfc3339()),
     }
 }
 
 pub fn action_to_today_task(row: &TaskRow, now: DateTime<Utc>) -> TodayTaskResponse {
     let local_today = now.with_timezone(&chrono::Local).date_naive();
-    let is_overdue = row.due_date.is_some_and(|d| common::time::bridge::jiff_to_chrono(*d) < now) && !row.completed;
+    let is_overdue = row
+        .due_date
+        .is_some_and(|d| common::time::bridge::jiff_to_chrono(*d) < now)
+        && !row.completed;
     let is_due_today = !is_overdue
-        && row
-            .due_date
-            .is_some_and(|d| common::time::bridge::jiff_to_chrono(*d).with_timezone(&chrono::Local).date_naive() == local_today);
+        && row.due_date.is_some_and(|d| {
+            common::time::bridge::jiff_to_chrono(*d)
+                .with_timezone(&chrono::Local)
+                .date_naive()
+                == local_today
+        });
 
     let due_display = if is_overdue {
         row.due_date.map(|d| {
@@ -81,7 +97,11 @@ pub fn action_to_today_task(row: &TaskRow, now: DateTime<Utc>) -> TodayTaskRespo
             )
         })
     } else {
-        row.due_date.map(|d| common::time::bridge::jiff_to_chrono(*d).format("%b %-d").to_string())
+        row.due_date.map(|d| {
+            common::time::bridge::jiff_to_chrono(*d)
+                .format("%b %-d")
+                .to_string()
+        })
     };
 
     TodayTaskResponse {

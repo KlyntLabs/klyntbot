@@ -112,7 +112,10 @@ impl CrossDomainSearcherImpl {
     /// Look up task metadata by ID. Returns (title, created_at) if found.
     async fn lookup_task(&self, id: &str) -> Option<(String, DateTime<Utc>)> {
         match self.task_repo.get(id).await {
-            Ok(Some(row)) => Some((row.title, common::time::bridge::jiff_to_chrono(*row.created_at))),
+            Ok(Some(row)) => Some((
+                row.title,
+                common::time::bridge::jiff_to_chrono(*row.created_at),
+            )),
             Ok(None) => {
                 debug!(id, "task not found for cross-domain hit");
                 None

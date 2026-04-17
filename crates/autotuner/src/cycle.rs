@@ -206,7 +206,10 @@ impl NightlyCycle {
         // Collect diagnostic health report
         let match_rate = self
             .repo
-            .shadow_log_agreement_rate(None, chrono_to_jiff(Utc::now() - chrono::Duration::hours(24)))
+            .shadow_log_agreement_rate(
+                None,
+                chrono_to_jiff(Utc::now() - chrono::Duration::hours(24)),
+            )
             .await
             .unwrap_or(1.0);
         let health = AutotunerHealth::diagnose(completed_count, match_rate, promotion.is_some());

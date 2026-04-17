@@ -35,7 +35,10 @@ impl AppCore {
         let id = uuid::Uuid::new_v4().to_string();
         let now: storage::SqlTs = common::time::bridge::chrono_to_jiff(chrono::Utc::now()).into();
 
-        let due_date: Option<storage::SqlTs> = params.due_date.and_then(|d| parse_date(&d)).map(|d| common::time::bridge::chrono_to_jiff(d).into());
+        let due_date: Option<storage::SqlTs> = params
+            .due_date
+            .and_then(|d| parse_date(&d))
+            .map(|d| common::time::bridge::chrono_to_jiff(d).into());
 
         let row = ObjectiveRow {
             id: id.clone(),
@@ -81,7 +84,10 @@ impl AppCore {
         &self,
         params: ObjectiveUpdateParams,
     ) -> HandlerResult<ObjectiveResponse> {
-        let due_date = params.due_date.map(|opt| opt.and_then(|d| parse_date(&d)).map(|d| common::time::bridge::chrono_to_jiff(d)));
+        let due_date = params.due_date.map(|opt| {
+            opt.and_then(|d| parse_date(&d))
+                .map(|d| common::time::bridge::chrono_to_jiff(d))
+        });
 
         let updated = self
             .repos

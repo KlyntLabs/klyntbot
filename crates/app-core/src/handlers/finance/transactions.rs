@@ -33,7 +33,8 @@ impl AppCore {
             .tx_date
             .and_then(|d| parse_naive_date(&d))
             .unwrap_or_else(|| now_chrono.date_naive());
-        let tx_date: storage::SqlDate = common::time::bridge::chrono_date_to_jiff(tx_date_naive).into();
+        let tx_date: storage::SqlDate =
+            common::time::bridge::chrono_date_to_jiff(tx_date_naive).into();
 
         let account = self
             .repos
@@ -136,8 +137,14 @@ impl AppCore {
             account_id: params.account_id,
             tx_type: params.tx_type,
             category: params.category,
-            date_from: params.date_from.and_then(|d| parse_naive_date(&d)).map(|d| common::time::bridge::chrono_date_to_jiff(d).into()),
-            date_to: params.date_to.and_then(|d| parse_naive_date(&d)).map(|d| common::time::bridge::chrono_date_to_jiff(d).into()),
+            date_from: params
+                .date_from
+                .and_then(|d| parse_naive_date(&d))
+                .map(|d| common::time::bridge::chrono_date_to_jiff(d).into()),
+            date_to: params
+                .date_to
+                .and_then(|d| parse_naive_date(&d))
+                .map(|d| common::time::bridge::chrono_date_to_jiff(d).into()),
             query: params.query,
             limit: params.limit,
             ..Default::default()

@@ -93,7 +93,8 @@ impl FinanceHandler for FinanceHandlerImpl {
             .filter(|g| {
                 g.deadline
                     .map(|d| {
-                        let days_left = (common::time::bridge::jiff_date_to_chrono(*d) - today).num_days();
+                        let days_left =
+                            (common::time::bridge::jiff_date_to_chrono(*d) - today).num_days();
                         (0..=7).contains(&days_left)
                     })
                     .unwrap_or(false)
@@ -102,7 +103,9 @@ impl FinanceHandler for FinanceHandlerImpl {
         if !approaching.is_empty() {
             let mut goal_lines = vec!["### Goals Approaching Deadline".to_string()];
             for g in &approaching {
-                let days = (common::time::bridge::jiff_date_to_chrono(*g.deadline.unwrap()) - today).num_days();
+                let days = (common::time::bridge::jiff_date_to_chrono(*g.deadline.unwrap())
+                    - today)
+                    .num_days();
                 let pct = if g.target_amount > 0 {
                     (g.current_amount as f64 / g.target_amount as f64) * 100.0
                 } else {
@@ -253,7 +256,11 @@ impl FinanceHandler for FinanceHandlerImpl {
         let today = chrono::Local::now().date_naive();
         let overdue = goals
             .iter()
-            .filter(|g| g.deadline.map(|d| common::time::bridge::jiff_date_to_chrono(*d) < today).unwrap_or(false))
+            .filter(|g| {
+                g.deadline
+                    .map(|d| common::time::bridge::jiff_date_to_chrono(*d) < today)
+                    .unwrap_or(false)
+            })
             .count();
         if overdue > 0 {
             issues.push(format!(

@@ -17,7 +17,10 @@ pub async fn load_tool_failures(
     outcome_repo: &storage::OutcomeRepo,
     since: chrono::DateTime<chrono::Utc>,
 ) -> Vec<ToolFailureSummary> {
-    match outcome_repo.tool_failure_stats_since(common::time::bridge::chrono_to_jiff(since)).await {
+    match outcome_repo
+        .tool_failure_stats_since(common::time::bridge::chrono_to_jiff(since))
+        .await
+    {
         Ok(rows) => rows
             .into_iter()
             .map(|r| ToolFailureSummary {

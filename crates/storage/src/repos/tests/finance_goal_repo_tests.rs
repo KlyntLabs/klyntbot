@@ -2,7 +2,7 @@
 
 #[cfg(test)]
 mod tests {
-    
+
     use crate::repos::finance_goal_repo::FinanceGoalRepo;
     use crate::rows::finance::{FinanceGoalPatch, FinanceGoalRow};
     use crate::StoragePool;

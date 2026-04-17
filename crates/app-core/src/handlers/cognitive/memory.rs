@@ -560,7 +560,11 @@ impl AppCore {
                         details.insert("Priority".to_string(), label.to_string());
                     }
                     let subtitle = if let Some(due) = task.due_date {
-                        format!("{} · due {}", task.status, common::time::bridge::jiff_to_chrono(*due).format("%Y-%m-%d"))
+                        format!(
+                            "{} · due {}",
+                            task.status,
+                            common::time::bridge::jiff_to_chrono(*due).format("%Y-%m-%d")
+                        )
                     } else {
                         task.status.clone()
                     };

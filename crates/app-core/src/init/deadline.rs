@@ -307,7 +307,10 @@ async fn handle_domain_event(
                     let remind_at = due - Duration::hours(2);
                     if remind_at > Utc::now() {
                         scheduler
-                            .schedule(common::time::bridge::chrono_to_jiff(remind_at), DeadlineAction::TaskReminder { task_id, label })
+                            .schedule(
+                                common::time::bridge::chrono_to_jiff(remind_at),
+                                DeadlineAction::TaskReminder { task_id, label },
+                            )
                             .await;
                     }
                 }
@@ -348,7 +351,10 @@ async fn handle_domain_event(
 
                     // Schedule the expire action.
                     scheduler
-                        .schedule(common::time::bridge::chrono_to_jiff(deadline), DeadlineAction::FocusExpire { task_id })
+                        .schedule(
+                            common::time::bridge::chrono_to_jiff(deadline),
+                            DeadlineAction::FocusExpire { task_id },
+                        )
                         .await;
                 }
             }
@@ -367,7 +373,10 @@ async fn handle_domain_event(
                 if let Ok(next_date) = date_str.parse::<DateTime<Utc>>() {
                     if next_date > Utc::now() {
                         scheduler
-                            .schedule(common::time::bridge::chrono_to_jiff(next_date), DeadlineAction::SpawnRecurring { template_id })
+                            .schedule(
+                                common::time::bridge::chrono_to_jiff(next_date),
+                                DeadlineAction::SpawnRecurring { template_id },
+                            )
                             .await;
                     }
                 }

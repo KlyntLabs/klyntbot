@@ -604,7 +604,9 @@ mod tests {
         {
             let row = StrategyRecordRow {
                 id: uuid::Uuid::new_v4(),
-                timestamp: crate::sqlite_types::SqlTs::from(now + jiff::SignedDuration::from_secs(i as i64)),
+                timestamp: crate::sqlite_types::SqlTs::from(
+                    now + jiff::SignedDuration::from_secs(i as i64),
+                ),
                 request_id: format!("req-{}", i),
                 predicted_strategy: pred.to_string(),
                 actual_strategy: actual.to_string(),

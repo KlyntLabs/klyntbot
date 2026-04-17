@@ -568,12 +568,8 @@ impl FinanceTool {
             let prices: Vec<(jiff::civil::Date, common::Decimal)> = txs
                 .iter()
                 .filter_map(|tx| {
-                    tx.price_per_unit.map(|price| {
-                        (
-                            *tx.tx_date,
-                            common::Decimal::new(price, 0),
-                        )
-                    })
+                    tx.price_per_unit
+                        .map(|price| (*tx.tx_date, common::Decimal::new(price, 0)))
                 })
                 .collect();
 

@@ -108,7 +108,9 @@ pub async fn build_dashboard_data(
             title: t.title.clone(),
             status: t.status.clone(),
             project_name: t.project_id.clone(),
-            due_date: t.due_date.map(|d| common::time::bridge::jiff_to_chrono(*d).to_rfc3339()),
+            due_date: t
+                .due_date
+                .map(|d| common::time::bridge::jiff_to_chrono(*d).to_rfc3339()),
         })
         .collect();
 

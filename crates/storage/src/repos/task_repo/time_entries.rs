@@ -1,6 +1,5 @@
 //! Task time entry operations.
 
-
 use super::TaskRepo;
 use crate::error::StorageError;
 use crate::rows::task::TaskTimeEntryRow;
@@ -170,9 +169,11 @@ impl TaskRepo {
 /// Convert a `YYYY-MM-DD` date string to epoch milliseconds.
 /// If `next_day` is true, returns the start of the following day (exclusive upper bound).
 fn date_str_to_ms(date: &str, next_day: bool) -> i64 {
-    let d: jiff::civil::Date = date
-        .parse()
-        .unwrap_or_else(|_| jiff::Timestamp::now().to_zoned(jiff::tz::TimeZone::UTC).date());
+    let d: jiff::civil::Date = date.parse().unwrap_or_else(|_| {
+        jiff::Timestamp::now()
+            .to_zoned(jiff::tz::TimeZone::UTC)
+            .date()
+    });
     let d = if next_day {
         d.checked_add(jiff::Span::new().days(1)).unwrap_or(d)
     } else {

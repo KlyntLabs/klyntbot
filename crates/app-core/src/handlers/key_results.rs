@@ -66,7 +66,10 @@ impl AppCore {
         &self,
         params: KeyResultUpdateParams,
     ) -> HandlerResult<KeyResultResponse> {
-        let due_date = params.due_date.map(|opt| opt.and_then(|d| parse_date(&d)).map(|d| common::time::bridge::chrono_to_jiff(d)));
+        let due_date = params.due_date.map(|opt| {
+            opt.and_then(|d| parse_date(&d))
+                .map(|d| common::time::bridge::chrono_to_jiff(d))
+        });
 
         let updated = self
             .repos

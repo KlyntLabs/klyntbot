@@ -110,7 +110,12 @@ impl FinanceTool {
         let today = Local::now().date_naive();
         let overdue_goals: Vec<_> = goals
             .iter()
-            .filter(|g| g.deadline.as_ref().map(|d| jiff_date_to_chrono(**d) < today).unwrap_or(false))
+            .filter(|g| {
+                g.deadline
+                    .as_ref()
+                    .map(|d| jiff_date_to_chrono(**d) < today)
+                    .unwrap_or(false)
+            })
             .collect();
         if !overdue_goals.is_empty() {
             issues.push(Issue {

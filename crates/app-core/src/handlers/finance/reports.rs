@@ -85,7 +85,10 @@ impl AppCore {
     ) -> HandlerResult<FinanceGoalRow> {
         let id = uuid::Uuid::new_v4().to_string();
         let now: storage::SqlTs = common::time::bridge::chrono_to_jiff(chrono::Utc::now()).into();
-        let deadline: Option<storage::SqlDate> = params.deadline.and_then(|d| parse_naive_date(&d)).map(|d| common::time::bridge::chrono_date_to_jiff(d).into());
+        let deadline: Option<storage::SqlDate> = params
+            .deadline
+            .and_then(|d| parse_naive_date(&d))
+            .map(|d| common::time::bridge::chrono_date_to_jiff(d).into());
         let currency = match params.currency {
             Some(c) => c,
             None => self.default_currency().await,
@@ -125,9 +128,10 @@ impl AppCore {
         &self,
         params: FinanceGoalUpdateParams,
     ) -> HandlerResult<FinanceGoalRow> {
-        let deadline: Option<Option<storage::SqlDate>> = params
-            .deadline
-            .map(|opt| opt.and_then(|d| parse_naive_date(&d)).map(|d| common::time::bridge::chrono_date_to_jiff(d).into()));
+        let deadline: Option<Option<storage::SqlDate>> = params.deadline.map(|opt| {
+            opt.and_then(|d| parse_naive_date(&d))
+                .map(|d| common::time::bridge::chrono_date_to_jiff(d).into())
+        });
         let patch = FinanceGoalPatch {
             id: params.id.clone(),
             current_amount: params.current_amount,
@@ -163,7 +167,10 @@ impl AppCore {
     ) -> HandlerResult<FinanceLiabilityRow> {
         let id = uuid::Uuid::new_v4().to_string();
         let now: storage::SqlTs = common::time::bridge::chrono_to_jiff(chrono::Utc::now()).into();
-        let due_date: Option<storage::SqlDate> = params.due_date.and_then(|d| parse_naive_date(&d)).map(|d| common::time::bridge::chrono_date_to_jiff(d).into());
+        let due_date: Option<storage::SqlDate> = params
+            .due_date
+            .and_then(|d| parse_naive_date(&d))
+            .map(|d| common::time::bridge::chrono_date_to_jiff(d).into());
         let currency = match params.currency {
             Some(c) => c,
             None => self.default_currency().await,

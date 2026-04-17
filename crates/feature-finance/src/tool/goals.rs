@@ -288,7 +288,12 @@ impl FinanceTool {
                 let cats = self
                     .storage
                     .transactions
-                    .sum_by_category(chrono_date_to_jiff(date_from), chrono_date_to_jiff(today), "expense", &self.default_currency)
+                    .sum_by_category(
+                        chrono_date_to_jiff(date_from),
+                        chrono_date_to_jiff(today),
+                        "expense",
+                        &self.default_currency,
+                    )
                     .await?;
                 cats.iter().map(|(_, total)| total).sum()
             }

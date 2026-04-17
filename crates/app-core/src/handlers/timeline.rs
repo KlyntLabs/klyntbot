@@ -90,8 +90,12 @@ impl AppCore {
                     return None;
                 }
                 let filter = storage::rows::finance::FinanceTransactionFilter {
-                    date_from: chrono::NaiveDate::parse_from_str(start, "%Y-%m-%d").ok().map(|d| common::time::bridge::chrono_date_to_jiff(d).into()),
-                    date_to: chrono::NaiveDate::parse_from_str(end, "%Y-%m-%d").ok().map(|d| common::time::bridge::chrono_date_to_jiff(d).into()),
+                    date_from: chrono::NaiveDate::parse_from_str(start, "%Y-%m-%d")
+                        .ok()
+                        .map(|d| common::time::bridge::chrono_date_to_jiff(d).into()),
+                    date_to: chrono::NaiveDate::parse_from_str(end, "%Y-%m-%d")
+                        .ok()
+                        .map(|d| common::time::bridge::chrono_date_to_jiff(d).into()),
                     limit: Some(100),
                     ..Default::default()
                 };
@@ -194,7 +198,9 @@ fn normalize_time_entry(te: storage::TimeEntryWithTask) -> TimelineEntry {
         title: te.task_title,
         description: te.note,
         started_at: common::time::bridge::jiff_to_chrono(*te.started_at).to_rfc3339(),
-        ended_at: te.ended_at.map(|t| common::time::bridge::jiff_to_chrono(*t).to_rfc3339()),
+        ended_at: te
+            .ended_at
+            .map(|t| common::time::bridge::jiff_to_chrono(*t).to_rfc3339()),
         duration_secs: te.duration_secs,
         entity_id: Some(te.task_id.clone()),
         entity_route: Some(format!("/task/{}", te.task_id)),

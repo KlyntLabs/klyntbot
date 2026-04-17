@@ -1,7 +1,10 @@
 //! Focus, unfocus, and log_time action handlers.
 
 use chrono::Utc;
-use common::{time::bridge::{chrono_to_jiff, jiff_to_chrono}, Result, ToolError};
+use common::{
+    time::bridge::{chrono_to_jiff, jiff_to_chrono},
+    Result, ToolError,
+};
 use tools_core::ParamExtractor;
 
 use super::super::TaskTool;
@@ -9,7 +12,9 @@ use super::super::TaskTool;
 impl TaskTool {
     pub(crate) async fn handle_focus(&self, p: &ParamExtractor<'_>) -> Result<String> {
         let id = p.required_str("id")?;
-        let deadline = Some(chrono_to_jiff(Utc::now() + chrono::Duration::hours(self.focus_deadline_hours as i64)));
+        let deadline = Some(chrono_to_jiff(
+            Utc::now() + chrono::Duration::hours(self.focus_deadline_hours as i64),
+        ));
 
         // Accept optional energy_level for the focus session
         let energy_level = p.optional_str("energy_level")?;
@@ -23,7 +28,14 @@ impl TaskTool {
             let has_running = te_rows.iter().any(|e| e.ended_at.is_none());
             if !has_running {
                 self.repo
-                    .add_time_entry(id, "focus", chrono_to_jiff(Utc::now()), None, None, energy_level)
+                    .add_time_entry(
+                        id,
+                        "focus",
+                        chrono_to_jiff(Utc::now()),
+                        None,
+                        None,
+                        energy_level,
+                    )
                     .await?;
             }
 

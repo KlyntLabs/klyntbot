@@ -2,7 +2,7 @@
 
 #[cfg(test)]
 mod tests {
-    
+
     use crate::repos::finance_investment_repo::FinanceInvestmentRepo;
     use crate::rows::finance::{FinanceInvestmentRow, FinanceInvestmentTxRow, FinancePortfolioRow};
     use crate::StoragePool;
@@ -43,7 +43,9 @@ mod tests {
             currency: "VND".to_string(),
             current_price: None,
             current_value: None,
-            purchase_date: Some(crate::sqlite_types::SqlDate::from(jiff::civil::Date::new(2025, 1, 15).unwrap())),
+            purchase_date: Some(crate::sqlite_types::SqlDate::from(
+                jiff::civil::Date::new(2025, 1, 15).unwrap(),
+            )),
             asset_class: None,
             notes: None,
             created_at: now,

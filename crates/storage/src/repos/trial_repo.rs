@@ -176,8 +176,9 @@ impl TrialRepo {
         max_age_days: u32,
         min_messages: u32,
     ) -> Result<u32, StorageError> {
-        let cutoff =
-            (jiff::Timestamp::now() - jiff::SignedDuration::from_hours((max_age_days as i64) * 24)).to_string();
+        let cutoff = (jiff::Timestamp::now()
+            - jiff::SignedDuration::from_hours((max_age_days as i64) * 24))
+        .to_string();
         let result = sqlx::query(
             "UPDATE autotuner_trials SET status = 'completed', completed_at = datetime('now')
              WHERE status = 'active'
@@ -632,7 +633,10 @@ mod tests {
         // Verify via agreement rate — predicted_mode="direct" vs control_mode="reactive"
         // means 0% agreement
         let rate = repo
-            .shadow_log_agreement_rate(Some("trial-gt"), jiff::Timestamp::now() - jiff::SignedDuration::from_hours(1))
+            .shadow_log_agreement_rate(
+                Some("trial-gt"),
+                jiff::Timestamp::now() - jiff::SignedDuration::from_hours(1),
+            )
             .await
             .unwrap();
         assert!(
@@ -684,7 +688,10 @@ mod tests {
         let repo = setup().await;
 
         let rate = repo
-            .shadow_log_agreement_rate(None, jiff::Timestamp::now() - jiff::SignedDuration::from_hours(1))
+            .shadow_log_agreement_rate(
+                None,
+                jiff::Timestamp::now() - jiff::SignedDuration::from_hours(1),
+            )
             .await
             .unwrap();
 

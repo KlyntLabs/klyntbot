@@ -875,7 +875,9 @@ async fn test_summary_and_overdue() {
 
     // Overdue: task with past due date and not completed
     let mut overdue_task = make_task("sum4", "Overdue task");
-    overdue_task.due_date = Some(crate::sqlite_types::SqlTs::from(jiff::Timestamp::now() - jiff::SignedDuration::from_hours(24)));
+    overdue_task.due_date = Some(crate::sqlite_types::SqlTs::from(
+        jiff::Timestamp::now() - jiff::SignedDuration::from_hours(24),
+    ));
     repo.add(&overdue_task).await.unwrap();
 
     let overdue = repo.overdue().await.unwrap();

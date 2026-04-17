@@ -6,7 +6,7 @@
 #[cfg(test)]
 mod tests {
     use crate::sqlite_types::{SqlDate, SqlTs};
-use jiff::{civil::Date, Timestamp};
+    use jiff::{civil::Date, Timestamp};
     use uuid::Uuid;
 
     use crate::repos::project_repo::ProjectWithStats;

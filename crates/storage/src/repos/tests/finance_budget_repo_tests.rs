@@ -2,7 +2,7 @@
 
 #[cfg(test)]
 mod tests {
-    
+
     use crate::repos::finance_account_repo::FinanceAccountRepo;
     use crate::repos::finance_budget_repo::FinanceBudgetRepo;
     use crate::repos::finance_transaction_repo::FinanceTransactionRepo;

@@ -1,6 +1,9 @@
 //! Show, list, summary, and tree action handlers.
 
-use common::{time::bridge::{chrono_to_jiff, jiff_to_chrono}, Result, ToolError};
+use common::{
+    time::bridge::{chrono_to_jiff, jiff_to_chrono},
+    Result, ToolError,
+};
 use futures_util::future::try_join_all;
 use tools_core::ParamExtractor;
 

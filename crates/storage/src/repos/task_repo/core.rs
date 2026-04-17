@@ -156,15 +156,30 @@ impl TaskRepo {
         .bind(patch.priority.is_some()) // ?5
         .bind(patch.priority.unwrap_or_default()) // ?6
         .bind(patch.due_date.is_some()) // ?7
-        .bind(patch.due_date.unwrap_or_default().map(|t| t.as_millisecond())) // ?8
+        .bind(
+            patch
+                .due_date
+                .unwrap_or_default()
+                .map(|t| t.as_millisecond()),
+        ) // ?8
         .bind(patch.tags.as_ref().map(sqlx::types::Json)) // ?9
         .bind(&patch.status) // ?10
         .bind(patch.calendar_event_uid.is_some()) // ?11
         .bind(patch.calendar_event_uid.as_ref().and_then(|v| v.as_deref())) // ?12
         .bind(patch.next_instance_date.is_some()) // ?13
-        .bind(patch.next_instance_date.unwrap_or_default().map(|t| t.as_millisecond())) // ?14
+        .bind(
+            patch
+                .next_instance_date
+                .unwrap_or_default()
+                .map(|t| t.as_millisecond()),
+        ) // ?14
         .bind(patch.last_reminded_at.is_some()) // ?15
-        .bind(patch.last_reminded_at.unwrap_or_default().map(|t| t.as_millisecond())) // ?16
+        .bind(
+            patch
+                .last_reminded_at
+                .unwrap_or_default()
+                .map(|t| t.as_millisecond()),
+        ) // ?16
         .bind(patch.estimated_minutes.is_some()) // ?17
         .bind(patch.estimated_minutes.unwrap_or_default()) // ?18
         .bind(patch.recurrence_rule.is_some()) // ?19
@@ -207,9 +222,19 @@ impl TaskRepo {
         .bind(patch.objective_id.is_some()) // ?46
         .bind(patch.objective_id.as_ref().and_then(|v| v.as_deref())) // ?47
         .bind(patch.scheduled_start.is_some()) // ?48
-        .bind(patch.scheduled_start.unwrap_or_default().map(|t| t.as_millisecond())) // ?49
+        .bind(
+            patch
+                .scheduled_start
+                .unwrap_or_default()
+                .map(|t| t.as_millisecond()),
+        ) // ?49
         .bind(patch.scheduled_end.is_some()) // ?50
-        .bind(patch.scheduled_end.unwrap_or_default().map(|t| t.as_millisecond())) // ?51
+        .bind(
+            patch
+                .scheduled_end
+                .unwrap_or_default()
+                .map(|t| t.as_millisecond()),
+        ) // ?51
         .fetch_optional(&self.pool)
         .await?
         .ok_or_not_found(&format!("task {}", patch.id))?;

@@ -97,7 +97,9 @@ impl RecurringTaskSpawner {
             };
 
             // Check if an instance is due
-            let next_instance_date_chrono = tpl_row.next_instance_date.map(|ts| common::time::bridge::jiff_to_chrono(*ts));
+            let next_instance_date_chrono = tpl_row
+                .next_instance_date
+                .map(|ts| common::time::bridge::jiff_to_chrono(*ts));
             if !rrule_utils::should_spawn_instance(next_instance_date_chrono, now) {
                 continue;
             }

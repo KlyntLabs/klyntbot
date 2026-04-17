@@ -81,7 +81,8 @@ impl TaskRepo {
         &self,
         lookback_days: u32,
     ) -> Result<Vec<TaskEstimationRow>, StorageError> {
-        let cutoff = jiff::Timestamp::now() - jiff::SignedDuration::from_hours((lookback_days as i64) * 24);
+        let cutoff =
+            jiff::Timestamp::now() - jiff::SignedDuration::from_hours((lookback_days as i64) * 24);
         let rows = sqlx::query_as::<_, TaskEstimationRow>(
             "SELECT * FROM task_estimation_history WHERE completed_at >= ?1 ORDER BY completed_at DESC",
         )

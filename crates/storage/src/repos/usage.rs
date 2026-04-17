@@ -99,8 +99,8 @@ impl UsageRepo {
     pub async fn total_cost_current_month(&self) -> Result<f64, StorageError> {
         let now = jiff::Timestamp::now();
         let today = now.to_zoned(jiff::tz::TimeZone::UTC).date();
-        let month_start_date = jiff::civil::Date::new(today.year(), today.month(), 1)
-            .expect("valid date");
+        let month_start_date =
+            jiff::civil::Date::new(today.year(), today.month(), 1).expect("valid date");
         let month_start = month_start_date
             .at(0, 0, 0, 0)
             .to_zoned(jiff::tz::TimeZone::UTC)

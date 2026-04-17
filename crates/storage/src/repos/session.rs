@@ -471,7 +471,8 @@ impl SessionRepo {
     ///
     /// Returns the number of sessions deleted (messages are cascade-deleted by the DB).
     pub async fn delete_stale_sessions(&self, ttl_days: u32) -> Result<u64, StorageError> {
-        let cutoff = jiff::Timestamp::now() - jiff::SignedDuration::from_hours((ttl_days as i64) * 24);
+        let cutoff =
+            jiff::Timestamp::now() - jiff::SignedDuration::from_hours((ttl_days as i64) * 24);
         let result = sqlx::query("DELETE FROM sessions WHERE updated_at < ?1")
             .bind(cutoff.as_millisecond())
             .execute(&self.pool)

@@ -90,7 +90,10 @@ impl AppCore {
     ) -> HandlerResult<FinanceInvestmentRow> {
         let id = uuid::Uuid::new_v4().to_string();
         let now = common::time::bridge::chrono_to_jiff(chrono::Utc::now()).into();
-        let purchase_date = params.purchase_date.and_then(|d| parse_naive_date(&d)).map(|d| common::time::bridge::chrono_date_to_jiff(d).into());
+        let purchase_date = params
+            .purchase_date
+            .and_then(|d| parse_naive_date(&d))
+            .map(|d| common::time::bridge::chrono_date_to_jiff(d).into());
         let currency = match params.currency {
             Some(c) => c,
             None => self.default_currency().await,

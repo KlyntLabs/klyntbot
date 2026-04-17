@@ -7,7 +7,7 @@ mod tests {
     use crate::repos::finance_account_repo::FinanceAccountRepo;
     use crate::rows::finance::{FinanceAccountPatch, FinanceAccountRow};
     use crate::StoragePool;
-    
+
     async fn test_account_repo() -> Option<FinanceAccountRepo> {
         let dir = tempfile::tempdir().ok()?;
         let pool = StoragePool::connect(dir.path()).await.ok()?;

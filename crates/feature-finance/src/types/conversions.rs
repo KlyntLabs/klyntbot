@@ -1,6 +1,8 @@
 //! Bidirectional Row ↔ Domain `From` impls (16 total).
 
-use common::time::bridge::{chrono_date_to_jiff, chrono_to_jiff, jiff_date_to_chrono, jiff_to_chrono};
+use common::time::bridge::{
+    chrono_date_to_jiff, chrono_to_jiff, jiff_date_to_chrono, jiff_to_chrono,
+};
 use storage::rows::finance::{
     FinanceAccountRow, FinanceBudgetRow, FinanceGoalRow, FinanceInvestmentRow,
     FinanceInvestmentTxRow, FinanceLiabilityRow, FinancePortfolioRow, FinanceTransactionRow,

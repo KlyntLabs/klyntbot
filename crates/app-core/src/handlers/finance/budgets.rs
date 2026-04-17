@@ -26,8 +26,12 @@ impl AppCore {
             .start_date
             .and_then(|d| parse_naive_date(&d))
             .unwrap_or_else(|| now_chrono.date_naive());
-        let start_date: storage::SqlDate = common::time::bridge::chrono_date_to_jiff(start_date_naive).into();
-        let end_date: Option<storage::SqlDate> = params.end_date.and_then(|d| parse_naive_date(&d)).map(|d| common::time::bridge::chrono_date_to_jiff(d).into());
+        let start_date: storage::SqlDate =
+            common::time::bridge::chrono_date_to_jiff(start_date_naive).into();
+        let end_date: Option<storage::SqlDate> = params
+            .end_date
+            .and_then(|d| parse_naive_date(&d))
+            .map(|d| common::time::bridge::chrono_date_to_jiff(d).into());
         let currency = match params.currency {
             Some(c) => c,
             None => self.default_currency().await,

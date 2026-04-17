@@ -2,7 +2,7 @@
 
 #[cfg(test)]
 mod tests {
-    
+
     use crate::repos::finance_liability_repo::FinanceLiabilityRepo;
     use crate::rows::finance::{FinanceLiabilityPatch, FinanceLiabilityRow};
     use crate::StoragePool;
