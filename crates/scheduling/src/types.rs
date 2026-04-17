@@ -1,6 +1,6 @@
 //! Cron job types and structures.
 
-use chrono::Utc;
+use jiff::Timestamp;
 use serde::{Deserialize, Serialize};
 
 /// Schedule definition for a cron job
@@ -113,7 +113,7 @@ pub enum IntentTrigger {
     UserPresent,
     FirstActivityAfter {
         #[serde(rename = "afterLocal")]
-        after_local: chrono::NaiveTime,
+        after_local: jiff::civil::Time,
     },
     MinActiveMinutes {
         minutes: u32,
@@ -227,7 +227,7 @@ impl CronJob {
         message: impl Into<String>,
         origin: CronOrigin,
     ) -> Self {
-        let now_ms = Utc::now().timestamp_millis();
+        let now_ms = Timestamp::now().as_millisecond();
         Self {
             id: id.into(),
             name: name.into(),
@@ -413,7 +413,7 @@ mod tests {
     #[test]
     fn test_intent_trigger_first_activity_after() {
         let trigger = IntentTrigger::FirstActivityAfter {
-            after_local: chrono::NaiveTime::from_hms_opt(8, 0, 0).unwrap(),
+            after_local: jiff::civil::Time::constant(8, 0, 0, 0),
         };
         let json = serde_json::to_value(&trigger).unwrap();
         assert_eq!(json["kind"], "first_activity_after");
@@ -428,7 +428,7 @@ mod tests {
         let mut job = CronJob::new("j1", "Weekly reflection", schedule, "", CronOrigin::System);
         job.intent_window = Some(IntentWindow {
             trigger: IntentTrigger::FirstActivityAfter {
-                after_local: chrono::NaiveTime::from_hms_opt(8, 0, 0).unwrap(),
+                after_local: jiff::civil::Time::constant(8, 0, 0, 0),
             },
             tolerance: std::time::Duration::from_secs(7200),
             catch_up: CatchUpPriority::WhenPresent,

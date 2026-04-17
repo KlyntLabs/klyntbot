@@ -19,7 +19,7 @@
 use std::collections::BTreeMap;
 use std::sync::Arc;
 
-use chrono::{DateTime, Utc};
+use jiff::Timestamp;
 use tokio::sync::{Notify, RwLock};
 use tokio::task::JoinHandle;
 use tokio::time::{Duration, Instant};
@@ -41,7 +41,7 @@ pub type DeadlineHandler = Arc<dyn Fn(DeadlineAction) + Send + Sync>;
 #[derive(Debug, Clone)]
 pub struct DeadlineEntry {
     /// When the action should fire (UTC).
-    pub fire_at: DateTime<Utc>,
+    pub fire_at: Timestamp,
     /// The action to execute.
     pub action: DeadlineAction,
 }
@@ -169,7 +169,7 @@ impl DeadlineScheduler {
     ///
     /// If `fire_at` is in the past the executor will fire the action on its
     /// very next iteration (typically within milliseconds).
-    pub async fn schedule(&self, fire_at: DateTime<Utc>, action: DeadlineAction) {
+    pub async fn schedule(&self, fire_at: Timestamp, action: DeadlineAction) {
         let key = action.dedup_key();
         debug!("DeadlineScheduler: scheduling '{key}' at {fire_at}");
 
@@ -256,10 +256,10 @@ impl DeadlineScheduler {
                 let guard = inner.read().await;
                 match guard.soonest() {
                     Some(entry) => {
-                        let now = Utc::now();
-                        let delta = entry.fire_at.signed_duration_since(now);
+                        let now = Timestamp::now();
                         // `max(0)` ensures past deadlines fire immediately.
-                        let millis = delta.num_milliseconds().max(0) as u64;
+                        let millis =
+                            (entry.fire_at.as_millisecond() - now.as_millisecond()).max(0) as u64;
                         Duration::from_millis(millis)
                     }
                     // No pending deadlines — park for 24 h; a Notify will
@@ -282,7 +282,7 @@ impl DeadlineScheduler {
             }
 
             // Collect all entries whose fire_at is now (or in the past).
-            let now = Utc::now();
+            let now = Timestamp::now();
             let due: Vec<DeadlineEntry> = {
                 let mut guard = inner.write().await;
                 let due_keys: Vec<String> = guard
@@ -340,7 +340,7 @@ mod tests {
         scheduler.start().await;
 
         // Schedule in the past — should fire on the next executor iteration.
-        let past = Utc::now() - chrono::Duration::seconds(1);
+        let past = Timestamp::now() - jiff::SignedDuration::from_secs(1);
         scheduler
             .schedule(
                 past,
@@ -365,7 +365,7 @@ mod tests {
         let scheduler = DeadlineScheduler::new(make_handler(counter.clone()));
         scheduler.start().await;
 
-        let far_future = Utc::now() + chrono::Duration::hours(24);
+        let far_future = Timestamp::now() + jiff::SignedDuration::from_hours(24);
 
         scheduler
             .schedule(
@@ -399,7 +399,7 @@ mod tests {
         let scheduler = DeadlineScheduler::new(make_handler(counter.clone()));
         scheduler.start().await;
 
-        let far_future = Utc::now() + chrono::Duration::hours(24);
+        let far_future = Timestamp::now() + jiff::SignedDuration::from_hours(24);
         scheduler
             .schedule(
                 far_future,
@@ -424,7 +424,7 @@ mod tests {
         let scheduler = DeadlineScheduler::new(make_handler(counter.clone()));
         scheduler.start().await;
 
-        let far_future = Utc::now() + chrono::Duration::hours(24);
+        let far_future = Timestamp::now() + jiff::SignedDuration::from_hours(24);
 
         for i in 0..3u32 {
             scheduler

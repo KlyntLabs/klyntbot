@@ -95,7 +95,7 @@ pub fn evaluate_trigger(trigger: &IntentTrigger, presence: &PresenceSnapshot) ->
         IntentTrigger::MinActiveMinutes { minutes } => presence.continuous_active_mins >= *minutes,
         IntentTrigger::UserIdle { min_idle_secs } => presence.idle_secs >= *min_idle_secs,
         IntentTrigger::FirstActivityAfter { after_local } => {
-            presence.is_user_present && chrono::Local::now().time() >= *after_local
+            presence.is_user_present && jiff::Zoned::now().datetime().time() >= *after_local
         }
     }
 }

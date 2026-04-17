@@ -13,8 +13,7 @@ pub use intent::{classify_missed_job, evaluate_trigger, MissedJobClass, Presence
 use std::collections::HashMap;
 use std::sync::Arc;
 
-use chrono::Utc;
-use chrono_tz::Tz;
+use jiff::Timestamp;
 use tokio::sync::{Notify, RwLock};
 use tokio::task::JoinHandle;
 use tokio::time::{Duration, Instant};
@@ -27,7 +26,7 @@ use storage::CronJobRow;
 
 /// Get current time in milliseconds
 fn now_ms() -> i64 {
-    Utc::now().timestamp_millis()
+    Timestamp::now().as_millisecond()
 }
 
 /// Compute next run time in ms
@@ -58,13 +57,13 @@ fn compute_next_run(schedule: &CronSchedule, now_ms: i64) -> Option<i64> {
                 None => {
                     // No timezone specified — compute directly in UTC.
                     cron_schedule
-                        .upcoming(Utc)
+                        .upcoming(chrono::Utc)
                         .next()
                         .map(|dt| dt.timestamp_millis())
                 }
                 Some(tz_str) => {
                     // Parse the timezone string; fall back to UTC with a warning on failure.
-                    match tz_str.parse::<Tz>() {
+                    match tz_str.parse::<chrono_tz::Tz>() {
                         Ok(tz) => cron_schedule
                             .upcoming(tz)
                             .next()
@@ -75,7 +74,7 @@ fn compute_next_run(schedule: &CronSchedule, now_ms: i64) -> Option<i64> {
                                 tz_str
                             );
                             cron_schedule
-                                .upcoming(Utc)
+                                .upcoming(chrono::Utc)
                                 .next()
                                 .map(|dt| dt.timestamp_millis())
                         }
