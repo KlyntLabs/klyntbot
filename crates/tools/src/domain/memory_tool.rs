@@ -700,7 +700,7 @@ mod tests {
         store.set(EnhancementTraceSnapshot {
             query: bundle,
             trace: EnhancementTrace::default(),
-            captured_at: chrono::Utc::now(),
+            captured_at: common::time::bridge::chrono_to_jiff(chrono::Utc::now()),
         });
 
         let tool = MemoryTool::new().with_enhancement_trace_store(Arc::clone(&store));
