@@ -49,7 +49,8 @@ CREATE TABLE IF NOT EXISTS tasks (
     estimated_focus_blocks INTEGER,
     complexity_score     INTEGER,
     scheduled_start      INTEGER,
-    scheduled_end        INTEGER
+    scheduled_end        INTEGER,
+    template_id          TEXT REFERENCES task_recurrence_templates(id) ON DELETE SET NULL
 );
 
 CREATE INDEX IF NOT EXISTS idx_tasks_status ON tasks(status);
@@ -244,3 +245,39 @@ BEGIN
     SET duration_secs = (NEW.completed_at - NEW.started_at) / 1000
     WHERE id = NEW.id;
 END;
+
+-- ---------- Task recurrence templates (Phase 2) ----------
+CREATE TABLE IF NOT EXISTS task_recurrence_templates (
+    id                   TEXT PRIMARY KEY,
+    source_task_id       TEXT NOT NULL,
+    rrule                TEXT NOT NULL,
+    iana_tz              TEXT NOT NULL,
+    materialize_ahead    INTEGER NOT NULL DEFAULT 3,
+    next_instance_at_ms  INTEGER,
+    last_instance_at_ms  INTEGER,
+    until_at_ms          INTEGER,
+    count_remaining      INTEGER,
+    enabled              INTEGER NOT NULL DEFAULT 1,
+    created_at_ms        INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_task_recurrence_enabled
+    ON task_recurrence_templates(enabled) WHERE enabled = 1;
+
+-- ---------- Task alarms (Phase 2) ----------
+CREATE TABLE IF NOT EXISTS task_alarms (
+    id                  TEXT PRIMARY KEY,
+    task_id             TEXT NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
+    rule_type           TEXT NOT NULL,                       -- 'relative_before'|'civil_time'|'absolute'
+    offset_secs         INTEGER,
+    day_offset          INTEGER,
+    time_of_day         TEXT,                                -- 'HH:MM'
+    iana_tz             TEXT,
+    absolute_fire_at_ms INTEGER,
+    channel_mask        INTEGER NOT NULL DEFAULT 0,
+    priority_override   TEXT,
+    misfire_policy      TEXT,
+    grace_window_secs   INTEGER,
+    created_at_ms       INTEGER NOT NULL,
+    UNIQUE (task_id, rule_type, offset_secs, day_offset, time_of_day, absolute_fire_at_ms)
+);
+CREATE INDEX IF NOT EXISTS idx_task_alarms_task ON task_alarms(task_id);

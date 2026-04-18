@@ -38,7 +38,9 @@ pub mod session_memory;
 pub mod skill_version;
 pub mod status_workflow;
 pub mod strategy;
+pub mod task_alarms;
 pub mod task_group;
+pub mod task_recurrence;
 pub mod task_repo;
 #[cfg(test)]
 pub mod tests;
@@ -83,7 +85,9 @@ pub use session_memory::SessionMemoryRepo;
 pub use skill_version::SkillVersionRepo;
 pub use status_workflow::StatusWorkflowRepo;
 pub use strategy::{OverallStats, StrategyRepo, ToolStatsRow};
+pub use task_alarms::TaskAlarmsRepo;
 pub use task_group::TaskGroupRepo;
+pub use task_recurrence::TaskRecurrenceRepo;
 pub use task_repo::{TaskFilter, TaskPatch, TaskRepo, TimeEntryWithTask};
 pub use tool_usage::ToolUsageRepo;
 pub use trial_repo::TrialRepo;
@@ -144,6 +148,8 @@ pub struct Repos {
     pub custom_columns: CustomColumnRepo,
     pub entity_links: EntityLinkRepo,
     pub project_sources: ProjectSourceRepo,
+    pub task_alarms: TaskAlarmsRepo,
+    pub task_recurrence: TaskRecurrenceRepo,
     pub tasks: TaskRepo,
     pub tool_usage: ToolUsageRepo,
     pub dnd_override: DndOverrideRepo,
@@ -178,6 +184,8 @@ impl Repos {
             custom_columns: CustomColumnRepo::new(db.clone()),
             entity_links: EntityLinkRepo::new(db.clone()),
             project_sources: ProjectSourceRepo::new(db.clone()),
+            task_alarms: TaskAlarmsRepo::new(db.clone()),
+            task_recurrence: TaskRecurrenceRepo::new(db.clone()),
             tasks: TaskRepo::new(db.clone()),
             tool_usage: ToolUsageRepo::new(db.clone()),
             dnd_override: DndOverrideRepo::new(db.clone()),
