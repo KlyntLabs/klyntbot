@@ -74,3 +74,53 @@ async fn list_in_flight_returns_rows_with_firing_started_but_not_fired() {
     assert_eq!(in_flight.len(), 1);
     assert_eq!(in_flight[0].id, "a");
 }
+
+#[tokio::test]
+async fn cancel_by_prefix_treats_underscore_and_percent_as_literals() {
+    let repo = setup().await;
+    // Row with literal underscore in its prefix.
+    repo.insert(&sf("a", 1000, Some("cron:job_xyz:")))
+        .await
+        .unwrap();
+    // Row that would falsely match if `_` were a LIKE wildcard (single-char).
+    repo.insert(&sf("b", 2000, Some("cron:jobAxyz:")))
+        .await
+        .unwrap();
+    // Cancel by the exact literal prefix.
+    let deleted = repo.cancel_by_prefix("cron:job_xyz:").await.unwrap();
+    assert_eq!(deleted, 1, "only the literal match should be deleted");
+    let remaining = repo.list_pending_up_to_ms(9999).await.unwrap();
+    assert_eq!(remaining.len(), 1);
+    assert_eq!(remaining[0].id, "b");
+}
+
+#[tokio::test]
+async fn cancel_by_kind_ref_deletes_only_matching_pending() {
+    let repo = setup().await;
+    let mut a = sf("a", 1000, None);
+    a.kind = "cron_job".into();
+    a.ref_id = Some("j1".into());
+    let mut b = sf("b", 2000, None);
+    b.kind = "cron_job".into();
+    b.ref_id = Some("j2".into());
+    let mut c = sf("c", 3000, None);
+    c.kind = "task_alarm".into();
+    c.ref_id = Some("j1".into());
+    repo.insert(&a).await.unwrap();
+    repo.insert(&b).await.unwrap();
+    repo.insert(&c).await.unwrap();
+
+    let deleted = repo.cancel_by_kind_ref("cron_job", "j1").await.unwrap();
+    assert_eq!(deleted, 1);
+
+    let remaining: Vec<String> = repo
+        .list_pending_up_to_ms(9999)
+        .await
+        .unwrap()
+        .into_iter()
+        .map(|r| r.id)
+        .collect();
+    assert_eq!(remaining.len(), 2);
+    assert!(remaining.contains(&"b".to_string()));
+    assert!(remaining.contains(&"c".to_string()));
+}

@@ -14,6 +14,10 @@ impl ScheduledFiresRepo {
         Self { pool }
     }
 
+    /// Insert a new scheduled fire. The row is always persisted as **pending**:
+    /// `fired=0`, `firing_started_at_ms=NULL`, `fired_at_ms=NULL` are hardcoded
+    /// regardless of the values in `row`. Only `begin_firing` and `mark_fired`
+    /// may advance a row out of the pending state.
     pub async fn insert(&self, row: &ScheduledFireRow) -> Result<(), StorageError> {
         sqlx::query(
             "INSERT INTO scheduled_fires
@@ -97,12 +101,19 @@ impl ScheduledFiresRepo {
     /// Delete all pending fires whose dedup_prefix matches the given literal prefix.
     /// Returns count deleted.
     pub async fn cancel_by_prefix(&self, prefix: &str) -> Result<u64, StorageError> {
-        let like = format!("{prefix}%");
-        let result =
-            sqlx::query("DELETE FROM scheduled_fires WHERE fired = 0 AND dedup_prefix LIKE ?1")
-                .bind(like)
-                .execute(&self.pool)
-                .await?;
+        // Escape LIKE wildcards in the literal prefix. Order matters: escape the
+        // escape char first, then the wildcards.
+        let escaped = prefix
+            .replace('\\', "\\\\")
+            .replace('%', "\\%")
+            .replace('_', "\\_");
+        let like = format!("{escaped}%");
+        let result = sqlx::query(
+            "DELETE FROM scheduled_fires WHERE fired = 0 AND dedup_prefix LIKE ?1 ESCAPE '\\'",
+        )
+        .bind(like)
+        .execute(&self.pool)
+        .await?;
         Ok(result.rows_affected())
     }
 
