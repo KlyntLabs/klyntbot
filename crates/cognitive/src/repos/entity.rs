@@ -1,6 +1,6 @@
 //! Repository for the `entities` and `entity_relationships` tables.
 
-use chrono::Utc;
+use jiff::Timestamp;
 use serde::{Deserialize, Serialize};
 use sqlx::SqlitePool;
 use uuid::Uuid;
@@ -85,7 +85,7 @@ impl EntityRepo {
     /// If it already exists, increment `mention_count` and update `last_seen_at`.
     /// Returns the entity row (existing or newly created).
     pub async fn upsert_entity(&self, entity: &NewEntity) -> Result<EntityRow, sqlx::Error> {
-        let now = Utc::now().to_rfc3339();
+        let now = Timestamp::now().to_string();
 
         // Check for existing entity by normalized name + type
         let existing = sqlx::query_as::<_, EntityRow>(
@@ -180,7 +180,7 @@ impl EntityRepo {
         &self,
         rel: &NewRelationship,
     ) -> Result<RelationshipRow, sqlx::Error> {
-        let now = Utc::now().to_rfc3339();
+        let now = Timestamp::now().to_string();
 
         let existing = sqlx::query_as::<_, RelationshipRow>(
             "SELECT * FROM entity_relationships WHERE source_entity_id = ?1 AND target_entity_id = ?2 AND relationship_type = ?3",
@@ -387,7 +387,7 @@ impl EntityRepo {
         source_id: &str,
         target_id: &str,
     ) -> Result<EntityRow, sqlx::Error> {
-        let now = Utc::now().to_rfc3339();
+        let now = Timestamp::now().to_string();
         let mut tx = self.pool.begin().await?;
 
         // Get source mention_count

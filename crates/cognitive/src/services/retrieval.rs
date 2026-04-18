@@ -5,7 +5,7 @@
 //! frequency. Falls back to importance × stability ranking when vector search
 //! is unavailable or returns too few results.
 
-use chrono::Utc;
+use jiff::Timestamp;
 use tracing::{debug, warn};
 
 use crate::decay::{
@@ -94,6 +94,7 @@ impl RetrievalParams {
 ///   3. Secondary sort by `importance × stability`
 ///
 /// Both paths record access events on retrieved facts (increases FSRS stability).
+#[allow(clippy::too_many_arguments)]
 pub async fn retrieve_relevant_facts(
     repo: &SemanticFactRepo,
     embedder: Option<&dyn SemanticFactEmbedder>,
@@ -287,7 +288,7 @@ async fn vector_path(
         hits.iter().map(|(id, sim)| (id.as_str(), *sim)).collect();
 
     let facts = repo.get_batch(&ids).await?;
-    let now = Utc::now();
+    let now = Timestamp::now();
 
     let mut scored = Vec::with_capacity(facts.len());
     for fact in facts {
@@ -350,7 +351,7 @@ async fn fallback_path(
         repo.list_by_scope_chain(&chain_refs).await?
     };
 
-    let now = Utc::now();
+    let now = Timestamp::now();
 
     let mut scored = Vec::with_capacity(all_facts.len());
     for fact in all_facts {
@@ -394,17 +395,17 @@ async fn fallback_path(
 }
 
 /// Compute FSRS retrievability and normalized access frequency for a fact.
-fn compute_decay_and_freq(fact: &SemanticFact, now: &chrono::DateTime<Utc>) -> (f64, f64) {
+fn compute_decay_and_freq(fact: &SemanticFact, now: &Timestamp) -> (f64, f64) {
     let elapsed_days = fact
         .last_accessed
         .as_ref()
-        .and_then(|la| la.parse::<chrono::NaiveDateTime>().ok())
-        .map(|la| (now.naive_utc() - la).num_seconds() as f64 / 86400.0)
+        .and_then(|la| la.parse::<Timestamp>().ok())
+        .map(|la| (now.as_millisecond() - la.as_millisecond()) as f64 / 86_400_000.0)
         .unwrap_or_else(|| {
             fact.recorded_at
-                .parse::<chrono::NaiveDateTime>()
+                .parse::<Timestamp>()
                 .ok()
-                .map(|ra| (now.naive_utc() - ra).num_seconds() as f64 / 86400.0)
+                .map(|ra| (now.as_millisecond() - ra.as_millisecond()) as f64 / 86_400_000.0)
                 .unwrap_or(30.0)
         });
 

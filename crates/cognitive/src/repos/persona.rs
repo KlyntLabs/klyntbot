@@ -1,6 +1,6 @@
 //! Repository for the `insight_personas` and `insight_persona_pins` tables.
 
-use chrono::Utc;
+use jiff::Timestamp;
 use serde::{Deserialize, Serialize};
 use sqlx::SqlitePool;
 use uuid::Uuid;
@@ -216,7 +216,7 @@ impl PersonaRepo {
 
     /// Seed all builtin personas. Idempotent — skips if already present.
     pub async fn seed_builtins(&self) -> Result<(), sqlx::Error> {
-        let now = Utc::now().to_rfc3339();
+        let now = Timestamp::now().to_string();
         for b in BUILTINS {
             sqlx::query(
                 r#"
@@ -248,7 +248,7 @@ impl PersonaRepo {
     /// Create a user-defined persona.
     pub async fn create(&self, persona: &NewPersona) -> Result<PersonaRow, sqlx::Error> {
         let id = Uuid::new_v4().to_string();
-        let now = Utc::now().to_rfc3339();
+        let now = Timestamp::now().to_string();
         let domains_json = serde_json::to_string(&persona.domains).unwrap_or_else(|_| "[]".into());
         let questioning_style = persona.questioning_style.as_deref().unwrap_or("analytical");
         let cognitive_bias = persona.cognitive_bias.as_deref().unwrap_or("balanced");
@@ -291,7 +291,7 @@ impl PersonaRepo {
     /// Create an auto-generated persona (source = "auto").
     pub async fn create_auto(&self, persona: &NewPersona) -> Result<PersonaRow, sqlx::Error> {
         let id = Uuid::new_v4().to_string();
-        let now = Utc::now().to_rfc3339();
+        let now = Timestamp::now().to_string();
         let domains_json = serde_json::to_string(&persona.domains).unwrap_or_else(|_| "[]".into());
         let questioning_style = persona.questioning_style.as_deref().unwrap_or("analytical");
         let cognitive_bias = persona.cognitive_bias.as_deref().unwrap_or("balanced");
@@ -363,7 +363,7 @@ impl PersonaRepo {
             return Err(sqlx::Error::Protocol("Cannot edit builtin persona".into()));
         }
 
-        let now = Utc::now().to_rfc3339();
+        let now = Timestamp::now().to_string();
         let name = updates.name.as_deref().unwrap_or(&existing.name);
         let role = updates.role.as_deref().unwrap_or(&existing.role);
         let expertise = updates.expertise.as_deref().unwrap_or(&existing.expertise);
@@ -404,7 +404,7 @@ impl PersonaRepo {
 
     /// Adjust a persona's relevance score (for thumbs up/down feedback).
     pub async fn update_relevance(&self, id: &str, delta: f64) -> Result<(), sqlx::Error> {
-        let now = Utc::now().to_rfc3339();
+        let now = Timestamp::now().to_string();
         sqlx::query(
             r#"
             UPDATE insight_personas
@@ -431,7 +431,7 @@ impl PersonaRepo {
 
     /// Toggle a persona's active state.
     pub async fn set_active(&self, id: &str, active: bool) -> Result<(), sqlx::Error> {
-        let now = Utc::now().to_rfc3339();
+        let now = Timestamp::now().to_string();
         sqlx::query("UPDATE insight_personas SET is_active = ?1, updated_at = ?2 WHERE id = ?3")
             .bind(active as i64)
             .bind(&now)
@@ -542,7 +542,7 @@ impl PersonaRepo {
 
     /// Set pinned personas for a note (replaces existing pins).
     pub async fn set_pins(&self, note_id: &str, persona_ids: &[String]) -> Result<(), sqlx::Error> {
-        let now = Utc::now().to_rfc3339();
+        let now = Timestamp::now().to_string();
         let mut tx = self.pool.begin().await?;
 
         sqlx::query("DELETE FROM insight_persona_pins WHERE note_id = ?1")

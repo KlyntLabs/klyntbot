@@ -4,8 +4,6 @@
 //! actual LLM provider. Tests use a mock that returns pre-defined facts.
 
 use async_trait::async_trait;
-use chrono::Utc;
-
 use crate::types::{Observation, SemanticFact, DEFAULT_MEMORY_TYPE};
 
 /// A candidate fact extracted from an observation, before consolidation.
@@ -110,7 +108,7 @@ pub fn classify_memory_type(text: &str) -> &'static str {
 /// Converts `ExtractedFact` candidates into full `SemanticFact` records
 /// ready for consolidation.
 pub fn to_semantic_fact(candidate: &ExtractedFact, observation: &Observation) -> SemanticFact {
-    let now = Utc::now();
+    let now = jiff::Timestamp::now();
     let combined_text = format!(
         "{} {} {}",
         candidate.subject, candidate.predicate, candidate.object
@@ -123,9 +121,9 @@ pub fn to_semantic_fact(candidate: &ExtractedFact, observation: &Observation) ->
         object: candidate.object.clone(),
         confidence: candidate.confidence,
         source: candidate.source.clone(),
-        valid_from: observation.timestamp.format("%Y-%m-%d").to_string(),
+        valid_from: observation.timestamp.strftime("%Y-%m-%d").to_string(),
         valid_until: None,
-        recorded_at: now.format("%Y-%m-%dT%H:%M:%S").to_string(),
+        recorded_at: now.strftime("%Y-%m-%dT%H:%M:%SZ").to_string(),
         superseded_at: None,
         superseded_by: None,
         stability: 1.0,
@@ -150,7 +148,7 @@ mod tests {
             content: "User is most productive between 10am and 12pm".into(),
             importance: 0.8,
             source_event: "ProductivityScoreComputed".into(),
-            timestamp: Utc::now(),
+            timestamp: jiff::Timestamp::now(),
         }
     }
 

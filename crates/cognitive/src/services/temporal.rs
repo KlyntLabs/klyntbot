@@ -6,7 +6,7 @@
 
 use std::collections::HashMap;
 
-use chrono::{DateTime, Utc};
+use jiff::Timestamp;
 use serde::Serialize;
 
 use crate::repos::{FactChangelogRepo, SemanticFactRepo};
@@ -116,11 +116,11 @@ impl TemporalService {
     /// slice are considered.
     pub async fn change_summary(
         &self,
-        since: DateTime<Utc>,
+        since: Timestamp,
         domains: Option<&[&str]>,
     ) -> Result<ChangeSummary, sqlx::Error> {
-        let since_str = since.to_rfc3339();
-        let now_str = Utc::now().to_rfc3339();
+        let since_str = since.to_string();
+        let now_str = Timestamp::now().to_string();
 
         let new_facts = self
             .fact_repo
@@ -227,13 +227,12 @@ impl TemporalService {
         to: &str,
         domains: Option<&[&str]>,
     ) -> Result<KnowledgeDiff, sqlx::Error> {
-        let from_dt = chrono::DateTime::parse_from_rfc3339(from)
-            .map(|d| d.with_timezone(&Utc))
+        let from_ts = from.parse::<Timestamp>()
             .map_err(|_| {
                 sqlx::Error::Protocol(format!("invalid RFC3339 'from' timestamp: {from}"))
             })?;
 
-        let summary = self.change_summary(from_dt, domains).await?;
+        let summary = self.change_summary(from_ts, domains).await?;
 
         Ok(KnowledgeDiff {
             period: (from.to_string(), to.to_string()),
@@ -252,13 +251,11 @@ impl TemporalService {
         domain: Option<&str>,
         limit: usize,
     ) -> Result<Vec<DecisionPoint>, sqlx::Error> {
-        let since = (Utc::now() - chrono::Duration::days(180))
-            .format("%Y-%m-%dT%H:%M:%SZ")
-            .to_string();
+        let since = (Timestamp::now() - jiff::SignedDuration::from_secs(180 * 86400)).to_string();
         let domain_arr: Option<Vec<&str>> = domain.map(|d| vec![d]);
         let superseded = self
             .fact_repo
-            .list_superseded_since(&since, domain_arr.as_deref().map(|s| s.as_ref()))
+            .list_superseded_since(&since, domain_arr.as_deref())
             .await?;
 
         let mut seen: HashMap<(String, String), Vec<SemanticFact>> = HashMap::new();
@@ -388,9 +385,7 @@ mod tests {
         repo.upsert(&fact).await.unwrap();
 
         // Query since one week before the fact was recorded.
-        let since = DateTime::parse_from_rfc3339("2026-03-01T00:00:00Z")
-            .unwrap()
-            .with_timezone(&Utc);
+        let since: Timestamp = "2026-03-01T00:00:00Z".parse().unwrap();
 
         let summary = service.change_summary(since, None).await.unwrap();
 
@@ -490,9 +485,7 @@ mod tests {
         repo.upsert(&fact).await.unwrap();
 
         // Query since a future date — nothing should appear.
-        let since = DateTime::parse_from_rfc3339("2030-01-01T00:00:00Z")
-            .unwrap()
-            .with_timezone(&Utc);
+        let since: Timestamp = "2030-01-01T00:00:00Z".parse().unwrap();
 
         let summary = service.change_summary(since, None).await.unwrap();
 

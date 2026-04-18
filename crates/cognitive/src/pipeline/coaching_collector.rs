@@ -1,6 +1,6 @@
 //! Collects signals from coaching pattern detection.
 
-use chrono::Utc;
+use jiff::Timestamp;
 use tokio::sync::broadcast;
 use tokio_util::sync::CancellationToken;
 use tracing::{debug, warn};
@@ -35,7 +35,7 @@ impl CoachingCollector {
                                         source_count: signal_count as u32,
                                         ..Default::default()
                                     },
-                                    timestamp: Utc::now(),
+                                    timestamp: Timestamp::now(),
                                 };
                                 let _ = signal_tx.send(signal).await;
                             }

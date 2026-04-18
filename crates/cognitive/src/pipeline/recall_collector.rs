@@ -7,7 +7,7 @@
 
 use std::collections::HashSet;
 
-use chrono::{DateTime, Utc};
+use jiff::Timestamp;
 use tokio::sync::broadcast;
 use tokio_util::sync::CancellationToken;
 use tracing::{debug, info, warn};
@@ -31,7 +31,7 @@ struct BufferedMessage {
     content: String,
     session_key: String,
     #[allow(dead_code)]
-    timestamp: DateTime<Utc>,
+    timestamp: Timestamp,
 }
 
 pub struct RecallCollector;
@@ -58,7 +58,7 @@ impl RecallCollector {
                                 buffer.push(BufferedMessage {
                                     content: msg,
                                     session_key,
-                                    timestamp: Utc::now(),
+                                    timestamp: Timestamp::now(),
                                 });
 
                                 if buffer.len() >= BUFFER_FLUSH_SIZE {
@@ -109,7 +109,7 @@ impl RecallCollector {
                     raw_observations: cluster.iter().map(|m| m.content.clone()).collect(),
                     ..Default::default()
                 },
-                timestamp: Utc::now(),
+                timestamp: Timestamp::now(),
             };
 
             info!(
@@ -157,7 +157,7 @@ mod tests {
         BufferedMessage {
             content: content.into(),
             session_key: session.into(),
-            timestamp: Utc::now(),
+            timestamp: Timestamp::now(),
         }
     }
 

@@ -5,7 +5,7 @@
 
 use std::sync::Arc;
 
-use chrono::{DateTime, Duration, Utc};
+use jiff::Timestamp;
 use dashmap::DashMap;
 use tokio::task::JoinHandle;
 use uuid::Uuid;
@@ -185,7 +185,7 @@ impl MirrorFacade {
         let new_v = BrainVersion {
             version: next,
             trial_id: None,
-            promoted_at: Utc::now(),
+            promoted_at: Timestamp::now(),
             params: target_v.params.clone(),
             reason: format!("Reverted to v{target}"),
             parent_version: Some(next - 1),
@@ -239,7 +239,7 @@ impl MirrorFacade {
                         }
                     }
                     Ok(None) => {
-                        let now = Utc::now().to_rfc3339();
+                        let now = Timestamp::now().to_string();
                         let procedural = ProceduralRule {
                             id: Uuid::new_v4().to_string(),
                             domain: domain.to_string(),
@@ -299,8 +299,8 @@ impl MirrorFacade {
             effectiveness_score: 0.5,
             status: MetaRuleStatus::Pending,
             signal_count: 0,
-            created_at: Utc::now(),
-            updated_at: Utc::now(),
+            created_at: Timestamp::now(),
+            updated_at: Timestamp::now(),
         };
         self.repo.insert_meta_rule(&rule).await?;
         Ok(rule)
@@ -364,8 +364,8 @@ impl MirrorFacade {
     pub async fn generate_weekly_narrative(&self) -> Result<TrendNarrative> {
         let handler = self.require_handler()?;
 
-        let period_end = Utc::now();
-        let period_start = period_end - Duration::days(7);
+        let period_end = Timestamp::now();
+        let period_start = period_end - jiff::SignedDuration::from_secs(7 * 86400);
 
         let snapshots = self.repo.get_routing_history(7).await?;
 
@@ -375,7 +375,7 @@ impl MirrorFacade {
 
         let narrative = TrendNarrative {
             id: Uuid::new_v4(),
-            generated_at: Utc::now(),
+            generated_at: Timestamp::now(),
             period_start,
             period_end,
             routing_summary: generated.routing_summary,
@@ -408,17 +408,17 @@ impl MirrorFacade {
     pub async fn generate_mirror_response(
         &self,
         query: String,
-        period: Option<(DateTime<Utc>, DateTime<Utc>)>,
+        period: Option<(Timestamp, Timestamp)>,
     ) -> Result<MirrorResponse> {
         let handler = self.require_handler()?;
 
         let (period_start, period_end) = period.unwrap_or_else(|| {
-            let end = Utc::now();
-            let start = end - Duration::days(14);
+            let end = Timestamp::now();
+            let start = end - jiff::SignedDuration::from_secs(14 * 86400);
             (start, end)
         });
 
-        let days = (period_end - period_start).num_days().max(1) as u32;
+        let days = ((period_end.as_millisecond() - period_start.as_millisecond()) / 86_400_000).max(1) as u32;
         let snapshots = self.repo.get_routing_history(days).await?;
 
         let ctx = build_narrative_context((period_start, period_end), snapshots);
@@ -487,7 +487,7 @@ impl MirrorFacade {
     fn write_episodic(&self, content: String, summary: Option<String>, importance: f64) {
         if let Some(ref episodic) = self.episodic_repo {
             let repo = episodic.clone();
-            let now = Utc::now().to_rfc3339();
+            let now = Timestamp::now().to_string();
             tokio::spawn(async move {
                 let mem = crate::types::EpisodicMemory {
                     id: Uuid::new_v4().to_string(),
@@ -548,7 +548,7 @@ fn meta_rule_to_rule_text(meta: &MetaRule) -> String {
 // ---------------------------------------------------------------------------
 
 fn build_narrative_context(
-    period: (DateTime<Utc>, DateTime<Utc>),
+    period: (Timestamp, Timestamp),
     routing_snapshots: Vec<RoutingSnapshot>,
 ) -> NarrativeContext {
     // Aggregate skill usage percentages across all snapshots.
@@ -618,7 +618,7 @@ mod tests {
         );
         RoutingSnapshot {
             id: Uuid::new_v4(),
-            captured_at: Utc::now(),
+            captured_at: Timestamp::now(),
             window_hours: 1,
             total_messages: 10,
             distribution,
@@ -722,8 +722,8 @@ mod tests {
             effectiveness_score: 0.5,
             status: MetaRuleStatus::Pending,
             signal_count: 0,
-            created_at: Utc::now(),
-            updated_at: Utc::now(),
+            created_at: Timestamp::now(),
+            updated_at: Timestamp::now(),
         }
     }
 
@@ -771,7 +771,7 @@ mod tests {
         let facade = setup().await;
         let snippet = crate::mirror::NarrativeSnippet {
             id: Uuid::new_v4(),
-            created_at: Utc::now(),
+            created_at: Timestamp::now(),
             alert_type: MirrorAlertType::RoutingDrift,
             headline: "Test snippet".to_string(),
             body: "Body text".to_string(),
@@ -792,7 +792,7 @@ mod tests {
         crate::mirror::BrainVersion {
             version,
             trial_id: None,
-            promoted_at: Utc::now(),
+            promoted_at: Timestamp::now(),
             params: serde_json::json!({"temperature": 0.7}),
             reason: format!("v{version}"),
             parent_version: parent,

@@ -1,6 +1,6 @@
 //! Repository for Phase 1 Mirror tables.
 
-use chrono::{DateTime, Utc};
+use jiff::Timestamp;
 use common::Result;
 use uuid::Uuid;
 
@@ -14,10 +14,9 @@ use crate::mirror::{
 // Parsing helpers
 // ---------------------------------------------------------------------------
 
-/// Parse an RFC3339 timestamp string to DateTime<Utc>
-fn parse_rfc3339(s: &str) -> common::Result<DateTime<Utc>> {
-    DateTime::parse_from_rfc3339(s)
-        .map(|d| d.with_timezone(&Utc))
+/// Parse an RFC3339 timestamp string to Timestamp
+fn parse_rfc3339(s: &str) -> common::Result<Timestamp> {
+    s.parse::<Timestamp>()
         .map_err(|e| common::KlyntbotError::Storage(format!("bad timestamp: {e}")))
 }
 
@@ -293,7 +292,7 @@ impl MirrorRepo {
             "#,
         )
         .bind(snap.id.to_string())
-        .bind(snap.captured_at.to_rfc3339())
+        .bind(snap.captured_at.to_string())
         .bind(snap.window_hours as i64)
         .bind(snap.total_messages as i64)
         .bind(distribution_json)
@@ -318,11 +317,11 @@ impl MirrorRepo {
     }
 
     pub async fn get_routing_history(&self, days: u32) -> Result<Vec<RoutingSnapshot>> {
-        let cutoff = Utc::now() - chrono::Duration::days(days as i64);
+        let cutoff = Timestamp::now() - jiff::SignedDuration::from_secs(days as i64 * 86400);
         let rows = sqlx::query_as::<_, RoutingSnapshotRow>(
             "SELECT * FROM mirror_routing_snapshots WHERE captured_at >= ?1 ORDER BY captured_at DESC",
         )
-        .bind(cutoff.to_rfc3339())
+        .bind(cutoff.to_string())
         .fetch_all(self.db())
         .await
         .map_err(|e| common::KlyntbotError::Storage(e.to_string()))?;
@@ -353,13 +352,13 @@ impl MirrorRepo {
             "#,
         )
         .bind(snippet.id.to_string())
-        .bind(snippet.created_at.to_rfc3339())
+        .bind(snippet.created_at.to_string())
         .bind(alert_type)
         .bind(&snippet.headline)
         .bind(&snippet.body)
         .bind(action_json)
         .bind(user_feedback)
-        .bind(snippet.dismissed_at.map(|d| d.to_rfc3339()))
+        .bind(snippet.dismissed_at.map(|d| d.to_string()))
         .execute(self.db())
         .await
         .map_err(|e| common::KlyntbotError::Storage(e.to_string()))?;
@@ -398,9 +397,9 @@ impl MirrorRepo {
             "#,
         )
         .bind(narrative.id.to_string())
-        .bind(narrative.generated_at.to_rfc3339())
-        .bind(narrative.period_start.to_rfc3339())
-        .bind(narrative.period_end.to_rfc3339())
+        .bind(narrative.generated_at.to_string())
+        .bind(narrative.period_start.to_string())
+        .bind(narrative.period_end.to_string())
         .bind(&narrative.routing_summary)
         .bind(improvement_highlights_json)
         .bind(&narrative.experiment_summary)
@@ -473,11 +472,11 @@ impl MirrorRepo {
     /// Delete hourly routing snapshots older than `max_age_days`.
     /// Daily aggregates (window_hours != 1) are preserved.
     pub async fn cleanup_old_snapshots(&self, max_age_days: u32) -> Result<u64> {
-        let cutoff = Utc::now() - chrono::Duration::days(max_age_days as i64);
+        let cutoff = Timestamp::now() - jiff::SignedDuration::from_secs(max_age_days as i64 * 86400);
         let result = sqlx::query(
             "DELETE FROM mirror_routing_snapshots WHERE captured_at < ?1 AND window_hours = 1",
         )
-        .bind(cutoff.to_rfc3339())
+        .bind(cutoff.to_string())
         .execute(self.db())
         .await
         .map_err(|e| common::KlyntbotError::Storage(e.to_string()))?;
@@ -485,9 +484,9 @@ impl MirrorRepo {
     }
 
     pub async fn cleanup_old_snippets(&self, max_age_days: u32) -> Result<u64> {
-        let cutoff = Utc::now() - chrono::Duration::days(max_age_days as i64);
+        let cutoff = Timestamp::now() - jiff::SignedDuration::from_secs(max_age_days as i64 * 86400);
         let result = sqlx::query("DELETE FROM mirror_snippets WHERE created_at < ?1")
-            .bind(cutoff.to_rfc3339())
+            .bind(cutoff.to_string())
             .execute(self.db())
             .await
             .map_err(|e| common::KlyntbotError::Storage(e.to_string()))?;
@@ -517,8 +516,8 @@ impl MirrorRepo {
         .bind(rule.effectiveness_score)
         .bind(status)
         .bind(rule.signal_count as i64)
-        .bind(rule.created_at.to_rfc3339())
-        .bind(rule.updated_at.to_rfc3339())
+        .bind(rule.created_at.to_string())
+        .bind(rule.updated_at.to_string())
         .execute(self.db())
         .await
         .map_err(|e| common::KlyntbotError::Storage(e.to_string()))?;
@@ -550,7 +549,7 @@ impl MirrorRepo {
         let status_str = enum_to_str(&status)?;
         sqlx::query("UPDATE mirror_meta_rules SET status = ?1, updated_at = ?2 WHERE id = ?3")
             .bind(status_str)
-            .bind(Utc::now().to_rfc3339())
+            .bind(Timestamp::now().to_string())
             .bind(id.to_string())
             .execute(self.db())
             .await
@@ -563,7 +562,7 @@ impl MirrorRepo {
             "UPDATE mirror_meta_rules SET signal_count = signal_count + 1, updated_at = ?1 \
              WHERE id = ?2",
         )
-        .bind(Utc::now().to_rfc3339())
+        .bind(Timestamp::now().to_string())
         .bind(id.to_string())
         .execute(self.db())
         .await
@@ -578,7 +577,7 @@ impl MirrorRepo {
              WHERE id = ?3",
         )
         .bind(decay_factor)
-        .bind(Utc::now().to_rfc3339())
+        .bind(Timestamp::now().to_string())
         .bind(id.to_string())
         .execute(self.db())
         .await
@@ -603,7 +602,7 @@ impl MirrorRepo {
         )
         .bind(v.version as i64)
         .bind(&v.trial_id)
-        .bind(v.promoted_at.to_rfc3339())
+        .bind(v.promoted_at.to_string())
         .bind(params_json)
         .bind(&v.reason)
         .bind(v.parent_version.map(|p| p as i64))
@@ -681,8 +680,8 @@ impl MirrorRepo {
         )
         .bind(preview.id.to_string())
         .bind(&preview.trial_id)
-        .bind(preview.started_at.to_rfc3339())
-        .bind(preview.preview_at.to_rfc3339())
+        .bind(preview.started_at.to_string())
+        .bind(preview.preview_at.to_string())
         .bind(preview.messages_scored as i64)
         .bind(early_signals_json)
         .bind(recommendation)
@@ -718,9 +717,9 @@ impl MirrorRepo {
     }
 
     pub async fn cleanup_old_trial_previews(&self, max_age_days: u32) -> Result<u64> {
-        let cutoff = Utc::now() - chrono::Duration::days(max_age_days as i64);
+        let cutoff = Timestamp::now() - jiff::SignedDuration::from_secs(max_age_days as i64 * 86400);
         let result = sqlx::query("DELETE FROM mirror_trial_previews WHERE preview_at < ?1")
-            .bind(cutoff.to_rfc3339())
+            .bind(cutoff.to_string())
             .execute(self.db())
             .await
             .map_err(|e| common::KlyntbotError::Storage(e.to_string()))?;
@@ -755,7 +754,7 @@ mod tests {
         );
         RoutingSnapshot {
             id: Uuid::new_v4(),
-            captured_at: Utc::now(),
+            captured_at: Timestamp::now(),
             window_hours: 1,
             total_messages: 10,
             distribution,
@@ -769,7 +768,7 @@ mod tests {
     fn make_snippet() -> NarrativeSnippet {
         NarrativeSnippet {
             id: Uuid::new_v4(),
-            created_at: Utc::now(),
+            created_at: Timestamp::now(),
             alert_type: MirrorAlertType::RoutingDrift,
             headline: "Routing drifted".to_string(),
             body: "Finance skill usage dropped 20%.".to_string(),
@@ -782,9 +781,9 @@ mod tests {
     fn make_narrative() -> TrendNarrative {
         TrendNarrative {
             id: Uuid::new_v4(),
-            generated_at: Utc::now(),
-            period_start: Utc::now() - chrono::Duration::days(7),
-            period_end: Utc::now(),
+            generated_at: Timestamp::now(),
+            period_start: Timestamp::now() - jiff::SignedDuration::from_secs(7 * 86400),
+            period_end: Timestamp::now(),
             routing_summary: "Stable week".to_string(),
             improvement_highlights: vec!["Better task routing".to_string()],
             experiment_summary: "No active experiments".to_string(),
@@ -895,7 +894,7 @@ mod tests {
 
         // Insert an old snapshot by overriding captured_at to 100 days ago
         let old_id = Uuid::new_v4();
-        let old_time = Utc::now() - chrono::Duration::days(100);
+        let old_time = Timestamp::now() - jiff::SignedDuration::from_secs(100 * 86400);
         sqlx::query(
             "INSERT INTO mirror_routing_snapshots
              (id, captured_at, window_hours, total_messages, distribution_json,
@@ -903,7 +902,7 @@ mod tests {
              VALUES (?1, ?2, 1, 5, '{}', 0.0, 0.9, 0)",
         )
         .bind(old_id.to_string())
-        .bind(old_time.to_rfc3339())
+        .bind(old_time.to_string())
         .execute(repo.db())
         .await
         .unwrap();
@@ -920,14 +919,14 @@ mod tests {
         repo.insert_snippet(&snippet).await.unwrap();
         // Insert old snippet
         let old_snippet_id = Uuid::new_v4();
-        let old_snippet_time = Utc::now() - chrono::Duration::days(100);
+        let old_snippet_time = Timestamp::now() - jiff::SignedDuration::from_secs(100 * 86400);
         sqlx::query(
             "INSERT INTO mirror_snippets
              (id, created_at, alert_type, headline, body)
              VALUES (?1, ?2, 'RoutingDrift', 'Old headline', 'Old body')",
         )
         .bind(old_snippet_id.to_string())
-        .bind(old_snippet_time.to_rfc3339())
+        .bind(old_snippet_time.to_string())
         .execute(repo.db())
         .await
         .unwrap();
@@ -945,8 +944,8 @@ mod tests {
             effectiveness_score: 0.5,
             status: MetaRuleStatus::Pending,
             signal_count: 0,
-            created_at: Utc::now(),
-            updated_at: Utc::now(),
+            created_at: Timestamp::now(),
+            updated_at: Timestamp::now(),
         }
     }
 
@@ -1039,7 +1038,7 @@ mod tests {
         BrainVersion {
             version,
             trial_id: Some(format!("trial-{version}")),
-            promoted_at: Utc::now(),
+            promoted_at: Timestamp::now(),
             params: serde_json::json!({"temperature": 0.7}),
             reason: format!("reason-{version}"),
             parent_version: parent,
@@ -1128,8 +1127,8 @@ mod tests {
         TrialPreview {
             id: Uuid::new_v4(),
             trial_id: trial_id.to_string(),
-            started_at: Utc::now() - chrono::Duration::hours(4),
-            preview_at: Utc::now(),
+            started_at: Timestamp::now() - jiff::SignedDuration::from_secs(4 * 3600),
+            preview_at: Timestamp::now(),
             messages_scored: 25,
             early_signals: TrialEarlySignals {
                 correction_rate_delta: -0.15,

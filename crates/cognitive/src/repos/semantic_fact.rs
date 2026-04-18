@@ -1115,7 +1115,7 @@ mod tests {
             source: "observed".into(),
             valid_from: "2026-03-01".into(),
             valid_until: None,
-            recorded_at: chrono::Utc::now().to_rfc3339(),
+            recorded_at: jiff::Timestamp::now().to_string(),
             superseded_at: None,
             superseded_by: None,
             stability: 1.0,
@@ -1151,7 +1151,7 @@ mod tests {
             source: "observed".into(),
             valid_from: "2026-03-01".into(),
             valid_until: None,
-            recorded_at: chrono::Utc::now().to_rfc3339(),
+            recorded_at: jiff::Timestamp::now().to_string(),
             superseded_at: None,
             superseded_by: None,
             stability: 1.0,
@@ -1166,7 +1166,7 @@ mod tests {
         repo.upsert(&f1).await.unwrap();
 
         // Fast failure: superseded 2 days after creation
-        let now = chrono::Utc::now();
+        let now = jiff::Timestamp::now();
         let f2 = crate::types::SemanticFact {
             id: "f2".into(),
             domain: "work".into(),
@@ -1177,8 +1177,8 @@ mod tests {
             source: "observed".into(),
             valid_from: "2026-03-01".into(),
             valid_until: None,
-            recorded_at: (now - chrono::Duration::days(3)).to_rfc3339(),
-            superseded_at: Some((now - chrono::Duration::days(1)).to_rfc3339()),
+            recorded_at: (now - jiff::SignedDuration::from_secs(3 * 86400)).to_string(),
+            superseded_at: Some((now - jiff::SignedDuration::from_secs(86400)).to_string()),
             superseded_by: Some("f3".into()),
             stability: 1.0,
             last_accessed: None,
@@ -1204,7 +1204,7 @@ mod tests {
         let pool = crate::repos::cognitive_test_pool().await;
         let repo = SemanticFactRepo::new(pool);
 
-        let now = chrono::Utc::now();
+        let now = jiff::Timestamp::now();
 
         // Fact superseded after 30 days — NOT a fast failure (legitimate real-world change)
         let f1 = crate::types::SemanticFact {
@@ -1217,8 +1217,8 @@ mod tests {
             source: "observed".into(),
             valid_from: "2026-01-01".into(),
             valid_until: None,
-            recorded_at: (now - chrono::Duration::days(60)).to_rfc3339(),
-            superseded_at: Some((now - chrono::Duration::days(20)).to_rfc3339()),
+            recorded_at: (now - jiff::SignedDuration::from_secs(60 * 86400)).to_string(),
+            superseded_at: Some((now - jiff::SignedDuration::from_secs(20 * 86400)).to_string()),
             superseded_by: Some("f-new".into()),
             stability: 1.0,
             last_accessed: None,
@@ -1246,7 +1246,7 @@ mod tests {
         let pool = crate::repos::cognitive_test_pool().await;
         let repo = SemanticFactRepo::new(pool);
 
-        let now = chrono::Utc::now();
+        let now = jiff::Timestamp::now();
 
         // Work domain: 1 active fact, health = 1.0
         let f1 = crate::types::SemanticFact {
@@ -1259,7 +1259,7 @@ mod tests {
             source: "observed".into(),
             valid_from: "2026-03-01".into(),
             valid_until: None,
-            recorded_at: now.to_rfc3339(),
+            recorded_at: now.to_string(),
             superseded_at: None,
             superseded_by: None,
             stability: 1.0,
@@ -1284,8 +1284,8 @@ mod tests {
             source: "observed".into(),
             valid_from: "2026-03-01".into(),
             valid_until: None,
-            recorded_at: (now - chrono::Duration::days(3)).to_rfc3339(),
-            superseded_at: Some((now - chrono::Duration::days(1)).to_rfc3339()),
+            recorded_at: (now - jiff::SignedDuration::from_secs(3 * 86400)).to_string(),
+            superseded_at: Some((now - jiff::SignedDuration::from_secs(86400)).to_string()),
             superseded_by: Some("f-fix".into()),
             stability: 1.0,
             last_accessed: None,

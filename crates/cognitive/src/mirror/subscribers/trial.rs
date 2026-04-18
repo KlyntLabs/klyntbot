@@ -2,7 +2,7 @@
 //! queries early metrics via EarlyTrialEvaluator, writes preview to repo.
 
 use bus::DomainEvent;
-use chrono::Utc;
+use jiff::Timestamp;
 use dashmap::DashMap;
 use std::sync::Arc;
 use tokio::sync::broadcast;
@@ -76,7 +76,7 @@ impl TrialPreviewSubscriber {
         let tid = trial_id.clone();
 
         let handle = tokio::spawn(async move {
-            let started_at = Utc::now();
+            let started_at = Timestamp::now();
             tokio::time::sleep(std::time::Duration::from_secs(PREVIEW_DELAY_SECS)).await;
 
             let signals = if let Some(eval) = &evaluator {
@@ -105,7 +105,7 @@ impl TrialPreviewSubscriber {
                 id: Uuid::new_v4(),
                 trial_id: trial_id.clone(),
                 started_at,
-                preview_at: Utc::now(),
+                preview_at: Timestamp::now(),
                 messages_scored,
                 early_signals: signals,
                 recommendation: recommendation.clone(),

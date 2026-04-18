@@ -5,7 +5,7 @@
 //! 2. Deletes episodic memories older than 90 days with low access
 //! 3. Enforces size budget on active semantic facts
 
-use chrono::Datelike;
+
 use tracing::{debug, info, warn};
 
 use crate::repos::{
@@ -58,6 +58,7 @@ pub struct CompactionResult {
 }
 
 /// Run the full compaction cycle.
+#[allow(clippy::too_many_arguments)]
 pub async fn run_compaction(
     fact_repo: &SemanticFactRepo,
     episodic_repo: &EpisodicMemoryRepo,
@@ -121,7 +122,7 @@ pub async fn run_compaction(
         }
 
         // 8b. Weekly strength decay (Sundays only)
-        if chrono::Utc::now().weekday() == chrono::Weekday::Sun {
+        if jiff::Timestamp::now().strftime("%A").to_string() == "Sunday" {
             let pruned = ca
                 .decay_all(CO_ACTIVATION_DECAY_FACTOR, CO_ACTIVATION_MIN_STRENGTH)
                 .await?;

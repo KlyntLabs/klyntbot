@@ -197,7 +197,7 @@ mod tests {
     fn test_co_activation_empty_peers() {
         // Empty peers should short-circuit to 0.0 (tested via the function signature)
         // The async function returns 0.0 for empty peers without hitting the repo
-        assert!(true); // Validated by the early return in co_activation_score
+        // Validated by the early return in co_activation_score (no assertion needed)
     }
 
     #[test]

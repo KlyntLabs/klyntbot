@@ -1,4 +1,4 @@
-use chrono::{DateTime, Utc};
+use jiff::Timestamp;
 use common::truncate_at_boundary;
 use storage::{sanitize_predicate_value, VectorStore};
 
@@ -30,7 +30,7 @@ pub struct RecallResult {
     pub role: String,
     pub content: String,
     pub score: f64,
-    pub created_at: DateTime<Utc>,
+    pub created_at: Timestamp,
 }
 
 /// Metadata for a conversation message being stored.
@@ -120,22 +120,15 @@ impl ConversationRecallService {
             .search_conv_embeddings(&vector, limit * 2, threshold as f64)
             .await?;
 
-        let now = Utc::now();
+        let now = Timestamp::now();
 
         let mut results: Vec<RecallResult> = raw_results
             .into_iter()
             .filter_map(
                 |(id, session_key, role, preview, created_at_str, similarity)| {
-                    let created_at = chrono::DateTime::parse_from_rfc3339(&created_at_str)
-                        .map(|dt| dt.with_timezone(&Utc))
-                        .unwrap_or_else(|e| {
-                            tracing::warn!(
-                                "Failed to parse recall timestamp '{created_at_str}': {e}"
-                            );
-                            now
-                        });
+                    let created_at = created_at_str.parse::<Timestamp>().unwrap_or(Timestamp::now());
 
-                    let days_old = (now - created_at).num_seconds() as f64 / 86400.0;
+                    let days_old = (now.as_millisecond() - created_at.as_millisecond()) as f64 / 86_400_000.0;
                     let decayed_score = similarity * self.decay_factor.powf(days_old.max(0.0));
 
                     if decayed_score >= threshold as f64 {
@@ -164,8 +157,8 @@ impl ConversationRecallService {
     }
 
     /// Delete conversation embeddings older than the given cutoff.
-    pub async fn delete_older_than(&self, cutoff: DateTime<Utc>) -> common::Result<()> {
-        let cutoff_str = sanitize_predicate_value(&cutoff.to_rfc3339())?;
+    pub async fn delete_older_than(&self, cutoff: Timestamp) -> common::Result<()> {
+        let cutoff_str = sanitize_predicate_value(&cutoff.to_string())?;
         self.vector_store
             .delete_where("conv_embeddings", &format!("created_at < '{cutoff_str}'"))
             .await?;

@@ -12,7 +12,7 @@ use tracing::{debug, info, warn};
 use uuid::Uuid;
 
 use bus::DomainEvent;
-use chrono::Utc;
+use jiff::Timestamp;
 
 use crate::mirror::{
     snippet_from_alert, MirrorAlert, MirrorRepo, NarrativeSnippet, RoutingSnapshot, SkillRouteStats,
@@ -178,7 +178,7 @@ impl RoutingMirrorSubscriber {
 
         RoutingSnapshot {
             id: Uuid::new_v4(),
-            captured_at: Utc::now(),
+            captured_at: Timestamp::now(),
             window_hours: 1,
             total_messages: total,
             distribution,

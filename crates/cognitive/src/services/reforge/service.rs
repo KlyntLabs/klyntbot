@@ -6,7 +6,7 @@
 
 use std::collections::HashMap;
 
-use chrono::Utc;
+use jiff::Timestamp;
 use sqlx;
 use tracing::{debug, info, warn};
 
@@ -138,8 +138,8 @@ pub async fn run_reforge(
                     content: pattern.pattern.clone(),
                     summary: Some("Cross-session pattern".to_string()),
                     importance: pattern.confidence,
-                    occurred_at: Utc::now().to_rfc3339(),
-                    recorded_at: Utc::now().to_rfc3339(),
+                    occurred_at: Timestamp::now().to_string(),
+                    recorded_at: Timestamp::now().to_string(),
                     stability: 3.0,
                     last_accessed: None,
                     access_count: 0,
@@ -180,7 +180,7 @@ pub async fn run_reforge(
     // Persist context priority suggestions for the next cycle's feedback loop.
     if let Some(ref review) = review_output {
         if let Some(repo) = feedback_sources.and_then(|fb| fb.suggestion_repo) {
-            let now = Utc::now().to_rfc3339();
+            let now = Timestamp::now().to_string();
             for suggestion in &review.context_priority_suggestions {
                 let row = storage::repos::reforge_suggestion::ReforgeSuggestionRow {
                     id: uuid::Uuid::new_v4().to_string(),
@@ -248,8 +248,8 @@ pub async fn run_reforge(
         content: narrative,
         summary: Some("Reforge cycle narrative".to_string()),
         importance: 0.9,
-        occurred_at: Utc::now().to_rfc3339(),
-        recorded_at: Utc::now().to_rfc3339(),
+        occurred_at: Timestamp::now().to_string(),
+        recorded_at: Timestamp::now().to_string(),
         stability: 5.0,
         last_accessed: None,
         access_count: 0,
@@ -775,7 +775,7 @@ async fn apply_knowledge(
     rule_repo: &ProceduralRuleRepo,
     result: &mut ReforgeResult,
 ) {
-    let now = Utc::now().to_rfc3339();
+    let now = Timestamp::now().to_string();
 
     // --- Fact updates ---
     for fu in &syn.fact_updates {
@@ -1021,7 +1021,7 @@ async fn apply_skill_edits(
             diff: Some(diff),
             source: SOURCE_REFORGE.to_string(),
             reason: Some(edit.reason.clone()),
-            created_at: Utc::now().to_rfc3339(),
+            created_at: Timestamp::now().to_string(),
         };
 
         if let Err(e) = skill_version_repo.insert(&version_row).await {
@@ -1615,6 +1615,7 @@ fn prune_for_diversity(
 
 /// Check that trial suggestions are sufficiently diverse from each other and
 /// from the champion. Returns true if diversity is sufficient.
+#[allow(dead_code)]
 fn check_diversity(
     suggestions: &[&HashMap<String, f64>],
     champion_params: &HashMap<String, f64>,

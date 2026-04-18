@@ -2,7 +2,7 @@
 //! maps onto the new `insight_reviews` table.  Will be fully replaced by
 //! `InsightReviewRepo` in a subsequent task (Task 3/9).
 
-use chrono::Utc;
+use jiff::Timestamp;
 use serde::{Deserialize, Serialize};
 use sqlx::SqlitePool;
 use uuid::Uuid;
@@ -130,7 +130,7 @@ impl InsightCacheRepo {
         persona_ids: Option<&str>,
     ) -> Result<InsightCacheRow, sqlx::Error> {
         let id = Uuid::new_v4().to_string();
-        let now = Utc::now().to_rfc3339();
+        let now = Timestamp::now().to_string();
 
         // Build content JSON from provided tabs.
         let mut tabs = serde_json::Map::new();
@@ -227,7 +227,7 @@ impl InsightCacheRepo {
         tab_name: &str,
         content: &str,
     ) -> Result<(), sqlx::Error> {
-        let now = Utc::now().to_rfc3339();
+        let now = Timestamp::now().to_string();
 
         // Validate tab name before building JSON patch.
         match tab_name {

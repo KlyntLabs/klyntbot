@@ -1,6 +1,6 @@
 //! Repository for the `flashcards` table — FSRS-5 spaced-repetition scheduling.
 
-use chrono::Utc;
+use jiff::Timestamp;
 use serde::{Deserialize, Serialize};
 use sqlx::SqlitePool;
 use uuid::Uuid;
@@ -152,7 +152,7 @@ impl FlashcardRepo {
             return Ok(Vec::new());
         }
 
-        let now = Utc::now().to_rfc3339();
+        let now = Timestamp::now().to_string();
         let mut ids = Vec::with_capacity(cards.len());
         let mut tx = self.pool.begin().await?;
 
@@ -231,7 +231,7 @@ impl FlashcardRepo {
 
     /// Get the next review card for an atom: due card first, fallback to most recent.
     pub async fn next_for_atom(&self, atom_id: &str) -> Result<Option<FlashcardRow>, sqlx::Error> {
-        let now = Utc::now().to_rfc3339();
+        let now = Timestamp::now().to_string();
         // Single query: prioritize due cards, then fall back to most recently created
         sqlx::query_as::<_, FlashcardRow>(
             r#"
@@ -279,7 +279,7 @@ impl FlashcardRepo {
         deck: &str,
         limit: i64,
     ) -> Result<Vec<FlashcardRow>, sqlx::Error> {
-        let now = Utc::now().to_rfc3339();
+        let now = Timestamp::now().to_string();
         sqlx::query_as::<_, FlashcardRow>(
             r#"
             SELECT * FROM flashcards
@@ -314,11 +314,9 @@ impl FlashcardRepo {
 
         // Compute elapsed days since last review (or creation)
         let last_review_str = card.last_reviewed_at.as_deref().unwrap_or(&card.created_at);
-        let last_review_dt = chrono::DateTime::parse_from_rfc3339(last_review_str)
-            .ok()
-            .map(|dt| dt.with_timezone(&Utc));
-        let elapsed_days = last_review_dt
-            .map(|dt| (Utc::now() - dt).num_seconds() as f64 / 86400.0)
+        let last_review_ts = last_review_str.parse::<Timestamp>().ok();
+        let elapsed_days = last_review_ts
+            .map(|ts| (Timestamp::now().as_millisecond() - ts.as_millisecond()) as f64 / 86_400_000.0)
             .unwrap_or(0.0)
             .max(0.0);
 
@@ -353,10 +351,10 @@ impl FlashcardRepo {
             card.lapses
         };
 
-        let now = Utc::now();
-        let due_at = now + chrono::Duration::days(interval_days as i64);
-        let now_str = now.to_rfc3339();
-        let due_str = due_at.to_rfc3339();
+        let now = Timestamp::now();
+        let due_at = now + jiff::SignedDuration::from_secs(interval_days as i64 * 86400);
+        let now_str = now.to_string();
+        let due_str = due_at.to_string();
 
         // Update card
         sqlx::query(
@@ -387,10 +385,10 @@ impl FlashcardRepo {
         } else {
             card.due_at
                 .as_deref()
-                .and_then(|d| chrono::DateTime::parse_from_rfc3339(d).ok())
+                .and_then(|d| d.parse::<Timestamp>().ok())
                 .and_then(|due| {
-                    last_review_dt
-                        .map(|lr| (due.with_timezone(&Utc) - lr).num_seconds() as f64 / 86400.0)
+                    last_review_ts
+                        .map(|lr| (due.as_millisecond() - lr.as_millisecond()) as f64 / 86_400_000.0)
                 })
                 .unwrap_or(0.0)
         };
@@ -432,7 +430,7 @@ impl FlashcardRepo {
 
     /// Return a summary of every deck.
     pub async fn list_decks(&self) -> Result<Vec<DeckSummary>, sqlx::Error> {
-        let now = Utc::now().to_rfc3339();
+        let now = Timestamp::now().to_string();
 
         sqlx::query_as::<_, DeckSummary>(
             r#"
@@ -476,7 +474,7 @@ impl FlashcardRepo {
         cloze_data: Option<&serde_json::Value>,
         vocab_data: Option<&serde_json::Value>,
     ) -> Result<FlashcardRow, sqlx::Error> {
-        let now = Utc::now().to_rfc3339();
+        let now = Timestamp::now().to_string();
         let tags_str = serde_json::to_string(tags).unwrap_or_else(|_| "[]".to_string());
         let cloze_str = cloze_data.map(|v| v.to_string());
         let vocab_str = vocab_data.map(|v| v.to_string());
@@ -540,7 +538,7 @@ impl FlashcardRepo {
         id: &str,
         suspended: bool,
     ) -> Result<FlashcardRow, sqlx::Error> {
-        let now = Utc::now().to_rfc3339();
+        let now = Timestamp::now().to_string();
         sqlx::query("UPDATE flashcards SET suspended = ?1, updated_at = ?2 WHERE id = ?3")
             .bind(suspended as i64)
             .bind(&now)
@@ -553,7 +551,7 @@ impl FlashcardRepo {
 
     /// Fetch all due cards across ALL decks.
     pub async fn get_all_due_cards(&self, limit: i64) -> Result<Vec<FlashcardRow>, sqlx::Error> {
-        let now = Utc::now().to_rfc3339();
+        let now = Timestamp::now().to_string();
         sqlx::query_as::<_, FlashcardRow>(
             r#"
             SELECT * FROM flashcards
@@ -587,7 +585,7 @@ impl FlashcardRepo {
 
     /// Get total due count across all decks.
     pub async fn total_due_count(&self) -> Result<i64, sqlx::Error> {
-        let now = Utc::now().to_rfc3339();
+        let now = Timestamp::now().to_string();
         let row: (i64,) = sqlx::query_as(
             r#"
             SELECT COUNT(*) FROM flashcards
@@ -626,7 +624,7 @@ impl FlashcardRepo {
 
     /// Set `back_embedding_updated_at` to now for a card after its back embedding is computed.
     pub async fn update_embedding_timestamp(&self, id: &str) -> Result<(), sqlx::Error> {
-        let now = Utc::now().to_rfc3339();
+        let now = Timestamp::now().to_string();
         sqlx::query("UPDATE flashcards SET back_embedding_updated_at = ?1 WHERE id = ?2")
             .bind(&now)
             .bind(id)
@@ -747,7 +745,7 @@ impl FlashcardRepo {
         boost_fraction: f64,
     ) -> Result<(), sqlx::Error> {
         let capped = boost_fraction.min(0.20);
-        let now = Utc::now().to_rfc3339();
+        let now = Timestamp::now().to_string();
 
         // Only boost cards that are due within 48 hours from now.
         // The boost extends due_at by `capped * interval_seconds` where
@@ -783,7 +781,7 @@ impl FlashcardRepo {
         max_penalty: f64,
     ) -> Result<(), sqlx::Error> {
         let capped = max_penalty.min(0.08);
-        let now = Utc::now().to_rfc3339();
+        let now = Timestamp::now().to_string();
 
         // Reduce due_at by `capped * interval_seconds` (pull due date closer).
         sqlx::query(

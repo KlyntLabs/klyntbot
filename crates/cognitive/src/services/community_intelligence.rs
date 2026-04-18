@@ -192,7 +192,7 @@ async fn execute_split(
     community_repo.delete_community(&split.community_id).await?;
 
     // 6. Create new sub-communities
-    let now = chrono::Utc::now().to_rfc3339();
+    let now = jiff::Timestamp::now().to_string();
     for (idx, group_members) in &new_groups {
         let new_id = format!("{}-sub{}", split.community_id, idx);
         let community = CommunityRow {
@@ -221,7 +221,7 @@ pub async fn build_intelligence_input(
     community_repo: &CommunityRepo,
 ) -> common::Result<CommunityIntelligenceInput> {
     let communities = community_repo.list_active_communities().await?;
-    let now = chrono::Utc::now();
+    let now = jiff::Timestamp::now();
 
     let mut contexts = Vec::new();
     for c in &communities {
@@ -231,8 +231,8 @@ pub async fn build_intelligence_input(
             .and_then(|s| serde_json::from_str(s).ok())
             .unwrap_or_default();
 
-        let age_days = chrono::DateTime::parse_from_rfc3339(&c.created_at)
-            .map(|dt| (now - dt.with_timezone(&chrono::Utc)).num_days().max(0) as u32)
+        let age_days = c.created_at.parse::<jiff::Timestamp>()
+            .map(|ts| ((now.as_millisecond() - ts.as_millisecond()).max(0) / 86_400_000) as u32)
             .unwrap_or(0);
 
         contexts.push(CommunityContext {

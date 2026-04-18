@@ -7,7 +7,7 @@
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 
-use chrono::Utc;
+use jiff::Timestamp;
 use serde::Serialize;
 use tokio::sync::broadcast;
 use tokio::task::JoinHandle;
@@ -82,7 +82,7 @@ impl AccumulatedEntry {
     }
 
     fn add(&mut self, obs: Observation) {
-        let day = obs.timestamp.format("%Y-%m-%d").to_string();
+        let day = obs.timestamp.strftime("%Y-%m-%d").to_string();
         self.days_seen.insert(day);
         self.observations.push(obs);
         // Cap per-key observations to prevent unbounded growth
@@ -338,7 +338,7 @@ impl BackgroundConsolidationService {
             // Accumulator promotions — separate from DLQ to avoid index corruption
             let mut promotion_queue: Vec<Observation> = Vec::new();
 
-            let session_start = chrono::Utc::now().to_rfc3339();
+            let session_start = jiff::Timestamp::now().to_string();
             let mut batch_count: u64 = 0;
 
             loop {
@@ -489,7 +489,7 @@ impl BackgroundConsolidationService {
                     for obs in &to_extract {
                         if obs.importance >= 0.7 {
                             if let Some(ref ep_repo) = episodic_repo {
-                                let ts = Utc::now().format("%Y-%m-%dT%H:%M:%S").to_string();
+                                let ts = Timestamp::now().strftime("%Y-%m-%dT%H:%M:%S").to_string();
                                 let mem = EpisodicMemory {
                                     id: uuid::Uuid::new_v4().to_string(),
                                     domain: obs.domain.clone(),
@@ -895,7 +895,7 @@ async fn event_to_observation(
     event: &DomainEvent,
     session_repo: &Option<storage::SessionRepo>,
 ) -> Option<Observation> {
-    let now = Utc::now();
+    let now = Timestamp::now();
     match event {
         DomainEvent::ChatTurnCompleted {
             session_key,
@@ -1411,15 +1411,13 @@ fn event_type_key(event: &DomainEvent) -> String {
 
 /// Check if a fact was recorded in the current session.
 fn is_same_session(recorded_at: &str, session_start: &str) -> bool {
-    let recorded = chrono::DateTime::parse_from_rfc3339(recorded_at)
-        .or_else(|_| {
-            recorded_at
-                .parse::<chrono::NaiveDateTime>()
-                .map(|ndt| ndt.and_utc().fixed_offset())
-        })
-        .unwrap_or_default();
-    let start = chrono::DateTime::parse_from_rfc3339(session_start).unwrap_or_default();
-    (recorded - start).num_seconds().abs() < 300
+    let recorded = recorded_at
+        .parse::<jiff::Timestamp>()
+        .unwrap_or(jiff::Timestamp::UNIX_EPOCH);
+    let start = session_start
+        .parse::<jiff::Timestamp>()
+        .unwrap_or(jiff::Timestamp::UNIX_EPOCH);
+    ((recorded.as_millisecond() - start.as_millisecond()) / 1000).abs() < 300
 }
 
 /// Upsert a domain object into the entities table.
@@ -1502,7 +1500,7 @@ fn summarize_accumulated(event_type: &str, observations: &[Observation]) -> Obse
         ),
         importance: avg_importance,
         source_event: format!("accumulated:{event_type}"),
-        timestamp: Utc::now(),
+        timestamp: Timestamp::now(),
     }
 }
 
@@ -1537,7 +1535,7 @@ fn summarize_observation(content: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use chrono::DateTime;
+
 
     #[tokio::test]
     async fn test_event_to_observation_user_stated_fact() {
@@ -1613,7 +1611,7 @@ mod tests {
                 content: format!("event {i}"),
                 importance: 0.5,
                 source_event: "test".into(),
-                timestamp: ts.parse::<DateTime<Utc>>().unwrap(),
+                timestamp: ts.parse::<jiff::Timestamp>().unwrap(),
             });
         }
 
@@ -1648,14 +1646,14 @@ mod tests {
                 content: "Score: 72".into(),
                 importance: 0.5,
                 source_event: "ProductivityScoreComputed".into(),
-                timestamp: Utc::now(),
+                timestamp: Timestamp::now(),
             },
             Observation {
                 domain: "productivity".into(),
                 content: "Score: 78".into(),
                 importance: 0.6,
                 source_event: "ProductivityScoreComputed".into(),
-                timestamp: Utc::now(),
+                timestamp: Timestamp::now(),
             },
         ];
 

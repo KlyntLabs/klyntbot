@@ -1,7 +1,7 @@
 //! NarrativeHandler trait and alert-to-snippet conversion templates.
 
 use async_trait::async_trait;
-use chrono::Utc;
+use jiff::Timestamp;
 use uuid::Uuid;
 
 use common::Result;
@@ -72,7 +72,7 @@ pub fn snippet_from_alert(alert: &MirrorAlert) -> NarrativeSnippet {
             );
             NarrativeSnippet {
                 id: Uuid::new_v4(),
-                created_at: Utc::now(),
+                created_at: Timestamp::now(),
                 alert_type: MirrorAlertType::RoutingDrift,
                 headline,
                 body,
@@ -85,7 +85,7 @@ pub fn snippet_from_alert(alert: &MirrorAlert) -> NarrativeSnippet {
         }
         MirrorAlert::TrialUnpromising { trial_id, reason } => NarrativeSnippet {
             id: Uuid::new_v4(),
-            created_at: Utc::now(),
+            created_at: Timestamp::now(),
             alert_type: MirrorAlertType::TrialUnpromising,
             headline: "An experiment isn't looking great".to_string(),
             body: format!(
@@ -104,7 +104,7 @@ pub fn snippet_from_alert(alert: &MirrorAlert) -> NarrativeSnippet {
             source: _,
         } => NarrativeSnippet {
             id: Uuid::new_v4(),
-            created_at: Utc::now(),
+            created_at: Timestamp::now(),
             alert_type: MirrorAlertType::MetaRuleProposed,
             headline: "I learned something about how I think".to_string(),
             body: format!(

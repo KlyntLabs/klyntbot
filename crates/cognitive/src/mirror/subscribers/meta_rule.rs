@@ -9,7 +9,7 @@ use tracing::{info, warn};
 use uuid::Uuid;
 
 use bus::DomainEvent;
-use chrono::Utc;
+use jiff::Timestamp;
 
 use crate::mirror::{
     snippet_from_alert, MetaRule, MetaRuleAction, MetaRuleSource, MetaRuleStatus, MirrorAlert,
@@ -186,8 +186,8 @@ impl MetaRuleDetector {
                 effectiveness_score: 0.5,
                 status: MetaRuleStatus::Pending,
                 signal_count: 1,
-                created_at: Utc::now(),
-                updated_at: Utc::now(),
+                created_at: Timestamp::now(),
+                updated_at: Timestamp::now(),
             };
 
             if let Err(e) = repo.insert_meta_rule(&rule).await {

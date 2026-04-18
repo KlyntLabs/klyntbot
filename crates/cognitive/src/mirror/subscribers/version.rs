@@ -3,7 +3,7 @@
 use std::sync::Arc;
 
 use bus::DomainEvent;
-use chrono::Utc;
+use jiff::Timestamp;
 use common::Result;
 use tokio::sync::broadcast;
 use tokio_util::sync::CancellationToken;
@@ -45,7 +45,7 @@ impl ConfigArchiver {
         let v = BrainVersion {
             version: 1,
             trial_id: None,
-            promoted_at: Utc::now(),
+            promoted_at: Timestamp::now(),
             params: default_params,
             reason: "Initial brain state".to_string(),
             parent_version: None,
@@ -70,7 +70,7 @@ impl ConfigArchiver {
         let v = BrainVersion {
             version: next,
             trial_id,
-            promoted_at: Utc::now(),
+            promoted_at: Timestamp::now(),
             params,
             reason,
             parent_version: parent,

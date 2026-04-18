@@ -1,4 +1,4 @@
-use chrono::{DateTime, Utc};
+use jiff::Timestamp;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use uuid::Uuid;
@@ -20,7 +20,7 @@ pub struct MirrorState {
 pub struct BrainVersion {
     pub version: u32,
     pub trial_id: Option<String>,
-    pub promoted_at: DateTime<Utc>,
+    pub promoted_at: Timestamp,
     pub params: serde_json::Value,
     pub reason: String,
     pub parent_version: Option<u32>,
@@ -39,7 +39,7 @@ pub trait AutotunerBridge: Send + Sync {
 #[serde(rename_all = "camelCase")]
 pub struct RoutingSnapshot {
     pub id: Uuid,
-    pub captured_at: DateTime<Utc>,
+    pub captured_at: Timestamp,
     pub window_hours: u8,
     pub total_messages: u32,
     pub distribution: HashMap<String, SkillRouteStats>,
@@ -62,9 +62,9 @@ pub struct SkillRouteStats {
 #[serde(rename_all = "camelCase")]
 pub struct TrendNarrative {
     pub id: Uuid,
-    pub generated_at: DateTime<Utc>,
-    pub period_start: DateTime<Utc>,
-    pub period_end: DateTime<Utc>,
+    pub generated_at: Timestamp,
+    pub period_start: Timestamp,
+    pub period_end: Timestamp,
     pub routing_summary: String,
     pub improvement_highlights: Vec<String>,
     pub experiment_summary: String,
@@ -77,13 +77,13 @@ pub struct TrendNarrative {
 #[serde(rename_all = "camelCase")]
 pub struct NarrativeSnippet {
     pub id: Uuid,
-    pub created_at: DateTime<Utc>,
+    pub created_at: Timestamp,
     pub alert_type: MirrorAlertType,
     pub headline: String,
     pub body: String,
     pub suggested_action: Option<SuggestedAction>,
     pub user_feedback: Option<UserFeedback>,
-    pub dismissed_at: Option<DateTime<Utc>>,
+    pub dismissed_at: Option<Timestamp>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -143,7 +143,7 @@ pub enum SuggestedAction {
 /// Context assembled for the NarrativeHandler LLM call
 #[derive(Debug, Clone, Serialize)]
 pub struct NarrativeContext {
-    pub period: (DateTime<Utc>, DateTime<Utc>),
+    pub period: (Timestamp, Timestamp),
     pub routing_snapshots: Vec<RoutingSnapshot>,
     pub correction_count: u32,
     pub top_skills_by_usage: Vec<(String, f64)>,
@@ -187,8 +187,8 @@ pub struct MetaRule {
     pub effectiveness_score: f64,
     pub status: MetaRuleStatus,
     pub signal_count: u32,
-    pub created_at: DateTime<Utc>,
-    pub updated_at: DateTime<Utc>,
+    pub created_at: Timestamp,
+    pub updated_at: Timestamp,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -225,8 +225,8 @@ pub enum MetaRuleStatus {
 pub struct TrialPreview {
     pub id: Uuid,
     pub trial_id: String,
-    pub started_at: DateTime<Utc>,
-    pub preview_at: DateTime<Utc>,
+    pub started_at: Timestamp,
+    pub preview_at: Timestamp,
     pub messages_scored: u32,
     pub early_signals: TrialEarlySignals,
     pub recommendation: PreviewRecommendation,
@@ -265,6 +265,6 @@ pub trait EarlyTrialEvaluator: Send + Sync {
     async fn evaluate_trial_early(
         &self,
         trial_id: &str,
-        since: DateTime<Utc>,
+        since: Timestamp,
     ) -> common::Result<TrialEarlySignals>;
 }

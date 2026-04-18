@@ -1,6 +1,6 @@
 //! Repository for `squads` and `squad_members` tables.
 
-use chrono::Utc;
+use jiff::Timestamp;
 use serde::{Deserialize, Serialize};
 use sqlx::SqlitePool;
 use uuid::Uuid;
@@ -163,14 +163,12 @@ pub struct InteractionCounts {
 /// Returns `true` when `last_smart_updated` is an ISO-8601 / SQLite datetime
 /// string that falls within the last 24 hours.
 fn is_cache_fresh(updated: &str) -> bool {
-    use chrono::{DateTime, Duration, Utc};
-    // Accept both RFC-3339 ("…T…Z") and SQLite datetime ("… ") formats
-    let parsed = updated.parse::<DateTime<Utc>>().or_else(|_| {
-        // SQLite stores datetimes as "YYYY-MM-DD HH:MM:SS"; append " UTC" for parsing
-        format!("{updated} UTC").parse::<DateTime<Utc>>()
+    // Accept both RFC-3339 ("…T…Z") and SQLite datetime ("YYYY-MM-DD HH:MM:SS") formats
+    let parsed = updated.parse::<jiff::Timestamp>().or_else(|_| {
+        format!("{}Z", updated.trim().replace(' ', "T")).parse::<jiff::Timestamp>()
     });
     match parsed {
-        Ok(dt) => Utc::now() - dt < Duration::days(1),
+        Ok(ts) => (jiff::Timestamp::now().as_millisecond() - ts.as_millisecond()) < 86_400_000,
         Err(_) => false,
     }
 }
@@ -190,7 +188,7 @@ impl SquadRepo {
     /// Create a user-defined squad.
     pub async fn create(&self, squad: &NewSquad) -> Result<SquadRow, sqlx::Error> {
         let id = Uuid::new_v4().to_string();
-        let now = Utc::now().to_rfc3339();
+        let now = Timestamp::now().to_string();
         let domains_json = serde_json::to_string(&squad.domains).unwrap_or_else(|_| "[]".into());
 
         sqlx::query(
@@ -254,7 +252,7 @@ impl SquadRepo {
             return Err(sqlx::Error::Protocol("Cannot edit builtin squad".into()));
         }
 
-        let now = Utc::now().to_rfc3339();
+        let now = Timestamp::now().to_string();
         let name = name.unwrap_or(&existing.name);
         let description = description.unwrap_or(&existing.description);
         let icon = icon.unwrap_or(&existing.icon);
@@ -471,7 +469,7 @@ impl SquadRepo {
 
     /// Seed all builtin squads and their members. Idempotent — skips if already present.
     pub async fn seed_builtins(&self) -> Result<(), sqlx::Error> {
-        let now = Utc::now().to_rfc3339();
+        let now = Timestamp::now().to_string();
         let mut tx = self.pool.begin().await?;
         for b in BUILTIN_SQUADS {
             sqlx::query(

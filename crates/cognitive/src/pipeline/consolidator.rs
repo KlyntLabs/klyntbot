@@ -201,7 +201,7 @@ pub fn promotion_source(signals: &[CognitiveSignal]) -> String {
 mod tests {
     use super::*;
     use crate::pipeline::signal::SignalContext;
-    use chrono::Utc;
+    use jiff::Timestamp;
 
     fn sig(source: SignalSource, content: &str, domain: &str, confidence: f64) -> CognitiveSignal {
         CognitiveSignal {
@@ -210,7 +210,7 @@ mod tests {
             domain: domain.into(),
             confidence,
             context: SignalContext::default(),
-            timestamp: Utc::now(),
+            timestamp: Timestamp::now(),
         }
     }
 

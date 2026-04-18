@@ -45,7 +45,7 @@ impl AtomExtractionCache {
 
     /// Update or insert the cache entry for a note.
     pub async fn set(&self, note_id: &str, content_hash: &str) -> Result<(), sqlx::Error> {
-        let now = chrono::Utc::now().to_rfc3339();
+        let now = jiff::Timestamp::now().to_string();
         sqlx::query(
             "INSERT INTO atom_extraction_cache (note_id, content_hash, extracted_at) VALUES (?1, ?2, ?3) ON CONFLICT(note_id) DO UPDATE SET content_hash = ?2, extracted_at = ?3",
         )

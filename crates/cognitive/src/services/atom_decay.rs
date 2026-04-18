@@ -25,7 +25,7 @@ pub async fn run_decay_cycle(pool: &SqlitePool, bus: &DomainEventBus) -> common:
     }
 
     info!("Atom decay: processing {} stale atoms", stale.len());
-    let now = chrono::Utc::now();
+    let now = jiff::Timestamp::now();
     let mut fading_count = 0usize;
     let mut archived_count = 0usize;
 
@@ -44,8 +44,8 @@ pub async fn run_decay_cycle(pool: &SqlitePool, bus: &DomainEventBus) -> common:
         let elapsed_days = atom
             .last_interaction_ts
             .as_deref()
-            .and_then(|ts| chrono::DateTime::parse_from_rfc3339(ts).ok())
-            .map(|dt| (now - dt.with_timezone(&chrono::Utc)).num_seconds() as f64 / 86400.0)
+            .and_then(|ts| ts.parse::<jiff::Timestamp>().ok())
+            .map(|ts| (now.as_millisecond() - ts.as_millisecond()) as f64 / 86_400_000.0)
             .unwrap_or(30.0);
         let new_retention = 1.0 / (1.0 + elapsed_days / (9.0 * atom.stability));
 

@@ -84,24 +84,18 @@ pub fn relevance_score(
 /// Compute temporal recency score from a valid_from timestamp string.
 /// Returns a value between 0.1 and 1.0 — recent facts score higher.
 pub fn temporal_recency_score(valid_from: &str) -> f64 {
-    let now = chrono::Utc::now();
-    let age_days: f64 = chrono::DateTime::parse_from_rfc3339(valid_from)
-        .map(|dt| (now - dt.with_timezone(&chrono::Utc)).num_days().max(0) as f64)
-        .map_err(|e| e.to_string())
+    let now = jiff::Timestamp::now();
+    // Try parsing as RFC3339 timestamp, then as date-only
+    let age_days: f64 = valid_from
+        .parse::<jiff::Timestamp>()
+        .map(|ts| (now.as_millisecond() - ts.as_millisecond()).max(0) as f64 / 86_400_000.0)
         .or_else(|_| {
             valid_from
-                .parse::<chrono::NaiveDateTime>()
-                .map(|ndt| (now.naive_utc() - ndt).num_days().max(0) as f64)
-                .map_err(|e| e.to_string())
-        })
-        .or_else(|_| {
-            chrono::NaiveDate::parse_from_str(valid_from, "%Y-%m-%d")
+                .parse::<jiff::civil::Date>()
                 .map(|d| {
-                    (now.naive_utc() - d.and_hms_opt(0, 0, 0).unwrap())
-                        .num_days()
-                        .max(0) as f64
+                    let ts = d.to_zoned(jiff::tz::TimeZone::UTC).map(|z| z.timestamp()).unwrap_or(now);
+                    (now.as_millisecond() - ts.as_millisecond()).max(0) as f64 / 86_400_000.0
                 })
-                .map_err(|e| e.to_string())
         })
         .unwrap_or(30.0);
     (1.0_f64 / (1.0_f64 + age_days / 30.0_f64)).max(0.1_f64)
@@ -217,7 +211,7 @@ mod tests {
 
     #[test]
     fn test_temporal_recency_score_recent() {
-        let now = chrono::Utc::now().format("%Y-%m-%dT%H:%M:%S").to_string();
+        let now = jiff::Timestamp::now().strftime("%Y-%m-%dT%H:%M:%S").to_string();
         let score = temporal_recency_score(&now);
         assert!(
             score > 0.95,

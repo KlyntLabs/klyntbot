@@ -1,6 +1,6 @@
 //! Repository for the `domain_event_log` and `pipeline_event_log` tables.
 
-use chrono::{DateTime, Utc};
+use jiff::Timestamp;
 use serde::{Deserialize, Serialize};
 use sqlx::SqlitePool;
 
@@ -182,14 +182,14 @@ impl EventLogRepo {
     pub async fn count_by_event_type(
         &self,
         event_type: &str,
-        since: DateTime<Utc>,
+        since: Timestamp,
     ) -> Result<i64, sqlx::Error> {
         sqlx::query_scalar::<_, i64>(
             "SELECT COUNT(*) FROM domain_event_log
              WHERE event_type = ?1 AND timestamp >= ?2",
         )
         .bind(event_type)
-        .bind(since.to_rfc3339())
+        .bind(since.to_string())
         .fetch_one(&self.pool)
         .await
     }
@@ -199,7 +199,7 @@ impl EventLogRepo {
         &self,
         event_type: &str,
         data_contains: &str,
-        since: DateTime<Utc>,
+        since: Timestamp,
     ) -> Result<i64, sqlx::Error> {
         sqlx::query_scalar::<_, i64>(
             "SELECT COUNT(*) FROM domain_event_log
@@ -207,7 +207,7 @@ impl EventLogRepo {
         )
         .bind(event_type)
         .bind(format!("%{data_contains}%"))
-        .bind(since.to_rfc3339())
+        .bind(since.to_string())
         .fetch_one(&self.pool)
         .await
     }
@@ -431,9 +431,7 @@ mod tests {
         .await
         .unwrap();
 
-        let since = chrono::DateTime::parse_from_rfc3339("2026-03-09T00:00:00Z")
-            .unwrap()
-            .with_timezone(&chrono::Utc);
+        let since: Timestamp = "2026-03-09T00:00:00Z".parse().unwrap();
 
         // Should count only the two TaskCreated events on March 9
         let count = repo

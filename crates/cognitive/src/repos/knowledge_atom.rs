@@ -1,6 +1,6 @@
 //! Repository for the `knowledge_atoms` and `knowledge_topics` tables.
 
-use chrono::Utc;
+use jiff::Timestamp;
 use serde::{Deserialize, Serialize};
 use sqlx::SqlitePool;
 use uuid::Uuid;
@@ -78,7 +78,7 @@ impl KnowledgeAtomRepo {
 
     pub async fn create(&self, atom: &NewKnowledgeAtom) -> Result<KnowledgeAtomRow, sqlx::Error> {
         let id = Uuid::new_v4().to_string();
-        let now = Utc::now().to_rfc3339();
+        let now = Timestamp::now().to_string();
 
         // Only set last_interaction_ts for active atoms.
         let interaction_ts: Option<&str> = if atom.status == "active" {
@@ -185,7 +185,7 @@ impl KnowledgeAtomRepo {
 
     /// Dismiss (archive) an atom.
     pub async fn dismiss(&self, id: &str) -> Result<(), sqlx::Error> {
-        let now = Utc::now().to_rfc3339();
+        let now = Timestamp::now().to_string();
         sqlx::query(
             r#"
             UPDATE knowledge_atoms
@@ -210,7 +210,7 @@ impl KnowledgeAtomRepo {
         stability: f64,
         difficulty: f64,
     ) -> Result<(), sqlx::Error> {
-        let now = Utc::now().to_rfc3339();
+        let now = Timestamp::now().to_string();
         sqlx::query(
             r#"
             UPDATE knowledge_atoms
@@ -234,7 +234,7 @@ impl KnowledgeAtomRepo {
 
     /// Touch: update last_interaction_ts to now.
     pub async fn touch(&self, id: &str) -> Result<(), sqlx::Error> {
-        let now = Utc::now().to_rfc3339();
+        let now = Timestamp::now().to_string();
         sqlx::query(
             "UPDATE knowledge_atoms SET last_interaction_ts = ?2, updated_at = ?2 WHERE id = ?1",
         )
@@ -263,7 +263,7 @@ impl KnowledgeAtomRepo {
         }
 
         let id = Uuid::new_v4().to_string();
-        let now = Utc::now().to_rfc3339();
+        let now = Timestamp::now().to_string();
         sqlx::query(
             "INSERT INTO knowledge_topics (id, name, domain, atom_count, avg_retention, created_at) VALUES (?1, ?2, ?3, 0, 1.0, ?4)",
         )
@@ -319,7 +319,7 @@ impl KnowledgeAtomRepo {
         &self,
         stale_days: i64,
     ) -> Result<Vec<KnowledgeAtomRow>, sqlx::Error> {
-        let cutoff = (Utc::now() - chrono::Duration::days(stale_days)).to_rfc3339();
+        let cutoff = (Timestamp::now() - jiff::SignedDuration::from_secs((stale_days) * 86400)).to_string();
         sqlx::query_as::<_, KnowledgeAtomRow>(
             r#"
             SELECT * FROM knowledge_atoms
@@ -339,7 +339,7 @@ impl KnowledgeAtomRepo {
         new_salience: f64,
         new_retention_pct: f64,
     ) -> Result<(), sqlx::Error> {
-        let now = Utc::now().to_rfc3339();
+        let now = Timestamp::now().to_string();
         sqlx::query(
             "UPDATE knowledge_atoms SET salience = ?2, retention_pct = ?3, updated_at = ?4 WHERE id = ?1",
         )
@@ -417,7 +417,7 @@ impl KnowledgeAtomRepo {
         boost: f64,
         referencing_note_id: &str,
     ) -> Result<f64, sqlx::Error> {
-        let now = Utc::now().to_rfc3339();
+        let now = Timestamp::now().to_string();
         let atom =
             sqlx::query_as::<_, KnowledgeAtomRow>("SELECT * FROM knowledge_atoms WHERE id = ?1")
                 .bind(id)
@@ -644,7 +644,7 @@ mod tests {
             .unwrap();
 
         // Manually set last_interaction_ts to 30 days ago
-        let old_ts = (Utc::now() - chrono::Duration::days(30)).to_rfc3339();
+        let old_ts = (Timestamp::now() - jiff::SignedDuration::from_secs((30) * 86400)).to_string();
         sqlx::query("UPDATE knowledge_atoms SET last_interaction_ts = ?2 WHERE id = ?1")
             .bind(&atom.id)
             .bind(&old_ts)

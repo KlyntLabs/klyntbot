@@ -26,8 +26,8 @@ fn freshness_label(fact: &crate::types::SemanticFact) -> &'static str {
     let days_old = fact
         .last_accessed
         .as_ref()
-        .and_then(|ts| chrono::DateTime::parse_from_rfc3339(ts).ok())
-        .map(|dt| (chrono::Utc::now() - dt.with_timezone(&chrono::Utc)).num_days())
+        .and_then(|ts| ts.parse::<jiff::Timestamp>().ok())
+        .map(|ts| (jiff::Timestamp::now().as_millisecond() - ts.as_millisecond()) / 86_400_000)
         .unwrap_or(90);
     if fact.convergence_score >= 0.4 || (fact.confidence >= 0.8 && days_old <= 7) {
         "strong"

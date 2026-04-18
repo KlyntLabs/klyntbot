@@ -15,10 +15,10 @@ const EVENT_USER_CORRECTED_AI: &str = "UserCorrectedAI";
 /// Load tool failure stats from the learning_outcomes table.
 pub async fn load_tool_failures(
     outcome_repo: &storage::OutcomeRepo,
-    since: chrono::DateTime<chrono::Utc>,
+    since: jiff::Timestamp,
 ) -> Vec<ToolFailureSummary> {
     match outcome_repo
-        .tool_failure_stats_since(common::time::bridge::chrono_to_jiff(since))
+        .tool_failure_stats_since(since)
         .await
     {
         Ok(rows) => rows
@@ -124,7 +124,7 @@ pub async fn load_behavioral_metrics(pool: &sqlx::SqlitePool) -> BehavioralMetri
     }
 
     // Focus quality trend (7d avg vs 14d avg from daily_summaries)
-    if let Ok(row) = sqlx::query_as::<_, (f64, f64)>(
+    if let Ok(Some((recent, prev))) = sqlx::query_as::<_, (f64, f64)>(
         "SELECT
            (SELECT AVG(avg_session_quality) FROM daily_summaries WHERE date > date('now', '-7 days')),
            (SELECT AVG(avg_session_quality) FROM daily_summaries WHERE date > date('now', '-14 days') AND date <= date('now', '-7 days'))",
@@ -132,10 +132,8 @@ pub async fn load_behavioral_metrics(pool: &sqlx::SqlitePool) -> BehavioralMetri
     .fetch_optional(pool)
     .await
     {
-        if let Some((recent, prev)) = row {
-            if prev > 0.0 {
-                metrics.focus_quality_trend = Some(recent - prev);
-            }
+        if prev > 0.0 {
+            metrics.focus_quality_trend = Some(recent - prev);
         }
     }
 

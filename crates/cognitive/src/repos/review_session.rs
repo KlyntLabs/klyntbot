@@ -1,6 +1,6 @@
 //! Repository for the `review_sessions` table — tracks active recall review sessions.
 
-use chrono::Utc;
+use jiff::Timestamp;
 use serde::{Deserialize, Serialize};
 use sqlx::SqlitePool;
 
@@ -35,7 +35,7 @@ impl ReviewSessionRepo {
 
     /// Create a new active review session.
     pub async fn create(&self, id: &str) -> Result<ReviewSessionRow, sqlx::Error> {
-        let now = Utc::now().to_rfc3339();
+        let now = Timestamp::now().to_string();
         sqlx::query(
             r#"
             INSERT INTO review_sessions (id, started_at, cards_reviewed, propagation_count, status)
@@ -63,7 +63,7 @@ impl ReviewSessionRepo {
         weak_card_ids: Option<&str>,
         session_data: Option<&str>,
     ) -> Result<ReviewSessionRow, sqlx::Error> {
-        let now = Utc::now().to_rfc3339();
+        let now = Timestamp::now().to_string();
         sqlx::query(
             r#"
             UPDATE review_sessions

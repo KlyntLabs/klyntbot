@@ -1,6 +1,6 @@
 //! Repository for querying review statistics from the `review_log` and `knowledge_atoms` tables.
 
-use chrono::{NaiveDate, Utc};
+use jiff::{civil::Date, Timestamp};
 use sqlx::SqlitePool;
 
 // ── Stat types ─────────────────────────────────────────────────
@@ -49,17 +49,17 @@ impl ReviewStatsRepo {
             return Ok(0);
         }
 
-        let today = Utc::now().date_naive();
+        let today: Date = Timestamp::now().strftime("%Y-%m-%d").to_string().parse().unwrap_or(Date::MIN);
         let mut streak = 0usize;
         let mut expected = today;
 
         for (date_str,) in &rows {
-            let Ok(date) = NaiveDate::parse_from_str(date_str, "%Y-%m-%d") else {
+            let Ok(date) = date_str.parse::<Date>() else {
                 break;
             };
             if date == expected {
                 streak += 1;
-                expected = expected.pred_opt().unwrap_or(expected);
+                expected = expected.checked_sub(jiff::Span::new().days(1)).unwrap_or(expected);
             } else if date < expected {
                 // Gap found — stop counting
                 break;
@@ -71,7 +71,7 @@ impl ReviewStatsRepo {
 
     /// Daily review counts for the last N days.
     pub async fn daily_reviews(&self, days: i64) -> Result<Vec<DailyReviewStat>, sqlx::Error> {
-        let cutoff = (Utc::now() - chrono::Duration::days(days)).to_rfc3339();
+        let cutoff = (Timestamp::now() - jiff::SignedDuration::from_secs((days) * 86400)).to_string();
 
         let rows: Vec<(String, i64, f64)> = sqlx::query_as(
             r#"
@@ -98,7 +98,7 @@ impl ReviewStatsRepo {
 
     /// Per-domain stats from `knowledge_atoms`: domain, atom_count, avg_retention, reviews in last 7 days.
     pub async fn domain_retention_stats(&self) -> Result<Vec<DomainRetentionStat>, sqlx::Error> {
-        let cutoff_7d = (Utc::now() - chrono::Duration::days(7)).to_rfc3339();
+        let cutoff_7d = (Timestamp::now() - jiff::SignedDuration::from_secs((7) * 86400)).to_string();
 
         let rows: Vec<(String, i64, f64, i64)> = sqlx::query_as(
             r#"
@@ -164,7 +164,7 @@ impl ReviewStatsRepo {
 
     /// Daily atom creation counts for the last N days.
     pub async fn daily_atoms_created(&self, days: i64) -> Result<Vec<(String, i64)>, sqlx::Error> {
-        let cutoff = (Utc::now() - chrono::Duration::days(days)).to_rfc3339();
+        let cutoff = (Timestamp::now() - jiff::SignedDuration::from_secs((days) * 86400)).to_string();
         sqlx::query_as(
             r#"SELECT DATE(created_at) as d, COUNT(*) as cnt
                FROM knowledge_atoms
@@ -224,7 +224,7 @@ mod tests {
         let repo = ReviewStatsRepo::new(pool.clone());
 
         // Insert two active atoms with different importance and retention
-        let now = Utc::now().to_rfc3339();
+        let now = Timestamp::now().to_string();
         sqlx::query(
             r#"INSERT INTO knowledge_atoms
                 (id, subject, atom_type, domain, retention_pct, stability, difficulty,
@@ -256,7 +256,7 @@ mod tests {
     async fn test_current_streak_includes_atoms() {
         let pool = cognitive_test_pool().await;
         let repo = ReviewStatsRepo::new(pool.clone());
-        let now = Utc::now().to_rfc3339();
+        let now = Timestamp::now().to_string();
 
         // Insert an active atom created today (no reviews)
         sqlx::query(
@@ -283,7 +283,7 @@ mod tests {
         let repo = ReviewStatsRepo::new(pool.clone());
 
         // Create a flashcard to reference
-        let now = Utc::now().to_rfc3339();
+        let now = Timestamp::now().to_string();
         sqlx::query(
             r#"INSERT INTO flashcards
                 (id, deck, front, back, card_type, stability, difficulty, state, created_at, updated_at)
@@ -295,8 +295,8 @@ mod tests {
         .unwrap();
 
         // Insert reviews for today and yesterday (2-day streak)
-        let today = Utc::now().date_naive();
-        let yesterday = today.pred_opt().unwrap();
+        let today: Date = Timestamp::now().strftime("%Y-%m-%d").to_string().parse().unwrap_or(Date::MIN);
+        let yesterday = today.checked_sub(jiff::Span::new().days(1)).unwrap_or(today);
 
         for (i, date) in [today, yesterday].iter().enumerate() {
             let ts = format!("{}T12:00:00+00:00", date);

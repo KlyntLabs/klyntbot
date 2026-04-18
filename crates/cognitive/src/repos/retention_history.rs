@@ -41,7 +41,7 @@ impl RetentionHistoryRepo {
         &self,
         days: i64,
     ) -> Result<Vec<DailyRetentionPoint>, sqlx::Error> {
-        let cutoff = (chrono::Utc::now() - chrono::Duration::days(days)).to_rfc3339();
+        let cutoff = (jiff::Timestamp::now() - jiff::SignedDuration::from_secs(days * 86400)).to_string();
         sqlx::query_as::<_, (String, f64, i64)>(
             r#"
             SELECT DATE(rl.reviewed_at) as d,
@@ -74,7 +74,7 @@ impl RetentionHistoryRepo {
         &self,
         days: i64,
     ) -> Result<Vec<DomainRetentionHistory>, sqlx::Error> {
-        let cutoff = (chrono::Utc::now() - chrono::Duration::days(days)).to_rfc3339();
+        let cutoff = (jiff::Timestamp::now() - jiff::SignedDuration::from_secs(days * 86400)).to_string();
         let rows: Vec<(String, String, f64, i64)> = sqlx::query_as(
             r#"
             SELECT ka.domain, DATE(rl.reviewed_at) as d,
@@ -135,8 +135,8 @@ mod tests {
         let pool = cognitive_test_pool().await;
         let repo = RetentionHistoryRepo::new(pool.clone());
 
-        let now = chrono::Utc::now();
-        let today_ts = format!("{}T12:00:00+00:00", now.date_naive());
+        let now = jiff::Timestamp::now();
+        let today_ts = format!("{}T12:00:00+00:00", now.strftime("%Y-%m-%d"));
 
         // Insert a flashcard to reference (no atom needed for overall retention)
         sqlx::query(

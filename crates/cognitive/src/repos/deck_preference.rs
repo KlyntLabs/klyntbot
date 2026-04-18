@@ -1,6 +1,6 @@
 //! Repository for the `deck_preferences` table — per-deck answer mode preferences.
 
-use chrono::Utc;
+use jiff::Timestamp;
 use serde::{Deserialize, Serialize};
 use sqlx::SqlitePool;
 
@@ -35,7 +35,7 @@ impl DeckPreferenceRepo {
 
     /// Set (upsert) the answer mode for a deck.
     pub async fn set(&self, deck: &str, mode: &str) -> Result<DeckPreferenceRow, sqlx::Error> {
-        let now = Utc::now().to_rfc3339();
+        let now = Timestamp::now().to_string();
         sqlx::query(
             r#"
             INSERT INTO deck_preferences (deck, answer_mode, updated_at)

@@ -1,6 +1,6 @@
 //! Core types for the cognitive memory system.
 
-use chrono::{DateTime, Utc};
+use jiff::Timestamp;
 use serde::{Deserialize, Serialize};
 
 /// Memory operation result from consolidation.
@@ -126,7 +126,7 @@ pub struct Observation {
     pub content: String,
     pub importance: f64,
     pub source_event: String,
-    pub timestamp: DateTime<Utc>,
+    pub timestamp: Timestamp,
 }
 
 /// The structured user model — queryable, domain-organized.

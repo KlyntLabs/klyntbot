@@ -4,7 +4,7 @@
 //! strength (Hebbian learning). This enables the retrieval system to boost facts
 //! that historically co-occur in useful retrievals.
 
-use chrono::Utc;
+use jiff::Timestamp;
 use sqlx::SqlitePool;
 
 #[derive(Debug, Clone)]
@@ -23,7 +23,7 @@ impl CoActivationRepo {
         if fact_ids.len() < 2 {
             return Ok(());
         }
-        let now = Utc::now().to_rfc3339();
+        let now = Timestamp::now().to_string();
         let mut sorted = fact_ids.to_vec();
         sorted.sort();
         sorted.dedup();

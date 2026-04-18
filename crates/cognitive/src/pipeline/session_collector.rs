@@ -1,6 +1,6 @@
 //! Collects knowledge signals from ended sessions by reading session scratchpads.
 
-use chrono::Utc;
+use jiff::Timestamp;
 use storage::SessionMemoryRepo;
 use tokio::sync::broadcast;
 use tokio_util::sync::CancellationToken;
@@ -86,7 +86,7 @@ impl SessionCollector {
                 source_count: 1,
                 ..Default::default()
             },
-            timestamp: Utc::now(),
+            timestamp: Timestamp::now(),
         };
         let _ = tx.send(signal).await;
     }
@@ -132,6 +132,6 @@ mod tests {
     fn test_keyword_confidence_range() {
         let insights = vec!["Learned something new".into(), "Fixed a bug".into()];
         let conf = keyword_confidence(&insights);
-        assert!(conf >= 0.5 && conf <= 0.8);
+        assert!((0.5..=0.8).contains(&conf));
     }
 }

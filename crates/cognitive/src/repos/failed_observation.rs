@@ -126,7 +126,7 @@ impl FailedObservationRepo {
     /// Delete observations older than `days` days (by `created_at`).
     /// Returns the number of rows removed.
     pub async fn delete_older_than(&self, days: i64) -> Result<u64, sqlx::Error> {
-        let cutoff = (chrono::Utc::now() - chrono::Duration::days(days)).to_rfc3339();
+        let cutoff = (jiff::Timestamp::now() - jiff::SignedDuration::from_secs(days * 86400)).to_string();
         let result = sqlx::query("DELETE FROM failed_observations WHERE created_at < ?1")
             .bind(&cutoff)
             .execute(&self.pool)
@@ -153,7 +153,7 @@ impl FailedObservationRepo {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use chrono::Utc;
+
 
     async fn setup() -> (SqlitePool, FailedObservationRepo) {
         let pool = crate::repos::cognitive_test_pool().await;
@@ -167,7 +167,7 @@ mod tests {
             content: "User prefers morning work".into(),
             importance: 0.8,
             source_event: "ChatTurnCompleted".into(),
-            timestamp: Utc::now(),
+            timestamp: jiff::Timestamp::now(),
         }
     }
 

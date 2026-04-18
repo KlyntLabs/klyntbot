@@ -1,6 +1,6 @@
 //! Common signal type produced by all collectors and consumed by the consolidator.
 
-use chrono::{DateTime, Utc};
+use jiff::Timestamp;
 
 #[derive(Debug, Clone)]
 pub struct CognitiveSignal {
@@ -9,7 +9,7 @@ pub struct CognitiveSignal {
     pub domain: String,
     pub confidence: f64,
     pub context: SignalContext,
-    pub timestamp: DateTime<Utc>,
+    pub timestamp: Timestamp,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -53,7 +53,7 @@ mod tests {
                 source_count: 1,
                 ..Default::default()
             },
-            timestamp: Utc::now(),
+            timestamp: Timestamp::now(),
         };
         assert_eq!(signal.confidence, 0.8);
         assert_eq!(signal.context.source_count, 1);

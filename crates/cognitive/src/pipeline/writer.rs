@@ -1,6 +1,6 @@
 //! Stage 3: executes PromotionOps against repos.
 
-use chrono::Utc;
+use jiff::Timestamp;
 use tracing::{debug, info, warn};
 use uuid::Uuid;
 
@@ -38,7 +38,7 @@ pub async fn execute_promotions(
                     debug!("Writer: reinforced fact '{}'", best.id);
                 }
                 _ => {
-                    let now = Utc::now().to_rfc3339();
+                    let now = Timestamp::now().to_string();
                     let fact = SemanticFact {
                         id: Uuid::new_v4().to_string(),
                         domain: domain.clone(),
@@ -81,7 +81,7 @@ pub async fn execute_promotions(
                     debug!("Writer: reinforced rule '{}'", existing.id);
                 }
                 _ => {
-                    let now = Utc::now().to_rfc3339();
+                    let now = Timestamp::now().to_string();
                     let rule = ProceduralRule {
                         id: Uuid::new_v4().to_string(),
                         domain: domain.clone(),
@@ -110,7 +110,7 @@ pub async fn execute_promotions(
                 importance,
             } => {
                 if let Some(ep_repo) = episodic_repo {
-                    let now = Utc::now().to_rfc3339();
+                    let now = Timestamp::now().to_string();
                     let memory = EpisodicMemory {
                         id: Uuid::new_v4().to_string(),
                         domain: domain.clone(),

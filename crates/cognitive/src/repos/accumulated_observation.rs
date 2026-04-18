@@ -4,7 +4,7 @@
 
 use std::collections::{HashMap, HashSet};
 
-use chrono::DateTime;
+use jiff::Timestamp;
 use sqlx::SqlitePool;
 use tracing::warn;
 
@@ -68,8 +68,8 @@ impl AccumulatedObservationRepo {
 
             let timestamp = row
                 .observed_at
-                .parse::<DateTime<chrono::Utc>>()
-                .unwrap_or_else(|_| chrono::Utc::now());
+                .parse::<Timestamp>()
+                .unwrap_or_else(|_| Timestamp::now());
             entry.observations.push(Observation {
                 domain: row.domain,
                 content: row.content,
@@ -84,8 +84,8 @@ impl AccumulatedObservationRepo {
     /// Persist a single observation for an event type.
     pub async fn insert(&self, event_type_key: &str, obs: &Observation) {
         let id = uuid::Uuid::new_v4().to_string();
-        let observed_at = obs.timestamp.to_rfc3339();
-        let day_key = obs.timestamp.format("%Y-%m-%d").to_string();
+        let observed_at = obs.timestamp.to_string();
+        let day_key = obs.timestamp.strftime("%Y-%m-%d").to_string();
 
         if let Err(e) = sqlx::query(
             r#"
@@ -112,7 +112,7 @@ impl AccumulatedObservationRepo {
     /// Delete observations older than `days` days.
     /// Returns the number of rows removed.
     pub async fn delete_older_than(&self, days: i64) -> Result<u64, sqlx::Error> {
-        let cutoff = (chrono::Utc::now() - chrono::Duration::days(days)).to_rfc3339();
+        let cutoff = (Timestamp::now() - jiff::SignedDuration::from_secs(days * 86400)).to_string();
         let result = sqlx::query("DELETE FROM accumulated_observations WHERE observed_at < ?1")
             .bind(&cutoff)
             .execute(&self.pool)
@@ -148,8 +148,6 @@ impl AccumulatedObservationRepo {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use chrono::Utc;
-
     async fn setup() -> SqlitePool {
         crate::repos::cognitive_test_pool().await
     }
@@ -164,7 +162,7 @@ mod tests {
             content: "Score: 72".into(),
             importance: 0.5,
             source_event: "ProductivityScoreComputed".into(),
-            timestamp: Utc::now(),
+            timestamp: Timestamp::now(),
         };
         repo.insert("ProductivityScoreComputed", &obs).await;
 
@@ -186,7 +184,7 @@ mod tests {
             content: "Score: 72".into(),
             importance: 0.5,
             source_event: "ProductivityScoreComputed".into(),
-            timestamp: Utc::now(),
+            timestamp: Timestamp::now(),
         };
         repo.insert("ProductivityScoreComputed", &obs).await;
         repo.insert("ProductivityScoreComputed", &obs).await;
@@ -220,7 +218,7 @@ mod tests {
             content: "recent".into(),
             importance: 0.5,
             source_event: "RecentEvent".into(),
-            timestamp: Utc::now(),
+            timestamp: Timestamp::now(),
         };
         repo.insert("RecentEvent", &obs).await;
 
@@ -237,9 +235,9 @@ mod tests {
         let pool = setup().await;
         let repo = AccumulatedObservationRepo::new(pool);
 
-        let day1: DateTime<Utc> = "2026-03-01T10:00:00Z".parse().unwrap();
-        let day2: DateTime<Utc> = "2026-03-02T14:00:00Z".parse().unwrap();
-        let day1_again: DateTime<Utc> = "2026-03-01T16:00:00Z".parse().unwrap();
+        let day1: Timestamp = "2026-03-01T10:00:00Z".parse().unwrap();
+        let day2: Timestamp = "2026-03-02T14:00:00Z".parse().unwrap();
+        let day1_again: Timestamp = "2026-03-01T16:00:00Z".parse().unwrap();
 
         for ts in &[day1, day2, day1_again] {
             let obs = Observation {

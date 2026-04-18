@@ -5,7 +5,7 @@
 //! extraction. This collector's purpose is convergence — grouping chat
 //! signals with atom, coaching, and session signals.
 
-use chrono::Utc;
+use jiff::Timestamp;
 use tokio::sync::broadcast;
 use tokio_util::sync::CancellationToken;
 use tracing::{debug, warn};
@@ -30,23 +30,21 @@ impl ChatTurnCollector {
                     _ = cancel.cancelled() => break,
                     result = event_rx.recv() => {
                         match result {
-                            Ok(bus::DomainEvent::ChatTurnCompleted { session_key, user_message }) => {
-                                if let Some(msg) = user_message {
-                                    if msg.len() >= MIN_MESSAGE_LEN {
-                                        let signal = CognitiveSignal {
-                                            source: SignalSource::ChatTurn,
-                                            content: msg,
-                                            domain: "general".into(),
-                                            confidence: 0.6,
-                                            context: SignalContext {
-                                                session_key: Some(session_key),
-                                                source_count: 1,
-                                                ..Default::default()
-                                            },
-                                            timestamp: Utc::now(),
-                                        };
-                                        let _ = signal_tx.send(signal).await;
-                                    }
+                            Ok(bus::DomainEvent::ChatTurnCompleted { session_key, user_message: Some(msg) }) => {
+                                if msg.len() >= MIN_MESSAGE_LEN {
+                                    let signal = CognitiveSignal {
+                                        source: SignalSource::ChatTurn,
+                                        content: msg,
+                                        domain: "general".into(),
+                                        confidence: 0.6,
+                                        context: SignalContext {
+                                            session_key: Some(session_key),
+                                            source_count: 1,
+                                            ..Default::default()
+                                        },
+                                        timestamp: Timestamp::now(),
+                                    };
+                                    let _ = signal_tx.send(signal).await;
                                 }
                             }
                             Err(broadcast::error::RecvError::Closed) => break,

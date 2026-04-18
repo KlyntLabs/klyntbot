@@ -119,8 +119,8 @@ impl BlackboardRepo {
 
     /// Delete all blackboard entries older than `max_age`.
     /// Returns the number of rows removed.
-    pub async fn cleanup_stale(&self, max_age: chrono::Duration) -> Result<u64, sqlx::Error> {
-        let cutoff = (chrono::Utc::now() - max_age).to_rfc3339();
+    pub async fn cleanup_stale(&self, max_age: jiff::SignedDuration) -> Result<u64, sqlx::Error> {
+        let cutoff = (jiff::Timestamp::now() - max_age).to_string();
         let result = sqlx::query("DELETE FROM blackboard_entries WHERE created_at < ?1")
             .bind(&cutoff)
             .execute(&self.pool)
@@ -340,7 +340,7 @@ mod tests {
 
         // Wait a tiny bit, then cleanup with zero max_age
         tokio::time::sleep(std::time::Duration::from_millis(100)).await;
-        let removed = repo.cleanup_stale(chrono::Duration::zero()).await.unwrap();
+        let removed = repo.cleanup_stale(jiff::SignedDuration::ZERO).await.unwrap();
         assert!(removed > 0);
 
         let remaining = repo.list_for_session("test-session").await.unwrap();
@@ -366,7 +366,7 @@ mod tests {
         repo.insert(&entry).await.unwrap();
 
         let removed = repo
-            .cleanup_stale(chrono::Duration::hours(24))
+            .cleanup_stale(jiff::SignedDuration::from_secs(86400))
             .await
             .unwrap();
         assert_eq!(removed, 0);

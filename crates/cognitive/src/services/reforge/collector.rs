@@ -2,7 +2,7 @@
 
 use std::collections::HashMap;
 
-use chrono::{Duration, Utc};
+
 use tracing::debug;
 
 use crate::repos::{
@@ -46,7 +46,7 @@ pub async fn detect_user_edits(
                         diff: Some(diff),
                         source: "User".to_string(),
                         reason: Some("Detected manual file edit".to_string()),
-                        created_at: chrono::Utc::now().to_rfc3339(),
+                        created_at: jiff::Timestamp::now().to_string(),
                     };
                     if let Err(e) = version_repo.insert(&row).await {
                         tracing::warn!(
@@ -77,8 +77,9 @@ pub struct FeedbackSources<'a> {
 /// Days elapsed since an RFC 3339 timestamp, defaulting to 7 if missing or unparseable.
 fn days_since(ts: Option<&str>) -> i64 {
     match ts {
-        Some(s) => chrono::DateTime::parse_from_rfc3339(s)
-            .map(|dt| (Utc::now() - dt.with_timezone(&Utc)).num_days().max(1))
+        Some(s) => s
+            .parse::<jiff::Timestamp>()
+            .map(|ts| (jiff::Timestamp::now().as_millisecond() - ts.as_millisecond()).max(86_400_000) / 86_400_000)
             .unwrap_or(7),
         None => 7,
     }
@@ -115,7 +116,7 @@ pub async fn collect(
     let since: &str = match last_run_at {
         Some(ts) => ts,
         None => {
-            bootstrap_since = (Utc::now() - Duration::days(7)).to_rfc3339();
+            bootstrap_since = (jiff::Timestamp::now() - jiff::SignedDuration::from_secs(7 * 86400)).to_string();
             &bootstrap_since
         }
     };
@@ -139,7 +140,7 @@ pub async fn collect(
         .collect();
 
     // --- Episodic memories ---
-    let now_str = Utc::now().to_rfc3339();
+    let now_str = jiff::Timestamp::now().to_string();
     let episodic_memories = match episodic_repo.list_range(since, &now_str).await {
         Ok(mems) => mems,
         Err(e) => {
@@ -227,9 +228,9 @@ pub async fn collect(
         retrieval_precision_by_domain,
         extraction_yield_by_domain,
     ) = if let Some(fb) = feedback_sources {
-        let since_dt = chrono::DateTime::parse_from_rfc3339(since)
-            .map(|dt| dt.with_timezone(&chrono::Utc))
-            .unwrap_or_else(|_| chrono::Utc::now() - Duration::days(7));
+        let since_dt = since
+            .parse::<jiff::Timestamp>()
+            .unwrap_or_else(|_| jiff::Timestamp::now() - jiff::SignedDuration::from_secs(7 * 86400));
 
         let tool_failures = if let Some(repo) = fb.outcome_repo {
             super::feedback::load_tool_failures(repo, since_dt).await
@@ -420,14 +421,14 @@ async fn load_trial_history(
         }
     };
 
-    let now = chrono::Utc::now();
+    let now = jiff::Timestamp::now();
 
     experiments
         .into_iter()
         .filter_map(|exp| {
-            let days_ago = chrono::DateTime::parse_from_rfc3339(&exp.created_at)
+            let days_ago = exp.created_at.parse::<jiff::Timestamp>()
                 .ok()
-                .map(|dt| (now - dt.with_timezone(&chrono::Utc)).num_days().max(0) as u32)
+                .map(|ts| ((now.as_millisecond() - ts.as_millisecond()).max(0) / 86_400_000) as u32)
                 .unwrap_or(0);
 
             let trials: Vec<TrialOutcome> = completed_trials
