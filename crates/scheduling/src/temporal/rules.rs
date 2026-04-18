@@ -75,7 +75,9 @@ impl AlarmRule {
                     time_of_day.second(),
                     0,
                 );
-                let zoned = civil_dt.to_zoned(tz)?;
+                // Explicit DST disambiguation: Compatible = post-transition for gaps
+                // (spring-forward), pre-transition (DST) for folds (fall-back).
+                let zoned = tz.to_ambiguous_zoned(civil_dt).compatible()?;
                 Ok(zoned.timestamp())
             }
         }
@@ -139,6 +141,38 @@ mod tests {
         let rule = AlarmRule::Absolute { fire_at: t };
         let fire = rule.compute_fire_at(None, "UTC").unwrap();
         assert_eq!(fire, t);
+    }
+
+    #[test]
+    fn civil_time_fold_resolves_to_earlier_dst_instant() {
+        // 2026-11-01 in America/New_York: fall-back at 02:00 EDT→01:00 EST,
+        // so 01:30 local occurs twice. Compatible disambiguation picks the
+        // earlier (still-EDT, UTC-4) instant. Anchor via fixed-offset literal
+        // so this test is immune to `ts()` helper changes.
+        let due = ts(2026, 11, 2, 14, 0, "America/New_York");
+        let rule = AlarmRule::CivilTimeOnDayOffset {
+            day_offset: -1,
+            time_of_day: time(1, 30, 0, 0),
+            iana_tz: "America/New_York".into(),
+        };
+        let fire = rule.compute_fire_at(Some(due), "UTC").unwrap();
+        // Earlier occurrence = 01:30 EDT = UTC-4 → 05:30 UTC.
+        let expected: Timestamp = "2026-11-01T01:30:00-04:00".parse().unwrap();
+        assert_eq!(fire.as_millisecond(), expected.as_millisecond());
+    }
+
+    #[test]
+    fn alarm_rule_serde_round_trips_with_stable_tag() {
+        let rule = AlarmRule::Absolute {
+            fire_at: Timestamp::from_millisecond(1_800_000_000_000).unwrap(),
+        };
+        let json = serde_json::to_string(&rule).unwrap();
+        assert!(
+            json.contains(r#""type":"absolute""#),
+            "tag shape changed: {json}"
+        );
+        let back: AlarmRule = serde_json::from_str(&json).unwrap();
+        assert!(matches!(back, AlarmRule::Absolute { .. }));
     }
 
     #[test]
