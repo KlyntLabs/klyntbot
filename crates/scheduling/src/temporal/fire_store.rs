@@ -31,6 +31,12 @@ impl FireStore {
         Self { repo }
     }
 
+    /// Insert a new pending fire and return its generated id.
+    ///
+    /// **Not idempotent.** Each call creates a fresh row with a new UUID.
+    /// To avoid duplicates when re-scheduling, callers must
+    /// `cancel_by_prefix` or `cancel_by_kind_ref` first. (See `CronBridge`
+    /// for the reconcile-then-schedule pattern.)
     pub async fn schedule(&self, spec: FireSpec) -> Result<String, SchedulerError> {
         let id = format!("fire_{}", Uuid::new_v4().simple());
         let now_ms = Timestamp::now().as_millisecond();
@@ -51,8 +57,14 @@ impl FireStore {
     }
 
     pub async fn next_pending_fire_at(&self) -> Result<Option<Timestamp>, SchedulerError> {
-        let ms = self.repo.next_pending_fire_at_ms().await?;
-        Ok(ms.and_then(|m| Timestamp::from_millisecond(m).ok()))
+        match self.repo.next_pending_fire_at_ms().await? {
+            None => Ok(None),
+            Some(m) => Timestamp::from_millisecond(m).map(Some).map_err(|_| {
+                SchedulerError::InvalidState(format!(
+                    "next pending fire_at_ms {m} is out of jiff range"
+                ))
+            }),
+        }
     }
 
     pub async fn list_due(&self, now: Timestamp) -> Result<Vec<ScheduledFireRow>, SchedulerError> {
