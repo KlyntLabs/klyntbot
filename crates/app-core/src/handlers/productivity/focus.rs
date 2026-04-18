@@ -1,6 +1,5 @@
 //! Focus session handlers — start, end, status, pomodoro, breaks, auto-focus.
 
-use chrono::Utc;
 use desktop_shared::commands::{FocusSessionResponse, IntelligenceSessionResponse};
 use desktop_shared::errors::ApiError;
 use desktop_shared::events::AutoFocusPayload;
@@ -56,7 +55,9 @@ impl AppCore {
     ) -> Result<Vec<FocusSessionResponse>, ApiError> {
         let repos = self.productivity_repos()?;
         let start = parse_date_or_err(&date)?;
-        let end = start + chrono::Duration::days(1);
+        let end = start
+            .checked_add(jiff::SignedDuration::from_secs(86400))
+            .unwrap_or(start);
         let sessions = repos
             .sessions
             .list_range(&start, &end, None)
@@ -72,9 +73,13 @@ impl AppCore {
     ) -> Result<Vec<IntelligenceSessionResponse>, ApiError> {
         let repos = self.productivity_repos()?;
         let (start, end) = parse_local_day_range(&date, tz_offset_mins)?;
-        let start_str = start.to_rfc3339();
-        let end_str = end.to_rfc3339();
-        let next_date = end.date_naive().format("%Y-%m-%d").to_string();
+        let start_str = start.to_string();
+        let end_str = end.to_string();
+        let next_date = end
+            .to_zoned(jiff::tz::TimeZone::UTC)
+            .date()
+            .strftime("%Y-%m-%d")
+            .to_string();
 
         // Fetch sessions and quality scores in parallel
         let (sessions_res, scores_res) = tokio::join!(
@@ -176,7 +181,7 @@ impl AppCore {
             project_id: None,
             session_type: feature_productivity::types::SessionType::Focus,
             target_mins: None,
-            started_at: Utc::now(),
+            started_at: jiff::Timestamp::now(),
             ended_at: None, // Still active
             actual_mins: None,
             interruptions: 0,

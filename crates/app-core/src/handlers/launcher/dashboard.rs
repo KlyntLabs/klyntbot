@@ -12,10 +12,8 @@ pub async fn build_dashboard_data(
     repos: &Repos,
     prod_repos: Option<&ProductivityRepos>,
 ) -> Result<DashboardData, ApiError> {
-    let now_jiff = jiff::Timestamp::now();
-    let today = now_jiff.strftime("%Y-%m-%d").to_string();
-    // Bridge: keep chrono DateTime<Utc> for feature-productivity interop
-    let now = common::time::bridge::jiff_to_chrono(now_jiff);
+    let now = jiff::Timestamp::now();
+    let today = now.strftime("%Y-%m-%d").to_string();
 
     // Focus session
     let focus = match prod_repos {
@@ -23,7 +21,7 @@ pub async fn build_dashboard_data(
             let session = pr.sessions.get_active().await.map_err(map_prod_err)?;
             match session {
                 Some(s) => {
-                    let elapsed = (now - s.started_at).num_seconds();
+                    let elapsed = now.duration_since(s.started_at).as_secs();
                     let target_secs = s.target_mins.map(|m| m * 60);
                     let task_name = if let Some(ref action_id) = s.action_id {
                         repos
@@ -63,7 +61,7 @@ pub async fn build_dashboard_data(
                     let starts_at = e.started_at.parse::<jiff::Timestamp>().ok()?;
                     let ends_at = e.ended_at.parse::<jiff::Timestamp>().ok()?;
                     let minutes_until = (starts_at.as_millisecond()
-                        - now_jiff.as_millisecond())
+                        - now.as_millisecond())
                         / 60_000;
                     Some(CalendarDashboard {
                         event_id: e.id,
@@ -79,7 +77,7 @@ pub async fn build_dashboard_data(
     };
 
     // Today's tasks (doing + due today)
-    let today_date = now_jiff
+    let today_date = now
         .to_zoned(jiff::tz::TimeZone::UTC)
         .date();
     let start_of_today: jiff::Timestamp = today_date

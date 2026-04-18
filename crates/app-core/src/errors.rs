@@ -1,4 +1,3 @@
-use chrono::{DateTime, Utc};
 use desktop_shared::errors::ApiError;
 
 /// Convert a `KlyntbotError` into a productivity-flavored `ApiError`.
@@ -21,31 +20,26 @@ pub fn map_storage_err(e: storage::StorageError) -> ApiError {
     }
 }
 
-/// Parse a "YYYY-MM-DD" string into a midnight UTC DateTime.
-/// Bridge function: returns `DateTime<Utc>` for unmigrated `feature-productivity` call sites.
-pub fn parse_date(s: &str) -> Option<DateTime<Utc>> {
+/// Parse a "YYYY-MM-DD" string into a midnight UTC `jiff::Timestamp`.
+pub fn parse_date(s: &str) -> Option<jiff::Timestamp> {
     jiff::civil::Date::strptime("%Y-%m-%d", s)
         .ok()
         .and_then(|d| {
-            let ts = d
-                .at(0, 0, 0, 0)
+            d.at(0, 0, 0, 0)
                 .to_zoned(jiff::tz::TimeZone::UTC)
-                .ok()?
-                .timestamp();
-            Some(common::time::bridge::jiff_to_chrono(ts))
+                .ok()
+                .map(|z| z.timestamp())
         })
 }
 
 /// Parse a "YYYY-MM-DD" string or return a validation `ApiError`.
-/// Bridge function: returns `DateTime<Utc>` for unmigrated `feature-productivity` call sites.
-pub fn parse_date_or_err(s: &str) -> Result<DateTime<Utc>, ApiError> {
+pub fn parse_date_or_err(s: &str) -> Result<jiff::Timestamp, ApiError> {
     parse_date(s).ok_or_else(|| ApiError::new("VALIDATION", format!("invalid date: {s}")))
 }
 
 /// Parse an RFC3339 timestamp or return an `INVALID_DATE` `ApiError`.
-/// Bridge function: returns `DateTime<Utc>` for unmigrated `feature-productivity` call sites.
-pub fn parse_rfc3339_or_err(field: &str, s: &str) -> Result<DateTime<Utc>, ApiError> {
-    common::parse_datetime(s, "UTC")
+pub fn parse_rfc3339_or_err(field: &str, s: &str) -> Result<jiff::Timestamp, ApiError> {
+    common::parse_datetime_jiff(s, "UTC")
         .ok_or_else(|| ApiError::new("INVALID_DATE", format!("Bad {field}: {s}")))
 }
 
@@ -55,11 +49,10 @@ pub fn parse_rfc3339_or_err(field: &str, s: &str) -> Result<DateTime<Utc>, ApiEr
 /// When `None`, treats the date as UTC (offset = 0).
 ///
 /// Returns `(start_utc, end_utc)` representing the 24-hour local day in UTC.
-/// Bridge function: returns `DateTime<Utc>` for unmigrated `feature-productivity` call sites.
 pub fn parse_local_day_range(
     s: &str,
     tz_offset_mins: Option<i32>,
-) -> Result<(DateTime<Utc>, DateTime<Utc>), ApiError> {
+) -> Result<(jiff::Timestamp, jiff::Timestamp), ApiError> {
     let date = jiff::civil::Date::strptime("%Y-%m-%d", s)
         .map_err(|_| ApiError::new("VALIDATION", format!("invalid date: {s}")))?;
     let midnight = date
@@ -76,10 +69,7 @@ pub fn parse_local_day_range(
     let end = start
         .checked_add(jiff::SignedDuration::from_secs(86400))
         .unwrap_or(start);
-    Ok((
-        common::time::bridge::jiff_to_chrono(start),
-        common::time::bridge::jiff_to_chrono(end),
-    ))
+    Ok((start, end))
 }
 
 /// Parse a "YYYY-MM-DD" string into a `jiff::civil::Date`.

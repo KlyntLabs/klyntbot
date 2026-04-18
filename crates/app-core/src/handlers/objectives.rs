@@ -38,7 +38,7 @@ impl AppCore {
         let due_date: Option<storage::SqlTs> = params
             .due_date
             .and_then(|d| parse_date(&d))
-            .map(|d| common::time::bridge::chrono_to_jiff(d).into());
+            .map(|d| d.into());
 
         let row = ObjectiveRow {
             id: id.clone(),
@@ -86,7 +86,6 @@ impl AppCore {
     ) -> HandlerResult<ObjectiveResponse> {
         let due_date = params.due_date.map(|opt| {
             opt.and_then(|d| parse_date(&d))
-                .map(common::time::bridge::chrono_to_jiff)
         });
 
         let updated = self

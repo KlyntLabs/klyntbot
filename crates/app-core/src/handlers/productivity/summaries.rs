@@ -1,6 +1,5 @@
 //! Productivity summary handlers — today, timeline, weekly, date ranges, activity feed.
 
-use chrono::Utc;
 use desktop_shared::commands::{
     ActivityTimelineResponse, HourlyBreakdownResponse, ProductivityPatternsResponse,
     ProductivitySummaryResponse,
@@ -21,7 +20,7 @@ impl AppCore {
 
         // Compute trend deltas vs 4-week rolling average
         let repos = self.productivity_repos()?;
-        let today_str = Utc::now().format("%Y-%m-%d").to_string();
+        let today_str = jiff::Timestamp::now().strftime("%Y-%m-%d").to_string();
         if let Ok(baseline) = repos.summaries.rolling_averages(&today_str, 28).await {
             resp.score_trend = match (resp.productivity_score, baseline.avg_score) {
                 (Some(current), Some(avg)) => Some(current - avg),
@@ -58,12 +57,16 @@ impl AppCore {
 
     pub async fn productivity_weekly(&self) -> Result<Vec<ProductivitySummaryResponse>, ApiError> {
         let repos = self.productivity_repos()?;
-        let today = Utc::now().date_naive();
-        let today_str = today.format("%Y-%m-%d").to_string();
-        let week_start = today - chrono::Duration::days(6);
+        let now = jiff::Timestamp::now();
+        let today_str = now.strftime("%Y-%m-%d").to_string();
+        let week_start_str = now
+            .checked_sub(jiff::SignedDuration::from_secs(6 * 86400))
+            .unwrap_or(now)
+            .strftime("%Y-%m-%d")
+            .to_string();
         let mut summaries = repos
             .summaries
-            .list_range(&week_start.format("%Y-%m-%d").to_string(), &today_str)
+            .list_range(&week_start_str, &today_str)
             .await
             .map_err(map_prod_err)?;
 
@@ -94,7 +97,7 @@ impl AppCore {
             .map_err(map_prod_err)?;
 
         // Include today's live-computed summary if today falls within the range
-        let today = Utc::now().format("%Y-%m-%d").to_string();
+        let today = jiff::Timestamp::now().strftime("%Y-%m-%d").to_string();
         if today >= start_date && today <= end_date {
             let has_today = summaries.iter().any(|s| s.date == today);
             if let Ok(aggregator) = self.aggregator() {

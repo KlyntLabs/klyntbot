@@ -22,7 +22,7 @@ fn row_to_response(row: &EntityLinkRow) -> EntityLinkResponse {
             .metadata
             .as_deref()
             .and_then(|m| serde_json::from_str(m).ok()),
-        created_at: common::time::bridge::jiff_to_chrono(*row.created_at).to_rfc3339(),
+        created_at: row.created_at.to_string(),
     }
 }
 
@@ -127,10 +127,7 @@ impl AppCore {
                                     .and_then(|v| v.as_str())
                                     .map(|s| s.to_string()),
                                 conversation_type: session.conversation_type,
-                                updated_at: common::time::bridge::jiff_to_chrono(
-                                    *session.updated_at,
-                                )
-                                .to_rfc3339(),
+                                updated_at: session.updated_at.to_string(),
                             });
                         }
                         Err(e) => {

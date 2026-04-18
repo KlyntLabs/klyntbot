@@ -45,7 +45,7 @@ impl AppCore {
                 RecentLearningSession {
                     session_key: s.key.clone(),
                     title: extract_title(&s.metadata),
-                    updated_at: common::time::bridge::jiff_to_chrono(*s.updated_at).to_rfc3339(),
+                    updated_at: s.updated_at.to_string(),
                     preview: preview.chars().take(200).collect(),
                 }
             })

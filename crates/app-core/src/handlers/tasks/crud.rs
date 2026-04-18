@@ -109,7 +109,7 @@ impl AppCore {
             due_date: params
                 .due_date
                 .and_then(|d| parse_date(&d))
-                .map(|d| common::time::bridge::chrono_to_jiff(d).into()),
+                .map(|d| d.into()),
             tags: params.tags.unwrap_or_default(),
             status: "todo".to_string(),
             focused_at: None,
@@ -210,7 +210,6 @@ impl AppCore {
             status: params.status,
             due_date: params.due_date.map(|opt| {
                 opt.and_then(|d| parse_date(&d))
-                    .map(common::time::bridge::chrono_to_jiff)
             }),
             tags: params.tags,
             area_id: params.area_id,
@@ -224,12 +223,10 @@ impl AppCore {
             execution_state: params.execution_state,
             estimated_minutes: params.estimated_minutes,
             scheduled_start: params.scheduled_start.map(|opt| {
-                opt.and_then(|d| common::parse_datetime(&d, "UTC"))
-                    .map(common::time::bridge::chrono_to_jiff)
+                opt.and_then(|d| common::parse_datetime_jiff(&d, "UTC"))
             }),
             scheduled_end: params.scheduled_end.map(|opt| {
-                opt.and_then(|d| common::parse_datetime(&d, "UTC"))
-                    .map(common::time::bridge::chrono_to_jiff)
+                opt.and_then(|d| common::parse_datetime_jiff(&d, "UTC"))
             }),
             ..Default::default()
         };

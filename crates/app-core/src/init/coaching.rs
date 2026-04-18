@@ -1,6 +1,5 @@
 use std::sync::Arc;
 
-use chrono::{Duration, Timelike};
 use cognitive::situation::{compute_situation, SituationInputs, UserSituation};
 use feature_coaching::{FeedbackTracker, InterventionRouter, PatternDetector, SignalAccumulator};
 use feature_productivity::repos::ProductivityRepos;
@@ -128,15 +127,18 @@ pub(super) async fn build_situation_inputs(
     repos: &Repos,
     router: Option<&Arc<Mutex<InterventionRouter>>>,
 ) -> UserSituation {
-    let now = common::time::bridge::jiff_to_chrono(jiff::Timestamp::now());
-    let hour_of_day = now.hour();
-    let today_start = now
-        .date_naive()
-        .and_hms_opt(0, 0, 0)
-        .map(|dt| dt.and_utc())
+    let now = jiff::Timestamp::now();
+    let now_zoned = now.to_zoned(jiff::tz::TimeZone::UTC);
+    let hour_of_day = now_zoned.hour() as u32;
+    let today_start = now_zoned
+        .date()
+        .at(0, 0, 0, 0)
+        .to_zoned(jiff::tz::TimeZone::UTC)
+        .map(|z| z.timestamp())
         .unwrap_or(now);
-    let thirty_min_ago = now - Duration::minutes(30);
-    let thirty_min_ago_jiff = common::time::bridge::chrono_to_jiff(thirty_min_ago);
+    let thirty_min_ago = now
+        .checked_sub(jiff::SignedDuration::from_secs(30 * 60))
+        .unwrap_or(now);
 
     let mut inputs = SituationInputs {
         hour_of_day,
@@ -161,8 +163,12 @@ pub(super) async fn build_situation_inputs(
         }
 
         // Historical average context switches (from last 7 days of daily summaries)
-        let week_ago_date = (now - Duration::days(7)).format("%Y-%m-%d").to_string();
-        let today_date = now.format("%Y-%m-%d").to_string();
+        let week_ago_date = now
+            .checked_sub(jiff::SignedDuration::from_secs(7 * 86400))
+            .unwrap_or(now)
+            .strftime("%Y-%m-%d")
+            .to_string();
+        let today_date = now.strftime("%Y-%m-%d").to_string();
         if let Ok(summaries) = pr.summaries.list_range(&week_ago_date, &today_date).await {
             if !summaries.is_empty() {
                 let total_switches: i64 = summaries.iter().map(|s| s.context_switches).sum();
@@ -189,7 +195,7 @@ pub(super) async fn build_situation_inputs(
         {
             let recent_count = patterns
                 .iter()
-                .filter(|p| p.created_at >= thirty_min_ago_jiff)
+                .filter(|p| p.created_at >= thirty_min_ago)
                 .count();
             inputs.distraction_count_last_30min = recent_count as i32;
         }
@@ -200,8 +206,8 @@ pub(super) async fn build_situation_inputs(
             inputs.focus_quality = session.quality_score;
 
             // mins_since_break = time since focus session started (no break during focus)
-            let focus_mins = (now - session.started_at).num_minutes() as f64;
-            inputs.mins_since_break = focus_mins;
+            let focus_secs = now.duration_since(session.started_at).as_secs_f64();
+            inputs.mins_since_break = focus_secs / 60.0;
         } else {
             // mins_since_break: time since last idle event
             if let Ok(idle_secs) = pr.events.total_idle_secs(&today_start, &now).await {
@@ -211,7 +217,8 @@ pub(super) async fn build_situation_inputs(
                         let last_idle = recent.iter().find(|e| e.is_idle);
                         if let Some(idle_event) = last_idle {
                             let idle_end = idle_event.ended_at.unwrap_or(now);
-                            inputs.mins_since_break = (now - idle_end).num_minutes() as f64;
+                            let secs = now.duration_since(idle_end).as_secs_f64();
+                            inputs.mins_since_break = secs / 60.0;
                         } else {
                             // No idle events found, use hours active as proxy
                             inputs.mins_since_break = inputs.hours_active_today * 60.0;
@@ -231,10 +238,12 @@ pub(super) async fn build_situation_inputs(
     }
 
     // Tasks due within 24h
-    let tomorrow = now + Duration::hours(24);
+    let tomorrow = now
+        .checked_add(jiff::SignedDuration::from_secs(24 * 3600))
+        .unwrap_or(now);
     let filter = storage::TaskFilter {
-        due_after: Some(common::time::bridge::chrono_to_jiff(now)),
-        due_before: Some(common::time::bridge::chrono_to_jiff(tomorrow)),
+        due_after: Some(now),
+        due_before: Some(tomorrow),
         ..Default::default()
     };
     if let Ok(upcoming) = repos.tasks.list(&filter).await {

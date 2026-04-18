@@ -1,6 +1,5 @@
 //! Calendar event handlers — list, sync, weekly assessment.
 
-use chrono::Utc;
 use desktop_shared::commands::WeeklyAssessmentResponse;
 use desktop_shared::errors::ApiError;
 
@@ -27,7 +26,7 @@ impl AppCore {
         events: Vec<desktop_shared::commands::CalendarEventInput>,
     ) -> Result<Vec<feature_productivity::types::CalendarEvent>, ApiError> {
         let repos = self.productivity_repos()?;
-        let now = Utc::now().to_rfc3339();
+        let now = jiff::Timestamp::now().to_string();
         let mut results = Vec::new();
 
         for input in events {
@@ -64,7 +63,7 @@ impl AppCore {
     /// Get the next upcoming calendar event (for tray countdown).
     pub async fn next_upcoming_event(&self) -> Option<feature_productivity::types::CalendarEvent> {
         let repos = self.productivity_repos().ok()?;
-        let now = Utc::now().to_rfc3339();
+        let now = jiff::Timestamp::now().to_string();
         repos
             .calendar_events
             .next_upcoming(&now)
@@ -81,8 +80,14 @@ impl AppCore {
     ) -> Result<WeeklyAssessmentResponse, ApiError> {
         let repos = self.productivity_repos()?;
         let start_date = parse_date_or_err(&week_start)?;
-        let end_date = start_date + chrono::Duration::days(6);
-        let end_str = end_date.format("%Y-%m-%d").to_string();
+        let end_date = start_date
+            .checked_add(jiff::SignedDuration::from_secs(6 * 86400))
+            .unwrap_or(start_date);
+        let end_str = end_date
+            .to_zoned(jiff::tz::TimeZone::UTC)
+            .date()
+            .strftime("%Y-%m-%d")
+            .to_string();
 
         // Query daily summaries for the week
         let summaries = repos
@@ -149,7 +154,7 @@ impl AppCore {
             total_distracting_secs: Some(total_distracting_secs),
             top_apps: top_apps_json,
             summary: summary_text,
-            created_at: Utc::now().to_rfc3339(),
+            created_at: jiff::Timestamp::now().to_string(),
         };
 
         repos

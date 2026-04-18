@@ -166,9 +166,7 @@ impl AppCore {
         date: String,
         tz_offset_mins: Option<i32>,
     ) -> Result<Vec<ContextTimelineBlockResponse>, ApiError> {
-        let (start_chrono, end_chrono) = crate::errors::parse_local_day_range(&date, tz_offset_mins)?;
-        let start = common::time::bridge::chrono_to_jiff(start_chrono);
-        let end = common::time::bridge::chrono_to_jiff(end_chrono);
+        let (start, end) = crate::errors::parse_local_day_range(&date, tz_offset_mins)?;
 
         // Fetch all events for the day
         let events =
@@ -368,9 +366,7 @@ impl AppCore {
         date: &str,
         tz_offset_mins: Option<i32>,
     ) -> Result<DashboardIntelligenceResponse, ApiError> {
-        let (start_chrono, end_chrono) = crate::errors::parse_local_day_range(date, tz_offset_mins)?;
-        let start = common::time::bridge::chrono_to_jiff(start_chrono);
-        let end = common::time::bridge::chrono_to_jiff(end_chrono);
+        let (start, end) = crate::errors::parse_local_day_range(date, tz_offset_mins)?;
         let yesterday_start = start - jiff::SignedDuration::from_hours(24);
 
         // Fetch today's events, yesterday's events, active contexts, and semantic facts in parallel

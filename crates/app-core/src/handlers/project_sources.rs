@@ -19,8 +19,8 @@ pub(crate) fn source_row_to_response(row: &storage::ProjectSourceRow) -> Project
             .as_deref()
             .and_then(|m| serde_json::from_str(m).ok()),
         tags: serde_json::from_str(&row.tags).unwrap_or_default(),
-        created_at: common::time::bridge::jiff_to_chrono(*row.created_at).to_rfc3339(),
-        updated_at: common::time::bridge::jiff_to_chrono(*row.updated_at).to_rfc3339(),
+        created_at: row.created_at.to_string(),
+        updated_at: row.updated_at.to_string(),
     }
 }
 

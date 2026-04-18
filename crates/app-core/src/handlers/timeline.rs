@@ -56,8 +56,8 @@ impl AppCore {
                 // }
 
                 if want(sources, TimelineSource::Calendar) {
-                    let start_rfc = start_utc.to_rfc3339();
-                    let end_rfc = end_utc.to_rfc3339();
+                    let start_rfc = start_utc.to_string();
+                    let end_rfc = end_utc.to_string();
                     if let Ok(cal_events) =
                         repos.calendar_events.list_range(&start_rfc, &end_rfc).await
                     {
@@ -176,8 +176,8 @@ fn normalize_app_event(e: feature_productivity::ActivityEvent) -> TimelineEntry 
         entry_type: TimelineEntryType::AppUsage,
         title: e.app_name.clone(),
         description: e.window_title,
-        started_at: e.started_at.to_rfc3339(),
-        ended_at: e.ended_at.map(|t| t.to_rfc3339()),
+        started_at: e.started_at.to_string(),
+        ended_at: e.ended_at.map(|t| t.to_string()),
         duration_secs: e.duration_secs,
         entity_id: None,
         entity_route: Some("/productivity".into()),

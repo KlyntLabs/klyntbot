@@ -1,6 +1,5 @@
 //! Tracking handlers — categories, apps, goals, time entries, insights, projects.
 
-use chrono::Utc;
 use desktop_shared::commands::{
     ActivityCategoryResponse, CategoryRulesResponse, GoalProgressResponse, InsightCardResponse,
     ProductivityProjectResponse, TimeEntryResponse, TrackedAppResponse,
@@ -50,7 +49,7 @@ impl AppCore {
 
     pub async fn productivity_goals(&self) -> Result<Vec<GoalProgressResponse>, ApiError> {
         let aggregator = self.aggregator()?;
-        let today = Utc::now().format("%Y-%m-%d").to_string();
+        let today = jiff::Timestamp::now().strftime("%Y-%m-%d").to_string();
         let results = aggregator.check_goals(&today).await.map_err(map_prod_err)?;
         Ok(results
             .into_iter()
@@ -72,7 +71,9 @@ impl AppCore {
     ) -> Result<Vec<TimeEntryResponse>, ApiError> {
         let repos = self.productivity_repos()?;
         let start = parse_date_or_err(&date)?;
-        let end = start + chrono::Duration::days(1);
+        let end = start
+            .checked_add(jiff::SignedDuration::from_secs(86400))
+            .unwrap_or(start);
         let entries = repos
             .time_entries
             .list_range(&start, &end)
@@ -85,7 +86,7 @@ impl AppCore {
                 description: e.description,
                 category_id: e.category_id,
                 project_id: e.project_id,
-                started_at: common::time::bridge::chrono_to_jiff(e.started_at),
+                started_at: e.started_at,
                 duration_secs: e.duration_secs,
                 source: e.source,
             })
@@ -115,7 +116,7 @@ impl AppCore {
             target_value,
             enabled: true,
             project_id: None,
-            created_at: Utc::now(),
+            created_at: jiff::Timestamp::now(),
         };
         let id = repos.goals.insert(&goal).await.map_err(map_prod_err)?;
         Ok(GoalProgressResponse {
@@ -153,8 +154,10 @@ impl AppCore {
         project_id: Option<String>,
     ) -> Result<TimeEntryResponse, ApiError> {
         let repos = self.productivity_repos()?;
-        let now = Utc::now();
-        let started_at = now - chrono::Duration::minutes(duration_mins);
+        let now = jiff::Timestamp::now();
+        let started_at = now
+            .checked_sub(jiff::SignedDuration::from_secs(duration_mins * 60))
+            .unwrap_or(now);
         let duration_secs = duration_mins * 60;
         let entry = feature_productivity::types::TimeEntry {
             id: None,
@@ -176,7 +179,7 @@ impl AppCore {
             description: entry.description,
             category_id: entry.category_id,
             project_id: entry.project_id,
-            started_at: common::time::bridge::chrono_to_jiff(started_at),
+            started_at,
             duration_secs,
             source: entry.source,
         })
@@ -260,7 +263,7 @@ impl AppCore {
         date: Option<String>,
     ) -> Result<Vec<InsightCardResponse>, ApiError> {
         let repos = self.productivity_repos()?;
-        let date = date.unwrap_or_else(|| Utc::now().format("%Y-%m-%d").to_string());
+        let date = date.unwrap_or_else(|| jiff::Timestamp::now().strftime("%Y-%m-%d").to_string());
         let engine = feature_productivity::insights::InsightEngine::new(repos.clone());
         // Generate any missing insights (idempotent)
         let _ = engine
@@ -308,7 +311,7 @@ impl AppCore {
             url_patterns: url_patterns.unwrap_or_default(),
             color,
             is_auto_detected: false,
-            created_at: Utc::now(),
+            created_at: jiff::Timestamp::now(),
         };
         repos
             .projects

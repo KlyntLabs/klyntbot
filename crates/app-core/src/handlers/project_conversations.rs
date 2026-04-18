@@ -30,7 +30,7 @@ impl AppCore {
                     .and_then(|v| v.as_str())
                     .map(|s| s.to_string()),
                 conversation_type: r.conversation_type,
-                updated_at: common::time::bridge::jiff_to_chrono(*r.updated_at).to_rfc3339(),
+                updated_at: r.updated_at.to_string(),
             })
             .collect())
     }
