@@ -184,7 +184,7 @@ impl TaskTool {
 
     // ─── Scoring helpers ───────────────────────────────────────────
 
-    pub(crate) fn calculate_score(task: &Task, now: chrono::DateTime<chrono::Utc>) -> f64 {
+    pub(crate) fn calculate_score(task: &Task, now: jiff::Timestamp) -> f64 {
         crate::scoring::calculate_score(task, now)
     }
 
@@ -431,44 +431,47 @@ mod tests {
     use super::*;
     use crate::scoring;
 
-    use chrono::{Duration, Utc};
+    use jiff::{SignedDuration, Timestamp};
 
     #[test]
     fn test_urgency_overdue() {
-        let now = Utc::now();
+        let now = Timestamp::now();
+        let two_days_ago = now.checked_sub(SignedDuration::from_secs(2 * 86400)).unwrap_or(now);
         assert_eq!(
-            scoring::calculate_urgency(Some(now - Duration::days(2)), now),
+            scoring::calculate_urgency(Some(two_days_ago), now),
             10
         );
     }
 
     #[test]
     fn test_urgency_today() {
-        let now = Utc::now();
+        let now = Timestamp::now();
         assert_eq!(scoring::calculate_urgency(Some(now), now), 5);
     }
 
     #[test]
     fn test_urgency_tomorrow() {
-        let now = Utc::now();
+        let now = Timestamp::now();
+        let tomorrow = now.checked_add(SignedDuration::from_secs(86400)).unwrap_or(now);
         assert_eq!(
-            scoring::calculate_urgency(Some(now + Duration::days(1)), now),
+            scoring::calculate_urgency(Some(tomorrow), now),
             3
         );
     }
 
     #[test]
     fn test_urgency_future() {
-        let now = Utc::now();
+        let now = Timestamp::now();
+        let week_out = now.checked_add(SignedDuration::from_secs(7 * 86400)).unwrap_or(now);
         assert_eq!(
-            scoring::calculate_urgency(Some(now + Duration::days(7)), now),
+            scoring::calculate_urgency(Some(week_out), now),
             1
         );
     }
 
     #[test]
     fn test_urgency_no_due_date() {
-        let now = Utc::now();
+        let now = Timestamp::now();
         assert_eq!(scoring::calculate_urgency(None, now), 1);
     }
 
@@ -484,11 +487,11 @@ mod tests {
 
     #[test]
     fn test_score_formula() {
-        let now = Utc::now();
+        let now = Timestamp::now();
         let mut task = Task::default_instance();
         task.priority = Some(1);
-        task.due_date = Some(now - Duration::days(2));
-        task.created_at = now - Duration::days(5);
+        task.due_date = Some(now.checked_sub(SignedDuration::from_secs(2 * 86400)).unwrap_or(now));
+        task.created_at = now.checked_sub(SignedDuration::from_secs(5 * 86400)).unwrap_or(now);
         let score = TaskTool::calculate_score(&task, now);
         // urgency=10, priority_wt=5, age=5 -> 10*5 + 5*0.1 = 50.5
         assert!(

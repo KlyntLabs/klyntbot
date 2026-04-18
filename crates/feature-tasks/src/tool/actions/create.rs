@@ -31,7 +31,7 @@ impl TaskTool {
         task.priority = p.optional_u64("priority")?.map(|v| v as i16);
         task.due_date = p
             .optional_str("due_date")?
-            .and_then(|s| common::parse_datetime(s, &self.timezone));
+            .and_then(|s| common::parse_datetime_jiff(s, &self.timezone));
         task.tags = p.string_array_or_empty("tags")?;
         task.project_id = p.optional_str("project_id")?.map(String::from);
         task.parent_id = p.optional_str("parent_id")?.map(String::from);
@@ -135,7 +135,7 @@ impl TaskTool {
                     parts.push(format!("P{}", p));
                 }
                 if let Some(ref d) = created.due_date {
-                    parts.push(format!("Due {}", d.format("%b %d")));
+                    parts.push(format!("Due {}", d.strftime("%b %d")));
                 }
                 if created.task_type != crate::types::TaskType::Manual {
                     parts.push(format!("{}", created.task_type));

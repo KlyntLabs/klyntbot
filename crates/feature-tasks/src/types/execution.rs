@@ -1,7 +1,6 @@
 //! Execution runtime types and activity audit log.
 
-use chrono::{DateTime, Utc};
-use common::time::bridge::jiff_to_chrono;
+use jiff::Timestamp;
 use serde::{Deserialize, Serialize};
 use std::fmt;
 use std::str::FromStr;
@@ -63,8 +62,8 @@ pub struct TaskExecution {
     pub task_id: String,
     pub status: ExecutionStatus,
     pub agent_profile: Option<String>,
-    pub started_at: Option<DateTime<Utc>>,
-    pub completed_at: Option<DateTime<Utc>>,
+    pub started_at: Option<Timestamp>,
+    pub completed_at: Option<Timestamp>,
     pub duration_secs: Option<i64>,
     pub tokens_used: Option<i64>,
     pub cost_usd: Option<f64>,
@@ -74,7 +73,7 @@ pub struct TaskExecution {
     pub artifacts: Vec<ExecutionArtifact>,
     pub metrics: Option<serde_json::Value>,
     pub retry_count: i32,
-    pub created_at: DateTime<Utc>,
+    pub created_at: Timestamp,
 }
 
 impl From<TaskExecutionRow> for TaskExecution {
@@ -84,8 +83,8 @@ impl From<TaskExecutionRow> for TaskExecution {
             task_id: row.task_id,
             status: row.status.parse::<ExecutionStatus>().unwrap_or_default(),
             agent_profile: row.agent_profile,
-            started_at: row.started_at.map(|ts| jiff_to_chrono(*ts)),
-            completed_at: row.completed_at.map(|ts| jiff_to_chrono(*ts)),
+            started_at: row.started_at.map(|ts| *ts),
+            completed_at: row.completed_at.map(|ts| *ts),
             duration_secs: row.duration_secs,
             tokens_used: row.tokens_used,
             cost_usd: row.cost_usd,
@@ -102,7 +101,7 @@ impl From<TaskExecutionRow> for TaskExecution {
                 .as_deref()
                 .and_then(|s| serde_json::from_str(s).ok()),
             retry_count: row.retry_count,
-            created_at: jiff_to_chrono(*row.created_at),
+            created_at: *row.created_at,
         }
     }
 }
@@ -255,7 +254,7 @@ pub struct ExecutionArtifact {
     pub name: String,
     pub artifact_type: String,
     pub content: String,
-    pub created_at: DateTime<Utc>,
+    pub created_at: Timestamp,
 }
 
 /// Snapshot of contextual information captured when a task is created or updated.
@@ -275,7 +274,7 @@ pub struct ContextSnapshot {
     #[serde(default)]
     pub active_blockers: Vec<String>,
     /// When this snapshot was captured.
-    pub captured_at: DateTime<Utc>,
+    pub captured_at: Timestamp,
 }
 
 /// Agent-specific configuration stored on a task.
@@ -304,7 +303,7 @@ pub struct TaskActivity {
     pub actor_type: ActorType,
     pub actor_id: Option<String>,
     pub summary: Option<String>,
-    pub created_at: DateTime<Utc>,
+    pub created_at: Timestamp,
 }
 
 impl From<TaskActivityRow> for TaskActivity {
@@ -325,7 +324,7 @@ impl From<TaskActivityRow> for TaskActivity {
                 .unwrap_or(ActorType::System),
             actor_id: row.actor_id,
             summary: row.summary,
-            created_at: jiff_to_chrono(*row.created_at),
+            created_at: *row.created_at,
         }
     }
 }

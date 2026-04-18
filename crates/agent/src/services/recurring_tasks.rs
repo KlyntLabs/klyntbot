@@ -87,7 +87,7 @@ impl RecurringTaskSpawner {
     /// Check all templates and spawn instances that are due via SQL.
     async fn check_and_spawn(repo: &storage::TaskRepo, _timezone: &str) -> common::Result<()> {
         let template_rows = repo.list_templates().await?;
-        let now = chrono::Utc::now();
+        let now = jiff::Timestamp::now();
 
         for tpl_row in &template_rows {
             // Skip templates without a recurrence rule
@@ -97,10 +97,8 @@ impl RecurringTaskSpawner {
             };
 
             // Check if an instance is due
-            let next_instance_date_chrono = tpl_row
-                .next_instance_date
-                .map(|ts| common::time::bridge::jiff_to_chrono(*ts));
-            if !rrule_utils::should_spawn_instance(next_instance_date_chrono, now) {
+            let next_instance_date = tpl_row.next_instance_date.map(|ts| *ts);
+            if !rrule_utils::should_spawn_instance(next_instance_date, now) {
                 continue;
             }
 
@@ -113,7 +111,7 @@ impl RecurringTaskSpawner {
             instance.tags = tpl_row.tags.clone();
             instance.project_id = tpl_row.project_id.clone();
             instance.recurrence_parent_id = Some(tpl_row.id.clone());
-            instance.due_date = next_instance_date_chrono;
+            instance.due_date = next_instance_date;
 
             let instance_id = instance.id.clone();
             let instance_row: storage::TaskRow = (&instance).into();
@@ -123,7 +121,7 @@ impl RecurringTaskSpawner {
             let next = rrule_utils::next_occurrence(&rule, now)?;
             let patch = storage::TaskPatch {
                 id: tpl_row.id.clone(),
-                next_instance_date: Some(next.map(common::time::bridge::chrono_to_jiff)),
+                next_instance_date: Some(next),
                 ..Default::default()
             };
             if let Err(e) = repo.update(&patch).await {
@@ -147,7 +145,7 @@ impl RecurringTaskSpawner {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use chrono::{Duration, Utc};
+    use jiff::{SignedDuration, Timestamp};
     use tools::todo_types::TodoStatus;
     use tools_core::FeaturePackage;
 
@@ -182,7 +180,7 @@ mod tests {
         Some(repos.tasks)
     }
 
-    fn create_template(title: &str, rule: &str, next: chrono::DateTime<Utc>) -> Todo {
+    fn create_template(title: &str, rule: &str, next: Timestamp) -> Todo {
         let mut todo = Todo::default_instance();
         todo.title = title.to_string();
         todo.area_id = TEST_AREA_ID.to_string();
@@ -197,7 +195,9 @@ mod tests {
         let Some(repo) = test_todo_repo().await else {
             return;
         };
-        let past = Utc::now() - Duration::hours(1);
+        let past = Timestamp::now()
+            .checked_sub(SignedDuration::from_secs(3600))
+            .unwrap_or_else(|_| Timestamp::now());
         let template = create_template("Daily standup", "FREQ=DAILY", past);
         let template_id = template.id.clone();
 
@@ -237,7 +237,9 @@ mod tests {
         let Some(repo) = test_todo_repo().await else {
             return;
         };
-        let future = Utc::now() + Duration::hours(24);
+        let future = Timestamp::now()
+            .checked_add(SignedDuration::from_secs(86400))
+            .unwrap_or_else(|_| Timestamp::now());
         let template = create_template("Weekly review", "FREQ=WEEKLY", future);
         let template_id = template.id.clone();
 
@@ -275,7 +277,11 @@ mod tests {
         todo.title = "No rule".to_string();
         todo.area_id = TEST_AREA_ID.to_string();
         todo.is_template = true;
-        todo.next_instance_date = Some(Utc::now() - Duration::hours(1));
+        todo.next_instance_date = Some(
+            Timestamp::now()
+                .checked_sub(SignedDuration::from_secs(3600))
+                .unwrap_or_else(|_| Timestamp::now()),
+        );
         let todo_id = todo.id.clone();
 
         let row: storage::TaskRow = (&todo).into();

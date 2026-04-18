@@ -45,9 +45,12 @@ impl MemoryMaintenanceService {
         loop {
             tokio::select! {
                 _ = interval.tick() => {
-                    let cutoff = chrono::Utc::now()
-                        - chrono::Duration::days(self.max_age_days as i64);
-                    let cutoff_str = match sanitize_predicate_value(&cutoff.to_rfc3339()) {
+                    let cutoff = jiff::Timestamp::now()
+                        .checked_sub(jiff::SignedDuration::from_secs(
+                            self.max_age_days as i64 * 86_400,
+                        ))
+                        .unwrap_or_else(|_| jiff::Timestamp::now());
+                    let cutoff_str = match sanitize_predicate_value(&cutoff.to_string()) {
                         Ok(s) => s,
                         Err(e) => {
                             warn!(error = %e, "MemoryMaintenanceService: invalid cutoff");

@@ -6,7 +6,7 @@
 
 pub mod mocks;
 
-use chrono::Utc;
+
 use klyntbot::bus::{InboundMessage, MessageBus, OutboundMessage};
 use klyntbot::config::Config;
 use klyntbot::providers::types::*;
@@ -161,8 +161,8 @@ pub fn create_test_todo(title: &str) -> Todo {
         focused_at: None,
         focus_deadline: None,
         focus_expired_count: 0,
-        created_at: Utc::now(),
-        updated_at: Utc::now(),
+        created_at: jiff::Timestamp::now(),
+        updated_at: jiff::Timestamp::now(),
         completed_at: None,
         parent_id: None,
         project_id: None,

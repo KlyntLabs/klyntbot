@@ -62,9 +62,12 @@ impl SessionCleanupService {
                     }
 
                     // Clean up old log records that grow without bound.
-                    let cutoff = (chrono::Utc::now()
-                        - chrono::Duration::days(self.ttl_days as i64))
-                    .to_rfc3339();
+                    let cutoff = jiff::Timestamp::now()
+                        .checked_sub(jiff::SignedDuration::from_secs(
+                            self.ttl_days as i64 * 86_400,
+                        ))
+                        .unwrap_or_else(|_| jiff::Timestamp::now())
+                        .to_string();
                     for (table, ts_col) in [
                         ("interaction_log", "timestamp"),
                         ("decision_log", "created_at"),

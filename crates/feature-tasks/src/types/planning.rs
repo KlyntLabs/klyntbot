@@ -1,7 +1,6 @@
 //! Planning, forecast, shared, and attachment types.
 
-use chrono::{DateTime, NaiveTime, Utc};
-use common::time::bridge::jiff_to_chrono;
+use jiff::{civil::Time, Timestamp};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use storage::rows::task::*;
@@ -55,7 +54,7 @@ pub struct DayPlan {
     pub reasoning: String,
     #[serde(default)]
     pub deferred: Vec<DeferredTask>,
-    pub generated_at: DateTime<Utc>,
+    pub generated_at: Timestamp,
 }
 
 /// A slot in a day plan.
@@ -95,19 +94,19 @@ pub struct DeferredTask {
 #[serde(rename_all = "camelCase")]
 pub struct WorkingHours {
     /// Start of working day.
-    pub start: NaiveTime,
+    pub start: Time,
     /// End of working day.
-    pub end: NaiveTime,
+    pub end: Time,
     /// Start of lunch break.
-    pub lunch_start: NaiveTime,
+    pub lunch_start: Time,
 }
 
 impl Default for WorkingHours {
     fn default() -> Self {
         Self {
-            start: NaiveTime::from_hms_opt(9, 0, 0).unwrap(),
-            end: NaiveTime::from_hms_opt(17, 0, 0).unwrap(),
-            lunch_start: NaiveTime::from_hms_opt(12, 0, 0).unwrap(),
+            start: Time::new(9, 0, 0, 0).unwrap(),
+            end: Time::new(17, 0, 0, 0).unwrap(),
+            lunch_start: Time::new(12, 0, 0, 0).unwrap(),
         }
     }
 }
@@ -277,8 +276,8 @@ impl Default for EnergyProfile {
 #[serde(rename_all = "camelCase")]
 pub struct CalendarBlock {
     pub title: String,
-    pub start: DateTime<Utc>,
-    pub end: DateTime<Utc>,
+    pub start: Timestamp,
+    pub end: Timestamp,
     #[serde(default = "default_true")]
     pub is_busy: bool,
 }
@@ -309,7 +308,7 @@ pub struct EstimationRecord {
     pub complexity_score: Option<i32>,
     pub energy_level: Option<EnergyLevel>,
     pub tags: Vec<String>,
-    pub completed_at: DateTime<Utc>,
+    pub completed_at: Timestamp,
 }
 
 impl From<TaskEstimationRow> for EstimationRecord {
@@ -326,7 +325,7 @@ impl From<TaskEstimationRow> for EstimationRecord {
                 .as_deref()
                 .and_then(|s| s.parse::<EnergyLevel>().ok()),
             tags: row.tags,
-            completed_at: jiff_to_chrono(*row.completed_at),
+            completed_at: *row.completed_at,
         }
     }
 }
@@ -343,7 +342,7 @@ pub struct Attachment {
     pub value: String,
     #[serde(default)]
     pub tags: Vec<String>,
-    pub created_at: DateTime<Utc>,
+    pub created_at: Timestamp,
 }
 
 /// Type of attachment.
@@ -386,7 +385,7 @@ impl From<TaskAttachmentRow> for Attachment {
             title: row.title,
             value: row.value,
             tags: row.tags,
-            created_at: jiff_to_chrono(*row.created_at),
+            created_at: *row.created_at,
         }
     }
 }
@@ -396,8 +395,8 @@ impl From<TaskAttachmentRow> for Attachment {
 #[serde(rename_all = "camelCase")]
 pub struct TimeEntry {
     pub id: String,
-    pub started_at: DateTime<Utc>,
-    pub ended_at: Option<DateTime<Utc>>,
+    pub started_at: Timestamp,
+    pub ended_at: Option<Timestamp>,
     pub duration_secs: Option<i64>,
     pub note: Option<String>,
     pub energy_level: Option<EnergyLevel>,
@@ -418,8 +417,8 @@ impl From<TaskTimeEntryRow> for TimeEntry {
     fn from(row: TaskTimeEntryRow) -> Self {
         Self {
             id: row.id.to_string(),
-            started_at: jiff_to_chrono(*row.started_at),
-            ended_at: row.ended_at.map(|ts| jiff_to_chrono(*ts)),
+            started_at: *row.started_at,
+            ended_at: row.ended_at.map(|ts| *ts),
             duration_secs: row.duration_secs,
             note: row.note,
             energy_level: row

@@ -3,7 +3,7 @@
 //! Ported from feature-todo's tool scoring helpers. These are standalone functions
 //! (not methods on a tool struct) for use in planning and suggestion generation.
 
-use chrono::{DateTime, Utc};
+use jiff::Timestamp;
 
 use crate::types::Task;
 
@@ -14,17 +14,17 @@ use crate::types::Task;
 /// - 5 if due today
 /// - 3 if due tomorrow
 /// - 1 otherwise or no due date
-pub fn calculate_urgency(due_date: Option<DateTime<Utc>>, now: DateTime<Utc>) -> u32 {
+pub fn calculate_urgency(due_date: Option<Timestamp>, now: Timestamp) -> u32 {
     match due_date {
         None => 1,
         Some(due) => {
-            let now_date = now.date_naive();
-            let due_date = due.date_naive();
+            let now_date = now.to_zoned(jiff::tz::TimeZone::UTC).date();
+            let due_date = due.to_zoned(jiff::tz::TimeZone::UTC).date();
             if due_date < now_date {
                 10
             } else if due_date == now_date {
                 5
-            } else if due_date == now_date + chrono::Duration::days(1) {
+            } else if due_date == now_date.checked_add(jiff::Span::new().days(1)).unwrap() {
                 3
             } else {
                 1
@@ -47,15 +47,15 @@ pub fn priority_weight(priority: Option<i16>) -> u32 {
 }
 
 /// Calculate the age of a task in fractional days.
-pub fn calculate_age_days(created_at: DateTime<Utc>, now: DateTime<Utc>) -> f64 {
-    let duration = now.signed_duration_since(created_at);
-    (duration.num_seconds().max(0) as f64) / 86400.0
+pub fn calculate_age_days(created_at: Timestamp, now: Timestamp) -> f64 {
+    let diff_ms = now.as_millisecond() - created_at.as_millisecond();
+    (diff_ms.max(0) as f64) / 86_400_000.0
 }
 
 /// Calculate a composite score for a task based on urgency, priority, and age.
 ///
 /// Higher scores indicate higher priority for scheduling.
-pub fn calculate_score(task: &Task, now: DateTime<Utc>) -> f64 {
+pub fn calculate_score(task: &Task, now: Timestamp) -> f64 {
     let urgency = calculate_urgency(task.due_date, now) as f64;
     let priority_wt = priority_weight(task.priority) as f64;
     let age_days = calculate_age_days(task.created_at, now);
@@ -65,39 +65,46 @@ pub fn calculate_score(task: &Task, now: DateTime<Utc>) -> f64 {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use chrono::TimeZone;
+
+    fn ts(year: i16, month: i8, day: i8, hour: i8, minute: i8, second: i8) -> Timestamp {
+        jiff::civil::date(year, month, day)
+            .at(hour, minute, second, 0)
+            .to_zoned(jiff::tz::TimeZone::UTC)
+            .unwrap()
+            .timestamp()
+    }
 
     #[test]
     fn test_urgency_no_due_date() {
-        let now = Utc::now();
+        let now = Timestamp::now();
         assert_eq!(calculate_urgency(None, now), 1);
     }
 
     #[test]
     fn test_urgency_overdue() {
-        let now = Utc.with_ymd_and_hms(2025, 6, 15, 12, 0, 0).unwrap();
-        let due = Utc.with_ymd_and_hms(2025, 6, 14, 12, 0, 0).unwrap();
+        let now = ts(2025, 6, 15, 12, 0, 0);
+        let due = ts(2025, 6, 14, 12, 0, 0);
         assert_eq!(calculate_urgency(Some(due), now), 10);
     }
 
     #[test]
     fn test_urgency_due_today() {
-        let now = Utc.with_ymd_and_hms(2025, 6, 15, 9, 0, 0).unwrap();
-        let due = Utc.with_ymd_and_hms(2025, 6, 15, 23, 0, 0).unwrap();
+        let now = ts(2025, 6, 15, 9, 0, 0);
+        let due = ts(2025, 6, 15, 23, 0, 0);
         assert_eq!(calculate_urgency(Some(due), now), 5);
     }
 
     #[test]
     fn test_urgency_due_tomorrow() {
-        let now = Utc.with_ymd_and_hms(2025, 6, 15, 9, 0, 0).unwrap();
-        let due = Utc.with_ymd_and_hms(2025, 6, 16, 9, 0, 0).unwrap();
+        let now = ts(2025, 6, 15, 9, 0, 0);
+        let due = ts(2025, 6, 16, 9, 0, 0);
         assert_eq!(calculate_urgency(Some(due), now), 3);
     }
 
     #[test]
     fn test_urgency_future() {
-        let now = Utc.with_ymd_and_hms(2025, 6, 15, 9, 0, 0).unwrap();
-        let due = Utc.with_ymd_and_hms(2025, 6, 20, 9, 0, 0).unwrap();
+        let now = ts(2025, 6, 15, 9, 0, 0);
+        let due = ts(2025, 6, 20, 9, 0, 0);
         assert_eq!(calculate_urgency(Some(due), now), 1);
     }
 
@@ -114,8 +121,8 @@ mod tests {
 
     #[test]
     fn test_age_days() {
-        let now = Utc.with_ymd_and_hms(2025, 6, 15, 12, 0, 0).unwrap();
-        let created = Utc.with_ymd_and_hms(2025, 6, 14, 12, 0, 0).unwrap();
+        let now = ts(2025, 6, 15, 12, 0, 0);
+        let created = ts(2025, 6, 14, 12, 0, 0);
         let age = calculate_age_days(created, now);
         assert!((age - 1.0).abs() < 0.01);
     }
@@ -125,7 +132,7 @@ mod tests {
         let mut task = crate::types::Task::default_instance();
         task.area_id = "area-1".to_string();
         task.priority = Some(1);
-        let now = Utc::now();
+        let now = Timestamp::now();
         let score = calculate_score(&task, now);
         // urgency=1 (no due date) * priority_weight=5 + small age component
         assert!(score >= 5.0);
@@ -133,18 +140,18 @@ mod tests {
 
     #[test]
     fn test_score_overdue_high_priority_beats_future_low() {
-        let now = Utc.with_ymd_and_hms(2025, 6, 15, 12, 0, 0).unwrap();
+        let now = ts(2025, 6, 15, 12, 0, 0);
 
         let mut high = crate::types::Task::default_instance();
         high.area_id = "a".to_string();
         high.priority = Some(1);
-        high.due_date = Some(Utc.with_ymd_and_hms(2025, 6, 14, 12, 0, 0).unwrap());
+        high.due_date = Some(ts(2025, 6, 14, 12, 0, 0));
         high.created_at = now;
 
         let mut low = crate::types::Task::default_instance();
         low.area_id = "a".to_string();
         low.priority = Some(5);
-        low.due_date = Some(Utc.with_ymd_and_hms(2025, 7, 1, 12, 0, 0).unwrap());
+        low.due_date = Some(ts(2025, 7, 1, 12, 0, 0));
         low.created_at = now;
 
         assert!(calculate_score(&high, now) > calculate_score(&low, now));

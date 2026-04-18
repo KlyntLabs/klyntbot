@@ -4,7 +4,7 @@ use std::sync::Arc;
 
 use async_trait::async_trait;
 use bus::{DomainEvent, DomainEventBus};
-use chrono::Utc;
+use jiff::Timestamp;
 use common::Result;
 use providers::{ChatParams, DynProvider, Message, ResponseFormat};
 use tracing::debug;
@@ -122,7 +122,10 @@ impl DayPlanningHandler for LlmDayPlanningHandler {
 
 /// Compute available working minutes from working hours (minus 30 min lunch).
 fn compute_available_mins(wh: &feature_tasks::types::WorkingHours) -> i32 {
-    ((wh.end - wh.start).num_minutes() - 30) as i32
+    // Convert times to minutes since midnight
+    let end_mins = wh.end.hour() as i32 * 60 + wh.end.minute() as i32;
+    let start_mins = wh.start.hour() as i32 * 60 + wh.start.minute() as i32;
+    (end_mins - start_mins - 30).max(0)
 }
 
 async fn call_llm_for_plan(
@@ -180,7 +183,7 @@ async fn call_llm_for_plan(
                 reason: d.reason,
             })
             .collect(),
-        generated_at: Utc::now(),
+        generated_at: Timestamp::now(),
     })
 }
 
@@ -212,19 +215,25 @@ fn build_planning_prompt(ctx: &PlanningContext, locked: &[PlanSlot]) -> String {
     prompt = prompt.replace("{{scored_tasks}}", &tasks_str);
     prompt = prompt.replace(
         "{{work_start}}",
-        &ctx.working_hours.start.format("%H:%M").to_string(),
+        &ctx.working_hours
+            .start
+            .strftime("%H:%M")
+            .to_string(),
     );
     prompt = prompt.replace(
         "{{work_end}}",
-        &ctx.working_hours.end.format("%H:%M").to_string(),
+        &ctx.working_hours.end.strftime("%H:%M").to_string(),
     );
     prompt = prompt.replace(
         "{{lunch_start}}",
-        &ctx.working_hours.lunch_start.format("%H:%M").to_string(),
+        &ctx.working_hours
+            .lunch_start
+            .strftime("%H:%M")
+            .to_string(),
     );
 
     // Calculate available minutes (work hours minus lunch)
-    let work_mins = (ctx.working_hours.end - ctx.working_hours.start).num_minutes() - 30;
+    let work_mins = compute_available_mins(&ctx.working_hours);
     prompt = prompt.replace("{{available_mins}}", &work_mins.to_string());
 
     // Energy profile
@@ -251,8 +260,10 @@ fn build_planning_prompt(ctx: &PlanningContext, locked: &[PlanSlot]) -> String {
                 format!(
                     "- {} ({} - {}, {})",
                     b.title,
-                    b.start.format("%H:%M"),
-                    b.end.format("%H:%M"),
+                    b.start
+                        .to_zoned(jiff::tz::TimeZone::UTC)
+                        .strftime("%H:%M"),
+                    b.end.to_zoned(jiff::tz::TimeZone::UTC).strftime("%H:%M"),
                     if b.is_busy { "busy" } else { "free" },
                 )
             })
@@ -286,7 +297,6 @@ fn build_planning_prompt(ctx: &PlanningContext, locked: &[PlanSlot]) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use chrono::NaiveTime;
     use feature_tasks::types::{Task, WorkingHours};
 
     #[test]
@@ -298,9 +308,9 @@ mod tests {
         let ctx = PlanningContext {
             tasks: vec![task],
             working_hours: WorkingHours {
-                start: NaiveTime::from_hms_opt(9, 0, 0).unwrap(),
-                end: NaiveTime::from_hms_opt(17, 0, 0).unwrap(),
-                lunch_start: NaiveTime::from_hms_opt(12, 0, 0).unwrap(),
+                start: jiff::civil::Time::new(9, 0, 0, 0).unwrap(),
+                end: jiff::civil::Time::new(17, 0, 0, 0).unwrap(),
+                lunch_start: jiff::civil::Time::new(12, 0, 0, 0).unwrap(),
             },
             calendar_blocks: vec![],
             energy_profile: None,

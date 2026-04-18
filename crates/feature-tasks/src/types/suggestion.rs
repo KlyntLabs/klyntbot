@@ -1,7 +1,6 @@
 //! Suggestion and decomposition types.
 
-use chrono::{DateTime, Utc};
-use common::time::bridge::jiff_to_chrono;
+use jiff::Timestamp;
 use serde::{Deserialize, Serialize};
 use std::fmt;
 use std::str::FromStr;
@@ -25,8 +24,8 @@ pub struct TaskSuggestion {
     pub action_payload: Option<SuggestionAction>,
     pub status: SuggestionStatus,
     pub trigger: Option<SuggestionTrigger>,
-    pub created_at: DateTime<Utc>,
-    pub resolved_at: Option<DateTime<Utc>>,
+    pub created_at: Timestamp,
+    pub resolved_at: Option<Timestamp>,
 }
 
 impl From<TaskSuggestionRow> for TaskSuggestion {
@@ -50,8 +49,8 @@ impl From<TaskSuggestionRow> for TaskSuggestion {
                 .trigger
                 .as_deref()
                 .and_then(|s| serde_json::from_str(s).ok()),
-            created_at: jiff_to_chrono(*row.created_at),
-            resolved_at: row.resolved_at.map(|ts| jiff_to_chrono(*ts)),
+            created_at: *row.created_at,
+            resolved_at: row.resolved_at.map(|ts| *ts),
         }
     }
 }

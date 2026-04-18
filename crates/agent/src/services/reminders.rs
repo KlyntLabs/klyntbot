@@ -1,6 +1,5 @@
 //! ReminderEngine - Deterministic reminder system for todos
 
-use chrono::{Duration, Utc};  // needed for Todo fields which are still DateTime<Utc>
 use std::sync::Arc;
 use std::time::Duration as StdDuration;
 use tokio::task::JoinHandle;
@@ -8,6 +7,7 @@ use tokio_util::sync::CancellationToken;
 use tracing::{debug, error};
 
 use common::Result;
+use jiff::Timestamp;
 use tools::todo_types::Todo;
 
 use super::notifications::NotificationDispatcher;
@@ -98,13 +98,14 @@ impl ReminderEngine {
         let rows = repo.list(&filter).await?;
 
         let todos: Vec<Todo> = rows.into_iter().map(Todo::from).collect();
+        let now = Timestamp::now();
 
         for todo in &todos {
             // Rule #1: Due date alerts (within 2 hours)
             if let Some(due_date) = todo.due_date.filter(|_| Self::should_remind_due_date(todo)) {
-                let time_left = due_date.signed_duration_since(Utc::now());
-                let hours_left = time_left.num_hours();
-                let mins_left = time_left.num_minutes() % 60;
+                let diff_ms = due_date.as_millisecond() - now.as_millisecond();
+                let hours_left = diff_ms / 3_600_000;
+                let mins_left = (diff_ms % 3_600_000) / 60_000;
 
                 let time_str = if hours_left > 0 {
                     format!("{}h {}m", hours_left, mins_left)
@@ -133,8 +134,8 @@ impl ReminderEngine {
                 .focus_deadline
                 .filter(|_| Self::should_remind_focused_deadline(todo))
             {
-                let time_left = deadline.signed_duration_since(Utc::now());
-                let mins_left = time_left.num_minutes();
+                let diff_ms = deadline.as_millisecond() - now.as_millisecond();
+                let mins_left = diff_ms / 60_000;
 
                 dispatcher
                     .notify(
@@ -146,8 +147,8 @@ impl ReminderEngine {
 
             // Rule #3: Overdue nagging (once per day)
             if let Some(due_date) = todo.due_date.filter(|_| Self::should_remind_overdue(todo)) {
-                let overdue_by = Utc::now().signed_duration_since(due_date);
-                let days_overdue = overdue_by.num_days();
+                let diff_ms = now.as_millisecond() - due_date.as_millisecond();
+                let days_overdue = diff_ms / 86_400_000;
 
                 let overdue_str = if days_overdue == 1 {
                     "1 day overdue".to_string()
@@ -169,15 +170,12 @@ impl ReminderEngine {
 
     /// Check if a todo should trigger a due date reminder (within 2 hours, not yet reminded)
     pub fn should_remind_due_date(todo: &Todo) -> bool {
-        // Minimal implementation to pass the test
         if let Some(due_date) = todo.due_date {
-            // Check if within 2 hours
-            let now = Utc::now();
-            let time_until_due = due_date.signed_duration_since(now);
-
+            let now = Timestamp::now();
+            let diff_ms = due_date.as_millisecond() - now.as_millisecond();
             // Within 2 hours and not in the past
-            if time_until_due <= Duration::hours(2) && time_until_due > Duration::zero() {
-                // Check if not already reminded
+            let two_hours_ms = 2 * 3_600_000_i64;
+            if diff_ms > 0 && diff_ms <= two_hours_ms {
                 return todo.last_reminded_at.is_none();
             }
         }
@@ -186,19 +184,15 @@ impl ReminderEngine {
 
     /// Check if a focused task should trigger a deadline reminder (within 1 hour, not yet reminded)
     pub fn should_remind_focused_deadline(todo: &Todo) -> bool {
-        // Must be focused
         if todo.focused_at.is_none() {
             return false;
         }
 
-        // Must have a focus deadline
         if let Some(focus_deadline) = todo.focus_deadline {
-            let now = Utc::now();
-            let time_until_deadline = focus_deadline.signed_duration_since(now);
-
-            // Within 1 hour and not in the past
-            if time_until_deadline <= Duration::hours(1) && time_until_deadline > Duration::zero() {
-                // Check if not already reminded
+            let now = Timestamp::now();
+            let diff_ms = focus_deadline.as_millisecond() - now.as_millisecond();
+            let one_hour_ms = 3_600_000_i64;
+            if diff_ms > 0 && diff_ms <= one_hour_ms {
                 return todo.last_reminded_at.is_none();
             }
         }
@@ -207,19 +201,13 @@ impl ReminderEngine {
 
     /// Check if an overdue task should nag (once per day)
     pub fn should_remind_overdue(todo: &Todo) -> bool {
-        // Must have a due date
         if let Some(due_date) = todo.due_date {
-            let now = Utc::now();
-
-            // Must be overdue (due date in the past)
+            let now = Timestamp::now();
             if due_date < now {
-                // Check if never reminded, or last reminded over 24 hours ago
                 if let Some(last_reminded) = todo.last_reminded_at {
-                    let time_since_reminded = now.signed_duration_since(last_reminded);
-                    // Nag again if more than 24 hours since last nag
-                    return time_since_reminded >= Duration::hours(24);
+                    let since_reminded_ms = now.as_millisecond() - last_reminded.as_millisecond();
+                    return since_reminded_ms >= 24 * 3_600_000;
                 } else {
-                    // Never reminded, so nag now
                     return true;
                 }
             }
@@ -231,10 +219,11 @@ impl ReminderEngine {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use chrono::{DateTime, Duration, Utc};
+    use jiff::{SignedDuration, Timestamp};
     use tools::todo_types::{Todo, TodoStatus};
 
-    fn create_test_todo(title: &str, due_date: Option<DateTime<Utc>>) -> Todo {
+    fn create_test_todo(title: &str, due_date: Option<Timestamp>) -> Todo {
+        let now = Timestamp::now();
         Todo {
             id: format!("test-{}", &uuid::Uuid::new_v4().to_string()[..8]),
             title: title.to_string(),
@@ -248,8 +237,8 @@ mod tests {
             focused_at: None,
             focus_deadline: None,
             focus_expired_count: 0,
-            created_at: Utc::now(),
-            updated_at: Utc::now(),
+            created_at: now,
+            updated_at: now,
             completed_at: None,
             parent_id: None,
             project_id: None,
@@ -271,189 +260,114 @@ mod tests {
         }
     }
 
+    fn add_secs(ts: Timestamp, secs: i64) -> Timestamp {
+        ts.checked_add(SignedDuration::from_secs(secs))
+            .unwrap_or(ts)
+    }
+
     #[tokio::test]
     async fn test_detects_due_date_within_2_hours() {
-        // Arrange: Create a todo due in 1 hour (within 2 hour window)
-        let due_in_1_hour = Utc::now() + Duration::hours(1);
+        let due_in_1_hour = add_secs(Timestamp::now(), 3600);
         let todo = create_test_todo("Urgent task", Some(due_in_1_hour));
-
-        // Act: Check if this todo should trigger a reminder
         let should_remind = ReminderEngine::should_remind_due_date(&todo);
-
-        // Assert: Should be true because it's within 2 hours and hasn't been reminded
         assert!(should_remind, "Should remind for task due within 2 hours");
     }
 
     #[tokio::test]
     async fn test_no_remind_if_already_reminded() {
-        // Arrange: Todo due soon but already reminded
-        let due_in_1_hour = Utc::now() + Duration::hours(1);
+        let due_in_1_hour = add_secs(Timestamp::now(), 3600);
         let mut todo = create_test_todo("Already reminded", Some(due_in_1_hour));
-        todo.last_reminded_at = Some(Utc::now() - Duration::minutes(30));
-
-        // Act
+        todo.last_reminded_at = Some(add_secs(Timestamp::now(), -1800));
         let should_remind = ReminderEngine::should_remind_due_date(&todo);
-
-        // Assert: Should not remind again
         assert!(!should_remind, "Should not remind if already reminded");
     }
 
     #[tokio::test]
     async fn test_no_remind_if_due_beyond_2_hours() {
-        // Arrange: Todo due in 3 hours (beyond 2 hour window)
-        let due_in_3_hours = Utc::now() + Duration::hours(3);
+        let due_in_3_hours = add_secs(Timestamp::now(), 3 * 3600);
         let todo = create_test_todo("Not urgent yet", Some(due_in_3_hours));
-
-        // Act
         let should_remind = ReminderEngine::should_remind_due_date(&todo);
-
-        // Assert: Should not remind yet
         assert!(!should_remind, "Should not remind if due beyond 2 hours");
     }
 
     #[tokio::test]
     async fn test_no_remind_if_overdue() {
-        // Arrange: Todo overdue (in the past)
-        let due_1_hour_ago = Utc::now() - Duration::hours(1);
+        let due_1_hour_ago = add_secs(Timestamp::now(), -3600);
         let todo = create_test_todo("Overdue", Some(due_1_hour_ago));
-
-        // Act
         let should_remind = ReminderEngine::should_remind_due_date(&todo);
-
-        // Assert: Should not remind (overdue is handled by different rule)
-        assert!(
-            !should_remind,
-            "Should not use due date rule for overdue tasks"
-        );
+        assert!(!should_remind, "Should not use due date rule for overdue tasks");
     }
-
-    // ── Reminder Rule #2: Focused task deadlines (within 1 hour) ──
 
     #[tokio::test]
     async fn test_detects_focused_deadline_within_1_hour() {
-        // RED: Test for focused task with deadline within 1 hour
-
-        // Arrange: Focused task with deadline in 30 minutes
-        let now = Utc::now();
-        let deadline_in_30_min = now + Duration::minutes(30);
+        let now = Timestamp::now();
+        let deadline_in_30_min = add_secs(now, 1800);
         let mut todo = create_test_todo("Focused urgent", None);
-        todo.focused_at = Some(now - Duration::hours(2));
+        todo.focused_at = Some(add_secs(now, -7200));
         todo.focus_deadline = Some(deadline_in_30_min);
-
-        // Act
         let should_remind = ReminderEngine::should_remind_focused_deadline(&todo);
-
-        // Assert
-        assert!(
-            should_remind,
-            "Should remind for focused task deadline within 1 hour"
-        );
+        assert!(should_remind, "Should remind for focused task deadline within 1 hour");
     }
 
     #[tokio::test]
     async fn test_no_remind_focused_if_not_focused() {
-        // Arrange: Not a focused task
         let todo = create_test_todo("Not focused", None);
-
-        // Act
         let should_remind = ReminderEngine::should_remind_focused_deadline(&todo);
-
-        // Assert
         assert!(!should_remind, "Should not remind if task is not focused");
     }
 
     #[tokio::test]
     async fn test_no_remind_focused_if_already_reminded() {
-        // Arrange: Focused task but already reminded
-        let now = Utc::now();
+        let now = Timestamp::now();
         let mut todo = create_test_todo("Focused", None);
-        todo.focused_at = Some(now - Duration::hours(2));
-        todo.focus_deadline = Some(now + Duration::minutes(30));
-        todo.last_reminded_at = Some(now - Duration::minutes(10));
-
-        // Act
+        todo.focused_at = Some(add_secs(now, -7200));
+        todo.focus_deadline = Some(add_secs(now, 1800));
+        todo.last_reminded_at = Some(add_secs(now, -600));
         let should_remind = ReminderEngine::should_remind_focused_deadline(&todo);
-
-        // Assert
         assert!(!should_remind, "Should not remind if already reminded");
     }
 
     #[tokio::test]
     async fn test_no_remind_focused_if_beyond_1_hour() {
-        // Arrange: Focused task with deadline beyond 1 hour
-        let now = Utc::now();
+        let now = Timestamp::now();
         let mut todo = create_test_todo("Focused not urgent", None);
-        todo.focused_at = Some(now - Duration::hours(1));
-        todo.focus_deadline = Some(now + Duration::hours(2));
-
-        // Act
+        todo.focused_at = Some(add_secs(now, -3600));
+        todo.focus_deadline = Some(add_secs(now, 7200));
         let should_remind = ReminderEngine::should_remind_focused_deadline(&todo);
-
-        // Assert
-        assert!(
-            !should_remind,
-            "Should not remind if deadline beyond 1 hour"
-        );
+        assert!(!should_remind, "Should not remind if deadline beyond 1 hour");
     }
-
-    // ── Reminder Rule #3: Overdue nagging (once per day) ──
 
     #[tokio::test]
     async fn test_detects_overdue_task() {
-        // RED: Test for overdue task that should nag
-
-        // Arrange: Task overdue by 2 hours
-        let due_2_hours_ago = Utc::now() - Duration::hours(2);
+        let due_2_hours_ago = add_secs(Timestamp::now(), -7200);
         let todo = create_test_todo("Overdue task", Some(due_2_hours_ago));
-
-        // Act
         let should_remind = ReminderEngine::should_remind_overdue(&todo);
-
-        // Assert
         assert!(should_remind, "Should nag for overdue task");
     }
 
     #[tokio::test]
     async fn test_no_remind_overdue_if_reminded_recently() {
-        // Arrange: Overdue task but nagged 2 hours ago (within 24 hours)
-        let due_yesterday = Utc::now() - Duration::days(1);
+        let due_yesterday = add_secs(Timestamp::now(), -86400);
         let mut todo = create_test_todo("Overdue", Some(due_yesterday));
-        todo.last_reminded_at = Some(Utc::now() - Duration::hours(2));
-
-        // Act
+        todo.last_reminded_at = Some(add_secs(Timestamp::now(), -7200));
         let should_remind = ReminderEngine::should_remind_overdue(&todo);
-
-        // Assert
         assert!(!should_remind, "Should not nag if reminded within 24 hours");
     }
 
     #[tokio::test]
     async fn test_remind_overdue_if_last_nag_over_24_hours() {
-        // Arrange: Overdue task, last nagged 25 hours ago (beyond 24 hours)
-        let due_yesterday = Utc::now() - Duration::days(1);
+        let due_yesterday = add_secs(Timestamp::now(), -86400);
         let mut todo = create_test_todo("Overdue", Some(due_yesterday));
-        todo.last_reminded_at = Some(Utc::now() - Duration::hours(25));
-
-        // Act
+        todo.last_reminded_at = Some(add_secs(Timestamp::now(), -90000)); // 25 hours ago
         let should_remind = ReminderEngine::should_remind_overdue(&todo);
-
-        // Assert
-        assert!(
-            should_remind,
-            "Should nag again if last nag was over 24 hours ago"
-        );
+        assert!(should_remind, "Should nag again if last nag was over 24 hours ago");
     }
 
     #[tokio::test]
     async fn test_no_remind_overdue_if_not_overdue() {
-        // Arrange: Task not overdue (due in future)
-        let due_tomorrow = Utc::now() + Duration::days(1);
+        let due_tomorrow = add_secs(Timestamp::now(), 86400);
         let todo = create_test_todo("Not overdue", Some(due_tomorrow));
-
-        // Act
         let should_remind = ReminderEngine::should_remind_overdue(&todo);
-
-        // Assert
         assert!(!should_remind, "Should not nag if not overdue");
     }
 }

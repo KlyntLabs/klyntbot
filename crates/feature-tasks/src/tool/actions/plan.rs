@@ -1,6 +1,6 @@
 //! Plan day action handler with energy-level matching.
 
-use chrono::Utc;
+use jiff::Timestamp;
 use common::Result;
 use futures_util::future::try_join_all;
 use tools_core::ParamExtractor;
@@ -123,7 +123,7 @@ impl TaskTool {
         let all_tasks: Vec<Task> = rows.into_iter().map(Task::from).collect();
         debug!("Total tasks in store: {}", all_tasks.len());
 
-        let now = Utc::now();
+        let now = Timestamp::now();
         let candidates: Vec<_> = all_tasks.into_iter().filter(is_plannable).collect();
 
         // Batch-check blockers concurrently instead of N sequential queries
@@ -181,17 +181,18 @@ impl TaskTool {
                 .unwrap_or_else(|| "P3".to_string());
 
             let due_context = if let Some(due) = task.due_date {
-                let due_date = due.date_naive();
-                let now_date = now.date_naive();
+                let due_date = due.to_zoned(jiff::tz::TimeZone::UTC).date();
+                let now_date = now.to_zoned(jiff::tz::TimeZone::UTC).date();
                 if due_date < now_date {
-                    let days = (now_date - due_date).num_days();
+                    let diff_ms = now.as_millisecond() - due.as_millisecond();
+                    let days = (diff_ms.max(0) / 86_400_000).max(1);
                     format!("Overdue by {} day(s)", days)
                 } else if due_date == now_date {
                     "Due today".to_string()
-                } else if due_date == now_date + chrono::Duration::days(1) {
+                } else if due_date == now_date.checked_add(jiff::Span::new().days(1)).unwrap() {
                     "Due tomorrow".to_string()
                 } else {
-                    format!("Due {}", due_date.format("%Y-%m-%d"))
+                    format!("Due {}", due_date)
                 }
             } else {
                 "No deadline".to_string()

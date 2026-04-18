@@ -213,12 +213,9 @@ mod tests {
     #[test]
     fn test_working_hours_default() {
         let wh = WorkingHours::default();
-        assert_eq!(wh.start, chrono::NaiveTime::from_hms_opt(9, 0, 0).unwrap());
-        assert_eq!(wh.end, chrono::NaiveTime::from_hms_opt(17, 0, 0).unwrap());
-        assert_eq!(
-            wh.lunch_start,
-            chrono::NaiveTime::from_hms_opt(12, 0, 0).unwrap()
-        );
+        assert_eq!(wh.start, jiff::civil::Time::new(9, 0, 0, 0).unwrap());
+        assert_eq!(wh.end, jiff::civil::Time::new(17, 0, 0, 0).unwrap());
+        assert_eq!(wh.lunch_start, jiff::civil::Time::new(12, 0, 0, 0).unwrap());
     }
 
     #[test]
@@ -243,7 +240,7 @@ mod tests {
             parent_chain: vec!["p1".to_string()],
             sibling_titles: vec!["sibling".to_string()],
             active_blockers: vec![],
-            captured_at: chrono::Utc::now(),
+            captured_at: jiff::Timestamp::now(),
         };
         let json = serde_json::to_string(&snap).unwrap();
         let parsed: ContextSnapshot = serde_json::from_str(&json).unwrap();

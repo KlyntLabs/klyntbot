@@ -1,6 +1,6 @@
 //! Recurrence action handlers (recur, list_recurring, delete_recurring).
 
-use chrono::Utc;
+use jiff::Timestamp;
 use common::{Result, ToolError};
 use tools_core::ParamExtractor;
 
@@ -20,7 +20,7 @@ impl TaskTool {
         crate::rrule_utils::validate_rrule(rule_str)?;
 
         // Compute next instance date
-        let now = Utc::now();
+        let now = Timestamp::now();
         let next_instance_date = crate::rrule_utils::next_occurrence(rule_str, now)?;
 
         let mut template = Task::default_instance();
@@ -55,7 +55,11 @@ impl TaskTool {
         let human = crate::rrule_utils::humanize_rrule(rule_str);
         let next_str = created
             .next_instance_date
-            .map(|d| d.format("%Y-%m-%d %H:%M UTC").to_string())
+            .map(|d| {
+                d.to_zoned(jiff::tz::TimeZone::UTC)
+                    .strftime("%Y-%m-%d %H:%M UTC")
+                    .to_string()
+            })
             .unwrap_or_else(|| "none".to_string());
 
         Ok(format!(
@@ -78,7 +82,11 @@ impl TaskTool {
             let human = crate::rrule_utils::humanize_rrule(rule_str);
             let next_str = t
                 .next_instance_date
-                .map(|d| d.format("%Y-%m-%d %H:%M UTC").to_string())
+                .map(|d| {
+                d.to_zoned(jiff::tz::TimeZone::UTC)
+                    .strftime("%Y-%m-%d %H:%M UTC")
+                    .to_string()
+            })
                 .unwrap_or_else(|| "none".to_string());
 
             output.push_str(&format!(

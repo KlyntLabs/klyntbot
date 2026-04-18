@@ -308,7 +308,11 @@ mod tests {
         let mut task = Task::default_instance();
         task.title = "URGENT: Fix bug".to_string();
         task.priority = Some(1);
-        task.due_date = Some(chrono::Utc::now() + chrono::Duration::try_days(1).unwrap());
+        task.due_date = Some(
+            jiff::Timestamp::now()
+                .checked_add(jiff::SignedDuration::from_secs(86400))
+                .unwrap_or_else(|_| jiff::Timestamp::now()),
+        );
 
         let result = engine.enrich(&task).await.unwrap();
         // All fields already set, should return None

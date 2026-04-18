@@ -4,7 +4,7 @@
 //! tool-layer abstractions (`TodoPatch`, `TodoFilter`, `TodoSummary`)
 //! with typed conversions to storage-layer equivalents.
 
-use chrono::{DateTime, Utc};
+use jiff::Timestamp;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
@@ -23,15 +23,15 @@ pub struct Action {
     pub area_id: String,
     pub key_result_id: Option<String>,
     pub priority: Option<u8>,
-    pub due_date: Option<DateTime<Utc>>,
+    pub due_date: Option<Timestamp>,
     pub tags: Vec<String>,
     pub status: ActionStatus,
-    pub focused_at: Option<DateTime<Utc>>,
-    pub focus_deadline: Option<DateTime<Utc>>,
+    pub focused_at: Option<Timestamp>,
+    pub focus_deadline: Option<Timestamp>,
     pub focus_expired_count: u32,
-    pub created_at: DateTime<Utc>,
-    pub updated_at: DateTime<Utc>,
-    pub completed_at: Option<DateTime<Utc>>,
+    pub created_at: Timestamp,
+    pub updated_at: Timestamp,
+    pub completed_at: Option<Timestamp>,
     #[serde(default)]
     pub parent_id: Option<String>,
     #[serde(default)]
@@ -47,7 +47,7 @@ pub struct Action {
     #[serde(default)]
     pub calendar_event_uid: Option<String>,
     #[serde(default)]
-    pub last_reminded_at: Option<DateTime<Utc>>,
+    pub last_reminded_at: Option<Timestamp>,
     #[serde(default)]
     pub recurrence_rule: Option<String>,
     #[serde(default)]
@@ -55,7 +55,7 @@ pub struct Action {
     #[serde(default)]
     pub is_template: bool,
     #[serde(default)]
-    pub next_instance_date: Option<DateTime<Utc>>,
+    pub next_instance_date: Option<Timestamp>,
     #[serde(default)]
     pub blocked_by: Vec<String>,
     #[serde(default)]
@@ -76,7 +76,7 @@ impl Action {
 
     /// Create a default blank instance (useful as a starting point).
     pub fn default_instance() -> Self {
-        let now = Utc::now();
+        let now = Timestamp::now();
         Self {
             id: Self::generate_id(),
             title: String::new(),
@@ -180,7 +180,7 @@ pub struct Attachment {
     pub value: String,
     #[serde(default)]
     pub tags: Vec<String>,
-    pub created_at: DateTime<Utc>,
+    pub created_at: Timestamp,
 }
 
 /// Type of attachment.
@@ -215,8 +215,8 @@ impl AttachmentType {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TimeEntry {
     pub id: String,
-    pub started_at: DateTime<Utc>,
-    pub ended_at: Option<DateTime<Utc>>,
+    pub started_at: Timestamp,
+    pub ended_at: Option<Timestamp>,
     pub duration_secs: Option<u64>,
     pub note: Option<String>,
     #[serde(default)]
@@ -243,23 +243,15 @@ impl From<TaskRow> for Action {
             area_id: row.area_id,
             key_result_id: row.key_result_id,
             priority: row.priority.map(|p| p as u8),
-            due_date: row
-                .due_date
-                .map(|ts| common::time::bridge::jiff_to_chrono(*ts)),
+            due_date: row.due_date.map(|ts| *ts),
             tags: row.tags,
             status: ActionStatus::from_str_loose(&row.status).unwrap_or(ActionStatus::Todo),
-            focused_at: row
-                .focused_at
-                .map(|ts| common::time::bridge::jiff_to_chrono(*ts)),
-            focus_deadline: row
-                .focus_deadline
-                .map(|ts| common::time::bridge::jiff_to_chrono(*ts)),
+            focused_at: row.focused_at.map(|ts| *ts),
+            focus_deadline: row.focus_deadline.map(|ts| *ts),
             focus_expired_count: row.focus_expired_count as u32,
-            created_at: common::time::bridge::jiff_to_chrono(*row.created_at),
-            updated_at: common::time::bridge::jiff_to_chrono(*row.updated_at),
-            completed_at: row
-                .completed_at
-                .map(|ts| common::time::bridge::jiff_to_chrono(*ts)),
+            created_at: *row.created_at,
+            updated_at: *row.updated_at,
+            completed_at: row.completed_at.map(|ts| *ts),
             parent_id: row.parent_id,
             project_id: row.project_id,
             attachments: Vec::new(),
@@ -267,15 +259,11 @@ impl From<TaskRow> for Action {
             total_tracked_secs: row.total_tracked_secs as u64,
             estimated_minutes: row.estimated_minutes.map(|m| m as u32),
             calendar_event_uid: row.calendar_event_uid,
-            last_reminded_at: row
-                .last_reminded_at
-                .map(|ts| common::time::bridge::jiff_to_chrono(*ts)),
+            last_reminded_at: row.last_reminded_at.map(|ts| *ts),
             recurrence_rule: row.recurrence_rule,
             recurrence_parent_id: row.recurrence_parent_id,
             is_template: row.is_template,
-            next_instance_date: row
-                .next_instance_date
-                .map(|ts| common::time::bridge::jiff_to_chrono(*ts)),
+            next_instance_date: row.next_instance_date.map(|ts| *ts),
             blocked_by: Vec::new(),
             blocks: Vec::new(),
             status_label_id: row.status_label_id,
@@ -294,27 +282,21 @@ impl From<&Action> for TaskRow {
             area_id: action.area_id.clone(),
             key_result_id: action.key_result_id.clone(),
             priority: action.priority.map(|p| p as i16),
-            due_date: action
-                .due_date
-                .map(|dt| storage::sqlite_types::SqlTs(common::time::bridge::chrono_to_jiff(dt))),
+            due_date: action.due_date.map(storage::sqlite_types::SqlTs),
             tags: action.tags.clone(),
             status: action.status.as_str().to_string(),
             focused_at: action
                 .focused_at
-                .map(|dt| storage::sqlite_types::SqlTs(common::time::bridge::chrono_to_jiff(dt))),
+                .map(storage::sqlite_types::SqlTs),
             focus_deadline: action
                 .focus_deadline
-                .map(|dt| storage::sqlite_types::SqlTs(common::time::bridge::chrono_to_jiff(dt))),
+                .map(storage::sqlite_types::SqlTs),
             focus_expired_count: action.focus_expired_count as i32,
-            created_at: storage::sqlite_types::SqlTs(common::time::bridge::chrono_to_jiff(
-                action.created_at,
-            )),
-            updated_at: storage::sqlite_types::SqlTs(common::time::bridge::chrono_to_jiff(
-                action.updated_at,
-            )),
+            created_at: storage::sqlite_types::SqlTs(action.created_at),
+            updated_at: storage::sqlite_types::SqlTs(action.updated_at),
             completed_at: action
                 .completed_at
-                .map(|dt| storage::sqlite_types::SqlTs(common::time::bridge::chrono_to_jiff(dt))),
+                .map(storage::sqlite_types::SqlTs),
             parent_id: action.parent_id.clone(),
             project_id: action.project_id.clone(),
             total_tracked_secs: action.total_tracked_secs as i64,
@@ -322,13 +304,13 @@ impl From<&Action> for TaskRow {
             calendar_event_uid: action.calendar_event_uid.clone(),
             last_reminded_at: action
                 .last_reminded_at
-                .map(|dt| storage::sqlite_types::SqlTs(common::time::bridge::chrono_to_jiff(dt))),
+                .map(storage::sqlite_types::SqlTs),
             recurrence_rule: action.recurrence_rule.clone(),
             recurrence_parent_id: action.recurrence_parent_id.clone(),
             is_template: action.is_template,
             next_instance_date: action
                 .next_instance_date
-                .map(|dt| storage::sqlite_types::SqlTs(common::time::bridge::chrono_to_jiff(dt))),
+                .map(storage::sqlite_types::SqlTs),
             status_label_id: action.status_label_id.clone(),
             position: action.position,
             group_id: action.group_id.clone(),
@@ -368,10 +350,10 @@ pub struct TodoPatch {
     pub title: Option<String>,
     pub description: Option<Option<String>>,
     pub priority: Option<u8>,
-    pub due_date: Option<Option<DateTime<Utc>>>,
+    pub due_date: Option<Option<Timestamp>>,
     pub tags: Option<Vec<String>>,
     pub status: Option<TodoStatus>,
-    pub last_reminded_at: Option<Option<DateTime<Utc>>>,
+    pub last_reminded_at: Option<Option<Timestamp>>,
     pub calendar_event_uid: Option<Option<String>>,
     pub estimated_minutes: Option<Option<u32>>,
     pub area_id: Option<String>,
@@ -410,17 +392,13 @@ impl TodoPatch {
             title: self.title.clone(),
             description: self.description.clone(),
             priority: self.priority.map(|p| Some(p as i16)),
-            due_date: self
-                .due_date
-                .map(|opt| opt.map(common::time::bridge::chrono_to_jiff)),
+            due_date: self.due_date,
             tags: self.tags.clone(),
             status: self.status.map(|s| s.as_str().to_string()),
             calendar_event_uid: self.calendar_event_uid.clone(),
             next_instance_date: None,
             estimated_minutes: self.estimated_minutes.map(|opt| opt.map(|m| m as i32)),
-            last_reminded_at: self
-                .last_reminded_at
-                .map(|opt| opt.map(common::time::bridge::chrono_to_jiff)),
+            last_reminded_at: self.last_reminded_at,
             recurrence_rule: None,
             area_id: self.area_id.clone(),
             project_id: None,

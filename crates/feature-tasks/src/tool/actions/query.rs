@@ -112,7 +112,7 @@ impl TaskTool {
                     output.push_str(&format!("Tags: {}\n", task.tags.join(", ")));
                 }
                 if let Some(due) = &task.due_date {
-                    output.push_str(&format!("Due: {}\n", due.format("%Y-%m-%d")));
+                    output.push_str(&format!("Due: {}\n", due.strftime("%Y-%m-%d")));
                 }
                 if let Some(ref energy) = task.energy_level {
                     output.push_str(&format!("Energy: {}\n", energy));

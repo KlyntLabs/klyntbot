@@ -6,7 +6,7 @@
 //! - Velocity calculation
 //! - Accuracy statistics
 
-use chrono::{DateTime, Utc};
+use jiff::Timestamp;
 
 /// A completed task's estimation record for similarity matching.
 #[derive(Debug, Clone)]
@@ -18,7 +18,7 @@ pub struct EstimationRecord {
     pub project_id: Option<String>,
     pub estimated_minutes: i32,
     pub actual_minutes: i32,
-    pub completed_at: DateTime<Utc>,
+    pub completed_at: Timestamp,
 }
 
 /// Compute similarity score between a target task and a historical record.
@@ -35,7 +35,7 @@ pub fn similarity(
     target_complexity: Option<i32>,
     target_project: Option<&str>,
     record: &EstimationRecord,
-    now: DateTime<Utc>,
+    now: Timestamp,
 ) -> f64 {
     let tags_sim = jaccard_similarity(target_tags, &record.tags);
     let energy_sim = energy_similarity(target_energy, record.energy_level.as_deref());
@@ -98,8 +98,9 @@ fn complexity_similarity(a: Option<i32>, b: Option<i32>) -> f64 {
 }
 
 /// Recency score: e^(-days_ago / 30)
-fn recency_score(completed_at: DateTime<Utc>, now: DateTime<Utc>) -> f64 {
-    let days_ago = (now - completed_at).num_days().max(0) as f64;
+fn recency_score(completed_at: Timestamp, now: Timestamp) -> f64 {
+    let diff_ms = now.as_millisecond() - completed_at.as_millisecond();
+    let days_ago = (diff_ms.max(0) as f64) / 86_400_000.0;
     (-days_ago / 30.0).exp()
 }
 
@@ -178,10 +179,12 @@ impl DataQualityTier {
 /// Compute project velocity: completed minutes in last N weeks / N.
 pub fn project_velocity(
     completed_records: &[EstimationRecord],
-    now: DateTime<Utc>,
+    now: Timestamp,
     weeks: u32,
 ) -> Option<f64> {
-    let cutoff = now - chrono::Duration::weeks(weeks as i64);
+    let cutoff = now
+        .checked_sub(jiff::SignedDuration::from_secs(weeks as i64 * 7 * 86_400))
+        .unwrap_or(now);
     let recent: Vec<&EstimationRecord> = completed_records
         .iter()
         .filter(|r| r.completed_at >= cutoff)
@@ -204,13 +207,17 @@ pub fn project_velocity(
 /// - `Stable` otherwise
 pub fn compute_trend(
     records: &[EstimationRecord],
-    now: DateTime<Utc>,
+    now: Timestamp,
     min_sample: usize,
 ) -> crate::types::AccuracyTrend {
     use crate::types::AccuracyTrend;
 
-    let cutoff_30 = now - chrono::Duration::days(30);
-    let cutoff_90 = now - chrono::Duration::days(90);
+    let cutoff_30 = now
+        .checked_sub(jiff::SignedDuration::from_secs(30 * 86_400))
+        .unwrap_or(now);
+    let cutoff_90 = now
+        .checked_sub(jiff::SignedDuration::from_secs(90 * 86_400))
+        .unwrap_or(now);
 
     let (mut recent, mut older) = (Vec::new(), Vec::new());
 
@@ -303,7 +310,6 @@ pub fn accuracy_stats(records: &[EstimationRecord]) -> Option<AccuracyStats> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use chrono::Duration;
 
     fn record(
         tags: &[&str],
@@ -322,7 +328,9 @@ mod tests {
             project_id: Some(project.into()),
             estimated_minutes: est,
             actual_minutes: actual,
-            completed_at: Utc::now() - Duration::days(days_ago),
+            completed_at: Timestamp::now()
+                .checked_sub(jiff::SignedDuration::from_secs(days_ago * 86_400))
+                .unwrap_or_else(|_| Timestamp::now()),
         }
     }
 
@@ -415,7 +423,7 @@ mod tests {
 
     #[test]
     fn test_project_velocity() {
-        let now = Utc::now();
+        let now = Timestamp::now();
         let records = vec![
             record(&[], "medium", 3, "p1", 30, 45, 3),
             record(&[], "medium", 3, "p1", 60, 55, 10),
@@ -428,7 +436,7 @@ mod tests {
 
     #[test]
     fn test_project_velocity_none_when_empty() {
-        assert!(project_velocity(&[], Utc::now(), 4).is_none());
+        assert!(project_velocity(&[], Timestamp::now(), 4).is_none());
     }
 
     #[test]
@@ -447,7 +455,7 @@ mod tests {
     #[test]
     fn test_compute_trend_improving() {
         use crate::types::AccuracyTrend;
-        let now = Utc::now();
+        let now = Timestamp::now();
         let mut records = Vec::new();
         // Recent (0-30 days): estimates are close to actuals (low deviation)
         for i in 0..6 {
@@ -463,7 +471,7 @@ mod tests {
     #[test]
     fn test_compute_trend_degrading() {
         use crate::types::AccuracyTrend;
-        let now = Utc::now();
+        let now = Timestamp::now();
         let mut records = Vec::new();
         // Recent: estimates are way off
         for i in 0..6 {
@@ -479,7 +487,7 @@ mod tests {
     #[test]
     fn test_compute_trend_stable() {
         use crate::types::AccuracyTrend;
-        let now = Utc::now();
+        let now = Timestamp::now();
         let mut records = Vec::new();
         // Both windows: similar deviation (~25-27%)
         for i in 0..6 {
@@ -494,7 +502,7 @@ mod tests {
     #[test]
     fn test_compute_trend_insufficient_recent() {
         use crate::types::AccuracyTrend;
-        let now = Utc::now();
+        let now = Timestamp::now();
         let mut records = Vec::new();
         // Only 2 recent records (below min_sample=5)
         for i in 0..2 {

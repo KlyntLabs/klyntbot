@@ -66,10 +66,10 @@ fn build_prompt(task: &Task, trigger: &SuggestionTrigger, context: &str) -> Stri
         )
         .replace(
             "{{ due_date }}",
-            &task.due_date.map_or("none".into(), |d| d.to_rfc3339()),
+            &task.due_date.map_or("none".into(), |d| d.to_string()),
         )
         .replace("{{ tags }}", &task.tags.join(", "))
-        .replace("{{ created_at }}", &task.created_at.to_rfc3339())
+        .replace("{{ created_at }}", &task.created_at.to_string())
         .replace(
             "{{ description }}",
             task.description.as_deref().unwrap_or(""),
@@ -151,7 +151,7 @@ impl ProactiveHandler for LlmProactiveHandler {
         tasks.append(&mut doing_rows);
 
         let mut all_suggestions = Vec::new();
-        let now_chrono = chrono::Utc::now();
+        let now_ts = jiff::Timestamp::now();
         let stale_cutoff = jiff::Timestamp::now()
             .checked_sub(jiff::SignedDuration::from_secs(
                 self.tasks_config.stale_task_days as i64 * 86400,
@@ -162,7 +162,7 @@ impl ProactiveHandler for LlmProactiveHandler {
         for row in &tasks {
             let task = Task::from(row.clone());
             if let Some(due) = &task.due_date {
-                if *due < now_chrono {
+                if *due < now_ts {
                     let mut c = self
                         .evaluate_task(&task, &SuggestionTrigger::TaskOverdue)
                         .await?;

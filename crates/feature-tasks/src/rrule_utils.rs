@@ -7,6 +7,7 @@
 
 use chrono::{DateTime, NaiveDateTime, Utc};
 use common::Result;
+use jiff::Timestamp;
 use rrule::RRuleSet;
 use std::collections::HashMap;
 
@@ -53,14 +54,18 @@ pub struct RRule {
     pub byminute: Vec<u32>,
     pub bymonthday: Vec<u32>,
     pub count: Option<u32>,
-    pub until: Option<DateTime<Utc>>,
-    pub exdate: Vec<DateTime<Utc>>,
+    pub until: Option<Timestamp>,
+    pub exdate: Vec<Timestamp>,
 }
 
-fn parse_ical_datetime(s: &str) -> std::result::Result<DateTime<Utc>, String> {
+fn parse_ical_datetime(s: &str) -> std::result::Result<Timestamp, String> {
     let s = s.trim();
     NaiveDateTime::parse_from_str(s, "%Y%m%dT%H%M%SZ")
         .map(|ndt| ndt.and_utc())
+        .map(|dt: DateTime<Utc>| {
+            Timestamp::from_millisecond(dt.timestamp_millis())
+                .expect("timestamp in range")
+        })
         .map_err(|e| format!("Invalid datetime '{}': {}", s, e))
 }
 
@@ -185,19 +190,25 @@ impl RRule {
             parts.push(format!("COUNT={}", count));
         }
         if let Some(until) = self.until {
-            parts.push(format!("UNTIL={}", until.format("%Y%m%dT%H%M%SZ")));
+            let chrono_until = DateTime::<Utc>::from_timestamp_millis(until.as_millisecond())
+                .expect("timestamp in range");
+            parts.push(format!("UNTIL={}", chrono_until.format("%Y%m%dT%H%M%SZ")));
         }
 
         parts.join(";")
     }
 
-    pub fn next_occurrences(&self, from: DateTime<Utc>, max: usize) -> Result<Vec<DateTime<Utc>>> {
-        let dtstart = format!("DTSTART:{}", from.format("%Y%m%dT%H%M%SZ"));
+    pub fn next_occurrences(&self, from: Timestamp, max: usize) -> Result<Vec<Timestamp>> {
+        let chrono_from = DateTime::<Utc>::from_timestamp_millis(from.as_millisecond())
+            .expect("timestamp in range");
+        let dtstart = format!("DTSTART:{}", chrono_from.format("%Y%m%dT%H%M%SZ"));
         let core = self.core_rule_string();
         let mut lines = vec![dtstart, format!("RRULE:{}", core)];
 
         for exd in &self.exdate {
-            lines.push(format!("EXDATE:{}", exd.format("%Y%m%dT%H%M%SZ")));
+            let chrono_exd = DateTime::<Utc>::from_timestamp_millis(exd.as_millisecond())
+                .expect("timestamp in range");
+            lines.push(format!("EXDATE:{}", chrono_exd.format("%Y%m%dT%H%M%SZ")));
         }
 
         let full = lines.join("\n");
@@ -207,12 +218,15 @@ impl RRule {
 
         let limit = max + 1;
         let result = rrule_set.all(limit as u16);
-        let dates: Vec<DateTime<Utc>> = result
+        let dates: Vec<Timestamp> = result
             .dates
             .into_iter()
             .map(|dt| dt.with_timezone(&Utc))
-            .filter(|dt| *dt > from)
+            .filter(|dt| *dt > chrono_from)
             .take(max)
+            .map(|dt| {
+                Timestamp::from_millisecond(dt.timestamp_millis()).expect("timestamp in range")
+            })
             .collect();
 
         Ok(dates)
@@ -231,17 +245,14 @@ pub fn validate_rrule(rule: &str) -> Result<()> {
 }
 
 /// Compute the next occurrence of an RRULE after a given datetime.
-pub fn next_occurrence(rule: &str, after: DateTime<Utc>) -> Result<Option<DateTime<Utc>>> {
+pub fn next_occurrence(rule: &str, after: Timestamp) -> Result<Option<Timestamp>> {
     let parsed = RRule::parse(rule)?;
     let occurrences = parsed.next_occurrences(after, 1)?;
     Ok(occurrences.into_iter().next())
 }
 
 /// Check if a recurring task instance should be spawned.
-pub fn should_spawn_instance(
-    next_instance_date: Option<DateTime<Utc>>,
-    now: DateTime<Utc>,
-) -> bool {
+pub fn should_spawn_instance(next_instance_date: Option<Timestamp>, now: Timestamp) -> bool {
     next_instance_date.is_some_and(|next| next <= now)
 }
 
@@ -358,8 +369,7 @@ mod tests {
 
     #[test]
     fn test_next_occurrence_daily() {
-        use chrono::TimeZone;
-        let after = Utc.with_ymd_and_hms(2025, 1, 1, 9, 0, 0).unwrap();
+        let after = "2025-01-01T09:00:00Z".parse::<Timestamp>().unwrap();
         let next = next_occurrence("FREQ=DAILY", after).unwrap();
         assert!(next.is_some());
         assert!(next.unwrap() > after);
@@ -367,15 +377,19 @@ mod tests {
 
     #[test]
     fn test_should_spawn_past() {
-        let now = Utc::now();
-        let past = now - chrono::Duration::hours(1);
+        let now = Timestamp::now();
+        let past = now
+            .checked_sub(jiff::SignedDuration::from_secs(3600))
+            .unwrap_or(now);
         assert!(should_spawn_instance(Some(past), now));
     }
 
     #[test]
     fn test_should_spawn_future() {
-        let now = Utc::now();
-        let future = now + chrono::Duration::hours(1);
+        let now = Timestamp::now();
+        let future = now
+            .checked_add(jiff::SignedDuration::from_secs(3600))
+            .unwrap_or(now);
         assert!(!should_spawn_instance(Some(future), now));
     }
 }

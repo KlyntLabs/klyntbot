@@ -50,7 +50,7 @@ impl LlmForecastHandler {
                 project_id: r.project_id,
                 estimated_minutes: r.estimated_minutes,
                 actual_minutes: r.actual_minutes,
-                completed_at: common::time::bridge::jiff_to_chrono(*r.completed_at),  // feature-tasks still uses chrono
+                completed_at: *r.completed_at,
             })
             .collect())
     }
@@ -133,7 +133,7 @@ fn parse_risks(response: &str) -> Vec<ForecastRisk> {
 impl ForecastHandler for LlmForecastHandler {
     async fn forecast_task(&self, task: &Task, context: &ForecastContext) -> Result<TaskForecast> {
         let records = self.load_records(context.lookback_days).await?;
-        let now = chrono::Utc::now();
+        let now = jiff::Timestamp::now();
 
         // Score each record for similarity against target task
         let scored: Vec<(f64, &fc::EstimationRecord)> = records
@@ -262,7 +262,7 @@ impl ForecastHandler for LlmForecastHandler {
         // Confidence interval: ±30%/50% of remaining estimate.
         // Velocity is checked only to confirm we have recent data.
         let has_velocity =
-            fc::project_velocity(&records, chrono::Utc::now(), 4).is_some_and(|v| v > 0.0);
+            fc::project_velocity(&records, jiff::Timestamp::now(), 4).is_some_and(|v| v > 0.0);
         let (confidence_low, confidence_high) = if has_velocity {
             (
                 (remaining_mins as f64 * 0.7) as i32,
@@ -289,7 +289,7 @@ impl ForecastHandler for LlmForecastHandler {
         let records = self.load_records(lookback).await?;
 
         let stats = fc::accuracy_stats(&records);
-        let trend = fc::compute_trend(&records, chrono::Utc::now(), 5);
+        let trend = fc::compute_trend(&records, jiff::Timestamp::now(), 5);
 
         // Compute per-energy-level breakdowns
         let by_energy_level = compute_breakdown(&records, |r| r.energy_level.clone());
@@ -430,7 +430,7 @@ mod tests {
                 project_id: None,
                 estimated_minutes: 30,
                 actual_minutes: 45,
-                completed_at: chrono::Utc::now(),
+                completed_at: jiff::Timestamp::now(),
             },
             fc::EstimationRecord {
                 task_id: "t2".into(),
@@ -440,7 +440,7 @@ mod tests {
                 project_id: None,
                 estimated_minutes: 60,
                 actual_minutes: 90,
-                completed_at: chrono::Utc::now(),
+                completed_at: jiff::Timestamp::now(),
             },
         ];
         let breakdown = compute_breakdown(&records, |r| r.energy_level.clone());
