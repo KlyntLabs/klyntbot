@@ -581,7 +581,16 @@ pub enum DomainEvent {
     },
 
     // -- Scheduler alarms --
-    /// Emitted when a scheduled alarm fires.
+    /// A scheduled fire has matured. `kind` identifies which subsystem owns the fire;
+    /// `ref_id` is that subsystem's identifier. Conventions:
+    /// - `kind = "task_alarm"` → `ref_id` is the task id
+    /// - `kind = "cron_job"` → `ref_id` is the cron_jobs.id
+    /// - `kind = "standalone_alarm"` → `ref_id` is the alarm id
+    /// - `kind = "held_release"` → `ref_id` is the held_notifications.id
+    ///
+    /// `payload_json` is the raw `scheduled_fires.payload` string; subscribers
+    /// that need structured data should parse it. This keeps the bus event
+    /// decoupled from the storage schema.
     AlarmFired {
         fire_id: String,
         kind: String,
@@ -601,7 +610,6 @@ pub enum DomainEvent {
     },
     /// Emitted when alarms were missed (e.g. while app was offline).
     MissedAlarms {
-        count: usize,
         fire_ids: Vec<String>,
         oldest_fire_at_ms: i64,
         newest_fire_at_ms: i64,
@@ -1010,13 +1018,24 @@ mod tests {
     #[test]
     fn missed_alarms_round_trips() {
         let event = DomainEvent::MissedAlarms {
-            count: 3,
             fire_ids: vec!["a".into(), "b".into(), "c".into()],
             oldest_fire_at_ms: 1_000,
             newest_fire_at_ms: 2_000,
         };
         let json = serde_json::to_string(&event).unwrap();
-        let _parsed: DomainEvent = serde_json::from_str(&json).unwrap();
+        let parsed: DomainEvent = serde_json::from_str(&json).unwrap();
+        match parsed {
+            DomainEvent::MissedAlarms {
+                fire_ids,
+                oldest_fire_at_ms,
+                newest_fire_at_ms,
+            } => {
+                assert_eq!(fire_ids.len(), 3);
+                assert_eq!(oldest_fire_at_ms, 1_000);
+                assert_eq!(newest_fire_at_ms, 2_000);
+            }
+            _ => panic!("wrong variant"),
+        }
     }
 
     #[test]
