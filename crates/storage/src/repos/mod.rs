@@ -31,6 +31,7 @@ pub mod reforge_state;
 pub mod reforge_suggestion;
 pub mod response_warning;
 pub mod retrieval_feedback;
+pub mod scheduled_fires;
 pub mod session;
 pub mod session_context;
 pub mod session_memory;
@@ -75,6 +76,7 @@ pub use reforge_state::ReforgeStateRepo;
 pub use reforge_suggestion::ReforgeSuggestionRepo;
 pub use response_warning::{ResponseWarningRepo, ResponseWarningRow};
 pub use retrieval_feedback::RetrievalFeedbackRepo;
+pub use scheduled_fires::ScheduledFiresRepo;
 pub use session::SessionRepo;
 pub use session_context::{SessionContextParams, SessionContextRepo};
 pub use session_memory::SessionMemoryRepo;
@@ -146,6 +148,7 @@ pub struct Repos {
     pub tool_usage: ToolUsageRepo,
     pub dnd_override: DndOverrideRepo,
     pub reforge_state: ReforgeStateRepo,
+    pub scheduled_fires: ScheduledFiresRepo,
     pub skill_version: SkillVersionRepo,
 }
 
@@ -179,6 +182,7 @@ impl Repos {
             tool_usage: ToolUsageRepo::new(db.clone()),
             dnd_override: DndOverrideRepo::new(db.clone()),
             reforge_state: ReforgeStateRepo::new(db.clone()),
+            scheduled_fires: ScheduledFiresRepo::new(db.clone()),
             skill_version: SkillVersionRepo::new(db.clone()),
             pool: db,
         }
