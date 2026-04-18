@@ -126,9 +126,10 @@ impl AppCore {
             .unwrap_or_default();
 
         // Filter to cards due within 7 days, take up to 3
-        let now = chrono::Utc::now();
-        let seven_days = now + chrono::Duration::days(7);
-        let cutoff = seven_days.to_rfc3339();
+        let cutoff = jiff::Timestamp::now()
+            .checked_add(jiff::SignedDuration::from_secs(7 * 86400))
+            .unwrap_or_else(|_| jiff::Timestamp::now())
+            .to_string();
 
         #[allow(clippy::unnecessary_map_or)] // is_none_or requires Rust 1.82, MSRV is 1.75
         let prerequisites: Vec<FlashcardResponse> = linked

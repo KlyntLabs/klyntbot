@@ -78,7 +78,7 @@ impl AppCore {
         params: ProjectCreateParams,
     ) -> HandlerResult<ProjectResponse> {
         let id = uuid::Uuid::new_v4().to_string();
-        let now: storage::SqlTs = common::time::bridge::chrono_to_jiff(chrono::Utc::now()).into();
+        let now: storage::SqlTs = jiff::Timestamp::now().into();
 
         let row = ProjectRow {
             id: id.clone(),
@@ -329,14 +329,13 @@ impl AppCore {
             return Ok(None);
         }
 
-        let now = chrono::Utc::now();
+        let now = jiff::Timestamp::now();
         let mut total_freshness = 0.0f64;
         let mut count = 0usize;
         for (_note_id, generated_at_str) in &rows {
-            if let Ok(generated_at) = chrono::DateTime::parse_from_rfc3339(generated_at_str) {
-                let days = (now - generated_at.with_timezone(&chrono::Utc))
-                    .num_days()
-                    .max(0) as f64;
+            if let Ok(generated_at) = generated_at_str.parse::<jiff::Timestamp>() {
+                let days = ((now.as_millisecond() - generated_at.as_millisecond()).max(0) as f64)
+                    / 86_400_000.0;
                 total_freshness += (1.0 - days / 7.0).max(0.0);
                 count += 1;
             }

@@ -90,12 +90,12 @@ impl AppCore {
                     return None;
                 }
                 let filter = storage::rows::finance::FinanceTransactionFilter {
-                    date_from: chrono::NaiveDate::parse_from_str(start, "%Y-%m-%d")
+                    date_from: jiff::civil::Date::strptime("%Y-%m-%d", start)
                         .ok()
-                        .map(|d| common::time::bridge::chrono_date_to_jiff(d).into()),
-                    date_to: chrono::NaiveDate::parse_from_str(end, "%Y-%m-%d")
+                        .map(|d| d.into()),
+                    date_to: jiff::civil::Date::strptime("%Y-%m-%d", end)
                         .ok()
-                        .map(|d| common::time::bridge::chrono_date_to_jiff(d).into()),
+                        .map(|d| d.into()),
                     limit: Some(100),
                     ..Default::default()
                 };
@@ -197,10 +197,10 @@ fn normalize_time_entry(te: storage::TimeEntryWithTask) -> TimelineEntry {
         entry_type: TimelineEntryType::TaskTimeEntry,
         title: te.task_title,
         description: te.note,
-        started_at: common::time::bridge::jiff_to_chrono(*te.started_at).to_rfc3339(),
+        started_at: te.started_at.to_string(),
         ended_at: te
             .ended_at
-            .map(|t| common::time::bridge::jiff_to_chrono(*t).to_rfc3339()),
+            .map(|t| t.to_string()),
         duration_secs: te.duration_secs,
         entity_id: Some(te.task_id.clone()),
         entity_route: Some(format!("/task/{}", te.task_id)),
@@ -359,11 +359,9 @@ fn normalize_task(t: storage::TaskRow, start: &str, end: &str) -> Vec<TimelineEn
 
     // Scheduled task — full time block
     if let (Some(ref sched_start), Some(ref sched_end)) = (&t.scheduled_start, &t.scheduled_end) {
-        let sched_start_chrono = common::time::bridge::jiff_to_chrono(**sched_start);
-        let sched_end_chrono = common::time::bridge::jiff_to_chrono(**sched_end);
-        let start_str = sched_start_chrono.to_rfc3339();
-        let end_str = sched_end_chrono.to_rfc3339();
-        let duration = (sched_end_chrono - sched_start_chrono).num_seconds();
+        let start_str = sched_start.to_string();
+        let end_str = sched_end.to_string();
+        let duration = (sched_end.as_millisecond() - sched_start.as_millisecond()) / 1000;
         out.push(TimelineEntry {
             id: format!("{}-scheduled", t.id),
             source: TimelineSource::Todo,
@@ -384,7 +382,7 @@ fn normalize_task(t: storage::TaskRow, start: &str, end: &str) -> Vec<TimelineEn
             })),
         });
     } else if let Some(ref due) = t.due_date {
-        let due_str = common::time::bridge::jiff_to_chrono(**due).to_rfc3339();
+        let due_str = due.to_string();
         if due_str >= start_bound && due_str <= end_bound {
             out.push(TimelineEntry {
                 id: format!("{}-due", t.id),
@@ -409,7 +407,7 @@ fn normalize_task(t: storage::TaskRow, start: &str, end: &str) -> Vec<TimelineEn
     }
 
     // Task created in range
-    let created_str = common::time::bridge::jiff_to_chrono(*t.created_at).to_rfc3339();
+    let created_str = t.created_at.to_string();
     if created_str >= start_bound && created_str <= end_bound {
         out.push(TimelineEntry {
             id: format!("{}-created", t.id),
@@ -429,7 +427,7 @@ fn normalize_task(t: storage::TaskRow, start: &str, end: &str) -> Vec<TimelineEn
 
     // Task completed in range
     if let Some(ref completed) = t.completed_at {
-        let comp_str = common::time::bridge::jiff_to_chrono(**completed).to_rfc3339();
+        let comp_str = completed.to_string();
         if comp_str >= start_bound && comp_str <= end_bound {
             out.push(TimelineEntry {
                 id: format!("{}-completed", t.id),
@@ -521,7 +519,7 @@ fn normalize_transaction(tx: storage::rows::finance::FinanceTransactionRow) -> T
         entry_type,
         title,
         description: tx.notes.clone(),
-        started_at: common::time::bridge::jiff_to_chrono(*tx.created_at).to_rfc3339(),
+        started_at: tx.created_at.to_string(),
         ended_at: None,
         duration_secs: None,
         entity_id: Some(tx.id),
@@ -575,10 +573,10 @@ fn normalize_note_activity(note: feature_notes::models::NoteRow, start: &str) ->
 
 fn normalize_calendar_event(e: feature_productivity::CalendarEvent) -> TimelineEntry {
     let duration_secs = {
-        let start = chrono::DateTime::parse_from_rfc3339(&e.started_at).ok();
-        let end = chrono::DateTime::parse_from_rfc3339(&e.ended_at).ok();
+        let start = e.started_at.parse::<jiff::Timestamp>().ok();
+        let end = e.ended_at.parse::<jiff::Timestamp>().ok();
         match (start, end) {
-            (Some(s), Some(e)) => Some((e - s).num_seconds()),
+            (Some(s), Some(e)) => Some((e.as_millisecond() - s.as_millisecond()) / 1000),
             _ => None,
         }
     };

@@ -1,4 +1,3 @@
-use chrono::Utc;
 use desktop_shared::commands::{SuggestionResponse, TaskResponse};
 use desktop_shared::errors::ApiError;
 use feature_tasks::types::{SuggestionAction, SuggestionTrigger, Task};
@@ -50,7 +49,7 @@ impl AppCore {
                     .and_then(|a| serde_json::to_string(a).ok()),
                 status: "pending".to_string(),
                 trigger: candidate.trigger.as_ref().map(|t| format!("{t:?}")),
-                created_at: common::time::bridge::chrono_to_jiff(Utc::now()).into(),
+                created_at: jiff::Timestamp::now().into(),
                 resolved_at: None,
             };
 
@@ -149,6 +148,6 @@ fn suggestion_row_to_response(row: &TaskSuggestionRow) -> SuggestionResponse {
         description: row.description.clone(),
         confidence: row.confidence,
         status: row.status.clone(),
-        created_at: common::time::bridge::jiff_to_chrono(*row.created_at).to_rfc3339(),
+        created_at: row.created_at.to_string(),
     }
 }

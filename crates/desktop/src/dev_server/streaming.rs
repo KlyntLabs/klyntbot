@@ -282,7 +282,7 @@ pub(super) async fn cognitive_sse_handler(
                                 "eventType": &event_type,
                                 "salience": salience_str,
                                 "domain": event.domain(),
-                                "timestamp": chrono::Utc::now().to_rfc3339(),
+                                "timestamp": jiff::Timestamp::now().to_string(),
                                 "payload": event_type,
                             });
                             let cog_data = serde_json::to_string(&payload).unwrap_or_default();

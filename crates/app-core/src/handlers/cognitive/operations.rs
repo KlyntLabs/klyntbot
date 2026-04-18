@@ -120,7 +120,7 @@ impl AppCore {
             "ActivitySessionCompleted" => bus::DomainEvent::ActivitySessionCompleted {
                 date: payload["date"]
                     .as_str()
-                    .unwrap_or(&chrono::Utc::now().format("%Y-%m-%d").to_string())
+                    .unwrap_or(&jiff::Zoned::now().strftime("%Y-%m-%d").to_string())
                     .to_string(),
                 total_active_secs: payload["total_active_secs"].as_i64().unwrap_or(300),
                 productive_secs: payload["productive_secs"].as_i64().unwrap_or(240),
@@ -129,7 +129,7 @@ impl AppCore {
             "ProductivityScoreComputed" => bus::DomainEvent::ProductivityScoreComputed {
                 date: payload["date"]
                     .as_str()
-                    .unwrap_or(&chrono::Utc::now().format("%Y-%m-%d").to_string())
+                    .unwrap_or(&jiff::Zoned::now().strftime("%Y-%m-%d").to_string())
                     .to_string(),
                 score: payload["score"].as_f64().unwrap_or(0.0),
             },

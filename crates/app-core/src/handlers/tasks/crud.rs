@@ -1,4 +1,3 @@
-use chrono::{DateTime, Utc};
 use desktop_shared::commands::{TaskCreateParams, TaskResponse, TaskUpdateParams};
 use desktop_shared::errors::ApiError;
 use desktop_shared::types::EntityKind;
@@ -43,7 +42,7 @@ impl AppCore {
 
     pub async fn task_create(&self, params: TaskCreateParams) -> HandlerResult<TaskResponse> {
         let id = uuid::Uuid::new_v4().to_string();
-        let now: storage::SqlTs = common::time::bridge::chrono_to_jiff(chrono::Utc::now()).into();
+        let now: storage::SqlTs = jiff::Timestamp::now().into();
 
         let area_id = match (&params.area_id, &params.parent_id) {
             (Some(aid), _) => aid.clone(),
@@ -173,7 +172,7 @@ impl AppCore {
                     task_id: id.clone(),
                     due_date: created
                         .due_date
-                        .map(|d| common::time::bridge::jiff_to_chrono(*d).to_rfc3339()),
+                        .map(|d| d.to_string()),
                 });
             }
         }
@@ -313,8 +312,7 @@ impl AppCore {
                     if changed {
                         bus.publish(bus::DomainEvent::TaskDueDateChanged {
                             task_id: task_id.clone(),
-                            due_date: new_due
-                                .map(|d| common::time::bridge::jiff_to_chrono(d).to_rfc3339()),
+                            due_date: new_due.map(|d| d.to_string()),
                         });
                     }
                 }
@@ -500,7 +498,7 @@ impl AppCore {
     pub async fn task_add_time_entry(
         &self,
         task_id: String,
-        started_at: DateTime<Utc>,
+        started_at: jiff::Timestamp,
         duration_secs: Option<i64>,
         note: Option<String>,
     ) -> Result<TaskTimeEntryRow, ApiError> {
@@ -509,7 +507,7 @@ impl AppCore {
             .add_time_entry(
                 &task_id,
                 "user",
-                common::time::bridge::chrono_to_jiff(started_at),
+                started_at,
                 duration_secs,
                 note.as_deref(),
                 None,

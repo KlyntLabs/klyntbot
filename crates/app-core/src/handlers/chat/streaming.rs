@@ -816,7 +816,7 @@ pub async fn chat_send(
 
     // 3. Call agent with streaming (agent loop stores user + assistant messages)
     let msg_id = uuid::Uuid::new_v4();
-    let now = chrono::Utc::now();
+    let now = jiff::Timestamp::now();
     let user_message = content.clone();
     let streaming_handle = agent
         .process_direct_streaming(content.clone(), session_key.clone())
@@ -1764,7 +1764,7 @@ impl AppCore {
 
         // 3. Persist the user message
         let msg_id = uuid::Uuid::new_v4();
-        let now = chrono::Utc::now();
+        let now = jiff::Timestamp::now();
         self.repos
             .sessions
             .add_message(

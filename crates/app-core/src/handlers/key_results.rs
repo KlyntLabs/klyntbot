@@ -12,7 +12,7 @@ impl AppCore {
         params: KeyResultCreateParams,
     ) -> HandlerResult<KeyResultResponse> {
         let id = uuid::Uuid::new_v4().to_string();
-        let now: storage::SqlTs = common::time::bridge::chrono_to_jiff(chrono::Utc::now()).into();
+        let now: storage::SqlTs = jiff::Timestamp::now().into();
 
         let row = KeyResultRow {
             id: id.clone(),

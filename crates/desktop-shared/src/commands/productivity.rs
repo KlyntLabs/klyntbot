@@ -1,4 +1,3 @@
-use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 
 use crate::events::FocusSyncPayload;
@@ -90,8 +89,8 @@ pub struct FocusSessionResponse {
     pub project_id: Option<String>,
     pub session_type: String,
     pub target_mins: Option<i64>,
-    pub started_at: DateTime<Utc>,
-    pub ended_at: Option<DateTime<Utc>>,
+    pub started_at: jiff::Timestamp,
+    pub ended_at: Option<jiff::Timestamp>,
     pub actual_mins: Option<i64>,
     pub interruptions: i64,
     pub quality_score: Option<f64>,
@@ -140,7 +139,7 @@ pub struct ActivityTimelineResponse {
     pub window_title: Option<String>,
     pub site_name: Option<String>,
     pub category_id: Option<String>,
-    pub started_at: DateTime<Utc>,
+    pub started_at: jiff::Timestamp,
     pub duration_secs: Option<i64>,
     pub is_idle: bool,
     pub project_id: Option<String>,
@@ -186,7 +185,7 @@ pub struct TimeEntryResponse {
     pub description: String,
     pub category_id: Option<String>,
     pub project_id: Option<String>,
-    pub started_at: DateTime<Utc>,
+    pub started_at: jiff::Timestamp,
     pub duration_secs: i64,
     pub source: String,
 }
@@ -205,7 +204,7 @@ pub struct InsightCardResponse {
     pub baseline_value: Option<f64>,
     pub date: String,
     pub dismissed: bool,
-    pub generated_at: DateTime<Utc>,
+    pub generated_at: jiff::Timestamp,
 }
 
 // ── Weekly Assessment ──────────────────────────────────────────────────

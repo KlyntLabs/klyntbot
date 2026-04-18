@@ -125,7 +125,7 @@ impl JourneyTracker {
     }
 
     async fn save_bits(&self, bits: u32) {
-        let now = chrono::Utc::now().to_rfc3339();
+        let now = jiff::Timestamp::now().to_string();
         let _ = sqlx::query(
             "INSERT INTO user_preferences (key, value, updated_at) VALUES (?1, ?2, ?3)
              ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at",

@@ -219,8 +219,8 @@ pub async fn task_add_time_entry(
     duration_secs: Option<i64>,
     note: Option<String>,
 ) -> Result<TaskTimeEntryRow, ApiError> {
-    let started_at = chrono::DateTime::parse_from_rfc3339(&started_at)
-        .map(|dt| dt.with_timezone(&chrono::Utc))
+    let started_at = started_at
+        .parse::<jiff::Timestamp>()
         .map_err(|e| ApiError::new("VALIDATION", format!("invalid started_at: {e}")))?;
     state
         .task_add_time_entry(task_id, started_at, duration_secs, note)
@@ -379,8 +379,8 @@ pub(crate) async fn dispatch_dev(
         "task_add_time_entry" => {
             let task_id = try_field!(dev::get_str(body, "taskId"));
             let started_at_str = try_field!(dev::get_str(body, "startedAt"));
-            let started_at = chrono::DateTime::parse_from_rfc3339(&started_at_str)
-                .map(|dt| dt.with_timezone(&chrono::Utc))
+            let started_at = started_at_str
+                .parse::<jiff::Timestamp>()
                 .map_err(|e| {
                     desktop_shared::errors::ApiError::new(
                         "VALIDATION",

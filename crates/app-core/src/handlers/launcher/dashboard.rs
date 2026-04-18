@@ -1,4 +1,3 @@
-use chrono::Utc;
 use desktop_shared::errors::ApiError;
 use feature_launcher::{
     CalendarDashboard, DashboardData, FocusDashboard, ProductivityDashboard, TaskDashboard,
@@ -13,8 +12,10 @@ pub async fn build_dashboard_data(
     repos: &Repos,
     prod_repos: Option<&ProductivityRepos>,
 ) -> Result<DashboardData, ApiError> {
-    let now = Utc::now();
-    let today = now.format("%Y-%m-%d").to_string();
+    let now_jiff = jiff::Timestamp::now();
+    let today = now_jiff.strftime("%Y-%m-%d").to_string();
+    // Bridge: keep chrono DateTime<Utc> for feature-productivity interop
+    let now = common::time::bridge::jiff_to_chrono(now_jiff);
 
     // Focus session
     let focus = match prod_repos {
@@ -59,15 +60,11 @@ pub async fn build_dashboard_data(
             events
                 .into_iter()
                 .filter_map(|e| {
-                    let starts_at_chrono = chrono::DateTime::parse_from_rfc3339(&e.started_at)
-                        .ok()?
-                        .with_timezone(&chrono::Utc);
-                    let ends_at_chrono = chrono::DateTime::parse_from_rfc3339(&e.ended_at)
-                        .ok()?
-                        .with_timezone(&chrono::Utc);
-                    let minutes_until = (starts_at_chrono - now).num_minutes();
-                    let starts_at = common::time::bridge::chrono_to_jiff(starts_at_chrono);
-                    let ends_at = common::time::bridge::chrono_to_jiff(ends_at_chrono);
+                    let starts_at = e.started_at.parse::<jiff::Timestamp>().ok()?;
+                    let ends_at = e.ended_at.parse::<jiff::Timestamp>().ok()?;
+                    let minutes_until = (starts_at.as_millisecond()
+                        - now_jiff.as_millisecond())
+                        / 60_000;
                     Some(CalendarDashboard {
                         event_id: e.id,
                         title: e.title,
@@ -82,15 +79,24 @@ pub async fn build_dashboard_data(
     };
 
     // Today's tasks (doing + due today)
-    let start_of_today = now.date_naive().and_hms_opt(0, 0, 0).unwrap().and_utc();
-    let start_of_tomorrow = start_of_today + chrono::Duration::days(1);
+    let today_date = now_jiff
+        .to_zoned(jiff::tz::TimeZone::UTC)
+        .date();
+    let start_of_today: jiff::Timestamp = today_date
+        .at(0, 0, 0, 0)
+        .to_zoned(jiff::tz::TimeZone::UTC)
+        .map_err(|_| ApiError::new("INTERNAL", "timezone error"))?
+        .timestamp();
+    let start_of_tomorrow = start_of_today
+        .checked_add(jiff::SignedDuration::from_secs(86400))
+        .unwrap_or(start_of_today);
     let doing_filter = storage::repos::TaskFilter {
         status: Some("doing".to_string()),
         ..Default::default()
     };
     let due_today_filter = storage::repos::TaskFilter {
-        due_after: Some(common::time::bridge::chrono_to_jiff(start_of_today)),
-        due_before: Some(common::time::bridge::chrono_to_jiff(start_of_tomorrow)),
+        due_after: Some(start_of_today),
+        due_before: Some(start_of_tomorrow),
         ..Default::default()
     };
     let (doing, due_today) = tokio::try_join!(
@@ -112,7 +118,7 @@ pub async fn build_dashboard_data(
             project_name: t.project_id.clone(),
             due_date: t
                 .due_date
-                .map(|d| common::time::bridge::jiff_to_chrono(*d).to_rfc3339()),
+                .map(|d| d.to_string()),
         })
         .collect();
 

@@ -12,20 +12,18 @@ use crate::errors::map_cognitive_err;
 use crate::state::AppCore;
 
 pub(crate) fn fact_to_response(f: &SemanticFact) -> SemanticFactResponse {
-    let elapsed_days = chrono::Utc::now()
-        .signed_duration_since(
-            f.last_accessed
-                .as_deref()
-                .and_then(|s| chrono::DateTime::parse_from_rfc3339(s).ok())
-                .map(|dt| dt.with_timezone(&chrono::Utc))
-                .unwrap_or_else(|| {
-                    chrono::DateTime::parse_from_rfc3339(&f.recorded_at)
-                        .map(|dt| dt.with_timezone(&chrono::Utc))
-                        .unwrap_or_else(|_| chrono::Utc::now())
-                }),
-        )
-        .num_seconds() as f64
-        / 86400.0;
+    let reference_ts: jiff::Timestamp = f
+        .last_accessed
+        .as_deref()
+        .and_then(|s| s.parse::<jiff::Timestamp>().ok())
+        .unwrap_or_else(|| {
+            f.recorded_at
+                .parse::<jiff::Timestamp>()
+                .unwrap_or_else(|_| jiff::Timestamp::now())
+        });
+    let elapsed_days = (jiff::Timestamp::now().as_millisecond()
+        - reference_ts.as_millisecond()) as f64
+        / 86_400_000.0;
     let r = retrievability(elapsed_days, f.stability);
 
     let status = if f.superseded_at.is_some() {
@@ -242,7 +240,7 @@ impl AppCore {
             total_facts_90d,
             fast_failures_90d,
             trend_pct,
-            computed_at: chrono::Utc::now().to_rfc3339(),
+            computed_at: jiff::Timestamp::now().to_string(),
         })
     }
 
@@ -563,7 +561,7 @@ impl AppCore {
                         format!(
                             "{} · due {}",
                             task.status,
-                            common::time::bridge::jiff_to_chrono(*due).format("%Y-%m-%d")
+                            due.strftime("%Y-%m-%d")
                         )
                     } else {
                         task.status.clone()

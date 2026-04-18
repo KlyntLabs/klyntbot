@@ -59,7 +59,7 @@ pub(super) async fn init_cognitive(
                             diff: None,
                             source: "Seed".to_string(),
                             reason: Some("Initial skill from compiled defaults".to_string()),
-                            created_at: chrono::Utc::now().to_rfc3339(),
+                            created_at: jiff::Timestamp::now().to_string(),
                         };
                         if let Err(e) = version_repo.insert(&row).await {
                             warn!(
@@ -244,7 +244,7 @@ fn spawn_event_log_persistence(
                     result = rx.recv() => {
                         match result {
                             Ok(pe) => {
-                                let ts = chrono::Utc::now().to_rfc3339();
+                                let ts = jiff::Timestamp::now().to_string();
                                 let id = uuid::Uuid::new_v4().to_string();
 
                                 let result = match &pe {

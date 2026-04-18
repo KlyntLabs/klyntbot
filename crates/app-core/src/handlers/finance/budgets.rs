@@ -20,18 +20,17 @@ impl AppCore {
         params: FinanceBudgetCreateParams,
     ) -> HandlerResult<FinanceBudgetRow> {
         let id = uuid::Uuid::new_v4().to_string();
-        let now_chrono = chrono::Utc::now();
-        let now: storage::SqlTs = common::time::bridge::chrono_to_jiff(now_chrono).into();
-        let start_date_naive = params
+        let now = jiff::Timestamp::now();
+        let now: storage::SqlTs = now.into();
+        let start_date: storage::SqlDate = params
             .start_date
             .and_then(|d| parse_naive_date(&d))
-            .unwrap_or_else(|| now_chrono.date_naive());
-        let start_date: storage::SqlDate =
-            common::time::bridge::chrono_date_to_jiff(start_date_naive).into();
+            .unwrap_or_else(|| jiff::Zoned::now().date())
+            .into();
         let end_date: Option<storage::SqlDate> = params
             .end_date
             .and_then(|d| parse_naive_date(&d))
-            .map(|d| common::time::bridge::chrono_date_to_jiff(d).into());
+            .map(|d| d.into());
         let currency = match params.currency {
             Some(c) => c,
             None => self.default_currency().await,

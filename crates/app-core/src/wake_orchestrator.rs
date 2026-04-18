@@ -1,6 +1,5 @@
 use bus::domain_events::WakeType;
 use bus::{DomainEvent, DomainEventBus};
-use chrono::Timelike;
 use config::WakeDeliveryConfig;
 use std::sync::Arc;
 use std::time::Duration;
@@ -26,7 +25,7 @@ pub struct FocusSuspendedInfo {
 
 /// Build the greeting string.
 pub fn build_greeting(away_secs: u64, wake_type: WakeType) -> String {
-    let hour = chrono::Local::now().hour();
+    let hour = jiff::Zoned::now().hour() as u32;
     let period = match hour {
         5..=11 => "Good morning",
         12..=16 => "Good afternoon",
@@ -55,7 +54,7 @@ fn humanize_duration(total_secs: u64) -> String {
 
 /// Compute quiet period seconds based on time of day.
 pub fn quiet_period_secs(config: &WakeDeliveryConfig) -> u64 {
-    let hour = chrono::Local::now().hour();
+    let hour = jiff::Zoned::now().hour() as u32;
     match hour {
         5..=11 => config.quiet_period_morning_secs,
         12..=16 => config.quiet_period_midday_secs,

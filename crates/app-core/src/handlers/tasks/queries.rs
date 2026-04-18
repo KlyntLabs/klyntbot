@@ -9,9 +9,16 @@ use super::converters::{action_to_today_task, kr_to_response, objective_to_respo
 
 impl AppCore {
     pub async fn today_tasks(&self) -> Result<Vec<TodayTaskResponse>, ApiError> {
-        let now = chrono::Utc::now();
-        let start_of_today = now.date_naive().and_hms_opt(0, 0, 0).unwrap().and_utc();
-        let start_of_tomorrow = start_of_today + chrono::Duration::days(1);
+        let now = jiff::Timestamp::now();
+        let today_date = now.to_zoned(jiff::tz::TimeZone::UTC).date();
+        let start_of_today: jiff::Timestamp = today_date
+            .at(0, 0, 0, 0)
+            .to_zoned(jiff::tz::TimeZone::UTC)
+            .map(|z| z.timestamp())
+            .unwrap_or(now);
+        let start_of_tomorrow = start_of_today
+            .checked_add(jiff::SignedDuration::from_secs(86400))
+            .unwrap_or(start_of_today);
 
         // Run all three queries concurrently — SqlitePool is safe for parallel reads
         let doing_filter = TaskFilter {
@@ -19,8 +26,8 @@ impl AppCore {
             ..Default::default()
         };
         let due_today_filter = TaskFilter {
-            due_after: Some(common::time::bridge::chrono_to_jiff(start_of_today)),
-            due_before: Some(common::time::bridge::chrono_to_jiff(start_of_tomorrow)),
+            due_after: Some(start_of_today),
+            due_before: Some(start_of_tomorrow),
             ..Default::default()
         };
         let (doing, due_today, overdue) = tokio::try_join!(
@@ -41,7 +48,7 @@ impl AppCore {
 
         // Sort: overdue first, then by priority (P1 first), then by due_date
         all_rows.sort_by(|a, b| {
-            let now_jiff = common::time::bridge::chrono_to_jiff(now);
+            let now_jiff = now;
             let a_overdue = a.due_date.is_some_and(|d| *d < now_jiff) as u8;
             let b_overdue = b.due_date.is_some_and(|d| *d < now_jiff) as u8;
             b_overdue
@@ -59,9 +66,8 @@ impl AppCore {
     /// Get the next upcoming task (earliest `due_date > now`, not completed).
     /// Used by the tray countdown to show a task deadline timer.
     pub async fn next_upcoming_task(&self) -> Option<TaskRow> {
-        let now = chrono::Utc::now();
         let filter = TaskFilter {
-            due_after: Some(common::time::bridge::chrono_to_jiff(now)),
+            due_after: Some(jiff::Timestamp::now()),
             limit: Some(1),
             ..Default::default()
         };

@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use chrono::{Duration, Timelike, Utc};
+use chrono::{Duration, Timelike};
 use cognitive::situation::{compute_situation, SituationInputs, UserSituation};
 use feature_coaching::{FeedbackTracker, InterventionRouter, PatternDetector, SignalAccumulator};
 use feature_productivity::repos::ProductivityRepos;
@@ -128,7 +128,7 @@ pub(super) async fn build_situation_inputs(
     repos: &Repos,
     router: Option<&Arc<Mutex<InterventionRouter>>>,
 ) -> UserSituation {
-    let now = Utc::now();
+    let now = common::time::bridge::jiff_to_chrono(jiff::Timestamp::now());
     let hour_of_day = now.hour();
     let today_start = now
         .date_naive()

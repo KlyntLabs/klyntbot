@@ -1,6 +1,5 @@
 use std::sync::Arc;
 
-use chrono::Utc;
 use tracing::{info, warn};
 use uuid::Uuid;
 
@@ -38,7 +37,7 @@ pub async fn run_proactive_scan(
                 .and_then(|a| serde_json::to_string(a).ok()),
             status: "pending".to_string(),
             trigger: candidate.trigger.as_ref().map(|t| format!("{t:?}")),
-            created_at: common::time::bridge::chrono_to_jiff(Utc::now()).into(),
+            created_at: jiff::Timestamp::now().into(),
             resolved_at: None,
         };
 

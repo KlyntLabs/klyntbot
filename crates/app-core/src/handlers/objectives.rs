@@ -33,7 +33,7 @@ impl AppCore {
         params: ObjectiveCreateParams,
     ) -> HandlerResult<ObjectiveResponse> {
         let id = uuid::Uuid::new_v4().to_string();
-        let now: storage::SqlTs = common::time::bridge::chrono_to_jiff(chrono::Utc::now()).into();
+        let now: storage::SqlTs = jiff::Timestamp::now().into();
 
         let due_date: Option<storage::SqlTs> = params
             .due_date

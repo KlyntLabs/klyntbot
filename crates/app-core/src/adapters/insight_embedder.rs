@@ -3,7 +3,6 @@
 //! Follows the same adapter pattern as `NoteEmbeddingAdapter` in the `agent` crate.
 
 use async_trait::async_trait;
-use chrono::Utc;
 use feature_insights::InsightEmbedder;
 use std::sync::Arc;
 use tools::embedding_engine::EmbeddingEngine;
@@ -35,7 +34,7 @@ impl InsightEmbedder for InsightEmbedderImpl {
             .map_err(|e| format!("embedding failed: {e}"))?;
 
         // upsert_embedding expects &[(&str, &str)] for extra fields
-        let updated_at = Utc::now().to_rfc3339();
+        let updated_at = jiff::Timestamp::now().to_string();
         let extra_fields: &[(&str, &str)] = &[("updated_at", &updated_at)];
 
         self.store

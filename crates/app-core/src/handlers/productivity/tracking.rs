@@ -85,7 +85,7 @@ impl AppCore {
                 description: e.description,
                 category_id: e.category_id,
                 project_id: e.project_id,
-                started_at: e.started_at,
+                started_at: common::time::bridge::chrono_to_jiff(e.started_at),
                 duration_secs: e.duration_secs,
                 source: e.source,
             })
@@ -176,7 +176,7 @@ impl AppCore {
             description: entry.description,
             category_id: entry.category_id,
             project_id: entry.project_id,
-            started_at,
+            started_at: common::time::bridge::chrono_to_jiff(started_at),
             duration_secs,
             source: entry.source,
         })

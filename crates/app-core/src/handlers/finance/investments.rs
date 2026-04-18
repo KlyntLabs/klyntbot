@@ -62,7 +62,7 @@ impl AppCore {
         params: FinancePortfolioCreateParams,
     ) -> HandlerResult<FinancePortfolioRow> {
         let id = uuid::Uuid::new_v4().to_string();
-        let now: storage::SqlTs = common::time::bridge::chrono_to_jiff(chrono::Utc::now()).into();
+        let now: storage::SqlTs = jiff::Timestamp::now().into();
         let currency = match params.currency {
             Some(c) => c,
             None => self.default_currency().await,
@@ -89,11 +89,11 @@ impl AppCore {
         params: FinanceInvestmentCreateParams,
     ) -> HandlerResult<FinanceInvestmentRow> {
         let id = uuid::Uuid::new_v4().to_string();
-        let now = common::time::bridge::chrono_to_jiff(chrono::Utc::now()).into();
+        let now = jiff::Timestamp::now().into();
         let purchase_date = params
             .purchase_date
             .and_then(|d| parse_naive_date(&d))
-            .map(|d| common::time::bridge::chrono_date_to_jiff(d).into());
+            .map(|d| d.into());
         let currency = match params.currency {
             Some(c) => c,
             None => self.default_currency().await,
@@ -209,10 +209,10 @@ impl AppCore {
         params: FinanceInvestmentTxCreateParams,
     ) -> HandlerResult<FinanceInvestmentTxRow> {
         let id = uuid::Uuid::new_v4().to_string();
-        let now: storage::SqlTs = common::time::bridge::chrono_to_jiff(chrono::Utc::now()).into();
+        let now: storage::SqlTs = jiff::Timestamp::now().into();
         let tx_date: storage::SqlDate = parse_naive_date(&params.tx_date)
             .ok_or_else(|| ApiError::new("VALIDATION", "invalid txDate format"))
-            .map(|d| common::time::bridge::chrono_date_to_jiff(d).into())?;
+            .map(|d| d.into())?;
         let row = FinanceInvestmentTxRow {
             id: id.clone(),
             investment_id: params.investment_id,

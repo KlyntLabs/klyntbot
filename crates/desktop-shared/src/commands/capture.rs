@@ -30,7 +30,7 @@ impl IngestRequest {
 
         Ok(activity_log::ActivityLogEntry {
             id: activity_log::normalizers::new_ulid(),
-            timestamp: common::time::bridge::chrono_to_jiff(chrono::Utc::now()),
+            timestamp: jiff::Timestamp::now(),
             source,
             actor,
             resource_type: self.resource_type,

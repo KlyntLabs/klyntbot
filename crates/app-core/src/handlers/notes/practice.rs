@@ -139,7 +139,7 @@ impl AppCore {
         &self,
         params: PracticeStartParams,
     ) -> Result<PracticeSessionResponse, ApiError> {
-        let now = chrono::Utc::now().to_rfc3339();
+        let now = jiff::Timestamp::now().to_string();
         let id = uuid::Uuid::new_v4().to_string();
         let segments_json =
             serde_json::to_string(&params.segments).unwrap_or_else(|_| "[]".to_string());
@@ -342,7 +342,7 @@ impl AppCore {
                 if let Ok(created_atom) = atom_repo.create_batch(vec![atom]).await {
                     // Create SemanticFact: source_text translates_to final_translation
                     let sf_repo = SemanticFactRepo::new(self.storage_pool.inner().clone());
-                    let now = chrono::Utc::now().to_rfc3339();
+                    let now = jiff::Timestamp::now().to_string();
                     let fact = SemanticFact {
                         id: uuid::Uuid::new_v4().to_string(),
                         domain: domain.clone(),

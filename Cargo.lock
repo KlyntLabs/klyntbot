@@ -4009,6 +4009,7 @@ dependencies = [
  "feature-notes",
  "feature-productivity",
  "futures-util",
+ "jiff",
  "klyntbot-server",
  "mimalloc",
  "open",
@@ -4047,8 +4048,8 @@ version = "0.1.0"
 dependencies = [
  "activity-log",
  "bus",
- "chrono",
  "common",
+ "jiff",
  "serde",
  "serde_json",
  "voice-engine",

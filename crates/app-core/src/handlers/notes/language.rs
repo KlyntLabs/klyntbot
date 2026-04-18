@@ -130,7 +130,7 @@ impl AppCore {
             .ok_or_else(|| ApiError::new("NOT_AVAILABLE", "Flashcard repo not available"))?;
         let sf_repo = SemanticFactRepo::new(self.storage_pool.inner().clone());
 
-        let now = chrono::Utc::now().to_rfc3339();
+        let now = jiff::Timestamp::now().to_string();
 
         // Dedup: skip words that already have flashcards in this deck
         let fronts: Vec<String> = params.words.iter().map(|w| w.word.clone()).collect();

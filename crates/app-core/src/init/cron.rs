@@ -251,9 +251,9 @@ fn register_cron_callbacks(
                         let focused: Vec<storage::TaskRow> = todo_repo.list_focused().await?;
                         for task in &focused {
                             if let Some(deadline) = task.focus_deadline {
-                                let remaining = common::time::bridge::jiff_to_chrono(*deadline)
-                                    - chrono::Utc::now();
-                                let hours_left = remaining.num_hours();
+                                let hours_left = (deadline.as_millisecond()
+                                    - jiff::Timestamp::now().as_millisecond())
+                                    / 3_600_000;
                                 if hours_left <= 1 && hours_left > 0 {
                                     dispatcher
                                         .notify(
@@ -333,10 +333,9 @@ fn register_cron_callbacks(
                 tokio::task::block_in_place(|| {
                     rt.block_on(async move {
                         let focused: Vec<storage::TaskRow> = todo_repo.list_focused().await?;
-                        let now = chrono::Utc::now();
+                        let now_jiff = jiff::Timestamp::now();
                         let mut expired_count = 0u32;
                         for task in &focused {
-                            let now_jiff = common::time::bridge::chrono_to_jiff(now);
                             if task.focus_deadline.map(|d| *d < now_jiff).unwrap_or(false) {
                                 let _ = todo_repo.unfocus(&task.id).await;
                                 expired_count += 1;
@@ -598,7 +597,7 @@ fn register_cron_callbacks(
                                 if let Err(e) = suggestion_repo
                                     .delete_older_than(
                                         90,
-                                        common::time::bridge::chrono_to_jiff(chrono::Utc::now()),
+                                        jiff::Timestamp::now(),
                                     )
                                     .await
                                 {
@@ -848,10 +847,13 @@ fn register_cron_callbacks(
                 let vs = vs.clone();
                 tokio::task::block_in_place(|| {
                     rt.block_on(async move {
-                        let cutoff =
-                            chrono::Utc::now() - chrono::Duration::days(max_age_days as i64);
+                        let cutoff = jiff::Timestamp::now()
+                            .checked_sub(jiff::SignedDuration::from_secs(
+                                max_age_days as i64 * 86400,
+                            ))
+                            .unwrap_or_else(|_| jiff::Timestamp::now());
                         let cutoff_str =
-                            match storage::sanitize_predicate_value(&cutoff.to_rfc3339()) {
+                            match storage::sanitize_predicate_value(&cutoff.to_string()) {
                                 Ok(s) => s,
                                 Err(e) => {
                                     return Ok(Some(format!(
@@ -1322,8 +1324,10 @@ pub async fn run_nightly_batch(
     };
 
     // Store each insight for tomorrow's morning briefing.
-    let tomorrow = (chrono::Utc::now() + chrono::Duration::days(1))
-        .format("%Y-%m-%d")
+    let tomorrow = jiff::Timestamp::now()
+        .checked_add(jiff::SignedDuration::from_secs(86400))
+        .unwrap_or_else(|_| jiff::Timestamp::now())
+        .strftime("%Y-%m-%d")
         .to_string();
 
     for insight in &insights {

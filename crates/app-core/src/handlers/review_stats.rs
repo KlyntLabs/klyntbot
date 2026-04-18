@@ -16,11 +16,13 @@ impl AppCore {
         )
         .map_err(map_db)?;
 
-        let today = chrono::Utc::now().date_naive();
+        let today = jiff::Zoned::now().date();
         let mut weekly = Vec::with_capacity(7);
-        for i in (0..7).rev() {
-            let date = (today - chrono::Duration::days(i))
-                .format("%Y-%m-%d")
+        for i in (0..7i64).rev() {
+            let date = today
+                .checked_sub(jiff::Span::new().days(i))
+                .unwrap_or(today)
+                .strftime("%Y-%m-%d")
                 .to_string();
             let reviews = daily_reviews
                 .iter()

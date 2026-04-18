@@ -18,7 +18,7 @@ impl AppCore {
         let pool = self.repos.pool();
         let fact_repo = SemanticFactRepo::new(pool.clone());
 
-        let now = chrono::Utc::now().to_rfc3339();
+        let now = jiff::Timestamp::now().to_string();
         let fact = SemanticFact {
             id: uuid::Uuid::new_v4().to_string(),
             domain: params.domain,
@@ -91,7 +91,7 @@ impl AppCore {
     ) -> Result<ProceduralRuleResponse, ApiError> {
         let pool = self.repos.pool();
         let repo = cognitive::repos::ProceduralRuleRepo::new(pool.clone());
-        let now = chrono::Utc::now().to_rfc3339();
+        let now = jiff::Timestamp::now().to_string();
 
         let rule = cognitive::types::ProceduralRule {
             id: uuid::Uuid::new_v4().to_string(),

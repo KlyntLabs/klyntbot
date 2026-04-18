@@ -42,6 +42,7 @@ futures-util = { workspace = true }
 tokio = { workspace = true }
 tokio-util = { workspace = true }
 chrono = { workspace = true }
+jiff = { workspace = true }
 uuid = { workspace = true }
 dirs = { workspace = true }
 tracing = { workspace = true }

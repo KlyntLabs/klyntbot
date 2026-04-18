@@ -1,6 +1,5 @@
 use std::collections::HashMap;
 
-use chrono::Datelike;
 use desktop_shared::commands::{
     CurrencyNetWorth, DailySpending, FinanceCategoryBreakdown, FinanceCategoryReportResponse,
     FinanceDailySpendingResponse, FinanceGoalCreateParams, FinanceGoalUpdateParams,
@@ -84,11 +83,11 @@ impl AppCore {
         params: FinanceGoalCreateParams,
     ) -> HandlerResult<FinanceGoalRow> {
         let id = uuid::Uuid::new_v4().to_string();
-        let now: storage::SqlTs = common::time::bridge::chrono_to_jiff(chrono::Utc::now()).into();
+        let now: storage::SqlTs = jiff::Timestamp::now().into();
         let deadline: Option<storage::SqlDate> = params
             .deadline
             .and_then(|d| parse_naive_date(&d))
-            .map(|d| common::time::bridge::chrono_date_to_jiff(d).into());
+            .map(|d| d.into());
         let currency = match params.currency {
             Some(c) => c,
             None => self.default_currency().await,
@@ -130,7 +129,7 @@ impl AppCore {
     ) -> HandlerResult<FinanceGoalRow> {
         let deadline: Option<Option<storage::SqlDate>> = params.deadline.map(|opt| {
             opt.and_then(|d| parse_naive_date(&d))
-                .map(|d| common::time::bridge::chrono_date_to_jiff(d).into())
+                .map(|d| d.into())
         });
         let patch = FinanceGoalPatch {
             id: params.id.clone(),
@@ -166,11 +165,11 @@ impl AppCore {
         params: FinanceLiabilityCreateParams,
     ) -> HandlerResult<FinanceLiabilityRow> {
         let id = uuid::Uuid::new_v4().to_string();
-        let now: storage::SqlTs = common::time::bridge::chrono_to_jiff(chrono::Utc::now()).into();
+        let now: storage::SqlTs = jiff::Timestamp::now().into();
         let due_date: Option<storage::SqlDate> = params
             .due_date
             .and_then(|d| parse_naive_date(&d))
-            .map(|d| common::time::bridge::chrono_date_to_jiff(d).into());
+            .map(|d| d.into());
         let currency = match params.currency {
             Some(c) => c,
             None => self.default_currency().await,
@@ -263,10 +262,10 @@ impl AppCore {
         date_to: Option<String>,
         tx_type: &str,
     ) -> Result<FinanceCategoryReportResponse, ApiError> {
-        let now = chrono::Utc::now().date_naive();
+        let now = jiff::Zoned::now().date();
         let from = date_from
             .and_then(|d| parse_naive_date(&d))
-            .unwrap_or_else(|| now.with_day(1).unwrap_or(now));
+            .unwrap_or_else(|| now.with().day(1).build().unwrap_or(now));
         let to = date_to.and_then(|d| parse_naive_date(&d)).unwrap_or(now);
 
         let rows = self
@@ -274,8 +273,8 @@ impl AppCore {
             .finance
             .transactions
             .sum_by_category(
-                common::time::bridge::chrono_date_to_jiff(from),
-                common::time::bridge::chrono_date_to_jiff(to),
+                from,
+                to,
                 tx_type,
                 &self.default_currency().await,
             )
@@ -359,8 +358,8 @@ impl AppCore {
             .finance
             .transactions
             .daily_spending(
-                common::time::bridge::chrono_date_to_jiff(from),
-                common::time::bridge::chrono_date_to_jiff(to),
+                from,
+                to,
                 &self.default_currency().await,
             )
             .await
@@ -392,8 +391,8 @@ impl AppCore {
 
         let currency = self.default_currency().await;
 
-        let from_jiff = common::time::bridge::chrono_date_to_jiff(from);
-        let to_jiff = common::time::bridge::chrono_date_to_jiff(to);
+        let from_jiff = from;
+        let to_jiff = to;
         let (income, spending) = tokio::try_join!(
             self.repos
                 .finance
@@ -411,14 +410,17 @@ impl AppCore {
 
     pub async fn finance_monthly_summary(&self) -> Result<FinanceMonthlySummaryResponse, ApiError> {
         let currency = self.default_currency().await;
-        let now = chrono::Local::now();
-        let current_month_label = now.format("%Y-%m").to_string();
+        let now = jiff::Zoned::now();
+        let current_month_label = now.strftime("%Y-%m").to_string();
         let previous_month = now
-            .with_day(1)
-            .unwrap_or(now)
-            .checked_sub_months(chrono::Months::new(1))
-            .unwrap_or(now);
-        let previous_month_label = previous_month.format("%Y-%m").to_string();
+            .date()
+            .with()
+            .day(1)
+            .build()
+            .unwrap_or_else(|_| now.date())
+            .checked_sub(jiff::Span::new().months(1))
+            .unwrap_or_else(|_| now.date());
+        let previous_month_label = previous_month.strftime("%Y-%m").to_string();
 
         let (income_rows, expense_rows) = tokio::try_join!(
             self.repos

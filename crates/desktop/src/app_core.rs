@@ -315,7 +315,7 @@ fn wire_event_channels(
                                 let payload = desktop_shared::cognitive_commands::DomainEventPayload {
                                     salience: salience.as_str().to_string(),
                                     domain: event.domain().to_string(),
-                                    timestamp: chrono::Utc::now().to_rfc3339(),
+                                    timestamp: jiff::Timestamp::now().to_string(),
                                     payload: serde_json::Value::String(event_type.clone()),
                                     event_type,
                                 };

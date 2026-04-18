@@ -15,7 +15,7 @@ impl AppCore {
         params: AnnotationCreateParams,
     ) -> Result<AnnotationResponse, ApiError> {
         let repo = AnnotationRepo::new(self.storage_pool.inner().clone());
-        let now = chrono::Utc::now().to_rfc3339();
+        let now = jiff::Timestamp::now().to_string();
         let annotation = Annotation {
             id: params.mark_id.clone(),
             target_type: "note".into(),
@@ -57,7 +57,7 @@ impl AppCore {
         if let Some(tags) = params.tags {
             annotation.tags = tags;
         }
-        annotation.updated_at = chrono::Utc::now().to_rfc3339();
+        annotation.updated_at = jiff::Timestamp::now().to_string();
 
         repo.upsert(&annotation).await.map_err(map_cognitive_err)?;
         Ok(annotation_to_response(&annotation))

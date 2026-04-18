@@ -20,8 +20,10 @@ impl FlashcardAccessorImpl {
 #[async_trait]
 impl FlashcardAccessor for FlashcardAccessorImpl {
     async fn review_success_rate(&self, insight_review_id: &str, days: i64) -> f64 {
-        let cutoff = chrono::Utc::now() - chrono::Duration::days(days);
-        let cutoff_str = cutoff.to_rfc3339();
+        let cutoff = jiff::Timestamp::now()
+            .checked_sub(jiff::SignedDuration::from_secs(days * 86400))
+            .unwrap_or_else(|_| jiff::Timestamp::now());
+        let cutoff_str = cutoff.to_string();
 
         let result = sqlx::query_scalar::<_, f64>(
             "SELECT AVG(CASE WHEN rl.rating >= 3 THEN 1.0 ELSE 0.0 END)

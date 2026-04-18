@@ -508,7 +508,7 @@ impl AppCore {
         if let Some(bus) = &self.domain_event_bus {
             let pool = self.storage_pool.inner();
             // Batch-update all active atoms' last_interaction_ts in one query
-            let now = chrono::Utc::now().to_rfc3339();
+            let now = jiff::Timestamp::now().to_string();
             let _ = sqlx::query(
                 "UPDATE knowledge_atoms SET last_interaction_ts = ?1, updated_at = ?1 \
                  WHERE source_note_id = ?2 AND status = 'active'",
@@ -1304,7 +1304,7 @@ impl AppCore {
         if personas.is_empty() {
             return None;
         }
-        let now = chrono::Utc::now().to_rfc3339();
+        let now = jiff::Timestamp::now().to_string();
         Some(cognitive::ResolvedSquad {
             squad: cognitive::SquadRow {
                 id: "synthetic-note-squad".to_string(),

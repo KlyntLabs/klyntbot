@@ -167,8 +167,10 @@ pub async fn mcp_oauth_start(
 
                 if let Some(server) = cfg.mcp.servers.iter_mut().find(|s| s.name == server_name) {
                     let expires_at = tokens.expires_in.map(|secs| {
-                        let expiry = chrono::Utc::now() + chrono::Duration::seconds(secs as i64);
-                        expiry.to_rfc3339()
+                        jiff::Timestamp::now()
+                            .checked_add(jiff::SignedDuration::from_secs(secs as i64))
+                            .unwrap_or_else(|_| jiff::Timestamp::now())
+                            .to_string()
                     });
 
                     server.oauth = Some(config::McpOAuthCredentials {

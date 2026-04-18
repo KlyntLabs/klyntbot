@@ -102,7 +102,7 @@ impl AppCore {
             options_json,
             position,
             width: params.width.or(Some(150)),
-            created_at: common::time::bridge::chrono_to_jiff(chrono::Utc::now()).into(),
+            created_at: jiff::Timestamp::now().into(),
         };
 
         let created = self

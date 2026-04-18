@@ -5,7 +5,6 @@
 use std::sync::atomic::{AtomicBool, AtomicU8, Ordering};
 use std::sync::Arc;
 
-use chrono::{DateTime, Local, Utc};
 use tauri::{AppHandle, Manager};
 
 use crate::app_core::AppCore;
@@ -22,7 +21,7 @@ pub static VOICE_PHASE: AtomicU8 = AtomicU8::new(0);
 /// Cached "next item" — either a calendar event or a task deadline.
 struct NextItem {
     title: String,
-    time: DateTime<Utc>,
+    time: jiff::Timestamp,
 }
 
 /// Spawn the background countdown loop. Call once during app setup.
@@ -100,8 +99,7 @@ async fn countdown_loop(app: AppHandle, shutdown: tokio_util::sync::Cancellation
 
         match &cached {
             Some(item) => {
-                let now = Utc::now();
-                let total_secs = item.time.signed_duration_since(now).num_seconds();
+                let total_secs = (item.time.as_millisecond() - jiff::Timestamp::now().as_millisecond()) / 1000;
 
                 if total_secs <= 0 {
                     // Item time has passed — clear and re-query next tick
@@ -150,18 +148,15 @@ async fn countdown_loop(app: AppHandle, shutdown: tokio_util::sync::Cancellation
 async fn query_next_item(app: &AppHandle) -> Option<NextItem> {
     let core = app.try_state::<Arc<AppCore>>()?;
     // Use local time for "today" boundary so it matches the user's timezone
-    let end_of_today = Local::now()
-        .date_naive()
-        .succ_opt()?
-        .and_hms_opt(0, 0, 0)?
-        .and_local_timezone(Local)
-        .single()?
-        .with_timezone(&Utc);
+    let tomorrow = jiff::Zoned::now().date().checked_add(jiff::Span::new().days(1)).ok()?;
+    let end_of_today = tomorrow
+        .at(0, 0, 0, 0)
+        .to_zoned(jiff::tz::TimeZone::system())
+        .ok()?
+        .timestamp();
 
     let next_event = core.next_upcoming_event().await.and_then(|e| {
-        let t = DateTime::parse_from_rfc3339(&e.started_at)
-            .ok()?
-            .with_timezone(&Utc);
+        let t = e.started_at.parse::<jiff::Timestamp>().ok()?;
         if t >= end_of_today {
             return None;
         }
@@ -173,13 +168,12 @@ async fn query_next_item(app: &AppHandle) -> Option<NextItem> {
 
     let next_task = core.next_upcoming_task().await.and_then(|t| {
         let due = t.due_date?;
-        let due_chrono = common::time::bridge::jiff_to_chrono(*due);
-        if due_chrono >= end_of_today {
+        if *due >= end_of_today {
             return None;
         }
         Some(NextItem {
             title: t.title,
-            time: due_chrono,
+            time: *due,
         })
     });
 

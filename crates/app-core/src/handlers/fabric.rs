@@ -1,6 +1,5 @@
 use std::collections::{HashMap, HashSet};
 
-use chrono::Utc;
 use cognitive::repos::{CommunityRepo, EntityRow, SqliteBookTreeRepo, SqliteGTLinkRepo};
 use context_engine::book_index::{BookTreeRepo, GTLinkRepo, SourceType};
 use desktop_shared::commands::fabric::{
@@ -229,10 +228,13 @@ impl AppCore {
             .unwrap_or("")
             .to_string();
 
-        let five_mins_ago = Utc::now() - chrono::Duration::minutes(5);
+        let five_mins_ago = jiff::Timestamp::now()
+            .checked_sub(jiff::SignedDuration::from_secs(300))
+            .unwrap_or_else(|_| jiff::Timestamp::now());
         let live_pulse_active = active_communities.iter().any(|c| {
-            chrono::DateTime::parse_from_rfc3339(&c.updated_at)
-                .map(|dt| dt > five_mins_ago)
+            c.updated_at
+                .parse::<jiff::Timestamp>()
+                .map(|ts| ts > five_mins_ago)
                 .unwrap_or(false)
         });
 
@@ -440,7 +442,7 @@ impl AppCore {
                     .unwrap_or("")
                     .to_string();
 
-                let now = Utc::now().to_rfc3339();
+                let now = jiff::Timestamp::now().to_string();
                 let note_id = uuid::Uuid::new_v4().to_string();
 
                 let row = NoteRow {

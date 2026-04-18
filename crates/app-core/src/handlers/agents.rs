@@ -341,7 +341,7 @@ impl AppCore {
                 .map_err(|e| ApiError::new("IO_ERROR", e.to_string()))?;
         }
 
-        let date = chrono::Utc::now().format("%Y-%m-%d").to_string();
+        let date = jiff::Zoned::now().strftime("%Y-%m-%d").to_string();
         let content = NEW_REFERENCE_TEMPLATE
             .replace("{name}", skill_name)
             .replace("{date}", &date);

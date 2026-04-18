@@ -1,4 +1,3 @@
-use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 
 use crate::events::{MessageSegment, TransparencyData};
@@ -11,7 +10,7 @@ pub struct ChatThreadResponse {
     pub session_key: String,
     pub title: String,
     pub message_count: i64,
-    pub updated_at: DateTime<Utc>,
+    pub updated_at: jiff::Timestamp,
     // Context fields from session_context join
     pub context_type: Option<String>,
     pub entity_kind: Option<String>,
@@ -35,7 +34,7 @@ pub struct ChatMessageResponse {
     pub id: String,
     pub role: String,
     pub content: String,
-    pub timestamp: DateTime<Utc>,
+    pub timestamp: jiff::Timestamp,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub segments: Option<Vec<MessageSegment>>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -53,8 +52,8 @@ pub struct ChatSessionResponse {
     pub session_key: String,
     pub title: String,
     pub message_count: i64,
-    pub created_at: DateTime<Utc>,
-    pub updated_at: DateTime<Utc>,
+    pub created_at: jiff::Timestamp,
+    pub updated_at: jiff::Timestamp,
     pub project_id: Option<String>,
     pub conversation_type: Option<String>,
     pub pinned: bool,

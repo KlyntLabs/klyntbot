@@ -128,7 +128,7 @@ impl AppCore {
             diff,
             source: "User".to_string(),
             reason: Some(format!("Reset to v{version}")),
-            created_at: chrono::Utc::now().to_rfc3339(),
+            created_at: jiff::Timestamp::now().to_string(),
         };
         repo.insert(&row).await.map_err(map_storage_err)?;
 

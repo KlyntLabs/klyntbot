@@ -27,14 +27,12 @@ impl AppCore {
         params: FinanceTransactionCreateParams,
     ) -> HandlerResult<FinanceTransactionRow> {
         let id = uuid::Uuid::new_v4().to_string();
-        let now_chrono = chrono::Utc::now();
-        let now: storage::SqlTs = common::time::bridge::chrono_to_jiff(now_chrono).into();
-        let tx_date_naive = params
+        let now: storage::SqlTs = jiff::Timestamp::now().into();
+        let tx_date: storage::SqlDate = params
             .tx_date
             .and_then(|d| parse_naive_date(&d))
-            .unwrap_or_else(|| now_chrono.date_naive());
-        let tx_date: storage::SqlDate =
-            common::time::bridge::chrono_date_to_jiff(tx_date_naive).into();
+            .unwrap_or_else(|| jiff::Zoned::now().date())
+            .into();
 
         let account = self
             .repos
@@ -140,11 +138,11 @@ impl AppCore {
             date_from: params
                 .date_from
                 .and_then(|d| parse_naive_date(&d))
-                .map(|d| common::time::bridge::chrono_date_to_jiff(d).into()),
+                .map(|d| d.into()),
             date_to: params
                 .date_to
                 .and_then(|d| parse_naive_date(&d))
-                .map(|d| common::time::bridge::chrono_date_to_jiff(d).into()),
+                .map(|d| d.into()),
             query: params.query,
             limit: params.limit,
             ..Default::default()

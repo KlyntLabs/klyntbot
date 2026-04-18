@@ -14,7 +14,6 @@
 use std::sync::Arc;
 
 use bus::{DomainEvent, DomainEventBus};
-use chrono::{DateTime, Duration, Utc};
 use scheduling::{DeadlineAction, DeadlineScheduler};
 use tracing::{debug, info, warn};
 
@@ -148,7 +147,7 @@ async fn handle_task_reminder(
     // Mark as reminded.
     let patch = storage::TaskPatch {
         id: task_id.to_string(),
-        last_reminded_at: Some(Some(common::time::bridge::chrono_to_jiff(Utc::now()))),
+        last_reminded_at: Some(Some(jiff::Timestamp::now())),
         ..Default::default()
     };
     if let Err(e) = repo.update(&patch).await {
@@ -200,7 +199,7 @@ async fn handle_focus_expire(
     };
 
     match task.focus_deadline {
-        Some(deadline) if common::time::bridge::jiff_to_chrono(*deadline) <= Utc::now() => {
+        Some(deadline) if *deadline <= jiff::Timestamp::now() => {
             // Unfocus the task.
             if let Err(e) = repo.unfocus(task_id).await {
                 warn!("deadline: failed to unfocus task {task_id}: {e}");
@@ -232,7 +231,7 @@ async fn handle_spawn_recurring(
             if let Ok(Some(tpl)) = repo.get(template_id).await {
                 let next_date = tpl
                     .next_instance_date
-                    .map(|d| common::time::bridge::jiff_to_chrono(*d).to_rfc3339());
+                    .map(|d| d.to_string());
                 domain_event_bus.publish(DomainEvent::RecurringTemplateAdvanced {
                     template_id: template_id.to_string(),
                     next_instance_date: next_date,
@@ -296,7 +295,7 @@ async fn handle_domain_event(
                 .await;
 
             if let Some(due_str) = due_date {
-                if let Ok(due) = due_str.parse::<DateTime<Utc>>() {
+                if let Ok(due) = due_str.parse::<jiff::Timestamp>() {
                     // Fetch the task title for the notification label.
                     let label = match todo_repo.get(&task_id).await {
                         Ok(Some(t)) => t.title,
@@ -304,11 +303,13 @@ async fn handle_domain_event(
                     };
 
                     // Schedule reminder 2 hours before due date.
-                    let remind_at = due - Duration::hours(2);
-                    if remind_at > Utc::now() {
+                    let remind_at = due
+                        .checked_sub(jiff::SignedDuration::from_secs(7200))
+                        .unwrap_or(due);
+                    if remind_at > jiff::Timestamp::now() {
                         scheduler
                             .schedule(
-                                common::time::bridge::chrono_to_jiff(remind_at),
+                                remind_at,
                                 DeadlineAction::TaskReminder { task_id, label },
                             )
                             .await;
@@ -330,16 +331,18 @@ async fn handle_domain_event(
                 .await;
 
             if let Some(dl_str) = focus_deadline {
-                if let Ok(deadline) = dl_str.parse::<DateTime<Utc>>() {
-                    let now = Utc::now();
+                if let Ok(deadline) = dl_str.parse::<jiff::Timestamp>() {
+                    let now = jiff::Timestamp::now();
 
                     // Schedule warnings at 6h, 3h, 1h before expiry.
                     for hours in [6u32, 3, 1] {
-                        let warn_at = deadline - Duration::hours(hours as i64);
+                        let warn_at = deadline
+                            .checked_sub(jiff::SignedDuration::from_secs(hours as i64 * 3600))
+                            .unwrap_or(deadline);
                         if warn_at > now {
                             scheduler
                                 .schedule(
-                                    common::time::bridge::chrono_to_jiff(warn_at),
+                                    warn_at,
                                     DeadlineAction::FocusWarning {
                                         task_id: task_id.clone(),
                                         hours_left: hours,
@@ -351,10 +354,7 @@ async fn handle_domain_event(
 
                     // Schedule the expire action.
                     scheduler
-                        .schedule(
-                            common::time::bridge::chrono_to_jiff(deadline),
-                            DeadlineAction::FocusExpire { task_id },
-                        )
+                        .schedule(deadline, DeadlineAction::FocusExpire { task_id })
                         .await;
                 }
             }
@@ -370,13 +370,10 @@ async fn handle_domain_event(
                 .await;
 
             if let Some(date_str) = next_instance_date {
-                if let Ok(next_date) = date_str.parse::<DateTime<Utc>>() {
-                    if next_date > Utc::now() {
+                if let Ok(next_date) = date_str.parse::<jiff::Timestamp>() {
+                    if next_date > jiff::Timestamp::now() {
                         scheduler
-                            .schedule(
-                                common::time::bridge::chrono_to_jiff(next_date),
-                                DeadlineAction::SpawnRecurring { template_id },
-                            )
+                            .schedule(next_date, DeadlineAction::SpawnRecurring { template_id })
                             .await;
                     }
                 }
@@ -411,19 +408,20 @@ fn spawn_startup_population(
             })
             .await
         {
-            let now = Utc::now();
+            let now = jiff::Timestamp::now();
             for task in &tasks {
                 if let Some(due) = task.due_date {
                     // Skip already-reminded tasks.
                     if task.last_reminded_at.is_some() {
                         continue;
                     }
-                    let due_chrono = common::time::bridge::jiff_to_chrono(*due);
-                    let remind_at = due_chrono - Duration::hours(2);
+                    let remind_at = due
+                        .checked_sub(jiff::SignedDuration::from_secs(7200))
+                        .unwrap_or(*due);
                     if remind_at > now {
                         scheduler
                             .schedule(
-                                common::time::bridge::chrono_to_jiff(remind_at),
+                                remind_at,
                                 DeadlineAction::TaskReminder {
                                     task_id: task.id.clone(),
                                     label: task.title.clone(),
@@ -438,17 +436,18 @@ fn spawn_startup_population(
 
         // ── Focused tasks with deadlines ──
         if let Ok(focused) = todo_repo.list_focused().await {
-            let now = Utc::now();
+            let now = jiff::Timestamp::now();
             for task in &focused {
                 if let Some(deadline) = task.focus_deadline {
-                    let deadline_chrono = common::time::bridge::jiff_to_chrono(*deadline);
                     // Schedule warnings at 6h, 3h, 1h before expiry.
                     for hours in [6u32, 3, 1] {
-                        let warn_at = deadline_chrono - Duration::hours(hours as i64);
+                        let warn_at = deadline
+                            .checked_sub(jiff::SignedDuration::from_secs(hours as i64 * 3600))
+                            .unwrap_or(*deadline);
                         if warn_at > now {
                             scheduler
                                 .schedule(
-                                    common::time::bridge::chrono_to_jiff(warn_at),
+                                    warn_at,
                                     DeadlineAction::FocusWarning {
                                         task_id: task.id.clone(),
                                         hours_left: hours,
@@ -460,10 +459,10 @@ fn spawn_startup_population(
                     }
 
                     // Schedule expire action.
-                    if deadline_chrono > now {
+                    if *deadline > now {
                         scheduler
                             .schedule(
-                                common::time::bridge::chrono_to_jiff(deadline_chrono),
+                                *deadline,
                                 DeadlineAction::FocusExpire {
                                     task_id: task.id.clone(),
                                 },
@@ -477,15 +476,14 @@ fn spawn_startup_population(
 
         // ── Recurring templates with next_instance_date ──
         if let Ok(templates) = todo_repo.list_templates().await {
-            let now = Utc::now();
+            let now = jiff::Timestamp::now();
             let _ = deadline_hours; // available if needed for future use
             for tpl in &templates {
                 if let Some(next) = tpl.next_instance_date {
-                    let next_chrono = common::time::bridge::jiff_to_chrono(*next);
-                    if next_chrono > now {
+                    if *next > now {
                         scheduler
                             .schedule(
-                                common::time::bridge::chrono_to_jiff(next_chrono),
+                                *next,
                                 DeadlineAction::SpawnRecurring {
                                     template_id: tpl.id.clone(),
                                 },

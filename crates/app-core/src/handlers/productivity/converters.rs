@@ -88,8 +88,8 @@ pub fn session_to_response(s: FocusSession) -> FocusSessionResponse {
         project_id: s.project_id,
         session_type: s.session_type.to_string(),
         target_mins: s.target_mins,
-        started_at: s.started_at,
-        ended_at: s.ended_at,
+        started_at: common::time::bridge::chrono_to_jiff(s.started_at),
+        ended_at: s.ended_at.map(common::time::bridge::chrono_to_jiff),
         actual_mins: s.actual_mins,
         interruptions: s.interruptions,
         quality_score: s.quality_score,
@@ -138,7 +138,7 @@ pub fn insight_to_response(c: InsightCard) -> InsightCardResponse {
         baseline_value: c.baseline_value,
         date: c.date,
         dismissed: c.dismissed,
-        generated_at: c.generated_at,
+        generated_at: common::time::bridge::chrono_to_jiff(c.generated_at),
     }
 }
 
@@ -150,7 +150,7 @@ pub fn event_to_timeline(
         window_title: e.window_title,
         site_name: e.site_name,
         category_id: e.category_id,
-        started_at: e.started_at,
+        started_at: common::time::bridge::chrono_to_jiff(e.started_at),
         duration_secs: e.duration_secs,
         is_idle: e.is_idle,
         project_id: e.project_id,

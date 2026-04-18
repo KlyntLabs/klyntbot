@@ -10,7 +10,10 @@ impl AppCore {
         let fc_repo = self.flashcard_repo()?;
 
         let review_stats = cognitive::ReviewStatsRepo::new(atom_repo.pool().clone());
-        let week_ago = (chrono::Utc::now() - chrono::Duration::days(7)).to_rfc3339();
+        let week_ago = jiff::Timestamp::now()
+            .checked_sub(jiff::SignedDuration::from_secs(7 * 86400))
+            .unwrap_or_else(|_| jiff::Timestamp::now())
+            .to_string();
 
         // Run all independent queries concurrently
         let (streak_res, due_res, fading_res, topics_res, daily_res, created_res) = tokio::join!(

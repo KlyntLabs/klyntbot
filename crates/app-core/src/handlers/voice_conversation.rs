@@ -1,7 +1,6 @@
 //! VoiceConversationManager — core types, state machine, command channel,
 //! and the conversation loop (listening -> reflecting -> speaking -> auto-resume).
 
-use chrono::{DateTime, Duration, Utc};
 use common::{ChannelName, ChatId, SessionKey};
 use serde::{Deserialize, Serialize};
 use std::sync::atomic::Ordering;
@@ -71,7 +70,7 @@ pub struct VoiceConversationState {
     pub phase: ConversationPhase,
     pub paused: bool,
     pub turn_count: u32,
-    pub last_activity: DateTime<Utc>,
+    pub last_activity: jiff::Timestamp,
     pub interrupted: bool,
     pub pending_transcript: Option<String>,
     pub pending_response_text: Option<String>,
@@ -86,7 +85,7 @@ impl Default for VoiceConversationState {
             phase: ConversationPhase::Idle,
             paused: false,
             turn_count: 0,
-            last_activity: Utc::now(),
+            last_activity: jiff::Timestamp::now(),
             interrupted: false,
             pending_transcript: None,
             pending_response_text: None,
@@ -102,7 +101,7 @@ impl VoiceConversationState {
         self.phase = ConversationPhase::Idle;
         self.paused = false;
         self.turn_count = 0;
-        self.last_activity = Utc::now();
+        self.last_activity = jiff::Timestamp::now();
         self.interrupted = false;
         self.pending_transcript = None;
         self.pending_response_text = None;
@@ -111,7 +110,7 @@ impl VoiceConversationState {
     }
 
     pub fn touch(&mut self) {
-        self.last_activity = Utc::now();
+        self.last_activity = jiff::Timestamp::now();
     }
 }
 
@@ -131,9 +130,9 @@ pub enum VoiceCommand {
 
 // ── Helpers ──────────────────────────────────────────────────
 
-pub fn is_warm_session(last_activity: DateTime<Utc>, threshold_minutes: u32) -> bool {
-    let elapsed = Utc::now() - last_activity;
-    elapsed.num_minutes() < threshold_minutes as i64
+pub fn is_warm_session(last_activity: jiff::Timestamp, threshold_minutes: u32) -> bool {
+    let elapsed_mins = (jiff::Timestamp::now().as_millisecond() - last_activity.as_millisecond()) / 60_000;
+    elapsed_mins < threshold_minutes as i64
 }
 
 pub fn compute_breath_ms(response_text: &str) -> u64 {
@@ -259,9 +258,11 @@ impl VoiceConversationManager {
         if let Ok(sessions) = self
             .repos
             .sessions
-            .list_sessions_since(common::time::bridge::chrono_to_jiff(
-                Utc::now() - Duration::minutes(warm_chat_min as i64),
-            ))
+            .list_sessions_since(
+                jiff::Timestamp::now()
+                    .checked_sub(jiff::SignedDuration::from_secs(warm_chat_min as i64 * 60))
+                    .unwrap_or_else(|_| jiff::Timestamp::now()),
+            )
             .await
         {
             if let Some(session) = sessions.first() {
@@ -1598,9 +1599,13 @@ mod tests {
 
     #[test]
     fn warm_session_detection() {
-        let now = Utc::now();
-        let recent = now - chrono::Duration::minutes(10);
-        let old = now - chrono::Duration::minutes(20);
+        let now = jiff::Timestamp::now();
+        let recent = now
+            .checked_sub(jiff::SignedDuration::from_secs(600))
+            .unwrap_or(now);
+        let old = now
+            .checked_sub(jiff::SignedDuration::from_secs(1200))
+            .unwrap_or(now);
 
         assert!(is_warm_session(recent, 15)); // 10 min < 15 min threshold
         assert!(!is_warm_session(old, 15)); // 20 min >= 15 min threshold
