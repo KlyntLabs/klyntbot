@@ -106,7 +106,7 @@ mod tests {
 
         let result = suggest_due_date(&task).unwrap();
         let diff_hours = (result.value.as_millisecond() - jiff::Timestamp::now().as_millisecond()) / 3_600_000;
-        assert!(diff_hours >= 20 && diff_hours <= 28);
+        assert!((20..=28).contains(&diff_hours));
         assert!(result.confidence >= 0.80);
     }
 
@@ -117,7 +117,7 @@ mod tests {
 
         let result = suggest_due_date(&task).unwrap();
         let diff_days = (result.value.as_millisecond() - jiff::Timestamp::now().as_millisecond()) / 86_400_000;
-        assert!(diff_days >= 4 && diff_days <= 6);
+        assert!((4..=6).contains(&diff_days));
     }
 
     #[test]

@@ -584,7 +584,7 @@ impl ActivityNormalizer for WindowEventNormalizer {
             "{}:{}:{}",
             evt.app_name,
             evt.window_title.as_deref().unwrap_or(""),
-            evt.started_at.to_string()
+            evt.started_at
         ));
 
         let source = if evt.url.is_some() {

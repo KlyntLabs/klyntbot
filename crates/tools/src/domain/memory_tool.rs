@@ -495,9 +495,8 @@ impl MemoryTool {
                             "before_date required for before_date filter".to_string(),
                         )
                     })?;
-                let date = chrono::DateTime::parse_from_rfc3339(date_str)
-                    .map_err(|e| common::ToolError::InvalidParams(format!("Invalid date: {}", e)))?
-                    .with_timezone(&chrono::Utc);
+                let date = date_str.parse::<jiff::Timestamp>()
+                    .map_err(|e| common::ToolError::InvalidParams(format!("Invalid date: {}", e)))?;
                 PurgeFilter::Before(date)
             }
             "all" => PurgeFilter::All,
@@ -617,7 +616,7 @@ mod tests {
                     content_preview: "This is a test message".to_string(),
                     content_full: "This is a test message".to_string(),
                     score: 0.85,
-                    created_at: chrono::Utc::now(),
+                    created_at: jiff::Timestamp::now(),
                 };
                 Ok(vec![result].into_iter().take(limit).collect())
             } else {

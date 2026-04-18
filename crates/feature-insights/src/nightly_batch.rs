@@ -14,7 +14,7 @@ pub struct CrossDomainInsightRow {
     pub insight_text: String,
     pub dot_refs: String,
     pub surfaced: bool,
-    pub created_at: String,
+    pub created_at: i64,
 }
 
 /// Service for storing and retrieving nightly cross-domain insights.

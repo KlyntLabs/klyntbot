@@ -76,10 +76,7 @@ mod tests {
 
     fn sample_context(skills: Vec<(&str, f64)>, corrections: u32) -> NarrativeContext {
         NarrativeContext {
-            period: (
-                common::time::bridge::jiff_to_chrono(jiff::Timestamp::now()),
-                common::time::bridge::jiff_to_chrono(jiff::Timestamp::now()),
-            ),
+            period: (jiff::Timestamp::now(), jiff::Timestamp::now()),
             routing_snapshots: vec![],
             correction_count: corrections,
             top_skills_by_usage: skills

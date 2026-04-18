@@ -51,7 +51,7 @@ impl HeuristicExtractionHandler {
                         h.finish() & 0xFFFF
                     });
                     // Truncate to first sentence or 150 chars — don't store entire messages as facts
-                    let object = match content.find(|c: char| c == '.' || c == '!') {
+                    let object = match content.find(['.', '!']) {
                         Some(i) if i < 150 => content[..=i].to_string(),
                         _ => common::helpers::truncate_at_boundary(content, 150).to_string(),
                     };

@@ -313,7 +313,7 @@ impl AppCore {
     ) -> Result<KnowledgeGrowthResponse, ApiError> {
         let fact_repo = cognitive::repos::SemanticFactRepo::new(self.storage_pool.inner().clone());
         let temporal = cognitive::TemporalService::new(fact_repo);
-        let since = chrono::Utc::now() - chrono::Duration::days(i64::from(days));
+        let since = jiff::Timestamp::now() - jiff::SignedDuration::from_secs(i64::from(days) * 86400);
         let summary = temporal
             .change_summary(since, None)
             .await

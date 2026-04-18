@@ -212,7 +212,7 @@ mod tests {
             cognitive::SemanticFactRepo::new(inner.clone()),
         );
 
-        let since = jiff::Timestamp::now() - jiff::SignedDuration::from_secs(1 * 86400);
+        let since = jiff::Timestamp::now() - jiff::SignedDuration::from_secs(86400);
         let snapshot = collector.collect_metrics(since, None).await.unwrap();
 
         assert_eq!(snapshot.total_messages, 0);
@@ -242,7 +242,7 @@ mod tests {
         let trial_repo = storage::TrialRepo::new(inner.clone());
         trial_repo.migrate().await.unwrap();
 
-        let since = jiff::Timestamp::now() - jiff::SignedDuration::from_secs(1 * 3600);
+        let since = jiff::Timestamp::now() - jiff::SignedDuration::from_secs(3600);
 
         // 1. Insert strategy records so get_stats_since returns total_records > 0.
         //    Two records: one with memories retrieved (3), one without (0).

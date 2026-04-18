@@ -10,6 +10,7 @@ use crate::commands::window::{WINDOW_LAUNCHER, WINDOW_TRAY};
 
 /// Destroy a window by label if it exists and is hidden.
 /// It will be lazily re-created on next `get_or_create_window` call.
+#[allow(dead_code)]
 pub fn destroy_if_hidden(app: &AppHandle, label: &str) {
     if let Some(w) = app.get_webview_window(label) {
         if !w.is_visible().unwrap_or(true) {

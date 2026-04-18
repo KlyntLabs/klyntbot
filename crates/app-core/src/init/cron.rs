@@ -217,7 +217,6 @@ const JOB_REFORGE_NIGHTLY: &str = "__klyntbot_reforge_nightly";
 
 /// Register individual cron handlers.
 #[allow(clippy::too_many_arguments)]
-#[allow(clippy::too_many_arguments)]
 fn register_cron_callbacks(
     cron_service: &mut CronService,
     repos: &Repos,
@@ -822,7 +821,7 @@ fn register_cron_callbacks(
                 tokio::task::block_in_place(|| {
                     rt.block_on(async move {
                         let repo = cognitive::BlackboardRepo::new(pool);
-                        match repo.cleanup_stale(chrono::Duration::days(30)).await {
+                        match repo.cleanup_stale(jiff::SignedDuration::from_secs(30 * 86400)).await {
                             Ok(0) => Ok(Some("No stale blackboard entries".to_string())),
                             Ok(n) => {
                                 info!(deleted = n, "Blackboard cleanup: removed stale entries");

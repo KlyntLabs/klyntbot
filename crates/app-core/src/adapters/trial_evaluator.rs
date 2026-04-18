@@ -1,8 +1,8 @@
 //! Adapter implementing `EarlyTrialEvaluator` using `StrategyRepo` activity metrics.
 
 use async_trait::async_trait;
-use chrono::{DateTime, Utc};
 use cognitive::mirror::{EarlyTrialEvaluator, TrendDirection, TrialEarlySignals};
+use jiff::Timestamp;
 
 pub struct AppTrialEvaluator {
     strategy_repo: storage::StrategyRepo,
@@ -19,12 +19,11 @@ impl EarlyTrialEvaluator for AppTrialEvaluator {
     async fn evaluate_trial_early(
         &self,
         _trial_id: &str,
-        since: DateTime<Utc>,
+        since: Timestamp,
     ) -> common::Result<TrialEarlySignals> {
-        let since_jiff = common::time::bridge::chrono_to_jiff(since);
         let message_count = self
             .strategy_repo
-            .count_since(since_jiff)
+            .count_since(since)
             .await
             .unwrap_or(0);
 
@@ -39,10 +38,13 @@ impl EarlyTrialEvaluator for AppTrialEvaluator {
             TrendDirection::Stable
         } else {
             // Compare first-half vs second-half activity to detect momentum.
-            let midpoint = since + (Utc::now() - since) / 2;
+            let midpoint = jiff::Timestamp::from_millisecond(
+                (since.as_millisecond() + jiff::Timestamp::now().as_millisecond()) / 2,
+            )
+            .unwrap_or(since);
             let second_half = self
                 .strategy_repo
-                .count_since(common::time::bridge::chrono_to_jiff(midpoint))
+                .count_since(midpoint)
                 .await
                 .unwrap_or(0);
             let first_half = message_count - second_half;

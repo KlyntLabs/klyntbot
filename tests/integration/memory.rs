@@ -325,7 +325,10 @@ async fn purge_by_date_range() {
     );
 
     // Purge before tomorrow (should delete all current embeddings)
-    let tomorrow = (chrono::Utc::now() + chrono::Duration::days(1)).to_rfc3339();
+    let tomorrow = jiff::Timestamp::now()
+        .checked_add(jiff::SignedDuration::from_secs(86400))
+        .unwrap()
+        .to_string();
 
     let purge_args = json!({
         "action": "purge",

@@ -57,7 +57,7 @@ impl AppCore {
                 let last = last_fired.get(*name);
                 let cooldown_remaining = last
                     .map(|t| {
-                        let elapsed = jiff::Timestamp::now().duration_since(*t).as_secs() as i64;
+                        let elapsed = jiff::Timestamp::now().duration_since(*t).as_secs();
                         (300 - elapsed).max(0)
                     })
                     .unwrap_or(0);

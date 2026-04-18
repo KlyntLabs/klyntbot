@@ -4,7 +4,6 @@
 
 use super::embedding_utils::{cosine_similarity, deterministic_embedding};
 use async_trait::async_trait;
-use chrono::Utc;
 use std::collections::HashMap;
 use std::sync::Mutex;
 use tools::conversation_recall::{
@@ -143,7 +142,7 @@ impl ConversationRecallHandler for MockConversationRecallHandler {
                     content_preview: "Mock content".to_string(),
                     content_full: "Mock content".to_string(),
                     score: similarity,
-                    created_at: Utc::now(),
+                    created_at: jiff::Timestamp::now(),
                 }
             })
             .filter(|r| r.score >= threshold)

@@ -5,7 +5,7 @@
 //! delegating to `cognitive::ConversationRecallService`).
 
 use async_trait::async_trait;
-use chrono::{DateTime, Utc};
+use jiff::Timestamp;
 use serde::{Deserialize, Serialize};
 
 /// A single conversation recall search result.
@@ -17,7 +17,7 @@ pub struct RecallSearchResult {
     pub content_preview: String,
     pub content_full: String,
     pub score: f64,
-    pub created_at: DateTime<Utc>,
+    pub created_at: Timestamp,
 }
 
 /// Filter for purging conversation embeddings.
@@ -26,7 +26,7 @@ pub enum PurgeFilter {
     /// Delete all embeddings for a specific session.
     BySessionKey(String),
     /// Delete all embeddings embedded before a specific date.
-    Before(DateTime<Utc>),
+    Before(Timestamp),
     /// Delete all embeddings.
     All,
 }

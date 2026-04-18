@@ -13,7 +13,7 @@ use klyntbot::storage::StoragePool;
 
 use super::common::test_pool;
 
-use chrono::{Duration, Utc};
+
 use std::collections::HashMap;
 use uuid::Uuid;
 
@@ -38,7 +38,7 @@ async fn test_mirror_routing_accumulation_and_facade() {
     // 3. Insert a routing snapshot (simulating what RoutingMirrorSubscriber flushes).
     let snapshot = RoutingSnapshot {
         id: Uuid::new_v4(),
-        captured_at: Utc::now(),
+        captured_at: jiff::Timestamp::now(),
         window_hours: 1,
         total_messages: 100,
         distribution: HashMap::from([
@@ -112,8 +112,8 @@ async fn test_mirror_meta_rule_lifecycle() {
         effectiveness_score: 0.5,
         status: MetaRuleStatus::Pending,
         signal_count: 0,
-        created_at: Utc::now(),
-        updated_at: Utc::now(),
+        created_at: jiff::Timestamp::now(),
+        updated_at: jiff::Timestamp::now(),
     };
     repo.insert_meta_rule(&rule).await.unwrap();
 
@@ -151,7 +151,7 @@ async fn test_mirror_brain_version_lifecycle() {
         let v = BrainVersion {
             version: i,
             trial_id: None,
-            promoted_at: chrono::Utc::now(),
+            promoted_at: jiff::Timestamp::now(),
             params: serde_json::json!({"version": i}),
             reason: format!("Version {i}"),
             parent_version: if i > 1 { Some(i - 1) } else { None },
@@ -193,8 +193,8 @@ async fn test_mirror_trial_preview_lifecycle() {
     let preview = TrialPreview {
         id: Uuid::new_v4(),
         trial_id: "trial-test-001".to_string(),
-        started_at: Utc::now() - chrono::Duration::hours(4),
-        preview_at: Utc::now(),
+        started_at: jiff::Timestamp::now() - jiff::SignedDuration::from_secs(4 * 3600),
+        preview_at: jiff::Timestamp::now(),
         messages_scored: 25,
         early_signals: TrialEarlySignals {
             correction_rate_delta: -0.15,
@@ -233,8 +233,8 @@ async fn test_mirror_approve_meta_rule_writes_episodic_memory() {
         effectiveness_score: 0.5,
         status: MetaRuleStatus::Pending,
         signal_count: 0,
-        created_at: Utc::now(),
-        updated_at: Utc::now(),
+        created_at: jiff::Timestamp::now(),
+        updated_at: jiff::Timestamp::now(),
     };
     repo.insert_meta_rule(&rule).await.unwrap();
 
@@ -311,8 +311,8 @@ async fn test_mirror_trial_preview_cleanup() {
     let recent = TrialPreview {
         id: Uuid::new_v4(),
         trial_id: "trial-recent".to_string(),
-        started_at: Utc::now() - Duration::hours(4),
-        preview_at: Utc::now(),
+        started_at: jiff::Timestamp::now() - jiff::SignedDuration::from_secs(4 * 3600),
+        preview_at: jiff::Timestamp::now(),
         messages_scored: 10,
         early_signals: TrialEarlySignals {
             correction_rate_delta: 0.0,
@@ -327,8 +327,14 @@ async fn test_mirror_trial_preview_cleanup() {
 
     // Insert a preview with old preview_at (100 days ago) via raw SQL.
     let old_id = Uuid::new_v4();
-    let old_preview_at = (Utc::now() - Duration::days(100)).to_rfc3339();
-    let old_started_at = (Utc::now() - Duration::days(101)).to_rfc3339();
+    let old_preview_at = jiff::Timestamp::now()
+        .checked_sub(jiff::SignedDuration::from_secs(100 * 86400))
+        .unwrap()
+        .to_string();
+    let old_started_at = jiff::Timestamp::now()
+        .checked_sub(jiff::SignedDuration::from_secs(101 * 86400))
+        .unwrap()
+        .to_string();
     let early_signals_json = serde_json::json!({
         "correctionRateDelta": -0.1,
         "confidenceTrend": "Falling",

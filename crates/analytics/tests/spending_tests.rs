@@ -15,7 +15,7 @@ fn monthly_expenses(category: &str, amounts: &[i64]) -> Vec<SpendingRecord> {
         .iter()
         .enumerate()
         .map(|(i, &amt)| SpendingRecord {
-            date: Date::new((2025) as i16, ((i as u32 % 12) + 1) as i8, (15) as i8).unwrap(),
+            date: Date::new(2025, ((i as u32 % 12) + 1) as i8, 15).unwrap(),
             amount: Decimal::new(amt, 0),
             tx_type: SpendingType::Expense,
             category: Some(category.to_string()),
@@ -48,7 +48,7 @@ fn correlated_expenses(
     let mut records = Vec::new();
     for (i, &amt) in amounts_a.iter().enumerate() {
         records.push(SpendingRecord {
-            date: Date::new((2025) as i16, ((i as u32 % 12) + 1) as i8, (10) as i8).unwrap(),
+            date: Date::new(2025, ((i as u32 % 12) + 1) as i8, 10).unwrap(),
             amount: Decimal::new(amt, 0),
             tx_type: SpendingType::Expense,
             category: Some(cat_a.to_string()),
@@ -57,7 +57,7 @@ fn correlated_expenses(
     }
     for (i, &amt) in amounts_b.iter().enumerate() {
         records.push(SpendingRecord {
-            date: Date::new((2025) as i16, ((i as u32 % 12) + 1) as i8, (20) as i8).unwrap(),
+            date: Date::new(2025, ((i as u32 % 12) + 1) as i8, 20).unwrap(),
             amount: Decimal::new(amt, 0),
             tx_type: SpendingType::Expense,
             category: Some(cat_b.to_string()),
@@ -163,7 +163,7 @@ fn anomaly_income_records_excluded() {
     // All income — should produce no anomalies even if they look anomalous.
     let txs: Vec<SpendingRecord> = (0..7)
         .map(|i| SpendingRecord {
-            date: Date::new((2025) as i16, ((i % 12) + 1) as i8, (15) as i8).unwrap(),
+            date: Date::new(2025, ((i % 12) + 1) as i8, 15).unwrap(),
             amount: if i == 6 { dec!(10000) } else { dec!(100) },
             tx_type: SpendingType::Income,
             category: Some("salary".to_string()),
@@ -317,7 +317,7 @@ fn trends_category_breakdown() {
 #[test]
 fn recurring_monthly_detected() {
     let dates: Vec<Date> = (1..=6)
-        .map(|m| Date::new((2025) as i16, (m) as i8, (1) as i8).unwrap())
+        .map(|m| Date::new(2025, m, 1).unwrap())
         .collect();
     let txs = recurring_expenses("Netflix", 15, &dates);
     let config = RecurringConfig::default();
@@ -335,7 +335,7 @@ fn recurring_monthly_detected() {
 fn recurring_overdue_flagged() {
     // Monthly charge, last seen 3 months ago -> overdue.
     let dates: Vec<Date> = (1..=4)
-        .map(|m| Date::new((2025) as i16, (m) as i8, (1) as i8).unwrap())
+        .map(|m| Date::new(2025, m, 1).unwrap())
         .collect();
     let txs = recurring_expenses("Gym", 50, &dates);
     let config = RecurringConfig::default();
@@ -350,7 +350,7 @@ fn recurring_overdue_flagged() {
 fn recurring_not_overdue_when_recent() {
     // Monthly charge, last seen recently -> not overdue.
     let dates: Vec<Date> = (1..=6)
-        .map(|m| Date::new((2025) as i16, (m) as i8, (1) as i8).unwrap())
+        .map(|m| Date::new(2025, m, 1).unwrap())
         .collect();
     let txs = recurring_expenses("Spotify", 10, &dates);
     let config = RecurringConfig::default();
@@ -404,7 +404,7 @@ fn recurring_income_excluded() {
     // Income records should be excluded.
     let txs: Vec<SpendingRecord> = (1..=6)
         .map(|m| SpendingRecord {
-            date: Date::new((2025) as i16, (m) as i8, (1) as i8).unwrap(),
+            date: Date::new(2025, m, 1).unwrap(),
             amount: dec!(5000),
             tx_type: SpendingType::Income,
             category: Some("salary".to_string()),
@@ -425,7 +425,7 @@ fn recurring_no_counterparty_skipped() {
     // Records without counterparty should be ignored.
     let txs: Vec<SpendingRecord> = (1..=6)
         .map(|m| SpendingRecord {
-            date: Date::new((2025) as i16, (m) as i8, (1) as i8).unwrap(),
+            date: Date::new(2025, m, 1).unwrap(),
             amount: dec!(100),
             tx_type: SpendingType::Expense,
             category: Some("misc".to_string()),
@@ -499,14 +499,14 @@ fn correlation_insufficient_shared_months() {
     let mut txs = Vec::new();
     for m in 1..=2 {
         txs.push(SpendingRecord {
-            date: Date::new((2025) as i16, (m) as i8, (10) as i8).unwrap(),
+            date: Date::new(2025, m, 10).unwrap(),
             amount: Decimal::new(100, 0),
             tx_type: SpendingType::Expense,
             category: Some("food".to_string()),
             counterparty: None,
         });
         txs.push(SpendingRecord {
-            date: Date::new((2025) as i16, (m) as i8, (20) as i8).unwrap(),
+            date: Date::new(2025, m, 20).unwrap(),
             amount: Decimal::new(50, 0),
             tx_type: SpendingType::Expense,
             category: Some("transport".to_string()),
@@ -583,7 +583,7 @@ proptest! {
         // Create expenses in two categories
         let mut txs = Vec::new();
         for m in 0..n_months {
-            let date = Date::new((2025) as i16, ((m as u32 % 12) + 1) as i8, (15) as i8).unwrap();
+            let date = Date::new(2025, ((m as u32 % 12) + 1) as i8, 15).unwrap();
             txs.push(SpendingRecord {
                 date,
                 amount: rust_decimal::Decimal::new(100 + m as i64 * 10, 0),

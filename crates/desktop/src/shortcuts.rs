@@ -85,6 +85,7 @@ pub fn toggle_window(app: &AppHandle, window_label: &str) {
 /// Center a window on the monitor where the mouse cursor currently is.
 /// Falls back to `window.center()` if cursor position can't be determined.
 fn position_on_cursor_monitor(window: &tauri::WebviewWindow) {
+    #[allow(unused_imports)]
     use tauri::Manager;
 
     // Get cursor position and find which monitor it's on.

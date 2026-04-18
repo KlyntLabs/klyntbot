@@ -140,9 +140,9 @@ pub fn evaluate_cross_domain(
         layers.push(Layer::SemanticOverlap { cosine: *cosine });
 
         // Layer 2 — temporal proximity.
-        let days_apart = ((input.source_created.as_millisecond() - target_created.as_millisecond())
+        let days_apart = (input.source_created.as_millisecond() - target_created.as_millisecond())
             .abs()
-            / 86_400_000) as i64;
+            / 86_400_000;
         if days_apart <= config.max_temporal_days {
             layers.push(Layer::TemporalProximity { days_apart });
         }

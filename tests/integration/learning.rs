@@ -5,7 +5,6 @@
 //! LearningTool routing, strategy persistence, and goal metrics.
 
 use super::common::*;
-use chrono::Utc;
 use klyntbot::agent::confidence::prompt::confidence_prompt;
 use klyntbot::agent::confidence::ConfidenceEvaluator;
 use klyntbot::agent::learning::adaptive::AdaptiveThresholds;
@@ -44,7 +43,7 @@ fn make_feedback(
         },
         accepted,
         confidence: 0.85,
-        timestamp: Utc::now(),
+        timestamp: jiff::Timestamp::now(),
     }
 }
 
@@ -64,7 +63,7 @@ fn make_feedback_with_field(
         },
         accepted,
         confidence: 0.85,
-        timestamp: Utc::now(),
+        timestamp: jiff::Timestamp::now(),
     }
 }
 
@@ -83,7 +82,7 @@ fn make_outcome(id: &str, tool: &str, success: bool, confidence: f32) -> Outcome
         confidence_score: Some(confidence),
         confidence_dimensions: None,
         execution_mode: ExecutionMode::Chat,
-        created_at: Utc::now(),
+        created_at: jiff::Timestamp::now(),
     }
 }
 
@@ -235,7 +234,7 @@ async fn analyzer_produces_five_confidence_bands() {
             confidence_score: Some(c),
             confidence_dimensions: None,
             execution_mode: ExecutionMode::Chat,
-            created_at: Utc::now(),
+            created_at: jiff::Timestamp::now(),
         })
         .collect();
 
@@ -289,7 +288,7 @@ async fn analyzer_suggested_threshold_within_bounds() {
                 confidence_score: Some(*confidence),
                 confidence_dimensions: None,
                 execution_mode: ExecutionMode::Chat,
-                created_at: Utc::now(),
+                created_at: jiff::Timestamp::now(),
             })
             .collect();
 
@@ -414,7 +413,7 @@ async fn threshold_never_below_min_bound() {
             confidence_score: Some(0.05),
             confidence_dimensions: None,
             execution_mode: ExecutionMode::Chat,
-            created_at: Utc::now(),
+            created_at: jiff::Timestamp::now(),
         })
         .collect();
 
@@ -452,7 +451,7 @@ async fn threshold_never_above_max_bound() {
             confidence_score: Some(i as f32 / 60.0),
             confidence_dimensions: None,
             execution_mode: ExecutionMode::Chat,
-            created_at: Utc::now(),
+            created_at: jiff::Timestamp::now(),
         })
         .collect();
 
@@ -477,7 +476,7 @@ async fn threshold_step_limit_enforced() {
     let old_threshold = adaptive.current_threshold();
 
     let analysis = AnalysisResult {
-        computed_at: Utc::now(),
+        computed_at: jiff::Timestamp::now(),
         total_outcomes: 100,
         per_tool_stats: Default::default(),
         suggested_threshold: 0.1,
@@ -500,7 +499,7 @@ async fn cold_start_blocks_adaptation_below_minimum() {
     let mut adaptive = AdaptiveThresholds::new_in_memory(0.7, 0.4, 0.9, 50);
 
     let analysis = AnalysisResult {
-        computed_at: Utc::now(),
+        computed_at: jiff::Timestamp::now(),
         total_outcomes: 49,
         per_tool_stats: Default::default(),
         suggested_threshold: 0.5,
@@ -521,7 +520,7 @@ async fn adaptation_triggers_at_minimum_outcomes() {
     let mut adaptive = AdaptiveThresholds::new_in_memory(0.7, 0.4, 0.9, 50);
 
     let analysis = AnalysisResult {
-        computed_at: Utc::now(),
+        computed_at: jiff::Timestamp::now(),
         total_outcomes: 50,
         per_tool_stats: Default::default(),
         suggested_threshold: 0.5,
@@ -545,7 +544,7 @@ async fn threshold_history_tracked_after_change() {
     let mut adaptive = AdaptiveThresholds::new_in_memory(0.7, 0.4, 0.9, 50);
 
     let analysis = AnalysisResult {
-        computed_at: Utc::now(),
+        computed_at: jiff::Timestamp::now(),
         total_outcomes: 100,
         per_tool_stats: Default::default(),
         suggested_threshold: 0.5,
@@ -585,7 +584,7 @@ async fn enrichment_feedback_records_override() {
         actual_value: Some("3".to_string()),
         accepted: false,
         confidence: 0.85,
-        timestamp: Utc::now(),
+        timestamp: jiff::Timestamp::now(),
     };
     recorder.record_feedback(feedback).await.unwrap();
 
@@ -614,7 +613,7 @@ async fn enrichment_feedback_records_acceptance() {
         actual_value: None,
         accepted: true,
         confidence: 0.90,
-        timestamp: Utc::now(),
+        timestamp: jiff::Timestamp::now(),
     };
     recorder.record_feedback(feedback).await.unwrap();
 
@@ -661,7 +660,7 @@ async fn privacy_no_args_or_messages_in_outcomes() {
         confidence_score: None,
         confidence_dimensions: None,
         execution_mode: ExecutionMode::Chat,
-        created_at: Utc::now(),
+        created_at: jiff::Timestamp::now(),
     };
     let json = serde_json::to_string(&record).unwrap();
 
@@ -1224,13 +1223,13 @@ async fn learning_tool_routes_history_with_entries() {
             from: 0.70,
             to: 0.72,
             reason: "initial".to_string(),
-            timestamp: Utc::now(),
+            timestamp: jiff::Timestamp::now(),
         },
         ThresholdEntry {
             from: 0.72,
             to: 0.75,
             reason: "increased".to_string(),
-            timestamp: Utc::now(),
+            timestamp: jiff::Timestamp::now(),
         },
     ]));
     let tool = LearningTool::new(Some(mock as Arc<dyn LearningHandler>));
@@ -1253,19 +1252,19 @@ async fn learning_tool_routes_history_explicit_limit() {
             from: 0.70,
             to: 0.72,
             reason: "r1".to_string(),
-            timestamp: Utc::now(),
+            timestamp: jiff::Timestamp::now(),
         },
         ThresholdEntry {
             from: 0.72,
             to: 0.74,
             reason: "r2".to_string(),
-            timestamp: Utc::now(),
+            timestamp: jiff::Timestamp::now(),
         },
         ThresholdEntry {
             from: 0.74,
             to: 0.76,
             reason: "r3".to_string(),
-            timestamp: Utc::now(),
+            timestamp: jiff::Timestamp::now(),
         },
     ]));
     let tool = LearningTool::new(Some(mock as Arc<dyn LearningHandler>));
@@ -1286,19 +1285,19 @@ async fn threshold_history_respects_limit() {
             from: 0.70,
             to: 0.72,
             reason: "r1".to_string(),
-            timestamp: Utc::now(),
+            timestamp: jiff::Timestamp::now(),
         },
         ThresholdEntry {
             from: 0.72,
             to: 0.74,
             reason: "r2".to_string(),
-            timestamp: Utc::now(),
+            timestamp: jiff::Timestamp::now(),
         },
         ThresholdEntry {
             from: 0.74,
             to: 0.76,
             reason: "r3".to_string(),
-            timestamp: Utc::now(),
+            timestamp: jiff::Timestamp::now(),
         },
     ]);
 

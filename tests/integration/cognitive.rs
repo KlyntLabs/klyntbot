@@ -18,7 +18,6 @@ use klyntbot::cognitive::{ConsolidationHandler, ExtractionHandler};
 
 use super::common::test_pool;
 use bus::{DomainEvent, FeedbackResponse};
-use chrono::Utc;
 use context_engine::source::{ContextSource, SourceContext};
 use feature_coaching::feedback::FeedbackTracker;
 use feature_coaching::reasoner::{CoachingDecision, InterventionType};
@@ -45,7 +44,7 @@ fn test_observation(source: &str, content: &str, importance: f64) -> Observation
         content: content.into(),
         importance,
         source_event: source.into(),
-        timestamp: Utc::now(),
+        timestamp: jiff::Timestamp::now(),
     }
 }
 
@@ -181,7 +180,7 @@ async fn test_heuristic_extraction_accumulated_pattern() {
         content: "Pattern from 5 accumulated events".into(),
         importance: 0.5,
         source_event: "accumulated:ProductivityScoreComputed".into(),
-        timestamp: Utc::now(),
+        timestamp: jiff::Timestamp::now(),
     };
     let result = handler.extract_facts_batch(&[obs]).await.unwrap();
     let facts: Vec<_> = result
@@ -1014,8 +1013,8 @@ async fn test_reforge_cycle_end_to_end() {
         content: "User completed a deep-work block before 10am.".into(),
         summary: Some("Morning deep work".into()),
         importance: 0.8,
-        occurred_at: chrono::Utc::now().to_rfc3339(),
-        recorded_at: chrono::Utc::now().to_rfc3339(),
+        occurred_at: jiff::Timestamp::now().to_string(),
+        recorded_at: jiff::Timestamp::now().to_string(),
         stability: 1.0,
         last_accessed: None,
         access_count: 0,
@@ -1192,8 +1191,8 @@ async fn test_reforge_phase6_with_autotuner_bridge() {
         content: "Autotuner integration test episodic memory.".into(),
         summary: Some("Phase 6 test".into()),
         importance: 0.8,
-        occurred_at: chrono::Utc::now().to_rfc3339(),
-        recorded_at: chrono::Utc::now().to_rfc3339(),
+        occurred_at: jiff::Timestamp::now().to_string(),
+        recorded_at: jiff::Timestamp::now().to_string(),
         stability: 1.0,
         last_accessed: None,
         access_count: 0,
@@ -1319,8 +1318,8 @@ async fn test_reforge_with_feedback_signals() {
         content: "User tracked multiple expenses today.".into(),
         summary: Some("Finance tracking activity".into()),
         importance: 0.7,
-        occurred_at: chrono::Utc::now().to_rfc3339(),
-        recorded_at: chrono::Utc::now().to_rfc3339(),
+        occurred_at: jiff::Timestamp::now().to_string(),
+        recorded_at: jiff::Timestamp::now().to_string(),
         stability: 3.0,
         last_accessed: None,
         access_count: 0,

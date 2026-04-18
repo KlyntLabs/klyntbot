@@ -104,8 +104,7 @@ impl SourceRegistry {
         // Check for prefix routing (e.g., "f/ query", "? query", "> cmd")
         for source in &self.sources {
             if let Some(prefix) = source.prefix() {
-                if query.starts_with(prefix) {
-                    let inner_query = &query[prefix.len()..];
+                if let Some(inner_query) = query.strip_prefix(prefix) {
                     return cached_search(source, inner_query.trim(), limit, &self.query_cache)
                         .await;
                 }

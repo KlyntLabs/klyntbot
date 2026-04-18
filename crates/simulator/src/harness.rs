@@ -747,12 +747,12 @@ impl SimulationHarness {
                             }
                         }
                         "notes" => {
-                            if seed % 4 == 0 {
+                            if seed.is_multiple_of(4) {
                                 metrics.accumulator_mut().cross_domain_dots += 1;
                             }
                         }
                         "learning" => {
-                            if seed % 5 == 0 {
+                            if seed.is_multiple_of(5) {
                                 metrics.accumulator_mut().cross_domain_dots += 1;
                             }
                         }
@@ -760,7 +760,7 @@ impl SimulationHarness {
                     }
 
                     // DistractionDetected (~20% of ALL messages) → Accumulate
-                    if seed % 5 == 0 {
+                    if seed.is_multiple_of(5) {
                         let evt = DomainEvent::DistractionDetected {
                             app: "social_media".to_string(),
                             duration_secs: Some(30 + (seed % 90) as i64),
@@ -1783,7 +1783,7 @@ impl SimulationHarness {
             content: msg.content.clone(),
             importance,
             source_event,
-            timestamp: common::time::bridge::jiff_to_chrono(msg.simulated_at.timestamp()),
+            timestamp: msg.simulated_at.timestamp(),
         };
 
         let extraction_result = match self
@@ -2334,7 +2334,7 @@ fn emit_coaching_events(bus: &bus::DomainEventBus, topic: &str, msg_idx: usize, 
         }
         "notes" => {
             // ~25% of note messages discover a cross-domain connection.
-            if seed % 4 == 0 {
+            if seed.is_multiple_of(4) {
                 bus.publish(DomainEvent::CrossDomainDotReady {
                     source_kind: "note".to_string(),
                     source_id: format!("sim-note-{day}-{msg_idx}"),
@@ -2350,7 +2350,7 @@ fn emit_coaching_events(bus: &bus::DomainEventBus, topic: &str, msg_idx: usize, 
         }
         "learning" => {
             // ~20% of learning messages connect to existing notes/tasks.
-            if seed % 5 == 0 {
+            if seed.is_multiple_of(5) {
                 bus.publish(DomainEvent::CrossDomainDotReady {
                     source_kind: "atom".to_string(),
                     source_id: format!("sim-atom-{day}-{msg_idx}"),
@@ -2368,7 +2368,7 @@ fn emit_coaching_events(bus: &bus::DomainEventBus, topic: &str, msg_idx: usize, 
     }
 
     // Background distraction noise: ~20% of ALL messages.
-    if seed % 5 == 0 {
+    if seed.is_multiple_of(5) {
         bus.publish(DomainEvent::DistractionDetected {
             app: "social_media".to_string(),
             duration_secs: Some(30 + (seed % 90) as i64),

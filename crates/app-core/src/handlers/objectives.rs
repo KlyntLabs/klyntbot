@@ -86,7 +86,7 @@ impl AppCore {
     ) -> HandlerResult<ObjectiveResponse> {
         let due_date = params.due_date.map(|opt| {
             opt.and_then(|d| parse_date(&d))
-                .map(|d| common::time::bridge::chrono_to_jiff(d))
+                .map(common::time::bridge::chrono_to_jiff)
         });
 
         let updated = self

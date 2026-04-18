@@ -211,7 +211,7 @@ impl AppCore {
             status: params.status,
             due_date: params.due_date.map(|opt| {
                 opt.and_then(|d| parse_date(&d))
-                    .map(|d| common::time::bridge::chrono_to_jiff(d))
+                    .map(common::time::bridge::chrono_to_jiff)
             }),
             tags: params.tags,
             area_id: params.area_id,
@@ -226,11 +226,11 @@ impl AppCore {
             estimated_minutes: params.estimated_minutes,
             scheduled_start: params.scheduled_start.map(|opt| {
                 opt.and_then(|d| common::parse_datetime(&d, "UTC"))
-                    .map(|d| common::time::bridge::chrono_to_jiff(d))
+                    .map(common::time::bridge::chrono_to_jiff)
             }),
             scheduled_end: params.scheduled_end.map(|opt| {
                 opt.and_then(|d| common::parse_datetime(&d, "UTC"))
-                    .map(|d| common::time::bridge::chrono_to_jiff(d))
+                    .map(common::time::bridge::chrono_to_jiff)
             }),
             ..Default::default()
         };

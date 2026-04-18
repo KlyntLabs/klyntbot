@@ -43,8 +43,10 @@ impl AutotunerBridge for AgentAutotunerBridge {
             .run_evaluation_and_promotion(&champion)
             .await?;
 
-        let mut result = Phase6Result::default();
-        result.evaluated_count = cycle_result.evaluated_trials.len();
+        let mut result = Phase6Result {
+            evaluated_count: cycle_result.evaluated_trials.len(),
+            ..Default::default()
+        };
 
         // Handle promotion
         if let Some((trial_id, trial_result, params)) = cycle_result.promotion {

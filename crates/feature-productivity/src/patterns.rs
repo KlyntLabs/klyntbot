@@ -1,7 +1,7 @@
 //! Productivity pattern analyzer — detects usage patterns from focus sessions
 //! and daily summaries for personalized agent context.
 
-use chrono::{DateTime, Timelike, Utc, Weekday};
+use chrono::{Timelike, Utc, Weekday};
 use serde::{Deserialize, Serialize};
 
 use crate::repos::ProductivityRepos;
@@ -170,6 +170,7 @@ impl ProductivityPatternAnalyzer {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use chrono::DateTime;
     use crate::types::{SessionSource, SessionType};
 
     #[test]

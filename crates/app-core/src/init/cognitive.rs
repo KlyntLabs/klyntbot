@@ -211,11 +211,11 @@ fn spawn_event_log_persistence(
                                 // Store only the variant name — full serialization
                                 // causes heap pressure with large payloads.
                                 let payload = &event_type;
-                                let ts = chrono::Utc::now().to_rfc3339();
+                                let ts = jiff::Timestamp::now().to_string();
                                 let id = uuid::Uuid::new_v4().to_string();
 
                                 if let Err(e) = repo
-                                    .insert_domain_event(&id, &event_type, domain, salience_str, &payload, &ts)
+                                    .insert_domain_event(&id, &event_type, domain, salience_str, payload, &ts)
                                     .await
                                 {
                                     warn!("failed to persist domain event: {e}");
