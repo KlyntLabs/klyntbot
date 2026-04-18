@@ -12,6 +12,7 @@ pub mod objective;
 pub mod project;
 pub mod project_source;
 pub mod reforge_state;
+pub mod scheduled_fire;
 pub mod session;
 pub mod session_context;
 pub mod session_memory;

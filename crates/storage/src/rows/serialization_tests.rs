@@ -561,4 +561,25 @@ mod tests {
             assert_no_snake_case_keys(value, name);
         }
     }
+
+    #[test]
+    fn scheduled_fire_row_round_trips_payload() {
+        use crate::rows::scheduled_fire::ScheduledFireRow;
+        let row = ScheduledFireRow {
+            id: "fire_abc".into(),
+            fire_at_ms: 1_800_000_000_000,
+            kind: "cron_job".into(),
+            ref_id: Some("job_xyz".into()),
+            payload: serde_json::json!({ "message": "hi", "channels": ["tray"] }),
+            dedup_prefix: Some("cron:job_xyz:".into()),
+            fired: false,
+            firing_started_at_ms: None,
+            fired_at_ms: None,
+            created_at_ms: 1_800_000_000_000 - 1000,
+        };
+        let json = serde_json::to_string(&row).unwrap();
+        let parsed: ScheduledFireRow = serde_json::from_str(&json).unwrap();
+        assert_eq!(parsed.id, row.id);
+        assert_eq!(parsed.payload["message"], "hi");
+    }
 }
