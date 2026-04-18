@@ -5,7 +5,7 @@
 
 use std::collections::HashMap;
 
-use chrono::{DateTime, Utc};
+use jiff::Timestamp;
 use serde::{Deserialize, Serialize};
 
 // ===========================================================================
@@ -65,7 +65,7 @@ impl ToolConfidenceMap {
 /// Records the outcome of a single strategy execution.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct StrategyRecord {
-    pub timestamp: DateTime<Utc>,
+    pub timestamp: Timestamp,
     pub request_id: String,
     /// Predicted strategy name (e.g., "DirectResponse", "ToolAssisted").
     pub predicted_strategy: String,
@@ -180,7 +180,7 @@ mod tests {
         iterations: u32,
     ) -> StrategyRecord {
         StrategyRecord {
-            timestamp: Utc::now(),
+            timestamp: jiff::Timestamp::now(),
             request_id: "test".to_string(),
             predicted_strategy: predicted.to_string(),
             actual_strategy: actual.to_string(),

@@ -6,7 +6,7 @@
 
 use std::collections::HashMap;
 
-use chrono::{DateTime, Utc};
+use jiff::Timestamp;
 use serde::{Deserialize, Serialize};
 
 use crate::confidence::types::ConfidenceDimensions;
@@ -31,7 +31,7 @@ pub struct OutcomeRecord {
     /// Full dimension breakdown, if available.
     pub confidence_dimensions: Option<ConfidenceDimensions>,
     pub execution_mode: ExecutionMode,
-    pub created_at: DateTime<Utc>,
+    pub created_at: Timestamp,
 }
 
 /// Whether the tool was called during chat or plan execution.
@@ -45,7 +45,7 @@ pub enum ExecutionMode {
 /// Analysis results computed by LearningAnalyzer.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AnalysisResult {
-    pub computed_at: DateTime<Utc>,
+    pub computed_at: Timestamp,
     pub total_outcomes: usize,
     pub per_tool_stats: HashMap<String, ToolStats>,
     pub suggested_threshold: f32,
@@ -101,7 +101,7 @@ pub struct EnrichmentFeedbackEntry {
     pub actual_value: Option<String>,
     pub accepted: bool,
     pub confidence: f64,
-    pub timestamp: DateTime<Utc>,
+    pub timestamp: Timestamp,
 }
 
 /// Trait for recording enrichment feedback.
@@ -116,7 +116,7 @@ pub struct AdaptiveThresholdState {
     pub current_threshold: f32,
     pub last_analysis: Option<AnalysisResult>,
     pub threshold_history: Vec<ThresholdChange>,
-    pub updated_at: DateTime<Utc>,
+    pub updated_at: Timestamp,
 }
 
 impl AdaptiveThresholdState {
@@ -136,7 +136,7 @@ pub struct ThresholdChange {
     pub from: f32,
     pub to: f32,
     pub reason: String,
-    pub timestamp: DateTime<Utc>,
+    pub timestamp: Timestamp,
 }
 
 #[cfg(test)]
@@ -160,7 +160,7 @@ mod tests {
                 info_sufficiency: 0.85,
             }),
             execution_mode: ExecutionMode::Chat,
-            created_at: Utc::now(),
+            created_at: Timestamp::now(),
         };
         let json = serde_json::to_string(&record).unwrap();
         let loaded: OutcomeRecord = serde_json::from_str(&json).unwrap();
@@ -197,7 +197,7 @@ mod tests {
             actual_value: Some("2".to_string()),
             accepted: false,
             confidence: 0.75,
-            timestamp: Utc::now(),
+            timestamp: Timestamp::now(),
         };
         let json = serde_json::to_string(&entry).unwrap();
         let loaded: EnrichmentFeedbackEntry = serde_json::from_str(&json).unwrap();
@@ -218,9 +218,9 @@ mod tests {
                 from: 0.7,
                 to: 0.72,
                 reason: "success rate increased".to_string(),
-                timestamp: Utc::now(),
+                timestamp: Timestamp::now(),
             }],
-            updated_at: Utc::now(),
+            updated_at: Timestamp::now(),
         };
         let json = serde_json::to_string(&state).unwrap();
         let loaded: AdaptiveThresholdState = serde_json::from_str(&json).unwrap();
@@ -246,7 +246,7 @@ mod tests {
             confidence_score: None,
             confidence_dimensions: None,
             execution_mode: ExecutionMode::Chat,
-            created_at: Utc::now(),
+            created_at: Timestamp::now(),
         };
         let json = serde_json::to_string(&record).unwrap();
         assert!(!json.contains("tool_args"));

@@ -112,7 +112,7 @@ impl FinanceTreeBuilder {
         amount: f64,
         is_over_budget: bool,
     ) -> common::Result<()> {
-        let date = chrono::Utc::now().format("%Y-%m-%d").to_string();
+        let date = jiff::Timestamp::now().strftime("%Y-%m-%d").to_string();
         let daily_id = format!("finance-daily-{date}");
         let cat_id = format!("finance-cat-{date}-{}", slugify(category));
         let txn_id = format!("finance-txn-{}", Uuid::new_v4());
@@ -145,7 +145,7 @@ impl FinanceTreeBuilder {
         spent: f64,
         limit: f64,
     ) -> common::Result<()> {
-        let date = chrono::Utc::now().format("%Y-%m-%d").to_string();
+        let date = jiff::Timestamp::now().strftime("%Y-%m-%d").to_string();
         let daily_id = format!("finance-daily-{date}");
         let cat_id = format!("finance-cat-{date}-{}", slugify(category));
         let alert_id = format!("finance-alert-{date}-{}", slugify(category));

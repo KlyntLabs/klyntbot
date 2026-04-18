@@ -905,7 +905,6 @@ mod tests {
     use super::*;
     use std::sync::Arc;
 
-    use chrono::Utc;
     use cognitive::situation::UserSituation;
     use cognitive::types::{SemanticFact, DEFAULT_MEMORY_TYPE};
     use feature_coaching::signal_accumulator::TriggerFired;
@@ -994,7 +993,7 @@ mod tests {
             content: content.into(),
             importance,
             source_event: source.into(),
-            timestamp: Utc::now(),
+            timestamp: jiff::Timestamp::now(),
         }
     }
 
@@ -1148,7 +1147,7 @@ mod tests {
             content: "User is most productive between 10am and 12pm".into(),
             importance: 0.8,
             source_event: "ProductivityScoreComputed".into(),
-            timestamp: Utc::now(),
+            timestamp: jiff::Timestamp::now(),
         };
         let result = handler.extract_facts_batch(&[obs]).await.unwrap();
         let facts: Vec<_> = result
@@ -1173,7 +1172,7 @@ mod tests {
             content: "User stated: I like mornings".into(),
             importance: 1.0,
             source_event: "UserStatedFact".into(),
-            timestamp: Utc::now(),
+            timestamp: jiff::Timestamp::now(),
         };
         let result = handler.extract_facts_batch(&[obs]).await.unwrap();
         let facts: Vec<_> = result

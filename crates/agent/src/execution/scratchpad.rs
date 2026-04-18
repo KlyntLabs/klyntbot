@@ -1,6 +1,6 @@
 //! Reasoning scratchpad for tracking execution traces across cycles.
 
-use chrono::{DateTime, Utc};
+use jiff::Timestamp;
 use regex::Regex;
 use serde::{Deserialize, Serialize};
 use std::sync::OnceLock;
@@ -69,7 +69,7 @@ pub struct ReasoningTrace {
     pub planned_actions: Vec<String>,
     pub actual_action: String,
     pub reflection: Option<String>,
-    pub timestamp: DateTime<Utc>,
+    pub timestamp: Timestamp,
     /// Which plan step this trace corresponds to (if a plan exists).
     pub plan_step_index: Option<usize>,
 }
@@ -273,7 +273,7 @@ mod tests {
             planned_actions: vec![action.to_string()],
             actual_action: action.to_string(),
             reflection: None,
-            timestamp: Utc::now(),
+            timestamp: Timestamp::now(),
             plan_step_index: None,
         }
     }
@@ -313,7 +313,7 @@ mod tests {
             planned_actions: vec!["edit_file".to_string()],
             actual_action: "edit_file".to_string(),
             reflection: Some("successful edit".to_string()),
-            timestamp: Utc::now(),
+            timestamp: Timestamp::now(),
             plan_step_index: None,
         });
 
@@ -400,7 +400,7 @@ mod tests {
             planned_actions: vec![],
             actual_action: "test".to_string(),
             reflection: None,
-            timestamp: Utc::now(),
+            timestamp: Timestamp::now(),
             plan_step_index: Some(0),
         };
         assert_eq!(trace.plan_step_index, Some(0));

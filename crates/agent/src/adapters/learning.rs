@@ -155,7 +155,7 @@ mod tests {
         {
             use crate::learning::types::{AnalysisResult, EnrichmentStats};
             let analysis = AnalysisResult {
-                computed_at: chrono::Utc::now(),
+                computed_at: jiff::Timestamp::now(),
                 total_outcomes: 100,
                 per_tool_stats: std::collections::HashMap::new(),
                 suggested_threshold: 0.55, // Different from initial 0.7

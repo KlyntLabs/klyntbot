@@ -143,7 +143,7 @@ fn format_narrative_context(ctx: &NarrativeContext) -> String {
     for snap in &ctx.routing_snapshots {
         out.push_str(&format!(
             "- {} | {} messages | fallback={:.1}% | avg_confidence={:.2}\n",
-            snap.captured_at.format("%Y-%m-%d %H:%M"),
+            snap.captured_at.strftime("%Y-%m-%d %H:%M"),
             snap.total_messages,
             snap.fallback_rate * 100.0,
             snap.avg_routing_confidence,

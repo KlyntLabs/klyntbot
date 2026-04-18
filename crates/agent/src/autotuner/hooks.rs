@@ -6,7 +6,6 @@ use std::sync::Arc;
 
 use async_trait::async_trait;
 use autotuner::{ShadowContext, ShadowRetriever};
-use chrono::{DateTime, Utc};
 use common::TrialParams;
 use storage::{TrialRepo, TrialRow};
 use tokio::sync::RwLock;
@@ -47,7 +46,7 @@ pub struct AutoTunerHookImpl {
     trial_repo: TrialRepo,
     shadow_retriever: Option<Arc<dyn ShadowRetriever>>,
     /// Cached active trials with timestamp to avoid querying DB per message.
-    active_trials_cache: RwLock<(DateTime<Utc>, Vec<TrialRow>)>,
+    active_trials_cache: RwLock<(jiff::Timestamp, Vec<TrialRow>)>,
 }
 
 impl AutoTunerHookImpl {
@@ -56,7 +55,7 @@ impl AutoTunerHookImpl {
             orchestrator,
             trial_repo,
             shadow_retriever: None,
-            active_trials_cache: RwLock::new((DateTime::<Utc>::MIN_UTC, Vec::new())),
+            active_trials_cache: RwLock::new((jiff::Timestamp::UNIX_EPOCH, Vec::new())),
         }
     }
 
@@ -76,7 +75,7 @@ impl AutoTunerHook for AutoTunerHookImpl {
         // Read cached active trials; refresh from DB if stale.
         let active_trials = {
             let (last_fetched, cached) = self.active_trials_cache.read().await.clone();
-            if Utc::now() - last_fetched > chrono::Duration::seconds(ACTIVE_TRIALS_CACHE_TTL_SECS) {
+            if (jiff::Timestamp::now().as_millisecond() - last_fetched.as_millisecond()) / 1000 > ACTIVE_TRIALS_CACHE_TTL_SECS {
                 let fresh = match self.trial_repo.get_active_trials().await {
                     Ok(trials) => trials,
                     Err(e) => {
@@ -84,7 +83,7 @@ impl AutoTunerHook for AutoTunerHookImpl {
                         return;
                     }
                 };
-                *self.active_trials_cache.write().await = (Utc::now(), fresh.clone());
+                *self.active_trials_cache.write().await = (jiff::Timestamp::now(), fresh.clone());
                 fresh
             } else {
                 cached
@@ -95,7 +94,7 @@ impl AutoTunerHook for AutoTunerHookImpl {
             return;
         }
 
-        let timestamp = chrono::Utc::now().to_rfc3339();
+        let timestamp = jiff::Timestamp::now().to_string();
         let context = ShadowContext {
             chat_id: chat_id.to_string(),
             session_key: format!("shadow:{chat_id}"),
@@ -274,7 +273,7 @@ mod tests {
             hypothesis: "test".to_string(),
             trend_analysis: "test".to_string(),
             recommendation_for_next: "test".to_string(),
-            created_at: chrono::Utc::now().to_rfc3339(),
+            created_at: jiff::Timestamp::now().to_string(),
         };
         trial_repo.create_experiment(&exp).await.unwrap();
 
@@ -284,7 +283,7 @@ mod tests {
             params: serde_json::to_string(&TrialParams::default()).unwrap(),
             generation_reasoning: "test".to_string(),
             status: "active".to_string(),
-            created_at: chrono::Utc::now().to_rfc3339(),
+            created_at: jiff::Timestamp::now().to_string(),
             completed_at: None,
             result: None,
         };
@@ -294,7 +293,7 @@ mod tests {
         trial_repo
             .insert_shadow_log(
                 "trial-gt",
-                &chrono::Utc::now().to_rfc3339(),
+                &jiff::Timestamp::now().to_string(),
                 "chat-gt",
                 "",
                 "general",
@@ -318,7 +317,9 @@ mod tests {
         let rate = trial_repo
             .shadow_log_agreement_rate(
                 Some("trial-gt"),
-                chrono::Utc::now() - chrono::Duration::hours(1),
+                jiff::Timestamp::now()
+                    .checked_sub(jiff::SignedDuration::from_secs(3600))
+                    .unwrap(),
             )
             .await
             .unwrap();

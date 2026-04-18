@@ -46,11 +46,13 @@ impl SuggestionApplier for TaskSuggestionApplier {
             }
             SuggestionAction::SetDueDate { due_date } => {
                 let tid = require_task_id(task_id)?;
-                let dt = chrono::DateTime::parse_from_rfc3339(due_date)
+                let ts = due_date
+                    .parse::<jiff::Timestamp>()
                     .or_else(|_| {
-                        // Try YYYY-MM-DD format
-                        chrono::NaiveDate::parse_from_str(due_date, "%Y-%m-%d")
-                            .map(|d| d.and_hms_opt(0, 0, 0).unwrap().and_utc().fixed_offset())
+                        // Try YYYY-MM-DD format: parse as civil date at midnight UTC
+                        due_date.parse::<jiff::civil::Date>().and_then(|d| {
+                            d.at(0, 0, 0, 0).to_zoned(jiff::tz::TimeZone::UTC).map(|z| z.timestamp())
+                        })
                     })
                     .map_err(|e| {
                         common::ToolError::ExecutionFailed(format!("Invalid date: {e}"))
@@ -58,9 +60,7 @@ impl SuggestionApplier for TaskSuggestionApplier {
                 self.repo
                     .update(&TaskPatch {
                         id: tid.into(),
-                        due_date: Some(Some(common::time::bridge::chrono_to_jiff(
-                            dt.with_timezone(&chrono::Utc),
-                        ))),
+                        due_date: Some(Some(ts)),
                         ..Default::default()
                     })
                     .await?;

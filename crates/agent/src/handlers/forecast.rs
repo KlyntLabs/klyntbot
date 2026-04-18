@@ -50,7 +50,7 @@ impl LlmForecastHandler {
                 project_id: r.project_id,
                 estimated_minutes: r.estimated_minutes,
                 actual_minutes: r.actual_minutes,
-                completed_at: common::time::bridge::jiff_to_chrono(*r.completed_at),
+                completed_at: common::time::bridge::jiff_to_chrono(*r.completed_at),  // feature-tasks still uses chrono
             })
             .collect())
     }

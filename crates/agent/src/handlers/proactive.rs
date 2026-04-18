@@ -4,7 +4,6 @@
 //! and generates suggestion candidates using LLM reasoning.
 
 use async_trait::async_trait;
-use chrono::{Duration, Utc};
 use common::Result;
 use feature_tasks::TasksConfig;
 use providers::{ChatParams, DynProvider, Message, ResponseFormat};
@@ -152,15 +151,18 @@ impl ProactiveHandler for LlmProactiveHandler {
         tasks.append(&mut doing_rows);
 
         let mut all_suggestions = Vec::new();
-        let now = Utc::now();
-        let stale_cutoff_chrono = now - Duration::days(self.tasks_config.stale_task_days as i64);
-        let stale_cutoff = common::time::bridge::chrono_to_jiff(stale_cutoff_chrono);
+        let now_chrono = chrono::Utc::now();
+        let stale_cutoff = jiff::Timestamp::now()
+            .checked_sub(jiff::SignedDuration::from_secs(
+                self.tasks_config.stale_task_days as i64 * 86400,
+            ))
+            .unwrap();
 
         // --- TaskOverdue ---
         for row in &tasks {
             let task = Task::from(row.clone());
             if let Some(due) = &task.due_date {
-                if *due < now {
+                if *due < now_chrono {
                     let mut c = self
                         .evaluate_task(&task, &SuggestionTrigger::TaskOverdue)
                         .await?;

@@ -60,7 +60,7 @@ impl AutotunerBridge for AgentAutotunerBridge {
             let new_champion = autotuner::Champion {
                 trial_id: Some(trial_id),
                 params,
-                promoted_at: common::time::bridge::chrono_to_jiff(chrono::Utc::now()),
+                promoted_at: jiff::Timestamp::now(),
                 baseline_metrics: trial_result.clone(),
                 reason_for_promotion: format!("Promoted by Reforge Phase 6 (trial {trial_id})"),
                 impact_summary: format!(
@@ -121,7 +121,7 @@ impl AutotunerBridge for AgentAutotunerBridge {
 
         // Create an experiment row to group these trials
         let experiment_id = uuid::Uuid::new_v4();
-        let now = chrono::Utc::now().to_rfc3339();
+        let now = jiff::Timestamp::now().to_string();
 
         let hypothesis = suggestions
             .first()

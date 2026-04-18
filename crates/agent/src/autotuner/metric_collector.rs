@@ -3,7 +3,6 @@
 
 use async_trait::async_trait;
 use autotuner::{MetricSnapshot, MetricSource};
-use chrono::{DateTime, Utc};
 use uuid::Uuid;
 
 /// Collects metrics from strategy records, domain events, usage records,
@@ -52,8 +51,6 @@ impl MetricSource for AgentMetricCollector {
         trial_id: Option<Uuid>,
     ) -> common::Result<MetricSnapshot> {
         let trial_id_str = trial_id.as_ref().map(|u| u.to_string());
-        let since_chrono = common::time::bridge::jiff_to_chrono(since);
-
         let (
             stats,
             correction_count,
@@ -68,11 +65,11 @@ impl MetricSource for AgentMetricCollector {
         ) = tokio::join!(
             self.strategy_repo.get_stats_since(since),
             self.event_log_repo
-                .count_by_event_type("UserCorrectedAI", since_chrono),
+                .count_by_event_type("UserCorrectedAI", since),
             self.event_log_repo.count_by_event_type_and_data(
                 "UserCorrectedAI",
                 "memory_miss",
-                since_chrono
+                since
             ),
             async {
                 let tokens = self.usage_repo.total_tokens_since(since).await.unwrap_or(0);
@@ -215,7 +212,7 @@ mod tests {
             cognitive::SemanticFactRepo::new(inner.clone()),
         );
 
-        let since = common::time::bridge::chrono_to_jiff(Utc::now() - chrono::Duration::days(1));
+        let since = jiff::Timestamp::now() - jiff::SignedDuration::from_secs(1 * 86400);
         let snapshot = collector.collect_metrics(since, None).await.unwrap();
 
         assert_eq!(snapshot.total_messages, 0);
@@ -245,7 +242,7 @@ mod tests {
         let trial_repo = storage::TrialRepo::new(inner.clone());
         trial_repo.migrate().await.unwrap();
 
-        let since = common::time::bridge::chrono_to_jiff(Utc::now() - chrono::Duration::hours(1));
+        let since = jiff::Timestamp::now() - jiff::SignedDuration::from_secs(1 * 3600);
 
         // 1. Insert strategy records so get_stats_since returns total_records > 0.
         //    Two records: one with memories retrieved (3), one without (0).

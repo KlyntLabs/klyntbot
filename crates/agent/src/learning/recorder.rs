@@ -10,7 +10,6 @@
 
 use std::sync::Arc;
 
-use chrono::{DateTime, Utc};
 use tokio::sync::RwLock;
 use tracing::warn;
 use uuid::Uuid;
@@ -45,7 +44,7 @@ fn outcome_to_row(outcome: &OutcomeRecord) -> Result<storage::OutcomeRow> {
         confidence_score: outcome.confidence_score,
         confidence_dimensions,
         execution_mode,
-        created_at: common::time::bridge::chrono_to_jiff(outcome.created_at).into(),
+        created_at: outcome.created_at.into(),
     })
 }
 
@@ -68,7 +67,7 @@ fn row_to_outcome(row: storage::OutcomeRow) -> Result<OutcomeRecord> {
         confidence_score: row.confidence_score,
         confidence_dimensions,
         execution_mode,
-        created_at: common::time::bridge::jiff_to_chrono(*row.created_at),
+        created_at: *row.created_at,
     })
 }
 
@@ -140,14 +139,11 @@ impl OutcomeStore {
     }
 
     /// Get outcomes recorded after a given timestamp.
-    pub async fn outcomes_since(&self, cutoff: DateTime<Utc>) -> Result<Vec<OutcomeRecord>> {
+    pub async fn outcomes_since(&self, cutoff: jiff::Timestamp) -> Result<Vec<OutcomeRecord>> {
         match &self.backend {
             Backend::Sqlite(repo) => {
                 let rows = repo
-                    .list_by_date_range(
-                        common::time::bridge::chrono_to_jiff(cutoff),
-                        common::time::bridge::chrono_to_jiff(Utc::now()),
-                    )
+                    .list_by_date_range(cutoff, jiff::Timestamp::now())
                     .await?;
                 rows.into_iter()
                     .map(row_to_outcome)
@@ -167,7 +163,9 @@ impl OutcomeStore {
     /// Get all outcome records (fetches from epoch to now).
     pub async fn get_all_outcomes(&self) -> Result<Vec<OutcomeRecord>> {
         match &self.backend {
-            Backend::Sqlite(_) => self.outcomes_since(DateTime::<Utc>::MIN_UTC).await,
+            Backend::Sqlite(_) => {
+                self.outcomes_since(jiff::Timestamp::from_second(i64::MIN / 1000).unwrap_or(jiff::Timestamp::UNIX_EPOCH)).await
+            }
             Backend::InMemory { outcomes, .. } => Ok(outcomes.lock().unwrap().clone()),
         }
     }
@@ -186,7 +184,7 @@ impl OutcomeStore {
                         actual_value: r.actual_value,
                         accepted: r.accepted,
                         confidence: r.confidence,
-                        timestamp: common::time::bridge::jiff_to_chrono(*r.timestamp),
+                        timestamp: *r.timestamp,
                     })
                     .collect())
             }
@@ -231,7 +229,7 @@ impl OutcomeRecorder {
             confidence_score: confidence.map(|c| c.score),
             confidence_dimensions: confidence.map(|c| c.dimensions.clone()),
             execution_mode,
-            created_at: Utc::now(),
+            created_at: jiff::Timestamp::now(),
         };
 
         let store = self.store.write().await;

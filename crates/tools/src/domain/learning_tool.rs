@@ -42,7 +42,7 @@ pub struct ThresholdEntry {
     pub from: f32,
     pub to: f32,
     pub reason: String,
-    pub timestamp: chrono::DateTime<chrono::Utc>,
+    pub timestamp: jiff::Timestamp,
 }
 
 /// LearningHandler trait for dependency inversion.

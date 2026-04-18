@@ -136,9 +136,9 @@ impl AgentLoop {
 
         if let Some(ref strategy_repo) = self.strategy_repo {
             let window_minutes: i64 = 30; // Default satisfaction window
-            let since = common::time::bridge::chrono_to_jiff(
-                chrono::Utc::now() - chrono::Duration::minutes(window_minutes),
-            );
+            let since = jiff::Timestamp::now()
+                .checked_sub(jiff::SignedDuration::from_secs(window_minutes * 60))
+                .unwrap();
             match strategy_repo
                 .set_satisfaction_for_chat(msg.chat_id.as_str(), since, score)
                 .await

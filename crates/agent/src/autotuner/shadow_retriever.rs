@@ -5,7 +5,6 @@ use std::sync::Arc;
 
 use async_trait::async_trait;
 use autotuner::{ShadowContext, ShadowRetrievalResult, ShadowRetriever};
-use chrono::{DateTime, Utc};
 use cognitive::UnifiedMemoryService;
 use common::TrialParams;
 
@@ -46,7 +45,7 @@ impl ShadowRetriever for AgentShadowRetriever {
             .await?;
 
         let total = scored_facts.len();
-        let now = Utc::now();
+        let now_ms = jiff::Timestamp::now().as_millisecond();
 
         let (avg_score, avg_age_days) = if total > 0 {
             let score_sum: f64 = scored_facts.iter().map(|f| f.score).sum();
@@ -55,8 +54,8 @@ impl ShadowRetriever for AgentShadowRetriever {
                 .map(|f| {
                     f.fact
                         .recorded_at
-                        .parse::<DateTime<Utc>>()
-                        .map(|ts| (now - ts).num_hours() as f64 / 24.0)
+                        .parse::<jiff::Timestamp>()
+                        .map(|ts| (now_ms - ts.as_millisecond()) as f64 / 86_400_000.0)
                         .unwrap_or(0.0)
                 })
                 .sum();

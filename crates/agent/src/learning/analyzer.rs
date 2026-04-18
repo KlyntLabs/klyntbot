@@ -2,8 +2,6 @@
 
 use std::collections::HashMap;
 
-use chrono::Utc;
-
 use super::types::{
     AnalysisResult, ConfidenceBand, EnrichmentFeedbackEntry, EnrichmentStats, FieldAcceptanceStats,
     OutcomeRecord, ToolStats,
@@ -26,7 +24,7 @@ impl LearningAnalyzer {
         let enrichment_stats = Self::compute_enrichment_stats(feedback);
 
         AnalysisResult {
-            computed_at: Utc::now(),
+            computed_at: jiff::Timestamp::now(),
             total_outcomes: outcomes.len(),
             per_tool_stats,
             suggested_threshold,
@@ -189,7 +187,6 @@ impl LearningAnalyzer {
 mod tests {
     use super::*;
     use crate::learning::types::ExecutionMode;
-    use chrono::Utc;
 
     fn make_outcome(tool: &str, success: bool, confidence: Option<f32>) -> OutcomeRecord {
         OutcomeRecord {
@@ -202,7 +199,7 @@ mod tests {
             confidence_score: confidence,
             confidence_dimensions: None,
             execution_mode: ExecutionMode::Chat,
-            created_at: Utc::now(),
+            created_at: jiff::Timestamp::now(),
         }
     }
 
@@ -218,7 +215,7 @@ mod tests {
             },
             accepted,
             confidence: 0.8,
-            timestamp: Utc::now(),
+            timestamp: jiff::Timestamp::now(),
         }
     }
 

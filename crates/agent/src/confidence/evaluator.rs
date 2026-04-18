@@ -3,7 +3,6 @@
 use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::Arc;
 
-use chrono::Utc;
 use tracing::debug;
 
 use super::types::{
@@ -66,7 +65,7 @@ impl ConfidenceEvaluator {
                 info_sufficiency: raw.info_sufficiency.clamp(0.0, 1.0),
             },
             action: DecisionAction::default(),
-            assessed_at: Utc::now(),
+            assessed_at: jiff::Timestamp::now(),
         };
 
         assessment.action = self.decide(&assessment);
@@ -295,7 +294,7 @@ mod tests {
                 info_sufficiency: 0.7,
             },
             action: DecisionAction::default(),
-            assessed_at: Utc::now(),
+            assessed_at: jiff::Timestamp::now(),
         };
         assert!(matches!(evaluator.decide(&high), DecisionAction::Proceed));
 
@@ -328,7 +327,7 @@ mod tests {
                 info_sufficiency: 0.8,
             },
             action: DecisionAction::default(),
-            assessed_at: Utc::now(),
+            assessed_at: jiff::Timestamp::now(),
         };
 
         // shell requires 0.9 — 0.75 should Clarify

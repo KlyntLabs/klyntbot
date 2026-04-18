@@ -62,15 +62,18 @@ impl FinanceHandler for FinanceHandlerImpl {
         }
 
         // Section 2: Yesterday's spending (top categories)
-        let yesterday = chrono::Local::now().date_naive() - chrono::Duration::days(1);
-        let yesterday_jiff = common::time::bridge::chrono_date_to_jiff(yesterday);
+        let yesterday = jiff::Timestamp::now()
+            .checked_sub(jiff::SignedDuration::from_secs(86400))
+            .unwrap()
+            .to_zoned(jiff::tz::TimeZone::system())
+            .date();
         let spending = self
             .repos
             .finance
             .transactions
             .sum_by_category(
-                yesterday_jiff,
-                yesterday_jiff,
+                yesterday,
+                yesterday,
                 "expense",
                 &self.config.default_currency,
             )
@@ -87,15 +90,16 @@ impl FinanceHandler for FinanceHandlerImpl {
 
         // Section 3: Goals approaching deadline (within 7 days)
         let goals = self.repos.finance.goals.list_active().await?;
-        let today = chrono::Local::now().date_naive();
+        let today = jiff::Timestamp::now()
+            .to_zoned(jiff::tz::TimeZone::system())
+            .date();
         let approaching: Vec<_> = goals
             .iter()
             .filter(|g| {
                 g.deadline
                     .map(|d| {
-                        let days_left =
-                            (common::time::bridge::jiff_date_to_chrono(*d) - today).num_days();
-                        (0..=7).contains(&days_left)
+                        let diff_days = days_between(today, *d);
+                        (0..=7).contains(&diff_days)
                     })
                     .unwrap_or(false)
             })
@@ -103,9 +107,7 @@ impl FinanceHandler for FinanceHandlerImpl {
         if !approaching.is_empty() {
             let mut goal_lines = vec!["### Goals Approaching Deadline".to_string()];
             for g in &approaching {
-                let days = (common::time::bridge::jiff_date_to_chrono(*g.deadline.unwrap())
-                    - today)
-                    .num_days();
+                let days = days_between(today, *g.deadline.unwrap());
                 let pct = if g.target_amount > 0 {
                     (g.current_amount as f64 / g.target_amount as f64) * 100.0
                 } else {
@@ -238,11 +240,12 @@ impl FinanceHandler for FinanceHandlerImpl {
 
         // Check stale investment prices
         let investments = self.repos.finance.investments.list_with_symbols().await?;
-        let stale_threshold = chrono::Local::now() - chrono::Duration::hours(24);
-        let stale_threshold_jiff = common::time::bridge::chrono_to_jiff(stale_threshold.to_utc());
+        let stale_threshold = jiff::Timestamp::now()
+            .checked_sub(jiff::SignedDuration::from_secs(24 * 3600))
+            .unwrap();
         let stale_count = investments
             .iter()
-            .filter(|inv| *inv.updated_at < stale_threshold_jiff)
+            .filter(|inv| *inv.updated_at < stale_threshold)
             .count();
         if stale_count > 0 {
             issues.push(format!(
@@ -253,12 +256,14 @@ impl FinanceHandler for FinanceHandlerImpl {
 
         // Check overdue goals
         let goals = self.repos.finance.goals.list_active().await?;
-        let today = chrono::Local::now().date_naive();
+        let today_health = jiff::Timestamp::now()
+            .to_zoned(jiff::tz::TimeZone::system())
+            .date();
         let overdue = goals
             .iter()
             .filter(|g| {
                 g.deadline
-                    .map(|d| common::time::bridge::jiff_date_to_chrono(*d) < today)
+                    .map(|d| *d < today_health)
                     .unwrap_or(false)
             })
             .count();
@@ -291,13 +296,27 @@ impl FinanceHandler for FinanceHandlerImpl {
     }
 
     async fn analyze_spending(&self, period: &str) -> Result<String> {
-        let today = chrono::Local::now().date_naive();
-        let (date_from, date_to, label) = match period {
-            "week" => (today - chrono::Duration::days(7), today, "Last 7 days"),
-            "quarter" => (today - chrono::Duration::days(90), today, "Last 90 days"),
-            "year" => (today - chrono::Duration::days(365), today, "Last year"),
-            _ => (today - chrono::Duration::days(30), today, "Last 30 days"),
+        let today = jiff::Timestamp::now()
+            .to_zoned(jiff::tz::TimeZone::system())
+            .date();
+        let secs_back: i64 = match period {
+            "week" => 7 * 86400,
+            "quarter" => 90 * 86400,
+            "year" => 365 * 86400,
+            _ => 30 * 86400,
         };
+        let label = match period {
+            "week" => "Last 7 days",
+            "quarter" => "Last 90 days",
+            "year" => "Last year",
+            _ => "Last 30 days",
+        };
+        let date_from = jiff::Timestamp::now()
+            .checked_sub(jiff::SignedDuration::from_secs(secs_back))
+            .unwrap()
+            .to_zoned(jiff::tz::TimeZone::system())
+            .date();
+        let date_to = today;
 
         let currency = &self.config.default_currency;
         let rows = self
@@ -305,8 +324,8 @@ impl FinanceHandler for FinanceHandlerImpl {
             .finance
             .transactions
             .sum_by_category(
-                common::time::bridge::chrono_date_to_jiff(date_from),
-                common::time::bridge::chrono_date_to_jiff(date_to),
+                date_from,
+                date_to,
                 "expense",
                 currency,
             )
@@ -334,4 +353,12 @@ impl FinanceHandler for FinanceHandlerImpl {
     fn proactivity_level(&self) -> ProactivityLevel {
         ProactivityLevel::parse(&self.config.proactivity_level)
     }
+}
+
+/// Compute the number of days from `from` to `to` (positive if `to` is in the future).
+fn days_between(from: jiff::civil::Date, to: jiff::civil::Date) -> i64 {
+    let utc = jiff::tz::TimeZone::UTC;
+    let from_ts = from.at(0, 0, 0, 0).to_zoned(utc.clone()).map(|z| z.timestamp().as_second()).unwrap_or(0);
+    let to_ts = to.at(0, 0, 0, 0).to_zoned(utc).map(|z| z.timestamp().as_second()).unwrap_or(0);
+    (to_ts - from_ts) / 86400
 }

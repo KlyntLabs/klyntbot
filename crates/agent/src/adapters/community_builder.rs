@@ -151,7 +151,7 @@ impl CommunityBuilder {
         let existing_ids: HashSet<String> =
             existing_communities.iter().map(|c| c.id.clone()).collect();
 
-        let now = chrono::Utc::now().to_rfc3339();
+        let now = jiff::Timestamp::now().to_string();
         let mut new_community_ids: HashSet<String> = HashSet::new();
 
         // 5. Process each community

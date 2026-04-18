@@ -5,7 +5,6 @@
 //! Tier 3 (event-driven): latest narrative
 
 use async_trait::async_trait;
-use chrono::{DateTime, Duration, Utc};
 use context_engine::source::{ContextSource, SourceContext};
 use context_engine::TtlCache;
 use feature_productivity::repos::ProductivityRepos;
@@ -21,7 +20,7 @@ pub struct ProductivityContextSource {
     aggregator: DailyAggregator,
     pattern_analyzer: ProductivityPatternAnalyzer,
     cache: TtlCache,
-    pattern_cache: Mutex<Option<(ProductivityPatterns, DateTime<Utc>)>>,
+    pattern_cache: Mutex<Option<(ProductivityPatterns, jiff::Timestamp)>>,
 }
 
 impl ProductivityContextSource {
@@ -78,7 +77,7 @@ impl ProductivityContextSource {
         {
             let cache = self.pattern_cache.lock().await;
             if let Some((ref patterns, expires_at)) = *cache {
-                if Utc::now() < expires_at {
+                if jiff::Timestamp::now() < expires_at {
                     return Some(patterns.clone());
                 }
             }
@@ -86,7 +85,9 @@ impl ProductivityContextSource {
 
         match self.pattern_analyzer.analyze(14).await {
             Ok(patterns) => {
-                let expires = Utc::now() + Duration::seconds(PATTERN_CACHE_TTL_SECS);
+                let expires = jiff::Timestamp::now()
+                    .checked_add(jiff::SignedDuration::from_secs(PATTERN_CACHE_TTL_SECS))
+                    .unwrap();
                 *self.pattern_cache.lock().await = Some((patterns.clone(), expires));
                 Some(patterns)
             }
@@ -114,7 +115,7 @@ impl ProductivityContextSource {
         }
 
         // Today's quality score from intelligence layer
-        let today = Utc::now().format("%Y-%m-%d").to_string();
+        let today = jiff::Timestamp::now().strftime("%Y-%m-%d").to_string();
         if let Ok(Some(score)) = self.repos.quality_scores.get_daily(&today).await {
             sections.push(format!(
                 "## Quality\nToday's score: {:.0}/100 (focus={:.0}% continuity={:.0}% distraction_inv={:.0}%)",
@@ -166,7 +167,8 @@ impl ProductivityContextSource {
         // Tier 1 fallback: old-style active focus session
         if sections.is_empty() {
             if let Ok(Some(session)) = self.repos.sessions.get_active().await {
-                let elapsed = (Utc::now() - session.started_at).num_minutes();
+                let started_ts = common::time::bridge::chrono_to_jiff(session.started_at);
+                let elapsed = (jiff::Timestamp::now().as_millisecond() - started_ts.as_millisecond()) / 60_000;
                 let target = session.target_mins.unwrap_or(45);
                 let remaining = (target - elapsed).max(0);
                 let mut focus_line = format!(
@@ -236,8 +238,10 @@ impl ProductivityContextSource {
         }
 
         // Tier 3: Latest narrative
-        let yesterday = (Utc::now() - Duration::days(1))
-            .format("%Y-%m-%d")
+        let yesterday = jiff::Timestamp::now()
+            .checked_sub(jiff::SignedDuration::from_secs(86400))
+            .unwrap()
+            .strftime("%Y-%m-%d")
             .to_string();
         for date in [&today, &yesterday] {
             if let Ok(Some(narrative)) = self.repos.narratives.get_by_date(date).await {

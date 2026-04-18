@@ -8,7 +8,6 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 
-use chrono::{Datelike, Timelike};
 
 /// Minimum interactions before patterns can be detected.
 const MIN_INTERACTIONS_FOR_ANALYSIS: usize = 10;
@@ -48,18 +47,23 @@ impl PatternAnalyzer {
         let mut time_counts: HashMap<String, i32> = HashMap::new();
 
         for log in &logs {
-            if let Ok(dt) =
-                chrono::NaiveDateTime::parse_from_str(&log.timestamp, "%Y-%m-%d %H:%M:%S")
+            // Parse timestamp as jiff civil datetime (local time, no tz)
+            if let Ok(dt) = log
+                .timestamp
+                .parse::<jiff::civil::DateTime>()
+                .or_else(|_| {
+                    jiff::civil::DateTime::strptime("%Y-%m-%d %H:%M:%S", &log.timestamp)
+                })
             {
                 // Day-of-week × agent
                 let day = match dt.weekday() {
-                    chrono::Weekday::Mon => "monday",
-                    chrono::Weekday::Tue => "tuesday",
-                    chrono::Weekday::Wed => "wednesday",
-                    chrono::Weekday::Thu => "thursday",
-                    chrono::Weekday::Fri => "friday",
-                    chrono::Weekday::Sat => "saturday",
-                    chrono::Weekday::Sun => "sunday",
+                    jiff::civil::Weekday::Monday => "monday",
+                    jiff::civil::Weekday::Tuesday => "tuesday",
+                    jiff::civil::Weekday::Wednesday => "wednesday",
+                    jiff::civil::Weekday::Thursday => "thursday",
+                    jiff::civil::Weekday::Friday => "friday",
+                    jiff::civil::Weekday::Saturday => "saturday",
+                    jiff::civil::Weekday::Sunday => "sunday",
                 };
                 *day_agent_counts
                     .entry((day.to_string(), log.agent_name.clone()))

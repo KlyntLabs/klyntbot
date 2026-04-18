@@ -4,7 +4,6 @@ use std::sync::Arc;
 
 use async_trait::async_trait;
 use bus::{DomainEvent, DomainEventBus};
-use chrono::Utc;
 use common::Result;
 use storage::TaskRepo;
 use tracing::{debug, info, warn};
@@ -88,7 +87,7 @@ impl TaskExecutionHandler for LlmTaskExecutionHandler {
                 })),
                 status: "pending".to_string(),
                 trigger: Some("execution_request".to_string()),
-                created_at: common::time::bridge::chrono_to_jiff(Utc::now()).into(),
+                created_at: jiff::Timestamp::now().into(),
                 resolved_at: None,
             };
             self.repo.create_suggestion(&sugg_row).await?;
@@ -117,7 +116,7 @@ impl TaskExecutionHandler for LlmTaskExecutionHandler {
             task_id: task.id.clone(),
             status: "pending".to_string(),
             agent_profile: config.agent_profile.clone(),
-            started_at: Some(common::time::bridge::chrono_to_jiff(Utc::now()).into()),
+            started_at: Some(jiff::Timestamp::now().into()),
             completed_at: None,
             duration_secs: None,
             tokens_used: None,
@@ -131,7 +130,7 @@ impl TaskExecutionHandler for LlmTaskExecutionHandler {
             artifacts: None,
             metrics: None,
             retry_count: 0,
-            created_at: common::time::bridge::chrono_to_jiff(Utc::now()).into(),
+            created_at: jiff::Timestamp::now().into(),
         };
         self.repo.create_execution(&exec_row).await?;
 

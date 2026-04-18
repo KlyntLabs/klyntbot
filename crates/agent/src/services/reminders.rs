@@ -1,6 +1,6 @@
 //! ReminderEngine - Deterministic reminder system for todos
 
-use chrono::{Duration, Utc};
+use chrono::{Duration, Utc};  // needed for Todo fields which are still DateTime<Utc>
 use std::sync::Arc;
 use std::time::Duration as StdDuration;
 use tokio::task::JoinHandle;
@@ -122,7 +122,7 @@ impl ReminderEngine {
                 // Update last_reminded_at via SQL
                 let patch = storage::TaskPatch {
                     id: todo.id.clone(),
-                    last_reminded_at: Some(Some(common::time::bridge::chrono_to_jiff(Utc::now()))),
+                    last_reminded_at: Some(Some(jiff::Timestamp::now())),
                     ..Default::default()
                 };
                 let _ = repo.update(&patch).await;

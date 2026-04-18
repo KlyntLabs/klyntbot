@@ -158,7 +158,7 @@ impl ProductivityTreeBuilder {
         quality: f64,
         interruptions: i32,
     ) -> common::Result<()> {
-        let date = chrono::Utc::now().format("%Y-%m-%d").to_string();
+        let date = jiff::Timestamp::now().strftime("%Y-%m-%d").to_string();
         let daily_id = format!("productivity-daily-{date}");
         let focus_id = format!("productivity-focus-{}", Uuid::new_v4());
 

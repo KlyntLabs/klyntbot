@@ -3,7 +3,6 @@
 use std::path::PathBuf;
 
 use async_trait::async_trait;
-use chrono::Utc;
 use context_engine::source::{ContextSource, SourceContext};
 
 /// Provides the identity section of the system prompt.
@@ -14,12 +13,12 @@ pub struct IdentitySource {
     workspace: PathBuf,
     timezone: String,
     /// Pre-parsed timezone — avoids re-parsing on every `provide()` call.
-    parsed_tz: Option<chrono_tz::Tz>,
+    parsed_tz: Option<jiff::tz::TimeZone>,
 }
 
 impl IdentitySource {
     pub fn new(workspace: PathBuf, timezone: String) -> Self {
-        let parsed_tz = timezone.parse::<chrono_tz::Tz>().ok();
+        let parsed_tz = jiff::tz::TimeZone::get(&timezone).ok();
         Self {
             workspace,
             timezone,
@@ -39,19 +38,19 @@ impl ContextSource for IdentitySource {
     }
 
     async fn provide(&self, ctx: &SourceContext) -> Option<String> {
-        let now = Utc::now();
+        let now = jiff::Timestamp::now();
 
-        let date_str = if let Some(tz) = self.parsed_tz {
-            let local = now.with_timezone(&tz);
+        let date_str = if let Some(ref tz) = self.parsed_tz {
+            let local = now.to_zoned(tz.clone());
             let utc_offset = common::date::timezone_utc_offset(&self.timezone);
             format!(
                 "{} ({}, UTC{})",
-                local.format("%Y-%m-%d %H:%M (%A)"),
+                local.strftime("%Y-%m-%d %H:%M (%A)"),
                 self.timezone,
                 utc_offset
             )
         } else {
-            now.format("%Y-%m-%d %H:%M (%A) (UTC)").to_string()
+            now.strftime("%Y-%m-%d %H:%M (%A) (UTC)").to_string()
         };
 
         let os = std::env::consts::OS;

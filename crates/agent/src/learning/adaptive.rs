@@ -1,7 +1,6 @@
 //! AdaptiveThresholds — adjusts the ConfidenceEvaluator threshold
 //! based on analysis results.
 
-use chrono::Utc;
 use tracing::{info, warn};
 
 use common::Result;
@@ -36,7 +35,7 @@ fn apply_analysis_impl(
             analysis.total_outcomes, min_outcomes
         );
         state.last_analysis = Some(analysis.clone());
-        state.updated_at = Utc::now();
+        state.updated_at = jiff::Timestamp::now();
         return None;
     }
 
@@ -50,7 +49,7 @@ fn apply_analysis_impl(
 
     if (new_threshold - state.current_threshold).abs() < 0.001 {
         state.last_analysis = Some(analysis.clone());
-        state.updated_at = Utc::now();
+        state.updated_at = jiff::Timestamp::now();
         return None;
     }
 
@@ -62,11 +61,11 @@ fn apply_analysis_impl(
             "Analysis suggested {:.3} (confidence {:.2}), step-limited from {:.3}",
             suggested, analysis.threshold_confidence, old
         ),
-        timestamp: Utc::now(),
+        timestamp: jiff::Timestamp::now(),
     });
     state.current_threshold = new_threshold;
     state.last_analysis = Some(analysis.clone());
-    state.updated_at = Utc::now();
+    state.updated_at = jiff::Timestamp::now();
 
     info!(
         "Adaptive threshold updated: {:.3} → {:.3}",
@@ -136,7 +135,7 @@ impl AdaptiveThresholds {
             current_threshold: threshold,
             last_analysis: None,
             threshold_history: Vec::new(),
-            updated_at: Utc::now(),
+            updated_at: jiff::Timestamp::now(),
         }
     }
 
@@ -181,7 +180,7 @@ mod tests {
 
     fn make_analysis(total: usize, suggested: f32, confidence: f32) -> AnalysisResult {
         AnalysisResult {
-            computed_at: Utc::now(),
+            computed_at: jiff::Timestamp::now(),
             total_outcomes: total,
             per_tool_stats: HashMap::new(),
             suggested_threshold: suggested,
@@ -198,7 +197,7 @@ mod tests {
             current_threshold: 0.7,
             last_analysis: None,
             threshold_history: Vec::new(),
-            updated_at: Utc::now(),
+            updated_at: jiff::Timestamp::now(),
         };
 
         let analysis = make_analysis(10, 0.5, 0.3); // too few outcomes
@@ -213,7 +212,7 @@ mod tests {
             current_threshold: 0.7,
             last_analysis: None,
             threshold_history: Vec::new(),
-            updated_at: Utc::now(),
+            updated_at: jiff::Timestamp::now(),
         };
 
         let analysis = make_analysis(100, 0.4, 0.9);
@@ -229,7 +228,7 @@ mod tests {
             current_threshold: 0.42,
             last_analysis: None,
             threshold_history: Vec::new(),
-            updated_at: Utc::now(),
+            updated_at: jiff::Timestamp::now(),
         };
 
         let analysis = make_analysis(100, 0.1, 0.9);
@@ -245,7 +244,7 @@ mod tests {
             current_threshold: 0.7,
             last_analysis: None,
             threshold_history: Vec::new(),
-            updated_at: Utc::now(),
+            updated_at: jiff::Timestamp::now(),
         };
 
         let analysis = make_analysis(100, 0.7, 0.9);
@@ -259,7 +258,7 @@ mod tests {
             current_threshold: 0.7,
             last_analysis: None,
             threshold_history: Vec::new(),
-            updated_at: Utc::now(),
+            updated_at: jiff::Timestamp::now(),
         };
 
         let analysis = make_analysis(100, 0.5, 0.8);
@@ -276,7 +275,7 @@ mod tests {
             current_threshold: 0.7,
             last_analysis: None,
             threshold_history: Vec::new(),
-            updated_at: Utc::now(),
+            updated_at: jiff::Timestamp::now(),
         };
 
         let analysis = make_analysis(100, 0.5, 0.9);
@@ -293,7 +292,7 @@ mod tests {
             current_threshold: 0.7,
             last_analysis: None,
             threshold_history: Vec::new(),
-            updated_at: Utc::now(),
+            updated_at: jiff::Timestamp::now(),
         };
 
         let analysis = make_analysis(100, 0.2, 0.9);

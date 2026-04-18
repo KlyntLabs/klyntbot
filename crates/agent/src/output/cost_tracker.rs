@@ -2,7 +2,7 @@
 
 use std::collections::HashMap;
 
-use chrono::{DateTime, Utc};
+use jiff::Timestamp;
 use serde::{Deserialize, Serialize};
 
 use common::Result;
@@ -11,7 +11,7 @@ use providers::Usage;
 /// A single usage record.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct UsageRecord {
-    pub timestamp: DateTime<Utc>,
+    pub timestamp: Timestamp,
     pub request_id: String,
     pub model: String,
     pub provider: String,
@@ -291,7 +291,7 @@ impl CostTracker {
 
         let row = storage::UsageRecordRow {
             id: uuid::Uuid::new_v4(),
-            timestamp: common::time::bridge::chrono_to_jiff(Utc::now()).into(),
+            timestamp: Timestamp::now().into(),
             request_id,
             model: model.to_string(),
             provider: provider.to_string(),
@@ -313,7 +313,9 @@ impl CostTracker {
     /// Generate a usage report for the last N days.
     pub async fn report(&self, days: u32) -> Result<UsageReport> {
         let cutoff =
-            common::time::bridge::chrono_to_jiff(Utc::now() - chrono::Duration::days(days as i64));
+            Timestamp::now()
+                .checked_sub(jiff::SignedDuration::from_secs(days as i64 * 86400))
+                .unwrap();
 
         let (total_requests_i64, total_cost) = self
             .sql_repo

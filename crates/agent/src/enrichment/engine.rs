@@ -128,7 +128,7 @@ fn parse_llm_enrichment_response(content: &str, task: &Task) -> Option<Enrichmen
 
     if task.due_date.is_none() {
         if let Some(ref date_str) = parsed.due_date {
-            if chrono::DateTime::parse_from_rfc3339(date_str).is_ok() {
+            if date_str.parse::<jiff::Timestamp>().is_ok() {
                 result.due_date = Some(EnrichmentSuggestion {
                     value: date_str.clone(),
                     confidence: parsed.due_date_confidence.unwrap_or(0.6),
@@ -171,7 +171,7 @@ impl EnrichmentHandler for EnrichmentEngine {
         if task.due_date.is_none() {
             if let Some(due) = super::scheduling::suggest_due_date(task) {
                 result.due_date = Some(EnrichmentSuggestion {
-                    value: due.value.to_rfc3339(),
+                    value: due.value.to_string(),
                     confidence: due.confidence,
                     reasoning: due.reasoning,
                 });
@@ -308,7 +308,7 @@ mod tests {
         let mut task = Task::default_instance();
         task.title = "URGENT: Fix bug".to_string();
         task.priority = Some(1);
-        task.due_date = Some(chrono::Utc::now() + chrono::Duration::days(1));
+        task.due_date = Some(chrono::Utc::now() + chrono::Duration::try_days(1).unwrap());
 
         let result = engine.enrich(&task).await.unwrap();
         // All fields already set, should return None

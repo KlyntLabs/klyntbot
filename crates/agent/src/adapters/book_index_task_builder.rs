@@ -128,7 +128,6 @@ fn add_task_node(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use chrono::Utc;
 
     #[test]
     fn build_project_tree() {

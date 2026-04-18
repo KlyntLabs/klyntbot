@@ -13,7 +13,6 @@ use autotuner::{
     GenerationResponse, MetricSource, NightlyCycle, TrialSummaryForPrompt,
 };
 use bus::DomainEventBus;
-use chrono::Utc;
 use common::TrialParams;
 use config::AutoTunerConfig;
 use providers::{ChatParams, DynProvider, Message};
@@ -444,7 +443,7 @@ impl AutoTunerOrchestrator {
                         let new_champion = Champion {
                             trial_id: Some(trial_id),
                             params,
-                            promoted_at: common::time::bridge::chrono_to_jiff(chrono::Utc::now()),
+                            promoted_at: jiff::Timestamp::now(),
                             baseline_metrics: trial_result,
                             reason_for_promotion: format!(
                                 "Promoted by nightly cycle (trial {trial_id})"
@@ -771,7 +770,9 @@ async fn run_llm_generation(orch: &AutoTunerOrchestrator) -> common::Result<Vec<
 
     // ── Build enriched context from real data (fall back to placeholders) ──
     let seven_days_ago =
-        common::time::bridge::chrono_to_jiff(chrono::Utc::now() - chrono::Duration::days(7));
+        (jiff::Timestamp::now()
+            .checked_sub(jiff::SignedDuration::from_secs(7 * 86400))
+            .unwrap());
 
     let trend_summary = if let Some(ref strategy_repo) = orch.strategy_repo {
         let stats = strategy_repo
@@ -847,7 +848,7 @@ async fn run_llm_generation(orch: &AutoTunerOrchestrator) -> common::Result<Vec<
 
     // Create experiment record.
     let experiment_id = uuid::Uuid::new_v4();
-    let now = chrono::Utc::now().to_rfc3339();
+    let now = jiff::Timestamp::now().to_string();
     let hypothesis = generation
         .variants
         .first()
@@ -1030,7 +1031,9 @@ mod tests {
     #[tokio::test]
     async fn champion_summary_populates_days_active() {
         let champion = Champion {
-            promoted_at: common::time::bridge::chrono_to_jiff(chrono::Utc::now() - chrono::Duration::days(3)),
+            promoted_at: jiff::Timestamp::now()
+                .checked_sub(jiff::SignedDuration::from_secs(3 * 86400))
+                .unwrap(),
             ..Champion::default()
         };
         let orch = make_orch(champion).await;

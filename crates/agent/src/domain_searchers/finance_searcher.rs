@@ -68,7 +68,7 @@ impl DomainSearcher for FinanceSearcher {
                     tx.tx_type,
                     amount_display,
                     tx.currency,
-                    common::time::bridge::jiff_date_to_chrono(*tx.tx_date),
+                    *tx.tx_date,
                     tx.notes.as_deref().unwrap_or(""),
                 );
                 MemoryEntry {

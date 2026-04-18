@@ -102,7 +102,7 @@ impl OkrTreeBuilder {
         progress: f64,
         target: f64,
     ) -> common::Result<()> {
-        let date = chrono::Utc::now().format("%Y-%m-%d").to_string();
+        let date = jiff::Timestamp::now().strftime("%Y-%m-%d").to_string();
         let obj_id = format!("okr-obj-{objective_id}");
         let progress_id = format!("okr-progress-{objective_id}-{date}");
 

@@ -1,6 +1,6 @@
 //! Confidence assessment types.
 
-use chrono::{DateTime, Utc};
+use jiff::Timestamp;
 use serde::{Deserialize, Serialize};
 
 /// End-to-end confidence assessment from LLM reasoning.
@@ -18,7 +18,7 @@ pub struct ConfidenceAssessment {
     #[serde(skip)]
     pub action: DecisionAction,
     /// Timestamp.
-    pub assessed_at: DateTime<Utc>,
+    pub assessed_at: Timestamp,
 }
 
 /// Assessment phase within the agent loop.
@@ -62,7 +62,7 @@ pub struct DecisionLogEntry {
     pub user_message_preview: String,
     pub assessment: ConfidenceAssessment,
     pub outcome: Option<String>,
-    pub created_at: DateTime<Utc>,
+    pub created_at: Timestamp,
 }
 
 /// Raw JSON block the LLM emits inside `<confidence>` tags.
@@ -104,7 +104,7 @@ mod tests {
                 info_sufficiency: 0.75,
             },
             action: DecisionAction::Proceed,
-            assessed_at: Utc::now(),
+            assessed_at: Timestamp::now(),
         };
 
         let json = serde_json::to_string(&assessment).unwrap();
