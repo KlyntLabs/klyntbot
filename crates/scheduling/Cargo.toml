@@ -22,3 +22,4 @@ thiserror = "2.0"
 tokio-util.workspace = true
 
 [dev-dependencies]
+tools-core.workspace = true
