@@ -8,6 +8,7 @@ license.workspace = true
 [dependencies]
 common.workspace = true
 storage.workspace = true
+bus.workspace = true
 tokio = { workspace = true }
 # chrono/chrono-tz: kept for cron crate API boundary (Schedule::upcoming requires chrono::TimeZone)
 chrono = { workspace = true }
