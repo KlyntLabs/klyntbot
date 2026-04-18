@@ -175,8 +175,8 @@ mod tests {
             icon: None,
             position: 0,
             status: "active".to_string(),
-            created_at: Utc::now(),
-            updated_at: Utc::now(),
+            created_at: storage::SqlTs(jiff::Timestamp::now()),
+            updated_at: storage::SqlTs(jiff::Timestamp::now()),
         };
         repos.areas.create(&area).await.ok()?;
         Some(repos.tasks)

@@ -109,7 +109,7 @@ async fn message_metadata_preserved_through_bus() {
         "chat_private",
         "Important message",
     );
-    inbound.timestamp = chrono::Utc::now();
+    inbound.timestamp = jiff::Timestamp::now();
 
     bus.publish_inbound(inbound).await.unwrap();
 
@@ -119,7 +119,7 @@ async fn message_metadata_preserved_through_bus() {
     assert_eq!(received.sender_id, "user_alice");
     assert_eq!(received.chat_id.as_str(), "chat_private");
     assert_eq!(received.content, "Important message");
-    assert!(received.timestamp.timestamp() > 0);
+    assert!(received.timestamp.as_second() > 0);
 }
 
 #[tokio::test]

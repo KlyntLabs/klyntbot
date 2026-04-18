@@ -126,7 +126,7 @@ mod tests {
             content: Some(content.to_string()),
             metadata: None,
             priority: bus::UpdatePriority::Normal,
-            timestamp: chrono::Utc::now(),
+            timestamp: jiff::Timestamp::now(),
         });
     }
 
@@ -177,7 +177,7 @@ mod tests {
     #[test]
     fn priority_ordering_high_first() {
         let (refresher, queue) = make_refresher();
-        let now = chrono::Utc::now();
+        let now = jiff::Timestamp::now();
         queue.push(bus::ContextUpdate {
             reason: bus::ContextUpdateReason::MemoryPromoted,
             content: Some("Low priority fact".to_string()),

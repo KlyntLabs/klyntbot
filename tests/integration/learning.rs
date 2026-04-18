@@ -811,7 +811,7 @@ async fn strategy_record_round_trips_with_satisfaction_backfill() {
 
     let record = klyntbot::storage::StrategyRecordRow {
         id: uuid::Uuid::new_v4(),
-        timestamp: Utc::now(),
+        timestamp: klyntbot::storage::SqlTs(jiff::Timestamp::now()),
         request_id: "integration-test-1".to_string(),
         predicted_strategy: "DirectResponse".to_string(),
         actual_strategy: "ToolAssisted".to_string(),
@@ -836,7 +836,9 @@ async fn strategy_record_round_trips_with_satisfaction_backfill() {
     };
     repos.strategies.create(&record).await.unwrap();
 
-    let since = Utc::now() - chrono::Duration::minutes(5);
+    let since = jiff::Timestamp::now()
+        .checked_sub(jiff::SignedDuration::from_secs(300))
+        .unwrap();
     let updated = repos
         .strategies
         .set_satisfaction_for_chat("tg:user123", since, 1.0)
@@ -859,7 +861,7 @@ async fn handler_reads_strategy_records_with_tool_stats() {
 
     let row = klyntbot::storage::StrategyRecordRow {
         id: uuid::Uuid::new_v4(),
-        timestamp: Utc::now(),
+        timestamp: klyntbot::storage::SqlTs(jiff::Timestamp::now()),
         request_id: "req-learn".to_string(),
         predicted_strategy: "ToolAssisted".to_string(),
         actual_strategy: "ToolAssisted".to_string(),
@@ -902,7 +904,9 @@ async fn satisfaction_no_match_returns_false() {
     let pool = klyntbot::StoragePool::connect_in_memory().await.unwrap();
     let repos = klyntbot::Repos::from_pool(&pool);
 
-    let since = Utc::now() - chrono::Duration::minutes(5);
+    let since = jiff::Timestamp::now()
+        .checked_sub(jiff::SignedDuration::from_secs(300))
+        .unwrap();
     let updated = repos
         .strategies
         .set_satisfaction_for_chat("nonexistent:chat", since, 0.0)
@@ -930,7 +934,7 @@ async fn handler_impl_returns_status_with_outcomes() {
 
     let row = storage::StrategyRecordRow {
         id: uuid::Uuid::new_v4(),
-        timestamp: Utc::now(),
+        timestamp: klyntbot::storage::SqlTs(jiff::Timestamp::now()),
         request_id: "req-1".to_string(),
         predicted_strategy: "DirectResponse".to_string(),
         actual_strategy: "DirectResponse".to_string(),
@@ -991,7 +995,7 @@ async fn handler_impl_analyze_now_with_multi_tool_aggregation() {
     for i in 0..2 {
         let row = storage::StrategyRecordRow {
             id: uuid::Uuid::new_v4(),
-            timestamp: Utc::now(),
+            timestamp: klyntbot::storage::SqlTs(jiff::Timestamp::now()),
             request_id: format!("req-todo-{}", i),
             predicted_strategy: "ToolAssisted".to_string(),
             actual_strategy: "ToolAssisted".to_string(),
@@ -1018,7 +1022,7 @@ async fn handler_impl_analyze_now_with_multi_tool_aggregation() {
     }
     let shell_row = storage::StrategyRecordRow {
         id: uuid::Uuid::new_v4(),
-        timestamp: Utc::now(),
+        timestamp: klyntbot::storage::SqlTs(jiff::Timestamp::now()),
         request_id: "req-shell-0".to_string(),
         predicted_strategy: "ToolAssisted".to_string(),
         actual_strategy: "ToolAssisted".to_string(),

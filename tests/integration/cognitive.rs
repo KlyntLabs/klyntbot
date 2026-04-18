@@ -90,7 +90,7 @@ fn test_delivered_intervention(trigger: &str) -> DeliveredIntervention {
         id: uuid::Uuid::new_v4().to_string(),
         intervention_type: InterventionType::ChatMessage,
         message: "test intervention".into(),
-        delivered_at: Utc::now(),
+        delivered_at: jiff::Timestamp::now(),
         trigger_name: trigger.into(),
         action_url: None,
     }

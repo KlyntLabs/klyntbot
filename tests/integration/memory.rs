@@ -433,9 +433,9 @@ async fn memory_tool_registration() {
         "Action should be required"
     );
 
-    // Verify all 5 actions in enum
+    // Verify all 6 actions in enum
     let actions = params["properties"]["action"]["enum"].as_array().unwrap();
-    assert_eq!(actions.len(), 5, "Should have 5 actions");
+    assert_eq!(actions.len(), 6, "Should have 6 actions");
     assert!(
         actions.contains(&json!("search_conversations")),
         "Should include search_conversations"

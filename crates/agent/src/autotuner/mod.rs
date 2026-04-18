@@ -919,7 +919,7 @@ mod tests {
             "CREATE TABLE IF NOT EXISTS learning_state (
                 key TEXT PRIMARY KEY,
                 value TEXT NOT NULL,
-                updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+                updated_at INTEGER NOT NULL DEFAULT (unixepoch('now') * 1000)
             )",
         )
         .execute(&pool)

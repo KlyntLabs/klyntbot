@@ -329,7 +329,7 @@ impl SimulationHarness {
 
         let total_days = self.scenario.total_days();
         let step = parse_epoch_step(&self.scenario.simulation.epoch_step);
-        let start_date: Zoned = "2025-01-01T00:00:00Z".parse().unwrap();
+        let start_date: Zoned = "2025-01-01T00:00:00+00:00[UTC]".parse().unwrap();
         let start_date_str = start_date.to_string();
         let end_date =
             start_date.clone() + jiff::SignedDuration::from_hours(i64::from(total_days) * 24);

@@ -350,8 +350,8 @@ mod tests {
             project_id: project_id.map(|s| s.to_string()),
             is_ephemeral: false,
             is_pinned: false,
-            created_at: String::new(),
-            updated_at: String::new(),
+            created_at: storage::SqlTs(jiff::Timestamp::now()),
+            updated_at: storage::SqlTs(jiff::Timestamp::now()),
         }
     }
 

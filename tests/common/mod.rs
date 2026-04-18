@@ -222,8 +222,8 @@ pub async fn ensure_test_area(pool: &klyntbot::storage::StoragePool) {
         icon: None,
         position: 0,
         status: "active".to_string(),
-        created_at: Utc::now(),
-        updated_at: Utc::now(),
+        created_at: klyntbot::storage::SqlTs(jiff::Timestamp::now()),
+        updated_at: klyntbot::storage::SqlTs(jiff::Timestamp::now()),
     };
     // Ignore error if already exists
     let _ = area_repo.create(&area).await;

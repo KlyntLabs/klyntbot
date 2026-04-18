@@ -8,7 +8,6 @@
 
 use super::embedding_utils::deterministic_embedding;
 use async_trait::async_trait;
-use chrono::Utc;
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 use tokio::sync::RwLock;
@@ -122,7 +121,7 @@ impl EmbeddingHandler for MockEmbeddingHandler {
             id: todo.id.clone(),
             embedding,
             model: "mock-model".to_string(),
-            embedded_at: Utc::now(),
+            embedded_at: jiff::Timestamp::now(),
         };
 
         if let Some(ref store) = self.store {
