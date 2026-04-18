@@ -3,7 +3,7 @@ use crate::repos::task_alarms::TaskAlarmsRepo;
 use crate::rows::task_alarm::TaskAlarmRow;
 use tools_core::FeatureMigration;
 
-async fn setup() -> TaskAlarmsRepo {
+async fn setup() -> (TaskAlarmsRepo, sqlx::SqlitePool) {
     let pool = StoragePool::connect_in_memory().await.unwrap();
     // connect_in_memory() already runs storage/001_initial.sql (areas, projects, etc.).
     // Now apply the feature-tasks migration which creates tasks, task_alarms, etc.
@@ -32,12 +32,13 @@ async fn setup() -> TaskAlarmsRepo {
     .await
     .unwrap();
 
-    TaskAlarmsRepo::new(pool.inner().clone())
+    let raw = pool.inner().clone();
+    (TaskAlarmsRepo::new(pool.inner().clone()), raw)
 }
 
 #[tokio::test]
 async fn insert_and_list_by_task() {
-    let repo = setup().await;
+    let (repo, _pool) = setup().await;
     let row = TaskAlarmRow {
         id: "a1".into(),
         task_id: "task_1".into(),
@@ -60,8 +61,8 @@ async fn insert_and_list_by_task() {
 }
 
 #[tokio::test]
-async fn delete_by_task_cascade() {
-    let repo = setup().await;
+async fn delete_by_task_explicit_clears_alarms() {
+    let (repo, _pool) = setup().await;
     repo.insert(&TaskAlarmRow {
         id: "a1".into(),
         task_id: "task_1".into(),
@@ -81,4 +82,37 @@ async fn delete_by_task_cascade() {
     .unwrap();
     repo.delete_by_task("task_1").await.unwrap();
     assert!(repo.list_by_task("task_1").await.unwrap().is_empty());
+}
+
+#[tokio::test]
+async fn deleting_parent_task_cascades_to_alarms() {
+    let (repo, pool) = setup().await;
+    repo.insert(&TaskAlarmRow {
+        id: "a1".into(),
+        task_id: "task_1".into(),
+        rule_type: "relative_before".into(),
+        offset_secs: Some(3600),
+        day_offset: None,
+        time_of_day: None,
+        iana_tz: None,
+        absolute_fire_at_ms: None,
+        channel_mask: 0,
+        priority_override: None,
+        misfire_policy: None,
+        grace_window_secs: None,
+        created_at_ms: 0,
+    })
+    .await
+    .unwrap();
+    // Delete the parent task. FK `task_alarms.task_id → tasks(id) ON DELETE CASCADE`
+    // should wipe the alarm row automatically.
+    sqlx::query("DELETE FROM tasks WHERE id = 'task_1'")
+        .execute(&pool)
+        .await
+        .unwrap();
+    let remaining = repo.list_by_task("task_1").await.unwrap();
+    assert!(
+        remaining.is_empty(),
+        "cascade should clear alarms, found {remaining:?}"
+    );
 }

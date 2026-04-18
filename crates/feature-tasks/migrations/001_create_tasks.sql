@@ -247,6 +247,9 @@ BEGIN
 END;
 
 -- ---------- Task recurrence templates (Phase 2) ----------
+-- Note: source_task_id has NO FK to tasks — templates may outlive their
+-- origin task (user could rename/split the source task without losing the
+-- recurrence definition).
 CREATE TABLE IF NOT EXISTS task_recurrence_templates (
     id                   TEXT PRIMARY KEY,
     source_task_id       TEXT NOT NULL,
