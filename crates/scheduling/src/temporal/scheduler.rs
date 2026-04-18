@@ -22,6 +22,7 @@ use tokio_util::sync::CancellationToken;
 use tracing::{info, warn};
 
 use crate::error::SchedulerError;
+use crate::temporal::cron_bridge::CronBridge;
 use crate::temporal::fire_store::FireStore;
 use crate::temporal::misfire::{Decision, MisfirePolicy};
 
@@ -55,6 +56,7 @@ pub struct TemporalScheduler {
     wake: Arc<Notify>,
     shutdown: CancellationToken,
     started: Arc<AtomicBool>,
+    cron_bridge: Option<Arc<CronBridge>>,
 }
 
 impl TemporalScheduler {
@@ -66,7 +68,16 @@ impl TemporalScheduler {
             wake: Arc::new(Notify::new()),
             shutdown: CancellationToken::new(),
             started: Arc::new(AtomicBool::new(false)),
+            cron_bridge: None,
         }
+    }
+
+    /// Attach a CronBridge so the scheduler can advance cron jobs after each
+    /// `kind="cron_job"` fire. Without this, cron jobs will fire once but never
+    /// re-schedule.
+    pub fn with_cron_bridge(mut self, bridge: CronBridge) -> Self {
+        self.cron_bridge = Some(Arc::new(bridge));
+        self
     }
 
     pub fn store(&self) -> &FireStore {
@@ -146,6 +157,8 @@ impl TemporalScheduler {
         let now = Timestamp::now();
         for row in rows {
             let id = row.id.clone();
+            let kind = row.kind.clone();
+            let ref_id = row.ref_id.clone();
             // Row is already claimed (firing_started_at_ms IS NOT NULL) from a
             // prior session. Publish the event and mark fired; skip begin_firing
             // because begin_firing rejects rows already in firing state.
@@ -162,6 +175,14 @@ impl TemporalScheduler {
                     fire_id = %id,
                     "failed to mark in-flight fire as fired",
                 );
+                continue;
+            }
+            if kind == "cron_job" {
+                if let (Some(bridge), Some(ref_id)) = (&self.cron_bridge, &ref_id) {
+                    if let Err(e) = bridge.advance(ref_id).await {
+                        warn!(error = %e, job = %ref_id, "cron bridge advance failed during recovery");
+                    }
+                }
             }
         }
         Ok(())
@@ -233,6 +254,15 @@ impl TemporalScheduler {
             fired_at_ms: now.as_millisecond(),
         });
         self.store.mark_fired(&row.id, now).await?;
+
+        // Cron jobs re-schedule themselves via the bridge after each fire.
+        if row.kind == "cron_job" {
+            if let (Some(bridge), Some(ref_id)) = (&self.cron_bridge, &row.ref_id) {
+                if let Err(e) = bridge.advance(ref_id).await {
+                    warn!(error = %e, job = %ref_id, "cron bridge advance failed");
+                }
+            }
+        }
         Ok(())
     }
 
@@ -388,6 +418,71 @@ mod tests {
             DomainEvent::AlarmFired { fire_id, .. } => assert_eq!(fire_id, id),
             other => panic!("expected AlarmFired, got {other:?}"),
         }
+    }
+
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn cron_job_fire_triggers_next_schedule() {
+        // Setup: in-memory pool with storage initial + scheduling feature migrations.
+        let pool = StoragePool::connect_in_memory().await.unwrap();
+        StoragePool::run_feature_migrations(
+            pool.inner(),
+            &[tools_core::FeatureMigration {
+                feature_name: "scheduling".into(),
+                version: 1,
+                description: "scheduled_fires".into(),
+                sql: include_str!("../../migrations/001_scheduled_fires.sql").into(),
+            }],
+        )
+        .await
+        .unwrap();
+
+        let cron = storage::repos::cron::CronRepo::new(pool.inner().clone());
+        let sf_repo =
+            storage::repos::scheduled_fires::ScheduledFiresRepo::new(pool.inner().clone());
+        let store = FireStore::new(sf_repo.clone());
+        let bridge = crate::temporal::cron_bridge::CronBridge::new(cron.clone(), store.clone());
+
+        // Every-second cron job.
+        cron.upsert(&storage::rows::cron::CronJobRow {
+            id: "j1".into(),
+            name: "every-sec".into(),
+            enabled: true,
+            origin: "user".into(),
+            schedule: serde_json::json!({ "cron": "* * * * * * *", "tz": "UTC" }),
+            payload: serde_json::json!({}),
+            next_run_at_ms: None,
+            last_run_at_ms: None,
+            last_status: None,
+            last_error: None,
+            created_at_ms: 0,
+            updated_at_ms: 0,
+            delete_after_run: false,
+            intent_window: None,
+            intent_pending_since_ms: None,
+        })
+        .await
+        .unwrap();
+        bridge.reconcile_all().await.unwrap();
+
+        let bus = Arc::new(DomainEventBus::new(32));
+        let scheduler =
+            TemporalScheduler::new(store.clone(), bus.clone(), SchedulerConfig::default())
+                .with_cron_bridge(bridge);
+        let _h = scheduler.start_background();
+
+        // Wait for a few fires.
+        tokio::time::sleep(Duration::from_secs(3)).await;
+
+        let fired_count: i64 = sqlx::query_scalar(
+            "SELECT COUNT(*) FROM scheduled_fires WHERE fired = 1 AND kind = 'cron_job'",
+        )
+        .fetch_one(pool.inner())
+        .await
+        .unwrap();
+        assert!(
+            fired_count >= 2,
+            "expected ≥2 cron fires in 3s, got {fired_count}"
+        );
     }
 
     #[tokio::test(flavor = "multi_thread", worker_threads = 2)]

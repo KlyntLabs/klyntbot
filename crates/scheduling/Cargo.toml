@@ -25,3 +25,4 @@ tokio-util.workspace = true
 
 [dev-dependencies]
 tools-core.workspace = true
+sqlx.workspace = true
