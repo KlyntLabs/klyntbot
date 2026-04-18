@@ -143,13 +143,24 @@ impl TemporalScheduler {
             count = rows.len(),
             "recovering in-flight fires after restart"
         );
+        let now = Timestamp::now();
         for row in rows {
             let id = row.id.clone();
-            if let Err(e) = self.dispatch(row, Timestamp::now()).await {
+            // Row is already claimed (firing_started_at_ms IS NOT NULL) from a
+            // prior session. Publish the event and mark fired; skip begin_firing
+            // because begin_firing rejects rows already in firing state.
+            self.bus.publish(DomainEvent::AlarmFired {
+                fire_id: row.id.clone(),
+                kind: row.kind.clone(),
+                ref_id: row.ref_id.clone(),
+                payload_json: row.payload.to_string(),
+                fired_at_ms: now.as_millisecond(),
+            });
+            if let Err(e) = self.store.mark_fired(&id, now).await {
                 warn!(
                     error = %e,
                     fire_id = %id,
-                    "failed to recover in-flight fire — will retry on next wake",
+                    "failed to mark in-flight fire as fired",
                 );
             }
         }
@@ -326,6 +337,57 @@ mod tests {
             .expect("event not received")
             .unwrap();
         assert!(matches!(event, DomainEvent::MissedAlarms { .. }));
+    }
+
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn recovers_in_flight_rows_on_restart() {
+        let pool = StoragePool::connect_in_memory().await.unwrap();
+        StoragePool::run_feature_migrations(
+            pool.inner(),
+            &[tools_core::FeatureMigration {
+                feature_name: "scheduling".into(),
+                version: 1,
+                description: "scheduled_fires".into(),
+                sql: include_str!("../../migrations/001_scheduled_fires.sql").into(),
+            }],
+        )
+        .await
+        .unwrap();
+        let store = FireStore::new(storage::repos::scheduled_fires::ScheduledFiresRepo::new(
+            pool.inner().clone(),
+        ));
+
+        // Simulate a crash: schedule a row, claim it via begin_firing, do NOT mark_fired.
+        let fire_at = Timestamp::now()
+            .checked_sub(jiff::Span::new().seconds(1))
+            .unwrap();
+        let id = store
+            .schedule(FireSpec {
+                fire_at,
+                kind: "test".into(),
+                ref_id: None,
+                payload: serde_json::json!({}),
+                dedup_prefix: None,
+            })
+            .await
+            .unwrap();
+        assert!(store.begin_firing(&id, Timestamp::now()).await.unwrap());
+        // (no mark_fired — simulates a process crash between phases)
+
+        // "Restart": new scheduler, fresh bus, same storage pool.
+        let bus = Arc::new(DomainEventBus::new(32));
+        let mut rx = bus.subscribe();
+        let scheduler = TemporalScheduler::new(store, bus.clone(), SchedulerConfig::default());
+        let _h = scheduler.start_background();
+
+        let ev = tokio::time::timeout(Duration::from_secs(2), rx.recv())
+            .await
+            .expect("no recovery event within timeout")
+            .unwrap();
+        match ev {
+            DomainEvent::AlarmFired { fire_id, .. } => assert_eq!(fire_id, id),
+            other => panic!("expected AlarmFired, got {other:?}"),
+        }
     }
 
     #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
