@@ -579,6 +579,33 @@ pub enum DomainEvent {
         sender: String,
         preview: String,
     },
+
+    // -- Scheduler alarms --
+    /// Emitted when a scheduled alarm fires.
+    AlarmFired {
+        fire_id: String,
+        kind: String,
+        ref_id: Option<String>,
+        payload_json: String,
+        fired_at_ms: i64,
+    },
+    /// Emitted when a fired alarm is snoozed to a later time.
+    AlarmSnoozed {
+        fire_id: String,
+        new_fire_at_ms: i64,
+    },
+    /// Emitted when a scheduled alarm is cancelled.
+    AlarmCancelled {
+        fire_id: String,
+        reason: String,
+    },
+    /// Emitted when alarms were missed (e.g. while app was offline).
+    MissedAlarms {
+        count: usize,
+        fire_ids: Vec<String>,
+        oldest_fire_at_ms: i64,
+        newest_fire_at_ms: i64,
+    },
 }
 
 impl DomainEvent {
@@ -677,6 +704,10 @@ impl DomainEvent {
             Self::FocusSessionSuspended { .. } => "FocusSessionSuspended",
             Self::CronCatchUpReady { .. } => "CronCatchUpReady",
             Self::WakePanelReady { .. } => "WakePanelReady",
+            Self::AlarmFired { .. } => "AlarmFired",
+            Self::AlarmSnoozed { .. } => "AlarmSnoozed",
+            Self::AlarmCancelled { .. } => "AlarmCancelled",
+            Self::MissedAlarms { .. } => "MissedAlarms",
         }
     }
 
@@ -778,6 +809,11 @@ impl DomainEvent {
             | Self::FocusSessionSuspended { .. }
             | Self::CronCatchUpReady { .. }
             | Self::WakePanelReady { .. } => "lifecycle",
+
+            Self::AlarmFired { .. }
+            | Self::AlarmSnoozed { .. }
+            | Self::AlarmCancelled { .. }
+            | Self::MissedAlarms { .. } => "scheduler",
         }
     }
 }
@@ -952,6 +988,35 @@ mod tests {
         assert!(
             matches!(event, DomainEvent::NoteEditingFinished { note_id, .. } if note_id == "note-1")
         );
+    }
+
+    #[test]
+    fn alarm_fired_round_trips_json() {
+        let event = DomainEvent::AlarmFired {
+            fire_id: "fire_abc".into(),
+            kind: "task_alarm".into(),
+            ref_id: Some("task_1".into()),
+            payload_json: "{\"msg\":\"hi\"}".into(),
+            fired_at_ms: 1_800_000_000_000,
+        };
+        let json = serde_json::to_string(&event).unwrap();
+        let parsed: DomainEvent = serde_json::from_str(&json).unwrap();
+        match parsed {
+            DomainEvent::AlarmFired { fire_id, .. } => assert_eq!(fire_id, "fire_abc"),
+            _ => panic!("wrong variant"),
+        }
+    }
+
+    #[test]
+    fn missed_alarms_round_trips() {
+        let event = DomainEvent::MissedAlarms {
+            count: 3,
+            fire_ids: vec!["a".into(), "b".into(), "c".into()],
+            oldest_fire_at_ms: 1_000,
+            newest_fire_at_ms: 2_000,
+        };
+        let json = serde_json::to_string(&event).unwrap();
+        let _parsed: DomainEvent = serde_json::from_str(&json).unwrap();
     }
 
     #[test]
