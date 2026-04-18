@@ -10,6 +10,7 @@
 //!
 //! Subscribers (Phase 3 dispatcher, UI) listen for `AlarmFired` / `MissedAlarms`.
 
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -53,6 +54,7 @@ pub struct TemporalScheduler {
     config: SchedulerConfig,
     wake: Arc<Notify>,
     shutdown: CancellationToken,
+    started: Arc<AtomicBool>,
 }
 
 impl TemporalScheduler {
@@ -63,6 +65,7 @@ impl TemporalScheduler {
             config,
             wake: Arc::new(Notify::new()),
             shutdown: CancellationToken::new(),
+            started: Arc::new(AtomicBool::new(false)),
         }
     }
 
@@ -82,7 +85,15 @@ impl TemporalScheduler {
     }
 
     /// Spawn the loop on the current runtime.
+    ///
+    /// Panics if called more than once across any clone of this scheduler —
+    /// double-start is always a programmer error (two loops sharing the same
+    /// FireStore would still be safe thanks to `begin_firing` claim semantics,
+    /// but would waste resources and race on the wake signal).
     pub fn start_background(self) -> tokio::task::JoinHandle<()> {
+        if self.started.swap(true, Ordering::SeqCst) {
+            panic!("TemporalScheduler::start_background called more than once");
+        }
         tokio::spawn(async move {
             if let Err(e) = self.run().await {
                 warn!(error = %e, "TemporalScheduler exited with error");
@@ -93,6 +104,10 @@ impl TemporalScheduler {
     /// Main loop. Returns only when shutdown is cancelled.
     pub async fn run(self) -> Result<(), SchedulerError> {
         info!("TemporalScheduler starting");
+        // Recover crashed in-flight rows BEFORE the main loop begins. These rows
+        // have `firing_started_at_ms IS NOT NULL` and will also appear in `list_due`
+        // on subsequent iterations, but their `begin_firing` call returns false
+        // so they're never double-dispatched.
         self.recover_in_flight().await?;
 
         loop {
@@ -129,7 +144,14 @@ impl TemporalScheduler {
             "recovering in-flight fires after restart"
         );
         for row in rows {
-            self.dispatch(row, Timestamp::now()).await?;
+            let id = row.id.clone();
+            if let Err(e) = self.dispatch(row, Timestamp::now()).await {
+                warn!(
+                    error = %e,
+                    fire_id = %id,
+                    "failed to recover in-flight fire — will retry on next wake",
+                );
+            }
         }
         Ok(())
     }
@@ -139,16 +161,28 @@ impl TemporalScheduler {
         let mut missed: Vec<ScheduledFireRow> = Vec::new();
         for row in due {
             let (policy, grace) = self.extract_misfire_params(&row);
-            let fire_at = Timestamp::from_millisecond(row.fire_at_ms)
-                .map_err(|_| SchedulerError::InvalidState("bad fire_at_ms".into()))?;
+            let fire_at = match Timestamp::from_millisecond(row.fire_at_ms) {
+                Ok(t) => t,
+                Err(_) => {
+                    warn!(
+                        id = %row.id,
+                        fire_at_ms = row.fire_at_ms,
+                        "scheduled_fires row has invalid fire_at_ms — skipping",
+                    );
+                    continue;
+                }
+            };
             match Decision::classify(policy, grace, fire_at, now) {
                 Decision::Fire => self.dispatch(row, now).await?,
                 Decision::SkipStale => {
+                    // If begin_firing returns false, the row was already claimed
+                    // (e.g. by recover_in_flight) — skipping quietly is correct.
                     if self.store.begin_firing(&row.id, now).await? {
                         self.store.mark_fired(&row.id, now).await?;
                         missed.push(row);
                     }
                 }
+                // Day-1 stub: coalescing (deduplicate by ref_id) is deferred to Phase 3.
                 Decision::CoalesceLater => self.dispatch(row, now).await?,
             }
         }
@@ -163,7 +197,10 @@ impl TemporalScheduler {
             .payload
             .get("misfire_policy")
             .and_then(|v| v.as_str())
-            .and_then(|s| serde_json::from_str::<MisfirePolicy>(&format!("\"{s}\"")).ok())
+            .and_then(|s| {
+                serde_json::from_value::<MisfirePolicy>(serde_json::Value::String(s.to_owned()))
+                    .ok()
+            })
             .unwrap_or(self.config.default_misfire_policy);
         let grace_secs = row
             .payload
@@ -289,5 +326,30 @@ mod tests {
             .expect("event not received")
             .unwrap();
         assert!(matches!(event, DomainEvent::MissedAlarms { .. }));
+    }
+
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    #[should_panic(expected = "start_background called more than once")]
+    async fn double_start_background_panics() {
+        let (scheduler, _bus) = setup().await;
+        let s2 = scheduler.clone();
+        let _h1 = scheduler.start_background();
+        // second start on the sibling clone must panic
+        let _h2 = s2.start_background();
+    }
+
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn shutdown_stops_the_loop() {
+        let (scheduler, _bus) = setup().await;
+        let shutdown_handle = scheduler.clone();
+        let h = scheduler.start_background();
+        // Let the loop enter its first select.
+        tokio::time::sleep(std::time::Duration::from_millis(50)).await;
+        shutdown_handle.shutdown();
+        // Should terminate quickly.
+        tokio::time::timeout(std::time::Duration::from_secs(2), h)
+            .await
+            .expect("loop did not exit within timeout")
+            .unwrap();
     }
 }
