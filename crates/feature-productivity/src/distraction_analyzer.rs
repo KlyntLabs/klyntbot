@@ -3,8 +3,6 @@
 
 use std::sync::Arc;
 
-use chrono::{DateTime, Timelike, Utc};
-use common::time::bridge::chrono_to_jiff;
 use tokio::sync::broadcast;
 use tokio::task::JoinHandle;
 use tokio_util::sync::CancellationToken;
@@ -41,10 +39,10 @@ impl DistractionAnalyzer {
         let cancel_clone = cancel.clone();
         let handle = tokio::spawn(async move {
             let mut last_productive_tick: Option<ActivityTick> = None;
-            let mut productive_streak_start: Option<DateTime<Utc>> = None;
-            let mut last_break_time: Option<DateTime<Utc>> = None;
-            let mut day_start: Option<DateTime<Utc>> = None;
-            let mut pending_recovery: Option<(i64, DateTime<Utc>)> = None;
+            let mut productive_streak_start: Option<jiff::Timestamp> = None;
+            let mut last_break_time: Option<jiff::Timestamp> = None;
+            let mut day_start: Option<jiff::Timestamp> = None;
+            let mut pending_recovery: Option<(i64, jiff::Timestamp)> = None;
 
             loop {
                 tokio::select! {
@@ -60,7 +58,7 @@ impl DistractionAnalyzer {
                         };
 
                         // Track day start
-                        if day_start.is_none() || tick.timestamp.date_naive() != day_start.unwrap().date_naive() {
+                        if day_start.is_none() || tick.timestamp.strftime("%Y-%m-%d").to_string() != day_start.unwrap().strftime("%Y-%m-%d").to_string() {
                             day_start = Some(tick.timestamp);
                             last_break_time = Some(tick.timestamp);
                         }
@@ -81,7 +79,7 @@ impl DistractionAnalyzer {
                         // Recovery detection: was distracting, now productive
                         if let Some((pattern_id, distraction_start)) = pending_recovery {
                             if is_productive {
-                                let recovery_secs = (tick.timestamp - distraction_start).num_seconds();
+                                let recovery_secs = tick.timestamp.as_second() - distraction_start.as_second();
                                 if let Err(e) = repos.distraction_patterns.update_recovery(pattern_id, recovery_secs).await {
                                     warn!("DistractionAnalyzer: failed to update recovery: {e}");
                                 }
@@ -95,18 +93,18 @@ impl DistractionAnalyzer {
                             let prev = last_productive_tick.as_ref().unwrap();
                             let now = tick.timestamp;
                             let hours_active = day_start
-                                .map(|ds| (now - ds).num_seconds() as f64 / 3600.0)
+                                .map(|ds| (now.as_second() - ds.as_second()) as f64 / 3600.0)
                                 .unwrap_or(0.0);
                             let mins_since_break = last_break_time
-                                .map(|bt| (now - bt).num_seconds() as f64 / 60.0)
+                                .map(|bt| (now.as_second() - bt.as_second()) as f64 / 60.0)
                                 .unwrap_or(0.0);
                             let preceding_duration_mins = productive_streak_start
-                                .map(|ps| (now - ps).num_seconds() as f64 / 60.0);
+                                .map(|ps| (now.as_second() - ps.as_second()) as f64 / 60.0);
 
                             let pattern = DistractionPattern {
                                 id: None,
-                                date: now.format("%Y-%m-%d").to_string(),
-                                hour_of_day: now.hour() as i32,
+                                date: now.strftime("%Y-%m-%d").to_string(),
+                                hour_of_day: (now.as_second().rem_euclid(86400) / 3600) as i32,
                                 hours_active_today: hours_active,
                                 mins_since_break,
                                 preceding_app: Some(prev.app_name.clone()),
@@ -115,7 +113,7 @@ impl DistractionAnalyzer {
                                 distraction_app: tick.app_name.clone(),
                                 distraction_category: tick.category_id.clone(),
                                 recovery_secs: None,
-                                created_at: chrono_to_jiff(now),
+                                created_at: now,
                             };
 
                             match repos.distraction_patterns.insert(&pattern).await {
@@ -174,12 +172,14 @@ impl DistractionAnalyzer {
     /// Used by NudgeService to suggest proactive breaks.
     pub async fn is_high_risk_window(
         repos: &ProductivityRepos,
-        now: DateTime<Utc>,
+        now: jiff::Timestamp,
     ) -> common::Result<bool> {
-        let today = now.format("%Y-%m-%d").to_string();
-        let hour = now.hour() as i32;
-        let fourteen_days_ago = (now - chrono::Duration::days(14))
-            .format("%Y-%m-%d")
+        let today = now.strftime("%Y-%m-%d").to_string();
+        let hour = (now.as_second().rem_euclid(86400) / 3600) as i32;
+        let fourteen_days_ago = now
+            .checked_sub(jiff::SignedDuration::from_secs(14 * 86400))
+            .unwrap_or(now)
+            .strftime("%Y-%m-%d")
             .to_string();
         let by_hour = repos
             .distraction_patterns

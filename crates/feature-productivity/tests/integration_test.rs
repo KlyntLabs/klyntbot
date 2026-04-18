@@ -1,12 +1,12 @@
 //! Integration tests for the productivity feature — end-to-end lifecycle scenarios.
 
-use chrono::{Duration, NaiveDate, TimeZone, Utc};
 use feature_productivity::config::FocusConfig;
 use feature_productivity::focus::FocusManager;
 use feature_productivity::repos::ProductivityRepos;
 use feature_productivity::tracker::categorizer::Categorizer;
 use feature_productivity::types::*;
 use feature_productivity::{DailyAggregator, ProductivityPatternAnalyzer};
+use jiff::{SignedDuration, Timestamp};
 
 async fn setup_pool() -> sqlx::SqlitePool {
     let pool = storage::StoragePool::connect_in_memory()
@@ -70,11 +70,19 @@ async fn test_full_focus_session_lifecycle() {
     assert!(repos.sessions.get_active().await.unwrap().is_none());
 
     // 6. Insert some activity events for aggregation
-    let now = Utc::now();
-    let today = now.format("%Y-%m-%d").to_string();
-    let today_start = now.date_naive().and_hms_opt(0, 0, 0).unwrap().and_utc();
+    let now = Timestamp::now();
+    let today = now.strftime("%Y-%m-%d").to_string();
+    let today_start = now
+        .strftime("%Y-%m-%d")
+        .to_string()
+        .parse::<jiff::civil::Date>()
+        .unwrap()
+        .at(0, 0, 0, 0)
+        .to_zoned(jiff::tz::TimeZone::UTC)
+        .unwrap()
+        .timestamp();
 
-    for i in 0..5 {
+    for i in 0i64..5 {
         let event = ActivityEvent {
             id: None,
             app_name: "VS Code".into(),
@@ -83,8 +91,18 @@ async fn test_full_focus_session_lifecycle() {
             bundle_id: None,
             url: None,
             category_id: Some("coding".into()),
-            started_at: today_start + Duration::hours(9) + Duration::minutes(i * 30),
-            ended_at: Some(today_start + Duration::hours(9) + Duration::minutes(i * 30 + 25)),
+            started_at: today_start
+                .checked_add(SignedDuration::from_hours(9))
+                .unwrap()
+                .checked_add(SignedDuration::from_mins(i * 30))
+                .unwrap(),
+            ended_at: Some(
+                today_start
+                    .checked_add(SignedDuration::from_hours(9))
+                    .unwrap()
+                    .checked_add(SignedDuration::from_mins(i * 30 + 25))
+                    .unwrap(),
+            ),
             duration_secs: Some(1500),
             is_idle: false,
             metadata: None,
@@ -168,7 +186,13 @@ async fn test_daily_aggregation_accuracy() {
     let repos = ProductivityRepos::new(pool);
 
     let date_str = "2026-03-04";
-    let day_start = Utc.with_ymd_and_hms(2026, 3, 4, 0, 0, 0).unwrap();
+    let day_start = "2026-03-04"
+        .parse::<jiff::civil::Date>()
+        .unwrap()
+        .at(0, 0, 0, 0)
+        .to_zoned(jiff::tz::TimeZone::UTC)
+        .unwrap()
+        .timestamp();
 
     // Insert events with known durations:
     // 2h coding (productive), 1h slack (neutral), 30m youtube (distracting), 30m idle
@@ -181,8 +205,8 @@ async fn test_daily_aggregation_accuracy() {
             bundle_id: None,
             url: None,
             category_id: Some("coding".into()),
-            started_at: day_start + Duration::hours(9),
-            ended_at: Some(day_start + Duration::hours(11)),
+            started_at: day_start.checked_add(SignedDuration::from_hours(9)).unwrap(),
+            ended_at: Some(day_start.checked_add(SignedDuration::from_hours(11)).unwrap()),
             duration_secs: Some(7200), // 2h
             is_idle: false,
             metadata: None,
@@ -197,8 +221,8 @@ async fn test_daily_aggregation_accuracy() {
             bundle_id: None,
             url: None,
             category_id: Some("communication".into()),
-            started_at: day_start + Duration::hours(11),
-            ended_at: Some(day_start + Duration::hours(12)),
+            started_at: day_start.checked_add(SignedDuration::from_hours(11)).unwrap(),
+            ended_at: Some(day_start.checked_add(SignedDuration::from_hours(12)).unwrap()),
             duration_secs: Some(3600), // 1h
             is_idle: false,
             metadata: None,
@@ -213,8 +237,14 @@ async fn test_daily_aggregation_accuracy() {
             bundle_id: None,
             url: Some("https://youtube.com".into()),
             category_id: Some("entertainment".into()),
-            started_at: day_start + Duration::hours(12),
-            ended_at: Some(day_start + Duration::hours(12) + Duration::minutes(30)),
+            started_at: day_start.checked_add(SignedDuration::from_hours(12)).unwrap(),
+            ended_at: Some(
+                day_start
+                    .checked_add(SignedDuration::from_hours(12))
+                    .unwrap()
+                    .checked_add(SignedDuration::from_mins(30))
+                    .unwrap(),
+            ),
             duration_secs: Some(1800), // 30m
             is_idle: false,
             metadata: None,
@@ -229,8 +259,12 @@ async fn test_daily_aggregation_accuracy() {
             bundle_id: None,
             url: None,
             category_id: None,
-            started_at: day_start + Duration::hours(12) + Duration::minutes(30),
-            ended_at: Some(day_start + Duration::hours(13)),
+            started_at: day_start
+                .checked_add(SignedDuration::from_hours(12))
+                .unwrap()
+                .checked_add(SignedDuration::from_mins(30))
+                .unwrap(),
+            ended_at: Some(day_start.checked_add(SignedDuration::from_hours(13)).unwrap()),
             duration_secs: Some(1800), // 30m
             is_idle: true,
             metadata: None,
@@ -316,8 +350,14 @@ async fn test_daily_aggregation_accuracy() {
         project_id: None,
         session_type: SessionType::Focus,
         target_mins: Some(45),
-        started_at: day_start + Duration::hours(9),
-        ended_at: Some(day_start + Duration::hours(9) + Duration::minutes(40)),
+        started_at: day_start.checked_add(SignedDuration::from_hours(9)).unwrap(),
+        ended_at: Some(
+            day_start
+                .checked_add(SignedDuration::from_hours(9))
+                .unwrap()
+                .checked_add(SignedDuration::from_mins(40))
+                .unwrap(),
+        ),
         actual_mins: Some(40),
         interruptions: 1,
         distraction_events: vec![],
@@ -358,7 +398,7 @@ async fn test_nudge_service_delivers_break_reminder() {
     let pool = setup_pool().await;
     let repos = ProductivityRepos::new(pool);
 
-    let now = Utc::now();
+    let now = Timestamp::now();
 
     // Insert a single large continuous activity event within the 90-min window
     let event = ActivityEvent {
@@ -369,7 +409,7 @@ async fn test_nudge_service_delivers_break_reminder() {
         bundle_id: None,
         url: None,
         category_id: Some("coding".into()),
-        started_at: now - Duration::minutes(85),
+        started_at: now.checked_sub(SignedDuration::from_mins(85)).unwrap(),
         ended_at: Some(now),
         duration_secs: Some(5400), // exactly 90 min
         is_idle: false,
@@ -380,7 +420,7 @@ async fn test_nudge_service_delivers_break_reminder() {
     repos.events.insert(&event).await.unwrap();
 
     // Verify break threshold is exceeded within the 90-min window
-    let window_start = now - Duration::minutes(90);
+    let window_start = now.checked_sub(SignedDuration::from_mins(90)).unwrap();
     let active_secs = repos
         .events
         .total_active_secs(&window_start, &now)
@@ -427,12 +467,14 @@ async fn test_pattern_analyzer_detects_patterns() {
     let repos = ProductivityRepos::new(pool);
     let analyzer = ProductivityPatternAnalyzer::new(repos.clone());
 
-    let now = Utc::now();
+    let now = Timestamp::now();
 
     // Insert 10 days of summaries
-    for day_offset in 0..10 {
-        let date = (now - Duration::days(day_offset))
-            .format("%Y-%m-%d")
+    for day_offset in 0i64..10 {
+        let date = now
+            .checked_sub(SignedDuration::from_secs(day_offset * 86400))
+            .unwrap()
+            .strftime("%Y-%m-%d")
             .to_string();
         let summary = DailySummary {
             date,
@@ -460,8 +502,20 @@ async fn test_pattern_analyzer_detects_patterns() {
     }
 
     // Insert focus sessions at different hours with varying quality
-    for day_offset in 0..10 {
-        let base = now - Duration::days(day_offset);
+    for day_offset in 0i64..10 {
+        let base_date = now
+            .checked_sub(SignedDuration::from_secs(day_offset * 86400))
+            .unwrap()
+            .strftime("%Y-%m-%d")
+            .to_string()
+            .parse::<jiff::civil::Date>()
+            .unwrap();
+        let base_day = base_date
+            .at(0, 0, 0, 0)
+            .to_zoned(jiff::tz::TimeZone::UTC)
+            .unwrap()
+            .timestamp();
+
         // Morning session (9am) — high quality
         let morning = FocusSession {
             id: format!("fs-morning-{}", day_offset),
@@ -469,8 +523,14 @@ async fn test_pattern_analyzer_detects_patterns() {
             project_id: None,
             session_type: SessionType::Focus,
             target_mins: Some(45),
-            started_at: base.date_naive().and_hms_opt(9, 0, 0).unwrap().and_utc(),
-            ended_at: Some(base.date_naive().and_hms_opt(9, 40, 0).unwrap().and_utc()),
+            started_at: base_day.checked_add(SignedDuration::from_hours(9)).unwrap(),
+            ended_at: Some(
+                base_day
+                    .checked_add(SignedDuration::from_hours(9))
+                    .unwrap()
+                    .checked_add(SignedDuration::from_mins(40))
+                    .unwrap(),
+            ),
             actual_mins: Some(40),
             interruptions: 0,
             distraction_events: vec![],
@@ -484,8 +544,14 @@ async fn test_pattern_analyzer_detects_patterns() {
         // Afternoon session (3pm) — lower quality
         let afternoon = FocusSession {
             id: format!("fs-afternoon-{}", day_offset),
-            started_at: base.date_naive().and_hms_opt(15, 0, 0).unwrap().and_utc(),
-            ended_at: Some(base.date_naive().and_hms_opt(15, 30, 0).unwrap().and_utc()),
+            started_at: base_day.checked_add(SignedDuration::from_hours(15)).unwrap(),
+            ended_at: Some(
+                base_day
+                    .checked_add(SignedDuration::from_hours(15))
+                    .unwrap()
+                    .checked_add(SignedDuration::from_mins(30))
+                    .unwrap(),
+            ),
             actual_mins: Some(30),
             quality_score: Some(0.65),
             ..morning.clone()
@@ -574,16 +640,21 @@ async fn test_goal_tracking() {
         target_value: 2.0,
         enabled: true,
         project_id: None,
-        created_at: Utc::now(),
+        created_at: Timestamp::now(),
     };
     repos.goals.insert(&goal).await.unwrap();
 
     // Insert 3h of productive activity (anchor at noon UTC to avoid midnight flakiness)
-    let noon = Utc::now()
-        .date_naive()
-        .and_hms_opt(12, 0, 0)
+    let noon = Timestamp::now()
+        .strftime("%Y-%m-%d")
+        .to_string()
+        .parse::<jiff::civil::Date>()
         .unwrap()
-        .and_utc();
+        .at(12, 0, 0, 0)
+        .to_zoned(jiff::tz::TimeZone::UTC)
+        .unwrap()
+        .timestamp();
+
     repos
         .events
         .insert(&ActivityEvent {
@@ -594,7 +665,7 @@ async fn test_goal_tracking() {
             bundle_id: None,
             url: None,
             category_id: Some("coding".into()),
-            started_at: noon - Duration::hours(3),
+            started_at: noon.checked_sub(SignedDuration::from_hours(3)).unwrap(),
             ended_at: Some(noon),
             duration_secs: Some(10800),
             is_idle: false,
@@ -605,7 +676,7 @@ async fn test_goal_tracking() {
         .await
         .unwrap();
 
-    let today = noon.format("%Y-%m-%d").to_string();
+    let today = noon.strftime("%Y-%m-%d").to_string();
     let results = aggregator.check_goals(&today).await.unwrap();
     assert_eq!(results.len(), 1);
     let (_goal, _current, met) = &results[0];
@@ -618,12 +689,17 @@ async fn test_historical_comparison() {
     let pool = setup_pool().await;
     let repos = ProductivityRepos::new(pool);
 
-    let today = Utc::now().date_naive();
-    let yesterday = today - Duration::days(1);
+    let now = Timestamp::now();
+    let today_str = now.strftime("%Y-%m-%d").to_string();
+    let yesterday_str = now
+        .checked_sub(SignedDuration::from_secs(86400))
+        .unwrap()
+        .strftime("%Y-%m-%d")
+        .to_string();
 
     // Insert yesterday's summary
     let yesterday_summary = DailySummary {
-        date: yesterday.format("%Y-%m-%d").to_string(),
+        date: yesterday_str.clone(),
         total_active_secs: 28800, // 8h
         total_focus_secs: 14400,
         total_break_secs: 3600,
@@ -648,24 +724,22 @@ async fn test_historical_comparison() {
 
     // Insert today's summary (better day)
     let today_summary = DailySummary {
-        date: today.format("%Y-%m-%d").to_string(),
+        date: today_str.clone(),
         productive_secs: 25200, // 7h — improvement
         productivity_score: Some(80.0),
         ..yesterday_summary.clone()
     };
     repos.summaries.upsert(&today_summary).await.unwrap();
 
-    // Verify both summaries are retrievable (reuse date strings from summaries)
-    let today_str = &today_summary.date;
-    let yesterday_str = &yesterday_summary.date;
+    // Verify both summaries are retrievable
     let current = repos
         .summaries
-        .list_range(today_str, today_str)
+        .list_range(&today_str, &today_str)
         .await
         .unwrap();
     let previous = repos
         .summaries
-        .list_range(yesterday_str, yesterday_str)
+        .list_range(&yesterday_str, &yesterday_str)
         .await
         .unwrap();
 
@@ -689,7 +763,13 @@ async fn test_project_tracking_aggregation() {
     let repos = ProductivityRepos::new(pool);
 
     let date_str = "2026-03-05";
-    let day_start = Utc.with_ymd_and_hms(2026, 3, 5, 0, 0, 0).unwrap();
+    let day_start = date_str
+        .parse::<jiff::civil::Date>()
+        .unwrap()
+        .at(0, 0, 0, 0)
+        .to_zoned(jiff::tz::TimeZone::UTC)
+        .unwrap()
+        .timestamp();
 
     // 1. Insert a project
     let project = feature_productivity::types::ProductivityProject {
@@ -699,7 +779,7 @@ async fn test_project_tracking_aggregation() {
         url_patterns: vec![],
         color: Some("#7C3AED".into()),
         is_auto_detected: false,
-        created_at: Utc::now(),
+        created_at: Timestamp::now(),
     };
     repos.projects.upsert(&project).await.unwrap();
 
@@ -712,8 +792,8 @@ async fn test_project_tracking_aggregation() {
         bundle_id: None,
         url: None,
         category_id: Some("coding".into()),
-        started_at: day_start + Duration::hours(9),
-        ended_at: Some(day_start + Duration::hours(11)),
+        started_at: day_start.checked_add(SignedDuration::from_hours(9)).unwrap(),
+        ended_at: Some(day_start.checked_add(SignedDuration::from_hours(11)).unwrap()),
         duration_secs: Some(7200), // 2h
         is_idle: false,
         metadata: None,
@@ -731,8 +811,8 @@ async fn test_project_tracking_aggregation() {
         bundle_id: None,
         url: None,
         category_id: Some("communication".into()),
-        started_at: day_start + Duration::hours(11),
-        ended_at: Some(day_start + Duration::hours(12)),
+        started_at: day_start.checked_add(SignedDuration::from_hours(11)).unwrap(),
+        ended_at: Some(day_start.checked_add(SignedDuration::from_hours(12)).unwrap()),
         duration_secs: Some(3600), // 1h
         is_idle: false,
         metadata: None,
@@ -762,8 +842,13 @@ async fn test_activity_export_csv() {
     let pool = setup_pool().await;
     let repos = ProductivityRepos::new(pool);
 
-    let date = NaiveDate::from_ymd_opt(2026, 3, 4).unwrap();
-    let day_start = date.and_hms_opt(9, 0, 0).unwrap().and_utc();
+    let day_start = "2026-03-04"
+        .parse::<jiff::civil::Date>()
+        .unwrap()
+        .at(9, 0, 0, 0)
+        .to_zoned(jiff::tz::TimeZone::UTC)
+        .unwrap()
+        .timestamp();
 
     // Insert two events
     for (i, app) in ["VS Code", "Safari"].iter().enumerate() {
@@ -775,8 +860,12 @@ async fn test_activity_export_csv() {
             bundle_id: None,
             url: None,
             category_id: Some("coding".into()),
-            started_at: day_start + Duration::hours(i as i64),
-            ended_at: Some(day_start + Duration::hours(i as i64 + 1)),
+            started_at: day_start.checked_add(SignedDuration::from_hours(i as i64)).unwrap(),
+            ended_at: Some(
+                day_start
+                    .checked_add(SignedDuration::from_hours(i as i64 + 1))
+                    .unwrap(),
+            ),
             duration_secs: Some(3600),
             is_idle: false,
             metadata: None,
@@ -787,8 +876,20 @@ async fn test_activity_export_csv() {
     }
 
     // Fetch events for that date range
-    let start = date.and_hms_opt(0, 0, 0).unwrap().and_utc();
-    let end = date.and_hms_opt(23, 59, 59).unwrap().and_utc();
+    let start = "2026-03-04"
+        .parse::<jiff::civil::Date>()
+        .unwrap()
+        .at(0, 0, 0, 0)
+        .to_zoned(jiff::tz::TimeZone::UTC)
+        .unwrap()
+        .timestamp();
+    let end = "2026-03-04"
+        .parse::<jiff::civil::Date>()
+        .unwrap()
+        .at(23, 59, 59, 0)
+        .to_zoned(jiff::tz::TimeZone::UTC)
+        .unwrap()
+        .timestamp();
 
     let events = repos
         .events

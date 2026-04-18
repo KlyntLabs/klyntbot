@@ -1,7 +1,6 @@
 //! Productivity pattern analyzer — detects usage patterns from focus sessions
 //! and daily summaries for personalized agent context.
 
-use chrono::{Timelike, Utc, Weekday};
 use serde::{Deserialize, Serialize};
 
 use crate::repos::ProductivityRepos;
@@ -18,8 +17,8 @@ pub struct ProductivityPatterns {
     pub productive_ratio: f64,
     /// Average daily context switches.
     pub avg_context_switches: f64,
-    /// Most productive day of week, if enough data.
-    pub best_day_of_week: Option<Weekday>,
+    /// Most productive day of week index (0=Monday … 6=Sunday), if enough data.
+    pub best_day_of_week: Option<u8>,
     /// Number of days analyzed.
     pub days_analyzed: usize,
     /// When this analysis was computed.
@@ -37,10 +36,12 @@ impl ProductivityPatternAnalyzer {
 
     /// Analyze the last `days` of data and return detected patterns.
     pub async fn analyze(&self, days: u32) -> common::Result<ProductivityPatterns> {
-        let now = Utc::now();
-        let start = now - chrono::Duration::days(i64::from(days));
-        let start_date = start.format("%Y-%m-%d").to_string();
-        let end_date = now.format("%Y-%m-%d").to_string();
+        let now = jiff::Timestamp::now();
+        let start = now
+            .checked_sub(jiff::SignedDuration::from_secs(i64::from(days) * 86_400))
+            .unwrap_or(now);
+        let start_date = start.strftime("%Y-%m-%d").to_string();
+        let end_date = now.strftime("%Y-%m-%d").to_string();
 
         let (summaries, sessions) = tokio::try_join!(
             self.repos.summaries.list_range(&start_date, &end_date),
@@ -78,7 +79,7 @@ impl ProductivityPatternAnalyzer {
         // Group quality scores by hour
         let mut hour_scores: [Vec<f64>; 24] = std::array::from_fn(|_| Vec::new());
         for s in &completed {
-            let hour = s.started_at.hour() as usize;
+            let hour = (s.started_at.as_second().rem_euclid(86400) / 3600) as usize;
             if let Some(q) = s.quality_score {
                 hour_scores[hour].push(q);
             }
@@ -134,7 +135,8 @@ impl ProductivityPatternAnalyzer {
     }
 
     /// Find the day of week with the highest average productive_secs.
-    fn compute_best_day(summaries: &[DailySummary]) -> Option<Weekday> {
+    /// Returns a 0-based index (0=Monday … 6=Sunday).
+    fn compute_best_day(summaries: &[DailySummary]) -> Option<u8> {
         if summaries.len() < 7 {
             return None;
         }
@@ -149,9 +151,6 @@ impl ProductivityPatternAnalyzer {
             }
         }
 
-        use chrono::Weekday::*;
-        const WEEKDAYS: [Weekday; 7] = [Mon, Tue, Wed, Thu, Fri, Sat, Sun];
-
         day_totals
             .iter()
             .enumerate()
@@ -163,14 +162,13 @@ impl ProductivityPatternAnalyzer {
                     .partial_cmp(&b_avg)
                     .unwrap_or(std::cmp::Ordering::Equal)
             })
-            .map(|(day, _)| WEEKDAYS[day])
+            .map(|(day, _)| day as u8)
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use chrono::DateTime;
     use crate::types::{SessionSource, SessionType};
 
     #[test]
@@ -181,10 +179,14 @@ mod tests {
 
     #[test]
     fn test_peak_hours_with_data() {
-        let now = Utc::now();
+        let today = jiff::Timestamp::now()
+            .strftime("%Y-%m-%d")
+            .to_string()
+            .parse::<jiff::civil::Date>()
+            .unwrap();
         let sessions: Vec<FocusSession> = (0..6)
             .map(|i| {
-                let hour_offset = if i < 3 { 9 } else { 14 }; // 3 at 9am, 3 at 2pm
+                let hour_offset = if i < 3 { 9i8 } else { 14i8 }; // 3 at 9am, 3 at 2pm
                 let quality = if i < 3 { 0.9 } else { 0.6 };
                 FocusSession {
                     id: format!("s{}", i),
@@ -192,16 +194,17 @@ mod tests {
                     project_id: None,
                     session_type: SessionType::Focus,
                     target_mins: Some(25),
-                    started_at: now
-                        .date_naive()
-                        .and_hms_opt(hour_offset, 0, 0)
+                    started_at: today
+                        .at(hour_offset, 0, 0, 0)
+                        .to_zoned(jiff::tz::TimeZone::UTC)
                         .unwrap()
-                        .and_utc(),
+                        .timestamp(),
                     ended_at: Some(
-                        now.date_naive()
-                            .and_hms_opt(hour_offset, 25, 0)
+                        today
+                            .at(hour_offset, 25, 0, 0)
+                            .to_zoned(jiff::tz::TimeZone::UTC)
                             .unwrap()
-                            .and_utc(),
+                            .timestamp(),
                     ),
                     actual_mins: Some(25),
                     interruptions: 0,
@@ -222,7 +225,7 @@ mod tests {
 
     #[test]
     fn test_avg_session_mins() {
-        let now = Utc::now();
+        let now = jiff::Timestamp::now();
         let sessions = vec![
             FocusSession {
                 id: "s1".to_string(),
@@ -231,7 +234,7 @@ mod tests {
                 session_type: SessionType::Focus,
                 target_mins: Some(25),
                 started_at: now,
-                ended_at: Some(now + chrono::Duration::minutes(25)),
+                ended_at: Some(now.checked_add(jiff::SignedDuration::from_mins(25)).unwrap()),
                 actual_mins: Some(25),
                 interruptions: 0,
                 distraction_events: vec![],
@@ -273,7 +276,7 @@ mod tests {
         assert!((ratio - 0.625).abs() < 0.001); // 4500/7200
     }
 
-    fn sessions_base(now: DateTime<Utc>) -> FocusSession {
+    fn sessions_base(now: jiff::Timestamp) -> FocusSession {
         FocusSession {
             id: String::new(),
             action_id: None,

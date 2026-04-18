@@ -3,7 +3,6 @@
 
 use std::collections::HashMap;
 
-use chrono::{DateTime, TimeZone, Utc};
 use jiff::SignedDuration;
 
 use std::sync::Arc;
@@ -52,15 +51,22 @@ impl DailyAggregator {
     /// Uses pre-computed 5-minute bucket aggregation for day-level totals (fast path).
     /// Falls back to raw event queries for the detailed per-app/per-category breakdowns.
     pub async fn compute_for_date(&self, date: &str) -> common::Result<DailySummary> {
-        let naive = chrono::NaiveDate::parse_from_str(date, "%Y-%m-%d")
+        let date_parsed = date
+            .parse::<jiff::civil::Date>()
             .map_err(|e| common::ToolError::InvalidParams(format!("invalid date '{date}': {e}")))?;
 
-        let start: DateTime<Utc> = Utc.from_utc_datetime(&naive.and_hms_opt(0, 0, 0).unwrap());
-        let end: DateTime<Utc> = Utc.from_utc_datetime(
-            &(naive + chrono::Duration::days(1))
-                .and_hms_opt(0, 0, 0)
-                .unwrap(),
-        );
+        let start = date_parsed
+            .at(0, 0, 0, 0)
+            .to_zoned(jiff::tz::TimeZone::UTC)
+            .map_err(|e| common::ToolError::InvalidParams(format!("tz error: {e}")))?
+            .timestamp();
+        let end = date_parsed
+            .tomorrow()
+            .map_err(|e| common::ToolError::InvalidParams(format!("date overflow: {e}")))?
+            .at(0, 0, 0, 0)
+            .to_zoned(jiff::tz::TimeZone::UTC)
+            .map_err(|e| common::ToolError::InvalidParams(format!("tz error: {e}")))?
+            .timestamp();
 
         // Gather data — bucket aggregation for totals, raw events for detail breakdowns.
         // Include existing summary fetch in the join to parallelise the AI-summary cache lookup.
@@ -343,7 +349,9 @@ impl DailyAggregator {
         raw_days: u64,
         bucket_days: u64,
     ) -> common::Result<(u64, u64)> {
-        let raw_cutoff = Utc::now() - chrono::Duration::days(raw_days as i64);
+        let raw_cutoff = jiff::Timestamp::now()
+            .checked_sub(SignedDuration::from_secs(raw_days as i64 * 86_400))
+            .unwrap_or_else(|_| jiff::Timestamp::now());
         let raw_purged = self.repos.events.purge_before(&raw_cutoff).await?;
         let bucket_cutoff = (jiff::Timestamp::now()
             - SignedDuration::from_secs(bucket_days as i64 * 86_400))
@@ -416,11 +424,12 @@ mod tests {
         let aggregator = DailyAggregator::new(repos.clone());
 
         // Use noon UTC today to avoid midnight-crossing flakiness
-        let now = Utc::now();
-        let noon = Utc.from_utc_datetime(&now.date_naive().and_hms_opt(12, 0, 0).unwrap());
-        let today = noon.format("%Y-%m-%d").to_string();
-        let start = noon - chrono::Duration::hours(2);
-        let end = noon - chrono::Duration::hours(1);
+        let today_date = jiff::Timestamp::now().strftime("%Y-%m-%d").to_string();
+        let today_parsed = today_date.parse::<jiff::civil::Date>().unwrap();
+        let noon = today_parsed.at(12, 0, 0, 0).to_zoned(jiff::tz::TimeZone::UTC).unwrap().timestamp();
+        let today = today_date;
+        let start = noon.checked_sub(jiff::SignedDuration::from_hours(2)).unwrap();
+        let end = noon.checked_sub(jiff::SignedDuration::from_hours(1)).unwrap();
 
         let event = ActivityEvent {
             id: None,
@@ -469,13 +478,14 @@ mod tests {
         let repos = ProductivityRepos::new(pool);
         let aggregator = DailyAggregator::new(repos.clone());
 
-        let now = Utc::now();
-        let noon = Utc.from_utc_datetime(&now.date_naive().and_hms_opt(12, 0, 0).unwrap());
-        let today = noon.format("%Y-%m-%d").to_string();
-        let start = noon - chrono::Duration::hours(2);
+        let today_date = jiff::Timestamp::now().strftime("%Y-%m-%d").to_string();
+        let today_parsed = today_date.parse::<jiff::civil::Date>().unwrap();
+        let noon = today_parsed.at(12, 0, 0, 0).to_zoned(jiff::tz::TimeZone::UTC).unwrap().timestamp();
+        let today = today_date;
+        let start = noon.checked_sub(jiff::SignedDuration::from_hours(2)).unwrap();
 
         // Two different apps
-        for (app, secs) in &[("VS Code", 7200), ("Safari", 1800)] {
+        for (app, secs) in &[("VS Code", 7200i64), ("Safari", 1800i64)] {
             let event = ActivityEvent {
                 id: None,
                 app_name: app.to_string(),
@@ -485,7 +495,7 @@ mod tests {
                 url: None,
                 category_id: None,
                 started_at: start,
-                ended_at: Some(start + chrono::Duration::seconds(*secs)),
+                ended_at: Some(start.checked_add(jiff::SignedDuration::from_secs(*secs)).unwrap()),
                 duration_secs: Some(*secs),
                 is_idle: false,
                 metadata: None,
@@ -508,10 +518,11 @@ mod tests {
         let repos = ProductivityRepos::new(pool);
         let aggregator = DailyAggregator::new(repos.clone());
 
-        let now = Utc::now();
-        let noon = Utc.from_utc_datetime(&now.date_naive().and_hms_opt(12, 0, 0).unwrap());
-        let today = noon.format("%Y-%m-%d").to_string();
-        let start = noon - chrono::Duration::hours(4);
+        let today_date = jiff::Timestamp::now().strftime("%Y-%m-%d").to_string();
+        let today_parsed = today_date.parse::<jiff::civil::Date>().unwrap();
+        let noon = today_parsed.at(12, 0, 0, 0).to_zoned(jiff::tz::TimeZone::UTC).unwrap().timestamp();
+        let today = today_date;
+        let start = noon.checked_sub(jiff::SignedDuration::from_hours(4)).unwrap();
 
         // 3h productive coding
         repos
@@ -525,7 +536,7 @@ mod tests {
                 url: None,
                 category_id: Some("coding".into()),
                 started_at: start,
-                ended_at: Some(start + chrono::Duration::hours(3)),
+                ended_at: Some(start.checked_add(jiff::SignedDuration::from_hours(3)).unwrap()),
                 duration_secs: Some(10800),
                 is_idle: false,
                 metadata: None,
@@ -546,8 +557,8 @@ mod tests {
                 bundle_id: None,
                 url: None,
                 category_id: Some("entertainment".into()),
-                started_at: start + chrono::Duration::hours(3),
-                ended_at: Some(start + chrono::Duration::hours(4)),
+                started_at: start.checked_add(jiff::SignedDuration::from_hours(3)).unwrap(),
+                ended_at: Some(start.checked_add(jiff::SignedDuration::from_hours(4)).unwrap()),
                 duration_secs: Some(3600),
                 is_idle: false,
                 metadata: None,

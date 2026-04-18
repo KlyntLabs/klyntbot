@@ -1,6 +1,6 @@
-use chrono::{Duration, Utc};
 use feature_productivity::repos::ProductivityRepos;
 use feature_productivity::types::*;
+use jiff::{SignedDuration, Timestamp};
 use sqlx::SqlitePool;
 
 async fn setup_pool() -> SqlitePool {
@@ -21,7 +21,7 @@ async fn setup_pool() -> SqlitePool {
 async fn test_insert_and_list_activity_events() {
     let pool = setup_pool().await;
     let repos = ProductivityRepos::new(pool);
-    let now = Utc::now();
+    let now = Timestamp::now();
 
     for i in 0..3 {
         let event = ActivityEvent {
@@ -32,8 +32,8 @@ async fn test_insert_and_list_activity_events() {
             bundle_id: None,
             url: None,
             category_id: Some("coding".to_string()),
-            started_at: now + Duration::seconds(i * 10),
-            ended_at: Some(now + Duration::seconds(i * 10 + 5)),
+            started_at: now.checked_add(SignedDuration::from_secs(i * 10)).unwrap(),
+            ended_at: Some(now.checked_add(SignedDuration::from_secs(i * 10 + 5)).unwrap()),
             duration_secs: Some(5),
             is_idle: false,
             metadata: None,
@@ -46,8 +46,8 @@ async fn test_insert_and_list_activity_events() {
     let events = repos
         .events
         .list_range(
-            &(now - Duration::seconds(1)),
-            &(now + Duration::seconds(60)),
+            &now.checked_sub(SignedDuration::from_secs(1)).unwrap(),
+            &now.checked_add(SignedDuration::from_secs(60)).unwrap(),
             None,
         )
         .await
@@ -61,7 +61,7 @@ async fn test_insert_and_list_activity_events() {
 async fn test_batch_insert_events() {
     let pool = setup_pool().await;
     let repos = ProductivityRepos::new(pool);
-    let now = Utc::now();
+    let now = Timestamp::now();
 
     let events: Vec<ActivityEvent> = (0..10)
         .map(|i| ActivityEvent {
@@ -72,8 +72,8 @@ async fn test_batch_insert_events() {
             bundle_id: None,
             url: None,
             category_id: None,
-            started_at: now + Duration::seconds(i * 5),
-            ended_at: Some(now + Duration::seconds(i * 5 + 4)),
+            started_at: now.checked_add(SignedDuration::from_secs(i * 5)).unwrap(),
+            ended_at: Some(now.checked_add(SignedDuration::from_secs(i * 5 + 4)).unwrap()),
             duration_secs: Some(4),
             is_idle: false,
             metadata: None,
@@ -86,8 +86,8 @@ async fn test_batch_insert_events() {
     let result = repos
         .events
         .list_range(
-            &(now - Duration::seconds(1)),
-            &(now + Duration::seconds(100)),
+            &now.checked_sub(SignedDuration::from_secs(1)).unwrap(),
+            &now.checked_add(SignedDuration::from_secs(100)).unwrap(),
             None,
         )
         .await
@@ -146,7 +146,7 @@ async fn test_category_crud() {
 async fn test_focus_session_lifecycle() {
     let pool = setup_pool().await;
     let repos = ProductivityRepos::new(pool);
-    let now = Utc::now();
+    let now = Timestamp::now();
 
     let session = FocusSession {
         id: "sess-1".to_string(),
@@ -174,7 +174,7 @@ async fn test_focus_session_lifecycle() {
 
     // End session
     let mut ended = repos.sessions.get("sess-1").await.unwrap().unwrap();
-    ended.ended_at = Some(now + Duration::minutes(40));
+    ended.ended_at = Some(now.checked_add(SignedDuration::from_mins(40)).unwrap());
     ended.actual_mins = Some(40);
     ended.quality_score = Some(0.85);
     ended.completed = true;
@@ -253,7 +253,7 @@ async fn test_nudge_cooldown() {
         message: "Time for a break!".to_string(),
         channel: None,
         acknowledged: false,
-        created_at: Utc::now(),
+        created_at: Timestamp::now(),
     };
 
     let id = repos.nudges.insert(&nudge).await.unwrap();
@@ -286,7 +286,7 @@ async fn test_nudge_cooldown() {
 async fn test_context_switch_count() {
     let pool = setup_pool().await;
     let repos = ProductivityRepos::new(pool);
-    let now = Utc::now();
+    let now = Timestamp::now();
 
     // Insert alternating app events: A, B, A, B, B, C = 4 switches
     let apps = ["AppA", "AppB", "AppA", "AppB", "AppB", "AppC"];
@@ -301,8 +301,8 @@ async fn test_context_switch_count() {
             bundle_id: None,
             url: None,
             category_id: None,
-            started_at: now + Duration::seconds(i as i64 * 10),
-            ended_at: Some(now + Duration::seconds(i as i64 * 10 + 5)),
+            started_at: now.checked_add(SignedDuration::from_secs(i as i64 * 10)).unwrap(),
+            ended_at: Some(now.checked_add(SignedDuration::from_secs(i as i64 * 10 + 5)).unwrap()),
             duration_secs: Some(5),
             is_idle: false,
             metadata: None,
@@ -316,8 +316,8 @@ async fn test_context_switch_count() {
     let switches = repos
         .events
         .count_context_switches(
-            &(now - Duration::seconds(1)),
-            &(now + Duration::seconds(100)),
+            &now.checked_sub(SignedDuration::from_secs(1)).unwrap(),
+            &now.checked_add(SignedDuration::from_secs(100)).unwrap(),
         )
         .await
         .unwrap();
@@ -328,8 +328,8 @@ async fn test_context_switch_count() {
 async fn test_purge_old_events() {
     let pool = setup_pool().await;
     let repos = ProductivityRepos::new(pool);
-    let now = Utc::now();
-    let old = now - Duration::days(100);
+    let now = Timestamp::now();
+    let old = now.checked_sub(SignedDuration::from_secs(100 * 86400)).unwrap();
 
     // Insert old and new events
     let old_event = ActivityEvent {
@@ -341,7 +341,7 @@ async fn test_purge_old_events() {
         url: None,
         category_id: None,
         started_at: old,
-        ended_at: Some(old + Duration::seconds(5)),
+        ended_at: Some(old.checked_add(SignedDuration::from_secs(5)).unwrap()),
         duration_secs: Some(5),
         is_idle: false,
         metadata: None,
@@ -350,7 +350,7 @@ async fn test_purge_old_events() {
     };
     let new_event = ActivityEvent {
         started_at: now,
-        ended_at: Some(now + Duration::seconds(5)),
+        ended_at: Some(now.checked_add(SignedDuration::from_secs(5)).unwrap()),
         app_name: "NewApp".to_string(),
         ..old_event.clone()
     };
@@ -359,14 +359,18 @@ async fn test_purge_old_events() {
     repos.events.insert(&new_event).await.unwrap();
 
     // Purge events older than 90 days
-    let cutoff = now - Duration::days(90);
+    let cutoff = now.checked_sub(SignedDuration::from_secs(90 * 86400)).unwrap();
     let purged = repos.events.purge_before(&cutoff).await.unwrap();
     assert_eq!(purged, 1);
 
     // Only new event remains
     let remaining = repos
         .events
-        .list_range(&(old - Duration::days(1)), &(now + Duration::days(1)), None)
+        .list_range(
+            &old.checked_sub(SignedDuration::from_secs(86400)).unwrap(),
+            &now.checked_add(SignedDuration::from_secs(86400)).unwrap(),
+            None,
+        )
         .await
         .unwrap();
     assert_eq!(remaining.len(), 1);

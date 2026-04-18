@@ -1,6 +1,5 @@
 //! NudgeService — background loop that sends break reminders and burnout alerts.
 
-use chrono::{DateTime, Duration, Utc};
 use tokio::sync::mpsc;
 use tokio::task::JoinHandle;
 use tokio_util::sync::CancellationToken;
@@ -97,7 +96,7 @@ async fn check_nudges(
         return Ok(());
     }
 
-    let now = Utc::now();
+    let now = jiff::Timestamp::now();
 
     // 1. Break reminder — continuous active time exceeds threshold.
     //    Check cooldown first (cheap indexed lookup) to avoid the expensive SUM query.
@@ -105,7 +104,9 @@ async fn check_nudges(
         && should_send(repos, NudgeType::BreakReminder, config.cooldown_mins, now).await?
     {
         let break_threshold_secs = focus_config.break_interval_mins as i64 * 60;
-        let window_start = now - Duration::seconds(break_threshold_secs);
+        let window_start = now
+            .checked_sub(jiff::SignedDuration::from_secs(break_threshold_secs))
+            .unwrap_or(now);
         let active_secs = repos.events.total_active_secs(&window_start, &now).await?;
 
         if active_secs >= break_threshold_secs {
@@ -128,10 +129,14 @@ async fn check_nudges(
         && should_send(repos, NudgeType::BurnoutAlert, burnout_cooldown, now).await?
     {
         let today_start = now
-            .date_naive()
-            .and_hms_opt(0, 0, 0)
-            .expect("midnight is always valid")
-            .and_utc();
+            .strftime("%Y-%m-%d")
+            .to_string()
+            .parse::<jiff::civil::Date>()
+            .expect("today is always valid")
+            .at(0, 0, 0, 0)
+            .to_zoned(jiff::tz::TimeZone::UTC)
+            .expect("UTC is always valid")
+            .timestamp();
         let daily_active = repos.events.total_active_secs(&today_start, &now).await?;
         let max_daily_secs = focus_config.max_daily_focus_hours as i64 * 3600;
 
@@ -170,13 +175,13 @@ async fn should_send(
     repos: &ProductivityRepos,
     nudge_type: NudgeType,
     cooldown_mins: u64,
-    now: DateTime<Utc>,
+    now: jiff::Timestamp,
 ) -> common::Result<bool> {
     let last = repos.nudges.last_of_type(nudge_type).await?;
     match last {
         Some(record) => {
-            let elapsed = now - record.created_at;
-            Ok(elapsed.num_minutes() >= cooldown_mins as i64)
+            let elapsed = (now.as_second() - record.created_at.as_second()) / 60;
+            Ok(elapsed >= cooldown_mins as i64)
         }
         None => Ok(true),
     }
@@ -226,7 +231,6 @@ fn is_quiet_hours(config: &NudgeConfig) -> bool {
 mod tests {
     use super::*;
     use crate::ProductivityFeature;
-    use chrono::Duration;
 
     async fn setup_pool() -> sqlx::SqlitePool {
         let pool = storage::StoragePool::connect_in_memory().await.unwrap();
@@ -263,9 +267,9 @@ mod tests {
         let (tx, mut rx) = mpsc::channel(10);
 
         // Insert continuous active events exceeding break_interval (90 min).
-        // Use 85-min window to avoid boundary race with check_nudges' own Utc::now().
-        let now = Utc::now();
-        for i in 0..10 {
+        // Use 85-min window to avoid boundary race with check_nudges' own jiff::Timestamp::now().
+        let now = jiff::Timestamp::now();
+        for i in 0..10i64 {
             let event = crate::types::ActivityEvent {
                 id: None,
                 app_name: "Code".into(),
@@ -274,8 +278,17 @@ mod tests {
                 bundle_id: None,
                 url: None,
                 category_id: Some("coding".into()),
-                started_at: now - Duration::minutes(85) + Duration::minutes(i * 8),
-                ended_at: Some(now - Duration::minutes(85) + Duration::minutes(i * 8 + 8)),
+                started_at: now
+                    .checked_sub(jiff::SignedDuration::from_secs(85 * 60))
+                    .unwrap()
+                    .checked_add(jiff::SignedDuration::from_secs(i * 8 * 60))
+                    .unwrap(),
+                ended_at: Some(
+                    now.checked_sub(jiff::SignedDuration::from_secs(85 * 60))
+                        .unwrap()
+                        .checked_add(jiff::SignedDuration::from_secs((i * 8 + 8) * 60))
+                        .unwrap(),
+                ),
                 duration_secs: Some(540), // 9 min each = 90 min total
                 is_idle: false,
                 metadata: None,
@@ -304,13 +317,15 @@ mod tests {
         let recent = NudgeRecord::new(
             NudgeType::BreakReminder,
             "Take a break".into(),
-            Utc::now() - Duration::minutes(5), // 5 min ago (cooldown is 15)
+            jiff::Timestamp::now()
+                .checked_sub(jiff::SignedDuration::from_secs(5 * 60))
+                .unwrap(),
         );
         repos.nudges.insert(&recent).await.unwrap();
 
         // Insert active events exceeding threshold
-        let now = Utc::now();
-        for i in 0..10 {
+        let now = jiff::Timestamp::now();
+        for i in 0..10i64 {
             let event = crate::types::ActivityEvent {
                 id: None,
                 app_name: "Code".into(),
@@ -319,8 +334,17 @@ mod tests {
                 bundle_id: None,
                 url: None,
                 category_id: None,
-                started_at: now - Duration::minutes(90) + Duration::minutes(i * 9),
-                ended_at: Some(now - Duration::minutes(90) + Duration::minutes(i * 9 + 9)),
+                started_at: now
+                    .checked_sub(jiff::SignedDuration::from_secs(90 * 60))
+                    .unwrap()
+                    .checked_add(jiff::SignedDuration::from_secs(i * 9 * 60))
+                    .unwrap(),
+                ended_at: Some(
+                    now.checked_sub(jiff::SignedDuration::from_secs(90 * 60))
+                        .unwrap()
+                        .checked_add(jiff::SignedDuration::from_secs((i * 9 + 9) * 60))
+                        .unwrap(),
+                ),
                 duration_secs: Some(540),
                 is_idle: false,
                 metadata: None,
@@ -364,11 +388,19 @@ mod tests {
         let (tx, mut rx) = mpsc::channel(10);
 
         // Insert 9 events right after midnight UTC today, each with 1h duration.
-        // The events' started_at must be between midnight UTC and Utc::now()
+        // The events' started_at must be between midnight UTC and jiff::Timestamp::now()
         // since check_nudges queries that range internally.
-        let now = Utc::now();
-        let today_start = now.date_naive().and_hms_opt(0, 0, 0).unwrap().and_utc();
-        for i in 0..9 {
+        let now = jiff::Timestamp::now();
+        let today_start = now
+            .strftime("%Y-%m-%d")
+            .to_string()
+            .parse::<jiff::civil::Date>()
+            .unwrap()
+            .at(0, 0, 0, 0)
+            .to_zoned(jiff::tz::TimeZone::UTC)
+            .expect("UTC is always valid")
+            .timestamp();
+        for i in 0..9i64 {
             let event = crate::types::ActivityEvent {
                 id: None,
                 app_name: "Code".into(),
@@ -378,8 +410,14 @@ mod tests {
                 url: None,
                 category_id: None,
                 // Pack events close together so they all fit before now
-                started_at: today_start + Duration::seconds(i),
-                ended_at: Some(today_start + Duration::seconds(i) + Duration::hours(1)),
+                started_at: today_start
+                    .checked_add(jiff::SignedDuration::from_secs(i))
+                    .unwrap(),
+                ended_at: Some(
+                    today_start
+                        .checked_add(jiff::SignedDuration::from_secs(i + 3600))
+                        .unwrap(),
+                ),
                 duration_secs: Some(3600), // 1 hour each = 9 hours total
                 is_idle: false,
                 metadata: None,

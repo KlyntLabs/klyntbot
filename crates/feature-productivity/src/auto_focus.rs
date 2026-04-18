@@ -3,7 +3,6 @@
 
 use std::collections::HashMap;
 
-use chrono::{DateTime, Utc};
 use tokio::sync::{broadcast, mpsc};
 use tokio::task::JoinHandle;
 use tokio_util::sync::CancellationToken;
@@ -16,8 +15,8 @@ use crate::types::{ActivityTick, CategoryType};
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct AutoFocusSession {
-    pub started_at: DateTime<Utc>,
-    pub ended_at: DateTime<Utc>,
+    pub started_at: jiff::Timestamp,
+    pub ended_at: jiff::Timestamp,
     pub dominant_app: String,
     pub dominant_category: Option<String>,
     pub productive_ratio: f64,
@@ -30,14 +29,14 @@ pub struct AutoFocusSession {
 pub enum AutoFocusEvent {
     /// Emitted when FSM transitions from Building → Focused (focus session starts)
     Started {
-        started_at: DateTime<Utc>,
+        started_at: jiff::Timestamp,
         dominant_app: String,
         dominant_category: Option<String>,
     },
     /// Emitted when cooldown grace expires (focus session ends)
     Ended {
-        started_at: DateTime<Utc>,
-        ended_at: DateTime<Utc>,
+        started_at: jiff::Timestamp,
+        ended_at: jiff::Timestamp,
         dominant_app: String,
         dominant_category: Option<String>,
         productive_ratio: f64,
@@ -50,14 +49,14 @@ pub enum AutoFocusEvent {
 enum FocusState {
     Unfocused,
     Building {
-        since: DateTime<Utc>,
+        since: jiff::Timestamp,
     },
     Focused {
-        since: DateTime<Utc>,
+        since: jiff::Timestamp,
     },
     Cooldown {
-        since: DateTime<Utc>,
-        focus_since: DateTime<Utc>,
+        since: jiff::Timestamp,
+        focus_since: jiff::Timestamp,
     },
 }
 
@@ -106,7 +105,7 @@ impl AutoFocusDetector {
         let handle = tokio::spawn(async move {
             let mut state = FocusState::Unfocused;
             let mut window = WindowStats::new();
-            let mut window_start: Option<DateTime<Utc>> = None;
+            let mut window_start: Option<jiff::Timestamp> = None;
             let mut consecutive_productive_windows: u32 = 0;
 
             // Accumulated stats for the session
@@ -166,7 +165,7 @@ impl AutoFocusDetector {
 
                         // Check if the 5-min window is complete
                         let window_elapsed = window_start
-                            .map(|ws| (tick.timestamp - ws).num_seconds())
+                            .map(|ws| tick.timestamp.as_second() - ws.as_second())
                             .unwrap_or(0);
 
                         if window_elapsed < window_duration_secs {
@@ -182,7 +181,7 @@ impl AutoFocusDetector {
                                 if is_productive_window {
                                     consecutive_productive_windows += 1;
                                     if consecutive_productive_windows >= 3 {
-                                        state = FocusState::Building { since: tick.timestamp - chrono::Duration::seconds(window_duration_secs * 3) };
+                                        state = FocusState::Building { since: tick.timestamp.checked_sub(jiff::SignedDuration::from_secs(window_duration_secs * 3)).unwrap_or(tick.timestamp) };
                                         debug!("AutoFocus: Unfocused → Building (3 productive windows)");
                                     }
                                 } else {
@@ -191,7 +190,7 @@ impl AutoFocusDetector {
                             }
                             FocusState::Building { since } => {
                                 let since_ts = *since;
-                                let elapsed = (tick.timestamp - since_ts).num_seconds();
+                                let elapsed = tick.timestamp.as_second() - since_ts.as_second();
                                 if !is_productive_window {
                                     state = FocusState::Unfocused;
                                     consecutive_productive_windows = 0;
@@ -230,7 +229,7 @@ impl AutoFocusDetector {
                                 }
                             }
                             FocusState::Cooldown { since, focus_since } => {
-                                let cooldown_elapsed = (tick.timestamp - *since).num_seconds();
+                                let cooldown_elapsed = tick.timestamp.as_second() - since.as_second();
                                 if is_productive_window {
                                     let focus_since = *focus_since;
                                     state = FocusState::Focused { since: focus_since };
@@ -245,7 +244,7 @@ impl AutoFocusDetector {
                                     } else {
                                         0.0
                                     };
-                                    let total_secs = (tick.timestamp - *focus_since).num_seconds();
+                                    let total_secs = tick.timestamp.as_second() - focus_since.as_second();
 
                                     let event = AutoFocusEvent::Ended {
                                         started_at: *focus_since,

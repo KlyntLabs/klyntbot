@@ -2,7 +2,6 @@
 
 use std::sync::Arc;
 
-use chrono::Utc;
 use uuid::Uuid;
 
 use bus::{DomainEvent, DomainEventBus};
@@ -43,7 +42,7 @@ impl FocusManager {
             return Err(common::ToolError::ExecutionFailed(format!(
                 "Focus session already active (id: {}, started: {})",
                 active.id,
-                active.started_at.format("%H:%M")
+                active.started_at.strftime("%H:%M")
             ))
             .into());
         }
@@ -55,7 +54,7 @@ impl FocusManager {
             project_id,
             session_type: SessionType::Focus,
             target_mins: Some(target),
-            started_at: Utc::now(),
+            started_at: jiff::Timestamp::now(),
             ended_at: None,
             actual_mins: None,
             interruptions: 0,
@@ -77,8 +76,8 @@ impl FocusManager {
             return Ok(None);
         };
 
-        let now = Utc::now();
-        let actual_mins = (now - session.started_at).num_minutes();
+        let now = jiff::Timestamp::now();
+        let actual_mins = (now.as_second() - session.started_at.as_second()) / 60;
         let target = session
             .target_mins
             .unwrap_or(self.config.default_duration_mins as i64);
@@ -127,7 +126,7 @@ impl FocusManager {
             project_id,
             session_type: SessionType::Pomodoro,
             target_mins: Some(work),
-            started_at: Utc::now(),
+            started_at: jiff::Timestamp::now(),
             ended_at: None,
             actual_mins: None,
             interruptions: 0,
@@ -163,7 +162,7 @@ impl FocusManager {
             project_id: None,
             session_type: SessionType::Break,
             target_mins: Some(break_mins),
-            started_at: Utc::now(),
+            started_at: jiff::Timestamp::now(),
             ended_at: None,
             actual_mins: None,
             interruptions: 0,
@@ -187,9 +186,9 @@ impl FocusManager {
             return Ok(None);
         }
 
-        let now = Utc::now();
+        let now = jiff::Timestamp::now();
         session.ended_at = Some(now);
-        session.actual_mins = Some((now - session.started_at).num_minutes());
+        session.actual_mins = Some((now.as_second() - session.started_at.as_second()) / 60);
         session.completed = true;
         // No quality score for breaks
         self.repos.sessions.update(&session).await?;
@@ -217,7 +216,7 @@ impl FocusManager {
     ) -> common::Result<()> {
         session.interruptions += 1;
         session.distraction_events.push(DistractionEvent {
-            timestamp: Utc::now(),
+            timestamp: jiff::Timestamp::now(),
             app_name: app_name.to_string(),
             duration_secs: None,
         });
@@ -235,7 +234,10 @@ impl FocusManager {
 fn compute_on_task_ratio(session: &FocusSession) -> f64 {
     let elapsed_mins = session
         .actual_mins
-        .unwrap_or_else(|| (Utc::now() - session.started_at).num_minutes())
+        .unwrap_or_else(|| {
+            let now = jiff::Timestamp::now();
+            (now.as_second() - session.started_at.as_second()) / 60
+        })
         .max(1) as f64;
 
     let distraction_mins = session
@@ -359,7 +361,7 @@ mod tests {
             project_id: None,
             session_type: SessionType::Focus,
             target_mins: Some(45),
-            started_at: Utc::now(),
+            started_at: jiff::Timestamp::now(),
             ended_at: None,
             actual_mins: Some(45),
             interruptions: 0,

@@ -3,7 +3,6 @@
 use std::sync::Arc;
 
 use async_trait::async_trait;
-use chrono::{Duration, Utc};
 use serde_json::Value;
 
 use std::fmt::Write;
@@ -53,7 +52,7 @@ impl ProductivityTool {
             "Focus session started ({}min target). Session ID: {}.\nStarted at: {}",
             target,
             session.id,
-            session.started_at.format("%H:%M")
+            session.started_at.strftime("%H:%M")
         ))
     }
 
@@ -80,7 +79,7 @@ impl ProductivityTool {
     async fn handle_focus_status(&self) -> Result<String> {
         match self.focus_manager.get_active().await? {
             Some(session) => {
-                let elapsed = (Utc::now() - session.started_at).num_minutes();
+                let elapsed = (jiff::Timestamp::now().as_second() - session.started_at.as_second()) / 60;
                 let target = session.target_mins.unwrap_or(45);
                 let remaining = (target - elapsed).max(0);
                 Ok(format!(
@@ -89,7 +88,7 @@ impl ProductivityTool {
                     target,
                     remaining,
                     session.interruptions,
-                    session.started_at.format("%H:%M")
+                    session.started_at.strftime("%H:%M")
                 ))
             }
             None => Ok("No active focus session.".into()),
@@ -197,10 +196,13 @@ impl ProductivityTool {
     }
 
     async fn handle_activity_week(&self) -> Result<String> {
-        let today = Utc::now().date_naive();
-        let week_ago = today - Duration::days(7);
-        let start_date = week_ago.format("%Y-%m-%d").to_string();
-        let end_date = today.format("%Y-%m-%d").to_string();
+        let now = jiff::Timestamp::now();
+        let end_date = now.strftime("%Y-%m-%d").to_string();
+        let start_date = now
+            .checked_sub(jiff::SignedDuration::from_secs(7 * 86400))
+            .unwrap_or(now)
+            .strftime("%Y-%m-%d")
+            .to_string();
 
         // Compute today's summary first (best-effort — weekly still works with stale today)
         if let Err(e) = self.aggregator.compute_today().await {
@@ -286,26 +288,42 @@ impl ProductivityTool {
     async fn handle_activity_compare(&self, p: &ParamExtractor<'_>) -> Result<String> {
         let period = p.optional_str("period")?.unwrap_or("day");
 
-        let today = Utc::now().date_naive();
+        let now_ts = jiff::Timestamp::now();
+        let today_str = now_ts.strftime("%Y-%m-%d").to_string();
         let (current_start, previous_start, previous_end, label) = match period {
             "day" => {
-                let yesterday = today - Duration::days(1);
+                let yesterday = now_ts
+                    .checked_sub(jiff::SignedDuration::from_secs(86400))
+                    .unwrap_or(now_ts)
+                    .strftime("%Y-%m-%d")
+                    .to_string();
                 (
-                    today.format("%Y-%m-%d").to_string(),
-                    yesterday.format("%Y-%m-%d").to_string(),
-                    yesterday.format("%Y-%m-%d").to_string(),
+                    today_str.clone(),
+                    yesterday.clone(),
+                    yesterday,
                     "Today vs Yesterday",
                 )
             }
             "week" => {
-                let week_ago = today - Duration::days(7);
-                let two_weeks_ago = today - Duration::days(14);
+                let week_ago = now_ts
+                    .checked_sub(jiff::SignedDuration::from_secs(7 * 86400))
+                    .unwrap_or(now_ts)
+                    .strftime("%Y-%m-%d")
+                    .to_string();
+                let two_weeks_ago = now_ts
+                    .checked_sub(jiff::SignedDuration::from_secs(14 * 86400))
+                    .unwrap_or(now_ts)
+                    .strftime("%Y-%m-%d")
+                    .to_string();
+                let week_ago_minus1 = now_ts
+                    .checked_sub(jiff::SignedDuration::from_secs(8 * 86400))
+                    .unwrap_or(now_ts)
+                    .strftime("%Y-%m-%d")
+                    .to_string();
                 (
-                    week_ago.format("%Y-%m-%d").to_string(),
-                    two_weeks_ago.format("%Y-%m-%d").to_string(),
-                    (week_ago - Duration::days(1))
-                        .format("%Y-%m-%d")
-                        .to_string(),
+                    week_ago,
+                    two_weeks_ago,
+                    week_ago_minus1,
                     "This week vs Last week",
                 )
             }
@@ -317,7 +335,6 @@ impl ProductivityTool {
         };
 
         // Ensure today is computed, then fetch both periods in parallel
-        let today_str = today.format("%Y-%m-%d").to_string();
         let _ = self.aggregator.get_or_compute(&today_str).await;
 
         let (current, previous) = tokio::try_join!(
@@ -379,7 +396,7 @@ impl ProductivityTool {
             target_value: target,
             enabled: true,
             project_id: None,
-            created_at: Utc::now(),
+            created_at: jiff::Timestamp::now(),
         };
         let id = self.repos.goals.insert(&goal).await?;
         Ok(format!(
@@ -391,7 +408,7 @@ impl ProductivityTool {
     }
 
     async fn handle_check_goals(&self) -> Result<String> {
-        let today = Utc::now().format("%Y-%m-%d").to_string();
+        let today = jiff::Timestamp::now().strftime("%Y-%m-%d").to_string();
         let results = self.aggregator.check_goals(&today).await?;
 
         if results.is_empty() {
@@ -450,10 +467,12 @@ impl ProductivityTool {
             description: description.to_string(),
             category_id,
             project_id,
-            started_at: Utc::now() - Duration::minutes(duration_mins),
+            started_at: jiff::Timestamp::now()
+                .checked_sub(jiff::SignedDuration::from_secs(duration_mins * 60))
+                .unwrap_or_else(|_| jiff::Timestamp::now()),
             duration_secs: duration_mins * 60,
             source: "manual".into(),
-            created_at: Utc::now(),
+            created_at: jiff::Timestamp::now(),
         };
 
         let id = self.repos.time_entries.insert(&entry).await?;
@@ -470,16 +489,20 @@ impl ProductivityTool {
         let end_date = p.required_str("end_date")?;
         let format = p.optional_str("format")?.unwrap_or("csv");
 
-        let start = chrono::NaiveDate::parse_from_str(start_date, "%Y-%m-%d")
+        let start = start_date
+            .parse::<jiff::civil::Date>()
             .map_err(|e| ToolError::InvalidParams(format!("invalid start_date: {e}")))?
-            .and_hms_opt(0, 0, 0)
-            .unwrap()
-            .and_utc();
-        let end = chrono::NaiveDate::parse_from_str(end_date, "%Y-%m-%d")
+            .at(0, 0, 0, 0)
+            .to_zoned(jiff::tz::TimeZone::UTC)
+            .map_err(|e| ToolError::InvalidParams(format!("tz error: {e}")))?
+            .timestamp();
+        let end = end_date
+            .parse::<jiff::civil::Date>()
             .map_err(|e| ToolError::InvalidParams(format!("invalid end_date: {e}")))?
-            .and_hms_opt(23, 59, 59)
-            .unwrap()
-            .and_utc();
+            .at(23, 59, 59, 0)
+            .to_zoned(jiff::tz::TimeZone::UTC)
+            .map_err(|e| ToolError::InvalidParams(format!("tz error: {e}")))?
+            .timestamp();
 
         let events = self
             .repos
