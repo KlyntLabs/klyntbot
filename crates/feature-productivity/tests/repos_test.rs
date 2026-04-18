@@ -33,7 +33,10 @@ async fn test_insert_and_list_activity_events() {
             url: None,
             category_id: Some("coding".to_string()),
             started_at: now.checked_add(SignedDuration::from_secs(i * 10)).unwrap(),
-            ended_at: Some(now.checked_add(SignedDuration::from_secs(i * 10 + 5)).unwrap()),
+            ended_at: Some(
+                now.checked_add(SignedDuration::from_secs(i * 10 + 5))
+                    .unwrap(),
+            ),
             duration_secs: Some(5),
             is_idle: false,
             metadata: None,
@@ -73,7 +76,10 @@ async fn test_batch_insert_events() {
             url: None,
             category_id: None,
             started_at: now.checked_add(SignedDuration::from_secs(i * 5)).unwrap(),
-            ended_at: Some(now.checked_add(SignedDuration::from_secs(i * 5 + 4)).unwrap()),
+            ended_at: Some(
+                now.checked_add(SignedDuration::from_secs(i * 5 + 4))
+                    .unwrap(),
+            ),
             duration_secs: Some(4),
             is_idle: false,
             metadata: None,
@@ -301,8 +307,13 @@ async fn test_context_switch_count() {
             bundle_id: None,
             url: None,
             category_id: None,
-            started_at: now.checked_add(SignedDuration::from_secs(i as i64 * 10)).unwrap(),
-            ended_at: Some(now.checked_add(SignedDuration::from_secs(i as i64 * 10 + 5)).unwrap()),
+            started_at: now
+                .checked_add(SignedDuration::from_secs(i as i64 * 10))
+                .unwrap(),
+            ended_at: Some(
+                now.checked_add(SignedDuration::from_secs(i as i64 * 10 + 5))
+                    .unwrap(),
+            ),
             duration_secs: Some(5),
             is_idle: false,
             metadata: None,
@@ -329,7 +340,9 @@ async fn test_purge_old_events() {
     let pool = setup_pool().await;
     let repos = ProductivityRepos::new(pool);
     let now = Timestamp::now();
-    let old = now.checked_sub(SignedDuration::from_secs(100 * 86400)).unwrap();
+    let old = now
+        .checked_sub(SignedDuration::from_secs(100 * 86400))
+        .unwrap();
 
     // Insert old and new events
     let old_event = ActivityEvent {
@@ -359,7 +372,9 @@ async fn test_purge_old_events() {
     repos.events.insert(&new_event).await.unwrap();
 
     // Purge events older than 90 days
-    let cutoff = now.checked_sub(SignedDuration::from_secs(90 * 86400)).unwrap();
+    let cutoff = now
+        .checked_sub(SignedDuration::from_secs(90 * 86400))
+        .unwrap();
     let purged = repos.events.purge_before(&cutoff).await.unwrap();
     assert_eq!(purged, 1);
 

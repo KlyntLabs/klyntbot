@@ -205,8 +205,14 @@ async fn test_daily_aggregation_accuracy() {
             bundle_id: None,
             url: None,
             category_id: Some("coding".into()),
-            started_at: day_start.checked_add(SignedDuration::from_hours(9)).unwrap(),
-            ended_at: Some(day_start.checked_add(SignedDuration::from_hours(11)).unwrap()),
+            started_at: day_start
+                .checked_add(SignedDuration::from_hours(9))
+                .unwrap(),
+            ended_at: Some(
+                day_start
+                    .checked_add(SignedDuration::from_hours(11))
+                    .unwrap(),
+            ),
             duration_secs: Some(7200), // 2h
             is_idle: false,
             metadata: None,
@@ -221,8 +227,14 @@ async fn test_daily_aggregation_accuracy() {
             bundle_id: None,
             url: None,
             category_id: Some("communication".into()),
-            started_at: day_start.checked_add(SignedDuration::from_hours(11)).unwrap(),
-            ended_at: Some(day_start.checked_add(SignedDuration::from_hours(12)).unwrap()),
+            started_at: day_start
+                .checked_add(SignedDuration::from_hours(11))
+                .unwrap(),
+            ended_at: Some(
+                day_start
+                    .checked_add(SignedDuration::from_hours(12))
+                    .unwrap(),
+            ),
             duration_secs: Some(3600), // 1h
             is_idle: false,
             metadata: None,
@@ -237,7 +249,9 @@ async fn test_daily_aggregation_accuracy() {
             bundle_id: None,
             url: Some("https://youtube.com".into()),
             category_id: Some("entertainment".into()),
-            started_at: day_start.checked_add(SignedDuration::from_hours(12)).unwrap(),
+            started_at: day_start
+                .checked_add(SignedDuration::from_hours(12))
+                .unwrap(),
             ended_at: Some(
                 day_start
                     .checked_add(SignedDuration::from_hours(12))
@@ -264,7 +278,11 @@ async fn test_daily_aggregation_accuracy() {
                 .unwrap()
                 .checked_add(SignedDuration::from_mins(30))
                 .unwrap(),
-            ended_at: Some(day_start.checked_add(SignedDuration::from_hours(13)).unwrap()),
+            ended_at: Some(
+                day_start
+                    .checked_add(SignedDuration::from_hours(13))
+                    .unwrap(),
+            ),
             duration_secs: Some(1800), // 30m
             is_idle: true,
             metadata: None,
@@ -350,7 +368,9 @@ async fn test_daily_aggregation_accuracy() {
         project_id: None,
         session_type: SessionType::Focus,
         target_mins: Some(45),
-        started_at: day_start.checked_add(SignedDuration::from_hours(9)).unwrap(),
+        started_at: day_start
+            .checked_add(SignedDuration::from_hours(9))
+            .unwrap(),
         ended_at: Some(
             day_start
                 .checked_add(SignedDuration::from_hours(9))
@@ -544,7 +564,9 @@ async fn test_pattern_analyzer_detects_patterns() {
         // Afternoon session (3pm) — lower quality
         let afternoon = FocusSession {
             id: format!("fs-afternoon-{}", day_offset),
-            started_at: base_day.checked_add(SignedDuration::from_hours(15)).unwrap(),
+            started_at: base_day
+                .checked_add(SignedDuration::from_hours(15))
+                .unwrap(),
             ended_at: Some(
                 base_day
                     .checked_add(SignedDuration::from_hours(15))
@@ -792,8 +814,14 @@ async fn test_project_tracking_aggregation() {
         bundle_id: None,
         url: None,
         category_id: Some("coding".into()),
-        started_at: day_start.checked_add(SignedDuration::from_hours(9)).unwrap(),
-        ended_at: Some(day_start.checked_add(SignedDuration::from_hours(11)).unwrap()),
+        started_at: day_start
+            .checked_add(SignedDuration::from_hours(9))
+            .unwrap(),
+        ended_at: Some(
+            day_start
+                .checked_add(SignedDuration::from_hours(11))
+                .unwrap(),
+        ),
         duration_secs: Some(7200), // 2h
         is_idle: false,
         metadata: None,
@@ -811,8 +839,14 @@ async fn test_project_tracking_aggregation() {
         bundle_id: None,
         url: None,
         category_id: Some("communication".into()),
-        started_at: day_start.checked_add(SignedDuration::from_hours(11)).unwrap(),
-        ended_at: Some(day_start.checked_add(SignedDuration::from_hours(12)).unwrap()),
+        started_at: day_start
+            .checked_add(SignedDuration::from_hours(11))
+            .unwrap(),
+        ended_at: Some(
+            day_start
+                .checked_add(SignedDuration::from_hours(12))
+                .unwrap(),
+        ),
         duration_secs: Some(3600), // 1h
         is_idle: false,
         metadata: None,
@@ -860,7 +894,9 @@ async fn test_activity_export_csv() {
             bundle_id: None,
             url: None,
             category_id: Some("coding".into()),
-            started_at: day_start.checked_add(SignedDuration::from_hours(i as i64)).unwrap(),
+            started_at: day_start
+                .checked_add(SignedDuration::from_hours(i as i64))
+                .unwrap(),
             ended_at: Some(
                 day_start
                     .checked_add(SignedDuration::from_hours(i as i64 + 1))

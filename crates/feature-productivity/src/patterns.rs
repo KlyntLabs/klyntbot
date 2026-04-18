@@ -234,7 +234,10 @@ mod tests {
                 session_type: SessionType::Focus,
                 target_mins: Some(25),
                 started_at: now,
-                ended_at: Some(now.checked_add(jiff::SignedDuration::from_mins(25)).unwrap()),
+                ended_at: Some(
+                    now.checked_add(jiff::SignedDuration::from_mins(25))
+                        .unwrap(),
+                ),
                 actual_mins: Some(25),
                 interruptions: 0,
                 distraction_events: vec![],

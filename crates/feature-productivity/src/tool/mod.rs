@@ -79,7 +79,8 @@ impl ProductivityTool {
     async fn handle_focus_status(&self) -> Result<String> {
         match self.focus_manager.get_active().await? {
             Some(session) => {
-                let elapsed = (jiff::Timestamp::now().as_second() - session.started_at.as_second()) / 60;
+                let elapsed =
+                    (jiff::Timestamp::now().as_second() - session.started_at.as_second()) / 60;
                 let target = session.target_mins.unwrap_or(45);
                 let remaining = (target - elapsed).max(0);
                 Ok(format!(

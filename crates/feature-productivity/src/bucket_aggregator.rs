@@ -212,16 +212,12 @@ mod tests {
     #[test]
     fn test_bucket_start_alignment() {
         // 2026-03-06T10:03:27Z should align to 2026-03-06T10:00:00Z
-        let ts = "2026-03-06T10:03:27Z"
-            .parse::<jiff::Timestamp>()
-            .unwrap();
+        let ts = "2026-03-06T10:03:27Z".parse::<jiff::Timestamp>().unwrap();
         let aligned = bucket_start_for(&ts);
         assert_eq!(aligned.strftime("%H:%M:%S").to_string(), "10:00:00");
 
         // Exact boundary stays
-        let ts2 = "2026-03-06T10:05:00Z"
-            .parse::<jiff::Timestamp>()
-            .unwrap();
+        let ts2 = "2026-03-06T10:05:00Z".parse::<jiff::Timestamp>().unwrap();
         let aligned2 = bucket_start_for(&ts2);
         assert_eq!(aligned2.strftime("%H:%M:%S").to_string(), "10:05:00");
     }

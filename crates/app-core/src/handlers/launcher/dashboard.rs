@@ -60,9 +60,8 @@ pub async fn build_dashboard_data(
                 .filter_map(|e| {
                     let starts_at = e.started_at.parse::<jiff::Timestamp>().ok()?;
                     let ends_at = e.ended_at.parse::<jiff::Timestamp>().ok()?;
-                    let minutes_until = (starts_at.as_millisecond()
-                        - now.as_millisecond())
-                        / 60_000;
+                    let minutes_until =
+                        (starts_at.as_millisecond() - now.as_millisecond()) / 60_000;
                     Some(CalendarDashboard {
                         event_id: e.id,
                         title: e.title,
@@ -77,9 +76,7 @@ pub async fn build_dashboard_data(
     };
 
     // Today's tasks (doing + due today)
-    let today_date = now
-        .to_zoned(jiff::tz::TimeZone::UTC)
-        .date();
+    let today_date = now.to_zoned(jiff::tz::TimeZone::UTC).date();
     let start_of_today: jiff::Timestamp = today_date
         .at(0, 0, 0, 0)
         .to_zoned(jiff::tz::TimeZone::UTC)
@@ -114,9 +111,7 @@ pub async fn build_dashboard_data(
             title: t.title.clone(),
             status: t.status.clone(),
             project_name: t.project_id.clone(),
-            due_date: t
-                .due_date
-                .map(|d| d.to_string()),
+            due_date: t.due_date.map(|d| d.to_string()),
         })
         .collect();
 

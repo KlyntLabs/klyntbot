@@ -426,10 +426,18 @@ mod tests {
         // Use noon UTC today to avoid midnight-crossing flakiness
         let today_date = jiff::Timestamp::now().strftime("%Y-%m-%d").to_string();
         let today_parsed = today_date.parse::<jiff::civil::Date>().unwrap();
-        let noon = today_parsed.at(12, 0, 0, 0).to_zoned(jiff::tz::TimeZone::UTC).unwrap().timestamp();
+        let noon = today_parsed
+            .at(12, 0, 0, 0)
+            .to_zoned(jiff::tz::TimeZone::UTC)
+            .unwrap()
+            .timestamp();
         let today = today_date;
-        let start = noon.checked_sub(jiff::SignedDuration::from_hours(2)).unwrap();
-        let end = noon.checked_sub(jiff::SignedDuration::from_hours(1)).unwrap();
+        let start = noon
+            .checked_sub(jiff::SignedDuration::from_hours(2))
+            .unwrap();
+        let end = noon
+            .checked_sub(jiff::SignedDuration::from_hours(1))
+            .unwrap();
 
         let event = ActivityEvent {
             id: None,
@@ -480,9 +488,15 @@ mod tests {
 
         let today_date = jiff::Timestamp::now().strftime("%Y-%m-%d").to_string();
         let today_parsed = today_date.parse::<jiff::civil::Date>().unwrap();
-        let noon = today_parsed.at(12, 0, 0, 0).to_zoned(jiff::tz::TimeZone::UTC).unwrap().timestamp();
+        let noon = today_parsed
+            .at(12, 0, 0, 0)
+            .to_zoned(jiff::tz::TimeZone::UTC)
+            .unwrap()
+            .timestamp();
         let today = today_date;
-        let start = noon.checked_sub(jiff::SignedDuration::from_hours(2)).unwrap();
+        let start = noon
+            .checked_sub(jiff::SignedDuration::from_hours(2))
+            .unwrap();
 
         // Two different apps
         for (app, secs) in &[("VS Code", 7200i64), ("Safari", 1800i64)] {
@@ -495,7 +509,11 @@ mod tests {
                 url: None,
                 category_id: None,
                 started_at: start,
-                ended_at: Some(start.checked_add(jiff::SignedDuration::from_secs(*secs)).unwrap()),
+                ended_at: Some(
+                    start
+                        .checked_add(jiff::SignedDuration::from_secs(*secs))
+                        .unwrap(),
+                ),
                 duration_secs: Some(*secs),
                 is_idle: false,
                 metadata: None,
@@ -520,9 +538,15 @@ mod tests {
 
         let today_date = jiff::Timestamp::now().strftime("%Y-%m-%d").to_string();
         let today_parsed = today_date.parse::<jiff::civil::Date>().unwrap();
-        let noon = today_parsed.at(12, 0, 0, 0).to_zoned(jiff::tz::TimeZone::UTC).unwrap().timestamp();
+        let noon = today_parsed
+            .at(12, 0, 0, 0)
+            .to_zoned(jiff::tz::TimeZone::UTC)
+            .unwrap()
+            .timestamp();
         let today = today_date;
-        let start = noon.checked_sub(jiff::SignedDuration::from_hours(4)).unwrap();
+        let start = noon
+            .checked_sub(jiff::SignedDuration::from_hours(4))
+            .unwrap();
 
         // 3h productive coding
         repos
@@ -536,7 +560,11 @@ mod tests {
                 url: None,
                 category_id: Some("coding".into()),
                 started_at: start,
-                ended_at: Some(start.checked_add(jiff::SignedDuration::from_hours(3)).unwrap()),
+                ended_at: Some(
+                    start
+                        .checked_add(jiff::SignedDuration::from_hours(3))
+                        .unwrap(),
+                ),
                 duration_secs: Some(10800),
                 is_idle: false,
                 metadata: None,
@@ -557,8 +585,14 @@ mod tests {
                 bundle_id: None,
                 url: None,
                 category_id: Some("entertainment".into()),
-                started_at: start.checked_add(jiff::SignedDuration::from_hours(3)).unwrap(),
-                ended_at: Some(start.checked_add(jiff::SignedDuration::from_hours(4)).unwrap()),
+                started_at: start
+                    .checked_add(jiff::SignedDuration::from_hours(3))
+                    .unwrap(),
+                ended_at: Some(
+                    start
+                        .checked_add(jiff::SignedDuration::from_hours(4))
+                        .unwrap(),
+                ),
                 duration_secs: Some(3600),
                 is_idle: false,
                 metadata: None,

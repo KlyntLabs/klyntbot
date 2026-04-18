@@ -66,9 +66,7 @@ impl AppCore {
         &self,
         params: KeyResultUpdateParams,
     ) -> HandlerResult<KeyResultResponse> {
-        let due_date = params.due_date.map(|opt| {
-            opt.and_then(|d| parse_date(&d))
-        });
+        let due_date = params.due_date.map(|opt| opt.and_then(|d| parse_date(&d)));
 
         let updated = self
             .repos

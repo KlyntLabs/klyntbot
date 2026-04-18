@@ -167,7 +167,9 @@ impl ProductivityContextSource {
         // Tier 1 fallback: old-style active focus session
         if sections.is_empty() {
             if let Ok(Some(session)) = self.repos.sessions.get_active().await {
-                let elapsed = (jiff::Timestamp::now().as_millisecond() - session.started_at.as_millisecond()) / 60_000;
+                let elapsed = (jiff::Timestamp::now().as_millisecond()
+                    - session.started_at.as_millisecond())
+                    / 60_000;
                 let target = session.target_mins.unwrap_or(45);
                 let remaining = (target - elapsed).max(0);
                 let mut focus_line = format!(

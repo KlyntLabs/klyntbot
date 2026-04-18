@@ -170,9 +170,7 @@ impl AppCore {
             if created.due_date.is_some() {
                 bus.publish(bus::DomainEvent::TaskDueDateChanged {
                     task_id: id.clone(),
-                    due_date: created
-                        .due_date
-                        .map(|d| d.to_string()),
+                    due_date: created.due_date.map(|d| d.to_string()),
                 });
             }
         }
@@ -208,9 +206,7 @@ impl AppCore {
             description: params.description,
             priority: params.priority,
             status: params.status,
-            due_date: params.due_date.map(|opt| {
-                opt.and_then(|d| parse_date(&d))
-            }),
+            due_date: params.due_date.map(|opt| opt.and_then(|d| parse_date(&d))),
             tags: params.tags,
             area_id: params.area_id,
             project_id: params.project_id,
@@ -222,12 +218,12 @@ impl AppCore {
             energy_level: params.energy_level.map(Some),
             execution_state: params.execution_state,
             estimated_minutes: params.estimated_minutes,
-            scheduled_start: params.scheduled_start.map(|opt| {
-                opt.and_then(|d| common::parse_datetime_jiff(&d, "UTC"))
-            }),
-            scheduled_end: params.scheduled_end.map(|opt| {
-                opt.and_then(|d| common::parse_datetime_jiff(&d, "UTC"))
-            }),
+            scheduled_start: params
+                .scheduled_start
+                .map(|opt| opt.and_then(|d| common::parse_datetime_jiff(&d, "UTC"))),
+            scheduled_end: params
+                .scheduled_end
+                .map(|opt| opt.and_then(|d| common::parse_datetime_jiff(&d, "UTC"))),
             ..Default::default()
         };
 

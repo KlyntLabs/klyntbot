@@ -198,9 +198,7 @@ fn normalize_time_entry(te: storage::TimeEntryWithTask) -> TimelineEntry {
         title: te.task_title,
         description: te.note,
         started_at: te.started_at.to_string(),
-        ended_at: te
-            .ended_at
-            .map(|t| t.to_string()),
+        ended_at: te.ended_at.map(|t| t.to_string()),
         duration_secs: te.duration_secs,
         entity_id: Some(te.task_id.clone()),
         entity_route: Some(format!("/task/{}", te.task_id)),

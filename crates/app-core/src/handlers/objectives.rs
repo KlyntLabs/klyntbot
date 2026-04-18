@@ -84,9 +84,7 @@ impl AppCore {
         &self,
         params: ObjectiveUpdateParams,
     ) -> HandlerResult<ObjectiveResponse> {
-        let due_date = params.due_date.map(|opt| {
-            opt.and_then(|d| parse_date(&d))
-        });
+        let due_date = params.due_date.map(|opt| opt.and_then(|d| parse_date(&d)));
 
         let updated = self
             .repos
