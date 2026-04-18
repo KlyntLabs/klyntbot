@@ -84,7 +84,7 @@ fn wire_event_channels(
                                 dominant_category,
                             } => {
                                 let payload = serde_json::json!({
-                                    "startedAt": started_at.to_rfc3339(),
+                                    "startedAt": started_at.to_string(),
                                     "dominantApp": dominant_app,
                                     "dominantCategory": dominant_category,
                                 });
@@ -136,8 +136,8 @@ fn wire_event_channels(
                                 }
 
                                 let payload = events::AutoFocusPayload {
-                                    started_at: started_at.to_rfc3339(),
-                                    ended_at: ended_at.to_rfc3339(),
+                                    started_at: started_at.to_string(),
+                                    ended_at: ended_at.to_string(),
                                     duration_mins: total_secs / 60,
                                     dominant_app,
                                     productive_ratio,

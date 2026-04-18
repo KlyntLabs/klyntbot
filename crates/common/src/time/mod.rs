@@ -2,7 +2,6 @@
 //! New code should use `jiff::Timestamp` / `jiff::Zoned` / `jiff::civil::*`
 //! instead of `chrono` types.
 
-pub mod bridge;
 pub mod convert;
 pub mod helpers;
 

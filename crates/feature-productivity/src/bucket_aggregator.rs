@@ -3,7 +3,6 @@
 
 use std::collections::HashMap;
 
-use chrono::Utc;
 use tokio::sync::broadcast;
 use tokio::task::JoinHandle;
 use tokio_util::sync::CancellationToken;
@@ -13,10 +12,10 @@ use crate::repos::ProductivityRepos;
 use crate::types::{ActivityBucket, ActivityTick, CategoryType, BUCKET_DURATION_SECS};
 
 /// Align a timestamp down to the nearest 5-minute boundary.
-fn bucket_start_for(ts: &chrono::DateTime<Utc>) -> chrono::DateTime<Utc> {
-    let secs = ts.timestamp();
+fn bucket_start_for(ts: &jiff::Timestamp) -> jiff::Timestamp {
+    let secs = ts.as_second();
     let aligned = secs - (secs % BUCKET_DURATION_SECS);
-    chrono::DateTime::from_timestamp(aligned, 0).unwrap_or(*ts)
+    jiff::Timestamp::from_second(aligned).unwrap_or(*ts)
 }
 
 /// Find the key with the highest value in a HashMap.
@@ -25,7 +24,7 @@ pub(crate) fn dominant_key(map: &HashMap<String, i64>) -> Option<String> {
 }
 
 struct PendingBucket {
-    bucket_start: chrono::DateTime<Utc>,
+    bucket_start: jiff::Timestamp,
     app_counts: HashMap<String, i64>,
     site_counts: HashMap<String, i64>,
     category_counts: HashMap<String, i64>,
@@ -40,7 +39,7 @@ struct PendingBucket {
 }
 
 impl PendingBucket {
-    fn new(bucket_start: chrono::DateTime<Utc>, tick_interval_secs: i64) -> Self {
+    fn new(bucket_start: jiff::Timestamp, tick_interval_secs: i64) -> Self {
         Self {
             bucket_start,
             app_counts: HashMap::new(),
@@ -104,8 +103,8 @@ impl PendingBucket {
         };
 
         ActivityBucket {
-            bucket_start: self.bucket_start.to_rfc3339(),
-            date: self.bucket_start.format("%Y-%m-%d").to_string(),
+            bucket_start: self.bucket_start.to_string(),
+            date: self.bucket_start.strftime("%Y-%m-%d").to_string(),
             dominant_app,
             dominant_site,
             dominant_category,
@@ -209,28 +208,27 @@ impl BucketAggregator {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use chrono::Utc;
 
     #[test]
     fn test_bucket_start_alignment() {
         // 2026-03-06T10:03:27Z should align to 2026-03-06T10:00:00Z
-        let ts = chrono::DateTime::parse_from_rfc3339("2026-03-06T10:03:27+00:00")
-            .unwrap()
-            .with_timezone(&Utc);
+        let ts = "2026-03-06T10:03:27Z"
+            .parse::<jiff::Timestamp>()
+            .unwrap();
         let aligned = bucket_start_for(&ts);
-        assert_eq!(aligned.format("%H:%M:%S").to_string(), "10:00:00");
+        assert_eq!(aligned.strftime("%H:%M:%S").to_string(), "10:00:00");
 
         // Exact boundary stays
-        let ts2 = chrono::DateTime::parse_from_rfc3339("2026-03-06T10:05:00+00:00")
-            .unwrap()
-            .with_timezone(&Utc);
+        let ts2 = "2026-03-06T10:05:00Z"
+            .parse::<jiff::Timestamp>()
+            .unwrap();
         let aligned2 = bucket_start_for(&ts2);
-        assert_eq!(aligned2.format("%H:%M:%S").to_string(), "10:05:00");
+        assert_eq!(aligned2.strftime("%H:%M:%S").to_string(), "10:05:00");
     }
 
     #[test]
     fn test_pending_bucket_accumulation() {
-        let now = Utc::now();
+        let now = jiff::Timestamp::now();
         let mut bucket = PendingBucket::new(now, 5);
 
         let tick1 = ActivityTick {

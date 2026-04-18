@@ -1,4 +1,3 @@
-use common::time::bridge::jiff_to_chrono;
 use sqlx::SqlitePool;
 use tracing::warn;
 
@@ -25,9 +24,9 @@ impl From<GoalRow> for ProductivityGoal {
             warn!(raw = %row.metric, "unknown metric in DB, defaulting to ProductiveHours");
             GoalMetric::ProductiveHours
         });
-        let created_at = common::parse_datetime(&row.created_at, "UTC").unwrap_or_else(|| {
+        let created_at = common::parse_datetime_jiff(&row.created_at, "UTC").unwrap_or_else(|| {
             warn!(raw = %row.created_at, "unparseable created_at in productivity_goals");
-            jiff_to_chrono(jiff::Timestamp::now())
+            jiff::Timestamp::now()
         });
         Self {
             id: row.id,

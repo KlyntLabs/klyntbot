@@ -1,6 +1,6 @@
 //! Show, list, summary, and tree action handlers.
 
-use common::{time::bridge::chrono_to_jiff, Result, ToolError};
+use common::{Result, ToolError};
 use futures_util::future::try_join_all;
 use tools_core::ParamExtractor;
 
@@ -31,12 +31,10 @@ impl TaskTool {
             energy_level: p.optional_str("energy_level")?.map(String::from),
             due_after: p
                 .optional_str("due_after")?
-                .and_then(|s| common::parse_datetime(s, &self.timezone))
-                .map(chrono_to_jiff),
+                .and_then(|s| common::parse_datetime_jiff(s, &self.timezone)),
             due_before: p
                 .optional_str("due_before")?
-                .and_then(|s| common::parse_datetime(s, &self.timezone))
-                .map(chrono_to_jiff),
+                .and_then(|s| common::parse_datetime_jiff(s, &self.timezone)),
             templates_only: false,
             root_only: false,
             status_group: None,

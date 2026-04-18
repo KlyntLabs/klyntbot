@@ -11,7 +11,6 @@ use tokio::sync::{broadcast, Mutex, RwLock};
 use tokio::task::JoinHandle;
 use tokio_util::sync::CancellationToken;
 
-use chrono::Utc;
 use tracing::{debug, info, warn};
 
 use crate::config::{PrivacyConfig, ProductivityConfig};
@@ -143,7 +142,7 @@ impl ActivityTracker {
 
                                 let idle_secs = macos::seconds_since_last_input();
                                 let is_idle = idle_secs >= idle_threshold;
-                                let now = Utc::now();
+                                let now = jiff::Timestamp::now();
 
                                 let raw_title = info.window_title.as_deref();
 
@@ -224,7 +223,7 @@ impl ActivityTracker {
                                                     url_patterns: vec![],
                                                     color: None,
                                                     is_auto_detected: true,
-                                                    created_at: Utc::now(),
+                                                    created_at: jiff::Timestamp::now(),
                                                 };
                                                 let r = repos.clone();
                                                 let d = Arc::clone(&detector);

@@ -248,7 +248,6 @@ mod tests {
     use super::*;
     use crate::repos::ProductivityRepos;
     use crate::ProductivityFeature;
-    use chrono::Utc;
 
     async fn setup_pool() -> sqlx::SqlitePool {
         let pool = storage::StoragePool::connect_in_memory().await.unwrap();
@@ -264,7 +263,7 @@ mod tests {
 
     fn make_tick(app_name: &str, window_title: Option<&str>, is_idle: bool) -> ActivityTick {
         ActivityTick {
-            timestamp: Utc::now(),
+            timestamp: jiff::Timestamp::now(),
             app_name: app_name.to_string(),
             bundle_id: None,
             window_title: window_title.map(|s| s.to_string()),

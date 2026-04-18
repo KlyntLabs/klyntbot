@@ -3,14 +3,11 @@
 //! Single source of truth for all date parsing across the codebase.
 //! Non-timezone strings are interpreted in the given fallback timezone.
 
-use chrono::{DateTime, Utc};
 use jiff::{
     civil::{self, Weekday},
     tz::TimeZone,
     Span, Timestamp, Zoned,
 };
-
-use crate::time::bridge::jiff_to_chrono;
 
 /// Parse a date/datetime string with timezone awareness (Jiff-native).
 ///
@@ -65,14 +62,6 @@ pub fn parse_datetime_jiff(s: &str, fallback_tz: &str) -> Option<Timestamp> {
 
     // 6. Natural language relative dates
     parse_relative_date(s, &tz)
-}
-
-/// Legacy Chrono-returning wrapper around [`parse_datetime_jiff`].
-///
-/// Retained for callers that haven't migrated. New code should use
-/// [`parse_datetime_jiff`] which returns the canonical `jiff::Timestamp`.
-pub fn parse_datetime(s: &str, fallback_tz: &str) -> Option<DateTime<Utc>> {
-    parse_datetime_jiff(s, fallback_tz).map(jiff_to_chrono)
 }
 
 /// Parse natural language relative date expressions.
@@ -241,17 +230,17 @@ mod tests {
 
     #[test]
     fn test_parse_empty_string() {
-        assert!(parse_datetime("", "UTC").is_none());
+        assert!(parse_datetime_jiff("", "UTC").is_none());
     }
 
     #[test]
     fn test_parse_whitespace_only() {
-        assert!(parse_datetime("   ", "UTC").is_none());
+        assert!(parse_datetime_jiff("   ", "UTC").is_none());
     }
 
     #[test]
     fn test_parse_invalid_string() {
-        assert!(parse_datetime("not a date", "UTC").is_none());
+        assert!(parse_datetime_jiff("not a date", "UTC").is_none());
     }
 
     #[test]
@@ -408,9 +397,9 @@ mod tests {
 
     #[test]
     fn test_parse_natural_date_invalid() {
-        assert!(parse_datetime("next someday", "UTC").is_none());
-        assert!(parse_datetime("in zero days", "UTC").is_none());
-        assert!(parse_datetime("in 3 months", "UTC").is_none());
+        assert!(parse_datetime_jiff("next someday", "UTC").is_none());
+        assert!(parse_datetime_jiff("in zero days", "UTC").is_none());
+        assert!(parse_datetime_jiff("in 3 months", "UTC").is_none());
     }
 
     #[test]

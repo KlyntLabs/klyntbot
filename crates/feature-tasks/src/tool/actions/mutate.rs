@@ -1,6 +1,6 @@
 //! Update, complete, and delete action handlers.
 
-use common::{time::bridge::chrono_to_jiff, Result, ToolError};
+use common::{Result, ToolError};
 use jiff::Timestamp;
 use tools_core::ParamExtractor;
 use tracing::warn;
@@ -35,7 +35,7 @@ impl TaskTool {
                 if s.is_empty() || s == "null" {
                     None
                 } else {
-                    common::parse_datetime(s, &self.timezone).map(chrono_to_jiff)
+                    common::parse_datetime_jiff(s, &self.timezone)
                 }
             }),
             tags: p.optional_array("tags")?.map(|arr| {
@@ -74,14 +74,14 @@ impl TaskTool {
                 if s.is_empty() || s == "null" {
                     None
                 } else {
-                    common::parse_datetime(s, &self.timezone).map(chrono_to_jiff)
+                    common::parse_datetime_jiff(s, &self.timezone)
                 }
             }),
             scheduled_end: p.optional_str("scheduled_end")?.map(|s| {
                 if s.is_empty() || s == "null" {
                     None
                 } else {
-                    common::parse_datetime(s, &self.timezone).map(chrono_to_jiff)
+                    common::parse_datetime_jiff(s, &self.timezone)
                 }
             }),
         };

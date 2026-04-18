@@ -1,5 +1,3 @@
-use chrono::{DateTime, Utc};
-use common::time::bridge::jiff_to_chrono;
 use jiff::SignedDuration;
 use sqlx::SqlitePool;
 use tracing::warn;
@@ -41,15 +39,15 @@ impl From<SessionRow> for FocusSession {
                 }
             })
             .unwrap_or_default();
-        let started_at = common::parse_datetime(&row.started_at, "UTC")
+        let started_at = common::parse_datetime_jiff(&row.started_at, "UTC")
             .unwrap_or_else(|| {
                 warn!(raw = %row.started_at, "unparseable started_at in productivity_sessions, using now()");
-                jiff_to_chrono(jiff::Timestamp::now())
+                jiff::Timestamp::now()
             });
         let ended_at = row
             .ended_at
             .as_deref()
-            .and_then(|s| common::parse_datetime(s, "UTC"));
+            .and_then(|s| common::parse_datetime_jiff(s, "UTC"));
         let source = row.source.parse::<SessionSource>().unwrap_or_else(|_| {
             warn!(raw = %row.source, "unknown source in DB, defaulting to Manual");
             SessionSource::Manual
@@ -102,8 +100,8 @@ impl FocusSessionRepo {
         .bind(&session.project_id)
         .bind(&session_type)
         .bind(session.target_mins)
-        .bind(session.started_at)
-        .bind(session.ended_at)
+        .bind(session.started_at.to_string())
+        .bind(session.ended_at.map(|t| t.to_string()))
         .bind(session.actual_mins)
         .bind(session.interruptions)
         .bind(&distractions_json)
@@ -159,7 +157,7 @@ impl FocusSessionRepo {
         .bind(&session.project_id)
         .bind(&session_type)
         .bind(session.target_mins)
-        .bind(session.ended_at)
+        .bind(session.ended_at.map(|t| t.to_string()))
         .bind(session.actual_mins)
         .bind(session.interruptions)
         .bind(&distractions_json)
@@ -175,16 +173,16 @@ impl FocusSessionRepo {
 
     pub async fn list_range(
         &self,
-        start: &DateTime<Utc>,
-        end: &DateTime<Utc>,
+        start: &jiff::Timestamp,
+        end: &jiff::Timestamp,
         limit: Option<i64>,
     ) -> common::Result<Vec<FocusSession>> {
         let limit = limit.unwrap_or(1000);
         let rows = sqlx::query_as::<_, SessionRow>(
             &format!("SELECT {SESSION_COLUMNS} FROM productivity_sessions WHERE started_at >= ?1 AND started_at < ?2 ORDER BY started_at DESC LIMIT ?3"),
         )
-        .bind(start)
-        .bind(end)
+        .bind(start.to_string())
+        .bind(end.to_string())
         .bind(limit)
         .fetch_all(&self.pool)
         .await

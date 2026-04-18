@@ -1,4 +1,3 @@
-use common::time::bridge::jiff_to_chrono;
 use sqlx::SqlitePool;
 use tracing::warn;
 
@@ -20,9 +19,9 @@ impl From<NudgeRow> for NudgeRecord {
             warn!(raw = %row.nudge_type, "unknown nudge_type in DB, defaulting to BreakReminder");
             NudgeType::BreakReminder
         });
-        let created_at = common::parse_datetime(&row.created_at, "UTC").unwrap_or_else(|| {
+        let created_at = common::parse_datetime_jiff(&row.created_at, "UTC").unwrap_or_else(|| {
             warn!(raw = %row.created_at, "unparseable created_at in nudge_history, using now()");
-            jiff_to_chrono(jiff::Timestamp::now())
+            jiff::Timestamp::now()
         });
         Self {
             id: row.id,
@@ -56,7 +55,7 @@ impl NudgeRepo {
         .bind(&nudge.message)
         .bind(&nudge.channel)
         .bind(nudge.acknowledged)
-        .bind(nudge.created_at)
+        .bind(nudge.created_at.to_string())
         .fetch_one(&self.pool)
         .await
         .map_err(|e| common::KlyntbotError::Storage(e.to_string()))?;

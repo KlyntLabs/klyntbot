@@ -136,7 +136,7 @@ impl ProductivityIntelligenceLayer {
             .await;
 
         let classified = ClassifiedTick {
-            timestamp: common::time::bridge::chrono_to_jiff(tick.timestamp),
+            timestamp: tick.timestamp,
             app_name: tick.app_name.clone(),
             category: classification.category.clone(),
             session_type: classification.session_type,
@@ -275,7 +275,7 @@ mod tests {
 
     fn make_tick(app: &str, is_idle: bool, is_context_switch: bool) -> ActivityTick {
         ActivityTick {
-            timestamp: chrono::Utc::now(),
+            timestamp: jiff::Timestamp::now(),
             app_name: app.to_string(),
             bundle_id: None,
             window_title: Some("test".to_string()),

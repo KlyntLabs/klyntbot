@@ -1,4 +1,3 @@
-use common::time::bridge::jiff_to_chrono;
 use sqlx::SqlitePool;
 
 use crate::types::{InsightCard, InsightType, Sentiment};
@@ -32,8 +31,8 @@ impl From<InsightRow> for InsightCard {
             baseline_value: row.baseline_value,
             date: row.date,
             dismissed: row.dismissed,
-            generated_at: common::parse_datetime(&row.generated_at, "UTC")
-                .unwrap_or_else(|| jiff_to_chrono(jiff::Timestamp::now())),
+            generated_at: common::parse_datetime_jiff(&row.generated_at, "UTC")
+                .unwrap_or_else(jiff::Timestamp::now),
         }
     }
 }
@@ -68,7 +67,7 @@ impl InsightRepo {
         .bind(card.baseline_value)
         .bind(&card.date)
         .bind(card.dismissed)
-        .bind(card.generated_at)
+        .bind(card.generated_at.to_string())
         .execute(&self.pool)
         .await
         .map_err(|e| common::KlyntbotError::Storage(e.to_string()))?;
@@ -127,7 +126,6 @@ impl InsightRepo {
 mod tests {
     use super::*;
     use crate::ProductivityFeature;
-    use common::time::bridge::jiff_to_chrono;
 
     async fn setup_pool() -> SqlitePool {
         let pool = storage::StoragePool::connect_in_memory().await.unwrap();
@@ -156,7 +154,7 @@ mod tests {
             baseline_value: Some(2.0),
             date: "2026-03-06".to_string(),
             dismissed: false,
-            generated_at: jiff_to_chrono(jiff::Timestamp::now()),
+            generated_at: jiff::Timestamp::now(),
         };
 
         repo.upsert(&card).await.unwrap();
@@ -187,7 +185,7 @@ mod tests {
             baseline_value: None,
             date: "2026-03-06".to_string(),
             dismissed: false,
-            generated_at: jiff_to_chrono(jiff::Timestamp::now()),
+            generated_at: jiff::Timestamp::now(),
         };
         repo.upsert(&card).await.unwrap();
 
@@ -216,7 +214,7 @@ mod tests {
             baseline_value: None,
             date: "2026-03-06".to_string(),
             dismissed: false,
-            generated_at: jiff_to_chrono(jiff::Timestamp::now()),
+            generated_at: jiff::Timestamp::now(),
         };
         repo.upsert(&card).await.unwrap();
 
@@ -244,7 +242,7 @@ mod tests {
             baseline_value: None,
             date: "2026-03-06".to_string(),
             dismissed: false,
-            generated_at: jiff_to_chrono(jiff::Timestamp::now()),
+            generated_at: jiff::Timestamp::now(),
         };
         repo.upsert(&card).await.unwrap();
 

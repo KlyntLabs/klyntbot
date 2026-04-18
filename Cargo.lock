@@ -61,8 +61,6 @@ dependencies = [
  "autotuner",
  "base64 0.22.1",
  "bus",
- "chrono",
- "chrono-tz",
  "cognitive",
  "common",
  "config",
@@ -310,7 +308,6 @@ dependencies = [
  "base64 0.22.1",
  "bus",
  "channels",
- "chrono",
  "cognitive",
  "common",
  "config",
@@ -2323,7 +2320,6 @@ version = "0.1.0"
 dependencies = [
  "async-trait",
  "bus",
- "chrono",
  "common",
  "config",
  "context_engine",
@@ -2385,8 +2381,6 @@ name = "common"
 version = "0.1.0"
 dependencies = [
  "async-trait",
- "chrono",
- "chrono-tz",
  "jiff",
  "reqwest 0.13.2",
  "rust_decimal",
@@ -3995,7 +3989,6 @@ dependencies = [
  "base64 0.22.1",
  "bus",
  "channels",
- "chrono",
  "clap 4.6.1",
  "cognitive",
  "common",
@@ -4742,7 +4735,6 @@ name = "feature-language-learning"
 version = "0.1.0"
 dependencies = [
  "async-trait",
- "chrono",
  "common",
  "config",
  "serde",
@@ -4821,7 +4813,6 @@ dependencies = [
  "activity-log",
  "async-trait",
  "bus",
- "chrono",
  "common",
  "config",
  "dirs",
@@ -14142,7 +14133,6 @@ version = "0.1.0"
 dependencies = [
  "async-trait",
  "bus",
- "chrono",
  "cognitive",
  "common",
  "config",

@@ -1,4 +1,3 @@
-use chrono::{DateTime, Utc};
 use jiff::Timestamp;
 use serde::{Deserialize, Serialize};
 
@@ -11,7 +10,7 @@ pub struct ProductivityProject {
     pub url_patterns: Vec<String>,
     pub color: Option<String>,
     pub is_auto_detected: bool,
-    pub created_at: DateTime<Utc>,
+    pub created_at: Timestamp,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -23,7 +22,7 @@ pub struct ProjectUsage {
     pub color: Option<String>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ActivityEvent {
     pub id: Option<i64>,
@@ -33,8 +32,8 @@ pub struct ActivityEvent {
     pub bundle_id: Option<String>,
     pub url: Option<String>,
     pub category_id: Option<String>,
-    pub started_at: DateTime<Utc>,
-    pub ended_at: Option<DateTime<Utc>>,
+    pub started_at: Timestamp,
+    pub ended_at: Option<Timestamp>,
     pub duration_secs: Option<i64>,
     pub is_idle: bool,
     pub metadata: Option<String>,
@@ -134,8 +133,8 @@ pub struct FocusSession {
     pub project_id: Option<String>,
     pub session_type: SessionType,
     pub target_mins: Option<i64>,
-    pub started_at: DateTime<Utc>,
-    pub ended_at: Option<DateTime<Utc>>,
+    pub started_at: Timestamp,
+    pub ended_at: Option<Timestamp>,
     pub actual_mins: Option<i64>,
     pub interruptions: i64,
     pub distraction_events: Vec<DistractionEvent>,
@@ -148,7 +147,7 @@ pub struct FocusSession {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct DistractionEvent {
-    pub timestamp: DateTime<Utc>,
+    pub timestamp: Timestamp,
     pub app_name: String,
     pub duration_secs: Option<i64>,
 }
@@ -237,11 +236,11 @@ pub struct NudgeRecord {
     pub message: String,
     pub channel: Option<String>,
     pub acknowledged: bool,
-    pub created_at: DateTime<Utc>,
+    pub created_at: Timestamp,
 }
 
 impl NudgeRecord {
-    pub fn new(nudge_type: NudgeType, message: String, created_at: DateTime<Utc>) -> Self {
+    pub fn new(nudge_type: NudgeType, message: String, created_at: Timestamp) -> Self {
         Self {
             id: None,
             nudge_type,
@@ -337,7 +336,7 @@ pub struct ProductivityGoal {
     pub target_value: f64,
     pub enabled: bool,
     pub project_id: Option<String>,
-    pub created_at: DateTime<Utc>,
+    pub created_at: Timestamp,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -347,10 +346,10 @@ pub struct TimeEntry {
     pub description: String,
     pub category_id: Option<String>,
     pub project_id: Option<String>,
-    pub started_at: DateTime<Utc>,
+    pub started_at: Timestamp,
     pub duration_secs: i64,
     pub source: String,
-    pub created_at: DateTime<Utc>,
+    pub created_at: Timestamp,
 }
 
 /// Duration of a single activity bucket window, in seconds (5 minutes).
@@ -361,7 +360,7 @@ pub const BUCKET_DURATION_SECS: i64 = 300;
 /// Consumed by all event bus subscribers.
 #[derive(Debug, Clone)]
 pub struct ActivityTick {
-    pub timestamp: DateTime<Utc>,
+    pub timestamp: Timestamp,
     pub app_name: String,
     pub bundle_id: Option<String>,
     pub window_title: Option<String>,
@@ -504,7 +503,7 @@ pub struct InsightCard {
     pub baseline_value: Option<f64>,
     pub date: String,
     pub dismissed: bool,
-    pub generated_at: DateTime<Utc>,
+    pub generated_at: Timestamp,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow)]

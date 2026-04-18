@@ -1,7 +1,54 @@
-use chrono::{DateTime, Utc};
 use sqlx::{Row, SqlitePool};
+use tracing::warn;
 
 use crate::types::ActivityEvent;
+
+#[derive(sqlx::FromRow)]
+struct ActivityEventRow {
+    id: Option<i64>,
+    app_name: String,
+    window_title: Option<String>,
+    site_name: Option<String>,
+    bundle_id: Option<String>,
+    url: Option<String>,
+    category_id: Option<String>,
+    started_at: String,
+    ended_at: Option<String>,
+    duration_secs: Option<i64>,
+    is_idle: bool,
+    metadata: Option<String>,
+    project_id: Option<String>,
+    focus_session_id: Option<String>,
+}
+
+impl From<ActivityEventRow> for ActivityEvent {
+    fn from(row: ActivityEventRow) -> Self {
+        let started_at = common::parse_datetime_jiff(&row.started_at, "UTC").unwrap_or_else(|| {
+            warn!(raw = %row.started_at, "unparseable started_at in activity_events, using now()");
+            jiff::Timestamp::now()
+        });
+        let ended_at = row
+            .ended_at
+            .as_deref()
+            .and_then(|s| common::parse_datetime_jiff(s, "UTC"));
+        Self {
+            id: row.id,
+            app_name: row.app_name,
+            window_title: row.window_title,
+            site_name: row.site_name,
+            bundle_id: row.bundle_id,
+            url: row.url,
+            category_id: row.category_id,
+            started_at,
+            ended_at,
+            duration_secs: row.duration_secs,
+            is_idle: row.is_idle,
+            metadata: row.metadata,
+            project_id: row.project_id,
+            focus_session_id: row.focus_session_id,
+        }
+    }
+}
 
 #[derive(Debug, Clone)]
 pub struct ActivityEventRepo {
@@ -22,8 +69,8 @@ fn bind_event<'a>(
         .bind(&event.bundle_id)
         .bind(&event.url)
         .bind(&event.category_id)
-        .bind(event.started_at)
-        .bind(event.ended_at)
+        .bind(event.started_at.to_string())
+        .bind(event.ended_at.map(|t| t.to_string()))
         .bind(event.duration_secs)
         .bind(event.is_idle)
         .bind(&event.metadata)
@@ -69,8 +116,8 @@ impl ActivityEventRepo {
 
     pub async fn list_range(
         &self,
-        start: &DateTime<Utc>,
-        end: &DateTime<Utc>,
+        start: &jiff::Timestamp,
+        end: &jiff::Timestamp,
         limit: Option<i64>,
     ) -> common::Result<Vec<ActivityEvent>> {
         self.list_range_offset(start, end, limit, None).await
@@ -78,33 +125,33 @@ impl ActivityEventRepo {
 
     pub async fn list_range_offset(
         &self,
-        start: &DateTime<Utc>,
-        end: &DateTime<Utc>,
+        start: &jiff::Timestamp,
+        end: &jiff::Timestamp,
         limit: Option<i64>,
         offset: Option<i64>,
     ) -> common::Result<Vec<ActivityEvent>> {
         let limit = limit.unwrap_or(10_000);
         let offset = offset.unwrap_or(0).max(0);
-        let rows = sqlx::query_as::<_, ActivityEvent>(
+        let rows = sqlx::query_as::<_, ActivityEventRow>(
             r#"SELECT id, app_name, window_title, site_name, bundle_id, url, category_id, started_at, ended_at, duration_secs, is_idle, metadata, project_id, focus_session_id
                FROM activity_events
                WHERE started_at >= ?1 AND started_at < ?2
                ORDER BY started_at ASC
                LIMIT ?3 OFFSET ?4"#,
         )
-        .bind(start)
-        .bind(end)
+        .bind(start.to_string())
+        .bind(end.to_string())
         .bind(limit)
         .bind(offset)
         .fetch_all(&self.pool)
         .await
         .map_err(|e| common::KlyntbotError::Storage(e.to_string()))?;
-        Ok(rows)
+        Ok(rows.into_iter().map(ActivityEvent::from).collect())
     }
 
     /// Returns the most recent events (newest first), limited by `limit`.
     pub async fn list_recent(&self, limit: i64) -> common::Result<Vec<ActivityEvent>> {
-        let rows = sqlx::query_as::<_, ActivityEvent>(
+        let rows = sqlx::query_as::<_, ActivityEventRow>(
             r#"SELECT id, app_name, window_title, site_name, bundle_id, url, category_id, started_at, ended_at, duration_secs, is_idle, metadata, project_id, focus_session_id
                FROM activity_events
                ORDER BY started_at DESC
@@ -114,12 +161,12 @@ impl ActivityEventRepo {
         .fetch_all(&self.pool)
         .await
         .map_err(|e| common::KlyntbotError::Storage(e.to_string()))?;
-        Ok(rows)
+        Ok(rows.into_iter().map(ActivityEvent::from).collect())
     }
 
-    pub async fn purge_before(&self, before: &DateTime<Utc>) -> common::Result<u64> {
+    pub async fn purge_before(&self, before: &jiff::Timestamp) -> common::Result<u64> {
         let result = sqlx::query("DELETE FROM activity_events WHERE started_at < ?1")
-            .bind(before)
+            .bind(before.to_string())
             .execute(&self.pool)
             .await
             .map_err(|e| common::KlyntbotError::Storage(e.to_string()))?;
@@ -128,8 +175,8 @@ impl ActivityEventRepo {
 
     pub async fn count_context_switches(
         &self,
-        start: &DateTime<Utc>,
-        end: &DateTime<Utc>,
+        start: &jiff::Timestamp,
+        end: &jiff::Timestamp,
     ) -> common::Result<i64> {
         let count: i64 = sqlx::query_scalar(
             r#"SELECT COUNT(*) FROM (
@@ -140,8 +187,8 @@ impl ActivityEventRepo {
                )
                WHERE prev IS NOT NULL AND app_name IS NOT prev"#,
         )
-        .bind(start)
-        .bind(end)
+        .bind(start.to_string())
+        .bind(end.to_string())
         .fetch_one(&self.pool)
         .await
         .map_err(|e| common::KlyntbotError::Storage(e.to_string()))?;
@@ -150,8 +197,8 @@ impl ActivityEventRepo {
 
     pub async fn aggregate_by_category(
         &self,
-        start: &DateTime<Utc>,
-        end: &DateTime<Utc>,
+        start: &jiff::Timestamp,
+        end: &jiff::Timestamp,
     ) -> common::Result<Vec<(Option<String>, i64)>> {
         #[derive(sqlx::FromRow)]
         struct Row {
@@ -165,8 +212,8 @@ impl ActivityEventRepo {
                GROUP BY category_id
                ORDER BY total_secs DESC"#,
         )
-        .bind(start)
-        .bind(end)
+        .bind(start.to_string())
+        .bind(end.to_string())
         .fetch_all(&self.pool)
         .await
         .map_err(|e| common::KlyntbotError::Storage(e.to_string()))?;
@@ -181,8 +228,8 @@ impl ActivityEventRepo {
     /// Returns (productive_secs, neutral_secs, distracting_secs).
     pub async fn aggregate_by_type(
         &self,
-        start: &DateTime<Utc>,
-        end: &DateTime<Utc>,
+        start: &jiff::Timestamp,
+        end: &jiff::Timestamp,
     ) -> common::Result<(i64, i64, i64)> {
         #[derive(sqlx::FromRow)]
         struct Row {
@@ -196,8 +243,8 @@ impl ActivityEventRepo {
                WHERE ae.started_at >= ?1 AND ae.started_at < ?2 AND ae.is_idle = FALSE
                GROUP BY ac.category_type"#,
         )
-        .bind(start)
-        .bind(end)
+        .bind(start.to_string())
+        .bind(end.to_string())
         .fetch_all(&self.pool)
         .await
         .map_err(|e| common::KlyntbotError::Storage(e.to_string()))?;
@@ -220,8 +267,8 @@ impl ActivityEventRepo {
     /// of "Google Chrome"); for native apps it stays as the app name.
     pub async fn top_apps(
         &self,
-        start: &DateTime<Utc>,
-        end: &DateTime<Utc>,
+        start: &jiff::Timestamp,
+        end: &jiff::Timestamp,
         limit: i64,
     ) -> common::Result<Vec<(String, i64, Option<String>)>> {
         #[derive(sqlx::FromRow)]
@@ -241,8 +288,8 @@ impl ActivityEventRepo {
                ORDER BY total_secs DESC
                LIMIT ?3"#,
         )
-        .bind(start)
-        .bind(end)
+        .bind(start.to_string())
+        .bind(end.to_string())
         .bind(limit)
         .fetch_all(&self.pool)
         .await
@@ -255,16 +302,16 @@ impl ActivityEventRepo {
 
     pub async fn total_idle_secs(
         &self,
-        start: &DateTime<Utc>,
-        end: &DateTime<Utc>,
+        start: &jiff::Timestamp,
+        end: &jiff::Timestamp,
     ) -> common::Result<i64> {
         let total: i64 = sqlx::query_scalar(
             r#"SELECT COALESCE(SUM(duration_secs), 0)
                FROM activity_events
                WHERE started_at >= ?1 AND started_at < ?2 AND is_idle = TRUE"#,
         )
-        .bind(start)
-        .bind(end)
+        .bind(start.to_string())
+        .bind(end.to_string())
         .fetch_one(&self.pool)
         .await
         .map_err(|e| common::KlyntbotError::Storage(e.to_string()))?;
@@ -273,8 +320,8 @@ impl ActivityEventRepo {
 
     pub async fn top_projects(
         &self,
-        start: &DateTime<Utc>,
-        end: &DateTime<Utc>,
+        start: &jiff::Timestamp,
+        end: &jiff::Timestamp,
         limit: i64,
     ) -> common::Result<Vec<(String, i64)>> {
         #[derive(sqlx::FromRow)]
@@ -291,8 +338,8 @@ impl ActivityEventRepo {
                ORDER BY total_secs DESC
                LIMIT ?3"#,
         )
-        .bind(start)
-        .bind(end)
+        .bind(start.to_string())
+        .bind(end.to_string())
         .bind(limit)
         .fetch_all(&self.pool)
         .await
@@ -413,16 +460,16 @@ impl ActivityEventRepo {
 
     pub async fn total_active_secs(
         &self,
-        start: &DateTime<Utc>,
-        end: &DateTime<Utc>,
+        start: &jiff::Timestamp,
+        end: &jiff::Timestamp,
     ) -> common::Result<i64> {
         let total: i64 = sqlx::query_scalar(
             r#"SELECT COALESCE(SUM(duration_secs), 0)
                FROM activity_events
                WHERE started_at >= ?1 AND started_at < ?2 AND is_idle = FALSE"#,
         )
-        .bind(start)
-        .bind(end)
+        .bind(start.to_string())
+        .bind(end.to_string())
         .fetch_one(&self.pool)
         .await
         .map_err(|e| common::KlyntbotError::Storage(e.to_string()))?;

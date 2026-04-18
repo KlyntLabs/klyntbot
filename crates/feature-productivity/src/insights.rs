@@ -1,7 +1,6 @@
 //! Heuristic InsightEngine — generates daily insight cards by comparing
 //! today's metrics against a rolling 14-day baseline.
 
-use common::time::bridge::jiff_to_chrono;
 use jiff::civil::Date;
 use jiff::Span;
 
@@ -164,7 +163,7 @@ impl InsightEngine {
                 baseline_value: Some(baseline.avg_deep_work_blocks),
                 date: date.to_string(),
                 dismissed: false,
-                generated_at: jiff_to_chrono(jiff::Timestamp::now()),
+                generated_at: jiff::Timestamp::now(),
             };
             self.repos.insights.upsert(&card).await?;
             return Ok(Some(card));
@@ -200,7 +199,7 @@ impl InsightEngine {
                 baseline_value: Some(baseline.avg_distraction_rate),
                 date: date.to_string(),
                 dismissed: false,
-                generated_at: jiff_to_chrono(jiff::Timestamp::now()),
+                generated_at: jiff::Timestamp::now(),
             };
             self.repos.insights.upsert(&card).await?;
             return Ok(Some(card));
@@ -235,7 +234,7 @@ impl InsightEngine {
                 baseline_value: Some(baseline.max_score_30d),
                 date: date.to_string(),
                 dismissed: false,
-                generated_at: jiff_to_chrono(jiff::Timestamp::now()),
+                generated_at: jiff::Timestamp::now(),
             };
             self.repos.insights.upsert(&card).await?;
             return Ok(Some(card));
@@ -280,7 +279,7 @@ impl InsightEngine {
                 baseline_value: None,
                 date: date.to_string(),
                 dismissed: false,
-                generated_at: jiff_to_chrono(jiff::Timestamp::now()),
+                generated_at: jiff::Timestamp::now(),
             };
             self.repos.insights.upsert(&card).await?;
             return Ok(Some(card));
@@ -328,7 +327,7 @@ impl InsightEngine {
                 baseline_value: Some(early_distractions as f64),
                 date: date.to_string(),
                 dismissed: false,
-                generated_at: jiff_to_chrono(jiff::Timestamp::now()),
+                generated_at: jiff::Timestamp::now(),
             };
             self.repos.insights.upsert(&card).await?;
             return Ok(Some(card));
@@ -367,7 +366,7 @@ impl InsightEngine {
                     baseline_value: Some(baseline.avg_recovery_secs),
                     date: date.to_string(),
                     dismissed: false,
-                    generated_at: jiff_to_chrono(jiff::Timestamp::now()),
+                    generated_at: jiff::Timestamp::now(),
                 };
                 self.repos.insights.upsert(&card).await?;
                 return Ok(Some(card));

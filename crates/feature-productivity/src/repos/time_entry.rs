@@ -1,5 +1,3 @@
-use chrono::{DateTime, Utc};
-use common::time::bridge::jiff_to_chrono;
 use sqlx::SqlitePool;
 use tracing::warn;
 
@@ -19,13 +17,13 @@ struct TimeEntryRow {
 
 impl From<TimeEntryRow> for TimeEntry {
     fn from(row: TimeEntryRow) -> Self {
-        let started_at = common::parse_datetime(&row.started_at, "UTC").unwrap_or_else(|| {
+        let started_at = common::parse_datetime_jiff(&row.started_at, "UTC").unwrap_or_else(|| {
             warn!(raw = %row.started_at, "unparseable started_at in time_entries");
-            jiff_to_chrono(jiff::Timestamp::now())
+            jiff::Timestamp::now()
         });
-        let created_at = common::parse_datetime(&row.created_at, "UTC").unwrap_or_else(|| {
+        let created_at = common::parse_datetime_jiff(&row.created_at, "UTC").unwrap_or_else(|| {
             warn!(raw = %row.created_at, "unparseable created_at in time_entries");
-            jiff_to_chrono(jiff::Timestamp::now())
+            jiff::Timestamp::now()
         });
         Self {
             id: row.id,
@@ -59,7 +57,7 @@ impl TimeEntryRepo {
         .bind(&entry.description)
         .bind(&entry.category_id)
         .bind(&entry.project_id)
-        .bind(entry.started_at)
+        .bind(entry.started_at.to_string())
         .bind(entry.duration_secs)
         .bind(&entry.source)
         .fetch_one(&self.pool)
@@ -70,8 +68,8 @@ impl TimeEntryRepo {
 
     pub async fn list_range(
         &self,
-        start: &DateTime<Utc>,
-        end: &DateTime<Utc>,
+        start: &jiff::Timestamp,
+        end: &jiff::Timestamp,
     ) -> common::Result<Vec<TimeEntry>> {
         let rows = sqlx::query_as::<_, TimeEntryRow>(
             r#"SELECT id, description, category_id, project_id, started_at, duration_secs, source, created_at
@@ -79,8 +77,8 @@ impl TimeEntryRepo {
                WHERE started_at >= ?1 AND started_at < ?2
                ORDER BY started_at ASC"#,
         )
-        .bind(start)
-        .bind(end)
+        .bind(start.to_string())
+        .bind(end.to_string())
         .fetch_all(&self.pool)
         .await
         .map_err(|e| common::KlyntbotError::Storage(e.to_string()))?;

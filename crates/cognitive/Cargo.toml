@@ -11,7 +11,6 @@ storage = { workspace = true }
 bus = { workspace = true }
 feature-notes = { workspace = true }
 context_engine = { workspace = true }
-chrono = { workspace = true }
 jiff = { workspace = true }
 dashmap = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
