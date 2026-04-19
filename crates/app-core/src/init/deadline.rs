@@ -17,15 +17,27 @@ use bus::{DomainEvent, DomainEventBus};
 use scheduling::{DeadlineAction, DeadlineScheduler};
 use tracing::{debug, info, warn};
 
-/// Convenience: publish a tray notification via the domain event bus.
-fn notify_tray(bus: &DomainEventBus, title: impl Into<String>, body: impl Into<String>) {
-    // TODO(phase-4): route through NotificationDispatcher so deadline notifications
-    // honour quiet hours / retry / idempotency. Today this publishes directly
-    // to bypass the dispatcher pipeline.
-    bus.publish(DomainEvent::TrayNotificationRequested {
-        title: title.into(),
-        body: body.into(),
-        alarm_id: None,
+/// Convenience: publish a deadline notification through the dispatcher pipeline
+/// (quiet hours, idempotency, retry) by emitting `AlarmFired`.
+fn notify_alarm(
+    bus: &DomainEventBus,
+    task_id: Option<String>,
+    title: impl Into<String>,
+    body: impl Into<String>,
+) {
+    let payload = serde_json::json!({
+        "title": title.into(),
+        "body": body.into(),
+        "channel_mask": 0,
+        "priority_override": null,
+    })
+    .to_string();
+    bus.publish(DomainEvent::AlarmFired {
+        fire_id: uuid::Uuid::new_v4().to_string(),
+        kind: "deadline_legacy".to_string(),
+        ref_id: task_id,
+        payload_json: payload,
+        fired_at_ms: jiff::Timestamp::now().as_millisecond(),
     });
 }
 
@@ -154,7 +166,7 @@ async fn handle_task_reminder(
     }
 
     // Send notification.
-    notify_tray(bus, "Task due soon", label);
+    notify_alarm(bus, Some(task_id.to_string()), "Task due soon", label);
 
     // Mark as reminded.
     let patch = storage::TaskPatch {
@@ -189,7 +201,7 @@ async fn handle_focus_warning(
     }
 
     let msg = format!("Focus deadline in {}h: {}", hours_left, task.title);
-    notify_tray(bus, "Focus deadline approaching", &msg);
+    notify_alarm(bus, Some(task_id.to_string()), "Focus deadline approaching", &msg);
 }
 
 async fn handle_focus_expire(
@@ -217,7 +229,7 @@ async fn handle_focus_expire(
             }
 
             let msg = format!("Focus expired after {}h: {}", deadline_hours, task.title);
-            notify_tray(bus, "Focus expired", &msg);
+            notify_alarm(bus, Some(task_id.to_string()), "Focus expired", &msg);
         }
         _ => {
             debug!("deadline: task {task_id} focus deadline not yet past, skipping expire");
