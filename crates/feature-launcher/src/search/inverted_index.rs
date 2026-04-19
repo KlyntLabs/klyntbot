@@ -292,6 +292,49 @@ impl InvertedFileIndex {
     }
 }
 
+#[cfg(target_os = "macos")]
+pub async fn mdfind_paths(
+    query: &str,
+    roots: &[PathBuf],
+    skip: &SkipSet,
+    cancel: tokio_util::sync::CancellationToken,
+) -> Vec<PathBuf> {
+    let tokens = tokenize(query);
+    if tokens.is_empty() { return Vec::new(); }
+    let mut handles = Vec::new();
+    for root in roots {
+        let root = root.clone();
+        let q = query.to_string();
+        let cancel = cancel.clone();
+        handles.push(tokio::spawn(async move {
+            tokio::select! {
+                _ = cancel.cancelled() => Vec::<PathBuf>::new(),
+                r = tokio::time::timeout(
+                    std::time::Duration::from_secs(2),
+                    tokio::process::Command::new("/usr/bin/mdfind")
+                        .arg("-onlyin").arg(&root)
+                        .arg(&q)
+                        .output(),
+                ) => match r {
+                    Ok(Ok(out)) if out.status.success() =>
+                        String::from_utf8_lossy(&out.stdout)
+                            .lines().map(|l| PathBuf::from(l.trim())).collect(),
+                    _ => Vec::new(),
+                },
+            }
+        }));
+    }
+    let mut paths = Vec::new();
+    for h in handles { if let Ok(ps) = h.await { paths.extend(ps); } }
+    paths.retain(|p| {
+        let in_skip = p.components().any(|c|
+            c.as_os_str().to_str().is_some_and(|n| skip.skip_dir(n))
+        );
+        !in_skip
+    });
+    paths
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -415,5 +458,18 @@ mod tests {
 
         idx.apply_event_remove(&p);
         assert!(idx.search("doomed", 10).is_empty());
+    }
+
+    #[cfg(target_os = "macos")]
+    #[tokio::test]
+    async fn mdfind_paths_returns_empty_for_unmatched_query() {
+        let cancel = tokio_util::sync::CancellationToken::new();
+        let paths = mdfind_paths(
+            "klyntbot_no_such_unique_marker_xyz_12345",
+            &[std::env::temp_dir()],
+            &SkipSet::defaults(),
+            cancel,
+        ).await;
+        assert!(paths.is_empty());
     }
 }

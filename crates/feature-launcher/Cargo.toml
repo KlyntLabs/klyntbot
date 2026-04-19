@@ -13,7 +13,7 @@ serde_json.workspace = true
 sqlx.workspace = true
 jiff = { workspace = true }
 tokio.workspace = true
-tokio-util = { workspace = true }
+tokio-util = { workspace = true, features = ["rt"] }
 async-trait.workspace = true
 tracing.workspace = true
 meval = "0.2"

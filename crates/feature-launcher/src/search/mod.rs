@@ -9,6 +9,7 @@ pub mod content_grep;
 pub mod file_search;
 pub mod file_watcher;
 pub mod git_repos;
+pub mod inverted_index;
 pub mod running_apps;
 pub mod script_runner;
 pub mod ssh_hosts;
@@ -17,6 +18,7 @@ pub mod system_prefs;
 pub mod url_navigation;
 
 pub use app_index::{AppEntry, AppIndex};
+pub use inverted_index::{InvertedFileIndex, IndexEntry, ScoredEntry};
 pub use background::{BackgroundRefresher, RefreshEntry};
 pub use bookmarks::BookmarksSource;
 pub use brew::BrewSource;
