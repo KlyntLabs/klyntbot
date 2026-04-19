@@ -238,11 +238,12 @@ impl TemporalScheduler {
                 Decision::Fire => fire.push(row),
                 Decision::SkipStale => skip.push(row),
                 Decision::CoalesceLater => {
-                    let key = (
-                        row.ref_id.clone().unwrap_or_default(),
-                        row.kind.clone(),
-                    );
-                    coalesce.entry(key).or_default().push(row);
+                    if let Some(ref_id) = &row.ref_id {
+                        let key = (ref_id.clone(), row.kind.clone());
+                        coalesce.entry(key).or_default().push(row);
+                    } else {
+                        fire.push(row);
+                    }
                 }
             }
         }
@@ -268,9 +269,11 @@ impl TemporalScheduler {
             group.sort_unstable_by_key(|r| r.fire_at_ms);
             let winner = group.pop().expect("coalesce group is never empty");
             for loser in &group {
-                self.store
-                    .mark_suppressed(&loser.id, &winner.id, now)
-                    .await?;
+                if self.store.begin_firing(&loser.id, now).await? {
+                    self.store
+                        .mark_suppressed(&loser.id, &winner.id, now)
+                        .await?;
+                }
             }
             self.dispatch(winner, now).await?;
         }
@@ -666,18 +669,113 @@ mod tests {
             "c2 suppressed_by should be c3"
         );
 
-        // c3 (the winner) must have suppressed_by = None.
-        let c3_row: (i64, Option<String>) =
-            sqlx::query_as("SELECT fired, suppressed_by FROM scheduled_fires WHERE id = ?1")
-                .bind(&c3)
-                .fetch_one(pool.inner())
-                .await
-                .unwrap();
+        // c3 (the winner) must have suppressed_by = None and firing_started_at_ms IS NOT NULL
+        // (proving it went through begin_firing — two-phase commit).
+        let c3_row: (i64, Option<String>, Option<i64>) = sqlx::query_as(
+            "SELECT fired, suppressed_by, firing_started_at_ms FROM scheduled_fires WHERE id = ?1",
+        )
+        .bind(&c3)
+        .fetch_one(pool.inner())
+        .await
+        .unwrap();
         assert_eq!(c3_row.0, 1, "c3 should be fired");
         assert!(
             c3_row.1.is_none(),
             "c3 suppressed_by should be None (it is the winner)"
         );
+        assert!(
+            c3_row.2.is_some(),
+            "c3 firing_started_at_ms must be set (winner went through begin_firing)"
+        );
+    }
+
+    /// Coalesce: rows with ref_id = None cannot be coalesced — both must fire independently.
+    #[tokio::test]
+    async fn coalesce_skips_rows_with_no_ref_id() {
+        let pool = StoragePool::connect_in_memory().await.unwrap();
+        StoragePool::run_feature_migrations(
+            pool.inner(),
+            &[tools_core::FeatureMigration {
+                feature_name: "scheduling".into(),
+                version: 1,
+                description: "scheduled_fires".into(),
+                sql: include_str!("../../migrations/001_scheduled_fires.sql").into(),
+            }],
+        )
+        .await
+        .unwrap();
+        let store = FireStore::new(storage::repos::scheduled_fires::ScheduledFiresRepo::new(
+            pool.inner().clone(),
+        ));
+        let bus = Arc::new(DomainEventBus::new(32));
+        let mut rx = bus.subscribe();
+
+        let now = Timestamp::now();
+        let minus_30m = now.checked_sub(jiff::Span::new().minutes(30)).unwrap();
+        let minus_25m = now.checked_sub(jiff::Span::new().minutes(25)).unwrap();
+
+        // Both rows have ref_id = None and the same kind — they must NOT coalesce.
+        let payload = serde_json::json!({ "misfire_policy": "coalesce" });
+
+        let r1 = store
+            .schedule(FireSpec {
+                fire_at: minus_30m,
+                kind: "task_alarm".into(),
+                ref_id: None,
+                payload: payload.clone(),
+                dedup_prefix: None,
+            })
+            .await
+            .unwrap();
+        let r2 = store
+            .schedule(FireSpec {
+                fire_at: minus_25m,
+                kind: "task_alarm".into(),
+                ref_id: None,
+                payload: payload.clone(),
+                dedup_prefix: None,
+            })
+            .await
+            .unwrap();
+
+        let config = SchedulerConfig {
+            default_misfire_policy: crate::temporal::misfire::MisfirePolicy::Coalesce,
+            ..SchedulerConfig::default()
+        };
+        let scheduler = TemporalScheduler::new(store.clone(), bus.clone(), config);
+        scheduler.process_due(now).await.unwrap();
+
+        // Both rows should have fired (two AlarmFired events).
+        let mut fired_ids = Vec::new();
+        for _ in 0..2 {
+            let event = tokio::time::timeout(Duration::from_millis(200), rx.recv())
+                .await
+                .expect("expected an AlarmFired event")
+                .unwrap();
+            match event {
+                DomainEvent::AlarmFired { fire_id, .. } => fired_ids.push(fire_id),
+                other => panic!("expected AlarmFired, got {other:?}"),
+            }
+        }
+        assert!(fired_ids.contains(&r1), "r1 (None ref_id) must fire");
+        assert!(fired_ids.contains(&r2), "r2 (None ref_id) must fire");
+
+        // Neither row should be suppressed by the other.
+        let r1_row: (i64, Option<String>) =
+            sqlx::query_as("SELECT fired, suppressed_by FROM scheduled_fires WHERE id = ?1")
+                .bind(&r1)
+                .fetch_one(pool.inner())
+                .await
+                .unwrap();
+        assert!(r1_row.1.is_none(), "r1 must not be suppressed");
+
+        let r2_row: (i64, Option<String>) =
+            sqlx::query_as("SELECT fired, suppressed_by FROM scheduled_fires WHERE id = ?1")
+                .bind(&r2)
+                .fetch_one(pool.inner())
+                .await
+                .unwrap();
+        assert!(r2_row.1.is_none(), "r2 must not be suppressed");
     }
 
     #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
