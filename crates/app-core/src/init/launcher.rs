@@ -119,6 +119,18 @@ pub(super) async fn init_launcher(
         let s = Arc::clone(&source);
         tokio::spawn(async move { s.refresh().await });
         file_search_source = Some(Arc::clone(&source));
+        let file_cfg = &launcher_config.sources.files;
+        let interval = std::time::Duration::from_secs(file_cfg.rebuild_interval_min * 60);
+        let fs_for_rebuild = Arc::clone(&source);
+        tokio::spawn(async move {
+            let mut tick = tokio::time::interval(interval);
+            tick.tick().await; // skip immediate first tick (initial build already runs)
+            loop {
+                tick.tick().await;
+                tracing::info!("launcher: triggering 30-min safety rebuild");
+                fs_for_rebuild.refresh().await;
+            }
+        });
         sources.push(source);
     } else {
         file_search_source = None;
