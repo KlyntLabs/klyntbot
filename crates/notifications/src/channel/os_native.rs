@@ -33,7 +33,9 @@ impl Channel for OsNativeChannel {
     async fn deliver(&self, payload: &NotificationPayload) -> Result<()> {
         let is_urgent = payload.priority_override.as_deref() == Some("urgent");
         let result = if is_urgent {
-            self.sender.send_critical(&payload.title, &payload.body).await
+            self.sender
+                .send_critical(&payload.title, &payload.body)
+                .await
         } else {
             self.sender.send(&payload.title, &payload.body).await
         };
@@ -94,10 +96,21 @@ mod tests {
         let mock = MockSender::new();
         let channel = OsNativeChannel::new(mock.clone());
 
-        channel.deliver(&make_payload(Some("urgent"))).await.unwrap();
+        channel
+            .deliver(&make_payload(Some("urgent")))
+            .await
+            .unwrap();
 
-        assert_eq!(mock.critical_count.load(Ordering::SeqCst), 1, "send_critical must be called once");
-        assert_eq!(mock.send_count.load(Ordering::SeqCst), 0, "send must not be called");
+        assert_eq!(
+            mock.critical_count.load(Ordering::SeqCst),
+            1,
+            "send_critical must be called once"
+        );
+        assert_eq!(
+            mock.send_count.load(Ordering::SeqCst),
+            0,
+            "send must not be called"
+        );
     }
 
     #[tokio::test]
@@ -107,7 +120,15 @@ mod tests {
 
         channel.deliver(&make_payload(None)).await.unwrap();
 
-        assert_eq!(mock.send_count.load(Ordering::SeqCst), 1, "send must be called once");
-        assert_eq!(mock.critical_count.load(Ordering::SeqCst), 0, "send_critical must not be called");
+        assert_eq!(
+            mock.send_count.load(Ordering::SeqCst),
+            1,
+            "send must be called once"
+        );
+        assert_eq!(
+            mock.critical_count.load(Ordering::SeqCst),
+            0,
+            "send_critical must not be called"
+        );
     }
 }

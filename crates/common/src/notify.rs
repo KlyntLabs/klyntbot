@@ -163,7 +163,10 @@ pub fn build_critical_script(title: &str, body: &str) -> String {
 pub async fn send_os_notification_critical(title: &str, body: &str) -> Result<()> {
     use tokio::process::Command;
     let script = build_critical_script(title, body);
-    Command::new("osascript").args(["-e", &script]).output().await?;
+    Command::new("osascript")
+        .args(["-e", &script])
+        .output()
+        .await?;
     Ok(())
 }
 
@@ -318,7 +321,10 @@ mod tests {
                 "double-quote in title must be escaped: {script}"
             );
             // No raw newlines in the body
-            assert!(!script.contains('\n'), "raw newline must be stripped: {script}");
+            assert!(
+                !script.contains('\n'),
+                "raw newline must be stripped: {script}"
+            );
         }
 
         #[test]

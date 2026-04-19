@@ -201,7 +201,12 @@ async fn handle_focus_warning(
     }
 
     let msg = format!("Focus deadline in {}h: {}", hours_left, task.title);
-    notify_alarm(bus, Some(task_id.to_string()), "Focus deadline approaching", &msg);
+    notify_alarm(
+        bus,
+        Some(task_id.to_string()),
+        "Focus deadline approaching",
+        &msg,
+    );
 }
 
 async fn handle_focus_expire(

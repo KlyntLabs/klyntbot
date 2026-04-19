@@ -28,7 +28,10 @@ pub struct TelegramNotificationChannel {
 
 impl TelegramNotificationChannel {
     pub fn new(sender: Arc<TelegramSender>, default_chat_id: i64) -> Self {
-        Self { sender, default_chat_id }
+        Self {
+            sender,
+            default_chat_id,
+        }
     }
 }
 
@@ -40,11 +43,7 @@ impl Channel for TelegramNotificationChannel {
 
     async fn deliver(&self, payload: &NotificationPayload) -> Result<()> {
         let text = format!("{}\n{}", payload.title, payload.body);
-        let msg = OutboundMessage::new(
-            "telegram",
-            self.default_chat_id.to_string(),
-            text,
-        );
+        let msg = OutboundMessage::new("telegram", self.default_chat_id.to_string(), text);
         self.sender
             .send(&msg)
             .await

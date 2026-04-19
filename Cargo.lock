@@ -8785,6 +8785,7 @@ version = "0.1.0"
 dependencies = [
  "async-trait",
  "bus",
+ "channels",
  "common",
  "config",
  "jiff",

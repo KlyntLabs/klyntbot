@@ -301,10 +301,7 @@ fn parse_payload(alarm_id: &str, payload_json: &str) -> NotificationPayload {
         Some("urgent") => Priority::Urgent,
         _ => Priority::Normal,
     };
-    let channel_mask = v
-        .get("channel_mask")
-        .and_then(|x| x.as_u64())
-        .unwrap_or(0) as u32;
+    let channel_mask = v.get("channel_mask").and_then(|x| x.as_u64()).unwrap_or(0) as u32;
     let priority_override = v
         .get("priority_override")
         .and_then(|x| x.as_str())
@@ -343,8 +340,7 @@ mod tests {
         let pool = storage::StoragePool::connect_in_memory().await.unwrap();
         let raw = pool.inner().clone();
         let log_repo = storage::repos::notification_log::NotificationLogRepo::new(raw.clone());
-        let held_repo =
-            storage::repos::held_notifications::HeldNotificationsRepo::new(raw.clone());
+        let held_repo = storage::repos::held_notifications::HeldNotificationsRepo::new(raw.clone());
         let fires_repo = storage::repos::ScheduledFiresRepo::new(raw);
         let fire_store = scheduling::FireStore::new(fires_repo);
         let held_release = HeldReleaseService::new(held_repo.clone(), fire_store);
@@ -385,12 +381,9 @@ mod tests {
 
     #[test]
     fn parse_payload_reads_channel_mask_and_priority() {
-        let json =
-            r#"{"title":"t","body":"b","channel_mask":4,"priority_override":"urgent"}"#;
+        let json = r#"{"title":"t","body":"b","channel_mask":4,"priority_override":"urgent"}"#;
         let payload = parse_payload("alarm_1", json);
         assert_eq!(payload.channel_mask, 4);
         assert_eq!(payload.priority_override.as_deref(), Some("urgent"));
     }
 }
-
-
