@@ -607,7 +607,7 @@ impl AppCore {
             ))));
             // Outbound channels (telegram, discord, slack) — no-op until Phase 4 wires
             // last_active updates from the message router.
-            for ch_name in ["telegram", "discord", "slack"] {
+            for ch_name in ["telegram", "discord", "slack", "email"] {
                 registry.register(std::sync::Arc::new(
                     notifications::channel::outbound::OutboundChannel::new(
                         ch_name,
