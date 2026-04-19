@@ -633,6 +633,19 @@ mod tests {
             Some(c3.as_str()),
             "c2 suppressed_by should be c3"
         );
+
+        // c3 (the winner) must have suppressed_by = None.
+        let c3_row: (i64, Option<String>) =
+            sqlx::query_as("SELECT fired, suppressed_by FROM scheduled_fires WHERE id = ?1")
+                .bind(&c3)
+                .fetch_one(pool.inner())
+                .await
+                .unwrap();
+        assert_eq!(c3_row.0, 1, "c3 should be fired");
+        assert!(
+            c3_row.1.is_none(),
+            "c3 suppressed_by should be None (it is the winner)"
+        );
     }
 
     #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
