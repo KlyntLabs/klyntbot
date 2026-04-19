@@ -1057,9 +1057,7 @@ async fn ensure_cron_jobs(
         cron_repo
             .list()
             .await
-            .map_err(|e| {
-                common::KlyntbotError::Storage(format!("cron list failed: {e}"))
-            })?
+            .map_err(|e| common::KlyntbotError::Storage(format!("cron list failed: {e}")))?
             .into_iter()
             .map(|r| (r.name.clone(), r))
             .collect();

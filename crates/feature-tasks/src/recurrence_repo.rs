@@ -545,15 +545,12 @@ mod tests {
         let fire_store = Arc::new(FireStore::new(sf_repo));
 
         let template_repo = Arc::new(SqliteTemplateRepo::new(pool.clone()));
-        let instance_repo =
-            Arc::new(SqliteInstanceRepo::new(pool.clone(), Arc::clone(&fire_store)));
+        let instance_repo = Arc::new(SqliteInstanceRepo::new(
+            pool.clone(),
+            Arc::clone(&fire_store),
+        ));
 
-        let engine = RecurrenceEngine::new(
-            fire_store,
-            template_repo.clone(),
-            instance_repo,
-            2,
-        );
+        let engine = RecurrenceEngine::new(fire_store, template_repo.clone(), instance_repo, 2);
 
         // 2026-04-28 00:00 UTC
         let cursor = jiff::civil::date(2026, 4, 28)
@@ -569,7 +566,10 @@ mod tests {
                 .fetch_one(pool.inner())
                 .await
                 .unwrap();
-        assert_eq!(count_first, 2, "first on_spawn should create exactly 2 instances");
+        assert_eq!(
+            count_first, 2,
+            "first on_spawn should create exactly 2 instances"
+        );
 
         // Simulate partial-crash: reset the cursor to re-run the same window.
         sqlx::query(

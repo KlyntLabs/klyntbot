@@ -18,7 +18,6 @@ pub mod system_prefs;
 pub mod url_navigation;
 
 pub use app_index::{AppEntry, AppIndex};
-pub use inverted_index::{InvertedFileIndex, IndexEntry, ScoredEntry};
 pub use background::{BackgroundRefresher, RefreshEntry};
 pub use bookmarks::BookmarksSource;
 pub use brew::BrewSource;
@@ -29,6 +28,7 @@ pub use content_grep::ContentGrepSource;
 pub use file_search::{FileSearchSource, FsEventKind};
 pub use file_watcher::{SourceFileWatcher, WatchEntry};
 pub use git_repos::GitReposSource;
+pub use inverted_index::{IndexEntry, InvertedFileIndex, ScoredEntry};
 pub use running_apps::RunningAppsSource;
 pub use script_runner::ScriptRunner;
 pub use ssh_hosts::SshHostsSource;

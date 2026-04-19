@@ -173,15 +173,9 @@ impl CronExecutor {
                         Ok(()) => {}
                         Err(join_err) => {
                             if join_err.is_panic() {
-                                error!(
-                                    "CronExecutor: job '{}' panicked",
-                                    job_name_for_watcher
-                                );
+                                error!("CronExecutor: job '{}' panicked", job_name_for_watcher);
                             } else if join_err.is_cancelled() {
-                                warn!(
-                                    "CronExecutor: job '{}' cancelled",
-                                    job_name_for_watcher
-                                );
+                                warn!("CronExecutor: job '{}' cancelled", job_name_for_watcher);
                             }
                         }
                     }
@@ -448,9 +442,7 @@ mod tests {
     #[tokio::test]
     async fn handler_panic_is_logged_and_executor_continues() {
         let repo = setup_repo().await;
-        repo.upsert(&make_row("job-6a", "panic_job"))
-            .await
-            .unwrap();
+        repo.upsert(&make_row("job-6a", "panic_job")).await.unwrap();
         repo.upsert(&make_row("job-6b", "survivor_job"))
             .await
             .unwrap();

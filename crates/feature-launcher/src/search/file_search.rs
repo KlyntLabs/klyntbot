@@ -96,7 +96,10 @@ impl super::SearchSource for FileSearchSource {
                     title: e.name.clone(),
                     subtitle: Some(path_str),
                     icon: Some("file".to_string()),
-                    kind: LauncherItemKind::File { path: e.path.clone(), kind: e.kind },
+                    kind: LauncherItemKind::File {
+                        path: e.path.clone(),
+                        kind: e.kind,
+                    },
                     score: (s.score as f64 / 200.0) * 0.85,
                     no_view: false,
                 }
@@ -106,13 +109,9 @@ impl super::SearchSource for FileSearchSource {
         // mdfind fallback
         #[cfg(target_os = "macos")]
         if self.mdfind_fallback && items.len() < self.mdfind_threshold {
-            let extra = crate::search::inverted_index::mdfind_paths(
-                query,
-                &self.roots,
-                &self.skip,
-                cancel,
-            )
-            .await;
+            let extra =
+                crate::search::inverted_index::mdfind_paths(query, &self.roots, &self.skip, cancel)
+                    .await;
             let existing: HashSet<PathBuf> = items
                 .iter()
                 .filter_map(|i| match &i.kind {

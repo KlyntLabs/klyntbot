@@ -28,8 +28,7 @@ pub struct WatchEntry {
     pub recursive: bool,
     /// Optional custom handler invoked instead of `source.refresh()`.
     /// Receives the batch of debounced events that triggered this watch entry.
-    pub on_change:
-        Option<Arc<dyn Fn(Vec<DebouncedEvent>) -> BoxFuture<'static, ()> + Send + Sync>>,
+    pub on_change: Option<Arc<dyn Fn(Vec<DebouncedEvent>) -> BoxFuture<'static, ()> + Send + Sync>>,
 }
 
 pub struct SourceFileWatcher {
@@ -73,7 +72,8 @@ impl SourceFileWatcher {
                     .filter(|e| e.kind == DebouncedEventKind::Any)
                     .collect();
 
-                for (watched_path, _recursive, source, min_interval, on_change) in map_clone.iter() {
+                for (watched_path, _recursive, source, min_interval, on_change) in map_clone.iter()
+                {
                     let matched: Vec<_> = any_events
                         .iter()
                         .filter(|e| e.path.starts_with(watched_path) || &e.path == watched_path)
@@ -129,8 +129,7 @@ impl SourceFileWatcher {
             } else {
                 notify::RecursiveMode::NonRecursive
             };
-            if let Err(e) = debouncer.watcher().watch(path, mode)
-            {
+            if let Err(e) = debouncer.watcher().watch(path, mode) {
                 tracing::warn!(
                     "Failed to watch {} for {}: {e}",
                     path.display(),

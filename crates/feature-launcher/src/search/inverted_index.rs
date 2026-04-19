@@ -27,7 +27,10 @@ pub struct InvertedFileIndex {
 
 impl InvertedFileIndex {
     pub fn empty() -> Self {
-        Self { entries: Vec::new(), postings: HashMap::new() }
+        Self {
+            entries: Vec::new(),
+            postings: HashMap::new(),
+        }
     }
 
     pub fn len(&self) -> usize {
@@ -61,7 +64,12 @@ use ignore::WalkBuilder;
 use std::path::Path;
 
 const SKIP_DIRS: &[&str] = &[
-    "node_modules", "target", "__pycache__", ".cache", ".Trash", "Library",
+    "node_modules",
+    "target",
+    "__pycache__",
+    ".cache",
+    ".Trash",
+    "Library",
 ];
 const SKIP_EXTENSIONS: &[&str] = &["pyc", "pyo", "class", "o", "obj", "dylib", "so"];
 
@@ -73,18 +81,27 @@ pub struct SkipSet {
 
 impl SkipSet {
     pub fn defaults() -> Self {
-        Self { dirs: SKIP_DIRS.to_vec(), exts: SKIP_EXTENSIONS.to_vec() }
+        Self {
+            dirs: SKIP_DIRS.to_vec(),
+            exts: SKIP_EXTENSIONS.to_vec(),
+        }
     }
-    fn skip_dir(&self, name: &str) -> bool { self.dirs.contains(&name) }
-    fn skip_ext(&self, ext: &str) -> bool { self.exts.contains(&ext) }
+    fn skip_dir(&self, name: &str) -> bool {
+        self.dirs.contains(&name)
+    }
+    fn skip_ext(&self, ext: &str) -> bool {
+        self.exts.contains(&ext)
+    }
 }
 
 pub(crate) fn classify_extension(path: &Path) -> FileKind {
     match path.extension().and_then(|e| e.to_str()) {
         Some("png" | "jpg" | "jpeg" | "gif" | "svg" | "webp" | "ico" | "heic") => FileKind::Image,
         Some("pdf" | "doc" | "docx" | "txt" | "md" | "rtf" | "pages" | "odt") => FileKind::Document,
-        Some("rs" | "ts" | "tsx" | "js" | "jsx" | "py" | "go" | "rb" | "java" | "c" | "cpp"
-            | "h" | "swift" | "kt" | "sh" | "toml" | "yaml" | "json" | "html" | "css") => FileKind::Code,
+        Some(
+            "rs" | "ts" | "tsx" | "js" | "jsx" | "py" | "go" | "rb" | "java" | "c" | "cpp" | "h"
+            | "swift" | "kt" | "sh" | "toml" | "yaml" | "json" | "html" | "css",
+        ) => FileKind::Code,
         Some("zip" | "tar" | "gz" | "bz2" | "xz" | "7z" | "rar" | "dmg") => FileKind::Archive,
         _ => FileKind::File,
     }
@@ -96,7 +113,9 @@ impl InvertedFileIndex {
         let mut postings: HashMap<SmolStr, Vec<u32>> = HashMap::new();
 
         'outer: for root in roots {
-            if !root.exists() { continue; }
+            if !root.exists() {
+                continue;
+            }
             let walker = WalkBuilder::new(root)
                 .hidden(true)
                 .git_ignore(true)
@@ -117,23 +136,37 @@ impl InvertedFileIndex {
                 .build();
 
             for result in walker {
-                if entries.len() >= max_entries { break 'outer; }
+                if entries.len() >= max_entries {
+                    break 'outer;
+                }
                 let entry = match result {
                     Ok(e) => e,
-                    Err(e) => { tracing::debug!("inverted_index walk error: {e}"); continue; }
+                    Err(e) => {
+                        tracing::debug!("inverted_index walk error: {e}");
+                        continue;
+                    }
                 };
-                if entry.file_type().is_none_or(|ft| ft.is_dir()) { continue; }
+                if entry.file_type().is_none_or(|ft| ft.is_dir()) {
+                    continue;
+                }
                 let path = entry.path();
                 let name = match path.file_name().and_then(|n| n.to_str()) {
                     Some(n) => n.to_string(),
                     None => continue,
                 };
                 if let Some(ext) = path.extension().and_then(|e| e.to_str()) {
-                    if skip.skip_ext(ext) { continue; }
+                    if skip.skip_ext(ext) {
+                        continue;
+                    }
                 }
                 let depth = entry.depth().min(255) as u8;
                 let idx = entries.len() as u32;
-                entries.push(IndexEntry { path: path.to_path_buf(), name: name.clone(), kind: classify_extension(path), depth });
+                entries.push(IndexEntry {
+                    path: path.to_path_buf(),
+                    name: name.clone(),
+                    kind: classify_extension(path),
+                    depth,
+                });
 
                 // Index name tokens
                 for token in tokenize(&name) {
@@ -143,7 +176,9 @@ impl InvertedFileIndex {
                 }
                 // Index path component tokens (ii: from spec Q3)
                 for component in path.components().filter_map(|c| c.as_os_str().to_str()) {
-                    if component == name { continue; }
+                    if component == name {
+                        continue;
+                    }
                     for token in tokenize(component) {
                         for prefix in prefixes(&token) {
                             postings.entry(prefix).or_default().push(idx);
@@ -167,14 +202,29 @@ fn score_entry_match(query_tokens: &[String], entry: &IndexEntry) -> i32 {
     let name_lower = entry.name.to_lowercase();
     let mut score: i32 = 0;
     for q in query_tokens {
-        if name_lower == *q { score += 140; continue; }
-        if name_lower.starts_with(q) { score += 118; continue; }
+        if name_lower == *q {
+            score += 140;
+            continue;
+        }
+        if name_lower.starts_with(q) {
+            score += 118;
+            continue;
+        }
         // compact-prefix: collapse separators in name
         let compact: String = name_lower.chars().filter(|c| c.is_alphanumeric()).collect();
-        if compact.starts_with(q) { score += 106; continue; }
-        if name_lower.contains(q) { score += 60; continue; }
+        if compact.starts_with(q) {
+            score += 106;
+            continue;
+        }
+        if name_lower.contains(q) {
+            score += 60;
+            continue;
+        }
         // subsequence
-        if is_subsequence(q, &name_lower) { score += 44; continue; }
+        if is_subsequence(q, &name_lower) {
+            score += 44;
+            continue;
+        }
     }
     // depth penalty
     score -= (entry.depth as i32) * 2;
@@ -185,7 +235,9 @@ fn is_subsequence(needle: &str, haystack: &str) -> bool {
     let mut h = haystack.chars();
     'outer: for nc in needle.chars() {
         for hc in h.by_ref() {
-            if hc == nc { continue 'outer; }
+            if hc == nc {
+                continue 'outer;
+            }
         }
         return false;
     }
@@ -199,7 +251,9 @@ impl InvertedFileIndex {
             return Vec::new();
         }
         let tokens = tokenize(q);
-        if tokens.is_empty() { return Vec::new(); }
+        if tokens.is_empty() {
+            return Vec::new();
+        }
 
         // For each token, get a posting list using its longest available prefix (up to MAX_PREFIX_LEN).
         let mut lists: Vec<&Vec<u32>> = Vec::with_capacity(tokens.len());
@@ -216,14 +270,22 @@ impl InvertedFileIndex {
         let mut candidates: Vec<u32> = lists[0].clone();
         for list in &lists[1..] {
             candidates.retain(|idx| list.binary_search(idx).is_ok());
-            if candidates.is_empty() { return Vec::new(); }
+            if candidates.is_empty() {
+                return Vec::new();
+            }
         }
 
         // Score
-        let mut scored: Vec<ScoredEntry> = candidates.iter().map(|&idx| {
-            let entry = &self.entries[idx as usize];
-            ScoredEntry { entry_idx: idx, score: score_entry_match(&tokens, entry) }
-        }).collect();
+        let mut scored: Vec<ScoredEntry> = candidates
+            .iter()
+            .map(|&idx| {
+                let entry = &self.entries[idx as usize];
+                ScoredEntry {
+                    entry_idx: idx,
+                    score: score_entry_match(&tokens, entry),
+                }
+            })
+            .collect();
         scored.sort_by(|a, b| {
             b.score.cmp(&a.score).then_with(|| {
                 let a_len = self.entries[a.entry_idx as usize].name.len();
@@ -240,9 +302,13 @@ impl InvertedFileIndex {
 impl InvertedFileIndex {
     /// Add a single file to the index. Idempotent — duplicate paths are skipped.
     pub fn apply_event_create(&mut self, path: &Path) {
-        if !path.is_file() { return; }
+        if !path.is_file() {
+            return;
+        }
         // Skip if already indexed
-        if self.entries.iter().any(|e| e.path == path) { return; }
+        if self.entries.iter().any(|e| e.path == path) {
+            return;
+        }
         let name = match path.file_name().and_then(|n| n.to_str()) {
             Some(n) => n.to_string(),
             None => return,
@@ -264,7 +330,9 @@ impl InvertedFileIndex {
             }
         }
         for component in path.components().filter_map(|c| c.as_os_str().to_str()) {
-            if component == name { continue; }
+            if component == name {
+                continue;
+            }
             for token in tokenize(component) {
                 for prefix in prefixes(&token) {
                     let list = self.postings.entry(prefix).or_default();
@@ -279,7 +347,10 @@ impl InvertedFileIndex {
     /// Remove a path from the index. Tombstones the entry (we don't compact mid-flight).
     pub fn apply_event_remove(&mut self, path: &Path) {
         let target = self.entries.iter().position(|e| e.path == path);
-        let target = match target { Some(t) => t as u32, None => return };
+        let target = match target {
+            Some(t) => t as u32,
+            None => return,
+        };
         // Drop the entry's name → blank; remove from all postings.
         // Cheap approach: scan all postings, drop this idx.
         for list in self.postings.values_mut() {
@@ -305,7 +376,9 @@ pub async fn mdfind_paths(
     cancel: tokio_util::sync::CancellationToken,
 ) -> Vec<PathBuf> {
     let tokens = tokenize(query);
-    if tokens.is_empty() { return Vec::new(); }
+    if tokens.is_empty() {
+        return Vec::new();
+    }
     let mut handles = Vec::new();
     for root in roots {
         let root = root.clone();
@@ -330,11 +403,15 @@ pub async fn mdfind_paths(
         }));
     }
     let mut paths = Vec::new();
-    for h in handles { if let Ok(ps) = h.await { paths.extend(ps); } }
+    for h in handles {
+        if let Ok(ps) = h.await {
+            paths.extend(ps);
+        }
+    }
     paths.retain(|p| {
-        let in_skip = p.components().any(|c|
-            c.as_os_str().to_str().is_some_and(|n| skip.skip_dir(n))
-        );
+        let in_skip = p
+            .components()
+            .any(|c| c.as_os_str().to_str().is_some_and(|n| skip.skip_dir(n)));
         !in_skip
     });
     paths
@@ -347,8 +424,14 @@ mod tests {
     #[test]
     fn tokenize_splits_on_separators() {
         assert_eq!(tokenize("hello-world.rs"), vec!["hello", "world", "rs"]);
-        assert_eq!(tokenize("My Document_v2.pdf"), vec!["my", "document", "v2", "pdf"]);
-        assert_eq!(tokenize("/home/user/notes/idea.md"), vec!["home", "user", "notes", "idea", "md"]);
+        assert_eq!(
+            tokenize("My Document_v2.pdf"),
+            vec!["my", "document", "v2", "pdf"]
+        );
+        assert_eq!(
+            tokenize("/home/user/notes/idea.md"),
+            vec!["home", "user", "notes", "idea", "md"]
+        );
     }
 
     #[test]
@@ -382,11 +465,7 @@ mod tests {
         fs::create_dir_all(base.join("downloads")).unwrap();
         fs::write(base.join("downloads/invoice.pdf"), "").unwrap();
 
-        let idx = InvertedFileIndex::build(
-            &[base.to_path_buf()],
-            &SkipSet::default(),
-            1_000_000,
-        );
+        let idx = InvertedFileIndex::build(&[base.to_path_buf()], &SkipSet::default(), 1_000_000);
         assert_eq!(idx.len(), 2);
         // "downloads" should be in postings (path component indexing)
         assert!(idx.postings.contains_key(&SmolStr::new("dow")));
@@ -418,7 +497,10 @@ mod tests {
         // "downloads invoice" should match only the pdf, not the txt or photo
         let results = idx.search("downloads invoice", 10);
         assert_eq!(results.len(), 1);
-        assert_eq!(idx.entries[results[0].entry_idx as usize].name, "invoice.pdf");
+        assert_eq!(
+            idx.entries[results[0].entry_idx as usize].name,
+            "invoice.pdf"
+        );
     }
 
     #[test]
@@ -474,7 +556,8 @@ mod tests {
             &[std::env::temp_dir()],
             &SkipSet::defaults(),
             cancel,
-        ).await;
+        )
+        .await;
         assert!(paths.is_empty());
     }
 }

@@ -741,5 +741,4 @@ mod tests {
             "template.enabled must be false"
         );
     }
-
 }
