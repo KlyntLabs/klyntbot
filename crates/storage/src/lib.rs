@@ -16,6 +16,9 @@ pub mod repos;
 pub mod rows;
 pub mod vector_store;
 
+#[cfg(test)]
+pub mod test_util;
+
 // ── Core infrastructure ─────────────────────────────────────────────
 pub use error::{OptionExt, StorageError};
 pub use pool::StoragePool;

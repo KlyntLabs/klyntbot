@@ -582,4 +582,20 @@ mod tests {
         assert_eq!(parsed.id, row.id);
         assert_eq!(parsed.payload["message"], "hi");
     }
+
+    #[test]
+    fn notification_log_row_round_trips() {
+        use crate::rows::notification_log::NotificationLogRow;
+        let row = NotificationLogRow {
+            alarm_id: "fire_abc".into(),
+            channel: "os_native".into(),
+            sent_at_ms: 1_800_000_000_000,
+            ack_at_ms: None,
+            error: None,
+        };
+        let s = serde_json::to_string(&row).unwrap();
+        let parsed: NotificationLogRow = serde_json::from_str(&s).unwrap();
+        assert_eq!(parsed.alarm_id, "fire_abc");
+        assert_eq!(parsed.channel, "os_native");
+    }
 }

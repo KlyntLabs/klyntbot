@@ -8,6 +8,7 @@ pub mod entity_link;
 pub mod finance;
 pub mod key_result;
 pub mod learning;
+pub mod notification_log;
 pub mod objective;
 pub mod project;
 pub mod project_source;

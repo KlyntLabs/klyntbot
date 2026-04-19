@@ -23,6 +23,7 @@ pub mod finance_transaction_repo;
 pub mod interaction_log;
 pub mod key_result;
 pub mod learning_state;
+pub mod notification_log;
 pub mod objective;
 pub mod outcome;
 pub mod project_repo;
@@ -70,6 +71,7 @@ pub use finance_transaction_repo::FinanceTransactionRepo;
 pub use interaction_log::InteractionLogRepo;
 pub use key_result::KeyResultRepo;
 pub use learning_state::LearningStateRepo;
+pub use notification_log::NotificationLogRepo;
 pub use objective::ObjectiveRepo;
 pub use outcome::OutcomeRepo;
 pub use project_repo::{ProjectFilter, ProjectPatch, ProjectRepo, ProjectWithStats};
@@ -156,6 +158,7 @@ pub struct Repos {
     pub reforge_state: ReforgeStateRepo,
     pub scheduled_fires: ScheduledFiresRepo,
     pub skill_version: SkillVersionRepo,
+    pub notification_log: NotificationLogRepo,
 }
 
 impl Repos {
@@ -192,6 +195,7 @@ impl Repos {
             reforge_state: ReforgeStateRepo::new(db.clone()),
             scheduled_fires: ScheduledFiresRepo::new(db.clone()),
             skill_version: SkillVersionRepo::new(db.clone()),
+            notification_log: NotificationLogRepo::new(db.clone()),
             pool: db,
         }
     }

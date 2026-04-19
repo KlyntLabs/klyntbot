@@ -12,6 +12,7 @@ pub mod finance_goal_repo_tests;
 pub mod finance_investment_repo_tests;
 pub mod finance_liability_repo_tests;
 pub mod finance_transaction_repo_tests;
+pub mod notification_log_tests;
 pub mod retrieval_feedback_tests;
 pub mod scheduled_fires_tests;
 pub mod task_alarms_tests;
