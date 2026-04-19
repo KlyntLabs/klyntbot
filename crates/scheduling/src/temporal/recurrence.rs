@@ -181,7 +181,7 @@ impl RecurrenceEngine {
             self.store
                 .schedule(FireSpec {
                     fire_at,
-                    kind: "recurrence_spawn".into(),
+                    kind: super::scheduler::RECURRENCE_SPAWN_KIND.into(),
                     ref_id: Some(template_id.to_string()),
                     payload: json!({}),
                     dedup_prefix: Some(format!("template:{template_id}:")),
@@ -210,33 +210,27 @@ impl RecurrenceEngine {
 }
 
 // ---------------------------------------------------------------------------
-// Tests
+// Test mocks (accessible within the scheduling crate's test code)
 // ---------------------------------------------------------------------------
 
 #[cfg(test)]
-mod tests {
+pub(crate) mod test_mocks {
     use super::*;
     use std::collections::HashMap;
     use std::sync::Mutex;
-    use storage::pool::StoragePool;
-    use storage::repos::scheduled_fires::ScheduledFiresRepo;
-
-    // -----------------------------------------------------------------------
-    // Mock repos
-    // -----------------------------------------------------------------------
 
     #[derive(Default)]
-    struct MockTemplateState {
-        templates: HashMap<String, RecurrenceTemplate>,
-        next_instance: HashMap<String, Option<Timestamp>>,
-        disabled: Vec<String>,
-        count_remaining: HashMap<String, Option<u32>>,
+    pub(crate) struct MockTemplateState {
+        pub(crate) templates: HashMap<String, RecurrenceTemplate>,
+        pub(crate) next_instance: HashMap<String, Option<Timestamp>>,
+        pub(crate) disabled: Vec<String>,
+        pub(crate) count_remaining: HashMap<String, Option<u32>>,
     }
 
-    struct MockTemplateRepo(Mutex<MockTemplateState>);
+    pub(crate) struct MockTemplateRepo(pub(crate) Mutex<MockTemplateState>);
 
     impl MockTemplateRepo {
-        fn with(tmpl: RecurrenceTemplate) -> Self {
+        pub(crate) fn with(tmpl: RecurrenceTemplate) -> Self {
             let mut state = MockTemplateState::default();
             let count = tmpl.count_remaining;
             let id = tmpl.id.clone();
@@ -294,7 +288,7 @@ mod tests {
     }
 
     #[derive(Default)]
-    struct MockInstanceRepo(Mutex<Vec<(String, Timestamp)>>);
+    pub(crate) struct MockInstanceRepo(pub(crate) Mutex<Vec<(String, Timestamp)>>);
 
     #[async_trait]
     impl InstanceRepo for MockInstanceRepo {
@@ -315,6 +309,18 @@ mod tests {
             Ok(())
         }
     }
+}
+
+// ---------------------------------------------------------------------------
+// Tests
+// ---------------------------------------------------------------------------
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use storage::pool::StoragePool;
+    use storage::repos::scheduled_fires::ScheduledFiresRepo;
+    use test_mocks::{MockInstanceRepo, MockTemplateRepo};
 
     // -----------------------------------------------------------------------
     // Helper: build a real in-memory FireStore (same pattern as fire_store tests)

@@ -200,7 +200,7 @@ impl TemporalScheduler {
                     }
                 }
             }
-            if kind == "recurrence_spawn" {
+            if kind == RECURRENCE_SPAWN_KIND {
                 if let (Some(engine), Some(ref_id)) = (&self.recurrence_engine, &ref_id) {
                     if let Err(e) = engine.on_spawn(ref_id, now).await {
                         warn!(error = %e, template_id = %ref_id, "recurrence_spawn engine failed during recovery");
@@ -325,7 +325,7 @@ impl TemporalScheduler {
         }
 
         // Recurrence spawn: materialise task instances via the engine.
-        if row.kind == "recurrence_spawn" {
+        if row.kind == RECURRENCE_SPAWN_KIND {
             if let (Some(engine), Some(ref_id)) = (&self.recurrence_engine, &row.ref_id) {
                 if let Err(e) = engine.on_spawn(ref_id, now).await {
                     warn!(error = %e, template_id = %ref_id, "recurrence_spawn engine failed");
@@ -776,6 +776,105 @@ mod tests {
                 .await
                 .unwrap();
         assert!(r2_row.1.is_none(), "r2 must not be suppressed");
+    }
+
+    /// T4: scheduler dispatch integration — `recurrence_spawn` kind routes to the engine.
+    ///
+    /// Seeds a daily template starting 2026-05-01 with materialize_ahead=2, inserts a
+    /// due `recurrence_spawn` fire, calls `process_due`, then verifies:
+    ///   1. The fire row is marked fired=1 in the DB (scheduler did its job).
+    ///   2. At least 2 instances were created in the mock instance repo (engine was invoked).
+    #[tokio::test]
+    async fn dispatch_routes_recurrence_spawn_to_engine() {
+        use crate::temporal::recurrence::test_mocks::{MockInstanceRepo, MockTemplateRepo};
+        use crate::temporal::recurrence::{RecurrenceEngine, RecurrenceTemplate};
+
+        let pool = StoragePool::connect_in_memory().await.unwrap();
+        StoragePool::run_feature_migrations(
+            pool.inner(),
+            &[tools_core::FeatureMigration {
+                feature_name: "scheduling".into(),
+                version: 1,
+                description: "scheduled_fires".into(),
+                sql: include_str!("../../migrations/001_scheduled_fires.sql").into(),
+            }],
+        )
+        .await
+        .unwrap();
+
+        let sf_repo =
+            storage::repos::scheduled_fires::ScheduledFiresRepo::new(pool.inner().clone());
+        let store = FireStore::new(sf_repo);
+        let bus = Arc::new(DomainEventBus::new(32));
+
+        // Seed template: FREQ=DAILY, starts 2026-05-01, materialize_ahead=2, no UNTIL, no count.
+        let tmpl_id = "tmpl-1";
+        let next_instance_at = jiff::civil::date(2026, 5, 1)
+            .at(0, 0, 0, 0)
+            .to_zoned(jiff::tz::TimeZone::UTC)
+            .unwrap()
+            .timestamp();
+
+        let template = RecurrenceTemplate {
+            id: tmpl_id.to_string(),
+            source_task_id: "task-for-tmpl-1".into(),
+            rrule: "FREQ=DAILY".into(),
+            iana_tz: "UTC".into(),
+            materialize_ahead: 2,
+            next_instance_at: Some(next_instance_at),
+            until_at: None,
+            count_remaining: None,
+            enabled: true,
+        };
+
+        let tmpl_repo = Arc::new(MockTemplateRepo::with(template));
+        let inst_repo = Arc::new(MockInstanceRepo::default());
+        let engine = RecurrenceEngine::new(
+            Arc::new(store.clone()),
+            tmpl_repo,
+            inst_repo.clone(),
+            2, // default_materialize_ahead
+        );
+
+        let scheduler =
+            TemporalScheduler::new(store.clone(), bus.clone(), SchedulerConfig::default())
+                .with_recurrence_engine(Arc::new(engine));
+
+        // Insert a due `recurrence_spawn` fire with fire_at_ms = now.
+        let now = Timestamp::now();
+        let fire_id = store
+            .schedule(FireSpec {
+                fire_at: now,
+                kind: RECURRENCE_SPAWN_KIND.into(),
+                ref_id: Some(tmpl_id.to_string()),
+                payload: serde_json::json!({}),
+                dedup_prefix: Some(format!("template:{tmpl_id}:")),
+            })
+            .await
+            .unwrap();
+
+        // Run one pass of the scheduler loop.
+        scheduler.process_due(now).await.unwrap();
+
+        // Assert 1: the fire row is marked fired=1.
+        let fired: i64 = sqlx::query_scalar("SELECT fired FROM scheduled_fires WHERE id = ?1")
+            .bind(&fire_id)
+            .fetch_one(pool.inner())
+            .await
+            .unwrap();
+        assert_eq!(fired, 1, "fire row must be marked fired=1 after dispatch");
+
+        // Assert 2: engine's on_spawn was actually invoked — at least 2 instances created.
+        let instances = inst_repo.0.lock().unwrap();
+        assert!(
+            instances.len() >= 2,
+            "expected at least 2 instances for template {tmpl_id}, got {}",
+            instances.len()
+        );
+        // All instances should belong to the right template.
+        for (tid, _) in instances.iter() {
+            assert_eq!(tid, tmpl_id, "instance must reference template {tmpl_id}");
+        }
     }
 
     #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
