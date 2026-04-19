@@ -20,6 +20,7 @@ pub mod finance_investment_repo;
 pub mod finance_liability_repo;
 pub mod finance_snapshot_repo;
 pub mod finance_transaction_repo;
+pub mod held_notifications;
 pub mod interaction_log;
 pub mod key_result;
 pub mod learning_state;
@@ -68,6 +69,7 @@ pub use finance_investment_repo::FinanceInvestmentRepo;
 pub use finance_liability_repo::FinanceLiabilityRepo;
 pub use finance_snapshot_repo::FinanceSnapshotRepo;
 pub use finance_transaction_repo::FinanceTransactionRepo;
+pub use held_notifications::HeldNotificationsRepo;
 pub use interaction_log::InteractionLogRepo;
 pub use key_result::KeyResultRepo;
 pub use learning_state::LearningStateRepo;
@@ -159,6 +161,7 @@ pub struct Repos {
     pub scheduled_fires: ScheduledFiresRepo,
     pub skill_version: SkillVersionRepo,
     pub notification_log: NotificationLogRepo,
+    pub held_notifications: HeldNotificationsRepo,
 }
 
 impl Repos {
@@ -196,6 +199,7 @@ impl Repos {
             scheduled_fires: ScheduledFiresRepo::new(db.clone()),
             skill_version: SkillVersionRepo::new(db.clone()),
             notification_log: NotificationLogRepo::new(db.clone()),
+            held_notifications: HeldNotificationsRepo::new(db.clone()),
             pool: db,
         }
     }
