@@ -17,6 +17,27 @@ use crate::service::row_to_job;
 use crate::types::{CronJob, IntentTrigger};
 use common::Result;
 
+/// Inner implementation — accepts an explicit `tz` so tests can pass `TimeZone::UTC`
+/// for determinism instead of relying on `TimeZone::system()`.
+fn in_intent_window_with_tz(job: &CronJob, now: jiff::Timestamp, tz: &jiff::tz::TimeZone) -> bool {
+    let window = match &job.intent_window {
+        Some(w) => w,
+        None => return true,
+    };
+
+    match &window.trigger {
+        IntentTrigger::FirstActivityAfter { after_local } => {
+            // Convert `now` to civil time in the given tz and compare time-of-day.
+            let local_time = now.to_zoned(tz.clone()).datetime().time();
+            local_time >= *after_local
+        }
+        // Presence-based triggers cannot be evaluated here — allow dispatch.
+        IntentTrigger::UserPresent
+        | IntentTrigger::MinActiveMinutes { .. }
+        | IntentTrigger::UserIdle { .. } => true,
+    }
+}
+
 /// Returns `true` if `job` is allowed to fire at `now` given its `intent_window`.
 ///
 /// - If `intent_window` is `None`, always returns `true` (no restriction).
@@ -27,25 +48,7 @@ use common::Result;
 ///   presence data which is not available in the executor; they return `true` so the
 ///   alarm fires and the handler decides whether to act.
 fn in_intent_window(job: &CronJob, now: jiff::Timestamp) -> bool {
-    let window = match &job.intent_window {
-        Some(w) => w,
-        None => return true,
-    };
-
-    match &window.trigger {
-        IntentTrigger::FirstActivityAfter { after_local } => {
-            // Convert `now` to local civil time and compare the time-of-day component.
-            let local_time = now
-                .to_zoned(jiff::tz::TimeZone::system())
-                .datetime()
-                .time();
-            local_time >= *after_local
-        }
-        // Presence-based triggers cannot be evaluated here — allow dispatch.
-        IntentTrigger::UserPresent
-        | IntentTrigger::MinActiveMinutes { .. }
-        | IntentTrigger::UserIdle { .. } => true,
-    }
+    in_intent_window_with_tz(job, now, &jiff::tz::TimeZone::system())
 }
 
 /// Callback type for cron job handlers registered with [`CronExecutor`].
@@ -582,17 +585,142 @@ mod tests {
         shutdown.cancel();
     }
 
-    /// Build a `CronJobRow` whose `intent_window` is set to `FirstActivityAfter` with
-    /// the given local `after_hour` (0–23). Used by intent-window gate tests.
-    fn make_row_with_intent_hour(id: &str, name: &str, after_hour: u8) -> CronJobRow {
+    // ── Pure unit tests for `in_intent_window_with_tz` ─────────────────────────
+    //
+    // All timestamps are anchored to a fixed UTC civil datetime so these tests are
+    // completely deterministic regardless of the host system timezone or wall clock.
+    // We call `in_intent_window_with_tz(..., &TimeZone::UTC)` to bypass system tz.
+
+    fn make_job_with_first_activity_after(after_hour: i8, after_min: i8) -> CronJob {
+        use crate::types::{CatchUpPriority, CronOrigin, CronPayload, CronSchedule};
+        CronJob {
+            id: "test-job".into(),
+            name: "test".into(),
+            enabled: true,
+            origin: CronOrigin::System,
+            schedule: CronSchedule::Cron {
+                expr: "0 0 * * *".into(),
+                tz: Some("UTC".into()),
+            },
+            payload: CronPayload::default(),
+            state: Default::default(),
+            created_at_ms: 0,
+            updated_at_ms: 0,
+            delete_after_run: false,
+            intent_window: Some(crate::types::IntentWindow {
+                trigger: IntentTrigger::FirstActivityAfter {
+                    after_local: jiff::civil::Time::new(after_hour, after_min, 0, 0)
+                        .expect("valid time"),
+                },
+                tolerance: std::time::Duration::from_secs(3600),
+                catch_up: CatchUpPriority::WhenPresent,
+            }),
+            intent_pending_since_ms: None,
+        }
+    }
+
+    fn make_job_no_intent_window() -> CronJob {
+        let mut job = make_job_with_first_activity_after(9, 0);
+        job.intent_window = None;
+        job
+    }
+
+    fn make_job_with_presence_trigger(trigger: IntentTrigger) -> CronJob {
+        use crate::types::CatchUpPriority;
+        let mut job = make_job_no_intent_window();
+        job.intent_window = Some(crate::types::IntentWindow {
+            trigger,
+            tolerance: std::time::Duration::from_secs(3600),
+            catch_up: CatchUpPriority::WhenPresent,
+        });
+        job
+    }
+
+    /// Build a UTC `Timestamp` from a fixed date with explicit hour and minute.
+    fn utc_ts(hour: i8, min: i8) -> jiff::Timestamp {
+        jiff::civil::DateTime::new(2024, 6, 15, hour, min, 0, 0)
+            .expect("valid datetime")
+            .to_zoned(jiff::tz::TimeZone::UTC)
+            .expect("UTC zoned")
+            .timestamp()
+    }
+
+    #[test]
+    fn in_intent_window_blocks_before_after_local() {
+        // after_local = 09:00 UTC, now = 08:00 UTC → should block
+        let job = make_job_with_first_activity_after(9, 0);
+        let ts = utc_ts(8, 0);
+        assert!(
+            !in_intent_window_with_tz(&job, ts, &jiff::tz::TimeZone::UTC),
+            "should block when local time (08:00) is before after_local (09:00)"
+        );
+    }
+
+    #[test]
+    fn in_intent_window_allows_after_local() {
+        // after_local = 09:00 UTC, now = 10:00 UTC → should allow
+        let job = make_job_with_first_activity_after(9, 0);
+        let ts = utc_ts(10, 0);
+        assert!(
+            in_intent_window_with_tz(&job, ts, &jiff::tz::TimeZone::UTC),
+            "should allow when local time (10:00) is at or after after_local (09:00)"
+        );
+    }
+
+    #[test]
+    fn in_intent_window_allows_at_exact_after_local() {
+        // after_local = 09:00 UTC, now = 09:00 UTC → boundary (>=), should allow
+        let job = make_job_with_first_activity_after(9, 0);
+        let ts = utc_ts(9, 0);
+        assert!(
+            in_intent_window_with_tz(&job, ts, &jiff::tz::TimeZone::UTC),
+            "should allow at exact boundary (09:00 == after_local 09:00)"
+        );
+    }
+
+    #[test]
+    fn in_intent_window_short_circuits_on_none() {
+        // No intent_window → always true regardless of timestamp.
+        let job = make_job_no_intent_window();
+        for hour in [0i8, 8, 12, 23] {
+            let ts = utc_ts(hour, 0);
+            assert!(
+                in_intent_window_with_tz(&job, ts, &jiff::tz::TimeZone::UTC),
+                "intent_window=None must always return true (hour={})",
+                hour
+            );
+        }
+    }
+
+    #[test]
+    fn in_intent_window_passes_on_presence_triggers() {
+        // UserPresent, MinActiveMinutes, UserIdle — all pass through (return true).
+        let ts = utc_ts(3, 0); // arbitrary early-morning timestamp
+        for trigger in [
+            IntentTrigger::UserPresent,
+            IntentTrigger::MinActiveMinutes { minutes: 30 },
+            IntentTrigger::UserIdle { min_idle_secs: 300 },
+        ] {
+            let job = make_job_with_presence_trigger(trigger);
+            assert!(
+                in_intent_window_with_tz(&job, ts, &jiff::tz::TimeZone::UTC),
+                "presence trigger must always pass in executor"
+            );
+        }
+    }
+
+    // ── Integration test: end-to-end dispatch blocked by intent_window ──────────
+
+    /// Build a `CronJobRow` whose `intent_window` uses `after_local = 23:59:59`.
+    /// This is effectively "blocked forever" — CI will not run at that precise second.
+    fn make_row_blocked_forever(id: &str, name: &str) -> CronJobRow {
         let mut row = make_row(id, name);
-        // Encode the IntentWindow as the JSON string the DB column stores.
         let json = serde_json::json!({
             "trigger": {
                 "kind": "first_activity_after",
-                "afterLocal": format!("{:02}:00:00", after_hour)
+                "afterLocal": "23:59:59"
             },
-            "toleranceSecs": 3600,
+            "toleranceSecs": 1,
             "catchUp": "when_present"
         });
         row.intent_window = Some(json.to_string());
@@ -600,22 +728,12 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn intent_window_blocks_outside_range() {
-        // Choose an `after_local` that is always in the future relative to "now" — we
-        // pick hour 25 which is impossible, so any current time is before it.  Because
-        // jiff `civil::Time` caps at 23:59, we instead use the `FirstActivityAfter`
-        // trigger with `after_local = 23:59` and run the test at any time before that.
-        //
-        // Simpler approach: set after_local to 23:59 and rely on the test running
-        // before that time.  On CI (UTC, ~midnight) this could flake.  Instead we
-        // build the row with after_local = current_local_hour + 1 (mod 24) so it is
-        // always in the future relative to *now*.
-        let now_local = jiff::Zoned::now().datetime().time();
-        // Pick an hour guaranteed to be strictly in the future today.
-        let block_hour = ((now_local.hour() as u32 + 1) % 24) as u8;
-
+    async fn intent_window_blocks_dispatch() {
+        // Uses after_local = 23:59:59 — always blocks unless the test runs at
+        // that exact second, which is astronomically unlikely. Deterministic on CI
+        // regardless of timezone or wall clock.
         let repo = setup_repo().await;
-        repo.upsert(&make_row_with_intent_hour("job-7", "gated_job", block_hour))
+        repo.upsert(&make_row_blocked_forever("job-7", "gated_job"))
             .await
             .unwrap();
 
@@ -646,51 +764,6 @@ mod tests {
             call_count.load(Ordering::SeqCst),
             0,
             "handler must be suppressed when outside intent_window"
-        );
-
-        shutdown.cancel();
-    }
-
-    #[tokio::test]
-    async fn intent_window_allows_inside_range() {
-        // Set after_local = 00:00 (midnight) so any current local time satisfies it.
-        let repo = setup_repo().await;
-        repo.upsert(&make_row_with_intent_hour("job-8", "allowed_job", 0))
-            .await
-            .unwrap();
-
-        let bus = Arc::new(DomainEventBus::new(64));
-        let executor = CronExecutor::new(repo, Arc::clone(&bus));
-
-        let call_count = Arc::new(AtomicUsize::new(0));
-        let cc = Arc::clone(&call_count);
-        executor.register(
-            "allowed_job",
-            Arc::new(move |_job| {
-                cc.fetch_add(1, Ordering::SeqCst);
-                Ok(None)
-            }),
-        );
-
-        let shutdown = CancellationToken::new();
-        let _handle = executor.start(shutdown.clone());
-
-        tokio::time::sleep(Duration::from_millis(10)).await;
-
-        bus.publish(alarm_fired("cron_job", Some("job-8")));
-
-        let deadline = Instant::now() + Duration::from_secs(2);
-        while call_count.load(Ordering::SeqCst) == 0 {
-            if Instant::now() > deadline {
-                panic!("handler was not invoked within 2s — intent_window gate may be too strict");
-            }
-            tokio::time::sleep(Duration::from_millis(10)).await;
-        }
-
-        assert_eq!(
-            call_count.load(Ordering::SeqCst),
-            1,
-            "handler must fire when inside intent_window"
         );
 
         shutdown.cancel();
