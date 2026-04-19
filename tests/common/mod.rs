@@ -6,7 +6,6 @@
 
 pub mod mocks;
 
-
 use klyntbot::bus::{InboundMessage, MessageBus, OutboundMessage};
 use klyntbot::config::Config;
 use klyntbot::providers::types::*;

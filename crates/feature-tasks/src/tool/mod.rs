@@ -436,11 +436,10 @@ mod tests {
     #[test]
     fn test_urgency_overdue() {
         let now = Timestamp::now();
-        let two_days_ago = now.checked_sub(SignedDuration::from_secs(2 * 86400)).unwrap_or(now);
-        assert_eq!(
-            scoring::calculate_urgency(Some(two_days_ago), now),
-            10
-        );
+        let two_days_ago = now
+            .checked_sub(SignedDuration::from_secs(2 * 86400))
+            .unwrap_or(now);
+        assert_eq!(scoring::calculate_urgency(Some(two_days_ago), now), 10);
     }
 
     #[test]
@@ -452,21 +451,19 @@ mod tests {
     #[test]
     fn test_urgency_tomorrow() {
         let now = Timestamp::now();
-        let tomorrow = now.checked_add(SignedDuration::from_secs(86400)).unwrap_or(now);
-        assert_eq!(
-            scoring::calculate_urgency(Some(tomorrow), now),
-            3
-        );
+        let tomorrow = now
+            .checked_add(SignedDuration::from_secs(86400))
+            .unwrap_or(now);
+        assert_eq!(scoring::calculate_urgency(Some(tomorrow), now), 3);
     }
 
     #[test]
     fn test_urgency_future() {
         let now = Timestamp::now();
-        let week_out = now.checked_add(SignedDuration::from_secs(7 * 86400)).unwrap_or(now);
-        assert_eq!(
-            scoring::calculate_urgency(Some(week_out), now),
-            1
-        );
+        let week_out = now
+            .checked_add(SignedDuration::from_secs(7 * 86400))
+            .unwrap_or(now);
+        assert_eq!(scoring::calculate_urgency(Some(week_out), now), 1);
     }
 
     #[test]
@@ -490,8 +487,13 @@ mod tests {
         let now = Timestamp::now();
         let mut task = Task::default_instance();
         task.priority = Some(1);
-        task.due_date = Some(now.checked_sub(SignedDuration::from_secs(2 * 86400)).unwrap_or(now));
-        task.created_at = now.checked_sub(SignedDuration::from_secs(5 * 86400)).unwrap_or(now);
+        task.due_date = Some(
+            now.checked_sub(SignedDuration::from_secs(2 * 86400))
+                .unwrap_or(now),
+        );
+        task.created_at = now
+            .checked_sub(SignedDuration::from_secs(5 * 86400))
+            .unwrap_or(now);
         let score = TaskTool::calculate_score(&task, now);
         // urgency=10, priority_wt=5, age=5 -> 10*5 + 5*0.1 = 50.5
         assert!(

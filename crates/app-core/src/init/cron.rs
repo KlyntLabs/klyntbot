@@ -489,8 +489,10 @@ fn register_cron_callbacks(
                         // Load autotuner context for Phase 3 prompt
                         // (metric snapshots collected here where autotuner types are available).
                         let autotuner_ctx = if autotuner_bridge.is_some() {
-                            let since_24h = jiff::Timestamp::now() - jiff::SignedDuration::from_hours(24);
-                            let since_7d = jiff::Timestamp::now() - jiff::SignedDuration::from_hours(168);
+                            let since_24h =
+                                jiff::Timestamp::now() - jiff::SignedDuration::from_hours(24);
+                            let since_7d =
+                                jiff::Timestamp::now() - jiff::SignedDuration::from_hours(168);
 
                             let m24 = metric_source
                                 .collect_metrics(since_24h, None)
@@ -595,10 +597,7 @@ fn register_cron_callbacks(
                             Some(result) => {
                                 // Clean up old suggestions (90 day retention)
                                 if let Err(e) = suggestion_repo
-                                    .delete_older_than(
-                                        90,
-                                        jiff::Timestamp::now(),
-                                    )
+                                    .delete_older_than(90, jiff::Timestamp::now())
                                     .await
                                 {
                                     tracing::warn!("Reforge: failed to clean up suggestions: {e}");
@@ -820,7 +819,10 @@ fn register_cron_callbacks(
                 tokio::task::block_in_place(|| {
                     rt.block_on(async move {
                         let repo = cognitive::BlackboardRepo::new(pool);
-                        match repo.cleanup_stale(jiff::SignedDuration::from_secs(30 * 86400)).await {
+                        match repo
+                            .cleanup_stale(jiff::SignedDuration::from_secs(30 * 86400))
+                            .await
+                        {
                             Ok(0) => Ok(Some("No stale blackboard entries".to_string())),
                             Ok(n) => {
                                 info!(deleted = n, "Blackboard cleanup: removed stale entries");

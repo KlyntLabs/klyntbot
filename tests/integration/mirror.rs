@@ -13,7 +13,6 @@ use klyntbot::storage::StoragePool;
 
 use super::common::test_pool;
 
-
 use std::collections::HashMap;
 use uuid::Uuid;
 

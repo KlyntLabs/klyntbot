@@ -1,7 +1,7 @@
 //! Recurrence action handlers (recur, list_recurring, delete_recurring).
 
-use jiff::Timestamp;
 use common::{Result, ToolError};
+use jiff::Timestamp;
 use tools_core::ParamExtractor;
 
 use super::super::TaskTool;
@@ -83,10 +83,10 @@ impl TaskTool {
             let next_str = t
                 .next_instance_date
                 .map(|d| {
-                d.to_zoned(jiff::tz::TimeZone::UTC)
-                    .strftime("%Y-%m-%d %H:%M UTC")
-                    .to_string()
-            })
+                    d.to_zoned(jiff::tz::TimeZone::UTC)
+                        .strftime("%Y-%m-%d %H:%M UTC")
+                        .to_string()
+                })
                 .unwrap_or_else(|| "none".to_string());
 
             output.push_str(&format!(

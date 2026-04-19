@@ -229,9 +229,7 @@ async fn handle_spawn_recurring(
 
             // Re-read the template to get the updated next_instance_date and re-schedule.
             if let Ok(Some(tpl)) = repo.get(template_id).await {
-                let next_date = tpl
-                    .next_instance_date
-                    .map(|d| d.to_string());
+                let next_date = tpl.next_instance_date.map(|d| d.to_string());
                 domain_event_bus.publish(DomainEvent::RecurringTemplateAdvanced {
                     template_id: template_id.to_string(),
                     next_instance_date: next_date,
@@ -308,10 +306,7 @@ async fn handle_domain_event(
                         .unwrap_or(due);
                     if remind_at > jiff::Timestamp::now() {
                         scheduler
-                            .schedule(
-                                remind_at,
-                                DeadlineAction::TaskReminder { task_id, label },
-                            )
+                            .schedule(remind_at, DeadlineAction::TaskReminder { task_id, label })
                             .await;
                     }
                 }

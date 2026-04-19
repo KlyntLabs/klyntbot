@@ -4837,7 +4837,6 @@ version = "0.1.0"
 dependencies = [
  "async-trait",
  "bus",
- "chrono",
  "common",
  "futures-util",
  "jiff",
@@ -7141,7 +7140,6 @@ dependencies = [
  "async-trait",
  "bus",
  "channels",
- "chrono",
  "cognitive",
  "common",
  "config",
@@ -11719,17 +11717,21 @@ dependencies = [
 name = "scheduling"
 version = "0.1.0"
 dependencies = [
+ "bus",
  "chrono",
  "chrono-tz",
  "common",
  "cron",
  "jiff",
+ "rrule",
  "serde",
  "serde_json",
+ "sqlx",
  "storage",
  "thiserror 2.0.18",
  "tokio",
  "tokio-util",
+ "tools-core",
  "tracing",
  "uuid",
 ]

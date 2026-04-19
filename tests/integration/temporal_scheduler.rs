@@ -24,10 +24,7 @@ async fn end_to_end_fires_and_emits_event() {
             feature_name: "scheduling".into(),
             version: 1,
             description: "scheduled_fires".into(),
-            sql: include_str!(
-                "../../crates/scheduling/migrations/001_scheduled_fires.sql"
-            )
-            .into(),
+            sql: include_str!("../../crates/scheduling/migrations/001_scheduled_fires.sql").into(),
         }],
     )
     .await
@@ -37,11 +34,7 @@ async fn end_to_end_fires_and_emits_event() {
     let bus = Arc::new(DomainEventBus::new(32));
     let mut rx = bus.subscribe();
 
-    let scheduler = TemporalScheduler::new(
-        store.clone(),
-        bus.clone(),
-        SchedulerConfig::default(),
-    );
+    let scheduler = TemporalScheduler::new(store.clone(), bus.clone(), SchedulerConfig::default());
     let _loop_handle = scheduler.clone().start_background();
 
     // Schedule a fire ~100ms in the future and wake the loop.
