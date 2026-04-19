@@ -307,4 +307,14 @@ impl LauncherSearchEngine {
             .await
             .map_err(map_storage_err)
     }
+
+    /// Execute a launcher item: record execution and return a result envelope.
+    pub async fn execute(
+        &self,
+        item_id: &str,
+        kind: &str,
+    ) -> Result<feature_launcher::LauncherExecuteResult, ApiError> {
+        self.record_execution(item_id, kind).await?;
+        Ok(feature_launcher::LauncherExecuteResult::default())
+    }
 }
