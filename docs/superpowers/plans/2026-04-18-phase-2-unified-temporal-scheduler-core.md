@@ -2,6 +2,8 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
+> **Superseded note:** The alarm-fired dispatch layer described here was implemented by the Phase 3 `notifications` crate (AlarmFired subscriber, quiet hours, held release, multi-channel fan-out).
+
 **Goal:** Build the `TemporalScheduler` — a single SQLite-backed, wall-clock-anchored scheduler that replaces `CronService` and supersedes `DeadlineScheduler`, with RFC 5545 RRULE evaluation and VALARM-style alarm rules.
 
 **Architecture:** One canonical `scheduled_fires` table is the sole source of truth for *when* to fire. A single tokio loop sleeps ≤30s at a time (macOS sleep-safe) and re-checks `Jiff::Timestamp::now()` on every wake. Firing is two-phase committed for crash safety. `AlarmRule` (three variants: RelativeBefore / CivilTimeOnDayOffset / Absolute) computes fire_at using Jiff `Zoned` arithmetic. RRULE recurrence is evaluated via the `rrule` crate at a chrono↔jiff boundary fully hidden inside `temporal/rrule.rs`. Fires emit `DomainEvent::AlarmFired` on the bus — no synchronous handlers, no `block_in_place`.

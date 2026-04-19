@@ -65,7 +65,7 @@ L0: common, platform-macos — KlyntbotError, MessageRole, ChannelName, ChatId, 
 L1: config, bus, tools-core, tools-core-macros, analytics — Config (camelCase JSON), message bus, Tool/FeaturePackage traits, derive macros, FIRE/Monte Carlo analytics
 L2: storage               — SqlitePool, migrations, *Repo structs, *Row types
 L3: providers, session, scheduling, context_engine, skill-system — LLM clients, session persistence, cron, token budgets, skill discovery/routing
-L4: tools, feature-tasks, feature-finance, feature-notes, feature-productivity, feature-coaching, feature-insights, feature-launcher, feature-learning (flashcard generation), feature-language-learning (pronunciation, practice sessions, exam tracking), activity-log, plugin-runtime, autotuner, voice-engine, simulator — 20+ tools, feature packages, WASM plugins, self-optimization experiments, voice synthesis, agent simulation
+L4: tools, feature-tasks, feature-finance, feature-notes, feature-productivity, feature-coaching, feature-insights, feature-launcher, feature-learning (flashcard generation), feature-language-learning (pronunciation, practice sessions, exam tracking), activity-log, notifications (AlarmFired subscriber, quiet hours, held release, multi-channel fan-out), plugin-runtime, autotuner, voice-engine, simulator — 20+ tools, feature packages, WASM plugins, self-optimization experiments, voice synthesis, agent simulation
 L5: channels, agent, cognitive — Platform integrations (Telegram/Discord/Slack/Email), agent runtime, cognitive memory (episodic/semantic extraction, spaced repetition via FSRS5, salience decay, reflection, reforge)
 L6: mcp                   — MCP server/client
 L7: app-core, desktop-shared, desktop — Application core (shared handlers), Tauri desktop app
