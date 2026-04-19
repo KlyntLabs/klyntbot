@@ -77,6 +77,7 @@ impl LauncherSearchEngine {
                                 kind: FileKind::File,
                             },
                             score: *score,
+                            no_view: false,
                         })
                     }
                     _ => None,
@@ -102,6 +103,7 @@ impl LauncherSearchEngine {
                         result: r.result,
                     },
                     score: 2.0,
+                    no_view: false,
                 }]
             })
             .unwrap_or_default();
@@ -150,6 +152,7 @@ impl LauncherSearchEngine {
                 query: query.to_string(),
             },
             score: 0.0,
+            no_view: false,
         });
 
         Ok(results)
@@ -178,6 +181,7 @@ impl LauncherSearchEngine {
                     status: t.status.clone(),
                 },
                 score: if t.status == "doing" { 0.9 } else { 0.7 },
+                no_view: false,
             })
             .collect())
     }
@@ -207,6 +211,7 @@ impl LauncherSearchEngine {
                         preview,
                     },
                     score: 0.6,
+                    no_view: false,
                 }
             })
             .collect())
