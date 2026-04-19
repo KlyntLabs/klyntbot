@@ -7,5 +7,6 @@ mod finance;
 mod learning;
 mod memory;
 mod mirror;
+mod notifications_dispatcher;
 mod sessions;
 mod temporal_scheduler;
