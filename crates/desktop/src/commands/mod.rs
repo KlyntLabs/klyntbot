@@ -38,6 +38,7 @@ pub mod settings;
 pub mod shortcuts;
 pub mod squads;
 pub mod status;
+pub mod status_badge;
 pub mod tasks;
 pub mod timeline;
 pub mod view;

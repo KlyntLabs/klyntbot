@@ -1176,6 +1176,7 @@ fn run_desktop_app() {
             commands::launcher::launcher_run_script,
             commands::launcher::launcher_system_command,
             commands::launcher::launcher_open_app,
+            commands::status_badge::show_status_badge,
             commands::window::resize_window,
             commands::window::open_url,
             commands::window::show_dashboard,

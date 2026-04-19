@@ -214,24 +214,43 @@ pub enum ExecStatus {
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub enum BadgeKind { Success, Warn, Error, Info }
+pub enum BadgeKind {
+    Success,
+    Warn,
+    Error,
+    Info,
+}
 
 impl Default for LauncherExecuteResult {
     fn default() -> Self {
-        Self { status: ExecStatus::Ok, message: None, badge: BadgeKind::Info }
+        Self {
+            status: ExecStatus::Ok,
+            message: None,
+            badge: BadgeKind::Info,
+        }
     }
 }
 
 impl From<()> for LauncherExecuteResult {
-    fn from(_: ()) -> Self { Self::default() }
+    fn from(_: ()) -> Self {
+        Self::default()
+    }
 }
 
 impl LauncherExecuteResult {
     pub fn ok_msg(msg: impl Into<String>) -> Self {
-        Self { status: ExecStatus::Ok, message: Some(msg.into()), badge: BadgeKind::Success }
+        Self {
+            status: ExecStatus::Ok,
+            message: Some(msg.into()),
+            badge: BadgeKind::Success,
+        }
     }
     pub fn err(msg: impl Into<String>) -> Self {
         let m = msg.into();
-        Self { status: ExecStatus::Err(m.clone()), message: Some(m), badge: BadgeKind::Error }
+        Self {
+            status: ExecStatus::Err(m.clone()),
+            message: Some(m),
+            badge: BadgeKind::Error,
+        }
     }
 }
