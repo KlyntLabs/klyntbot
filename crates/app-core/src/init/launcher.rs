@@ -1,7 +1,8 @@
 use std::sync::Arc;
 
 use feature_launcher::{
-    AppIndex, ClipboardRepo, FrequencyRepo, ScriptRunner, SearchSource, SourceRegistry,
+    AppIndex, ClipboardRepo, FileSearchSource, FrequencyRepo, FsEventKind, ScriptRunner,
+    SearchSource, SourceRegistry,
 };
 use storage::StoragePool;
 use tokio_util::sync::CancellationToken;
@@ -106,6 +107,8 @@ pub(super) async fn init_launcher(
     }
 
     // File search (ignore-walk index) — pre-indexed, refreshed by BackgroundRefresher
+    // Keep a typed clone so we can wire incremental FSEvent updates later.
+    let file_search_source: Option<Arc<FileSearchSource>>;
     if launcher_config.sources.files.enabled {
         let source = Arc::new(feature_launcher::FileSearchSource::new(
             launcher_config.sources.files.scan_dirs.clone(),
@@ -115,7 +118,10 @@ pub(super) async fn init_launcher(
         ));
         let s = Arc::clone(&source);
         tokio::spawn(async move { s.refresh().await });
+        file_search_source = Some(Arc::clone(&source));
         sources.push(source);
+    } else {
+        file_search_source = None;
     }
 
     // Content grep (rg) — prefix ?, live query, cached by SourceRegistry
@@ -217,6 +223,7 @@ pub(super) async fn init_launcher(
                 source: s,
                 min_interval: None,
                 recursive: false,
+                on_change: None,
             });
         }
     }
@@ -229,6 +236,7 @@ pub(super) async fn init_launcher(
                 source: s,
                 min_interval: Some(std::time::Duration::from_secs(10)),
                 recursive: false,
+                on_change: None,
             });
         }
     }
@@ -241,6 +249,7 @@ pub(super) async fn init_launcher(
                 source: s,
                 min_interval: None,
                 recursive: false,
+                on_change: None,
             });
         }
     }
@@ -252,7 +261,41 @@ pub(super) async fn init_launcher(
                 source: s,
                 min_interval: None,
                 recursive: false,
+                on_change: None,
             });
+        }
+    }
+    // File search incremental updates — attach a custom FSEvent handler per scan dir
+    // that calls `apply_events` instead of the full `refresh()`.
+    if let (Some(file_search), Some(s)) = (file_search_source.as_ref(), find_source("files")) {
+        for dir_str in &launcher_config.sources.files.scan_dirs {
+            let dir = std::path::PathBuf::from(shellexpand::tilde(dir_str).to_string());
+            if dir.exists() {
+                let fs = Arc::clone(file_search);
+                watches.push(feature_launcher::WatchEntry {
+                    path: dir,
+                    source: Arc::clone(&s),
+                    min_interval: None,
+                    recursive: true,
+                    on_change: Some(Arc::new(move |events| {
+                        let fs = Arc::clone(&fs);
+                        Box::pin(async move {
+                            let changes: Vec<_> = events
+                                .into_iter()
+                                .map(|ev| {
+                                    let kind = if ev.path.exists() {
+                                        FsEventKind::Create
+                                    } else {
+                                        FsEventKind::Remove
+                                    };
+                                    (ev.path, kind)
+                                })
+                                .collect();
+                            fs.apply_events(changes).await;
+                        })
+                    })),
+                });
+            }
         }
     }
     if launcher_config.sources.apps.enabled {
@@ -270,6 +313,7 @@ pub(super) async fn init_launcher(
                         source: Arc::clone(&s),
                         min_interval: Some(std::time::Duration::from_secs(5)),
                         recursive: true,
+                        on_change: None,
                     });
                 }
             }

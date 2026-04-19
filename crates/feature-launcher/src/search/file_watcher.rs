@@ -1,11 +1,18 @@
 use super::SearchSource;
 use dashmap::DashMap;
-use notify_debouncer_mini::{new_debouncer, DebouncedEventKind};
+use futures_util::future::BoxFuture;
+use notify_debouncer_mini::{new_debouncer, DebouncedEvent, DebouncedEventKind};
 use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
-type SourceEntry = (PathBuf, Arc<dyn SearchSource>, Option<Duration>);
+type SourceEntry = (
+    PathBuf,
+    bool,
+    Arc<dyn SearchSource>,
+    Option<Duration>,
+    Option<Arc<dyn Fn(Vec<DebouncedEvent>) -> BoxFuture<'static, ()> + Send + Sync>>,
+);
 
 /// A file path to watch, the source to refresh on change, and an optional
 /// minimum interval between refreshes (cooldown). Sources like browser history
@@ -17,6 +24,12 @@ pub struct WatchEntry {
     /// When `Some`, refreshes are skipped if the previous refresh was less than
     /// this duration ago. `None` means refresh on every debounced event.
     pub min_interval: Option<Duration>,
+    /// Whether to watch subdirectories recursively.
+    pub recursive: bool,
+    /// Optional custom handler invoked instead of `source.refresh()`.
+    /// Receives the batch of debounced events that triggered this watch entry.
+    pub on_change:
+        Option<Arc<dyn Fn(Vec<DebouncedEvent>) -> BoxFuture<'static, ()> + Send + Sync>>,
 }
 
 pub struct SourceFileWatcher {
@@ -29,7 +42,7 @@ impl SourceFileWatcher {
             watches
                 .into_iter()
                 .filter(|w| w.path.exists())
-                .map(|w| (w.path, w.source, w.min_interval))
+                .map(|w| (w.path, w.recursive, w.source, w.min_interval, w.on_change))
                 .collect(),
         );
 
@@ -54,51 +67,69 @@ impl SourceFileWatcher {
                     }
                 };
 
-                for event in events {
-                    if event.kind != DebouncedEventKind::Any {
+                // Collect all Any events upfront (avoids re-filtering per entry)
+                let any_events: Vec<_> = events
+                    .into_iter()
+                    .filter(|e| e.kind == DebouncedEventKind::Any)
+                    .collect();
+
+                for (watched_path, _recursive, source, min_interval, on_change) in map_clone.iter() {
+                    let matched: Vec<_> = any_events
+                        .iter()
+                        .filter(|e| e.path.starts_with(watched_path) || &e.path == watched_path)
+                        .cloned()
+                        .collect();
+                    if matched.is_empty() {
                         continue;
                     }
-                    let changed = &event.path;
-                    for (watched_path, source, min_interval) in map_clone.iter() {
-                        if changed.starts_with(watched_path) || changed == watched_path {
-                            // Enforce per-source cooldown
-                            if let Some(interval) = min_interval {
-                                let name = source.name();
-                                if let Some(last) = cooldowns.get(name) {
-                                    if last.elapsed() < *interval {
-                                        tracing::debug!(
-                                            "Skipping refresh for {} (cooldown {:.0?} remaining)",
-                                            name,
-                                            *interval - last.elapsed(),
-                                        );
-                                        break;
-                                    }
-                                }
-                                cooldowns.insert(name, Instant::now());
-                            }
 
-                            let source = Arc::clone(source);
-                            tracing::debug!(
-                                "File change detected for {}, refreshing {}",
-                                watched_path.display(),
-                                source.name()
-                            );
-                            if let Ok(handle) = tokio::runtime::Handle::try_current() {
+                    // Enforce per-source cooldown
+                    if let Some(interval) = min_interval {
+                        let name = source.name();
+                        if let Some(last) = cooldowns.get(name) {
+                            if last.elapsed() < *interval {
+                                tracing::debug!(
+                                    "Skipping refresh for {} (cooldown {:.0?} remaining)",
+                                    name,
+                                    *interval - last.elapsed(),
+                                );
+                                continue;
+                            }
+                        }
+                        cooldowns.insert(source.name(), Instant::now());
+                    }
+
+                    tracing::debug!(
+                        "File change detected for {}, refreshing {}",
+                        watched_path.display(),
+                        source.name()
+                    );
+
+                    if let Ok(handle) = tokio::runtime::Handle::try_current() {
+                        match on_change {
+                            Some(handler) => {
+                                let fut = handler(matched);
+                                handle.spawn(fut);
+                            }
+                            None => {
+                                let source = Arc::clone(source);
                                 handle.spawn(async move {
                                     source.refresh().await;
                                 });
                             }
-                            break;
                         }
                     }
                 }
             },
         )?;
 
-        for (path, source, _) in &*source_map {
-            if let Err(e) = debouncer
-                .watcher()
-                .watch(path, notify::RecursiveMode::NonRecursive)
+        for (path, recursive, source, _, _) in &*source_map {
+            let mode = if *recursive {
+                notify::RecursiveMode::Recursive
+            } else {
+                notify::RecursiveMode::NonRecursive
+            };
+            if let Err(e) = debouncer.watcher().watch(path, mode)
             {
                 tracing::warn!(
                     "Failed to watch {} for {}: {e}",

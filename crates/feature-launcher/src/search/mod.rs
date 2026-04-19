@@ -26,7 +26,7 @@ pub use browser_history::BrowserHistorySource;
 pub use calculator::Calculator;
 pub use contacts::ContactsSource;
 pub use content_grep::ContentGrepSource;
-pub use file_search::FileSearchSource;
+pub use file_search::{FileSearchSource, FsEventKind};
 pub use file_watcher::{SourceFileWatcher, WatchEntry};
 pub use git_repos::GitReposSource;
 pub use running_apps::RunningAppsSource;
