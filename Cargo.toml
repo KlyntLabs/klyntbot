@@ -106,7 +106,6 @@ tracing = "0.1.44"
 tracing-subscriber = { version = "0.3.22", features = ["env-filter"] }
 thiserror = "2.0.18"
 anyhow = "1.0.101"
-chrono = { version = "0.4.43", features = ["serde"] }
 uuid = { version = "1.20.0", features = ["v4", "serde"] }
 dirs = "6.0.0"
 cron = "0.15.0"
@@ -132,7 +131,6 @@ crossterm = "0.28"
 unicode-width = "0.2"
 tokio-util = "0.7"
 tempfile = "3.14"
-chrono-tz = "0.10"
 jiff = { version = "0.2", features = ["serde", "tz-system"] }
 iana-time-zone = "0.1"
 rrule = "0.14"
