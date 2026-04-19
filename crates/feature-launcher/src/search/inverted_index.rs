@@ -226,8 +226,69 @@ impl InvertedFileIndex {
                 a_len.cmp(&b_len)
             })
         });
+        scored.retain(|s| !self.entries[s.entry_idx as usize].name.is_empty());
         scored.truncate(limit);
         scored
+    }
+}
+
+impl InvertedFileIndex {
+    /// Add a single file to the index. Idempotent — duplicate paths are skipped.
+    pub fn apply_event_create(&mut self, path: &Path) {
+        if !path.is_file() { return; }
+        // Skip if already indexed
+        if self.entries.iter().any(|e| e.path == path) { return; }
+        let name = match path.file_name().and_then(|n| n.to_str()) {
+            Some(n) => n.to_string(),
+            None => return,
+        };
+        let depth = path.components().count().min(255) as u8;
+        let idx = self.entries.len() as u32;
+        self.entries.push(IndexEntry {
+            path: path.to_path_buf(),
+            name: name.clone(),
+            kind: classify_extension(path),
+            depth,
+        });
+        for token in tokenize(&name) {
+            for prefix in prefixes(&token) {
+                let list = self.postings.entry(prefix).or_default();
+                list.push(idx);
+                list.sort_unstable();
+                list.dedup();
+            }
+        }
+        for component in path.components().filter_map(|c| c.as_os_str().to_str()) {
+            if component == name { continue; }
+            for token in tokenize(component) {
+                for prefix in prefixes(&token) {
+                    let list = self.postings.entry(prefix).or_default();
+                    list.push(idx);
+                    list.sort_unstable();
+                    list.dedup();
+                }
+            }
+        }
+    }
+
+    /// Remove a path from the index. Tombstones the entry (we don't compact mid-flight).
+    pub fn apply_event_remove(&mut self, path: &Path) {
+        let target = self.entries.iter().position(|e| e.path == path);
+        let target = match target { Some(t) => t as u32, None => return };
+        // Drop the entry's name → blank; remove from all postings.
+        // Cheap approach: scan all postings, drop this idx.
+        for list in self.postings.values_mut() {
+            list.retain(|&i| i != target);
+        }
+        // Mark entry as empty (keep slot to preserve indices).
+        self.entries[target as usize].name.clear();
+        self.entries[target as usize].path = PathBuf::new();
+    }
+
+    /// Rename = remove + create.
+    pub fn apply_event_rename(&mut self, from: &Path, to: &Path) {
+        self.apply_event_remove(from);
+        self.apply_event_create(to);
     }
 }
 
@@ -327,5 +388,32 @@ mod tests {
     fn search_empty_query_returns_empty() {
         let idx = InvertedFileIndex::empty();
         assert!(idx.search("", 10).is_empty());
+    }
+
+    #[test]
+    fn apply_events_adds_new_file() {
+        let dir = TempDir::new().unwrap();
+        let base = dir.path();
+        let mut idx = InvertedFileIndex::build(&[base.to_path_buf()], &SkipSet::defaults(), 1000);
+        assert_eq!(idx.len(), 0);
+
+        let new_path = base.join("newfile.rs");
+        fs::write(&new_path, "").unwrap();
+        idx.apply_event_create(&new_path);
+        assert_eq!(idx.len(), 1);
+        assert!(!idx.search("newfile", 10).is_empty());
+    }
+
+    #[test]
+    fn apply_events_removes_file() {
+        let dir = TempDir::new().unwrap();
+        let base = dir.path();
+        let p = base.join("doomed.txt");
+        fs::write(&p, "").unwrap();
+        let mut idx = InvertedFileIndex::build(&[base.to_path_buf()], &SkipSet::defaults(), 1000);
+        assert_eq!(idx.len(), 1);
+
+        idx.apply_event_remove(&p);
+        assert!(idx.search("doomed", 10).is_empty());
     }
 }
