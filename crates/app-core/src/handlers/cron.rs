@@ -5,11 +5,15 @@ use desktop_shared::types::{
     CronJobCreateParams, CronJobResponse, CronJobStateResponse, CronJobUpdateParams,
     CronPayloadResponse, CronStatusResponse,
 };
+use jiff::Timestamp;
+use uuid::Uuid;
 
 use crate::state::{AppCore, HandlerResult};
 
-/// Convert a scheduling::CronJob to the IPC response type.
-fn to_response(job: &scheduling::CronJob) -> CronJobResponse {
+/// Convert a `CronJobRow` to the IPC response type.
+fn to_response(row: &storage::CronJobRow) -> CronJobResponse {
+    // Re-use the scheduling crate's row→domain converter for field extraction.
+    let job = scheduling::row_to_job(row.clone());
     CronJobResponse {
         id: job.id.clone(),
         name: job.name.clone(),
@@ -47,123 +51,260 @@ impl AppCore {
         &self,
         include_disabled: bool,
     ) -> Result<Vec<CronJobResponse>, ApiError> {
-        let jobs = self.cron_service.list_jobs(include_disabled).await;
-        Ok(jobs.iter().map(to_response).collect())
+        let mut rows = self
+            .cron_repo
+            .list()
+            .await
+            .map_err(|e| ApiError::new("CRON_ERROR", e.to_string()))?;
+
+        if !include_disabled {
+            rows.retain(|r| r.enabled);
+        }
+
+        // Sort by next_run_at_ms ascending (None/null sorts last).
+        rows.sort_by_key(|r| r.next_run_at_ms.unwrap_or(i64::MAX));
+
+        Ok(rows.iter().map(to_response).collect())
     }
 
     pub async fn cron_status(&self) -> Result<CronStatusResponse, ApiError> {
-        let status = self.cron_service.status().await;
+        let rows = self
+            .cron_repo
+            .list()
+            .await
+            .map_err(|e| ApiError::new("CRON_ERROR", e.to_string()))?;
+
+        let jobs = rows.len();
+        let next_wake_at_ms = rows
+            .iter()
+            .filter(|r| r.enabled)
+            .filter_map(|r| r.next_run_at_ms)
+            .min();
+
         Ok(CronStatusResponse {
-            enabled: status.enabled,
-            jobs: status.jobs,
-            next_wake_at_ms: status.next_wake_at_ms,
+            enabled: true,
+            jobs,
+            next_wake_at_ms,
         })
     }
 
     pub async fn cron_enable(&self, id: String, enabled: bool) -> HandlerResult<CronJobResponse> {
-        let job = self
-            .cron_service
-            .enable_job(&id, enabled)
+        self.cron_repo
+            .set_enabled(&id, enabled)
+            .await
+            .map_err(|e| match e {
+                storage::error::StorageError::NotFound(_) => {
+                    ApiError::new("NOT_FOUND", format!("cron job '{id}'"))
+                }
+                other => ApiError::new("CRON_ERROR", other.to_string()),
+            })?;
+
+        self.cron_bridge
+            .reconcile_all()
+            .await
+            .map_err(|e| ApiError::new("CRON_ERROR", e.to_string()))?;
+
+        let row = self
+            .cron_repo
+            .get(&id)
+            .await
+            .map_err(|e| ApiError::new("CRON_ERROR", e.to_string()))?;
+
+        Ok((to_response(&row), vec![]))
+    }
+
+    /// Manually trigger a cron job: set `next_run_at_ms` to now and reconcile
+    /// so the TemporalScheduler fires it within the next loop iteration (≤30 s).
+    pub async fn cron_run(&self, id: String) -> Result<bool, ApiError> {
+        let mut row = self
+            .cron_repo
+            .get_opt(&id)
             .await
             .map_err(|e| ApiError::new("CRON_ERROR", e.to_string()))?
             .ok_or_else(|| ApiError::new("NOT_FOUND", format!("cron job '{id}'")))?;
-        Ok((to_response(&job), vec![]))
-    }
 
-    pub async fn cron_run(&self, id: String) -> Result<bool, ApiError> {
-        self.cron_service
-            .run_job(&id, true)
+        let now_ms = Timestamp::now().as_millisecond();
+        row.next_run_at_ms = Some(now_ms);
+        row.updated_at_ms = now_ms;
+
+        self.cron_repo
+            .upsert(&row)
             .await
-            .map_err(|e| ApiError::new("CRON_ERROR", e.to_string()))
+            .map_err(|e| ApiError::new("CRON_ERROR", e.to_string()))?;
+
+        self.cron_bridge
+            .reconcile_all()
+            .await
+            .map_err(|e| ApiError::new("CRON_ERROR", e.to_string()))?;
+
+        // Wake the scheduler so it fires immediately instead of waiting up to 30 s.
+        if let Some(ref ts) = self.temporal_scheduler {
+            ts.wake();
+        }
+
+        Ok(true)
     }
 
     pub async fn cron_delete(&self, id: String) -> Result<bool, ApiError> {
-        let jobs = self.cron_service.list_jobs(true).await;
-        if let Some(job) = jobs.iter().find(|j| j.id == id) {
-            if job.origin == scheduling::CronOrigin::System {
+        // Guard: system jobs cannot be deleted.
+        if let Some(row) = self
+            .cron_repo
+            .get_opt(&id)
+            .await
+            .map_err(|e| ApiError::new("CRON_ERROR", e.to_string()))?
+        {
+            if row.origin == "system" {
                 return Err(ApiError::new("FORBIDDEN", "Cannot delete system cron jobs"));
             }
         }
-        self.cron_service
-            .remove_job(&id)
+
+        let deleted = self
+            .cron_repo
+            .delete(&id)
             .await
-            .map_err(|e| ApiError::new("CRON_ERROR", e.to_string()))
+            .map_err(|e| ApiError::new("CRON_ERROR", e.to_string()))?;
+
+        if deleted {
+            self.cron_bridge
+                .reconcile_all()
+                .await
+                .map_err(|e| ApiError::new("CRON_ERROR", e.to_string()))?;
+        }
+
+        Ok(deleted)
     }
 
     pub async fn cron_create(&self, params: CronJobCreateParams) -> HandlerResult<CronJobResponse> {
         let schedule: scheduling::CronSchedule = serde_json::from_value(params.schedule)
             .map_err(|e| ApiError::new("INVALID_PARAMS", format!("invalid schedule: {e}")))?;
 
-        let job = self
-            .cron_service
-            .add_job(
-                params.name,
-                schedule,
-                params.message,
-                params.deliver,
-                params.channel,
-                params.to,
-                params.delete_after_run,
-                scheduling::CronOrigin::User,
-            )
+        let now_ms = Timestamp::now().as_millisecond();
+        let job_id = Uuid::new_v4().to_string()[..8].to_string();
+
+        let row = storage::CronJobRow {
+            id: job_id,
+            name: params.name,
+            enabled: true,
+            origin: "user".to_string(),
+            schedule: serde_json::to_value(&schedule)
+                .expect("CronSchedule serialization is infallible"),
+            payload: serde_json::json!({
+                "kind": "agent_turn",
+                "message": params.message,
+                "deliver": params.deliver,
+                "channel": params.channel,
+                "to": params.to,
+            }),
+            next_run_at_ms: None,
+            last_run_at_ms: None,
+            last_status: None,
+            last_error: None,
+            created_at_ms: now_ms,
+            updated_at_ms: now_ms,
+            delete_after_run: params.delete_after_run,
+            intent_window: None,
+            intent_pending_since_ms: None,
+        };
+
+        let saved = self
+            .cron_repo
+            .upsert(&row)
             .await
             .map_err(|e| ApiError::new("CRON_ERROR", e.to_string()))?;
 
-        Ok((to_response(&job), vec![]))
+        self.cron_bridge
+            .reconcile_all()
+            .await
+            .map_err(|e| ApiError::new("CRON_ERROR", e.to_string()))?;
+
+        Ok((to_response(&saved), vec![]))
     }
 
     pub async fn cron_update(&self, params: CronJobUpdateParams) -> HandlerResult<CronJobResponse> {
-        let jobs = self.cron_service.list_jobs(true).await;
-        let existing = jobs
-            .iter()
-            .find(|j| j.id == params.id)
+        let existing = self
+            .cron_repo
+            .get_opt(&params.id)
+            .await
+            .map_err(|e| ApiError::new("CRON_ERROR", e.to_string()))?
             .ok_or_else(|| ApiError::new("NOT_FOUND", format!("cron job '{}'", params.id)))?;
 
-        if existing.origin == scheduling::CronOrigin::System {
+        if existing.origin == "system" {
             return Err(ApiError::new("FORBIDDEN", "Cannot edit system cron jobs"));
         }
 
+        let now_ms = Timestamp::now().as_millisecond();
+
+        // Parse existing payload for defaults.
+        let ex_payload: scheduling::CronPayload =
+            serde_json::from_value(existing.payload.clone()).unwrap_or_default();
+
         let name = params.name.unwrap_or_else(|| existing.name.clone());
-        let schedule = match params.schedule {
-            Some(s) => serde_json::from_value(s)
-                .map_err(|e| ApiError::new("INVALID_PARAMS", format!("invalid schedule: {e}")))?,
+        let schedule_val = match params.schedule {
+            Some(s) => {
+                // validate round-trip
+                let _: scheduling::CronSchedule =
+                    serde_json::from_value(s.clone()).map_err(|e| {
+                        ApiError::new("INVALID_PARAMS", format!("invalid schedule: {e}"))
+                    })?;
+                s
+            }
             None => existing.schedule.clone(),
         };
-        let message = params
-            .message
-            .unwrap_or_else(|| existing.payload.message.clone());
-        let deliver = params.deliver.unwrap_or(existing.payload.deliver);
+        let message = params.message.unwrap_or_else(|| ex_payload.message.clone());
+        let deliver = params.deliver.unwrap_or(ex_payload.deliver);
+        // params.channel / params.to are Option<Option<String>> (outer = was it in the patch?).
         let channel = match params.channel {
             Some(c) => c,
-            None => existing.payload.channel.clone(),
+            None => ex_payload.channel,
         };
         let to = match params.to {
             Some(t) => t,
-            None => existing.payload.to.clone(),
+            None => ex_payload.to,
         };
-        let origin = existing.origin.clone();
 
-        // Add new job first, then remove old — avoids data loss if add fails
-        let job = self
-            .cron_service
-            .add_job(
-                name,
-                schedule,
-                message,
-                deliver,
-                channel,
-                to,
-                existing.delete_after_run,
-                origin,
-            )
+        // Build a new row with a fresh ID (update semantics: new row replaces old).
+        let new_id = Uuid::new_v4().to_string()[..8].to_string();
+        let new_row = storage::CronJobRow {
+            id: new_id,
+            name,
+            enabled: existing.enabled,
+            origin: existing.origin.clone(),
+            schedule: schedule_val,
+            payload: serde_json::json!({
+                "kind": ex_payload.kind,
+                "message": message,
+                "deliver": deliver,
+                "channel": channel,
+                "to": to,
+            }),
+            next_run_at_ms: None,
+            last_run_at_ms: None,
+            last_status: None,
+            last_error: None,
+            created_at_ms: existing.created_at_ms,
+            updated_at_ms: now_ms,
+            delete_after_run: existing.delete_after_run,
+            intent_window: existing.intent_window.clone(),
+            intent_pending_since_ms: existing.intent_pending_since_ms,
+        };
+
+        // Insert new row first, then delete old — avoids data loss if insert fails.
+        let saved = self
+            .cron_repo
+            .upsert(&new_row)
             .await
             .map_err(|e| ApiError::new("CRON_ERROR", e.to_string()))?;
 
-        self.cron_service
-            .remove_job(&params.id)
+        self.cron_repo
+            .delete(&params.id)
             .await
             .map_err(|e| ApiError::new("CRON_ERROR", e.to_string()))?;
 
-        Ok((to_response(&job), vec![]))
+        self.cron_bridge
+            .reconcile_all()
+            .await
+            .map_err(|e| ApiError::new("CRON_ERROR", e.to_string()))?;
+
+        Ok((to_response(&saved), vec![]))
     }
 }

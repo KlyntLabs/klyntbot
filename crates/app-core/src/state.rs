@@ -13,8 +13,9 @@ use feature_coaching::{FeedbackTracker, InterventionRouter, PatternDetector, Sig
 use feature_notes::repo::{NoteRepo, PracticeSessionRepo};
 use feature_productivity::repos::ProductivityRepos;
 use feature_productivity::{DailyAggregator, FocusManager, NudgeService, ProductivityEngine};
+use scheduling::temporal::cron_bridge::CronBridge;
 use scheduling::CronService;
-use storage::{Repos, StoragePool, VectorStore};
+use storage::{repos::cron::CronRepo, Repos, StoragePool, VectorStore};
 use tokio::sync::{broadcast, oneshot, Mutex, RwLock};
 use tokio_util::sync::CancellationToken;
 use tracing::{error, info};
@@ -48,6 +49,10 @@ pub struct AppCore {
 
     pub channel_manager: Arc<Mutex<ChannelManager>>,
     pub cron_service: Arc<CronService>,
+    /// Direct SQL repo for cron job CRUD — used by handlers instead of CronService.
+    pub cron_repo: CronRepo,
+    /// Bridge that syncs `cron_jobs` rows into `scheduled_fires` after mutations.
+    pub cron_bridge: Arc<CronBridge>,
     pub shutdown_token: CancellationToken,
     /// Active streaming cancellation tokens keyed by session_key.
     pub active_streams: Arc<dashmap::DashMap<String, CancellationToken>>,

@@ -153,7 +153,7 @@ pub(super) async fn init_cron(
     );
 
     let cron_service = Arc::new(cron_service);
-    ensure_cron_jobs(&cron_service, config)
+    ensure_cron_jobs(&repos.cron, config)
         .await
         .map_err(|e| format!("cron job registration failed: {e}"))?;
     set_default_intent_windows(&cron_service).await;
@@ -1040,33 +1040,73 @@ fn register_cron_callbacks(
     }
 }
 
-/// Register default cron jobs (idempotent — skips existing).
+/// Register default cron jobs directly via `CronRepo` (idempotent — skips existing).
+///
+/// Uses `CronRepo::upsert` rather than `CronService::add_job` so this path
+/// does not depend on `CronService` internals. `CronBridge::reconcile_all()`
+/// is called once at the end (by the `init_temporal_scheduler` step that follows).
 async fn ensure_cron_jobs(
-    cron_service: &Arc<CronService>,
+    cron_repo: &storage::repos::cron::CronRepo,
     config: &config::Config,
 ) -> Result<(), common::KlyntbotError> {
-    let existing: std::collections::HashSet<String> = cron_service
-        .list_jobs(true)
-        .await
-        .into_iter()
-        .map(|j| j.name)
-        .collect();
+    use jiff::Timestamp;
+    use uuid::Uuid;
 
-    // System = protected (can't edit/delete), User = fully editable in the UI.
+    // Build a map of existing jobs by name so we can skip or fix them.
+    let existing_rows: std::collections::HashMap<String, storage::rows::cron::CronJobRow> =
+        cron_repo
+            .list()
+            .await
+            .map_err(|e| {
+                common::KlyntbotError::Storage(format!("cron list failed: {e}"))
+            })?
+            .into_iter()
+            .map(|r| (r.name.clone(), r))
+            .collect();
+
     // Creates the job if missing, or fixes origin if it was previously different.
     macro_rules! ensure_job {
-        ($name:expr, $schedule:expr, $msg:expr, $origin:expr) => {
-            if !existing.contains($name) {
-                cron_service
-                    .add_job($name, $schedule, $msg, false, None, None, false, $origin)
-                    .await?;
+        ($name:expr, $schedule:expr, $msg:expr, $origin_str:expr) => {{
+            if let Some(existing) = existing_rows.get($name as &str) {
+                // Fix origin mismatch (e.g. job was created as "user" but should be "system").
+                if existing.origin != $origin_str {
+                    let mut fixed = existing.clone();
+                    fixed.origin = $origin_str.to_string();
+                    fixed.updated_at_ms = Timestamp::now().as_millisecond();
+                    cron_repo.upsert(&fixed).await.map_err(|e| {
+                        common::KlyntbotError::Storage(format!("cron upsert failed: {e}"))
+                    })?;
+                }
             } else {
-                cron_service.set_origin($name, $origin).await;
+                let now_ms = Timestamp::now().as_millisecond();
+                let row = storage::rows::cron::CronJobRow {
+                    id: Uuid::new_v4().to_string()[..8].to_string(),
+                    name: $name.to_string(),
+                    enabled: true,
+                    origin: $origin_str.to_string(),
+                    schedule: serde_json::to_value(&$schedule)
+                        .expect("CronSchedule serialization is infallible"),
+                    payload: serde_json::json!({
+                        "kind": "agent_turn",
+                        "message": $msg,
+                        "deliver": false,
+                    }),
+                    next_run_at_ms: None,
+                    last_run_at_ms: None,
+                    last_status: None,
+                    last_error: None,
+                    created_at_ms: now_ms,
+                    updated_at_ms: now_ms,
+                    delete_after_run: false,
+                    intent_window: None,
+                    intent_pending_since_ms: None,
+                };
+                cron_repo.upsert(&row).await.map_err(|e| {
+                    common::KlyntbotError::Storage(format!("cron upsert failed: {e}"))
+                })?;
             }
-        };
+        }};
     }
-    let system = scheduling::CronOrigin::System;
-
     // ── User-editable jobs ────────────────────────────────────────────────
     // All user jobs are now lazy-created via `ensure_lazy_job()` when
     // the feature is first used, or manually from the Automations page.
@@ -1082,7 +1122,7 @@ async fn ensure_cron_jobs(
                 every_ms: config.finance.price_refresh.interval_hours as u64 * 60 * 60 * 1000,
             },
             "Refresh investment prices",
-            system.clone()
+            "system"
         );
     }
 
@@ -1102,7 +1142,7 @@ async fn ensure_cron_jobs(
             tz: Some(config.timezone.clone()),
         },
         "Nightly Reforge: knowledge synthesis, skill improvement, compaction",
-        system.clone()
+        "system"
     );
     ensure_job!(
         JOB_ATOM_DECAY,
@@ -1111,7 +1151,7 @@ async fn ensure_cron_jobs(
             tz: Some(config.timezone.clone()),
         },
         "Daily knowledge atom decay",
-        system.clone()
+        "system"
     );
     ensure_job!(
         JOB_ATOM_EXTRACTION_CATCHALL,
@@ -1120,7 +1160,7 @@ async fn ensure_cron_jobs(
             tz: None
         },
         "Extract atoms from unprocessed notes",
-        system.clone()
+        "system"
     );
     ensure_job!(
         JOB_SESSION_CLEANUP,
@@ -1128,7 +1168,7 @@ async fn ensure_cron_jobs(
             every_ms: config.conversation.session.cleanup_interval_hours as u64 * 60 * 60 * 1000,
         },
         "Delete stale sessions",
-        system.clone()
+        "system"
     );
     ensure_job!(
         JOB_BLACKBOARD_CLEANUP,
@@ -1137,7 +1177,7 @@ async fn ensure_cron_jobs(
             tz: Some(config.timezone.clone()),
         },
         "Clean stale blackboard entries",
-        system.clone()
+        "system"
     );
     ensure_job!(
         JOB_MEMORY_MAINTENANCE,
@@ -1145,7 +1185,7 @@ async fn ensure_cron_jobs(
             every_ms: config.conversation.memory.maintenance_interval_hours as u64 * 60 * 60 * 1000,
         },
         "Prune old conversation embeddings",
-        system.clone()
+        "system"
     );
 
     ensure_job!(
@@ -1154,7 +1194,7 @@ async fn ensure_cron_jobs(
             every_ms: 24 * 60 * 60 * 1000
         },
         "Clean old analytics records and prune low-salience facts",
-        system.clone()
+        "system"
     );
     ensure_job!(
         JOB_LEARNING_ANALYSIS,
@@ -1162,7 +1202,7 @@ async fn ensure_cron_jobs(
             every_ms: config.learning.analysis_interval_secs * 1000
         },
         "Analyze tool outcomes and adapt confidence threshold",
-        system.clone()
+        "system"
     );
     ensure_job!(
         JOB_CROSS_DOMAIN_NIGHTLY,
@@ -1171,7 +1211,7 @@ async fn ensure_cron_jobs(
             tz: None
         },
         "Nightly cross-domain insight batch",
-        system.clone()
+        "system"
     );
     ensure_job!(
         JOB_LAUNCHER_USAGE_PRUNE,
@@ -1180,7 +1220,7 @@ async fn ensure_cron_jobs(
             tz: None
         },
         "Prune old launcher usage entries",
-        system
+        "system"
     );
 
     Ok(())

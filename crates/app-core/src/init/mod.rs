@@ -177,6 +177,7 @@ impl AppCore {
             scheduler: temporal_scheduler,
             scheduler_handle: temporal_scheduler_handle,
             wake_subscriber: temporal_wake_subscriber,
+            cron_bridge,
         } = temporal_scheduler::init_temporal_scheduler(
             &repos,
             Arc::clone(&domain_event_bus),
@@ -673,6 +674,8 @@ impl AppCore {
         let mirror_facade_for_voice = mirror_facade.clone();
 
         // ── Assemble AppCore ─────────────────────────────────────────────
+        // Clone cron_repo before repos is moved into AppCore.
+        let cron_repo = repos.cron.clone();
         let mut core = AppCore {
             mode,
             repos,
@@ -684,6 +687,8 @@ impl AppCore {
             hot_config: Arc::clone(&hot_config),
             channel_manager: channel_manager.clone(),
             cron_service: cron_service.clone(),
+            cron_repo,
+            cron_bridge: Arc::new(cron_bridge),
             shutdown_token: shutdown_token.clone(),
             active_streams: Arc::new(dashmap::DashMap::new()),
             pending_interactions: Arc::new(dashmap::DashMap::new()),

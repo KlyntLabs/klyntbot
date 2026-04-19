@@ -25,6 +25,8 @@ pub(super) struct TemporalSchedulerResult {
     pub scheduler: TemporalScheduler,
     pub scheduler_handle: tokio::task::JoinHandle<()>,
     pub wake_subscriber: tokio::task::JoinHandle<()>,
+    /// Clone of the CronBridge for direct use by AppCore handlers (CRUD mutations).
+    pub cron_bridge: CronBridge,
 }
 
 /// Spawn the unified `TemporalScheduler` with a `CronBridge` seeded from
@@ -46,6 +48,10 @@ pub(super) async fn init_temporal_scheduler(
         .reconcile_all()
         .await
         .map_err(|e| format!("TemporalScheduler cron reconcile failed: {e}"))?;
+
+    // Clone before the bridge is moved into the scheduler — AppCore holds this
+    // clone so CRUD handlers can call reconcile_all() after mutations.
+    let bridge_for_appcore = bridge.clone();
 
     // Build the RecurrenceEngine backed by SQLite repos.
     let fire_store_arc = Arc::new(fire_store.clone());
@@ -96,5 +102,6 @@ pub(super) async fn init_temporal_scheduler(
         scheduler,
         scheduler_handle,
         wake_subscriber,
+        cron_bridge: bridge_for_appcore,
     })
 }
