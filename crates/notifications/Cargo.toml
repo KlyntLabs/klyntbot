@@ -19,6 +19,11 @@ serde = { workspace = true }
 serde_json = { workspace = true }
 jiff = { workspace = true }
 uuid = { workspace = true, features = ["v4"] }
+channels = { workspace = true }
+
+[features]
+default = ["email"]
+email = ["channels/email"]
 
 [dev-dependencies]
 tokio = { workspace = true, features = ["test-util"] }

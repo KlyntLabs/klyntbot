@@ -34,9 +34,22 @@ pub fn mask_to_names(mask: u32) -> Vec<String> {
     v
 }
 
+pub mod discord;
+pub mod email;
 pub mod os_native;
 pub mod outbound;
+pub mod telegram;
 pub mod tray;
+
+pub use discord::DiscordNotificationChannel;
+#[cfg(feature = "email")]
+pub use email::EmailNotificationChannel;
+pub use telegram::TelegramNotificationChannel;
+
+// TODO(4.8 / follow-up): Wire TelegramNotificationChannel / DiscordNotificationChannel /
+// EmailNotificationChannel into NotificationDispatcher's channel registry at app-core
+// init time, constructing each from the corresponding config section
+// (notifications.telegram, .discord, .email) when present.
 
 #[derive(Debug, Clone)]
 pub struct NotificationPayload {
