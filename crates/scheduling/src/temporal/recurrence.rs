@@ -12,7 +12,7 @@ use serde_json::json;
 
 use crate::error::SchedulerError;
 use crate::temporal::fire_store::{FireSpec, FireStore};
-use crate::temporal::rrule::{evaluate_next_n, RRuleSpec};
+use crate::temporal::rrule::next_n_from_rrule_string;
 
 // ---------------------------------------------------------------------------
 // Public data types
@@ -106,11 +106,6 @@ impl RecurrenceEngine {
             tmpl.materialize_ahead
         };
 
-        // Parse the RRULE string into an RRuleSpec for the evaluator.
-        // Fetch `ahead + 1` occurrences from the start cursor in one shot so we
-        // can (a) apply the UNTIL/count guards and (b) determine the next spawn
-        // time without a second evaluate call.
-        let spec = parse_rrule_string(&tmpl.rrule, &tmpl.iana_tz)?;
         let cursor = tmpl.next_instance_at.unwrap_or(now);
 
         // Check count guard before doing anything.
@@ -122,7 +117,9 @@ impl RecurrenceEngine {
         }
 
         // Fetch enough candidates to cover `ahead` instances + 1 for next_spawn.
-        let candidates = evaluate_next_n(&spec, cursor, ahead as usize + 1)
+        // Uses the native `rrule` crate parser so the full RFC 5545 property set
+        // is supported (BYSETPOS, BYYEARDAY, negative BYMONTHDAY, WKST, etc.).
+        let candidates = next_n_from_rrule_string(&tmpl.rrule, &tmpl.iana_tz, cursor, ahead as usize + 1)
             .map_err(|e| SchedulerError::Rrule(e.to_string()))?;
 
         let mut last_materialized: Option<Timestamp> = None;
@@ -132,9 +129,9 @@ impl RecurrenceEngine {
                 break;
             }
 
-            // Respect UNTIL guard (exclusive: instances must be strictly before until).
+            // Respect UNTIL guard (inclusive per RFC 5545 §3.3.10: UNTIL date is included).
             if let Some(until) = tmpl.until_at {
-                if next >= until {
+                if next > until {
                     break;
                 }
             }
@@ -165,7 +162,7 @@ impl RecurrenceEngine {
             candidates.into_iter().find(|t| *t > last)
         } else {
             // Nothing materialized — compute from cursor
-            let nexts = evaluate_next_n(&spec, cursor, 1)
+            let nexts = next_n_from_rrule_string(&tmpl.rrule, &tmpl.iana_tz, cursor, 1)
                 .map_err(|e| SchedulerError::Rrule(e.to_string()))?;
             nexts.into_iter().next()
         };
@@ -200,131 +197,6 @@ impl RecurrenceEngine {
             .await?;
         Ok(())
     }
-}
-
-// ---------------------------------------------------------------------------
-// Private helpers
-// ---------------------------------------------------------------------------
-
-/// Parse a bare RRULE string (e.g. "FREQ=DAILY") into an `RRuleSpec`.
-///
-/// This is intentionally minimal: it only handles the subset produced by
-/// `RRuleSpec::compile()`. Complex rules stored by future callers may need
-/// a more complete parser; for now this is sufficient for unit tests and
-/// the feature-tasks integration.
-fn parse_rrule_string(rrule: &str, iana_tz: &str) -> Result<RRuleSpec, SchedulerError> {
-    use crate::temporal::rrule::Frequency;
-    use jiff::civil::Time as CivilTime;
-
-    let mut frequency = None;
-    let mut interval = None;
-    let mut by_day: Option<Vec<String>> = None;
-    let mut by_month_day: Option<Vec<i32>> = None;
-    let mut byhour: Option<u8> = None;
-    let mut byminute: Option<u8> = None;
-    let mut count = None;
-    let mut until: Option<Timestamp> = None;
-
-    for part in rrule.split(';') {
-        let (key, val) = match part.split_once('=') {
-            Some(kv) => kv,
-            None => continue,
-        };
-        match key.trim().to_uppercase().as_str() {
-            "FREQ" => {
-                frequency = Some(match val.trim().to_uppercase().as_str() {
-                    "DAILY" => Frequency::Daily,
-                    "WEEKLY" => Frequency::Weekly,
-                    "MONTHLY" => Frequency::Monthly,
-                    "YEARLY" => Frequency::Yearly,
-                    other => {
-                        return Err(SchedulerError::Rrule(format!(
-                            "unknown FREQ: {other}"
-                        )))
-                    }
-                });
-            }
-            "INTERVAL" => {
-                interval = val.trim().parse::<u32>().ok();
-            }
-            "BYDAY" => {
-                by_day = Some(val.split(',').map(|s| s.trim().to_uppercase()).collect());
-            }
-            "BYMONTHDAY" => {
-                by_month_day = Some(
-                    val.split(',')
-                        .filter_map(|s| s.trim().parse::<i32>().ok())
-                        .collect(),
-                );
-            }
-            "BYHOUR" => {
-                byhour = val.trim().parse::<u8>().ok();
-            }
-            "BYMINUTE" => {
-                byminute = val.trim().parse::<u8>().ok();
-            }
-            "COUNT" => {
-                count = val.trim().parse::<u32>().ok();
-            }
-            "UNTIL" => {
-                // FORMAT: 20260501T000000Z
-                until = parse_until_dt(val.trim());
-            }
-            _ => {}
-        }
-    }
-
-    let frequency = frequency.ok_or_else(|| SchedulerError::Rrule("missing FREQ".into()))?;
-
-    let at: Option<CivilTime> = match (byhour, byminute) {
-        (Some(h), Some(m)) => {
-            Some(jiff::civil::time(h as i8, m as i8, 0, 0))
-        }
-        (Some(h), None) => Some(jiff::civil::time(h as i8, 0, 0, 0)),
-        _ => None,
-    };
-
-    Ok(RRuleSpec {
-        frequency,
-        interval,
-        by_day,
-        by_month_day,
-        at,
-        timezone: iana_tz.to_string(),
-        until,
-        count,
-    })
-}
-
-fn parse_until_dt(s: &str) -> Option<Timestamp> {
-    // Accept "YYYYMMDDTHHMMSSz" or "YYYYMMDD"
-    let s = s.trim_end_matches('Z');
-    let dt = if s.len() == 15 && s.chars().nth(8) == Some('T') {
-        // 20260501T000000
-        let year = s[0..4].parse::<i16>().ok()?;
-        let month = s[4..6].parse::<i8>().ok()?;
-        let day = s[6..8].parse::<i8>().ok()?;
-        let hour = s[9..11].parse::<i8>().ok()?;
-        let min = s[11..13].parse::<i8>().ok()?;
-        let sec = s[13..15].parse::<i8>().ok()?;
-        jiff::civil::date(year, month, day)
-            .at(hour, min, sec, 0)
-            .to_zoned(jiff::tz::TimeZone::UTC)
-            .ok()?
-            .timestamp()
-    } else if s.len() == 8 {
-        let year = s[0..4].parse::<i16>().ok()?;
-        let month = s[4..6].parse::<i8>().ok()?;
-        let day = s[6..8].parse::<i8>().ok()?;
-        jiff::civil::date(year, month, day)
-            .at(0, 0, 0, 0)
-            .to_zoned(jiff::tz::TimeZone::UTC)
-            .ok()?
-            .timestamp()
-    } else {
-        return None;
-    };
-    Some(dt)
 }
 
 // ---------------------------------------------------------------------------
@@ -515,12 +387,12 @@ mod tests {
 
         engine.on_spawn(&tmpl_id, april28()).await.unwrap();
 
-        // Expect: 4/28, 4/29, 4/30  (5/1 is excluded: > until means strict >)
+        // Expect: 4/28, 4/29, 4/30, 5/1 — UNTIL is inclusive per RFC 5545 §3.3.10.
         let instances = inst_repo.0.lock().unwrap();
         assert_eq!(
             instances.len(),
-            3,
-            "expected 3 instances (4/28, 4/29, 4/30), got {}",
+            4,
+            "expected 4 instances (4/28, 4/29, 4/30, 5/1), got {}",
             instances.len()
         );
     }
@@ -693,5 +565,62 @@ mod tests {
         // No new spawn scheduled either
         let pending = fire_store.list_due(ts_days_from_epoch(9999)).await.unwrap();
         assert_eq!(pending.len(), 0, "no spawn should be scheduled for disabled template");
+    }
+
+    // -----------------------------------------------------------------------
+    // Test 5: native parser handles properties the old custom parser lacked
+    //
+    // BYMONTHDAY=-1 means "last day of month".  The custom parser treated -1
+    // as an opaque i32 but had no RFC 5545 semantics — the rrule crate handles
+    // it correctly.  Starting 2026-01-15 with UNTIL=2026-04-01 we expect
+    // exactly 3 instances: Jan 31, Feb 28, Mar 31.
+    // -----------------------------------------------------------------------
+
+    #[tokio::test]
+    async fn unknown_rrule_property_is_respected() {
+        let fire_store = Arc::new(make_fire_store().await);
+        let tmpl_id = "t5".to_string();
+
+        // cursor: 2026-01-15 00:00:00 UTC (before Jan 31)
+        let cursor = jiff::civil::date(2026, 1, 15)
+            .at(0, 0, 0, 0)
+            .to_zoned(jiff::tz::TimeZone::UTC)
+            .unwrap()
+            .timestamp();
+
+        // UNTIL = 2026-04-01 00:00:00 UTC (exclusive of Apr 30)
+        let until = jiff::civil::date(2026, 4, 1)
+            .at(0, 0, 0, 0)
+            .to_zoned(jiff::tz::TimeZone::UTC)
+            .unwrap()
+            .timestamp();
+
+        let template = RecurrenceTemplate {
+            id: tmpl_id.clone(),
+            source_task_id: "task5".into(),
+            rrule: "FREQ=MONTHLY;BYMONTHDAY=-1".into(),
+            iana_tz: "UTC".into(),
+            materialize_ahead: 10,
+            next_instance_at: Some(cursor),
+            until_at: Some(until),
+            count_remaining: None,
+            enabled: true,
+        };
+
+        let tmpl_repo = Arc::new(MockTemplateRepo::with(template));
+        let inst_repo = Arc::new(MockInstanceRepo::default());
+        let engine = RecurrenceEngine::new(fire_store, tmpl_repo, inst_repo.clone(), 3);
+
+        engine.on_spawn(&tmpl_id, cursor).await.unwrap();
+
+        let instances = inst_repo.0.lock().unwrap();
+        // Jan 31, Feb 28, Mar 31 — Apr 30 is past UNTIL so excluded
+        assert_eq!(
+            instances.len(),
+            3,
+            "expected 3 instances (Jan 31, Feb 28, Mar 31), got {}: {:?}",
+            instances.len(),
+            instances.iter().map(|(_, ts)| ts.to_string()).collect::<Vec<_>>(),
+        );
     }
 }
