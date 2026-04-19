@@ -213,7 +213,6 @@ const JOB_SESSION_CLEANUP: &str = "__klyntbot_session_cleanup";
 const JOB_MEMORY_MAINTENANCE: &str = "__klyntbot_memory_maintenance";
 const JOB_ANALYTICS_CLEANUP: &str = "__klyntbot_analytics_cleanup";
 const JOB_BLACKBOARD_CLEANUP: &str = "__klyntbot_blackboard_cleanup";
-const JOB_REMINDER_CHECK: &str = "__klyntbot_reminder_check";
 const JOB_RECURRING_TASKS: &str = "__klyntbot_recurring_tasks";
 pub(super) const JOB_INSIGHT_REFRESH: &str = "__klyntbot_insight_refresh";
 pub(super) const JOB_LEARNING_ANALYSIS: &str = "__klyntbot_learning_analysis";
@@ -971,36 +970,6 @@ fn register_cron_callbacks(
                         Ok(Some(format!(
                             "Analytics: {cleaned} records cleaned, {pruned} facts pruned, {pending_cleaned} stale pending memories removed"
                         )))
-                    })
-                })
-            }),
-        );
-    }
-
-    // ── reminder_check ────────────────────────────────────────────────────
-    {
-        let todo_repo = repos.tasks.clone();
-        let domain_bus = Arc::clone(domain_event_bus);
-        let rt = rt.clone();
-        cron_executor.register(
-            JOB_REMINDER_CHECK,
-            Arc::new(move |_job: &scheduling::CronJob| {
-                let todo_repo = todo_repo.clone();
-                let domain_bus = Arc::clone(&domain_bus);
-                tokio::task::block_in_place(|| {
-                    rt.block_on(async move {
-                        match agent::services::reminders::ReminderEngine::check_and_send_reminders_static(
-                            &todo_repo,
-                            &domain_bus,
-                        )
-                        .await
-                        {
-                            Ok(()) => Ok(Some("Reminder check complete".to_string())),
-                            Err(e) => {
-                                warn!("Reminder check failed: {e}");
-                                Ok(Some(format!("Reminder check failed: {e}")))
-                            }
-                        }
                     })
                 })
             }),

@@ -5,5 +5,4 @@
 
 pub mod memory_maintenance;
 pub mod recurring_tasks;
-pub mod reminders;
 pub mod session_cleanup;

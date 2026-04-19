@@ -1624,19 +1624,6 @@ impl AgentLoopBuilder {
             &skill_reference_index,
         )));
 
-        // ── Reminder engine ───────────────────────────────────────────────
-        let reminder_engine = if let Some(ref domain_bus) = self.domain_event_bus {
-            let mut engine = super::super::ReminderEngine::new(
-                repos.tasks.clone(),
-                Arc::clone(domain_bus),
-                std::time::Duration::from_secs(300),
-            );
-            engine.start();
-            Some(Arc::new(RwLock::new(engine)))
-        } else {
-            None
-        };
-
         // ── Recurring task spawner ────────────────────────────────────────
         let mut recurring_spawner = super::super::RecurringTaskSpawner::new(
             repos.tasks.clone(),
@@ -1904,7 +1891,6 @@ impl AgentLoopBuilder {
             tool_registry,
             running: Arc::new(AtomicBool::new(false)),
             last_active_channel: self.notification_handle,
-            reminder_engine,
             recurring_task_spawner,
             conversation_recall_handler,
             learning_service,
