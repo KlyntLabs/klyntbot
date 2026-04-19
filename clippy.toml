@@ -1,0 +1,14 @@
+disallowed-types = [
+    { path = "chrono::DateTime",      reason = "use jiff::Timestamp or jiff::Zoned" },
+    { path = "chrono::NaiveDateTime", reason = "use jiff::civil::DateTime" },
+    { path = "chrono::NaiveDate",     reason = "use jiff::civil::Date" },
+    { path = "chrono::NaiveTime",     reason = "use jiff::civil::Time" },
+    { path = "chrono::Utc",           reason = "use jiff::Timestamp or jiff::tz::TimeZone::UTC" },
+    { path = "chrono::Local",         reason = "use jiff::Zoned::now() with system tz" },
+    { path = "chrono::Duration",      reason = "use jiff::Span or std::time::Duration" },
+    { path = "chrono_tz::Tz",         reason = "use jiff::tz::TimeZone" },
+]
+disallowed-methods = [
+    { path = "chrono::Utc::now",   reason = "use jiff::Timestamp::now" },
+    { path = "chrono::Local::now", reason = "use jiff::Zoned::now" },
+]

@@ -1,3 +1,6 @@
+#![allow(clippy::disallowed_types, clippy::disallowed_methods)]
+// Documented chrono boundary shim — transitively required by `cron` / `rrule` crates.
+
 //! Bridge between legacy `cron_jobs` (definition table) and `scheduled_fires` (firing table).
 //!
 //! For each enabled `cron_jobs` row, the bridge maintains exactly one pending

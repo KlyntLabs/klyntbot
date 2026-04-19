@@ -1,3 +1,6 @@
+#![allow(clippy::disallowed_types, clippy::disallowed_methods)]
+// Documented chrono boundary shim — transitively required by `cron` / `rrule` crates.
+
 //! RRULE DSL → RFC 5545 compiler + evaluator.
 //!
 //! ⚠️ CHRONO BOUNDARY: the upstream `rrule` crate uses `chrono::DateTime<Tz>`
