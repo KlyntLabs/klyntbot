@@ -1,6 +1,10 @@
 //! Tray countdown — shows the next upcoming calendar event or task deadline
 //! in the macOS menu bar with a live countdown (e.g. "« 24:57 · Standup").
 //! Yields to the focus timer when a session is active.
+//!
+//! Cache invalidation: instead of polling the DB every 30 s, a bus subscriber
+//! sets a `dirty` flag whenever a relevant domain event arrives.  The 1 s
+//! display tick checks the flag and re-queries only when needed.
 
 use std::sync::atomic::{AtomicBool, AtomicU8, Ordering};
 use std::sync::Arc;
@@ -25,11 +29,57 @@ struct NextItem {
 }
 
 /// Spawn the background countdown loop. Call once during app setup.
-pub fn spawn(app: &AppHandle, shutdown: tokio_util::sync::CancellationToken) {
+///
+/// `bus` is used to subscribe to domain events that invalidate the cached
+/// "next item" so we avoid 30 s DB polling when nothing has changed.
+pub fn spawn(
+    app: &AppHandle,
+    shutdown: tokio_util::sync::CancellationToken,
+    bus: Arc<bus::DomainEventBus>,
+) {
+    // Start dirty so we load on the very first tick.
+    let dirty = Arc::new(AtomicBool::new(true));
+
+    // Bus subscriber — marks dirty on any event that affects the next item.
+    let dirty_sub = Arc::clone(&dirty);
+    let shutdown_sub = shutdown.clone();
+    tokio::spawn(async move {
+        let mut rx = bus.subscribe();
+        loop {
+            tokio::select! {
+                _ = shutdown_sub.cancelled() => break,
+                evt = rx.recv() => match evt {
+                    Ok(e) if is_cache_invalidating(&e) => {
+                        dirty_sub.store(true, Ordering::Relaxed);
+                    }
+                    Ok(_) => {}
+                    Err(tokio::sync::broadcast::error::RecvError::Lagged(_)) => {
+                        // Lagged — mark dirty to be safe.
+                        dirty_sub.store(true, Ordering::Relaxed);
+                    }
+                    Err(tokio::sync::broadcast::error::RecvError::Closed) => break,
+                }
+            }
+        }
+    });
+
+    // Display tick loop (1 s when counting down, IDLE_TICK_SECS otherwise).
     let app = app.clone();
     tauri::async_runtime::spawn(async move {
-        countdown_loop(app, shutdown).await;
+        countdown_loop(app, shutdown, dirty).await;
     });
+}
+
+/// Returns `true` for domain events that should invalidate the cached next item.
+fn is_cache_invalidating(evt: &bus::DomainEvent) -> bool {
+    matches!(
+        evt,
+        bus::DomainEvent::TaskDueDateChanged { .. }
+            | bus::DomainEvent::TaskFocusChanged { .. }
+            | bus::DomainEvent::AlarmFired { .. }
+            | bus::DomainEvent::AlarmSnoozed { .. }
+            | bus::DomainEvent::AlarmCancelled { .. }
+    )
 }
 
 /// Notify the countdown that the focus timer state changed — re-evaluate
@@ -41,13 +91,15 @@ pub fn notify_focus_ended(app: &AppHandle) {
     }
 }
 
-const POLL_INTERVAL_SECS: u64 = 30;
 /// Slow tick when nothing is actively counting down (saves ~86K wakeups/day).
 const IDLE_TICK_SECS: u64 = 10;
 
-async fn countdown_loop(app: AppHandle, shutdown: tokio_util::sync::CancellationToken) {
+async fn countdown_loop(
+    app: AppHandle,
+    shutdown: tokio_util::sync::CancellationToken,
+    dirty: Arc<AtomicBool>,
+) {
     let mut cached: Option<NextItem> = None;
-    let mut poll_counter: u64 = 0;
     let mut interval = tokio::time::interval(tokio::time::Duration::from_secs(1));
 
     loop {
@@ -59,7 +111,7 @@ async fn countdown_loop(app: AppHandle, shutdown: tokio_util::sync::Cancellation
         // If focus timer is active, it owns the tray title — skip
         if FOCUS_ACTIVE.load(Ordering::Relaxed) {
             cached = None;
-            poll_counter = 0;
+            dirty.store(true, Ordering::Relaxed);
             continue;
         }
 
@@ -90,12 +142,11 @@ async fn countdown_loop(app: AppHandle, shutdown: tokio_util::sync::Cancellation
             }
         }
 
-        // Re-query DB every POLL_INTERVAL_SECS or when cache is empty
-        if cached.is_none() || poll_counter >= POLL_INTERVAL_SECS {
-            poll_counter = 0;
+        // Re-query DB when the bus subscriber marked the cache dirty, or on
+        // first tick (dirty starts true).
+        if cached.is_none() || dirty.swap(false, Ordering::Relaxed) {
             cached = query_next_item(&app).await;
         }
-        poll_counter += 1;
 
         match &cached {
             Some(item) => {
@@ -106,7 +157,7 @@ async fn countdown_loop(app: AppHandle, shutdown: tokio_util::sync::Cancellation
                     // Item time has passed — clear and re-query next tick
                     set_tray_title(&app, "");
                     cached = None;
-                    poll_counter = 0;
+                    dirty.store(true, Ordering::Relaxed);
                     continue;
                 }
 

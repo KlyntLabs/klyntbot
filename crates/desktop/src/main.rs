@@ -681,8 +681,13 @@ fn run_desktop_app() {
 
             // Start the tray countdown (next upcoming event in menu bar)
             {
-                let shutdown = app.state::<Arc<app_core::AppCore>>().shutdown_token.clone();
-                tray_countdown::spawn(app.handle(), shutdown);
+                let core = app.state::<Arc<app_core::AppCore>>();
+                let shutdown = core.shutdown_token.clone();
+                let bus = core
+                    .domain_event_bus()
+                    .expect("domain event bus must be initialised before tray countdown")
+                    .clone();
+                tray_countdown::spawn(app.handle(), shutdown, bus);
             }
 
             Ok(())

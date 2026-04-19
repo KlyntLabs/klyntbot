@@ -2,6 +2,7 @@
 mod common;
 
 mod alarm_lifecycle;
+mod mcp_alarm_tool;
 mod channels;
 mod cognitive;
 mod cron_bridge_restart;
