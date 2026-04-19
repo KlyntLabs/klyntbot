@@ -20,6 +20,7 @@ members = [
     "crates/analytics",
     "crates/plugin-runtime",
     "crates/mcp",
+    "crates/notifications",
     "crates/desktop-shared",
     "crates/desktop",
     "crates/feature-notes",
@@ -84,6 +85,7 @@ voice-engine = { path = "crates/voice-engine" }
 feature-language-learning = { path = "crates/feature-language-learning" }
 extism = "1"
 mcp = { path = "crates/mcp" }
+notifications = { path = "crates/notifications" }
 rmcp = { version = "0.17", default-features = false }
 
 # Proc-macro dependencies

@@ -1,0 +1,23 @@
+[package]
+name = "notifications"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+common = { workspace = true }
+config = { workspace = true }
+bus = { workspace = true }
+storage = { workspace = true }
+scheduling = { workspace = true }
+tools-core = { workspace = true }
+tokio = { workspace = true, features = ["sync", "rt", "macros", "time"] }
+tracing = { workspace = true }
+thiserror = { workspace = true }
+async-trait = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+jiff = { workspace = true }
+uuid = { workspace = true, features = ["v4"] }
+
+[dev-dependencies]
+tokio = { workspace = true, features = ["test-util"] }
