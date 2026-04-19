@@ -23,7 +23,6 @@ pub struct NotificationDispatcher {
     default_channels: Vec<String>,
     quiet_hours: Option<QuietHoursPolicy>,
     log_repo: NotificationLogRepo,
-    #[allow(dead_code)] // Task 11: held-release consumption will use this
     held_repo: HeldNotificationsRepo,
     held_release: HeldReleaseService,
     retry: RetryPolicy,
@@ -81,15 +80,17 @@ impl NotificationDispatcher {
                                 payload_json,
                                 fired_at_ms: _,
                             }) => {
-                                if let Err(e) = svc
-                                    .handle_alarm_fired(&fire_id, &kind, &payload_json)
-                                    .await
-                                {
+                                let result = if kind == "held_release" {
+                                    svc.handle_held_release(&payload_json).await
+                                } else {
+                                    svc.handle_alarm_fired(&fire_id, &kind, &payload_json).await
+                                };
+                                if let Err(e) = result {
                                     warn!("dispatch failure for {fire_id}: {e}");
                                 }
                             }
                             Ok(DomainEvent::HeldNotificationReleased { .. }) => {
-                                // observability — Task 11 will handle release dispatch
+                                // observability hook — release dispatch is driven by AlarmFired(kind="held_release")
                             }
                             Ok(_) => {}
                             Err(e) => {
@@ -133,6 +134,65 @@ impl NotificationDispatcher {
             self.dispatch_one(&channel_name, &payload).await;
         }
         debug!("dispatched alarm {fire_id} kind={kind}");
+        Ok(())
+    }
+
+    async fn handle_held_release(&self, payload_json: &str) -> Result<()> {
+        let v: serde_json::Value =
+            serde_json::from_str(payload_json).unwrap_or(serde_json::Value::Null);
+        let held_id = v
+            .get("held_id")
+            .and_then(|x| x.as_str())
+            .unwrap_or("")
+            .to_string();
+        if held_id.is_empty() {
+            return Ok(());
+        }
+
+        // Fetch all pending rows (unconstrained by release_at_ms) so we can release
+        // a specific held_id regardless of when it was originally scheduled to release.
+        // The scheduler firing the alarm is the authoritative release signal.
+        let all_pending = self.held_repo.list_pending_before(i64::MAX).await?;
+        let Some(row) = all_pending.into_iter().find(|r| r.id == held_id) else {
+            debug!("held_release fired for unknown or already-released held_id={held_id}");
+            return Ok(());
+        };
+
+        let channels: Vec<String> = match serde_json::from_value(row.channels) {
+            Ok(v) => v,
+            Err(e) => {
+                tracing::warn!(held_id = %held_id, error = %e, "malformed channels JSON; skipping release");
+                return Ok(());
+            }
+        };
+        let payload = NotificationPayload {
+            alarm_id: row.alarm_id.clone(),
+            title: row
+                .payload
+                .get("title")
+                .and_then(|x| x.as_str())
+                .unwrap_or("Reminder")
+                .to_string(),
+            body: row
+                .payload
+                .get("body")
+                .and_then(|x| x.as_str())
+                .unwrap_or("")
+                .to_string(),
+            priority: match row.payload.get("priority").and_then(|x| x.as_str()) {
+                Some("urgent") => Priority::Urgent,
+                _ => Priority::Normal,
+            },
+        };
+        for ch in &channels {
+            self.dispatch_one(ch, &payload).await;
+        }
+        self.held_release.mark_released(&held_id).await?;
+        self.bus.publish(DomainEvent::HeldNotificationReleased {
+            held_id,
+            alarm_id: row.alarm_id,
+            channels,
+        });
         Ok(())
     }
 
