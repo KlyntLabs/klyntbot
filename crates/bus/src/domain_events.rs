@@ -580,6 +580,29 @@ pub enum DomainEvent {
         preview: String,
     },
 
+    // -- Notifications --
+    /// Emitted when a held notification is released (e.g. quiet hours ended).
+    HeldNotificationReleased {
+        held_id: String,
+        alarm_id: String,
+        channels: Vec<String>,
+    },
+
+    /// Emitted after all retry attempts for a notification delivery have been exhausted.
+    NotificationDeliveryFailed {
+        alarm_id: String,
+        channel: String,
+        error: String,
+        attempts: u32,
+    },
+
+    /// Emitted when a tray (system/menu-bar) notification should be shown.
+    TrayNotificationRequested {
+        title: String,
+        body: String,
+        alarm_id: Option<String>,
+    },
+
     // -- Scheduler alarms --
     /// A scheduled fire has matured. `kind` identifies which subsystem owns the fire;
     /// `ref_id` is that subsystem's identifier. Conventions:
@@ -712,6 +735,9 @@ impl DomainEvent {
             Self::FocusSessionSuspended { .. } => "FocusSessionSuspended",
             Self::CronCatchUpReady { .. } => "CronCatchUpReady",
             Self::WakePanelReady { .. } => "WakePanelReady",
+            Self::HeldNotificationReleased { .. } => "HeldNotificationReleased",
+            Self::NotificationDeliveryFailed { .. } => "NotificationDeliveryFailed",
+            Self::TrayNotificationRequested { .. } => "TrayNotificationRequested",
             Self::AlarmFired { .. } => "AlarmFired",
             Self::AlarmSnoozed { .. } => "AlarmSnoozed",
             Self::AlarmCancelled { .. } => "AlarmCancelled",
@@ -817,6 +843,10 @@ impl DomainEvent {
             | Self::FocusSessionSuspended { .. }
             | Self::CronCatchUpReady { .. }
             | Self::WakePanelReady { .. } => "lifecycle",
+
+            Self::HeldNotificationReleased { .. }
+            | Self::NotificationDeliveryFailed { .. }
+            | Self::TrayNotificationRequested { .. } => "notifications",
 
             Self::AlarmFired { .. }
             | Self::AlarmSnoozed { .. }
@@ -1036,6 +1066,54 @@ mod tests {
             }
             _ => panic!("wrong variant"),
         }
+    }
+
+    #[test]
+    fn held_notification_released_event_round_trips() {
+        use super::DomainEvent;
+        let e = DomainEvent::HeldNotificationReleased {
+            held_id: "h1".into(),
+            alarm_id: "fire_1".into(),
+            channels: vec!["telegram".into()],
+        };
+        let s = serde_json::to_string(&e).unwrap();
+        let parsed: DomainEvent = serde_json::from_str(&s).unwrap();
+        assert!(matches!(
+            parsed,
+            DomainEvent::HeldNotificationReleased { .. }
+        ));
+    }
+
+    #[test]
+    fn notification_delivery_failed_event_round_trips() {
+        use super::DomainEvent;
+        let e = DomainEvent::NotificationDeliveryFailed {
+            alarm_id: "fire_1".into(),
+            channel: "discord".into(),
+            error: "500".into(),
+            attempts: 3,
+        };
+        let s = serde_json::to_string(&e).unwrap();
+        let parsed: DomainEvent = serde_json::from_str(&s).unwrap();
+        assert!(matches!(
+            parsed,
+            DomainEvent::NotificationDeliveryFailed { .. }
+        ));
+    }
+
+    #[test]
+    fn tray_notification_requested_event_round_trips() {
+        use super::DomainEvent;
+        let e = DomainEvent::TrayNotificationRequested {
+            title: "ping".into(),
+            body: "hello".into(),
+            alarm_id: Some("fire_1".into()),
+        };
+        let s = serde_json::to_string(&e).unwrap();
+        assert!(matches!(
+            serde_json::from_str::<DomainEvent>(&s).unwrap(),
+            DomainEvent::TrayNotificationRequested { .. }
+        ));
     }
 
     #[test]
