@@ -1,5 +1,11 @@
 export type LauncherMode = "dashboard" | "search" | "detail" | "chat" | "recording";
 
+export interface LauncherExecuteResult {
+  status: { kind: "ok" } | { kind: "err"; message: string };
+  message?: string | null;
+  badge: "success" | "warn" | "error" | "info";
+}
+
 export interface LauncherItem {
   id: string;
   title: string;
@@ -7,6 +13,7 @@ export interface LauncherItem {
   icon?: string;
   kind: LauncherItemKind;
   score: number;
+  noView?: boolean;
 }
 
 export type LauncherItemKind =
