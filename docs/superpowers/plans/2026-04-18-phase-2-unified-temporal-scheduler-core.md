@@ -2279,6 +2279,12 @@ git commit -m "feat(app-core): wire TemporalScheduler, subscribe to SystemDidWak
 
 ## Task 14: Delete old `CronService`
 
+> **Status: DEFERRED to Phase 3.** The original plan intended to delete `CronService` at the end of Phase 2. During execution we discovered `CronService` has ~1400 lines of callback consumers in `crates/app-core/src/init/cron.rs` (proactive scan, notification dispatcher, autotuner, decomposition/forecast handlers, suggestion applier). Deleting it requires re-plumbing each callback as a `DomainEvent::AlarmFired` bus subscriber — that is Phase 3 work, not Phase 2.
+>
+> Phase 2 ships `CronService` and `TemporalScheduler` running side-by-side via `crates/app-core/src/init/temporal_scheduler.rs`. Both process cron_jobs independently; the duplicate work is harmless because Phase 2's `AlarmFired` bus events have no non-wake subscribers.
+>
+> The task description below is retained for historical reference and will be executed in Phase 3.
+
 **Files:**
 - Delete: `crates/scheduling/src/service/` (entire directory)
 - Modify: `crates/scheduling/src/lib.rs`

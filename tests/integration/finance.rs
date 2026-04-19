@@ -762,7 +762,7 @@ async fn report_spending_shows_category_breakdown() {
     let account_id = extract_field(&acct, "id").unwrap();
 
     // Add expenses in different categories this month
-    let today = chrono::Local::now().date_naive();
+    let today = jiff::Zoned::now().date();
     let tx_date = today.to_string();
 
     for (cat, amount) in &[

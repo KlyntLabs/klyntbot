@@ -5,7 +5,6 @@
 //!
 //! Ported from feature-todo's `rrule_utils.rs` without modification.
 
-use chrono::{DateTime, NaiveDateTime, Utc};
 use common::Result;
 use jiff::Timestamp;
 use rrule::RRuleSet;
@@ -60,12 +59,10 @@ pub struct RRule {
 
 fn parse_ical_datetime(s: &str) -> std::result::Result<Timestamp, String> {
     let s = s.trim();
-    NaiveDateTime::parse_from_str(s, "%Y%m%dT%H%M%SZ")
-        .map(|ndt| ndt.and_utc())
-        .map(|dt: DateTime<Utc>| {
-            Timestamp::from_millisecond(dt.timestamp_millis())
-                .expect("timestamp in range")
-        })
+    // Format: 20200101T000000Z — parse as a jiff civil datetime and treat as UTC.
+    jiff::civil::DateTime::strptime("%Y%m%dT%H%M%SZ", s)
+        .and_then(|cdt| cdt.to_zoned(jiff::tz::TimeZone::UTC))
+        .map(|z| z.timestamp())
         .map_err(|e| format!("Invalid datetime '{}': {}", s, e))
 }
 
@@ -190,25 +187,22 @@ impl RRule {
             parts.push(format!("COUNT={}", count));
         }
         if let Some(until) = self.until {
-            let chrono_until = DateTime::<Utc>::from_timestamp_millis(until.as_millisecond())
-                .expect("timestamp in range");
-            parts.push(format!("UNTIL={}", chrono_until.format("%Y%m%dT%H%M%SZ")));
+            let z = until.to_zoned(jiff::tz::TimeZone::UTC);
+            parts.push(format!("UNTIL={}", z.strftime("%Y%m%dT%H%M%SZ")));
         }
 
         parts.join(";")
     }
 
     pub fn next_occurrences(&self, from: Timestamp, max: usize) -> Result<Vec<Timestamp>> {
-        let chrono_from = DateTime::<Utc>::from_timestamp_millis(from.as_millisecond())
-            .expect("timestamp in range");
-        let dtstart = format!("DTSTART:{}", chrono_from.format("%Y%m%dT%H%M%SZ"));
+        let from_z = from.to_zoned(jiff::tz::TimeZone::UTC);
+        let dtstart = format!("DTSTART:{}", from_z.strftime("%Y%m%dT%H%M%SZ"));
         let core = self.core_rule_string();
         let mut lines = vec![dtstart, format!("RRULE:{}", core)];
 
         for exd in &self.exdate {
-            let chrono_exd = DateTime::<Utc>::from_timestamp_millis(exd.as_millisecond())
-                .expect("timestamp in range");
-            lines.push(format!("EXDATE:{}", chrono_exd.format("%Y%m%dT%H%M%SZ")));
+            let exd_z = exd.to_zoned(jiff::tz::TimeZone::UTC);
+            lines.push(format!("EXDATE:{}", exd_z.strftime("%Y%m%dT%H%M%SZ")));
         }
 
         let full = lines.join("\n");
@@ -218,15 +212,16 @@ impl RRule {
 
         let limit = max + 1;
         let result = rrule_set.all(limit as u16);
+        // The rrule crate returns chrono::DateTime<chrono_tz::Tz>; convert to jiff::Timestamp
+        // via the Unix timestamp so we stay at the boundary.
         let dates: Vec<Timestamp> = result
             .dates
             .into_iter()
-            .map(|dt| dt.with_timezone(&Utc))
-            .filter(|dt| *dt > chrono_from)
-            .take(max)
             .map(|dt| {
                 Timestamp::from_millisecond(dt.timestamp_millis()).expect("timestamp in range")
             })
+            .filter(|ts| *ts > from)
+            .take(max)
             .collect();
 
         Ok(dates)
