@@ -41,6 +41,10 @@ export default defineConfig({
     minify: !process.env.TAURI_ENV_DEBUG ? "esbuild" : false,
     sourcemap: !!process.env.TAURI_ENV_DEBUG,
     rollupOptions: {
+      input: {
+        main: path.resolve(__dirname, 'index.html'),
+        statusBadge: path.resolve(__dirname, 'status-badge.html'),
+      },
       output: {
         manualChunks: {
           three: ["three", "react-force-graph-2d", "react-force-graph-3d"],
