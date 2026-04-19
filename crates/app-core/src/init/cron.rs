@@ -238,6 +238,9 @@ fn register_cron_callbacks(
                                     - jiff::Timestamp::now().as_millisecond())
                                     / 3_600_000;
                                 if hours_left <= 1 && hours_left > 0 {
+                                    // TODO(phase-4): route through NotificationDispatcher so cron
+                                    // notifications honour quiet hours / retry / idempotency.
+                                    // Today this publishes directly to bypass the dispatcher pipeline.
                                     domain_bus.publish(
                                         bus::DomainEvent::TrayNotificationRequested {
                                             title: "⏰ Focus Deadline: 1h left".into(),
@@ -296,6 +299,9 @@ fn register_cron_callbacks(
                             summary.done,
                             overdue.len()
                         );
+                        // TODO(phase-4): route through NotificationDispatcher so cron
+                        // notifications honour quiet hours / retry / idempotency.
+                        // Today this publishes directly to bypass the dispatcher pipeline.
                         domain_bus.publish(bus::DomainEvent::TrayNotificationRequested {
                             title: "📋 Daily Task Digest".into(),
                             body,
@@ -336,6 +342,9 @@ fn register_cron_callbacks(
                                 "{} task(s) auto-unfocused due to {}h deadline",
                                 expired_count, config_focus.deadline_hours
                             );
+                            // TODO(phase-4): route through NotificationDispatcher so cron
+                            // notifications honour quiet hours / retry / idempotency.
+                            // Today this publishes directly to bypass the dispatcher pipeline.
                             domain_bus.publish(bus::DomainEvent::TrayNotificationRequested {
                                 title: "⏰ Focus Tasks Expired".into(),
                                 body,

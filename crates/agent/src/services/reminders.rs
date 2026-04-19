@@ -20,6 +20,9 @@ pub struct ReminderEngine {
     cancel_token: CancellationToken,
 }
 
+// TODO(phase-4): all three TrayNotificationRequested publish sites in this impl
+// bypass NotificationDispatcher and therefore skip quiet hours / retry / idempotency.
+// Route them through NotificationDispatcher once Phase 4 lands.
 impl ReminderEngine {
     /// Create a new ReminderEngine backed by a SQL TodoRepo.
     pub fn new(

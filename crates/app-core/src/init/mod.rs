@@ -570,7 +570,7 @@ impl AppCore {
             });
         }
 
-        // ── Phase 3: New NotificationDispatcher ──────────────────────────
+        // ── Notification Dispatcher ───────────────────────────────────────
         // Run migration for notification tables (notification_log, held_notifications).
         ::storage::StoragePool::run_feature_migrations(
             storage_pool.inner(),
@@ -759,7 +759,7 @@ impl AppCore {
             pending_memory_repo,
             _mirror_handles: mirror_handles,
             _mirror_shutdown: mirror_shutdown,
-            _notification_dispatcher_handle: notification_dispatcher_handle,
+            notification_dispatcher_handle,
             _config_watcher_token: Some(config_watcher_token),
             _lifecycle_monitor: None,
             _wake_orchestrator_handle: None,

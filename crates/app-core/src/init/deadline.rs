@@ -19,6 +19,9 @@ use tracing::{debug, info, warn};
 
 /// Convenience: publish a tray notification via the domain event bus.
 fn notify_tray(bus: &DomainEventBus, title: impl Into<String>, body: impl Into<String>) {
+    // TODO(phase-4): route through NotificationDispatcher so deadline notifications
+    // honour quiet hours / retry / idempotency. Today this publishes directly
+    // to bypass the dispatcher pipeline.
     bus.publish(DomainEvent::TrayNotificationRequested {
         title: title.into(),
         body: body.into(),

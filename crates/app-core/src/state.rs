@@ -143,7 +143,7 @@ pub struct AppCore {
     /// Cancellation token for the MirrorEngine background subscribers.
     pub _mirror_shutdown: Option<CancellationToken>,
     /// Phase-3 NotificationDispatcher handle (kept alive for app lifetime).
-    pub _notification_dispatcher_handle: Option<notifications::NotificationDispatcherHandle>,
+    pub notification_dispatcher_handle: Option<notifications::NotificationDispatcherHandle>,
     /// Cancellation token for the config file watcher background service.
     pub _config_watcher_token: Option<CancellationToken>,
     /// Lifecycle monitor handle (macOS sleep/wake + idle detection).
@@ -465,6 +465,10 @@ impl AppCore {
         // so they stop consuming domain events immediately.
         if let Some(ref token) = self._mirror_shutdown {
             token.cancel();
+        }
+        // Stop the NotificationDispatcher select loop.
+        if let Some(ref handle) = self.notification_dispatcher_handle {
+            handle.shutdown.cancel();
         }
         // Abort the voice conversation loop if still running.
         if let Some(ref handle) = self.voice_loop_handle {
