@@ -200,7 +200,7 @@ impl TemporalScheduler {
                     }
                 }
             }
-            if kind == RECURRENCE_SPAWN_KIND {
+            if kind == "recurrence_spawn" {
                 if let (Some(engine), Some(ref_id)) = (&self.recurrence_engine, &ref_id) {
                     if let Err(e) = engine.on_spawn(ref_id, now).await {
                         warn!(error = %e, template_id = %ref_id, "recurrence_spawn engine failed during recovery");
@@ -325,7 +325,7 @@ impl TemporalScheduler {
         }
 
         // Recurrence spawn: materialise task instances via the engine.
-        if row.kind == RECURRENCE_SPAWN_KIND {
+        if row.kind == "recurrence_spawn" {
             if let (Some(engine), Some(ref_id)) = (&self.recurrence_engine, &row.ref_id) {
                 if let Err(e) = engine.on_spawn(ref_id, now).await {
                     warn!(error = %e, template_id = %ref_id, "recurrence_spawn engine failed");

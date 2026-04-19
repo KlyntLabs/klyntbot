@@ -177,7 +177,6 @@ impl AppCore {
             scheduler: temporal_scheduler,
             scheduler_handle: temporal_scheduler_handle,
             wake_subscriber: temporal_wake_subscriber,
-            cron_bridge,
         } = temporal_scheduler::init_temporal_scheduler(
             &repos,
             Arc::clone(&domain_event_bus),
