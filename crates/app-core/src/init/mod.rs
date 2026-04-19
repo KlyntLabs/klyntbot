@@ -154,7 +154,7 @@ impl AppCore {
 
         // ── Phase 2: Cron ────────────────────────────────────────────────
         let cron::CronResult {
-            cron_service,
+            cron_executor,
             proactive_handler,
             suggestion_applier,
             decomposition_handler,
@@ -285,7 +285,8 @@ impl AppCore {
             &bus,
             cognitive_provider,
             &domain_event_bus,
-            &cron_service,
+            &cron_executor,
+            &repos.cron,
             autotuner.as_ref(),
             Arc::clone(&hot_config),
             Some(Arc::clone(&context_update_queue)),
@@ -673,6 +674,12 @@ impl AppCore {
         // Clone mirror_facade before move into AppCore (needed for VoiceService echo provider)
         let mirror_facade_for_voice = mirror_facade.clone();
 
+        // ── Start CronExecutor subscriber loop ───────────────────────────
+        // Must start before AppCore is assembled so the executor can process
+        // AlarmFired events from TemporalScheduler immediately after startup.
+        let _cron_executor_handle = cron_executor.start(shutdown_token.clone());
+        info!("CronExecutor subscriber started");
+
         // ── Assemble AppCore ─────────────────────────────────────────────
         // Clone cron_repo before repos is moved into AppCore.
         let cron_repo = repos.cron.clone();
@@ -686,7 +693,7 @@ impl AppCore {
             config: Arc::clone(&shared_config),
             hot_config: Arc::clone(&hot_config),
             channel_manager: channel_manager.clone(),
-            cron_service: cron_service.clone(),
+            cron_executor: cron_executor.clone(),
             cron_repo,
             cron_bridge: Arc::new(cron_bridge),
             shutdown_token: shutdown_token.clone(),
@@ -1085,7 +1092,7 @@ impl AppCore {
             let svc = Arc::clone(insight_svc);
             let note_repo_clone = core.note_repo.clone();
             let rt = tokio::runtime::Handle::current();
-            cron_service.register_handler(
+            cron_executor.register(
                 cron::JOB_INSIGHT_REFRESH,
                 Arc::new(move |_job: &scheduling::CronJob| {
                     let svc = Arc::clone(&svc);
@@ -1115,7 +1122,7 @@ impl AppCore {
                     .unwrap_or_else(|| cfg.agents.defaults.model.clone())
             };
             let rt = tokio::runtime::Handle::current();
-            cron_service.register_handler(
+            cron_executor.register(
                 cron::JOB_CROSS_DOMAIN_NIGHTLY,
                 Arc::new(move |_job: &scheduling::CronJob| {
                     let pool = pool.clone();
@@ -1140,7 +1147,6 @@ impl AppCore {
             if let Some(ref bus) = core.domain_event_bus {
                 let lifecycle_config = lifecycle_config_snapshot.clone();
                 let bus_clone = bus.clone();
-                let cron_clone = cron_service.clone();
 
                 let monitor_config = platform_macos::lifecycle::MonitorConfig {
                     idle_threshold_secs: lifecycle_config.idle_threshold_secs,
@@ -1160,38 +1166,22 @@ impl AppCore {
                         };
                         match event {
                             LE::SystemWillSleep => {
+                                // Publish SystemWillSleep so subscribers can react.
+                                // CronService sleep-start tracking removed (4.4c) —
+                                // TemporalScheduler's SystemDidWake subscriber handles wake catch-up.
                                 bus_clone.publish(bus::DomainEvent::SystemWillSleep);
-                                let cron = cron_clone.clone();
-                                tokio::task::block_in_place(|| {
-                                    tokio::runtime::Handle::current()
-                                        .block_on(cron.on_system_will_sleep());
-                                });
                             }
                             LE::SystemDidWake {
                                 away_duration,
                                 wake_type,
                             } => {
                                 let away_secs = away_duration.as_secs();
+                                // SystemDidWake triggers TemporalScheduler::wake() via its own
+                                // bus subscriber (init_temporal_scheduler). No CronService
+                                // miss-classification needed — TemporalScheduler reconciles.
                                 bus_clone.publish(bus::DomainEvent::SystemDidWake {
                                     away_secs,
                                     wake_type: bus_wt(wake_type),
-                                });
-                                // Spawn classification + cheap job execution so the
-                                // callback returns immediately without blocking the
-                                // lifecycle polling thread.
-                                let cron = cron_clone.clone();
-                                let bus2 = bus_clone.clone();
-                                tokio::spawn(async move {
-                                    let (immediate, deferred, expired) =
-                                        cron.on_system_did_wake().await;
-                                    bus2.publish(bus::DomainEvent::CronCatchUpReady {
-                                        immediate_count: immediate.len(),
-                                        deferred_count: deferred.len(),
-                                        expired_count: expired.len(),
-                                    });
-                                    for job in &immediate {
-                                        let _ = cron.run_job(&job.id, false).await;
-                                    }
                                 });
                             }
                             LE::UserBecameIdle { idle_secs } => {

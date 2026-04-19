@@ -6,15 +6,7 @@ use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
-type OnChangeFn = Arc<dyn Fn(Vec<DebouncedEvent>) -> BoxFuture<'static, ()> + Send + Sync>;
-
-type SourceEntry = (
-    PathBuf,
-    bool,
-    Arc<dyn SearchSource>,
-    Option<Duration>,
-    Option<OnChangeFn>,
-);
+type SourceEntry = (PathBuf, Arc<dyn SearchSource>, Option<Duration>, bool);
 
 /// A file path to watch, the source to refresh on change, and an optional
 /// minimum interval between refreshes (cooldown). Sources like browser history
@@ -26,11 +18,9 @@ pub struct WatchEntry {
     /// When `Some`, refreshes are skipped if the previous refresh was less than
     /// this duration ago. `None` means refresh on every debounced event.
     pub min_interval: Option<Duration>,
-    /// Whether to watch subdirectories recursively.
+    /// Whether to watch the path recursively. Needed for directories like
+    /// `/Applications` where app bundles are created as nested trees.
     pub recursive: bool,
-    /// Optional custom handler invoked instead of `source.refresh()`.
-    /// Receives the batch of debounced events that triggered this watch entry.
-    pub on_change: Option<OnChangeFn>,
 }
 
 pub struct SourceFileWatcher {
@@ -43,7 +33,7 @@ impl SourceFileWatcher {
             watches
                 .into_iter()
                 .filter(|w| w.path.exists())
-                .map(|w| (w.path, w.recursive, w.source, w.min_interval, w.on_change))
+                .map(|w| (w.path, w.source, w.min_interval, w.recursive))
                 .collect(),
         );
 
@@ -84,6 +74,24 @@ impl SourceFileWatcher {
                     if matched.is_empty() {
                         continue;
                     }
+                    let changed = &event.path;
+                    for (watched_path, source, min_interval, _) in map_clone.iter() {
+                        if changed.starts_with(watched_path) || changed == watched_path {
+                            // Enforce per-source cooldown
+                            if let Some(interval) = min_interval {
+                                let name = source.name();
+                                if let Some(last) = cooldowns.get(name) {
+                                    if last.elapsed() < *interval {
+                                        tracing::debug!(
+                                            "Skipping refresh for {} (cooldown {:.0?} remaining)",
+                                            name,
+                                            *interval - last.elapsed(),
+                                        );
+                                        break;
+                                    }
+                                }
+                                cooldowns.insert(name, Instant::now());
+                            }
 
                     // Enforce per-source cooldown
                     if let Some(interval) = min_interval {
@@ -125,7 +133,7 @@ impl SourceFileWatcher {
             },
         )?;
 
-        for (path, recursive, source, _, _) in &*source_map {
+        for (path, source, _, recursive) in &*source_map {
             let mode = if *recursive {
                 notify::RecursiveMode::Recursive
             } else {

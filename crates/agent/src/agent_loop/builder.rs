@@ -39,7 +39,7 @@ use super::{AgentLoop, LastActiveChannel};
 /// Builder for constructing an [`AgentLoop`] with all its dependencies.
 ///
 /// Required fields (`bus`, `provider`, `config`) are constructor params.
-/// Optional: `pool` (enables feature-tasks, finance), `cron_service`, `notification_handle`.
+/// Optional: `pool` (enables feature-tasks, finance), `cron_executor`, `notification_handle`.
 ///
 /// # Example
 /// ```ignore
@@ -75,7 +75,10 @@ pub struct AgentLoopBuilder {
     config: Config,
     pool: Option<sqlx::SqlitePool>,
     vector_store: Option<storage::VectorStore>,
-    cron_service: Option<Arc<scheduling::CronService>>,
+    cron_executor: Option<(
+        Arc<scheduling::temporal::cron_executor::CronExecutor>,
+        storage::repos::cron::CronRepo,
+    )>,
     notification_handle: Option<LastActiveChannel>,
     notification_sender: Option<Arc<dyn common::NotificationSender>>,
     domain_event_bus: Option<Arc<bus::DomainEventBus>>,
@@ -98,7 +101,7 @@ impl AgentLoopBuilder {
             config,
             pool: None,
             vector_store: None,
-            cron_service: None,
+            cron_executor: None,
             notification_handle: None,
             notification_sender: None,
             domain_event_bus: None,
@@ -128,8 +131,12 @@ impl AgentLoopBuilder {
         self
     }
 
-    pub fn with_cron_service(mut self, service: Arc<scheduling::CronService>) -> Self {
-        self.cron_service = Some(service);
+    pub fn with_cron_executor(
+        mut self,
+        executor: Arc<scheduling::temporal::cron_executor::CronExecutor>,
+        repo: storage::repos::cron::CronRepo,
+    ) -> Self {
+        self.cron_executor = Some((executor, repo));
         self
     }
 
@@ -635,9 +642,9 @@ impl AgentLoopBuilder {
 
         // Cron tool (optional)
         let cron_handler: Option<Arc<dyn tools::cron_tool::CronHandler>> =
-            if let Some(ref cron_svc) = self.cron_service {
+            if let Some((ref executor, ref repo)) = self.cron_executor {
                 let adapter: Arc<dyn tools::cron_tool::CronHandler> =
-                    Arc::new(CronHandlerAdapter::new(Arc::clone(cron_svc)));
+                    Arc::new(CronHandlerAdapter::new(Arc::clone(executor), repo.clone()));
                 tool_registry.register(CronTool::with_handler(Arc::clone(&adapter)));
                 Some(adapter)
             } else {
@@ -1696,9 +1703,9 @@ impl AgentLoopBuilder {
 
             // Register cron handler so the learning analysis shows in the Automations page.
             // The handler triggers the existing background loop rather than running inline.
-            if let Some(ref cron_svc) = self.cron_service {
+            if let Some((ref executor, _)) = self.cron_executor {
                 let svc_for_cron = Arc::clone(&svc_arc);
-                cron_svc.register_handler(
+                executor.register(
                     "__klyntbot_learning_analysis",
                     Arc::new(move |_job: &scheduling::CronJob| {
                         let svc = Arc::clone(&svc_for_cron);

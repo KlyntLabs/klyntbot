@@ -139,6 +139,23 @@ impl CronRepo {
         Ok(())
     }
 
+    /// Set or clear the intent window for a cron job by name.
+    ///
+    /// No-op if no job with that name exists. The `intent_window` column stores
+    /// the JSON-serialised `IntentWindow`; pass `None` to clear.
+    pub async fn set_intent_window_by_name(
+        &self,
+        name: &str,
+        intent_window_json: Option<&str>,
+    ) -> Result<(), StorageError> {
+        sqlx::query("UPDATE cron_jobs SET intent_window = ?1 WHERE name = ?2")
+            .bind(intent_window_json)
+            .bind(name)
+            .execute(&self.pool)
+            .await?;
+        Ok(())
+    }
+
     /// Delete a cron job by ID.
     pub async fn delete(&self, id: &str) -> Result<bool, StorageError> {
         let result = sqlx::query("DELETE FROM cron_jobs WHERE id = ?1")

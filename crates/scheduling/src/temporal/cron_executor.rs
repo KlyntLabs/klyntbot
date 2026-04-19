@@ -105,6 +105,49 @@ impl CronExecutor {
         })
     }
 
+    /// Immediately invoke the handler for the given job ID, if registered.
+    ///
+    /// Used by the CronTool "run" action for manual / forced job execution.
+    /// Returns `Ok(true)` if the handler was found and invoked, `Ok(false)` if
+    /// no job with that ID exists in the repo.
+    pub async fn run_now(&self, job_id: &str) -> Result<bool> {
+        let row = match self.cron_repo.get_opt(job_id).await {
+            Ok(Some(r)) => r,
+            Ok(None) => return Ok(false),
+            Err(e) => {
+                return Err(common::KlyntbotError::Storage(format!(
+                    "CronExecutor::run_now DB error: {e}"
+                )))
+            }
+        };
+        let job = row_to_job(row);
+        let job_name = job.name.clone();
+
+        let handler = {
+            let guard = self
+                .handlers
+                .read()
+                .expect("CronExecutor handler lock poisoned");
+            guard.get(&job_name).cloned()
+        };
+
+        match handler {
+            None => {
+                warn!("CronExecutor::run_now: no handler for '{}'", job_name);
+                Ok(false)
+            }
+            Some(cb) => {
+                info!("CronExecutor::run_now: executing '{}'", job_name);
+                match tokio::task::spawn_blocking(move || cb(&job)).await {
+                    Ok(Ok(_)) => info!("CronExecutor::run_now: '{}' completed", job_name),
+                    Ok(Err(e)) => error!("CronExecutor::run_now: '{}' failed: {}", job_name, e),
+                    Err(e) => error!("CronExecutor::run_now: '{}' panicked: {}", job_name, e),
+                }
+                Ok(true)
+            }
+        }
+    }
+
     /// Resolve the cron job and invoke the handler, if registered.
     async fn dispatch(
         cron_repo: &CronRepo,
@@ -173,15 +216,9 @@ impl CronExecutor {
                         Ok(()) => {}
                         Err(join_err) => {
                             if join_err.is_panic() {
-                                error!(
-                                    "CronExecutor: job '{}' panicked",
-                                    job_name_for_watcher
-                                );
+                                error!("CronExecutor: job '{}' panicked", job_name_for_watcher);
                             } else if join_err.is_cancelled() {
-                                warn!(
-                                    "CronExecutor: job '{}' cancelled",
-                                    job_name_for_watcher
-                                );
+                                warn!("CronExecutor: job '{}' cancelled", job_name_for_watcher);
                             }
                         }
                     }
@@ -448,9 +485,7 @@ mod tests {
     #[tokio::test]
     async fn handler_panic_is_logged_and_executor_continues() {
         let repo = setup_repo().await;
-        repo.upsert(&make_row("job-6a", "panic_job"))
-            .await
-            .unwrap();
+        repo.upsert(&make_row("job-6a", "panic_job")).await.unwrap();
         repo.upsert(&make_row("job-6b", "survivor_job"))
             .await
             .unwrap();

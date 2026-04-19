@@ -3,7 +3,7 @@ use std::sync::Arc;
 use agent::{AgentLoop, PersonaManager};
 use bus::{DomainEventBus, MessageBus};
 use cognitive::situation::UserSituation;
-use scheduling::CronService;
+use scheduling::temporal::cron_executor::CronExecutor;
 use storage::{Repos, StoragePool, VectorStore};
 use tokio::sync::{mpsc, Mutex, RwLock};
 use tracing::info;
@@ -34,7 +34,8 @@ pub(super) async fn init_agent(
     bus: &Arc<MessageBus>,
     cognitive_provider: Option<providers::DynProvider>,
     domain_event_bus: &Arc<DomainEventBus>,
-    cron_service: &Arc<CronService>,
+    cron_executor: &Arc<CronExecutor>,
+    cron_repo: &storage::repos::cron::CronRepo,
     autotuner: Option<&Arc<agent::autotuner::AutoTunerOrchestrator>>,
     hot_config: Arc<RwLock<config::HotConfig>>,
     context_update_queue: Option<Arc<bus::ContextUpdateQueue>>,
@@ -76,7 +77,7 @@ pub(super) async fn init_agent(
     let pipeline_tx = pipeline_broadcast_tx.clone();
     let mut builder = AgentLoop::builder(bus.clone(), provider, config.clone())
         .with_pool(storage_pool.inner().clone())
-        .with_cron_service(cron_service.clone());
+        .with_cron_executor(Arc::clone(cron_executor), cron_repo.clone());
 
     if let Some(engine) = embedding_engine {
         builder = builder.with_embedding_engine(engine);

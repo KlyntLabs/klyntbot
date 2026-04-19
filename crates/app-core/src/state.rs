@@ -14,7 +14,7 @@ use feature_notes::repo::{NoteRepo, PracticeSessionRepo};
 use feature_productivity::repos::ProductivityRepos;
 use feature_productivity::{DailyAggregator, FocusManager, NudgeService, ProductivityEngine};
 use scheduling::temporal::cron_bridge::CronBridge;
-use scheduling::CronService;
+use scheduling::temporal::cron_executor::CronExecutor;
 use storage::{repos::cron::CronRepo, Repos, StoragePool, VectorStore};
 use tokio::sync::{broadcast, oneshot, Mutex, RwLock};
 use tokio_util::sync::CancellationToken;
@@ -48,8 +48,8 @@ pub struct AppCore {
     pub hot_config: Arc<RwLock<config::HotConfig>>,
 
     pub channel_manager: Arc<Mutex<ChannelManager>>,
-    pub cron_service: Arc<CronService>,
-    /// Direct SQL repo for cron job CRUD — used by handlers instead of CronService.
+    pub cron_executor: Arc<CronExecutor>,
+    /// Direct SQL repo for cron job CRUD — used by handlers and the CronTool adapter.
     pub cron_repo: CronRepo,
     /// Bridge that syncs `cron_jobs` rows into `scheduled_fires` after mutations.
     pub cron_bridge: Arc<CronBridge>,
@@ -133,7 +133,7 @@ pub struct AppCore {
     pub autotuner: Option<Arc<agent::autotuner::AutoTunerOrchestrator>>,
     /// Deadline scheduler for event-driven task reminders, focus warnings, and recurring spawns.
     pub deadline_scheduler: Option<Arc<scheduling::DeadlineScheduler>>,
-    /// Unified TemporalScheduler (Phase 2). Runs alongside legacy cron_service.
+    /// Unified TemporalScheduler — sole firing source post-4.4c.
     pub temporal_scheduler: Option<scheduling::temporal::TemporalScheduler>,
     /// Join handle for the TemporalScheduler background loop.
     pub _temporal_scheduler_handle: Option<tokio::task::JoinHandle<()>>,
@@ -480,7 +480,6 @@ impl AppCore {
             handle.abort();
         }
         self.shutdown_token.cancel();
-        self.cron_service.stop().await;
         if let Err(e) = self.storage_pool.optimize().await {
             tracing::warn!("SQLite PRAGMA optimize failed: {e}");
         }

@@ -16,7 +16,8 @@ use bus::DomainEventBus;
 use common::TrialParams;
 use config::AutoTunerConfig;
 use providers::{ChatParams, DynProvider, Message};
-use scheduling::{CronSchedule, CronService, JobCallback};
+use scheduling::temporal::cron_executor::CronHandler as JobCallback;
+use scheduling::{CronExecutor, CronSchedule};
 use storage::rows::trial::{ExperimentRow, TrialRow};
 use storage::{LearningStateRepo, OverallStats, StrategyRepo, TrialRepo};
 use tokio::sync::RwLock;
@@ -354,7 +355,7 @@ impl AutoTunerOrchestrator {
     /// Can be called before or after wrapping the `CronService` in `Arc`.
     pub fn register_nightly_cycle(
         orchestrator: Arc<Self>,
-        cron_service: &CronService,
+        cron_service: &CronExecutor,
         autotuner_config: AutoTunerConfig,
         trial_repo: TrialRepo,
         metric_source: Arc<dyn MetricSource>,
@@ -615,42 +616,58 @@ impl AutoTunerOrchestrator {
             })
         });
 
-        cron_service.register_handler(JOB_AUTOTUNER_NIGHTLY, callback);
+        cron_service.register(JOB_AUTOTUNER_NIGHTLY, callback);
     }
 
-    /// Ensure the nightly autotuner cron job exists in the CronService.
+    /// Ensure the nightly autotuner cron job exists via `CronRepo`.
     ///
     /// Idempotent — skips if a job with the same name already exists.
     pub async fn ensure_nightly_job(
-        cron_service: &Arc<CronService>,
+        cron_repo: &storage::CronRepo,
         schedule_expr: &str,
     ) -> common::Result<()> {
-        let existing: std::collections::HashSet<String> = cron_service
-            .list_jobs(true)
-            .await
-            .into_iter()
-            .map(|j| j.name)
-            .collect();
+        use jiff::Timestamp;
+        use storage::rows::cron::CronJobRow;
 
-        if !existing.contains(JOB_AUTOTUNER_NIGHTLY) {
-            cron_service
-                .add_job(
-                    JOB_AUTOTUNER_NIGHTLY,
-                    CronSchedule::Cron {
-                        expr: schedule_expr.to_string(),
-                        tz: None,
-                    },
-                    "Nightly autotuner evaluation and promotion cycle",
-                    false,
-                    None,
-                    None,
-                    false,
-                    scheduling::CronOrigin::System,
-                )
-                .await?;
-            info!("registered autotuner nightly cron job (schedule: {schedule_expr})");
+        let existing = cron_repo
+            .list()
+            .await
+            .map_err(|e| common::KlyntbotError::Storage(format!("cron list failed: {e}")))?;
+        if existing.iter().any(|r| r.name == JOB_AUTOTUNER_NIGHTLY) {
+            return Ok(());
         }
 
+        let now_ms = Timestamp::now().as_millisecond();
+        let id = uuid::Uuid::new_v4().to_string()[..8].to_string();
+        let row = CronJobRow {
+            id,
+            name: JOB_AUTOTUNER_NIGHTLY.to_string(),
+            enabled: true,
+            origin: "system".to_string(),
+            schedule: serde_json::to_value(&CronSchedule::Cron {
+                expr: schedule_expr.to_string(),
+                tz: None,
+            })
+            .expect("CronSchedule serialization is infallible"),
+            payload: serde_json::json!({
+                "message": "Nightly autotuner evaluation and promotion cycle",
+                "deliver": false,
+            }),
+            next_run_at_ms: None,
+            last_run_at_ms: None,
+            last_status: None,
+            last_error: None,
+            created_at_ms: now_ms,
+            updated_at_ms: now_ms,
+            delete_after_run: false,
+            intent_window: None,
+            intent_pending_since_ms: None,
+        };
+        cron_repo
+            .upsert(&row)
+            .await
+            .map_err(|e| common::KlyntbotError::Storage(format!("cron upsert failed: {e}")))?;
+        info!("registered autotuner nightly cron job (schedule: {schedule_expr})");
         Ok(())
     }
 

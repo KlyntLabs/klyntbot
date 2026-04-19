@@ -3,13 +3,13 @@ use std::sync::Arc;
 use bus::{DomainEventBus, MessageBus};
 use feature_tasks::handlers::suggestion_applier::SuggestionApplier;
 use feature_tasks::{DecompositionHandler, ForecastHandler, ProactiveHandler, TasksConfig};
-use scheduling::CronService;
+use scheduling::temporal::cron_executor::CronExecutor;
 use storage::Repos;
 use tracing::{info, warn};
 
 /// Results from the cron initialization phase.
 pub(super) struct CronResult {
-    pub cron_service: Arc<CronService>,
+    pub cron_executor: Arc<CronExecutor>,
     pub proactive_handler: Option<Arc<dyn feature_tasks::ProactiveHandler>>,
     pub suggestion_applier: Option<Arc<dyn SuggestionApplier>>,
     pub decomposition_handler: Option<Arc<dyn DecompositionHandler>>,
@@ -31,12 +31,8 @@ pub(super) async fn init_cron(
     tasks_config: TasksConfig,
     vector_store: Option<storage::VectorStore>,
 ) -> Result<CronResult, String> {
-    // 6. Cron service — set callbacks BEFORE wrapping in Arc
-    let mut cron_service = CronService::new(repos.cron.clone());
-    cron_service
-        .start()
-        .await
-        .map_err(|e| format!("cron start failed: {e}"))?;
+    // 6. CronExecutor — handler registration only; TemporalScheduler drives firing.
+    let cron_executor = CronExecutor::new(repos.cron.clone(), Arc::clone(domain_event_bus));
 
     // Build AI decomposition and forecast handlers.
     let decomposition_handler: Option<Arc<dyn DecompositionHandler>> = {
@@ -136,7 +132,7 @@ pub(super) async fn init_cron(
     let autotuner = Some(orchestrator);
 
     register_cron_callbacks(
-        &mut cron_service,
+        &cron_executor,
         repos,
         config,
         bus,
@@ -152,15 +148,15 @@ pub(super) async fn init_cron(
         autotuner.clone(),
     );
 
-    let cron_service = Arc::new(cron_service);
+    let cron_executor = Arc::new(cron_executor);
     ensure_cron_jobs(&repos.cron, config)
         .await
         .map_err(|e| format!("cron job registration failed: {e}"))?;
-    set_default_intent_windows(&cron_service).await;
-    info!("cron service started");
+    set_default_intent_windows(&repos.cron).await;
+    info!("cron executor initialized");
 
     Ok(CronResult {
-        cron_service,
+        cron_executor,
         proactive_handler: proactive_handler_out,
         suggestion_applier: suggestion_applier_out,
         decomposition_handler,
@@ -202,7 +198,7 @@ const JOB_REFORGE_NIGHTLY: &str = "__klyntbot_reforge_nightly";
 /// Register individual cron handlers.
 #[allow(clippy::too_many_arguments)]
 fn register_cron_callbacks(
-    cron_service: &mut CronService,
+    cron_executor: &CronExecutor,
     repos: &Repos,
     config: &config::Config,
     bus: &Arc<MessageBus>,
@@ -224,7 +220,7 @@ fn register_cron_callbacks(
         let todo_repo = repos.tasks.clone();
         let domain_bus = Arc::clone(domain_event_bus);
         let rt = rt.clone();
-        cron_service.register_handler(
+        cron_executor.register(
             JOB_FOCUS_CHECK,
             Arc::new(move |_job: &scheduling::CronJob| {
                 let todo_repo = todo_repo.clone();
@@ -282,7 +278,7 @@ fn register_cron_callbacks(
         let todo_repo = repos.tasks.clone();
         let domain_bus = Arc::clone(domain_event_bus);
         let rt = rt.clone();
-        cron_service.register_handler(
+        cron_executor.register(
             JOB_DAILY_DIGEST,
             Arc::new(move |_job: &scheduling::CronJob| {
                 let todo_repo = todo_repo.clone();
@@ -320,7 +316,7 @@ fn register_cron_callbacks(
         let domain_bus = Arc::clone(domain_event_bus);
         let config_focus = config.todo.focus.clone();
         let rt = rt.clone();
-        cron_service.register_handler(
+        cron_executor.register(
             JOB_OVERDUE_CHECK,
             Arc::new(move |_job: &scheduling::CronJob| {
                 let todo_repo = todo_repo.clone();
@@ -361,51 +357,68 @@ fn register_cron_callbacks(
     // ── __klyntbot_* bus-routed jobs (shared handler) ────────────────────
     //
     // These jobs publish an InboundMessage to the bus, routing to the agent.
-    // A single fallback handler dispatches by job name.
+    // Each has an explicit handler registered with CronExecutor.
     {
-        let bus = bus.clone();
-        let rt = rt.clone();
-        cron_service.set_callback(Arc::new(move |job: &scheduling::CronJob| {
-            let bus = Arc::clone(&bus);
-            let job_name = job.name.clone();
-            tokio::task::block_in_place(|| {
-                rt.block_on(async move {
-                    let (channel, msg_text) = match job_name.as_str() {
-                        JOB_WEEKLY_REPORT => (
-                            "weekly_report",
-                            "Generate weekly progress report using the weekly-report skill",
-                        ),
-                        JOB_DAILY_PLANNING => ("daily_planning", "/daily-planning"),
-                        JOB_FINANCE_DAILY_REVIEW => (
-                            "finance_daily_review",
-                            "Run finance daily review and send summary",
-                        ),
-                        JOB_FINANCE_BUDGET_CHECK => (
-                            "finance_budget_check",
-                            "Check budget thresholds and send alerts",
-                        ),
-                        JOB_FINANCE_PRICE_REFRESH => {
-                            ("finance_price_refresh", "Refresh investment prices")
-                        }
-                        JOB_FINANCE_HEALTH_CHECK => {
-                            ("finance_health_check", "Run finance data health check")
-                        }
-                        _ => return Ok(None),
-                    };
-                    // chat_id must be "channel:id" format for process_system_message routing.
-                    // Cron jobs route to the "system" channel with the job channel as the id.
-                    let chat_id = format!("system:{channel}");
-                    let msg =
-                        bus::InboundMessage::new("system", "cron", chat_id, msg_text.to_string());
-                    bus.publish_inbound(msg).await.map_err(|e| {
-                        common::KlyntbotError::Bus(format!(
-                            "Failed to publish {job_name} message: {e}"
-                        ))
-                    })?;
-                    Ok(Some(format!("{job_name} triggered")))
-                })
-            })
-        }));
+        macro_rules! register_bus_job {
+            ($name:expr, $channel:expr, $msg_text:expr) => {{
+                let bus = bus.clone();
+                let rt = rt.clone();
+                let job_name = $name;
+                cron_executor.register(
+                    job_name,
+                    Arc::new(move |_job: &scheduling::CronJob| {
+                        let bus = Arc::clone(&bus);
+                        let channel = $channel;
+                        let msg_text = $msg_text;
+                        let job_name = job_name;
+                        tokio::task::block_in_place(|| {
+                            rt.block_on(async move {
+                                let chat_id = format!("system:{channel}");
+                                let msg = bus::InboundMessage::new(
+                                    "system",
+                                    "cron",
+                                    chat_id,
+                                    msg_text.to_string(),
+                                );
+                                bus.publish_inbound(msg).await.map_err(|e| {
+                                    common::KlyntbotError::Bus(format!(
+                                        "Failed to publish {job_name} message: {e}"
+                                    ))
+                                })?;
+                                Ok(Some(format!("{job_name} triggered")))
+                            })
+                        })
+                    }),
+                );
+            }};
+        }
+
+        register_bus_job!(
+            JOB_WEEKLY_REPORT,
+            "weekly_report",
+            "Generate weekly progress report using the weekly-report skill"
+        );
+        register_bus_job!(JOB_DAILY_PLANNING, "daily_planning", "/daily-planning");
+        register_bus_job!(
+            JOB_FINANCE_DAILY_REVIEW,
+            "finance_daily_review",
+            "Run finance daily review and send summary"
+        );
+        register_bus_job!(
+            JOB_FINANCE_BUDGET_CHECK,
+            "finance_budget_check",
+            "Check budget thresholds and send alerts"
+        );
+        register_bus_job!(
+            JOB_FINANCE_PRICE_REFRESH,
+            "finance_price_refresh",
+            "Refresh investment prices"
+        );
+        register_bus_job!(
+            JOB_FINANCE_HEALTH_CHECK,
+            "finance_health_check",
+            "Run finance data health check"
+        );
     }
 
     // ── atom_decay_daily ───────────────────────────────────────────────
@@ -413,7 +426,7 @@ fn register_cron_callbacks(
         let pool = repos.pool().clone();
         let bus = Arc::clone(domain_event_bus);
         let rt = rt.clone();
-        cron_service.register_handler(
+        cron_executor.register(
             JOB_ATOM_DECAY,
             Arc::new(move |_job: &scheduling::CronJob| {
                 let pool = pool.clone();
@@ -443,7 +456,7 @@ fn register_cron_callbacks(
         let metric_source_for_reforge = metric_source;
         let trial_repo_for_reforge = trial_repo;
         let orchestrator_for_reforge = orchestrator.clone();
-        cron_service.register_handler(
+        cron_executor.register(
             JOB_REFORGE_NIGHTLY,
             Arc::new(move |_job: &scheduling::CronJob| {
                 let pool = pool.clone();
@@ -632,7 +645,7 @@ fn register_cron_callbacks(
         let pool = repos.pool().clone();
         let bus = Arc::clone(domain_event_bus);
         let rt = rt.clone();
-        cron_service.register_handler(
+        cron_executor.register(
             JOB_ATOM_EXTRACTION_CATCHALL,
             Arc::new(move |_job: &scheduling::CronJob| {
                 let pool = pool.clone();
@@ -668,7 +681,7 @@ fn register_cron_callbacks(
     {
         let pool = repos.pool().clone();
         let rt = rt.clone();
-        cron_service.register_handler(
+        cron_executor.register(
             JOB_MORNING_BRIEFING,
             Arc::new(move |_job: &scheduling::CronJob| {
                 let pool = pool.clone();
@@ -701,7 +714,7 @@ fn register_cron_callbacks(
     {
         let pool = repos.pool().clone();
         let rt = rt.clone();
-        cron_service.register_handler(
+        cron_executor.register(
             JOB_WEEKLY_KNOWLEDGE_DIGEST,
             Arc::new(move |_job: &scheduling::CronJob| {
                 let pool = pool.clone();
@@ -748,7 +761,7 @@ fn register_cron_callbacks(
         let cfg = tasks_config.clone();
         let applier = suggestion_applier.clone();
         let rt = rt.clone();
-        cron_service.register_handler(
+        cron_executor.register(
             JOB_PROACTIVE_SCAN,
             Arc::new(move |_job: &scheduling::CronJob| {
                 let handler = handler.clone();
@@ -782,7 +795,7 @@ fn register_cron_callbacks(
         let session_repo = storage::SessionRepo::new(repos.pool().clone());
         let ttl_days = config.conversation.session.ttl_days;
         let rt = rt.clone();
-        cron_service.register_handler(
+        cron_executor.register(
             JOB_SESSION_CLEANUP,
             Arc::new(move |_job: &scheduling::CronJob| {
                 let session_repo = session_repo.clone();
@@ -812,7 +825,7 @@ fn register_cron_callbacks(
     {
         let pool = repos.pool().clone();
         let rt = rt.clone();
-        cron_service.register_handler(
+        cron_executor.register(
             JOB_BLACKBOARD_CLEANUP,
             Arc::new(move |_job: &scheduling::CronJob| {
                 let pool = pool.clone();
@@ -843,7 +856,7 @@ fn register_cron_callbacks(
     if let Some(vs) = vector_store {
         let max_age_days = config.conversation.memory.max_age_days;
         let rt = rt.clone();
-        cron_service.register_handler(
+        cron_executor.register(
             JOB_MEMORY_MAINTENANCE,
             Arc::new(move |_job: &scheduling::CronJob| {
                 let vs = vs.clone();
@@ -907,7 +920,7 @@ fn register_cron_callbacks(
         let repos_bg = repos.clone();
         let cog_pool = repos.pool().clone();
         let rt = rt.clone();
-        cron_service.register_handler(
+        cron_executor.register(
             JOB_ANALYTICS_CLEANUP,
             Arc::new(move |_job: &scheduling::CronJob| {
                 let repos_bg = repos_bg.clone();
@@ -956,7 +969,7 @@ fn register_cron_callbacks(
         let todo_repo = repos.tasks.clone();
         let domain_bus = Arc::clone(domain_event_bus);
         let rt = rt.clone();
-        cron_service.register_handler(
+        cron_executor.register(
             JOB_REMINDER_CHECK,
             Arc::new(move |_job: &scheduling::CronJob| {
                 let todo_repo = todo_repo.clone();
@@ -985,7 +998,7 @@ fn register_cron_callbacks(
     {
         let pool = repos.pool().clone();
         let rt = rt.clone();
-        cron_service.register_handler(
+        cron_executor.register(
             JOB_LAUNCHER_USAGE_PRUNE,
             Arc::new(move |_job: &scheduling::CronJob| {
                 let pool = pool.clone();
@@ -1014,7 +1027,7 @@ fn register_cron_callbacks(
         let todo_repo = repos.tasks.clone();
         let timezone = config.timezone.clone();
         let rt = rt.clone();
-        cron_service.register_handler(
+        cron_executor.register(
             JOB_RECURRING_TASKS,
             Arc::new(move |_job: &scheduling::CronJob| {
                 let todo_repo = todo_repo.clone();
@@ -1058,9 +1071,7 @@ async fn ensure_cron_jobs(
         cron_repo
             .list()
             .await
-            .map_err(|e| {
-                common::KlyntbotError::Storage(format!("cron list failed: {e}"))
-            })?
+            .map_err(|e| common::KlyntbotError::Storage(format!("cron list failed: {e}")))?
             .into_iter()
             .map(|r| (r.name.clone(), r))
             .collect();
@@ -1227,9 +1238,9 @@ async fn ensure_cron_jobs(
     Ok(())
 }
 
-/// Set default intent windows on AI-heavy cron jobs.
+/// Set default intent windows on AI-heavy cron jobs via direct SQL update.
 /// Called after ensure_cron_jobs to overlay intelligent scheduling.
-async fn set_default_intent_windows(cron_service: &scheduling::CronService) {
+async fn set_default_intent_windows(cron_repo: &storage::repos::cron::CronRepo) {
     use scheduling::types::{CatchUpPriority, IntentTrigger, IntentWindow};
     use std::time::Duration;
 
@@ -1294,7 +1305,16 @@ async fn set_default_intent_windows(cron_service: &scheduling::CronService) {
     ];
 
     for (name, window) in windows {
-        cron_service.set_intent_window(name, window.clone()).await;
+        let json = match serde_json::to_string(window) {
+            Ok(j) => j,
+            Err(e) => {
+                tracing::warn!("Failed to serialize intent window for '{}': {}", name, e);
+                continue;
+            }
+        };
+        if let Err(e) = cron_repo.set_intent_window_by_name(name, Some(&json)).await {
+            tracing::warn!("Failed to set intent window for '{}': {}", name, e);
+        }
     }
 }
 

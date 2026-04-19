@@ -12,10 +12,9 @@ pub mod types;
 pub use deadline::{DeadlineHandler, DeadlineScheduler};
 pub use deadline_actions::DeadlineAction;
 pub use error::CronError;
-pub use service::{
-    classify_missed_job, evaluate_trigger, row_to_job, CronService, JobCallback, MissedJobClass,
-    PresenceSnapshot,
-};
+// `service` module is kept for the `row_to_job` helper used by `CronExecutor` (same crate).
+// CronService itself is removed — use `CronExecutor` + `TemporalScheduler` instead.
+pub use service::row_to_job;
 pub use temporal::cron_executor::{CronExecutor, CronHandler};
 pub use temporal::fire_store::{FireSpec, FireStore};
 pub use temporal::recurrence::{RecurrenceEngine, RecurrenceTemplate};

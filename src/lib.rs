@@ -37,7 +37,7 @@ pub use providers::{
     create_provider, create_provider_with_failover, DynProvider, LlmProvider, LlmResponse, Message,
     ProviderRegistry,
 };
-pub use scheduling::{CronJob, CronService};
+pub use scheduling::{CronExecutor, CronJob};
 pub use session::{Session, SessionManager};
 pub use storage::{Repos, StoragePool};
 pub use tools::{DynTool, Tool};

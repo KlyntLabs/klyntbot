@@ -250,8 +250,8 @@ impl AppCore {
         let now_ms = Timestamp::now().as_millisecond();
 
         // Parse existing payload for defaults.
-        let ex_payload: scheduling::CronPayload =
-            serde_json::from_value(existing.payload.clone()).map_err(|e| {
+        let ex_payload: scheduling::CronPayload = serde_json::from_value(existing.payload.clone())
+            .map_err(|e| {
                 ApiError::new(
                     "CRON_ERROR",
                     format!("corrupt payload for job {}: {e}", params.id),
