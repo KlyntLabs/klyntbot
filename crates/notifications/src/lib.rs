@@ -11,3 +11,4 @@ pub mod retry;
 
 pub use dispatcher::{NotificationDispatcher, NotificationDispatcherHandle};
 pub use error::{NotificationError, Result};
+pub use migrations::migration;
