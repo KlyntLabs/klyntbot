@@ -155,7 +155,6 @@ impl AppCore {
         // ── Phase 2: Cron ────────────────────────────────────────────────
         let cron::CronResult {
             cron_service,
-            notification_dispatcher,
             proactive_handler,
             suggestion_applier,
             decomposition_handler,
@@ -165,7 +164,6 @@ impl AppCore {
             &config,
             &repos,
             &bus,
-            &notification_sender,
             cognitive_provider.clone(),
             provider.clone(),
             &domain_event_bus,
@@ -283,8 +281,6 @@ impl AppCore {
             cognitive_provider,
             &domain_event_bus,
             &cron_service,
-            &notification_dispatcher,
-            &notification_sender,
             autotuner.as_ref(),
             Arc::clone(&hot_config),
             Some(Arc::clone(&context_update_queue)),
@@ -324,14 +320,9 @@ impl AppCore {
         }
 
         // ── Deadline scheduler (event-driven timers) ────────────────────
-        let deadline_scheduler = deadline::init_deadline_scheduler(
-            &repos,
-            &notification_dispatcher,
-            &domain_event_bus,
-            &config,
-            &shutdown_token,
-        )
-        .await;
+        let deadline_scheduler =
+            deadline::init_deadline_scheduler(&repos, &domain_event_bus, &config, &shutdown_token)
+                .await;
 
         // ── Phases 5 & 8: Run independent init phases concurrently ─────
         let (productivity_result, launcher_result) = tokio::join!(
@@ -579,6 +570,88 @@ impl AppCore {
             });
         }
 
+        // ── Phase 3: New NotificationDispatcher ──────────────────────────
+        // Run migration for notification tables (notification_log, held_notifications).
+        ::storage::StoragePool::run_feature_migrations(
+            storage_pool.inner(),
+            &[notifications::migration()],
+        )
+        .await
+        .map_err(|e| format!("notifications migration failed: {e}"))?;
+
+        let notification_dispatcher_handle = {
+            use notifications::channel::{
+                os_native::OsNativeChannel, tray::TrayChannel, ChannelRegistry,
+            };
+            use notifications::held::HeldReleaseService;
+            use notifications::quiet_hours::QuietHoursPolicy;
+            use notifications::retry::RetryPolicy;
+            use notifications::NotificationDispatcher;
+
+            let notif_cfg = &config.notifications;
+            let last_active: std::sync::Arc<
+                tokio::sync::RwLock<Option<(common::ChannelName, common::ChatId)>>,
+            > = std::sync::Arc::new(tokio::sync::RwLock::new(None));
+
+            let mut registry = ChannelRegistry::new();
+
+            // OS-native channel: delegate to provided sender or fallback.
+            let os_sender: std::sync::Arc<dyn common::NotificationSender> =
+                match &notification_sender {
+                    Some(s) => std::sync::Arc::clone(s),
+                    None => std::sync::Arc::new(common::notify::OsNotificationSender),
+                };
+            registry.register(std::sync::Arc::new(OsNativeChannel::new(os_sender)));
+            registry.register(std::sync::Arc::new(TrayChannel::new(Arc::clone(
+                &domain_event_bus,
+            ))));
+            // Outbound channels (telegram, discord, slack) — no-op until Phase 4 wires
+            // last_active updates from the message router.
+            for ch_name in ["telegram", "discord", "slack"] {
+                registry.register(std::sync::Arc::new(
+                    notifications::channel::outbound::OutboundChannel::new(
+                        ch_name,
+                        bus.clone(),
+                        Arc::clone(&last_active),
+                    ),
+                ));
+            }
+
+            let quiet_hours = if notif_cfg.quiet_hours.enabled {
+                // TODO(phase-3.5): wire real user timezone when config has it.
+                let tz = config.timezone.as_str();
+                match QuietHoursPolicy::new(notif_cfg.quiet_hours.clone(), tz) {
+                    Ok(qh) => Some(qh),
+                    Err(e) => {
+                        tracing::warn!("quiet hours policy init failed ({e}), disabling");
+                        None
+                    }
+                }
+            } else {
+                None
+            };
+
+            let sf_repo = ::storage::repos::ScheduledFiresRepo::new(storage_pool.inner().clone());
+            let fire_store = scheduling::FireStore::new(sf_repo);
+
+            let dispatcher = NotificationDispatcher::new(
+                Arc::clone(&domain_event_bus),
+                registry,
+                notif_cfg.default_channels.clone(),
+                quiet_hours,
+                ::storage::repos::NotificationLogRepo::new(storage_pool.inner().clone()),
+                ::storage::repos::HeldNotificationsRepo::new(storage_pool.inner().clone()),
+                HeldReleaseService::new(
+                    ::storage::repos::HeldNotificationsRepo::new(storage_pool.inner().clone()),
+                    fire_store,
+                ),
+                RetryPolicy::from_config(&notif_cfg.retry),
+            );
+            let handle = dispatcher.start();
+            info!("NotificationDispatcher started (Phase 3)");
+            Some(handle)
+        };
+
         // ── Snapshot lifecycle config before moving config into Arc ──────
         let lifecycle_config_snapshot = config.lifecycle.clone();
 
@@ -686,6 +759,7 @@ impl AppCore {
             pending_memory_repo,
             _mirror_handles: mirror_handles,
             _mirror_shutdown: mirror_shutdown,
+            _notification_dispatcher_handle: notification_dispatcher_handle,
             _config_watcher_token: Some(config_watcher_token),
             _lifecycle_monitor: None,
             _wake_orchestrator_handle: None,

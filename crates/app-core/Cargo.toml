@@ -44,6 +44,7 @@ base64 = { workspace = true }
 activity-log = { workspace = true }
 async-trait = { workspace = true }
 sqlx = { workspace = true }
+notifications = { workspace = true }
 notify = { workspace = true }
 notify-debouncer-mini = { workspace = true }
 platform-macos = { workspace = true }

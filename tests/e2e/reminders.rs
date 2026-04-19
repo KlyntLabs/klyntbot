@@ -16,7 +16,9 @@ use tools::todo_types::{TimeEntry, TimeEntrySource, Todo, TodoStatus};
 #[tokio::test]
 async fn due_date_exactly_2_hours_triggers() {
     // Boundary: exactly 2 hours should trigger
-    let due_in_2h = jiff::Timestamp::now() .checked_add(jiff::SignedDuration::from_secs(2 * 3600)).unwrap();
+    let due_in_2h = jiff::Timestamp::now()
+        .checked_add(jiff::SignedDuration::from_secs(2 * 3600))
+        .unwrap();
     let todo = Todo {
         due_date: Some(due_in_2h),
         ..create_test_todo("Boundary task")
@@ -29,7 +31,11 @@ async fn due_date_exactly_2_hours_triggers() {
 #[tokio::test]
 async fn due_date_just_over_2_hours_skips() {
     // Boundary: 2 hours + 1 second should NOT trigger
-    let due_in_2h_plus = jiff::Timestamp::now() .checked_add(jiff::SignedDuration::from_secs(2 * 3600)).unwrap() .checked_add(jiff::SignedDuration::from_secs(1)).unwrap();
+    let due_in_2h_plus = jiff::Timestamp::now()
+        .checked_add(jiff::SignedDuration::from_secs(2 * 3600))
+        .unwrap()
+        .checked_add(jiff::SignedDuration::from_secs(1))
+        .unwrap();
     let todo = Todo {
         due_date: Some(due_in_2h_plus),
         ..create_test_todo("Just over boundary")
@@ -58,7 +64,9 @@ async fn due_date_exactly_now_skips() {
 #[tokio::test]
 async fn due_date_1_second_future_triggers() {
     // Edge case: due in 1 second (very short time remaining)
-    let due_soon = jiff::Timestamp::now() .checked_add(jiff::SignedDuration::from_secs(1)).unwrap();
+    let due_soon = jiff::Timestamp::now()
+        .checked_add(jiff::SignedDuration::from_secs(1))
+        .unwrap();
     let todo = Todo {
         due_date: Some(due_soon),
         ..create_test_todo("Due in 1 second")
@@ -76,8 +84,14 @@ async fn focus_deadline_exactly_1_hour_triggers() {
     // Boundary: exactly 1 hour should trigger
     let now = jiff::Timestamp::now();
     let todo = Todo {
-        focused_at: Some(now .checked_sub(jiff::SignedDuration::from_secs(3 * 3600)).unwrap()),
-        focus_deadline: Some(now .checked_add(jiff::SignedDuration::from_secs(3600)).unwrap()),
+        focused_at: Some(
+            now.checked_sub(jiff::SignedDuration::from_secs(3 * 3600))
+                .unwrap(),
+        ),
+        focus_deadline: Some(
+            now.checked_add(jiff::SignedDuration::from_secs(3600))
+                .unwrap(),
+        ),
         ..create_test_todo("Boundary focus")
     };
 
@@ -90,8 +104,16 @@ async fn focus_deadline_just_over_1_hour_skips() {
     // Boundary: 1 hour + 1 second should NOT trigger
     let now = jiff::Timestamp::now();
     let todo = Todo {
-        focused_at: Some(now .checked_sub(jiff::SignedDuration::from_secs(2 * 3600)).unwrap()),
-        focus_deadline: Some(now .checked_add(jiff::SignedDuration::from_secs(3600)).unwrap() .checked_add(jiff::SignedDuration::from_secs(1)).unwrap()),
+        focused_at: Some(
+            now.checked_sub(jiff::SignedDuration::from_secs(2 * 3600))
+                .unwrap(),
+        ),
+        focus_deadline: Some(
+            now.checked_add(jiff::SignedDuration::from_secs(3600))
+                .unwrap()
+                .checked_add(jiff::SignedDuration::from_secs(1))
+                .unwrap(),
+        ),
         ..create_test_todo("Just over boundary")
     };
 
@@ -104,8 +126,14 @@ async fn overdue_exactly_24_hours_since_nag_triggers() {
     // Boundary: exactly 24 hours since last nag should trigger
     let now = jiff::Timestamp::now();
     let todo = Todo {
-        due_date: Some(now .checked_sub(jiff::SignedDuration::from_secs(86400)).unwrap()),
-        last_reminded_at: Some(now .checked_sub(jiff::SignedDuration::from_secs(24 * 3600)).unwrap()),
+        due_date: Some(
+            now.checked_sub(jiff::SignedDuration::from_secs(86400))
+                .unwrap(),
+        ),
+        last_reminded_at: Some(
+            now.checked_sub(jiff::SignedDuration::from_secs(24 * 3600))
+                .unwrap(),
+        ),
         ..create_test_todo("24h since nag")
     };
 
@@ -118,8 +146,16 @@ async fn overdue_just_under_24_hours_since_nag_skips() {
     // Boundary: 23h 59m since last nag should NOT trigger
     let now = jiff::Timestamp::now();
     let todo = Todo {
-        due_date: Some(now .checked_sub(jiff::SignedDuration::from_secs(86400)).unwrap()),
-        last_reminded_at: Some(now .checked_sub(jiff::SignedDuration::from_secs(23 * 3600)).unwrap() .checked_sub(jiff::SignedDuration::from_secs(59 * 60)).unwrap()),
+        due_date: Some(
+            now.checked_sub(jiff::SignedDuration::from_secs(86400))
+                .unwrap(),
+        ),
+        last_reminded_at: Some(
+            now.checked_sub(jiff::SignedDuration::from_secs(23 * 3600))
+                .unwrap()
+                .checked_sub(jiff::SignedDuration::from_secs(59 * 60))
+                .unwrap(),
+        ),
         ..create_test_todo("Just under 24h")
     };
 
@@ -153,8 +189,11 @@ fn time_entry_negative_duration_allowed() {
     let entry = TimeEntry {
         id: "entry-1".to_string(),
         started_at: now,
-        ended_at: Some(now .checked_sub(jiff::SignedDuration::from_secs(3600)).unwrap()), // Invalid: end before start
-        duration_secs: None,                      // Duration not calculated
+        ended_at: Some(
+            now.checked_sub(jiff::SignedDuration::from_secs(3600))
+                .unwrap(),
+        ), // Invalid: end before start
+        duration_secs: None, // Duration not calculated
         note: None,
         source: TimeEntrySource::Focus,
     };
@@ -167,7 +206,9 @@ fn time_entry_running_without_end() {
     // Normal case: time entry still running (no end time)
     let entry = TimeEntry {
         id: "running-1".to_string(),
-        started_at: jiff::Timestamp::now() .checked_sub(jiff::SignedDuration::from_secs(2 * 3600)).unwrap(),
+        started_at: jiff::Timestamp::now()
+            .checked_sub(jiff::SignedDuration::from_secs(2 * 3600))
+            .unwrap(),
         ended_at: None,
         duration_secs: None,
         note: Some("Still working".to_string()),
@@ -181,7 +222,9 @@ fn time_entry_running_without_end() {
 #[test]
 fn time_entry_multi_day_duration() {
     // Edge case: time entry spanning multiple days
-    let start = jiff::Timestamp::now() .checked_sub(jiff::SignedDuration::from_secs(5 * 86400)).unwrap();
+    let start = jiff::Timestamp::now()
+        .checked_sub(jiff::SignedDuration::from_secs(5 * 86400))
+        .unwrap();
     let end = jiff::Timestamp::now();
     let duration_secs = 5 * 24 * 3600; // 5 days in seconds
 
@@ -259,9 +302,18 @@ async fn multiple_reminder_conditions_fire_simultaneously() {
     // Edge case: task triggers multiple reminder rules simultaneously
     let now = jiff::Timestamp::now();
     let todo = Todo {
-        due_date: Some(now .checked_add(jiff::SignedDuration::from_secs(30 * 60)).unwrap()), // Due date reminder
-        focused_at: Some(now .checked_sub(jiff::SignedDuration::from_secs(2 * 3600)).unwrap()),
-        focus_deadline: Some(now .checked_add(jiff::SignedDuration::from_secs(30 * 60)).unwrap()), // Focus reminder
+        due_date: Some(
+            now.checked_add(jiff::SignedDuration::from_secs(30 * 60))
+                .unwrap(),
+        ), // Due date reminder
+        focused_at: Some(
+            now.checked_sub(jiff::SignedDuration::from_secs(2 * 3600))
+                .unwrap(),
+        ),
+        focus_deadline: Some(
+            now.checked_add(jiff::SignedDuration::from_secs(30 * 60))
+                .unwrap(),
+        ), // Focus reminder
         ..create_test_todo("Multiple triggers")
     };
 
@@ -278,10 +330,22 @@ async fn last_reminded_blocks_all_rules() {
     // Edge case: last_reminded_at blocks both due date and focus reminders
     let now = jiff::Timestamp::now();
     let mut todo = Todo {
-        due_date: Some(now .checked_add(jiff::SignedDuration::from_secs(30 * 60)).unwrap()),
-        focused_at: Some(now .checked_sub(jiff::SignedDuration::from_secs(2 * 3600)).unwrap()),
-        focus_deadline: Some(now .checked_add(jiff::SignedDuration::from_secs(30 * 60)).unwrap()),
-        last_reminded_at: Some(now .checked_sub(jiff::SignedDuration::from_secs(10 * 60)).unwrap()), // Recently reminded
+        due_date: Some(
+            now.checked_add(jiff::SignedDuration::from_secs(30 * 60))
+                .unwrap(),
+        ),
+        focused_at: Some(
+            now.checked_sub(jiff::SignedDuration::from_secs(2 * 3600))
+                .unwrap(),
+        ),
+        focus_deadline: Some(
+            now.checked_add(jiff::SignedDuration::from_secs(30 * 60))
+                .unwrap(),
+        ),
+        last_reminded_at: Some(
+            now.checked_sub(jiff::SignedDuration::from_secs(10 * 60))
+                .unwrap(),
+        ), // Recently reminded
         ..create_test_todo("Recently reminded")
     };
 
@@ -298,7 +362,10 @@ async fn last_reminded_blocks_all_rules() {
     );
 
     // But overdue nag has its own 24-hour logic
-    todo.due_date = Some(now .checked_sub(jiff::SignedDuration::from_secs(86400)).unwrap()); // Make it overdue
+    todo.due_date = Some(
+        now.checked_sub(jiff::SignedDuration::from_secs(86400))
+            .unwrap(),
+    ); // Make it overdue
     let overdue_remind = ReminderEngine::should_remind_overdue(&todo);
     assert!(
         !overdue_remind,
@@ -314,8 +381,14 @@ async fn done_task_still_fires_reminder() {
     let now = jiff::Timestamp::now();
     let todo = Todo {
         status: TodoStatus::Done,
-        due_date: Some(now .checked_add(jiff::SignedDuration::from_secs(30 * 60)).unwrap()),
-        completed_at: Some(now .checked_sub(jiff::SignedDuration::from_secs(3600)).unwrap()),
+        due_date: Some(
+            now.checked_add(jiff::SignedDuration::from_secs(30 * 60))
+                .unwrap(),
+        ),
+        completed_at: Some(
+            now.checked_sub(jiff::SignedDuration::from_secs(3600))
+                .unwrap(),
+        ),
         ..create_test_todo("Completed but has due date")
     };
 
@@ -336,7 +409,10 @@ async fn archived_task_still_fires_reminder() {
     let now = jiff::Timestamp::now();
     let todo = Todo {
         status: TodoStatus::Archived,
-        due_date: Some(now .checked_add(jiff::SignedDuration::from_secs(30 * 60)).unwrap()),
+        due_date: Some(
+            now.checked_add(jiff::SignedDuration::from_secs(30 * 60))
+                .unwrap(),
+        ),
         ..create_test_todo("Archived task")
     };
 
@@ -370,7 +446,10 @@ async fn focused_without_deadline_skips_reminder() {
     // Edge case: focused task without deadline
     let now = jiff::Timestamp::now();
     let todo = Todo {
-        focused_at: Some(now .checked_sub(jiff::SignedDuration::from_secs(2 * 3600)).unwrap()),
+        focused_at: Some(
+            now.checked_sub(jiff::SignedDuration::from_secs(2 * 3600))
+                .unwrap(),
+        ),
         focus_deadline: None, // No deadline set
         ..create_test_todo("Focused without deadline")
     };
@@ -389,7 +468,10 @@ async fn overdue_by_many_days_nags() {
     // Edge case: task overdue by many days
     let now = jiff::Timestamp::now();
     let todo = Todo {
-        due_date: Some(now .checked_sub(jiff::SignedDuration::from_secs(365 * 86400)).unwrap()), // Overdue by a year
+        due_date: Some(
+            now.checked_sub(jiff::SignedDuration::from_secs(365 * 86400))
+                .unwrap(),
+        ), // Overdue by a year
         ..create_test_todo("Very overdue")
     };
 
@@ -402,7 +484,10 @@ async fn due_far_in_future_skips_reminder() {
     // Edge case: task due far in future
     let now = jiff::Timestamp::now();
     let todo = Todo {
-        due_date: Some(now .checked_add(jiff::SignedDuration::from_secs(365 * 86400)).unwrap()), // Due in a year
+        due_date: Some(
+            now.checked_add(jiff::SignedDuration::from_secs(365 * 86400))
+                .unwrap(),
+        ), // Due in a year
         ..create_test_todo("Far future")
     };
 

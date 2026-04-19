@@ -646,22 +646,8 @@ impl AgentLoopBuilder {
 
         // Shared references — SqlitePool is Clone+Send+Sync via Arc internally
 
-        // ── Notification dispatcher ───────────────────────────────────────
-        let notification_dispatcher = if !config.todo.notifications.targets.is_empty() {
-            Some(Arc::new(match &self.notification_sender {
-                Some(sender) => super::super::NotificationDispatcher::with_sender(
-                    bus.outbound_sender(),
-                    config.todo.notifications.clone(),
-                    Arc::clone(sender),
-                ),
-                None => super::super::NotificationDispatcher::new(
-                    bus.outbound_sender(),
-                    config.todo.notifications.clone(),
-                ),
-            }))
-        } else {
-            None
-        };
+        // Notification dispatcher removed (Phase 3): legacy agent::NotificationDispatcher
+        // is replaced by notifications::NotificationDispatcher wired in app-core.
 
         // ── Learning: outcome store ────────────────────────────
         let outcome_store = if config.learning.enabled {
@@ -1632,10 +1618,10 @@ impl AgentLoopBuilder {
         )));
 
         // ── Reminder engine ───────────────────────────────────────────────
-        let reminder_engine = if let Some(ref dispatcher) = notification_dispatcher {
+        let reminder_engine = if let Some(ref domain_bus) = self.domain_event_bus {
             let mut engine = super::super::ReminderEngine::new(
                 repos.tasks.clone(),
-                Arc::clone(dispatcher),
+                Arc::clone(domain_bus),
                 std::time::Duration::from_secs(300),
             );
             engine.start();
@@ -1913,7 +1899,6 @@ impl AgentLoopBuilder {
             last_active_channel: self.notification_handle,
             reminder_engine,
             recurring_task_spawner,
-            _notification_dispatcher: notification_dispatcher,
             conversation_recall_handler,
             learning_service,
             runtime,

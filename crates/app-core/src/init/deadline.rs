@@ -17,19 +17,26 @@ use bus::{DomainEvent, DomainEventBus};
 use scheduling::{DeadlineAction, DeadlineScheduler};
 use tracing::{debug, info, warn};
 
+/// Convenience: publish a tray notification via the domain event bus.
+fn notify_tray(bus: &DomainEventBus, title: impl Into<String>, body: impl Into<String>) {
+    bus.publish(DomainEvent::TrayNotificationRequested {
+        title: title.into(),
+        body: body.into(),
+        alarm_id: None,
+    });
+}
+
 /// Create, start, and populate the deadline scheduler.
 ///
 /// Returns `Arc<DeadlineScheduler>` to be stored in `AppCore`.
 pub async fn init_deadline_scheduler(
     repos: &storage::Repos,
-    notification_dispatcher: &Arc<agent::NotificationDispatcher>,
     domain_event_bus: &Arc<DomainEventBus>,
     config: &config::Config,
     shutdown_token: &tokio_util::sync::CancellationToken,
 ) -> Arc<DeadlineScheduler> {
     let scheduler = Arc::new(DeadlineScheduler::new(build_handler(
         repos.tasks.clone(),
-        Arc::clone(notification_dispatcher),
         config.todo.focus.deadline_hours,
         config.timezone.clone(),
         Arc::clone(domain_event_bus),
@@ -66,7 +73,6 @@ pub async fn init_deadline_scheduler(
 
 fn build_handler(
     todo_repo: storage::TaskRepo,
-    dispatcher: Arc<agent::NotificationDispatcher>,
     deadline_hours: u64,
     timezone: String,
     domain_event_bus: Arc<DomainEventBus>,
@@ -75,7 +81,6 @@ fn build_handler(
 
     Arc::new(move |action: DeadlineAction| {
         let todo_repo = todo_repo.clone();
-        let dispatcher = Arc::clone(&dispatcher);
         let timezone = timezone.clone();
         let domain_event_bus = Arc::clone(&domain_event_bus);
 
@@ -83,17 +88,23 @@ fn build_handler(
             rt.block_on(async move {
                 match action {
                     DeadlineAction::TaskReminder { task_id, label } => {
-                        handle_task_reminder(&todo_repo, &dispatcher, &task_id, &label).await;
+                        handle_task_reminder(&todo_repo, &domain_event_bus, &task_id, &label).await;
                     }
                     DeadlineAction::FocusWarning {
                         task_id,
                         hours_left,
                     } => {
-                        handle_focus_warning(&todo_repo, &dispatcher, &task_id, hours_left).await;
+                        handle_focus_warning(&todo_repo, &domain_event_bus, &task_id, hours_left)
+                            .await;
                     }
                     DeadlineAction::FocusExpire { task_id } => {
-                        handle_focus_expire(&todo_repo, &dispatcher, &task_id, deadline_hours)
-                            .await;
+                        handle_focus_expire(
+                            &todo_repo,
+                            &domain_event_bus,
+                            &task_id,
+                            deadline_hours,
+                        )
+                        .await;
                     }
                     DeadlineAction::SpawnRecurring { template_id } => {
                         handle_spawn_recurring(
@@ -112,7 +123,7 @@ fn build_handler(
 
 async fn handle_task_reminder(
     repo: &storage::TaskRepo,
-    dispatcher: &agent::NotificationDispatcher,
+    bus: &DomainEventBus,
     task_id: &str,
     label: &str,
 ) {
@@ -140,9 +151,7 @@ async fn handle_task_reminder(
     }
 
     // Send notification.
-    if let Err(e) = dispatcher.notify("Task due soon", label).await {
-        warn!("deadline: notification failed for task {task_id}: {e}");
-    }
+    notify_tray(bus, "Task due soon", label);
 
     // Mark as reminded.
     let patch = storage::TaskPatch {
@@ -157,7 +166,7 @@ async fn handle_task_reminder(
 
 async fn handle_focus_warning(
     repo: &storage::TaskRepo,
-    dispatcher: &agent::NotificationDispatcher,
+    bus: &DomainEventBus,
     task_id: &str,
     hours_left: u32,
 ) {
@@ -177,14 +186,12 @@ async fn handle_focus_warning(
     }
 
     let msg = format!("Focus deadline in {}h: {}", hours_left, task.title);
-    if let Err(e) = dispatcher.notify("Focus deadline approaching", &msg).await {
-        warn!("deadline: focus warning notification failed for {task_id}: {e}");
-    }
+    notify_tray(bus, "Focus deadline approaching", &msg);
 }
 
 async fn handle_focus_expire(
     repo: &storage::TaskRepo,
-    dispatcher: &agent::NotificationDispatcher,
+    bus: &DomainEventBus,
     task_id: &str,
     deadline_hours: u64,
 ) {
@@ -207,9 +214,7 @@ async fn handle_focus_expire(
             }
 
             let msg = format!("Focus expired after {}h: {}", deadline_hours, task.title);
-            if let Err(e) = dispatcher.notify("Focus expired", &msg).await {
-                warn!("deadline: expire notification failed for {task_id}: {e}");
-            }
+            notify_tray(bus, "Focus expired", &msg);
         }
         _ => {
             debug!("deadline: task {task_id} focus deadline not yet past, skipping expire");

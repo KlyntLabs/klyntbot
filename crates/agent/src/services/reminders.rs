@@ -6,16 +6,15 @@ use tokio::task::JoinHandle;
 use tokio_util::sync::CancellationToken;
 use tracing::{debug, error};
 
+use bus::{DomainEvent, DomainEventBus};
 use common::Result;
 use jiff::Timestamp;
 use tools::todo_types::Todo;
 
-use super::notifications::NotificationDispatcher;
-
 /// ReminderEngine - checks for todos that need reminders
 pub struct ReminderEngine {
     todo_repo: storage::TaskRepo,
-    dispatcher: Arc<NotificationDispatcher>,
+    bus: Arc<DomainEventBus>,
     check_interval: StdDuration,
     task_handle: Option<JoinHandle<()>>,
     cancel_token: CancellationToken,
@@ -25,12 +24,12 @@ impl ReminderEngine {
     /// Create a new ReminderEngine backed by a SQL TodoRepo.
     pub fn new(
         todo_repo: storage::TaskRepo,
-        dispatcher: Arc<NotificationDispatcher>,
+        bus: Arc<DomainEventBus>,
         check_interval: StdDuration,
     ) -> Self {
         Self {
             todo_repo,
-            dispatcher,
+            bus,
             check_interval,
             task_handle: None,
             cancel_token: CancellationToken::new(),
@@ -40,7 +39,7 @@ impl ReminderEngine {
     /// Start the reminder engine background task
     pub fn start(&mut self) {
         let todo_repo = self.todo_repo.clone();
-        let dispatcher = Arc::clone(&self.dispatcher);
+        let bus = Arc::clone(&self.bus);
         let check_interval = self.check_interval;
         let cancel_token = self.cancel_token.clone();
 
@@ -54,7 +53,7 @@ impl ReminderEngine {
                     _ = tokio::time::sleep(check_interval) => {
                         if let Err(e) = Self::check_and_send_reminders(
                             &todo_repo,
-                            &dispatcher
+                            &bus,
                         ).await {
                             error!("ReminderEngine check failed: {}", e);
                         }
@@ -79,15 +78,15 @@ impl ReminderEngine {
     /// Public static variant for use by the cron handler.
     pub async fn check_and_send_reminders_static(
         repo: &storage::TaskRepo,
-        dispatcher: &Arc<NotificationDispatcher>,
+        bus: &Arc<DomainEventBus>,
     ) -> Result<()> {
-        Self::check_and_send_reminders(repo, dispatcher).await
+        Self::check_and_send_reminders(repo, bus).await
     }
 
     /// Check all reminder rules and send notifications via SQL TodoRepo.
     async fn check_and_send_reminders(
         repo: &storage::TaskRepo,
-        dispatcher: &Arc<NotificationDispatcher>,
+        bus: &Arc<DomainEventBus>,
     ) -> Result<()> {
         // Get only non-template, non-done todos for reminder checking
         let filter = storage::TaskFilter {
@@ -113,12 +112,11 @@ impl ReminderEngine {
                     format!("{}m", mins_left)
                 };
 
-                dispatcher
-                    .notify(
-                        &format!("Due Soon: {}", todo.title),
-                        &format!("Due in {} · P{}", time_str, todo.priority.unwrap_or(3)),
-                    )
-                    .await?;
+                bus.publish(DomainEvent::TrayNotificationRequested {
+                    title: format!("Due Soon: {}", todo.title),
+                    body: format!("Due in {} · P{}", time_str, todo.priority.unwrap_or(3)),
+                    alarm_id: None,
+                });
 
                 // Update last_reminded_at via SQL
                 let patch = storage::TaskPatch {
@@ -137,12 +135,11 @@ impl ReminderEngine {
                 let diff_ms = deadline.as_millisecond() - now.as_millisecond();
                 let mins_left = diff_ms / 60_000;
 
-                dispatcher
-                    .notify(
-                        &format!("Deadline: {}", todo.title),
-                        &format!("{} minutes remaining", mins_left),
-                    )
-                    .await?;
+                bus.publish(DomainEvent::TrayNotificationRequested {
+                    title: format!("Deadline: {}", todo.title),
+                    body: format!("{} minutes remaining", mins_left),
+                    alarm_id: None,
+                });
             }
 
             // Rule #3: Overdue nagging (once per day)
@@ -156,12 +153,11 @@ impl ReminderEngine {
                     format!("{} days overdue", days_overdue)
                 };
 
-                dispatcher
-                    .notify(
-                        &format!("Overdue: {}", todo.title),
-                        &format!("{} · P{}", overdue_str, todo.priority.unwrap_or(3)),
-                    )
-                    .await?;
+                bus.publish(DomainEvent::TrayNotificationRequested {
+                    title: format!("Overdue: {}", todo.title),
+                    body: format!("{} · P{}", overdue_str, todo.priority.unwrap_or(3)),
+                    alarm_id: None,
+                });
             }
         }
 
@@ -295,7 +291,10 @@ mod tests {
         let due_1_hour_ago = add_secs(Timestamp::now(), -3600);
         let todo = create_test_todo("Overdue", Some(due_1_hour_ago));
         let should_remind = ReminderEngine::should_remind_due_date(&todo);
-        assert!(!should_remind, "Should not use due date rule for overdue tasks");
+        assert!(
+            !should_remind,
+            "Should not use due date rule for overdue tasks"
+        );
     }
 
     #[tokio::test]
@@ -306,7 +305,10 @@ mod tests {
         todo.focused_at = Some(add_secs(now, -7200));
         todo.focus_deadline = Some(deadline_in_30_min);
         let should_remind = ReminderEngine::should_remind_focused_deadline(&todo);
-        assert!(should_remind, "Should remind for focused task deadline within 1 hour");
+        assert!(
+            should_remind,
+            "Should remind for focused task deadline within 1 hour"
+        );
     }
 
     #[tokio::test]
@@ -334,7 +336,10 @@ mod tests {
         todo.focused_at = Some(add_secs(now, -3600));
         todo.focus_deadline = Some(add_secs(now, 7200));
         let should_remind = ReminderEngine::should_remind_focused_deadline(&todo);
-        assert!(!should_remind, "Should not remind if deadline beyond 1 hour");
+        assert!(
+            !should_remind,
+            "Should not remind if deadline beyond 1 hour"
+        );
     }
 
     #[tokio::test]
@@ -360,7 +365,10 @@ mod tests {
         let mut todo = create_test_todo("Overdue", Some(due_yesterday));
         todo.last_reminded_at = Some(add_secs(Timestamp::now(), -90000)); // 25 hours ago
         let should_remind = ReminderEngine::should_remind_overdue(&todo);
-        assert!(should_remind, "Should nag again if last nag was over 24 hours ago");
+        assert!(
+            should_remind,
+            "Should nag again if last nag was over 24 hours ago"
+        );
     }
 
     #[tokio::test]

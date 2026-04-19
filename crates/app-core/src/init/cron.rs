@@ -10,7 +10,6 @@ use tracing::{info, warn};
 /// Results from the cron initialization phase.
 pub(super) struct CronResult {
     pub cron_service: Arc<CronService>,
-    pub notification_dispatcher: Arc<agent::NotificationDispatcher>,
     pub proactive_handler: Option<Arc<dyn feature_tasks::ProactiveHandler>>,
     pub suggestion_applier: Option<Arc<dyn SuggestionApplier>>,
     pub decomposition_handler: Option<Arc<dyn DecompositionHandler>>,
@@ -26,7 +25,6 @@ pub(super) async fn init_cron(
     config: &config::Config,
     repos: &Repos,
     bus: &Arc<MessageBus>,
-    notification_sender: &Option<Arc<dyn common::NotificationSender>>,
     cognitive_provider: Option<providers::DynProvider>,
     provider: providers::DynProvider,
     domain_event_bus: &Arc<DomainEventBus>,
@@ -39,18 +37,6 @@ pub(super) async fn init_cron(
         .start()
         .await
         .map_err(|e| format!("cron start failed: {e}"))?;
-
-    let notification_dispatcher = Arc::new(match notification_sender {
-        Some(sender) => agent::NotificationDispatcher::with_sender(
-            bus.outbound_sender(),
-            config.todo.notifications.clone(),
-            Arc::clone(sender),
-        ),
-        None => agent::NotificationDispatcher::new(
-            bus.outbound_sender(),
-            config.todo.notifications.clone(),
-        ),
-    });
 
     // Build AI decomposition and forecast handlers.
     let decomposition_handler: Option<Arc<dyn DecompositionHandler>> = {
@@ -152,7 +138,6 @@ pub(super) async fn init_cron(
     register_cron_callbacks(
         &mut cron_service,
         repos,
-        &notification_dispatcher,
         config,
         bus,
         cognitive_provider,
@@ -176,7 +161,6 @@ pub(super) async fn init_cron(
 
     Ok(CronResult {
         cron_service,
-        notification_dispatcher,
         proactive_handler: proactive_handler_out,
         suggestion_applier: suggestion_applier_out,
         decomposition_handler,
@@ -220,7 +204,6 @@ const JOB_REFORGE_NIGHTLY: &str = "__klyntbot_reforge_nightly";
 fn register_cron_callbacks(
     cron_service: &mut CronService,
     repos: &Repos,
-    notification_dispatcher: &Arc<agent::NotificationDispatcher>,
     config: &config::Config,
     bus: &Arc<MessageBus>,
     cognitive_provider: Option<providers::DynProvider>,
@@ -239,13 +222,13 @@ fn register_cron_callbacks(
     // ── todo_focus_check ─────────────────────────────────────────────────
     {
         let todo_repo = repos.tasks.clone();
-        let dispatcher = Arc::clone(notification_dispatcher);
+        let domain_bus = Arc::clone(domain_event_bus);
         let rt = rt.clone();
         cron_service.register_handler(
             JOB_FOCUS_CHECK,
             Arc::new(move |_job: &scheduling::CronJob| {
                 let todo_repo = todo_repo.clone();
-                let dispatcher = Arc::clone(&dispatcher);
+                let domain_bus = Arc::clone(&domain_bus);
                 tokio::task::block_in_place(|| {
                     rt.block_on(async move {
                         let focused: Vec<storage::TaskRow> = todo_repo.list_focused().await?;
@@ -255,29 +238,32 @@ fn register_cron_callbacks(
                                     - jiff::Timestamp::now().as_millisecond())
                                     / 3_600_000;
                                 if hours_left <= 1 && hours_left > 0 {
-                                    dispatcher
-                                        .notify(
-                                            "⏰ Focus Deadline: 1h left",
-                                            &format!("\"{}\" — deadline approaching!", task.title),
-                                        )
-                                        .await
-                                        .ok();
+                                    domain_bus.publish(
+                                        bus::DomainEvent::TrayNotificationRequested {
+                                            title: "⏰ Focus Deadline: 1h left".into(),
+                                            body: format!(
+                                                "\"{}\" — deadline approaching!",
+                                                task.title
+                                            ),
+                                            alarm_id: None,
+                                        },
+                                    );
                                 } else if hours_left <= 3 && hours_left > 1 {
-                                    dispatcher
-                                        .notify(
-                                            "⏰ Focus Deadline: 3h left",
-                                            &format!("\"{}\" — stay on track", task.title),
-                                        )
-                                        .await
-                                        .ok();
+                                    domain_bus.publish(
+                                        bus::DomainEvent::TrayNotificationRequested {
+                                            title: "⏰ Focus Deadline: 3h left".into(),
+                                            body: format!("\"{}\" — stay on track", task.title),
+                                            alarm_id: None,
+                                        },
+                                    );
                                 } else if hours_left <= 6 && hours_left > 3 {
-                                    dispatcher
-                                        .notify(
-                                            "⏰ Focus Deadline: 6h left",
-                                            &format!("\"{}\" — keep going", task.title),
-                                        )
-                                        .await
-                                        .ok();
+                                    domain_bus.publish(
+                                        bus::DomainEvent::TrayNotificationRequested {
+                                            title: "⏰ Focus Deadline: 6h left".into(),
+                                            body: format!("\"{}\" — keep going", task.title),
+                                            alarm_id: None,
+                                        },
+                                    );
                                 }
                             }
                         }
@@ -291,13 +277,13 @@ fn register_cron_callbacks(
     // ── todo_daily_digest ────────────────────────────────────────────────
     {
         let todo_repo = repos.tasks.clone();
-        let dispatcher = Arc::clone(notification_dispatcher);
+        let domain_bus = Arc::clone(domain_event_bus);
         let rt = rt.clone();
         cron_service.register_handler(
             JOB_DAILY_DIGEST,
             Arc::new(move |_job: &scheduling::CronJob| {
                 let todo_repo = todo_repo.clone();
-                let dispatcher = Arc::clone(&dispatcher);
+                let domain_bus = Arc::clone(&domain_bus);
                 tokio::task::block_in_place(|| {
                     rt.block_on(async move {
                         let summary = todo_repo.summary().await?;
@@ -310,7 +296,11 @@ fn register_cron_callbacks(
                             summary.done,
                             overdue.len()
                         );
-                        dispatcher.notify("📋 Daily Task Digest", &body).await.ok();
+                        domain_bus.publish(bus::DomainEvent::TrayNotificationRequested {
+                            title: "📋 Daily Task Digest".into(),
+                            body,
+                            alarm_id: None,
+                        });
                         Ok(Some("Daily digest sent".to_string()))
                     })
                 })
@@ -321,14 +311,14 @@ fn register_cron_callbacks(
     // ── todo_overdue_check ───────────────────────────────────────────────
     {
         let todo_repo = repos.tasks.clone();
-        let dispatcher = Arc::clone(notification_dispatcher);
+        let domain_bus = Arc::clone(domain_event_bus);
         let config_focus = config.todo.focus.clone();
         let rt = rt.clone();
         cron_service.register_handler(
             JOB_OVERDUE_CHECK,
             Arc::new(move |_job: &scheduling::CronJob| {
                 let todo_repo = todo_repo.clone();
-                let dispatcher = Arc::clone(&dispatcher);
+                let domain_bus = Arc::clone(&domain_bus);
                 let config_focus = config_focus.clone();
                 tokio::task::block_in_place(|| {
                     rt.block_on(async move {
@@ -346,10 +336,11 @@ fn register_cron_callbacks(
                                 "{} task(s) auto-unfocused due to {}h deadline",
                                 expired_count, config_focus.deadline_hours
                             );
-                            dispatcher
-                                .notify("⏰ Focus Tasks Expired", &body)
-                                .await
-                                .ok();
+                            domain_bus.publish(bus::DomainEvent::TrayNotificationRequested {
+                                title: "⏰ Focus Tasks Expired".into(),
+                                body,
+                                alarm_id: None,
+                            });
                         }
                         Ok(Some("Overdue check complete".to_string()))
                     })
@@ -954,18 +945,18 @@ fn register_cron_callbacks(
     // ── reminder_check ────────────────────────────────────────────────────
     {
         let todo_repo = repos.tasks.clone();
-        let dispatcher = Arc::clone(notification_dispatcher);
+        let domain_bus = Arc::clone(domain_event_bus);
         let rt = rt.clone();
         cron_service.register_handler(
             JOB_REMINDER_CHECK,
             Arc::new(move |_job: &scheduling::CronJob| {
                 let todo_repo = todo_repo.clone();
-                let dispatcher = Arc::clone(&dispatcher);
+                let domain_bus = Arc::clone(&domain_bus);
                 tokio::task::block_in_place(|| {
                     rt.block_on(async move {
                         match agent::services::reminders::ReminderEngine::check_and_send_reminders_static(
                             &todo_repo,
-                            &dispatcher,
+                            &domain_bus,
                         )
                         .await
                         {

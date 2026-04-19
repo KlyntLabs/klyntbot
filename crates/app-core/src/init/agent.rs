@@ -35,8 +35,6 @@ pub(super) async fn init_agent(
     cognitive_provider: Option<providers::DynProvider>,
     domain_event_bus: &Arc<DomainEventBus>,
     cron_service: &Arc<CronService>,
-    notification_dispatcher: &Arc<agent::NotificationDispatcher>,
-    notification_sender: &Option<Arc<dyn common::NotificationSender>>,
     autotuner: Option<&Arc<agent::autotuner::AutoTunerOrchestrator>>,
     hot_config: Arc<RwLock<config::HotConfig>>,
     context_update_queue: Option<Arc<bus::ContextUpdateQueue>>,
@@ -78,16 +76,10 @@ pub(super) async fn init_agent(
     let pipeline_tx = pipeline_broadcast_tx.clone();
     let mut builder = AgentLoop::builder(bus.clone(), provider, config.clone())
         .with_pool(storage_pool.inner().clone())
-        .with_cron_service(cron_service.clone())
-        .with_notification_handle(notification_dispatcher.last_active_handle());
+        .with_cron_service(cron_service.clone());
 
     if let Some(engine) = embedding_engine {
         builder = builder.with_embedding_engine(engine);
-    }
-
-    // Thread the custom notification sender (if provided) to the agent's ReminderEngine
-    if let Some(ref sender) = notification_sender {
-        builder = builder.with_notification_sender(Arc::clone(sender));
     }
 
     let mut builder = builder

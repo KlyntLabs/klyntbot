@@ -4,7 +4,6 @@
 //! for cooperative shutdown.
 
 pub mod memory_maintenance;
-pub mod notifications;
 pub mod recurring_tasks;
 pub mod reminders;
 pub mod session_cleanup;

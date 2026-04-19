@@ -41,9 +41,7 @@ pub use adapters::{
     learning as learning_handler, llm_summary, mirror_handlers, productivity, progress,
     task_embedding,
 };
-pub use services::{
-    memory_maintenance, notifications, recurring_tasks, reminders, session_cleanup,
-};
+pub use services::{memory_maintenance, recurring_tasks, reminders, session_cleanup};
 
 // ── Type re-exports ──────────────────────────────────────────────────────────
 pub use agent_loop::{AgentLoop, StreamingHandle};
@@ -59,7 +57,6 @@ pub use execution::{CycleOutcome, ExecutionCore, ExecutionParams, ToolExecutionR
 pub use finance::FinanceHandlerImpl;
 pub use learning::LearningService;
 pub use learning_handler::LearningHandlerImpl;
-pub use notifications::NotificationDispatcher;
 pub use persona::{PersonaChain, PersonaManager, PersonaScope};
 pub use productivity::ProductivityHandlerImpl;
 pub use progress::ProgressHandlerImpl;

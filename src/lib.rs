@@ -12,6 +12,7 @@ pub use config;
 pub use context_engine;
 pub use feature_coaching;
 pub use mcp;
+pub use notifications;
 pub use providers;
 pub use scheduling;
 pub use session;
@@ -31,6 +32,7 @@ pub use common::{
     InteractionRequest, MessageRole, Question, Result, SessionKey,
 };
 pub use config::Config;
+pub use notifications::{NotificationDispatcher, NotificationDispatcherHandle};
 pub use providers::{
     create_provider, create_provider_with_failover, DynProvider, LlmProvider, LlmResponse, Message,
     ProviderRegistry,

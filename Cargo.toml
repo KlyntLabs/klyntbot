@@ -196,6 +196,7 @@ feature-coaching.workspace = true
 storage.workspace = true
 plugin-runtime.workspace = true
 mcp.workspace = true
+notifications.workspace = true
 
 [dev-dependencies]
 jiff.workspace = true

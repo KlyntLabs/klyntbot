@@ -53,8 +53,6 @@ pub struct AgentLoop {
     pub(crate) last_active_channel: Option<LastActiveChannel>,
     pub(crate) reminder_engine: Option<Arc<RwLock<super::ReminderEngine>>>,
     pub(crate) recurring_task_spawner: Option<Arc<RwLock<super::RecurringTaskSpawner>>>,
-    /// Held for lifetime; shared with notification targets
-    pub(crate) _notification_dispatcher: Option<Arc<super::NotificationDispatcher>>,
     /// Conversation recall handler for semantic memory
     pub(crate) conversation_recall_handler: Option<Arc<dyn tools::ConversationRecallHandler>>,
     /// Background learning service for adaptive threshold updates (None if learning disabled)
