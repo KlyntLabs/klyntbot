@@ -114,6 +114,19 @@ pub(super) async fn init_storage(
     .await
     .map_err(|e| format!("tasks migration failed: {e}"))?;
 
+    // Run scheduling feature migrations (Phase 2: scheduled_fires table).
+    StoragePool::run_feature_migrations(
+        storage_pool.inner(),
+        &[tools_core::FeatureMigration {
+            feature_name: "scheduling".to_string(),
+            version: 1,
+            description: "Create scheduled_fires table".to_string(),
+            sql: include_str!("../../../scheduling/migrations/001_scheduled_fires.sql").to_string(),
+        }],
+    )
+    .await
+    .map_err(|e| format!("scheduling migration failed: {e}"))?;
+
     // Run language-learning feature migrations.
     StoragePool::run_feature_migrations(
         storage_pool.inner(),

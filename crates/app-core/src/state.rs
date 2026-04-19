@@ -128,6 +128,12 @@ pub struct AppCore {
     pub autotuner: Option<Arc<agent::autotuner::AutoTunerOrchestrator>>,
     /// Deadline scheduler for event-driven task reminders, focus warnings, and recurring spawns.
     pub deadline_scheduler: Option<Arc<scheduling::DeadlineScheduler>>,
+    /// Unified TemporalScheduler (Phase 2). Runs alongside legacy cron_service.
+    pub temporal_scheduler: Option<scheduling::temporal::TemporalScheduler>,
+    /// Join handle for the TemporalScheduler background loop.
+    pub _temporal_scheduler_handle: Option<tokio::task::JoinHandle<()>>,
+    /// Join handle for the SystemDidWake → scheduler.wake() subscriber.
+    pub _temporal_wake_subscriber: Option<tokio::task::JoinHandle<()>>,
     /// Mirror self-reflection facade (None when cognitive provider is unavailable).
     pub mirror_facade: Option<Arc<cognitive::mirror::MirrorFacade>>,
     /// Pending memory repo for user-confirmable facts (None when cognitive unavailable).

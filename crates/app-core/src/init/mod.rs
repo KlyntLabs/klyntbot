@@ -7,6 +7,7 @@ mod deadline;
 mod launcher;
 mod productivity;
 mod storage;
+pub(super) mod temporal_scheduler;
 
 use std::sync::Arc;
 
@@ -172,6 +173,14 @@ impl AppCore {
             vector_store.clone(),
         )
         .await?;
+
+        // ── TemporalScheduler (Phase 2, side-by-side with CronService) ──────
+        let temporal_scheduler::TemporalSchedulerResult {
+            scheduler: temporal_scheduler,
+            scheduler_handle: temporal_scheduler_handle,
+            wake_subscriber: temporal_wake_subscriber,
+        } = temporal_scheduler::init_temporal_scheduler(&repos, Arc::clone(&domain_event_bus))
+            .await?;
 
         // ── Note embedding handler (before vector_store is moved into agent) ──
         let embedding_provider = if config.embedding.provider == "openai" {
@@ -670,6 +679,9 @@ impl AppCore {
             )),
             autotuner,
             deadline_scheduler: Some(deadline_scheduler),
+            temporal_scheduler: Some(temporal_scheduler),
+            _temporal_scheduler_handle: Some(temporal_scheduler_handle),
+            _temporal_wake_subscriber: Some(temporal_wake_subscriber),
             mirror_facade,
             pending_memory_repo,
             _mirror_handles: mirror_handles,
