@@ -118,6 +118,7 @@ impl super::SearchSource for SshHostsSource {
                         user: h.user.clone(),
                     },
                     score: (score as f64) / 1000.0 * 0.6,
+                    no_view: false,
                 }
             })
             .collect()

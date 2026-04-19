@@ -10,6 +10,8 @@ pub struct LauncherItem {
     pub icon: Option<String>,
     pub kind: LauncherItemKind,
     pub score: f64,
+    #[serde(default)]
+    pub no_view: bool,
 }
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize)]

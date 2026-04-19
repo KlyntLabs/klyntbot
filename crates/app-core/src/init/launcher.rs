@@ -109,6 +109,9 @@ pub(super) async fn init_launcher(
     if launcher_config.sources.files.enabled {
         let source = Arc::new(feature_launcher::FileSearchSource::new(
             launcher_config.sources.files.scan_dirs.clone(),
+            launcher_config.sources.files.max_entries,
+            launcher_config.sources.files.mdfind_fallback,
+            launcher_config.sources.files.mdfind_threshold,
         ));
         let s = Arc::clone(&source);
         tokio::spawn(async move { s.refresh().await });

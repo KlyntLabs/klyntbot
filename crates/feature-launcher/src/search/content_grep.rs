@@ -115,6 +115,7 @@ impl super::SearchSource for ContentGrepSource {
                     preview,
                 },
                 score: 0.7,
+                no_view: false,
             });
         }
 

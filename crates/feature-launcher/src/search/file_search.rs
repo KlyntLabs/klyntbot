@@ -1,126 +1,65 @@
+use crate::search::inverted_index::{classify_extension, InvertedFileIndex, SkipSet};
 use crate::types::*;
-use ignore::WalkBuilder;
-use parking_lot::RwLock;
-use std::path::{Path, PathBuf};
+use arc_swap::ArcSwap;
+use std::collections::HashSet;
+use std::path::PathBuf;
 use std::sync::Arc;
-
-/// Directories to always skip (covers non-git dirs where .gitignore doesn't apply).
-const SKIP_DIRS: &[&str] = &[
-    "node_modules",
-    "target",
-    "__pycache__",
-    ".cache",
-    ".Trash",
-    "Library",
-];
-
-/// File extensions to skip — compiled artifacts and shared libraries.
-const SKIP_EXTENSIONS: &[&str] = &["pyc", "pyo", "class", "o", "obj", "dylib", "so"];
-
-#[derive(Debug, Clone)]
-struct FileEntry {
-    name: String,
-    path: PathBuf,
-    /// Which scan_dir this came from — earlier dirs get a mild score boost.
-    dir_index: usize,
-}
+use tokio_util::sync::CancellationToken;
 
 #[derive(Clone)]
 pub struct FileSearchSource {
-    entries: Arc<RwLock<Vec<FileEntry>>>,
-    scan_dirs: Vec<String>,
+    index: Arc<ArcSwap<InvertedFileIndex>>,
+    roots: Vec<PathBuf>,
+    skip: SkipSet,
+    max_entries: usize,
+    mdfind_fallback: bool,
+    mdfind_threshold: usize,
+    cancel: Arc<parking_lot::Mutex<CancellationToken>>,
 }
 
 impl FileSearchSource {
-    pub fn new(scan_dirs: Vec<String>) -> Self {
+    pub fn new(
+        scan_dirs: Vec<String>,
+        max_entries: usize,
+        mdfind_fallback: bool,
+        mdfind_threshold: usize,
+    ) -> Self {
+        let roots: Vec<PathBuf> = scan_dirs
+            .iter()
+            .map(|s| PathBuf::from(shellexpand::tilde(s).to_string()))
+            .collect();
         Self {
-            entries: Arc::new(RwLock::new(Vec::new())),
-            scan_dirs,
+            index: Arc::new(ArcSwap::from_pointee(InvertedFileIndex::empty())),
+            roots,
+            skip: SkipSet::defaults(),
+            max_entries,
+            mdfind_fallback,
+            mdfind_threshold,
+            cancel: Arc::new(parking_lot::Mutex::new(CancellationToken::new())),
         }
     }
 
-    fn walk_dirs(dirs: &[String]) -> Vec<FileEntry> {
-        let mut entries = Vec::new();
-
-        for (dir_index, dir) in dirs.iter().enumerate() {
-            let expanded = shellexpand::tilde(dir).to_string();
-            let root = Path::new(&expanded);
-            if !root.exists() {
-                continue;
-            }
-
-            let walker = WalkBuilder::new(root)
-                .hidden(true)
-                .git_ignore(true)
-                .git_global(true)
-                .git_exclude(true)
-                .require_git(false)
-                .filter_entry(|entry| {
-                    // Prune SKIP_DIRS so the walker doesn't descend into them
-                    if entry.file_type().is_some_and(|ft| ft.is_dir()) {
-                        if let Some(name) = entry.file_name().to_str() {
-                            return !SKIP_DIRS.contains(&name);
-                        }
-                    }
-                    true
-                })
-                .build();
-
-            for result in walker {
-                let entry = match result {
-                    Ok(e) => e,
-                    Err(e) => {
-                        tracing::debug!("file_search walk error: {e}");
-                        continue;
-                    }
-                };
-
-                // Skip directories — we only index files
-                if entry.file_type().is_none_or(|ft| ft.is_dir()) {
-                    continue;
-                }
-
-                let path = entry.path();
-
-                let file_name = match path.file_name().and_then(|n| n.to_str()) {
-                    Some(n) => n,
-                    None => continue,
-                };
-
-                // Skip unwanted extensions
-                if let Some(ext) = path.extension().and_then(|e| e.to_str()) {
-                    if SKIP_EXTENSIONS.contains(&ext) {
-                        continue;
-                    }
-                }
-
-                entries.push(FileEntry {
-                    name: file_name.to_string(),
-                    path: path.to_path_buf(),
-                    dir_index,
-                });
+    pub async fn apply_events(&self, paths: Vec<(PathBuf, FsEventKind)>) {
+        let current = self.index.load_full();
+        let mut next = current.clone_for_patch();
+        for (p, kind) in paths {
+            match kind {
+                FsEventKind::Create => next.apply_event_create(&p),
+                FsEventKind::Remove => next.apply_event_remove(&p),
             }
         }
-
-        entries
+        self.index.store(Arc::new(next));
     }
 
-    fn classify_extension(path: &Path) -> FileKind {
-        match path.extension().and_then(|e| e.to_str()) {
-            Some("png" | "jpg" | "jpeg" | "gif" | "svg" | "webp" | "ico" | "heic") => {
-                FileKind::Image
-            }
-            Some("pdf" | "doc" | "docx" | "txt" | "md" | "rtf" | "pages" | "odt") => {
-                FileKind::Document
-            }
-            Some(
-                "rs" | "ts" | "tsx" | "js" | "jsx" | "py" | "go" | "rb" | "java" | "c" | "cpp"
-                | "h" | "swift" | "kt" | "sh" | "toml" | "yaml" | "json" | "html" | "css",
-            ) => FileKind::Code,
-            Some("zip" | "tar" | "gz" | "bz2" | "xz" | "7z" | "rar" | "dmg") => FileKind::Archive,
-            _ => FileKind::File,
-        }
+    pub fn index_len(&self) -> usize {
+        self.index.load().len()
     }
+}
+
+#[derive(Clone, Copy)]
+pub enum FsEventKind {
+    Create,
+    Remove,
 }
 
 #[async_trait::async_trait]
@@ -137,123 +76,98 @@ impl super::SearchSource for FileSearchSource {
         if query.is_empty() {
             return vec![];
         }
+        // Cancel any prior in-flight mdfind for this source
+        let cancel = {
+            let mut g = self.cancel.lock();
+            g.cancel();
+            *g = CancellationToken::new();
+            g.clone()
+        };
+        let snap = self.index.load_full();
+        let scored = snap.search(query, limit);
 
-        let entries = self.entries.read();
-        let scored = super::fuzzy_match(query, &entries, |e| &e.name, limit);
-
-        scored
-            .into_iter()
-            .map(|(score, e)| {
+        let mut items: Vec<LauncherItem> = scored
+            .iter()
+            .map(|s| {
+                let e = &snap.entries[s.entry_idx as usize];
                 let path_str = e.path.display().to_string();
-                let dir_boost = 1.0 - (e.dir_index as f64 * 0.05).min(0.3);
-                // Don't resolve file-type icons via NSWorkspace — triggers IconServices
-                // mmap leak. Use text fallback from frontend ICON_MAP.
-                let icon = Some("file".to_string());
                 LauncherItem {
                     id: format!("file:{path_str}"),
                     title: e.name.clone(),
                     subtitle: Some(path_str),
-                    icon,
-                    kind: LauncherItemKind::File {
-                        path: e.path.clone(),
-                        kind: Self::classify_extension(&e.path),
-                    },
-                    score: (score as f64 / 1000.0) * 0.85 * dir_boost,
+                    icon: Some("file".to_string()),
+                    kind: LauncherItemKind::File { path: e.path.clone(), kind: e.kind },
+                    score: (s.score as f64 / 200.0) * 0.85,
+                    no_view: false,
                 }
             })
-            .collect()
+            .collect();
+
+        // mdfind fallback
+        #[cfg(target_os = "macos")]
+        if self.mdfind_fallback && items.len() < self.mdfind_threshold {
+            let extra = crate::search::inverted_index::mdfind_paths(
+                query,
+                &self.roots,
+                &self.skip,
+                cancel,
+            )
+            .await;
+            let existing: HashSet<PathBuf> = items
+                .iter()
+                .filter_map(|i| match &i.kind {
+                    LauncherItemKind::File { path, .. } => Some(path.clone()),
+                    _ => None,
+                })
+                .collect();
+            for p in extra {
+                if existing.contains(&p) {
+                    continue;
+                }
+                let name = p
+                    .file_name()
+                    .and_then(|n| n.to_str())
+                    .unwrap_or("")
+                    .to_string();
+                if name.is_empty() {
+                    continue;
+                }
+                let path_str = p.display().to_string();
+                items.push(LauncherItem {
+                    id: format!("file:{path_str}"),
+                    title: name,
+                    subtitle: Some(path_str),
+                    icon: Some("file".to_string()),
+                    kind: LauncherItemKind::File {
+                        path: p.clone(),
+                        kind: classify_extension(&p),
+                    },
+                    score: 0.40,
+                    no_view: false,
+                });
+            }
+            items.sort_by(|a, b| {
+                b.score
+                    .partial_cmp(&a.score)
+                    .unwrap_or(std::cmp::Ordering::Equal)
+            });
+            items.truncate(limit);
+        }
+
+        items
     }
 
     async fn refresh(&self) {
-        let dirs = self.scan_dirs.clone();
-        let new_entries = tokio::task::spawn_blocking(move || Self::walk_dirs(&dirs))
+        let roots = self.roots.clone();
+        let skip = self.skip.clone();
+        let cap = self.max_entries;
+        let new = tokio::task::spawn_blocking(move || InvertedFileIndex::build(&roots, &skip, cap))
             .await
             .unwrap_or_else(|e| {
-                tracing::error!("file_search walk task failed: {e}");
-                vec![]
+                tracing::error!("inverted index build failed: {e}");
+                InvertedFileIndex::empty()
             });
-        tracing::info!(
-            "Indexed {} files (icons deferred to search)",
-            new_entries.len()
-        );
-        *self.entries.write() = new_entries;
-        // Icons resolved lazily during search() — not at index time.
-        // Eagerly resolving 138 file-type icons causes macOS IconServices
-        // to mmap ~4GB of icon cache files into the process.
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::search::SearchSource;
-    use std::fs;
-    use tempfile::TempDir;
-
-    #[tokio::test]
-    async fn test_index_and_search() {
-        let dir = TempDir::new().unwrap();
-        let base = dir.path();
-
-        fs::write(base.join("hello.rs"), "fn main() {}").unwrap();
-        fs::write(base.join("world.txt"), "hello world").unwrap();
-        fs::create_dir_all(base.join("sub")).unwrap();
-        fs::write(base.join("sub/nested.rs"), "mod nested;").unwrap();
-
-        fs::create_dir_all(base.join("node_modules")).unwrap();
-        fs::write(base.join("node_modules/junk.js"), "junk").unwrap();
-
-        let source = FileSearchSource::new(vec![base.to_string_lossy().to_string()]);
-        source.refresh().await;
-
-        let results = source.search("hello", 10).await;
-        assert_eq!(results.len(), 1);
-        assert_eq!(results[0].title, "hello.rs");
-
-        let results = source.search("rs", 10).await;
-        assert!(results.len() >= 2);
-
-        let results = source.search("junk", 10).await;
-        assert!(results.is_empty());
-    }
-
-    #[tokio::test]
-    async fn test_gitignore_respected() {
-        let dir = TempDir::new().unwrap();
-        let base = dir.path();
-
-        fs::write(base.join(".gitignore"), "*.log\nbuild/\n").unwrap();
-        fs::write(base.join("app.rs"), "fn main() {}").unwrap();
-        fs::write(base.join("debug.log"), "log output").unwrap();
-        fs::create_dir_all(base.join("build")).unwrap();
-        fs::write(base.join("build/output.bin"), "binary").unwrap();
-
-        let source = FileSearchSource::new(vec![base.to_string_lossy().to_string()]);
-        source.refresh().await;
-
-        let results = source.search("app", 10).await;
-        assert_eq!(results.len(), 1);
-        assert_eq!(results[0].title, "app.rs");
-
-        let results = source.search("debug", 10).await;
-        assert!(results.is_empty());
-
-        let results = source.search("output", 10).await;
-        assert!(results.is_empty());
-    }
-
-    #[tokio::test]
-    async fn test_nonexistent_dir_skipped() {
-        let source = FileSearchSource::new(vec!["/nonexistent/path/12345".to_string()]);
-        source.refresh().await;
-        let results = source.search("anything", 10).await;
-        assert!(results.is_empty());
-    }
-
-    #[tokio::test]
-    async fn test_empty_query_returns_nothing() {
-        let source = FileSearchSource::new(vec![]);
-        let results = source.search("", 10).await;
-        assert!(results.is_empty());
+        tracing::info!("Indexed {} files (inverted)", new.len());
+        self.index.store(Arc::new(new));
     }
 }

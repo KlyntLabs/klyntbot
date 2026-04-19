@@ -88,6 +88,7 @@ impl AppIndex {
                         running: false,
                     },
                     score: (score as f64) / 1000.0,
+                    no_view: false,
                 }
             })
             .collect()

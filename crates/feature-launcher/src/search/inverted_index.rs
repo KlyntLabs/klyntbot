@@ -19,6 +19,7 @@ pub struct ScoredEntry {
     pub score: i32,
 }
 
+#[derive(Clone)]
 pub struct InvertedFileIndex {
     pub(crate) entries: Vec<IndexEntry>,
     pub(crate) postings: HashMap<SmolStr, Vec<u32>>,
@@ -35,6 +36,10 @@ impl InvertedFileIndex {
 
     pub fn is_empty(&self) -> bool {
         self.entries.is_empty()
+    }
+
+    pub fn clone_for_patch(&self) -> Self {
+        self.clone()
     }
 }
 
@@ -74,7 +79,7 @@ impl SkipSet {
     fn skip_ext(&self, ext: &str) -> bool { self.exts.contains(&ext) }
 }
 
-fn classify_extension(path: &Path) -> FileKind {
+pub(crate) fn classify_extension(path: &Path) -> FileKind {
     match path.extension().and_then(|e| e.to_str()) {
         Some("png" | "jpg" | "jpeg" | "gif" | "svg" | "webp" | "ico" | "heic") => FileKind::Image,
         Some("pdf" | "doc" | "docx" | "txt" | "md" | "rtf" | "pages" | "odt") => FileKind::Document,

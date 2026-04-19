@@ -98,6 +98,7 @@ impl super::SearchSource for BrewSource {
                         is_cask: p.is_cask,
                     },
                     score: (score as f64) / 1000.0 * 0.4,
+                    no_view: false,
                 }
             })
             .collect()

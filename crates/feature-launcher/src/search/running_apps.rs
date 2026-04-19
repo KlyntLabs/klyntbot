@@ -97,6 +97,7 @@ impl super::SearchSource for RunningAppsSource {
                         path: app.path.clone(),
                     },
                     score: (score as f64) / 1000.0 * 1.2,
+                    no_view: false,
                 }
             })
             .collect()
