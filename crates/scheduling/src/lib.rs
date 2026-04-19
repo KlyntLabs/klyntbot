@@ -18,7 +18,7 @@ pub use service::{
 };
 pub use temporal::cron_executor::{CronExecutor, CronHandler};
 pub use temporal::fire_store::{FireSpec, FireStore};
-pub use temporal::recurrence::{InstanceRepo, RecurrenceEngine, RecurrenceTemplate, TemplateRepo};
+pub use temporal::recurrence::{RecurrenceEngine, RecurrenceTemplate};
 pub use temporal::rules::{AlarmRule, RuleError};
 pub use types::{
     CronJob, CronJobState, CronOrigin, CronPayload, CronSchedule, CronServiceStatus, CronStore,

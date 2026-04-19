@@ -40,6 +40,8 @@ pub struct RecurrenceTemplate {
 
 #[async_trait]
 pub trait TemplateRepo: Send + Sync {
+    /// Returns the current template state. `count_remaining` MUST reflect the live value
+    /// (not a cached snapshot) — the engine reads it before deciding whether to materialize.
     async fn get(&self, id: &str) -> anyhow::Result<Option<RecurrenceTemplate>>;
     async fn update_next_instance(
         &self,
@@ -54,11 +56,8 @@ pub trait TemplateRepo: Send + Sync {
 #[async_trait]
 pub trait InstanceRepo: Send + Sync {
     /// Create an instance row and return its id.
-    async fn create_instance(
-        &self,
-        template_id: &str,
-        due_at: Timestamp,
-    ) -> anyhow::Result<String>;
+    async fn create_instance(&self, template_id: &str, due_at: Timestamp)
+        -> anyhow::Result<String>;
     /// Cancel all unfired instances for this template.
     async fn cancel_unfired_instances(&self, template_id: &str) -> anyhow::Result<()>;
 }
@@ -90,12 +89,13 @@ impl RecurrenceEngine {
     }
 
     /// Called when a `recurrence_spawn` alarm fires for `template_id`.
-    pub async fn on_spawn(
-        &self,
-        template_id: &str,
-        now: Timestamp,
-    ) -> Result<(), SchedulerError> {
-        let tmpl = match self.template_repo.get(template_id).await? {
+    pub async fn on_spawn(&self, template_id: &str, now: Timestamp) -> Result<(), SchedulerError> {
+        let tmpl = match self
+            .template_repo
+            .get(template_id)
+            .await
+            .map_err(|e| SchedulerError::InvalidState(e.to_string()))?
+        {
             Some(t) if t.enabled => t,
             _ => return Ok(()),
         };
@@ -112,15 +112,17 @@ impl RecurrenceEngine {
         if matches!(tmpl.count_remaining, Some(0)) {
             self.template_repo
                 .update_next_instance(template_id, None)
-                .await?;
+                .await
+                .map_err(|e| SchedulerError::InvalidState(e.to_string()))?;
             return Ok(());
         }
 
         // Fetch enough candidates to cover `ahead` instances + 1 for next_spawn.
         // Uses the native `rrule` crate parser so the full RFC 5545 property set
         // is supported (BYSETPOS, BYYEARDAY, negative BYMONTHDAY, WKST, etc.).
-        let candidates = next_n_from_rrule_string(&tmpl.rrule, &tmpl.iana_tz, cursor, ahead as usize + 1)
-            .map_err(|e| SchedulerError::Rrule(e.to_string()))?;
+        let candidates =
+            next_n_from_rrule_string(&tmpl.rrule, &tmpl.iana_tz, cursor, ahead as usize + 1)
+                .map_err(|e| SchedulerError::Rrule(e.to_string()))?;
 
         let mut last_materialized: Option<Timestamp> = None;
 
@@ -138,18 +140,21 @@ impl RecurrenceEngine {
 
             self.instance_repo
                 .create_instance(template_id, next)
-                .await?;
+                .await
+                .map_err(|e| SchedulerError::InvalidState(e.to_string()))?;
 
             // Decrement count if finite.
             if tmpl.count_remaining.is_some() {
                 let new_count = self
                     .template_repo
                     .decrement_count(template_id)
-                    .await?;
+                    .await
+                    .map_err(|e| SchedulerError::InvalidState(e.to_string()))?;
                 if new_count == Some(0) {
                     self.template_repo
                         .update_next_instance(template_id, None)
-                        .await?;
+                        .await
+                        .map_err(|e| SchedulerError::InvalidState(e.to_string()))?;
                     return Ok(());
                 }
             }
@@ -158,18 +163,19 @@ impl RecurrenceEngine {
         }
 
         // Determine next_spawn: the first candidate that comes after all materialized ones.
+        // If nothing was materialized (UNTIL already exhausted or count was 0), short-circuit
+        // to None — calling the evaluator again would produce a timestamp past UNTIL and
+        // cause an endless recurrence_spawn cycle.
         let next_spawn = if let Some(last) = last_materialized {
             candidates.into_iter().find(|t| *t > last)
         } else {
-            // Nothing materialized — compute from cursor
-            let nexts = next_n_from_rrule_string(&tmpl.rrule, &tmpl.iana_tz, cursor, 1)
-                .map_err(|e| SchedulerError::Rrule(e.to_string()))?;
-            nexts.into_iter().next()
+            None
         };
 
         self.template_repo
             .update_next_instance(template_id, next_spawn)
-            .await?;
+            .await
+            .map_err(|e| SchedulerError::InvalidState(e.to_string()))?;
 
         if let Some(fire_at) = next_spawn {
             self.store
@@ -188,24 +194,18 @@ impl RecurrenceEngine {
 
     /// Disable a template and cancel all related pending work.
     pub async fn disable_template(&self, template_id: &str) -> Result<(), SchedulerError> {
-        self.template_repo.disable(template_id).await?;
+        self.template_repo
+            .disable(template_id)
+            .await
+            .map_err(|e| SchedulerError::InvalidState(e.to_string()))?;
         self.instance_repo
             .cancel_unfired_instances(template_id)
-            .await?;
+            .await
+            .map_err(|e| SchedulerError::InvalidState(e.to_string()))?;
         self.store
             .cancel_by_prefix(&format!("template:{template_id}:"))
             .await?;
         Ok(())
-    }
-}
-
-// ---------------------------------------------------------------------------
-// Trait error conversions
-// ---------------------------------------------------------------------------
-
-impl From<anyhow::Error> for SchedulerError {
-    fn from(e: anyhow::Error) -> Self {
-        SchedulerError::InvalidState(e.to_string())
     }
 }
 
@@ -378,12 +378,7 @@ mod tests {
 
         let tmpl_repo = Arc::new(MockTemplateRepo::with(template));
         let inst_repo = Arc::new(MockInstanceRepo::default());
-        let engine = RecurrenceEngine::new(
-            fire_store,
-            tmpl_repo,
-            inst_repo.clone(),
-            3,
-        );
+        let engine = RecurrenceEngine::new(fire_store, tmpl_repo, inst_repo.clone(), 3);
 
         engine.on_spawn(&tmpl_id, april28()).await.unwrap();
 
@@ -395,6 +390,10 @@ mod tests {
             "expected 4 instances (4/28, 4/29, 4/30, 5/1), got {}",
             instances.len()
         );
+        assert_eq!(instances[0].1.to_string(), "2026-04-28T00:00:00Z");
+        assert_eq!(instances[1].1.to_string(), "2026-04-29T00:00:00Z");
+        assert_eq!(instances[2].1.to_string(), "2026-04-30T00:00:00Z");
+        assert_eq!(instances[3].1.to_string(), "2026-05-01T00:00:00Z"); // UNTIL inclusive per RFC 5545
     }
 
     // -----------------------------------------------------------------------
@@ -420,17 +419,17 @@ mod tests {
 
         let tmpl_repo = Arc::new(MockTemplateRepo::with(template));
         let inst_repo = Arc::new(MockInstanceRepo::default());
-        let engine = RecurrenceEngine::new(
-            fire_store,
-            tmpl_repo.clone(),
-            inst_repo.clone(),
-            3,
-        );
+        let engine = RecurrenceEngine::new(fire_store, tmpl_repo.clone(), inst_repo.clone(), 3);
 
         engine.on_spawn(&tmpl_id, april28()).await.unwrap();
 
         let instances = inst_repo.0.lock().unwrap();
-        assert_eq!(instances.len(), 2, "expected 2 instances, got {}", instances.len());
+        assert_eq!(
+            instances.len(),
+            2,
+            "expected 2 instances, got {}",
+            instances.len()
+        );
         drop(instances);
 
         // count_remaining should be 0
@@ -488,12 +487,8 @@ mod tests {
             .unwrap()
             .push(("t3".to_string(), ts_days_from_epoch(999)));
 
-        let engine = RecurrenceEngine::new(
-            fire_store.clone(),
-            tmpl_repo.clone(),
-            inst_repo.clone(),
-            3,
-        );
+        let engine =
+            RecurrenceEngine::new(fire_store.clone(), tmpl_repo.clone(), inst_repo.clone(), 3);
 
         engine.disable_template(&tmpl_id).await.unwrap();
 
@@ -504,10 +499,7 @@ mod tests {
         }
 
         // Pending fires with prefix cleared
-        let pending = fire_store
-            .list_due(ts_days_from_epoch(9999))
-            .await
-            .unwrap();
+        let pending = fire_store.list_due(ts_days_from_epoch(9999)).await.unwrap();
         let matching: Vec<_> = pending
             .iter()
             .filter(|r| {
@@ -547,24 +539,27 @@ mod tests {
 
         let tmpl_repo = Arc::new(MockTemplateRepo::with(template));
         let inst_repo = Arc::new(MockInstanceRepo::default());
-        let engine = RecurrenceEngine::new(
-            fire_store.clone(),
-            tmpl_repo,
-            inst_repo.clone(),
-            3,
-        );
+        let engine = RecurrenceEngine::new(fire_store.clone(), tmpl_repo, inst_repo.clone(), 3);
 
         engine.on_spawn(&tmpl_id, april28()).await.unwrap();
 
         // Scope the lock so it drops before the await below
         {
             let instances = inst_repo.0.lock().unwrap();
-            assert_eq!(instances.len(), 0, "disabled template should create no instances");
+            assert_eq!(
+                instances.len(),
+                0,
+                "disabled template should create no instances"
+            );
         }
 
         // No new spawn scheduled either
         let pending = fire_store.list_due(ts_days_from_epoch(9999)).await.unwrap();
-        assert_eq!(pending.len(), 0, "no spawn should be scheduled for disabled template");
+        assert_eq!(
+            pending.len(),
+            0,
+            "no spawn should be scheduled for disabled template"
+        );
     }
 
     // -----------------------------------------------------------------------
@@ -620,7 +615,13 @@ mod tests {
             3,
             "expected 3 instances (Jan 31, Feb 28, Mar 31), got {}: {:?}",
             instances.len(),
-            instances.iter().map(|(_, ts)| ts.to_string()).collect::<Vec<_>>(),
+            instances
+                .iter()
+                .map(|(_, ts)| ts.to_string())
+                .collect::<Vec<_>>(),
         );
+        assert_eq!(instances[0].1.to_string(), "2026-01-31T00:00:00Z"); // last day of Jan
+        assert_eq!(instances[1].1.to_string(), "2026-02-28T00:00:00Z"); // last day of Feb (non-leap)
+        assert_eq!(instances[2].1.to_string(), "2026-03-31T00:00:00Z"); // last day of Mar
     }
 }
