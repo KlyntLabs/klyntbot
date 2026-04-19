@@ -53,11 +53,24 @@ pub trait TemplateRepo: Send + Sync {
     async fn disable(&self, id: &str) -> anyhow::Result<()>;
 }
 
+/// Outcome of `InstanceRepo::create_instance`.
+#[derive(Debug)]
+pub enum CreateInstanceOutcome {
+    /// A new task row was inserted; contains the new task id.
+    Created(String),
+    /// The template references a source task that no longer exists.
+    /// The engine should disable the template and stop scheduling.
+    SourceTaskMissing,
+}
+
 #[async_trait]
 pub trait InstanceRepo: Send + Sync {
-    /// Create an instance row and return its id.
-    async fn create_instance(&self, template_id: &str, due_at: Timestamp)
-        -> anyhow::Result<String>;
+    /// Create an instance row and return the outcome.
+    async fn create_instance(
+        &self,
+        template_id: &str,
+        due_at: Timestamp,
+    ) -> anyhow::Result<CreateInstanceOutcome>;
     /// Cancel all unfired instances for this template.
     async fn cancel_unfired_instances(&self, template_id: &str) -> anyhow::Result<()>;
 }
@@ -138,10 +151,29 @@ impl RecurrenceEngine {
                 }
             }
 
-            self.instance_repo
+            match self
+                .instance_repo
                 .create_instance(template_id, next)
                 .await
-                .map_err(|e| SchedulerError::InvalidState(e.to_string()))?;
+                .map_err(|e| SchedulerError::InvalidState(e.to_string()))?
+            {
+                CreateInstanceOutcome::Created(_) => {}
+                CreateInstanceOutcome::SourceTaskMissing => {
+                    // Source task was deleted — disable the template and clean up.
+                    self.template_repo
+                        .disable(template_id)
+                        .await
+                        .map_err(|e| SchedulerError::InvalidState(e.to_string()))?;
+                    self.instance_repo
+                        .cancel_unfired_instances(template_id)
+                        .await
+                        .map_err(|e| SchedulerError::InvalidState(e.to_string()))?;
+                    self.store
+                        .cancel_by_prefix(&format!("template:{template_id}:"))
+                        .await?;
+                    return Ok(());
+                }
+            }
 
             // Decrement count if finite.
             if tmpl.count_remaining.is_some() {
@@ -192,7 +224,13 @@ impl RecurrenceEngine {
         Ok(())
     }
 
-    /// Disable a template and cancel all related pending work.
+    /// Disable a template and cascade cancellation of its instances and pending spawns.
+    ///
+    /// **TOCTOU note:** A concurrent `on_spawn` that started before `disable` completed
+    /// may insert a fresh `scheduled_fires` row for this template that is not covered
+    /// by this call's `cancel_by_prefix`. That orphaned spawn fire will no-op on next
+    /// trigger because the template is now disabled (early-exit guard in `on_spawn`).
+    /// Impact: one harmless orphan fire per race window.
     pub async fn disable_template(&self, template_id: &str) -> Result<(), SchedulerError> {
         self.template_repo
             .disable(template_id)
@@ -296,16 +334,38 @@ pub(crate) mod test_mocks {
             &self,
             template_id: &str,
             due_at: Timestamp,
-        ) -> anyhow::Result<String> {
+        ) -> anyhow::Result<CreateInstanceOutcome> {
             self.0
                 .lock()
                 .unwrap()
                 .push((template_id.to_string(), due_at));
-            Ok(format!("inst_{}", due_at.as_millisecond()))
+            Ok(CreateInstanceOutcome::Created(format!(
+                "inst_{}",
+                due_at.as_millisecond()
+            )))
         }
 
         async fn cancel_unfired_instances(&self, _template_id: &str) -> anyhow::Result<()> {
             self.0.lock().unwrap().clear();
+            Ok(())
+        }
+    }
+
+    /// An `InstanceRepo` that always reports the source task as missing.
+    #[derive(Default)]
+    pub(crate) struct MockMissingInstanceRepo;
+
+    #[async_trait]
+    impl InstanceRepo for MockMissingInstanceRepo {
+        async fn create_instance(
+            &self,
+            _template_id: &str,
+            _due_at: Timestamp,
+        ) -> anyhow::Result<CreateInstanceOutcome> {
+            Ok(CreateInstanceOutcome::SourceTaskMissing)
+        }
+
+        async fn cancel_unfired_instances(&self, _template_id: &str) -> anyhow::Result<()> {
             Ok(())
         }
     }
@@ -464,7 +524,7 @@ mod tests {
         fire_store
             .schedule(FireSpec {
                 fire_at: ts_days_from_epoch(1000),
-                kind: "recurrence_spawn".into(),
+                kind: super::super::scheduler::RECURRENCE_SPAWN_KIND.into(),
                 ref_id: Some(tmpl_id.clone()),
                 payload: json!({}),
                 dedup_prefix: Some(format!("template:{tmpl_id}:")),
@@ -630,4 +690,56 @@ mod tests {
         assert_eq!(instances[1].1.to_string(), "2026-02-28T00:00:00Z"); // last day of Feb (non-leap)
         assert_eq!(instances[2].1.to_string(), "2026-03-31T00:00:00Z"); // last day of Mar
     }
+
+    // -----------------------------------------------------------------------
+    // Test 6: source_task_missing_disables_template
+    //
+    // When the source task no longer exists, create_instance returns
+    // SourceTaskMissing, and the engine must disable the template and
+    // cancel pending spawns instead of propagating an error.
+    // -----------------------------------------------------------------------
+
+    #[tokio::test]
+    async fn source_task_missing_disables_template() {
+        use test_mocks::MockMissingInstanceRepo;
+
+        let fire_store = Arc::new(make_fire_store().await);
+        let tmpl_id = "t6".to_string();
+
+        let template = RecurrenceTemplate {
+            id: tmpl_id.clone(),
+            source_task_id: "deleted_task".into(),
+            rrule: "FREQ=DAILY".into(),
+            iana_tz: "UTC".into(),
+            materialize_ahead: 3,
+            next_instance_at: Some(april28()),
+            until_at: None,
+            count_remaining: None,
+            enabled: true,
+        };
+
+        let tmpl_repo = Arc::new(MockTemplateRepo::with(template));
+        let inst_repo = Arc::new(MockMissingInstanceRepo);
+        let engine = RecurrenceEngine::new(fire_store, tmpl_repo.clone(), inst_repo, 3);
+
+        // Should succeed (no error propagated).
+        engine.on_spawn(&tmpl_id, april28()).await.unwrap();
+
+        // Template must be disabled.
+        let state = tmpl_repo.0.lock().unwrap();
+        assert!(
+            state.disabled.contains(&tmpl_id),
+            "template must be disabled when source task is missing"
+        );
+        // Enabled flag must be false too.
+        assert!(
+            !state
+                .templates
+                .get(&tmpl_id)
+                .map(|t| t.enabled)
+                .unwrap_or(true),
+            "template.enabled must be false"
+        );
+    }
+
 }

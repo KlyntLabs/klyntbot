@@ -864,11 +864,13 @@ mod tests {
             .unwrap();
         assert_eq!(fired, 1, "fire row must be marked fired=1 after dispatch");
 
-        // Assert 2: engine's on_spawn was actually invoked — at least 2 instances created.
+        // Assert 2: engine's on_spawn was actually invoked — exactly 2 instances created
+        // (materialize_ahead=2 is set on both the template and the engine default).
         let instances = inst_repo.0.lock().unwrap();
-        assert!(
-            instances.len() >= 2,
-            "expected at least 2 instances for template {tmpl_id}, got {}",
+        assert_eq!(
+            instances.len(),
+            2,
+            "expected exactly 2 instances for template {tmpl_id}, got {}",
             instances.len()
         );
         // All instances should belong to the right template.

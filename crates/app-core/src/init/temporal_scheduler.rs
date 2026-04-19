@@ -15,6 +15,11 @@ use scheduling::temporal::{SchedulerConfig, TemporalScheduler};
 use storage::Repos;
 use tracing::{info, warn};
 
+/// Default number of instances to materialise ahead per recurrence spawn cycle.
+/// Spec §3.2 references `config.notifications.default_materialize_ahead`;
+/// promoting that to a config field is deferred to a future task.
+const DEFAULT_MATERIALIZE_AHEAD: u32 = 3;
+
 /// Results from temporal scheduler initialization.
 pub(super) struct TemporalSchedulerResult {
     pub scheduler: TemporalScheduler,
@@ -43,13 +48,14 @@ pub(super) async fn init_temporal_scheduler(
         .map_err(|e| format!("TemporalScheduler cron reconcile failed: {e}"))?;
 
     // Build the RecurrenceEngine backed by SQLite repos.
+    let fire_store_arc = Arc::new(fire_store.clone());
     let template_repo = Arc::new(SqliteTemplateRepo::new(pool.clone()));
-    let instance_repo = Arc::new(SqliteInstanceRepo::new(pool));
+    let instance_repo = Arc::new(SqliteInstanceRepo::new(pool, Arc::clone(&fire_store_arc)));
     let recurrence_engine = Arc::new(RecurrenceEngine::new(
-        Arc::new(fire_store.clone()),
+        fire_store_arc,
         template_repo,
         instance_repo,
-        3, // default_materialize_ahead
+        DEFAULT_MATERIALIZE_AHEAD,
     ));
 
     let scheduler = TemporalScheduler::new(
