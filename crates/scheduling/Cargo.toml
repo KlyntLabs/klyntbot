@@ -22,6 +22,8 @@ rrule = "0.14"
 tracing.workspace = true
 thiserror = "2.0"
 tokio-util.workspace = true
+async-trait.workspace = true
+anyhow.workspace = true
 
 [dev-dependencies]
 tools-core.workspace = true
