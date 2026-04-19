@@ -23,7 +23,7 @@ pub struct NotificationDispatcher {
     default_channels: Vec<String>,
     quiet_hours: Option<QuietHoursPolicy>,
     log_repo: NotificationLogRepo,
-    #[allow(dead_code)]
+    #[allow(dead_code)] // Task 11: held-release consumption will use this
     held_repo: HeldNotificationsRepo,
     held_release: HeldReleaseService,
     retry: RetryPolicy,
@@ -212,9 +212,14 @@ impl NotificationDispatcher {
     }
 }
 
-fn parse_payload(fire_id: &str, payload_json: &str) -> NotificationPayload {
-    let v: serde_json::Value =
-        serde_json::from_str(payload_json).unwrap_or(serde_json::Value::Null);
+fn parse_payload(alarm_id: &str, payload_json: &str) -> NotificationPayload {
+    let v: serde_json::Value = match serde_json::from_str(payload_json) {
+        Ok(v) => v,
+        Err(e) => {
+            tracing::warn!(alarm_id = %alarm_id, error = %e, "malformed alarm payload JSON; using defaults");
+            serde_json::Value::Null
+        }
+    };
     let title = v
         .get("title")
         .and_then(|x| x.as_str())
@@ -231,7 +236,7 @@ fn parse_payload(fire_id: &str, payload_json: &str) -> NotificationPayload {
         _ => Priority::Normal,
     };
     NotificationPayload {
-        alarm_id: fire_id.into(),
+        alarm_id: alarm_id.into(),
         title,
         body,
         priority,

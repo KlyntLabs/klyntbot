@@ -71,9 +71,6 @@ async fn duplicate_alarm_fires_once_per_channel() {
     );
     let handle = dispatcher.start();
 
-    // Sleep so the dispatcher's broadcast::Receiver is subscribed before we publish.
-    tokio::time::sleep(std::time::Duration::from_millis(50)).await;
-
     let payload = serde_json::json!({"title": "t", "body": "b"}).to_string();
     for _ in 0..3 {
         bus.publish(DomainEvent::AlarmFired {
