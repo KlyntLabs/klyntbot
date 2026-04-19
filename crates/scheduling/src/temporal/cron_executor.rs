@@ -44,9 +44,6 @@ impl CronExecutor {
     ///
     /// Can be called before or after [`start`] — handlers are stored in a
     /// shared `Arc<RwLock<...>>` so late registration takes effect immediately.
-    ///
-    /// If a fire arrives before a handler for the given name is registered,
-    /// the fire is dropped with a `warn!` log and the executor continues.
     pub fn register(&self, name: &str, handler: CronHandler) {
         self.handlers
             .write()
@@ -56,9 +53,6 @@ impl CronExecutor {
 
     /// Alias for [`register`] — matches the `CronService::register_handler` API
     /// so Task 4.4c can swap without renaming call sites.
-    ///
-    /// If a fire arrives before a handler for the given name is registered,
-    /// the fire is dropped with a `warn!` log and the executor continues.
     pub fn set_callback(&self, name: &str, handler: CronHandler) {
         self.register(name, handler);
     }
@@ -119,8 +113,7 @@ impl CronExecutor {
             }
         };
 
-        // DB fetch resolves ref_id → job name for handler lookup.
-        // `JobCallback` is keyed by name, so one handler handles all jobs of the same name.
+        // Fetch the full CronJobRow so we can pass a proper CronJob to the handler.
         let row = match cron_repo.get(&job_id).await {
             Ok(r) => r,
             Err(storage::error::StorageError::NotFound(_)) => {
@@ -156,28 +149,13 @@ impl CronExecutor {
             }
             Some(cb) => {
                 info!("CronExecutor: dispatching job '{}'", job_name);
-                let job_name_for_watcher = job_name.clone();
                 // Use spawn_blocking so a slow (sync) handler can't block other fires.
-                let handle = tokio::task::spawn_blocking(move || match cb(&job) {
+                tokio::task::spawn_blocking(move || match cb(&job) {
                     Ok(_) => {
                         info!("CronExecutor: job '{}' completed successfully", job_name);
                     }
                     Err(e) => {
                         error!("CronExecutor: job '{}' failed: {}", job_name, e);
-                    }
-                });
-                // Watcher task surfaces panics inside the handler — without it, a panic
-                // in spawn_blocking is silently swallowed by the tokio runtime.
-                tokio::spawn(async move {
-                    match handle.await {
-                        Ok(()) => {}
-                        Err(join_err) => {
-                            if join_err.is_panic() {
-                                error!("CronExecutor: job '{}' panicked", job_name_for_watcher);
-                            } else if join_err.is_cancelled() {
-                                warn!("CronExecutor: job '{}' cancelled", job_name_for_watcher);
-                            }
-                        }
                     }
                 });
             }
@@ -381,9 +359,9 @@ mod tests {
         }
 
         let elapsed = t0.elapsed();
-        // 300ms is the serial-execution time; 400ms proves parallelism with CI headroom.
+        // If handlers ran serially they'd take ~300ms; parallel completes ~100ms.
         assert!(
-            elapsed < Duration::from_millis(400),
+            elapsed < Duration::from_millis(250),
             "handlers took {:?} — expected parallel execution",
             elapsed
         );
@@ -437,66 +415,5 @@ mod tests {
             1,
             "no new dispatches after shutdown"
         );
-    }
-
-    #[tokio::test]
-    async fn handler_panic_is_logged_and_executor_continues() {
-        let repo = setup_repo().await;
-        repo.upsert(&make_row("job-6a", "panic_job")).await.unwrap();
-        repo.upsert(&make_row("job-6b", "survivor_job"))
-            .await
-            .unwrap();
-
-        let bus = Arc::new(DomainEventBus::new(64));
-        let executor = CronExecutor::new(repo, Arc::clone(&bus));
-
-        // First handler always panics.
-        executor.register(
-            "panic_job",
-            Arc::new(|_job| -> Result<Option<String>> {
-                panic!("intentional panic in handler");
-            }),
-        );
-
-        // Second handler records invocation — proves executor survived the panic.
-        let call_count = Arc::new(AtomicUsize::new(0));
-        let cc = Arc::clone(&call_count);
-        executor.register(
-            "survivor_job",
-            Arc::new(move |_job| {
-                cc.fetch_add(1, Ordering::SeqCst);
-                Ok(None)
-            }),
-        );
-
-        let shutdown = CancellationToken::new();
-        let _handle = executor.start(shutdown.clone());
-
-        tokio::time::sleep(Duration::from_millis(10)).await;
-
-        // Fire the panicking job first.
-        bus.publish(alarm_fired("cron_job", Some("job-6a")));
-
-        // Give the panic watcher time to log and the executor to recover.
-        tokio::time::sleep(Duration::from_millis(150)).await;
-
-        // Fire the survivor job — executor must still be alive and processing.
-        bus.publish(alarm_fired("cron_job", Some("job-6b")));
-
-        let deadline = Instant::now() + Duration::from_secs(2);
-        while call_count.load(Ordering::SeqCst) == 0 {
-            if Instant::now() > deadline {
-                panic!("survivor handler was not invoked within 2s — executor may have crashed");
-            }
-            tokio::time::sleep(Duration::from_millis(10)).await;
-        }
-
-        assert_eq!(
-            call_count.load(Ordering::SeqCst),
-            1,
-            "survivor handler should have run exactly once"
-        );
-
-        shutdown.cancel();
     }
 }

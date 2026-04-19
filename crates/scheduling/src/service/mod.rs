@@ -525,9 +525,9 @@ impl CronService {
 
 /// Convert a `CronJobRow` from SQL back to a domain [`CronJob`].
 ///
-/// Public so that callers outside the `scheduling` crate (e.g. `app-core`
-/// handlers) can reuse this conversion without duplicating the logic.
-pub fn row_to_job(row: CronJobRow) -> CronJob {
+/// `pub(crate)` so that `CronExecutor` (in the `temporal` module) can reuse
+/// this conversion without duplicating the logic.
+pub(crate) fn row_to_job(row: CronJobRow) -> CronJob {
     let (schedule, schedule_corrupt) = match serde_json::from_value(row.schedule) {
         Ok(s) => (s, false),
         Err(e) => {
