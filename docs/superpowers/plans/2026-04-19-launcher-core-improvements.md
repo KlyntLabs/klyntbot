@@ -503,12 +503,20 @@ impl InvertedFileIndex {
             let entry = &self.entries[idx as usize];
             ScoredEntry { entry_idx: idx, score: score_entry_match(&tokens, entry) }
         }).collect();
-        scored.sort_by(|a, b| b.score.cmp(&a.score));
+        scored.sort_by(|a, b| {
+            b.score.cmp(&a.score).then_with(|| {
+                let a_len = self.entries[a.entry_idx as usize].name.len();
+                let b_len = self.entries[b.entry_idx as usize].name.len();
+                a_len.cmp(&b_len)
+            })
+        });
         scored.truncate(limit);
         scored
     }
 }
 ```
+
+(Tie-break: when raw scores match, shorter names win — `"hello.rs"` beats `"hellothere.rs"` for query `"hello"`.)
 
 - [ ] **Step 4: Run tests**
 
