@@ -7,6 +7,32 @@ use scheduling::temporal::cron_executor::CronExecutor;
 use storage::Repos;
 use tracing::{info, warn};
 
+/// Publish an `AlarmFired` event routed through `NotificationDispatcher`.
+///
+/// This ensures all cron-sourced notifications honour quiet hours, retry,
+/// and idempotency instead of bypassing the dispatcher pipeline.
+fn publish_cron_alarm(
+    bus: &DomainEventBus,
+    cron_job_id: Option<String>,
+    title: impl Into<String>,
+    body: impl Into<String>,
+) {
+    let payload = serde_json::json!({
+        "title": title.into(),
+        "body": body.into(),
+        "channel_mask": 0,
+        "priority_override": null,
+    })
+    .to_string();
+    bus.publish(bus::DomainEvent::AlarmFired {
+        fire_id: uuid::Uuid::new_v4().to_string(),
+        kind: "cron".to_string(),
+        ref_id: cron_job_id,
+        payload_json: payload,
+        fired_at_ms: jiff::Timestamp::now().as_millisecond(),
+    });
+}
+
 /// Results from the cron initialization phase.
 pub(super) struct CronResult {
     pub cron_executor: Arc<CronExecutor>,
@@ -234,34 +260,25 @@ fn register_cron_callbacks(
                                     - jiff::Timestamp::now().as_millisecond())
                                     / 3_600_000;
                                 if hours_left <= 1 && hours_left > 0 {
-                                    // TODO(phase-4): route through NotificationDispatcher so cron
-                                    // notifications honour quiet hours / retry / idempotency.
-                                    // Today this publishes directly to bypass the dispatcher pipeline.
-                                    domain_bus.publish(
-                                        bus::DomainEvent::TrayNotificationRequested {
-                                            title: "⏰ Focus Deadline: 1h left".into(),
-                                            body: format!(
-                                                "\"{}\" — deadline approaching!",
-                                                task.title
-                                            ),
-                                            alarm_id: None,
-                                        },
+                                    publish_cron_alarm(
+                                        &domain_bus,
+                                        Some(JOB_FOCUS_CHECK.to_string()),
+                                        "⏰ Focus Deadline: 1h left",
+                                        format!("\"{}\" — deadline approaching!", task.title),
                                     );
                                 } else if hours_left <= 3 && hours_left > 1 {
-                                    domain_bus.publish(
-                                        bus::DomainEvent::TrayNotificationRequested {
-                                            title: "⏰ Focus Deadline: 3h left".into(),
-                                            body: format!("\"{}\" — stay on track", task.title),
-                                            alarm_id: None,
-                                        },
+                                    publish_cron_alarm(
+                                        &domain_bus,
+                                        Some(JOB_FOCUS_CHECK.to_string()),
+                                        "⏰ Focus Deadline: 3h left",
+                                        format!("\"{}\" — stay on track", task.title),
                                     );
                                 } else if hours_left <= 6 && hours_left > 3 {
-                                    domain_bus.publish(
-                                        bus::DomainEvent::TrayNotificationRequested {
-                                            title: "⏰ Focus Deadline: 6h left".into(),
-                                            body: format!("\"{}\" — keep going", task.title),
-                                            alarm_id: None,
-                                        },
+                                    publish_cron_alarm(
+                                        &domain_bus,
+                                        Some(JOB_FOCUS_CHECK.to_string()),
+                                        "⏰ Focus Deadline: 6h left",
+                                        format!("\"{}\" — keep going", task.title),
                                     );
                                 }
                             }
@@ -295,14 +312,12 @@ fn register_cron_callbacks(
                             summary.done,
                             overdue.len()
                         );
-                        // TODO(phase-4): route through NotificationDispatcher so cron
-                        // notifications honour quiet hours / retry / idempotency.
-                        // Today this publishes directly to bypass the dispatcher pipeline.
-                        domain_bus.publish(bus::DomainEvent::TrayNotificationRequested {
-                            title: "📋 Daily Task Digest".into(),
+                        publish_cron_alarm(
+                            &domain_bus,
+                            Some(JOB_DAILY_DIGEST.to_string()),
+                            "📋 Daily Task Digest",
                             body,
-                            alarm_id: None,
-                        });
+                        );
                         Ok(Some("Daily digest sent".to_string()))
                     })
                 })
@@ -338,14 +353,12 @@ fn register_cron_callbacks(
                                 "{} task(s) auto-unfocused due to {}h deadline",
                                 expired_count, config_focus.deadline_hours
                             );
-                            // TODO(phase-4): route through NotificationDispatcher so cron
-                            // notifications honour quiet hours / retry / idempotency.
-                            // Today this publishes directly to bypass the dispatcher pipeline.
-                            domain_bus.publish(bus::DomainEvent::TrayNotificationRequested {
-                                title: "⏰ Focus Tasks Expired".into(),
+                            publish_cron_alarm(
+                                &domain_bus,
+                                Some(JOB_OVERDUE_CHECK.to_string()),
+                                "⏰ Focus Tasks Expired",
                                 body,
-                                alarm_id: None,
-                            });
+                            );
                         }
                         Ok(Some("Overdue check complete".to_string()))
                     })
