@@ -177,8 +177,12 @@ impl AppCore {
             scheduler: temporal_scheduler,
             scheduler_handle: temporal_scheduler_handle,
             wake_subscriber: temporal_wake_subscriber,
-        } = temporal_scheduler::init_temporal_scheduler(&repos, Arc::clone(&domain_event_bus))
-            .await?;
+        } = temporal_scheduler::init_temporal_scheduler(
+            &repos,
+            Arc::clone(&domain_event_bus),
+            storage_pool.clone(),
+        )
+        .await?;
 
         // ── Note embedding handler (before vector_store is moved into agent) ──
         let embedding_provider = if config.embedding.provider == "openai" {

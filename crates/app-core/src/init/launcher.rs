@@ -195,6 +195,12 @@ pub(super) async fn init_launcher(
             interval: std::time::Duration::from_secs(interval_secs),
         });
     }
+    if let Some(s) = find_source("apps") {
+        refresh_entries.push(feature_launcher::RefreshEntry {
+            source: s,
+            interval: std::time::Duration::from_secs(300),
+        });
+    }
 
     // File watches (FSEvents via notify)
     let mut watches: Vec<feature_launcher::WatchEntry> = Vec::new();
@@ -207,6 +213,7 @@ pub(super) async fn init_launcher(
                 path,
                 source: s,
                 min_interval: None,
+                recursive: false,
             });
         }
     }
@@ -218,6 +225,7 @@ pub(super) async fn init_launcher(
                 path,
                 source: s,
                 min_interval: Some(std::time::Duration::from_secs(10)),
+                recursive: false,
             });
         }
     }
@@ -229,6 +237,7 @@ pub(super) async fn init_launcher(
                 path: ssh_config,
                 source: s,
                 min_interval: None,
+                recursive: false,
             });
         }
     }
@@ -239,7 +248,28 @@ pub(super) async fn init_launcher(
                 path: std::path::PathBuf::from(&scripts_dir),
                 source: s,
                 min_interval: None,
+                recursive: false,
             });
+        }
+    }
+    if launcher_config.sources.apps.enabled {
+        if let Some(s) = find_source("apps") {
+            let home = std::env::var("HOME").unwrap_or_default();
+            let app_dirs = [
+                std::path::PathBuf::from("/Applications"),
+                std::path::PathBuf::from("/System/Applications"),
+                std::path::PathBuf::from(&home).join("Applications"),
+            ];
+            for dir in app_dirs {
+                if dir.exists() {
+                    watches.push(feature_launcher::WatchEntry {
+                        path: dir,
+                        source: Arc::clone(&s),
+                        min_interval: Some(std::time::Duration::from_secs(5)),
+                        recursive: true,
+                    });
+                }
+            }
         }
     }
 

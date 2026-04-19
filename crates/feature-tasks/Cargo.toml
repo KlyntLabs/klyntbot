@@ -4,8 +4,10 @@ version.workspace = true
 edition.workspace = true
 
 [dependencies]
+anyhow.workspace = true
 bus.workspace = true
 common.workspace = true
+scheduling.workspace = true
 tools-core.workspace = true
 tools-core-macros.workspace = true
 storage.workspace = true

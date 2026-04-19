@@ -26,6 +26,7 @@ use crate::error::SchedulerError;
 use crate::temporal::cron_bridge::CronBridge;
 use crate::temporal::fire_store::FireStore;
 use crate::temporal::misfire::{Decision, MisfirePolicy};
+use crate::temporal::recurrence::RecurrenceEngine;
 
 /// Max time the loop will sleep without checking wall clock. Keep short enough
 /// that macOS system-sleep resume leaves us at most this far behind.
@@ -58,6 +59,7 @@ pub struct TemporalScheduler {
     shutdown: CancellationToken,
     started: Arc<AtomicBool>,
     cron_bridge: Option<Arc<CronBridge>>,
+    recurrence_engine: Option<Arc<RecurrenceEngine>>,
 }
 
 impl TemporalScheduler {
@@ -70,6 +72,7 @@ impl TemporalScheduler {
             shutdown: CancellationToken::new(),
             started: Arc::new(AtomicBool::new(false)),
             cron_bridge: None,
+            recurrence_engine: None,
         }
     }
 
@@ -78,6 +81,14 @@ impl TemporalScheduler {
     /// re-schedule.
     pub fn with_cron_bridge(mut self, bridge: CronBridge) -> Self {
         self.cron_bridge = Some(Arc::new(bridge));
+        self
+    }
+
+    /// Attach a `RecurrenceEngine` so the scheduler materialises task instances
+    /// when a `kind="recurrence_spawn"` fire triggers. Without this the fire is
+    /// still emitted on the bus; the engine is simply not called.
+    pub fn with_recurrence_engine(mut self, engine: Arc<RecurrenceEngine>) -> Self {
+        self.recurrence_engine = Some(engine);
         self
     }
 
@@ -182,6 +193,13 @@ impl TemporalScheduler {
                 if let (Some(bridge), Some(ref_id)) = (&self.cron_bridge, &ref_id) {
                     if let Err(e) = bridge.advance(ref_id).await {
                         warn!(error = %e, job = %ref_id, "cron bridge advance failed during recovery");
+                    }
+                }
+            }
+            if kind == "recurrence_spawn" {
+                if let (Some(engine), Some(ref_id)) = (&self.recurrence_engine, &ref_id) {
+                    if let Err(e) = engine.on_spawn(ref_id, now).await {
+                        warn!(error = %e, template_id = %ref_id, "recurrence_spawn engine failed during recovery");
                     }
                 }
             }
@@ -301,6 +319,16 @@ impl TemporalScheduler {
                 }
             }
         }
+
+        // Recurrence spawn: materialise task instances via the engine.
+        if row.kind == "recurrence_spawn" {
+            if let (Some(engine), Some(ref_id)) = (&self.recurrence_engine, &row.ref_id) {
+                if let Err(e) = engine.on_spawn(ref_id, now).await {
+                    warn!(error = %e, template_id = %ref_id, "recurrence_spawn engine failed");
+                }
+            }
+        }
+
         Ok(())
     }
 
