@@ -8,7 +8,6 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 
-
 /// Minimum interactions before patterns can be detected.
 const MIN_INTERACTIONS_FOR_ANALYSIS: usize = 10;
 
@@ -51,9 +50,7 @@ impl PatternAnalyzer {
             if let Ok(dt) = log
                 .timestamp
                 .parse::<jiff::civil::DateTime>()
-                .or_else(|_| {
-                    jiff::civil::DateTime::strptime("%Y-%m-%d %H:%M:%S", &log.timestamp)
-                })
+                .or_else(|_| jiff::civil::DateTime::strptime("%Y-%m-%d %H:%M:%S", &log.timestamp))
             {
                 // Day-of-week × agent
                 let day = match dt.weekday() {

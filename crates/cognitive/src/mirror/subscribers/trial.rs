@@ -2,8 +2,8 @@
 //! queries early metrics via EarlyTrialEvaluator, writes preview to repo.
 
 use bus::DomainEvent;
-use jiff::Timestamp;
 use dashmap::DashMap;
+use jiff::Timestamp;
 use std::sync::Arc;
 use tokio::sync::broadcast;
 use tokio::task::JoinHandle;

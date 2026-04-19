@@ -231,7 +231,9 @@ pub async fn build_intelligence_input(
             .and_then(|s| serde_json::from_str(s).ok())
             .unwrap_or_default();
 
-        let age_days = c.created_at.parse::<jiff::Timestamp>()
+        let age_days = c
+            .created_at
+            .parse::<jiff::Timestamp>()
             .map(|ts| ((now.as_millisecond() - ts.as_millisecond()).max(0) / 86_400_000) as u32)
             .unwrap_or(0);
 

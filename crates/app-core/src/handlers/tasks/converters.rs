@@ -55,9 +55,9 @@ pub fn action_to_today_task(row: &TaskRow, now: jiff::Timestamp) -> TodayTaskRes
     let local_today = now.to_zoned(jiff::tz::TimeZone::system()).date();
     let is_overdue = row.due_date.is_some_and(|d| *d < now) && !row.completed;
     let is_due_today = !is_overdue
-        && row.due_date.is_some_and(|d| {
-            d.to_zoned(jiff::tz::TimeZone::system()).date() == local_today
-        });
+        && row
+            .due_date
+            .is_some_and(|d| d.to_zoned(jiff::tz::TimeZone::system()).date() == local_today);
 
     let due_display = if is_overdue {
         row.due_date.map(|d| {

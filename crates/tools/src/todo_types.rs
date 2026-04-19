@@ -285,32 +285,22 @@ impl From<&Action> for TaskRow {
             due_date: action.due_date.map(storage::sqlite_types::SqlTs),
             tags: action.tags.clone(),
             status: action.status.as_str().to_string(),
-            focused_at: action
-                .focused_at
-                .map(storage::sqlite_types::SqlTs),
-            focus_deadline: action
-                .focus_deadline
-                .map(storage::sqlite_types::SqlTs),
+            focused_at: action.focused_at.map(storage::sqlite_types::SqlTs),
+            focus_deadline: action.focus_deadline.map(storage::sqlite_types::SqlTs),
             focus_expired_count: action.focus_expired_count as i32,
             created_at: storage::sqlite_types::SqlTs(action.created_at),
             updated_at: storage::sqlite_types::SqlTs(action.updated_at),
-            completed_at: action
-                .completed_at
-                .map(storage::sqlite_types::SqlTs),
+            completed_at: action.completed_at.map(storage::sqlite_types::SqlTs),
             parent_id: action.parent_id.clone(),
             project_id: action.project_id.clone(),
             total_tracked_secs: action.total_tracked_secs as i64,
             estimated_minutes: action.estimated_minutes.map(|m| m as i32),
             calendar_event_uid: action.calendar_event_uid.clone(),
-            last_reminded_at: action
-                .last_reminded_at
-                .map(storage::sqlite_types::SqlTs),
+            last_reminded_at: action.last_reminded_at.map(storage::sqlite_types::SqlTs),
             recurrence_rule: action.recurrence_rule.clone(),
             recurrence_parent_id: action.recurrence_parent_id.clone(),
             is_template: action.is_template,
-            next_instance_date: action
-                .next_instance_date
-                .map(storage::sqlite_types::SqlTs),
+            next_instance_date: action.next_instance_date.map(storage::sqlite_types::SqlTs),
             status_label_id: action.status_label_id.clone(),
             position: action.position,
             group_id: action.group_id.clone(),

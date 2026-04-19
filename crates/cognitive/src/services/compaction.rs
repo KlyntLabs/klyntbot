@@ -5,7 +5,6 @@
 //! 2. Deletes episodic memories older than 90 days with low access
 //! 3. Enforces size budget on active semantic facts
 
-
 use tracing::{debug, info, warn};
 
 use crate::repos::{

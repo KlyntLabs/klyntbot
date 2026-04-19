@@ -17,10 +17,7 @@ pub async fn load_tool_failures(
     outcome_repo: &storage::OutcomeRepo,
     since: jiff::Timestamp,
 ) -> Vec<ToolFailureSummary> {
-    match outcome_repo
-        .tool_failure_stats_since(since)
-        .await
-    {
+    match outcome_repo.tool_failure_stats_since(since).await {
         Ok(rows) => rows
             .into_iter()
             .map(|r| ToolFailureSummary {

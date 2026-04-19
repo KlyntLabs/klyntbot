@@ -495,8 +495,9 @@ impl MemoryTool {
                             "before_date required for before_date filter".to_string(),
                         )
                     })?;
-                let date = date_str.parse::<jiff::Timestamp>()
-                    .map_err(|e| common::ToolError::InvalidParams(format!("Invalid date: {}", e)))?;
+                let date = date_str.parse::<jiff::Timestamp>().map_err(|e| {
+                    common::ToolError::InvalidParams(format!("Invalid date: {}", e))
+                })?;
                 PurgeFilter::Before(date)
             }
             "all" => PurgeFilter::All,

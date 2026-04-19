@@ -1536,7 +1536,6 @@ fn summarize_observation(content: &str) -> String {
 mod tests {
     use super::*;
 
-
     #[tokio::test]
     async fn test_event_to_observation_user_stated_fact() {
         let event = DomainEvent::UserStatedFact {

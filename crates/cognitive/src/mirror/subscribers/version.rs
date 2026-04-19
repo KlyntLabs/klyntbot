@@ -3,8 +3,8 @@
 use std::sync::Arc;
 
 use bus::DomainEvent;
-use jiff::Timestamp;
 use common::Result;
+use jiff::Timestamp;
 use tokio::sync::broadcast;
 use tokio_util::sync::CancellationToken;
 

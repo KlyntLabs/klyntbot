@@ -2,7 +2,6 @@
 
 use std::collections::HashMap;
 
-
 use tracing::debug;
 
 use crate::repos::{
@@ -79,7 +78,10 @@ fn days_since(ts: Option<&str>) -> i64 {
     match ts {
         Some(s) => s
             .parse::<jiff::Timestamp>()
-            .map(|ts| (jiff::Timestamp::now().as_millisecond() - ts.as_millisecond()).max(86_400_000) / 86_400_000)
+            .map(|ts| {
+                (jiff::Timestamp::now().as_millisecond() - ts.as_millisecond()).max(86_400_000)
+                    / 86_400_000
+            })
             .unwrap_or(7),
         None => 7,
     }
@@ -116,7 +118,8 @@ pub async fn collect(
     let since: &str = match last_run_at {
         Some(ts) => ts,
         None => {
-            bootstrap_since = (jiff::Timestamp::now() - jiff::SignedDuration::from_secs(7 * 86400)).to_string();
+            bootstrap_since =
+                (jiff::Timestamp::now() - jiff::SignedDuration::from_secs(7 * 86400)).to_string();
             &bootstrap_since
         }
     };
@@ -228,9 +231,9 @@ pub async fn collect(
         retrieval_precision_by_domain,
         extraction_yield_by_domain,
     ) = if let Some(fb) = feedback_sources {
-        let since_dt = since
-            .parse::<jiff::Timestamp>()
-            .unwrap_or_else(|_| jiff::Timestamp::now() - jiff::SignedDuration::from_secs(7 * 86400));
+        let since_dt = since.parse::<jiff::Timestamp>().unwrap_or_else(|_| {
+            jiff::Timestamp::now() - jiff::SignedDuration::from_secs(7 * 86400)
+        });
 
         let tool_failures = if let Some(repo) = fb.outcome_repo {
             super::feedback::load_tool_failures(repo, since_dt).await
@@ -426,7 +429,9 @@ async fn load_trial_history(
     experiments
         .into_iter()
         .filter_map(|exp| {
-            let days_ago = exp.created_at.parse::<jiff::Timestamp>()
+            let days_ago = exp
+                .created_at
+                .parse::<jiff::Timestamp>()
                 .ok()
                 .map(|ts| ((now.as_millisecond() - ts.as_millisecond()).max(0) / 86_400_000) as u32)
                 .unwrap_or(0);

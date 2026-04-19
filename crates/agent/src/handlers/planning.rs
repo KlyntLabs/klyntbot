@@ -4,8 +4,8 @@ use std::sync::Arc;
 
 use async_trait::async_trait;
 use bus::{DomainEvent, DomainEventBus};
-use jiff::Timestamp;
 use common::Result;
+use jiff::Timestamp;
 use providers::{ChatParams, DynProvider, Message, ResponseFormat};
 use tracing::debug;
 
@@ -215,10 +215,7 @@ fn build_planning_prompt(ctx: &PlanningContext, locked: &[PlanSlot]) -> String {
     prompt = prompt.replace("{{scored_tasks}}", &tasks_str);
     prompt = prompt.replace(
         "{{work_start}}",
-        &ctx.working_hours
-            .start
-            .strftime("%H:%M")
-            .to_string(),
+        &ctx.working_hours.start.strftime("%H:%M").to_string(),
     );
     prompt = prompt.replace(
         "{{work_end}}",
@@ -226,10 +223,7 @@ fn build_planning_prompt(ctx: &PlanningContext, locked: &[PlanSlot]) -> String {
     );
     prompt = prompt.replace(
         "{{lunch_start}}",
-        &ctx.working_hours
-            .lunch_start
-            .strftime("%H:%M")
-            .to_string(),
+        &ctx.working_hours.lunch_start.strftime("%H:%M").to_string(),
     );
 
     // Calculate available minutes (work hours minus lunch)
@@ -260,9 +254,7 @@ fn build_planning_prompt(ctx: &PlanningContext, locked: &[PlanSlot]) -> String {
                 format!(
                     "- {} ({} - {}, {})",
                     b.title,
-                    b.start
-                        .to_zoned(jiff::tz::TimeZone::UTC)
-                        .strftime("%H:%M"),
+                    b.start.to_zoned(jiff::tz::TimeZone::UTC).strftime("%H:%M"),
                     b.end.to_zoned(jiff::tz::TimeZone::UTC).strftime("%H:%M"),
                     if b.is_busy { "busy" } else { "free" },
                 )

@@ -127,10 +127,9 @@ impl AppCore {
         &self,
         params: FinanceGoalUpdateParams,
     ) -> HandlerResult<FinanceGoalRow> {
-        let deadline: Option<Option<storage::SqlDate>> = params.deadline.map(|opt| {
-            opt.and_then(|d| parse_naive_date(&d))
-                .map(|d| d.into())
-        });
+        let deadline: Option<Option<storage::SqlDate>> = params
+            .deadline
+            .map(|opt| opt.and_then(|d| parse_naive_date(&d)).map(|d| d.into()));
         let patch = FinanceGoalPatch {
             id: params.id.clone(),
             current_amount: params.current_amount,
@@ -272,12 +271,7 @@ impl AppCore {
             .repos
             .finance
             .transactions
-            .sum_by_category(
-                from,
-                to,
-                tx_type,
-                &self.default_currency().await,
-            )
+            .sum_by_category(from, to, tx_type, &self.default_currency().await)
             .await
             .map_err(map_storage_err)?;
 
@@ -357,11 +351,7 @@ impl AppCore {
             .repos
             .finance
             .transactions
-            .daily_spending(
-                from,
-                to,
-                &self.default_currency().await,
-            )
+            .daily_spending(from, to, &self.default_currency().await)
             .await
             .map_err(map_storage_err)?;
 

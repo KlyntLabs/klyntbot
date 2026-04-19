@@ -67,8 +67,8 @@ impl FrequencyRepo {
                         last_used = Some(used_at.clone());
                     }
                     if let Ok(dt) = used_at.parse::<Timestamp>() {
-                        let hours = (now.as_millisecond() - dt.as_millisecond()) as f64
-                            / 3_600_000.0;
+                        let hours =
+                            (now.as_millisecond() - dt.as_millisecond()) as f64 / 3_600_000.0;
                         score += (-lambda * hours).exp();
                     }
                 }
@@ -98,8 +98,7 @@ impl FrequencyRepo {
             std::collections::HashMap::new();
         for (item_id, kind, used_at) in &rows {
             if let Ok(dt) = used_at.parse::<Timestamp>() {
-                let hours =
-                    (now.as_millisecond() - dt.as_millisecond()) as f64 / 3_600_000.0;
+                let hours = (now.as_millisecond() - dt.as_millisecond()) as f64 / 3_600_000.0;
                 *scores.entry((item_id.clone(), kind.clone())).or_default() +=
                     (-lambda * hours).exp();
             }

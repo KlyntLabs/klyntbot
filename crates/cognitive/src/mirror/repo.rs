@@ -1,7 +1,7 @@
 //! Repository for Phase 1 Mirror tables.
 
-use jiff::Timestamp;
 use common::Result;
+use jiff::Timestamp;
 use uuid::Uuid;
 
 use crate::mirror::{
@@ -472,7 +472,8 @@ impl MirrorRepo {
     /// Delete hourly routing snapshots older than `max_age_days`.
     /// Daily aggregates (window_hours != 1) are preserved.
     pub async fn cleanup_old_snapshots(&self, max_age_days: u32) -> Result<u64> {
-        let cutoff = Timestamp::now() - jiff::SignedDuration::from_secs(max_age_days as i64 * 86400);
+        let cutoff =
+            Timestamp::now() - jiff::SignedDuration::from_secs(max_age_days as i64 * 86400);
         let result = sqlx::query(
             "DELETE FROM mirror_routing_snapshots WHERE captured_at < ?1 AND window_hours = 1",
         )
@@ -484,7 +485,8 @@ impl MirrorRepo {
     }
 
     pub async fn cleanup_old_snippets(&self, max_age_days: u32) -> Result<u64> {
-        let cutoff = Timestamp::now() - jiff::SignedDuration::from_secs(max_age_days as i64 * 86400);
+        let cutoff =
+            Timestamp::now() - jiff::SignedDuration::from_secs(max_age_days as i64 * 86400);
         let result = sqlx::query("DELETE FROM mirror_snippets WHERE created_at < ?1")
             .bind(cutoff.to_string())
             .execute(self.db())
@@ -717,7 +719,8 @@ impl MirrorRepo {
     }
 
     pub async fn cleanup_old_trial_previews(&self, max_age_days: u32) -> Result<u64> {
-        let cutoff = Timestamp::now() - jiff::SignedDuration::from_secs(max_age_days as i64 * 86400);
+        let cutoff =
+            Timestamp::now() - jiff::SignedDuration::from_secs(max_age_days as i64 * 86400);
         let result = sqlx::query("DELETE FROM mirror_trial_previews WHERE preview_at < ?1")
             .bind(cutoff.to_string())
             .execute(self.db())

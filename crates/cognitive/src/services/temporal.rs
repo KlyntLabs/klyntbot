@@ -227,10 +227,9 @@ impl TemporalService {
         to: &str,
         domains: Option<&[&str]>,
     ) -> Result<KnowledgeDiff, sqlx::Error> {
-        let from_ts = from.parse::<Timestamp>()
-            .map_err(|_| {
-                sqlx::Error::Protocol(format!("invalid RFC3339 'from' timestamp: {from}"))
-            })?;
+        let from_ts = from.parse::<Timestamp>().map_err(|_| {
+            sqlx::Error::Protocol(format!("invalid RFC3339 'from' timestamp: {from}"))
+        })?;
 
         let summary = self.change_summary(from_ts, domains).await?;
 

@@ -13,7 +13,9 @@ pub fn suggest_due_date(task: &Task) -> Option<EnrichmentSuggestion<jiff::Timest
     // Urgent tasks: due today
     if contains_urgency(&text) {
         return Some(EnrichmentSuggestion {
-            value: now.checked_add(jiff::SignedDuration::from_secs(8 * 3600)).unwrap(),
+            value: now
+                .checked_add(jiff::SignedDuration::from_secs(8 * 3600))
+                .unwrap(),
             confidence: 0.75,
             reasoning: "Urgent keywords detected; suggesting end of day".to_string(),
         });
@@ -22,7 +24,9 @@ pub fn suggest_due_date(task: &Task) -> Option<EnrichmentSuggestion<jiff::Timest
     // Tasks with "today" or "tonight"
     if text.contains("today") || text.contains("tonight") {
         return Some(EnrichmentSuggestion {
-            value: now.checked_add(jiff::SignedDuration::from_secs(8 * 3600)).unwrap(),
+            value: now
+                .checked_add(jiff::SignedDuration::from_secs(8 * 3600))
+                .unwrap(),
             confidence: 0.85,
             reasoning: "Task mentions 'today'/'tonight'".to_string(),
         });
@@ -31,7 +35,9 @@ pub fn suggest_due_date(task: &Task) -> Option<EnrichmentSuggestion<jiff::Timest
     // Tasks with "tomorrow"
     if text.contains("tomorrow") {
         return Some(EnrichmentSuggestion {
-            value: now.checked_add(jiff::SignedDuration::from_secs(86400)).unwrap(),
+            value: now
+                .checked_add(jiff::SignedDuration::from_secs(86400))
+                .unwrap(),
             confidence: 0.85,
             reasoning: "Task mentions 'tomorrow'".to_string(),
         });
@@ -40,7 +46,9 @@ pub fn suggest_due_date(task: &Task) -> Option<EnrichmentSuggestion<jiff::Timest
     // Tasks with "this week" or "end of week"
     if text.contains("this week") || text.contains("end of week") || text.contains("eow") {
         return Some(EnrichmentSuggestion {
-            value: now.checked_add(jiff::SignedDuration::from_secs(5 * 86400)).unwrap(),
+            value: now
+                .checked_add(jiff::SignedDuration::from_secs(5 * 86400))
+                .unwrap(),
             confidence: 0.75,
             reasoning: "Task mentions 'this week'".to_string(),
         });
@@ -49,7 +57,9 @@ pub fn suggest_due_date(task: &Task) -> Option<EnrichmentSuggestion<jiff::Timest
     // Tasks with "next week"
     if text.contains("next week") {
         return Some(EnrichmentSuggestion {
-            value: now.checked_add(jiff::SignedDuration::from_secs(7 * 86400)).unwrap(),
+            value: now
+                .checked_add(jiff::SignedDuration::from_secs(7 * 86400))
+                .unwrap(),
             confidence: 0.75,
             reasoning: "Task mentions 'next week'".to_string(),
         });
@@ -64,7 +74,9 @@ pub fn suggest_due_date(task: &Task) -> Option<EnrichmentSuggestion<jiff::Timest
             _ => 14,
         };
         return Some(EnrichmentSuggestion {
-            value: now.checked_add(jiff::SignedDuration::from_secs(days * 86400)).unwrap(),
+            value: now
+                .checked_add(jiff::SignedDuration::from_secs(days * 86400))
+                .unwrap(),
             confidence: 0.50,
             reasoning: format!(
                 "Based on priority {} — suggesting {} day(s)",
@@ -95,7 +107,8 @@ mod tests {
         assert!(result.is_some());
         let s = result.unwrap();
         // Should be within ~24 hours
-        let diff_hours = (s.value.as_millisecond() - jiff::Timestamp::now().as_millisecond()) / 3_600_000;
+        let diff_hours =
+            (s.value.as_millisecond() - jiff::Timestamp::now().as_millisecond()) / 3_600_000;
         assert!(diff_hours <= 24);
     }
 
@@ -105,7 +118,8 @@ mod tests {
         task.title = "Submit report tomorrow".to_string();
 
         let result = suggest_due_date(&task).unwrap();
-        let diff_hours = (result.value.as_millisecond() - jiff::Timestamp::now().as_millisecond()) / 3_600_000;
+        let diff_hours =
+            (result.value.as_millisecond() - jiff::Timestamp::now().as_millisecond()) / 3_600_000;
         assert!((20..=28).contains(&diff_hours));
         assert!(result.confidence >= 0.80);
     }
@@ -116,7 +130,8 @@ mod tests {
         task.title = "Finish this week".to_string();
 
         let result = suggest_due_date(&task).unwrap();
-        let diff_days = (result.value.as_millisecond() - jiff::Timestamp::now().as_millisecond()) / 86_400_000;
+        let diff_days =
+            (result.value.as_millisecond() - jiff::Timestamp::now().as_millisecond()) / 86_400_000;
         assert!((4..=6).contains(&diff_days));
     }
 
@@ -127,7 +142,8 @@ mod tests {
         task.priority = Some(1);
 
         let result = suggest_due_date(&task).unwrap();
-        let diff_days = (result.value.as_millisecond() - jiff::Timestamp::now().as_millisecond()) / 86_400_000;
+        let diff_days =
+            (result.value.as_millisecond() - jiff::Timestamp::now().as_millisecond()) / 86_400_000;
         assert!(diff_days <= 2);
     }
 

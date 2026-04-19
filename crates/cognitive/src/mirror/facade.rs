@@ -5,8 +5,8 @@
 
 use std::sync::Arc;
 
-use jiff::Timestamp;
 use dashmap::DashMap;
+use jiff::Timestamp;
 use tokio::task::JoinHandle;
 use uuid::Uuid;
 
@@ -418,7 +418,8 @@ impl MirrorFacade {
             (start, end)
         });
 
-        let days = ((period_end.as_millisecond() - period_start.as_millisecond()) / 86_400_000).max(1) as u32;
+        let days = ((period_end.as_millisecond() - period_start.as_millisecond()) / 86_400_000)
+            .max(1) as u32;
         let snapshots = self.repo.get_routing_history(days).await?;
 
         let ctx = build_narrative_context((period_start, period_end), snapshots);

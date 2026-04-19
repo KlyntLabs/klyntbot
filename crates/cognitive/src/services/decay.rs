@@ -90,12 +90,13 @@ pub fn temporal_recency_score(valid_from: &str) -> f64 {
         .parse::<jiff::Timestamp>()
         .map(|ts| (now.as_millisecond() - ts.as_millisecond()).max(0) as f64 / 86_400_000.0)
         .or_else(|_| {
-            valid_from
-                .parse::<jiff::civil::Date>()
-                .map(|d| {
-                    let ts = d.to_zoned(jiff::tz::TimeZone::UTC).map(|z| z.timestamp()).unwrap_or(now);
-                    (now.as_millisecond() - ts.as_millisecond()).max(0) as f64 / 86_400_000.0
-                })
+            valid_from.parse::<jiff::civil::Date>().map(|d| {
+                let ts = d
+                    .to_zoned(jiff::tz::TimeZone::UTC)
+                    .map(|z| z.timestamp())
+                    .unwrap_or(now);
+                (now.as_millisecond() - ts.as_millisecond()).max(0) as f64 / 86_400_000.0
+            })
         })
         .unwrap_or(30.0);
     (1.0_f64 / (1.0_f64 + age_days / 30.0_f64)).max(0.1_f64)
@@ -211,7 +212,9 @@ mod tests {
 
     #[test]
     fn test_temporal_recency_score_recent() {
-        let now = jiff::Timestamp::now().strftime("%Y-%m-%dT%H:%M:%S").to_string();
+        let now = jiff::Timestamp::now()
+            .strftime("%Y-%m-%dT%H:%M:%S")
+            .to_string();
         let score = temporal_recency_score(&now);
         assert!(
             score > 0.95,

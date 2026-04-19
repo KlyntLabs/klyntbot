@@ -66,7 +66,8 @@ impl AppCore {
             };
 
             // ── Brain growth: 7-day feedback loop stats ──────────────
-            let seven_days_ago = jiff::Timestamp::now() - jiff::SignedDuration::from_secs(7 * 86400);
+            let seven_days_ago =
+                jiff::Timestamp::now() - jiff::SignedDuration::from_secs(7 * 86400);
             let trial_repo = orch.trial_repo();
 
             let (corrections_7d, trials_7d, promoted_7d, total_messages) = tokio::join!(

@@ -316,7 +316,9 @@ impl FlashcardRepo {
         let last_review_str = card.last_reviewed_at.as_deref().unwrap_or(&card.created_at);
         let last_review_ts = last_review_str.parse::<Timestamp>().ok();
         let elapsed_days = last_review_ts
-            .map(|ts| (Timestamp::now().as_millisecond() - ts.as_millisecond()) as f64 / 86_400_000.0)
+            .map(|ts| {
+                (Timestamp::now().as_millisecond() - ts.as_millisecond()) as f64 / 86_400_000.0
+            })
             .unwrap_or(0.0)
             .max(0.0);
 
@@ -387,8 +389,9 @@ impl FlashcardRepo {
                 .as_deref()
                 .and_then(|d| d.parse::<Timestamp>().ok())
                 .and_then(|due| {
-                    last_review_ts
-                        .map(|lr| (due.as_millisecond() - lr.as_millisecond()) as f64 / 86_400_000.0)
+                    last_review_ts.map(|lr| {
+                        (due.as_millisecond() - lr.as_millisecond()) as f64 / 86_400_000.0
+                    })
                 })
                 .unwrap_or(0.0)
         };

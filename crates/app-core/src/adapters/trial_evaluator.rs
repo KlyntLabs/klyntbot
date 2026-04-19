@@ -21,11 +21,7 @@ impl EarlyTrialEvaluator for AppTrialEvaluator {
         _trial_id: &str,
         since: Timestamp,
     ) -> common::Result<TrialEarlySignals> {
-        let message_count = self
-            .strategy_repo
-            .count_since(since)
-            .await
-            .unwrap_or(0);
+        let message_count = self.strategy_repo.count_since(since).await.unwrap_or(0);
 
         // Baseline correction rate ~5%; positive delta means trial is better than baseline.
         let baseline_correction_rate = 0.05;
@@ -42,11 +38,7 @@ impl EarlyTrialEvaluator for AppTrialEvaluator {
                 (since.as_millisecond() + jiff::Timestamp::now().as_millisecond()) / 2,
             )
             .unwrap_or(since);
-            let second_half = self
-                .strategy_repo
-                .count_since(midpoint)
-                .await
-                .unwrap_or(0);
+            let second_half = self.strategy_repo.count_since(midpoint).await.unwrap_or(0);
             let first_half = message_count - second_half;
 
             if second_half > first_half + 2 {

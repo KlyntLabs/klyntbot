@@ -316,9 +316,7 @@ fn trends_category_breakdown() {
 
 #[test]
 fn recurring_monthly_detected() {
-    let dates: Vec<Date> = (1..=6)
-        .map(|m| Date::new(2025, m, 1).unwrap())
-        .collect();
+    let dates: Vec<Date> = (1..=6).map(|m| Date::new(2025, m, 1).unwrap()).collect();
     let txs = recurring_expenses("Netflix", 15, &dates);
     let config = RecurringConfig::default();
     let as_of = date(2025, 6, 15);
@@ -334,9 +332,7 @@ fn recurring_monthly_detected() {
 #[test]
 fn recurring_overdue_flagged() {
     // Monthly charge, last seen 3 months ago -> overdue.
-    let dates: Vec<Date> = (1..=4)
-        .map(|m| Date::new(2025, m, 1).unwrap())
-        .collect();
+    let dates: Vec<Date> = (1..=4).map(|m| Date::new(2025, m, 1).unwrap()).collect();
     let txs = recurring_expenses("Gym", 50, &dates);
     let config = RecurringConfig::default();
     // Check as of August — last payment was April 1, ~120 days ago, expected ~30 day interval.
@@ -349,9 +345,7 @@ fn recurring_overdue_flagged() {
 #[test]
 fn recurring_not_overdue_when_recent() {
     // Monthly charge, last seen recently -> not overdue.
-    let dates: Vec<Date> = (1..=6)
-        .map(|m| Date::new(2025, m, 1).unwrap())
-        .collect();
+    let dates: Vec<Date> = (1..=6).map(|m| Date::new(2025, m, 1).unwrap()).collect();
     let txs = recurring_expenses("Spotify", 10, &dates);
     let config = RecurringConfig::default();
     let as_of = date(2025, 6, 15);
@@ -366,10 +360,7 @@ fn recurring_not_overdue_when_recent() {
 #[test]
 fn recurring_insufficient_occurrences_skipped() {
     // Only 2 occurrences — below min_occurrences of 3.
-    let dates = vec![
-        date(2025, 1, 1),
-        date(2025, 2, 1),
-    ];
+    let dates = vec![date(2025, 1, 1), date(2025, 2, 1)];
     let txs = recurring_expenses("SomeService", 20, &dates);
     let config = RecurringConfig::default();
     let as_of = date(2025, 3, 1);

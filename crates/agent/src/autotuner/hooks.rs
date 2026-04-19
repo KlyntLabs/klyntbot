@@ -75,7 +75,9 @@ impl AutoTunerHook for AutoTunerHookImpl {
         // Read cached active trials; refresh from DB if stale.
         let active_trials = {
             let (last_fetched, cached) = self.active_trials_cache.read().await.clone();
-            if (jiff::Timestamp::now().as_millisecond() - last_fetched.as_millisecond()) / 1000 > ACTIVE_TRIALS_CACHE_TTL_SECS {
+            if (jiff::Timestamp::now().as_millisecond() - last_fetched.as_millisecond()) / 1000
+                > ACTIVE_TRIALS_CACHE_TTL_SECS
+            {
                 let fresh = match self.trial_repo.get_active_trials().await {
                     Ok(trials) => trials,
                     Err(e) => {

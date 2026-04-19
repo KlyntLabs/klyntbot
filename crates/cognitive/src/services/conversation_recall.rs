@@ -1,5 +1,5 @@
-use jiff::Timestamp;
 use common::truncate_at_boundary;
+use jiff::Timestamp;
 use storage::{sanitize_predicate_value, VectorStore};
 
 use crate::embedder::TextEmbedder;
@@ -126,9 +126,12 @@ impl ConversationRecallService {
             .into_iter()
             .filter_map(
                 |(id, session_key, role, preview, created_at_str, similarity)| {
-                    let created_at = created_at_str.parse::<Timestamp>().unwrap_or(Timestamp::now());
+                    let created_at = created_at_str
+                        .parse::<Timestamp>()
+                        .unwrap_or(Timestamp::now());
 
-                    let days_old = (now.as_millisecond() - created_at.as_millisecond()) as f64 / 86_400_000.0;
+                    let days_old =
+                        (now.as_millisecond() - created_at.as_millisecond()) as f64 / 86_400_000.0;
                     let decayed_score = similarity * self.decay_factor.powf(days_old.max(0.0));
 
                     if decayed_score >= threshold as f64 {

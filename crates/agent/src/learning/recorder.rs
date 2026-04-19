@@ -164,7 +164,11 @@ impl OutcomeStore {
     pub async fn get_all_outcomes(&self) -> Result<Vec<OutcomeRecord>> {
         match &self.backend {
             Backend::Sqlite(_) => {
-                self.outcomes_since(jiff::Timestamp::from_second(i64::MIN / 1000).unwrap_or(jiff::Timestamp::UNIX_EPOCH)).await
+                self.outcomes_since(
+                    jiff::Timestamp::from_second(i64::MIN / 1000)
+                        .unwrap_or(jiff::Timestamp::UNIX_EPOCH),
+                )
+                .await
             }
             Backend::InMemory { outcomes, .. } => Ok(outcomes.lock().unwrap().clone()),
         }

@@ -138,7 +138,9 @@ impl AutoTunerOrchestrator {
         let Some(champion) = self.champion.try_read().ok() else {
             return false;
         };
-        let days_since_promotion = (jiff::Timestamp::now().as_millisecond() - champion.promoted_at.as_millisecond()) / 86_400_000;
+        let days_since_promotion = (jiff::Timestamp::now().as_millisecond()
+            - champion.promoted_at.as_millisecond())
+            / 86_400_000;
         days_since_promotion >= 7
     }
 
@@ -209,7 +211,9 @@ impl AutoTunerOrchestrator {
     /// Build a summary for the transparency panel / events.
     pub async fn champion_summary(&self) -> ChampionSummary {
         let c = self.champion.read().await;
-        let days = ((jiff::Timestamp::now().as_millisecond() - c.promoted_at.as_millisecond()) / 86_400_000).max(0) as u32;
+        let days = ((jiff::Timestamp::now().as_millisecond() - c.promoted_at.as_millisecond())
+            / 86_400_000)
+            .max(0) as u32;
         ChampionSummary {
             trial_id: c.trial_id,
             description: c.reason_for_promotion.clone(),
@@ -658,7 +662,10 @@ impl AutoTunerOrchestrator {
         let mut summaries = Vec::with_capacity(experiments.len());
         for exp in experiments {
             let id = uuid::Uuid::parse_str(&exp.id).unwrap_or_else(|_| uuid::Uuid::nil());
-            let started_at = exp.created_at.parse::<jiff::Timestamp>().unwrap_or_else(|_| jiff::Timestamp::now());
+            let started_at = exp
+                .created_at
+                .parse::<jiff::Timestamp>()
+                .unwrap_or_else(|_| jiff::Timestamp::now());
             summaries.push(ExperimentSummary {
                 id,
                 variant_count: 3,   // We always generate 3 variants per experiment

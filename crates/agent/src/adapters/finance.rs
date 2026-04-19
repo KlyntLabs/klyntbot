@@ -261,11 +261,7 @@ impl FinanceHandler for FinanceHandlerImpl {
             .date();
         let overdue = goals
             .iter()
-            .filter(|g| {
-                g.deadline
-                    .map(|d| *d < today_health)
-                    .unwrap_or(false)
-            })
+            .filter(|g| g.deadline.map(|d| *d < today_health).unwrap_or(false))
             .count();
         if overdue > 0 {
             issues.push(format!(
@@ -323,12 +319,7 @@ impl FinanceHandler for FinanceHandlerImpl {
             .repos
             .finance
             .transactions
-            .sum_by_category(
-                date_from,
-                date_to,
-                "expense",
-                currency,
-            )
+            .sum_by_category(date_from, date_to, "expense", currency)
             .await?;
 
         let total: i64 = rows.iter().map(|(_, amount)| amount).sum();
@@ -358,7 +349,15 @@ impl FinanceHandler for FinanceHandlerImpl {
 /// Compute the number of days from `from` to `to` (positive if `to` is in the future).
 fn days_between(from: jiff::civil::Date, to: jiff::civil::Date) -> i64 {
     let utc = jiff::tz::TimeZone::UTC;
-    let from_ts = from.at(0, 0, 0, 0).to_zoned(utc.clone()).map(|z| z.timestamp().as_second()).unwrap_or(0);
-    let to_ts = to.at(0, 0, 0, 0).to_zoned(utc).map(|z| z.timestamp().as_second()).unwrap_or(0);
+    let from_ts = from
+        .at(0, 0, 0, 0)
+        .to_zoned(utc.clone())
+        .map(|z| z.timestamp().as_second())
+        .unwrap_or(0);
+    let to_ts = to
+        .at(0, 0, 0, 0)
+        .to_zoned(utc)
+        .map(|z| z.timestamp().as_second())
+        .unwrap_or(0);
     (to_ts - from_ts) / 86400
 }

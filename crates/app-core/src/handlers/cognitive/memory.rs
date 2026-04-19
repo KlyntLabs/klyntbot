@@ -21,8 +21,8 @@ pub(crate) fn fact_to_response(f: &SemanticFact) -> SemanticFactResponse {
                 .parse::<jiff::Timestamp>()
                 .unwrap_or_else(|_| jiff::Timestamp::now())
         });
-    let elapsed_days = (jiff::Timestamp::now().as_millisecond()
-        - reference_ts.as_millisecond()) as f64
+    let elapsed_days = (jiff::Timestamp::now().as_millisecond() - reference_ts.as_millisecond())
+        as f64
         / 86_400_000.0;
     let r = retrievability(elapsed_days, f.stability);
 
@@ -558,11 +558,7 @@ impl AppCore {
                         details.insert("Priority".to_string(), label.to_string());
                     }
                     let subtitle = if let Some(due) = task.due_date {
-                        format!(
-                            "{} · due {}",
-                            task.status,
-                            due.strftime("%Y-%m-%d")
-                        )
+                        format!("{} · due {}", task.status, due.strftime("%Y-%m-%d"))
                     } else {
                         task.status.clone()
                     };

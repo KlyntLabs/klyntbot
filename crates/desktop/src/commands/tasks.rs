@@ -379,14 +379,12 @@ pub(crate) async fn dispatch_dev(
         "task_add_time_entry" => {
             let task_id = try_field!(dev::get_str(body, "taskId"));
             let started_at_str = try_field!(dev::get_str(body, "startedAt"));
-            let started_at = started_at_str
-                .parse::<jiff::Timestamp>()
-                .map_err(|e| {
-                    desktop_shared::errors::ApiError::new(
-                        "VALIDATION",
-                        format!("invalid startedAt: {e}"),
-                    )
-                });
+            let started_at = started_at_str.parse::<jiff::Timestamp>().map_err(|e| {
+                desktop_shared::errors::ApiError::new(
+                    "VALIDATION",
+                    format!("invalid startedAt: {e}"),
+                )
+            });
             let started_at = try_field!(started_at);
             let duration_secs: Option<i64> = dev::get(body, "durationSecs");
             let note: Option<String> = dev::get(body, "note");

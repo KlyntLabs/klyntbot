@@ -49,7 +49,11 @@ impl ReviewStatsRepo {
             return Ok(0);
         }
 
-        let today: Date = Timestamp::now().strftime("%Y-%m-%d").to_string().parse().unwrap_or(Date::MIN);
+        let today: Date = Timestamp::now()
+            .strftime("%Y-%m-%d")
+            .to_string()
+            .parse()
+            .unwrap_or(Date::MIN);
         let mut streak = 0usize;
         let mut expected = today;
 
@@ -59,7 +63,9 @@ impl ReviewStatsRepo {
             };
             if date == expected {
                 streak += 1;
-                expected = expected.checked_sub(jiff::Span::new().days(1)).unwrap_or(expected);
+                expected = expected
+                    .checked_sub(jiff::Span::new().days(1))
+                    .unwrap_or(expected);
             } else if date < expected {
                 // Gap found — stop counting
                 break;
@@ -71,7 +77,8 @@ impl ReviewStatsRepo {
 
     /// Daily review counts for the last N days.
     pub async fn daily_reviews(&self, days: i64) -> Result<Vec<DailyReviewStat>, sqlx::Error> {
-        let cutoff = (Timestamp::now() - jiff::SignedDuration::from_secs((days) * 86400)).to_string();
+        let cutoff =
+            (Timestamp::now() - jiff::SignedDuration::from_secs((days) * 86400)).to_string();
 
         let rows: Vec<(String, i64, f64)> = sqlx::query_as(
             r#"
@@ -98,7 +105,8 @@ impl ReviewStatsRepo {
 
     /// Per-domain stats from `knowledge_atoms`: domain, atom_count, avg_retention, reviews in last 7 days.
     pub async fn domain_retention_stats(&self) -> Result<Vec<DomainRetentionStat>, sqlx::Error> {
-        let cutoff_7d = (Timestamp::now() - jiff::SignedDuration::from_secs((7) * 86400)).to_string();
+        let cutoff_7d =
+            (Timestamp::now() - jiff::SignedDuration::from_secs((7) * 86400)).to_string();
 
         let rows: Vec<(String, i64, f64, i64)> = sqlx::query_as(
             r#"
@@ -164,7 +172,8 @@ impl ReviewStatsRepo {
 
     /// Daily atom creation counts for the last N days.
     pub async fn daily_atoms_created(&self, days: i64) -> Result<Vec<(String, i64)>, sqlx::Error> {
-        let cutoff = (Timestamp::now() - jiff::SignedDuration::from_secs((days) * 86400)).to_string();
+        let cutoff =
+            (Timestamp::now() - jiff::SignedDuration::from_secs((days) * 86400)).to_string();
         sqlx::query_as(
             r#"SELECT DATE(created_at) as d, COUNT(*) as cnt
                FROM knowledge_atoms
@@ -295,8 +304,14 @@ mod tests {
         .unwrap();
 
         // Insert reviews for today and yesterday (2-day streak)
-        let today: Date = Timestamp::now().strftime("%Y-%m-%d").to_string().parse().unwrap_or(Date::MIN);
-        let yesterday = today.checked_sub(jiff::Span::new().days(1)).unwrap_or(today);
+        let today: Date = Timestamp::now()
+            .strftime("%Y-%m-%d")
+            .to_string()
+            .parse()
+            .unwrap_or(Date::MIN);
+        let yesterday = today
+            .checked_sub(jiff::Span::new().days(1))
+            .unwrap_or(today);
 
         for (i, date) in [today, yesterday].iter().enumerate() {
             let ts = format!("{}T12:00:00+00:00", date);

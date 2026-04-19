@@ -51,7 +51,9 @@ impl SuggestionApplier for TaskSuggestionApplier {
                     .or_else(|_| {
                         // Try YYYY-MM-DD format: parse as civil date at midnight UTC
                         due_date.parse::<jiff::civil::Date>().and_then(|d| {
-                            d.at(0, 0, 0, 0).to_zoned(jiff::tz::TimeZone::UTC).map(|z| z.timestamp())
+                            d.at(0, 0, 0, 0)
+                                .to_zoned(jiff::tz::TimeZone::UTC)
+                                .map(|z| z.timestamp())
                         })
                     })
                     .map_err(|e| {

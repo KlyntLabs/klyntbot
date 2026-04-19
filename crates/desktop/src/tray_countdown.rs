@@ -99,7 +99,8 @@ async fn countdown_loop(app: AppHandle, shutdown: tokio_util::sync::Cancellation
 
         match &cached {
             Some(item) => {
-                let total_secs = (item.time.as_millisecond() - jiff::Timestamp::now().as_millisecond()) / 1000;
+                let total_secs =
+                    (item.time.as_millisecond() - jiff::Timestamp::now().as_millisecond()) / 1000;
 
                 if total_secs <= 0 {
                     // Item time has passed — clear and re-query next tick
@@ -148,7 +149,10 @@ async fn countdown_loop(app: AppHandle, shutdown: tokio_util::sync::Cancellation
 async fn query_next_item(app: &AppHandle) -> Option<NextItem> {
     let core = app.try_state::<Arc<AppCore>>()?;
     // Use local time for "today" boundary so it matches the user's timezone
-    let tomorrow = jiff::Zoned::now().date().checked_add(jiff::Span::new().days(1)).ok()?;
+    let tomorrow = jiff::Zoned::now()
+        .date()
+        .checked_add(jiff::Span::new().days(1))
+        .ok()?;
     let end_of_today = tomorrow
         .at(0, 0, 0, 0)
         .to_zoned(jiff::tz::TimeZone::system())

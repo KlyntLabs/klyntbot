@@ -340,7 +340,10 @@ mod tests {
 
         // Wait a tiny bit, then cleanup with zero max_age
         tokio::time::sleep(std::time::Duration::from_millis(100)).await;
-        let removed = repo.cleanup_stale(jiff::SignedDuration::ZERO).await.unwrap();
+        let removed = repo
+            .cleanup_stale(jiff::SignedDuration::ZERO)
+            .await
+            .unwrap();
         assert!(removed > 0);
 
         let remaining = repo.list_for_session("test-session").await.unwrap();

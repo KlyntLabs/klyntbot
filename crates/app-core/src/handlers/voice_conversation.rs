@@ -131,7 +131,8 @@ pub enum VoiceCommand {
 // ── Helpers ──────────────────────────────────────────────────
 
 pub fn is_warm_session(last_activity: jiff::Timestamp, threshold_minutes: u32) -> bool {
-    let elapsed_mins = (jiff::Timestamp::now().as_millisecond() - last_activity.as_millisecond()) / 60_000;
+    let elapsed_mins =
+        (jiff::Timestamp::now().as_millisecond() - last_activity.as_millisecond()) / 60_000;
     elapsed_mins < threshold_minutes as i64
 }
 

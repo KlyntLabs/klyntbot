@@ -319,7 +319,8 @@ impl KnowledgeAtomRepo {
         &self,
         stale_days: i64,
     ) -> Result<Vec<KnowledgeAtomRow>, sqlx::Error> {
-        let cutoff = (Timestamp::now() - jiff::SignedDuration::from_secs((stale_days) * 86400)).to_string();
+        let cutoff =
+            (Timestamp::now() - jiff::SignedDuration::from_secs((stale_days) * 86400)).to_string();
         sqlx::query_as::<_, KnowledgeAtomRow>(
             r#"
             SELECT * FROM knowledge_atoms

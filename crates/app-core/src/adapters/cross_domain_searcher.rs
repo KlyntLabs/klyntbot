@@ -4,12 +4,12 @@
 use std::sync::Arc;
 
 use async_trait::async_trait;
-use jiff::Timestamp;
 use cognitive::repos::SqliteBookTreeRepo;
 use context_engine::book_index::BookTreeRepo;
 use feature_insights::cross_domain::{EntityDomain, EntityRef};
 use feature_insights::traits::{CrossDomainSearcher, CrossDomainVectorHit};
 use feature_notes::repo::NoteRepo;
+use jiff::Timestamp;
 use storage::TaskRepo;
 use storage::VectorStore;
 use tools::embedding_engine::EmbeddingEngine;
@@ -112,10 +112,7 @@ impl CrossDomainSearcherImpl {
     /// Look up task metadata by ID. Returns (title, created_at) if found.
     async fn lookup_task(&self, id: &str) -> Option<(String, Timestamp)> {
         match self.task_repo.get(id).await {
-            Ok(Some(row)) => Some((
-                row.title,
-                *row.created_at,
-            )),
+            Ok(Some(row)) => Some((row.title, *row.created_at)),
             Ok(None) => {
                 debug!(id, "task not found for cross-domain hit");
                 None
@@ -159,10 +156,7 @@ impl CrossDomainSearcherImpl {
                 let label = node.title.filter(|t| !t.is_empty()).unwrap_or(node.content);
                 // Tree nodes don't carry a timestamp — use epoch as a neutral sentinel.
                 // The score (cosine similarity) is the primary ranking signal anyway.
-                Some((
-                    label,
-                    Timestamp::UNIX_EPOCH,
-                ))
+                Some((label, Timestamp::UNIX_EPOCH))
             }
             Ok(None) => {
                 debug!(id, "finance tree node not found for cross-domain hit");
@@ -176,11 +170,7 @@ impl CrossDomainSearcherImpl {
     }
 
     /// Look up entity metadata for a vector hit in a target domain.
-    async fn lookup_entity(
-        &self,
-        domain: &EntityDomain,
-        id: &str,
-    ) -> Option<(String, Timestamp)> {
+    async fn lookup_entity(&self, domain: &EntityDomain, id: &str) -> Option<(String, Timestamp)> {
         match domain {
             EntityDomain::Task => self.lookup_task(id).await,
             EntityDomain::Note => self.lookup_note(id).await,

@@ -164,9 +164,9 @@ pub struct InteractionCounts {
 /// string that falls within the last 24 hours.
 fn is_cache_fresh(updated: &str) -> bool {
     // Accept both RFC-3339 ("…T…Z") and SQLite datetime ("YYYY-MM-DD HH:MM:SS") formats
-    let parsed = updated.parse::<jiff::Timestamp>().or_else(|_| {
-        format!("{}Z", updated.trim().replace(' ', "T")).parse::<jiff::Timestamp>()
-    });
+    let parsed = updated
+        .parse::<jiff::Timestamp>()
+        .or_else(|_| format!("{}Z", updated.trim().replace(' ', "T")).parse::<jiff::Timestamp>());
     match parsed {
         Ok(ts) => (jiff::Timestamp::now().as_millisecond() - ts.as_millisecond()) < 86_400_000,
         Err(_) => false,

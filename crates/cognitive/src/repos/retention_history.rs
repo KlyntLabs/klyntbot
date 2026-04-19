@@ -41,7 +41,8 @@ impl RetentionHistoryRepo {
         &self,
         days: i64,
     ) -> Result<Vec<DailyRetentionPoint>, sqlx::Error> {
-        let cutoff = (jiff::Timestamp::now() - jiff::SignedDuration::from_secs(days * 86400)).to_string();
+        let cutoff =
+            (jiff::Timestamp::now() - jiff::SignedDuration::from_secs(days * 86400)).to_string();
         sqlx::query_as::<_, (String, f64, i64)>(
             r#"
             SELECT DATE(rl.reviewed_at) as d,
@@ -74,7 +75,8 @@ impl RetentionHistoryRepo {
         &self,
         days: i64,
     ) -> Result<Vec<DomainRetentionHistory>, sqlx::Error> {
-        let cutoff = (jiff::Timestamp::now() - jiff::SignedDuration::from_secs(days * 86400)).to_string();
+        let cutoff =
+            (jiff::Timestamp::now() - jiff::SignedDuration::from_secs(days * 86400)).to_string();
         let rows: Vec<(String, String, f64, i64)> = sqlx::query_as(
             r#"
             SELECT ka.domain, DATE(rl.reviewed_at) as d,

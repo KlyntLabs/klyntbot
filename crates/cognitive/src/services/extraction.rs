@@ -3,8 +3,8 @@
 //! The `ExtractionHandler` trait is implemented in the agent crate with an
 //! actual LLM provider. Tests use a mock that returns pre-defined facts.
 
-use async_trait::async_trait;
 use crate::types::{Observation, SemanticFact, DEFAULT_MEMORY_TYPE};
+use async_trait::async_trait;
 
 /// A candidate fact extracted from an observation, before consolidation.
 #[derive(Debug, Clone)]
