@@ -49,6 +49,10 @@ pub(super) async fn init_temporal_scheduler(
         .await
         .map_err(|e| format!("TemporalScheduler cron reconcile failed: {e}"))?;
 
+    // Clone before the bridge is moved into the scheduler — AppCore holds this
+    // clone so CRUD handlers can call reconcile_all() after mutations.
+    let bridge_for_appcore = bridge.clone();
+
     // Build the RecurrenceEngine backed by SQLite repos.
     let fire_store_arc = Arc::new(fire_store.clone());
     let template_repo = Arc::new(SqliteTemplateRepo::new(pool.clone()));
