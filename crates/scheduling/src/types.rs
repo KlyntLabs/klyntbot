@@ -187,37 +187,6 @@ fn default_enabled() -> bool {
     true
 }
 
-/// Status snapshot for the cron service
-#[derive(Debug, Clone)]
-pub struct CronServiceStatus {
-    pub enabled: bool,
-    pub jobs: usize,
-    pub next_wake_at_ms: Option<i64>,
-}
-
-/// Persistent store for cron jobs
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct CronStore {
-    #[serde(default = "default_version")]
-    pub version: u32,
-
-    #[serde(default)]
-    pub jobs: Vec<CronJob>,
-}
-
-fn default_version() -> u32 {
-    1
-}
-
-impl Default for CronStore {
-    fn default() -> Self {
-        Self {
-            version: default_version(),
-            jobs: Vec::new(),
-        }
-    }
-}
-
 impl CronJob {
     /// Create a new cron job
     pub fn new(
@@ -349,27 +318,6 @@ mod tests {
         assert_eq!(json["nextRunAtMs"], 1234567890);
         assert_eq!(json["lastRunAtMs"], 1234567800);
         assert_eq!(json["lastStatus"], "success");
-    }
-
-    #[test]
-    fn test_cron_store_serialization() {
-        let schedule = CronSchedule::Every { every_ms: 60000 };
-        let job = CronJob::new("job1", "Test Job", schedule, "Test", CronOrigin::System);
-
-        let store = CronStore {
-            version: 1,
-            jobs: vec![job],
-        };
-
-        let json = serde_json::to_value(&store).unwrap();
-        assert_eq!(json["version"], 1);
-        assert_eq!(json["jobs"].as_array().unwrap().len(), 1);
-
-        // Test round-trip
-        let deserialized: CronStore = serde_json::from_value(json).unwrap();
-        assert_eq!(deserialized.version, 1);
-        assert_eq!(deserialized.jobs.len(), 1);
-        assert_eq!(deserialized.jobs[0].id, "job1");
     }
 
     #[test]

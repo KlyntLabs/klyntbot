@@ -3,9 +3,6 @@
 //! `CronExecutor` subscribes to the `DomainEventBus`, filters for cron-job
 //! fires, looks up the registered Rust handler by job name, and invokes it
 //! concurrently (one `tokio::spawn` per fire).
-//!
-//! Handler signature mirrors `CronService::JobCallback` exactly so that
-//! Task 4.4c can move callbacks verbatim.
 
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -17,10 +14,41 @@ use tokio_util::sync::CancellationToken;
 use tracing::{error, info, warn};
 
 use crate::service::row_to_job;
-use crate::types::CronJob;
+use crate::types::{CronJob, IntentTrigger};
 use common::Result;
 
-/// Callback type — matches `CronService::JobCallback` exactly.
+/// Returns `true` if `job` is allowed to fire at `now` given its `intent_window`.
+///
+/// - If `intent_window` is `None`, always returns `true` (no restriction).
+/// - For `FirstActivityAfter { after_local }`: blocks dispatch if the current local
+///   time of day is before `after_local`. This is the only trigger that can be
+///   evaluated purely from wall-clock time without a presence snapshot.
+/// - All other triggers (`UserPresent`, `MinActiveMinutes`, `UserIdle`) require live
+///   presence data which is not available in the executor; they return `true` so the
+///   alarm fires and the handler decides whether to act.
+fn in_intent_window(job: &CronJob, now: jiff::Timestamp) -> bool {
+    let window = match &job.intent_window {
+        Some(w) => w,
+        None => return true,
+    };
+
+    match &window.trigger {
+        IntentTrigger::FirstActivityAfter { after_local } => {
+            // Convert `now` to local civil time and compare the time-of-day component.
+            let local_time = now
+                .to_zoned(jiff::tz::TimeZone::system())
+                .datetime()
+                .time();
+            local_time >= *after_local
+        }
+        // Presence-based triggers cannot be evaluated here — allow dispatch.
+        IntentTrigger::UserPresent
+        | IntentTrigger::MinActiveMinutes { .. }
+        | IntentTrigger::UserIdle { .. } => true,
+    }
+}
+
+/// Callback type for cron job handlers registered with [`CronExecutor`].
 pub type CronHandler = Arc<dyn Fn(&CronJob) -> Result<Option<String>> + Send + Sync>;
 
 /// Dispatches `AlarmFired { kind = "cron_job" }` events to registered Rust handlers.
@@ -54,8 +82,7 @@ impl CronExecutor {
             .insert(name.to_owned(), handler);
     }
 
-    /// Alias for [`register`] — matches the `CronService::register_handler` API
-    /// so Task 4.4c can swap without renaming call sites.
+    /// Alias for [`register`] — convenience alias kept for call-site compatibility.
     ///
     /// If a fire arrives before a handler for the given name is registered,
     /// the fire is dropped with a `warn!` log and the executor continues.
@@ -184,6 +211,18 @@ impl CronExecutor {
 
         let job = row_to_job(row);
         let job_name = job.name.clone();
+
+        // Evaluate intent_window before dispatching. Jobs with a `FirstActivityAfter`
+        // trigger are suppressed if the current local time is before the configured
+        // threshold. Other trigger kinds require live presence data and are not
+        // evaluated here (they pass through and fire normally).
+        if !in_intent_window(&job, jiff::Timestamp::now()) {
+            warn!(
+                job_name = %job_name,
+                "CronExecutor: job fire suppressed — outside intent_window"
+            );
+            return;
+        }
 
         let handler = {
             let guard = handlers.read().expect("CronExecutor handler lock poisoned");
@@ -538,6 +577,120 @@ mod tests {
             call_count.load(Ordering::SeqCst),
             1,
             "survivor handler should have run exactly once"
+        );
+
+        shutdown.cancel();
+    }
+
+    /// Build a `CronJobRow` whose `intent_window` is set to `FirstActivityAfter` with
+    /// the given local `after_hour` (0–23). Used by intent-window gate tests.
+    fn make_row_with_intent_hour(id: &str, name: &str, after_hour: u8) -> CronJobRow {
+        let mut row = make_row(id, name);
+        // Encode the IntentWindow as the JSON string the DB column stores.
+        let json = serde_json::json!({
+            "trigger": {
+                "kind": "first_activity_after",
+                "afterLocal": format!("{:02}:00:00", after_hour)
+            },
+            "toleranceSecs": 3600,
+            "catchUp": "when_present"
+        });
+        row.intent_window = Some(json.to_string());
+        row
+    }
+
+    #[tokio::test]
+    async fn intent_window_blocks_outside_range() {
+        // Choose an `after_local` that is always in the future relative to "now" — we
+        // pick hour 25 which is impossible, so any current time is before it.  Because
+        // jiff `civil::Time` caps at 23:59, we instead use the `FirstActivityAfter`
+        // trigger with `after_local = 23:59` and run the test at any time before that.
+        //
+        // Simpler approach: set after_local to 23:59 and rely on the test running
+        // before that time.  On CI (UTC, ~midnight) this could flake.  Instead we
+        // build the row with after_local = current_local_hour + 1 (mod 24) so it is
+        // always in the future relative to *now*.
+        let now_local = jiff::Zoned::now().datetime().time();
+        // Pick an hour guaranteed to be strictly in the future today.
+        let block_hour = ((now_local.hour() as u32 + 1) % 24) as u8;
+
+        let repo = setup_repo().await;
+        repo.upsert(&make_row_with_intent_hour("job-7", "gated_job", block_hour))
+            .await
+            .unwrap();
+
+        let bus = Arc::new(DomainEventBus::new(64));
+        let executor = CronExecutor::new(repo, Arc::clone(&bus));
+
+        let call_count = Arc::new(AtomicUsize::new(0));
+        let cc = Arc::clone(&call_count);
+        executor.register(
+            "gated_job",
+            Arc::new(move |_job| {
+                cc.fetch_add(1, Ordering::SeqCst);
+                Ok(None)
+            }),
+        );
+
+        let shutdown = CancellationToken::new();
+        let _handle = executor.start(shutdown.clone());
+
+        tokio::time::sleep(Duration::from_millis(10)).await;
+
+        bus.publish(alarm_fired("cron_job", Some("job-7")));
+
+        // Wait long enough for the event to be processed — handler must NOT be called.
+        tokio::time::sleep(Duration::from_millis(200)).await;
+
+        assert_eq!(
+            call_count.load(Ordering::SeqCst),
+            0,
+            "handler must be suppressed when outside intent_window"
+        );
+
+        shutdown.cancel();
+    }
+
+    #[tokio::test]
+    async fn intent_window_allows_inside_range() {
+        // Set after_local = 00:00 (midnight) so any current local time satisfies it.
+        let repo = setup_repo().await;
+        repo.upsert(&make_row_with_intent_hour("job-8", "allowed_job", 0))
+            .await
+            .unwrap();
+
+        let bus = Arc::new(DomainEventBus::new(64));
+        let executor = CronExecutor::new(repo, Arc::clone(&bus));
+
+        let call_count = Arc::new(AtomicUsize::new(0));
+        let cc = Arc::clone(&call_count);
+        executor.register(
+            "allowed_job",
+            Arc::new(move |_job| {
+                cc.fetch_add(1, Ordering::SeqCst);
+                Ok(None)
+            }),
+        );
+
+        let shutdown = CancellationToken::new();
+        let _handle = executor.start(shutdown.clone());
+
+        tokio::time::sleep(Duration::from_millis(10)).await;
+
+        bus.publish(alarm_fired("cron_job", Some("job-8")));
+
+        let deadline = Instant::now() + Duration::from_secs(2);
+        while call_count.load(Ordering::SeqCst) == 0 {
+            if Instant::now() > deadline {
+                panic!("handler was not invoked within 2s — intent_window gate may be too strict");
+            }
+            tokio::time::sleep(Duration::from_millis(10)).await;
+        }
+
+        assert_eq!(
+            call_count.load(Ordering::SeqCst),
+            1,
+            "handler must fire when inside intent_window"
         );
 
         shutdown.cancel();

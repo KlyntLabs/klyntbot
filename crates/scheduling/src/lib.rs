@@ -20,5 +20,5 @@ pub use temporal::fire_store::{FireSpec, FireStore};
 pub use temporal::recurrence::{RecurrenceEngine, RecurrenceTemplate};
 pub use temporal::rules::{AlarmRule, RuleError};
 pub use types::{
-    CronJob, CronJobState, CronOrigin, CronPayload, CronSchedule, CronServiceStatus, CronStore,
+    CronJob, CronJobState, CronOrigin, CronPayload, CronSchedule,
 };
