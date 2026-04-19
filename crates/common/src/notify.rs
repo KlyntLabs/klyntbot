@@ -15,6 +15,10 @@ impl NotificationSender for OsNotificationSender {
     async fn send(&self, title: &str, body: &str) -> Result<()> {
         send_os_notification(title, body).await
     }
+
+    async fn send_critical(&self, title: &str, body: &str) -> Result<()> {
+        send_os_notification_critical(title, body).await
+    }
 }
 
 /// Sanitize text for embedding in an AppleScript double-quoted string.
@@ -137,6 +141,81 @@ pub async fn send_os_notification(_title: &str, _body: &str) -> Result<()> {
     Ok(())
 }
 
+// ── Critical (urgent) notification helpers ───────────────────────────────────
+
+/// Build the AppleScript string for a critical notification (pure, testable).
+#[cfg(target_os = "macos")]
+pub fn build_critical_script(title: &str, body: &str) -> String {
+    let safe_title = sanitize_for_applescript(title);
+    let safe_body = sanitize_for_applescript(body);
+    format!(
+        "display notification \"{}\" with title \"URGENT · {}\" sound name \"Ping\"",
+        safe_body, safe_title
+    )
+}
+
+/// Send a native OS notification with elevated urgency.
+///
+/// macOS: audible Ping sound + "URGENT · " title prefix. True Focus bypass
+/// requires the `com.apple.developer.usernotifications.critical-alerts`
+/// entitlement which is unavailable here — this is best-effort only.
+#[cfg(target_os = "macos")]
+pub async fn send_os_notification_critical(title: &str, body: &str) -> Result<()> {
+    use tokio::process::Command;
+    let script = build_critical_script(title, body);
+    Command::new("osascript").args(["-e", &script]).output().await?;
+    Ok(())
+}
+
+#[cfg(target_os = "linux")]
+pub async fn send_os_notification_critical(title: &str, body: &str) -> Result<()> {
+    use tokio::process::Command;
+    // `-u critical` instructs most GNOME/KDE notification daemons to bypass DND.
+    Command::new("notify-send")
+        .args(["-u", "critical"])
+        .arg(title)
+        .arg(body)
+        .output()
+        .await?;
+    Ok(())
+}
+
+#[cfg(target_os = "windows")]
+pub async fn send_os_notification_critical(title: &str, body: &str) -> Result<()> {
+    use tokio::process::Command;
+
+    let safe_title = sanitize_for_powershell(title);
+    let safe_body = sanitize_for_powershell(body);
+
+    // Identical to send_os_notification but sets ToastNotificationPriority::High
+    // before Show() for elevated urgency on Windows 10+.
+    // TODO(priority-toast): consider adding <audio src="ms-winsoundevent:Notification.Looping.Alarm"/>
+    // to the XML template for a looping alarm sound on supported configurations.
+    let ps_script = format!(
+        "[Windows.UI.Notifications.ToastNotificationManager, Windows.UI.Notifications, ContentType = WindowsRuntime] | Out-Null; \
+         [Windows.UI.Notifications.ToastNotification, Windows.UI.Notifications, ContentType = WindowsRuntime] | Out-Null; \
+         $template = [Windows.UI.Notifications.ToastNotificationManager]::GetTemplateContent([Windows.UI.Notifications.ToastTemplateType]::ToastText02); \
+         $template.SelectSingleNode('//text[@id=\"1\"]').InnerText = '{}'; \
+         $template.SelectSingleNode('//text[@id=\"2\"]').InnerText = '{}'; \
+         $toast = [Windows.UI.Notifications.ToastNotification]::new($template); \
+         $toast.Priority = [Windows.UI.Notifications.ToastNotificationPriority]::High; \
+         [Windows.UI.Notifications.ToastNotificationManager]::CreateToastNotifier('Klyntbot').Show($toast)",
+        safe_title, safe_body
+    );
+
+    Command::new("powershell")
+        .args(["-Command", &ps_script])
+        .output()
+        .await?;
+
+    Ok(())
+}
+
+#[cfg(not(any(target_os = "macos", target_os = "linux", target_os = "windows")))]
+pub async fn send_os_notification_critical(_title: &str, _body: &str) -> Result<()> {
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -215,6 +294,31 @@ mod tests {
         fn unicode_preserved() {
             let input = "Hello 🌍 café résumé";
             assert_eq!(sanitize_for_applescript(input), input);
+        }
+
+        #[test]
+        fn critical_applescript_includes_sound_and_urgent_prefix() {
+            let script = build_critical_script("My Title", "My Body");
+            assert!(
+                script.contains("sound name"),
+                "script must contain sound name clause: {script}"
+            );
+            assert!(
+                script.contains("URGENT · "),
+                "script must contain URGENT · prefix: {script}"
+            );
+        }
+
+        #[test]
+        fn critical_applescript_sanitizes_input() {
+            let script = build_critical_script("title\"injection", "body\nnewline");
+            // The injected " in the title should be escaped to \"
+            assert!(
+                script.contains("title\\\"injection"),
+                "double-quote in title must be escaped: {script}"
+            );
+            // No raw newlines in the body
+            assert!(!script.contains('\n'), "raw newline must be stripped: {script}");
         }
 
         #[test]
