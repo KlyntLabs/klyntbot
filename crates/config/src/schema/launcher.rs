@@ -28,6 +28,18 @@ fn default_file_scan_dirs() -> Vec<String> {
 fn default_120() -> u64 {
     120
 }
+fn default_max_entries() -> usize {
+    1_000_000
+}
+fn default_true() -> bool {
+    true
+}
+fn default_mdfind_threshold() -> usize {
+    20
+}
+fn default_rebuild_interval_min() -> u64 {
+    30
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", default)]
@@ -119,6 +131,14 @@ pub struct FileSearchConfig {
     pub scan_dirs: Vec<String>,
     #[serde(default = "default_120")]
     pub refresh_interval_secs: u64,
+    #[serde(default = "default_max_entries")]
+    pub max_entries: usize,
+    #[serde(default = "default_true")]
+    pub mdfind_fallback: bool,
+    #[serde(default = "default_mdfind_threshold")]
+    pub mdfind_threshold: usize,
+    #[serde(default = "default_rebuild_interval_min")]
+    pub rebuild_interval_min: u64,
 }
 
 impl Default for FileSearchConfig {
@@ -127,6 +147,10 @@ impl Default for FileSearchConfig {
             enabled: true,
             scan_dirs: default_file_scan_dirs(),
             refresh_interval_secs: 120,
+            max_entries: default_max_entries(),
+            mdfind_fallback: true,
+            mdfind_threshold: default_mdfind_threshold(),
+            rebuild_interval_min: default_rebuild_interval_min(),
         }
     }
 }
