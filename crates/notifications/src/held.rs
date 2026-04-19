@@ -67,7 +67,13 @@ impl HeldReleaseService {
         let rows = self.held.list_pending_before(now.as_millisecond()).await?;
         let mut out = Vec::with_capacity(rows.len());
         for r in rows {
-            let channels: Vec<String> = serde_json::from_value(r.channels).unwrap_or_default();
+            let channels: Vec<String> = match serde_json::from_value(r.channels) {
+                Ok(v) => v,
+                Err(e) => {
+                    tracing::warn!(held_id = %r.id, error = %e, "malformed channels JSON; skipping");
+                    continue;
+                }
+            };
             out.push(ReleaseBatch {
                 held_id: r.id,
                 alarm_id: r.alarm_id,
