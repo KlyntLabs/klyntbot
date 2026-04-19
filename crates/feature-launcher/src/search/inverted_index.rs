@@ -158,6 +158,79 @@ impl InvertedFileIndex {
     }
 }
 
+fn score_entry_match(query_tokens: &[String], entry: &IndexEntry) -> i32 {
+    let name_lower = entry.name.to_lowercase();
+    let mut score: i32 = 0;
+    for q in query_tokens {
+        if name_lower == *q { score += 140; continue; }
+        if name_lower.starts_with(q) { score += 118; continue; }
+        // compact-prefix: collapse separators in name
+        let compact: String = name_lower.chars().filter(|c| c.is_alphanumeric()).collect();
+        if compact.starts_with(q) { score += 106; continue; }
+        if name_lower.contains(q) { score += 60; continue; }
+        // subsequence
+        if is_subsequence(q, &name_lower) { score += 44; continue; }
+    }
+    // depth penalty
+    score -= (entry.depth as i32) * 2;
+    score
+}
+
+fn is_subsequence(needle: &str, haystack: &str) -> bool {
+    let mut h = haystack.chars();
+    'outer: for nc in needle.chars() {
+        for hc in h.by_ref() {
+            if hc == nc { continue 'outer; }
+        }
+        return false;
+    }
+    true
+}
+
+impl InvertedFileIndex {
+    pub fn search(&self, query: &str, limit: usize) -> Vec<ScoredEntry> {
+        let q = query.trim();
+        if q.is_empty() || self.entries.is_empty() {
+            return Vec::new();
+        }
+        let tokens = tokenize(q);
+        if tokens.is_empty() { return Vec::new(); }
+
+        // For each token, get a posting list using its longest available prefix (up to MAX_PREFIX_LEN).
+        let mut lists: Vec<&Vec<u32>> = Vec::with_capacity(tokens.len());
+        for t in &tokens {
+            let key = SmolStr::new(&t[..t.len().min(MAX_PREFIX_LEN)]);
+            match self.postings.get(&key) {
+                Some(list) => lists.push(list),
+                None => return Vec::new(), // missing token → no results
+            }
+        }
+
+        // Sort lists by length ascending; intersect.
+        lists.sort_by_key(|l| l.len());
+        let mut candidates: Vec<u32> = lists[0].clone();
+        for list in &lists[1..] {
+            candidates.retain(|idx| list.binary_search(idx).is_ok());
+            if candidates.is_empty() { return Vec::new(); }
+        }
+
+        // Score
+        let mut scored: Vec<ScoredEntry> = candidates.iter().map(|&idx| {
+            let entry = &self.entries[idx as usize];
+            ScoredEntry { entry_idx: idx, score: score_entry_match(&tokens, entry) }
+        }).collect();
+        scored.sort_by(|a, b| {
+            b.score.cmp(&a.score).then_with(|| {
+                let a_len = self.entries[a.entry_idx as usize].name.len();
+                let b_len = self.entries[b.entry_idx as usize].name.len();
+                a_len.cmp(&b_len)
+            })
+        });
+        scored.truncate(limit);
+        scored
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -221,5 +294,38 @@ mod tests {
         }
         let idx = InvertedFileIndex::build(&[base.to_path_buf()], &SkipSet::default(), 10);
         assert_eq!(idx.len(), 10);
+    }
+
+    #[test]
+    fn search_intersects_multiple_terms() {
+        let dir = TempDir::new().unwrap();
+        let base = dir.path();
+        fs::create_dir_all(base.join("downloads")).unwrap();
+        fs::write(base.join("downloads/invoice.pdf"), "").unwrap();
+        fs::write(base.join("downloads/photo.png"), "").unwrap();
+        fs::write(base.join("invoice.txt"), "").unwrap();
+
+        let idx = InvertedFileIndex::build(&[base.to_path_buf()], &SkipSet::defaults(), 1000);
+        // "downloads invoice" should match only the pdf, not the txt or photo
+        let results = idx.search("downloads invoice", 10);
+        assert_eq!(results.len(), 1);
+        assert_eq!(idx.entries[results[0].entry_idx as usize].name, "invoice.pdf");
+    }
+
+    #[test]
+    fn search_exact_match_scores_higher() {
+        let dir = TempDir::new().unwrap();
+        let base = dir.path();
+        fs::write(base.join("hello.rs"), "").unwrap();
+        fs::write(base.join("hellothere.rs"), "").unwrap();
+        let idx = InvertedFileIndex::build(&[base.to_path_buf()], &SkipSet::defaults(), 1000);
+        let results = idx.search("hello", 10);
+        assert_eq!(idx.entries[results[0].entry_idx as usize].name, "hello.rs");
+    }
+
+    #[test]
+    fn search_empty_query_returns_empty() {
+        let idx = InvertedFileIndex::empty();
+        assert!(idx.search("", 10).is_empty());
     }
 }
