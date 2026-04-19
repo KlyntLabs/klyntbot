@@ -10,6 +10,7 @@
 //!
 //! Subscribers (Phase 3 dispatcher, UI) listen for `AlarmFired` / `MissedAlarms`.
 
+use std::collections::HashMap;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::time::Duration;
@@ -188,9 +189,16 @@ impl TemporalScheduler {
         Ok(())
     }
 
-    async fn process_due(&self, now: Timestamp) -> Result<(), SchedulerError> {
+    pub(crate) async fn process_due(&self, now: Timestamp) -> Result<(), SchedulerError> {
         let due = self.store.list_due(now).await?;
         let mut missed: Vec<ScheduledFireRow> = Vec::new();
+
+        // Partition rows into three buckets in a single pass.
+        let mut fire: Vec<ScheduledFireRow> = Vec::new();
+        let mut skip: Vec<ScheduledFireRow> = Vec::new();
+        // Key: (ref_id, kind) — two different kinds for the same ref are independent.
+        let mut coalesce: HashMap<(String, String), Vec<ScheduledFireRow>> = HashMap::new();
+
         for row in due {
             let (policy, grace) = self.extract_misfire_params(&row);
             let fire_at = match Timestamp::from_millisecond(row.fire_at_ms) {
@@ -205,19 +213,46 @@ impl TemporalScheduler {
                 }
             };
             match Decision::classify(policy, grace, fire_at, now) {
-                Decision::Fire => self.dispatch(row, now).await?,
-                Decision::SkipStale => {
-                    // If begin_firing returns false, the row was already claimed
-                    // (e.g. by recover_in_flight) — skipping quietly is correct.
-                    if self.store.begin_firing(&row.id, now).await? {
-                        self.store.mark_fired(&row.id, now).await?;
-                        missed.push(row);
-                    }
+                Decision::Fire => fire.push(row),
+                Decision::SkipStale => skip.push(row),
+                Decision::CoalesceLater => {
+                    let key = (
+                        row.ref_id.clone().unwrap_or_default(),
+                        row.kind.clone(),
+                    );
+                    coalesce.entry(key).or_default().push(row);
                 }
-                // Day-1 stub: coalescing (deduplicate by ref_id) is deferred to Phase 3.
-                Decision::CoalesceLater => self.dispatch(row, now).await?,
             }
         }
+
+        // Process Fire rows.
+        for row in fire {
+            self.dispatch(row, now).await?;
+        }
+
+        // Process SkipStale rows.
+        for row in skip {
+            // If begin_firing returns false, the row was already claimed
+            // (e.g. by recover_in_flight) — skipping quietly is correct.
+            if self.store.begin_firing(&row.id, now).await? {
+                self.store.mark_fired(&row.id, now).await?;
+                missed.push(row);
+            }
+        }
+
+        // Process Coalesce groups: fire only the most recent per (ref_id, kind).
+        for (_key, mut group) in coalesce {
+            // Sort ascending by fire_at_ms so the last element is the most recent.
+            group.sort_unstable_by_key(|r| r.fire_at_ms);
+            let winner = group.pop().expect("coalesce group is never empty");
+            for loser in &group {
+                self.store
+                    .mark_suppressed(&loser.id, &winner.id, now)
+                    .await?;
+            }
+            self.dispatch(winner, now).await?;
+        }
+
         if !missed.is_empty() {
             self.emit_missed(missed);
         }
@@ -482,6 +517,121 @@ mod tests {
         assert!(
             fired_count >= 2,
             "expected ≥2 cron fires in 3s, got {fired_count}"
+        );
+    }
+
+    /// Coalesce: 3 stale rows with same (ref_id, kind). Only the most recent (c3)
+    /// should dispatch; c1 and c2 should be marked fired with suppressed_by = c3.
+    #[tokio::test]
+    async fn coalesce_fires_only_most_recent_per_ref() {
+        let pool = StoragePool::connect_in_memory().await.unwrap();
+        StoragePool::run_feature_migrations(
+            pool.inner(),
+            &[tools_core::FeatureMigration {
+                feature_name: "scheduling".into(),
+                version: 1,
+                description: "scheduled_fires".into(),
+                sql: include_str!("../../migrations/001_scheduled_fires.sql").into(),
+            }],
+        )
+        .await
+        .unwrap();
+        let store = FireStore::new(storage::repos::scheduled_fires::ScheduledFiresRepo::new(
+            pool.inner().clone(),
+        ));
+        let bus = Arc::new(DomainEventBus::new(32));
+        let mut rx = bus.subscribe();
+
+        let now = Timestamp::now();
+        let minus_30m = now.checked_sub(jiff::Span::new().minutes(30)).unwrap();
+        let minus_25m = now.checked_sub(jiff::Span::new().minutes(25)).unwrap();
+        let minus_20m = now.checked_sub(jiff::Span::new().minutes(20)).unwrap();
+
+        let payload = serde_json::json!({ "misfire_policy": "coalesce" });
+
+        let c1 = store
+            .schedule(FireSpec {
+                fire_at: minus_30m,
+                kind: "task_alarm".into(),
+                ref_id: Some("task:abc:reminder".into()),
+                payload: payload.clone(),
+                dedup_prefix: None,
+            })
+            .await
+            .unwrap();
+        let c2 = store
+            .schedule(FireSpec {
+                fire_at: minus_25m,
+                kind: "task_alarm".into(),
+                ref_id: Some("task:abc:reminder".into()),
+                payload: payload.clone(),
+                dedup_prefix: None,
+            })
+            .await
+            .unwrap();
+        let c3 = store
+            .schedule(FireSpec {
+                fire_at: minus_20m,
+                kind: "task_alarm".into(),
+                ref_id: Some("task:abc:reminder".into()),
+                payload: payload.clone(),
+                dedup_prefix: None,
+            })
+            .await
+            .unwrap();
+
+        let config = SchedulerConfig {
+            default_misfire_policy: crate::temporal::misfire::MisfirePolicy::Coalesce,
+            ..SchedulerConfig::default()
+        };
+        let scheduler = TemporalScheduler::new(store.clone(), bus.clone(), config);
+
+        // Run a single process_due pass directly (no background loop).
+        scheduler.process_due(now).await.unwrap();
+
+        // Exactly one AlarmFired event should have been emitted (for c3).
+        let event = tokio::time::timeout(Duration::from_millis(200), rx.recv())
+            .await
+            .expect("expected an AlarmFired event")
+            .unwrap();
+        match &event {
+            DomainEvent::AlarmFired { fire_id, .. } => {
+                assert_eq!(fire_id, &c3, "winner should be c3 (most recent)");
+            }
+            other => panic!("expected AlarmFired, got {other:?}"),
+        }
+        // No second event should arrive within a short window.
+        let second = tokio::time::timeout(Duration::from_millis(100), rx.recv()).await;
+        assert!(
+            second.is_err(),
+            "expected no second event, but got one: {second:?}"
+        );
+
+        // c1 and c2 must be marked fired with suppressed_by = c3.
+        let c1_row: (i64, Option<String>) =
+            sqlx::query_as("SELECT fired, suppressed_by FROM scheduled_fires WHERE id = ?1")
+                .bind(&c1)
+                .fetch_one(pool.inner())
+                .await
+                .unwrap();
+        assert_eq!(c1_row.0, 1, "c1 should be fired");
+        assert_eq!(
+            c1_row.1.as_deref(),
+            Some(c3.as_str()),
+            "c1 suppressed_by should be c3"
+        );
+
+        let c2_row: (i64, Option<String>) =
+            sqlx::query_as("SELECT fired, suppressed_by FROM scheduled_fires WHERE id = ?1")
+                .bind(&c2)
+                .fetch_one(pool.inner())
+                .await
+                .unwrap();
+        assert_eq!(c2_row.0, 1, "c2 should be fired");
+        assert_eq!(
+            c2_row.1.as_deref(),
+            Some(c3.as_str()),
+            "c2 suppressed_by should be c3"
         );
     }
 
