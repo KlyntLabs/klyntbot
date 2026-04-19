@@ -183,6 +183,8 @@ impl NotificationDispatcher {
                 Some("urgent") => Priority::Urgent,
                 _ => Priority::Normal,
             },
+            channel_mask: 0,
+            priority_override: None,
         };
         for ch in &channels {
             self.dispatch_one(ch, &payload).await;
@@ -267,8 +269,12 @@ impl NotificationDispatcher {
         }
     }
 
-    fn resolve_channels(&self, _payload: &NotificationPayload) -> Vec<String> {
-        self.default_channels.clone()
+    fn resolve_channels(&self, payload: &NotificationPayload) -> Vec<String> {
+        if payload.channel_mask == 0 {
+            self.default_channels.clone()
+        } else {
+            crate::channel::mask_to_names(payload.channel_mask)
+        }
     }
 }
 
@@ -295,10 +301,96 @@ fn parse_payload(alarm_id: &str, payload_json: &str) -> NotificationPayload {
         Some("urgent") => Priority::Urgent,
         _ => Priority::Normal,
     };
+    let channel_mask = v
+        .get("channel_mask")
+        .and_then(|x| x.as_u64())
+        .unwrap_or(0) as u32;
+    let priority_override = v
+        .get("priority_override")
+        .and_then(|x| x.as_str())
+        .map(String::from);
     NotificationPayload {
         alarm_id: alarm_id.into(),
         title,
         body,
         priority,
+        channel_mask,
+        priority_override,
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::channel::{ChannelRegistry, Priority, CHANNEL_EMAIL, CHANNEL_TELEGRAM};
+    use crate::held::HeldReleaseService;
+    use crate::retry::RetryPolicy;
+    use std::sync::Arc;
+
+    fn test_payload() -> NotificationPayload {
+        NotificationPayload {
+            alarm_id: "test_alarm".into(),
+            title: "Test".into(),
+            body: "Body".into(),
+            priority: Priority::Normal,
+            channel_mask: 0,
+            priority_override: None,
+        }
+    }
+
+    async fn make_dispatcher(default_channels: Vec<&str>) -> NotificationDispatcher {
+        let bus = Arc::new(bus::DomainEventBus::new(16));
+        let pool = storage::StoragePool::connect_in_memory().await.unwrap();
+        let raw = pool.inner().clone();
+        let log_repo = storage::repos::notification_log::NotificationLogRepo::new(raw.clone());
+        let held_repo =
+            storage::repos::held_notifications::HeldNotificationsRepo::new(raw.clone());
+        let fires_repo = storage::repos::ScheduledFiresRepo::new(raw);
+        let fire_store = scheduling::FireStore::new(fires_repo);
+        let held_release = HeldReleaseService::new(held_repo.clone(), fire_store);
+        NotificationDispatcher::new(
+            bus,
+            ChannelRegistry::new(),
+            default_channels.into_iter().map(String::from).collect(),
+            None,
+            log_repo,
+            held_repo,
+            held_release,
+            RetryPolicy::default(),
+        )
+    }
+
+    #[tokio::test]
+    async fn resolve_channels_uses_mask_when_nonzero() {
+        let dispatcher = make_dispatcher(vec!["os_native", "tray"]).await;
+        let payload = NotificationPayload {
+            channel_mask: CHANNEL_TELEGRAM | CHANNEL_EMAIL,
+            ..test_payload()
+        };
+        assert_eq!(
+            dispatcher.resolve_channels(&payload),
+            vec!["telegram", "email"]
+        );
+    }
+
+    #[tokio::test]
+    async fn resolve_channels_falls_back_to_defaults_when_mask_zero() {
+        let dispatcher = make_dispatcher(vec!["tray"]).await;
+        let payload = NotificationPayload {
+            channel_mask: 0,
+            ..test_payload()
+        };
+        assert_eq!(dispatcher.resolve_channels(&payload), vec!["tray"]);
+    }
+
+    #[test]
+    fn parse_payload_reads_channel_mask_and_priority() {
+        let json =
+            r#"{"title":"t","body":"b","channel_mask":4,"priority_override":"urgent"}"#;
+        let payload = parse_payload("alarm_1", json);
+        assert_eq!(payload.channel_mask, 4);
+        assert_eq!(payload.priority_override.as_deref(), Some("urgent"));
+    }
+}
+
+

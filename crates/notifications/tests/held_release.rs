@@ -37,6 +37,8 @@ async fn hold_inserts_row_and_schedules_release_fire() {
         title: "t".into(),
         body: "b".into(),
         priority: Priority::Normal,
+        channel_mask: 0,
+        priority_override: None,
     };
     let release_at = Timestamp::now()
         .checked_add(std::time::Duration::from_secs(600))

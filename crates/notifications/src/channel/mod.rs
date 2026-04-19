@@ -6,6 +6,34 @@ use std::sync::Arc;
 
 use crate::error::Result;
 
+pub const CHANNEL_OS_NATIVE: u32 = 1 << 0;
+pub const CHANNEL_TRAY: u32 = 1 << 1;
+pub const CHANNEL_TELEGRAM: u32 = 1 << 2;
+pub const CHANNEL_DISCORD: u32 = 1 << 3;
+pub const CHANNEL_EMAIL: u32 = 1 << 4;
+
+/// Convert a channel_mask bitfield into the corresponding channel-name strings.
+/// Returns an empty Vec for mask == 0. Order is OS_NATIVE, TRAY, TELEGRAM, DISCORD, EMAIL.
+pub fn mask_to_names(mask: u32) -> Vec<String> {
+    let mut v = Vec::new();
+    if mask & CHANNEL_OS_NATIVE != 0 {
+        v.push("os_native".into());
+    }
+    if mask & CHANNEL_TRAY != 0 {
+        v.push("tray".into());
+    }
+    if mask & CHANNEL_TELEGRAM != 0 {
+        v.push("telegram".into());
+    }
+    if mask & CHANNEL_DISCORD != 0 {
+        v.push("discord".into());
+    }
+    if mask & CHANNEL_EMAIL != 0 {
+        v.push("email".into());
+    }
+    v
+}
+
 pub mod os_native;
 pub mod outbound;
 pub mod tray;
@@ -16,6 +44,8 @@ pub struct NotificationPayload {
     pub title: String,
     pub body: String,
     pub priority: Priority,
+    pub channel_mask: u32,                 // 0 = inherit defaults
+    pub priority_override: Option<String>, // "urgent" | None
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -88,6 +118,8 @@ mod tests {
             title: "t".into(),
             body: "b".into(),
             priority: Priority::Normal,
+            channel_mask: 0,
+            priority_override: None,
         })
         .await
         .unwrap();
