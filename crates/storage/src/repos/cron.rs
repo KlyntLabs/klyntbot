@@ -78,15 +78,6 @@ impl CronRepo {
             .ok_or_not_found(&format!("cron job '{}'", id))
     }
 
-    /// Get a cron job by name, returning `None` if not found.
-    pub async fn get_by_name(&self, name: &str) -> Result<Option<CronJobRow>, StorageError> {
-        let row = sqlx::query_as::<_, CronJobRow>("SELECT * FROM cron_jobs WHERE name = ?1")
-            .bind(name)
-            .fetch_optional(&self.pool)
-            .await?;
-        Ok(row)
-    }
-
     /// List all cron jobs.
     pub async fn list(&self) -> Result<Vec<CronJobRow>, StorageError> {
         let rows =

@@ -1050,7 +1050,8 @@ async fn ensure_cron_jobs(
     config: &config::Config,
 ) -> Result<(), common::KlyntbotError> {
     use jiff::Timestamp;
-    use uuid::Uuid;
+
+    use crate::handlers::cron::new_cron_id;
 
     // Build a map of existing jobs by name so we can skip or fix them.
     let existing_rows: std::collections::HashMap<String, storage::rows::cron::CronJobRow> =
@@ -1080,7 +1081,7 @@ async fn ensure_cron_jobs(
             } else {
                 let now_ms = Timestamp::now().as_millisecond();
                 let row = storage::rows::cron::CronJobRow {
-                    id: Uuid::new_v4().to_string()[..8].to_string(),
+                    id: new_cron_id(),
                     name: $name.to_string(),
                     enabled: true,
                     origin: $origin_str.to_string(),

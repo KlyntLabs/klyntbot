@@ -10,6 +10,11 @@ use uuid::Uuid;
 
 use crate::state::{AppCore, HandlerResult};
 
+/// Generate a short 8-character cron job ID from a new UUIDv4.
+pub(crate) fn new_cron_id() -> String {
+    Uuid::new_v4().to_string()[..8].to_string()
+}
+
 /// Convert a `CronJobRow` to the IPC response type.
 fn to_response(row: &storage::CronJobRow) -> CronJobResponse {
     // Re-use the scheduling crate's row→domain converter for field extraction.
@@ -17,7 +22,10 @@ fn to_response(row: &storage::CronJobRow) -> CronJobResponse {
     CronJobResponse {
         id: job.id.clone(),
         name: job.name.clone(),
-        enabled: job.enabled,
+        // Source `enabled` from the raw DB row, not from `row_to_job`, which forces
+        // `enabled=false` on rows with corrupt schedule JSON (execution-path defensive
+        // behavior). The list/read path should reflect what the DB actually stores.
+        enabled: row.enabled,
         origin: match &job.origin {
             scheduling::CronOrigin::System => "system",
             scheduling::CronOrigin::User => "user",
@@ -82,6 +90,9 @@ impl AppCore {
             .min();
 
         Ok(CronStatusResponse {
+            // TODO(4.4c): wire to TemporalScheduler::is_running() once CronService is retired.
+            // For now, we're always "enabled" because CronBridge runs as part of TemporalScheduler
+            // which is started unconditionally in AppCore construction.
             enabled: true,
             jobs,
             next_wake_at_ms,
@@ -179,7 +190,7 @@ impl AppCore {
             .map_err(|e| ApiError::new("INVALID_PARAMS", format!("invalid schedule: {e}")))?;
 
         let now_ms = Timestamp::now().as_millisecond();
-        let job_id = Uuid::new_v4().to_string()[..8].to_string();
+        let job_id = new_cron_id();
 
         let row = storage::CronJobRow {
             id: job_id,
@@ -221,6 +232,10 @@ impl AppCore {
     }
 
     pub async fn cron_update(&self, params: CronJobUpdateParams) -> HandlerResult<CronJobResponse> {
+        // TODO(4.4c): update semantics will simplify once CronService is removed —
+        // this handler currently inserts a new row and deletes the old to preserve
+        // CronService-era ID replacement behavior. In 4.4c, switch to in-place UPDATE
+        // which preserves the ID and keeps existing scheduled_fires rows intact.
         let existing = self
             .cron_repo
             .get_opt(&params.id)
@@ -236,7 +251,12 @@ impl AppCore {
 
         // Parse existing payload for defaults.
         let ex_payload: scheduling::CronPayload =
-            serde_json::from_value(existing.payload.clone()).unwrap_or_default();
+            serde_json::from_value(existing.payload.clone()).map_err(|e| {
+                ApiError::new(
+                    "CRON_ERROR",
+                    format!("corrupt payload for job {}: {e}", params.id),
+                )
+            })?;
 
         let name = params.name.unwrap_or_else(|| existing.name.clone());
         let schedule_val = match params.schedule {
@@ -263,7 +283,7 @@ impl AppCore {
         };
 
         // Build a new row with a fresh ID (update semantics: new row replaces old).
-        let new_id = Uuid::new_v4().to_string()[..8].to_string();
+        let new_id = new_cron_id();
         let new_row = storage::CronJobRow {
             id: new_id,
             name,

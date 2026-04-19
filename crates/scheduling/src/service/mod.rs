@@ -523,10 +523,17 @@ impl CronService {
     }
 }
 
-/// Convert a `CronJobRow` from SQL back to a domain [`CronJob`].
+/// Convert a storage `CronJobRow` into a scheduling `CronJob`.
 ///
-/// Public so that callers outside the `scheduling` crate (e.g. `app-core`
-/// handlers) can reuse this conversion without duplicating the logic.
+/// **Transitional visibility:** This is `pub` only until Task 4.4c migrates
+/// remaining callers (or moves the conversion helpers onto `CronJobRow` itself).
+/// Do not add new cross-crate callers.
+///
+/// Note: rows with corrupt schedule JSON will have `enabled` forced to `false`
+/// in the returned `CronJob` as a defensive execution-path measure. Callers that
+/// display the stored enabled state (e.g. list endpoints) should source `enabled`
+/// from the raw `CronJobRow` directly.
+#[doc(hidden)]
 pub fn row_to_job(row: CronJobRow) -> CronJob {
     let (schedule, schedule_corrupt) = match serde_json::from_value(row.schedule) {
         Ok(s) => (s, false),
