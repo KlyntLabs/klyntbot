@@ -187,7 +187,7 @@ mod tests {
         let p: Vec<_> = prefixes("documentation").collect();
         assert_eq!(p.len(), 12);
         assert_eq!(p[0].as_str(), "d");
-        assert_eq!(p[11].as_str(), "documentati");
+        assert_eq!(p[11].as_str(), "documentatio");
     }
 
     #[test]
