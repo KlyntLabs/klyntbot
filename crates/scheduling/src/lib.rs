@@ -16,6 +16,7 @@ pub use service::{
     classify_missed_job, evaluate_trigger, CronService, JobCallback, MissedJobClass,
     PresenceSnapshot,
 };
+pub use temporal::cron_executor::{CronExecutor, CronHandler};
 pub use temporal::fire_store::{FireSpec, FireStore};
 pub use temporal::recurrence::{RecurrenceEngine, RecurrenceTemplate};
 pub use temporal::rules::{AlarmRule, RuleError};
