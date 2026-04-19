@@ -7,7 +7,7 @@ mod deadline;
 mod launcher;
 mod productivity;
 mod storage;
-pub(super) mod temporal_scheduler;
+mod temporal_scheduler;
 
 use std::sync::Arc;
 
