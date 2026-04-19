@@ -31,9 +31,10 @@ impl RetrievalFeedbackRepo {
         let retrieved_json = serde_json::to_string(retrieved_ids).unwrap_or_default();
         let referenced_json = serde_json::to_string(referenced_ids).unwrap_or_default();
 
+        let now_ms = jiff::Timestamp::now().as_millisecond();
         sqlx::query(
-            "INSERT INTO retrieval_feedback (id, retrieved_fact_ids, referenced_fact_ids, precision, session_key, score_breakdown)
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
+            "INSERT INTO retrieval_feedback (id, retrieved_fact_ids, referenced_fact_ids, precision, session_key, score_breakdown, created_at)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
         )
         .bind(&id)
         .bind(&retrieved_json)
@@ -41,6 +42,7 @@ impl RetrievalFeedbackRepo {
         .bind(precision)
         .bind(session_key)
         .bind(score_breakdown)
+        .bind(now_ms)
         .execute(&self.pool)
         .await?;
         Ok(())

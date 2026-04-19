@@ -784,7 +784,7 @@ CREATE TABLE IF NOT EXISTS retrieval_feedback (
     referenced_fact_ids TEXT NOT NULL,
     precision REAL NOT NULL,
     session_key TEXT NOT NULL,
-    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    created_at INTEGER NOT NULL DEFAULT (unixepoch('now') * 1000),
     score_breakdown TEXT           -- JSON: per-component scores for the top-K facts
 );
 CREATE INDEX IF NOT EXISTS idx_retrieval_feedback_session ON retrieval_feedback(session_key);
