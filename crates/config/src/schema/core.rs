@@ -23,6 +23,7 @@ use super::learning::LearningConfig;
 use super::lifecycle::LifecycleConfig;
 use super::mcp::McpConfig;
 use super::notes::NotesConfig;
+use super::notifications::NotificationsConfig;
 use super::packs::PacksConfig;
 use super::plugins::PluginsConfig;
 use super::productivity::ProductivityConfig;
@@ -234,6 +235,10 @@ pub struct Config {
     /// Embedding provider for semantic search.
     #[serde(default)]
     pub embedding: EmbeddingConfig,
+
+    /// Notification delivery system configuration (quiet hours, channels, retry).
+    #[serde(default)]
+    pub notifications: NotificationsConfig,
 }
 
 /// Embedding provider configuration.
