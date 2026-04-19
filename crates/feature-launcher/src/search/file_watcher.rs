@@ -6,12 +6,14 @@ use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
+type OnChangeFn = Arc<dyn Fn(Vec<DebouncedEvent>) -> BoxFuture<'static, ()> + Send + Sync>;
+
 type SourceEntry = (
     PathBuf,
     bool,
     Arc<dyn SearchSource>,
     Option<Duration>,
-    Option<Arc<dyn Fn(Vec<DebouncedEvent>) -> BoxFuture<'static, ()> + Send + Sync>>,
+    Option<OnChangeFn>,
 );
 
 /// A file path to watch, the source to refresh on change, and an optional
@@ -28,7 +30,7 @@ pub struct WatchEntry {
     pub recursive: bool,
     /// Optional custom handler invoked instead of `source.refresh()`.
     /// Receives the batch of debounced events that triggered this watch entry.
-    pub on_change: Option<Arc<dyn Fn(Vec<DebouncedEvent>) -> BoxFuture<'static, ()> + Send + Sync>>,
+    pub on_change: Option<OnChangeFn>,
 }
 
 pub struct SourceFileWatcher {
