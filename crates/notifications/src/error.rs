@@ -6,6 +6,8 @@ use thiserror::Error;
 pub enum NotificationError {
     #[error("storage error: {0}")]
     Storage(#[from] common::KlyntbotError),
+    #[error("storage error: {0}")]
+    StorageDirect(#[from] storage::error::StorageError),
     #[error("scheduler error: {0}")]
     Scheduler(#[from] scheduling::error::SchedulerError),
     #[error("channel delivery failed: channel={channel} reason={reason}")]

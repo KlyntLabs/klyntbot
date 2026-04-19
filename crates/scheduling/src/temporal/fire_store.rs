@@ -98,6 +98,18 @@ impl FireStore {
     ) -> Result<u64, SchedulerError> {
         Ok(self.repo.cancel_by_kind_ref(kind, ref_id).await?)
     }
+
+    /// List all pending rows with the given kind and fire_at_ms <= cutoff_ms, oldest first.
+    pub async fn pending_with_kind_before(
+        &self,
+        cutoff_ms: i64,
+        kind: &str,
+    ) -> Result<Vec<ScheduledFireRow>, SchedulerError> {
+        Ok(self
+            .repo
+            .list_pending_with_kind_up_to_ms(cutoff_ms, kind)
+            .await?)
+    }
 }
 
 #[cfg(test)]

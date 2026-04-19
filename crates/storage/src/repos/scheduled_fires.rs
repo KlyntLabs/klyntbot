@@ -117,6 +117,24 @@ impl ScheduledFiresRepo {
         Ok(result.rows_affected())
     }
 
+    /// List all pending rows with the given kind and fire_at_ms <= cutoff, oldest first.
+    pub async fn list_pending_with_kind_up_to_ms(
+        &self,
+        cutoff_ms: i64,
+        kind: &str,
+    ) -> Result<Vec<ScheduledFireRow>, StorageError> {
+        let rows = sqlx::query_as::<_, ScheduledFireRow>(
+            "SELECT * FROM scheduled_fires
+             WHERE fired = 0 AND kind = ?1 AND fire_at_ms <= ?2
+             ORDER BY fire_at_ms ASC",
+        )
+        .bind(kind)
+        .bind(cutoff_ms)
+        .fetch_all(&self.pool)
+        .await?;
+        Ok(rows)
+    }
+
     /// Delete all pending fires with the given (kind, ref_id). Used for cron re-sync.
     pub async fn cancel_by_kind_ref(&self, kind: &str, ref_id: &str) -> Result<u64, StorageError> {
         let result = sqlx::query(
