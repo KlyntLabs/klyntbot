@@ -28,6 +28,8 @@ ignore = { workspace = true }
 dashmap.workspace = true
 notify.workspace = true
 notify-debouncer-mini.workspace = true
+arc-swap = "1.7"
+smol_str = "0.3"
 
 [dev-dependencies]
 tokio = { workspace = true, features = ["macros", "test-util"] }
