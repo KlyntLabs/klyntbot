@@ -129,6 +129,9 @@ pub enum LauncherItemKind {
     UrlNavigation {
         url: String,
     },
+    WindowAction {
+        action: crate::types::WindowAction,
+    },
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
