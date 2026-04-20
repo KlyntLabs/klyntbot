@@ -11,6 +11,7 @@ use crate::app_core::AppCore;
 fn set_tray_voice(active: bool, phase: u8) {
     crate::tray_countdown::VOICE_ACTIVE.store(active, std::sync::atomic::Ordering::Relaxed);
     crate::tray_countdown::VOICE_PHASE.store(phase, std::sync::atomic::Ordering::Relaxed);
+    crate::tray_countdown::wake();
 }
 
 #[tauri::command]

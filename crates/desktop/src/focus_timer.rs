@@ -168,6 +168,7 @@ impl FocusTimer {
         }
 
         tray_countdown::FOCUS_ACTIVE.store(true, std::sync::atomic::Ordering::Relaxed);
+        tray_countdown::wake();
 
         // DND: capture and enable
         let dnd_was_active_before = if dnd_enabled {

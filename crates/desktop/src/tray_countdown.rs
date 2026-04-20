@@ -2,14 +2,26 @@
 //! in the macOS menu bar with a live countdown (e.g. "« 24:57 · Standup").
 //! Yields to the focus timer when a session is active.
 //!
-//! Cache invalidation: instead of polling the DB every 30 s, a bus subscriber
-//! sets a `dirty` flag whenever a relevant domain event arrives.  The 1 s
-//! display tick checks the flag and re-queries only when needed.
+//! ## Tick policy
+//!
+//! The loop is **event-driven** with a state-dependent sleep budget:
+//!
+//! - countdown text visible (the digits decrement every second) → 1 s tick
+//! - voice mode active (text changes only on phase transitions)  → 2 s tick
+//! - focus mode active (focus_timer owns the title)              → 60 s tick
+//! - truly idle (no countdown, no focus, no voice)               → 1 h tick
+//!
+//! In every state the loop additionally waits on a shared [`tokio::sync::Notify`]
+//! that any state-changing site can poke via [`wake`]. Bus events
+//! (`AlarmFired`, `TaskFocusChanged`, etc.), focus_timer start/end, and
+//! voice phase transitions all wake immediately. The state-dependent sleep
+//! is therefore a **safety upper bound**, not a polling interval.
 
 use std::sync::atomic::{AtomicBool, AtomicU8, Ordering};
-use std::sync::Arc;
+use std::sync::{Arc, OnceLock};
 
 use tauri::{AppHandle, Manager};
+use tokio::sync::Notify;
 
 use crate::app_core::AppCore;
 
@@ -21,6 +33,17 @@ pub static VOICE_ACTIVE: AtomicBool = AtomicBool::new(false);
 
 /// Current voice conversation phase: 0=idle, 1=listening, 2=reflecting, 3=speaking.
 pub static VOICE_PHASE: AtomicU8 = AtomicU8::new(0);
+
+/// Shared wake handle. Initialized lazily by [`spawn`]; pokeable via [`wake`].
+static WAKE: OnceLock<Arc<Notify>> = OnceLock::new();
+
+/// Wake the countdown loop on next opportunity. No-op if the loop hasn't
+/// been spawned yet (e.g. test environment). Safe to call from any thread.
+pub fn wake() {
+    if let Some(n) = WAKE.get() {
+        n.notify_one();
+    }
+}
 
 /// Cached "next item" — either a calendar event or a task deadline.
 struct NextItem {
@@ -39,9 +62,12 @@ pub fn spawn(
 ) {
     // Start dirty so we load on the very first tick.
     let dirty = Arc::new(AtomicBool::new(true));
+    let notify = WAKE.get_or_init(|| Arc::new(Notify::new())).clone();
 
-    // Bus subscriber — marks dirty on any event that affects the next item.
+    // Bus subscriber — marks dirty on any event that affects the next item
+    // and pokes the loop so it re-evaluates immediately.
     let dirty_sub = Arc::clone(&dirty);
+    let notify_sub = Arc::clone(&notify);
     let shutdown_sub = shutdown.clone();
     tokio::spawn(async move {
         let mut rx = bus.subscribe();
@@ -51,11 +77,13 @@ pub fn spawn(
                 evt = rx.recv() => match evt {
                     Ok(e) if is_cache_invalidating(&e) => {
                         dirty_sub.store(true, Ordering::Relaxed);
+                        notify_sub.notify_one();
                     }
                     Ok(_) => {}
                     Err(tokio::sync::broadcast::error::RecvError::Lagged(_)) => {
                         // Lagged — mark dirty to be safe.
                         dirty_sub.store(true, Ordering::Relaxed);
+                        notify_sub.notify_one();
                     }
                     Err(tokio::sync::broadcast::error::RecvError::Closed) => break,
                 }
@@ -63,10 +91,10 @@ pub fn spawn(
         }
     });
 
-    // Display tick loop (1 s when counting down, IDLE_TICK_SECS otherwise).
+    // Display loop — event-driven with state-dependent sleep upper bound.
     let app = app.clone();
     tauri::async_runtime::spawn(async move {
-        countdown_loop(app, shutdown, dirty).await;
+        countdown_loop(app, shutdown, dirty, notify).await;
     });
 }
 
@@ -82,41 +110,47 @@ fn is_cache_invalidating(evt: &bus::DomainEvent) -> bool {
     )
 }
 
-/// Notify the countdown that the focus timer state changed — re-evaluate
-/// the tray title immediately instead of waiting for the next poll.
+/// Notify the countdown that the focus timer ended — clears the tray title
+/// and wakes the loop so it re-evaluates the next item immediately.
 pub fn notify_focus_ended(app: &AppHandle) {
     FOCUS_ACTIVE.store(false, Ordering::Relaxed);
     if let Some(tray) = app.tray_by_id("klynt-tray") {
         let _ = tray.set_title(Some(""));
     }
+    wake();
 }
 
-/// Slow tick when nothing is actively counting down (saves ~86K wakeups/day).
-const IDLE_TICK_SECS: u64 = 10;
+/// Sleep budget when truly idle — long upper bound, in practice the bus
+/// subscriber will wake us on every relevant change.
+const IDLE_MAX_SLEEP_SECS: u64 = 3600;
+/// Sleep when only focus is active (focus_timer owns the title; we just
+/// need to detect the FOCUS_ACTIVE→false transition if the wake was missed).
+const FOCUS_MAX_SLEEP_SECS: u64 = 60;
+/// Sleep during voice mode — title changes only on phase transitions, but
+/// VOICE_PHASE.store callers also call [`wake`].
+const VOICE_TICK_SECS: u64 = 2;
+/// Display tick when the countdown digits are visible.
+const COUNTDOWN_TICK_SECS: u64 = 1;
 
 async fn countdown_loop(
     app: AppHandle,
     shutdown: tokio_util::sync::CancellationToken,
     dirty: Arc<AtomicBool>,
+    notify: Arc<Notify>,
 ) {
     let mut cached: Option<NextItem> = None;
-    let mut interval = tokio::time::interval(tokio::time::Duration::from_secs(1));
 
     loop {
-        tokio::select! {
-            _ = shutdown.cancelled() => break,
-            _ = interval.tick() => {}
-        }
+        // ── Render this tick's title and decide the next sleep budget. ──
+        let sleep_secs;
 
-        // If focus timer is active, it owns the tray title — skip
         if FOCUS_ACTIVE.load(Ordering::Relaxed) {
+            // Focus timer owns the title — drop our cached countdown so we
+            // re-query when focus ends.
             cached = None;
             dirty.store(true, Ordering::Relaxed);
-            continue;
-        }
-
-        // If voice capture is active, show phase-specific text (focus timer takes priority above)
-        if VOICE_ACTIVE.load(Ordering::Relaxed) {
+            sleep_secs = FOCUS_MAX_SLEEP_SECS;
+        } else if VOICE_ACTIVE.load(Ordering::Relaxed) {
             let phase = VOICE_PHASE.load(Ordering::Relaxed);
             let title = match phase {
                 1 => "Listening...",
@@ -125,72 +159,64 @@ async fn countdown_loop(
                 _ => "Voice active",
             };
             set_tray_title(&app, title);
-            // Set tooltip to indicate voice is active
             set_tray_tooltip(&app, "Voice active — click to pause");
             cached = None;
-            continue;
-        }
-
-        // Voice model ready but idle — hint tooltip
-        if VOICE_PHASE.load(Ordering::Relaxed) == 0 {
-            if let Some(core) = app.try_state::<Arc<AppCore>>() {
-                if core.voice_service().is_ok() {
-                    set_tray_tooltip(&app, "Voice ready — ⌥⇧V to think out loud");
-                } else {
-                    set_tray_tooltip(&app, "Klynt");
-                }
-            }
-        }
-
-        // Re-query DB when the bus subscriber marked the cache dirty, or on
-        // first tick (dirty starts true).
-        if cached.is_none() || dirty.swap(false, Ordering::Relaxed) {
-            cached = query_next_item(&app).await;
-        }
-
-        match &cached {
-            Some(item) => {
-                let total_secs =
-                    (item.time.as_millisecond() - jiff::Timestamp::now().as_millisecond()) / 1000;
-
-                if total_secs <= 0 {
-                    // Item time has passed — clear and re-query next tick
-                    set_tray_title(&app, "");
-                    cached = None;
-                    dirty.store(true, Ordering::Relaxed);
-                    continue;
-                }
-
-                let hrs = total_secs / 3600;
-                let mins = (total_secs % 3600) / 60;
-                let secs = total_secs % 60;
-                let truncated: String = item.title.chars().take(20).collect();
-                let time_str = if hrs > 0 {
-                    format!("{hrs}:{mins:02}:{secs:02}")
-                } else {
-                    format!("{mins:02}:{secs:02}")
-                };
-                let title = format!("« {time_str} · {truncated}");
-                set_tray_title(&app, &title);
-            }
-            None => {
-                set_tray_title(&app, "");
-            }
-        }
-
-        // Adaptive tick: 1s when actively counting down, IDLE_TICK_SECS otherwise.
-        // Saves CPU/power when no countdown is displayed.
-        let target_secs = if cached.is_some()
-            || FOCUS_ACTIVE.load(Ordering::Relaxed)
-            || VOICE_ACTIVE.load(Ordering::Relaxed)
-        {
-            1
+            sleep_secs = VOICE_TICK_SECS;
         } else {
-            IDLE_TICK_SECS
-        };
-        if interval.period() != tokio::time::Duration::from_secs(target_secs) {
-            interval = tokio::time::interval(tokio::time::Duration::from_secs(target_secs));
-            interval.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
+            // Voice idle — hint tooltip.
+            if VOICE_PHASE.load(Ordering::Relaxed) == 0 {
+                if let Some(core) = app.try_state::<Arc<AppCore>>() {
+                    if core.voice_service().is_ok() {
+                        set_tray_tooltip(&app, "Voice ready — ⌥⇧V to think out loud");
+                    } else {
+                        set_tray_tooltip(&app, "Klynt");
+                    }
+                }
+            }
+
+            // Re-query DB on first run or when the bus subscriber marked dirty.
+            if cached.is_none() || dirty.swap(false, Ordering::Relaxed) {
+                cached = query_next_item(&app).await;
+            }
+
+            match &cached {
+                Some(item) => {
+                    let total_secs = (item.time.as_millisecond()
+                        - jiff::Timestamp::now().as_millisecond())
+                        / 1000;
+                    if total_secs <= 0 {
+                        // Item passed — clear and re-query next iteration.
+                        set_tray_title(&app, "");
+                        cached = None;
+                        dirty.store(true, Ordering::Relaxed);
+                        sleep_secs = COUNTDOWN_TICK_SECS;
+                    } else {
+                        let hrs = total_secs / 3600;
+                        let mins = (total_secs % 3600) / 60;
+                        let secs = total_secs % 60;
+                        let truncated: String = item.title.chars().take(20).collect();
+                        let time_str = if hrs > 0 {
+                            format!("{hrs}:{mins:02}:{secs:02}")
+                        } else {
+                            format!("{mins:02}:{secs:02}")
+                        };
+                        set_tray_title(&app, &format!("« {time_str} · {truncated}"));
+                        sleep_secs = COUNTDOWN_TICK_SECS;
+                    }
+                }
+                None => {
+                    set_tray_title(&app, "");
+                    // Truly idle — sleep deeply, bus subscriber will wake us.
+                    sleep_secs = IDLE_MAX_SLEEP_SECS;
+                }
+            }
+        }
+
+        // ── Wait: shutdown | wake | timeout (whichever first). ──
+        tokio::select! {
+            _ = shutdown.cancelled() => break,
+            _ = notify.notified() => {}
+            _ = tokio::time::sleep(tokio::time::Duration::from_secs(sleep_secs)) => {}
         }
     }
 }
