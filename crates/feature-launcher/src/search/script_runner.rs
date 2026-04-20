@@ -9,12 +9,14 @@ pub struct ScriptEntry {
     pub path: PathBuf,
     pub icon: Option<String>,
     pub description: Option<String>,
+    pub arguments: Vec<ArgSpec>,
 }
 
 pub struct ScriptMetadata {
     pub name: Option<String>,
     pub icon: Option<String>,
     pub description: Option<String>,
+    pub arguments: Vec<ArgSpec>,
 }
 
 #[derive(Clone)]
@@ -47,8 +49,9 @@ impl ScriptRunner {
             name: None,
             icon: None,
             description: None,
+            arguments: Vec::new(),
         };
-        for line in content.lines().take(5) {
+        for line in content.lines().take(15) {
             let line = line.trim();
             if let Some(rest) = line.strip_prefix("# name:") {
                 meta.name = Some(rest.trim().to_string());
@@ -56,6 +59,18 @@ impl ScriptRunner {
                 meta.icon = Some(rest.trim().to_string());
             } else if let Some(rest) = line.strip_prefix("# description:") {
                 meta.description = Some(rest.trim().to_string());
+            } else if let Some(rest) = line.strip_prefix("# arg:") {
+                let rest = rest.trim();
+                if let Some(eq_pos) = rest.find('=') {
+                    let name = rest[..eq_pos].trim().to_string();
+                    let placeholder = rest[eq_pos + 1..].trim().to_string();
+                    meta.arguments.push(ArgSpec {
+                        name,
+                        placeholder,
+                        kind: ArgKind::Text,
+                        required: true,
+                    });
+                }
             }
         }
         meta
@@ -86,6 +101,7 @@ impl ScriptRunner {
                 path,
                 icon: meta.icon,
                 description: meta.description,
+                arguments: meta.arguments,
             });
         }
         scripts
@@ -114,7 +130,7 @@ impl ScriptRunner {
                 },
                 score: (score as f64) / 1000.0 * 0.6,
                 no_view: false,
-                arguments: vec![],
+                arguments: s.arguments.clone(),
             })
             .collect()
     }
@@ -233,6 +249,27 @@ mod tests {
     }
 
     #[test]
+    fn parses_arg_frontmatter() {
+        let dir = tempfile::TempDir::new().unwrap();
+        let p = dir.path().join("greet.sh");
+        std::fs::write(
+            &p,
+            "#!/bin/sh\n# name: Greet\n# arg: name=Your name\n# arg: greeting=Hello\necho \"{{greeting}}, {{name}}!\"\n",
+        )
+        .unwrap();
+        let runner = ScriptRunner::with_dir(dir.path().to_path_buf());
+        let scripts = ScriptRunner::discover(dir.path());
+        runner.set_scripts(scripts);
+        let items = runner.search("greet", 10);
+        assert_eq!(items.len(), 1);
+        assert_eq!(items[0].arguments.len(), 2);
+        assert_eq!(items[0].arguments[0].name, "name");
+        assert_eq!(items[0].arguments[0].placeholder, "Your name");
+        assert_eq!(items[0].arguments[1].name, "greeting");
+        assert_eq!(items[0].arguments[1].placeholder, "Hello");
+    }
+
+    #[test]
     fn test_search_scripts() {
         let runner = ScriptRunner::new();
         runner.set_scripts(vec![
@@ -241,12 +278,14 @@ mod tests {
                 path: "/scripts/deploy.sh".into(),
                 icon: None,
                 description: None,
+                arguments: vec![],
             },
             ScriptEntry {
                 name: "Backup DB".into(),
                 path: "/scripts/backup.sh".into(),
                 icon: None,
                 description: None,
+                arguments: vec![],
             },
         ]);
         let results = runner.search("deploy", 10);
