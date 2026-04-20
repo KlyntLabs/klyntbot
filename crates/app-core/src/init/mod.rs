@@ -154,10 +154,6 @@ impl AppCore {
         // ── Phase 2: Cron ────────────────────────────────────────────────
         let cron::CronResult {
             cron_executor,
-            proactive_handler,
-            suggestion_applier,
-            decomposition_handler,
-            forecast_handler,
             autotuner,
         } = cron::init_cron(
             &config,
@@ -166,7 +162,6 @@ impl AppCore {
             cognitive_provider.clone(),
             provider.clone(),
             &domain_event_bus,
-            feature_tasks::TasksConfig::default(),
             vector_store.clone(),
         )
         .await?;
@@ -739,10 +734,6 @@ impl AppCore {
             embedding_engine: appcore_embedding_engine,
             vector_store: appcore_vector_store,
             launcher_engine,
-            proactive_handler,
-            suggestion_applier,
-            decomposition_handler,
-            forecast_handler,
             insight_service: {
                 let insight_repo =
                     feature_insights::InsightReviewRepo::new(storage_pool.inner().clone());

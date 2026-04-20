@@ -1,8 +1,6 @@
 use std::sync::Arc;
 
 use bus::{DomainEventBus, MessageBus};
-use feature_tasks::handlers::suggestion_applier::SuggestionApplier;
-use feature_tasks::{DecompositionHandler, ForecastHandler, ProactiveHandler, TasksConfig};
 use scheduling::temporal::cron_executor::CronExecutor;
 use storage::Repos;
 use tracing::{info, warn};
@@ -36,10 +34,6 @@ fn publish_cron_alarm(
 /// Results from the cron initialization phase.
 pub(super) struct CronResult {
     pub cron_executor: Arc<CronExecutor>,
-    pub proactive_handler: Option<Arc<dyn ProactiveHandler>>,
-    pub suggestion_applier: Option<Arc<dyn SuggestionApplier>>,
-    pub decomposition_handler: Option<Arc<dyn DecompositionHandler>>,
-    pub forecast_handler: Option<Arc<dyn ForecastHandler>>,
     pub autotuner: Option<Arc<agent::autotuner::AutoTunerOrchestrator>>,
 }
 
@@ -52,51 +46,10 @@ pub(super) async fn init_cron(
     cognitive_provider: Option<providers::DynProvider>,
     provider: providers::DynProvider,
     domain_event_bus: &Arc<DomainEventBus>,
-    tasks_config: TasksConfig,
     vector_store: Option<storage::VectorStore>,
 ) -> Result<CronResult, String> {
     // 6. CronExecutor — handler registration only; TemporalScheduler drives firing.
     let cron_executor = CronExecutor::new(repos.cron.clone(), Arc::clone(domain_event_bus));
-
-    // Build AI decomposition and forecast handlers.
-    let decomposition_handler: Option<Arc<dyn DecompositionHandler>> = {
-        let task_repo = repos.tasks.clone();
-        Some(Arc::new(agent::handlers::LlmDecompositionHandler::new(
-            provider.clone(),
-            config.agents.defaults.model.clone(),
-            task_repo,
-            Some(Arc::clone(domain_event_bus)),
-        )))
-    };
-    let forecast_handler: Option<Arc<dyn ForecastHandler>> = {
-        let task_repo = repos.tasks.clone();
-        Some(Arc::new(agent::handlers::LlmForecastHandler::new(
-            provider.clone(),
-            config.agents.defaults.model.clone(),
-            task_repo,
-        )))
-    };
-
-    // Build the proactive handler and applier — kept for on-demand API use
-    // (Tauri commands task_get_suggestions / task_apply_suggestion).
-    // The proactive_scan cron job has been removed; these are no longer scheduled.
-    let proactive_handler: Arc<dyn ProactiveHandler> = {
-        let task_repo = repos.tasks.clone();
-        Arc::new(agent::handlers::LlmProactiveHandler::new(
-            provider.clone(),
-            config.agents.defaults.model.clone(),
-            task_repo,
-            tasks_config.clone(),
-        ))
-    };
-    let suggestion_applier: Option<Arc<dyn SuggestionApplier>> = {
-        let task_repo = repos.tasks.clone();
-        Some(Arc::new(agent::handlers::TaskSuggestionApplier::new(
-            task_repo,
-        )))
-    };
-    let proactive_handler_out = Some(proactive_handler);
-    let suggestion_applier_out = suggestion_applier;
 
     let autotuner_provider = provider.clone();
 
@@ -177,10 +130,6 @@ pub(super) async fn init_cron(
 
     Ok(CronResult {
         cron_executor,
-        proactive_handler: proactive_handler_out,
-        suggestion_applier: suggestion_applier_out,
-        decomposition_handler,
-        forecast_handler,
         autotuner,
     })
 }
