@@ -119,8 +119,7 @@ async fn non_utc_quiet_window_holds_alarm() {
         fire_id: "tz_test_fire_1".into(),
         kind: "task_alarm".into(),
         ref_id: Some("task:tz-test".into()),
-        payload_json: serde_json::json!({"title": "TZ test", "body": "should be held"})
-            .to_string(),
+        payload_json: serde_json::json!({"title": "TZ test", "body": "should be held"}).to_string(),
         fired_at_ms: jiff::Timestamp::now().as_millisecond(),
     });
 

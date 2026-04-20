@@ -67,6 +67,7 @@ pub async fn show_status_badge(
     Ok(())
 }
 
+#[allow(dead_code)] // Consumed only by `dev_server_covers_all_tauri_commands` test.
 pub(crate) const DEV_COMMANDS: &[&str] = &["show_status_badge"];
 
 #[cfg(debug_assertions)]

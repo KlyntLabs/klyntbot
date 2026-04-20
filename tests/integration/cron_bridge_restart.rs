@@ -40,7 +40,7 @@ fn make_job(id: &str) -> CronJobRow {
         enabled: true,
         origin: "user".into(),
         // Every minute — always has a next run.
-        schedule: serde_json::json!({ "cron": "0 * * * * * *", "tz": "UTC" }),
+        schedule: serde_json::json!({ "kind": "cron", "expr": "0 * * * * * *", "tz": "UTC" }),
         payload: serde_json::json!({}),
         next_run_at_ms: None,
         last_run_at_ms: None,
@@ -79,10 +79,7 @@ async fn reconcile_all_creates_one_fire_per_enabled_job() {
     );
 
     // Each job id appears exactly once.
-    let mut ref_ids: Vec<_> = pending
-        .iter()
-        .filter_map(|r| r.ref_id.as_deref())
-        .collect();
+    let mut ref_ids: Vec<_> = pending.iter().filter_map(|r| r.ref_id.as_deref()).collect();
     ref_ids.sort_unstable();
     assert_eq!(ref_ids, ["c1", "c2", "c3"]);
 
@@ -113,14 +110,12 @@ async fn restart_reconcile_replaces_in_flight_row_without_duplication() {
     // leave fired=0. The scheduler would normally set this during begin_firing.
     let in_flight_id = &before[0].id;
     let now_ms = jiff::Timestamp::now().as_millisecond();
-    sqlx::query(
-        "UPDATE scheduled_fires SET firing_started_at_ms = ?1 WHERE id = ?2",
-    )
-    .bind(now_ms)
-    .bind(in_flight_id)
-    .execute(pool.inner())
-    .await
-    .unwrap();
+    sqlx::query("UPDATE scheduled_fires SET firing_started_at_ms = ?1 WHERE id = ?2")
+        .bind(now_ms)
+        .bind(in_flight_id)
+        .execute(pool.inner())
+        .await
+        .unwrap();
 
     // ── Simulated restart ─────────────────────────────────────────────────
     // Drop bridge1 (scheduler gone). Build a fresh CronBridge on the same pool.
@@ -142,17 +137,12 @@ async fn restart_reconcile_replaces_in_flight_row_without_duplication() {
     // No in-flight rows remain (they were cleared by reconcile).
     let in_flight = sf.list_pending_up_to_ms(i64::MAX).await.unwrap();
     assert!(
-        in_flight
-            .iter()
-            .all(|r| r.firing_started_at_ms.is_none()),
+        in_flight.iter().all(|r| r.firing_started_at_ms.is_none()),
         "no in-flight rows remain after reconcile"
     );
 
     // Ref ids still one-per-job.
-    let mut ref_ids: Vec<_> = after
-        .iter()
-        .filter_map(|r| r.ref_id.as_deref())
-        .collect();
+    let mut ref_ids: Vec<_> = after.iter().filter_map(|r| r.ref_id.as_deref()).collect();
     ref_ids.sort_unstable();
     assert_eq!(ref_ids, ["r1", "r2", "r3"]);
 }
