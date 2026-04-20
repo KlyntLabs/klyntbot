@@ -120,16 +120,32 @@ impl ScriptRunner {
     }
 
     pub async fn execute(path: &Path) -> common::Result<String> {
+        Self::execute_with_args(path, &std::collections::HashMap::new()).await
+    }
+
+    /// Execute a script, passing `args` as `KLYNT_ARG_<UPPERCASE_NAME>` environment variables.
+    ///
+    /// Scripts can reference args via `$KLYNT_ARG_FOO` without any template rewriting.
+    /// Template substitution into script content (for `{{name}}` placeholders) is handled
+    /// in Task 3.3 once ScriptRunner gains `# arg:` front-matter parsing.
+    pub async fn execute_with_args(
+        path: &Path,
+        args: &std::collections::HashMap<String, String>,
+    ) -> common::Result<String> {
         let ext = path.extension().and_then(|e| e.to_str()).unwrap_or("");
-        let output = match ext {
+        let mut cmd = match ext {
             "applescript" | "scpt" => {
-                tokio::process::Command::new("osascript")
-                    .arg(path)
-                    .output()
-                    .await?
+                let mut c = tokio::process::Command::new("osascript");
+                c.arg(path);
+                c
             }
-            _ => tokio::process::Command::new(path).output().await?,
+            _ => tokio::process::Command::new(path),
         };
+        for (key, value) in args {
+            let env_key = format!("KLYNT_ARG_{}", key.to_uppercase());
+            cmd.env(env_key, value);
+        }
+        let output = cmd.output().await?;
         if output.status.success() {
             Ok(String::from_utf8_lossy(&output.stdout).to_string())
         } else {

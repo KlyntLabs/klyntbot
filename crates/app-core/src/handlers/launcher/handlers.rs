@@ -18,9 +18,10 @@ impl AppCore {
         &self,
         item_id: String,
         kind: String,
+        args: std::collections::HashMap<String, String>,
     ) -> Result<LauncherExecuteResult, ApiError> {
         let engine = self.launcher_engine()?;
-        engine.execute(&item_id, &kind).await
+        engine.execute(&item_id, &kind, &args).await
     }
 
     /// Build dashboard data for the launcher.

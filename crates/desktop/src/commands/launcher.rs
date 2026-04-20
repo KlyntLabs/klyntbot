@@ -24,8 +24,11 @@ pub async fn launcher_execute(
     state: State<'_, Arc<AppCore>>,
     item_id: String,
     kind: String,
+    args: Option<std::collections::HashMap<String, String>>,
 ) -> Result<LauncherExecuteResult, ApiError> {
-    state.launcher_execute(item_id, kind).await
+    state
+        .launcher_execute(item_id, kind, args.unwrap_or_default())
+        .await
 }
 
 #[tauri::command]
@@ -59,15 +62,29 @@ pub async fn launcher_clipboard_pin(
 }
 
 #[tauri::command]
-pub async fn launcher_run_script(path: String) -> Result<String, ApiError> {
+pub async fn launcher_run_script(
+    path: String,
+    args: Option<std::collections::HashMap<String, String>>,
+) -> Result<String, ApiError> {
     let script_path = std::path::Path::new(&path);
-    ScriptRunner::execute(script_path)
+    let args = args.unwrap_or_default();
+    // Args are passed as env vars (KLYNT_ARG_<UPPERCASE_NAME>=<value>) so the script
+    // can reference them via $KLYNT_ARG_FOO without us rewriting the script file.
+    // Template substitution into script content is deferred to Task 3.3 when
+    // ScriptRunner gains # arg: front-matter parsing.
+    ScriptRunner::execute_with_args(script_path, &args)
         .await
         .map_err(|e| ApiError::new("SCRIPT_ERROR", e.to_string()))
 }
 
 #[tauri::command]
-pub async fn launcher_system_command(action: SystemAction) -> Result<(), ApiError> {
+pub async fn launcher_system_command(
+    action: SystemAction,
+    args: Option<std::collections::HashMap<String, String>>,
+) -> Result<(), ApiError> {
+    // args accepted here for IPC stability; DND duration threading deferred to Task 3.4
+    // when SystemCommands::execute gains a duration parameter.
+    let _ = args;
     SystemCommands::execute(&action)
         .await
         .map_err(|e| ApiError::new("SYSTEM_COMMAND_ERROR", e.to_string()))
@@ -122,7 +139,9 @@ pub(crate) async fn dispatch_dev(
         "launcher_execute" => {
             let item_id = dev::get(body, "itemId").unwrap_or_default();
             let kind = dev::get(body, "kind").unwrap_or_default();
-            dev::val(core.launcher_execute(item_id, kind).await)
+            let args: std::collections::HashMap<String, String> =
+                dev::get(body, "args").unwrap_or_default();
+            dev::val(core.launcher_execute(item_id, kind, args).await)
         }
         "launcher_dashboard" => dev::val(core.launcher_dashboard().await),
         "launcher_clipboard_paste" => {
@@ -140,11 +159,15 @@ pub(crate) async fn dispatch_dev(
         }
         "launcher_run_script" => {
             let path: String = dev::get(body, "path").unwrap_or_default();
-            dev::val(launcher_run_script(path).await)
+            let args: Option<std::collections::HashMap<String, String>> =
+                dev::get(body, "args");
+            dev::val(launcher_run_script(path, args).await)
         }
         "launcher_system_command" => {
             let action: SystemAction = dev::get(body, "action").unwrap_or(SystemAction::LockScreen);
-            dev::val(launcher_system_command(action).await)
+            let args: Option<std::collections::HashMap<String, String>> =
+                dev::get(body, "args");
+            dev::val(launcher_system_command(action, args).await)
         }
         "launcher_open_app" => {
             let path: String = dev::get(body, "path").unwrap_or_default();

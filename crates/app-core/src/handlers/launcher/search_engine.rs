@@ -78,6 +78,7 @@ impl LauncherSearchEngine {
                             },
                             score: *score,
                             no_view: false,
+                            arguments: vec![],
                         })
                     }
                     _ => None,
@@ -104,6 +105,7 @@ impl LauncherSearchEngine {
                     },
                     score: 2.0,
                     no_view: false,
+                    arguments: vec![],
                 }]
             })
             .unwrap_or_default();
@@ -153,6 +155,7 @@ impl LauncherSearchEngine {
             },
             score: 0.0,
             no_view: false,
+            arguments: vec![],
         });
 
         Ok(results)
@@ -182,6 +185,7 @@ impl LauncherSearchEngine {
                 },
                 score: if t.status == "doing" { 0.9 } else { 0.7 },
                 no_view: false,
+                arguments: vec![],
             })
             .collect())
     }
@@ -212,6 +216,7 @@ impl LauncherSearchEngine {
                     },
                     score: 0.6,
                     no_view: false,
+                    arguments: vec![],
                 }
             })
             .collect())
@@ -309,11 +314,16 @@ impl LauncherSearchEngine {
     }
 
     /// Execute a launcher item: record execution and return a result envelope.
+    ///
+    /// `args` are threaded through here for API stability but applied at the actual
+    /// dispatch boundary (`launcher_run_script` / `launcher_system_command` Tauri commands).
     pub async fn execute(
         &self,
         item_id: &str,
         kind: &str,
+        args: &std::collections::HashMap<String, String>,
     ) -> Result<feature_launcher::LauncherExecuteResult, ApiError> {
+        let _ = args; // Applied at dispatch boundary; see launcher_run_script / launcher_system_command
         self.record_execution(item_id, kind).await?;
         Ok(feature_launcher::LauncherExecuteResult::default())
     }
