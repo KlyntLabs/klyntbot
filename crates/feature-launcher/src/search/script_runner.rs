@@ -140,10 +140,7 @@ impl ScriptRunner {
     }
 
     /// Execute a script, passing `args` as `KLYNT_ARG_<UPPERCASE_NAME>` environment variables.
-    ///
-    /// Scripts can reference args via `$KLYNT_ARG_FOO` without any template rewriting.
-    /// Template substitution into script content (for `{{name}}` placeholders) is handled
-    /// in Task 3.3 once ScriptRunner gains `# arg:` front-matter parsing.
+    /// Scripts reference them via `$KLYNT_ARG_FOO` — no script rewriting.
     pub async fn execute_with_args(
         path: &Path,
         args: &std::collections::HashMap<String, String>,

@@ -45,7 +45,7 @@ export function executeItem(
         .then(() =>
           ipc<LauncherExecuteResult>("launcher_execute", {
             itemId: item.id,
-            kind: "command",
+            kind: "system",
             args,
           }),
         )

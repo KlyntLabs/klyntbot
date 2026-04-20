@@ -76,6 +76,17 @@ const COMMANDS: &[CommandDef] = &[
     },
 ];
 
+fn arg_specs(defs: &'static [(&'static str, &'static str, bool)]) -> Vec<ArgSpec> {
+    defs.iter()
+        .map(|(name, placeholder, required)| ArgSpec {
+            name: (*name).to_string(),
+            placeholder: (*placeholder).to_string(),
+            kind: ArgKind::Text,
+            required: *required,
+        })
+        .collect()
+}
+
 pub struct SystemCommands;
 
 impl SystemCommands {
@@ -93,16 +104,7 @@ impl SystemCommands {
                     },
                     score: 0.5,
                     no_view: cmd.no_view,
-                    arguments: cmd
-                        .arguments
-                        .iter()
-                        .map(|(name, placeholder, required)| ArgSpec {
-                            name: (*name).to_string(),
-                            placeholder: (*placeholder).to_string(),
-                            kind: ArgKind::Text,
-                            required: *required,
-                        })
-                        .collect(),
+                    arguments: arg_specs(cmd.arguments),
                 })
                 .collect();
         }
@@ -152,16 +154,7 @@ impl SystemCommands {
                 },
                 score: (score as f64) / 1000.0 * 1.0,
                 no_view: cmd.no_view,
-                arguments: cmd
-                    .arguments
-                    .iter()
-                    .map(|(name, placeholder, required)| ArgSpec {
-                        name: (*name).to_string(),
-                        placeholder: (*placeholder).to_string(),
-                        kind: ArgKind::Text,
-                        required: *required,
-                    })
-                    .collect(),
+                arguments: arg_specs(cmd.arguments),
             })
             .collect()
     }

@@ -68,10 +68,6 @@ pub async fn launcher_run_script(
 ) -> Result<String, ApiError> {
     let script_path = std::path::Path::new(&path);
     let args = args.unwrap_or_default();
-    // Args are passed as env vars (KLYNT_ARG_<UPPERCASE_NAME>=<value>) so the script
-    // can reference them via $KLYNT_ARG_FOO without us rewriting the script file.
-    // Template substitution into script content is deferred to Task 3.3 when
-    // ScriptRunner gains # arg: front-matter parsing.
     ScriptRunner::execute_with_args(script_path, &args)
         .await
         .map_err(|e| ApiError::new("SCRIPT_ERROR", e.to_string()))
