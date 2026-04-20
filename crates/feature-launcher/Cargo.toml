@@ -13,7 +13,7 @@ serde_json.workspace = true
 sqlx.workspace = true
 jiff = { workspace = true }
 tokio.workspace = true
-tokio-util = { workspace = true }
+tokio-util = { workspace = true, features = ["rt"] }
 async-trait.workspace = true
 tracing.workspace = true
 meval = "0.2"
@@ -28,6 +28,8 @@ ignore = { workspace = true }
 dashmap.workspace = true
 notify.workspace = true
 notify-debouncer-mini.workspace = true
+arc-swap = "1.7"
+smol_str = "0.3"
 
 [dev-dependencies]
 tokio = { workspace = true, features = ["macros", "test-util"] }

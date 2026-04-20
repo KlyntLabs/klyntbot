@@ -117,6 +117,7 @@ impl super::SearchSource for SystemPrefsSource {
                     pane_id: p.bundle_id.clone(),
                 },
                 score: (score as f64) / 1000.0 * 0.6,
+                no_view: false,
             })
             .collect()
     }

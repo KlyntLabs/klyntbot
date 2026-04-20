@@ -10,6 +10,7 @@
 //!
 //! Subscribers (Phase 3 dispatcher, UI) listen for `AlarmFired` / `MissedAlarms`.
 
+use std::collections::HashMap;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::time::Duration;
@@ -25,11 +26,16 @@ use crate::error::SchedulerError;
 use crate::temporal::cron_bridge::CronBridge;
 use crate::temporal::fire_store::FireStore;
 use crate::temporal::misfire::{Decision, MisfirePolicy};
+use crate::temporal::recurrence::RecurrenceEngine;
 
 /// Max time the loop will sleep without checking wall clock. Keep short enough
 /// that macOS system-sleep resume leaves us at most this far behind.
 const MAX_SLEEP: Duration = Duration::from_secs(30);
 const DEFAULT_GRACE_SECS: u64 = 3600;
+
+/// Canonical kind string for recurrence-spawn fires.
+/// Used in `dispatch` and `recover_in_flight` so a rename is caught at one site.
+pub(crate) const RECURRENCE_SPAWN_KIND: &str = "recurrence_spawn";
 
 #[derive(Debug, Clone)]
 pub struct SchedulerConfig {
@@ -57,6 +63,7 @@ pub struct TemporalScheduler {
     shutdown: CancellationToken,
     started: Arc<AtomicBool>,
     cron_bridge: Option<Arc<CronBridge>>,
+    recurrence_engine: Option<Arc<RecurrenceEngine>>,
 }
 
 impl TemporalScheduler {
@@ -69,6 +76,7 @@ impl TemporalScheduler {
             shutdown: CancellationToken::new(),
             started: Arc::new(AtomicBool::new(false)),
             cron_bridge: None,
+            recurrence_engine: None,
         }
     }
 
@@ -77,6 +85,14 @@ impl TemporalScheduler {
     /// re-schedule.
     pub fn with_cron_bridge(mut self, bridge: CronBridge) -> Self {
         self.cron_bridge = Some(Arc::new(bridge));
+        self
+    }
+
+    /// Attach a `RecurrenceEngine` so the scheduler materialises task instances
+    /// when a `kind="recurrence_spawn"` fire triggers. Without this the fire is
+    /// still emitted on the bus; the engine is simply not called.
+    pub fn with_recurrence_engine(mut self, engine: Arc<RecurrenceEngine>) -> Self {
+        self.recurrence_engine = Some(engine);
         self
     }
 
@@ -184,13 +200,27 @@ impl TemporalScheduler {
                     }
                 }
             }
+            if kind == RECURRENCE_SPAWN_KIND {
+                if let (Some(engine), Some(ref_id)) = (&self.recurrence_engine, &ref_id) {
+                    if let Err(e) = engine.on_spawn(ref_id, now).await {
+                        warn!(error = %e, template_id = %ref_id, "recurrence_spawn engine failed during recovery");
+                    }
+                }
+            }
         }
         Ok(())
     }
 
-    async fn process_due(&self, now: Timestamp) -> Result<(), SchedulerError> {
+    pub(crate) async fn process_due(&self, now: Timestamp) -> Result<(), SchedulerError> {
         let due = self.store.list_due(now).await?;
         let mut missed: Vec<ScheduledFireRow> = Vec::new();
+
+        // Partition rows into three buckets in a single pass.
+        let mut fire: Vec<ScheduledFireRow> = Vec::new();
+        let mut skip: Vec<ScheduledFireRow> = Vec::new();
+        // Key: (ref_id, kind) — two different kinds for the same ref are independent.
+        let mut coalesce: HashMap<(String, String), Vec<ScheduledFireRow>> = HashMap::new();
+
         for row in due {
             let (policy, grace) = self.extract_misfire_params(&row);
             let fire_at = match Timestamp::from_millisecond(row.fire_at_ms) {
@@ -205,19 +235,49 @@ impl TemporalScheduler {
                 }
             };
             match Decision::classify(policy, grace, fire_at, now) {
-                Decision::Fire => self.dispatch(row, now).await?,
-                Decision::SkipStale => {
-                    // If begin_firing returns false, the row was already claimed
-                    // (e.g. by recover_in_flight) — skipping quietly is correct.
-                    if self.store.begin_firing(&row.id, now).await? {
-                        self.store.mark_fired(&row.id, now).await?;
-                        missed.push(row);
+                Decision::Fire => fire.push(row),
+                Decision::SkipStale => skip.push(row),
+                Decision::CoalesceLater => {
+                    if let Some(ref_id) = &row.ref_id {
+                        let key = (ref_id.clone(), row.kind.clone());
+                        coalesce.entry(key).or_default().push(row);
+                    } else {
+                        fire.push(row);
                     }
                 }
-                // Day-1 stub: coalescing (deduplicate by ref_id) is deferred to Phase 3.
-                Decision::CoalesceLater => self.dispatch(row, now).await?,
             }
         }
+
+        // Process Fire rows.
+        for row in fire {
+            self.dispatch(row, now).await?;
+        }
+
+        // Process SkipStale rows.
+        for row in skip {
+            // If begin_firing returns false, the row was already claimed
+            // (e.g. by recover_in_flight) — skipping quietly is correct.
+            if self.store.begin_firing(&row.id, now).await? {
+                self.store.mark_fired(&row.id, now).await?;
+                missed.push(row);
+            }
+        }
+
+        // Process Coalesce groups: fire only the most recent per (ref_id, kind).
+        for (_key, mut group) in coalesce {
+            // Sort ascending by fire_at_ms so the last element is the most recent.
+            group.sort_unstable_by_key(|r| r.fire_at_ms);
+            let winner = group.pop().expect("coalesce group is never empty");
+            for loser in &group {
+                if self.store.begin_firing(&loser.id, now).await? {
+                    self.store
+                        .mark_suppressed(&loser.id, &winner.id, now)
+                        .await?;
+                }
+            }
+            self.dispatch(winner, now).await?;
+        }
+
         if !missed.is_empty() {
             self.emit_missed(missed);
         }
@@ -263,6 +323,16 @@ impl TemporalScheduler {
                 }
             }
         }
+
+        // Recurrence spawn: materialise task instances via the engine.
+        if row.kind == RECURRENCE_SPAWN_KIND {
+            if let (Some(engine), Some(ref_id)) = (&self.recurrence_engine, &row.ref_id) {
+                if let Err(e) = engine.on_spawn(ref_id, now).await {
+                    warn!(error = %e, template_id = %ref_id, "recurrence_spawn engine failed");
+                }
+            }
+        }
+
         Ok(())
     }
 
@@ -483,6 +553,330 @@ mod tests {
             fired_count >= 2,
             "expected ≥2 cron fires in 3s, got {fired_count}"
         );
+    }
+
+    /// Coalesce: 3 stale rows with same (ref_id, kind). Only the most recent (c3)
+    /// should dispatch; c1 and c2 should be marked fired with suppressed_by = c3.
+    #[tokio::test]
+    async fn coalesce_fires_only_most_recent_per_ref() {
+        let pool = StoragePool::connect_in_memory().await.unwrap();
+        StoragePool::run_feature_migrations(
+            pool.inner(),
+            &[tools_core::FeatureMigration {
+                feature_name: "scheduling".into(),
+                version: 1,
+                description: "scheduled_fires".into(),
+                sql: include_str!("../../migrations/001_scheduled_fires.sql").into(),
+            }],
+        )
+        .await
+        .unwrap();
+        let store = FireStore::new(storage::repos::scheduled_fires::ScheduledFiresRepo::new(
+            pool.inner().clone(),
+        ));
+        let bus = Arc::new(DomainEventBus::new(32));
+        let mut rx = bus.subscribe();
+
+        let now = Timestamp::now();
+        let minus_30m = now.checked_sub(jiff::Span::new().minutes(30)).unwrap();
+        let minus_25m = now.checked_sub(jiff::Span::new().minutes(25)).unwrap();
+        let minus_20m = now.checked_sub(jiff::Span::new().minutes(20)).unwrap();
+
+        let payload = serde_json::json!({ "misfire_policy": "coalesce" });
+
+        let c1 = store
+            .schedule(FireSpec {
+                fire_at: minus_30m,
+                kind: "task_alarm".into(),
+                ref_id: Some("task:abc:reminder".into()),
+                payload: payload.clone(),
+                dedup_prefix: None,
+            })
+            .await
+            .unwrap();
+        let c2 = store
+            .schedule(FireSpec {
+                fire_at: minus_25m,
+                kind: "task_alarm".into(),
+                ref_id: Some("task:abc:reminder".into()),
+                payload: payload.clone(),
+                dedup_prefix: None,
+            })
+            .await
+            .unwrap();
+        let c3 = store
+            .schedule(FireSpec {
+                fire_at: minus_20m,
+                kind: "task_alarm".into(),
+                ref_id: Some("task:abc:reminder".into()),
+                payload: payload.clone(),
+                dedup_prefix: None,
+            })
+            .await
+            .unwrap();
+
+        let config = SchedulerConfig {
+            default_misfire_policy: crate::temporal::misfire::MisfirePolicy::Coalesce,
+            ..SchedulerConfig::default()
+        };
+        let scheduler = TemporalScheduler::new(store.clone(), bus.clone(), config);
+
+        // Run a single process_due pass directly (no background loop).
+        scheduler.process_due(now).await.unwrap();
+
+        // Exactly one AlarmFired event should have been emitted (for c3).
+        let event = tokio::time::timeout(Duration::from_millis(200), rx.recv())
+            .await
+            .expect("expected an AlarmFired event")
+            .unwrap();
+        match &event {
+            DomainEvent::AlarmFired { fire_id, .. } => {
+                assert_eq!(fire_id, &c3, "winner should be c3 (most recent)");
+            }
+            other => panic!("expected AlarmFired, got {other:?}"),
+        }
+        // No second event should arrive within a short window.
+        let second = tokio::time::timeout(Duration::from_millis(100), rx.recv()).await;
+        assert!(
+            second.is_err(),
+            "expected no second event, but got one: {second:?}"
+        );
+
+        // c1 and c2 must be marked fired with suppressed_by = c3.
+        let c1_row: (i64, Option<String>) =
+            sqlx::query_as("SELECT fired, suppressed_by FROM scheduled_fires WHERE id = ?1")
+                .bind(&c1)
+                .fetch_one(pool.inner())
+                .await
+                .unwrap();
+        assert_eq!(c1_row.0, 1, "c1 should be fired");
+        assert_eq!(
+            c1_row.1.as_deref(),
+            Some(c3.as_str()),
+            "c1 suppressed_by should be c3"
+        );
+
+        let c2_row: (i64, Option<String>) =
+            sqlx::query_as("SELECT fired, suppressed_by FROM scheduled_fires WHERE id = ?1")
+                .bind(&c2)
+                .fetch_one(pool.inner())
+                .await
+                .unwrap();
+        assert_eq!(c2_row.0, 1, "c2 should be fired");
+        assert_eq!(
+            c2_row.1.as_deref(),
+            Some(c3.as_str()),
+            "c2 suppressed_by should be c3"
+        );
+
+        // c3 (the winner) must have suppressed_by = None and firing_started_at_ms IS NOT NULL
+        // (proving it went through begin_firing — two-phase commit).
+        let c3_row: (i64, Option<String>, Option<i64>) = sqlx::query_as(
+            "SELECT fired, suppressed_by, firing_started_at_ms FROM scheduled_fires WHERE id = ?1",
+        )
+        .bind(&c3)
+        .fetch_one(pool.inner())
+        .await
+        .unwrap();
+        assert_eq!(c3_row.0, 1, "c3 should be fired");
+        assert!(
+            c3_row.1.is_none(),
+            "c3 suppressed_by should be None (it is the winner)"
+        );
+        assert!(
+            c3_row.2.is_some(),
+            "c3 firing_started_at_ms must be set (winner went through begin_firing)"
+        );
+    }
+
+    /// Coalesce: rows with ref_id = None cannot be coalesced — both must fire independently.
+    #[tokio::test]
+    async fn coalesce_skips_rows_with_no_ref_id() {
+        let pool = StoragePool::connect_in_memory().await.unwrap();
+        StoragePool::run_feature_migrations(
+            pool.inner(),
+            &[tools_core::FeatureMigration {
+                feature_name: "scheduling".into(),
+                version: 1,
+                description: "scheduled_fires".into(),
+                sql: include_str!("../../migrations/001_scheduled_fires.sql").into(),
+            }],
+        )
+        .await
+        .unwrap();
+        let store = FireStore::new(storage::repos::scheduled_fires::ScheduledFiresRepo::new(
+            pool.inner().clone(),
+        ));
+        let bus = Arc::new(DomainEventBus::new(32));
+        let mut rx = bus.subscribe();
+
+        let now = Timestamp::now();
+        let minus_30m = now.checked_sub(jiff::Span::new().minutes(30)).unwrap();
+        let minus_25m = now.checked_sub(jiff::Span::new().minutes(25)).unwrap();
+
+        // Both rows have ref_id = None and the same kind — they must NOT coalesce.
+        let payload = serde_json::json!({ "misfire_policy": "coalesce" });
+
+        let r1 = store
+            .schedule(FireSpec {
+                fire_at: minus_30m,
+                kind: "task_alarm".into(),
+                ref_id: None,
+                payload: payload.clone(),
+                dedup_prefix: None,
+            })
+            .await
+            .unwrap();
+        let r2 = store
+            .schedule(FireSpec {
+                fire_at: minus_25m,
+                kind: "task_alarm".into(),
+                ref_id: None,
+                payload: payload.clone(),
+                dedup_prefix: None,
+            })
+            .await
+            .unwrap();
+
+        let config = SchedulerConfig {
+            default_misfire_policy: crate::temporal::misfire::MisfirePolicy::Coalesce,
+            ..SchedulerConfig::default()
+        };
+        let scheduler = TemporalScheduler::new(store.clone(), bus.clone(), config);
+        scheduler.process_due(now).await.unwrap();
+
+        // Both rows should have fired (two AlarmFired events).
+        let mut fired_ids = Vec::new();
+        for _ in 0..2 {
+            let event = tokio::time::timeout(Duration::from_millis(200), rx.recv())
+                .await
+                .expect("expected an AlarmFired event")
+                .unwrap();
+            match event {
+                DomainEvent::AlarmFired { fire_id, .. } => fired_ids.push(fire_id),
+                other => panic!("expected AlarmFired, got {other:?}"),
+            }
+        }
+        assert!(fired_ids.contains(&r1), "r1 (None ref_id) must fire");
+        assert!(fired_ids.contains(&r2), "r2 (None ref_id) must fire");
+
+        // Neither row should be suppressed by the other.
+        let r1_row: (i64, Option<String>) =
+            sqlx::query_as("SELECT fired, suppressed_by FROM scheduled_fires WHERE id = ?1")
+                .bind(&r1)
+                .fetch_one(pool.inner())
+                .await
+                .unwrap();
+        assert!(r1_row.1.is_none(), "r1 must not be suppressed");
+
+        let r2_row: (i64, Option<String>) =
+            sqlx::query_as("SELECT fired, suppressed_by FROM scheduled_fires WHERE id = ?1")
+                .bind(&r2)
+                .fetch_one(pool.inner())
+                .await
+                .unwrap();
+        assert!(r2_row.1.is_none(), "r2 must not be suppressed");
+    }
+
+    /// T4: scheduler dispatch integration — `recurrence_spawn` kind routes to the engine.
+    ///
+    /// Seeds a daily template starting 2026-05-01 with materialize_ahead=2, inserts a
+    /// due `recurrence_spawn` fire, calls `process_due`, then verifies:
+    ///   1. The fire row is marked fired=1 in the DB (scheduler did its job).
+    ///   2. At least 2 instances were created in the mock instance repo (engine was invoked).
+    #[tokio::test]
+    async fn dispatch_routes_recurrence_spawn_to_engine() {
+        use crate::temporal::recurrence::test_mocks::{MockInstanceRepo, MockTemplateRepo};
+        use crate::temporal::recurrence::{RecurrenceEngine, RecurrenceTemplate};
+
+        let pool = StoragePool::connect_in_memory().await.unwrap();
+        StoragePool::run_feature_migrations(
+            pool.inner(),
+            &[tools_core::FeatureMigration {
+                feature_name: "scheduling".into(),
+                version: 1,
+                description: "scheduled_fires".into(),
+                sql: include_str!("../../migrations/001_scheduled_fires.sql").into(),
+            }],
+        )
+        .await
+        .unwrap();
+
+        let sf_repo =
+            storage::repos::scheduled_fires::ScheduledFiresRepo::new(pool.inner().clone());
+        let store = FireStore::new(sf_repo);
+        let bus = Arc::new(DomainEventBus::new(32));
+
+        // Seed template: FREQ=DAILY, starts 2026-05-01, materialize_ahead=2, no UNTIL, no count.
+        let tmpl_id = "tmpl-1";
+        let next_instance_at = jiff::civil::date(2026, 5, 1)
+            .at(0, 0, 0, 0)
+            .to_zoned(jiff::tz::TimeZone::UTC)
+            .unwrap()
+            .timestamp();
+
+        let template = RecurrenceTemplate {
+            id: tmpl_id.to_string(),
+            source_task_id: "task-for-tmpl-1".into(),
+            rrule: "FREQ=DAILY".into(),
+            iana_tz: "UTC".into(),
+            materialize_ahead: 2,
+            next_instance_at: Some(next_instance_at),
+            until_at: None,
+            count_remaining: None,
+            enabled: true,
+        };
+
+        let tmpl_repo = Arc::new(MockTemplateRepo::with(template));
+        let inst_repo = Arc::new(MockInstanceRepo::default());
+        let engine = RecurrenceEngine::new(
+            Arc::new(store.clone()),
+            tmpl_repo,
+            inst_repo.clone(),
+            2, // default_materialize_ahead
+        );
+
+        let scheduler =
+            TemporalScheduler::new(store.clone(), bus.clone(), SchedulerConfig::default())
+                .with_recurrence_engine(Arc::new(engine));
+
+        // Insert a due `recurrence_spawn` fire with fire_at_ms = now.
+        let now = Timestamp::now();
+        let fire_id = store
+            .schedule(FireSpec {
+                fire_at: now,
+                kind: RECURRENCE_SPAWN_KIND.into(),
+                ref_id: Some(tmpl_id.to_string()),
+                payload: serde_json::json!({}),
+                dedup_prefix: Some(format!("template:{tmpl_id}:")),
+            })
+            .await
+            .unwrap();
+
+        // Run one pass of the scheduler loop.
+        scheduler.process_due(now).await.unwrap();
+
+        // Assert 1: the fire row is marked fired=1.
+        let fired: i64 = sqlx::query_scalar("SELECT fired FROM scheduled_fires WHERE id = ?1")
+            .bind(&fire_id)
+            .fetch_one(pool.inner())
+            .await
+            .unwrap();
+        assert_eq!(fired, 1, "fire row must be marked fired=1 after dispatch");
+
+        // Assert 2: engine's on_spawn was actually invoked — exactly 2 instances created
+        // (materialize_ahead=2 is set on both the template and the engine default).
+        let instances = inst_repo.0.lock().unwrap();
+        assert_eq!(
+            instances.len(),
+            2,
+            "expected exactly 2 instances for template {tmpl_id}, got {}",
+            instances.len()
+        );
+        // All instances should belong to the right template.
+        for (tid, _) in instances.iter() {
+            assert_eq!(tid, tmpl_id, "instance must reference template {tmpl_id}");
+        }
     }
 
     #[tokio::test(flavor = "multi_thread", worker_threads = 2)]

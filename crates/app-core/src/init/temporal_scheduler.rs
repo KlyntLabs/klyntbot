@@ -7,17 +7,26 @@
 use std::sync::Arc;
 
 use bus::{DomainEvent, DomainEventBus};
+use feature_tasks::recurrence_repo::{SqliteInstanceRepo, SqliteTemplateRepo};
 use scheduling::temporal::cron_bridge::CronBridge;
 use scheduling::temporal::fire_store::FireStore;
+use scheduling::temporal::recurrence::RecurrenceEngine;
 use scheduling::temporal::{SchedulerConfig, TemporalScheduler};
 use storage::Repos;
 use tracing::{info, warn};
+
+/// Default number of instances to materialise ahead per recurrence spawn cycle.
+/// Spec §3.2 references `config.notifications.default_materialize_ahead`;
+/// promoting that to a config field is deferred to a future task.
+const DEFAULT_MATERIALIZE_AHEAD: u32 = 3;
 
 /// Results from temporal scheduler initialization.
 pub(super) struct TemporalSchedulerResult {
     pub scheduler: TemporalScheduler,
     pub scheduler_handle: tokio::task::JoinHandle<()>,
     pub wake_subscriber: tokio::task::JoinHandle<()>,
+    /// Clone of the CronBridge for direct use by AppCore handlers (CRUD mutations).
+    pub cron_bridge: CronBridge,
 }
 
 /// Spawn the unified `TemporalScheduler` with a `CronBridge` seeded from
@@ -30,6 +39,7 @@ pub(super) struct TemporalSchedulerResult {
 pub(super) async fn init_temporal_scheduler(
     repos: &Repos,
     domain_event_bus: Arc<DomainEventBus>,
+    pool: storage::StoragePool,
 ) -> Result<TemporalSchedulerResult, String> {
     let fire_store = FireStore::new(repos.scheduled_fires.clone());
     let bridge = CronBridge::new(repos.cron.clone(), fire_store.clone());
@@ -39,12 +49,28 @@ pub(super) async fn init_temporal_scheduler(
         .await
         .map_err(|e| format!("TemporalScheduler cron reconcile failed: {e}"))?;
 
+    // Clone before the bridge is moved into the scheduler — AppCore holds this
+    // clone so CRUD handlers can call reconcile_all() after mutations.
+    let bridge_for_appcore = bridge.clone();
+
+    // Build the RecurrenceEngine backed by SQLite repos.
+    let fire_store_arc = Arc::new(fire_store.clone());
+    let template_repo = Arc::new(SqliteTemplateRepo::new(pool.clone()));
+    let instance_repo = Arc::new(SqliteInstanceRepo::new(pool, Arc::clone(&fire_store_arc)));
+    let recurrence_engine = Arc::new(RecurrenceEngine::new(
+        fire_store_arc,
+        template_repo,
+        instance_repo,
+        DEFAULT_MATERIALIZE_AHEAD,
+    ));
+
     let scheduler = TemporalScheduler::new(
         fire_store,
         Arc::clone(&domain_event_bus),
         SchedulerConfig::default(),
     )
-    .with_cron_bridge(bridge);
+    .with_cron_bridge(bridge)
+    .with_recurrence_engine(recurrence_engine);
 
     // Subscribe to SystemDidWake → immediate scheduler.wake() for sub-second
     // catch-up after laptop resume (tokio sleeps pause during system sleep,
@@ -76,5 +102,6 @@ pub(super) async fn init_temporal_scheduler(
         scheduler,
         scheduler_handle,
         wake_subscriber,
+        cron_bridge: bridge_for_appcore,
     })
 }

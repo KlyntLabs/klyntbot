@@ -50,6 +50,7 @@ impl FireStore {
             fired: false,
             firing_started_at_ms: None,
             fired_at_ms: None,
+            suppressed_by: None,
             created_at_ms: now_ms,
         };
         self.repo.insert(&row).await?;
@@ -80,6 +81,19 @@ impl FireStore {
 
     pub async fn mark_fired(&self, id: &str, now: Timestamp) -> Result<(), SchedulerError> {
         self.repo.mark_fired(id, now.as_millisecond()).await?;
+        Ok(())
+    }
+
+    /// Mark a row as fired-but-suppressed by a winning coalesce row.
+    pub async fn mark_suppressed(
+        &self,
+        id: &str,
+        suppressed_by: &str,
+        now: Timestamp,
+    ) -> Result<(), SchedulerError> {
+        self.repo
+            .mark_suppressed(id, suppressed_by, now.as_millisecond())
+            .await?;
         Ok(())
     }
 

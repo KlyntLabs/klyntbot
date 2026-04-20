@@ -14,6 +14,7 @@ fn sf(id: &str, at: i64, prefix: Option<&str>) -> ScheduledFireRow {
         fired: false,
         firing_started_at_ms: None,
         fired_at_ms: None,
+        suppressed_by: None,
         created_at_ms: 0,
     }
 }

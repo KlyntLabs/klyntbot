@@ -14,6 +14,7 @@ impl UrlNavigation {
             icon: Some("globe".to_string()),
             kind: LauncherItemKind::UrlNavigation { url },
             score: 2.5,
+            no_view: false,
         })
     }
 }

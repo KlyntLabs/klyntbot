@@ -266,6 +266,12 @@ CREATE TABLE IF NOT EXISTS task_recurrence_templates (
 CREATE INDEX IF NOT EXISTS idx_task_recurrence_enabled
     ON task_recurrence_templates(enabled) WHERE enabled = 1;
 
+-- Prevent duplicate instance rows if recover_in_flight replays a spawn cycle.
+-- Applies only to recurrence instances (rows with a template_id set).
+CREATE UNIQUE INDEX IF NOT EXISTS idx_tasks_template_due_unique
+    ON tasks(template_id, due_date)
+    WHERE template_id IS NOT NULL;
+
 -- ---------- Task alarms (Phase 2) ----------
 CREATE TABLE IF NOT EXISTS task_alarms (
     id                  TEXT PRIMARY KEY,

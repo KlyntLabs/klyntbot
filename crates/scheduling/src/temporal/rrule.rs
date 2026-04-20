@@ -78,6 +78,43 @@ impl RRuleSpec {
     }
 }
 
+/// Parse a bare RRULE string (e.g. `"FREQ=DAILY;BYDAY=MO,WE"`) together with an
+/// IANA timezone and an `after` cursor, and return the next `n` occurrences
+/// strictly after `after`.
+///
+/// Internally this prepends a `DTSTART;TZID=…` line and delegates to the
+/// upstream `rrule` crate's `RRuleSet` parser, so the **full RFC 5545 property
+/// set** (`BYSETPOS`, `BYYEARDAY`, `WKST`, negative `BYMONTHDAY`, etc.) is
+/// supported without any custom parsing.
+pub fn next_n_from_rrule_string(
+    rrule: &str,
+    iana_tz: &str,
+    after: Timestamp,
+    n: usize,
+) -> Result<Vec<Timestamp>, SchedulerError> {
+    let tz = chrono_tz::Tz::from_str(iana_tz)
+        .map_err(|e| SchedulerError::Rrule(format!("bad timezone {iana_tz}: {e}")))?;
+    let rrule_tz: RruleTz = tz.into();
+
+    let after_utc = timestamp_to_chrono_utc(after);
+    let dtstart: DateTime<RruleTz> = after_utc.with_timezone(&rrule_tz);
+    let full = format!(
+        "DTSTART;TZID={iana_tz}:{}\nRRULE:{rrule}",
+        dtstart.format("%Y%m%dT%H%M%S"),
+    );
+
+    let set: RRuleSet = full
+        .parse()
+        .map_err(|e| SchedulerError::Rrule(format!("rrule parse: {e}")))?;
+
+    let out: Vec<Timestamp> = set
+        .into_iter()
+        .take(n)
+        .filter_map(|dt| Timestamp::from_millisecond(dt.timestamp_millis()).ok())
+        .collect();
+    Ok(out)
+}
+
 pub fn evaluate_next_n(
     spec: &RRuleSpec,
     after: Timestamp,

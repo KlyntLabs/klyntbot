@@ -14,5 +14,6 @@ pub struct ScheduledFireRow {
     pub fired: bool,
     pub firing_started_at_ms: Option<i64>,
     pub fired_at_ms: Option<i64>,
+    pub suppressed_by: Option<String>,
     pub created_at_ms: i64,
 }

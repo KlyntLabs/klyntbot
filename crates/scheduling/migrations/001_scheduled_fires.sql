@@ -9,6 +9,7 @@ CREATE TABLE scheduled_fires (
     fired INTEGER NOT NULL DEFAULT 0,
     firing_started_at_ms INTEGER,
     fired_at_ms INTEGER,
+    suppressed_by TEXT,
     created_at_ms INTEGER NOT NULL
 );
 

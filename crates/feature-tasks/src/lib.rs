@@ -15,6 +15,7 @@ pub mod complexity;
 pub mod config;
 pub mod forecast;
 pub mod handlers;
+pub mod recurrence_repo;
 pub mod rrule_utils;
 pub mod scoring;
 pub mod search;

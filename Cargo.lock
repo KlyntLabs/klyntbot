@@ -4751,6 +4751,7 @@ dependencies = [
 name = "feature-launcher"
 version = "0.1.0"
 dependencies = [
+ "arc-swap",
  "async-trait",
  "base64 0.22.1",
  "common",
@@ -4768,6 +4769,7 @@ dependencies = [
  "serde",
  "serde_json",
  "shellexpand",
+ "smol_str",
  "sqlx",
  "storage",
  "tempfile",
@@ -4836,12 +4838,14 @@ dependencies = [
 name = "feature-tasks"
 version = "0.1.0"
 dependencies = [
+ "anyhow",
  "async-trait",
  "bus",
  "common",
  "futures-util",
  "jiff",
  "rrule",
+ "scheduling",
  "serde",
  "serde_json",
  "sqlx",
@@ -11741,6 +11745,8 @@ dependencies = [
 name = "scheduling"
 version = "0.1.0"
 dependencies = [
+ "anyhow",
+ "async-trait",
  "bus",
  "chrono",
  "chrono-tz",
@@ -12414,6 +12420,16 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "67b1b7a3b5fe4f1376887184045fcf45c69e92af734b7aaddc05fb777b6fbd03"
 dependencies = [
  "serde",
+]
+
+[[package]]
+name = "smol_str"
+version = "0.3.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "4aaa7368fcf4852a4c2dd92df0cace6a71f2091ca0a23391ce7f3a31833f1523"
+dependencies = [
+ "borsh",
+ "serde_core",
 ]
 
 [[package]]
@@ -14040,6 +14056,7 @@ dependencies = [
  "bytes",
  "futures-core",
  "futures-sink",
+ "futures-util",
  "pin-project-lite",
  "tokio",
 ]

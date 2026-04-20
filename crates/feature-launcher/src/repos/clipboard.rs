@@ -154,6 +154,7 @@ impl crate::search::SearchSource for ClipboardRepo {
                         content_type,
                     },
                     score: 0.5,
+                    no_view: false,
                 }
             })
             .collect()

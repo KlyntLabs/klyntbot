@@ -93,6 +93,7 @@ impl super::SearchSource for BookmarksSource {
                     browser: self.browser.clone(),
                 },
                 score: (score as f64) / 1000.0 * 0.8,
+                no_view: false,
             })
             .collect()
     }

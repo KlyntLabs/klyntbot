@@ -125,6 +125,7 @@ impl super::SearchSource for BrowserHistorySource {
                     visited_at: e.last_visit.clone(),
                 },
                 score: (score as f64) / 1000.0 * 0.4,
+                no_view: false,
             })
             .collect()
     }

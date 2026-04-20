@@ -74,6 +74,7 @@ impl SystemCommands {
                         action: cmd.action.clone(),
                     },
                     score: 0.5,
+                    no_view: false,
                 })
                 .collect();
         }
@@ -122,6 +123,7 @@ impl SystemCommands {
                     action: cmd.action.clone(),
                 },
                 score: (score as f64) / 1000.0 * 1.0,
+                no_view: false,
             })
             .collect()
     }

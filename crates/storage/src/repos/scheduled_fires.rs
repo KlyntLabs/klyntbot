@@ -22,8 +22,8 @@ impl ScheduledFiresRepo {
         sqlx::query(
             "INSERT INTO scheduled_fires
                  (id, fire_at_ms, kind, ref_id, payload, dedup_prefix,
-                  fired, firing_started_at_ms, fired_at_ms, created_at_ms)
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6, 0, NULL, NULL, ?7)",
+                  fired, firing_started_at_ms, fired_at_ms, suppressed_by, created_at_ms)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, 0, NULL, NULL, NULL, ?7)",
         )
         .bind(&row.id)
         .bind(row.fire_at_ms)
@@ -133,6 +133,27 @@ impl ScheduledFiresRepo {
         .fetch_all(&self.pool)
         .await?;
         Ok(rows)
+    }
+
+    /// Mark a row as fired-but-suppressed: sets fired=1, fired_at_ms, and suppressed_by.
+    /// Returns Ok(()) regardless of whether the row existed (idempotent on already-fired rows
+    /// because the WHERE clause restricts to fired=0).
+    pub async fn mark_suppressed(
+        &self,
+        id: &str,
+        suppressed_by: &str,
+        now_ms: i64,
+    ) -> Result<(), StorageError> {
+        sqlx::query(
+            "UPDATE scheduled_fires SET fired = 1, fired_at_ms = ?2, suppressed_by = ?3
+             WHERE id = ?1 AND fired = 0",
+        )
+        .bind(id)
+        .bind(now_ms)
+        .bind(suppressed_by)
+        .execute(&self.pool)
+        .await?;
+        Ok(())
     }
 
     /// Delete all pending fires with the given (kind, ref_id). Used for cron re-sync.
