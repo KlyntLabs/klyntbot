@@ -1,4 +1,5 @@
 import { ActionMenu } from "@features/launcher/components/ActionMenu";
+import { ArgChipBar } from "@features/launcher/components/ArgChipBar";
 import { DetailPanel } from "@features/launcher/components/DetailPanel";
 import { LauncherChat } from "@features/launcher/components/LauncherChat";
 import { LauncherInput } from "@features/launcher/components/LauncherInput";
@@ -21,6 +22,8 @@ export function Launcher() {
   const mode = useLauncherStore((s) => s.mode);
   const setMode = useLauncherStore((s) => s.setMode);
   const reset = useLauncherStore((s) => s.reset);
+  const argModeItem = useLauncherStore((s) => s.argModeItem);
+  const setArgModeItem = useLauncherStore((s) => s.setArgModeItem);
 
   const [chatSessionKey, setChatSessionKey] = useState("");
   const [chatInitialQuery, setChatInitialQuery] = useState<string | null>(null);
@@ -175,9 +178,26 @@ export function Launcher() {
         ) : (
           <div className="relative rounded-[var(--glass-radius-inner)] overflow-hidden">
             <LauncherInput />
-            {mode === "dashboard" && <ShortcutHints />}
-            {mode === "search" && <ResultsList onExecute={handleExecute} />}
-            {mode === "detail" && <DetailPanel />}
+            {argModeItem ? (
+              <ArgChipBar
+                specs={argModeItem.arguments ?? []}
+                onSubmit={(args) => {
+                  setArgModeItem(null);
+                  executeItem(
+                    argModeItem,
+                    { onEnterChat: enterChat, onExpandToMain: expandToMain, onHide: hideWindow },
+                    args,
+                  );
+                }}
+                onCancel={() => setArgModeItem(null)}
+              />
+            ) : (
+              <>
+                {mode === "dashboard" && <ShortcutHints />}
+                {mode === "search" && <ResultsList onExecute={handleExecute} />}
+                {mode === "detail" && <DetailPanel />}
+              </>
+            )}
             <ActionMenu />
           </div>
         )}

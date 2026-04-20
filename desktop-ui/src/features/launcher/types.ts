@@ -1,5 +1,14 @@
 export type LauncherMode = "dashboard" | "search" | "detail" | "chat" | "recording";
 
+export type ArgKind = { type: "text" } | { type: "number" } | { type: "choice"; values: string[] };
+
+export interface ArgSpec {
+  name: string;
+  placeholder: string;
+  kind: ArgKind;
+  required: boolean;
+}
+
 export interface LauncherExecuteResult {
   status: { kind: "ok" } | { kind: "err"; message: string };
   message?: string | null;
@@ -14,6 +23,7 @@ export interface LauncherItem {
   kind: LauncherItemKind;
   score: number;
   noView?: boolean;
+  arguments?: ArgSpec[];
 }
 
 export type LauncherItemKind =

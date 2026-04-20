@@ -1,11 +1,7 @@
 import { useRef, useState } from "react";
+import type { ArgSpec } from "../types";
 
-export interface ArgSpec {
-  name: string;
-  placeholder: string;
-  kind: { type: "text" } | { type: "number" } | { type: "choice"; values: string[] };
-  required: boolean;
-}
+export type { ArgSpec };
 
 interface Props {
   specs: ArgSpec[];

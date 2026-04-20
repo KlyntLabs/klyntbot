@@ -12,6 +12,7 @@ interface LauncherState {
   historyIndex: number;
   detailItem: LauncherItem | null;
   actionMenuOpen: boolean;
+  argModeItem: LauncherItem | null;
 
   setMode: (mode: LauncherMode) => void;
   setQuery: (query: string) => void;
@@ -24,6 +25,7 @@ interface LauncherState {
   navigateHistory: (direction: "up" | "down") => void;
   setDetailItem: (item: LauncherItem | null) => void;
   setActionMenuOpen: (open: boolean) => void;
+  setArgModeItem: (item: LauncherItem | null) => void;
   reset: () => void;
 }
 
@@ -38,6 +40,7 @@ export const useLauncherStore = create<LauncherState>((set, get) => ({
   historyIndex: -1,
   detailItem: null,
   actionMenuOpen: false,
+  argModeItem: null,
 
   setMode: (mode) => set({ mode }),
   setQuery: (query) => {
@@ -61,6 +64,7 @@ export const useLauncherStore = create<LauncherState>((set, get) => ({
   },
   setDetailItem: (item) => set({ detailItem: item }),
   setActionMenuOpen: (open) => set({ actionMenuOpen: open }),
+  setArgModeItem: (item) => set({ argModeItem: item }),
   navigateHistory: (direction) => {
     const { queryHistory, historyIndex } = get();
     if (queryHistory.length === 0) return;
@@ -84,5 +88,6 @@ export const useLauncherStore = create<LauncherState>((set, get) => ({
       historyIndex: -1,
       detailItem: null,
       actionMenuOpen: false,
+      argModeItem: null,
     }),
 }));

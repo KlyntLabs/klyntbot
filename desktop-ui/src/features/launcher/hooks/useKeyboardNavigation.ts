@@ -53,13 +53,20 @@ export function useKeyboardNavigation({ onEnterChat, onExpandToMain, onHide }: K
             return;
           }
 
+          if (item.arguments && item.arguments.length > 0) {
+            store.setArgModeItem(item);
+            return;
+          }
+
           executeItem(item, { onEnterChat, onExpandToMain, onHide });
           break;
         }
 
         case "Escape": {
           e.preventDefault();
-          if (store.mode === "detail") {
+          if (store.argModeItem) {
+            store.setArgModeItem(null);
+          } else if (store.mode === "detail") {
             store.setDetailItem(null);
             store.setMode("search");
           } else if (store.query) {
