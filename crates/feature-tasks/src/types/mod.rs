@@ -1,18 +1,15 @@
 //! Domain types for the feature-tasks crate.
 //!
-//! Canonical definitions of `Task`, `TaskExecution`, `TaskActivity`, `TaskSuggestion`,
-//! and all associated enums and supporting types. Includes conversions from/to
-//! storage row types.
+//! Canonical definitions of `Task`, `TaskActivity`, and all associated enums
+//! and supporting types. Includes conversions from/to storage row types.
 
 mod entity;
 mod execution;
 mod planning;
-mod suggestion;
 
 pub use entity::*;
 pub use execution::*;
 pub use planning::*;
-pub use suggestion::*;
 
 #[cfg(test)]
 mod tests {
@@ -203,14 +200,6 @@ mod tests {
     }
 
     #[test]
-    fn test_suggestion_action_serde() {
-        let action = SuggestionAction::SetPriority { priority: 1 };
-        let json = serde_json::to_string(&action).unwrap();
-        let parsed: SuggestionAction = serde_json::from_str(&json).unwrap();
-        assert_eq!(parsed, action);
-    }
-
-    #[test]
     fn test_working_hours_default() {
         let wh = WorkingHours::default();
         assert_eq!(wh.start, jiff::civil::Time::new(9, 0, 0, 0).unwrap());
@@ -223,14 +212,6 @@ mod tests {
         assert_eq!(TaskStatus::from_str_loose("todo"), Some(TaskStatus::Todo));
         assert_eq!(TaskStatus::from_str_loose("DONE"), Some(TaskStatus::Done));
         assert_eq!(TaskStatus::from_str_loose("unknown"), None);
-    }
-
-    #[test]
-    fn test_execution_config_default() {
-        let cfg = ExecutionConfig::default();
-        assert_eq!(cfg.max_iterations, Some(10));
-        assert!(!cfg.require_approval);
-        assert_eq!(cfg.retry_policy.max_retries, 2);
     }
 
     #[test]

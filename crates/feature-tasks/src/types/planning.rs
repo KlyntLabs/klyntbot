@@ -1,93 +1,11 @@
-//! Planning, forecast, shared, and attachment types.
+//! Shared task infrastructure types: working hours, attachments, time entries,
+//! estimation records, and scope overrides.
 
 use jiff::{civil::Time, Timestamp};
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
 use storage::rows::task::*;
 
-use super::entity::{EnergyLevel, Task};
-
-// ── Planning Types ──────────────────────────────────────────────────────────
-
-/// Context for day planning.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct PlanningContext {
-    /// Available tasks (pre-filtered).
-    pub tasks: Vec<Task>,
-    /// User's working hours.
-    pub working_hours: WorkingHours,
-    /// Calendar blocks for the day.
-    #[serde(default)]
-    pub calendar_blocks: Vec<CalendarBlock>,
-    /// User's energy profile.
-    pub energy_profile: Option<EnergyProfile>,
-    /// Maximum tasks to schedule.
-    pub max_tasks: Option<u32>,
-    /// Currently focused task IDs (locked slots).
-    #[serde(default)]
-    pub locked_task_ids: Vec<String>,
-    /// Target date for the plan.
-    pub target_date: Option<String>,
-}
-
-/// A task with a computed priority score.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct ScoredTask {
-    pub task: Task,
-    pub score: f64,
-    pub is_unblocked: bool,
-    pub dependent_count: u32,
-}
-
-/// A generated day plan.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct DayPlan {
-    pub slots: Vec<PlanSlot>,
-    #[serde(default)]
-    pub locked_slots: Vec<PlanSlot>,
-    pub total_work_mins: i32,
-    pub available_mins: i32,
-    pub utilization: f64,
-    pub reasoning: String,
-    #[serde(default)]
-    pub deferred: Vec<DeferredTask>,
-    pub generated_at: Timestamp,
-}
-
-/// A slot in a day plan.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct PlanSlot {
-    pub task_id: String,
-    pub title: String,
-    pub estimated_minutes: i32,
-    pub energy_level: Option<EnergyLevel>,
-    pub start_time: Option<String>,
-    pub status: PlanSlotStatus,
-}
-
-/// Status of a plan slot.
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]
-#[serde(rename_all = "lowercase")]
-pub enum PlanSlotStatus {
-    #[default]
-    Pending,
-    Active,
-    Completed,
-    Skipped,
-}
-
-/// A task deferred from the current plan.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct DeferredTask {
-    pub task_id: String,
-    pub title: String,
-    pub reason: String,
-}
+use super::entity::EnergyLevel;
 
 /// Working hours configuration.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -111,125 +29,15 @@ impl Default for WorkingHours {
     }
 }
 
-// ── Forecast Types ──────────────────────────────────────────────────────────
-
-/// Context for generating forecasts.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct ForecastContext {
-    /// Minimum number of historical samples required.
-    pub min_sample_size: u32,
-    /// How far back (in days) to look for historical data.
-    pub lookback_days: u32,
-    /// Whether to include subtask analysis.
-    #[serde(default)]
-    pub include_subtasks: bool,
-}
-
-impl Default for ForecastContext {
-    fn default() -> Self {
-        Self {
-            min_sample_size: 5,
-            lookback_days: 90,
-            include_subtasks: true,
-        }
-    }
-}
-
-/// Forecast for a single task.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct TaskForecast {
-    pub task_id: String,
-    pub estimated_minutes: i32,
-    pub confidence_low: i32,
-    pub confidence_high: i32,
-    pub methodology: ForecastMethodology,
-    #[serde(default)]
-    pub risks: Vec<ForecastRisk>,
-    pub data_quality: DataQuality,
-}
-
-/// Forecast for a project (aggregation of task forecasts).
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct ProjectForecast {
-    pub project_id: String,
-    pub total_estimated_minutes: i32,
-    pub confidence_low: i32,
-    pub confidence_high: i32,
-    pub remaining_tasks: u32,
-    pub completed_tasks: u32,
-    #[serde(default)]
-    pub risks: Vec<ForecastRisk>,
-    pub data_quality: DataQuality,
-}
-
-/// A risk associated with a forecast.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct ForecastRisk {
-    pub kind: RiskKind,
-    pub description: String,
-    pub impact_minutes: Option<i32>,
-}
-
-/// Kind of forecast risk.
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
-#[serde(rename_all = "lowercase")]
-pub enum RiskKind {
-    HistoricalUnderestimation,
-    DependencyChain,
-    UnknownComplexity,
-    ResourceContention,
-    ExternalDependency,
-}
-
-/// Methodology used for forecasting.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct ForecastMethodology {
-    pub name: String,
-    pub sample_size: u32,
-    pub lookback_days: u32,
-    pub adjustments: Vec<String>,
-}
-
-/// Quality of data underlying a forecast.
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]
-#[serde(rename_all = "lowercase")]
-pub enum DataQuality {
-    High,
-    #[default]
-    Medium,
-    Low,
-    Insufficient,
-}
-
-/// Report on estimation accuracy.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct AccuracyReport {
-    pub scope: AccuracyScope,
-    pub sample_size: u32,
-    pub mean_deviation_pct: f64,
-    pub median_deviation_pct: f64,
-    pub p90_deviation_pct: f64,
-    pub trend: AccuracyTrend,
-    pub by_energy_level: HashMap<String, f64>,
-    pub by_complexity: HashMap<String, f64>,
-}
-
-/// Scope for accuracy reporting.
+/// Per-scope overrides for task management settings.
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 #[serde(rename_all = "camelCase")]
-pub struct AccuracyScope {
-    pub project_id: Option<String>,
-    pub area_id: Option<String>,
-    #[serde(default)]
-    pub tags: Vec<String>,
-    pub lookback_days: Option<u32>,
+pub struct ScopeOverrides {
+    pub wip_limit: Option<u32>,
+    pub stale_task_days: Option<u32>,
 }
+
+// ── Forecast Support ────────────────────────────────────────────────────────
 
 /// Trend in estimation accuracy.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]
@@ -240,58 +48,6 @@ pub enum AccuracyTrend {
     Stable,
     Degrading,
     Insufficient,
-}
-
-// ── Shared Types ────────────────────────────────────────────────────────────
-
-/// User's energy profile for scheduling.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct EnergyProfile {
-    /// Hours of the day when energy is highest (e.g. [9, 10, 11]).
-    #[serde(default)]
-    pub peak_hours: Vec<u32>,
-    /// Hours of the day when energy is lowest.
-    #[serde(default)]
-    pub low_energy_hours: Vec<u32>,
-    /// Average focus session duration in minutes.
-    pub avg_focus_duration_mins: Option<u32>,
-    /// Preferred task size in minutes.
-    pub preferred_task_size_mins: Option<u32>,
-}
-
-impl Default for EnergyProfile {
-    fn default() -> Self {
-        Self {
-            peak_hours: vec![9, 10, 11],
-            low_energy_hours: vec![14, 15],
-            avg_focus_duration_mins: Some(45),
-            preferred_task_size_mins: Some(30),
-        }
-    }
-}
-
-/// A calendar block representing busy/free time.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct CalendarBlock {
-    pub title: String,
-    pub start: Timestamp,
-    pub end: Timestamp,
-    #[serde(default = "default_true")]
-    pub is_busy: bool,
-}
-
-fn default_true() -> bool {
-    true
-}
-
-/// Per-scope overrides for task management settings.
-#[derive(Debug, Clone, Serialize, Deserialize, Default)]
-#[serde(rename_all = "camelCase")]
-pub struct ScopeOverrides {
-    pub wip_limit: Option<u32>,
-    pub stale_task_days: Option<u32>,
 }
 
 // ── Estimation Record ───────────────────────────────────────────────────────

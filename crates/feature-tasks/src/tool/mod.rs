@@ -9,10 +9,7 @@ use std::sync::Arc;
 use bus::DomainEventBus;
 
 use crate::config::TasksConfig;
-use crate::handlers::{
-    DayPlanningHandler, DecompositionHandler, EmbeddingHandler, EnrichmentHandler, ForecastHandler,
-    ProactiveHandler, SuggestionApplier, TaskExecutionHandler,
-};
+use crate::handlers::{EmbeddingHandler, EnrichmentHandler};
 use crate::types::{Attachment, Task, TimeEntry};
 use common::{Result, ToolError};
 use storage::TaskRepo;
@@ -39,18 +36,6 @@ pub struct TaskTool {
     pub(crate) domain_bus: Option<Arc<DomainEventBus>>,
     /// Feature configuration.
     pub(crate) config: TasksConfig,
-    /// Optional decomposition handler (LLM-powered subtask generation).
-    pub(crate) decomposition_handler: Option<Arc<dyn DecompositionHandler>>,
-    /// Optional execution handler (agentic task execution).
-    pub(crate) execution_handler: Option<Arc<dyn TaskExecutionHandler>>,
-    /// Optional day planning handler (LLM-powered daily planning).
-    pub(crate) planning_handler: Option<Arc<dyn DayPlanningHandler>>,
-    /// Optional proactive suggestion handler.
-    pub(crate) proactive_handler: Option<Arc<dyn ProactiveHandler>>,
-    /// Optional suggestion applier for executing accepted suggestions.
-    pub(crate) suggestion_applier: Option<Arc<dyn SuggestionApplier>>,
-    /// Optional forecast handler for estimation accuracy and project forecasting.
-    pub(crate) forecast_handler: Option<Arc<dyn ForecastHandler>>,
     /// Optional task_alarms repo — required for `alarms` param on create/update.
     pub(crate) task_alarms_repo: Option<storage::repos::task_alarms::TaskAlarmsRepo>,
     /// Optional FireStore — required for `alarms` param on create/update.
@@ -80,12 +65,6 @@ impl TaskTool {
             progress_handler: None,
             domain_bus: None,
             config: TasksConfig::default(),
-            decomposition_handler: None,
-            execution_handler: None,
-            planning_handler: None,
-            proactive_handler: None,
-            suggestion_applier: None,
-            forecast_handler: None,
             task_alarms_repo: None,
             fire_store: None,
         }
@@ -162,42 +141,6 @@ impl TaskTool {
         self.semantic_threshold = config.search.semantic_threshold;
         self.rrf_k = config.search.rrf_k;
         self.config = config;
-        self
-    }
-
-    /// Attach a decomposition handler for AI-powered subtask generation.
-    pub fn with_decomposition_handler(mut self, handler: Arc<dyn DecompositionHandler>) -> Self {
-        self.decomposition_handler = Some(handler);
-        self
-    }
-
-    /// Attach an execution handler for agentic task execution.
-    pub fn with_execution_handler(mut self, handler: Arc<dyn TaskExecutionHandler>) -> Self {
-        self.execution_handler = Some(handler);
-        self
-    }
-
-    /// Attach a day planning handler for LLM-powered daily planning.
-    pub fn with_planning_handler(mut self, handler: Arc<dyn DayPlanningHandler>) -> Self {
-        self.planning_handler = Some(handler);
-        self
-    }
-
-    /// Attach a proactive suggestion handler.
-    pub fn with_proactive_handler(mut self, handler: Arc<dyn ProactiveHandler>) -> Self {
-        self.proactive_handler = Some(handler);
-        self
-    }
-
-    /// Attach a suggestion applier for executing accepted suggestions.
-    pub fn with_suggestion_applier(mut self, applier: Arc<dyn SuggestionApplier>) -> Self {
-        self.suggestion_applier = Some(applier);
-        self
-    }
-
-    /// Attach a forecast handler for estimation accuracy and project forecasting.
-    pub fn with_forecast_handler(mut self, handler: Arc<dyn ForecastHandler>) -> Self {
-        self.forecast_handler = Some(handler);
         self
     }
 
@@ -314,11 +257,7 @@ impl Tool for TaskTool {
                         "focus", "unfocus", "log_time",
                         "add_dep", "remove_dep",
                         "batch",
-                        "recur", "list_recurring", "delete_recurring",
-                        "plan_day",
-                        "decompose", "execute", "cancel_execution",
-                        "suggest", "apply_suggestion", "dismiss_suggestion", "list_suggestions",
-                        "forecast_task", "forecast_project", "accuracy_report"
+                        "recur", "list_recurring", "delete_recurring"
                     ],
                     "description": "Action to perform"
                 },
@@ -397,17 +336,6 @@ impl Tool for TaskTool {
                     "type": "string",
                     "description": "Recurring task template ID (delete_recurring)"
                 },
-                "count": {
-                    "type": "integer",
-                    "description": "Number of tasks to include in plan (default: 3)"
-                },
-                "execution_id": { "type": "string", "description": "Execution ID (for cancel_execution)" },
-                "suggestion_id": { "type": "string", "description": "Suggestion ID (for apply_suggestion/dismiss_suggestion)" },
-                "agent_profile": { "type": "string", "description": "Agent profile for execution" },
-                "max_cost": { "type": "number", "description": "Max cost in USD for execution" },
-                "max_iterations": { "type": "integer", "description": "Max LLM iterations for execution" },
-                "timeout_secs": { "type": "integer", "description": "Timeout in seconds for execution" },
-                "require_approval": { "type": "boolean", "description": "Require approval before execution" },
                 "unassigned": {
                     "type": "boolean",
                     "description": "Filter for tasks not assigned to any project or area (list)"
@@ -495,17 +423,6 @@ impl Tool for TaskTool {
             "recur" => self.handle_recur(&p).await,
             "list_recurring" => self.handle_list_recurring().await,
             "delete_recurring" => self.handle_delete_recurring(&p).await,
-            "plan_day" => self.handle_plan_day(&p).await,
-            "decompose" => self.handle_decompose(&p).await,
-            "execute" => self.handle_execute(&p).await,
-            "cancel_execution" => self.handle_cancel_execution(&p).await,
-            "suggest" => self.handle_suggest(&p).await,
-            "apply_suggestion" => self.handle_apply_suggestion(&p).await,
-            "dismiss_suggestion" => self.handle_dismiss_suggestion(&p).await,
-            "list_suggestions" => self.handle_list_suggestions(&p).await,
-            "forecast_task" => self.handle_forecast_task(&p).await,
-            "forecast_project" => self.handle_forecast_project(&p).await,
-            "accuracy_report" => self.handle_accuracy_report(&p).await,
             _ => Err(ToolError::InvalidParams(format!("Unknown action: {action}")).into()),
         }
     }
@@ -992,31 +909,6 @@ mod tests {
             .await
             .unwrap();
         assert!(unfocus_result.contains("Unfocused task"));
-    }
-
-    #[tokio::test]
-    async fn test_plan_day() {
-        let tool = make_tool().await;
-        let ctx = test_ctx();
-
-        tool.execute(
-            serde_json::json!({ "action": "create", "title": "Plan task 1", "area_id": "test-area", "priority": 1 }),
-            &ctx,
-        ).await.unwrap();
-        tool.execute(
-            serde_json::json!({ "action": "create", "title": "Plan task 2", "area_id": "test-area", "priority": 3 }),
-            &ctx,
-        ).await.unwrap();
-
-        let result = tool
-            .execute(
-                serde_json::json!({ "action": "plan_day", "count": 2 }),
-                &ctx,
-            )
-            .await
-            .unwrap();
-        assert!(result.contains("Daily plan"));
-        assert!(result.contains("Plan task 1"));
     }
 
     #[tokio::test]

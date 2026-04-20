@@ -150,58 +150,6 @@ impl FromStr for ExecutionStatus {
     }
 }
 
-/// Result of initiating task execution.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "lowercase", tag = "type")]
-pub enum ExecuteResult {
-    Started { execution_id: String },
-    AwaitingApproval { suggestion_id: String },
-}
-
-/// Configuration for an agentic task execution.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct ExecutionConfig {
-    /// Which agent profile to use (e.g. "task", "general").
-    pub agent_profile: Option<String>,
-    /// Maximum cost in USD for this execution.
-    pub max_cost_usd: Option<f64>,
-    /// Maximum number of ReAct iterations.
-    pub max_iterations: Option<u32>,
-    /// Timeout in seconds.
-    pub timeout_secs: Option<u64>,
-    /// Allowlisted tools (empty = all allowed).
-    #[serde(default)]
-    pub allowed_tools: Vec<String>,
-    /// Allowlisted MCP servers (empty = none, ["*"] = all).
-    #[serde(default)]
-    pub allowed_mcp: Vec<String>,
-    /// Retry policy for failed executions.
-    #[serde(default)]
-    pub retry_policy: RetryPolicy,
-    /// Whether to require user approval before execution starts.
-    #[serde(default)]
-    pub require_approval: bool,
-    /// How often (in seconds) to emit progress updates.
-    pub progress_interval_secs: Option<u64>,
-}
-
-impl Default for ExecutionConfig {
-    fn default() -> Self {
-        Self {
-            agent_profile: Some("task".to_string()),
-            max_cost_usd: Some(0.50),
-            max_iterations: Some(10),
-            timeout_secs: Some(300),
-            allowed_tools: Vec::new(),
-            allowed_mcp: Vec::new(),
-            retry_policy: RetryPolicy::default(),
-            require_approval: false,
-            progress_interval_secs: Some(30),
-        }
-    }
-}
-
 /// Retry policy for failed task executions.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]

@@ -1,13 +1,8 @@
 pub mod batch;
 pub mod create;
-pub mod decompose;
 pub mod deps;
-pub mod execute;
 pub mod focus;
-pub mod forecast;
 pub mod mutate;
-pub mod plan;
 pub mod query;
 pub mod recurrence;
 pub mod search;
-pub mod suggest;
