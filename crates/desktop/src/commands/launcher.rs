@@ -159,14 +159,12 @@ pub(crate) async fn dispatch_dev(
         }
         "launcher_run_script" => {
             let path: String = dev::get(body, "path").unwrap_or_default();
-            let args: Option<std::collections::HashMap<String, String>> =
-                dev::get(body, "args");
+            let args: Option<std::collections::HashMap<String, String>> = dev::get(body, "args");
             dev::val(launcher_run_script(path, args).await)
         }
         "launcher_system_command" => {
             let action: SystemAction = dev::get(body, "action").unwrap_or(SystemAction::LockScreen);
-            let args: Option<std::collections::HashMap<String, String>> =
-                dev::get(body, "args");
+            let args: Option<std::collections::HashMap<String, String>> = dev::get(body, "args");
             dev::val(launcher_system_command(action, args).await)
         }
         "launcher_open_app" => {

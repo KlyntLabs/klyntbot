@@ -93,12 +93,16 @@ impl SystemCommands {
                     },
                     score: 0.5,
                     no_view: cmd.no_view,
-                    arguments: cmd.arguments.iter().map(|(name, placeholder, required)| ArgSpec {
-                        name: (*name).to_string(),
-                        placeholder: (*placeholder).to_string(),
-                        kind: ArgKind::Text,
-                        required: *required,
-                    }).collect(),
+                    arguments: cmd
+                        .arguments
+                        .iter()
+                        .map(|(name, placeholder, required)| ArgSpec {
+                            name: (*name).to_string(),
+                            placeholder: (*placeholder).to_string(),
+                            kind: ArgKind::Text,
+                            required: *required,
+                        })
+                        .collect(),
                 })
                 .collect();
         }
@@ -148,12 +152,16 @@ impl SystemCommands {
                 },
                 score: (score as f64) / 1000.0 * 1.0,
                 no_view: cmd.no_view,
-                arguments: cmd.arguments.iter().map(|(name, placeholder, required)| ArgSpec {
-                    name: (*name).to_string(),
-                    placeholder: (*placeholder).to_string(),
-                    kind: ArgKind::Text,
-                    required: *required,
-                }).collect(),
+                arguments: cmd
+                    .arguments
+                    .iter()
+                    .map(|(name, placeholder, required)| ArgSpec {
+                        name: (*name).to_string(),
+                        placeholder: (*placeholder).to_string(),
+                        kind: ArgKind::Text,
+                        required: *required,
+                    })
+                    .collect(),
             })
             .collect()
     }
