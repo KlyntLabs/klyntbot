@@ -25,7 +25,6 @@ export type { Status, Priority };
 
 export type TaskState = "new" | "has-history" | "completed";
 export type ActorType = "user" | "agent" | "system";
-export type SuggestionStatus = "pending" | "applied" | "dismissed";
 
 export interface DetailTask {
   id: string;
@@ -59,15 +58,6 @@ export interface ActivityEntry {
   action: string;
   detail: string | null;
   createdAt: string;
-}
-
-export interface Suggestion {
-  id: string;
-  suggestionType: string;
-  title: string;
-  description: string;
-  confidence: number;
-  status: SuggestionStatus;
 }
 
 export interface SubIssue {
