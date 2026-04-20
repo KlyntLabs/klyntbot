@@ -640,6 +640,19 @@ impl AgentLoopBuilder {
             Arc::clone(&subagent_manager) as Arc<dyn tools::spawn::SpawnHandler>
         ));
 
+        // Standalone AlarmTool (free-floating reminders, spec §8.2/§8.4).
+        {
+            let fire_store = Arc::new(scheduling::temporal::fire_store::FireStore::new(
+                repos.scheduled_fires.clone(),
+            ));
+            let mut alarm_tool =
+                feature_alarms::AlarmTool::new(fire_store, repos.scheduled_fires.clone());
+            if let Some(ref domain_bus) = self.domain_event_bus {
+                alarm_tool = alarm_tool.with_domain_bus(Arc::clone(domain_bus));
+            }
+            tool_registry.register(alarm_tool);
+        }
+
         // Cron tool (optional)
         let cron_handler: Option<Arc<dyn tools::cron_tool::CronHandler>> =
             if let Some((ref executor, ref repo)) = self.cron_executor {

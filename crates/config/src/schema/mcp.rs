@@ -189,6 +189,7 @@ fn default_exposed_tools() -> Vec<String> {
         "annotate",
         "learning",
         "cron",
+        "alarm",
         "mirror",
         "temporal",
     ]

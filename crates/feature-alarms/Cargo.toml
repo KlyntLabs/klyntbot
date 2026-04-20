@@ -1,0 +1,22 @@
+[package]
+name = "feature-alarms"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+async-trait.workspace = true
+bus.workspace = true
+common.workspace = true
+jiff = { workspace = true }
+scheduling.workspace = true
+serde = { workspace = true }
+serde_json.workspace = true
+storage.workspace = true
+thiserror = { workspace = true }
+tokio.workspace = true
+tools-core.workspace = true
+tracing.workspace = true
+uuid = { workspace = true }
+
+[dev-dependencies]
+tokio = { workspace = true, features = ["macros", "test-util"] }

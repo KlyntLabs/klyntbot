@@ -66,6 +66,7 @@ dependencies = [
  "config",
  "context_engine",
  "dirs",
+ "feature-alarms",
  "feature-coaching",
  "feature-finance",
  "feature-language-learning",
@@ -4664,6 +4665,25 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1e6853b52649d4ac5c0bd02320cddc5ba956bdb407c4b75a2c6b75bf51500f8c"
 dependencies = [
  "simd-adler32",
+]
+
+[[package]]
+name = "feature-alarms"
+version = "0.1.0"
+dependencies = [
+ "async-trait",
+ "bus",
+ "common",
+ "jiff",
+ "scheduling",
+ "serde",
+ "serde_json",
+ "storage",
+ "thiserror 2.0.18",
+ "tokio",
+ "tools-core",
+ "tracing",
+ "uuid",
 ]
 
 [[package]]
