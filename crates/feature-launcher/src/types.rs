@@ -165,6 +165,7 @@ pub enum WindowAction {
     Maximize,
     Center,
     Restore,
+    Preset(String),
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

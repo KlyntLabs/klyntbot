@@ -11,17 +11,23 @@ struct LastAction {
 
 pub struct WindowManager {
     last_actions: Mutex<HashMap<u32, LastAction>>,
+    pre_preset_cache: Mutex<HashMap<u32, (f64, f64, f64, f64)>>,
 }
 
 impl WindowManager {
     pub fn new() -> Self {
         Self {
             last_actions: Mutex::new(HashMap::new()),
+            pre_preset_cache: Mutex::new(HashMap::new()),
         }
     }
 
     #[cfg(target_os = "macos")]
     pub fn execute(&self, action: &WindowAction) -> common::Result<()> {
+        if let WindowAction::Preset(name) = action {
+            return self.apply_preset(name);
+        }
+
         use super::accessibility;
 
         let pid = accessibility::get_frontmost_pid().ok_or_else(|| {
@@ -71,6 +77,52 @@ impl WindowManager {
         )))
     }
 
+    #[cfg(target_os = "macos")]
+    pub fn apply_preset(&self, name: &str) -> common::Result<()> {
+        use super::accessibility;
+        use crate::window_mgmt::presets::lookup;
+
+        let preset = lookup(name).ok_or_else(|| {
+            common::KlyntbotError::Io(std::io::Error::new(
+                std::io::ErrorKind::InvalidInput,
+                format!("unknown preset: {name}"),
+            ))
+        })?;
+        let pid = accessibility::get_frontmost_pid().ok_or_else(|| {
+            common::KlyntbotError::Io(std::io::Error::new(
+                std::io::ErrorKind::NotFound,
+                "no focused window",
+            ))
+        })?;
+        let window_id = pid as u32;
+
+        if name == "restore" {
+            if let Some(prev) = self.pre_preset_cache.lock().get(&window_id).copied() {
+                accessibility::set_window_frame(pid, prev.0, prev.1, prev.2, prev.3);
+            }
+            return Ok(());
+        }
+
+        let (sx, sy, sw, sh) = accessibility::get_screen_frame();
+        // TODO(v2): capture current window rect for true restore; main-display frame only in v1.
+        self.pre_preset_cache.lock().insert(window_id, (sx, sy, sw, sh));
+        let f = preset.frame;
+        let x = sx + (f.x as f64) * sw;
+        let y = sy + (f.y as f64) * sh;
+        let w = (f.w as f64) * sw;
+        let h = (f.h as f64) * sh;
+        accessibility::set_window_frame(pid, x, y, w, h);
+        Ok(())
+    }
+
+    #[cfg(not(target_os = "macos"))]
+    pub fn apply_preset(&self, _name: &str) -> common::Result<()> {
+        Err(common::KlyntbotError::Io(std::io::Error::new(
+            std::io::ErrorKind::Unsupported,
+            "Window management only supported on macOS",
+        )))
+    }
+
     fn compute_frame(
         &self,
         action: &WindowAction,
@@ -95,6 +147,8 @@ impl WindowManager {
                 let ch = sh * 0.7;
                 (sx + (sw - cw) / 2.0, sy + (sh - ch) / 2.0, cw, ch)
             }
+            // Preset variant is handled before compute_frame is called
+            WindowAction::Preset(_) => (sx, sy, sw, sh),
         }
     }
 }
@@ -102,5 +156,17 @@ impl WindowManager {
 impl Default for WindowManager {
     fn default() -> Self {
         Self::new()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn preset_frame_math_left_half_on_1920_1080() {
+        let p = crate::window_mgmt::presets::lookup("left-half").unwrap();
+        let w = (p.frame.w as f64 * 1920.0) as i32;
+        let h = (p.frame.h as f64 * 1080.0) as i32;
+        assert_eq!(w, 960);
+        assert_eq!(h, 1080);
     }
 }
