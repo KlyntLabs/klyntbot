@@ -5,6 +5,8 @@ struct CommandDef {
     subtitle: &'static str,
     action: SystemAction,
     keywords: &'static [&'static str],
+    arguments: &'static [(&'static str, &'static str, bool)], // (name, placeholder, required)
+    no_view: bool,
 }
 
 const COMMANDS: &[CommandDef] = &[
@@ -13,48 +15,64 @@ const COMMANDS: &[CommandDef] = &[
         subtitle: "Lock the display",
         action: SystemAction::LockScreen,
         keywords: &["lock", "screen", "security"],
+        arguments: &[],
+        no_view: false,
     },
     CommandDef {
         title: "Sleep",
         subtitle: "Put the Mac to sleep",
         action: SystemAction::Sleep,
         keywords: &["sleep", "suspend"],
+        arguments: &[],
+        no_view: false,
     },
     CommandDef {
         title: "Restart",
         subtitle: "Restart the Mac",
         action: SystemAction::Restart,
         keywords: &["restart", "reboot"],
+        arguments: &[],
+        no_view: false,
     },
     CommandDef {
         title: "Shutdown",
         subtitle: "Shut down the Mac",
         action: SystemAction::Shutdown,
         keywords: &["shutdown", "power off", "turn off"],
+        arguments: &[],
+        no_view: false,
     },
     CommandDef {
         title: "Empty Trash",
         subtitle: "Empty the Trash",
         action: SystemAction::EmptyTrash,
         keywords: &["trash", "empty", "clean"],
+        arguments: &[],
+        no_view: false,
     },
     CommandDef {
         title: "Toggle Dark Mode",
         subtitle: "Switch appearance",
         action: SystemAction::ToggleDarkMode,
         keywords: &["dark", "light", "mode", "appearance", "theme"],
+        arguments: &[],
+        no_view: false,
     },
     CommandDef {
         title: "Toggle Do Not Disturb",
         subtitle: "Toggle Focus mode",
         action: SystemAction::ToggleDoNotDisturb,
         keywords: &["disturb", "dnd", "focus", "notifications", "quiet"],
+        arguments: &[("duration", "30m, 2h, until tomorrow", false)],
+        no_view: true,
     },
     CommandDef {
         title: "Eject All",
         subtitle: "Eject all external drives",
         action: SystemAction::EjectAll,
         keywords: &["eject", "drives", "unmount"],
+        arguments: &[],
+        no_view: false,
     },
 ];
 
@@ -74,8 +92,13 @@ impl SystemCommands {
                         action: cmd.action.clone(),
                     },
                     score: 0.5,
-                    no_view: false,
-                    arguments: vec![],
+                    no_view: cmd.no_view,
+                    arguments: cmd.arguments.iter().map(|(name, placeholder, required)| ArgSpec {
+                        name: (*name).to_string(),
+                        placeholder: (*placeholder).to_string(),
+                        kind: ArgKind::Text,
+                        required: *required,
+                    }).collect(),
                 })
                 .collect();
         }
@@ -124,8 +147,13 @@ impl SystemCommands {
                     action: cmd.action.clone(),
                 },
                 score: (score as f64) / 1000.0 * 1.0,
-                no_view: false,
-                arguments: vec![],
+                no_view: cmd.no_view,
+                arguments: cmd.arguments.iter().map(|(name, placeholder, required)| ArgSpec {
+                    name: (*name).to_string(),
+                    placeholder: (*placeholder).to_string(),
+                    kind: ArgKind::Text,
+                    required: *required,
+                }).collect(),
             })
             .collect()
     }
@@ -229,5 +257,19 @@ mod tests {
     fn test_search_empty_returns_all() {
         let results = SystemCommands::search("");
         assert_eq!(results.len(), 8);
+    }
+
+    #[test]
+    fn dnd_command_has_duration_arg() {
+        let items = SystemCommands::search("dnd");
+        let dnd = items
+            .iter()
+            .find(|i| i.title.to_lowercase().contains("do not disturb"))
+            .expect("dnd item present");
+        assert_eq!(dnd.arguments.len(), 1);
+        assert_eq!(dnd.arguments[0].name, "duration");
+        assert_eq!(dnd.arguments[0].placeholder, "30m, 2h, until tomorrow");
+        assert!(!dnd.arguments[0].required);
+        assert!(dnd.no_view);
     }
 }
