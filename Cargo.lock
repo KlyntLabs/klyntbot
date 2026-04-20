@@ -4850,6 +4850,7 @@ dependencies = [
  "serde_json",
  "sqlx",
  "storage",
+ "thiserror 2.0.18",
  "tokio",
  "tools-core",
  "tools-core-macros",

@@ -51,6 +51,10 @@ pub struct TaskTool {
     pub(crate) suggestion_applier: Option<Arc<dyn SuggestionApplier>>,
     /// Optional forecast handler for estimation accuracy and project forecasting.
     pub(crate) forecast_handler: Option<Arc<dyn ForecastHandler>>,
+    /// Optional task_alarms repo — required for `alarms` param on create/update.
+    pub(crate) task_alarms_repo: Option<storage::repos::task_alarms::TaskAlarmsRepo>,
+    /// Optional FireStore — required for `alarms` param on create/update.
+    pub(crate) fire_store: Option<Arc<scheduling::temporal::fire_store::FireStore>>,
 }
 
 impl TaskTool {
@@ -82,7 +86,22 @@ impl TaskTool {
             proactive_handler: None,
             suggestion_applier: None,
             forecast_handler: None,
+            task_alarms_repo: None,
+            fire_store: None,
         }
+    }
+
+    /// Attach the task_alarms repo + scheduler FireStore so the `alarms`
+    /// param on create/update materializes user/agent-supplied alarm rules
+    /// into the canonical `scheduled_fires` table.
+    pub fn with_alarm_writer(
+        mut self,
+        task_alarms_repo: storage::repos::task_alarms::TaskAlarmsRepo,
+        fire_store: Arc<scheduling::temporal::fire_store::FireStore>,
+    ) -> Self {
+        self.task_alarms_repo = Some(task_alarms_repo);
+        self.fire_store = Some(fire_store);
+        self
     }
 
     /// Attach an area repo for auto-resolving area_id on create.
@@ -214,6 +233,54 @@ impl TaskTool {
             Some(row) => Ok(Some(self.load_full_task(row).await?)),
             None => Ok(None),
         }
+    }
+
+    /// Parse the `alarms` JSON param into typed `AlarmSpec`s.
+    ///
+    /// Returns `Ok(None)` if the field is absent (caller should leave alarms unchanged),
+    /// `Ok(Some(vec![]))` for explicit empty (clear all alarms),
+    /// `Ok(Some(specs))` otherwise.
+    pub(crate) fn parse_alarms_param(
+        p: &tools_core::ParamExtractor<'_>,
+    ) -> Result<Option<Vec<crate::alarms::AlarmSpec>>> {
+        let Some(arr) = p.optional_array("alarms")? else {
+            return Ok(None);
+        };
+        let mut specs = Vec::with_capacity(arr.len());
+        for v in arr {
+            let spec: crate::alarms::AlarmSpec =
+                serde_json::from_value(v.clone()).map_err(|e| {
+                    ToolError::InvalidParams(format!("invalid alarm spec: {e} (item: {v})"))
+                })?;
+            specs.push(spec);
+        }
+        Ok(Some(specs))
+    }
+
+    /// Materialize alarm specs for a task. No-op if `task_alarms_repo` /
+    /// `fire_store` weren't injected. Cancels existing alarms first when
+    /// `replace` is true (use for updates).
+    pub(crate) async fn apply_alarm_specs(
+        &self,
+        task_id: &str,
+        due_date: Option<jiff::Timestamp>,
+        specs: &[crate::alarms::AlarmSpec],
+        replace: bool,
+    ) -> Result<usize> {
+        let (Some(repo), Some(store)) = (&self.task_alarms_repo, &self.fire_store) else {
+            tracing::debug!("alarms: task {task_id} provided alarms but no writer wired; skipping");
+            return Ok(0);
+        };
+        if replace {
+            crate::alarms::cancel_for_task(task_id, repo, store)
+                .await
+                .map_err(|e| ToolError::ExecutionFailed(format!("alarm cancel failed: {e}")))?;
+        }
+        crate::alarms::materialize_for_task(task_id, due_date, specs, &self.timezone, repo, store)
+            .await
+            .map_err(|e| {
+                ToolError::ExecutionFailed(format!("alarm materialize failed: {e}")).into()
+            })
     }
 
     /// Load a task by ID or return a not-found error.
@@ -357,6 +424,24 @@ impl Tool for TaskTool {
                 "group_id": { "type": "string", "description": "Group ID (for update)" },
                 "scheduled_start": { "type": "string", "description": "Scheduled start datetime (for update)" },
                 "scheduled_end": { "type": "string", "description": "Scheduled end datetime (for update)" },
+                "alarms": {
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "type": { "type": "string", "enum": ["relative_before", "civil_time", "absolute"] },
+                            "offset_secs": { "type": "integer", "description": "for relative_before: seconds before due_date" },
+                            "day_offset": { "type": "integer", "description": "for civil_time: day offset (-1 = day before)" },
+                            "time_of_day": { "type": "string", "description": "for civil_time: 'HH:MM'" },
+                            "timezone": { "type": "string", "description": "for civil_time: IANA tz, defaults to config.timezone" },
+                            "fire_at": { "type": "string", "description": "for absolute: ISO 8601 timestamp" },
+                            "channels": { "type": "array", "items": { "type": "string" }, "description": "channel names: os_native|tray|telegram|discord|email" },
+                            "priority": { "type": "string", "enum": ["normal", "urgent"] }
+                        },
+                        "required": ["type"]
+                    },
+                    "description": "Alarm rules for this task (replaces existing alarms on update). Spec §8.3."
+                },
                 "operations": {
                     "type": "array",
                     "items": {

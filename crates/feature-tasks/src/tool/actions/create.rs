@@ -54,9 +54,28 @@ impl TaskTool {
             task.agent_config = serde_json::from_str(ac).ok();
         }
 
+        // Parse optional alarms before insert so we surface bad-shape errors
+        // before any DB writes.
+        let alarm_specs = Self::parse_alarms_param(p)?;
+
         let row = storage::TaskRow::from(&task);
         let created_row = self.repo.add(&row).await?;
         let created = Task::from(created_row);
+
+        // Materialize alarm rules + scheduled fires.
+        if let Some(specs) = &alarm_specs {
+            // `replace=false` on create — there are no existing alarms.
+            if let Err(e) = self
+                .apply_alarm_specs(&created.id, created.due_date, specs, false)
+                .await
+            {
+                warn!(
+                    "task_alarms: create {} provided {} alarms but materialize failed: {e}",
+                    created.id,
+                    specs.len()
+                );
+            }
+        }
 
         // Auto-enrich if handler is available
         let mut enriched_info = String::new();

@@ -1311,6 +1311,16 @@ impl AgentLoopBuilder {
                 task_tool = task_tool.with_domain_bus(Arc::clone(domain_bus));
             }
 
+            // Wire alarm writer (task_alarms repo + FireStore) so the `alarms`
+            // param on TaskTool create/update materializes into scheduled_fires.
+            // Spec §3 (rule model), §8.1 (TaskTool subfields).
+            {
+                let fire_store = Arc::new(scheduling::temporal::fire_store::FireStore::new(
+                    repos.scheduled_fires.clone(),
+                ));
+                task_tool = task_tool.with_alarm_writer(repos.task_alarms.clone(), fire_store);
+            }
+
             // ── Phase 2: Agentic Intelligence handlers ────────────────────
             let decomp_handler = Arc::new(crate::handlers::LlmDecompositionHandler::new(
                 provider.clone(),

@@ -15,6 +15,9 @@ impl TaskTool {
     pub(crate) async fn handle_update(&self, p: &ParamExtractor<'_>) -> Result<String> {
         let id = p.required_str("id")?;
 
+        // Parse optional alarms before any DB writes — surface shape errors early.
+        let alarm_specs = Self::parse_alarms_param(p)?;
+
         // Capture old values for activity logging
         let old_row = if self.config.auto_log_activity {
             self.repo.get(id).await?
@@ -101,6 +104,21 @@ impl TaskTool {
                 if let Some(ref emb) = self.embedding_handler {
                     if let Err(e) = emb.embed_task(&task).await {
                         warn!("Failed to regenerate embedding for task {}: {}", task.id, e);
+                    }
+                }
+
+                // Re-materialize alarms (replace semantics per spec §3.3).
+                // Absent `alarms` field → leave existing alarms unchanged.
+                // `alarms: []` → cancel all (specs empty, replace=true clears).
+                if let Some(specs) = &alarm_specs {
+                    if let Err(e) = self
+                        .apply_alarm_specs(&task.id, task.due_date, specs, true)
+                        .await
+                    {
+                        warn!(
+                            "task_alarms: update {} alarms re-materialize failed: {e}",
+                            task.id
+                        );
                     }
                 }
 

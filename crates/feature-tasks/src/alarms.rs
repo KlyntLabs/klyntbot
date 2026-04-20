@@ -407,7 +407,10 @@ mod tests {
         let back: AlarmSpec = serde_json::from_str(&s).unwrap();
         assert!(matches!(
             back,
-            AlarmSpec::RelativeBefore { offset_secs: 3600, .. }
+            AlarmSpec::RelativeBefore {
+                offset_secs: 3600,
+                ..
+            }
         ));
     }
 }
