@@ -9,7 +9,7 @@ use std::sync::Arc;
 use bus::DomainEventBus;
 
 use crate::config::TasksConfig;
-use crate::handlers::{EmbeddingHandler, EnrichmentHandler};
+use crate::handlers::EmbeddingHandler;
 use crate::types::{Attachment, Task, TimeEntry};
 use common::{Result, ToolError};
 use storage::TaskRepo;
@@ -22,14 +22,11 @@ pub struct TaskTool {
     pub(crate) max_focus_slots: usize,
     pub(crate) focus_deadline_hours: u64,
     pub(crate) timezone: String,
-    pub(crate) enrichment_handler: Option<Arc<dyn EnrichmentHandler>>,
     pub(crate) embedding_handler: Option<Arc<dyn EmbeddingHandler>>,
     /// LanceDB vector store for semantic search.
     pub(crate) embedding_store: Option<storage::VectorStore>,
     pub(crate) semantic_threshold: f64,
     pub(crate) rrf_k: u32,
-    /// Confidence threshold for auto-applying enrichment suggestions (0.0-1.0).
-    pub(crate) enrichment_threshold: f64,
     /// Optional progress handler for cascading KR progress on complete.
     pub(crate) progress_handler: Option<Arc<dyn ProgressHandler>>,
     /// Optional domain event bus for cross-feature communication.
@@ -56,12 +53,10 @@ impl TaskTool {
             max_focus_slots,
             focus_deadline_hours,
             timezone,
-            enrichment_handler: None,
             embedding_handler: None,
             embedding_store: None,
             semantic_threshold: 0.5,
             rrf_k: 60,
-            enrichment_threshold: 0.70,
             progress_handler: None,
             domain_bus: None,
             config: TasksConfig::default(),
@@ -89,12 +84,6 @@ impl TaskTool {
         self
     }
 
-    /// Attach an enrichment handler.
-    pub fn with_enrichment_handler(mut self, handler: Arc<dyn EnrichmentHandler>) -> Self {
-        self.enrichment_handler = Some(handler);
-        self
-    }
-
     /// Attach an embedding handler for auto-embedding on create/update.
     pub fn with_embedding_handler(mut self, handler: Arc<dyn EmbeddingHandler>) -> Self {
         self.embedding_handler = Some(handler);
@@ -111,12 +100,6 @@ impl TaskTool {
     pub fn with_search_config(mut self, threshold: f64, rrf_k: u32) -> Self {
         self.semantic_threshold = threshold;
         self.rrf_k = rrf_k;
-        self
-    }
-
-    /// Set the enrichment auto-apply confidence threshold.
-    pub fn with_enrichment_threshold(mut self, threshold: f64) -> Self {
-        self.enrichment_threshold = threshold;
         self
     }
 
@@ -137,7 +120,6 @@ impl TaskTool {
         self.max_focus_slots = config.max_focus_slots;
         self.focus_deadline_hours = config.focus_deadline_hours;
         self.timezone = config.timezone.clone();
-        self.enrichment_threshold = config.enrichment.auto_apply_threshold;
         self.semantic_threshold = config.search.semantic_threshold;
         self.rrf_k = config.search.rrf_k;
         self.config = config;

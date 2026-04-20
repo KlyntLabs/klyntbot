@@ -1262,24 +1262,6 @@ impl AgentLoopBuilder {
             )
             .with_area_repo(area_repo);
 
-            // Set enrichment threshold from config
-            task_tool =
-                task_tool.with_enrichment_threshold(config.todo.enrichment.auto_apply_threshold);
-
-            // Enrichment engine — directly implements feature_tasks::EnrichmentHandler
-            if config.todo.enrichment.enabled {
-                let mut enrichment_engine =
-                    super::super::enrichment::EnrichmentEngine::new(config.todo.enrichment.clone());
-                if config.todo.enrichment.use_llm {
-                    enrichment_engine = enrichment_engine
-                        .with_provider(provider.clone(), config.agents.defaults.model.clone());
-                }
-                let enrichment_engine = Arc::new(enrichment_engine);
-                task_tool = task_tool.with_enrichment_handler(
-                    enrichment_engine as Arc<dyn feature_tasks::EnrichmentHandler>,
-                );
-            }
-
             // Task embedding (semantic search)
             if let (true, Some(vs)) = (config.todo.search.enabled, self.vector_store.clone()) {
                 let task_embed_impl =

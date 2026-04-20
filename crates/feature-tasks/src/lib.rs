@@ -4,7 +4,7 @@
 //! Provides:
 //! - `TasksFeature`: implements `FeaturePackage` (tools, migrations, config, health)
 //! - Domain types: `Task`, `TaskActivity`, etc.
-//! - Handler traits: `EnrichmentHandler`, `EmbeddingHandler`, `ProgressHandler`
+//! - Handler traits: `EmbeddingHandler`, `ProgressHandler`
 //! - Utilities: `scoring`, `complexity`, `rrule_utils`, `search`
 //! - Config: `TasksConfig`
 
@@ -26,7 +26,7 @@ pub mod types;
 pub use complexity::{evaluate_task_complexity, TaskComplexitySignals};
 pub use config::{EnrichmentConfig, SearchConfig, TasksConfig};
 pub use handlers::{
-    EmbeddingHandler, EnrichmentHandler, EnrichmentResult, EnrichmentSuggestion, ProgressHandler,
+    EmbeddingHandler, ProgressHandler,
 };
 pub use rrule_utils::{humanize_rrule, next_occurrence, should_spawn_instance, validate_rrule};
 pub use scoring::{calculate_age_days, calculate_score, calculate_urgency, priority_weight};

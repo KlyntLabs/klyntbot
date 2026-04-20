@@ -57,7 +57,7 @@ pub struct ExtractedRelationship {
 ///
 /// Defined here (L3), implemented in the agent crate (L5) with actual LLM
 /// providers. This follows the same dependency inversion pattern as
-/// `EnrichmentHandler` and `SpawnHandler`.
+/// `SpawnHandler`.
 #[async_trait]
 pub trait ExtractionHandler: Send + Sync {
     /// Extract structured semantic facts from a batch of observations.

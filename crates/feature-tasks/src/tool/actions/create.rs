@@ -8,7 +8,7 @@ use bus::DomainEvent;
 
 use super::super::TaskTool;
 use crate::types::Task;
-use storage::TaskPatch;
+
 
 impl TaskTool {
     pub(crate) async fn handle_create(
@@ -77,65 +77,6 @@ impl TaskTool {
             }
         }
 
-        // Auto-enrich if handler is available
-        let mut enriched_info = String::new();
-        if let Some(handler) = &self.enrichment_handler {
-            match handler.enrich(&created).await {
-                Ok(Some(suggestions)) => {
-                    let threshold = self.enrichment_threshold;
-                    let mut update_priority: Option<Option<i16>> = None;
-                    let update_est: Option<Option<i32>> = None;
-                    let mut update_energy: Option<Option<String>> = None;
-                    let mut applied = Vec::new();
-
-                    if let Some(ref priority_sug) = suggestions.priority {
-                        if priority_sug.confidence >= threshold {
-                            update_priority = Some(Some(priority_sug.value));
-                            applied.push(format!("P{}", priority_sug.value));
-                        }
-                    }
-
-                    if let Some(ref energy_sug) = suggestions.energy_level {
-                        if energy_sug.confidence >= threshold {
-                            update_energy = Some(Some(energy_sug.value.to_string()));
-                            applied.push(format!("energy:{}", energy_sug.value));
-                        }
-                    }
-
-                    if !applied.is_empty() {
-                        let patch = TaskPatch {
-                            id: created.id.clone(),
-                            priority: update_priority,
-                            estimated_minutes: update_est,
-                            energy_level: update_energy,
-                            ..Default::default()
-                        };
-                        if self.repo.update(&patch).await.is_ok() {
-                            enriched_info = format!(" (enriched: {})", applied.join(", "));
-                        }
-                    }
-
-                    // Log activity if configured
-                    if self.config.auto_log_activity && !applied.is_empty() {
-                        let _ = self
-                            .repo
-                            .log_activity(
-                                &created.id,
-                                "enrichment",
-                                None,
-                                None,
-                                Some(&applied.join(", ")),
-                                "system",
-                                Some("Auto-enrichment applied on creation"),
-                            )
-                            .await;
-                    }
-                }
-                Ok(None) => {}
-                Err(e) => warn!("Task enrichment failed: {}", e),
-            }
-        }
-
         // Auto-embed (best-effort)
         if let Some(ref emb) = self.embedding_handler {
             if let Err(e) = emb.embed_task(&created).await {
@@ -188,8 +129,8 @@ impl TaskTool {
         }
 
         Ok(format!(
-            "Task created: {} (ID: {}, type: {}){}",
-            created.title, created.id, created.task_type, enriched_info
+            "Task created: {} (ID: {}, type: {})",
+            created.title, created.id, created.task_type
         ))
     }
 
