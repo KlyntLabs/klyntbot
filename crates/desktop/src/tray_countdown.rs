@@ -69,7 +69,7 @@ pub fn spawn(
     let dirty_sub = Arc::clone(&dirty);
     let notify_sub = Arc::clone(&notify);
     let shutdown_sub = shutdown.clone();
-    tokio::spawn(async move {
+    tauri::async_runtime::spawn(async move {
         let mut rx = bus.subscribe();
         loop {
             tokio::select! {

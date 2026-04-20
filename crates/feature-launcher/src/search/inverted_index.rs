@@ -54,10 +54,15 @@ pub(crate) fn tokenize(s: &str) -> Vec<String> {
         .collect()
 }
 
-/// Generate prefix keys for a token: "downloads" → ["d","do","dow",...,"downloads"] capped at MAX_PREFIX_LEN.
+/// Generate prefix keys for a token: "downloads" → ["d","do","dow",...,"downloads"] capped at MAX_PREFIX_LEN chars.
 pub(crate) fn prefixes(token: &str) -> impl Iterator<Item = SmolStr> + '_ {
-    let max = token.len().min(MAX_PREFIX_LEN);
-    (1..=max).map(move |n| SmolStr::new(&token[..n]))
+    token
+        .char_indices()
+        .take(MAX_PREFIX_LEN)
+        .map(move |(i, c)| {
+            let end = i + c.len_utf8();
+            SmolStr::new(&token[..end])
+        })
 }
 
 use ignore::WalkBuilder;

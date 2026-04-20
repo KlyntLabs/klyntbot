@@ -1132,7 +1132,7 @@ async fn ensure_cron_jobs(
     ensure_job!(
         JOB_REFORGE_NIGHTLY,
         scheduling::CronSchedule::Cron {
-            expr: "0 3 * * *".to_string(),
+            expr: "0 0 3 * * *".to_string(),
             tz: Some(config.timezone.clone()),
         },
         "Nightly Reforge: knowledge synthesis, skill improvement, compaction",
@@ -1141,7 +1141,7 @@ async fn ensure_cron_jobs(
     ensure_job!(
         JOB_ATOM_DECAY,
         scheduling::CronSchedule::Cron {
-            expr: "0 3 * * *".to_string(),
+            expr: "0 0 3 * * *".to_string(),
             tz: Some(config.timezone.clone()),
         },
         "Daily knowledge atom decay",
@@ -1150,7 +1150,7 @@ async fn ensure_cron_jobs(
     ensure_job!(
         JOB_ATOM_EXTRACTION_CATCHALL,
         scheduling::CronSchedule::Cron {
-            expr: "0 2 * * *".to_string(),
+            expr: "0 0 2 * * *".to_string(),
             tz: None
         },
         "Extract atoms from unprocessed notes",
@@ -1167,7 +1167,7 @@ async fn ensure_cron_jobs(
     ensure_job!(
         JOB_BLACKBOARD_CLEANUP,
         scheduling::CronSchedule::Cron {
-            expr: "0 4 * * 0".to_string(),
+            expr: "0 0 4 * * SUN".to_string(),
             tz: Some(config.timezone.clone()),
         },
         "Clean stale blackboard entries",
@@ -1201,7 +1201,7 @@ async fn ensure_cron_jobs(
     ensure_job!(
         JOB_CROSS_DOMAIN_NIGHTLY,
         scheduling::CronSchedule::Cron {
-            expr: "0 2 * * *".to_string(),
+            expr: "0 0 2 * * *".to_string(),
             tz: None
         },
         "Nightly cross-domain insight batch",
@@ -1210,7 +1210,7 @@ async fn ensure_cron_jobs(
     ensure_job!(
         JOB_LAUNCHER_USAGE_PRUNE,
         scheduling::CronSchedule::Cron {
-            expr: "0 3 * * 0".to_string(),
+            expr: "0 0 3 * * SUN".to_string(),
             tz: None
         },
         "Prune old launcher usage entries",
