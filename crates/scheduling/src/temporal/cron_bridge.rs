@@ -51,7 +51,8 @@ impl CronBridge {
     }
 
     /// Called after a cron fire dispatches: compute the next run and insert a
-    /// fresh pending row. No-op if the job has been disabled since.
+    /// fresh pending row. No-op if the job has been disabled since, or if the
+    /// schedule is a one-shot `At` (which fires exactly once).
     pub async fn advance(&self, job_id: &str) -> Result<(), SchedulerError> {
         // If the job was deleted between fire and advance, no-op instead of
         // propagating NotFound — the scheduler dispatch path must not fault on
@@ -61,9 +62,17 @@ impl CronBridge {
             Err(storage::error::StorageError::NotFound(_)) => return Ok(()),
             Err(e) => return Err(e.into()),
         };
-        if job.enabled {
-            self.ensure_scheduled(&job).await?;
+        if !job.enabled {
+            return Ok(());
         }
+        // One-shot `At` schedules don't recur — leaving them unscheduled here
+        // means they never fire again, which matches their semantics.
+        if let Ok(crate::types::CronSchedule::At { .. }) =
+            serde_json::from_value::<crate::types::CronSchedule>(job.schedule.clone())
+        {
+            return Ok(());
+        }
+        self.ensure_scheduled(&job).await?;
         Ok(())
     }
 
@@ -84,25 +93,44 @@ impl CronBridge {
         Ok(())
     }
 
-    /// Compute the next fire time for a cron job. Uses the `cron` crate at a
-    /// chrono boundary hidden inside this function.
+    /// Compute the next fire time for a cron job. Handles all three
+    /// `CronSchedule` variants (Cron / Every / At). Uses the `cron` crate at a
+    /// chrono boundary hidden inside the Cron arm only.
     fn next_fire_for(&self, job: &CronJobRow) -> Result<Timestamp, SchedulerError> {
-        let cron_expr = job
-            .schedule
-            .get("cron")
-            .and_then(|v| v.as_str())
-            .ok_or_else(|| {
+        let schedule: crate::types::CronSchedule = serde_json::from_value(job.schedule.clone())
+            .map_err(|e| {
                 SchedulerError::InvalidState(format!(
-                    "cron job {} has no 'cron' field in schedule",
+                    "cron job {} has invalid schedule: {e}",
                     job.id
                 ))
             })?;
-        let tz_name = job
-            .schedule
-            .get("tz")
-            .and_then(|v| v.as_str())
-            .unwrap_or("UTC");
-        let schedule = Schedule::from_str(cron_expr).map_err(|e| {
+
+        let (cron_expr, tz_name) = match schedule {
+            crate::types::CronSchedule::Every { every_ms } => {
+                let next_ms = jiff::Timestamp::now()
+                    .as_millisecond()
+                    .saturating_add(every_ms as i64);
+                return Timestamp::from_millisecond(next_ms).map_err(|e| {
+                    SchedulerError::InvalidState(format!(
+                        "cron job {} every_ms produced out-of-range timestamp: {e}",
+                        job.id
+                    ))
+                });
+            }
+            crate::types::CronSchedule::At { at_ms } => {
+                return Timestamp::from_millisecond(at_ms).map_err(|e| {
+                    SchedulerError::InvalidState(format!(
+                        "cron job {} at_ms produced out-of-range timestamp: {e}",
+                        job.id
+                    ))
+                });
+            }
+            crate::types::CronSchedule::Cron { expr, tz } => {
+                (expr, tz.unwrap_or_else(|| "UTC".to_string()))
+            }
+        };
+
+        let schedule = Schedule::from_str(&cron_expr).map_err(|e| {
             SchedulerError::InvalidState(format!("invalid cron '{cron_expr}': {e}"))
         })?;
 
@@ -160,7 +188,7 @@ mod tests {
             name: format!("job-{id}"),
             enabled,
             origin: "user".into(),
-            schedule: serde_json::json!({ "cron": cron_expr, "tz": "UTC" }),
+            schedule: serde_json::json!({ "kind": "cron", "expr": cron_expr, "tz": "UTC" }),
             payload: serde_json::json!({}),
             next_run_at_ms: None,
             last_run_at_ms: None,

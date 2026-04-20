@@ -168,14 +168,14 @@ pub enum DomainEvent {
         actor: Option<String>,
     },
 
-    /// Emitted when a task's due date is set or changed. Used by DeadlineScheduler.
+    /// Emitted when a task's due date is set or changed. Consumed by feature_tasks::focus_alarms.
     TaskDueDateChanged {
         task_id: String,
         /// None means the due date was cleared.
         due_date: Option<String>,
     },
 
-    /// Emitted when a task is focused/unfocused with a deadline. Used by DeadlineScheduler.
+    /// Emitted when a task is focused/unfocused with a deadline. Consumed by feature_tasks::focus_alarms.
     TaskFocusChanged {
         task_id: String,
         /// None means unfocused.

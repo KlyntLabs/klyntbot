@@ -166,7 +166,7 @@ impl AppCore {
                 });
             }
 
-            // Notify DeadlineScheduler of due date
+            // Emit TaskDueDateChanged for downstream subscribers (alarms, tray countdown).
             if created.due_date.is_some() {
                 bus.publish(bus::DomainEvent::TaskDueDateChanged {
                     task_id: id.clone(),
@@ -294,7 +294,7 @@ impl AppCore {
                     }
                 }
 
-                // Emit due date change for DeadlineScheduler
+                // Emit TaskDueDateChanged for downstream subscribers (alarms, tray countdown).
                 if let Some(ref new_due) = patch.due_date {
                     let old_due = old.due_date;
                     let changed = match (old_due, new_due) {

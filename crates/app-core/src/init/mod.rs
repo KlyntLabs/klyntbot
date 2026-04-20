@@ -3,7 +3,6 @@ mod channels;
 mod coaching;
 mod cognitive;
 mod cron;
-mod deadline;
 mod launcher;
 mod productivity;
 mod storage;
@@ -325,10 +324,25 @@ impl AppCore {
             });
         }
 
-        // ── Deadline scheduler (event-driven timers) ────────────────────
-        let deadline_scheduler =
-            deadline::init_deadline_scheduler(&repos, &domain_event_bus, &config, &shutdown_token)
-                .await;
+        // ── Focus alarms + AlarmFired side-effects (replaces legacy
+        //    DeadlineScheduler — focus warnings now persist via
+        //    scheduled_fires; recurring spawns are covered by the static
+        //    `__klyntbot_recurring_tasks` cron job in init/cron.rs).
+        let _focus_alarms_handle = {
+            let fire_store = Arc::new(scheduling::temporal::fire_store::FireStore::new(
+                repos.scheduled_fires.clone(),
+            ));
+            feature_tasks::focus_alarms::spawn(
+                Arc::clone(&domain_event_bus),
+                fire_store,
+                shutdown_token.clone(),
+            )
+        };
+        let _alarm_side_effects_handle = feature_tasks::alarm_side_effects::spawn(
+            Arc::clone(&domain_event_bus),
+            repos.tasks.clone(),
+            shutdown_token.clone(),
+        );
 
         // ── Phases 5 & 8: Run independent init phases concurrently ─────
         let (productivity_result, launcher_result) = tokio::join!(
@@ -767,7 +781,6 @@ impl AppCore {
                 storage_pool.inner().clone(),
             )),
             autotuner,
-            deadline_scheduler: Some(deadline_scheduler),
             temporal_scheduler: Some(temporal_scheduler),
             _temporal_scheduler_handle: Some(temporal_scheduler_handle),
             _temporal_wake_subscriber: Some(temporal_wake_subscriber),

@@ -36,7 +36,7 @@ impl TaskTool {
                     .await;
             }
 
-            // Notify DeadlineScheduler
+            // Notify focus_alarms subscriber to materialize 6h/3h/1h warnings + expire.
             if let Some(ref bus) = self.domain_bus {
                 bus.publish(bus::DomainEvent::TaskFocusChanged {
                     task_id: id.to_string(),
@@ -74,7 +74,7 @@ impl TaskTool {
                     .await;
             }
 
-            // Notify DeadlineScheduler
+            // Notify focus_alarms subscriber to cancel any pending warnings.
             if let Some(ref bus) = self.domain_bus {
                 bus.publish(bus::DomainEvent::TaskFocusChanged {
                     task_id: id.to_string(),

@@ -4852,6 +4852,7 @@ dependencies = [
  "storage",
  "thiserror 2.0.18",
  "tokio",
+ "tokio-util",
  "tools-core",
  "tools-core-macros",
  "tracing",

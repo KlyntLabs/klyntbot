@@ -518,7 +518,7 @@ mod tests {
             name: "every-sec".into(),
             enabled: true,
             origin: "user".into(),
-            schedule: serde_json::json!({ "cron": "* * * * * * *", "tz": "UTC" }),
+            schedule: serde_json::json!({ "kind": "cron", "expr": "* * * * * * *", "tz": "UTC" }),
             payload: serde_json::json!({}),
             next_run_at_ms: None,
             last_run_at_ms: None,

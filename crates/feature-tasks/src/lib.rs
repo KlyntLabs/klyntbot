@@ -10,10 +10,12 @@
 //! - Utilities: `scoring`, `complexity`, `rrule_utils`, `search`
 //! - Config: `TasksConfig`
 
+pub mod alarm_side_effects;
 pub mod alarms;
 pub mod cognitive_bridge;
 pub mod complexity;
 pub mod config;
+pub mod focus_alarms;
 pub mod forecast;
 pub mod handlers;
 pub mod recurrence_repo;
