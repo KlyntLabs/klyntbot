@@ -7,6 +7,7 @@ edition.workspace = true
 anyhow.workspace = true
 bus.workspace = true
 common.workspace = true
+notifications.workspace = true
 scheduling.workspace = true
 tools-core.workspace = true
 tools-core-macros.workspace = true

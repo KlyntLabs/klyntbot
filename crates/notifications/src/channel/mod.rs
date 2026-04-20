@@ -14,6 +14,21 @@ pub const CHANNEL_EMAIL: u32 = 1 << 4;
 
 /// Convert a channel_mask bitfield into the corresponding channel-name strings.
 /// Returns an empty Vec for mask == 0. Order is OS_NATIVE, TRAY, TELEGRAM, DISCORD, EMAIL.
+/// Convert channel-name strings into a channel_mask bitfield.
+/// Unknown names are ignored (contribute 0). Inverse of [`mask_to_names`].
+pub fn names_to_mask(names: &[String]) -> u32 {
+    names.iter().fold(0u32, |m, n| {
+        m | match n.as_str() {
+            "os_native" => CHANNEL_OS_NATIVE,
+            "tray" => CHANNEL_TRAY,
+            "telegram" => CHANNEL_TELEGRAM,
+            "discord" => CHANNEL_DISCORD,
+            "email" => CHANNEL_EMAIL,
+            _ => 0,
+        }
+    })
+}
+
 pub fn mask_to_names(mask: u32) -> Vec<String> {
     let mut v = Vec::new();
     if mask & CHANNEL_OS_NATIVE != 0 {

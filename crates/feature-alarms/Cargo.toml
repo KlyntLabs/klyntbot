@@ -8,6 +8,7 @@ async-trait.workspace = true
 bus.workspace = true
 common.workspace = true
 jiff = { workspace = true }
+notifications.workspace = true
 scheduling.workspace = true
 serde = { workspace = true }
 serde_json.workspace = true

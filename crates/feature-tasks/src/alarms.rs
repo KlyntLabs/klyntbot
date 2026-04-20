@@ -66,23 +66,11 @@ pub enum MaterializeError {
     Scheduler(#[from] scheduling::error::SchedulerError),
 }
 
-/// Channel name → bit. Mirrors `notifications::channel::CHANNEL_*`.
-fn channel_name_to_bit(name: &str) -> u32 {
-    match name {
-        "os_native" => 1,
-        "tray" => 2,
-        "telegram" => 4,
-        "discord" => 8,
-        "email" => 16,
-        _ => 0,
-    }
-}
-
 fn channels_to_mask(channels: &Option<Vec<String>>) -> i64 {
-    match channels {
-        None => 0,
-        Some(list) => list.iter().fold(0u32, |m, n| m | channel_name_to_bit(n)) as i64,
-    }
+    channels
+        .as_deref()
+        .map(|list| notifications::channel::names_to_mask(list) as i64)
+        .unwrap_or(0)
 }
 
 fn parse_hhmm(s: &str) -> Result<CivilTime, MaterializeError> {

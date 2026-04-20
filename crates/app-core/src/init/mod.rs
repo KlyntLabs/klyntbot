@@ -324,10 +324,7 @@ impl AppCore {
             });
         }
 
-        // ── Focus alarms + AlarmFired side-effects (replaces legacy
-        //    DeadlineScheduler — focus warnings now persist via
-        //    scheduled_fires; recurring spawns are covered by the static
-        //    `__klyntbot_recurring_tasks` cron job in init/cron.rs).
+        // ── Focus alarms + AlarmFired side-effects ─────────────────────
         let _focus_alarms_handle = {
             let fire_store = Arc::new(scheduling::temporal::fire_store::FireStore::new(
                 repos.scheduled_fires.clone(),

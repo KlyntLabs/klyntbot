@@ -11,6 +11,7 @@ use async_trait::async_trait;
 use bus::{DomainEvent, DomainEventBus};
 use common::{Result, ToolError};
 use jiff::{SignedDuration, Timestamp};
+use notifications::channel::names_to_mask;
 use scheduling::temporal::fire_store::{FireSpec, FireStore};
 use serde_json::{json, Value};
 use storage::repos::scheduled_fires::ScheduledFiresRepo;
@@ -22,23 +23,6 @@ const KIND: &str = "standalone_alarm";
 
 fn dedup_prefix(alarm_id: &str) -> String {
     format!("standalone:{alarm_id}:")
-}
-
-fn channel_name_to_bit(name: &str) -> u32 {
-    match name {
-        "os_native" => 1,
-        "tray" => 2,
-        "telegram" => 4,
-        "discord" => 8,
-        "email" => 16,
-        _ => 0,
-    }
-}
-
-fn channels_to_mask(channels: Option<&[String]>) -> u32 {
-    channels
-        .map(|list| list.iter().fold(0u32, |m, n| m | channel_name_to_bit(n)))
-        .unwrap_or(0)
 }
 
 /// Parse a duration like "10m", "1h", "2d", "30s", or an integer (seconds).
@@ -114,7 +98,7 @@ impl AlarmTool {
         };
 
         let alarm_id = format!("alarm_{}", Uuid::new_v4().simple());
-        let mask = channels_to_mask(channels.as_deref());
+        let mask = channels.as_deref().map(names_to_mask).unwrap_or(0);
         let payload = json!({
             "title": "Reminder",
             "body": message,

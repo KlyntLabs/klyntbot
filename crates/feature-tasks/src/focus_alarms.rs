@@ -1,10 +1,6 @@
 //! Focus alarms service — subscribes to `TaskFocusChanged` and materializes
 //! 6h/3h/1h warning alarms + an expire alarm into `scheduled_fires`.
 //!
-//! Replaces the in-memory focus warning logic that lived in
-//! `app-core/src/init/deadline.rs`. Persistence + crash recovery are inherited
-//! for free because everything lives in the canonical `scheduled_fires` table.
-//!
 //! Dedup convention: `focus:{task_id}:` prefix. Cancel-then-insert on every
 //! event, so re-focusing a task reliably replaces its warnings.
 

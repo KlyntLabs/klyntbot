@@ -145,7 +145,7 @@ pub fn evaluate_salience(event: &DomainEvent) -> SalienceVerdict {
         // Note editing finished — discard from cognitive (handled by atom extraction)
         DomainEvent::NoteEditingFinished { .. } => SalienceVerdict::Discard,
 
-        // DeadlineScheduler events — discard (scheduler handles its own timers)
+        // Scheduler-owned timer events — discard
         DomainEvent::TaskDueDateChanged { .. } => SalienceVerdict::Discard,
         DomainEvent::TaskFocusChanged { .. } => SalienceVerdict::Discard,
         DomainEvent::RecurringTemplateAdvanced { .. } => SalienceVerdict::Discard,

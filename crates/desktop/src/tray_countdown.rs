@@ -139,6 +139,13 @@ async fn countdown_loop(
     notify: Arc<Notify>,
 ) {
     let mut cached: Option<NextItem> = None;
+    let mut last_tooltip: Option<String> = None;
+    let mut set_tooltip = |app: &AppHandle, value: &str| {
+        if last_tooltip.as_deref() != Some(value) {
+            set_tray_tooltip(app, value);
+            last_tooltip = Some(value.to_string());
+        }
+    };
 
     loop {
         // ── Render this tick's title and decide the next sleep budget. ──
@@ -159,7 +166,7 @@ async fn countdown_loop(
                 _ => "Voice active",
             };
             set_tray_title(&app, title);
-            set_tray_tooltip(&app, "Voice active — click to pause");
+            set_tooltip(&app, "Voice active — click to pause");
             cached = None;
             sleep_secs = VOICE_TICK_SECS;
         } else {
@@ -167,9 +174,9 @@ async fn countdown_loop(
             if VOICE_PHASE.load(Ordering::Relaxed) == 0 {
                 if let Some(core) = app.try_state::<Arc<AppCore>>() {
                     if core.voice_service().is_ok() {
-                        set_tray_tooltip(&app, "Voice ready — ⌥⇧V to think out loud");
+                        set_tooltip(&app, "Voice ready — ⌥⇧V to think out loud");
                     } else {
-                        set_tray_tooltip(&app, "Klynt");
+                        set_tooltip(&app, "Klynt");
                     }
                 }
             }
@@ -236,7 +243,10 @@ async fn query_next_item(app: &AppHandle) -> Option<NextItem> {
         .ok()?
         .timestamp();
 
-    let next_event = core.next_upcoming_event().await.and_then(|e| {
+    let (next_event_raw, next_task_raw) =
+        tokio::join!(core.next_upcoming_event(), core.next_upcoming_task());
+
+    let next_event = next_event_raw.and_then(|e| {
         let t = e.started_at.parse::<jiff::Timestamp>().ok()?;
         if t >= end_of_today {
             return None;
@@ -247,7 +257,7 @@ async fn query_next_item(app: &AppHandle) -> Option<NextItem> {
         })
     });
 
-    let next_task = core.next_upcoming_task().await.and_then(|t| {
+    let next_task = next_task_raw.and_then(|t| {
         let due = t.due_date?;
         if *due >= end_of_today {
             return None;

@@ -1,13 +1,11 @@
 //! AlarmFired side-effects — subscribes to `DomainEvent::AlarmFired` and
-//! performs the post-fire mutations that the legacy `DeadlineScheduler`
-//! handler closure used to do inline:
+//! performs the post-fire data mutations:
 //!
 //! - `kind = "focus_expire"` → call `TaskRepo::unfocus(task_id)`.
 //! - `kind = "task_alarm"`   → mark `tasks.last_reminded_at = now()` so the
 //!   reminder isn't re-fired if scheduling reconciles.
 //!
-//! Notification dispatch itself is handled by `crates/notifications/`; this
-//! subscriber only owns the local data-mutation aspect.
+//! Notification dispatch is handled by `crates/notifications/`.
 
 use std::sync::Arc;
 
