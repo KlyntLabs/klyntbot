@@ -184,6 +184,7 @@ impl super::SearchSource for ContactsSource {
                     },
                     score: (score as f64) / 1000.0 * 0.6,
                     no_view: false,
+                    arguments: vec![],
                 }
             })
             .collect()

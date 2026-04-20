@@ -102,6 +102,7 @@ impl super::SearchSource for FileSearchSource {
                     },
                     score: (s.score as f64 / 200.0) * 0.85,
                     no_view: false,
+                    arguments: vec![],
                 }
             })
             .collect();
@@ -143,6 +144,7 @@ impl super::SearchSource for FileSearchSource {
                     },
                     score: 0.40,
                     no_view: false,
+                    arguments: vec![],
                 });
             }
             items.sort_by(|a, b| {

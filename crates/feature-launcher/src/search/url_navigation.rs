@@ -15,6 +15,7 @@ impl UrlNavigation {
             kind: LauncherItemKind::UrlNavigation { url },
             score: 2.5,
             no_view: false,
+            arguments: vec![],
         })
     }
 }

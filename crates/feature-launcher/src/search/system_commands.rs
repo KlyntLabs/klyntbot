@@ -75,6 +75,7 @@ impl SystemCommands {
                     },
                     score: 0.5,
                     no_view: false,
+                    arguments: vec![],
                 })
                 .collect();
         }
@@ -124,6 +125,7 @@ impl SystemCommands {
                 },
                 score: (score as f64) / 1000.0 * 1.0,
                 no_view: false,
+                arguments: vec![],
             })
             .collect()
     }

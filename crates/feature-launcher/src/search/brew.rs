@@ -99,6 +99,7 @@ impl super::SearchSource for BrewSource {
                     },
                     score: (score as f64) / 1000.0 * 0.4,
                     no_view: false,
+                    arguments: vec![],
                 }
             })
             .collect()

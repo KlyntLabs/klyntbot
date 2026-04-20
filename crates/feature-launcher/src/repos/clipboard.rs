@@ -155,6 +155,7 @@ impl crate::search::SearchSource for ClipboardRepo {
                     },
                     score: 0.5,
                     no_view: false,
+                    arguments: vec![],
                 }
             })
             .collect()

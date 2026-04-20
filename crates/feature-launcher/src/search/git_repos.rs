@@ -88,6 +88,7 @@ impl super::SearchSource for GitReposSource {
                 },
                 score: (score as f64) / 1000.0 * 0.8,
                 no_view: false,
+                arguments: vec![],
             })
             .collect()
     }

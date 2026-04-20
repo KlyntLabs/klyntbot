@@ -9,6 +9,7 @@ storage.workspace = true
 tools-core.workspace = true
 platform-macos.workspace = true
 serde = { workspace = true }
+thiserror.workspace = true
 serde_json.workspace = true
 sqlx.workspace = true
 jiff = { workspace = true }

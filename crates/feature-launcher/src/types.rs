@@ -3,6 +3,28 @@ use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ArgSpec {
+    pub name: String,
+    pub placeholder: String,
+    pub kind: ArgKind,
+    #[serde(default = "default_true")]
+    pub required: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(tag = "type", content = "values", rename_all = "camelCase")]
+pub enum ArgKind {
+    Text,
+    Number,
+    Choice(Vec<String>),
+}
+
+fn default_true() -> bool {
+    true
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct LauncherItem {
     pub id: String,
     pub title: String,
@@ -12,6 +34,8 @@ pub struct LauncherItem {
     pub score: f64,
     #[serde(default)]
     pub no_view: bool,
+    #[serde(default)]
+    pub arguments: Vec<ArgSpec>,
 }
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize)]
