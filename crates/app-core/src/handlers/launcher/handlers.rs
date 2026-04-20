@@ -1,7 +1,7 @@
 //! Launcher handler methods on AppCore.
 
 use desktop_shared::errors::ApiError;
-use feature_launcher::{DashboardData, LauncherItem};
+use feature_launcher::{DashboardData, LauncherExecuteResult, LauncherItem};
 
 use crate::errors::map_storage_err;
 use crate::state::AppCore;
@@ -14,9 +14,13 @@ impl AppCore {
     }
 
     /// Record execution of a launcher item for frequency boosting.
-    pub async fn launcher_execute(&self, item_id: String, kind: String) -> Result<(), ApiError> {
+    pub async fn launcher_execute(
+        &self,
+        item_id: String,
+        kind: String,
+    ) -> Result<LauncherExecuteResult, ApiError> {
         let engine = self.launcher_engine()?;
-        engine.record_execution(&item_id, &kind).await
+        engine.execute(&item_id, &kind).await
     }
 
     /// Build dashboard data for the launcher.

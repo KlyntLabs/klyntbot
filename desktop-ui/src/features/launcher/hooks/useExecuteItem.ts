@@ -1,11 +1,22 @@
 import { ipc } from "@shared/hooks/useIpc";
 import { useLauncherStore } from "../stores/launcherStore";
-import type { LauncherItem } from "../types";
+import type { LauncherExecuteResult, LauncherItem } from "../types";
 
 interface ExecuteItemOptions {
   onEnterChat: (query: string) => void;
   onExpandToMain: () => void;
   onHide: () => void;
+}
+
+async function hideAndBadge(
+  item: LauncherItem,
+  result: LauncherExecuteResult,
+  onHide: () => void,
+): Promise<void> {
+  onHide();
+  if (item.noView && result.message) {
+    await ipc("show_status_badge", { text: result.message, kind: result.badge, durationMs: 2000 });
+  }
 }
 
 export function executeItem(item: LauncherItem, options: ExecuteItemOptions) {
@@ -19,26 +30,34 @@ export function executeItem(item: LauncherItem, options: ExecuteItemOptions) {
       break;
     case "application":
       ipc("launcher_open_app", { path: item.kind.path })
-        .then(() => ipc("launcher_execute", { itemId: item.id, kind: "app" }))
-        .then(() => onHide())
+        .then(() =>
+          ipc<LauncherExecuteResult>("launcher_execute", { itemId: item.id, kind: "app" }),
+        )
+        .then((result) => hideAndBadge(item, result, onHide))
         .catch((err) => console.error("Failed to open app:", err));
       break;
     case "systemCommand":
       ipc("launcher_system_command", { action: item.kind.action })
-        .then(() => ipc("launcher_execute", { itemId: item.id, kind: "command" }))
-        .then(() => onHide())
+        .then(() =>
+          ipc<LauncherExecuteResult>("launcher_execute", { itemId: item.id, kind: "command" }),
+        )
+        .then((result) => hideAndBadge(item, result, onHide))
         .catch((err) => console.error("Failed to execute system command:", err));
       break;
     case "script":
       ipc("launcher_run_script", { path: item.kind.path })
-        .then(() => ipc("launcher_execute", { itemId: item.id, kind: "script" }))
-        .then(() => onHide())
+        .then(() =>
+          ipc<LauncherExecuteResult>("launcher_execute", { itemId: item.id, kind: "script" }),
+        )
+        .then((result) => hideAndBadge(item, result, onHide))
         .catch((err) => console.error("Failed to run script:", err));
       break;
     case "clipboardEntry":
       ipc("launcher_clipboard_paste", { id: item.kind.entryId })
-        .then(() => ipc("launcher_execute", { itemId: item.id, kind: "clipboard" }))
-        .then(() => onHide())
+        .then(() =>
+          ipc<LauncherExecuteResult>("launcher_execute", { itemId: item.id, kind: "clipboard" }),
+        )
+        .then((result) => hideAndBadge(item, result, onHide))
         .catch((err) => console.error("Failed to paste clipboard:", err));
       break;
     case "calculator":
@@ -51,28 +70,36 @@ export function executeItem(item: LauncherItem, options: ExecuteItemOptions) {
     case "contentMatch":
     case "gitRepo":
       ipc("launcher_open_app", { path: item.kind.path })
-        .then(() => ipc("launcher_execute", { itemId: item.id, kind: item.kind.type }))
-        .then(() => onHide())
+        .then(() =>
+          ipc<LauncherExecuteResult>("launcher_execute", { itemId: item.id, kind: item.kind.type }),
+        )
+        .then((result) => hideAndBadge(item, result, onHide))
         .catch((err) => console.error("Failed to open:", err));
       break;
     case "bookmark":
     case "browserHistory":
     case "urlNavigation":
       ipc("launcher_open_app", { path: item.kind.url })
-        .then(() => ipc("launcher_execute", { itemId: item.id, kind: item.kind.type }))
-        .then(() => onHide())
+        .then(() =>
+          ipc<LauncherExecuteResult>("launcher_execute", { itemId: item.id, kind: item.kind.type }),
+        )
+        .then((result) => hideAndBadge(item, result, onHide))
         .catch((err) => console.error("Failed to open URL:", err));
       break;
     case "systemPref":
       ipc("launcher_open_app", { path: `x-apple.systempreferences:${item.kind.paneId}` })
-        .then(() => ipc("launcher_execute", { itemId: item.id, kind: "pref" }))
-        .then(() => onHide())
+        .then(() =>
+          ipc<LauncherExecuteResult>("launcher_execute", { itemId: item.id, kind: "pref" }),
+        )
+        .then((result) => hideAndBadge(item, result, onHide))
         .catch((err) => console.error("Failed to open pref:", err));
       break;
     case "runningApp":
       ipc("launcher_open_app", { path: item.kind.path })
-        .then(() => ipc("launcher_execute", { itemId: item.id, kind: "running_app" }))
-        .then(() => onHide())
+        .then(() =>
+          ipc<LauncherExecuteResult>("launcher_execute", { itemId: item.id, kind: "running_app" }),
+        )
+        .then((result) => hideAndBadge(item, result, onHide))
         .catch((err) => console.error("Failed to focus app:", err));
       break;
     case "sshHost":
@@ -81,8 +108,10 @@ export function executeItem(item: LauncherItem, options: ExecuteItemOptions) {
           ? `ssh://${item.kind.user}@${item.kind.host}`
           : `ssh://${item.kind.host}`;
         ipc("launcher_open_app", { path: sshCmd })
-          .then(() => ipc("launcher_execute", { itemId: item.id, kind: "ssh" }))
-          .then(() => onHide())
+          .then(() =>
+            ipc<LauncherExecuteResult>("launcher_execute", { itemId: item.id, kind: "ssh" }),
+          )
+          .then((result) => hideAndBadge(item, result, onHide))
           .catch((err) => console.error("Failed to open SSH:", err));
       }
       break;
@@ -95,8 +124,10 @@ export function executeItem(item: LauncherItem, options: ExecuteItemOptions) {
             : null;
         if (uri) {
           ipc("launcher_open_app", { path: uri })
-            .then(() => ipc("launcher_execute", { itemId: item.id, kind: "contact" }))
-            .then(() => onHide())
+            .then(() =>
+              ipc<LauncherExecuteResult>("launcher_execute", { itemId: item.id, kind: "contact" }),
+            )
+            .then((result) => hideAndBadge(item, result, onHide))
             .catch((err) => console.error("Failed to open contact:", err));
         }
       }

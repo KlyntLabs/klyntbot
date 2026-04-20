@@ -4,7 +4,8 @@ use std::sync::Arc;
 
 use desktop_shared::errors::ApiError;
 use feature_launcher::{
-    ClipboardEntry, DashboardData, LauncherItem, ScriptRunner, SystemAction, SystemCommands,
+    ClipboardEntry, DashboardData, LauncherExecuteResult, LauncherItem, ScriptRunner, SystemAction,
+    SystemCommands,
 };
 use tauri::State;
 
@@ -23,7 +24,7 @@ pub async fn launcher_execute(
     state: State<'_, Arc<AppCore>>,
     item_id: String,
     kind: String,
-) -> Result<(), ApiError> {
+) -> Result<LauncherExecuteResult, ApiError> {
     state.launcher_execute(item_id, kind).await
 }
 
