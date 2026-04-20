@@ -36,14 +36,12 @@ fn publish_cron_alarm(
 /// Results from the cron initialization phase.
 pub(super) struct CronResult {
     pub cron_executor: Arc<CronExecutor>,
-    pub proactive_handler: Option<Arc<dyn feature_tasks::ProactiveHandler>>,
+    pub proactive_handler: Option<Arc<dyn ProactiveHandler>>,
     pub suggestion_applier: Option<Arc<dyn SuggestionApplier>>,
     pub decomposition_handler: Option<Arc<dyn DecompositionHandler>>,
     pub forecast_handler: Option<Arc<dyn ForecastHandler>>,
     pub autotuner: Option<Arc<agent::autotuner::AutoTunerOrchestrator>>,
 }
-
-pub const JOB_PROACTIVE_SCAN: &str = "proactive_scan";
 
 /// Initialize cron service, register callbacks, and ensure default jobs.
 #[allow(clippy::too_many_arguments)]
@@ -79,14 +77,13 @@ pub(super) async fn init_cron(
         )))
     };
 
-    // Build the proactive handler and applier for the cron job.
-    // Uses its own LlmProactiveHandler instance (domain_bus=None — event emission
-    // happens in run_proactive_scan after persist, not inside the handler).
-    let autotuner_provider = provider.clone();
+    // Build the proactive handler and applier — kept for on-demand API use
+    // (Tauri commands task_get_suggestions / task_apply_suggestion).
+    // The proactive_scan cron job has been removed; these are no longer scheduled.
     let proactive_handler: Arc<dyn ProactiveHandler> = {
         let task_repo = repos.tasks.clone();
         Arc::new(agent::handlers::LlmProactiveHandler::new(
-            provider,
+            provider.clone(),
             config.agents.defaults.model.clone(),
             task_repo,
             tasks_config.clone(),
@@ -98,10 +95,10 @@ pub(super) async fn init_cron(
             task_repo,
         )))
     };
+    let proactive_handler_out = Some(proactive_handler);
+    let suggestion_applier_out = suggestion_applier;
 
-    // Clone handlers before they're moved into cron closures so AppCore can hold refs too.
-    let proactive_handler_out = Some(proactive_handler.clone());
-    let suggestion_applier_out = suggestion_applier.clone();
+    let autotuner_provider = provider.clone();
 
     // ── AutoTuner setup (must happen before register_cron_callbacks) ─────
     let trial_repo = storage::TrialRepo::new(repos.pool().clone());
@@ -164,9 +161,6 @@ pub(super) async fn init_cron(
         bus,
         cognitive_provider,
         domain_event_bus,
-        tasks_config.clone(),
-        proactive_handler,
-        suggestion_applier,
         vector_store,
         autotuner_bridge,
         metric_source,
@@ -198,7 +192,6 @@ const JOB_FOCUS_CHECK: &str = "todo_focus_check";
 const JOB_DAILY_DIGEST: &str = "todo_daily_digest";
 const JOB_OVERDUE_CHECK: &str = "todo_overdue_check";
 const JOB_WEEKLY_REPORT: &str = "__klyntbot_weekly_report";
-const JOB_DAILY_PLANNING: &str = "__klyntbot_daily_planning";
 const JOB_FINANCE_DAILY_REVIEW: &str = "__klyntbot_finance_daily_review";
 const JOB_ATOM_DECAY: &str = "__klyntbot_atom_decay_daily";
 const JOB_ATOM_EXTRACTION_CATCHALL: &str = "__klyntbot_atom_extraction_catchall";
@@ -229,9 +222,6 @@ fn register_cron_callbacks(
     bus: &Arc<MessageBus>,
     cognitive_provider: Option<providers::DynProvider>,
     domain_event_bus: &Arc<DomainEventBus>,
-    tasks_config: TasksConfig,
-    proactive_handler: Arc<dyn ProactiveHandler>,
-    suggestion_applier: Option<Arc<dyn SuggestionApplier>>,
     vector_store: Option<storage::VectorStore>,
     autotuner_bridge: Option<Arc<dyn cognitive::services::reforge::AutotunerBridge>>,
     metric_source: Arc<dyn autotuner::MetricSource>,
@@ -410,7 +400,6 @@ fn register_cron_callbacks(
             "weekly_report",
             "Generate weekly progress report using the weekly-report skill"
         );
-        register_bus_job!(JOB_DAILY_PLANNING, "daily_planning", "/daily-planning");
         register_bus_job!(
             JOB_FINANCE_DAILY_REVIEW,
             "finance_daily_review",
@@ -759,43 +748,6 @@ fn register_cron_callbacks(
                         Ok(Some(format!(
                             "Weekly digest: streak={streak}, fading={fading_count}"
                         )))
-                    })
-                })
-            }),
-        );
-    }
-
-    // ── proactive_scan ───────────────────────────────────────────────────
-    if tasks_config.proactive_suggestions {
-        let handler = proactive_handler.clone();
-        let repos_clone = repos.clone();
-        let bus_clone = Some(Arc::clone(domain_event_bus));
-        let cfg = tasks_config.clone();
-        let applier = suggestion_applier.clone();
-        let rt = rt.clone();
-        cron_executor.register(
-            JOB_PROACTIVE_SCAN,
-            Arc::new(move |_job: &scheduling::CronJob| {
-                let handler = handler.clone();
-                let repos = repos_clone.clone();
-                let bus = bus_clone.clone();
-                let cfg = cfg.clone();
-                let applier = applier.clone();
-                tokio::task::block_in_place(|| {
-                    rt.block_on(async move {
-                        match crate::handlers::tasks::proactive::run_proactive_scan(
-                            &handler, &repos, &bus, &cfg, &applier,
-                        )
-                        .await
-                        {
-                            Ok(n) => Ok(Some(format!(
-                                "Proactive scan complete: {n} suggestions generated"
-                            ))),
-                            Err(e) => {
-                                warn!("Proactive scan failed: {e}");
-                                Ok(None)
-                            }
-                        }
                     })
                 })
             }),
@@ -1242,14 +1194,6 @@ async fn set_default_intent_windows(cron_repo: &storage::repos::cron::CronRepo) 
                 trigger: IntentTrigger::UserIdle { min_idle_secs: 300 },
                 tolerance: Duration::from_secs(14400),
                 catch_up: CatchUpPriority::WhenIdle,
-            },
-        ),
-        (
-            JOB_PROACTIVE_SCAN,
-            IntentWindow {
-                trigger: IntentTrigger::MinActiveMinutes { minutes: 5 },
-                tolerance: Duration::from_secs(3600),
-                catch_up: CatchUpPriority::WhenPresent,
             },
         ),
         (
