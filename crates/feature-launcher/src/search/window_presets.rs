@@ -19,11 +19,7 @@ impl SearchSource for WindowPresetsSource {
         let query = query.trim().to_lowercase();
 
         if query.is_empty() {
-            return PRESETS
-                .iter()
-                .take(limit)
-                .map(make_item)
-                .collect();
+            return PRESETS.iter().take(limit).map(make_item).collect();
         }
 
         let mut scored: Vec<(i32, &crate::window_mgmt::presets::Preset)> = PRESETS
@@ -42,7 +38,11 @@ impl SearchSource for WindowPresetsSource {
                         break;
                     }
                 }
-                if score > 0 { Some((score, p)) } else { None }
+                if score > 0 {
+                    Some((score, p))
+                } else {
+                    None
+                }
             })
             .collect();
 

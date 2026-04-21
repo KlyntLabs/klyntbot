@@ -172,8 +172,7 @@ pub(crate) async fn dispatch_dev(
             dev::val(launcher_system_command(action, args).await)
         }
         "launcher_window_action" => {
-            let action: WindowAction =
-                dev::get(body, "action").unwrap_or(WindowAction::Center);
+            let action: WindowAction = dev::get(body, "action").unwrap_or(WindowAction::Center);
             dev::val(launcher_window_action(action).await)
         }
         "launcher_open_app" => {

@@ -105,7 +105,9 @@ impl WindowManager {
 
         let (sx, sy, sw, sh) = accessibility::get_screen_frame();
         // TODO(v2): capture current window rect for true restore; main-display frame only in v1.
-        self.pre_preset_cache.lock().insert(window_id, (sx, sy, sw, sh));
+        self.pre_preset_cache
+            .lock()
+            .insert(window_id, (sx, sy, sw, sh));
         let f = preset.frame;
         let x = sx + (f.x as f64) * sw;
         let y = sy + (f.y as f64) * sh;
