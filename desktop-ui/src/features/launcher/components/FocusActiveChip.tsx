@@ -9,7 +9,8 @@ interface Props {
 
 export function FocusActiveChip({ endsAt, onDone }: Props) {
   const handleExtend = (extraMs: number) => {
-    const newEndsAt = new Date(new Date(endsAt).getTime() + extraMs).toISOString();
+    const base = Math.max(new Date(endsAt).getTime(), Date.now());
+    const newEndsAt = new Date(base + extraMs).toISOString();
     ipc("focus_extend", { mode: "dnd", newEndsAt })
       .then(() => {
         invalidateQueries("focus_active");
