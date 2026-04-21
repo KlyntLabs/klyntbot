@@ -6,6 +6,7 @@ edition.workspace = true
 [dependencies]
 common = { path = "../common" }
 storage = { path = "../storage" }
+scheduling = { path = "../scheduling" }
 tools-core = { path = "../tools-core" }
 jiff = { workspace = true }
 serde_json = { workspace = true }

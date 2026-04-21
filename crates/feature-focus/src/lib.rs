@@ -1,5 +1,6 @@
 //! Focus Sessions — timed system-level actions (DND, silent mode, etc.).
 
+pub mod alarm_bridge;
 pub mod duration_parser;
 pub mod manager;
 pub mod repo;

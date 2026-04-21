@@ -4736,6 +4736,7 @@ dependencies = [
  "async-trait",
  "common",
  "jiff",
+ "scheduling",
  "serde",
  "serde_json",
  "sqlx",
