@@ -10,6 +10,7 @@ use serde_json::json;
 
 use crate::currency::ensure_base_amount;
 use crate::types::{FinanceTransaction, TransactionType};
+use ai_core::AiEntity;
 use common::{Result, ToolError};
 use storage::rows::finance::{
     FinanceTransactionFilter, FinanceTransactionPatch, FinanceTransactionRow,
@@ -167,6 +168,11 @@ impl FinanceTool {
             .await?;
 
         let tx = FinanceTransaction::from(inserted);
+
+        // Embed transaction for semantic search (best-effort, non-blocking).
+        if let Some(ref handler) = self.embedding_handler {
+            let _ = handler.embed_transaction(&tx.embed_text()).await;
+        }
 
         // Check budget impact for expense transactions with a category.
         let mut budget_impact: Option<serde_json::Value> = None;

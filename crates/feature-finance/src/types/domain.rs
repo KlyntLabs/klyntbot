@@ -1,5 +1,6 @@
 //! Finance domain enums and structs.
 
+use ai_core_macros::AiEntity;
 use jiff::{civil::Date, Timestamp};
 use serde::{Deserialize, Serialize};
 use tools_core::DomainEnum;
@@ -193,7 +194,9 @@ pub struct FinanceAccount {
 }
 
 /// Domain representation of a finance transaction.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, AiEntity)]
+#[ai(entity_type = "finance_transaction",
+     embed_on = ["counterparty", "category", "subcategory"])]
 pub struct FinanceTransaction {
     pub id: String,
     pub account_id: String,
@@ -210,6 +213,30 @@ pub struct FinanceTransaction {
     pub recurring_rule: Option<String>,
     pub created_at: Timestamp,
     pub updated_at: Timestamp,
+}
+
+impl FinanceTransaction {
+    /// Create a default instance for tests.
+    pub fn default_for_test() -> Self {
+        let now = Timestamp::now();
+        Self {
+            id: uuid::Uuid::new_v4().to_string(),
+            account_id: String::new(),
+            tx_type: TransactionType::default(),
+            amount: 0,
+            currency: "USD".to_string(),
+            category: None,
+            subcategory: None,
+            counterparty: None,
+            notes: None,
+            tx_date: Date::new(2026, 1, 1).unwrap(),
+            transfer_id: None,
+            is_recurring: false,
+            recurring_rule: None,
+            created_at: now,
+            updated_at: now,
+        }
+    }
 }
 
 /// Domain representation of a budget.

@@ -1,6 +1,19 @@
-use ai_core::{AiEventMeta, AiFeature, RecallDomain};
+use ai_core::{AiEntity, AiEventMeta, AiFeature, RecallDomain};
 use feature_finance::events::FinanceEvent;
+use feature_finance::types::FinanceTransaction;
 use feature_finance::FinanceFeature;
+
+#[test]
+fn transaction_embed_text_concatenates_key_fields() {
+    let tx = FinanceTransaction {
+        counterparty: Some("Whole Foods".into()),
+        category: Some("groceries".into()),
+        subcategory: Some("produce".into()),
+        ..FinanceTransaction::default_for_test()
+    };
+    assert_eq!(tx.embed_text(), "Whole Foods\ngroceries\nproduce");
+    assert_eq!(FinanceTransaction::entity_type(), "finance_transaction");
+}
 
 #[test]
 fn transaction_recorded_signal() {

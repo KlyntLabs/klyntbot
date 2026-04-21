@@ -33,6 +33,13 @@ pub(crate) fn parse_date(s: &str) -> Result<jiff::civil::Date> {
 use crate::handler::FinanceHandler;
 use crate::price_service::PriceService;
 
+/// Trait for embedding handlers.
+#[async_trait]
+pub trait EmbeddingHandler: Send + Sync {
+    /// Generate and store an embedding for a finance transaction (best-effort).
+    async fn embed_transaction(&self, text: &str) -> Result<()>;
+}
+
 /// Tool for managing personal finance: accounts, transactions, budgets,
 /// investments, goals, liabilities, and financial reports.
 // Fields are `pub(crate)` so sub-module implementations can access them directly.
@@ -44,6 +51,7 @@ pub struct FinanceTool {
     pub(crate) config_persistence: Option<Arc<dyn ConfigPersistence>>,
     pub(crate) domain_bus: Option<Arc<DomainEventBus>>,
     pub(crate) rate_cache: Option<crate::rate_cache::RateCache>,
+    pub(crate) embedding_handler: Option<Arc<dyn EmbeddingHandler>>,
 }
 
 impl FinanceTool {
@@ -61,6 +69,7 @@ impl FinanceTool {
             config_persistence: None,
             domain_bus: None,
             rate_cache: None,
+            embedding_handler: None,
         }
     }
 
@@ -85,6 +94,12 @@ impl FinanceTool {
     /// Attach a `RateCache` for two-layer exchange rate caching. Returns `self` for chaining.
     pub fn with_rate_cache(mut self, cache: crate::rate_cache::RateCache) -> Self {
         self.rate_cache = Some(cache);
+        self
+    }
+
+    /// Attach an embedding handler for auto-embedding on transaction add.
+    pub fn with_embedding_handler(mut self, handler: Arc<dyn EmbeddingHandler>) -> Self {
+        self.embedding_handler = Some(handler);
         self
     }
 
