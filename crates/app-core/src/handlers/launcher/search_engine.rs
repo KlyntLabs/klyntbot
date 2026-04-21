@@ -249,6 +249,7 @@ impl LauncherSearchEngine {
                     LauncherItemKind::BrewPackage { .. } => "brew",
                     LauncherItemKind::SshHost { .. } => "ssh",
                     LauncherItemKind::GitRepo { .. } => "repo",
+                    LauncherItemKind::WindowAction { .. } => "window",
                 };
                 Some((i, item.id.clone(), kind_str.to_string()))
             })

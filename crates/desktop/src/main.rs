@@ -1180,6 +1180,7 @@ fn run_desktop_app() {
             commands::launcher::launcher_clipboard_pin,
             commands::launcher::launcher_run_script,
             commands::launcher::launcher_system_command,
+            commands::launcher::launcher_window_action,
             commands::launcher::launcher_open_app,
             commands::status_badge::show_status_badge,
             commands::window::resize_window,

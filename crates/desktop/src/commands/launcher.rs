@@ -5,7 +5,7 @@ use std::sync::Arc;
 use desktop_shared::errors::ApiError;
 use feature_launcher::{
     ClipboardEntry, DashboardData, LauncherExecuteResult, LauncherItem, ScriptRunner, SystemAction,
-    SystemCommands,
+    SystemCommands, WindowAction,
 };
 use tauri::State;
 
@@ -87,6 +87,13 @@ pub async fn launcher_system_command(
 }
 
 #[tauri::command]
+pub async fn launcher_window_action(action: WindowAction) -> Result<(), ApiError> {
+    feature_launcher::window_manager()
+        .execute(&action)
+        .map_err(|e| ApiError::new("WINDOW_ACTION_ERROR", e.to_string()))
+}
+
+#[tauri::command]
 pub async fn launcher_open_app(path: String) -> Result<(), ApiError> {
     #[cfg(target_os = "macos")]
     {
@@ -116,6 +123,7 @@ pub(crate) const DEV_COMMANDS: &[&str] = &[
     "launcher_clipboard_pin",
     "launcher_run_script",
     "launcher_system_command",
+    "launcher_window_action",
     "launcher_open_app",
 ];
 
@@ -162,6 +170,11 @@ pub(crate) async fn dispatch_dev(
             let action: SystemAction = dev::get(body, "action").unwrap_or(SystemAction::LockScreen);
             let args: Option<std::collections::HashMap<String, String>> = dev::get(body, "args");
             dev::val(launcher_system_command(action, args).await)
+        }
+        "launcher_window_action" => {
+            let action: WindowAction =
+                dev::get(body, "action").unwrap_or(WindowAction::Center);
+            dev::val(launcher_window_action(action).await)
         }
         "launcher_open_app" => {
             let path: String = dev::get(body, "path").unwrap_or_default();

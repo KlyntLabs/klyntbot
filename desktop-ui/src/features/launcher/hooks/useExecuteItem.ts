@@ -164,6 +164,18 @@ export function executeItem(
         }
       }
       break;
+    case "windowAction":
+      ipc("launcher_window_action", { action: item.kind.action })
+        .then(() =>
+          ipc<LauncherExecuteResult>("launcher_execute", {
+            itemId: item.id,
+            kind: "window",
+            args,
+          }),
+        )
+        .then((result) => hideAndBadge(item, result, onHide))
+        .catch((err) => console.error("Failed to apply window action:", err));
+      break;
     case "brewPackage":
       navigator.clipboard
         .writeText(item.kind.name)

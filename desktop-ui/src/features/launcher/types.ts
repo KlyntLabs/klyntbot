@@ -55,7 +55,21 @@ export type LauncherItemKind =
   | { type: "brewPackage"; name: string; isCask: boolean }
   | { type: "sshHost"; host: string; user: string | null }
   | { type: "gitRepo"; path: string }
-  | { type: "urlNavigation"; url: string };
+  | { type: "urlNavigation"; url: string }
+  | { type: "windowAction"; action: WindowAction };
+
+export type WindowAction =
+  | "leftHalf"
+  | "rightHalf"
+  | "topHalf"
+  | "bottomHalf"
+  | "leftThird"
+  | "centerThird"
+  | "rightThird"
+  | "maximize"
+  | "center"
+  | "restore"
+  | { preset: string };
 
 export interface DashboardData {
   focus: FocusDashboard | null;
