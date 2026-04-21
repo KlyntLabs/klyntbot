@@ -49,7 +49,7 @@ impl FocusSessionRow {
 
 // ── Public domain type ────────────────────────────────────────────────────────
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct FocusSession {
     pub id: i64,
     pub mode: FocusMode,

@@ -1183,6 +1183,13 @@ fn run_desktop_app() {
             commands::launcher::launcher_window_action,
             commands::launcher::launcher_open_app,
             commands::status_badge::show_status_badge,
+            // Focus / DND
+            commands::focus::focus_install_shortcuts,
+            commands::focus::focus_shortcuts_installed,
+            commands::focus::focus_activate,
+            commands::focus::focus_deactivate,
+            commands::focus::focus_extend,
+            commands::focus::focus_active,
             commands::window::resize_window,
             commands::window::open_url,
             commands::window::show_dashboard,

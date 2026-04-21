@@ -17,6 +17,7 @@ cognitive = { workspace = true }
 common = { workspace = true }
 config = { workspace = true }
 feature-coaching = { workspace = true }
+feature-focus = { workspace = true }
 feature-launcher = { workspace = true }
 klyntbot-server = { workspace = true }
 dashmap = { workspace = true }
