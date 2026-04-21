@@ -1,11 +1,11 @@
 #![recursion_limit = "256"]
-//! feature-tasks: Agentic task management feature package for klyntbot.
+//! feature-tasks: task management feature package for klyntbot.
 //!
 //! Provides:
 //! - `TasksFeature`: implements `FeaturePackage` (tools, migrations, config, health)
-//! - Domain types: `Task`, `TaskActivity`, etc.
+//! - Domain types: `Task`, `Attachment`, `TimeEntry`, etc.
 //! - Handler traits: `EmbeddingHandler`, `ProgressHandler`
-//! - Utilities: `scoring`, `complexity`, `rrule_utils`, `search`
+//! - Utilities: `complexity`, `rrule_utils`, `search`
 //! - Config: `TasksConfig`
 
 pub mod alarm_side_effects;
@@ -34,7 +34,7 @@ use common::Result;
 use serde_json::Value;
 use tools_core::{DynTool, FeatureMigration, FeaturePackage, HealthStatus};
 
-/// Feature package for agentic task management.
+/// Feature package for task management.
 pub struct TasksFeature {
     pool: Option<storage::StoragePool>,
 }
@@ -76,7 +76,7 @@ impl FeaturePackage for TasksFeature {
         vec![FeatureMigration {
             feature_name: "tasks".to_string(),
             version: 2,
-            description: "Create agentic task tables".to_string(),
+            description: "Create task tables".to_string(),
             sql: Self::migration_sql().to_string(),
         }]
     }

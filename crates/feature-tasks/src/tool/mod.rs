@@ -15,7 +15,7 @@ use common::{Result, ToolError};
 use storage::TaskRepo;
 use tools_core::{ParamExtractor, ProgressHandler, RoutingContext, Tool};
 
-/// TaskTool: agentic task management with enrichment, embedding, and planning.
+/// TaskTool: task CRUD, semantic search, recurrence, focus, and alarms.
 pub struct TaskTool {
     pub(crate) repo: TaskRepo,
     pub(crate) area_repo: Option<storage::AreaRepo>,
