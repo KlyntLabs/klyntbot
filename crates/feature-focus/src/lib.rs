@@ -1,8 +1,10 @@
 //! Focus Sessions — timed system-level actions (DND, silent mode, etc.).
 
 pub mod duration_parser;
+pub mod manager;
 pub mod repo;
 
+pub use manager::{DndManager, DndScheduler, FocusBridge};
 pub use repo::{FocusSession, FocusSessionRepo};
 
 use serde::{Deserialize, Serialize};
