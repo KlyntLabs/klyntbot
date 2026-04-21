@@ -77,8 +77,7 @@ mod tests {
                 feature_name: "scheduling".into(),
                 version: 1,
                 description: "scheduled_fires".into(),
-                sql: include_str!("../../scheduling/migrations/001_scheduled_fires.sql")
-                    .into(),
+                sql: include_str!("../../scheduling/migrations/001_scheduled_fires.sql").into(),
             }],
         )
         .await

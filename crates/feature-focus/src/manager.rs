@@ -63,11 +63,7 @@ impl DndManager {
     ///
     /// Returns `Err(StorageConflict)` when a session for the same mode is already active.
     /// Callers that want to move the end time forward should call [`extend`] instead.
-    pub async fn activate(
-        &self,
-        mode: FocusMode,
-        ends_at: Timestamp,
-    ) -> Result<FocusSession> {
+    pub async fn activate(&self, mode: FocusMode, ends_at: Timestamp) -> Result<FocusSession> {
         // Guard: refuse double-activation.
         if self
             .repo
@@ -100,13 +96,7 @@ impl DndManager {
         // Persist the session.
         let session = self
             .repo
-            .insert_active(
-                mode,
-                Timestamp::now(),
-                ends_at,
-                Some(&alarm_id),
-                "launcher",
-            )
+            .insert_active(mode, Timestamp::now(), ends_at, Some(&alarm_id), "launcher")
             .await
             .map_err(|e| KlyntbotError::Storage(e.to_string()))?;
 
@@ -145,20 +135,14 @@ impl DndManager {
     /// Move the end time of the active session for `mode` to `new_ends_at`.
     ///
     /// Returns `Err(StorageNotFound)` when no session is active.
-    pub async fn extend(
-        &self,
-        mode: FocusMode,
-        new_ends_at: Timestamp,
-    ) -> Result<FocusSession> {
+    pub async fn extend(&self, mode: FocusMode, new_ends_at: Timestamp) -> Result<FocusSession> {
         let session = self
             .repo
             .active(mode)
             .await
             .map_err(|e| KlyntbotError::Storage(e.to_string()))?
             .ok_or_else(|| {
-                KlyntbotError::StorageNotFound(
-                    "no active focus session to extend".into(),
-                )
+                KlyntbotError::StorageNotFound("no active focus session to extend".into())
             })?;
 
         // Cancel old alarm (best-effort).
@@ -182,9 +166,7 @@ impl DndManager {
             .await
             .map_err(|e| KlyntbotError::Storage(e.to_string()))?
             .ok_or_else(|| {
-                KlyntbotError::StorageNotFound(
-                    "active session disappeared after extend".into(),
-                )
+                KlyntbotError::StorageNotFound("active session disappeared after extend".into())
             })?;
 
         Ok(updated)
@@ -226,7 +208,10 @@ mod tests {
             Ok(id)
         }
         async fn cancel(&self, alarm_id: &str) -> Result<()> {
-            self.calls.lock().unwrap().push(format!("cancel:{alarm_id}"));
+            self.calls
+                .lock()
+                .unwrap()
+                .push(format!("cancel:{alarm_id}"));
             Ok(())
         }
     }
@@ -239,11 +224,17 @@ mod tests {
     #[async_trait]
     impl FocusBridge for MockBridge {
         async fn turn_on(&self, mode: FocusMode) -> Result<()> {
-            self.calls.lock().unwrap().push(format!("turn_on:{}", mode.as_str()));
+            self.calls
+                .lock()
+                .unwrap()
+                .push(format!("turn_on:{}", mode.as_str()));
             Ok(())
         }
         async fn turn_off(&self, mode: FocusMode) -> Result<()> {
-            self.calls.lock().unwrap().push(format!("turn_off:{}", mode.as_str()));
+            self.calls
+                .lock()
+                .unwrap()
+                .push(format!("turn_off:{}", mode.as_str()));
             Ok(())
         }
         async fn is_ready(&self) -> Result<bool> {

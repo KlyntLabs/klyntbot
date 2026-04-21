@@ -17,14 +17,14 @@ pub async fn run_shortcut(name: &str) -> Result<()> {
         .args(["run", name])
         .output()
         .await
-        .map_err(|e| KlyntbotError::Io(e.to_string()))?;
+        .map_err(|e| KlyntbotError::Io(e))?;
 
     if output.status.success() {
         return Ok(());
     }
 
     let stderr = String::from_utf8_lossy(&output.stderr).into_owned();
-    Err(KlyntbotError::Io(format!(
+    Err(KlyntbotError::Storage(format!(
         "shortcuts run '{name}' exited with {}: {stderr}",
         output.status
     )))
@@ -64,12 +64,12 @@ pub async fn install_bundled_shortcut(name: &str, bytes: &[u8]) -> Result<()> {
 
     tokio::fs::write(&path, bytes)
         .await
-        .map_err(|e| KlyntbotError::Io(e.to_string()))?;
+        .map_err(|e| KlyntbotError::Io(e))?;
 
     tokio::process::Command::new("open")
         .args(["-a", "Shortcuts", path.to_str().unwrap_or_default()])
         .spawn()
-        .map_err(|e| KlyntbotError::Io(e.to_string()))?;
+        .map_err(|e| KlyntbotError::Io(e))?;
 
     Ok(())
 }
