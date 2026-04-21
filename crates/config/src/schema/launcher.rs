@@ -75,6 +75,7 @@ pub struct LauncherSourcesConfig {
     pub tasks: SourceToggle,
     pub notes: SourceToggle,
     pub clipboard: ClipboardSourceConfig,
+    pub window_presets: SourceToggle,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

@@ -14,6 +14,8 @@ pub use clipboard::ClipboardMonitor;
 pub use repos::*;
 pub use search::*;
 pub use types::*;
+pub use types::WindowAction;
+pub use window_mgmt::global as window_manager;
 pub use window_mgmt::WindowManager;
 
 pub struct LauncherFeature;

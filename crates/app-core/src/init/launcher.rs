@@ -67,6 +67,11 @@ pub(super) async fn init_launcher(
     // System commands (always enabled — lightweight)
     sources.push(Arc::new(feature_launcher::SystemCommands));
 
+    // Window presets — prefix w/
+    if launcher_config.sources.window_presets.enabled {
+        sources.push(Arc::new(feature_launcher::WindowPresetsSource));
+    }
+
     // Clipboard source
     if launcher_config.sources.clipboard.enabled {
         sources.push(Arc::new(clipboard_repo.clone()));
