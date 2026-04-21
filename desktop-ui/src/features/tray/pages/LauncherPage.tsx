@@ -1,15 +1,19 @@
 import { ActionMenu } from "@features/launcher/components/ActionMenu";
 import { ArgChipBar } from "@features/launcher/components/ArgChipBar";
 import { DetailPanel } from "@features/launcher/components/DetailPanel";
+import { FocusActiveChip } from "@features/launcher/components/FocusActiveChip";
 import { LauncherChat } from "@features/launcher/components/LauncherChat";
 import { LauncherInput } from "@features/launcher/components/LauncherInput";
 import { ResultsList } from "@features/launcher/components/ResultsList";
 import { VoiceRecorder } from "@features/launcher/components/VoiceRecorder";
 import { useDashboardData } from "@features/launcher/hooks/useDashboardData";
+import { useDndActive } from "@features/launcher/hooks/useDndActive";
 import { executeItem } from "@features/launcher/hooks/useExecuteItem";
 import { useKeyboardNavigation } from "@features/launcher/hooks/useKeyboardNavigation";
 import { useLauncherSearch } from "@features/launcher/hooks/useLauncherSearch";
 import { useLauncherStore } from "@features/launcher/stores/launcherStore";
+import { useFocusOnboarding } from "@features/settings/components/FocusOnboarding";
+import { ipc } from "@shared/hooks/useIpc";
 import { useTransparentBackground } from "@shared/hooks/useTransparentBackground";
 import { useWindowAutoResize } from "@shared/hooks/useWindowAutoResize";
 import { isTauri } from "@shared/lib/utils";
@@ -24,6 +28,8 @@ export function Launcher() {
   const reset = useLauncherStore((s) => s.reset);
   const argModeItem = useLauncherStore((s) => s.argModeItem);
   const setArgModeItem = useLauncherStore((s) => s.setArgModeItem);
+  const dndActive = useDndActive();
+  const focusOnboarding = useFocusOnboarding();
 
   const [chatSessionKey, setChatSessionKey] = useState("");
   const [chatInitialQuery, setChatInitialQuery] = useState<string | null>(null);
@@ -133,17 +139,31 @@ export function Launcher() {
       const results = useLauncherStore.getState().results;
       const item = results[index];
       if (!item) return;
+
+      // When the user invokes the DND item while a session is already active,
+      // show the extend/off chip bar instead of launching the arg chip.
+      if (
+        item.kind.type === "systemCommand" &&
+        item.kind.action === "toggleDoNotDisturb" &&
+        dndActive.data
+      ) {
+        setArgModeItem(item);
+        return;
+      }
+
       executeItem(item, {
         onEnterChat: enterChat,
         onExpandToMain: expandToMain,
         onHide: hideWindow,
+        onNeedsOnboarding: (retryFn) => focusOnboarding.open(retryFn),
       });
     },
-    [enterChat, expandToMain, hideWindow],
+    [enterChat, expandToMain, hideWindow, dndActive.data, setArgModeItem, focusOnboarding],
   );
 
   return (
     <div className="w-screen text-foreground">
+      {focusOnboarding.element}
       <div
         ref={contentRef}
         className="w-full glass-floating overflow-hidden"
@@ -178,14 +198,24 @@ export function Launcher() {
         ) : (
           <div className="relative rounded-[var(--glass-radius-inner)] overflow-hidden">
             <LauncherInput />
-            {argModeItem ? (
+            {argModeItem &&
+            argModeItem.kind.type === "systemCommand" &&
+            argModeItem.kind.action === "toggleDoNotDisturb" &&
+            dndActive.data ? (
+              <FocusActiveChip endsAt={dndActive.data.endsAt} onDone={() => setArgModeItem(null)} />
+            ) : argModeItem ? (
               <ArgChipBar
                 specs={argModeItem.arguments ?? []}
                 onSubmit={(args) => {
                   setArgModeItem(null);
                   executeItem(
                     argModeItem,
-                    { onEnterChat: enterChat, onExpandToMain: expandToMain, onHide: hideWindow },
+                    {
+                      onEnterChat: enterChat,
+                      onExpandToMain: expandToMain,
+                      onHide: hideWindow,
+                      onNeedsOnboarding: (retryFn) => focusOnboarding.open(retryFn),
+                    },
                     args,
                   );
                 }}

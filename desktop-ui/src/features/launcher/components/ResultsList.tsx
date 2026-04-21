@@ -1,6 +1,8 @@
 import { isTauri } from "@shared/lib/utils";
 import { convertFileSrc } from "@tauri-apps/api/core";
 import { useEffect, useRef } from "react";
+import { useDndActive } from "../hooks/useDndActive";
+import { formatRemaining } from "../lib/formatRemaining";
 import { useLauncherStore } from "../stores/launcherStore";
 import type { LauncherItem } from "../types";
 
@@ -11,6 +13,7 @@ interface ResultsListProps {
 export function ResultsList({ onExecute }: ResultsListProps) {
   const results = useLauncherStore((s) => s.results);
   const selectedIndex = useLauncherStore((s) => s.selectedIndex);
+  const dndActive = useDndActive();
   const isSearching = useLauncherStore((s) => s.isSearching);
   const listRef = useRef<HTMLDivElement>(null);
   // Prevent hover selection when results render under a stationary cursor.
@@ -95,6 +98,7 @@ export function ResultsList({ onExecute }: ResultsListProps) {
                 item={item}
                 index={index}
                 isSelected={index === selectedIndex}
+                dndSession={dndActive.data}
                 onClick={() => onExecute(index)}
                 onMouseEnter={() => {
                   if (mouseMovedRef.current) {
@@ -123,15 +127,21 @@ function ResultRow({
   item,
   index,
   isSelected,
+  dndSession,
   onClick,
   onMouseEnter,
 }: {
   item: LauncherItem;
   index: number;
   isSelected: boolean;
+  dndSession?: import("../types").FocusSession | null;
   onClick: () => void;
   onMouseEnter: () => void;
 }) {
+  const isDndItem = item.kind.type === "systemCommand" && item.kind.action === "toggleDoNotDisturb";
+  const displayTitle =
+    isDndItem && dndSession ? `DND on — ${formatRemaining(dndSession.endsAt)} left` : item.title;
+
   return (
     <div
       role="option"
@@ -152,7 +162,7 @@ function ResultRow({
     >
       <ItemIcon kind={item.kind.type} icon={item.icon} />
       <div className="flex-1 min-w-0">
-        <div className="text-sm text-foreground truncate">{item.title}</div>
+        <div className="text-sm text-foreground truncate">{displayTitle}</div>
         {item.subtitle && (
           <div className="text-xs text-muted-foreground truncate">{item.subtitle}</div>
         )}
