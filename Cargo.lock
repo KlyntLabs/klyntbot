@@ -2348,6 +2348,7 @@ dependencies = [
 name = "cognitive"
 version = "0.1.1"
 dependencies = [
+ "ai-core",
  "async-trait",
  "bus",
  "common",
@@ -4738,6 +4739,8 @@ dependencies = [
 name = "feature-finance"
 version = "0.1.1"
 dependencies = [
+ "ai-core",
+ "ai-core-macros",
  "analytics",
  "async-trait",
  "bus",
