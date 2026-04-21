@@ -4,7 +4,7 @@ use jiff::Timestamp;
 use serde::{Deserialize, Serialize};
 use std::fmt;
 use std::str::FromStr;
-use storage::rows::task::*;
+use storage::rows::task::TaskActivityRow;
 
 use super::entity::TaskType;
 
@@ -50,58 +50,6 @@ impl FromStr for ExecutionState {
             "completed" => Ok(Self::Completed),
             "failed" => Ok(Self::Failed),
             _ => Err(format!("unknown execution state: {}", s)),
-        }
-    }
-}
-
-/// A single execution record for an agentic task.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct TaskExecution {
-    pub id: String,
-    pub task_id: String,
-    pub status: ExecutionStatus,
-    pub agent_profile: Option<String>,
-    pub started_at: Option<Timestamp>,
-    pub completed_at: Option<Timestamp>,
-    pub duration_secs: Option<i64>,
-    pub tokens_used: Option<i64>,
-    pub cost_usd: Option<f64>,
-    pub input_context: Option<String>,
-    pub output_summary: Option<String>,
-    pub error_message: Option<String>,
-    pub artifacts: Vec<ExecutionArtifact>,
-    pub metrics: Option<serde_json::Value>,
-    pub retry_count: i32,
-    pub created_at: Timestamp,
-}
-
-impl From<TaskExecutionRow> for TaskExecution {
-    fn from(row: TaskExecutionRow) -> Self {
-        Self {
-            id: row.id,
-            task_id: row.task_id,
-            status: row.status.parse::<ExecutionStatus>().unwrap_or_default(),
-            agent_profile: row.agent_profile,
-            started_at: row.started_at.map(|ts| *ts),
-            completed_at: row.completed_at.map(|ts| *ts),
-            duration_secs: row.duration_secs,
-            tokens_used: row.tokens_used,
-            cost_usd: row.cost_usd,
-            input_context: row.input_context,
-            output_summary: row.output_summary,
-            error_message: row.error_message,
-            artifacts: row
-                .artifacts
-                .as_deref()
-                .and_then(|s| serde_json::from_str(s).ok())
-                .unwrap_or_default(),
-            metrics: row
-                .metrics
-                .as_deref()
-                .and_then(|s| serde_json::from_str(s).ok()),
-            retry_count: row.retry_count,
-            created_at: *row.created_at,
         }
     }
 }
