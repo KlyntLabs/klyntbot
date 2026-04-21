@@ -143,6 +143,16 @@ pub(super) async fn init_storage(
     .await
     .map_err(|e| format!("finance migration failed: {e}"))?;
 
+    // Run focus feature migrations (DND sessions).
+    StoragePool::run_feature_migrations(
+        storage_pool.inner(),
+        &<feature_focus::FocusFeature as tools_core::FeaturePackage>::migrations(
+            &feature_focus::FocusFeature,
+        ),
+    )
+    .await
+    .map_err(|e| format!("focus migration failed: {e}"))?;
+
     // 3. Create LLM provider (graceful — falls back to noop for setup wizard).
     // Use the "full" variant to get the inner ProviderManager (when a fallback is configured)
     // so we can wire circuit breaker persistence before the manager starts handling calls.

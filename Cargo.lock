@@ -4001,6 +4001,7 @@ dependencies = [
  "desktop-shared",
  "dirs",
  "feature-coaching",
+ "feature-focus",
  "feature-launcher",
  "feature-notes",
  "feature-productivity",
