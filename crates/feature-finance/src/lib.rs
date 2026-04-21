@@ -117,14 +117,6 @@ impl FeaturePackage for FinanceFeature {
         Self::migrations_static()
     }
 
-    fn config_key(&self) -> &str {
-        "finance"
-    }
-
-    fn default_config(&self) -> Value {
-        Self::default_config_static()
-    }
-
     async fn health_check(&self) -> Result<HealthStatus> {
         Ok(HealthStatus::Healthy)
     }

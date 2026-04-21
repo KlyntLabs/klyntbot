@@ -31,7 +31,6 @@ pub use types::*;
 
 use async_trait::async_trait;
 use common::Result;
-use serde_json::Value;
 use tools_core::{DynTool, FeatureMigration, FeaturePackage, HealthStatus};
 
 /// Feature package for task management.
@@ -81,14 +80,6 @@ impl FeaturePackage for TasksFeature {
         }]
     }
 
-    fn config_key(&self) -> &str {
-        "tasks"
-    }
-
-    fn default_config(&self) -> Value {
-        serde_json::to_value(TasksConfig::default()).unwrap_or(Value::Null)
-    }
-
     async fn health_check(&self) -> Result<HealthStatus> {
         let Some(pool) = &self.pool else {
             return Ok(HealthStatus::Healthy);
@@ -123,12 +114,6 @@ mod tests {
     }
 
     #[test]
-    fn test_feature_package_config_key() {
-        let feature = TasksFeature::new();
-        assert_eq!(feature.config_key(), "tasks");
-    }
-
-    #[test]
     fn test_feature_package_tools_empty() {
         let feature = TasksFeature::new();
         assert!(feature.tools().is_empty());
@@ -141,17 +126,6 @@ mod tests {
         assert_eq!(migrations.len(), 1);
         assert_eq!(migrations[0].feature_name, "tasks");
         assert_eq!(migrations[0].version, 2);
-    }
-
-    #[test]
-    fn test_feature_package_default_config_is_valid_json() {
-        let feature = TasksFeature::new();
-        let config = feature.default_config();
-        assert!(config.is_object());
-        let obj = config.as_object().unwrap();
-        assert!(obj.contains_key("maxFocusSlots"));
-        assert!(obj.contains_key("wipLimit"));
-        assert!(obj.contains_key("workingHours"));
     }
 
     #[test]

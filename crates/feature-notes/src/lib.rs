@@ -11,7 +11,6 @@ use std::sync::Arc;
 
 use async_trait::async_trait;
 use common::Result;
-use serde_json::Value;
 use tools_core::{FeatureMigration, FeaturePackage, HealthStatus};
 
 pub struct NotesFeature {
@@ -59,17 +58,6 @@ impl FeaturePackage for NotesFeature {
 
     fn migrations(&self) -> Vec<FeatureMigration> {
         Self::migrations_static()
-    }
-
-    fn config_key(&self) -> &str {
-        "notes"
-    }
-
-    fn default_config(&self) -> Value {
-        serde_json::json!({
-            "maxVersionsPerNote": 50,
-            "versionCooldownMinutes": 5
-        })
     }
 
     async fn health_check(&self) -> Result<HealthStatus> {

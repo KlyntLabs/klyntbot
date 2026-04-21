@@ -11,7 +11,6 @@ use std::sync::Arc;
 
 use async_trait::async_trait;
 use common::Result;
-use serde_json::Value;
 use tools_core::{FeatureMigration, FeaturePackage, HealthStatus};
 
 #[derive(Default)]
@@ -49,21 +48,6 @@ impl FeaturePackage for LanguageLearningFeature {
 
     fn migrations(&self) -> Vec<FeatureMigration> {
         Self::migrations_static()
-    }
-
-    fn config_key(&self) -> &str {
-        "languageLearning"
-    }
-
-    fn default_config(&self) -> Value {
-        serde_json::json!({
-            "enabled": false,
-            "feedback": {
-                "defaultLevel": "summary",
-                "escalationThreshold": 0.3,
-                "minEncounters": 5
-            }
-        })
     }
 
     async fn health_check(&self) -> Result<HealthStatus> {

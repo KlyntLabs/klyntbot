@@ -3,7 +3,6 @@
 use std::sync::Arc;
 
 use async_trait::async_trait;
-use serde_json::Value;
 use tokio::sync::Mutex;
 
 use crate::manifest::PluginManifest;
@@ -76,24 +75,6 @@ impl FeaturePackage for PluginPackage {
             .collect()
     }
 
-    fn config_key(&self) -> &str {
-        &self.manifest.id
-    }
-
-    fn default_config(&self) -> Value {
-        let mut config = serde_json::Map::new();
-        for (key, field) in &self.manifest.config_schema {
-            let default_val = match field.field_type.as_str() {
-                "string" => Value::String(String::new()),
-                "integer" | "number" => Value::Number(serde_json::Number::from(0)),
-                "boolean" => Value::Bool(false),
-                _ => Value::Null,
-            };
-            config.insert(key.clone(), default_val);
-        }
-        Value::Object(config)
-    }
-
     async fn health_check(&self) -> Result<HealthStatus> {
         if self.plugin.is_some() {
             Ok(HealthStatus::Healthy)
@@ -162,12 +143,6 @@ mod tests {
     }
 
     #[test]
-    fn test_config_key_matches_manifest_id() {
-        let pkg = PluginPackage::from_manifest(minimal_manifest());
-        assert_eq!(pkg.config_key(), "hello");
-    }
-
-    #[test]
     fn test_tools_empty_without_plugin() {
         let pkg = PluginPackage::from_manifest(manifest_with_tools_and_migrations());
         assert!(pkg.tools().is_empty());
@@ -181,25 +156,6 @@ mod tests {
         assert_eq!(migrations[0].feature_name, "weather");
         assert_eq!(migrations[0].version, 1);
         assert_eq!(migrations[0].description, "Create cache");
-    }
-
-    #[test]
-    fn test_default_config_from_schema() {
-        let pkg = PluginPackage::from_manifest(manifest_with_tools_and_migrations());
-        let config = pkg.default_config();
-        let obj = config.as_object().unwrap();
-        assert_eq!(obj.get("api_key").unwrap(), &Value::String(String::new()));
-        assert_eq!(
-            obj.get("refresh_interval").unwrap(),
-            &Value::Number(serde_json::Number::from(0))
-        );
-    }
-
-    #[test]
-    fn test_default_config_empty_for_no_schema() {
-        let pkg = PluginPackage::from_manifest(minimal_manifest());
-        let config = pkg.default_config();
-        assert_eq!(config, Value::Object(serde_json::Map::new()));
     }
 
     #[tokio::test]

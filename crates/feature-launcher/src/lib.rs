@@ -7,7 +7,6 @@ pub mod window_mgmt;
 
 use async_trait::async_trait;
 use common::Result;
-use serde_json::Value;
 use tools_core::{DynTool, FeatureMigration, FeaturePackage, HealthStatus};
 
 pub use clipboard::ClipboardMonitor;
@@ -57,19 +56,6 @@ impl FeaturePackage for LauncherFeature {
 
     fn migrations(&self) -> Vec<FeatureMigration> {
         Self::migrations_static()
-    }
-
-    fn config_key(&self) -> &str {
-        "launcher"
-    }
-
-    fn default_config(&self) -> Value {
-        serde_json::json!({
-            "enabled": true,
-            "clipboardHistoryEnabled": true,
-            "clipboardMaxEntries": 100,
-            "scriptsDir": "~/.klyntbot/scripts"
-        })
     }
 
     async fn health_check(&self) -> Result<HealthStatus> {

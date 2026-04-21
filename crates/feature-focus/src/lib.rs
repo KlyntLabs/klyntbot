@@ -39,7 +39,6 @@ impl std::str::FromStr for FocusMode {
 
 use async_trait::async_trait;
 use common::Result;
-use serde_json::Value;
 use tools_core::{DynTool, FeatureMigration, FeaturePackage, HealthStatus};
 
 pub struct FocusFeature;
@@ -61,14 +60,6 @@ impl FeaturePackage for FocusFeature {
             description: "Create focus_sessions table".to_string(),
             sql: include_str!("migrations/001_focus_sessions.sql").to_string(),
         }]
-    }
-
-    fn config_key(&self) -> &str {
-        "focus"
-    }
-
-    fn default_config(&self) -> Value {
-        Value::Null
     }
 
     async fn health_check(&self) -> Result<HealthStatus> {

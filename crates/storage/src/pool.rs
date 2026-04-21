@@ -84,7 +84,15 @@ impl StoragePool {
         pool: &sqlx::SqlitePool,
         migrations: &[tools_core::FeatureMigration],
     ) -> Result<(), StorageError> {
+        use std::collections::HashSet;
+        let mut seen: HashSet<(String, i64)> = HashSet::new();
         for m in migrations {
+            if !seen.insert((m.feature_name.clone(), m.version)) {
+                panic!(
+                    "duplicate migration version for feature {}: v{}",
+                    m.feature_name, m.version
+                );
+            }
             let exists: bool = sqlx::query_scalar(
                 "SELECT EXISTS(SELECT 1 FROM _feature_migrations WHERE feature_name = ?1 AND version = ?2)",
             )
@@ -120,5 +128,34 @@ impl StoragePool {
 impl std::fmt::Debug for StoragePool {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("StoragePool").finish_non_exhaustive()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use tools_core::FeatureMigration;
+
+    #[tokio::test]
+    #[should_panic(expected = "duplicate migration version for feature")]
+    async fn duplicate_version_panics() {
+        let pool = StoragePool::connect_in_memory().await.unwrap();
+        let migs = vec![
+            FeatureMigration {
+                feature_name: "x".into(),
+                version: 1,
+                description: "a".into(),
+                sql: "CREATE TABLE a(x INT);".into(),
+            },
+            FeatureMigration {
+                feature_name: "x".into(),
+                version: 1,
+                description: "b".into(),
+                sql: "CREATE TABLE b(x INT);".into(),
+            },
+        ];
+        StoragePool::run_feature_migrations(pool.inner(), &migs)
+            .await
+            .unwrap();
     }
 }

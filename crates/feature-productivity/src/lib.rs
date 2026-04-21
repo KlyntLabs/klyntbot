@@ -90,14 +90,6 @@ impl FeaturePackage for ProductivityFeature {
         Self::migrations_static()
     }
 
-    fn config_key(&self) -> &str {
-        "productivity"
-    }
-
-    fn default_config(&self) -> Value {
-        Self::default_config_static()
-    }
-
     async fn health_check(&self) -> common::Result<HealthStatus> {
         Ok(HealthStatus::Healthy)
     }
