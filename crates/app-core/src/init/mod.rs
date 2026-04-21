@@ -129,11 +129,10 @@ impl AppCore {
             info!("no cognitive provider — using heuristic handlers");
         }
 
-        // With ~25 subscribers each cloning every event, 256 slots give enough
-        // headroom for bursty tool-call sequences without Lagged errors while
-        // remaining bounded. Payload reduction (no user_message in
-        // ChatTurnCompleted, capped args_preview in ToolCallExecuted) keeps
-        // per-slot clone cost low.
+        // DomainEventBus — 256 slots give ~25 subscribers enough headroom for
+        // bursty tool-call sequences without Lagged errors while staying bounded.
+        // Payload reduction (no user_message in ChatTurnCompleted, capped
+        // args_preview in ToolCallExecuted) keeps per-slot clone cost low.
         let domain_event_bus = Arc::new(bus::DomainEventBus::new(256));
 
         // Context update queue for live context refresher (shared between agent + background services).

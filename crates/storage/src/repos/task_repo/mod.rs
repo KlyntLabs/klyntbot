@@ -5,7 +5,6 @@
 mod activity;
 mod attachments;
 mod core;
-mod decompositions;
 mod dependencies;
 mod estimations;
 mod hierarchy;

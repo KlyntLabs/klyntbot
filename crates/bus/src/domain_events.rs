@@ -116,17 +116,6 @@ pub enum DomainEvent {
         times_deferred: i32,
     },
 
-    // -- Tasks (agentic) --
-    TaskDecomposed {
-        source_task_id: String,
-        subtask_ids: Vec<String>,
-        total_estimated_mins: Option<i64>,
-    },
-    TaskExecutionStarted {
-        task_id: String,
-        execution_id: String,
-        agent_profile: String,
-    },
     TaskBlocked {
         task_id: String,
         blocker_id: String,
@@ -630,8 +619,6 @@ impl DomainEvent {
             Self::TaskCreated { .. } => "TaskCreated",
             Self::TaskCompleted { .. } => "TaskCompleted",
             Self::TaskDeferred { .. } => "TaskDeferred",
-            Self::TaskDecomposed { .. } => "TaskDecomposed",
-            Self::TaskExecutionStarted { .. } => "TaskExecutionStarted",
             Self::TaskBlocked { .. } => "TaskBlocked",
             Self::TaskUnblocked { .. } => "TaskUnblocked",
             Self::TaskStatusChanged { .. } => "TaskStatusChanged",
@@ -716,8 +703,6 @@ impl DomainEvent {
             | Self::TaskCompleted { .. }
             | Self::TaskDeferred { .. }
             | Self::GoalProgress { .. }
-            | Self::TaskDecomposed { .. }
-            | Self::TaskExecutionStarted { .. }
             | Self::TaskBlocked { .. }
             | Self::TaskUnblocked { .. }
             | Self::TaskFocusStarted { .. }

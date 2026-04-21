@@ -175,7 +175,6 @@ impl AdaptiveThresholds {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::learning::types::EnrichmentStats;
     use std::collections::HashMap;
 
     fn make_analysis(total: usize, suggested: f32, confidence: f32) -> AnalysisResult {
@@ -185,7 +184,6 @@ mod tests {
             per_tool_stats: HashMap::new(),
             suggested_threshold: suggested,
             threshold_confidence: confidence,
-            enrichment_stats: EnrichmentStats::default(),
         }
     }
 

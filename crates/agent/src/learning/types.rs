@@ -51,7 +51,6 @@ pub struct AnalysisResult {
     pub suggested_threshold: f32,
     /// How confident the analyzer is in the suggestion (0.0–1.0).
     pub threshold_confidence: f32,
-    pub enrichment_stats: EnrichmentStats,
 }
 
 /// Per-tool aggregate statistics.
@@ -72,42 +71,6 @@ pub struct ConfidenceBand {
     pub total: usize,
     pub successes: usize,
     pub success_rate: f32,
-}
-
-/// Aggregate enrichment acceptance statistics.
-#[derive(Debug, Clone, Default, Serialize, Deserialize)]
-pub struct EnrichmentStats {
-    pub total_suggestions: usize,
-    pub accepted_count: usize,
-    pub overridden_count: usize,
-    pub acceptance_rate: f32,
-    pub per_field: HashMap<String, FieldAcceptanceStats>,
-}
-
-/// Per-field enrichment acceptance breakdown.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct FieldAcceptanceStats {
-    pub total: usize,
-    pub accepted: usize,
-    pub acceptance_rate: f32,
-}
-
-/// Feedback entry for recording enrichment outcomes.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct EnrichmentFeedbackEntry {
-    pub task_id: String,
-    pub field: String,
-    pub suggested_value: String,
-    pub actual_value: Option<String>,
-    pub accepted: bool,
-    pub confidence: f64,
-    pub timestamp: Timestamp,
-}
-
-/// Trait for recording enrichment feedback.
-#[async_trait::async_trait]
-pub trait EnrichmentFeedbackHandler: Send + Sync {
-    async fn record_feedback(&self, entry: EnrichmentFeedbackEntry) -> common::Result<()>;
 }
 
 /// Persistent state for adaptive threshold adjustment.
@@ -188,27 +151,6 @@ mod tests {
             }
             _ => panic!("Expected PlanStep variant"),
         }
-
-        // EnrichmentFeedbackEntry roundtrip
-        let entry = EnrichmentFeedbackEntry {
-            task_id: "todo-123".to_string(),
-            field: "priority".to_string(),
-            suggested_value: "1".to_string(),
-            actual_value: Some("2".to_string()),
-            accepted: false,
-            confidence: 0.75,
-            timestamp: Timestamp::now(),
-        };
-        let json = serde_json::to_string(&entry).unwrap();
-        let loaded: EnrichmentFeedbackEntry = serde_json::from_str(&json).unwrap();
-        assert_eq!(
-            loaded.task_id, "todo-123",
-            "failed for: EnrichmentFeedbackEntry.task_id"
-        );
-        assert!(
-            !loaded.accepted,
-            "failed for: EnrichmentFeedbackEntry.accepted"
-        );
 
         // AdaptiveThresholdState roundtrip
         let state = AdaptiveThresholdState {

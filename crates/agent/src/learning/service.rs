@@ -126,27 +126,19 @@ impl LearningService {
         pattern_analyzer: Option<&PatternAnalyzer>,
     ) {
         // Read outcomes (acquire then release lock quickly)
-        let (outcomes, feedback) = {
+        let outcomes = {
             let store_guard = store.read().await;
-            let outcomes = match store_guard.get_all_outcomes().await {
+            match store_guard.get_all_outcomes().await {
                 Ok(o) => o,
                 Err(e) => {
                     warn!("Failed to read outcomes for analysis: {}", e);
                     return;
                 }
-            };
-            let feedback = match store_guard.get_all_feedback().await {
-                Ok(f) => f,
-                Err(e) => {
-                    warn!("Failed to read feedback for analysis: {}", e);
-                    return;
-                }
-            };
-            (outcomes, feedback)
+            }
         };
 
         // Analyze (no locks held)
-        let analysis = LearningAnalyzer::analyze(&outcomes, &feedback);
+        let analysis = LearningAnalyzer::analyze(&outcomes);
 
         info!(
             "Learning analysis complete: {} outcomes, suggested threshold {:.3}",

@@ -532,23 +532,6 @@ mod tests {
                 PRIMARY KEY (task_id, blocker_id),
                 CHECK (task_id != blocker_id)
             )"#,
-            r#"CREATE TABLE IF NOT EXISTS task_executions (
-                id TEXT PRIMARY KEY, task_id TEXT NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
-                status TEXT NOT NULL DEFAULT 'pending', agent_profile TEXT,
-                started_at INTEGER, completed_at INTEGER, duration_secs INTEGER,
-                tokens_used INTEGER, cost_usd REAL, input_context TEXT,
-                output_summary TEXT, error_message TEXT, artifacts TEXT, metrics TEXT,
-                retry_count INTEGER NOT NULL DEFAULT 0,
-                created_at INTEGER NOT NULL DEFAULT (unixepoch('now') * 1000)
-            )"#,
-            r#"CREATE TABLE IF NOT EXISTS task_suggestions (
-                id TEXT PRIMARY KEY, task_id TEXT REFERENCES tasks(id) ON DELETE CASCADE,
-                suggestion_type TEXT NOT NULL, title TEXT NOT NULL, description TEXT,
-                confidence REAL NOT NULL DEFAULT 0.0, action_payload TEXT,
-                status TEXT NOT NULL DEFAULT 'pending', trigger TEXT,
-                created_at INTEGER NOT NULL DEFAULT (unixepoch('now') * 1000),
-                resolved_at INTEGER
-            )"#,
             r#"CREATE TABLE IF NOT EXISTS task_estimation_history (
                 id TEXT PRIMARY KEY, task_id TEXT NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
                 estimated_minutes INTEGER NOT NULL, actual_minutes INTEGER NOT NULL,
@@ -556,13 +539,6 @@ mod tests {
                 energy_level TEXT, tags TEXT NOT NULL DEFAULT '[]',
                 project_id TEXT,
                 completed_at INTEGER NOT NULL
-            )"#,
-            r#"CREATE TABLE IF NOT EXISTS task_decompositions (
-                id TEXT PRIMARY KEY, task_id TEXT NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
-                plan TEXT NOT NULL, confidence REAL NOT NULL DEFAULT 0.0,
-                status TEXT NOT NULL DEFAULT 'pending', reasoning TEXT,
-                created_at INTEGER NOT NULL DEFAULT (unixepoch('now') * 1000),
-                applied_at INTEGER
             )"#,
             "INSERT OR IGNORE INTO areas (id, name, color, status) VALUES ('test-area', 'Test Area', '#000', 'active')",
         ] {

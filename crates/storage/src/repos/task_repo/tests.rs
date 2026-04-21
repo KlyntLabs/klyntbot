@@ -1,6 +1,6 @@
 use super::*;
 
-use crate::rows::task::{TaskDecompositionRow, TaskEstimationRow, TaskRow};
+use crate::rows::task::{TaskEstimationRow, TaskRow};
 
 /// Create all task-related tables needed for tests.
 /// The tasks table is from the feature-tasks migration, not core migrations,
@@ -151,24 +151,6 @@ async fn create_test_tables(db: &sqlx::SqlitePool) {
     .await
     .unwrap();
 
-    sqlx::query(
-        r#"
-            CREATE TABLE IF NOT EXISTS task_decompositions (
-                id         TEXT PRIMARY KEY,
-                task_id    TEXT NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
-                plan       TEXT NOT NULL,
-                confidence REAL NOT NULL DEFAULT 0.0,
-                status     TEXT NOT NULL DEFAULT 'pending',
-                reasoning  TEXT,
-                created_at INTEGER NOT NULL DEFAULT (unixepoch('now') * 1000),
-                applied_at INTEGER
-            )
-            "#,
-    )
-    .execute(db)
-    .await
-    .unwrap();
-
     // Insert a test area for FK references.
     sqlx::query(
         "INSERT OR IGNORE INTO areas (id, name, color, status) VALUES ('test-area', 'Test Area', '#000', 'active')",
@@ -176,14 +158,6 @@ async fn create_test_tables(db: &sqlx::SqlitePool) {
     .execute(db)
     .await
     .unwrap();
-}
-
-/// Helper to create a ready-to-use TaskRepo backed by an in-memory DB.
-async fn setup_repo() -> TaskRepo {
-    let pool = crate::StoragePool::connect_in_memory().await.unwrap();
-    let db = pool.inner().clone();
-    create_test_tables(&db).await;
-    TaskRepo::new(db)
 }
 
 /// Helper to create a minimal TaskRow for tests.
@@ -753,38 +727,3 @@ async fn test_summary_and_overdue() {
     assert_eq!(overdue.len(), 1);
     assert_eq!(overdue[0].id, "sum4");
 }
-
-#[tokio::test]
-async fn test_decomposition_crud() {
-    let repo = setup_repo().await;
-
-    let task = make_task("decomp-t", "Decomp test");
-    repo.add(&task).await.unwrap();
-
-    let row = TaskDecompositionRow {
-        id: "decomp-1".to_string(),
-        task_id: task.id.clone(),
-        plan: r#"{"subtasks":[]}"#.to_string(),
-        confidence: 0.85,
-        status: "pending".to_string(),
-        reasoning: Some("test".to_string()),
-        created_at: jiff::Timestamp::now().into(),
-        applied_at: None,
-    };
-    let created = repo.create_decomposition(&row).await.unwrap();
-    assert_eq!(created.id, "decomp-1");
-
-    let fetched = repo.get_decomposition("decomp-1").await.unwrap();
-    assert!(fetched.is_some());
-
-    let pending = repo.list_pending_decompositions(&task.id).await.unwrap();
-    assert_eq!(pending.len(), 1);
-
-    repo.apply_decomposition("decomp-1").await.unwrap();
-    let applied = repo.get_decomposition("decomp-1").await.unwrap().unwrap();
-    assert_eq!(applied.status, "applied");
-
-    let pending_after = repo.list_pending_decompositions(&task.id).await.unwrap();
-    assert!(pending_after.is_empty());
-}
-

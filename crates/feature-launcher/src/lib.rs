@@ -1,7 +1,7 @@
 pub mod clipboard;
-pub mod template;
 pub mod repos;
 pub mod search;
+pub mod template;
 pub mod types;
 pub mod window_mgmt;
 

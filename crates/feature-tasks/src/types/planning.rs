@@ -1,5 +1,5 @@
 //! Shared task infrastructure types: working hours, attachments, time entries,
-//! estimation records, and scope overrides.
+//! and scope overrides.
 
 use jiff::{civil::Time, Timestamp};
 use serde::{Deserialize, Serialize};
@@ -35,55 +35,6 @@ impl Default for WorkingHours {
 pub struct ScopeOverrides {
     pub wip_limit: Option<u32>,
     pub stale_task_days: Option<u32>,
-}
-
-// ── Forecast Support ────────────────────────────────────────────────────────
-
-/// Trend in estimation accuracy.
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]
-#[serde(rename_all = "lowercase")]
-pub enum AccuracyTrend {
-    Improving,
-    #[default]
-    Stable,
-    Degrading,
-    Insufficient,
-}
-
-// ── Estimation Record ───────────────────────────────────────────────────────
-
-/// A historical estimation accuracy record.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct EstimationRecord {
-    pub id: String,
-    pub task_id: String,
-    pub estimated_minutes: i32,
-    pub actual_minutes: i32,
-    pub deviation_pct: f64,
-    pub complexity_score: Option<i32>,
-    pub energy_level: Option<EnergyLevel>,
-    pub tags: Vec<String>,
-    pub completed_at: Timestamp,
-}
-
-impl From<TaskEstimationRow> for EstimationRecord {
-    fn from(row: TaskEstimationRow) -> Self {
-        Self {
-            id: row.id,
-            task_id: row.task_id,
-            estimated_minutes: row.estimated_minutes,
-            actual_minutes: row.actual_minutes,
-            deviation_pct: row.deviation_pct,
-            complexity_score: row.complexity_score,
-            energy_level: row
-                .energy_level
-                .as_deref()
-                .and_then(|s| s.parse::<EnergyLevel>().ok()),
-            tags: row.tags,
-            completed_at: *row.completed_at,
-        }
-    }
 }
 
 // ── Attachment & Time Entry ─────────────────────────────────────────────────

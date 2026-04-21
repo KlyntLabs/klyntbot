@@ -84,8 +84,6 @@ pub fn evaluate_salience(event: &DomainEvent) -> SalienceVerdict {
                 SalienceVerdict::Accumulate
             }
         }
-        DomainEvent::TaskExecutionStarted { .. } => SalienceVerdict::Accumulate,
-        DomainEvent::TaskDecomposed { .. } => SalienceVerdict::Accumulate,
         DomainEvent::TaskBlocked { .. } => SalienceVerdict::Accumulate,
         DomainEvent::TaskUnblocked { .. } => SalienceVerdict::Accumulate,
         DomainEvent::TaskStatusChanged { .. } => SalienceVerdict::Accumulate,

@@ -1210,36 +1210,6 @@ async fn event_to_observation(
                 timestamp: now,
             })
         }
-        DomainEvent::TaskDecomposed {
-            source_task_id,
-            subtask_ids,
-            total_estimated_mins,
-        } => {
-            let est = total_estimated_mins
-                .map(|m| format!(", total {m}min"))
-                .unwrap_or_default();
-            Some(Observation {
-                domain: "tasks".into(),
-                content: format!(
-                    "Task {source_task_id} decomposed into {} subtasks{est}",
-                    subtask_ids.len()
-                ),
-                importance: 0.4,
-                source_event: "TaskDecomposed".into(),
-                timestamp: now,
-            })
-        }
-        DomainEvent::TaskExecutionStarted {
-            task_id,
-            execution_id,
-            agent_profile: _,
-        } => Some(Observation {
-            domain: "tasks".into(),
-            content: format!("Agentic execution {execution_id} started for task {task_id}"),
-            importance: 0.4,
-            source_event: "TaskExecutionStarted".into(),
-            timestamp: now,
-        }),
         // Events produced by this service or its downstream — ignore to prevent echo loops
         DomainEvent::ContradictionDetected { .. }
         | DomainEvent::MemoryPromoted { .. }
@@ -1295,8 +1265,6 @@ fn event_type_key(event: &DomainEvent) -> String {
         DomainEvent::VoiceJournalProcessed { .. } => "VoiceJournalProcessed".into(),
         DomainEvent::ToolCallExecuted { .. } => "ToolCallExecuted".into(),
         DomainEvent::BehavioralPatternDetected { .. } => "BehavioralPatternDetected".into(),
-        DomainEvent::TaskDecomposed { .. } => "TaskDecomposed".into(),
-        DomainEvent::TaskExecutionStarted { .. } => "TaskExecutionStarted".into(),
         DomainEvent::TaskBlocked { .. } => "TaskBlocked".into(),
         DomainEvent::TaskUnblocked { .. } => "TaskUnblocked".into(),
         DomainEvent::TaskFocusStarted { .. } => "TaskFocusStarted".into(),
@@ -1658,20 +1626,6 @@ mod tests {
             "Small deviation should have low importance, got {}",
             obs2.importance
         );
-    }
-
-    #[tokio::test]
-    async fn test_event_to_observation_task_decomposed() {
-        let event = DomainEvent::TaskDecomposed {
-            source_task_id: "t1".into(),
-            subtask_ids: vec!["s1".into(), "s2".into(), "s3".into()],
-            total_estimated_mins: Some(120),
-        };
-        let obs = event_to_observation(&event, &None).await.unwrap();
-        assert_eq!(obs.domain, "tasks");
-        assert!(obs.content.contains("3 subtasks"));
-        assert!(obs.content.contains("120min"));
-        assert_eq!(obs.source_event, "TaskDecomposed");
     }
 
     #[test]

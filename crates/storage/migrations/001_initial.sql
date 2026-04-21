@@ -213,20 +213,6 @@ CREATE INDEX idx_strategy_records_chat_id ON strategy_records(chat_id);
 CREATE INDEX idx_strategy_records_timestamp ON strategy_records(timestamp);
 
 -- ============================================================
--- Enrichment Feedback
--- ============================================================
-CREATE TABLE enrichment_feedback (
-    id              INTEGER PRIMARY KEY AUTOINCREMENT,
-    task_id         TEXT NOT NULL,
-    field           TEXT NOT NULL,
-    suggested_value TEXT NOT NULL,
-    actual_value    TEXT,
-    accepted        INTEGER NOT NULL,
-    confidence      REAL NOT NULL,
-    timestamp       INTEGER NOT NULL DEFAULT (unixepoch('now') * 1000)
-);
-
--- ============================================================
 -- Usage Records (cost tracking)
 -- ============================================================
 CREATE TABLE usage_records (

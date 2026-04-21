@@ -227,24 +227,4 @@ mod tests {
         let parsed: ContextSnapshot = serde_json::from_str(&json).unwrap();
         assert_eq!(parsed.facts.len(), 1);
     }
-
-    #[test]
-    fn test_estimation_record_from_row() {
-        let row = TaskEstimationRow {
-            id: "est1".to_string(),
-            task_id: "task1".to_string(),
-            estimated_minutes: 30,
-            actual_minutes: 45,
-            deviation_pct: 50.0,
-            complexity_score: Some(3),
-            energy_level: Some("high".to_string()),
-            tags: vec!["dev".to_string()],
-            project_id: Some("proj1".to_string()),
-            completed_at: SqlTs::from(jiff::Timestamp::now()),
-        };
-        let record = EstimationRecord::from(row);
-        assert_eq!(record.estimated_minutes, 30);
-        assert_eq!(record.actual_minutes, 45);
-        assert_eq!(record.energy_level, Some(EnergyLevel::High));
-    }
 }

@@ -1,5 +1,5 @@
 //! Row structs for the `tasks`, `task_activity`, `task_executions`, `task_suggestions`,
-//! `task_decompositions`, `task_estimation_history`, `task_attachments`, `task_time_entries`,
+//! `task_estimation_history`, `task_attachments`, `task_time_entries`,
 //! and `task_dependencies` tables.
 
 use crate::sqlite_types::SqlTs;
@@ -69,20 +69,6 @@ pub struct TaskActivityRow {
     pub actor_id: Option<String>,
     pub summary: Option<String>,
     pub created_at: SqlTs,
-}
-
-/// Row struct for the `task_decompositions` table.
-#[derive(Debug, Clone, FromRow, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct TaskDecompositionRow {
-    pub id: String,
-    pub task_id: String,
-    pub plan: String,
-    pub confidence: f64,
-    pub status: String,
-    pub reasoning: Option<String>,
-    pub created_at: SqlTs,
-    pub applied_at: Option<SqlTs>,
 }
 
 /// Row struct for the `task_estimation_history` table.

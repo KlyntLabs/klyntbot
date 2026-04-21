@@ -51,20 +51,6 @@ pub struct StrategyRecordRow {
     pub context_fill_pct: Option<f64>,
 }
 
-/// Row struct for the `enrichment_feedback` table.
-#[derive(Debug, Clone, FromRow, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct EnrichmentFeedbackRow {
-    pub id: i32,
-    pub task_id: String,
-    pub field: String,
-    pub suggested_value: String,
-    pub actual_value: Option<String>,
-    pub accepted: bool,
-    pub confidence: f64,
-    pub timestamp: SqlTs,
-}
-
 /// Row struct for the `learning_state` key-value table.
 #[derive(Debug, Clone, FromRow, Serialize)]
 #[serde(rename_all = "camelCase")]

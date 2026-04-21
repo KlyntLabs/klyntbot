@@ -1,8 +1,8 @@
 //! Integration tests for the Learning System.
 //!
-//! Covers outcome recording, enrichment feedback, adaptive thresholds,
-//! cold-start protection, privacy guarantees, confidence evaluation,
-//! LearningTool routing, strategy persistence, and goal metrics.
+//! Covers outcome recording, adaptive thresholds, cold-start protection,
+//! privacy guarantees, confidence evaluation, LearningTool routing,
+//! strategy persistence, and goal metrics.
 
 use super::common::*;
 use klyntbot::agent::confidence::prompt::confidence_prompt;
@@ -11,8 +11,7 @@ use klyntbot::agent::learning::adaptive::AdaptiveThresholds;
 use klyntbot::agent::learning::analyzer::LearningAnalyzer;
 use klyntbot::agent::learning::recorder::OutcomeRecorder;
 use klyntbot::agent::learning::recorder::OutcomeStore;
-use klyntbot::agent::learning::types::{AnalysisResult, EnrichmentStats};
-use klyntbot::agent::learning::EnrichmentFeedbackHandler;
+use klyntbot::agent::learning::types::AnalysisResult;
 use klyntbot::agent::learning::{ExecutionMode, OutcomeRecord};
 use klyntbot::agent::learning_handler::LearningHandlerImpl;
 use klyntbot::agent::LearningService;
@@ -27,45 +26,6 @@ use tools::learning_tool::{LearningHandler, LearningStatus, LearningTool, Thresh
 use tools::Tool;
 
 // ── Helpers ────────────────────────────────────────────────────
-
-fn make_feedback(
-    task_id: &str,
-    accepted: bool,
-) -> klyntbot::agent::learning::EnrichmentFeedbackEntry {
-    klyntbot::agent::learning::EnrichmentFeedbackEntry {
-        task_id: task_id.to_string(),
-        field: "priority".to_string(),
-        suggested_value: "1".to_string(),
-        actual_value: if accepted {
-            None
-        } else {
-            Some("3".to_string())
-        },
-        accepted,
-        confidence: 0.85,
-        timestamp: jiff::Timestamp::now(),
-    }
-}
-
-fn make_feedback_with_field(
-    task_id: &str,
-    accepted: bool,
-    field: &str,
-) -> klyntbot::agent::learning::EnrichmentFeedbackEntry {
-    klyntbot::agent::learning::EnrichmentFeedbackEntry {
-        task_id: task_id.to_string(),
-        field: field.to_string(),
-        suggested_value: "1".to_string(),
-        actual_value: if accepted {
-            None
-        } else {
-            Some("3".to_string())
-        },
-        accepted,
-        confidence: 0.85,
-        timestamp: jiff::Timestamp::now(),
-    }
-}
 
 fn make_outcome(id: &str, tool: &str, success: bool, confidence: f32) -> OutcomeRecord {
     OutcomeRecord {
@@ -211,7 +171,7 @@ async fn outcomes_persist_and_are_analyzable() {
     }
     let outcomes = store.get_all_outcomes().await.unwrap();
     assert_eq!(outcomes.len(), 30, "all 30 outcomes must be present");
-    let analysis = LearningAnalyzer::analyze(&outcomes, &[]);
+    let analysis = LearningAnalyzer::analyze(&outcomes);
     assert_eq!(analysis.total_outcomes, 30);
     assert!(analysis.per_tool_stats.contains_key("todo"));
 }
@@ -238,7 +198,7 @@ async fn analyzer_produces_five_confidence_bands() {
         })
         .collect();
 
-    let result = LearningAnalyzer::analyze(&outcomes, &[]);
+    let result = LearningAnalyzer::analyze(&outcomes);
     let stats = result
         .per_tool_stats
         .get("todo")
@@ -292,7 +252,7 @@ async fn analyzer_suggested_threshold_within_bounds() {
             })
             .collect();
 
-        let result = LearningAnalyzer::analyze(&outcomes, &[]);
+        let result = LearningAnalyzer::analyze(&outcomes);
         assert!(
             result.suggested_threshold >= 0.4 && result.suggested_threshold <= 0.9,
             "suggested_threshold out of [0.4, 0.9] for '{}': {}",
@@ -312,7 +272,7 @@ async fn analyzer_handles_mixed_success_distribution() {
         })
         .collect();
 
-    let result = LearningAnalyzer::analyze(&outcomes, &[]);
+    let result = LearningAnalyzer::analyze(&outcomes);
 
     assert_eq!(result.total_outcomes, 60, "must count all 60 outcomes");
     assert!(
@@ -345,7 +305,7 @@ async fn analyzer_multi_tool_per_tool_stats() {
         make_outcome("w2", "web_search", true, 0.9),
     ];
 
-    let result = LearningAnalyzer::analyze(&outcomes, &[]);
+    let result = LearningAnalyzer::analyze(&outcomes);
 
     assert_eq!(result.total_outcomes, 9);
     assert_eq!(result.per_tool_stats["todo"].total_calls, 4);
@@ -372,30 +332,6 @@ async fn analyzer_now_returns_immediate_result() {
     );
 }
 
-#[tokio::test]
-async fn combined_outcomes_and_feedback_analysis() {
-    let outcomes: Vec<OutcomeRecord> = (0..50)
-        .map(|i| make_outcome(&format!("o{}", i), "todo", i % 5 != 0, 0.7))
-        .collect();
-
-    let feedback: Vec<klyntbot::agent::learning::EnrichmentFeedbackEntry> = (0..10)
-        .map(|i| make_feedback_with_field(&format!("f{}", i), i < 8, "priority"))
-        .collect();
-
-    let result = LearningAnalyzer::analyze(&outcomes, &feedback);
-
-    assert_eq!(result.total_outcomes, 50);
-    assert_eq!(result.per_tool_stats["todo"].total_calls, 50);
-
-    assert_eq!(result.enrichment_stats.total_suggestions, 10);
-    assert_eq!(result.enrichment_stats.accepted_count, 8);
-    assert_eq!(result.enrichment_stats.overridden_count, 2);
-    assert!(
-        (result.enrichment_stats.acceptance_rate - 0.8).abs() < 0.001,
-        "acceptance rate must be 0.8"
-    );
-}
-
 // ── Adaptive Thresholds ───────────────────────────────────────
 
 #[tokio::test]
@@ -417,7 +353,7 @@ async fn threshold_never_below_min_bound() {
         })
         .collect();
 
-    let analysis = LearningAnalyzer::analyze(&outcomes, &[]);
+    let analysis = LearningAnalyzer::analyze(&outcomes);
     if let Some(new_threshold) = adaptive.apply_analysis(&analysis) {
         assert!(
             new_threshold >= 0.4,
@@ -455,7 +391,7 @@ async fn threshold_never_above_max_bound() {
         })
         .collect();
 
-    let analysis = LearningAnalyzer::analyze(&outcomes, &[]);
+    let analysis = LearningAnalyzer::analyze(&outcomes);
     if let Some(new_threshold) = adaptive.apply_analysis(&analysis) {
         assert!(
             new_threshold <= 0.9,
@@ -481,7 +417,6 @@ async fn threshold_step_limit_enforced() {
         per_tool_stats: Default::default(),
         suggested_threshold: 0.1,
         threshold_confidence: 0.99,
-        enrichment_stats: EnrichmentStats::default(),
     };
 
     if let Some(new_threshold) = adaptive.apply_analysis(&analysis) {
@@ -504,7 +439,6 @@ async fn cold_start_blocks_adaptation_below_minimum() {
         per_tool_stats: Default::default(),
         suggested_threshold: 0.5,
         threshold_confidence: 0.9,
-        enrichment_stats: EnrichmentStats::default(),
     };
 
     let result = adaptive.apply_analysis(&analysis);
@@ -525,7 +459,6 @@ async fn adaptation_triggers_at_minimum_outcomes() {
         per_tool_stats: Default::default(),
         suggested_threshold: 0.5,
         threshold_confidence: 0.9,
-        enrichment_stats: EnrichmentStats::default(),
     };
 
     let result = adaptive.apply_analysis(&analysis);
@@ -549,7 +482,6 @@ async fn threshold_history_tracked_after_change() {
         per_tool_stats: Default::default(),
         suggested_threshold: 0.5,
         threshold_confidence: 0.9,
-        enrichment_stats: EnrichmentStats::default(),
     };
     let result = adaptive.apply_analysis(&analysis);
     assert!(result.is_some(), "threshold should change");
@@ -566,84 +498,6 @@ async fn threshold_history_tracked_after_change() {
     let change = &adaptive.state().threshold_history[0];
     assert!((change.from - 0.7).abs() < f32::EPSILON);
     assert!((change.to - saved_threshold).abs() < f32::EPSILON);
-}
-
-// ── Enrichment Feedback ───────────────────────────────────────
-
-#[tokio::test]
-async fn enrichment_feedback_records_override() {
-    use klyntbot::agent::learning::EnrichmentFeedbackEntry;
-
-    let store = Arc::new(RwLock::new(OutcomeStore::new_in_memory()));
-    let recorder = Arc::new(OutcomeRecorder::new(Arc::clone(&store)));
-
-    let feedback = EnrichmentFeedbackEntry {
-        task_id: "todo-001".to_string(),
-        field: "priority".to_string(),
-        suggested_value: "1".to_string(),
-        actual_value: Some("3".to_string()),
-        accepted: false,
-        confidence: 0.85,
-        timestamp: jiff::Timestamp::now(),
-    };
-    recorder.record_feedback(feedback).await.unwrap();
-
-    let guard = store.read().await;
-    let all_fb = guard.get_all_feedback().await.unwrap();
-    assert_eq!(all_fb.len(), 1, "one feedback entry must be stored");
-    assert_eq!(all_fb[0].task_id, "todo-001");
-    assert!(
-        !all_fb[0].accepted,
-        "override must be recorded as not accepted"
-    );
-    assert_eq!(all_fb[0].actual_value.as_deref(), Some("3"));
-}
-
-#[tokio::test]
-async fn enrichment_feedback_records_acceptance() {
-    use klyntbot::agent::learning::EnrichmentFeedbackEntry;
-
-    let store = Arc::new(RwLock::new(OutcomeStore::new_in_memory()));
-    let recorder = Arc::new(OutcomeRecorder::new(Arc::clone(&store)));
-
-    let feedback = EnrichmentFeedbackEntry {
-        task_id: "todo-002".to_string(),
-        field: "estimated_minutes".to_string(),
-        suggested_value: "30".to_string(),
-        actual_value: None,
-        accepted: true,
-        confidence: 0.90,
-        timestamp: jiff::Timestamp::now(),
-    };
-    recorder.record_feedback(feedback).await.unwrap();
-
-    let guard = store.read().await;
-    let all_fb = guard.get_all_feedback().await.unwrap();
-    assert_eq!(all_fb.len(), 1);
-    assert!(
-        all_fb[0].accepted,
-        "accepted suggestion must be recorded as accepted"
-    );
-    assert!(all_fb[0].actual_value.is_none());
-}
-
-#[tokio::test]
-async fn enrichment_acceptance_rate_computed_correctly() {
-    let feedback: Vec<_> = (0..10)
-        .map(|i| make_feedback(&format!("task-{}", i), i < 7))
-        .collect();
-
-    let result = LearningAnalyzer::analyze(&[], &feedback);
-    let stats = &result.enrichment_stats;
-
-    assert_eq!(stats.total_suggestions, 10);
-    assert_eq!(stats.accepted_count, 7);
-    assert_eq!(stats.overridden_count, 3);
-    assert!(
-        (stats.acceptance_rate - 0.7).abs() < 0.001,
-        "acceptance_rate must be 0.7, got {}",
-        stats.acceptance_rate
-    );
 }
 
 // ── Privacy ───────────────────────────────────────────────────

@@ -18,7 +18,7 @@ use common::Result;
 
 use crate::confidence::ConfidenceAssessment;
 
-use super::types::{EnrichmentFeedbackEntry, ExecutionMode, OutcomeRecord};
+use super::types::{ExecutionMode, OutcomeRecord};
 
 // ===========================================================================
 // Outcome storage
@@ -76,7 +76,6 @@ enum Backend {
     Sqlite(storage::OutcomeRepo),
     InMemory {
         outcomes: std::sync::Mutex<Vec<OutcomeRecord>>,
-        feedback: std::sync::Mutex<Vec<EnrichmentFeedbackEntry>>,
     },
 }
 
@@ -98,7 +97,6 @@ impl OutcomeStore {
         Self {
             backend: Backend::InMemory {
                 outcomes: std::sync::Mutex::new(Vec::new()),
-                feedback: std::sync::Mutex::new(Vec::new()),
             },
         }
     }
@@ -112,27 +110,6 @@ impl OutcomeStore {
             }
             Backend::InMemory { outcomes, .. } => {
                 outcomes.lock().unwrap().push(outcome);
-            }
-        }
-        Ok(())
-    }
-
-    /// Record enrichment feedback.
-    pub async fn record_feedback(&self, feedback: EnrichmentFeedbackEntry) -> Result<()> {
-        match &self.backend {
-            Backend::Sqlite(repo) => {
-                repo.create_enrichment_feedback(
-                    &feedback.task_id,
-                    &feedback.field,
-                    &feedback.suggested_value,
-                    feedback.actual_value.as_deref(),
-                    feedback.accepted,
-                    feedback.confidence,
-                )
-                .await?;
-            }
-            Backend::InMemory { feedback: fb, .. } => {
-                fb.lock().unwrap().push(feedback);
             }
         }
         Ok(())
@@ -171,28 +148,6 @@ impl OutcomeStore {
                 .await
             }
             Backend::InMemory { outcomes, .. } => Ok(outcomes.lock().unwrap().clone()),
-        }
-    }
-
-    /// Get all enrichment feedback entries.
-    pub async fn get_all_feedback(&self) -> Result<Vec<EnrichmentFeedbackEntry>> {
-        match &self.backend {
-            Backend::Sqlite(repo) => {
-                let rows = repo.list_enrichment_feedback().await?;
-                Ok(rows
-                    .into_iter()
-                    .map(|r| EnrichmentFeedbackEntry {
-                        task_id: r.task_id,
-                        field: r.field,
-                        suggested_value: r.suggested_value,
-                        actual_value: r.actual_value,
-                        accepted: r.accepted,
-                        confidence: r.confidence,
-                        timestamp: *r.timestamp,
-                    })
-                    .collect())
-            }
-            Backend::InMemory { feedback, .. } => Ok(feedback.lock().unwrap().clone()),
         }
     }
 }
@@ -262,25 +217,6 @@ fn fnv_hash(data: &[u8]) -> u32 {
         hash = hash.wrapping_mul(0x0100_0193);
     }
     hash
-}
-
-/// AC #4 — Explicit user rating feedback.
-///
-/// "Explicit feedback" in the learning system means enrichment accept/override signals:
-/// when the user keeps an AI suggestion (`accepted=true`) or replaces it with their
-/// own value (`accepted=false`, `actual_value=Some(…)`). This is distinct from general
-/// conversational feedback ("that was wrong"); the learning system captures enrichment
-/// field-level signals only. Both acceptance and overrides feed the `LearningAnalyzer`
-/// via `OutcomeStore::get_all_feedback()` to inform future enrichment confidence tuning.
-///
-/// There is no separate "rate this tool call" mechanism — enrichment feedback is the
-/// sole explicit signal path. Additional explicit feedback channels are a post-v0.3 item.
-#[async_trait::async_trait]
-impl crate::learning::EnrichmentFeedbackHandler for OutcomeRecorder {
-    async fn record_feedback(&self, feedback: EnrichmentFeedbackEntry) -> common::Result<()> {
-        let store = self.store.write().await;
-        store.record_feedback(feedback).await
-    }
 }
 
 /// Categorize an error message into a broad category.

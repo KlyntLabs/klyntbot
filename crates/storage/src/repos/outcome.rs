@@ -1,9 +1,9 @@
-//! Outcome repository — learning_outcomes + enrichment_feedback tables.
+//! Outcome repository — learning_outcomes table.
 
 use sqlx::SqlitePool;
 
 use crate::error::StorageError;
-use crate::rows::learning::{EnrichmentFeedbackRow, OutcomeRow};
+use crate::rows::learning::OutcomeRow;
 
 #[derive(Debug, Clone, sqlx::FromRow)]
 pub struct ToolFailureStatsRow {
@@ -114,60 +114,4 @@ impl OutcomeRepo {
     }
 
     delete_older_than_impl!("learning_outcomes", "created_at");
-
-    /// Delete enrichment feedback older than `days` days. Returns count of deleted rows.
-    pub async fn delete_enrichment_feedback_older_than(
-        &self,
-        days: i64,
-        now: jiff::Timestamp,
-    ) -> Result<u64, StorageError> {
-        let cutoff = now - jiff::SignedDuration::from_hours((days) * 24);
-        let result = sqlx::query("DELETE FROM enrichment_feedback WHERE timestamp < ?1")
-            .bind(cutoff.as_millisecond())
-            .execute(&self.pool)
-            .await?;
-        Ok(result.rows_affected())
-    }
-
-    // ── Enrichment Feedback ──────────────────────────────────────
-
-    /// Insert enrichment feedback (autoincrement id).
-    pub async fn create_enrichment_feedback(
-        &self,
-        task_id: &str,
-        field: &str,
-        suggested_value: &str,
-        actual_value: Option<&str>,
-        accepted: bool,
-        confidence: f64,
-    ) -> Result<EnrichmentFeedbackRow, StorageError> {
-        let row = sqlx::query_as::<_, EnrichmentFeedbackRow>(
-            "INSERT INTO enrichment_feedback (task_id, field, suggested_value, actual_value,
-                                              accepted, confidence, timestamp)
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)
-             RETURNING *",
-        )
-        .bind(task_id)
-        .bind(field)
-        .bind(suggested_value)
-        .bind(actual_value)
-        .bind(accepted)
-        .bind(confidence)
-        .bind(jiff::Timestamp::now().as_millisecond())
-        .fetch_one(&self.pool)
-        .await?;
-        Ok(row)
-    }
-
-    /// List enrichment feedback for analysis.
-    pub async fn list_enrichment_feedback(
-        &self,
-    ) -> Result<Vec<EnrichmentFeedbackRow>, StorageError> {
-        let rows = sqlx::query_as::<_, EnrichmentFeedbackRow>(
-            "SELECT * FROM enrichment_feedback ORDER BY timestamp DESC",
-        )
-        .fetch_all(&self.pool)
-        .await?;
-        Ok(rows)
-    }
 }
