@@ -29,8 +29,8 @@ impl OutcomeRepo {
         let result = sqlx::query_as::<_, OutcomeRow>(
             "INSERT INTO learning_outcomes (id, session_key, tool_name, success, error_category,
                                             duration_ms, confidence_score, confidence_dimensions,
-                                            execution_mode, created_at)
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)
+                                            created_at)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)
              RETURNING *",
         )
         .bind(&row.id)
@@ -41,7 +41,6 @@ impl OutcomeRepo {
         .bind(row.duration_ms)
         .bind(row.confidence_score)
         .bind(&row.confidence_dimensions)
-        .bind(&row.execution_mode)
         .bind(row.created_at)
         .fetch_one(&self.pool)
         .await?;

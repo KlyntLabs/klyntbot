@@ -136,7 +136,6 @@ impl LearningAnalyzer {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::learning::types::ExecutionMode;
 
     fn make_outcome(tool: &str, success: bool, confidence: Option<f32>) -> OutcomeRecord {
         OutcomeRecord {
@@ -148,7 +147,6 @@ mod tests {
             duration_ms: 50,
             confidence_score: confidence,
             confidence_dimensions: None,
-            execution_mode: ExecutionMode::Chat,
             created_at: jiff::Timestamp::now(),
         }
     }

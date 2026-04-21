@@ -164,14 +164,6 @@ pub enum DomainEvent {
         next_instance_date: Option<String>,
     },
 
-    TaskFocusStarted {
-        task_id: String,
-        energy_level: String,
-    },
-    TaskFocusEnded {
-        task_id: String,
-        duration_secs: u64,
-    },
     EstimationRecorded {
         task_id: String,
         estimated_mins: u32,
@@ -627,8 +619,6 @@ impl DomainEvent {
             Self::TaskDueDateChanged { .. } => "TaskDueDateChanged",
             Self::TaskFocusChanged { .. } => "TaskFocusChanged",
             Self::RecurringTemplateAdvanced { .. } => "RecurringTemplateAdvanced",
-            Self::TaskFocusStarted { .. } => "TaskFocusStarted",
-            Self::TaskFocusEnded { .. } => "TaskFocusEnded",
             Self::EstimationRecorded { .. } => "EstimationRecorded",
             Self::GoalProgress { .. } => "GoalProgress",
             Self::TransactionRecorded { .. } => "TransactionRecorded",
@@ -705,8 +695,6 @@ impl DomainEvent {
             | Self::GoalProgress { .. }
             | Self::TaskBlocked { .. }
             | Self::TaskUnblocked { .. }
-            | Self::TaskFocusStarted { .. }
-            | Self::TaskFocusEnded { .. }
             | Self::EstimationRecorded { .. }
             | Self::TaskStatusChanged { .. }
             | Self::TaskPriorityChanged { .. }

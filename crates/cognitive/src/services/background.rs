@@ -1166,29 +1166,6 @@ async fn event_to_observation(
             source_event: "PredictiveAlert".into(),
             timestamp: now,
         }),
-        DomainEvent::TaskFocusStarted {
-            task_id,
-            energy_level,
-        } => Some(Observation {
-            domain: "tasks".into(),
-            content: format!("Focus started on task {task_id} at energy level {energy_level}"),
-            importance: 0.3,
-            source_event: "TaskFocusStarted".into(),
-            timestamp: now,
-        }),
-        DomainEvent::TaskFocusEnded {
-            task_id,
-            duration_secs,
-        } => Some(Observation {
-            domain: "tasks".into(),
-            content: format!(
-                "Focus ended on task {task_id} after {}min",
-                duration_secs / 60
-            ),
-            importance: 0.3,
-            source_event: "TaskFocusEnded".into(),
-            timestamp: now,
-        }),
         DomainEvent::EstimationRecorded {
             task_id,
             estimated_mins,
@@ -1267,8 +1244,6 @@ fn event_type_key(event: &DomainEvent) -> String {
         DomainEvent::BehavioralPatternDetected { .. } => "BehavioralPatternDetected".into(),
         DomainEvent::TaskBlocked { .. } => "TaskBlocked".into(),
         DomainEvent::TaskUnblocked { .. } => "TaskUnblocked".into(),
-        DomainEvent::TaskFocusStarted { .. } => "TaskFocusStarted".into(),
-        DomainEvent::TaskFocusEnded { .. } => "TaskFocusEnded".into(),
         DomainEvent::EstimationRecorded { .. } => "EstimationRecorded".into(),
         DomainEvent::TaskStatusChanged { .. } => "TaskStatusChanged".into(),
         DomainEvent::TaskPriorityChanged { .. } => "TaskPriorityChanged".into(),
@@ -1556,31 +1531,6 @@ mod tests {
         assert!(summary.content.contains("Score: 72"));
         assert!(summary.content.contains("Score: 78"));
         assert!(summary.content.contains("2 accumulated"));
-    }
-
-    #[tokio::test]
-    async fn test_event_to_observation_task_focus_started() {
-        let event = DomainEvent::TaskFocusStarted {
-            task_id: "t1".into(),
-            energy_level: "high".into(),
-        };
-        let obs = event_to_observation(&event, &None).await.unwrap();
-        assert_eq!(obs.domain, "tasks");
-        assert!(obs.content.contains("t1"));
-        assert!(obs.content.contains("high"));
-        assert_eq!(obs.source_event, "TaskFocusStarted");
-    }
-
-    #[tokio::test]
-    async fn test_event_to_observation_task_focus_ended() {
-        let event = DomainEvent::TaskFocusEnded {
-            task_id: "t1".into(),
-            duration_secs: 2700,
-        };
-        let obs = event_to_observation(&event, &None).await.unwrap();
-        assert_eq!(obs.domain, "tasks");
-        assert!(obs.content.contains("45min")); // 2700 / 60
-        assert_eq!(obs.source_event, "TaskFocusEnded");
     }
 
     #[tokio::test]

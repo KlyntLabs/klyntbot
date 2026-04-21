@@ -12,7 +12,7 @@ use klyntbot::agent::learning::analyzer::LearningAnalyzer;
 use klyntbot::agent::learning::recorder::OutcomeRecorder;
 use klyntbot::agent::learning::recorder::OutcomeStore;
 use klyntbot::agent::learning::types::AnalysisResult;
-use klyntbot::agent::learning::{ExecutionMode, OutcomeRecord};
+use klyntbot::agent::learning::OutcomeRecord;
 use klyntbot::agent::learning_handler::LearningHandlerImpl;
 use klyntbot::agent::LearningService;
 use klyntbot::{AgentLoop, MessageBus};
@@ -41,7 +41,6 @@ fn make_outcome(id: &str, tool: &str, success: bool, confidence: f32) -> Outcome
         duration_ms: 50,
         confidence_score: Some(confidence),
         confidence_dimensions: None,
-        execution_mode: ExecutionMode::Chat,
         created_at: jiff::Timestamp::now(),
     }
 }
@@ -68,15 +67,7 @@ async fn outcome_records_on_successful_tool_call() {
     let recorder = OutcomeRecorder::new(Arc::clone(&store));
 
     recorder
-        .record_tool_outcome(
-            "todo",
-            true,
-            None,
-            42,
-            None,
-            ExecutionMode::Chat,
-            "cli:test-session",
-        )
+        .record_tool_outcome("todo", true, None, 42, None, "cli:test-session")
         .await;
 
     let guard = store.read().await;
@@ -103,7 +94,6 @@ async fn outcome_records_on_failed_tool_call() {
             Some("validation"),
             15,
             None,
-            ExecutionMode::Chat,
             "cli:test-session",
         )
         .await;
@@ -126,7 +116,7 @@ async fn outcome_captures_duration_ms() {
     let recorder = OutcomeRecorder::new(Arc::clone(&store));
 
     recorder
-        .record_tool_outcome("todo", true, None, 123, None, ExecutionMode::Chat, "cli:s")
+        .record_tool_outcome("todo", true, None, 123, None, "cli:s")
         .await;
 
     let guard = store.read().await;
@@ -138,26 +128,6 @@ async fn outcome_captures_duration_ms() {
         "duration_ms field must be present in serialized outcome"
     );
     assert_eq!(outcomes[0].duration_ms, 123);
-}
-
-#[tokio::test]
-async fn plan_step_outcomes_tagged_with_execution_mode() {
-    let mode = ExecutionMode::PlanStep {
-        plan_id: "plan-test-001".to_string(),
-        step_index: 2,
-    };
-    let json = serde_json::to_string(&mode).unwrap();
-    let back: ExecutionMode = serde_json::from_str(&json).unwrap();
-
-    assert!(
-        matches!(back, ExecutionMode::PlanStep { step_index: 2, .. }),
-        "PlanStep execution mode must round-trip correctly"
-    );
-
-    let chat = ExecutionMode::Chat;
-    let json2 = serde_json::to_string(&chat).unwrap();
-    let back2: ExecutionMode = serde_json::from_str(&json2).unwrap();
-    assert!(matches!(back2, ExecutionMode::Chat));
 }
 
 #[tokio::test]
@@ -193,7 +163,6 @@ async fn analyzer_produces_five_confidence_bands() {
             duration_ms: 10,
             confidence_score: Some(c),
             confidence_dimensions: None,
-            execution_mode: ExecutionMode::Chat,
             created_at: jiff::Timestamp::now(),
         })
         .collect();
@@ -247,7 +216,6 @@ async fn analyzer_suggested_threshold_within_bounds() {
                 duration_ms: 10,
                 confidence_score: Some(*confidence),
                 confidence_dimensions: None,
-                execution_mode: ExecutionMode::Chat,
                 created_at: jiff::Timestamp::now(),
             })
             .collect();
@@ -348,7 +316,6 @@ async fn threshold_never_below_min_bound() {
             duration_ms: 10,
             confidence_score: Some(0.05),
             confidence_dimensions: None,
-            execution_mode: ExecutionMode::Chat,
             created_at: jiff::Timestamp::now(),
         })
         .collect();
@@ -386,7 +353,6 @@ async fn threshold_never_above_max_bound() {
             duration_ms: 10,
             confidence_score: Some(i as f32 / 60.0),
             confidence_dimensions: None,
-            execution_mode: ExecutionMode::Chat,
             created_at: jiff::Timestamp::now(),
         })
         .collect();
@@ -513,7 +479,6 @@ async fn privacy_no_args_or_messages_in_outcomes() {
         duration_ms: 100,
         confidence_score: None,
         confidence_dimensions: None,
-        execution_mode: ExecutionMode::Chat,
         created_at: jiff::Timestamp::now(),
     };
     let json = serde_json::to_string(&record).unwrap();
@@ -541,15 +506,7 @@ async fn privacy_session_key_is_hashed() {
     let recorder = OutcomeRecorder::new(Arc::clone(&store));
 
     recorder
-        .record_tool_outcome(
-            "todo",
-            true,
-            None,
-            42,
-            None,
-            ExecutionMode::Chat,
-            "telegram:user99999",
-        )
+        .record_tool_outcome("todo", true, None, 42, None, "telegram:user99999")
         .await;
 
     let guard = store.read().await;

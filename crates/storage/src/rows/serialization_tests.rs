@@ -432,7 +432,6 @@ mod tests {
                     duration_ms: 100,
                     confidence_score: None,
                     confidence_dimensions: None,
-                    execution_mode: serde_json::json!("direct"),
                     created_at: now,
                 })
                 .unwrap(),

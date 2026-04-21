@@ -17,7 +17,6 @@ pub struct OutcomeRow {
     pub duration_ms: i64,
     pub confidence_score: Option<f32>,
     pub confidence_dimensions: Option<serde_json::Value>,
-    pub execution_mode: serde_json::Value,
     pub created_at: SqlTs,
 }
 

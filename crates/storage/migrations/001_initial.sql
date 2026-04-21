@@ -176,7 +176,6 @@ CREATE TABLE learning_outcomes (
     duration_ms            INTEGER NOT NULL,
     confidence_score       REAL,
     confidence_dimensions  TEXT,
-    execution_mode         TEXT NOT NULL DEFAULT '"chat"',
     created_at             INTEGER NOT NULL DEFAULT (unixepoch('now') * 1000)
 );
 CREATE INDEX idx_learning_outcomes_created_at ON learning_outcomes(created_at);

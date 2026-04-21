@@ -30,16 +30,7 @@ pub struct OutcomeRecord {
     pub confidence_score: Option<f32>,
     /// Full dimension breakdown, if available.
     pub confidence_dimensions: Option<ConfidenceDimensions>,
-    pub execution_mode: ExecutionMode,
     pub created_at: Timestamp,
-}
-
-/// Whether the tool was called during chat or plan execution.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
-pub enum ExecutionMode {
-    Chat,
-    PlanStep { plan_id: String, step_index: usize },
 }
 
 /// Analysis results computed by LearningAnalyzer.
@@ -122,7 +113,6 @@ mod tests {
                 tool_fit: 0.8,
                 info_sufficiency: 0.85,
             }),
-            execution_mode: ExecutionMode::Chat,
             created_at: Timestamp::now(),
         };
         let json = serde_json::to_string(&record).unwrap();
@@ -133,24 +123,6 @@ mod tests {
             "failed for: OutcomeRecord.tool_name"
         );
         assert!((loaded.confidence_score.unwrap() - 0.85).abs() < f32::EPSILON);
-
-        // ExecutionMode::PlanStep roundtrip
-        let mode = ExecutionMode::PlanStep {
-            plan_id: "plan-abc".to_string(),
-            step_index: 3,
-        };
-        let json = serde_json::to_string(&mode).unwrap();
-        let loaded: ExecutionMode = serde_json::from_str(&json).unwrap();
-        match loaded {
-            ExecutionMode::PlanStep {
-                plan_id,
-                step_index,
-            } => {
-                assert_eq!(plan_id, "plan-abc", "failed for: PlanStep.plan_id");
-                assert_eq!(step_index, 3, "failed for: PlanStep.step_index");
-            }
-            _ => panic!("Expected PlanStep variant"),
-        }
 
         // AdaptiveThresholdState roundtrip
         let state = AdaptiveThresholdState {
@@ -187,7 +159,6 @@ mod tests {
             duration_ms: 100,
             confidence_score: None,
             confidence_dimensions: None,
-            execution_mode: ExecutionMode::Chat,
             created_at: Timestamp::now(),
         };
         let json = serde_json::to_string(&record).unwrap();

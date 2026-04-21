@@ -75,8 +75,6 @@ pub fn evaluate_salience(event: &DomainEvent) -> SalienceVerdict {
         DomainEvent::NoteUpdated { .. } => SalienceVerdict::Accumulate,
         DomainEvent::ToolCallExecuted { .. } => SalienceVerdict::Accumulate,
         DomainEvent::BehavioralPatternDetected { .. } => SalienceVerdict::Accumulate,
-        DomainEvent::TaskFocusStarted { .. } => SalienceVerdict::Accumulate,
-        DomainEvent::TaskFocusEnded { .. } => SalienceVerdict::Accumulate,
         DomainEvent::EstimationRecorded { deviation_pct, .. } => {
             if deviation_pct.abs() > HIGH_DEVIATION_THRESHOLD {
                 SalienceVerdict::Extract

@@ -18,7 +18,7 @@ use common::Result;
 
 use crate::confidence::ConfidenceAssessment;
 
-use super::types::{ExecutionMode, OutcomeRecord};
+use super::types::OutcomeRecord;
 
 // ===========================================================================
 // Outcome storage
@@ -32,8 +32,6 @@ fn outcome_to_row(outcome: &OutcomeRecord) -> Result<storage::OutcomeRow> {
         .map(serde_json::to_value)
         .transpose()?;
 
-    let execution_mode = serde_json::to_value(&outcome.execution_mode)?;
-
     Ok(storage::OutcomeRow {
         id: outcome.id.clone(),
         session_key: outcome.session_key.clone(),
@@ -43,7 +41,6 @@ fn outcome_to_row(outcome: &OutcomeRecord) -> Result<storage::OutcomeRow> {
         duration_ms: outcome.duration_ms as i64,
         confidence_score: outcome.confidence_score,
         confidence_dimensions,
-        execution_mode,
         created_at: outcome.created_at.into(),
     })
 }
@@ -55,8 +52,6 @@ fn row_to_outcome(row: storage::OutcomeRow) -> Result<OutcomeRecord> {
         .map(serde_json::from_value)
         .transpose()?;
 
-    let execution_mode: ExecutionMode = serde_json::from_value(row.execution_mode)?;
-
     Ok(OutcomeRecord {
         id: row.id,
         session_key: row.session_key,
@@ -66,7 +61,6 @@ fn row_to_outcome(row: storage::OutcomeRow) -> Result<OutcomeRecord> {
         duration_ms: row.duration_ms as u64,
         confidence_score: row.confidence_score,
         confidence_dimensions,
-        execution_mode,
         created_at: *row.created_at,
     })
 }
@@ -175,7 +169,6 @@ impl OutcomeRecorder {
         error_category: Option<&str>,
         duration_ms: u64,
         confidence: Option<&ConfidenceAssessment>,
-        execution_mode: ExecutionMode,
         session_key: &str,
     ) {
         let record = OutcomeRecord {
@@ -187,7 +180,6 @@ impl OutcomeRecorder {
             duration_ms,
             confidence_score: confidence.map(|c| c.score),
             confidence_dimensions: confidence.map(|c| c.dimensions.clone()),
-            execution_mode,
             created_at: jiff::Timestamp::now(),
         };
 
