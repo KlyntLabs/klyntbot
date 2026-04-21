@@ -9,48 +9,30 @@ use std::sync::Arc;
 use bus::DomainEventBus;
 
 use crate::config::TasksConfig;
-use crate::handlers::{
-    DayPlanningHandler, DecompositionHandler, EmbeddingHandler, EnrichmentHandler, ForecastHandler,
-    ProactiveHandler, SuggestionApplier, TaskExecutionHandler,
-};
+use crate::handlers::EmbeddingHandler;
 use crate::types::{Attachment, Task, TimeEntry};
 use common::{Result, ToolError};
 use storage::TaskRepo;
 use tools_core::{ParamExtractor, ProgressHandler, RoutingContext, Tool};
 
-/// TaskTool: agentic task management with enrichment, embedding, and planning.
+/// TaskTool: task CRUD, semantic search, recurrence, focus, and alarms.
 pub struct TaskTool {
     pub(crate) repo: TaskRepo,
     pub(crate) area_repo: Option<storage::AreaRepo>,
     pub(crate) max_focus_slots: usize,
     pub(crate) focus_deadline_hours: u64,
     pub(crate) timezone: String,
-    pub(crate) enrichment_handler: Option<Arc<dyn EnrichmentHandler>>,
     pub(crate) embedding_handler: Option<Arc<dyn EmbeddingHandler>>,
     /// LanceDB vector store for semantic search.
     pub(crate) embedding_store: Option<storage::VectorStore>,
     pub(crate) semantic_threshold: f64,
     pub(crate) rrf_k: u32,
-    /// Confidence threshold for auto-applying enrichment suggestions (0.0-1.0).
-    pub(crate) enrichment_threshold: f64,
     /// Optional progress handler for cascading KR progress on complete.
     pub(crate) progress_handler: Option<Arc<dyn ProgressHandler>>,
     /// Optional domain event bus for cross-feature communication.
     pub(crate) domain_bus: Option<Arc<DomainEventBus>>,
     /// Feature configuration.
     pub(crate) config: TasksConfig,
-    /// Optional decomposition handler (LLM-powered subtask generation).
-    pub(crate) decomposition_handler: Option<Arc<dyn DecompositionHandler>>,
-    /// Optional execution handler (agentic task execution).
-    pub(crate) execution_handler: Option<Arc<dyn TaskExecutionHandler>>,
-    /// Optional day planning handler (LLM-powered daily planning).
-    pub(crate) planning_handler: Option<Arc<dyn DayPlanningHandler>>,
-    /// Optional proactive suggestion handler.
-    pub(crate) proactive_handler: Option<Arc<dyn ProactiveHandler>>,
-    /// Optional suggestion applier for executing accepted suggestions.
-    pub(crate) suggestion_applier: Option<Arc<dyn SuggestionApplier>>,
-    /// Optional forecast handler for estimation accuracy and project forecasting.
-    pub(crate) forecast_handler: Option<Arc<dyn ForecastHandler>>,
     /// Optional task_alarms repo — required for `alarms` param on create/update.
     pub(crate) task_alarms_repo: Option<storage::repos::task_alarms::TaskAlarmsRepo>,
     /// Optional FireStore — required for `alarms` param on create/update.
@@ -71,21 +53,13 @@ impl TaskTool {
             max_focus_slots,
             focus_deadline_hours,
             timezone,
-            enrichment_handler: None,
             embedding_handler: None,
             embedding_store: None,
             semantic_threshold: 0.5,
             rrf_k: 60,
-            enrichment_threshold: 0.70,
             progress_handler: None,
             domain_bus: None,
             config: TasksConfig::default(),
-            decomposition_handler: None,
-            execution_handler: None,
-            planning_handler: None,
-            proactive_handler: None,
-            suggestion_applier: None,
-            forecast_handler: None,
             task_alarms_repo: None,
             fire_store: None,
         }
@@ -110,12 +84,6 @@ impl TaskTool {
         self
     }
 
-    /// Attach an enrichment handler.
-    pub fn with_enrichment_handler(mut self, handler: Arc<dyn EnrichmentHandler>) -> Self {
-        self.enrichment_handler = Some(handler);
-        self
-    }
-
     /// Attach an embedding handler for auto-embedding on create/update.
     pub fn with_embedding_handler(mut self, handler: Arc<dyn EmbeddingHandler>) -> Self {
         self.embedding_handler = Some(handler);
@@ -132,12 +100,6 @@ impl TaskTool {
     pub fn with_search_config(mut self, threshold: f64, rrf_k: u32) -> Self {
         self.semantic_threshold = threshold;
         self.rrf_k = rrf_k;
-        self
-    }
-
-    /// Set the enrichment auto-apply confidence threshold.
-    pub fn with_enrichment_threshold(mut self, threshold: f64) -> Self {
-        self.enrichment_threshold = threshold;
         self
     }
 
@@ -158,53 +120,10 @@ impl TaskTool {
         self.max_focus_slots = config.max_focus_slots;
         self.focus_deadline_hours = config.focus_deadline_hours;
         self.timezone = config.timezone.clone();
-        self.enrichment_threshold = config.enrichment.auto_apply_threshold;
         self.semantic_threshold = config.search.semantic_threshold;
         self.rrf_k = config.search.rrf_k;
         self.config = config;
         self
-    }
-
-    /// Attach a decomposition handler for AI-powered subtask generation.
-    pub fn with_decomposition_handler(mut self, handler: Arc<dyn DecompositionHandler>) -> Self {
-        self.decomposition_handler = Some(handler);
-        self
-    }
-
-    /// Attach an execution handler for agentic task execution.
-    pub fn with_execution_handler(mut self, handler: Arc<dyn TaskExecutionHandler>) -> Self {
-        self.execution_handler = Some(handler);
-        self
-    }
-
-    /// Attach a day planning handler for LLM-powered daily planning.
-    pub fn with_planning_handler(mut self, handler: Arc<dyn DayPlanningHandler>) -> Self {
-        self.planning_handler = Some(handler);
-        self
-    }
-
-    /// Attach a proactive suggestion handler.
-    pub fn with_proactive_handler(mut self, handler: Arc<dyn ProactiveHandler>) -> Self {
-        self.proactive_handler = Some(handler);
-        self
-    }
-
-    /// Attach a suggestion applier for executing accepted suggestions.
-    pub fn with_suggestion_applier(mut self, applier: Arc<dyn SuggestionApplier>) -> Self {
-        self.suggestion_applier = Some(applier);
-        self
-    }
-
-    /// Attach a forecast handler for estimation accuracy and project forecasting.
-    pub fn with_forecast_handler(mut self, handler: Arc<dyn ForecastHandler>) -> Self {
-        self.forecast_handler = Some(handler);
-        self
-    }
-
-    // ─── Scoring helpers ───────────────────────────────────────────
-
-    pub(crate) fn calculate_score(task: &Task, now: jiff::Timestamp) -> f64 {
-        crate::scoring::calculate_score(task, now)
     }
 
     // ─── Full task loading ──────────────────────────────────────────
@@ -282,13 +201,6 @@ impl TaskTool {
                 ToolError::ExecutionFailed(format!("alarm materialize failed: {e}")).into()
             })
     }
-
-    /// Load a task by ID or return a not-found error.
-    pub(crate) async fn require_task(&self, id: &str) -> Result<Task> {
-        self.get_full_task(id)
-            .await?
-            .ok_or_else(|| ToolError::ExecutionFailed(format!("Task {id} not found")).into())
-    }
 }
 
 #[async_trait]
@@ -298,7 +210,7 @@ impl Tool for TaskTool {
     }
 
     fn description(&self) -> &str {
-        "Manage individual to-do items and action items. Create, complete, update, delete, list, and search tasks. Supports priorities, dependencies, time logging, recurring tasks, daily planning, and AI-assisted decomposition. NOT for project containers or OKR objectives."
+        "Manage individual to-do items and action items. Create, complete, update, delete, list, and search tasks. Supports priorities, dependencies, time logging, and recurring tasks. NOT for project containers or OKR objectives."
     }
 
     fn parameters(&self) -> Value {
@@ -314,11 +226,7 @@ impl Tool for TaskTool {
                         "focus", "unfocus", "log_time",
                         "add_dep", "remove_dep",
                         "batch",
-                        "recur", "list_recurring", "delete_recurring",
-                        "plan_day",
-                        "decompose", "execute", "cancel_execution",
-                        "suggest", "apply_suggestion", "dismiss_suggestion", "list_suggestions",
-                        "forecast_task", "forecast_project", "accuracy_report"
+                        "recur", "list_recurring", "delete_recurring"
                     ],
                     "description": "Action to perform"
                 },
@@ -397,17 +305,6 @@ impl Tool for TaskTool {
                     "type": "string",
                     "description": "Recurring task template ID (delete_recurring)"
                 },
-                "count": {
-                    "type": "integer",
-                    "description": "Number of tasks to include in plan (default: 3)"
-                },
-                "execution_id": { "type": "string", "description": "Execution ID (for cancel_execution)" },
-                "suggestion_id": { "type": "string", "description": "Suggestion ID (for apply_suggestion/dismiss_suggestion)" },
-                "agent_profile": { "type": "string", "description": "Agent profile for execution" },
-                "max_cost": { "type": "number", "description": "Max cost in USD for execution" },
-                "max_iterations": { "type": "integer", "description": "Max LLM iterations for execution" },
-                "timeout_secs": { "type": "integer", "description": "Timeout in seconds for execution" },
-                "require_approval": { "type": "boolean", "description": "Require approval before execution" },
                 "unassigned": {
                     "type": "boolean",
                     "description": "Filter for tasks not assigned to any project or area (list)"
@@ -495,17 +392,6 @@ impl Tool for TaskTool {
             "recur" => self.handle_recur(&p).await,
             "list_recurring" => self.handle_list_recurring().await,
             "delete_recurring" => self.handle_delete_recurring(&p).await,
-            "plan_day" => self.handle_plan_day(&p).await,
-            "decompose" => self.handle_decompose(&p).await,
-            "execute" => self.handle_execute(&p).await,
-            "cancel_execution" => self.handle_cancel_execution(&p).await,
-            "suggest" => self.handle_suggest(&p).await,
-            "apply_suggestion" => self.handle_apply_suggestion(&p).await,
-            "dismiss_suggestion" => self.handle_dismiss_suggestion(&p).await,
-            "list_suggestions" => self.handle_list_suggestions(&p).await,
-            "forecast_task" => self.handle_forecast_task(&p).await,
-            "forecast_project" => self.handle_forecast_project(&p).await,
-            "accuracy_report" => self.handle_accuracy_report(&p).await,
             _ => Err(ToolError::InvalidParams(format!("Unknown action: {action}")).into()),
         }
     }
@@ -514,79 +400,6 @@ impl Tool for TaskTool {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::scoring;
-
-    use jiff::{SignedDuration, Timestamp};
-
-    #[test]
-    fn test_urgency_overdue() {
-        let now = Timestamp::now();
-        let two_days_ago = now
-            .checked_sub(SignedDuration::from_secs(2 * 86400))
-            .unwrap_or(now);
-        assert_eq!(scoring::calculate_urgency(Some(two_days_ago), now), 10);
-    }
-
-    #[test]
-    fn test_urgency_today() {
-        let now = Timestamp::now();
-        assert_eq!(scoring::calculate_urgency(Some(now), now), 5);
-    }
-
-    #[test]
-    fn test_urgency_tomorrow() {
-        let now = Timestamp::now();
-        let tomorrow = now
-            .checked_add(SignedDuration::from_secs(86400))
-            .unwrap_or(now);
-        assert_eq!(scoring::calculate_urgency(Some(tomorrow), now), 3);
-    }
-
-    #[test]
-    fn test_urgency_future() {
-        let now = Timestamp::now();
-        let week_out = now
-            .checked_add(SignedDuration::from_secs(7 * 86400))
-            .unwrap_or(now);
-        assert_eq!(scoring::calculate_urgency(Some(week_out), now), 1);
-    }
-
-    #[test]
-    fn test_urgency_no_due_date() {
-        let now = Timestamp::now();
-        assert_eq!(scoring::calculate_urgency(None, now), 1);
-    }
-
-    #[test]
-    fn test_priority_weight_p1() {
-        assert_eq!(scoring::priority_weight(Some(1)), 5);
-    }
-
-    #[test]
-    fn test_priority_weight_none() {
-        assert_eq!(scoring::priority_weight(None), 3);
-    }
-
-    #[test]
-    fn test_score_formula() {
-        let now = Timestamp::now();
-        let mut task = Task::default_instance();
-        task.priority = Some(1);
-        task.due_date = Some(
-            now.checked_sub(SignedDuration::from_secs(2 * 86400))
-                .unwrap_or(now),
-        );
-        task.created_at = now
-            .checked_sub(SignedDuration::from_secs(5 * 86400))
-            .unwrap_or(now);
-        let score = TaskTool::calculate_score(&task, now);
-        // urgency=10, priority_wt=5, age=5 -> 10*5 + 5*0.1 = 50.5
-        assert!(
-            (score - 50.5).abs() < 0.01,
-            "Score should be ~50.5, got {}",
-            score
-        );
-    }
 
     // ─── Integration tests ──────────────────────────────────────────
 
@@ -615,9 +428,6 @@ mod tests {
                 calendar_event_uid TEXT, last_reminded_at INTEGER,
                 recurrence_rule TEXT, recurrence_parent_id TEXT,
                 is_template INTEGER NOT NULL DEFAULT 0, next_instance_date INTEGER,
-                acceptance_criteria TEXT, agent_config TEXT,
-                execution_state TEXT NOT NULL DEFAULT 'idle',
-                spawned_execution_id TEXT, context_snapshot TEXT,
                 energy_level TEXT DEFAULT 'medium',
                 estimated_focus_blocks INTEGER, complexity_score INTEGER,
                 scheduled_start INTEGER, scheduled_end INTEGER
@@ -646,23 +456,6 @@ mod tests {
                 PRIMARY KEY (task_id, blocker_id),
                 CHECK (task_id != blocker_id)
             )"#,
-            r#"CREATE TABLE IF NOT EXISTS task_executions (
-                id TEXT PRIMARY KEY, task_id TEXT NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
-                status TEXT NOT NULL DEFAULT 'pending', agent_profile TEXT,
-                started_at INTEGER, completed_at INTEGER, duration_secs INTEGER,
-                tokens_used INTEGER, cost_usd REAL, input_context TEXT,
-                output_summary TEXT, error_message TEXT, artifacts TEXT, metrics TEXT,
-                retry_count INTEGER NOT NULL DEFAULT 0,
-                created_at INTEGER NOT NULL DEFAULT (unixepoch('now') * 1000)
-            )"#,
-            r#"CREATE TABLE IF NOT EXISTS task_suggestions (
-                id TEXT PRIMARY KEY, task_id TEXT REFERENCES tasks(id) ON DELETE CASCADE,
-                suggestion_type TEXT NOT NULL, title TEXT NOT NULL, description TEXT,
-                confidence REAL NOT NULL DEFAULT 0.0, action_payload TEXT,
-                status TEXT NOT NULL DEFAULT 'pending', trigger TEXT,
-                created_at INTEGER NOT NULL DEFAULT (unixepoch('now') * 1000),
-                resolved_at INTEGER
-            )"#,
             r#"CREATE TABLE IF NOT EXISTS task_estimation_history (
                 id TEXT PRIMARY KEY, task_id TEXT NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
                 estimated_minutes INTEGER NOT NULL, actual_minutes INTEGER NOT NULL,
@@ -670,13 +463,6 @@ mod tests {
                 energy_level TEXT, tags TEXT NOT NULL DEFAULT '[]',
                 project_id TEXT,
                 completed_at INTEGER NOT NULL
-            )"#,
-            r#"CREATE TABLE IF NOT EXISTS task_decompositions (
-                id TEXT PRIMARY KEY, task_id TEXT NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
-                plan TEXT NOT NULL, confidence REAL NOT NULL DEFAULT 0.0,
-                status TEXT NOT NULL DEFAULT 'pending', reasoning TEXT,
-                created_at INTEGER NOT NULL DEFAULT (unixepoch('now') * 1000),
-                applied_at INTEGER
             )"#,
             "INSERT OR IGNORE INTO areas (id, name, color, status) VALUES ('test-area', 'Test Area', '#000', 'active')",
         ] {
@@ -717,23 +503,6 @@ mod tests {
         let list_args = serde_json::json!({ "action": "list" });
         let list_result = tool.execute(list_args, &ctx).await.unwrap();
         assert!(list_result.contains("Write tests"));
-    }
-
-    #[tokio::test]
-    async fn test_create_agentic_task() {
-        let tool = make_tool().await;
-        let ctx = test_ctx();
-        let args = serde_json::json!({
-            "action": "create",
-            "title": "Auto-review PR",
-            "area_id": "test-area",
-            "task_type": "agentic",
-            "acceptance_criteria": "All tests pass and coverage > 80%"
-        });
-
-        let result = tool.execute(args, &ctx).await.unwrap();
-        assert!(result.contains("Task created: Auto-review PR"));
-        assert!(result.contains("type: agentic"));
     }
 
     #[tokio::test]
@@ -992,31 +761,6 @@ mod tests {
             .await
             .unwrap();
         assert!(unfocus_result.contains("Unfocused task"));
-    }
-
-    #[tokio::test]
-    async fn test_plan_day() {
-        let tool = make_tool().await;
-        let ctx = test_ctx();
-
-        tool.execute(
-            serde_json::json!({ "action": "create", "title": "Plan task 1", "area_id": "test-area", "priority": 1 }),
-            &ctx,
-        ).await.unwrap();
-        tool.execute(
-            serde_json::json!({ "action": "create", "title": "Plan task 2", "area_id": "test-area", "priority": 3 }),
-            &ctx,
-        ).await.unwrap();
-
-        let result = tool
-            .execute(
-                serde_json::json!({ "action": "plan_day", "count": 2 }),
-                &ctx,
-            )
-            .await
-            .unwrap();
-        assert!(result.contains("Daily plan"));
-        assert!(result.contains("Plan task 1"));
     }
 
     #[tokio::test]

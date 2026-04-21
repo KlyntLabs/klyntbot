@@ -6,7 +6,6 @@ use std::fmt;
 use std::str::FromStr;
 use storage::rows::task::*;
 
-use super::execution::{AgentConfig, ContextSnapshot, ExecutionState};
 use super::planning::{Attachment, TimeEntry};
 
 // ── Core Task ───────────────────────────────────────────────────────────────
@@ -44,13 +43,7 @@ pub struct Task {
     pub status_label_id: Option<String>,
     pub position: i32,
     pub group_id: Option<String>,
-    // Agentic fields
     pub task_type: TaskType,
-    pub acceptance_criteria: Option<String>,
-    pub agent_config: Option<AgentConfig>,
-    pub execution_state: ExecutionState,
-    pub spawned_execution_id: Option<String>,
-    pub context_snapshot: Option<ContextSnapshot>,
     pub energy_level: Option<EnergyLevel>,
     pub estimated_focus_blocks: Option<i32>,
     pub actual_minutes: Option<i32>,
@@ -113,11 +106,6 @@ impl Task {
             position: 0,
             group_id: None,
             task_type: TaskType::default(),
-            acceptance_criteria: None,
-            agent_config: None,
-            execution_state: ExecutionState::default(),
-            spawned_execution_id: None,
-            context_snapshot: None,
             energy_level: None,
             estimated_focus_blocks: None,
             actual_minutes: None,
@@ -177,20 +165,6 @@ impl From<TaskRow> for Task {
             position: row.position,
             group_id: row.group_id,
             task_type: row.task_type.parse::<TaskType>().unwrap_or_default(),
-            acceptance_criteria: row.acceptance_criteria,
-            agent_config: row
-                .agent_config
-                .as_deref()
-                .and_then(|s| serde_json::from_str(s).ok()),
-            execution_state: row
-                .execution_state
-                .parse::<ExecutionState>()
-                .unwrap_or_default(),
-            spawned_execution_id: row.spawned_execution_id,
-            context_snapshot: row
-                .context_snapshot
-                .as_deref()
-                .and_then(|s| serde_json::from_str(s).ok()),
             energy_level: row
                 .energy_level
                 .as_deref()
@@ -244,17 +218,6 @@ impl From<&Task> for TaskRow {
             position: task.position,
             group_id: task.group_id.clone(),
             task_type: task.task_type.to_string(),
-            acceptance_criteria: task.acceptance_criteria.clone(),
-            agent_config: task
-                .agent_config
-                .as_ref()
-                .and_then(|c| serde_json::to_string(c).ok()),
-            execution_state: task.execution_state.to_string(),
-            spawned_execution_id: task.spawned_execution_id.clone(),
-            context_snapshot: task
-                .context_snapshot
-                .as_ref()
-                .and_then(|c| serde_json::to_string(c).ok()),
             energy_level: task.energy_level.as_ref().map(|e| e.to_string()),
             estimated_focus_blocks: task.estimated_focus_blocks,
             actual_minutes: task.actual_minutes,
@@ -268,23 +231,17 @@ impl From<&Task> for TaskRow {
 
 // ── Core Enums ──────────────────────────────────────────────────────────────
 
-/// The type of task: manual, agentic (fully automated), or hybrid.
+/// The type of task. Always `Manual`; kept for forward-compatibility with stored strings.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]
 #[serde(rename_all = "lowercase")]
 pub enum TaskType {
     #[default]
     Manual,
-    Agentic,
-    Hybrid,
 }
 
 impl fmt::Display for TaskType {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Self::Manual => write!(f, "manual"),
-            Self::Agentic => write!(f, "agentic"),
-            Self::Hybrid => write!(f, "hybrid"),
-        }
+        write!(f, "manual")
     }
 }
 
@@ -292,9 +249,7 @@ impl FromStr for TaskType {
     type Err = String;
     fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
         match s.to_lowercase().as_str() {
-            "manual" => Ok(Self::Manual),
-            "agentic" => Ok(Self::Agentic),
-            "hybrid" => Ok(Self::Hybrid),
+            "manual" | "agentic" | "hybrid" | "standard" => Ok(Self::Manual),
             _ => Err(format!("unknown task type: {}", s)),
         }
     }

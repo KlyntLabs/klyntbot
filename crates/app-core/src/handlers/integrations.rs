@@ -161,8 +161,6 @@ static SKILLS: &[SkillDef] = &[
 | Create task | `tasks` | action: "create", title, area_id, priority |
 | List tasks | `tasks` | action: "list", status, area_id |
 | Complete task | `tasks` | action: "complete", id |
-| Plan my day | `tasks` | action: "plan_day", count: 3 |
-| Break down task | `tasks` | action: "decompose", id |
 | Focus on task | `tasks` | action: "focus", id |
 | Search | `tasks` | action: "search", query |
 | List areas | `area` | action: "list" |

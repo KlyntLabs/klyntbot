@@ -1,5 +1,5 @@
 //! Row structs for the `tasks`, `task_activity`, `task_executions`, `task_suggestions`,
-//! `task_decompositions`, `task_estimation_history`, `task_attachments`, `task_time_entries`,
+//! `task_estimation_history`, `task_attachments`, `task_time_entries`,
 //! and `task_dependencies` tables.
 
 use crate::sqlite_types::SqlTs;
@@ -40,11 +40,6 @@ pub struct TaskRow {
     pub position: i32,
     pub group_id: Option<String>,
     pub task_type: String,
-    pub acceptance_criteria: Option<String>,
-    pub agent_config: Option<String>,
-    pub execution_state: String,
-    pub spawned_execution_id: Option<String>,
-    pub context_snapshot: Option<String>,
     pub energy_level: Option<String>,
     pub estimated_focus_blocks: Option<i32>,
     pub actual_minutes: Option<i32>,
@@ -69,59 +64,6 @@ pub struct TaskActivityRow {
     pub actor_id: Option<String>,
     pub summary: Option<String>,
     pub created_at: SqlTs,
-}
-
-/// Row struct for the `task_executions` table.
-#[derive(Debug, Clone, FromRow, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct TaskExecutionRow {
-    pub id: String,
-    pub task_id: String,
-    pub status: String,
-    pub agent_profile: Option<String>,
-    pub started_at: Option<SqlTs>,
-    pub completed_at: Option<SqlTs>,
-    pub duration_secs: Option<i64>,
-    pub tokens_used: Option<i64>,
-    pub cost_usd: Option<f64>,
-    pub input_context: Option<String>,
-    pub output_summary: Option<String>,
-    pub error_message: Option<String>,
-    pub artifacts: Option<String>,
-    pub metrics: Option<String>,
-    pub retry_count: i32,
-    pub created_at: SqlTs,
-}
-
-/// Row struct for the `task_suggestions` table.
-#[derive(Debug, Clone, FromRow, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct TaskSuggestionRow {
-    pub id: String,
-    pub task_id: Option<String>,
-    pub suggestion_type: String,
-    pub title: String,
-    pub description: Option<String>,
-    pub confidence: f64,
-    pub action_payload: Option<String>,
-    pub status: String,
-    pub trigger: Option<String>,
-    pub created_at: SqlTs,
-    pub resolved_at: Option<SqlTs>,
-}
-
-/// Row struct for the `task_decompositions` table.
-#[derive(Debug, Clone, FromRow, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct TaskDecompositionRow {
-    pub id: String,
-    pub task_id: String,
-    pub plan: String,
-    pub confidence: f64,
-    pub status: String,
-    pub reasoning: Option<String>,
-    pub created_at: SqlTs,
-    pub applied_at: Option<SqlTs>,
 }
 
 /// Row struct for the `task_estimation_history` table.

@@ -22,8 +22,7 @@ mod tests {
     };
     use crate::rows::key_result::KeyResultRow;
     use crate::rows::learning::{
-        DecisionLogRow, EnrichmentFeedbackRow, LearningStateRow, OutcomeRow, StrategyRecordRow,
-        StrategySummaryRow,
+        DecisionLogRow, LearningStateRow, OutcomeRow, StrategyRecordRow, StrategySummaryRow,
     };
     use crate::rows::objective::ObjectiveRow;
     use crate::rows::project::ProjectRow;
@@ -433,7 +432,6 @@ mod tests {
                     duration_ms: 100,
                     confidence_score: None,
                     confidence_dimensions: None,
-                    execution_mode: serde_json::json!("direct"),
                     created_at: now,
                 })
                 .unwrap(),
@@ -464,20 +462,6 @@ mod tests {
                     loop_detected: false,
                     loop_tools: None,
                     context_fill_pct: None,
-                })
-                .unwrap(),
-            ),
-            (
-                "EnrichmentFeedbackRow",
-                serde_json::to_value(&EnrichmentFeedbackRow {
-                    id: 1,
-                    task_id: "t".to_string(),
-                    field: "priority".to_string(),
-                    suggested_value: "1".to_string(),
-                    actual_value: None,
-                    accepted: true,
-                    confidence: 0.9,
-                    timestamp: now,
                 })
                 .unwrap(),
             ),

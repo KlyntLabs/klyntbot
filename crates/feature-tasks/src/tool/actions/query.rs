@@ -39,7 +39,6 @@ impl TaskTool {
             root_only: false,
             status_group: None,
             group_id: None,
-            execution_state: None,
             completed: None,
         };
 
@@ -56,11 +55,7 @@ impl TaskTool {
                 .priority
                 .map(|p| format!("P{}", p))
                 .unwrap_or_else(|| "P3".to_string());
-            let type_str = if task.task_type != crate::types::TaskType::Manual {
-                format!(" [{}]", task.task_type)
-            } else {
-                String::new()
-            };
+            let type_str = String::new();
             output.push_str(&format!(
                 "\n- [{}] {} ({}, {}{}{})",
                 task.id,
@@ -103,9 +98,6 @@ impl TaskTool {
                 if let Some(desc) = &task.description {
                     output.push_str(&format!("Description: {}\n", desc));
                 }
-                if let Some(ref criteria) = task.acceptance_criteria {
-                    output.push_str(&format!("Acceptance Criteria: {}\n", criteria));
-                }
                 if !task.tags.is_empty() {
                     output.push_str(&format!("Tags: {}\n", task.tags.join(", ")));
                 }
@@ -120,9 +112,6 @@ impl TaskTool {
                 }
                 if let Some(ref project_id) = task.project_id {
                     output.push_str(&format!("Project: {}\n", project_id));
-                }
-                if task.execution_state != crate::types::ExecutionState::Idle {
-                    output.push_str(&format!("Execution: {}\n", task.execution_state));
                 }
                 if !task.blocked_by.is_empty() {
                     output.push_str(&format!("Blocked by: {}\n", task.blocked_by.join(", ")));

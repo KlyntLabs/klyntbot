@@ -1,6 +1,5 @@
 import { X } from "lucide-react";
 import type { useIssueDetail } from "../../hooks/useIssueDetail";
-import { SidebarAiInsights } from "./SidebarAiInsights";
 import { SidebarProperties } from "./SidebarProperties";
 import { SidebarTime } from "./SidebarTime";
 
@@ -30,25 +29,7 @@ export function IssueDetailSidebar({ detail, onClose }: IssueDetailSidebarProps)
       </div>
       <div className="divide-y divide-border">
         <SidebarProperties task={detail.task} compact={false} onUpdate={detail.updateTask} />
-        {showTime && (
-          <SidebarTime
-            task={detail.task}
-            taskState={taskState}
-            forecast={detail.forecast}
-            forecastLoading={detail.forecastLoading}
-            onFetchForecast={detail.fetchForecast}
-          />
-        )}
-        <SidebarAiInsights
-          task={detail.task}
-          taskState={taskState}
-          suggestions={detail.suggestions}
-          onApply={detail.applySuggestion}
-          onDismiss={detail.dismissSuggestion}
-          onFetchSuggestions={detail.fetchSuggestions}
-          suggestionsLoading={detail.suggestionsLoading}
-          aiError={detail.aiError}
-        />
+        {showTime && <SidebarTime task={detail.task} taskState={taskState} />}
       </div>
     </div>
   );

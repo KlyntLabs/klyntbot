@@ -1,13 +1,11 @@
 #![recursion_limit = "256"]
-//! feature-tasks: Agentic task management feature package for klyntbot.
+//! feature-tasks: task management feature package for klyntbot.
 //!
 //! Provides:
 //! - `TasksFeature`: implements `FeaturePackage` (tools, migrations, config, health)
-//! - Domain types: `Task`, `TaskExecution`, `TaskActivity`, `TaskSuggestion`, etc.
-//! - Handler traits: `EnrichmentHandler`, `EmbeddingHandler`, `DecompositionHandler`,
-//!   `TaskExecutionHandler`, `DayPlanningHandler`, `ProactiveHandler`,
-//!   `SuggestionApplier`, `ForecastHandler`, `ProgressHandler`
-//! - Utilities: `scoring`, `complexity`, `rrule_utils`, `search`
+//! - Domain types: `Task`, `Attachment`, `TimeEntry`, etc.
+//! - Handler traits: `EmbeddingHandler`, `ProgressHandler`
+//! - Utilities: `complexity`, `rrule_utils`, `search`
 //! - Config: `TasksConfig`
 
 pub mod alarm_side_effects;
@@ -16,24 +14,17 @@ pub mod cognitive_bridge;
 pub mod complexity;
 pub mod config;
 pub mod focus_alarms;
-pub mod forecast;
 pub mod handlers;
 pub mod recurrence_repo;
 pub mod rrule_utils;
-pub mod scoring;
 pub mod search;
 pub mod tool;
 pub mod types;
 
 pub use complexity::{evaluate_task_complexity, TaskComplexitySignals};
-pub use config::{EnrichmentConfig, SearchConfig, TasksConfig};
-pub use handlers::{
-    DayPlanningHandler, DecompositionHandler, EmbeddingHandler, EnrichmentHandler,
-    EnrichmentResult, EnrichmentSuggestion, ForecastHandler, ProactiveHandler, ProgressHandler,
-    SuggestionApplier, TaskExecutionHandler,
-};
+pub use config::{SearchConfig, TasksConfig};
+pub use handlers::{EmbeddingHandler, ProgressHandler};
 pub use rrule_utils::{humanize_rrule, next_occurrence, should_spawn_instance, validate_rrule};
-pub use scoring::{calculate_age_days, calculate_score, calculate_urgency, priority_weight};
 pub use search::hybrid_merge;
 pub use tool::TaskTool;
 pub use types::*;
@@ -43,7 +34,7 @@ use common::Result;
 use serde_json::Value;
 use tools_core::{DynTool, FeatureMigration, FeaturePackage, HealthStatus};
 
-/// Feature package for agentic task management.
+/// Feature package for task management.
 pub struct TasksFeature {
     pool: Option<storage::StoragePool>,
 }
@@ -85,7 +76,7 @@ impl FeaturePackage for TasksFeature {
         vec![FeatureMigration {
             feature_name: "tasks".to_string(),
             version: 2,
-            description: "Create agentic task tables".to_string(),
+            description: "Create task tables".to_string(),
             sql: Self::migration_sql().to_string(),
         }]
     }

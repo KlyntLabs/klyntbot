@@ -130,13 +130,10 @@ impl AppCore {
             info!("no cognitive provider — using heuristic handlers");
         }
 
-        // DomainEventBus is created before cron so the proactive scan callback
-        // can capture it and emit ProactiveSuggestionCreated after persisting.
-        // With ~25 subscribers each cloning every event, 256 slots give enough
-        // headroom for bursty tool-call sequences without Lagged errors while
-        // remaining bounded. Payload reduction (no user_message in
-        // ChatTurnCompleted, capped args_preview in ToolCallExecuted) keeps
-        // per-slot clone cost low.
+        // DomainEventBus — 256 slots give ~25 subscribers enough headroom for
+        // bursty tool-call sequences without Lagged errors while staying bounded.
+        // Payload reduction (no user_message in ChatTurnCompleted, capped
+        // args_preview in ToolCallExecuted) keeps per-slot clone cost low.
         let domain_event_bus = Arc::new(bus::DomainEventBus::new(256));
 
         // Context update queue for live context refresher (shared between agent + background services).
@@ -155,10 +152,6 @@ impl AppCore {
         // ── Phase 2: Cron ────────────────────────────────────────────────
         let cron::CronResult {
             cron_executor,
-            proactive_handler,
-            suggestion_applier,
-            decomposition_handler,
-            forecast_handler,
             autotuner,
         } = cron::init_cron(
             &config,
@@ -167,7 +160,6 @@ impl AppCore {
             cognitive_provider.clone(),
             provider.clone(),
             &domain_event_bus,
-            feature_tasks::TasksConfig::default(),
             vector_store.clone(),
         )
         .await?;
@@ -751,10 +743,6 @@ impl AppCore {
             embedding_engine: appcore_embedding_engine,
             vector_store: appcore_vector_store,
             launcher_engine,
-            proactive_handler,
-            suggestion_applier,
-            decomposition_handler,
-            forecast_handler,
             insight_service: {
                 let insight_repo =
                     feature_insights::InsightReviewRepo::new(storage_pool.inner().clone());

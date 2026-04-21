@@ -40,11 +40,6 @@ CREATE TABLE IF NOT EXISTS tasks (
     recurrence_parent_id TEXT,
     is_template          INTEGER NOT NULL DEFAULT 0,
     next_instance_date   INTEGER,
-    acceptance_criteria  TEXT,
-    agent_config         TEXT,
-    execution_state      TEXT NOT NULL DEFAULT 'idle',
-    spawned_execution_id TEXT,
-    context_snapshot     TEXT,
     energy_level         TEXT DEFAULT 'medium',
     estimated_focus_blocks INTEGER,
     complexity_score     INTEGER,
@@ -62,8 +57,6 @@ CREATE INDEX IF NOT EXISTS idx_tasks_parent_id ON tasks(parent_id);
 CREATE INDEX IF NOT EXISTS idx_tasks_due_date ON tasks(due_date);
 CREATE INDEX IF NOT EXISTS idx_tasks_focused_at ON tasks(focused_at) WHERE focused_at IS NOT NULL;
 CREATE INDEX IF NOT EXISTS idx_tasks_is_template ON tasks(is_template) WHERE is_template = 1;
-CREATE INDEX IF NOT EXISTS idx_tasks_task_type ON tasks(task_type);
-CREATE INDEX IF NOT EXISTS idx_tasks_execution_state ON tasks(execution_state);
 CREATE INDEX IF NOT EXISTS idx_tasks_energy_level ON tasks(energy_level);
 CREATE INDEX IF NOT EXISTS idx_tasks_status_label_id ON tasks(status_label_id);
 CREATE INDEX IF NOT EXISTS idx_tasks_group_id ON tasks(group_id);
@@ -86,50 +79,6 @@ CREATE TABLE IF NOT EXISTS task_activity (
 
 CREATE INDEX IF NOT EXISTS idx_task_activity_task_id ON task_activity(task_id);
 CREATE INDEX IF NOT EXISTS idx_task_activity_created_at ON task_activity(created_at);
-
--- ============================================================
--- Task Executions (agent execution records)
--- ============================================================
-CREATE TABLE IF NOT EXISTS task_executions (
-    id             TEXT PRIMARY KEY,
-    task_id        TEXT NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
-    status         TEXT NOT NULL DEFAULT 'pending',
-    agent_profile  TEXT,
-    started_at     INTEGER,
-    completed_at   INTEGER,
-    duration_secs  INTEGER,
-    tokens_used    INTEGER,
-    cost_usd       REAL,
-    input_context  TEXT,
-    output_summary TEXT,
-    error_message  TEXT,
-    artifacts      TEXT,
-    metrics        TEXT,
-    retry_count    INTEGER NOT NULL DEFAULT 0,
-    created_at     INTEGER NOT NULL DEFAULT (unixepoch('now') * 1000)
-);
-
-CREATE INDEX IF NOT EXISTS idx_task_executions_task_id ON task_executions(task_id);
-
--- ============================================================
--- Task Suggestions (AI-generated suggestions)
--- ============================================================
-CREATE TABLE IF NOT EXISTS task_suggestions (
-    id              TEXT PRIMARY KEY,
-    task_id         TEXT REFERENCES tasks(id) ON DELETE CASCADE,
-    suggestion_type TEXT NOT NULL,
-    title           TEXT NOT NULL,
-    description     TEXT,
-    confidence      REAL NOT NULL DEFAULT 0.0,
-    action_payload  TEXT,
-    status          TEXT NOT NULL DEFAULT 'pending',
-    trigger         TEXT,
-    created_at      INTEGER NOT NULL DEFAULT (unixepoch('now') * 1000),
-    resolved_at     INTEGER
-);
-
-CREATE INDEX IF NOT EXISTS idx_task_suggestions_task_id ON task_suggestions(task_id);
-CREATE INDEX IF NOT EXISTS idx_task_suggestions_pending ON task_suggestions(status) WHERE status = 'pending';
 
 -- ============================================================
 -- Task Attachments
@@ -178,22 +127,6 @@ CREATE TABLE IF NOT EXISTS task_dependencies (
 CREATE INDEX IF NOT EXISTS idx_task_dependencies_blocker_id ON task_dependencies(blocker_id);
 
 -- ============================================================
--- Task Decompositions (pending decomposition plans)
--- ============================================================
-CREATE TABLE IF NOT EXISTS task_decompositions (
-    id          TEXT PRIMARY KEY,
-    task_id     TEXT NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
-    plan        TEXT NOT NULL,
-    confidence  REAL NOT NULL DEFAULT 0.0,
-    status      TEXT NOT NULL DEFAULT 'pending',
-    reasoning   TEXT,
-    created_at  INTEGER NOT NULL DEFAULT (unixepoch('now') * 1000),
-    applied_at  INTEGER
-);
-
-CREATE INDEX IF NOT EXISTS idx_task_decompositions_task_id ON task_decompositions(task_id);
-
--- ============================================================
 -- Task Estimation History (estimation accuracy tracking)
 -- ============================================================
 CREATE TABLE IF NOT EXISTS task_estimation_history (
@@ -232,17 +165,6 @@ FOR EACH ROW
 WHEN NEW.completed = 1 AND OLD.completed = 0
 BEGIN
     UPDATE tasks SET completed_at = (unixepoch('now') * 1000)
-    WHERE id = NEW.id;
-END;
-
--- 3. Auto-calculate duration_secs when execution completed_at is set
-CREATE TRIGGER IF NOT EXISTS trg_execution_duration
-AFTER UPDATE OF completed_at ON task_executions
-FOR EACH ROW
-WHEN NEW.completed_at IS NOT NULL AND OLD.completed_at IS NULL AND NEW.started_at IS NOT NULL
-BEGIN
-    UPDATE task_executions
-    SET duration_secs = (NEW.completed_at - NEW.started_at) / 1000
     WHERE id = NEW.id;
 END;
 

@@ -75,8 +75,6 @@ pub fn evaluate_salience(event: &DomainEvent) -> SalienceVerdict {
         DomainEvent::NoteUpdated { .. } => SalienceVerdict::Accumulate,
         DomainEvent::ToolCallExecuted { .. } => SalienceVerdict::Accumulate,
         DomainEvent::BehavioralPatternDetected { .. } => SalienceVerdict::Accumulate,
-        DomainEvent::TaskFocusStarted { .. } => SalienceVerdict::Accumulate,
-        DomainEvent::TaskFocusEnded { .. } => SalienceVerdict::Accumulate,
         DomainEvent::EstimationRecorded { deviation_pct, .. } => {
             if deviation_pct.abs() > HIGH_DEVIATION_THRESHOLD {
                 SalienceVerdict::Extract
@@ -84,15 +82,8 @@ pub fn evaluate_salience(event: &DomainEvent) -> SalienceVerdict {
                 SalienceVerdict::Accumulate
             }
         }
-        DomainEvent::TaskExecutionStarted { .. } => SalienceVerdict::Accumulate,
-        DomainEvent::TaskExecutionCompleted { .. } => SalienceVerdict::Extract,
-        DomainEvent::TaskExecutionFailed { .. } => SalienceVerdict::Extract,
-        DomainEvent::TaskExecutionProgress { .. } => SalienceVerdict::Accumulate,
-        DomainEvent::TaskDecomposed { .. } => SalienceVerdict::Accumulate,
         DomainEvent::TaskBlocked { .. } => SalienceVerdict::Accumulate,
         DomainEvent::TaskUnblocked { .. } => SalienceVerdict::Accumulate,
-        DomainEvent::DayPlanGenerated { .. } => SalienceVerdict::Accumulate,
-        DomainEvent::ProactiveSuggestionCreated { .. } => SalienceVerdict::Accumulate,
         DomainEvent::TaskStatusChanged { .. } => SalienceVerdict::Accumulate,
         DomainEvent::TaskPriorityChanged { .. } => SalienceVerdict::Accumulate,
         DomainEvent::TaskFieldUpdated { .. } => SalienceVerdict::Accumulate,
@@ -301,18 +292,6 @@ mod tests {
             deviation_pct: 16.7,
         });
         assert_eq!(verdict, SalienceVerdict::Accumulate);
-    }
-
-    #[test]
-    fn test_task_execution_completed_is_extract() {
-        let verdict = evaluate_salience(&DomainEvent::TaskExecutionCompleted {
-            task_id: "t1".into(),
-            execution_id: "e1".into(),
-            tokens_used: 1000,
-            cost_usd: Some(0.05),
-            artifacts_count: 2,
-        });
-        assert_eq!(verdict, SalienceVerdict::Extract);
     }
 
     #[test]

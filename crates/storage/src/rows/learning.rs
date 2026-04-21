@@ -17,7 +17,6 @@ pub struct OutcomeRow {
     pub duration_ms: i64,
     pub confidence_score: Option<f32>,
     pub confidence_dimensions: Option<serde_json::Value>,
-    pub execution_mode: serde_json::Value,
     pub created_at: SqlTs,
 }
 
@@ -49,20 +48,6 @@ pub struct StrategyRecordRow {
     pub loop_detected: bool,
     pub loop_tools: Option<String>,
     pub context_fill_pct: Option<f64>,
-}
-
-/// Row struct for the `enrichment_feedback` table.
-#[derive(Debug, Clone, FromRow, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct EnrichmentFeedbackRow {
-    pub id: i32,
-    pub task_id: String,
-    pub field: String,
-    pub suggested_value: String,
-    pub actual_value: Option<String>,
-    pub accepted: bool,
-    pub confidence: f64,
-    pub timestamp: SqlTs,
 }
 
 /// Row struct for the `learning_state` key-value table.

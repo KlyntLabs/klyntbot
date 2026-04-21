@@ -25,7 +25,6 @@ export type { Status, Priority };
 
 export type TaskState = "new" | "has-history" | "completed";
 export type ActorType = "user" | "agent" | "system";
-export type SuggestionStatus = "pending" | "applied" | "dismissed";
 
 export interface DetailTask {
   id: string;
@@ -40,12 +39,10 @@ export interface DetailTask {
   tags: string[];
   dueDate: string | null;
   energyLevel: string | null;
-  taskType: string;
   estimatedMinutes: number | null;
   actualMinutes: number | null;
   totalTrackedSecs: number;
   focusedAt: string | null;
-  acceptanceCriteria: string | null;
   complexityScore: number | null;
   completed: boolean;
   createdAt: string;
@@ -59,15 +56,6 @@ export interface ActivityEntry {
   action: string;
   detail: string | null;
   createdAt: string;
-}
-
-export interface Suggestion {
-  id: string;
-  suggestionType: string;
-  title: string;
-  description: string;
-  confidence: number;
-  status: SuggestionStatus;
 }
 
 export interface SubIssue {
@@ -284,12 +272,10 @@ export function taskToDetailTask(
     tags: task.tags,
     dueDate: task.dueDate ?? null,
     energyLevel: task.energyLevel ?? null,
-    taskType: task.taskType ?? "manual",
     estimatedMinutes: task.estimatedMinutes ?? null,
     actualMinutes: task.actualMinutes ?? null,
     totalTrackedSecs: task.totalTrackedSecs ?? 0,
     focusedAt: task.focusedAt ?? null,
-    acceptanceCriteria: task.acceptanceCriteria ?? null,
     complexityScore: task.complexityScore ?? null,
     completed: task.completed,
     createdAt: task.createdAt ?? "",

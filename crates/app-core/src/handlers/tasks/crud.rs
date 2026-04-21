@@ -130,11 +130,6 @@ impl AppCore {
             position: 0,
             group_id: params.group_id,
             task_type: params.task_type.unwrap_or_else(|| "manual".to_string()),
-            acceptance_criteria: params.acceptance_criteria,
-            agent_config: None,
-            execution_state: "idle".to_string(),
-            spawned_execution_id: None,
-            context_snapshot: None,
             energy_level: params.energy_level,
             estimated_focus_blocks: None,
             actual_minutes: None,
@@ -214,9 +209,7 @@ impl AppCore {
             status_label_id: params.status_label_id,
             group_id: params.group_id,
             task_type: params.task_type,
-            acceptance_criteria: params.acceptance_criteria,
             energy_level: params.energy_level.map(Some),
-            execution_state: params.execution_state,
             estimated_minutes: params.estimated_minutes,
             scheduled_start: params
                 .scheduled_start

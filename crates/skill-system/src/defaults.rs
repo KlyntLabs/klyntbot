@@ -108,10 +108,6 @@ pub fn compiled_skill_defaults() -> HashMap<String, Vec<(&'static str, &'static 
                 include_str!("../../../skills/task-management/assets/plan_template.md"),
             ),
             (
-                "references/daily-planner.md",
-                include_str!("../../../skills/task-management/references/daily-planner.md"),
-            ),
-            (
                 "references/project-management.md",
                 include_str!("../../../skills/task-management/references/project-management.md"),
             ),
@@ -122,10 +118,6 @@ pub fn compiled_skill_defaults() -> HashMap<String, Vec<(&'static str, &'static 
             (
                 "references/retrospective.md",
                 include_str!("../../../skills/task-management/references/retrospective.md"),
-            ),
-            (
-                "references/task-decompose.md",
-                include_str!("../../../skills/task-management/references/task-decompose.md"),
             ),
             (
                 "references/todo.md",

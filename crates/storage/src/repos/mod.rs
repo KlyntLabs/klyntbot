@@ -216,18 +216,16 @@ impl Repos {
     /// - `learning_outcomes`: 30 days
     /// - `interaction_log`: 60 days
     /// - `tool_usage`: 90 days
-    /// - `enrichment_feedback`: 90 days
     pub async fn cleanup_analytics(&self) -> Result<u64, crate::error::StorageError> {
         let now = jiff::Timestamp::now();
 
-        let (a, b, c, d, e) = futures_util::try_join!(
+        let (a, b, c, d) = futures_util::try_join!(
             self.strategies.delete_older_than(90, now),
             self.outcomes.delete_older_than(30, now),
             self.interaction_log.delete_older_than(60, now),
             self.tool_usage.delete_older_than(90, now),
-            self.outcomes.delete_enrichment_feedback_older_than(90, now),
         )?;
 
-        Ok(a + b + c + d + e)
+        Ok(a + b + c + d)
     }
 }

@@ -1,5 +1,5 @@
 import { EditorContentWrapper, useNoteEditor } from "@features/notes/components/editor/EditorCore";
-import { Bot, ChevronDown, ChevronRight } from "lucide-react";
+import { ChevronDown, ChevronRight } from "lucide-react";
 import { useState } from "react";
 import type { useIssueDetail } from "../../hooks/useIssueDetail";
 import type { SubIssue } from "../../lib/mappers";
@@ -21,7 +21,7 @@ export function IssueContentTab({ detail }: IssueContentTabProps) {
       {detail.task.acceptanceCriteria && (
         <AcceptanceCriteria text={detail.task.acceptanceCriteria} />
       )}
-      <SubIssuesList issues={detail.subIssues} onDecompose={detail.openDecomposition} />
+      <SubIssuesList issues={detail.subIssues} />
     </div>
   );
 }
@@ -73,7 +73,7 @@ function AcceptanceCriteria({ text }: { text: string }) {
   );
 }
 
-function SubIssuesList({ issues, onDecompose }: { issues: SubIssue[]; onDecompose: () => void }) {
+function SubIssuesList({ issues }: { issues: SubIssue[] }) {
   const navigateInPlace = useTabStore((s) => s.navigateInPlace);
   const completedCount = issues.filter((i) => i.completed).length;
 
@@ -83,14 +83,6 @@ function SubIssuesList({ issues, onDecompose }: { issues: SubIssue[]; onDecompos
         <h3 className="text-sm font-medium text-foreground">
           Sub-issues ({completedCount}/{issues.length} done)
         </h3>
-        <button
-          type="button"
-          onClick={onDecompose}
-          className="flex items-center gap-1 text-xs text-purple hover:text-purple/80 transition-colors"
-        >
-          <Bot className="size-3" />
-          Break Down
-        </button>
       </div>
       <div className="border border-border rounded-md divide-y divide-border">
         {issues.map((issue) => {

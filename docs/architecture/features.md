@@ -63,7 +63,7 @@ For typed tool implementations, the `ToolExecute` trait + `#[derive(Tool)]` macr
 
 Not all feature tools flow through `FeaturePackage::tools()`. Some tools require handler injection that depends on higher-layer crates (agent, context engine). These are wired directly in `crates/agent/src/agent_loop/builder.rs`:
 
-- `TaskTool` -- needs `EnrichmentHandler`, `DecompositionHandler`, `TaskExecutionHandler`, etc.
+- `TaskTool` -- needs `EmbeddingHandler`, `ProgressHandler`, alarm writers, and a domain event bus
 - `ProductivityTool` -- needs `FocusManager`, `DailyAggregator`
 - `LearningTool` -- needs `LearningHandler`
 
@@ -78,29 +78,22 @@ Feature crates at L4 cannot depend on the agent crate at L5. When a tool needs L
 ```
 feature-tasks (L4)                    agent (L5)
 --------------------                  -------------------
-trait EnrichmentHandler  <----------  struct EnrichmentHandlerImpl
-  async fn enrich(task)                 impl EnrichmentHandler
-                                          calls LLM provider
+trait EmbeddingHandler  <-----------  struct EmbeddingHandlerImpl
+  async fn embed(text)                  impl EmbeddingHandler
                                           calls embedding service
 
 TaskTool::new()
-  .with_enrichment_handler(Arc<dyn EnrichmentHandler>)
+  .with_embedding_handler(Arc<dyn EmbeddingHandler>)
 ```
 
-The builder in `agent_loop/builder.rs` constructs handler implementations and injects them as `Arc<dyn Trait>` via builder methods (`.with_enrichment_handler()`, `.with_decomposition_handler()`, etc.).
+The builder in `agent_loop/builder.rs` constructs handler implementations and injects them as `Arc<dyn Trait>` via builder methods.
 
 This pattern appears across multiple features:
 
 | Feature | Handler Trait | Agent Provides |
 |---|---|---|
-| feature-tasks | `EnrichmentHandler` | LLM-powered task metadata enrichment |
 | feature-tasks | `EmbeddingHandler` | Vector embedding generation + LanceDB storage |
-| feature-tasks | `DecompositionHandler` | LLM subtask tree generation |
-| feature-tasks | `TaskExecutionHandler` | Agentic task execution with feedback loop |
-| feature-tasks | `DayPlanningHandler` | LLM daily planning from task context |
-| feature-tasks | `ProactiveHandler` | Proactive suggestion generation |
-| feature-tasks | `SuggestionApplier` | Executing accepted suggestions |
-| feature-tasks | `ForecastHandler` | Estimation accuracy + project forecasting |
+| feature-tasks | `ProgressHandler` | Cascading KR progress updates on task complete |
 | feature-finance | `FinanceHandler` | Proactive financial analysis |
 | feature-coaching | `CoachingReasonerHandler` | LLM coaching decision pipeline |
 | tools | `LearningHandler` | Strategy retrieval + adaptive thresholds |
@@ -138,18 +131,17 @@ Tools return plain `String` results. The `ToolOutput` enum provides an opt-in up
 
 ## Feature Reference
 
-### feature-tasks -- Agentic Task Management
+### feature-tasks -- Task Management
 
-The richest feature. `TaskTool` is wired directly in the builder (not via `FeaturePackage::tools()`) because it requires 9 injected handler traits.
+Task CRUD + search + recurrence + focus + alarms. `TaskTool` is wired directly in the builder (not via `FeaturePackage::tools()`) because it needs an embedding handler, a progress handler, an alarm writer, and the domain event bus.
 
 | | |
 |---|---|
 | **Crate** | `crates/feature-tasks` |
 | **Tool name** | `tasks` |
-| **Actions** | 30 |
-| **Key types** | `Task`, `TaskExecution`, `TaskActivity`, `TaskSuggestion`, `Attachment`, `TimeEntry` |
+| **Key types** | `Task`, `TaskActivity`, `Attachment`, `TimeEntry` |
 | **Config struct** | `TasksConfig` |
-| **Storage tables** | tasks, task_executions, task_activities, task_suggestions, task_attachments, task_dependencies, task_decompositions, task_estimations, time_entries |
+| **Storage tables** | tasks, task_activities, task_attachments, task_dependencies, task_estimations, time_entries, task_alarms |
 
 **Action groups:**
 
@@ -159,26 +151,15 @@ The richest feature. `TaskTool` is wired directly in the builder (not via `Featu
 | Search | search (FTS + semantic hybrid with RRF ranking) |
 | Focus | focus, unfocus, log_time |
 | Dependencies | add_dep, remove_dep |
-| Batch | batch (batch create/update/execute) |
+| Batch | batch (batch create/update) |
 | Recurrence | recur, list_recurring, delete_recurring |
-| Planning | plan_day (LLM-powered daily planning) |
-| Decomposition | decompose (LLM subtask tree generation) |
-| Execution | execute, cancel_execution (agentic task runs with feedback loop) |
-| Suggestions | suggest, apply_suggestion, dismiss_suggestion, list_suggestions |
-| Forecast | forecast_task, forecast_project, accuracy_report |
 
-**Task types:** Manual (user-driven), Agentic (agent-driven with `ExecutionState` tracking), Hybrid (mixed). Tasks carry complexity scores, energy levels (`low`/`medium`/`high`/`deep`), priority (1-5), and optional `acceptance_criteria`.
+**Philosophy:** The task tool is a pure CRUD + scoring surface. LLM-driven behaviors (daily planning, decomposition, forecasting, proactive suggestions, auto-enrichment) were removed in April 2026 — users now compose those via cron + skills + the `agent` tool. Pure-math helpers (`scoring::calculate_score`, estimation history) remain for non-LLM ranking. `TaskCreated` / `TaskCompleted` events continue to publish so cognitive and reforge receive task signals.
 
 **Handler traits** (defined in `crates/feature-tasks/src/handlers/`):
 
-- `EnrichmentHandler` -- LLM analysis returning `EnrichmentResult` with `EnrichmentSuggestion` items. Auto-applied above configurable confidence threshold.
 - `EmbeddingHandler` -- generates vector embeddings on create/update for semantic search via LanceDB.
-- `DecompositionHandler` -- LLM-powered subtask tree generation from parent task context.
-- `TaskExecutionHandler` -- starts/monitors agentic task execution with approval gates.
-- `DayPlanningHandler` -- generates a prioritized daily plan from current tasks, energy, and calendar.
-- `ProactiveHandler` -- scans tasks and generates improvement suggestions.
-- `SuggestionApplier` -- executes accepted suggestions (audit-trailed).
-- `ForecastHandler` -- estimates task completion time from historical data; forecasts project timelines.
+- `ProgressHandler` -- cascades key-result progress updates when a task completes.
 
 ---
 

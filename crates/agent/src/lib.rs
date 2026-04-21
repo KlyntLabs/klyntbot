@@ -19,12 +19,10 @@ pub mod confidence;
 pub mod content_registry;
 pub mod context_sources;
 pub mod engines;
-pub mod enrichment;
 pub mod events;
 #[cfg(test)]
 mod events_tests;
 pub mod execution;
-pub mod handlers;
 pub mod learning;
 #[cfg(test)]
 mod notes_integration_tests;
@@ -51,7 +49,6 @@ pub use confidence::{ConfidenceAssessment, ConfidenceEvaluator, DecisionAction, 
 pub use context_sources::ConfidenceSource;
 pub use conversation_recall::ConversationRecallHandlerImpl;
 pub use cron::CronHandlerAdapter;
-pub use enrichment::EnrichmentEngine;
 pub use events::AgentEvent;
 pub use execution::{CycleOutcome, ExecutionCore, ExecutionParams, ToolExecutionResult};
 pub use finance::FinanceHandlerImpl;

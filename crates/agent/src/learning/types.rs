@@ -30,16 +30,7 @@ pub struct OutcomeRecord {
     pub confidence_score: Option<f32>,
     /// Full dimension breakdown, if available.
     pub confidence_dimensions: Option<ConfidenceDimensions>,
-    pub execution_mode: ExecutionMode,
     pub created_at: Timestamp,
-}
-
-/// Whether the tool was called during chat or plan execution.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
-pub enum ExecutionMode {
-    Chat,
-    PlanStep { plan_id: String, step_index: usize },
 }
 
 /// Analysis results computed by LearningAnalyzer.
@@ -51,7 +42,6 @@ pub struct AnalysisResult {
     pub suggested_threshold: f32,
     /// How confident the analyzer is in the suggestion (0.0–1.0).
     pub threshold_confidence: f32,
-    pub enrichment_stats: EnrichmentStats,
 }
 
 /// Per-tool aggregate statistics.
@@ -72,42 +62,6 @@ pub struct ConfidenceBand {
     pub total: usize,
     pub successes: usize,
     pub success_rate: f32,
-}
-
-/// Aggregate enrichment acceptance statistics.
-#[derive(Debug, Clone, Default, Serialize, Deserialize)]
-pub struct EnrichmentStats {
-    pub total_suggestions: usize,
-    pub accepted_count: usize,
-    pub overridden_count: usize,
-    pub acceptance_rate: f32,
-    pub per_field: HashMap<String, FieldAcceptanceStats>,
-}
-
-/// Per-field enrichment acceptance breakdown.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct FieldAcceptanceStats {
-    pub total: usize,
-    pub accepted: usize,
-    pub acceptance_rate: f32,
-}
-
-/// Feedback entry for recording enrichment outcomes.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct EnrichmentFeedbackEntry {
-    pub task_id: String,
-    pub field: String,
-    pub suggested_value: String,
-    pub actual_value: Option<String>,
-    pub accepted: bool,
-    pub confidence: f64,
-    pub timestamp: Timestamp,
-}
-
-/// Trait for recording enrichment feedback.
-#[async_trait::async_trait]
-pub trait EnrichmentFeedbackHandler: Send + Sync {
-    async fn record_feedback(&self, entry: EnrichmentFeedbackEntry) -> common::Result<()>;
 }
 
 /// Persistent state for adaptive threshold adjustment.
@@ -159,7 +113,6 @@ mod tests {
                 tool_fit: 0.8,
                 info_sufficiency: 0.85,
             }),
-            execution_mode: ExecutionMode::Chat,
             created_at: Timestamp::now(),
         };
         let json = serde_json::to_string(&record).unwrap();
@@ -170,45 +123,6 @@ mod tests {
             "failed for: OutcomeRecord.tool_name"
         );
         assert!((loaded.confidence_score.unwrap() - 0.85).abs() < f32::EPSILON);
-
-        // ExecutionMode::PlanStep roundtrip
-        let mode = ExecutionMode::PlanStep {
-            plan_id: "plan-abc".to_string(),
-            step_index: 3,
-        };
-        let json = serde_json::to_string(&mode).unwrap();
-        let loaded: ExecutionMode = serde_json::from_str(&json).unwrap();
-        match loaded {
-            ExecutionMode::PlanStep {
-                plan_id,
-                step_index,
-            } => {
-                assert_eq!(plan_id, "plan-abc", "failed for: PlanStep.plan_id");
-                assert_eq!(step_index, 3, "failed for: PlanStep.step_index");
-            }
-            _ => panic!("Expected PlanStep variant"),
-        }
-
-        // EnrichmentFeedbackEntry roundtrip
-        let entry = EnrichmentFeedbackEntry {
-            task_id: "todo-123".to_string(),
-            field: "priority".to_string(),
-            suggested_value: "1".to_string(),
-            actual_value: Some("2".to_string()),
-            accepted: false,
-            confidence: 0.75,
-            timestamp: Timestamp::now(),
-        };
-        let json = serde_json::to_string(&entry).unwrap();
-        let loaded: EnrichmentFeedbackEntry = serde_json::from_str(&json).unwrap();
-        assert_eq!(
-            loaded.task_id, "todo-123",
-            "failed for: EnrichmentFeedbackEntry.task_id"
-        );
-        assert!(
-            !loaded.accepted,
-            "failed for: EnrichmentFeedbackEntry.accepted"
-        );
 
         // AdaptiveThresholdState roundtrip
         let state = AdaptiveThresholdState {
@@ -245,7 +159,6 @@ mod tests {
             duration_ms: 100,
             confidence_score: None,
             confidence_dimensions: None,
-            execution_mode: ExecutionMode::Chat,
             created_at: Timestamp::now(),
         };
         let json = serde_json::to_string(&record).unwrap();

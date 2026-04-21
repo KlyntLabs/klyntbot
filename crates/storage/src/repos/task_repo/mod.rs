@@ -1,17 +1,14 @@
 //! Repository for the `tasks` table and its satellite tables
 //! (`task_attachments`, `task_time_entries`, `task_dependencies`,
-//!  `task_activity`, `task_executions`, `task_suggestions`, `task_estimation_history`).
+//!  `task_activity`, `task_estimation_history`).
 
 mod activity;
 mod attachments;
 mod core;
-mod decompositions;
 mod dependencies;
 mod estimations;
-mod executions;
 mod hierarchy;
 mod reporting;
-mod suggestions;
 mod time_entries;
 
 #[cfg(test)]
@@ -38,7 +35,6 @@ pub struct TaskFilter {
     pub status_group: Option<String>,
     pub group_id: Option<String>,
     pub task_type: Option<String>,
-    pub execution_state: Option<String>,
     pub energy_level: Option<String>,
     pub completed: Option<bool>,
 }
@@ -65,10 +61,6 @@ pub struct TaskPatch {
     pub position: Option<i32>,
     pub group_id: Option<Option<String>>,
     pub task_type: Option<String>,
-    pub acceptance_criteria: Option<Option<String>>,
-    pub agent_config: Option<Option<String>>,
-    pub execution_state: Option<String>,
-    pub spawned_execution_id: Option<Option<String>>,
     pub energy_level: Option<Option<String>>,
     pub complexity_score: Option<Option<i32>>,
     pub completed: Option<bool>,
@@ -92,7 +84,7 @@ pub struct TimeEntryWithTask {
 }
 
 /// Repository for task CRUD, hierarchy, focus, dependencies, attachments,
-/// time tracking, activity log, executions, suggestions, and estimation.
+/// time tracking, activity log, and estimation.
 #[derive(Debug, Clone)]
 pub struct TaskRepo {
     pool: SqlitePool,

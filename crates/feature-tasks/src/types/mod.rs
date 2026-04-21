@@ -1,18 +1,13 @@
 //! Domain types for the feature-tasks crate.
 //!
-//! Canonical definitions of `Task`, `TaskExecution`, `TaskActivity`, `TaskSuggestion`,
-//! and all associated enums and supporting types. Includes conversions from/to
-//! storage row types.
+//! Canonical definitions of `Task`, `TaskActivity`, and all associated enums
+//! and supporting types. Includes conversions from/to storage row types.
 
 mod entity;
-mod execution;
 mod planning;
-mod suggestion;
 
 pub use entity::*;
-pub use execution::*;
 pub use planning::*;
-pub use suggestion::*;
 
 #[cfg(test)]
 mod tests {
@@ -26,11 +21,6 @@ mod tests {
     }
 
     #[test]
-    fn test_execution_state_default_is_idle() {
-        assert_eq!(ExecutionState::default(), ExecutionState::Idle);
-    }
-
-    #[test]
     fn test_energy_level_default_is_medium() {
         assert_eq!(EnergyLevel::default(), EnergyLevel::Medium);
     }
@@ -40,12 +30,11 @@ mod tests {
         let mut t = Task::default_instance();
         t.area_id = "area-1".to_string();
         t.title = "Test task".to_string();
-        t.task_type = TaskType::Agentic;
         t.energy_level = Some(EnergyLevel::High);
         let json = serde_json::to_string(&t).unwrap();
         let parsed: Task = serde_json::from_str(&json).unwrap();
         assert_eq!(t.id, parsed.id);
-        assert_eq!(parsed.task_type, TaskType::Agentic);
+        assert_eq!(parsed.task_type, TaskType::Manual);
         assert_eq!(parsed.energy_level, Some(EnergyLevel::High));
         assert!(!parsed.is_template);
         assert!(!parsed.completed);
@@ -84,12 +73,7 @@ mod tests {
             status_label_id: None,
             position: 0,
             group_id: None,
-            task_type: "agentic".to_string(),
-            acceptance_criteria: Some("It works".to_string()),
-            agent_config: Some(r#"{"requireApproval":true,"retryPolicy":null}"#.to_string()),
-            execution_state: "idle".to_string(),
-            spawned_execution_id: None,
-            context_snapshot: None,
+            task_type: "manual".to_string(),
             energy_level: Some("high".to_string()),
             estimated_focus_blocks: Some(2),
             actual_minutes: None,
@@ -101,11 +85,9 @@ mod tests {
 
         let task = Task::from(row);
         assert_eq!(task.id, "test1234");
-        assert_eq!(task.task_type, TaskType::Agentic);
+        assert_eq!(task.task_type, TaskType::Manual);
         assert_eq!(task.energy_level, Some(EnergyLevel::High));
         assert_eq!(task.priority, Some(2));
-        assert!(task.agent_config.is_some());
-        assert!(task.agent_config.unwrap().require_approval);
         assert_eq!(task.estimated_focus_blocks, Some(2));
         assert_eq!(task.complexity_score, Some(3));
     }
@@ -114,72 +96,21 @@ mod tests {
     fn test_task_to_row_round_trip() {
         let mut t = Task::default_instance();
         t.area_id = "area-1".to_string();
-        t.task_type = TaskType::Hybrid;
         t.energy_level = Some(EnergyLevel::Deep);
-        t.agent_config = Some(AgentConfig {
-            require_approval: true,
-            retry_policy: Some(RetryPolicy::default()),
-        });
 
         let row = TaskRow::from(&t);
-        assert_eq!(row.task_type, "hybrid");
+        assert_eq!(row.task_type, "manual");
         assert_eq!(row.energy_level, Some("deep".to_string()));
-        assert!(row.agent_config.is_some());
 
         let task_back = Task::from(row);
-        assert_eq!(task_back.task_type, TaskType::Hybrid);
+        assert_eq!(task_back.task_type, TaskType::Manual);
         assert_eq!(task_back.energy_level, Some(EnergyLevel::Deep));
-        assert!(task_back.agent_config.is_some());
-    }
-
-    #[test]
-    fn test_agent_config_serde() {
-        let config = AgentConfig {
-            require_approval: true,
-            retry_policy: Some(RetryPolicy {
-                max_retries: 5,
-                base_delay_secs: 120,
-                exponential_backoff: true,
-            }),
-        };
-        let json = serde_json::to_string(&config).unwrap();
-        let parsed: AgentConfig = serde_json::from_str(&json).unwrap();
-        assert!(parsed.require_approval);
-        assert_eq!(parsed.retry_policy.unwrap().max_retries, 5);
-    }
-
-    #[test]
-    fn test_retry_policy_defaults() {
-        let manual = RetryPolicy::default_for_task_type(&TaskType::Manual);
-        assert_eq!(manual.max_retries, 0);
-
-        let agentic = RetryPolicy::default_for_task_type(&TaskType::Agentic);
-        assert_eq!(agentic.max_retries, 3);
-        assert!(agentic.exponential_backoff);
-
-        let hybrid = RetryPolicy::default_for_task_type(&TaskType::Hybrid);
-        assert_eq!(hybrid.max_retries, 1);
-        assert!(!hybrid.exponential_backoff);
     }
 
     #[test]
     fn test_task_type_display_and_parse() {
         assert_eq!(TaskType::Manual.to_string(), "manual");
-        assert_eq!("agentic".parse::<TaskType>().unwrap(), TaskType::Agentic);
         assert!("unknown".parse::<TaskType>().is_err());
-    }
-
-    #[test]
-    fn test_execution_state_display_and_parse() {
-        assert_eq!(ExecutionState::Idle.to_string(), "idle");
-        assert_eq!(
-            "running".parse::<ExecutionState>().unwrap(),
-            ExecutionState::Running
-        );
-        assert_eq!(
-            "awaiting_approval".parse::<ExecutionState>().unwrap(),
-            ExecutionState::AwaitingApproval
-        );
     }
 
     #[test]
@@ -203,14 +134,6 @@ mod tests {
     }
 
     #[test]
-    fn test_suggestion_action_serde() {
-        let action = SuggestionAction::SetPriority { priority: 1 };
-        let json = serde_json::to_string(&action).unwrap();
-        let parsed: SuggestionAction = serde_json::from_str(&json).unwrap();
-        assert_eq!(parsed, action);
-    }
-
-    #[test]
     fn test_working_hours_default() {
         let wh = WorkingHours::default();
         assert_eq!(wh.start, jiff::civil::Time::new(9, 0, 0, 0).unwrap());
@@ -223,47 +146,5 @@ mod tests {
         assert_eq!(TaskStatus::from_str_loose("todo"), Some(TaskStatus::Todo));
         assert_eq!(TaskStatus::from_str_loose("DONE"), Some(TaskStatus::Done));
         assert_eq!(TaskStatus::from_str_loose("unknown"), None);
-    }
-
-    #[test]
-    fn test_execution_config_default() {
-        let cfg = ExecutionConfig::default();
-        assert_eq!(cfg.max_iterations, Some(10));
-        assert!(!cfg.require_approval);
-        assert_eq!(cfg.retry_policy.max_retries, 2);
-    }
-
-    #[test]
-    fn test_context_snapshot_serde() {
-        let snap = ContextSnapshot {
-            facts: vec!["fact1".to_string()],
-            parent_chain: vec!["p1".to_string()],
-            sibling_titles: vec!["sibling".to_string()],
-            active_blockers: vec![],
-            captured_at: jiff::Timestamp::now(),
-        };
-        let json = serde_json::to_string(&snap).unwrap();
-        let parsed: ContextSnapshot = serde_json::from_str(&json).unwrap();
-        assert_eq!(parsed.facts.len(), 1);
-    }
-
-    #[test]
-    fn test_estimation_record_from_row() {
-        let row = TaskEstimationRow {
-            id: "est1".to_string(),
-            task_id: "task1".to_string(),
-            estimated_minutes: 30,
-            actual_minutes: 45,
-            deviation_pct: 50.0,
-            complexity_score: Some(3),
-            energy_level: Some("high".to_string()),
-            tags: vec!["dev".to_string()],
-            project_id: Some("proj1".to_string()),
-            completed_at: SqlTs::from(jiff::Timestamp::now()),
-        };
-        let record = EstimationRecord::from(row);
-        assert_eq!(record.estimated_minutes, 30);
-        assert_eq!(record.actual_minutes, 45);
-        assert_eq!(record.energy_level, Some(EnergyLevel::High));
     }
 }

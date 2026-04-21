@@ -2,10 +2,7 @@
 
 use std::collections::HashMap;
 
-use super::types::{
-    AnalysisResult, ConfidenceBand, EnrichmentFeedbackEntry, EnrichmentStats, FieldAcceptanceStats,
-    OutcomeRecord, ToolStats,
-};
+use super::types::{AnalysisResult, ConfidenceBand, OutcomeRecord, ToolStats};
 
 /// Confidence band boundaries for bucketing.
 const BAND_BOUNDARIES: &[(f32, f32)] =
@@ -15,13 +12,9 @@ pub struct LearningAnalyzer;
 
 impl LearningAnalyzer {
     /// Analyze all outcomes and produce an AnalysisResult.
-    pub fn analyze(
-        outcomes: &[OutcomeRecord],
-        feedback: &[EnrichmentFeedbackEntry],
-    ) -> AnalysisResult {
+    pub fn analyze(outcomes: &[OutcomeRecord]) -> AnalysisResult {
         let per_tool_stats = Self::compute_tool_stats(outcomes);
         let (suggested_threshold, threshold_confidence) = Self::suggest_threshold(&per_tool_stats);
-        let enrichment_stats = Self::compute_enrichment_stats(feedback);
 
         AnalysisResult {
             computed_at: jiff::Timestamp::now(),
@@ -29,7 +22,6 @@ impl LearningAnalyzer {
             per_tool_stats,
             suggested_threshold,
             threshold_confidence,
-            enrichment_stats,
         }
     }
 
@@ -139,54 +131,11 @@ impl LearningAnalyzer {
 
         (suggested, threshold_confidence)
     }
-
-    /// Compute enrichment acceptance stats.
-    fn compute_enrichment_stats(feedback: &[EnrichmentFeedbackEntry]) -> EnrichmentStats {
-        if feedback.is_empty() {
-            return EnrichmentStats::default();
-        }
-
-        let total = feedback.len();
-        let accepted = feedback.iter().filter(|f| f.accepted).count();
-        let overridden = total - accepted;
-
-        let mut per_field: HashMap<String, (usize, usize)> = HashMap::new();
-        for entry in feedback {
-            let (field_total, field_accepted) = per_field.entry(entry.field.clone()).or_default();
-            *field_total += 1;
-            if entry.accepted {
-                *field_accepted += 1;
-            }
-        }
-
-        let per_field_stats = per_field
-            .into_iter()
-            .map(|(field, (t, a))| {
-                (
-                    field,
-                    FieldAcceptanceStats {
-                        total: t,
-                        accepted: a,
-                        acceptance_rate: a as f32 / t as f32,
-                    },
-                )
-            })
-            .collect();
-
-        EnrichmentStats {
-            total_suggestions: total,
-            accepted_count: accepted,
-            overridden_count: overridden,
-            acceptance_rate: accepted as f32 / total as f32,
-            per_field: per_field_stats,
-        }
-    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::learning::types::ExecutionMode;
 
     fn make_outcome(tool: &str, success: bool, confidence: Option<f32>) -> OutcomeRecord {
         OutcomeRecord {
@@ -198,33 +147,15 @@ mod tests {
             duration_ms: 50,
             confidence_score: confidence,
             confidence_dimensions: None,
-            execution_mode: ExecutionMode::Chat,
             created_at: jiff::Timestamp::now(),
-        }
-    }
-
-    fn make_feedback(field: &str, accepted: bool) -> EnrichmentFeedbackEntry {
-        EnrichmentFeedbackEntry {
-            task_id: "todo-1".to_string(),
-            field: field.to_string(),
-            suggested_value: "1".to_string(),
-            actual_value: if accepted {
-                None
-            } else {
-                Some("2".to_string())
-            },
-            accepted,
-            confidence: 0.8,
-            timestamp: jiff::Timestamp::now(),
         }
     }
 
     #[test]
     fn test_analyze_empty_data() {
-        let result = LearningAnalyzer::analyze(&[], &[]);
+        let result = LearningAnalyzer::analyze(&[]);
         assert_eq!(result.total_outcomes, 0);
         assert!(result.per_tool_stats.is_empty());
-        assert_eq!(result.enrichment_stats.total_suggestions, 0);
     }
 
     #[test]
@@ -236,7 +167,7 @@ mod tests {
             make_outcome("shell", true, Some(0.6)),
         ];
 
-        let result = LearningAnalyzer::analyze(&outcomes, &[]);
+        let result = LearningAnalyzer::analyze(&outcomes);
         assert_eq!(result.per_tool_stats.len(), 2);
 
         let todo_stats = &result.per_tool_stats["todo"];
@@ -245,29 +176,9 @@ mod tests {
     }
 
     #[test]
-    fn test_enrichment_stats() {
-        let feedback = vec![
-            make_feedback("priority", true),
-            make_feedback("priority", true),
-            make_feedback("priority", false),
-            make_feedback("estimated_minutes", true),
-        ];
-
-        let result = LearningAnalyzer::analyze(&[], &feedback);
-        assert_eq!(result.enrichment_stats.total_suggestions, 4);
-        assert_eq!(result.enrichment_stats.accepted_count, 3);
-        assert_eq!(result.enrichment_stats.overridden_count, 1);
-        assert!((result.enrichment_stats.acceptance_rate - 0.75).abs() < f32::EPSILON);
-
-        let priority = &result.enrichment_stats.per_field["priority"];
-        assert_eq!(priority.total, 3);
-        assert_eq!(priority.accepted, 2);
-    }
-
-    #[test]
     fn test_threshold_suggestion_defaults_on_low_data() {
         let outcomes = vec![make_outcome("todo", true, Some(0.8))];
-        let result = LearningAnalyzer::analyze(&outcomes, &[]);
+        let result = LearningAnalyzer::analyze(&outcomes);
         // With insufficient data, threshold confidence should be low
         assert!(result.threshold_confidence <= 0.5);
     }

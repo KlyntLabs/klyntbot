@@ -153,14 +153,13 @@ mod tests {
 
         // Inject a mock analysis with a different suggested_threshold
         {
-            use crate::learning::types::{AnalysisResult, EnrichmentStats};
+            use crate::learning::types::AnalysisResult;
             let analysis = AnalysisResult {
                 computed_at: jiff::Timestamp::now(),
                 total_outcomes: 100,
                 per_tool_stats: std::collections::HashMap::new(),
                 suggested_threshold: 0.55, // Different from initial 0.7
                 threshold_confidence: 0.8,
-                enrichment_stats: EnrichmentStats::default(),
             };
             let mut adaptive = handler.adaptive.write().await;
             adaptive.apply_analysis(&analysis);

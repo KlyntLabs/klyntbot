@@ -24,16 +24,9 @@ Area (Work, Personal, Health)
 | Step | Question | If YES | If NO |
 |------|----------|--------|-------|
 | 1 | Is user creating a new task? | Go to **Task Creation** flow below | Go to step 2 |
-| 2 | Is it a planning request (daily/weekly)? | Use daily-planner or weekly-review reference (output template: `assets/plan_template.md`) | Go to step 3 |
-| 3 | Is it a complex goal needing breakdown? | Use **task-decompose** — create parent then subtasks | Go to step 4 |
-| 4 | Is it a review/scoring request? | Use retrospective or weekly-review reference | Go to step 5 |
+| 2 | Is it a planning request (weekly)? | Use weekly-review reference | Go to step 3 |
+| 3 | Is it a review/scoring request? | Use retrospective or weekly-review reference | Go to step 4 |
 | 5 | Does it involve money/budget? | **Delegate to finance-management** | Handle as project/area query |
-
-### When to Decompose vs Create Directly
-
-- **Create directly**: Single, clear action item ("buy groceries", "call dentist")
-- **Decompose**: Vague or multi-step goal ("launch website", "prepare for interview", "migrate database")
-- **Rule of thumb**: If it takes more than one sitting, decompose it
 
 ## Task Creation — ALWAYS Follow This
 
@@ -49,8 +42,6 @@ See `references/todo.md` for the complete creation workflow.
 | User says | What to do |
 |-----------|-----------|
 | "create a task" / "add todo" | Follow todo workflow (references/todo.md) |
-| "plan my day" / "morning plan" | Daily planner (references/daily-planner.md) |
-| "break this down" / "decompose" | Task decomposition (references/task-decompose.md) |
 | "weekly review" / "review my week" | Weekly review (references/weekly-review.md) |
 | "weekly report" / "week summary" | Data-driven report (references/reports.md) |
 | "project retrospective" / "how did X go" | Project retro report (references/reports.md) |
@@ -85,14 +76,10 @@ When a user's request crosses into another domain, hand off cleanly:
 ## Key Behaviors
 
 - Follow the **todo skill** for all task creation (ask-first, enrichment, confidence scoring)
-- Use **daily-planner** for morning/evening planning workflows
-- Use **task-decompose** for complex goals needing subtask breakdown
 - Use **weekly-review** for interactive GTD-style reviews (not passive reports)
 - Use **retrospective** for monthly/quarterly OKR scoring
 - Surface **project health** and stagnation proactively
 - For calendar operations, use Google Calendar MCP tools when available
-- Use `suggest` action for proactive AI suggestions (reprioritize, reschedule, decompose)
-- Use `forecast_task` / `forecast_project` for estimation forecasting
 - Use `reopen` action to uncomplete tasks (resets to "todo")
 - Use `due_after` / `due_before` filters for date-range task listing
 - Projects support `start_date`, `target_end_date`, `instructions`, `ai_personality`, `user_role` fields

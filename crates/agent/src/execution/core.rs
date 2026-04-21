@@ -673,7 +673,6 @@ impl ExecutionCore {
                             error_cat,
                             r.duration_ms,
                             None,
-                            crate::learning::types::ExecutionMode::Chat,
                             session_key.as_str(),
                         )
                         .await;

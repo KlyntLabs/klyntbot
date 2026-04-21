@@ -3,7 +3,6 @@ import { PanelRight } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useIssueDetail } from "../../hooks/useIssueDetail";
 import type { DisplayProject } from "../../lib/mappers";
-import { DecompositionPanel } from "./DecompositionPanel";
 import { IssueDetailBreadcrumb } from "./IssueDetailBreadcrumb";
 import { IssueDetailSidebar } from "./IssueDetailSidebar";
 import { IssueDetailTabs } from "./IssueDetailTabs";
@@ -42,31 +41,14 @@ export function IssueDetailView({ issueId, projectMap, areaMap }: IssueDetailVie
 
   return (
     <div ref={containerRef} className="flex h-full relative">
-      {/* Left column — splits when decomposition is open */}
-      <div className="flex-1 min-w-0 flex">
-        {/* Main content */}
-        <div className="flex-1 min-w-0 overflow-y-auto px-6 py-4">
-          <IssueDetailBreadcrumb />
-          <IssueDetailTitle
-            title={detail.task.title}
-            onUpdate={(title) => detail.updateTask("title", title)}
-          />
-          <IssueDetailTabs detail={detail} />
-        </div>
-
-        {/* Decomposition panel — slides in from right */}
-        {detail.decompositionOpen && (
-          <div className="w-[380px] shrink-0 border-l border-border bg-surface-base/50">
-            <DecompositionPanel
-              result={detail.decompositionResult}
-              loading={detail.decompositionLoading}
-              onDecompose={detail.decompose}
-              onApply={detail.applyDecomposition}
-              onClose={detail.closeDecomposition}
-              applying={detail.decompositionApplying}
-            />
-          </div>
-        )}
+      {/* Main content */}
+      <div className="flex-1 min-w-0 overflow-y-auto px-6 py-4">
+        <IssueDetailBreadcrumb />
+        <IssueDetailTitle
+          title={detail.task.title}
+          onUpdate={(title) => detail.updateTask("title", title)}
+        />
+        <IssueDetailTabs detail={detail} />
       </div>
 
       {/* Sidebar toggle */}

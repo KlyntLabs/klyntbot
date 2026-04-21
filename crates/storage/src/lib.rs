@@ -79,16 +79,16 @@ pub use rows::entity_link::EntityLinkRow;
 pub use rows::finance::FinanceInvestmentTxRow;
 pub use rows::key_result::KeyResultRow;
 pub use rows::learning::{
-    DecisionLogRow, EnrichmentFeedbackRow, InteractionLogRow, LearningStateRow, OutcomeRow,
-    StrategyRecordRow, StrategySummaryRow,
+    DecisionLogRow, InteractionLogRow, LearningStateRow, OutcomeRow, StrategyRecordRow,
+    StrategySummaryRow,
 };
 pub use rows::objective::ObjectiveRow;
 pub use rows::project::ProjectRow;
 pub use rows::project_source::ProjectSourceRow;
 pub use rows::session::{SessionListRow, SessionMessageRow, SessionRow};
 pub use rows::task::{
-    TaskActivityRow, TaskAttachmentRow, TaskDecompositionRow, TaskDependencyRow, TaskEstimationRow,
-    TaskExecutionRow, TaskRow, TaskSuggestionRow, TaskTimeEntryRow,
+    TaskActivityRow, TaskAttachmentRow, TaskDependencyRow, TaskEstimationRow, TaskRow,
+    TaskTimeEntryRow,
 };
 pub use rows::task_group::TaskGroupRow;
 pub use rows::tool_usage::{ToolUsageRow, ToolUsageStatsRow};
