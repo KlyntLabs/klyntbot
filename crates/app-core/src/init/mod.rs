@@ -3,6 +3,7 @@ mod channels;
 mod coaching;
 mod cognitive;
 mod cron;
+mod dnd;
 mod launcher;
 mod productivity;
 mod storage;
@@ -323,6 +324,16 @@ impl AppCore {
                 });
             });
         }
+
+        // ── DND focus session manager ─────────────────────────────────
+        let dnd::DndResult {
+            manager: dnd_manager,
+            _end_subscriber_handle: _dnd_end_subscriber_handle,
+        } = dnd::init_dnd(
+            &storage_pool,
+            &Some(Arc::clone(&domain_event_bus)),
+            &shutdown_token,
+        );
 
         // ── Focus alarms + AlarmFired side-effects ─────────────────────
         let _focus_alarms_handle = {
@@ -716,6 +727,7 @@ impl AppCore {
             ),
             productivity_repos,
             focus_manager,
+            dnd_manager: Some(dnd_manager),
             productivity_engine,
             aggregator,
             nudge_service,
@@ -781,6 +793,7 @@ impl AppCore {
             temporal_scheduler: Some(temporal_scheduler),
             _temporal_scheduler_handle: Some(temporal_scheduler_handle),
             _temporal_wake_subscriber: Some(temporal_wake_subscriber),
+            _dnd_end_subscriber_handle: Some(_dnd_end_subscriber_handle),
             mirror_facade,
             pending_memory_repo,
             _mirror_handles: mirror_handles,

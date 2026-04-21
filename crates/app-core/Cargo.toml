@@ -15,6 +15,7 @@ config = { workspace = true }
 context_engine = { workspace = true }
 feature-coaching = { workspace = true }
 feature-finance = { workspace = true }
+feature-focus = { path = "../feature-focus" }
 feature-insights = { workspace = true }
 feature-learning = { workspace = true }
 feature-language-learning = { workspace = true }

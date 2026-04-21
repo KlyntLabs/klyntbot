@@ -318,6 +318,7 @@ dependencies = [
  "dirs",
  "feature-coaching",
  "feature-finance",
+ "feature-focus",
  "feature-insights",
  "feature-language-learning",
  "feature-launcher",

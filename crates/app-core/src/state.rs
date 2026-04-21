@@ -10,6 +10,7 @@ use common::FormResponse;
 use desktop_shared::errors::ApiError;
 use desktop_shared::types::EntityKind;
 use feature_coaching::{FeedbackTracker, InterventionRouter, PatternDetector, SignalAccumulator};
+use feature_focus::DndManager;
 use feature_notes::repo::{NoteRepo, PracticeSessionRepo};
 use feature_productivity::repos::ProductivityRepos;
 use feature_productivity::{DailyAggregator, FocusManager, NudgeService, ProductivityEngine};
@@ -66,7 +67,12 @@ pub struct AppCore {
     /// Practice session repo (always available — backed by the same DB as notes).
     pub practice_repo: PracticeSessionRepo,
     pub productivity_repos: Option<ProductivityRepos>,
+    /// Productivity (Pomodoro) focus manager — distinct from DND sessions.
     pub focus_manager: Option<Arc<FocusManager>>,
+    /// DND session manager — controls timed Do-Not-Disturb sessions.
+    pub dnd_manager: Option<Arc<DndManager>>,
+    /// Background task that auto-deactivates DND sessions when the scheduled alarm fires.
+    pub _dnd_end_subscriber_handle: Option<tokio::task::JoinHandle<()>>,
     pub productivity_engine: Option<Arc<Mutex<ProductivityEngine>>>,
     pub aggregator: Option<Arc<DailyAggregator>>,
     pub nudge_service: Option<Arc<Mutex<NudgeService>>>,
@@ -179,6 +185,13 @@ impl AppCore {
         self.focus_manager
             .as_ref()
             .ok_or_else(|| ApiError::new("FEATURE_DISABLED", "productivity feature is not enabled"))
+    }
+
+    /// Return DND manager or a "feature disabled" error.
+    pub fn dnd_manager(&self) -> Result<&Arc<DndManager>, ApiError> {
+        self.dnd_manager
+            .as_ref()
+            .ok_or_else(|| ApiError::new("FEATURE_DISABLED", "focus (DND) feature is not enabled"))
     }
 
     /// Return daily aggregator or a "feature disabled" error.
