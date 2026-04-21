@@ -256,7 +256,7 @@ impl FromStr for TaskType {
     type Err = String;
     fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
         match s.to_lowercase().as_str() {
-            "manual" | "agentic" | "hybrid" | "standard" => Ok(Self::Manual),
+            "manual" | "standard" => Ok(Self::Manual),
             _ => Err(format!("unknown task type: {}", s)),
         }
     }

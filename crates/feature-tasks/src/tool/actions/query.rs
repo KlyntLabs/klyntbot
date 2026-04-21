@@ -198,16 +198,6 @@ impl TaskTool {
                     output.push_str(&format!("\nOverdue: {} tasks\n", overdue.len()));
                 }
 
-                // Agentic stats
-                let agentic_filter = TaskFilter {
-                    task_type: Some("agentic".to_string()),
-                    ..Default::default()
-                };
-                let agentic_count = self.repo.list(&agentic_filter).await?.len();
-                if agentic_count > 0 {
-                    output.push_str(&format!("\nAgentic tasks: {}\n", agentic_count));
-                }
-
                 return Ok(output);
             }
             Ok(_) => {} // no tasks with labels yet, fall through to legacy

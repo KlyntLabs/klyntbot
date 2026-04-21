@@ -258,21 +258,13 @@ impl Tool for TaskTool {
                 },
                 "task_type": {
                     "type": "string",
-                    "enum": ["manual", "agentic", "hybrid"],
+                    "enum": ["manual"],
                     "description": "Task type (default: manual)"
-                },
-                "acceptance_criteria": {
-                    "type": "string",
-                    "description": "Acceptance criteria for the task"
                 },
                 "energy_level": {
                     "type": "string",
                     "enum": ["low", "medium", "high", "deep"],
                     "description": "Energy level required"
-                },
-                "agent_config": {
-                    "type": "string",
-                    "description": "JSON agent configuration string"
                 },
                 "estimated_minutes": {
                     "type": "integer",

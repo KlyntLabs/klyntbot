@@ -10,7 +10,6 @@
 
 pub mod alarm_side_effects;
 pub mod alarms;
-pub mod cognitive_bridge;
 pub mod complexity;
 pub mod config;
 pub mod events;
