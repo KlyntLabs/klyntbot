@@ -107,6 +107,8 @@ fn is_cache_invalidating(evt: &bus::DomainEvent) -> bool {
             | bus::DomainEvent::AlarmFired { .. }
             | bus::DomainEvent::AlarmSnoozed { .. }
             | bus::DomainEvent::AlarmCancelled { .. }
+            | bus::DomainEvent::FocusSessionStarted { .. }
+            | bus::DomainEvent::FocusSessionEnded { .. }
     )
 }
 
@@ -151,7 +153,30 @@ async fn countdown_loop(
         // ── Render this tick's title and decide the next sleep budget. ──
         let sleep_secs;
 
-        if FOCUS_ACTIVE.load(Ordering::Relaxed) {
+        // DND session check — highest priority, overrides focus timer and voice.
+        let dnd_session = query_dnd_session(&app).await;
+        if let Some(ends_at) = dnd_session {
+            let remaining_ms = ends_at.as_millisecond() - jiff::Timestamp::now().as_millisecond();
+            if remaining_ms > 0 {
+                let total_secs = remaining_ms / 1000;
+                let hrs = total_secs / 3600;
+                let mins = (total_secs % 3600) / 60;
+                let title = if hrs > 0 {
+                    format!("\u{1F319} {}h {:02}m", hrs, mins)
+                } else {
+                    format!("\u{1F319} {}m", mins.max(1))
+                };
+                set_tray_title(&app, &title);
+                set_tooltip(&app, "DND active — click to manage");
+                cached = None;
+                dirty.store(true, Ordering::Relaxed);
+                sleep_secs = COUNTDOWN_TICK_SECS;
+            } else {
+                // Session just expired — fall through to re-query normally.
+                dirty.store(true, Ordering::Relaxed);
+                sleep_secs = COUNTDOWN_TICK_SECS;
+            }
+        } else if FOCUS_ACTIVE.load(Ordering::Relaxed) {
             // Focus timer owns the title — drop our cached countdown so we
             // re-query when focus ends.
             cached = None;
@@ -281,6 +306,16 @@ async fn query_next_item(app: &AppHandle) -> Option<NextItem> {
         (None, Some(tk)) => Some(tk),
         (None, None) => None,
     }
+}
+
+/// Return the `ends_at` timestamp of the currently-active DND session, or `None`.
+async fn query_dnd_session(app: &AppHandle) -> Option<jiff::Timestamp> {
+    let core = app.try_state::<Arc<AppCore>>()?;
+    let mgr = core.dnd_manager().ok()?;
+    mgr.active(feature_focus::FocusMode::Dnd)
+        .await
+        .ok()?
+        .map(|s| s.ends_at)
 }
 
 fn set_tray_title(app: &AppHandle, title: &str) {
