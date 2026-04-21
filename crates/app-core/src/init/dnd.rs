@@ -1,8 +1,8 @@
 //! DND (Do-Not-Disturb) focus session manager initialization.
 //!
-//! Builds a [`DndManager`] wired to the real [`TemporalAlarmBridge`] and a
-//! no-op bridge (real macOS bridge comes in PR-3). Spawns the
-//! `focus_end_subscriber` so scheduled alarms auto-deactivate sessions.
+//! Builds a [`DndManager`] wired to the real [`TemporalAlarmBridge`] and the
+//! platform-appropriate focus bridge. On macOS this is [`MacosFocusBridge`];
+//! on other platforms it is a no-op stub so the app still builds and runs.
 
 use std::sync::Arc;
 
@@ -19,19 +19,22 @@ use tracing::info;
 
 use crate::focus::end_subscriber::spawn_focus_end_subscriber;
 
-// ── No-op bridge (placeholder until PR-3 ships MacosFocusBridge) ─────────────
+// ── Non-macOS stub ────────────────────────────────────────────────────────────
 
-/// Stub bridge that does nothing. Replaced by `MacosFocusBridge` in PR-3.
+/// Stub bridge used on non-macOS platforms. All operations succeed as no-ops
+/// and `is_ready` reports false so callers can show appropriate UI.
+#[cfg(not(target_os = "macos"))]
 struct NoopFocusBridge;
 
+#[cfg(not(target_os = "macos"))]
 #[async_trait]
 impl FocusBridge for NoopFocusBridge {
     async fn turn_on(&self, _mode: FocusMode) -> common::Result<()> {
-        tracing::debug!("NoopFocusBridge: turn_on (no-op until PR-3 ships macOS bridge)");
+        tracing::debug!("NoopFocusBridge: turn_on (DND only supported on macOS)");
         Ok(())
     }
     async fn turn_off(&self, _mode: FocusMode) -> common::Result<()> {
-        tracing::debug!("NoopFocusBridge: turn_off (no-op until PR-3 ships macOS bridge)");
+        tracing::debug!("NoopFocusBridge: turn_off (DND only supported on macOS)");
         Ok(())
     }
     async fn is_ready(&self) -> common::Result<bool> {
@@ -60,7 +63,14 @@ pub(super) fn init_dnd(
         storage_pool.inner().clone(),
     ));
     let alarm_bridge = Arc::new(TemporalAlarmBridge::new(fire_store));
+
+    #[cfg(target_os = "macos")]
+    let focus_bridge: Arc<dyn FocusBridge> =
+        Arc::new(feature_focus::bridge::macos::MacosFocusBridge);
+
+    #[cfg(not(target_os = "macos"))]
     let focus_bridge: Arc<dyn FocusBridge> = Arc::new(NoopFocusBridge);
+
     let repo = feature_focus::FocusSessionRepo::new(storage_pool.inner().clone());
 
     let manager = Arc::new(DndManager::new(repo, alarm_bridge, focus_bridge));
