@@ -1166,41 +1166,6 @@ async fn event_to_observation(
             source_event: "PredictiveAlert".into(),
             timestamp: now,
         }),
-        // Agentic task events — Extract-priority need good observations
-        DomainEvent::TaskExecutionCompleted {
-            task_id,
-            execution_id,
-            tokens_used,
-            cost_usd,
-            artifacts_count,
-        } => {
-            let cost_str = cost_usd
-                .map(|c| format!(", cost ${c:.4}"))
-                .unwrap_or_default();
-            Some(Observation {
-                domain: "tasks".into(),
-                content: format!(
-                    "Task {task_id} execution {execution_id} completed: {tokens_used} tokens{cost_str}, {artifacts_count} artifacts"
-                ),
-                importance: 0.8,
-                source_event: "TaskExecutionCompleted".into(),
-                timestamp: now,
-            })
-        }
-        DomainEvent::TaskExecutionFailed {
-            task_id,
-            execution_id,
-            error,
-            retry_count,
-        } => Some(Observation {
-            domain: "tasks".into(),
-            content: format!(
-                "Task {task_id} execution {execution_id} failed (retry {retry_count}): {error}"
-            ),
-            importance: 0.9,
-            source_event: "TaskExecutionFailed".into(),
-            timestamp: now,
-        }),
         DomainEvent::TaskFocusStarted {
             task_id,
             energy_level,
@@ -1261,39 +1226,6 @@ async fn event_to_observation(
                 ),
                 importance: 0.4,
                 source_event: "TaskDecomposed".into(),
-                timestamp: now,
-            })
-        }
-        DomainEvent::DayPlanGenerated {
-            task_count,
-            total_estimated_mins,
-        } => Some(Observation {
-            domain: "tasks".into(),
-            content: format!(
-                "Day plan generated: {task_count} tasks, {total_estimated_mins}min scheduled"
-            ),
-            importance: 0.4,
-            source_event: "DayPlanGenerated".into(),
-            timestamp: now,
-        }),
-        DomainEvent::ProactiveSuggestionCreated {
-            suggestion_id: _,
-            suggestion_type,
-            task_id,
-            confidence,
-        } => {
-            let target = task_id
-                .as_deref()
-                .map(|id| format!(" for task {id}"))
-                .unwrap_or_default();
-            Some(Observation {
-                domain: "tasks".into(),
-                content: format!(
-                    "Proactive suggestion: {suggestion_type}{target} (confidence {:.0}%)",
-                    confidence * 100.0
-                ),
-                importance: 0.3,
-                source_event: "ProactiveSuggestionCreated".into(),
                 timestamp: now,
             })
         }
@@ -1365,16 +1297,11 @@ fn event_type_key(event: &DomainEvent) -> String {
         DomainEvent::BehavioralPatternDetected { .. } => "BehavioralPatternDetected".into(),
         DomainEvent::TaskDecomposed { .. } => "TaskDecomposed".into(),
         DomainEvent::TaskExecutionStarted { .. } => "TaskExecutionStarted".into(),
-        DomainEvent::TaskExecutionCompleted { .. } => "TaskExecutionCompleted".into(),
-        DomainEvent::TaskExecutionFailed { .. } => "TaskExecutionFailed".into(),
         DomainEvent::TaskBlocked { .. } => "TaskBlocked".into(),
         DomainEvent::TaskUnblocked { .. } => "TaskUnblocked".into(),
-        DomainEvent::DayPlanGenerated { .. } => "DayPlanGenerated".into(),
-        DomainEvent::ProactiveSuggestionCreated { .. } => "ProactiveSuggestionCreated".into(),
         DomainEvent::TaskFocusStarted { .. } => "TaskFocusStarted".into(),
         DomainEvent::TaskFocusEnded { .. } => "TaskFocusEnded".into(),
         DomainEvent::EstimationRecorded { .. } => "EstimationRecorded".into(),
-        DomainEvent::TaskExecutionProgress { .. } => "TaskExecutionProgress".into(),
         DomainEvent::TaskStatusChanged { .. } => "TaskStatusChanged".into(),
         DomainEvent::TaskPriorityChanged { .. } => "TaskPriorityChanged".into(),
         DomainEvent::TaskFieldUpdated { .. } => "TaskFieldUpdated".into(),
@@ -1745,34 +1672,6 @@ mod tests {
         assert!(obs.content.contains("3 subtasks"));
         assert!(obs.content.contains("120min"));
         assert_eq!(obs.source_event, "TaskDecomposed");
-    }
-
-    #[tokio::test]
-    async fn test_event_to_observation_day_plan_generated() {
-        let event = DomainEvent::DayPlanGenerated {
-            task_count: 5,
-            total_estimated_mins: 360,
-        };
-        let obs = event_to_observation(&event, &None).await.unwrap();
-        assert_eq!(obs.domain, "tasks");
-        assert!(obs.content.contains("5 tasks"));
-        assert!(obs.content.contains("360min"));
-        assert_eq!(obs.source_event, "DayPlanGenerated");
-    }
-
-    #[tokio::test]
-    async fn test_event_to_observation_proactive_suggestion() {
-        let event = DomainEvent::ProactiveSuggestionCreated {
-            suggestion_id: "sug-1".into(),
-            suggestion_type: "Decompose".into(),
-            task_id: Some("t1".into()),
-            confidence: 0.85,
-        };
-        let obs = event_to_observation(&event, &None).await.unwrap();
-        assert_eq!(obs.domain, "tasks");
-        assert!(obs.content.contains("Decompose"));
-        assert!(obs.content.contains("85%"));
-        assert_eq!(obs.source_event, "ProactiveSuggestionCreated");
     }
 
     #[test]

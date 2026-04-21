@@ -127,19 +127,6 @@ pub enum DomainEvent {
         execution_id: String,
         agent_profile: String,
     },
-    TaskExecutionCompleted {
-        task_id: String,
-        execution_id: String,
-        tokens_used: u64,
-        cost_usd: Option<f64>,
-        artifacts_count: u32,
-    },
-    TaskExecutionFailed {
-        task_id: String,
-        execution_id: String,
-        error: String,
-        retry_count: u32,
-    },
     TaskBlocked {
         task_id: String,
         blocker_id: String,
@@ -188,16 +175,6 @@ pub enum DomainEvent {
         next_instance_date: Option<String>,
     },
 
-    DayPlanGenerated {
-        task_count: u32,
-        total_estimated_mins: u32,
-    },
-    ProactiveSuggestionCreated {
-        suggestion_id: String,
-        suggestion_type: String,
-        task_id: Option<String>,
-        confidence: f64,
-    },
     TaskFocusStarted {
         task_id: String,
         energy_level: String,
@@ -211,16 +188,6 @@ pub enum DomainEvent {
         estimated_mins: u32,
         actual_mins: u32,
         deviation_pct: f64,
-    },
-    TaskExecutionProgress {
-        task_id: String,
-        execution_id: String,
-        current_step: String,
-        percentage: Option<u8>,
-        latest_tool: Option<String>,
-        reasoning_snippet: Option<String>,
-        cost_so_far_usd: f64,
-        elapsed_secs: u64,
     },
     GoalProgress {
         objective_id: String,
@@ -665,8 +632,6 @@ impl DomainEvent {
             Self::TaskDeferred { .. } => "TaskDeferred",
             Self::TaskDecomposed { .. } => "TaskDecomposed",
             Self::TaskExecutionStarted { .. } => "TaskExecutionStarted",
-            Self::TaskExecutionCompleted { .. } => "TaskExecutionCompleted",
-            Self::TaskExecutionFailed { .. } => "TaskExecutionFailed",
             Self::TaskBlocked { .. } => "TaskBlocked",
             Self::TaskUnblocked { .. } => "TaskUnblocked",
             Self::TaskStatusChanged { .. } => "TaskStatusChanged",
@@ -675,12 +640,9 @@ impl DomainEvent {
             Self::TaskDueDateChanged { .. } => "TaskDueDateChanged",
             Self::TaskFocusChanged { .. } => "TaskFocusChanged",
             Self::RecurringTemplateAdvanced { .. } => "RecurringTemplateAdvanced",
-            Self::DayPlanGenerated { .. } => "DayPlanGenerated",
-            Self::ProactiveSuggestionCreated { .. } => "ProactiveSuggestionCreated",
             Self::TaskFocusStarted { .. } => "TaskFocusStarted",
             Self::TaskFocusEnded { .. } => "TaskFocusEnded",
             Self::EstimationRecorded { .. } => "EstimationRecorded",
-            Self::TaskExecutionProgress { .. } => "TaskExecutionProgress",
             Self::GoalProgress { .. } => "GoalProgress",
             Self::TransactionRecorded { .. } => "TransactionRecorded",
             Self::BudgetAlert { .. } => "BudgetAlert",
@@ -756,16 +718,11 @@ impl DomainEvent {
             | Self::GoalProgress { .. }
             | Self::TaskDecomposed { .. }
             | Self::TaskExecutionStarted { .. }
-            | Self::TaskExecutionCompleted { .. }
-            | Self::TaskExecutionFailed { .. }
             | Self::TaskBlocked { .. }
             | Self::TaskUnblocked { .. }
-            | Self::DayPlanGenerated { .. }
-            | Self::ProactiveSuggestionCreated { .. }
             | Self::TaskFocusStarted { .. }
             | Self::TaskFocusEnded { .. }
             | Self::EstimationRecorded { .. }
-            | Self::TaskExecutionProgress { .. }
             | Self::TaskStatusChanged { .. }
             | Self::TaskPriorityChanged { .. }
             | Self::TaskFieldUpdated { .. }
