@@ -1,5 +1,6 @@
 //! Core Task entity, base enums, and row conversions.
 
+use ai_core_macros::AiEntity;
 use jiff::Timestamp;
 use serde::{Deserialize, Serialize};
 use std::fmt;
@@ -11,8 +12,9 @@ use super::planning::{Attachment, TimeEntry};
 // ── Core Task ───────────────────────────────────────────────────────────────
 
 /// A task with focus tracking, agentic execution, and planning support.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, AiEntity)]
 #[serde(rename_all = "camelCase")]
+#[ai(entity_type = "task", embed_on = ["title", "description"])]
 pub struct Task {
     pub id: String,
     pub title: String,
@@ -120,6 +122,11 @@ impl Task {
             blocked_by: Vec::new(),
             blocks: Vec::new(),
         }
+    }
+
+    /// Create a default instance for tests.
+    pub fn default_for_test() -> Self {
+        Self::default_instance()
     }
 }
 

@@ -1,5 +1,6 @@
-use ai_core::{AiEventMeta, AiFeature, RecallDomain, SalienceVerdict};
+use ai_core::{AiEntity, AiEventMeta, AiFeature, RecallDomain, SalienceVerdict};
 use feature_tasks::events::TaskEvent;
+use feature_tasks::types::Task;
 use feature_tasks::TasksFeature;
 
 #[test]
@@ -33,4 +34,16 @@ fn task_event_completed_high_deviation_extracts() {
 fn tasks_feature_declaration() {
     assert_eq!(<TasksFeature as AiFeature>::DOMAIN, RecallDomain::Tasks);
     assert_eq!(<TasksFeature as AiFeature>::SKILL, "task-management");
+}
+
+#[test]
+fn task_embed_text_uses_title_and_description() {
+    let t = Task {
+        id: "x".into(),
+        title: "Ship v1".into(),
+        description: Some("Finish the thing".into()),
+        ..Task::default_for_test()
+    };
+    assert_eq!(t.embed_text(), "Ship v1\nFinish the thing");
+    assert_eq!(Task::entity_type(), "task");
 }

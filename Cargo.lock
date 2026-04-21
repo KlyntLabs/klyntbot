@@ -4907,6 +4907,8 @@ dependencies = [
 name = "feature-tasks"
 version = "0.1.1"
 dependencies = [
+ "ai-core",
+ "ai-core-macros",
  "anyhow",
  "async-trait",
  "bus",

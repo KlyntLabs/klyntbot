@@ -33,6 +33,7 @@ pub use types::*;
 use ai_core_macros::AiFeature;
 use async_trait::async_trait;
 use common::Result;
+use std::sync::Arc;
 use tools_core::{DynTool, FeatureMigration, FeaturePackage, HealthStatus};
 
 /// Feature package for task management.
@@ -41,17 +42,24 @@ use tools_core::{DynTool, FeatureMigration, FeaturePackage, HealthStatus};
      event = "crate::events::TaskEvent")]
 pub struct TasksFeature {
     pool: Option<storage::StoragePool>,
+    task_tool: Option<Arc<TaskTool>>,
 }
 
 impl TasksFeature {
     /// Create a new TasksFeature.
     pub fn new() -> Self {
-        Self { pool: None }
+        Self { pool: None, task_tool: None }
     }
 
     /// Create a TasksFeature with a storage pool for health checking.
     pub fn with_pool(pool: storage::StoragePool) -> Self {
-        Self { pool: Some(pool) }
+        Self { pool: Some(pool), task_tool: None }
+    }
+
+    /// Attach a TaskTool to be returned by `tools()`.
+    pub fn with_task_tool(mut self, tool: Arc<TaskTool>) -> Self {
+        self.task_tool = Some(tool);
+        self
     }
 
     /// Migration SQL for this feature (version 1: core tables).
@@ -73,7 +81,10 @@ impl FeaturePackage for TasksFeature {
     }
 
     fn tools(&self) -> Vec<DynTool> {
-        vec![] // TaskTool is wired directly in agent builder, not via FeaturePackage
+        match &self.task_tool {
+            Some(tool) => vec![Arc::clone(tool) as DynTool],
+            None => vec![],
+        }
     }
 
     fn migrations(&self) -> Vec<FeatureMigration> {
@@ -119,7 +130,7 @@ mod tests {
     }
 
     #[test]
-    fn test_feature_package_tools_empty() {
+    fn test_feature_package_tools_empty_when_no_tool_set() {
         let feature = TasksFeature::new();
         assert!(feature.tools().is_empty());
     }

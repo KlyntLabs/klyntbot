@@ -22,6 +22,7 @@ pub fn expand(input: DeriveInput) -> syn::Result<TokenStream> {
                 entity_type = Some(s.value());
             }
             "embed_on" => {
+                meta.input.parse::<syn::Token![=]>()?;
                 let content;
                 syn::bracketed!(content in meta.input);
                 let list: syn::punctuated::Punctuated<LitStr, syn::Token![,]> =
