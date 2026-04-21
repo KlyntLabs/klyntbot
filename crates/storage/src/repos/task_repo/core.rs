@@ -18,8 +18,7 @@ impl TaskRepo {
                 calendar_event_uid, last_reminded_at,
                 recurrence_rule, recurrence_parent_id, is_template, next_instance_date,
                 status_label_id, position, group_id,
-                task_type, acceptance_criteria, agent_config,
-                execution_state, spawned_execution_id, context_snapshot,
+                task_type,
                 energy_level, estimated_focus_blocks, actual_minutes,
                 complexity_score, completed, objective_id,
                 scheduled_start, scheduled_end
@@ -32,11 +31,10 @@ impl TaskRepo {
                 ?20, ?21,
                 ?22, ?23, ?24, ?25,
                 ?26, ?27, ?28,
-                ?29, ?30, ?31,
-                ?32, ?33, ?34,
-                ?35, ?36, ?37,
-                ?38, ?39, ?40,
-                ?41, ?42
+                ?29,
+                ?30, ?31, ?32,
+                ?33, ?34, ?35,
+                ?36, ?37
             )
             RETURNING *
             "#,
@@ -70,11 +68,6 @@ impl TaskRepo {
         .bind(row.position)
         .bind(&row.group_id)
         .bind(&row.task_type)
-        .bind(&row.acceptance_criteria)
-        .bind(&row.agent_config)
-        .bind(&row.execution_state)
-        .bind(&row.spawned_execution_id)
-        .bind(&row.context_snapshot)
         .bind(&row.energy_level)
         .bind(row.estimated_focus_blocks)
         .bind(row.actual_minutes)
@@ -133,17 +126,13 @@ impl TaskRepo {
                 position           = COALESCE(?28, position),
                 group_id           = CASE WHEN ?29 THEN ?30 ELSE group_id END,
                 task_type          = COALESCE(?31, task_type),
-                acceptance_criteria = CASE WHEN ?32 THEN ?33 ELSE acceptance_criteria END,
-                agent_config       = CASE WHEN ?34 THEN ?35 ELSE agent_config END,
-                execution_state    = COALESCE(?36, execution_state),
-                spawned_execution_id = CASE WHEN ?37 THEN ?38 ELSE spawned_execution_id END,
-                energy_level       = CASE WHEN ?39 THEN ?40 ELSE energy_level END,
-                complexity_score   = CASE WHEN ?41 THEN ?42 ELSE complexity_score END,
-                completed          = COALESCE(?43, completed),
-                actual_minutes     = CASE WHEN ?44 THEN ?45 ELSE actual_minutes END,
-                objective_id       = CASE WHEN ?46 THEN ?47 ELSE objective_id END,
-                scheduled_start    = CASE WHEN ?48 THEN ?49 ELSE scheduled_start END,
-                scheduled_end      = CASE WHEN ?50 THEN ?51 ELSE scheduled_end END,
+                energy_level       = CASE WHEN ?32 THEN ?33 ELSE energy_level END,
+                complexity_score   = CASE WHEN ?34 THEN ?35 ELSE complexity_score END,
+                completed          = COALESCE(?36, completed),
+                actual_minutes     = CASE WHEN ?37 THEN ?38 ELSE actual_minutes END,
+                objective_id       = CASE WHEN ?39 THEN ?40 ELSE objective_id END,
+                scheduled_start    = CASE WHEN ?41 THEN ?42 ELSE scheduled_start END,
+                scheduled_end      = CASE WHEN ?43 THEN ?44 ELSE scheduled_end END,
                 updated_at         = (unixepoch('now') * 1000)
             WHERE id = ?1
             RETURNING *
@@ -195,46 +184,29 @@ impl TaskRepo {
         .bind(patch.group_id.is_some()) // ?29
         .bind(patch.group_id.as_ref().and_then(|v| v.as_deref())) // ?30
         .bind(&patch.task_type) // ?31
-        .bind(patch.acceptance_criteria.is_some()) // ?32
-        .bind(
-            patch
-                .acceptance_criteria
-                .as_ref()
-                .and_then(|v| v.as_deref()),
-        ) // ?33
-        .bind(patch.agent_config.is_some()) // ?34
-        .bind(patch.agent_config.as_ref().and_then(|v| v.as_deref())) // ?35
-        .bind(&patch.execution_state) // ?36
-        .bind(patch.spawned_execution_id.is_some()) // ?37
-        .bind(
-            patch
-                .spawned_execution_id
-                .as_ref()
-                .and_then(|v| v.as_deref()),
-        ) // ?38
-        .bind(patch.energy_level.is_some()) // ?39
-        .bind(patch.energy_level.as_ref().and_then(|v| v.as_deref())) // ?40
-        .bind(patch.complexity_score.is_some()) // ?41
-        .bind(patch.complexity_score.unwrap_or_default()) // ?42
-        .bind(patch.completed.map(|b| b as i32)) // ?43
-        .bind(patch.actual_minutes.is_some()) // ?44
-        .bind(patch.actual_minutes.unwrap_or_default()) // ?45
-        .bind(patch.objective_id.is_some()) // ?46
-        .bind(patch.objective_id.as_ref().and_then(|v| v.as_deref())) // ?47
-        .bind(patch.scheduled_start.is_some()) // ?48
+        .bind(patch.energy_level.is_some()) // ?32
+        .bind(patch.energy_level.as_ref().and_then(|v| v.as_deref())) // ?33
+        .bind(patch.complexity_score.is_some()) // ?34
+        .bind(patch.complexity_score.unwrap_or_default()) // ?35
+        .bind(patch.completed.map(|b| b as i32)) // ?36
+        .bind(patch.actual_minutes.is_some()) // ?37
+        .bind(patch.actual_minutes.unwrap_or_default()) // ?38
+        .bind(patch.objective_id.is_some()) // ?39
+        .bind(patch.objective_id.as_ref().and_then(|v| v.as_deref())) // ?40
+        .bind(patch.scheduled_start.is_some()) // ?41
         .bind(
             patch
                 .scheduled_start
                 .unwrap_or_default()
                 .map(|t| t.as_millisecond()),
-        ) // ?49
-        .bind(patch.scheduled_end.is_some()) // ?50
+        ) // ?42
+        .bind(patch.scheduled_end.is_some()) // ?43
         .bind(
             patch
                 .scheduled_end
                 .unwrap_or_default()
                 .map(|t| t.as_millisecond()),
-        ) // ?51
+        ) // ?44
         .fetch_optional(&self.pool)
         .await?
         .ok_or_not_found(&format!("task {}", patch.id))?;
@@ -326,11 +298,6 @@ impl TaskRepo {
         if let Some(ref tt) = filter.task_type {
             qb.push(" AND task_type = ");
             qb.push_bind(tt);
-        }
-
-        if let Some(ref es) = filter.execution_state {
-            qb.push(" AND execution_state = ");
-            qb.push_bind(es);
         }
 
         if let Some(ref el) = filter.energy_level {

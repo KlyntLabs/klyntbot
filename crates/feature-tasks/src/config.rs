@@ -34,8 +34,6 @@ pub struct TasksConfig {
     pub project_overrides: HashMap<String, ScopeOverrides>,
     /// Per-area overrides.
     pub area_overrides: HashMap<String, ScopeOverrides>,
-    /// Whether to integrate with the cognitive memory system.
-    pub cognitive_integration: bool,
 }
 
 impl Default for TasksConfig {
@@ -53,7 +51,6 @@ impl Default for TasksConfig {
             stale_task_days: 14,
             project_overrides: HashMap::new(),
             area_overrides: HashMap::new(),
-            cognitive_integration: true,
         }
     }
 }
@@ -123,7 +120,6 @@ mod tests {
         assert_eq!(cfg.stale_task_days, 14);
         assert!(cfg.project_overrides.is_empty());
         assert!(cfg.area_overrides.is_empty());
-        assert!(cfg.cognitive_integration);
     }
 
     #[test]

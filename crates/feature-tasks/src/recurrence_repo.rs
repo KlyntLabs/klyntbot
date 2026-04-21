@@ -203,13 +203,13 @@ impl InstanceRepo for SqliteInstanceRepo {
             r#"
             INSERT OR IGNORE INTO tasks (
                 id, title, area_id, project_id, key_result_id, objective_id,
-                priority, due_date, status, task_type, execution_state,
+                priority, due_date, status, task_type,
                 energy_level, template_id, tags,
                 focus_expired_count, total_tracked_secs, position, completed,
                 is_template, created_at, updated_at
             ) VALUES (
                 ?1, ?2, ?3, ?4, ?5, ?6,
-                ?7, ?8, 'todo', 'manual', 'idle',
+                ?7, ?8, 'todo', 'manual',
                 ?9, ?10, '[]',
                 0, 0, 0, 0,
                 0, ?11, ?11
@@ -440,10 +440,10 @@ mod tests {
         // Insert source task.
         sqlx::query(
             r#"
-            INSERT INTO tasks (id, title, area_id, status, task_type, execution_state,
+            INSERT INTO tasks (id, title, area_id, status, task_type,
                                tags, focus_expired_count, total_tracked_secs, position,
                                completed, is_template, created_at, updated_at)
-            VALUES ('src3', 'Source Task', 'area1', 'todo', 'manual', 'idle',
+            VALUES ('src3', 'Source Task', 'area1', 'todo', 'manual',
                     '[]', 0, 0, 0, 0, 0, ?1, ?1)
             "#,
         )
@@ -517,10 +517,10 @@ mod tests {
 
         sqlx::query(
             r#"
-            INSERT INTO tasks (id, title, area_id, status, task_type, execution_state,
+            INSERT INTO tasks (id, title, area_id, status, task_type,
                                tags, focus_expired_count, total_tracked_secs, position,
                                completed, is_template, created_at, updated_at)
-            VALUES ('src_r', 'Source', 'area_r', 'todo', 'manual', 'idle',
+            VALUES ('src_r', 'Source', 'area_r', 'todo', 'manual',
                     '[]', 0, 0, 0, 0, 0, ?1, ?1)
             "#,
         )

@@ -17,7 +17,6 @@ pub mod focus_alarms;
 pub mod handlers;
 pub mod recurrence_repo;
 pub mod rrule_utils;
-pub mod scoring;
 pub mod search;
 pub mod tool;
 pub mod types;

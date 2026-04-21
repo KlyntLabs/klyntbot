@@ -62,12 +62,7 @@ impl TaskTool {
             status_label_id: p.clearable_str("status_label_id")?,
             position: p.optional_u64("position")?.map(|v| v as i32),
             group_id: p.clearable_str("group_id")?,
-            // New agentic fields
             task_type: p.optional_str("task_type")?.map(String::from),
-            acceptance_criteria: p.clearable_str("acceptance_criteria")?,
-            agent_config: p.clearable_str("agent_config")?,
-            execution_state: None,
-            spawned_execution_id: None,
             energy_level: p.clearable_str("energy_level")?,
             complexity_score: None,
             completed: None,

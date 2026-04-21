@@ -40,11 +40,6 @@ CREATE TABLE IF NOT EXISTS tasks (
     recurrence_parent_id TEXT,
     is_template          INTEGER NOT NULL DEFAULT 0,
     next_instance_date   INTEGER,
-    acceptance_criteria  TEXT,
-    agent_config         TEXT,
-    execution_state      TEXT NOT NULL DEFAULT 'idle',
-    spawned_execution_id TEXT,
-    context_snapshot     TEXT,
     energy_level         TEXT DEFAULT 'medium',
     estimated_focus_blocks INTEGER,
     complexity_score     INTEGER,
@@ -62,8 +57,6 @@ CREATE INDEX IF NOT EXISTS idx_tasks_parent_id ON tasks(parent_id);
 CREATE INDEX IF NOT EXISTS idx_tasks_due_date ON tasks(due_date);
 CREATE INDEX IF NOT EXISTS idx_tasks_focused_at ON tasks(focused_at) WHERE focused_at IS NOT NULL;
 CREATE INDEX IF NOT EXISTS idx_tasks_is_template ON tasks(is_template) WHERE is_template = 1;
-CREATE INDEX IF NOT EXISTS idx_tasks_task_type ON tasks(task_type);
-CREATE INDEX IF NOT EXISTS idx_tasks_execution_state ON tasks(execution_state);
 CREATE INDEX IF NOT EXISTS idx_tasks_energy_level ON tasks(energy_level);
 CREATE INDEX IF NOT EXISTS idx_tasks_status_label_id ON tasks(status_label_id);
 CREATE INDEX IF NOT EXISTS idx_tasks_group_id ON tasks(group_id);
@@ -132,22 +125,6 @@ CREATE TABLE IF NOT EXISTS task_dependencies (
 );
 
 CREATE INDEX IF NOT EXISTS idx_task_dependencies_blocker_id ON task_dependencies(blocker_id);
-
--- ============================================================
--- Task Decompositions (pending decomposition plans)
--- ============================================================
-CREATE TABLE IF NOT EXISTS task_decompositions (
-    id          TEXT PRIMARY KEY,
-    task_id     TEXT NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
-    plan        TEXT NOT NULL,
-    confidence  REAL NOT NULL DEFAULT 0.0,
-    status      TEXT NOT NULL DEFAULT 'pending',
-    reasoning   TEXT,
-    created_at  INTEGER NOT NULL DEFAULT (unixepoch('now') * 1000),
-    applied_at  INTEGER
-);
-
-CREATE INDEX IF NOT EXISTS idx_task_decompositions_task_id ON task_decompositions(task_id);
 
 -- ============================================================
 -- Task Estimation History (estimation accuracy tracking)

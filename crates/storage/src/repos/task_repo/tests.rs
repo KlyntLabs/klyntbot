@@ -43,11 +43,6 @@ async fn create_test_tables(db: &sqlx::SqlitePool) {
                 recurrence_parent_id TEXT,
                 is_template          INTEGER NOT NULL DEFAULT 0,
                 next_instance_date   INTEGER,
-                acceptance_criteria  TEXT,
-                agent_config         TEXT,
-                execution_state      TEXT NOT NULL DEFAULT 'idle',
-                spawned_execution_id TEXT,
-                context_snapshot     TEXT,
                 energy_level         TEXT DEFAULT 'medium',
                 estimated_focus_blocks INTEGER,
                 complexity_score     INTEGER,
@@ -193,11 +188,6 @@ fn make_task(id: &str, title: &str) -> TaskRow {
         position: 0,
         group_id: None,
         task_type: "manual".to_string(),
-        acceptance_criteria: None,
-        agent_config: None,
-        execution_state: "idle".to_string(),
-        spawned_execution_id: None,
-        context_snapshot: None,
         energy_level: Some("medium".to_string()),
         estimated_focus_blocks: None,
         actual_minutes: None,
@@ -221,7 +211,6 @@ async fn test_add_and_get() {
     assert_eq!(inserted.id, "t1");
     assert_eq!(inserted.title, "Buy groceries");
     assert_eq!(inserted.task_type, "manual");
-    assert_eq!(inserted.execution_state, "idle");
     assert!(!inserted.completed);
 
     // get
@@ -260,12 +249,11 @@ async fn test_update_task() {
     let task = make_task("u1", "Original title");
     repo.add(&task).await.unwrap();
 
-    // Update title and new agentic fields.
+    // Update title and fields.
     let patch = TaskPatch {
         id: "u1".to_string(),
         title: Some("Updated title".to_string()),
         task_type: Some("agent_delegated".to_string()),
-        execution_state: Some("running".to_string()),
         energy_level: Some(Some("high".to_string())),
         complexity_score: Some(Some(7)),
         completed: Some(true),
@@ -274,7 +262,6 @@ async fn test_update_task() {
     let updated = repo.update(&patch).await.unwrap();
     assert_eq!(updated.title, "Updated title");
     assert_eq!(updated.task_type, "agent_delegated");
-    assert_eq!(updated.execution_state, "running");
     assert_eq!(updated.energy_level.as_deref(), Some("high"));
     assert_eq!(updated.complexity_score, Some(7));
     assert!(updated.completed);

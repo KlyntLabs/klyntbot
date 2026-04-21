@@ -35,7 +35,6 @@ pub struct TaskFilter {
     pub status_group: Option<String>,
     pub group_id: Option<String>,
     pub task_type: Option<String>,
-    pub execution_state: Option<String>,
     pub energy_level: Option<String>,
     pub completed: Option<bool>,
 }
@@ -62,10 +61,6 @@ pub struct TaskPatch {
     pub position: Option<i32>,
     pub group_id: Option<Option<String>>,
     pub task_type: Option<String>,
-    pub acceptance_criteria: Option<Option<String>>,
-    pub agent_config: Option<Option<String>>,
-    pub execution_state: Option<String>,
-    pub spawned_execution_id: Option<Option<String>>,
     pub energy_level: Option<Option<String>>,
     pub complexity_score: Option<Option<i32>>,
     pub completed: Option<bool>,

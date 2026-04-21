@@ -36,23 +36,12 @@ impl TaskTool {
         task.parent_id = p.optional_str("parent_id")?.map(String::from);
         task.estimated_minutes = p.optional_u64("estimated_minutes")?.map(|v| v as i32);
 
-        // New agentic fields
-        if let Some(tt) = p.optional_str("task_type")? {
-            task.task_type = tt
-                .parse()
-                .map_err(|e: String| ToolError::InvalidParams(e))?;
-        }
-        task.acceptance_criteria = p.optional_str("acceptance_criteria")?.map(String::from);
         if let Some(el) = p.optional_str("energy_level")? {
             task.energy_level = Some(
                 el.parse()
                     .map_err(|e: String| ToolError::InvalidParams(e))?,
             );
         }
-        if let Some(ac) = p.optional_str("agent_config")? {
-            task.agent_config = serde_json::from_str(ac).ok();
-        }
-
         // Parse optional alarms before insert so we surface bad-shape errors
         // before any DB writes.
         let alarm_specs = Self::parse_alarms_param(p)?;
@@ -95,9 +84,6 @@ impl TaskTool {
                 }
                 if let Some(ref d) = created.due_date {
                     parts.push(format!("Due {}", d.strftime("%b %d")));
-                }
-                if created.task_type != crate::types::TaskType::Manual {
-                    parts.push(format!("{}", created.task_type));
                 }
                 if parts.is_empty() {
                     None

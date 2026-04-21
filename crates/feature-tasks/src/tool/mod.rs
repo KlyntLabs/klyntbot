@@ -400,79 +400,6 @@ impl Tool for TaskTool {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::scoring;
-
-    use jiff::{SignedDuration, Timestamp};
-
-    #[test]
-    fn test_urgency_overdue() {
-        let now = Timestamp::now();
-        let two_days_ago = now
-            .checked_sub(SignedDuration::from_secs(2 * 86400))
-            .unwrap_or(now);
-        assert_eq!(scoring::calculate_urgency(Some(two_days_ago), now), 10);
-    }
-
-    #[test]
-    fn test_urgency_today() {
-        let now = Timestamp::now();
-        assert_eq!(scoring::calculate_urgency(Some(now), now), 5);
-    }
-
-    #[test]
-    fn test_urgency_tomorrow() {
-        let now = Timestamp::now();
-        let tomorrow = now
-            .checked_add(SignedDuration::from_secs(86400))
-            .unwrap_or(now);
-        assert_eq!(scoring::calculate_urgency(Some(tomorrow), now), 3);
-    }
-
-    #[test]
-    fn test_urgency_future() {
-        let now = Timestamp::now();
-        let week_out = now
-            .checked_add(SignedDuration::from_secs(7 * 86400))
-            .unwrap_or(now);
-        assert_eq!(scoring::calculate_urgency(Some(week_out), now), 1);
-    }
-
-    #[test]
-    fn test_urgency_no_due_date() {
-        let now = Timestamp::now();
-        assert_eq!(scoring::calculate_urgency(None, now), 1);
-    }
-
-    #[test]
-    fn test_priority_weight_p1() {
-        assert_eq!(scoring::priority_weight(Some(1)), 5);
-    }
-
-    #[test]
-    fn test_priority_weight_none() {
-        assert_eq!(scoring::priority_weight(None), 3);
-    }
-
-    #[test]
-    fn test_score_formula() {
-        let now = Timestamp::now();
-        let mut task = Task::default_instance();
-        task.priority = Some(1);
-        task.due_date = Some(
-            now.checked_sub(SignedDuration::from_secs(2 * 86400))
-                .unwrap_or(now),
-        );
-        task.created_at = now
-            .checked_sub(SignedDuration::from_secs(5 * 86400))
-            .unwrap_or(now);
-        let score = crate::scoring::calculate_score(&task, now);
-        // urgency=10, priority_wt=5, age=5 -> 10*5 + 5*0.1 = 50.5
-        assert!(
-            (score - 50.5).abs() < 0.01,
-            "Score should be ~50.5, got {}",
-            score
-        );
-    }
 
     // ─── Integration tests ──────────────────────────────────────────
 
@@ -501,9 +428,6 @@ mod tests {
                 calendar_event_uid TEXT, last_reminded_at INTEGER,
                 recurrence_rule TEXT, recurrence_parent_id TEXT,
                 is_template INTEGER NOT NULL DEFAULT 0, next_instance_date INTEGER,
-                acceptance_criteria TEXT, agent_config TEXT,
-                execution_state TEXT NOT NULL DEFAULT 'idle',
-                spawned_execution_id TEXT, context_snapshot TEXT,
                 energy_level TEXT DEFAULT 'medium',
                 estimated_focus_blocks INTEGER, complexity_score INTEGER,
                 scheduled_start INTEGER, scheduled_end INTEGER
@@ -579,23 +503,6 @@ mod tests {
         let list_args = serde_json::json!({ "action": "list" });
         let list_result = tool.execute(list_args, &ctx).await.unwrap();
         assert!(list_result.contains("Write tests"));
-    }
-
-    #[tokio::test]
-    async fn test_create_agentic_task() {
-        let tool = make_tool().await;
-        let ctx = test_ctx();
-        let args = serde_json::json!({
-            "action": "create",
-            "title": "Auto-review PR",
-            "area_id": "test-area",
-            "task_type": "agentic",
-            "acceptance_criteria": "All tests pass and coverage > 80%"
-        });
-
-        let result = tool.execute(args, &ctx).await.unwrap();
-        assert!(result.contains("Task created: Auto-review PR"));
-        assert!(result.contains("type: agentic"));
     }
 
     #[tokio::test]
