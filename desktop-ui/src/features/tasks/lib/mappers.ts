@@ -39,12 +39,10 @@ export interface DetailTask {
   tags: string[];
   dueDate: string | null;
   energyLevel: string | null;
-  taskType: string;
   estimatedMinutes: number | null;
   actualMinutes: number | null;
   totalTrackedSecs: number;
   focusedAt: string | null;
-  acceptanceCriteria: string | null;
   complexityScore: number | null;
   completed: boolean;
   createdAt: string;
@@ -274,12 +272,10 @@ export function taskToDetailTask(
     tags: task.tags,
     dueDate: task.dueDate ?? null,
     energyLevel: task.energyLevel ?? null,
-    taskType: task.taskType ?? "manual",
     estimatedMinutes: task.estimatedMinutes ?? null,
     actualMinutes: task.actualMinutes ?? null,
     totalTrackedSecs: task.totalTrackedSecs ?? 0,
     focusedAt: task.focusedAt ?? null,
-    acceptanceCriteria: task.acceptanceCriteria ?? null,
     complexityScore: task.complexityScore ?? null,
     completed: task.completed,
     createdAt: task.createdAt ?? "",
