@@ -109,7 +109,9 @@ impl TaskTool {
                     task_id: created.id.clone(),
                     title: created.title.clone(),
                     area_id: created.area_id.clone(),
+                    project_id: created.project_id.clone(),
                     priority: created.priority,
+                    estimated_minutes: created.estimated_minutes,
                 }
                 .into(),
             );

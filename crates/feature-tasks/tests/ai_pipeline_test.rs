@@ -9,7 +9,9 @@ fn task_event_created_signal() {
         task_id: "t1".into(),
         title: "Ship v1".into(),
         area_id: "a1".into(),
+        project_id: None,
         priority: Some(2),
+        estimated_minutes: None,
     };
     let sig = e.to_signal();
     assert_eq!(sig.event_kind, "Created");

@@ -201,48 +201,45 @@ impl TaskTool {
                     }
                 }
 
+                let total_time_secs: i64 = te_rows.iter().filter_map(|e| e.duration_secs).sum();
+                let actual_mins_tracked: Option<i32> =
+                    (total_time_secs > 0).then(|| (total_time_secs / 60) as i32);
+                let deviation_pct: Option<f64> = estimated_minutes
+                    .zip(actual_mins_tracked)
+                    .and_then(|(est, actual)| {
+                        (est > 0).then(|| ((actual as f64 - est as f64) / est as f64) * 100.0)
+                    });
+
                 // Track estimation accuracy
                 if self.config.estimation_tracking {
-                    if let Some(est_mins) = estimated_minutes {
-                        let actual_mins = {
-                            let total_secs: i64 =
-                                te_rows.iter().filter_map(|e| e.duration_secs).sum();
-                            if total_secs > 0 {
-                                (total_secs / 60) as i32
-                            } else {
-                                0
-                            }
+                    if let (Some(est_mins), Some(actual_mins)) =
+                        (estimated_minutes, actual_mins_tracked)
+                    {
+                        let dev = deviation_pct.unwrap_or(0.0);
+                        let estimation = storage::TaskEstimationRow {
+                            id: uuid::Uuid::new_v4().to_string(),
+                            task_id: id.to_string(),
+                            estimated_minutes: est_mins,
+                            actual_minutes: actual_mins,
+                            deviation_pct: dev,
+                            complexity_score: task.complexity_score,
+                            energy_level: task.energy_level.as_ref().map(|e| e.to_string()),
+                            tags: task.tags.clone(),
+                            project_id: task.project_id.clone(),
+                            completed_at: Timestamp::now().into(),
                         };
-                        if actual_mins > 0 {
-                            let deviation_pct = if est_mins > 0 {
-                                ((actual_mins as f64 - est_mins as f64) / est_mins as f64) * 100.0
-                            } else {
-                                0.0
-                            };
-                            let estimation = storage::TaskEstimationRow {
-                                id: uuid::Uuid::new_v4().to_string(),
-                                task_id: id.to_string(),
-                                estimated_minutes: est_mins,
-                                actual_minutes: actual_mins,
-                                deviation_pct,
-                                complexity_score: task.complexity_score,
-                                energy_level: task.energy_level.as_ref().map(|e| e.to_string()),
-                                tags: task.tags.clone(),
-                                project_id: task.project_id.clone(),
-                                completed_at: Timestamp::now().into(),
-                            };
-                            if let Err(e) = self.repo.record_estimation(&estimation).await {
-                                warn!("Failed to record estimation history: {}", e);
-                            } else if let Some(ref bus) = self.domain_bus {
-                                bus.publish(
-                                    TaskEvent::EstimationRecorded {
-                                        task_id: id.to_string(),
-                                        estimated_minutes: Some(est_mins),
-                                        actual_minutes: Some(actual_mins),
-                                    }
-                                    .into(),
-                                );
-                            }
+                        if let Err(e) = self.repo.record_estimation(&estimation).await {
+                            warn!("Failed to record estimation history: {}", e);
+                        } else if let Some(ref bus) = self.domain_bus {
+                            bus.publish(
+                                TaskEvent::EstimationRecorded {
+                                    task_id: id.to_string(),
+                                    estimated_minutes: Some(est_mins),
+                                    actual_minutes: Some(actual_mins),
+                                    deviation_pct: dev,
+                                }
+                                .into(),
+                            );
                         }
                     }
                 }
@@ -263,17 +260,7 @@ impl TaskTool {
                         .await;
                 }
 
-                // Emit domain event for task completion
                 if let Some(ref bus) = self.domain_bus {
-                    let deviation_pct = estimated_minutes.and_then(|est| {
-                        let total_secs: i64 = te_rows.iter().filter_map(|e| e.duration_secs).sum();
-                        if total_secs > 0 && est > 0 {
-                            let actual_mins = total_secs / 60;
-                            Some(((actual_mins as f64 - est as f64) / est as f64) * 100.0)
-                        } else {
-                            None
-                        }
-                    });
                     bus.publish(
                         TaskEvent::Completed {
                             task_id: task.id.clone(),

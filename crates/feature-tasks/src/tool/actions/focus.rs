@@ -8,6 +8,16 @@ use super::super::TaskTool;
 use crate::events::TaskEvent;
 
 impl TaskTool {
+    async fn fetch_title(&self, id: &str) -> String {
+        self.repo
+            .get(id)
+            .await
+            .ok()
+            .flatten()
+            .map(|r| r.title)
+            .unwrap_or_default()
+    }
+
     pub(crate) async fn handle_focus(&self, p: &ParamExtractor<'_>) -> Result<String> {
         let id = p.required_str("id")?;
         let deadline =
@@ -39,14 +49,7 @@ impl TaskTool {
 
             // Notify focus_alarms subscriber to materialize 6h/3h/1h warnings + expire.
             if let Some(ref bus) = self.domain_bus {
-                let title = self
-                    .repo
-                    .get(id)
-                    .await
-                    .ok()
-                    .flatten()
-                    .map(|r| r.title)
-                    .unwrap_or_default();
+                let title = self.fetch_title(id).await;
                 bus.publish(
                     TaskEvent::FocusChanged {
                         task_id: id.to_string(),
@@ -89,14 +92,7 @@ impl TaskTool {
 
             // Notify focus_alarms subscriber to cancel any pending warnings.
             if let Some(ref bus) = self.domain_bus {
-                let title = self
-                    .repo
-                    .get(id)
-                    .await
-                    .ok()
-                    .flatten()
-                    .map(|r| r.title)
-                    .unwrap_or_default();
+                let title = self.fetch_title(id).await;
                 bus.publish(
                     TaskEvent::FocusChanged {
                         task_id: id.to_string(),

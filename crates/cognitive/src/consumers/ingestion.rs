@@ -68,28 +68,24 @@ impl SignalConsumer for IngestionConsumer {
                 .await;
         }
 
-        // 2. Salience routing.
+        // 2. Salience routing. Discard exits before allocating an Observation.
+        if matches!(signal.salience, SalienceVerdict::Discard) {
+            return Ok(());
+        }
+
         let observation = Self::signal_to_observation(signal);
-        match signal.salience {
-            SalienceVerdict::Discard => return Ok(()),
-            SalienceVerdict::Accumulate => {
-                self.observation_repo
-                    .insert(signal.event_kind, &observation)
-                    .await;
-            }
-            SalienceVerdict::Extract => {
-                self.observation_repo
-                    .insert(signal.event_kind, &observation)
-                    .await;
-                if let Some(handler) = &self.extraction_handler {
-                    let handler = handler.clone();
-                    let obs = observation.clone();
-                    tokio::spawn(async move {
-                        if let Err(e) = handler.extract_facts_batch(&[obs]).await {
-                            tracing::warn!(error = %e, "extraction failed");
-                        }
-                    });
-                }
+        self.observation_repo
+            .insert(signal.event_kind, &observation)
+            .await;
+        if matches!(signal.salience, SalienceVerdict::Extract) {
+            if let Some(handler) = &self.extraction_handler {
+                let handler = handler.clone();
+                let obs = observation.clone();
+                tokio::spawn(async move {
+                    if let Err(e) = handler.extract_facts_batch(&[obs]).await {
+                        tracing::warn!(error = %e, "extraction failed");
+                    }
+                });
             }
         }
 
