@@ -119,6 +119,15 @@ impl FinanceTool {
 
         let inserted = self.storage.budgets.add(&row).await?;
 
+        if let Some(ref bus) = self.domain_bus {
+            bus.publish(crate::events::FinanceEvent::BudgetCreated {
+                budget_id: inserted.id.clone(),
+                name: inserted.name.clone(),
+                amount: inserted.amount,
+                currency: inserted.currency.clone(),
+            }.into());
+        }
+
         let resp = json!({
             "id": inserted.id,
             "name": inserted.name,

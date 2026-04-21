@@ -10,6 +10,7 @@
 
 pub mod config;
 pub mod currency;
+pub mod events;
 pub mod handler;
 pub mod price_service;
 pub mod rate_cache;
@@ -18,6 +19,7 @@ pub mod tool;
 pub mod types;
 
 pub use config::FinanceConfig;
+pub use events::FinanceEvent;
 pub use handler::{BudgetAlert, FinanceHandler, PriceUpdateSummary, ProactivityLevel};
 pub use price_service::PriceService;
 pub use tool::FinanceTool;
@@ -30,6 +32,7 @@ pub use types::{
 // depending on tools-core directly.
 pub use tools_core::FeaturePackage;
 
+use ai_core_macros::AiFeature;
 use async_trait::async_trait;
 use common::Result;
 use serde_json::Value;
@@ -39,7 +42,10 @@ use tools_core::{DynTool, FeatureMigration, HealthStatus};
 /// Feature package for personal finance management.
 ///
 /// Exposes one tool ("finance") covering accounts, transactions, budgets,
-/// investments, goals, liabilities, FIRE planning, and reporting.
+/// investments, goals, liabilities, and financial reports.
+#[derive(AiFeature)]
+#[ai(recall_domain = "Finance", skill = "finance-management",
+     event = "crate::events::FinanceEvent")]
 pub struct FinanceFeature {
     tool: Arc<FinanceTool>,
 }

@@ -187,6 +187,26 @@ pub enum DomainEvent {
         spent: f64,
         limit: f64,
     },
+    AccountCreated {
+        account_id: String,
+        name: String,
+        currency: String,
+    },
+    BudgetCreated {
+        budget_id: String,
+        name: String,
+        amount: i64,
+        currency: String,
+    },
+    GoalCreated {
+        goal_id: String,
+        name: String,
+        target_amount: i64,
+    },
+    GoalAchieved {
+        goal_id: String,
+        name: String,
+    },
 
     // -- Notes --
     NoteCreated {
@@ -623,6 +643,10 @@ impl DomainEvent {
             Self::GoalProgress { .. } => "GoalProgress",
             Self::TransactionRecorded { .. } => "TransactionRecorded",
             Self::BudgetAlert { .. } => "BudgetAlert",
+            Self::AccountCreated { .. } => "AccountCreated",
+            Self::BudgetCreated { .. } => "BudgetCreated",
+            Self::GoalCreated { .. } => "GoalCreated",
+            Self::GoalAchieved { .. } => "GoalAchieved",
             Self::NoteCreated { .. } => "NoteCreated",
             Self::NoteUpdated { .. } => "NoteUpdated",
             Self::NoteContentChanged { .. } => "NoteContentChanged",
@@ -719,7 +743,12 @@ impl DomainEvent {
             | Self::VoiceJournalProcessed { .. }
             | Self::VoiceCapture { .. } => "energy",
 
-            Self::TransactionRecorded { .. } | Self::BudgetAlert { .. } => "finance",
+            Self::TransactionRecorded { .. }
+            | Self::BudgetAlert { .. }
+            | Self::AccountCreated { .. }
+            | Self::BudgetCreated { .. }
+            | Self::GoalCreated { .. }
+            | Self::GoalAchieved { .. } => "finance",
 
             Self::UserStatedFact { domain, .. } => domain.as_str(),
             Self::UserCorrectedAI { .. } => "learning",

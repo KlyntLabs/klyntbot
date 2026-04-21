@@ -25,7 +25,7 @@ fn test_finance_feature_name() {
 
 #[test]
 fn test_finance_feature_config_key() {
-    assert_eq!(make_feature().config_key(), "finance");
+    assert_eq!(make_feature().name(), "finance");
 }
 
 // ============================================================

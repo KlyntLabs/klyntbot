@@ -89,6 +89,14 @@ impl FinanceTool {
 
         let account = FinanceAccount::from(inserted);
 
+        if let Some(ref bus) = self.domain_bus {
+            bus.publish(crate::events::FinanceEvent::AccountCreated {
+                account_id: account.id.clone(),
+                name: account.name.clone(),
+                currency: account.currency.clone(),
+            }.into());
+        }
+
         if let Some(ref tx) = ctx.entity_tx {
             let _ = tx
                 .send(common::EntityCard {

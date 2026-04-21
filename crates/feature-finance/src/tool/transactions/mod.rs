@@ -8,8 +8,6 @@ mod transfer;
 use jiff::{Timestamp, Zoned};
 use serde_json::json;
 
-use bus::DomainEvent;
-
 use crate::currency::ensure_base_amount;
 use crate::types::{FinanceTransaction, TransactionType};
 use common::{Result, ToolError};
@@ -210,19 +208,21 @@ impl FinanceTool {
         if let Some(ref bus) = self.domain_bus {
             let is_over_budget = budget_typed.map(|(p, _, _, _)| p >= 100).unwrap_or(false);
 
-            bus.publish(DomainEvent::TransactionRecorded {
+            bus.publish(crate::events::FinanceEvent::TransactionRecorded {
+                tx_id: tx.id.clone(),
                 category: category.clone().unwrap_or_default(),
-                amount: amount as f64,
+                amount,
+                currency: tx.currency.clone(),
                 is_over_budget,
-            });
+            }.into());
 
             if let Some((percentage, spent, limit, alert_threshold)) = budget_typed {
                 if percentage >= alert_threshold {
-                    bus.publish(DomainEvent::BudgetAlert {
+                    bus.publish(crate::events::FinanceEvent::BudgetAlert {
                         category: category.clone().unwrap_or_default(),
-                        spent: spent as f64,
-                        limit: limit as f64,
-                    });
+                        spent,
+                        limit,
+                    }.into());
                 }
             }
         }
