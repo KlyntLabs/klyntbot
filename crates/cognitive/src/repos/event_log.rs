@@ -203,7 +203,7 @@ impl EventLogRepo {
     ) -> Result<i64, sqlx::Error> {
         sqlx::query_scalar::<_, i64>(
             "SELECT COUNT(*) FROM domain_event_log
-             WHERE event_type = ?1 AND data LIKE ?2 AND timestamp >= ?3",
+             WHERE event_type = ?1 AND json_extract(payload, '$') LIKE ?2 AND timestamp >= ?3",
         )
         .bind(event_type)
         .bind(format!("%{data_contains}%"))
@@ -449,6 +449,37 @@ mod tests {
 
         // Non-existent event type should return 0
         let count = repo.count_by_event_type("Unknown", since).await.unwrap();
+        assert_eq!(count, 0);
+    }
+
+    #[tokio::test]
+    async fn count_by_event_type_and_data_does_not_panic() {
+        let pool = setup().await;
+        let repo = EventLogRepo::new(pool);
+
+        repo.insert_domain_event(
+            "evt-d1",
+            "TaskCreated",
+            "tasks",
+            "extract",
+            r#"{"task_id":"t1"}"#,
+            "2026-03-09T10:00:00Z",
+        )
+        .await
+        .unwrap();
+
+        let since: Timestamp = "2026-03-09T00:00:00Z".parse().unwrap();
+
+        let count = repo
+            .count_by_event_type_and_data("TaskCreated", "t1", since)
+            .await
+            .unwrap();
+        assert_eq!(count, 1);
+
+        let count = repo
+            .count_by_event_type_and_data("TaskCreated", "nonexistent", since)
+            .await
+            .unwrap();
         assert_eq!(count, 0);
     }
 }
