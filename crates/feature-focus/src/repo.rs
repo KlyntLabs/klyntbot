@@ -50,6 +50,7 @@ impl FocusSessionRow {
 // ── Public domain type ────────────────────────────────────────────────────────
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct FocusSession {
     pub id: i64,
     pub mode: FocusMode,

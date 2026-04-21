@@ -71,6 +71,16 @@ export type WindowAction =
   | "restore"
   | { preset: string };
 
+export interface FocusSession {
+  id: number;
+  mode: "dnd";
+  startedAt: string; // RFC 3339
+  endsAt: string; // RFC 3339
+  endedAt: string | null; // RFC 3339 or null while active
+  alarmId: string | null;
+  source: string;
+}
+
 export interface DashboardData {
   focus: FocusDashboard | null;
   calendar: CalendarDashboard[];

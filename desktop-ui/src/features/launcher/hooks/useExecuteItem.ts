@@ -1,4 +1,6 @@
 import { ipc } from "@shared/hooks/useIpc";
+import { invalidateQueries } from "@shared/hooks/useQuery";
+import { parseDurationToEndsAt } from "../lib/parseDuration";
 import { useLauncherStore } from "../stores/launcherStore";
 import type { LauncherExecuteResult, LauncherItem } from "../types";
 
@@ -6,6 +8,8 @@ interface ExecuteItemOptions {
   onEnterChat: (query: string) => void;
   onExpandToMain: () => void;
   onHide: () => void;
+  /** Called when focus_activate fails because shortcuts aren't installed. */
+  onNeedsOnboarding?: (retryFn: () => void) => void;
 }
 
 async function hideAndBadge(
@@ -41,16 +45,61 @@ export function executeItem(
         .catch((err) => console.error("Failed to open app:", err));
       break;
     case "systemCommand":
-      ipc("launcher_system_command", { action: item.kind.action, args })
-        .then(() =>
-          ipc<LauncherExecuteResult>("launcher_execute", {
-            itemId: item.id,
-            kind: "system",
-            args,
-          }),
-        )
-        .then((result) => hideAndBadge(item, result, onHide))
-        .catch((err) => console.error("Failed to execute system command:", err));
+      if (item.kind.action === "toggleDoNotDisturb") {
+        const endsAt = parseDurationToEndsAt(args.duration ?? "");
+        if (endsAt !== null) {
+          const activate = (resolvedEndsAt: string) => {
+            ipc("focus_shortcuts_installed")
+              .then((installed) => {
+                if (!installed) {
+                  options.onNeedsOnboarding?.(() => activate(resolvedEndsAt));
+                  return;
+                }
+                ipc("focus_activate", { mode: "dnd", endsAt: resolvedEndsAt })
+                  .then(() =>
+                    ipc<LauncherExecuteResult>("launcher_execute", {
+                      itemId: item.id,
+                      kind: "system",
+                      args,
+                    }),
+                  )
+                  .then((result) => {
+                    invalidateQueries("focus_active");
+                    hideAndBadge(item, result, onHide);
+                  })
+                  .catch((err) => {
+                    console.error("focus_activate failed:", err);
+                    options.onNeedsOnboarding?.(() => activate(resolvedEndsAt));
+                  });
+              })
+              .catch((err) => console.error("focus_shortcuts_installed failed:", err));
+          };
+          activate(endsAt);
+        } else {
+          // Unparseable duration — fall back to legacy system command path.
+          ipc("launcher_system_command", { action: item.kind.action, args })
+            .then(() =>
+              ipc<LauncherExecuteResult>("launcher_execute", {
+                itemId: item.id,
+                kind: "system",
+                args,
+              }),
+            )
+            .then((result) => hideAndBadge(item, result, onHide))
+            .catch((err) => console.error("Failed to execute system command:", err));
+        }
+      } else {
+        ipc("launcher_system_command", { action: item.kind.action, args })
+          .then(() =>
+            ipc<LauncherExecuteResult>("launcher_execute", {
+              itemId: item.id,
+              kind: "system",
+              args,
+            }),
+          )
+          .then((result) => hideAndBadge(item, result, onHide))
+          .catch((err) => console.error("Failed to execute system command:", err));
+      }
       break;
     case "script":
       ipc("launcher_run_script", { path: item.kind.path, args })
