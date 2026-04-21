@@ -1,0 +1,19 @@
+[package]
+name = "feature-focus"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+common = { path = "../common" }
+storage = { path = "../storage" }
+tools-core = { path = "../tools-core" }
+jiff = { workspace = true }
+serde_json = { workspace = true }
+serde = { workspace = true, features = ["derive"] }
+sqlx = { workspace = true }
+async-trait = { workspace = true }
+tracing = { workspace = true }
+thiserror = { workspace = true }
+
+[dev-dependencies]
+tokio = { workspace = true, features = ["macros", "rt"] }
