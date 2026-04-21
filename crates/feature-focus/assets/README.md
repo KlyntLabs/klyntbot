@@ -1,0 +1,3 @@
+These two binary files are macOS Shortcuts that Klyntbot uses to activate and deactivate Do Not Disturb. They are bundled via `include_bytes!` in `src/bridge/mod.rs` and installed into the user's Shortcuts library on first use via the `focus_install_shortcuts` Tauri command.
+
+To regenerate them: open the macOS Shortcuts app, create a shortcut named exactly "Klyntbot Focus On" containing a single **Set Focus** action (mode = Do Not Disturb, turn On, duration = Until Turned Off), then export it via **File → Export** and drag the resulting `.shortcut` file here. Repeat for "Klyntbot Focus Off" with the action set to turn Off. The names must match exactly because `bridge/macos.rs` passes them verbatim to `shortcuts run <name>`.

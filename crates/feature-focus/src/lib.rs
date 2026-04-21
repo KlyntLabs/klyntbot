@@ -1,10 +1,12 @@
 //! Focus Sessions — timed system-level actions (DND, silent mode, etc.).
 
 pub mod alarm_bridge;
+pub mod bridge;
 pub mod duration_parser;
 pub mod manager;
 pub mod repo;
 
+pub use bridge::{FOCUS_OFF_BYTES, FOCUS_ON_BYTES};
 pub use manager::{DndManager, DndScheduler, FocusBridge};
 pub use repo::{FocusSession, FocusSessionRepo};
 
