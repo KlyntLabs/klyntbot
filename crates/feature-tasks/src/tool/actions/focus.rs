@@ -5,6 +5,7 @@ use jiff::{SignedDuration, Timestamp};
 use tools_core::ParamExtractor;
 
 use super::super::TaskTool;
+use crate::events::TaskEvent;
 
 impl TaskTool {
     pub(crate) async fn handle_focus(&self, p: &ParamExtractor<'_>) -> Result<String> {
@@ -38,10 +39,22 @@ impl TaskTool {
 
             // Notify focus_alarms subscriber to materialize 6h/3h/1h warnings + expire.
             if let Some(ref bus) = self.domain_bus {
-                bus.publish(bus::DomainEvent::TaskFocusChanged {
-                    task_id: id.to_string(),
-                    focus_deadline: deadline.map(|d| d.to_string()),
-                });
+                let title = self
+                    .repo
+                    .get(id)
+                    .await
+                    .ok()
+                    .flatten()
+                    .map(|r| r.title)
+                    .unwrap_or_default();
+                bus.publish(
+                    TaskEvent::FocusChanged {
+                        task_id: id.to_string(),
+                        title,
+                        focus_deadline: deadline,
+                    }
+                    .into(),
+                );
             }
 
             Ok(format!("Focused on task: {}", id))
@@ -76,10 +89,22 @@ impl TaskTool {
 
             // Notify focus_alarms subscriber to cancel any pending warnings.
             if let Some(ref bus) = self.domain_bus {
-                bus.publish(bus::DomainEvent::TaskFocusChanged {
-                    task_id: id.to_string(),
-                    focus_deadline: None,
-                });
+                let title = self
+                    .repo
+                    .get(id)
+                    .await
+                    .ok()
+                    .flatten()
+                    .map(|r| r.title)
+                    .unwrap_or_default();
+                bus.publish(
+                    TaskEvent::FocusChanged {
+                        task_id: id.to_string(),
+                        title,
+                        focus_deadline: None,
+                    }
+                    .into(),
+                );
             }
 
             Ok(format!("Unfocused task: {}", id))

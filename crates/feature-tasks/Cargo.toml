@@ -4,6 +4,8 @@ version.workspace = true
 edition.workspace = true
 
 [dependencies]
+ai-core.workspace = true
+ai-core-macros.workspace = true
 anyhow.workspace = true
 bus.workspace = true
 common.workspace = true

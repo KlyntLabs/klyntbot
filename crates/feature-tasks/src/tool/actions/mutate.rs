@@ -5,9 +5,8 @@ use jiff::Timestamp;
 use tools_core::ParamExtractor;
 use tracing::warn;
 
-use bus::DomainEvent;
-
 use super::super::TaskTool;
+use crate::events::TaskEvent;
 use crate::types::Task;
 use storage::TaskPatch;
 
@@ -235,12 +234,14 @@ impl TaskTool {
                             if let Err(e) = self.repo.record_estimation(&estimation).await {
                                 warn!("Failed to record estimation history: {}", e);
                             } else if let Some(ref bus) = self.domain_bus {
-                                bus.publish(DomainEvent::EstimationRecorded {
-                                    task_id: id.to_string(),
-                                    estimated_mins: est_mins as u32,
-                                    actual_mins: actual_mins as u32,
-                                    deviation_pct,
-                                });
+                                bus.publish(
+                                    TaskEvent::EstimationRecorded {
+                                        task_id: id.to_string(),
+                                        estimated_minutes: Some(est_mins),
+                                        actual_minutes: Some(actual_mins),
+                                    }
+                                    .into(),
+                                );
                             }
                         }
                     }
@@ -264,21 +265,23 @@ impl TaskTool {
 
                 // Emit domain event for task completion
                 if let Some(ref bus) = self.domain_bus {
-                    let actual_mins = {
+                    let deviation_pct = estimated_minutes.and_then(|est| {
                         let total_secs: i64 = te_rows.iter().filter_map(|e| e.duration_secs).sum();
-                        if total_secs > 0 {
-                            Some(total_secs / 60)
+                        if total_secs > 0 && est > 0 {
+                            let actual_mins = total_secs / 60;
+                            Some(((actual_mins as f64 - est as f64) / est as f64) * 100.0)
                         } else {
                             None
                         }
-                    };
-                    let estimated_mins = estimated_minutes.map(|m| m as i64);
-                    bus.publish(DomainEvent::TaskCompleted {
-                        task_id: task.id.clone(),
-                        actual_duration_mins: actual_mins,
-                        estimated_duration_mins: estimated_mins,
-                        deviation_pct: None,
                     });
+                    bus.publish(
+                        TaskEvent::Completed {
+                            task_id: task.id.clone(),
+                            title: task.title.clone(),
+                            deviation_pct,
+                        }
+                        .into(),
+                    );
                 }
 
                 // Cascade progress to KR if task is linked

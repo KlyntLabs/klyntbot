@@ -4,9 +4,8 @@ use common::{Result, ToolError};
 use tools_core::{ParamExtractor, RoutingContext};
 use tracing::warn;
 
-use bus::DomainEvent;
-
 use super::super::TaskTool;
+use crate::events::TaskEvent;
 use crate::types::Task;
 
 impl TaskTool {
@@ -105,12 +104,15 @@ impl TaskTool {
         }
 
         if let Some(ref bus) = self.domain_bus {
-            bus.publish(DomainEvent::TaskCreated {
-                task_id: created.id.clone(),
-                project: created.project_id.clone(),
-                estimate_mins: created.estimated_minutes.map(|m| m as i64),
-                task_type: created.task_type.to_string(),
-            });
+            bus.publish(
+                TaskEvent::Created {
+                    task_id: created.id.clone(),
+                    title: created.title.clone(),
+                    area_id: created.area_id.clone(),
+                    priority: created.priority,
+                }
+                .into(),
+            );
         }
 
         Ok(format!(

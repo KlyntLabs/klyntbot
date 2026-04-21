@@ -13,6 +13,7 @@ pub mod alarms;
 pub mod cognitive_bridge;
 pub mod complexity;
 pub mod config;
+pub mod events;
 pub mod focus_alarms;
 pub mod handlers;
 pub mod recurrence_repo;
@@ -29,11 +30,15 @@ pub use search::hybrid_merge;
 pub use tool::TaskTool;
 pub use types::*;
 
+use ai_core_macros::AiFeature;
 use async_trait::async_trait;
 use common::Result;
 use tools_core::{DynTool, FeatureMigration, FeaturePackage, HealthStatus};
 
 /// Feature package for task management.
+#[derive(AiFeature)]
+#[ai(recall_domain = "Tasks", skill = "task-management",
+     event = "crate::events::TaskEvent")]
 pub struct TasksFeature {
     pool: Option<storage::StoragePool>,
 }
