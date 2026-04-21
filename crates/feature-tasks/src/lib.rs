@@ -25,9 +25,7 @@ pub mod types;
 
 pub use complexity::{evaluate_task_complexity, TaskComplexitySignals};
 pub use config::{EnrichmentConfig, SearchConfig, TasksConfig};
-pub use handlers::{
-    EmbeddingHandler, ProgressHandler,
-};
+pub use handlers::{EmbeddingHandler, ProgressHandler};
 pub use rrule_utils::{humanize_rrule, next_occurrence, should_spawn_instance, validate_rrule};
 pub use scoring::{calculate_age_days, calculate_score, calculate_urgency, priority_weight};
 pub use search::hybrid_merge;

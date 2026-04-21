@@ -126,12 +126,6 @@ impl TaskTool {
         self
     }
 
-    // ─── Scoring helpers ───────────────────────────────────────────
-
-    pub(crate) fn calculate_score(task: &Task, now: jiff::Timestamp) -> f64 {
-        crate::scoring::calculate_score(task, now)
-    }
-
     // ─── Full task loading ──────────────────────────────────────────
 
     pub(crate) async fn load_full_task(&self, row: storage::TaskRow) -> Result<Task> {
@@ -207,13 +201,6 @@ impl TaskTool {
                 ToolError::ExecutionFailed(format!("alarm materialize failed: {e}")).into()
             })
     }
-
-    /// Load a task by ID or return a not-found error.
-    pub(crate) async fn require_task(&self, id: &str) -> Result<Task> {
-        self.get_full_task(id)
-            .await?
-            .ok_or_else(|| ToolError::ExecutionFailed(format!("Task {id} not found")).into())
-    }
 }
 
 #[async_trait]
@@ -223,7 +210,7 @@ impl Tool for TaskTool {
     }
 
     fn description(&self) -> &str {
-        "Manage individual to-do items and action items. Create, complete, update, delete, list, and search tasks. Supports priorities, dependencies, time logging, recurring tasks, daily planning, and AI-assisted decomposition. NOT for project containers or OKR objectives."
+        "Manage individual to-do items and action items. Create, complete, update, delete, list, and search tasks. Supports priorities, dependencies, time logging, and recurring tasks. NOT for project containers or OKR objectives."
     }
 
     fn parameters(&self) -> Value {
@@ -478,7 +465,7 @@ mod tests {
         task.created_at = now
             .checked_sub(SignedDuration::from_secs(5 * 86400))
             .unwrap_or(now);
-        let score = TaskTool::calculate_score(&task, now);
+        let score = crate::scoring::calculate_score(&task, now);
         // urgency=10, priority_wt=5, age=5 -> 10*5 + 5*0.1 = 50.5
         assert!(
             (score - 50.5).abs() < 0.01,

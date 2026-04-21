@@ -9,7 +9,6 @@ use bus::DomainEvent;
 use super::super::TaskTool;
 use crate::types::Task;
 
-
 impl TaskTool {
     pub(crate) async fn handle_create(
         &self,
