@@ -208,14 +208,16 @@ fn spawn_event_log_persistence(
                                 let domain = event.domain();
                                 let salience_str = salience.as_str();
                                 let event_type = event.variant_name().to_string();
-                                // Store only the variant name — full serialization
-                                // causes heap pressure with large payloads.
-                                let payload = &event_type;
+                                let payload = serde_json::to_string(&event)
+                                    .unwrap_or_else(|e| {
+                                        tracing::warn!(error = %e, "serialize DomainEvent for event log failed");
+                                        format!("{{\"_kind\":{:?}}}", event_type)
+                                    });
                                 let ts = jiff::Timestamp::now().to_string();
                                 let id = uuid::Uuid::new_v4().to_string();
 
                                 if let Err(e) = repo
-                                    .insert_domain_event(&id, &event_type, domain, salience_str, payload, &ts)
+                                    .insert_domain_event(&id, &event_type, domain, salience_str, &payload, &ts)
                                     .await
                                 {
                                     warn!("failed to persist domain event: {e}");

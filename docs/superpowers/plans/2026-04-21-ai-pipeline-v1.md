@@ -1,6 +1,6 @@
 # AI Pipeline v1 — Foundation + Tasks + Finance + Cognitive
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **For agentic workers:** REQUIRED SUB-SKILL: Implement each tasks in sub-agent and don't commit anything yet
 
 **Goal:** Build the unified AI feature pipeline foundation (`ai-core` + `ai-core-macros`), migrate Tasks and Finance to it, replace cognitive's hardcoded event dispatch with a generic `SignalConsumer`, and clean up the trait + 3 pre-existing bugs uncovered during audit. No parallel paths, no backward compat, no dead code left behind.
 

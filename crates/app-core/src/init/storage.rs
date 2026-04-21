@@ -2,6 +2,7 @@ use std::sync::Arc;
 
 use feature_notes::repo::NoteRepo;
 use storage::{Repos, StoragePool, VectorStore};
+use tools_core::FeaturePackage;
 use tracing::{info, warn};
 
 /// Results from the storage initialization phase.
@@ -102,14 +103,10 @@ pub(super) async fn init_storage(
     let note_repo = NoteRepo::new(notes_pool);
 
     // Run tasks feature migrations.
+    let tasks_feature = feature_tasks::TasksFeature::new();
     StoragePool::run_feature_migrations(
         storage_pool.inner(),
-        &[tools_core::FeatureMigration {
-            feature_name: "tasks".to_string(),
-            version: 1,
-            description: "Create agentic task tables".to_string(),
-            sql: feature_tasks::TasksFeature::migration_sql().to_string(),
-        }],
+        &tasks_feature.migrations(),
     )
     .await
     .map_err(|e| format!("tasks migration failed: {e}"))?;

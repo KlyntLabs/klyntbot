@@ -682,3 +682,65 @@ fn compute_summary(entries: &[TimelineEntry]) -> TimelineSummary {
         source_breakdown,
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use bus::DomainEvent;
+
+    fn make_domain_event_row(event: &DomainEvent, id: &str, ts: &str) -> cognitive::DomainEventRow {
+        let event_type = event.variant_name().to_string();
+        // Simulate the FIXED writer: full JSON payload
+        let payload = serde_json::to_string(event).unwrap();
+        cognitive::DomainEventRow {
+            id: id.to_string(),
+            event_type,
+            domain: "tasks".to_string(),
+            salience: "accumulate".to_string(),
+            payload,
+            timestamp: ts.to_string(),
+        }
+    }
+
+    /// Round-trip: TaskCreated JSON payload → normalize_domain_event → task_id in entity_id.
+    #[test]
+    fn task_created_payload_round_trips() {
+        let event = DomainEvent::TaskCreated {
+            task_id: "t-roundtrip".to_string(),
+            project: None,
+            estimate_mins: None,
+            task_type: "todo".to_string(),
+        };
+        let row = make_domain_event_row(&event, "evt-rt-1", "2026-04-21T10:00:00Z");
+        let entry = normalize_domain_event(row).expect("should normalize");
+        assert_eq!(
+            entry.entity_id.as_deref(),
+            Some("t-roundtrip"),
+            "entity_id should be task_id from JSON payload"
+        );
+        assert!(
+            matches!(entry.entry_type, TimelineEntryType::TaskCreated),
+            "entry_type should be TaskCreated"
+        );
+    }
+
+    /// Regression: old writer stored just the variant name string (not JSON).
+    /// normalize_domain_event must return None for such malformed payloads.
+    #[test]
+    fn bare_variant_name_payload_returns_none() {
+        let row = cognitive::DomainEventRow {
+            id: "evt-bad".to_string(),
+            event_type: "TaskCreated".to_string(),
+            domain: "tasks".to_string(),
+            salience: "accumulate".to_string(),
+            // Old (buggy) writer stored just the variant name, not JSON
+            payload: "TaskCreated".to_string(),
+            timestamp: "2026-04-21T10:00:00Z".to_string(),
+        };
+        let result = normalize_domain_event(row);
+        assert!(
+            result.is_none(),
+            "bare variant name is not valid JSON, should return None"
+        );
+    }
+}
