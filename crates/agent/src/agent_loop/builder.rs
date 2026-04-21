@@ -1249,7 +1249,7 @@ impl AgentLoopBuilder {
         // Outputs for MemoryTool — populated inside the pool block if embedding is enabled
         let todo_embedding_handler: Option<Arc<dyn tools::EmbeddingHandler>>;
 
-        // ── Feature-tasks tool (requires real pool) ───────────────────────
+        // ── Feature-tasks tool (via FeaturePackage) ───────────────────────
         if self.pool.is_some() {
             let pool_ref = storage_pool.inner();
             let task_repo = storage::TaskRepo::new(pool_ref.clone());
@@ -1315,7 +1315,12 @@ impl AgentLoopBuilder {
                 task_tool = task_tool.with_alarm_writer(repos.task_alarms.clone(), fire_store);
             }
 
-            tool_registry.register(task_tool);
+            // Register via FeaturePackage
+            let tasks_feature = feature_tasks::TasksFeature::new()
+                .with_task_tool(Arc::new(task_tool));
+            for tool in tasks_feature.tools() {
+                tool_registry.register_dyn(tool);
+            }
 
             // ── OKR tool (needs same progress handler) ────────────────────
             tool_registry.register(
