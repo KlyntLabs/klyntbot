@@ -129,8 +129,6 @@ impl AppCore {
             info!("no cognitive provider — using heuristic handlers");
         }
 
-        // DomainEventBus is created before cron so the proactive scan callback
-        // can capture it and emit ProactiveSuggestionCreated after persisting.
         // With ~25 subscribers each cloning every event, 256 slots give enough
         // headroom for bursty tool-call sequences without Lagged errors while
         // remaining bounded. Payload reduction (no user_message in
