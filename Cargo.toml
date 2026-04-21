@@ -41,6 +41,8 @@ members = [
     "crates/simulator",
     "crates/voice-engine",
     "crates/feature-language-learning",
+    "crates/ai-core",
+    "crates/ai-core-macros",
 ]
 
 [workspace.package]
@@ -87,6 +89,8 @@ autotuner = { path = "crates/autotuner" }
 simulator = { path = "crates/simulator" }
 voice-engine = { path = "crates/voice-engine" }
 feature-language-learning = { path = "crates/feature-language-learning" }
+ai-core = { path = "crates/ai-core" }
+ai-core-macros = { path = "crates/ai-core-macros" }
 extism = "1"
 mcp = { path = "crates/mcp" }
 notifications = { path = "crates/notifications" }

@@ -1,0 +1,18 @@
+[package]
+name = "ai-core"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+common.workspace = true
+bus.workspace = true
+jiff.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+tokio.workspace = true
+tokio-util = { workspace = true, features = ["rt"] }
+async-trait.workspace = true
+tracing.workspace = true
+
+[dev-dependencies]
+tokio = { workspace = true, features = ["full", "macros", "test-util"] }
