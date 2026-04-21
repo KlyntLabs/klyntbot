@@ -71,45 +71,6 @@ pub struct TaskActivityRow {
     pub created_at: SqlTs,
 }
 
-/// Row struct for the `task_executions` table.
-#[derive(Debug, Clone, FromRow, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct TaskExecutionRow {
-    pub id: String,
-    pub task_id: String,
-    pub status: String,
-    pub agent_profile: Option<String>,
-    pub started_at: Option<SqlTs>,
-    pub completed_at: Option<SqlTs>,
-    pub duration_secs: Option<i64>,
-    pub tokens_used: Option<i64>,
-    pub cost_usd: Option<f64>,
-    pub input_context: Option<String>,
-    pub output_summary: Option<String>,
-    pub error_message: Option<String>,
-    pub artifacts: Option<String>,
-    pub metrics: Option<String>,
-    pub retry_count: i32,
-    pub created_at: SqlTs,
-}
-
-/// Row struct for the `task_suggestions` table.
-#[derive(Debug, Clone, FromRow, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct TaskSuggestionRow {
-    pub id: String,
-    pub task_id: Option<String>,
-    pub suggestion_type: String,
-    pub title: String,
-    pub description: Option<String>,
-    pub confidence: f64,
-    pub action_payload: Option<String>,
-    pub status: String,
-    pub trigger: Option<String>,
-    pub created_at: SqlTs,
-    pub resolved_at: Option<SqlTs>,
-}
-
 /// Row struct for the `task_decompositions` table.
 #[derive(Debug, Clone, FromRow, Serialize)]
 #[serde(rename_all = "camelCase")]

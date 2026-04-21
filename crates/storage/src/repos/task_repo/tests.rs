@@ -1,8 +1,6 @@
 use super::*;
 
-use crate::rows::task::{
-    TaskDecompositionRow, TaskEstimationRow, TaskExecutionRow, TaskRow, TaskSuggestionRow,
-};
+use crate::rows::task::{TaskDecompositionRow, TaskEstimationRow, TaskRow};
 
 /// Create all task-related tables needed for tests.
 /// The tasks table is from the feature-tasks migration, not core migrations,
@@ -75,53 +73,6 @@ async fn create_test_tables(db: &sqlx::SqlitePool) {
                 actor_id      TEXT,
                 summary       TEXT,
                 created_at    INTEGER NOT NULL DEFAULT (unixepoch('now') * 1000)
-            )
-            "#,
-    )
-    .execute(db)
-    .await
-    .unwrap();
-
-    sqlx::query(
-        r#"
-            CREATE TABLE IF NOT EXISTS task_executions (
-                id             TEXT PRIMARY KEY,
-                task_id        TEXT NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
-                status         TEXT NOT NULL DEFAULT 'pending',
-                agent_profile  TEXT,
-                started_at     INTEGER,
-                completed_at   INTEGER,
-                duration_secs  INTEGER,
-                tokens_used    INTEGER,
-                cost_usd       REAL,
-                input_context  TEXT,
-                output_summary TEXT,
-                error_message  TEXT,
-                artifacts      TEXT,
-                metrics        TEXT,
-                retry_count    INTEGER NOT NULL DEFAULT 0,
-                created_at     INTEGER NOT NULL DEFAULT (unixepoch('now') * 1000)
-            )
-            "#,
-    )
-    .execute(db)
-    .await
-    .unwrap();
-
-    sqlx::query(
-        r#"
-            CREATE TABLE IF NOT EXISTS task_suggestions (
-                id              TEXT PRIMARY KEY,
-                task_id         TEXT REFERENCES tasks(id) ON DELETE CASCADE,
-                suggestion_type TEXT NOT NULL,
-                title           TEXT NOT NULL,
-                description     TEXT,
-                confidence      REAL NOT NULL DEFAULT 0.0,
-                action_payload  TEXT,
-                status          TEXT NOT NULL DEFAULT 'pending',
-                trigger         TEXT,
-                created_at      INTEGER NOT NULL DEFAULT (unixepoch('now') * 1000),
-                resolved_at     INTEGER
             )
             "#,
     )
@@ -714,88 +665,6 @@ async fn test_time_entries() {
 }
 
 #[tokio::test]
-async fn test_executions() {
-    let pool = crate::StoragePool::connect_in_memory().await.unwrap();
-    let db = pool.inner().clone();
-    create_test_tables(&db).await;
-    let repo = TaskRepo::new(db);
-
-    let task = make_task("ex1", "Exec test");
-    repo.add(&task).await.unwrap();
-
-    let now: crate::sqlite_types::SqlTs = jiff::Timestamp::now().into();
-    let exec_row = TaskExecutionRow {
-        id: "exec-1".to_string(),
-        task_id: "ex1".to_string(),
-        status: "pending".to_string(),
-        agent_profile: Some("general".to_string()),
-        started_at: Some(now),
-        completed_at: None,
-        duration_secs: None,
-        tokens_used: None,
-        cost_usd: None,
-        input_context: Some("test context".to_string()),
-        output_summary: None,
-        error_message: None,
-        artifacts: None,
-        metrics: None,
-        retry_count: 0,
-        created_at: now,
-    };
-    let created = repo.create_execution(&exec_row).await.unwrap();
-    assert_eq!(created.id, "exec-1");
-    assert_eq!(created.status, "pending");
-
-    let updated = repo
-        .update_execution("exec-1", "completed", Some("All done"), None, None)
-        .await
-        .unwrap();
-    assert_eq!(updated.status, "completed");
-    assert_eq!(updated.output_summary.as_deref(), Some("All done"));
-    assert!(updated.completed_at.is_some());
-
-    let list = repo.list_executions("ex1").await.unwrap();
-    assert_eq!(list.len(), 1);
-}
-
-#[tokio::test]
-async fn test_suggestions() {
-    let pool = crate::StoragePool::connect_in_memory().await.unwrap();
-    let db = pool.inner().clone();
-    create_test_tables(&db).await;
-    let repo = TaskRepo::new(db);
-
-    let task = make_task("sug1", "Suggestion test");
-    repo.add(&task).await.unwrap();
-
-    let now: crate::sqlite_types::SqlTs = jiff::Timestamp::now().into();
-    let suggestion = TaskSuggestionRow {
-        id: "s1".to_string(),
-        task_id: Some("sug1".to_string()),
-        suggestion_type: "decompose".to_string(),
-        title: "Break this into subtasks".to_string(),
-        description: None,
-        confidence: 0.85,
-        action_payload: None,
-        status: "pending".to_string(),
-        trigger: Some("complexity".to_string()),
-        created_at: now,
-        resolved_at: None,
-    };
-    let created = repo.create_suggestion(&suggestion).await.unwrap();
-    assert_eq!(created.status, "pending");
-
-    let pending = repo.list_pending_suggestions(Some("sug1")).await.unwrap();
-    assert_eq!(pending.len(), 1);
-
-    let resolved = repo.resolve_suggestion("s1", "accepted").await.unwrap();
-    assert!(resolved);
-
-    let pending = repo.list_pending_suggestions(Some("sug1")).await.unwrap();
-    assert!(pending.is_empty());
-}
-
-#[tokio::test]
 async fn test_estimation_stats() {
     let pool = crate::StoragePool::connect_in_memory().await.unwrap();
     let db = pool.inner().clone();
@@ -886,41 +755,6 @@ async fn test_summary_and_overdue() {
 }
 
 #[tokio::test]
-async fn test_get_execution() {
-    let repo = setup_repo().await;
-
-    let task = make_task("exec-get-t", "Exec test");
-    repo.add(&task).await.unwrap();
-
-    let exec_row = TaskExecutionRow {
-        id: "exec-1".to_string(),
-        task_id: task.id.clone(),
-        status: "pending".to_string(),
-        agent_profile: Some("task".to_string()),
-        started_at: None,
-        completed_at: None,
-        duration_secs: None,
-        tokens_used: None,
-        cost_usd: None,
-        input_context: None,
-        output_summary: None,
-        error_message: None,
-        artifacts: None,
-        metrics: None,
-        retry_count: 0,
-        created_at: jiff::Timestamp::now().into(),
-    };
-    repo.create_execution(&exec_row).await.unwrap();
-
-    let fetched = repo.get_execution("exec-1").await.unwrap();
-    assert!(fetched.is_some());
-    assert_eq!(fetched.unwrap().status, "pending");
-
-    let missing = repo.get_execution("nonexistent").await.unwrap();
-    assert!(missing.is_none());
-}
-
-#[tokio::test]
 async fn test_decomposition_crud() {
     let repo = setup_repo().await;
 
@@ -954,31 +788,3 @@ async fn test_decomposition_crud() {
     assert!(pending_after.is_empty());
 }
 
-#[tokio::test]
-async fn test_expire_suggestions() {
-    let repo = setup_repo().await;
-
-    let task = make_task("expire-t", "Expire test");
-    repo.add(&task).await.unwrap();
-
-    let sugg = TaskSuggestionRow {
-        id: "sugg-1".to_string(),
-        task_id: Some(task.id.clone()),
-        suggestion_type: "Decompose".to_string(),
-        title: "Break down".to_string(),
-        description: None,
-        confidence: 0.8,
-        action_payload: None,
-        status: "pending".to_string(),
-        trigger: None,
-        created_at: jiff::Timestamp::now().into(),
-        resolved_at: None,
-    };
-    repo.create_suggestion(&sugg).await.unwrap();
-
-    let expired = repo.expire_suggestions_for_task(&task.id).await.unwrap();
-    assert_eq!(expired, 1);
-
-    let pending = repo.list_pending_suggestions(Some(&task.id)).await.unwrap();
-    assert!(pending.is_empty());
-}

@@ -88,7 +88,7 @@ pub use rows::project_source::ProjectSourceRow;
 pub use rows::session::{SessionListRow, SessionMessageRow, SessionRow};
 pub use rows::task::{
     TaskActivityRow, TaskAttachmentRow, TaskDecompositionRow, TaskDependencyRow, TaskEstimationRow,
-    TaskExecutionRow, TaskRow, TaskSuggestionRow, TaskTimeEntryRow,
+    TaskRow, TaskTimeEntryRow,
 };
 pub use rows::task_group::TaskGroupRow;
 pub use rows::tool_usage::{ToolUsageRow, ToolUsageStatsRow};

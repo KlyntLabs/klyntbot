@@ -88,50 +88,6 @@ CREATE INDEX IF NOT EXISTS idx_task_activity_task_id ON task_activity(task_id);
 CREATE INDEX IF NOT EXISTS idx_task_activity_created_at ON task_activity(created_at);
 
 -- ============================================================
--- Task Executions (agent execution records)
--- ============================================================
-CREATE TABLE IF NOT EXISTS task_executions (
-    id             TEXT PRIMARY KEY,
-    task_id        TEXT NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
-    status         TEXT NOT NULL DEFAULT 'pending',
-    agent_profile  TEXT,
-    started_at     INTEGER,
-    completed_at   INTEGER,
-    duration_secs  INTEGER,
-    tokens_used    INTEGER,
-    cost_usd       REAL,
-    input_context  TEXT,
-    output_summary TEXT,
-    error_message  TEXT,
-    artifacts      TEXT,
-    metrics        TEXT,
-    retry_count    INTEGER NOT NULL DEFAULT 0,
-    created_at     INTEGER NOT NULL DEFAULT (unixepoch('now') * 1000)
-);
-
-CREATE INDEX IF NOT EXISTS idx_task_executions_task_id ON task_executions(task_id);
-
--- ============================================================
--- Task Suggestions (AI-generated suggestions)
--- ============================================================
-CREATE TABLE IF NOT EXISTS task_suggestions (
-    id              TEXT PRIMARY KEY,
-    task_id         TEXT REFERENCES tasks(id) ON DELETE CASCADE,
-    suggestion_type TEXT NOT NULL,
-    title           TEXT NOT NULL,
-    description     TEXT,
-    confidence      REAL NOT NULL DEFAULT 0.0,
-    action_payload  TEXT,
-    status          TEXT NOT NULL DEFAULT 'pending',
-    trigger         TEXT,
-    created_at      INTEGER NOT NULL DEFAULT (unixepoch('now') * 1000),
-    resolved_at     INTEGER
-);
-
-CREATE INDEX IF NOT EXISTS idx_task_suggestions_task_id ON task_suggestions(task_id);
-CREATE INDEX IF NOT EXISTS idx_task_suggestions_pending ON task_suggestions(status) WHERE status = 'pending';
-
--- ============================================================
 -- Task Attachments
 -- ============================================================
 CREATE TABLE IF NOT EXISTS task_attachments (
@@ -232,17 +188,6 @@ FOR EACH ROW
 WHEN NEW.completed = 1 AND OLD.completed = 0
 BEGIN
     UPDATE tasks SET completed_at = (unixepoch('now') * 1000)
-    WHERE id = NEW.id;
-END;
-
--- 3. Auto-calculate duration_secs when execution completed_at is set
-CREATE TRIGGER IF NOT EXISTS trg_execution_duration
-AFTER UPDATE OF completed_at ON task_executions
-FOR EACH ROW
-WHEN NEW.completed_at IS NOT NULL AND OLD.completed_at IS NULL AND NEW.started_at IS NOT NULL
-BEGIN
-    UPDATE task_executions
-    SET duration_secs = (NEW.completed_at - NEW.started_at) / 1000
     WHERE id = NEW.id;
 END;
 

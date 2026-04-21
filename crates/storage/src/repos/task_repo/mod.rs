@@ -1,6 +1,6 @@
 //! Repository for the `tasks` table and its satellite tables
 //! (`task_attachments`, `task_time_entries`, `task_dependencies`,
-//!  `task_activity`, `task_executions`, `task_suggestions`, `task_estimation_history`).
+//!  `task_activity`, `task_estimation_history`).
 
 mod activity;
 mod attachments;
@@ -8,10 +8,8 @@ mod core;
 mod decompositions;
 mod dependencies;
 mod estimations;
-mod executions;
 mod hierarchy;
 mod reporting;
-mod suggestions;
 mod time_entries;
 
 #[cfg(test)]
@@ -92,7 +90,7 @@ pub struct TimeEntryWithTask {
 }
 
 /// Repository for task CRUD, hierarchy, focus, dependencies, attachments,
-/// time tracking, activity log, executions, suggestions, and estimation.
+/// time tracking, activity log, and estimation.
 #[derive(Debug, Clone)]
 pub struct TaskRepo {
     pool: SqlitePool,
