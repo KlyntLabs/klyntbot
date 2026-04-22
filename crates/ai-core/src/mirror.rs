@@ -27,7 +27,8 @@ pub struct MirrorSnapshotSpec {
 /// snapshot on flush. Implementations own their own repo handles.
 #[async_trait]
 pub trait MirrorSignalSource: Send + Sync + 'static {
-    const SPEC: MirrorSnapshotSpec;
+    /// Declarative spec for this source.
+    fn spec(&self) -> MirrorSnapshotSpec;
 
     /// Human-readable name for logs.
     fn name(&self) -> &'static str;
@@ -88,7 +89,7 @@ impl<S: MirrorSignalSource> MirrorSubscriberRunner<S> {
     /// Spawn using the source's declared interval. Returns `None` if the source
     /// is event-driven (no interval). Callers store the handle.
     pub fn spawn_declared_flush_loop(self: Arc<Self>) -> Option<JoinHandle<()>> {
-        let secs = S::SPEC.flush_interval_secs?;
+        let secs = self.source.spec().flush_interval_secs?;
         Some(self.spawn_flush_loop(Duration::from_secs(secs)))
     }
 }
@@ -100,7 +101,7 @@ impl<S: MirrorSignalSource> SignalConsumer for MirrorSubscriberRunner<S> {
     }
 
     async fn consume(&self, signal: &AiSignal) -> common::Result<()> {
-        if !S::SPEC.subscribed_kinds.contains(&signal.event_kind) {
+        if !self.source.spec().subscribed_kinds.contains(&signal.event_kind) {
             return Ok(());
         }
         self.source.accumulate(signal).await

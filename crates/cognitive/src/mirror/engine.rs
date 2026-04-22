@@ -1,18 +1,18 @@
 //! MirrorEngine — lifecycle manager for the Mirror self-reflection layer.
 //!
-//! Starts all event-driven subscribers and wires them to the domain event bus,
-//! then produces a configured [`MirrorFacade`] for use by Tauri commands and
-//! MCP handlers.
+//! Produces a configured [`MirrorFacade`] and a list of [`MirrorSignalSource`]
+//! implementations that should be wired into the workspace `SignalRouter`.
 
 use std::sync::Arc;
 
+use ai_core::MirrorSignalSource;
 use dashmap::DashMap;
 use tokio::task::JoinHandle;
 use tokio_util::sync::CancellationToken;
 
 use crate::mirror::{
-    AutotunerBridge, ConfigArchiver, MetaRuleDetector, MirrorFacade, MirrorRepo, NarrativeHandler,
-    RoutingMirrorSubscriber, TrialPreviewSubscriber,
+    AutotunerBridge, ConfigArchiverSource, MetaRuleSignalSource, MirrorFacade, MirrorRepo,
+    NarrativeHandler, RoutingSignalSource, TrialPreviewSource,
 };
 use crate::repos::{EpisodicMemoryRepo, ProceduralRuleRepo};
 
@@ -20,61 +20,62 @@ use crate::repos::{EpisodicMemoryRepo, ProceduralRuleRepo};
 // MirrorEngine
 // ---------------------------------------------------------------------------
 
-/// Starts Mirror subscribers and produces the [`MirrorFacade`].
+/// Produces the [`MirrorFacade`] and a list of [`MirrorSignalSource`]s.
+///
+/// The caller is responsible for wrapping each source in a
+/// [`MirrorSubscriberRunner`] and registering it with the `SignalRouter`.
 ///
 /// # Usage
 ///
 /// ```rust,ignore
-/// let (facade, handles, shutdown) = MirrorEngine::start(repo, Arc::new(bus), Some(handler), None, None, None);
-/// // Store `handles` to keep subscribers alive; drop or cancel `shutdown` to stop them.
+/// let (facade, sources, active_timers) = MirrorEngine::start(repo, Some(handler), None, None, None);
+/// // Wire sources into SignalRouter via MirrorSubscriberRunner...
 /// ```
 pub struct MirrorEngine;
 
 impl MirrorEngine {
-    /// Start all Mirror subscribers against `bus` and return the facade,
-    /// a list of [`JoinHandle`]s for the background tasks, and a
-    /// [`CancellationToken`] that can be cancelled to request a graceful
-    /// shutdown.
-    ///
-    /// If `narrative_handler` is `Some`, LLM-powered methods on the facade
-    /// will be available. If `None`, those methods return an error.
+    /// Create the facade and signal sources. Does not spawn any tasks —
+    /// the caller wires sources into the `SignalRouter`.
     pub fn start(
         repo: MirrorRepo,
-        bus: Arc<bus::DomainEventBus>,
         narrative_handler: Option<Arc<dyn NarrativeHandler>>,
         autotuner_bridge: Option<Arc<dyn AutotunerBridge>>,
         episodic_repo: Option<EpisodicMemoryRepo>,
         rule_repo: Option<ProceduralRuleRepo>,
         trial_evaluator: Option<Arc<dyn crate::mirror::types::EarlyTrialEvaluator>>,
-    ) -> (MirrorFacade, Vec<JoinHandle<()>>, CancellationToken) {
-        let shutdown = CancellationToken::new();
-
+    ) -> (
+        MirrorFacade,
+        Vec<Arc<dyn MirrorSignalSource>>,
+        Arc<DashMap<String, JoinHandle<()>>>,
+    ) {
         let meta_rule_repo = repo.clone();
         let version_repo = repo.clone();
         let trial_repo = repo.clone();
 
-        // Shared active timers between TrialPreviewSubscriber and MirrorFacade
+        // Shared active timers between TrialPreviewSource and MirrorFacade
         let active_timers: Arc<DashMap<String, JoinHandle<()>>> = Arc::new(DashMap::new());
 
-        let routing_sub = Arc::new(RoutingMirrorSubscriber::new(repo.clone()));
-        let meta_rule_detector = MetaRuleDetector::new(meta_rule_repo);
-        let config_archiver = ConfigArchiver::new(version_repo, autotuner_bridge.clone());
-        let trial_sub = Arc::new(TrialPreviewSubscriber::new(
+        let routing_source: Arc<dyn MirrorSignalSource> =
+            Arc::new(RoutingSignalSource::new(repo.clone()));
+        let meta_rule_source: Arc<dyn MirrorSignalSource> =
+            Arc::new(MetaRuleSignalSource::new(meta_rule_repo));
+        let config_archiver: Arc<dyn MirrorSignalSource> =
+            Arc::new(ConfigArchiverSource::new(version_repo, autotuner_bridge.clone()));
+        let trial_source: Arc<dyn MirrorSignalSource> = Arc::new(TrialPreviewSource::new(
             trial_repo,
             active_timers.clone(),
             trial_evaluator,
         ));
 
-        let handles = vec![
-            tokio::spawn(routing_sub.run(bus.subscribe(), shutdown.clone())),
-            tokio::spawn(meta_rule_detector.run(bus.subscribe(), shutdown.clone())),
-            tokio::spawn(config_archiver.run(bus.subscribe(), shutdown.clone())),
-            tokio::spawn(trial_sub.run(bus.subscribe(), shutdown.clone())),
+        let sources: Vec<Arc<dyn MirrorSignalSource>> = vec![
+            routing_source,
+            meta_rule_source,
+            config_archiver,
+            trial_source,
         ];
 
         let mut facade = MirrorFacade::new(repo);
-        facade = facade.with_active_timers(active_timers);
-        facade = facade.with_domain_event_bus(bus);
+        facade = facade.with_active_timers(active_timers.clone());
         if let Some(handler) = narrative_handler {
             facade = facade.with_narrative_handler(handler);
         }
@@ -88,7 +89,7 @@ impl MirrorEngine {
             facade = facade.with_rule_repo(rule_repo);
         }
 
-        (facade, handles, shutdown)
+        (facade, sources, active_timers)
     }
 }
 

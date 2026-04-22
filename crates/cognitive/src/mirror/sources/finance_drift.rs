@@ -1,6 +1,6 @@
 //! FinanceSpendingDriftSource — accumulates budget alert signals and flushes periodically.
 
-use ai_core::{AiSignal, MirrorSignalSource, MirrorSnapshotSpec};
+use ai_core::{AiSignal, MirrorSignalSource, MirrorSnapshotSpec}
 use async_trait::async_trait;
 
 pub struct FinanceSpendingDriftSource {
@@ -15,11 +15,12 @@ impl FinanceSpendingDriftSource {
 
 #[async_trait]
 impl MirrorSignalSource for FinanceSpendingDriftSource {
-    const SPEC: MirrorSnapshotSpec = MirrorSnapshotSpec {
+    fn spec(&self) -> MirrorSnapshotSpec {
+        MirrorSnapshotSpec {
         name: "finance_drift",
         subscribed_kinds: &["BudgetAlert"],
         flush_interval_secs: Some(3600),
-    };
+    }
 
     fn name(&self) -> &'static str {
         "finance-spending-drift-source"

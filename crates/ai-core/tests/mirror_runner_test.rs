@@ -17,11 +17,13 @@ struct CountSource {
 
 #[async_trait]
 impl MirrorSignalSource for CountSource {
-    const SPEC: MirrorSnapshotSpec = MirrorSnapshotSpec {
-        name: "count",
-        subscribed_kinds: &["Ping"],
-        flush_interval_secs: Some(60),
-    };
+    fn spec(&self) -> MirrorSnapshotSpec {
+        MirrorSnapshotSpec {
+            name: "count",
+            subscribed_kinds: &["Ping"],
+            flush_interval_secs: Some(60),
+        }
+    }
 
     fn name(&self) -> &'static str {
         "count-source"

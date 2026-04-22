@@ -46,7 +46,6 @@ pub struct MirrorFacade {
     pub(crate) active_timers: Option<Arc<DashMap<String, JoinHandle<()>>>>,
     episodic_repo: Option<EpisodicMemoryRepo>,
     rule_repo: Option<crate::repos::ProceduralRuleRepo>,
-    domain_event_bus: Option<Arc<bus::DomainEventBus>>,
     text_embedder: Option<Arc<dyn crate::embedder::TextEmbedder>>,
 }
 
@@ -62,7 +61,6 @@ impl MirrorFacade {
             active_timers: None,
             episodic_repo: None,
             rule_repo: None,
-            domain_event_bus: None,
             text_embedder: None,
         }
     }
@@ -100,13 +98,6 @@ impl MirrorFacade {
     /// builder-style chaining.
     pub fn with_rule_repo(mut self, repo: crate::repos::ProceduralRuleRepo) -> Self {
         self.rule_repo = Some(repo);
-        self
-    }
-
-    /// Attach a [`DomainEventBus`] so that key mirror actions (e.g. trial
-    /// kill) emit domain events for cross-feature side-effects.
-    pub fn with_domain_event_bus(mut self, bus: Arc<bus::DomainEventBus>) -> Self {
-        self.domain_event_bus = Some(bus);
         self
     }
 

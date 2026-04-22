@@ -1,6 +1,6 @@
 //! TaskFocusPatternSource — accumulates task focus signals and flushes periodically.
 
-use ai_core::{AiSignal, MirrorSignalSource, MirrorSnapshotSpec};
+use ai_core::{AiSignal, MirrorSignalSource, MirrorSnapshotSpec}
 use async_trait::async_trait;
 
 pub struct TaskFocusPatternSource {
@@ -15,11 +15,12 @@ impl TaskFocusPatternSource {
 
 #[async_trait]
 impl MirrorSignalSource for TaskFocusPatternSource {
-    const SPEC: MirrorSnapshotSpec = MirrorSnapshotSpec {
+    fn spec(&self) -> MirrorSnapshotSpec {
+        MirrorSnapshotSpec {
         name: "task_focus",
         subscribed_kinds: &["TaskFocusChanged", "TaskCompleted"],
         flush_interval_secs: Some(3600),
-    };
+    }
 
     fn name(&self) -> &'static str {
         "task-focus-pattern-source"

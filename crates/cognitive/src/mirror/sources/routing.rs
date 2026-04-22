@@ -2,19 +2,19 @@
 //! Replaces the old RoutingMirrorSubscriber that subscribed to DomainEventBus directly.
 
 use std::collections::HashMap;
-use std::sync::atomic::{AtomicU32, Ordering};
+use std::sync::atomic::{AtomicU32, Ordering}
 use std::sync::Arc;
 
-use ai_core::{AiSignal, MirrorSignalSource, MirrorSnapshotSpec};
+use ai_core::{AiSignal, MirrorSignalSource, MirrorSnapshotSpec}
 use async_trait::async_trait;
 use dashmap::DashMap;
 use jiff::Timestamp;
-use tracing::{debug, info, warn};
+use tracing::{debug, info, warn}
 use uuid::Uuid;
 
 use crate::mirror::{
     snippet_from_alert, MirrorAlert, MirrorRepo, NarrativeSnippet, RoutingSnapshot, SkillRouteStats,
-};
+}
 
 const MAX_TRIGGER_PHRASES: usize = 100;
 
@@ -83,7 +83,7 @@ impl RoutingSignalSource {
             low_conf as f64 / total as f64
         } else {
             0.0
-        };
+        }
 
         let mut distribution: HashMap<String, SkillRouteStats> = HashMap::new();
         let mut global_conf_sum = 0.0_f64;
@@ -97,13 +97,13 @@ impl RoutingSignalSource {
                 accum.count as f64 / total as f64 * 100.0
             } else {
                 0.0
-            };
+            }
 
             let avg_confidence = if accum.count > 0 {
                 accum.confidence_sum / accum.count as f64
             } else {
                 0.0
-            };
+            }
 
             let mut sorted_triggers: Vec<(String, u32)> = accum
                 .trigger_hits
@@ -135,7 +135,7 @@ impl RoutingSignalSource {
             global_conf_sum / global_count as f64
         } else {
             0.0
-        };
+        }
 
         RoutingSnapshot {
             id: Uuid::new_v4(),
@@ -205,11 +205,13 @@ impl RoutingSignalSource {
 
 #[async_trait]
 impl MirrorSignalSource for RoutingSignalSource {
-    const SPEC: MirrorSnapshotSpec = MirrorSnapshotSpec {
-        name: "routing",
-        subscribed_kinds: &["SkillRouted"],
-        flush_interval_secs: Some(3600),
-    };
+    fn spec(&self) -> MirrorSnapshotSpec {
+        MirrorSnapshotSpec {
+            name: "routing",
+            subscribed_kinds: &["SkillRouted"],
+            flush_interval_secs: Some(3600),
+        }
+    }
 
     fn name(&self) -> &'static str {
         "routing-signal-source"
@@ -244,7 +246,7 @@ impl MirrorSignalSource for RoutingSignalSource {
                 warn!("Mirror: failed to fetch routing history: {e}");
                 vec![]
             }
-        };
+        }
 
         let drift = self.detect_drift(&snapshot, &history);
 
@@ -268,7 +270,7 @@ impl MirrorSignalSource for RoutingSignalSource {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use ai_core::{AiMetrics, RecallDomain, SalienceVerdict};
+    use ai_core::{AiMetrics, RecallDomain, SalienceVerdict}
 
     fn skill_routed_signal(skill: &str, confidence: f64) -> AiSignal {
         AiSignal {
@@ -324,7 +326,7 @@ mod tests {
         let source2 = {
             let repo = crate::mirror::test_mirror_repo().await;
             RoutingSignalSource::new(repo)
-        };
+        }
         for _ in 0..9 {
             source2.accumulate_signal("general", 0.4, vec![]);
         }

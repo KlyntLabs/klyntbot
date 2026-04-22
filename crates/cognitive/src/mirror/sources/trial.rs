@@ -3,7 +3,7 @@
 
 use std::sync::Arc;
 
-use ai_core::{AiSignal, MirrorSignalSource, MirrorSnapshotSpec};
+use ai_core::{AiSignal, MirrorSignalSource, MirrorSnapshotSpec}
 use async_trait::async_trait;
 use dashmap::DashMap;
 use jiff::Timestamp;
@@ -13,7 +13,7 @@ use uuid::Uuid;
 use crate::mirror::{
     snippet_from_alert, EarlyTrialEvaluator, MirrorAlert, MirrorRepo, PreviewRecommendation,
     TrialEarlySignals, TrialPreview,
-};
+}
 
 const PREVIEW_DELAY_SECS: u64 = 4 * 60 * 60;
 const MIN_MESSAGES_FOR_KILL: u32 = 5;
@@ -56,7 +56,7 @@ impl TrialPreviewSource {
                     .unwrap_or_default()
             } else {
                 TrialEarlySignals::default()
-            };
+            }
 
             let messages_scored = signals.messages_scored;
             let recommendation = compute_recommendation(&signals, messages_scored);
@@ -81,7 +81,7 @@ impl TrialPreviewSource {
                 early_signals: signals,
                 recommendation: recommendation.clone(),
                 narrative: narrative.clone(),
-            };
+            }
 
             let _ = repo.insert_trial_preview(&preview).await;
 
@@ -89,7 +89,7 @@ impl TrialPreviewSource {
                 let alert = MirrorAlert::TrialUnpromising {
                     trial_id: trial_id.clone(),
                     reason: narrative,
-                };
+                }
                 let snippet = snippet_from_alert(&alert);
                 let _ = repo.insert_snippet(&snippet).await;
             }
@@ -106,11 +106,12 @@ impl TrialPreviewSource {
 
 #[async_trait]
 impl MirrorSignalSource for TrialPreviewSource {
-    const SPEC: MirrorSnapshotSpec = MirrorSnapshotSpec {
+    fn spec(&self) -> MirrorSnapshotSpec {
+        MirrorSnapshotSpec {
         name: "trial_preview",
         subscribed_kinds: &["AutotunerDecision"],
         flush_interval_secs: None,
-    };
+    }
 
     fn name(&self) -> &'static str {
         "trial-preview-source"
