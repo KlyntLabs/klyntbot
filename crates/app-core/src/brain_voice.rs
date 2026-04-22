@@ -114,9 +114,6 @@ impl BrainVoice {
 /// Returns `None` for events the brain voice does not care about.
 pub fn extract_signal(event: &DomainEvent) -> Option<(SignalSummary, String, Option<String>)> {
     match event {
-        // Note: MemoryPromoted variant was removed in v1.
-        // Memory promotion signals are now handled through the AI pipeline.
-
         DomainEvent::CrossDomainDotReady {
             source_kind,
             source_id,
@@ -140,9 +137,6 @@ pub fn extract_signal(event: &DomainEvent) -> Option<(SignalSummary, String, Opt
                 detail_route.clone(),
             ))
         }
-
-        // Note: MessageDeferred and MirrorSnippetCreated variants were removed in v1.
-        // These signals are now handled through the AI pipeline.
 
         _ => None,
     }
@@ -267,10 +261,6 @@ async fn run_brain_voice(
                         debug!("BrainVoice: focus session ended, flushed deferred signals");
                     }
                     Ok(ref event) => {
-                        // Note: MirrorSnippetCreated variant was removed in v1.
-                        // Journey milestone tracking for brain reports is now handled
-                        // through the AI pipeline.
-
                         if let Some((summary, tooltip, detail_route)) = extract_signal(event) {
                             let mut state = SignalState {
                                 pending_signals: &mut pending_signals,
@@ -524,27 +514,6 @@ mod tests {
     use super::*;
     use crate::events::NoopEmitter;
     use storage::StoragePool;
-
-    // Note: MemoryPromoted variant was removed in v1.
-    // This test is disabled until the AI pipeline provides equivalent signals.
-    // #[test]
-    // fn test_extract_memory_promoted() {
-    //     let event = DomainEvent::MemoryPromoted {
-    //         fact_id: "fact-1".into(),
-    //         summary: "Prefers morning routines".into(),
-    //         from_scope: "session".into(),
-    //         to_scope: "long_term".into(),
-    //     };
-    //     let result = extract_signal(&event);
-    //     assert!(result.is_some());
-    //     let (summary, tooltip, route) = result.unwrap();
-    //     assert_eq!(summary.signal_type, "memory_promoted");
-    //     assert_eq!(summary.entity_pair, "memory:fact-1");
-    //     assert!(summary.headline.contains("Promoted"));
-    //     assert!(tooltip.contains("session"));
-    //     assert!(tooltip.contains("long_term"));
-    //     assert!(route.is_none());
-    // }
 
     #[test]
     fn test_extract_cross_domain_dot() {

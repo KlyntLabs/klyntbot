@@ -242,20 +242,6 @@ fn normalize_domain_event(e: cognitive::DomainEventRow) -> Option<TimelineEntry>
                 "var(--timeline-task)",
             )
         }
-        // Note: TaskStatusChanged, TaskPriorityChanged, and TaskFieldUpdated
-        // variants were removed in v1. These timeline entries are now handled
-        // through the AI pipeline's TaskEvent signals.
-        bus::DomainEvent::KIND_TASK_CREATED => {
-            let task_id = field(inner, "task_id");
-            (
-                TimelineEntryType::TaskCreated,
-                TimelineSource::Task,
-                format!("Task created: {}", task_id.unwrap_or("?")),
-                task_id.map(String::from),
-                task_id.map(|id| format!("/task/{id}")),
-                "var(--timeline-task)",
-            )
-        }
         bus::DomainEvent::KIND_NOTE_CREATED => {
             let title_str = field(inner, "title").unwrap_or("Untitled");
             (

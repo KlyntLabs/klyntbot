@@ -16,10 +16,14 @@ pub(super) fn event_to_signal(event: &DomainEvent, timestamp: Timestamp) -> Sign
                 ..Default::default()
             },
         ),
-        DomainEvent::FocusSessionEnded { .. } => (bus::DomainEvent::KIND_FOCUS_SESSION_ENDED, SignalMetadata::default()),
-        DomainEvent::ProductivityScoreComputed { .. } => {
-            (bus::DomainEvent::KIND_PRODUCTIVITY_SCORE_COMPUTED, SignalMetadata::default())
-        }
+        DomainEvent::FocusSessionEnded { .. } => (
+            bus::DomainEvent::KIND_FOCUS_SESSION_ENDED,
+            SignalMetadata::default(),
+        ),
+        DomainEvent::ProductivityScoreComputed { .. } => (
+            bus::DomainEvent::KIND_PRODUCTIVITY_SCORE_COMPUTED,
+            SignalMetadata::default(),
+        ),
         DomainEvent::TaskCompleted { task_id, .. } => (
             bus::DomainEvent::KIND_TASK_COMPLETED,
             SignalMetadata {

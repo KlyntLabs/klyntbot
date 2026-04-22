@@ -9,22 +9,15 @@ use crate::types::SemanticFact;
 ///
 /// Creates a new fact in the target scope with a new ID, preserving the content.
 /// The original fact is kept (not superseded) — both scopes retain the knowledge.
-///
-/// If `bus` is provided, a [`bus::DomainEvent::MemoryPromoted`] event is published
-/// after the fact is successfully upserted.
 pub async fn promote_fact(
     repo: &SemanticFactRepo,
     fact_id: &str,
     target_scope_type: &str,
     target_scope_id: Option<&str>,
-    bus: Option<&bus::DomainEventBus>,
 ) -> Result<Option<SemanticFact>, sqlx::Error> {
-    let original = repo.get(fact_id).await?;
-    let Some(original) = original else {
+    let Some(original) = repo.get(fact_id).await? else {
         return Ok(None);
     };
-
-    let from_scope = original.scope_type.clone();
 
     let promoted = SemanticFact {
         id: Uuid::new_v4().to_string(),
@@ -36,9 +29,6 @@ pub async fn promote_fact(
     };
 
     repo.upsert(&promoted).await?;
-
-    // MemoryCreated event removed; no longer publishing domain event on promotion
-    let _bus = bus;
 
     Ok(Some(promoted))
 }
@@ -134,7 +124,6 @@ mod tests {
             "persona-fact-1",
             "squad",
             Some("builtin-squad-finance"),
-            None,
         )
         .await
         .unwrap();
@@ -149,90 +138,10 @@ mod tests {
     async fn test_promote_nonexistent_fact() {
         let pool = crate::repos::cognitive_test_pool().await;
         let repo = SemanticFactRepo::new(pool);
-        let result = promote_fact(&repo, "nonexistent", "squad", None, None)
+        let result = promote_fact(&repo, "nonexistent", "squad", None)
             .await
             .unwrap();
         assert!(result.is_none());
-    }
-
-    #[tokio::test]
-    async fn test_promote_fact_emits_event() {
-        let pool = crate::repos::cognitive_test_pool().await;
-        let repo = SemanticFactRepo::new(pool);
-
-        let fact = SemanticFact {
-            id: "event-test-fact-1".into(),
-            domain: "productivity".into(),
-            subject: "deep work".into(),
-            predicate: "improves".into(),
-            object: "focus".into(),
-            confidence: 0.9,
-            source: "observation".into(),
-            valid_from: jiff::Timestamp::now().to_string(),
-            valid_until: None,
-            recorded_at: jiff::Timestamp::now().to_string(),
-            superseded_at: None,
-            superseded_by: None,
-            stability: 1.5,
-            last_accessed: None,
-            access_count: 0,
-            convergence_score: 0.0,
-            project_id: None,
-            memory_type: "observation".into(),
-            scope_type: "session".into(),
-            scope_id: None,
-        };
-        repo.upsert(&fact).await.unwrap();
-
-        let bus = bus::DomainEventBus::new(16);
-        let mut rx = bus.subscribe();
-
-        let promoted = promote_fact(&repo, "event-test-fact-1", "global", None, Some(&bus))
-            .await
-            .unwrap();
-        assert!(promoted.is_some());
-
-        // MemoryPromoted event was removed; verify no event is emitted
-        assert!(
-            rx.try_recv().is_err(),
-            "MemoryPromoted event removed; no event should be emitted"
-        );
-    }
-
-    #[tokio::test]
-    async fn test_promote_fact_no_event_without_bus() {
-        let pool = crate::repos::cognitive_test_pool().await;
-        let repo = SemanticFactRepo::new(pool);
-
-        let fact = SemanticFact {
-            id: "no-bus-fact-1".into(),
-            domain: "finance".into(),
-            subject: "bonds".into(),
-            predicate: "risk_level".into(),
-            object: "medium".into(),
-            confidence: 0.8,
-            source: "analysis".into(),
-            valid_from: jiff::Timestamp::now().to_string(),
-            valid_until: None,
-            recorded_at: jiff::Timestamp::now().to_string(),
-            superseded_at: None,
-            superseded_by: None,
-            stability: 1.0,
-            last_accessed: None,
-            access_count: 0,
-            convergence_score: 0.0,
-            project_id: None,
-            memory_type: "fact".into(),
-            scope_type: "persona".into(),
-            scope_id: Some("analyst".into()),
-        };
-        repo.upsert(&fact).await.unwrap();
-
-        // Should not panic — bus is None
-        let result = promote_fact(&repo, "no-bus-fact-1", "squad", Some("sq1"), None)
-            .await
-            .unwrap();
-        assert!(result.is_some());
     }
 
     #[tokio::test]

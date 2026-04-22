@@ -81,15 +81,14 @@ impl From<FinanceEvent> for DomainEvent {
     fn from(e: FinanceEvent) -> Self {
         match e {
             FinanceEvent::TransactionRecorded {
-                _tx_id,
                 category,
                 amount,
-                currency: _,
                 _is_over_budget,
+                ..
             } => DomainEvent::TransactionRecorded {
                 category,
                 amount: amount as f64,
-                is_over_budget: false,
+                is_over_budget: _is_over_budget,
             },
             FinanceEvent::BudgetAlert {
                 category,

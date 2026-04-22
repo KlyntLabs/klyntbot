@@ -155,8 +155,6 @@ impl AppCore {
                 estimate_mins: created.estimated_minutes.map(|m| m as i64),
                 task_type: created.task_type.clone(),
             });
-            // Note: TaskHierarchyChanged and TaskDueDateChanged variants were removed in v1.
-            // Downstream consumers should listen to TaskCreated and handle due_date from the task repo.
         }
 
         // Newly created task has no subtasks yet; resolve status label for the response
@@ -168,22 +166,8 @@ impl AppCore {
     pub async fn task_update(
         &self,
         params: TaskUpdateParams,
-        actor: Option<String>,
+        _actor: Option<String>,
     ) -> HandlerResult<TaskResponse> {
-        // Fetch old task before applying the patch so we can diff
-        let old_task = self
-            .repos
-            .tasks
-            .get(&params.id)
-            .await
-            .map_err(map_storage_err)?;
-
-        // Capture fields needed for diffing before they move into the patch
-        let task_id = params.id.clone();
-        let new_status = params.status.clone();
-        let new_priority = params.priority;
-        let new_title = params.title.clone();
-
         let patch = TaskPatch {
             id: params.id.clone(),
             title: params.title,
@@ -218,26 +202,14 @@ impl AppCore {
 
         let updates = vec![EntityUpdate {
             kind: EntityKind::Task,
-            id: task_id.clone(),
+            id: params.id.clone(),
         }];
-
-        // Diff old vs new and emit domain events
-        if let Some(ref old) = old_task {
-            if let Ok(bus) = self.domain_event_bus() {
-                // Note: TaskStatusChanged, TaskPriorityChanged, TaskFieldUpdated,
-                // TaskHierarchyChanged, and TaskDueDateChanged variants were removed in v1.
-                // The AI pipeline now handles task changes via TaskEvent signals.
-            }
-        }
 
         let response = row_to_task(&self.repos, &updated).await?;
         Ok((response, updates))
     }
 
     pub async fn task_delete(&self, id: String) -> HandlerResult<bool> {
-        // Fetch the task before deletion so we can emit hierarchy change
-        let task = self.repos.tasks.get(&id).await.map_err(map_storage_err)?;
-
         let deleted = self
             .repos
             .tasks
@@ -246,7 +218,6 @@ impl AppCore {
             .map_err(map_storage_err)?;
 
         let updates = if deleted {
-            // Note: TaskHierarchyChanged variant was removed in v1.
             vec![EntityUpdate {
                 kind: EntityKind::Task,
                 id,

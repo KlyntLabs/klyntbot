@@ -612,7 +612,7 @@ async fn execute_squad_debate(
 #[allow(clippy::too_many_arguments)]
 async fn execute_direct_address(
     repos: &Repos,
-    domain_event_bus: Option<&Arc<bus::DomainEventBus>>,
+    _domain_event_bus: Option<&Arc<bus::DomainEventBus>>,
     content: &str,
     session_key: &str,
     squad_id: &str,

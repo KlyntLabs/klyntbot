@@ -1,4 +1,5 @@
 mod agent;
+pub mod ai_pipeline;
 mod channels;
 mod coaching;
 mod cognitive;
@@ -8,12 +9,11 @@ mod launcher;
 mod productivity;
 mod storage;
 mod temporal_scheduler;
-pub mod ai_pipeline;
 
 use std::sync::Arc;
 
-use ::agent::AgentLoop;
 use ::agent::cognitive_handlers::LlmExtractionHandler;
+use ::agent::AgentLoop;
 use ::channels::ChannelManager;
 use bus::MessageBus;
 use feature_productivity::auto_focus::AutoFocusEvent;
@@ -417,20 +417,15 @@ impl AppCore {
 
         // ── Phase 8: AI Pipeline — SignalRouter + IngestionConsumer ──────
         let ai_pipeline_router = {
-            let observation_repo = ::cognitive::repos::AccumulatedObservationRepo::new(
-                storage_pool.inner().clone(),
-            );
+            let observation_repo =
+                ::cognitive::repos::AccumulatedObservationRepo::new(storage_pool.inner().clone());
             let entity_repo = ::cognitive::repos::EntityRepo::new(storage_pool.inner().clone());
             let episodic_repo = ::cognitive::EpisodicMemoryRepo::new(storage_pool.inner().clone());
             let extraction_handler: Option<Arc<dyn ::cognitive::ExtractionHandler>> =
                 cognitive_provider.as_ref().map(|cp| {
                     let params = providers::cognitive_chat_params(&config, 1024);
-                    Arc::new(
-                        LlmExtractionHandler::new(
-                            cp.clone(),
-                            params,
-                        ),
-                    ) as Arc<dyn ::cognitive::ExtractionHandler>
+                    Arc::new(LlmExtractionHandler::new(cp.clone(), params))
+                        as Arc<dyn ::cognitive::ExtractionHandler>
                 });
             let ingestion = Arc::new(::cognitive::consumers::IngestionConsumer::new(
                 observation_repo,
@@ -438,10 +433,7 @@ impl AppCore {
                 episodic_repo,
                 extraction_handler,
             ));
-            let router = ai_pipeline::start(
-                Arc::clone(&domain_event_bus),
-                vec![ingestion],
-            );
+            let router = ai_pipeline::start(Arc::clone(&domain_event_bus), vec![ingestion]);
             info!("AI pipeline SignalRouter started with IngestionConsumer");
             Some(router)
         };
@@ -567,31 +559,6 @@ impl AppCore {
                     Ok(_) => {}
                     Err(e) => {
                         tracing::debug!("morning briefing insight check failed: {e}");
-                    }
-                }
-            });
-        }
-
-        // ── Auto-create note on trial kill ──────────────────────────────
-        {
-            let note_repo = note_repo.clone();
-            let mut rx = domain_event_bus.subscribe();
-            let token = shutdown_token.clone();
-            tokio::spawn(async move {
-                loop {
-                    tokio::select! {
-                        _ = token.cancelled() => break,
-                        result = rx.recv() => {
-                            match result {
-                                // Note: MirrorTrialKilled variant was removed in v1.
-                                // Auto-create note on trial kill is now handled through the AI pipeline.
-                                Ok(_) => {}
-                                Err(tokio::sync::broadcast::error::RecvError::Lagged(n)) => {
-                                    tracing::warn!("trial-kill note task lagged by {n} events");
-                                }
-                                Err(tokio::sync::broadcast::error::RecvError::Closed) => break,
-                            }
-                        }
                     }
                 }
             });
