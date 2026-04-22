@@ -495,6 +495,50 @@ impl MirrorRepo {
         Ok(result.rows_affected())
     }
 
+    /// Delete trend narratives older than `max_age_days`. Returns rows removed.
+    pub async fn cleanup_old_trend_narratives(&self, max_age_days: u32) -> Result<u64> {
+        let cutoff =
+            Timestamp::now() - jiff::SignedDuration::from_secs(max_age_days as i64 * 86400);
+        let result = sqlx::query("DELETE FROM mirror_trend_narratives WHERE generated_at < ?1")
+            .bind(cutoff.to_string())
+            .execute(self.db())
+            .await
+            .map_err(|e| common::KlyntbotError::Storage(e.to_string()))?;
+        Ok(result.rows_affected())
+    }
+
+    /// Delete `Disabled` meta-rules older than `max_age_days`. Active/Pending
+    /// rules are never auto-removed. Returns rows removed.
+    pub async fn cleanup_old_meta_rules(&self, max_age_days: u32) -> Result<u64> {
+        let cutoff =
+            Timestamp::now() - jiff::SignedDuration::from_secs(max_age_days as i64 * 86400);
+        let result = sqlx::query(
+            "DELETE FROM mirror_meta_rules
+             WHERE status = 'disabled' AND updated_at < ?1",
+        )
+        .bind(cutoff.to_string())
+        .execute(self.db())
+        .await
+        .map_err(|e| common::KlyntbotError::Storage(e.to_string()))?;
+        Ok(result.rows_affected())
+    }
+
+    /// Delete brain versions marked `reverted = 1` older than `max_age_days`.
+    /// Promoted versions are never deleted.
+    pub async fn cleanup_reverted_brain_versions(&self, max_age_days: u32) -> Result<u64> {
+        let cutoff =
+            Timestamp::now() - jiff::SignedDuration::from_secs(max_age_days as i64 * 86400);
+        let result = sqlx::query(
+            "DELETE FROM mirror_brain_versions
+             WHERE reverted = 1 AND promoted_at < ?1",
+        )
+        .bind(cutoff.to_string())
+        .execute(self.db())
+        .await
+        .map_err(|e| common::KlyntbotError::Storage(e.to_string()))?;
+        Ok(result.rows_affected())
+    }
+
     // -----------------------------------------------------------------------
     // Meta-rules
     // -----------------------------------------------------------------------
@@ -1170,5 +1214,77 @@ mod tests {
             .await
             .unwrap();
         assert!(not_found.is_none());
+    }
+
+    #[tokio::test]
+    async fn cleanup_old_trend_narratives_keeps_recent() {
+        let repo = crate::mirror::test_mirror_repo().await;
+        let old = TrendNarrative {
+            id: Uuid::new_v4(),
+            generated_at: Timestamp::now()
+                - jiff::SignedDuration::from_secs(400 * 86400),
+            period_start: Timestamp::now(),
+            period_end: Timestamp::now(),
+            routing_summary: "old".into(),
+            improvement_highlights: vec![],
+            experiment_summary: String::new(),
+            meta_rule_updates: vec![],
+            full_narrative: "old narrative".into(),
+            user_feedback: None,
+        };
+        let recent = TrendNarrative {
+            id: Uuid::new_v4(),
+            generated_at: Timestamp::now(),
+            ..old.clone()
+        };
+        repo.insert_trend_narrative(&old).await.unwrap();
+        repo.insert_trend_narrative(&recent).await.unwrap();
+
+        let deleted = repo.cleanup_old_trend_narratives(365).await.unwrap();
+        assert_eq!(deleted, 1);
+
+        let remaining = repo.get_narratives(100).await.unwrap();
+        assert_eq!(remaining.len(), 1);
+    }
+
+    #[tokio::test]
+    async fn cleanup_old_meta_rules_only_disabled() {
+        let repo = crate::mirror::test_mirror_repo().await;
+        let mut mk = |status: MetaRuleStatus, created_at: Timestamp| MetaRule {
+            id: Uuid::new_v4(),
+            trigger_condition: String::new(),
+            action: MetaRuleAction::ForceClarification,
+            source: MetaRuleSource::CorrectionDerived,
+            effectiveness_score: 0.5,
+            status,
+            signal_count: 0,
+            created_at,
+            updated_at: created_at,
+        };
+        let old_disabled = mk(
+            MetaRuleStatus::Disabled,
+            Timestamp::now() - jiff::SignedDuration::from_secs(200 * 86400),
+        );
+        let old_active = mk(
+            MetaRuleStatus::Active,
+            Timestamp::now() - jiff::SignedDuration::from_secs(200 * 86400),
+        );
+        let recent_disabled = mk(MetaRuleStatus::Disabled, Timestamp::now());
+        repo.insert_meta_rule(&old_disabled).await.unwrap();
+        repo.insert_meta_rule(&old_active).await.unwrap();
+        repo.insert_meta_rule(&recent_disabled).await.unwrap();
+
+        let deleted = repo.cleanup_old_meta_rules(180).await.unwrap();
+        assert_eq!(deleted, 1);
+
+        // Active + recent disabled remain.
+        assert_eq!(
+            repo.get_meta_rules_by_status(MetaRuleStatus::Active).await.unwrap().len(),
+            1
+        );
+        assert_eq!(
+            repo.get_meta_rules_by_status(MetaRuleStatus::Disabled).await.unwrap().len(),
+            1
+        );
     }
 }
