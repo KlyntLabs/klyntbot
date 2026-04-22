@@ -38,3 +38,31 @@ async fn consumer_receives_signal() {
     consumer.consume(&sig).await.unwrap();
     assert_eq!(log.lock().unwrap().as_slice(), &["TaskCreated"]);
 }
+
+use ai_core::{RecallProvider, RecallProviderRegistry, RecallQuery};
+
+struct FakeProvider(RecallDomain, f64);
+impl RecallProvider for FakeProvider {
+    fn domain(&self) -> RecallDomain { self.0 }
+    fn score_query(&self, _q: &RecallQuery) -> f64 { self.1 }
+}
+
+#[test]
+fn registry_iterates_providers() {
+    let reg = RecallProviderRegistry::new()
+        .with(FakeProvider(RecallDomain::Tasks, 0.9))
+        .with(FakeProvider(RecallDomain::Finance, 0.4));
+    let q = RecallQuery { message: "deadline".into(), intent_summary: None };
+    let ranked = reg.rank(&q);
+    assert_eq!(ranked.len(), 2);
+    assert_eq!(ranked[0].0, RecallDomain::Tasks);
+    assert!((ranked[0].1 - 0.9).abs() < 1e-9);
+}
+
+#[test]
+fn registry_filters_zero_scores() {
+    let reg = RecallProviderRegistry::new()
+        .with(FakeProvider(RecallDomain::Tasks, 0.0));
+    let q = RecallQuery { message: "x".into(), intent_summary: None };
+    assert!(reg.rank(&q).is_empty());
+}
