@@ -26,24 +26,25 @@ impl NotesFeature {
         include_str!("../migrations/001_create_notes.sql")
     }
 
-    pub fn migrations_static() -> Vec<FeatureMigration> {
-        vec![
-            FeatureMigration {
-                feature_name: "notes".to_string(),
-                version: 7,
-                description:
-                    "Create notes core tables (notebooks, notes, tags, links, entity_mentions, versions)"
-                        .to_string(),
-                sql: Self::migration_sql().to_string(),
-            },
-            FeatureMigration {
-                feature_name: "notes_practice".to_string(),
-                version: 1,
-                description: "Create practice_sessions table for translation practice".to_string(),
-                sql: include_str!("../migrations/002_practice_sessions.sql").to_string(),
-            },
-        ]
-    }
+}
+
+pub fn notes_migrations() -> Vec<FeatureMigration> {
+    vec![
+        FeatureMigration {
+            feature_name: "notes".to_string(),
+            version: 7,
+            description:
+                "Create notes core tables (notebooks, notes, tags, links, entity_mentions, versions)"
+                    .to_string(),
+            sql: NotesFeature::migration_sql().to_string(),
+        },
+        FeatureMigration {
+            feature_name: "notes_practice".to_string(),
+            version: 1,
+            description: "Create practice_sessions table for translation practice".to_string(),
+            sql: include_str!("../migrations/002_practice_sessions.sql").to_string(),
+        },
+    ]
 }
 
 #[async_trait]
@@ -57,7 +58,7 @@ impl FeaturePackage for NotesFeature {
     }
 
     fn migrations(&self) -> Vec<FeatureMigration> {
-        Self::migrations_static()
+        notes_migrations()
     }
 
     async fn health_check(&self) -> Result<HealthStatus> {

@@ -3,7 +3,7 @@
 //! This test verifies that creating a task via the TaskTool produces
 //! an observation and entity through the SignalRouter -> IngestionConsumer path.
 
-use ai_core::{AiSignal, RecallDomain, SalienceVerdict, SignalConsumer, SignalRouter};
+use ai_core::{AiSignal, SignalConsumer, SignalRouter};
 use async_trait::async_trait;
 use bus::{DomainEvent, DomainEventBus};
 use std::sync::{Arc, Mutex};

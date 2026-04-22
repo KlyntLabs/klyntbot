@@ -203,7 +203,7 @@ impl TaskTool {
 
                 let total_time_secs: i64 = te_rows.iter().filter_map(|e| e.duration_secs).sum();
                 let actual_mins_tracked: Option<i32> =
-                    (total_time_secs > 0).then(|| (total_time_secs / 60) as i32);
+                    (total_time_secs > 0).then_some((total_time_secs / 60) as i32);
                 let deviation_pct: Option<f64> = estimated_minutes
                     .zip(actual_mins_tracked)
                     .and_then(|(est, actual)| {

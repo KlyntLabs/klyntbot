@@ -1,4 +1,4 @@
-use crate::attrs::{parse_ai_event_attr, AiEventAttr, EntityBridge, SalienceSpec};
+use crate::attrs::{parse_ai_enum_attr, parse_ai_event_attr, AiEventAttr, EntityBridge, SalienceSpec};
 use proc_macro2::TokenStream;
 use quote::quote;
 use syn::{Data, DeriveInput, Fields, Variant};
@@ -15,11 +15,17 @@ pub fn expand(input: DeriveInput) -> syn::Result<TokenStream> {
         }
     };
 
+    let domain_ident = parse_ai_enum_attr(&input.attrs)?;
+    let domain_tokens = match &domain_ident {
+        Some(ident) => quote! { ::ai_core::RecallDomain::#ident },
+        None => quote! { ::ai_core::RecallDomain::General },
+    };
+
     let mut arms = Vec::new();
     let mut kind_arms = Vec::new();
 
     for variant in &data_enum.variants {
-        arms.push(render_variant(enum_ident, variant)?);
+        arms.push(render_variant(enum_ident, variant, &domain_tokens)?);
 
         let id = &variant.ident;
         let kind = id.to_string();
@@ -61,6 +67,7 @@ pub fn expand(input: DeriveInput) -> syn::Result<TokenStream> {
     };
 
     Ok(quote! {
+        #[allow(unused_variables, unused_assignments)]
         impl ::ai_core::AiEventMeta for #enum_ident {
             fn to_signal(&self) -> ::ai_core::AiSignal {
                 #to_signal_match
@@ -73,7 +80,11 @@ pub fn expand(input: DeriveInput) -> syn::Result<TokenStream> {
     })
 }
 
-fn render_variant(enum_ident: &syn::Ident, variant: &Variant) -> syn::Result<TokenStream> {
+fn render_variant(
+    enum_ident: &syn::Ident,
+    variant: &Variant,
+    domain_tokens: &TokenStream,
+) -> syn::Result<TokenStream> {
     let var_ident = &variant.ident;
     let attr = parse_ai_event_attr(&variant.attrs)?;
 
@@ -123,7 +134,7 @@ fn render_variant(enum_ident: &syn::Ident, variant: &Variant) -> syn::Result<Tok
 
     Ok(quote! {
         #pattern => ::ai_core::AiSignal {
-            domain: ::ai_core::RecallDomain::General,
+            domain: #domain_tokens,
             event_kind: #kind_lit,
             importance: #importance_expr,
             salience: #salience_expr,

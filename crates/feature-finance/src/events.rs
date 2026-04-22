@@ -2,6 +2,7 @@ use ai_core_macros::AiEvent;
 use bus::DomainEvent;
 
 #[derive(Debug, Clone, AiEvent)]
+#[ai(domain = "Finance")]
 pub enum FinanceEvent {
     #[ai(
         importance = 0.5,

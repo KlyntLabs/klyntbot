@@ -25,15 +25,16 @@ impl LanguageLearningFeature {
         include_str!("../migrations/001_create_tables.sql")
     }
 
-    pub fn migrations_static() -> Vec<FeatureMigration> {
-        vec![FeatureMigration {
-            feature_name: "language_learning".to_string(),
-            version: 1,
-            description: "Create phoneme_mastery, pronunciation_logs, exam_attempts tables"
-                .to_string(),
-            sql: Self::migration_sql().to_string(),
-        }]
-    }
+}
+
+pub fn language_learning_migrations() -> Vec<FeatureMigration> {
+    vec![FeatureMigration {
+        feature_name: "language_learning".to_string(),
+        version: 1,
+        description: "Create phoneme_mastery, pronunciation_logs, exam_attempts tables"
+            .to_string(),
+        sql: LanguageLearningFeature::migration_sql().to_string(),
+    }]
 }
 
 #[async_trait]
@@ -47,7 +48,7 @@ impl FeaturePackage for LanguageLearningFeature {
     }
 
     fn migrations(&self) -> Vec<FeatureMigration> {
-        Self::migrations_static()
+        language_learning_migrations()
     }
 
     async fn health_check(&self) -> Result<HealthStatus> {

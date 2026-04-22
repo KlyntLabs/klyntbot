@@ -32,6 +32,7 @@ pub struct NoteTreeBuilder {
     vector_store: Arc<storage::VectorStore>,
     embedder: Arc<dyn TextEmbedder>,
     context_update_queue: Option<Arc<ContextUpdateQueue>>,
+    #[allow(dead_code)]
     domain_event_bus: Option<Arc<DomainEventBus>>,
     note_repo: feature_notes::repo::NoteRepo,
 }

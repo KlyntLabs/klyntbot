@@ -5,7 +5,7 @@
 //! through the same code path the agent runtime uses.
 
 use common::{ChannelName, ChatId};
-use feature_notes::{repo::NoteRepo, tool::NotesTool, NotesFeature};
+use feature_notes::{notes_migrations, repo::NoteRepo, tool::NotesTool};
 use serde_json::json;
 use tools_core::{RoutingContext, ToolRegistry};
 
@@ -21,7 +21,7 @@ async fn setup_with_registry() -> (ToolRegistry, sqlx::SqlitePool) {
     let pool = storage_pool.inner().clone();
 
     // Run feature migrations (same as builder.rs)
-    storage::StoragePool::run_feature_migrations(&pool, &NotesFeature::migrations_static())
+    storage::StoragePool::run_feature_migrations(&pool, &notes_migrations())
         .await
         .unwrap();
 

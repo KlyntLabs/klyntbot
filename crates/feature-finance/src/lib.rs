@@ -66,21 +66,6 @@ impl FinanceFeature {
         include_str!("../migrations/001_finance_tables.sql")
     }
 
-    /// Return the migrations list without needing a `self` reference.
-    ///
-    /// Useful in tests that want to inspect migrations without constructing
-    /// a full `FinanceFeature` instance.
-    pub fn migrations_static() -> Vec<FeatureMigration> {
-        vec![FeatureMigration {
-            feature_name: "finance".to_string(),
-            version: 1,
-            description: "Create finance tables: accounts, transactions, budgets, portfolios, \
-                          investments, investment_txs, goals, liabilities"
-                .to_string(),
-            sql: Self::migration_sql().to_string(),
-        }]
-    }
-
     /// Return the default config value without needing a `self` reference.
     ///
     /// Useful in tests that want to inspect config shape without constructing
@@ -123,10 +108,29 @@ impl FeaturePackage for FinanceFeature {
     }
 
     fn migrations(&self) -> Vec<FeatureMigration> {
-        Self::migrations_static()
+        finance_migrations()
     }
 
     async fn health_check(&self) -> Result<HealthStatus> {
-        Ok(HealthStatus::Healthy)
+        match sqlx::query("SELECT 1 FROM finance_transactions LIMIT 1")
+            .fetch_optional(self.tool.storage.pool())
+            .await
+        {
+            Ok(_) => Ok(HealthStatus::Healthy),
+            Err(e) => Ok(HealthStatus::Unhealthy(format!(
+                "finance_transactions probe failed: {e}"
+            ))),
+        }
     }
+}
+
+pub fn finance_migrations() -> Vec<FeatureMigration> {
+    vec![FeatureMigration {
+        feature_name: "finance".to_string(),
+        version: 1,
+        description: "Create finance tables: accounts, transactions, budgets, portfolios, \
+                      investments, investment_txs, goals, liabilities"
+            .to_string(),
+        sql: FinanceFeature::migration_sql().to_string(),
+    }]
 }

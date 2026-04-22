@@ -14,9 +14,13 @@ use super::super::narratives::snippet_from_alert;
 use super::super::repo::MirrorRepo;
 use super::super::types::*;
 
-const PREVIEW_DELAY_SECS: u64 = 4 * 60 * 60; // 4 hours
+// TrialActivated variant was deleted in v1; this subscriber is inert until
+// v2's mirror redesign reintroduces trial lifecycle events.
+#[allow(dead_code)]
+const PREVIEW_DELAY_SECS: u64 = 4 * 60 * 60;
 const MIN_MESSAGES_FOR_KILL: u32 = 5;
 
+#[allow(dead_code)]
 pub struct TrialPreviewSubscriber {
     repo: MirrorRepo,
     active_timers: Arc<DashMap<String, JoinHandle<()>>>,
@@ -66,6 +70,7 @@ impl TrialPreviewSubscriber {
         self.active_timers.clear();
     }
 
+    #[allow(dead_code)]
     fn start_preview_timer(&self, trial_id: String, _hypothesis: String) {
         let repo = self.repo.clone();
         let evaluator = self.evaluator.clone();

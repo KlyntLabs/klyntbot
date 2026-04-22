@@ -1,21 +1,16 @@
-use ai_core::{AiEventMeta, AiSignal, RecallDomain, SignalConsumer, SignalRouter};
+use ai_core::{AiEventMeta, AiSignal, SignalConsumer, SignalRouter};
 use bus::{DomainEvent, DomainEventBus};
 use std::sync::Arc;
 
 /// Translator: DomainEvent -> Option<AiSignal>. Returns None when the event
-/// has no pipeline registration (e.g. transient infra events).
+/// has no pipeline registration (e.g. transient infra events). Domain is
+/// set by the feature's `#[derive(AiEvent)]` enum-level `#[ai(domain = ...)]`.
 pub fn translate(event: &DomainEvent) -> Option<AiSignal> {
-    // Tasks
     if let Some(e) = try_into_task_event(event) {
-        let mut sig = e.to_signal();
-        sig.domain = RecallDomain::Tasks;
-        return Some(sig);
+        return Some(e.to_signal());
     }
-    // Finance
     if let Some(e) = try_into_finance_event(event) {
-        let mut sig = e.to_signal();
-        sig.domain = RecallDomain::Finance;
-        return Some(sig);
+        return Some(e.to_signal());
     }
     None
 }
@@ -109,7 +104,7 @@ fn try_into_finance_event(e: &DomainEvent) -> Option<feature_finance::events::Fi
         } => Some(FinanceEvent::BudgetCreated {
             _budget_id: budget_id.clone(),
             name: name.clone(),
-            amount: *amount as i64,
+            amount: *amount,
             currency: currency.clone(),
         }),
         DomainEvent::GoalCreated {
@@ -119,7 +114,7 @@ fn try_into_finance_event(e: &DomainEvent) -> Option<feature_finance::events::Fi
         } => Some(FinanceEvent::GoalCreated {
             goal_id: goal_id.clone(),
             name: name.clone(),
-            target_amount: *target_amount as i64,
+            target_amount: *target_amount,
         }),
         DomainEvent::GoalAchieved { goal_id, name } => Some(FinanceEvent::GoalAchieved {
             goal_id: goal_id.clone(),

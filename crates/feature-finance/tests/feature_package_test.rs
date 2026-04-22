@@ -50,7 +50,7 @@ fn test_finance_feature_tools_name() {
 
 #[test]
 fn test_finance_feature_migrations_not_empty() {
-    let migrations = FinanceFeature::migrations_static();
+    let migrations = feature_finance::finance_migrations();
     assert!(
         !migrations.is_empty(),
         "migrations_static() must return at least one migration"
@@ -59,7 +59,7 @@ fn test_finance_feature_migrations_not_empty() {
 
 #[test]
 fn test_finance_feature_migrations_ordered_by_version() {
-    let migrations = FinanceFeature::migrations_static();
+    let migrations = feature_finance::finance_migrations();
     for window in migrations.windows(2) {
         assert!(
             window[0].version < window[1].version,
@@ -72,7 +72,7 @@ fn test_finance_feature_migrations_ordered_by_version() {
 
 #[test]
 fn test_finance_feature_migrations_have_sql() {
-    let migrations = FinanceFeature::migrations_static();
+    let migrations = feature_finance::finance_migrations();
     for m in &migrations {
         assert!(
             !m.sql.is_empty(),
@@ -116,7 +116,7 @@ fn test_finance_feature_default_config_has_expected_keys() {
 
 #[test]
 fn test_finance_feature_migrations_feature_name() {
-    let migrations = FinanceFeature::migrations_static();
+    let migrations = feature_finance::finance_migrations();
     for m in &migrations {
         assert_eq!(
             m.feature_name, "finance",
@@ -128,7 +128,7 @@ fn test_finance_feature_migrations_feature_name() {
 
 #[test]
 fn test_finance_feature_migrations_have_descriptions() {
-    let migrations = FinanceFeature::migrations_static();
+    let migrations = feature_finance::finance_migrations();
     for m in &migrations {
         assert!(
             !m.description.is_empty(),
@@ -144,7 +144,7 @@ fn test_finance_feature_migrations_have_descriptions() {
 
 #[test]
 fn test_finance_feature_migrations_idempotent_ddl() {
-    let migrations = FinanceFeature::migrations_static();
+    let migrations = feature_finance::finance_migrations();
     for m in &migrations {
         if m.sql.contains("CREATE") {
             assert!(

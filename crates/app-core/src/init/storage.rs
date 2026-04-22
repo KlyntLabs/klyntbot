@@ -94,12 +94,9 @@ pub(super) async fn init_storage(
 
     // Run notes feature migrations and create repo.
     let notes_pool = storage_pool.inner().clone();
-    StoragePool::run_feature_migrations(
-        &notes_pool,
-        &feature_notes::NotesFeature::migrations_static(),
-    )
-    .await
-    .map_err(|e| format!("notes migration failed: {e}"))?;
+    StoragePool::run_feature_migrations(&notes_pool, &feature_notes::notes_migrations())
+        .await
+        .map_err(|e| format!("notes migration failed: {e}"))?;
     let note_repo = NoteRepo::new(notes_pool);
 
     // Run tasks feature migrations.
@@ -124,7 +121,7 @@ pub(super) async fn init_storage(
     // Run language-learning feature migrations.
     StoragePool::run_feature_migrations(
         storage_pool.inner(),
-        &feature_language_learning::LanguageLearningFeature::migrations_static(),
+        &feature_language_learning::language_learning_migrations(),
     )
     .await
     .map_err(|e| format!("language-learning migration failed: {e}"))?;
@@ -132,7 +129,7 @@ pub(super) async fn init_storage(
     // Run finance feature migrations.
     StoragePool::run_feature_migrations(
         storage_pool.inner(),
-        &feature_finance::FinanceFeature::migrations_static(),
+        &feature_finance::finance_migrations(),
     )
     .await
     .map_err(|e| format!("finance migration failed: {e}"))?;

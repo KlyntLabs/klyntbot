@@ -592,7 +592,7 @@ impl AutoTunerOrchestrator {
 
                     // ── GENERATE step: create new trials via LLM ─────────────
                     match run_llm_generation(&orch).await {
-                        Ok(created_trials) => {
+                        Ok(_created_trials) => {
                             // TrialActivated variant deleted; no-op.
                         }
                         Err(e) => {
@@ -745,6 +745,7 @@ fn build_memory_snapshot(memories: &[cognitive::EpisodicMemory]) -> String {
 /// Run the LLM generation step: build context, call the LLM, parse the response,
 /// and create an experiment + trial records.
 /// Info about a trial created during LLM generation, for emitting domain events.
+#[allow(dead_code)]
 struct CreatedTrial {
     id: String,
     hypothesis: String,

@@ -235,7 +235,7 @@ impl BackgroundConsolidationService {
             min_days,
             domain_bus,
             context_update_queue,
-            session_repo,
+            session_repo: _session_repo,
             rule_repo,
             signal_tx,
             mut signal_rx,
@@ -858,7 +858,10 @@ impl BackgroundConsolidationService {
     }
 }
 
-/// Create a type key for an event (used as accumulator key).
+/// Create a type key for an event (used as accumulator key). Retained for
+/// now as it is still referenced by legacy unit tests; primary pipeline
+/// flow is via `IngestionConsumer` + `AiSignal::event_kind`.
+#[cfg(test)]
 fn event_type_key(event: &DomainEvent) -> &'static str {
     match event {
         DomainEvent::ActivitySessionCompleted { .. } => "ActivitySessionCompleted",

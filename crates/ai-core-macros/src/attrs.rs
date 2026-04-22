@@ -23,6 +23,30 @@ pub struct EntityBridge {
     pub id_from: syn::Ident,
 }
 
+/// Parses an enum-level `#[ai(domain = "Tasks")]` attribute. The value must be
+/// a `RecallDomain` variant ident. Returns `None` if the attribute is absent.
+pub fn parse_ai_enum_attr(attrs: &[Attribute]) -> syn::Result<Option<syn::Ident>> {
+    let Some(ai_attr) = attrs.iter().find(|a| a.path().is_ident("ai")) else {
+        return Ok(None);
+    };
+    let mut domain: Option<syn::Ident> = None;
+    ai_attr.parse_nested_meta(|meta| {
+        if meta.path.is_ident("domain") {
+            let value: Expr = meta.value()?.parse()?;
+            if let Expr::Lit(ExprLit {
+                lit: Lit::Str(s), ..
+            }) = value
+            {
+                domain = Some(syn::Ident::new(&s.value(), s.span()));
+                return Ok(());
+            }
+            return Err(meta.error("expected string literal naming a RecallDomain variant"));
+        }
+        Err(meta.error("unknown enum-level ai attribute"))
+    })?;
+    Ok(domain)
+}
+
 pub fn parse_ai_event_attr(attrs: &[Attribute]) -> syn::Result<AiEventAttr> {
     let ai_attr = attrs
         .iter()

@@ -2,13 +2,14 @@ use std::sync::Arc;
 
 use tracing::info;
 
-use bus::{DomainEvent, DomainEventBus};
+use bus::DomainEventBus;
 
 use crate::repos::VoiceJournalRepo;
 use crate::types::VoiceJournalEntry;
 
 pub struct VoiceJournalProcessor {
     repo: VoiceJournalRepo,
+    #[allow(dead_code)]
     event_bus: Arc<DomainEventBus>,
     // Reuses existing WhisperTool via ToolRegistry for transcription
 }

@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use tracing::info;
 
-use bus::{DomainEvent, DomainEventBus};
+use bus::DomainEventBus;
 
 use crate::handler::ProductivityHandler;
 use crate::repos::{IntelligenceSessionRepo, NarrativeRepo, QualityScoreRepo};
@@ -12,6 +12,7 @@ pub struct NarrativeGenerator {
     session_repo: IntelligenceSessionRepo,
     quality_repo: QualityScoreRepo,
     narrative_repo: NarrativeRepo,
+    #[allow(dead_code)]
     event_bus: Arc<DomainEventBus>,
     handler: Option<Arc<dyn ProductivityHandler>>,
 }
@@ -82,7 +83,7 @@ impl NarrativeGenerator {
 
         self.narrative_repo.upsert(&narrative).await?;
 
-        let excerpt = narrative_text.chars().take(100).collect::<String>();
+        let _excerpt = narrative_text.chars().take(100).collect::<String>();
         info!(date = %date, sentiment = %sentiment, "narrative generated");
 
         // NarrativeGenerated variant deleted; no-op.
