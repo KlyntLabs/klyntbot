@@ -31,6 +31,16 @@ pub struct EntityBridge {
     pub id_from: syn::Ident,
 }
 
+pub struct AiFeatureAttr {
+    pub recall_domain: syn::Ident,
+    pub skill: String,
+    pub event: syn::Path,
+    pub recall_boost_when: Option<syn::Expr>,
+    pub recall_priority_field: Option<syn::Ident>,
+    pub recall_recency_field: Option<syn::Ident>,
+    pub recall_status_filter: Option<syn::Expr>,
+}
+
 /// Parses an enum-level `#[ai(domain = "Tasks")]` attribute. The value must be
 /// a `RecallDomain` variant ident. Returns `None` if the attribute is absent.
 pub fn parse_ai_enum_attr(attrs: &[Attribute]) -> syn::Result<Option<syn::Ident>> {
@@ -193,6 +203,70 @@ fn parse_coaching_signal(
         amount_from,
         category_from,
         rule,
+    })
+}
+
+pub fn parse_ai_feature_attr(attrs: &[syn::Attribute]) -> syn::Result<AiFeatureAttr> {
+    let ai_attr = attrs.iter().find(|a| a.path().is_ident("ai"))
+        .ok_or_else(|| syn::Error::new(proc_macro2::Span::call_site(),
+            "AiFeature derive requires #[ai(...)]"))?;
+
+    let mut recall_domain = None;
+    let mut skill = None;
+    let mut event = None;
+    let mut recall_boost_when = None;
+    let mut recall_priority_field = None;
+    let mut recall_recency_field = None;
+    let mut recall_status_filter = None;
+
+    ai_attr.parse_nested_meta(|meta| {
+        let k = meta.path.get_ident()
+            .ok_or_else(|| meta.error("expected identifier"))?.to_string();
+        match k.as_str() {
+            "recall_domain" => {
+                let s: syn::LitStr = meta.value()?.parse()?;
+                recall_domain = Some(syn::Ident::new(&s.value(), s.span()));
+            }
+            "skill" => {
+                let s: syn::LitStr = meta.value()?.parse()?;
+                skill = Some(s.value());
+            }
+            "event" => {
+                let s: syn::LitStr = meta.value()?.parse()?;
+                event = Some(syn::parse_str(&s.value())?);
+            }
+            "recall_boost_when" => {
+                let s: syn::LitStr = meta.value()?.parse()?;
+                recall_boost_when = Some(syn::parse_str(&s.value())?);
+            }
+            "recall_priority_field" => {
+                let s: syn::LitStr = meta.value()?.parse()?;
+                recall_priority_field = Some(syn::Ident::new(&s.value(), s.span()));
+            }
+            "recall_recency_field" => {
+                let s: syn::LitStr = meta.value()?.parse()?;
+                recall_recency_field = Some(syn::Ident::new(&s.value(), s.span()));
+            }
+            "recall_status_filter" => {
+                let s: syn::LitStr = meta.value()?.parse()?;
+                recall_status_filter = Some(syn::parse_str(&s.value())?);
+            }
+            other => return Err(meta.error(format!("unknown ai() key: {other}"))),
+        }
+        Ok(())
+    })?;
+
+    Ok(AiFeatureAttr {
+        recall_domain: recall_domain.ok_or_else(|| syn::Error::new(
+            proc_macro2::Span::call_site(), "recall_domain is required"))?,
+        skill: skill.ok_or_else(|| syn::Error::new(
+            proc_macro2::Span::call_site(), "skill is required"))?,
+        event: event.ok_or_else(|| syn::Error::new(
+            proc_macro2::Span::call_site(), "event path is required"))?,
+        recall_boost_when,
+        recall_priority_field,
+        recall_recency_field,
+        recall_status_filter,
     })
 }
 
