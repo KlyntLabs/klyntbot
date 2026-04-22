@@ -8,7 +8,8 @@ pub enum TaskEvent {
         importance = 0.7,
         salience = "accumulate",
         observation_template = "Created task: {title} (priority {priority:?})",
-        entity_bridge(type = "task", name_from = "title", id_from = "task_id")
+        entity_bridge(type = "task", name_from = "title", id_from = "task_id"),
+        coaching_signal,
     )]
     Created {
         task_id: String,
@@ -23,7 +24,8 @@ pub enum TaskEvent {
         importance = 0.6,
         salience = "extract_if(deviation_pct.unwrap_or(0.0) > 50.0)",
         observation_template = "Completed {title} (deviation {deviation_pct:?}%)",
-        entity_bridge(type = "task", name_from = "title", id_from = "task_id")
+        entity_bridge(type = "task", name_from = "title", id_from = "task_id"),
+        coaching_signal,
     )]
     Completed {
         task_id: String,

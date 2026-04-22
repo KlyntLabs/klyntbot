@@ -11,6 +11,8 @@ bus = { workspace = true }
 cognitive = { workspace = true }
 storage = { workspace = true }
 ai-core = { workspace = true }
+feature-tasks = { workspace = true }
+feature-finance = { workspace = true }
 jiff = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
 serde_json = { workspace = true }

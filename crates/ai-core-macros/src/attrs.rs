@@ -169,6 +169,27 @@ fn parse_coaching_signal(
     let mut amount_from = None;
     let mut category_from = None;
     let mut rule = None;
+    // If the attribute is written as `coaching_signal` without parentheses,
+    // `meta` has no nested body and parse_nested_meta returns an error.
+    // Treat that as a bare flag (all fields None).
+    if meta.input.peek(syn::Token![=]) {
+        // `coaching_signal = ...` — nothing to parse
+        return Ok(CoachingSignalSpec {
+            app_from,
+            amount_from,
+            category_from,
+            rule,
+        });
+    }
+    // If the next token is not an opening parenthesis, this is a bare flag.
+    if !meta.input.peek(syn::token::Paren) {
+        return Ok(CoachingSignalSpec {
+            app_from,
+            amount_from,
+            category_from,
+            rule,
+        });
+    }
     meta.parse_nested_meta(|inner| {
         let key = inner
             .path
