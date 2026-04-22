@@ -10,7 +10,7 @@ impl RecallDomain {
     pub fn as_str(&self) -> &'static str {
         match self {
             RecallDomain::General => "general",
-            RecallDomain::Tasks   => "tasks",
+            RecallDomain::Tasks => "tasks",
             RecallDomain::Finance => "finance",
         }
     }

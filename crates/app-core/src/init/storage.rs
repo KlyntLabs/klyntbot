@@ -104,12 +104,9 @@ pub(super) async fn init_storage(
 
     // Run tasks feature migrations.
     let tasks_feature = feature_tasks::TasksFeature::new();
-    StoragePool::run_feature_migrations(
-        storage_pool.inner(),
-        &tasks_feature.migrations(),
-    )
-    .await
-    .map_err(|e| format!("tasks migration failed: {e}"))?;
+    StoragePool::run_feature_migrations(storage_pool.inner(), &tasks_feature.migrations())
+        .await
+        .map_err(|e| format!("tasks migration failed: {e}"))?;
 
     // Run scheduling feature migrations (Phase 2: scheduled_fires table).
     StoragePool::run_feature_migrations(

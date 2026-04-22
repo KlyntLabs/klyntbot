@@ -203,22 +203,6 @@ pub fn normalize_domain_event(event: &bus::DomainEvent) -> ActivityLogEntry {
                 None,
             ),
 
-            // Goals
-            bus::DomainEvent::GoalProgress {
-                objective_id,
-                progress,
-                target,
-            } => (
-                ActivitySource::Task,
-                ActivityActor::User,
-                "progress",
-                Some("objective"),
-                Some(objective_id.as_str()),
-                None,
-                Some(format!("Goal progress: {progress:.0}/{target:.0}")),
-                None,
-            ),
-
             // Tool calls
             bus::DomainEvent::ToolCallExecuted {
                 tool_name,

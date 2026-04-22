@@ -3,13 +3,20 @@ use async_trait::async_trait;
 use bus::{DomainEvent, DomainEventBus};
 use std::sync::{Arc, Mutex};
 
-struct Recorder { log: Arc<Mutex<Vec<String>>> }
+struct Recorder {
+    log: Arc<Mutex<Vec<String>>>,
+}
 
 #[async_trait]
 impl SignalConsumer for Recorder {
-    fn name(&self) -> &'static str { "rec" }
+    fn name(&self) -> &'static str {
+        "rec"
+    }
     async fn consume(&self, s: &AiSignal) -> common::Result<()> {
-        self.log.lock().unwrap().push(format!("{}:{:?}", s.event_kind, s.domain));
+        self.log
+            .lock()
+            .unwrap()
+            .push(format!("{}:{:?}", s.event_kind, s.domain));
         Ok(())
     }
 }
@@ -20,10 +27,8 @@ async fn router_broadcasts_signal_to_all_consumers() {
     let log = Arc::new(Mutex::new(Vec::new()));
     let consumer = Arc::new(Recorder { log: log.clone() }) as Arc<dyn SignalConsumer>;
 
-    let router = SignalRouter::start(
-        bus.clone(),
-        vec![consumer],
-        |_event| Some(AiSignal {
+    let router = SignalRouter::start(bus.clone(), vec![consumer], |_event| {
+        Some(AiSignal {
             domain: RecallDomain::Tasks,
             event_kind: "TaskCreated",
             importance: 0.7,
@@ -32,8 +37,8 @@ async fn router_broadcasts_signal_to_all_consumers() {
             entity: None,
             timestamp: jiff::Timestamp::now(),
             raw_event: None,
-        }),
-    );
+        })
+    });
 
     // Publish a minimal event - the translator will produce a signal regardless
     bus.publish(DomainEvent::ChatTurnCompleted {

@@ -319,11 +319,7 @@ impl MirrorFacade {
 
         self.write_episodic(format!("Killed experiment trial {trial_id}"), None, 0.7);
 
-        if let Some(ref bus) = self.domain_event_bus {
-            bus.publish(bus::DomainEvent::MirrorTrialKilled {
-                trial_id: trial_id.to_string(),
-            });
-        }
+        // MirrorTrialKilled event removed; no longer publishing domain event
 
         Ok(())
     }

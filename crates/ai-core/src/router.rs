@@ -19,7 +19,8 @@ impl SignalRouter {
         consumers: Vec<Arc<dyn SignalConsumer>>,
         translator: F,
     ) -> Self
-    where F: Fn(&DomainEvent) -> Option<AiSignal> + Send + Sync + 'static
+    where
+        F: Fn(&DomainEvent) -> Option<AiSignal> + Send + Sync + 'static,
     {
         let translator: Translator = Arc::new(translator);
         let cancel = CancellationToken::new();

@@ -1,10 +1,10 @@
 use proc_macro::TokenStream;
 use syn::{parse_macro_input, DeriveInput};
 
-mod attrs;
-mod ai_event;
 mod ai_entity;
+mod ai_event;
 mod ai_feature;
+mod attrs;
 
 #[proc_macro_derive(AiEvent, attributes(ai))]
 pub fn derive_ai_event(input: TokenStream) -> TokenStream {

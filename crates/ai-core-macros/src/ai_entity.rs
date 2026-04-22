@@ -6,16 +6,25 @@ pub fn expand(input: DeriveInput) -> syn::Result<TokenStream> {
     let struct_ident = &input.ident;
 
     // Parse container attribute: #[ai(entity_type = "...", embed_on = [...])]
-    let ai_attr = input.attrs.iter().find(|a| a.path().is_ident("ai"))
-        .ok_or_else(|| syn::Error::new_spanned(&input,
-            "AiEntity requires #[ai(entity_type = \"...\", embed_on = [...])] on the struct"))?;
+    let ai_attr =
+        input
+            .attrs
+            .iter()
+            .find(|a| a.path().is_ident("ai"))
+            .ok_or_else(|| {
+                syn::Error::new_spanned(&input,
+            "AiEntity requires #[ai(entity_type = \"...\", embed_on = [...])] on the struct")
+            })?;
 
     let mut entity_type: Option<String> = None;
     let mut embed_fields: Vec<Ident> = Vec::new();
 
     ai_attr.parse_nested_meta(|meta| {
-        let name = meta.path.get_ident()
-            .ok_or_else(|| meta.error("expected identifier"))?.to_string();
+        let name = meta
+            .path
+            .get_ident()
+            .ok_or_else(|| meta.error("expected identifier"))?
+            .to_string();
         match name.as_str() {
             "entity_type" => {
                 let s: LitStr = meta.value()?.parse()?;
@@ -36,35 +45,52 @@ pub fn expand(input: DeriveInput) -> syn::Result<TokenStream> {
         Ok(())
     })?;
 
-    let entity_type = entity_type.ok_or_else(|| syn::Error::new_spanned(&input,
-        "AiEntity needs #[ai(entity_type = \"...\")]"))?;
+    let entity_type = entity_type.ok_or_else(|| {
+        syn::Error::new_spanned(&input, "AiEntity needs #[ai(entity_type = \"...\")]")
+    })?;
 
     // Verify fields exist and collect accessor code.
     let data_struct = match &input.data {
         Data::Struct(s) => s,
-        _ => return Err(syn::Error::new_spanned(&input,
-            "AiEntity can only be derived on structs")),
+        _ => {
+            return Err(syn::Error::new_spanned(
+                &input,
+                "AiEntity can only be derived on structs",
+            ))
+        }
     };
     let field_map: std::collections::HashMap<String, &syn::Field> = match &data_struct.fields {
-        Fields::Named(n) => n.named.iter()
+        Fields::Named(n) => n
+            .named
+            .iter()
             .filter_map(|f| f.ident.as_ref().map(|i| (i.to_string(), f)))
             .collect(),
-        _ => return Err(syn::Error::new_spanned(&input,
-            "AiEntity requires named fields")),
+        _ => {
+            return Err(syn::Error::new_spanned(
+                &input,
+                "AiEntity requires named fields",
+            ))
+        }
     };
 
-    let accessors = embed_fields.iter().map(|id| {
-        let name = id.to_string();
-        let field = field_map.get(&name)
-            .ok_or_else(|| syn::Error::new(id.span(),
-                format!("embed_on references unknown field: {}", name)))?;
-        let is_option = is_option_type(&field.ty);
-        Ok(if is_option {
-            quote! { self.#id.as_deref().unwrap_or("") }
-        } else {
-            quote! { self.#id.as_str() }
+    let accessors = embed_fields
+        .iter()
+        .map(|id| {
+            let name = id.to_string();
+            let field = field_map.get(&name).ok_or_else(|| {
+                syn::Error::new(
+                    id.span(),
+                    format!("embed_on references unknown field: {}", name),
+                )
+            })?;
+            let is_option = is_option_type(&field.ty);
+            Ok(if is_option {
+                quote! { self.#id.as_deref().unwrap_or("") }
+            } else {
+                quote! { self.#id.as_str() }
+            })
         })
-    }).collect::<syn::Result<Vec<_>>>()?;
+        .collect::<syn::Result<Vec<_>>>()?;
 
     Ok(quote! {
         impl ::ai_core::AiEntity for #struct_ident {
@@ -83,7 +109,11 @@ pub fn expand(input: DeriveInput) -> syn::Result<TokenStream> {
 
 fn is_option_type(ty: &syn::Type) -> bool {
     if let syn::Type::Path(p) = ty {
-        p.path.segments.last().map(|s| s.ident == "Option").unwrap_or(false)
+        p.path
+            .segments
+            .last()
+            .map(|s| s.ident == "Option")
+            .unwrap_or(false)
     } else {
         false
     }

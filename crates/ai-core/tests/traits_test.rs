@@ -1,4 +1,4 @@
-use ai_core::{AiSignal, SalienceVerdict, SignalConsumer, RecallDomain};
+use ai_core::{AiSignal, RecallDomain, SalienceVerdict, SignalConsumer};
 use async_trait::async_trait;
 use jiff::Timestamp;
 use std::sync::{Arc, Mutex};
@@ -9,7 +9,9 @@ struct RecordingConsumer {
 
 #[async_trait]
 impl SignalConsumer for RecordingConsumer {
-    fn name(&self) -> &'static str { "recording" }
+    fn name(&self) -> &'static str {
+        "recording"
+    }
     async fn consume(&self, signal: &AiSignal) -> common::Result<()> {
         self.seen.lock().unwrap().push(signal.event_kind);
         Ok(())

@@ -1316,8 +1316,8 @@ impl AgentLoopBuilder {
             }
 
             // Register via FeaturePackage
-            let tasks_feature = feature_tasks::TasksFeature::new()
-                .with_task_tool(Arc::new(task_tool));
+            let tasks_feature =
+                feature_tasks::TasksFeature::new().with_task_tool(Arc::new(task_tool));
             for tool in tasks_feature.tools() {
                 tool_registry.register_dyn(tool);
             }

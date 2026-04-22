@@ -44,8 +44,11 @@ use tools_core::{DynTool, FeatureMigration, HealthStatus};
 /// Exposes one tool ("finance") covering accounts, transactions, budgets,
 /// investments, goals, liabilities, and financial reports.
 #[derive(AiFeature)]
-#[ai(recall_domain = "Finance", skill = "finance-management",
-     event = "crate::events::FinanceEvent")]
+#[ai(
+    recall_domain = "Finance",
+    skill = "finance-management",
+    event = "crate::events::FinanceEvent"
+)]
 pub struct FinanceFeature {
     tool: Arc<FinanceTool>,
 }

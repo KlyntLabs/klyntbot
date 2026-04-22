@@ -1,4 +1,4 @@
-use ai_core::{AiSignal, SalienceVerdict, EntityRef, RecallDomain};
+use ai_core::{AiSignal, EntityRef, RecallDomain, SalienceVerdict};
 use jiff::Timestamp;
 
 #[test]

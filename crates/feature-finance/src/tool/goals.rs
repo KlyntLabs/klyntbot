@@ -108,11 +108,14 @@ impl FinanceTool {
         let inserted = self.storage.goals.add(&row).await?;
 
         if let Some(ref bus) = self.domain_bus {
-            bus.publish(crate::events::FinanceEvent::GoalCreated {
-                goal_id: inserted.id.clone(),
-                name: inserted.name.clone(),
-                target_amount: inserted.target_amount,
-            }.into());
+            bus.publish(
+                crate::events::FinanceEvent::GoalCreated {
+                    goal_id: inserted.id.clone(),
+                    name: inserted.name.clone(),
+                    target_amount: inserted.target_amount,
+                }
+                .into(),
+            );
         }
 
         let goal = FinanceGoal::from(inserted);
@@ -244,12 +247,17 @@ impl FinanceTool {
 
         // Emit GoalAchieved when current_amount first reaches or exceeds target_amount.
         if let Some(ref bus) = self.domain_bus {
-            let was_achieved = old_row.map(|r| r.current_amount >= r.target_amount).unwrap_or(false);
+            let was_achieved = old_row
+                .map(|r| r.current_amount >= r.target_amount)
+                .unwrap_or(false);
             if !was_achieved && goal.current_amount >= goal.target_amount {
-                bus.publish(crate::events::FinanceEvent::GoalAchieved {
-                    goal_id: goal.id.clone(),
-                    name: goal.name.clone(),
-                }.into());
+                bus.publish(
+                    crate::events::FinanceEvent::GoalAchieved {
+                        goal_id: goal.id.clone(),
+                        name: goal.name.clone(),
+                    }
+                    .into(),
+                );
             }
         }
         let progress_pct = if goal.target_amount > 0 {

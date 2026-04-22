@@ -354,15 +354,6 @@ impl BackgroundConsolidationService {
                                 )
                                 .await;
                             }
-                            DomainEvent::GoalProgress { objective_id, .. } => {
-                                upsert_domain_entity(
-                                    &entity_repo,
-                                    objective_id,
-                                    "objective",
-                                    objective_id,
-                                )
-                                .await;
-                            }
                             _ => {}
                         }
                     }
@@ -878,7 +869,7 @@ fn event_type_key(event: &DomainEvent) -> String {
         DomainEvent::TaskCreated { .. } => "TaskCreated".into(),
         DomainEvent::TaskCompleted { .. } => "TaskCompleted".into(),
         DomainEvent::TaskDeferred { .. } => "TaskDeferred".into(),
-        DomainEvent::GoalProgress { .. } => "GoalProgress".into(),
+
         DomainEvent::TransactionRecorded { .. } => "TransactionRecorded".into(),
         DomainEvent::BudgetAlert { .. } => "BudgetAlert".into(),
         DomainEvent::ChatTurnCompleted { .. } => "ChatTurnCompleted".into(),
@@ -890,24 +881,13 @@ fn event_type_key(event: &DomainEvent) -> String {
         DomainEvent::SessionCreated { .. } => "SessionCreated".into(),
         DomainEvent::SessionEnded { .. } => "SessionEnded".into(),
         DomainEvent::QualityScored { .. } => "QualityScored".into(),
-        DomainEvent::PredictiveAlert { .. } => "PredictiveAlert".into(),
-        DomainEvent::NarrativeGenerated { .. } => "NarrativeGenerated".into(),
-        DomainEvent::RuleEvolved { .. } => "RuleEvolved".into(),
-        DomainEvent::VoiceJournalProcessed { .. } => "VoiceJournalProcessed".into(),
         DomainEvent::ToolCallExecuted { .. } => "ToolCallExecuted".into(),
         DomainEvent::BehavioralPatternDetected { .. } => "BehavioralPatternDetected".into(),
-        DomainEvent::TaskBlocked { .. } => "TaskBlocked".into(),
-        DomainEvent::TaskUnblocked { .. } => "TaskUnblocked".into(),
         DomainEvent::EstimationRecorded { .. } => "EstimationRecorded".into(),
-        DomainEvent::TaskStatusChanged { .. } => "TaskStatusChanged".into(),
-        DomainEvent::TaskPriorityChanged { .. } => "TaskPriorityChanged".into(),
-        DomainEvent::TaskFieldUpdated { .. } => "TaskFieldUpdated".into(),
         DomainEvent::AutotunerDecision { .. } => "AutotunerDecision".into(),
         DomainEvent::ContradictionDetected { .. } => "ContradictionDetected".into(),
         DomainEvent::NoteContentChanged { .. } => "NoteContentChanged".into(),
         DomainEvent::NoteDeleted { .. } => "NoteDeleted".into(),
-        DomainEvent::TaskHierarchyChanged { .. } => "TaskHierarchyChanged".into(),
-        DomainEvent::TreeNodesRebuilt { .. } => "TreeNodesRebuilt".into(),
         DomainEvent::KnowledgeAtomCreated { .. } => "KnowledgeAtomCreated".into(),
         DomainEvent::KnowledgeAtomAccepted { .. } => "KnowledgeAtomAccepted".into(),
         DomainEvent::KnowledgeAtomArchived { .. } => "KnowledgeAtomArchived".into(),
@@ -925,9 +905,7 @@ fn event_type_key(event: &DomainEvent) -> String {
         DomainEvent::InterventionTriggered { .. } => "InterventionTriggered".into(),
         DomainEvent::MemoryPendingConfirmation { .. } => "MemoryPendingConfirmation".into(),
         DomainEvent::SkillRouted { .. } => "SkillRouted".into(),
-        DomainEvent::TrialActivated { .. } => "TrialActivated".into(),
-        DomainEvent::MirrorTrialKilled { .. } => "MirrorTrialKilled".into(),
-        DomainEvent::MirrorSnippetCreated { .. } => "MirrorSnippetCreated".into(),
+
         DomainEvent::NoteEditingFinished { .. } => "NoteEditingFinished".into(),
         _ => "Unknown".into(),
     }

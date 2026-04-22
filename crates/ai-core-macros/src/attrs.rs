@@ -23,9 +23,15 @@ pub struct EntityBridge {
 }
 
 pub fn parse_ai_event_attr(attrs: &[Attribute]) -> syn::Result<AiEventAttr> {
-    let ai_attr = attrs.iter().find(|a| a.path().is_ident("ai"))
-        .ok_or_else(|| syn::Error::new(Span::call_site(),
-            "every variant must have #[ai(...)] attribute"))?;
+    let ai_attr = attrs
+        .iter()
+        .find(|a| a.path().is_ident("ai"))
+        .ok_or_else(|| {
+            syn::Error::new(
+                Span::call_site(),
+                "every variant must have #[ai(...)] attribute",
+            )
+        })?;
 
     let mut importance = None;
     let mut importance_fn = None;
@@ -34,14 +40,23 @@ pub fn parse_ai_event_attr(attrs: &[Attribute]) -> syn::Result<AiEventAttr> {
     let mut entity_bridge = None;
 
     ai_attr.parse_nested_meta(|meta| {
-        let name = meta.path.get_ident()
-            .ok_or_else(|| meta.error("expected identifier"))?.to_string();
+        let name = meta
+            .path
+            .get_ident()
+            .ok_or_else(|| meta.error("expected identifier"))?
+            .to_string();
         match name.as_str() {
             "importance" => {
                 let value: Expr = meta.value()?.parse()?;
-                if let Expr::Lit(ExprLit { lit: Lit::Float(f), .. }) = value {
+                if let Expr::Lit(ExprLit {
+                    lit: Lit::Float(f), ..
+                }) = value
+                {
                     importance = Some(f.base10_parse::<f64>()?);
-                } else if let Expr::Lit(ExprLit { lit: Lit::Int(i), .. }) = value {
+                } else if let Expr::Lit(ExprLit {
+                    lit: Lit::Int(i), ..
+                }) = value
+                {
                     importance = Some(i.base10_parse::<f64>()?);
                 } else {
                     return Err(meta.error("importance must be a numeric literal"));
@@ -83,14 +98,19 @@ fn parse_salience(s: &str) -> syn::Result<SalienceSpec> {
         "extract" => Ok(SalienceSpec::Extract),
         "discard" => Ok(SalienceSpec::Discard),
         _ if s.starts_with("extract_if(") && s.ends_with(')') => {
-            let inner = &s["extract_if(".len()..s.len()-1];
-            let expr: syn::Expr = syn::parse_str(inner)
-                .map_err(|e| syn::Error::new(Span::call_site(),
-                    format!("invalid extract_if expression: {}", e)))?;
+            let inner = &s["extract_if(".len()..s.len() - 1];
+            let expr: syn::Expr = syn::parse_str(inner).map_err(|e| {
+                syn::Error::new(
+                    Span::call_site(),
+                    format!("invalid extract_if expression: {}", e),
+                )
+            })?;
             Ok(SalienceSpec::ExtractIf(expr))
         }
-        _ => Err(syn::Error::new(Span::call_site(),
-            format!("unknown salience verdict: {}", s))),
+        _ => Err(syn::Error::new(
+            Span::call_site(),
+            format!("unknown salience verdict: {}", s),
+        )),
     }
 }
 
@@ -99,8 +119,11 @@ fn parse_entity_bridge(meta: &syn::meta::ParseNestedMeta) -> syn::Result<EntityB
     let mut name_from = None;
     let mut id_from = None;
     meta.parse_nested_meta(|inner| {
-        let key = inner.path.get_ident()
-            .ok_or_else(|| inner.error("expected identifier"))?.to_string();
+        let key = inner
+            .path
+            .get_ident()
+            .ok_or_else(|| inner.error("expected identifier"))?
+            .to_string();
         match key.as_str() {
             "type" => {
                 let s: syn::LitStr = inner.value()?.parse()?;
@@ -119,8 +142,11 @@ fn parse_entity_bridge(meta: &syn::meta::ParseNestedMeta) -> syn::Result<EntityB
         Ok(())
     })?;
     Ok(EntityBridge {
-        entity_type: ty.ok_or_else(|| syn::Error::new(Span::call_site(), "entity_bridge needs type"))?,
-        name_from: name_from.ok_or_else(|| syn::Error::new(Span::call_site(), "entity_bridge needs name_from"))?,
-        id_from: id_from.ok_or_else(|| syn::Error::new(Span::call_site(), "entity_bridge needs id_from"))?,
+        entity_type: ty
+            .ok_or_else(|| syn::Error::new(Span::call_site(), "entity_bridge needs type"))?,
+        name_from: name_from
+            .ok_or_else(|| syn::Error::new(Span::call_site(), "entity_bridge needs name_from"))?,
+        id_from: id_from
+            .ok_or_else(|| syn::Error::new(Span::call_site(), "entity_bridge needs id_from"))?,
     })
 }

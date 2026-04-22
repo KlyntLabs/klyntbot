@@ -37,8 +37,11 @@ use tools_core::{DynTool, FeatureMigration, FeaturePackage, HealthStatus};
 
 /// Feature package for task management.
 #[derive(AiFeature)]
-#[ai(recall_domain = "Tasks", skill = "task-management",
-     event = "crate::events::TaskEvent")]
+#[ai(
+    recall_domain = "Tasks",
+    skill = "task-management",
+    event = "crate::events::TaskEvent"
+)]
 pub struct TasksFeature {
     pool: Option<storage::StoragePool>,
     task_tool: Option<Arc<TaskTool>>,
@@ -47,12 +50,18 @@ pub struct TasksFeature {
 impl TasksFeature {
     /// Create a new TasksFeature.
     pub fn new() -> Self {
-        Self { pool: None, task_tool: None }
+        Self {
+            pool: None,
+            task_tool: None,
+        }
     }
 
     /// Create a TasksFeature with a storage pool for health checking.
     pub fn with_pool(pool: storage::StoragePool) -> Self {
-        Self { pool: Some(pool), task_tool: None }
+        Self {
+            pool: Some(pool),
+            task_tool: None,
+        }
     }
 
     /// Attach a TaskTool to be returned by `tools()`.

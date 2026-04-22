@@ -51,9 +51,6 @@ impl TrialPreviewSubscriber {
                 _ = shutdown.cancelled() => break,
                 event = rx.recv() => {
                     match event {
-                        Ok(DomainEvent::TrialActivated { trial_id, hypothesis, .. }) => {
-                            self.start_preview_timer(trial_id, hypothesis);
-                        }
                         Ok(_) => {}
                         Err(broadcast::error::RecvError::Lagged(n)) => {
                             tracing::warn!("TrialPreviewSubscriber lagged {n} events");

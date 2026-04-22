@@ -37,17 +37,8 @@ pub async fn promote_fact(
 
     repo.upsert(&promoted).await?;
 
-    if let Some(bus) = bus {
-        bus.publish(bus::DomainEvent::MemoryPromoted {
-            fact_id: promoted.id.clone(),
-            summary: format!(
-                "{} {} {}",
-                promoted.subject, promoted.predicate, promoted.object
-            ),
-            from_scope,
-            to_scope: promoted.scope_type.clone(),
-        });
-    }
+    // MemoryCreated event removed; no longer publishing domain event on promotion
+    let _bus = bus;
 
     Ok(Some(promoted))
 }

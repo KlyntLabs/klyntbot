@@ -7,21 +7,25 @@ pub fn expand(input: DeriveInput) -> syn::Result<TokenStream> {
     let enum_ident = &input.ident;
     let data_enum = match &input.data {
         Data::Enum(e) => e,
-        _ => return Err(syn::Error::new_spanned(&input,
-            "AiEvent can only be derived on enums")),
+        _ => {
+            return Err(syn::Error::new_spanned(
+                &input,
+                "AiEvent can only be derived on enums",
+            ))
+        }
     };
 
     let mut arms = Vec::new();
     let mut kind_arms = Vec::new();
-    
+
     for variant in &data_enum.variants {
         arms.push(render_variant(enum_ident, variant)?);
-        
+
         let id = &variant.ident;
         let kind = id.to_string();
         let pattern = match &variant.fields {
             Fields::Named(_) => quote! { #enum_ident::#id { .. } },
-            Fields::Unit     => quote! { #enum_ident::#id },
+            Fields::Unit => quote! { #enum_ident::#id },
             Fields::Unnamed(_) => quote! { #enum_ident::#id(..) },
         };
         kind_arms.push(quote! { #pattern => #kind });
@@ -75,11 +79,18 @@ fn render_variant(enum_ident: &syn::Ident, variant: &Variant) -> syn::Result<Tok
 
     // Collect field names for destructuring.
     let field_idents: Vec<_> = match &variant.fields {
-        Fields::Named(named) => named.named.iter()
-            .map(|f| f.ident.clone().unwrap()).collect(),
+        Fields::Named(named) => named
+            .named
+            .iter()
+            .map(|f| f.ident.clone().unwrap())
+            .collect(),
         Fields::Unit => Vec::new(),
-        Fields::Unnamed(_) => return Err(syn::Error::new_spanned(variant,
-            "AiEvent requires named fields or unit variants")),
+        Fields::Unnamed(_) => {
+            return Err(syn::Error::new_spanned(
+                variant,
+                "AiEvent requires named fields or unit variants",
+            ))
+        }
     };
 
     let pattern = if field_idents.is_empty() {
@@ -91,10 +102,18 @@ fn render_variant(enum_ident: &syn::Ident, variant: &Variant) -> syn::Result<Tok
     let importance_expr = match (&attr.importance, &attr.importance_fn) {
         (Some(lit), None) => quote! { #lit },
         (None, Some(path)) => quote! { #path(self) },
-        (Some(_), Some(_)) => return Err(syn::Error::new_spanned(variant,
-            "specify either importance or importance_fn, not both")),
-        (None, None) => return Err(syn::Error::new_spanned(variant,
-            "each variant needs #[ai(importance = ...)] or importance_fn")),
+        (Some(_), Some(_)) => {
+            return Err(syn::Error::new_spanned(
+                variant,
+                "specify either importance or importance_fn, not both",
+            ))
+        }
+        (None, None) => {
+            return Err(syn::Error::new_spanned(
+                variant,
+                "each variant needs #[ai(importance = ...)] or importance_fn",
+            ))
+        }
     };
 
     let salience_expr = render_salience(&attr.salience, &field_idents);
@@ -119,18 +138,16 @@ fn render_variant(enum_ident: &syn::Ident, variant: &Variant) -> syn::Result<Tok
 fn render_salience(spec: &SalienceSpec, fields: &[syn::Ident]) -> TokenStream {
     match spec {
         SalienceSpec::Accumulate => quote! { ::ai_core::SalienceVerdict::Accumulate },
-        SalienceSpec::Extract    => quote! { ::ai_core::SalienceVerdict::Extract },
-        SalienceSpec::Discard    => quote! { ::ai_core::SalienceVerdict::Discard },
+        SalienceSpec::Extract => quote! { ::ai_core::SalienceVerdict::Extract },
+        SalienceSpec::Discard => quote! { ::ai_core::SalienceVerdict::Discard },
         SalienceSpec::ExtractIf(expr) => {
             // Build a mapping of field names to their idents for substitution
-            let field_map: std::collections::HashMap<String, &syn::Ident> = fields
-                .iter()
-                .map(|f| (f.to_string(), f))
-                .collect();
-            
+            let field_map: std::collections::HashMap<String, &syn::Ident> =
+                fields.iter().map(|f| (f.to_string(), f)).collect();
+
             // Replace bare identifiers in the expression with field references
             let modified_expr = replace_identifiers_in_expr(expr, &field_map);
-            
+
             quote! {
                 if #modified_expr {
                     ::ai_core::SalienceVerdict::Extract
@@ -142,9 +159,12 @@ fn render_salience(spec: &SalienceSpec, fields: &[syn::Ident]) -> TokenStream {
     }
 }
 
-fn replace_identifiers_in_expr(expr: &syn::Expr, field_map: &std::collections::HashMap<String, &syn::Ident>) -> syn::Expr {
+fn replace_identifiers_in_expr(
+    expr: &syn::Expr,
+    field_map: &std::collections::HashMap<String, &syn::Ident>,
+) -> syn::Expr {
     use syn::{Expr, ExprPath, Path, PathSegment};
-    
+
     match expr {
         Expr::Path(ExprPath { path, .. }) => {
             if let Some(ident) = path.get_ident() {
@@ -159,7 +179,9 @@ fn replace_identifiers_in_expr(expr: &syn::Expr, field_map: &std::collections::H
                             segments: vec![PathSegment {
                                 ident: (*field_ident).clone(),
                                 arguments: syn::PathArguments::None,
-                            }].into_iter().collect(),
+                            }]
+                            .into_iter()
+                            .collect(),
                         },
                     });
                 }
@@ -194,7 +216,9 @@ fn replace_identifiers_in_expr(expr: &syn::Expr, field_map: &std::collections::H
         }
         Expr::Call(call) => {
             let func = Box::new(replace_identifiers_in_expr(&call.func, field_map));
-            let args = call.args.iter()
+            let args = call
+                .args
+                .iter()
                 .map(|arg| replace_identifiers_in_expr(arg, field_map))
                 .collect();
             Expr::Call(syn::ExprCall {
@@ -206,7 +230,9 @@ fn replace_identifiers_in_expr(expr: &syn::Expr, field_map: &std::collections::H
         }
         Expr::MethodCall(method) => {
             let receiver = Box::new(replace_identifiers_in_expr(&method.receiver, field_map));
-            let args = method.args.iter()
+            let args = method
+                .args
+                .iter()
                 .map(|arg| replace_identifiers_in_expr(arg, field_map))
                 .collect();
             Expr::MethodCall(syn::ExprMethodCall {
@@ -238,7 +264,9 @@ fn replace_identifiers_in_expr(expr: &syn::Expr, field_map: &std::collections::H
             })
         }
         Expr::Tuple(tuple) => {
-            let elems = tuple.elems.iter()
+            let elems = tuple
+                .elems
+                .iter()
                 .map(|elem| replace_identifiers_in_expr(elem, field_map))
                 .collect();
             Expr::Tuple(syn::ExprTuple {
@@ -248,7 +276,9 @@ fn replace_identifiers_in_expr(expr: &syn::Expr, field_map: &std::collections::H
             })
         }
         Expr::Array(array) => {
-            let elems = array.elems.iter()
+            let elems = array
+                .elems
+                .iter()
                 .map(|elem| replace_identifiers_in_expr(elem, field_map))
                 .collect();
             Expr::Array(syn::ExprArray {
@@ -258,7 +288,9 @@ fn replace_identifiers_in_expr(expr: &syn::Expr, field_map: &std::collections::H
             })
         }
         Expr::Struct(struct_expr) => {
-            let fields = struct_expr.fields.iter()
+            let fields = struct_expr
+                .fields
+                .iter()
                 .map(|field| syn::FieldValue {
                     attrs: field.attrs.clone(),
                     member: field.member.clone(),
@@ -273,16 +305,25 @@ fn replace_identifiers_in_expr(expr: &syn::Expr, field_map: &std::collections::H
                 brace_token: struct_expr.brace_token,
                 fields,
                 dot2_token: struct_expr.dot2_token,
-                rest: struct_expr.rest.as_ref().map(|rest| Box::new(replace_identifiers_in_expr(rest, field_map))),
+                rest: struct_expr
+                    .rest
+                    .as_ref()
+                    .map(|rest| Box::new(replace_identifiers_in_expr(rest, field_map))),
             })
         }
         Expr::If(if_expr) => {
             let cond = Box::new(replace_identifiers_in_expr(&if_expr.cond, field_map));
-            let then_stmts = if_expr.then_branch.stmts.iter()
+            let then_stmts = if_expr
+                .then_branch
+                .stmts
+                .iter()
                 .map(|stmt| replace_identifiers_in_stmt(stmt, field_map))
                 .collect();
             let else_branch = if_expr.else_branch.as_ref().map(|(token, expr)| {
-                (*token, Box::new(replace_identifiers_in_expr(expr, field_map)))
+                (
+                    *token,
+                    Box::new(replace_identifiers_in_expr(expr, field_map)),
+                )
             });
             Expr::If(syn::ExprIf {
                 attrs: if_expr.attrs.clone(),
@@ -297,7 +338,10 @@ fn replace_identifiers_in_expr(expr: &syn::Expr, field_map: &std::collections::H
         }
         Expr::While(while_expr) => {
             let cond = Box::new(replace_identifiers_in_expr(&while_expr.cond, field_map));
-            let stmts = while_expr.body.stmts.iter()
+            let stmts = while_expr
+                .body
+                .stmts
+                .iter()
                 .map(|stmt| replace_identifiers_in_stmt(stmt, field_map))
                 .collect();
             Expr::While(syn::ExprWhile {
@@ -313,7 +357,10 @@ fn replace_identifiers_in_expr(expr: &syn::Expr, field_map: &std::collections::H
         }
         Expr::ForLoop(for_loop) => {
             let expr = Box::new(replace_identifiers_in_expr(&for_loop.expr, field_map));
-            let stmts = for_loop.body.stmts.iter()
+            let stmts = for_loop
+                .body
+                .stmts
+                .iter()
                 .map(|stmt| replace_identifiers_in_stmt(stmt, field_map))
                 .collect();
             Expr::ForLoop(syn::ExprForLoop {
@@ -330,7 +377,10 @@ fn replace_identifiers_in_expr(expr: &syn::Expr, field_map: &std::collections::H
             })
         }
         Expr::Loop(loop_expr) => {
-            let stmts = loop_expr.body.stmts.iter()
+            let stmts = loop_expr
+                .body
+                .stmts
+                .iter()
                 .map(|stmt| replace_identifiers_in_stmt(stmt, field_map))
                 .collect();
             Expr::Loop(syn::ExprLoop {
@@ -345,12 +395,17 @@ fn replace_identifiers_in_expr(expr: &syn::Expr, field_map: &std::collections::H
         }
         Expr::Match(match_expr) => {
             let expr = Box::new(replace_identifiers_in_expr(&match_expr.expr, field_map));
-            let arms = match_expr.arms.iter()
+            let arms = match_expr
+                .arms
+                .iter()
                 .map(|arm| syn::Arm {
                     attrs: arm.attrs.clone(),
                     pat: arm.pat.clone(),
                     guard: arm.guard.as_ref().map(|(token, expr)| {
-                        (*token, Box::new(replace_identifiers_in_expr(expr, field_map)))
+                        (
+                            *token,
+                            Box::new(replace_identifiers_in_expr(expr, field_map)),
+                        )
                     }),
                     fat_arrow_token: arm.fat_arrow_token,
                     body: Box::new(replace_identifiers_in_expr(&arm.body, field_map)),
@@ -366,7 +421,10 @@ fn replace_identifiers_in_expr(expr: &syn::Expr, field_map: &std::collections::H
             })
         }
         Expr::Block(block) => {
-            let stmts = block.block.stmts.iter()
+            let stmts = block
+                .block
+                .stmts
+                .iter()
                 .map(|stmt| replace_identifiers_in_stmt(stmt, field_map))
                 .collect();
             Expr::Block(syn::ExprBlock {
@@ -399,7 +457,10 @@ fn replace_identifiers_in_expr(expr: &syn::Expr, field_map: &std::collections::H
             })
         }
         Expr::Return(return_expr) => {
-            let expr = return_expr.expr.as_ref().map(|expr| Box::new(replace_identifiers_in_expr(expr, field_map)));
+            let expr = return_expr
+                .expr
+                .as_ref()
+                .map(|expr| Box::new(replace_identifiers_in_expr(expr, field_map)));
             Expr::Return(syn::ExprReturn {
                 attrs: return_expr.attrs.clone(),
                 return_token: return_expr.return_token,
@@ -407,7 +468,10 @@ fn replace_identifiers_in_expr(expr: &syn::Expr, field_map: &std::collections::H
             })
         }
         Expr::Break(break_expr) => {
-            let expr = break_expr.expr.as_ref().map(|expr| Box::new(replace_identifiers_in_expr(expr, field_map)));
+            let expr = break_expr
+                .expr
+                .as_ref()
+                .map(|expr| Box::new(replace_identifiers_in_expr(expr, field_map)));
             Expr::Break(syn::ExprBreak {
                 attrs: break_expr.attrs.clone(),
                 label: break_expr.label.clone(),
@@ -415,12 +479,16 @@ fn replace_identifiers_in_expr(expr: &syn::Expr, field_map: &std::collections::H
                 expr,
             })
         }
-        Expr::Continue(continue_expr) => {
-            Expr::Continue(continue_expr.clone())
-        }
+        Expr::Continue(continue_expr) => Expr::Continue(continue_expr.clone()),
         Expr::Range(range) => {
-            let start = range.start.as_ref().map(|expr| Box::new(replace_identifiers_in_expr(expr, field_map)));
-            let end = range.end.as_ref().map(|expr| Box::new(replace_identifiers_in_expr(expr, field_map)));
+            let start = range
+                .start
+                .as_ref()
+                .map(|expr| Box::new(replace_identifiers_in_expr(expr, field_map)));
+            let end = range
+                .end
+                .as_ref()
+                .map(|expr| Box::new(replace_identifiers_in_expr(expr, field_map)));
             Expr::Range(syn::ExprRange {
                 attrs: range.attrs.clone(),
                 start,
@@ -457,7 +525,10 @@ fn replace_identifiers_in_expr(expr: &syn::Expr, field_map: &std::collections::H
         Expr::Lit(lit) => Expr::Lit(lit.clone()),
         Expr::Macro(mac) => Expr::Macro(mac.clone()),
         Expr::Async(async_expr) => {
-            let stmts = async_expr.block.stmts.iter()
+            let stmts = async_expr
+                .block
+                .stmts
+                .iter()
                 .map(|stmt| replace_identifiers_in_stmt(stmt, field_map))
                 .collect();
             Expr::Async(syn::ExprAsync {
@@ -496,7 +567,10 @@ fn replace_identifiers_in_expr(expr: &syn::Expr, field_map: &std::collections::H
             })
         }
         Expr::Const(const_expr) => {
-            let stmts = const_expr.block.stmts.iter()
+            let stmts = const_expr
+                .block
+                .stmts
+                .iter()
                 .map(|stmt| replace_identifiers_in_stmt(stmt, field_map))
                 .collect();
             Expr::Const(syn::ExprConst {
@@ -528,7 +602,10 @@ fn replace_identifiers_in_expr(expr: &syn::Expr, field_map: &std::collections::H
             })
         }
         Expr::TryBlock(try_block) => {
-            let stmts = try_block.block.stmts.iter()
+            let stmts = try_block
+                .block
+                .stmts
+                .iter()
                 .map(|stmt| replace_identifiers_in_stmt(stmt, field_map))
                 .collect();
             Expr::TryBlock(syn::ExprTryBlock {
@@ -541,7 +618,10 @@ fn replace_identifiers_in_expr(expr: &syn::Expr, field_map: &std::collections::H
             })
         }
         Expr::Unsafe(unsafe_expr) => {
-            let stmts = unsafe_expr.block.stmts.iter()
+            let stmts = unsafe_expr
+                .block
+                .stmts
+                .iter()
                 .map(|stmt| replace_identifiers_in_stmt(stmt, field_map))
                 .collect();
             Expr::Unsafe(syn::ExprUnsafe {
@@ -554,7 +634,10 @@ fn replace_identifiers_in_expr(expr: &syn::Expr, field_map: &std::collections::H
             })
         }
         Expr::Yield(yield_expr) => {
-            let expr = yield_expr.expr.as_ref().map(|expr| Box::new(replace_identifiers_in_expr(expr, field_map)));
+            let expr = yield_expr
+                .expr
+                .as_ref()
+                .map(|expr| Box::new(replace_identifiers_in_expr(expr, field_map)));
             Expr::Yield(syn::ExprYield {
                 attrs: yield_expr.attrs.clone(),
                 yield_token: yield_expr.yield_token,
@@ -566,14 +649,20 @@ fn replace_identifiers_in_expr(expr: &syn::Expr, field_map: &std::collections::H
     }
 }
 
-fn replace_identifiers_in_stmt(stmt: &syn::Stmt, field_map: &std::collections::HashMap<String, &syn::Ident>) -> syn::Stmt {
+fn replace_identifiers_in_stmt(
+    stmt: &syn::Stmt,
+    field_map: &std::collections::HashMap<String, &syn::Ident>,
+) -> syn::Stmt {
     match stmt {
         syn::Stmt::Local(local) => {
             let init = local.init.as_ref().map(|init| syn::LocalInit {
                 eq_token: init.eq_token,
                 expr: Box::new(replace_identifiers_in_expr(&init.expr, field_map)),
                 diverge: init.diverge.as_ref().map(|(token, expr)| {
-                    (*token, Box::new(replace_identifiers_in_expr(expr, field_map)))
+                    (
+                        *token,
+                        Box::new(replace_identifiers_in_expr(expr, field_map)),
+                    )
                 }),
             });
             syn::Stmt::Local(syn::Local {
@@ -597,16 +686,21 @@ fn render_content(attr: &AiEventAttr, fields: &[syn::Ident]) -> TokenStream {
         Some(template) => {
             let fmt_lit = syn::LitStr::new(template, proc_macro2::Span::call_site());
             // Only include fields that are actually referenced in the template
-            let field_refs: Vec<_> = fields.iter().filter_map(|f| {
-                let name = f.to_string();
-                if template.contains(&format!("{{{}}}", name)) || template.contains(&format!("{{{}:", name)) {
-                    let name_ident = syn::Ident::new(&name, f.span());
-                    Some(quote! { #name_ident = #f })
-                } else {
-                    None
-                }
-            }).collect();
-            
+            let field_refs: Vec<_> = fields
+                .iter()
+                .filter_map(|f| {
+                    let name = f.to_string();
+                    if template.contains(&format!("{{{}}}", name))
+                        || template.contains(&format!("{{{}:", name))
+                    {
+                        let name_ident = syn::Ident::new(&name, f.span());
+                        Some(quote! { #name_ident = #f })
+                    } else {
+                        None
+                    }
+                })
+                .collect();
+
             if field_refs.is_empty() {
                 quote! { format!(#fmt_lit) }
             } else {

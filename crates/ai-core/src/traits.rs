@@ -1,4 +1,7 @@
-use crate::{AiSignal, RecallDomain, recall::{RecallItem, RecallQuery}};
+use crate::{
+    recall::{RecallItem, RecallQuery},
+    AiSignal, RecallDomain,
+};
 use async_trait::async_trait;
 use bus::DomainEvent;
 
@@ -18,8 +21,12 @@ pub trait AiEventMeta {
 /// Entity-level declaration. Implemented via `#[derive(AiEntity)]`.
 pub trait AiEntity {
     fn embed_text(&self) -> String;
-    fn entity_type() -> &'static str where Self: Sized;
-    fn recall_filter(&self) -> bool { true }
+    fn entity_type() -> &'static str
+    where
+        Self: Sized;
+    fn recall_filter(&self) -> bool {
+        true
+    }
 }
 
 /// Generic subscriber.
@@ -32,6 +39,10 @@ pub trait SignalConsumer: Send + Sync {
 /// Optional retrieval-side interface for features that want custom recall behaviour.
 pub trait RecallProvider: Send + Sync {
     fn domain(&self) -> &'static str;
-    fn score_query(&self, _query: &RecallQuery) -> f64 { 0.0 }
-    fn candidates(&self, _query: &RecallQuery) -> Vec<RecallItem> { Vec::new() }
+    fn score_query(&self, _query: &RecallQuery) -> f64 {
+        0.0
+    }
+    fn candidates(&self, _query: &RecallQuery) -> Vec<RecallItem> {
+        Vec::new()
+    }
 }

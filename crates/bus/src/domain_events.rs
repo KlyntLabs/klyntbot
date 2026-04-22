@@ -67,7 +67,6 @@ pub enum DomainEvent {
         components: String,
     },
 
-
     // -- Tasks --
     TaskCreated {
         task_id: String,
@@ -85,8 +84,6 @@ pub enum DomainEvent {
         task_id: String,
         times_deferred: i32,
     },
-
-
 
     /// Emitted when a task is focused/unfocused with a deadline. Consumed by feature_tasks::focus_alarms.
     TaskFocusChanged {
@@ -376,7 +373,6 @@ pub enum DomainEvent {
         greeting: String,
         away_secs: u64,
     },
-
 
     /// Emitted when a cross-domain connection dot is ready for UI display.
     CrossDomainDotReady {
