@@ -1,5 +1,6 @@
 //! Unified AI feature pipeline.
 pub mod metrics;
+pub mod mirror;
 pub mod recall;
 pub mod recall_domain;
 pub mod recall_provider_registry;
@@ -8,6 +9,7 @@ pub mod signal;
 pub mod traits;
 
 pub use metrics::AiMetrics;
+pub use mirror::{MirrorSignalSource, MirrorSnapshotSpec, MirrorSubscriberRunner};
 pub use recall::{RecallItem, RecallQuery, RecallSpec};
 pub use recall_domain::RecallDomain;
 pub use recall_provider_registry::RecallProviderRegistry;
