@@ -250,17 +250,12 @@ impl BackgroundConsolidationService {
         if let (Some(ref sig_tx), Some(ref bus)) = (&signal_tx, &domain_bus) {
             // Legacy broadcast-based collectors — will be removed once all
             // collectors are SignalConsumer-based (v1.5 migration).
-            _collector_handles.push(crate::pipeline::AtomCollector::start(
-                bus.subscribe(),
-                sig_tx.clone(),
-                cancel.clone(),
-            ));
+            // AtomCollector is now a SignalConsumer — started by app-core Phase 8.
             _collector_handles.push(crate::pipeline::CoachingCollector::start(
                 bus.subscribe(),
                 sig_tx.clone(),
                 cancel.clone(),
             ));
-            // SessionCollector is now a SignalConsumer — started by app-core Phase 8.
             info!(
                 "Unified pipeline: {} collector(s) started",
                 _collector_handles.len()
