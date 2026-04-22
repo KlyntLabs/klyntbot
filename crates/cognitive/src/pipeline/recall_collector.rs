@@ -6,10 +6,12 @@
 //! [`CognitiveSignal`]s with `source = ConversationRecall`.
 
 use std::collections::HashSet;
+use std::sync::Arc;
 
+use ai_core::{AiSignal, RecallDomain, SignalConsumer};
+use async_trait::async_trait;
 use jiff::Timestamp;
-use tokio::sync::broadcast;
-use tokio_util::sync::CancellationToken;
+use tokio::sync::Mutex;
 use tracing::{debug, info, warn};
 
 use super::signal::{CognitiveSignal, SignalContext, SignalSource};
@@ -34,53 +36,24 @@ struct BufferedMessage {
     timestamp: Timestamp,
 }
 
-pub struct RecallCollector;
+pub struct RecallCollector {
+    tx: SignalSender,
+    buffer: Arc<Mutex<Vec<BufferedMessage>>>,
+}
 
 impl RecallCollector {
-    /// Spawn the collector task and return its [`JoinHandle`].
-    pub fn start(
-        mut event_rx: broadcast::Receiver<bus::DomainEvent>,
-        signal_tx: SignalSender,
-        cancel: CancellationToken,
-    ) -> tokio::task::JoinHandle<()> {
-        tokio::spawn(async move {
-            let mut buffer: Vec<BufferedMessage> = Vec::new();
+    pub fn new(tx: SignalSender) -> Self {
+        Self {
+            tx,
+            buffer: Arc::new(Mutex::new(Vec::new())),
+        }
+    }
 
-            loop {
-                tokio::select! {
-                    _ = cancel.cancelled() => break,
-                    result = event_rx.recv() => {
-                        match result {
-                            Ok(bus::DomainEvent::ChatTurnCompleted {
-                                session_key,
-                                user_message: Some(msg),
-                            }) if msg.len() > MIN_MESSAGE_LEN => {
-                                buffer.push(BufferedMessage {
-                                    content: msg,
-                                    session_key,
-                                    timestamp: Timestamp::now(),
-                                });
-
-                                if buffer.len() >= BUFFER_FLUSH_SIZE {
-                                    Self::flush_buffer(&mut buffer, &signal_tx).await;
-                                }
-                            }
-                            Err(broadcast::error::RecvError::Closed) => break,
-                            Err(broadcast::error::RecvError::Lagged(n)) => {
-                                warn!("RecallCollector lagged {n} events");
-                            }
-                            _ => {}
-                        }
-                    }
-                }
-            }
-
-            // Final flush on shutdown so no buffered data is discarded.
-            if !buffer.is_empty() {
-                Self::flush_buffer(&mut buffer, &signal_tx).await;
-            }
-            debug!("RecallCollector stopped");
-        })
+    async fn flush_if_needed(&self) {
+        let mut buf = self.buffer.lock().await;
+        if buf.len() >= BUFFER_FLUSH_SIZE {
+            Self::flush_buffer(&mut buf, &self.tx).await;
+        }
     }
 
     async fn flush_buffer(buffer: &mut Vec<BufferedMessage>, signal_tx: &SignalSender) {
@@ -102,7 +75,7 @@ impl RecallCollector {
             let signal = CognitiveSignal {
                 source: SignalSource::ConversationRecall,
                 content: best.content.clone(),
-                domain: ai_core::RecallDomain::General,
+                domain: RecallDomain::General,
                 confidence,
                 context: SignalContext {
                     source_count: sessions.len() as u32,
@@ -123,6 +96,38 @@ impl RecallCollector {
         }
 
         buffer.clear();
+    }
+}
+
+#[async_trait]
+impl SignalConsumer for RecallCollector {
+    fn name(&self) -> &'static str {
+        "cognitive.recall"
+    }
+
+    async fn consume(&self, signal: &AiSignal) -> common::Result<()> {
+        if signal.event_kind != "ChatTurnCompleted" {
+            return Ok(());
+        }
+        if signal.content.len() <= MIN_MESSAGE_LEN {
+            return Ok(());
+        }
+
+        let session_key = signal.raw_event.as_ref().and_then(|e| match e {
+            bus::DomainEvent::ChatTurnCompleted { session_key, .. } => Some(session_key.clone()),
+            _ => None,
+        }).unwrap_or_default();
+
+        {
+            let mut buf = self.buffer.lock().await;
+            buf.push(BufferedMessage {
+                content: signal.content.clone(),
+                session_key,
+                timestamp: jiff::Timestamp::now(),
+            });
+        }
+        self.flush_if_needed().await;
+        Ok(())
     }
 }
 
@@ -152,6 +157,26 @@ fn cluster_messages(messages: &[BufferedMessage]) -> Vec<Vec<&BufferedMessage>> 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use ai_core::{AiMetrics, SalienceVerdict};
+
+    fn make_chat_signal(msg: &str, session: &str) -> AiSignal {
+        AiSignal {
+            domain: ai_core::RecallDomain::General,
+            event_kind: "ChatTurnCompleted",
+            importance: 0.3,
+            salience: SalienceVerdict::Accumulate,
+            content: msg.to_string(),
+            entity: None,
+            timestamp: jiff::Timestamp::now(),
+            raw_event: Some(bus::DomainEvent::ChatTurnCompleted {
+                session_key: session.to_string(),
+                user_message: Some(msg.to_string()),
+            }),
+            metrics: AiMetrics::default(),
+            coaching_signal: false,
+            coaching_rule: None,
+        }
+    }
 
     fn msg(content: &str, session: &str) -> BufferedMessage {
         BufferedMessage {
@@ -225,5 +250,23 @@ mod tests {
         assert_eq!(sessions.len(), 1);
         assert!(largest.len() >= CLUSTER_THRESHOLD);
         assert!(sessions.len() >= SESSION_THRESHOLD);
+    }
+
+    #[tokio::test]
+    async fn recall_consumer_buffers_and_flushes() {
+        use ai_core::SignalConsumer;
+        let (tx, mut rx) = super::super::signal_queue(32);
+        let collector = RecallCollector::new(tx);
+
+        for i in 0..BUFFER_FLUSH_SIZE {
+            let sig = make_chat_signal(
+                &format!("rust error handling best practices msg {i}"),
+                &format!("s{}", i % 3),
+            );
+            collector.consume(&sig).await.unwrap();
+        }
+        // after BUFFER_FLUSH_SIZE messages flush happens; at least one cluster promoted
+        let promoted = rx.try_recv();
+        assert!(promoted.is_ok());
     }
 }
