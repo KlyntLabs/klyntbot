@@ -67,23 +67,17 @@ pub struct TriggerFired {
     pub context: String,
 }
 
-/// Default built-in trigger conditions.
+/// Default built-in trigger conditions. Each condition here MUST have a
+/// matching arm in `SignalAccumulator::evaluate_condition`. Conditions that
+/// lost their arm during v1.5 (learning triggers, distraction_streak,
+/// context_switch_overload) are handled by pattern_detector alone — keep
+/// them out of this list to avoid no-op evaluations.
 pub(super) fn default_conditions() -> Vec<TriggerCondition> {
     vec![
-        // distraction_streak removed — distraction data is still tracked for
-        // pattern detection (afternoon_energy_drop) and insights, but no longer
-        // triggers coaching popups. The distraction overlay handles real-time
-        // intervention for distracting apps.
         TriggerCondition::new("low_productivity", 1800), // 30min cooldown
         TriggerCondition::new("deadline_approaching", 3600), // 1h cooldown
         TriggerCondition::new("focus_quality_declining", 1800),
-        // context_switch_overload removed — context switch data is tracked for
-        // analytics/insights but no longer triggers coaching popups. The distraction
-        // overlay handles real-time notifications for distracting apps.
         TriggerCondition::new("budget_warning", 3600),
         TriggerCondition::new("task_avoidance", 1800),
-        // Learning triggers removed — atom/flashcard data is still tracked for
-        // analytics and the knowledge health dashboard, but no longer triggers
-        // coaching popups. Learning activity works under the hood.
     ]
 }

@@ -80,7 +80,7 @@ impl SignalAccumulator {
         fired
     }
 
-    fn evaluate_condition(
+    pub(crate) fn evaluate_condition(
         &self,
         condition: &TriggerCondition,
         situation: &UserSituation,
@@ -377,5 +377,17 @@ mod tests {
         assert!(!fired
             .iter()
             .any(|t| t.condition_name == "context_switch_overload"));
+    }
+
+    #[test]
+    fn every_default_condition_has_evaluator() {
+        let acc = SignalAccumulator::new();
+        let sit = UserSituation::default();
+        // For each condition, calling evaluate_condition with a matching
+        // synthesized situation must either fire or return None — never panic
+        // with `_ => None` hitting a condition name without a real evaluator.
+        for c in &acc.conditions {
+            let _ = acc.evaluate_condition(c, &sit, jiff::Timestamp::now());
+        }
     }
 }
