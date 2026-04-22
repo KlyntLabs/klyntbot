@@ -2,19 +2,19 @@
 //! Replaces the old RoutingMirrorSubscriber that subscribed to DomainEventBus directly.
 
 use std::collections::HashMap;
-use std::sync::atomic::{AtomicU32, Ordering}
+use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::Arc;
 
-use ai_core::{AiSignal, MirrorSignalSource, MirrorSnapshotSpec}
+use ai_core::{AiSignal, MirrorSignalSource, MirrorSnapshotSpec};
 use async_trait::async_trait;
 use dashmap::DashMap;
 use jiff::Timestamp;
-use tracing::{debug, info, warn}
+use tracing::{debug, info, warn};
 use uuid::Uuid;
 
 use crate::mirror::{
     snippet_from_alert, MirrorAlert, MirrorRepo, NarrativeSnippet, RoutingSnapshot, SkillRouteStats,
-}
+};
 
 const MAX_TRIGGER_PHRASES: usize = 100;
 
@@ -53,11 +53,7 @@ impl RoutingSignalSource {
         }
     }
 
-    fn accumulate_signal(&self,
-        skill_name: &str,
-        confidence: f64,
-        triggers: Vec<String>,
-    ) {
+    fn accumulate_signal(&self, skill_name: &str, confidence: f64, triggers: Vec<String>) {
         self.total_count.fetch_add(1, Ordering::Relaxed);
         if confidence < 0.6 {
             self.low_confidence_count.fetch_add(1, Ordering::Relaxed);
@@ -83,7 +79,7 @@ impl RoutingSignalSource {
             low_conf as f64 / total as f64
         } else {
             0.0
-        }
+        };
 
         let mut distribution: HashMap<String, SkillRouteStats> = HashMap::new();
         let mut global_conf_sum = 0.0_f64;
@@ -97,13 +93,13 @@ impl RoutingSignalSource {
                 accum.count as f64 / total as f64 * 100.0
             } else {
                 0.0
-            }
+            };
 
             let avg_confidence = if accum.count > 0 {
                 accum.confidence_sum / accum.count as f64
             } else {
                 0.0
-            }
+            };
 
             let mut sorted_triggers: Vec<(String, u32)> = accum
                 .trigger_hits
@@ -135,7 +131,7 @@ impl RoutingSignalSource {
             global_conf_sum / global_count as f64
         } else {
             0.0
-        }
+        };
 
         RoutingSnapshot {
             id: Uuid::new_v4(),
@@ -234,6 +230,9 @@ impl MirrorSignalSource for RoutingSignalSource {
 
     async fn flush(&self) -> common::Result<()> {
         let snapshot = self.build_snapshot();
+        if snapshot.total_messages == 0 {
+            return Ok(());
+        }
         debug!(
             total_messages = snapshot.total_messages,
             fallback_rate = snapshot.fallback_rate,
@@ -246,7 +245,7 @@ impl MirrorSignalSource for RoutingSignalSource {
                 warn!("Mirror: failed to fetch routing history: {e}");
                 vec![]
             }
-        }
+        };
 
         let drift = self.detect_drift(&snapshot, &history);
 
@@ -270,7 +269,7 @@ impl MirrorSignalSource for RoutingSignalSource {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use ai_core::{AiMetrics, RecallDomain, SalienceVerdict}
+    use ai_core::{AiMetrics, RecallDomain, SalienceVerdict};
 
     fn skill_routed_signal(skill: &str, confidence: f64) -> AiSignal {
         AiSignal {
@@ -299,17 +298,26 @@ mod tests {
         let repo = crate::mirror::test_mirror_repo().await;
         let source = Arc::new(RoutingSignalSource::new(repo));
 
-        source.accumulate(&skill_routed_signal("general", 0.85)).await.unwrap();
-        source.accumulate(&skill_routed_signal("general", 0.85)).await.unwrap();
-        source.accumulate(&skill_routed_signal("finance", 0.75)).await.unwrap();
+        source
+            .accumulate(&skill_routed_signal("general", 0.85))
+            .await
+            .unwrap();
+        source
+            .accumulate(&skill_routed_signal("general", 0.85))
+            .await
+            .unwrap();
+        source
+            .accumulate(&skill_routed_signal("finance", 0.75))
+            .await
+            .unwrap();
 
         let snapshot = source.build_snapshot();
         assert_eq!(snapshot.total_messages, 3);
         assert_eq!(snapshot.distribution["general"].count, 2);
     }
 
-    #[test]
-    fn test_drift_detection_high_fallback() {
+    #[tokio::test]
+    async fn test_drift_detection_high_fallback() {
         let repo = crate::mirror::test_mirror_repo().await;
         let source = RoutingSignalSource::new(repo);
         for _ in 0..8 {
@@ -326,7 +334,7 @@ mod tests {
         let source2 = {
             let repo = crate::mirror::test_mirror_repo().await;
             RoutingSignalSource::new(repo)
-        }
+        };
         for _ in 0..9 {
             source2.accumulate_signal("general", 0.4, vec![]);
         }
@@ -334,7 +342,10 @@ mod tests {
         let current = source2.build_snapshot();
 
         let alert = source2.detect_drift(&current, &history);
-        assert!(alert.is_some(), "Expected drift alert for high fallback rate");
+        assert!(
+            alert.is_some(),
+            "Expected drift alert for high fallback rate"
+        );
         match alert.unwrap() {
             MirrorAlert::RoutingDrift { skill, .. } => {
                 assert_eq!(skill, "fallback");

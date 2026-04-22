@@ -23,7 +23,9 @@ impl AiEventMeta for TinyEvent {
             coaching_rule: None,
         }
     }
-    fn event_kind(&self) -> &'static str { "Ping" }
+    fn event_kind(&self) -> &'static str {
+        "Ping"
+    }
 }
 
 impl From<TinyEvent> for DomainEvent {
@@ -59,7 +61,10 @@ fn mirror_snapshot_attr_emits_constant() {
     assert_eq!(specs.len(), 2);
     assert_eq!(specs[0].name, "task_focus");
     assert_eq!(specs[0].flush_interval_secs, Some(3600));
-    assert_eq!(specs[0].subscribed_kinds, &["TaskFocusChanged", "TaskCompleted"]);
+    assert_eq!(
+        specs[0].subscribed_kinds,
+        &["TaskFocusChanged", "TaskCompleted"]
+    );
     assert_eq!(specs[1].name, "task_velocity");
     assert_eq!(specs[1].flush_interval_secs, None);
     assert_eq!(specs[1].subscribed_kinds, &["TaskCompleted"]);

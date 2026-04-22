@@ -203,7 +203,12 @@ mod tests {
     use crate::pipeline::signal::SignalContext;
     use jiff::Timestamp;
 
-    fn sig(source: SignalSource, content: &str, domain: ai_core::RecallDomain, confidence: f64) -> CognitiveSignal {
+    fn sig(
+        source: SignalSource,
+        content: &str,
+        domain: ai_core::RecallDomain,
+        confidence: f64,
+    ) -> CognitiveSignal {
         CognitiveSignal {
             source,
             content: content.into(),

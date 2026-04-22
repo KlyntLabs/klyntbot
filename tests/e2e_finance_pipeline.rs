@@ -19,7 +19,9 @@ struct TestObservation {
 
 #[async_trait]
 impl SignalConsumer for TestConsumer {
-    fn name(&self) -> &'static str { "test_consumer" }
+    fn name(&self) -> &'static str {
+        "test_consumer"
+    }
 
     async fn consume(&self, signal: &AiSignal) -> common::Result<()> {
         self.observations.lock().unwrap().push(TestObservation {
@@ -61,8 +63,14 @@ async fn finance_transaction_recorded_produces_signal() {
     assert_eq!(obs.len(), 1, "expected exactly one observation");
     assert_eq!(obs[0].event_kind, "TransactionRecorded");
     assert_eq!(obs[0].domain, "finance");
-    assert!(obs[0].content.contains("groceries"), "content should contain category");
-    assert!(obs[0].importance >= 0.4 && obs[0].importance <= 0.6, "importance should be ~0.5");
+    assert!(
+        obs[0].content.contains("groceries"),
+        "content should contain category"
+    );
+    assert!(
+        obs[0].importance >= 0.4 && obs[0].importance <= 0.6,
+        "importance should be ~0.5"
+    );
 }
 
 #[tokio::test]
@@ -93,6 +101,12 @@ async fn finance_budget_alert_high_importance() {
     let obs = observations.lock().unwrap().clone();
     assert_eq!(obs.len(), 1);
     assert_eq!(obs[0].event_kind, "BudgetAlert");
-    assert!(obs[0].importance >= 0.8, "budget alert should have high importance");
-    assert!(obs[0].content.contains("dining"), "content should mention category");
+    assert!(
+        obs[0].importance >= 0.8,
+        "budget alert should have high importance"
+    );
+    assert!(
+        obs[0].content.contains("dining"),
+        "content should mention category"
+    );
 }

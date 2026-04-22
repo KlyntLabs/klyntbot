@@ -1,7 +1,7 @@
 //! MirrorFacade — public API for the Mirror self-reflection layer.
 //!
 //! Tauri commands and MCP handlers call this facade rather than accessing the
-//! repo or subscribers directly.
+//! repo or signal sources directly.
 
 use std::sync::Arc;
 

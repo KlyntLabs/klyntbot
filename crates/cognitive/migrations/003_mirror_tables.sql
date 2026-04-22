@@ -75,3 +75,25 @@ CREATE TABLE IF NOT EXISTS mirror_trial_previews (
 );
 CREATE INDEX IF NOT EXISTS idx_trial_previews_time ON mirror_trial_previews(preview_at);
 CREATE INDEX IF NOT EXISTS idx_trial_previews_trial_id ON mirror_trial_previews(trial_id);
+
+CREATE TABLE IF NOT EXISTS mirror_task_focus_snapshots (
+    id TEXT PRIMARY KEY,
+    captured_at TEXT NOT NULL,
+    window_hours INTEGER NOT NULL DEFAULT 1,
+    focus_changes INTEGER NOT NULL,
+    tasks_completed INTEGER NOT NULL,
+    completion_rate REAL NOT NULL,
+    longest_unfinished_secs INTEGER,
+    top_tasks_json TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_task_focus_snapshots_time ON mirror_task_focus_snapshots(captured_at);
+
+CREATE TABLE IF NOT EXISTS mirror_finance_drift_snapshots (
+    id TEXT PRIMARY KEY,
+    captured_at TEXT NOT NULL,
+    window_hours INTEGER NOT NULL DEFAULT 24,
+    total_transactions INTEGER NOT NULL,
+    over_budget_count INTEGER NOT NULL,
+    per_category_json TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_finance_drift_snapshots_time ON mirror_finance_drift_snapshots(captured_at);

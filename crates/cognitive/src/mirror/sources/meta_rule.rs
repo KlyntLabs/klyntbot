@@ -3,7 +3,7 @@
 
 use std::collections::HashMap;
 
-use ai_core::{AiSignal, MirrorSignalSource, MirrorSnapshotSpec}
+use ai_core::{AiSignal, MirrorSignalSource, MirrorSnapshotSpec};
 use async_trait::async_trait;
 use jiff::Timestamp;
 use tracing::warn;
@@ -12,7 +12,7 @@ use uuid::Uuid;
 use crate::mirror::{
     snippet_from_alert, MetaRule, MetaRuleAction, MetaRuleSource, MetaRuleStatus, MirrorAlert,
     MirrorRepo,
-}
+};
 
 const LOW_CONFIDENCE_THRESHOLD: f64 = 0.4;
 const SAME_SESSION_CORRECTION_THRESHOLD: u32 = 2;
@@ -38,11 +38,7 @@ impl MetaRuleSignalSource {
         }
     }
 
-    fn record_correction(
-        &self,
-        session_key: &str,
-        skill_name: &str,
-    ) -> Option<MirrorAlert> {
+    pub fn record_correction(&self, session_key: &str, skill_name: &str) -> Option<MirrorAlert> {
         let mut sessions = self.session_corrections.lock().unwrap();
         if sessions.len() > MAX_TRACKED_SESSIONS {
             sessions.clear();
@@ -51,7 +47,7 @@ impl MetaRuleSignalSource {
             let c = sessions.entry(session_key.to_string()).or_insert(0);
             *c += 1;
             *c
-        }
+        };
 
         if session_count >= SAME_SESSION_CORRECTION_THRESHOLD {
             let rule_id = Uuid::new_v4();
@@ -75,7 +71,7 @@ impl MetaRuleSignalSource {
             let c = skills.entry(skill_name.to_string()).or_insert(0);
             *c += 1;
             *c
-        }
+        };
 
         if skill_count >= CROSS_SESSION_CORRECTION_THRESHOLD {
             let rule_id = Uuid::new_v4();
@@ -92,18 +88,19 @@ impl MetaRuleSignalSource {
         None
     }
 
-    fn record_low_confidence(&self,
-        skill: &str,
-        confidence: f64,
-    ) -> Option<MirrorAlert> {
+    fn record_low_confidence(&self, skill: &str, confidence: f64) -> Option<MirrorAlert> {
         if confidence >= LOW_CONFIDENCE_THRESHOLD {
             return None;
         }
 
-        let streak = self.low_confidence_streak.fetch_add(1, std::sync::atomic::Ordering::Relaxed) + 1;
+        let streak = self
+            .low_confidence_streak
+            .fetch_add(1, std::sync::atomic::Ordering::Relaxed)
+            + 1;
 
         if streak >= LOW_CONFIDENCE_STREAK_THRESHOLD {
-            self.low_confidence_streak.store(0, std::sync::atomic::Ordering::Relaxed);
+            self.low_confidence_streak
+                .store(0, std::sync::atomic::Ordering::Relaxed);
             let rule_id = Uuid::new_v4();
             return Some(MirrorAlert::MetaRuleProposed {
                 rule_id,
@@ -119,10 +116,11 @@ impl MetaRuleSignalSource {
     }
 
     fn record_high_confidence(&self) {
-        self.low_confidence_streak.store(0, std::sync::atomic::Ordering::Relaxed);
+        self.low_confidence_streak
+            .store(0, std::sync::atomic::Ordering::Relaxed);
     }
 
-    async fn handle_alert(&self, alert: &MirrorAlert) {
+    pub async fn handle_alert(&self, alert: &MirrorAlert) {
         if let MirrorAlert::MetaRuleProposed {
             rule_id,
             rule_text,
@@ -139,7 +137,7 @@ impl MetaRuleSignalSource {
                 signal_count: 1,
                 created_at: Timestamp::now(),
                 updated_at: Timestamp::now(),
-            }
+            };
 
             if let Err(e) = self.repo.insert_meta_rule(&rule).await {
                 warn!("MetaRuleSignalSource: failed to insert meta-rule: {e}");
@@ -157,9 +155,10 @@ impl MetaRuleSignalSource {
 impl MirrorSignalSource for MetaRuleSignalSource {
     fn spec(&self) -> MirrorSnapshotSpec {
         MirrorSnapshotSpec {
-        name: "meta_rule",
-        subscribed_kinds: &["UserCorrectedAI", "SkillRouted"],
-        flush_interval_secs: None,
+            name: "meta_rule",
+            subscribed_kinds: &["UserCorrectedAI", "SkillRouted"],
+            flush_interval_secs: None,
+        }
     }
 
     fn name(&self) -> &'static str {

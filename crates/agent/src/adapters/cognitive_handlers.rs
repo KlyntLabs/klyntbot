@@ -36,7 +36,9 @@ impl HeuristicExtractionHandler {
 
         match observation.source_event.as_str() {
             bus::DomainEvent::KIND_USER_STATED_FACT => vec![fact(od, "stated", 1.0, "user_stated")],
-            bus::DomainEvent::KIND_USER_CORRECTED_AI => vec![fact(od, "corrected", 1.0, "user_stated")],
+            bus::DomainEvent::KIND_USER_CORRECTED_AI => {
+                vec![fact(od, "corrected", 1.0, "user_stated")]
+            }
             bus::DomainEvent::KIND_CHAT_TURN_COMPLETED => {
                 let content = observation.content.trim();
                 // Skip questions and very short messages — no facts to extract
@@ -65,8 +67,12 @@ impl HeuristicExtractionHandler {
                     }]
                 }
             }
-            bus::DomainEvent::KIND_BUDGET_ALERT => vec![fact("finance", "budget_pressure", 0.9, "observed")],
-            bus::DomainEvent::KIND_COACHING_FEEDBACK => vec![fact("coaching", "coaching_response", 0.9, "observed")],
+            bus::DomainEvent::KIND_BUDGET_ALERT => {
+                vec![fact("finance", "budget_pressure", 0.9, "observed")]
+            }
+            bus::DomainEvent::KIND_COACHING_FEEDBACK => {
+                vec![fact("coaching", "coaching_response", 0.9, "observed")]
+            }
             source if source.starts_with("accumulated:") => {
                 vec![fact(od, "pattern", 0.7, "inferred")]
             }

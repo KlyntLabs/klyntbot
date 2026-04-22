@@ -41,7 +41,8 @@ impl MirrorRetentionService {
         cancel: CancellationToken,
     ) -> JoinHandle<()> {
         tokio::spawn(async move {
-            let mut interval = tokio::time::interval(Duration::from_secs(config.sweep_interval_secs));
+            let mut interval =
+                tokio::time::interval(Duration::from_secs(config.sweep_interval_secs));
             interval.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
             interval.tick().await; // Skip immediate first tick.
             loop {
@@ -56,12 +57,22 @@ impl MirrorRetentionService {
     }
 
     pub async fn sweep_once(repo: &MirrorRepo, config: &MirrorRetentionConfig) {
-        let _ = repo.cleanup_old_snapshots(config.routing_snapshot_days).await;
+        let _ = repo
+            .cleanup_old_snapshots(config.routing_snapshot_days)
+            .await;
         let _ = repo.cleanup_old_snippets(config.snippet_days).await;
-        let _ = repo.cleanup_old_trend_narratives(config.narrative_days).await;
-        let _ = repo.cleanup_old_meta_rules(config.disabled_meta_rule_days).await;
-        let _ = repo.cleanup_reverted_brain_versions(config.reverted_brain_version_days).await;
-        let _ = repo.cleanup_old_trial_previews(config.trial_preview_days).await;
+        let _ = repo
+            .cleanup_old_trend_narratives(config.narrative_days)
+            .await;
+        let _ = repo
+            .cleanup_old_meta_rules(config.disabled_meta_rule_days)
+            .await;
+        let _ = repo
+            .cleanup_reverted_brain_versions(config.reverted_brain_version_days)
+            .await;
+        let _ = repo
+            .cleanup_old_trial_previews(config.trial_preview_days)
+            .await;
         tracing::debug!("mirror retention sweep completed");
     }
 }

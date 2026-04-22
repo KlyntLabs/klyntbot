@@ -145,19 +145,19 @@ fn render_variant(
         Some(c) => {
             let rule = match &c.rule {
                 Some(s) => quote! { Some(#s.to_string()) },
-                None    => quote! { None },
+                None => quote! { None },
             };
             let app = match &c.app_from {
                 Some(id) => quote! { Some(#id.to_string()) },
-                None     => quote! { None },
+                None => quote! { None },
             };
             let amount = match &c.amount_from {
                 Some(id) => quote! { Some(*#id as f64) },
-                None     => quote! { None },
+                None => quote! { None },
             };
             let category = match &c.category_from {
                 Some(id) => quote! { Some(#id.to_string()) },
-                None     => quote! { None },
+                None => quote! { None },
             };
             (quote! { true }, rule, app, amount, category)
         }

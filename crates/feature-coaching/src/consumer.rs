@@ -16,13 +16,15 @@ impl CoachingSignalConsumer {
 
 #[async_trait]
 impl SignalConsumer for CoachingSignalConsumer {
-    fn name(&self) -> &'static str { "coaching" }
+    fn name(&self) -> &'static str {
+        "coaching"
+    }
 
     async fn consume(&self, signal: &AiSignal) -> common::Result<()> {
         if !signal.coaching_signal {
             return Ok(());
         }
-        let _ = self.tx.send(signal.clone()).await;  // drop on full — coaching is best-effort
+        let _ = self.tx.send(signal.clone()).await; // drop on full — coaching is best-effort
         Ok(())
     }
 }

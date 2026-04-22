@@ -8,7 +8,8 @@ fn budget_alert_is_coaching_signal() {
         category: "food".into(),
         spent: 450,
         limit: 500,
-    }.to_signal();
+    }
+    .to_signal();
     assert!(sig.coaching_signal);
     assert_eq!(sig.metrics.category.as_deref(), Some("food"));
     assert_eq!(sig.metrics.amount, Some(450.0));
@@ -22,7 +23,8 @@ fn transaction_recorded_has_amount_metric() {
         amount: 42,
         currency: "USD".into(),
         _is_over_budget: false,
-    }.to_signal();
+    }
+    .to_signal();
     assert!(sig.coaching_signal);
     assert_eq!(sig.metrics.amount, Some(42.0));
 }
@@ -33,6 +35,7 @@ fn task_completed_is_coaching_signal() {
         task_id: "t1".into(),
         title: "x".into(),
         deviation_pct: Some(20.0),
-    }.to_signal();
+    }
+    .to_signal();
     assert!(sig.coaching_signal);
 }

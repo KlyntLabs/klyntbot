@@ -7,9 +7,11 @@ fn no_bare_event_type_literals() {
     for p in src_roots {
         let body = std::fs::read_to_string(p).unwrap_or_default();
         for line in body.lines() {
-            if line.contains("event_type") && line.contains('"')
+            if line.contains("event_type")
+                && line.contains('"')
                 && !line.trim_start().starts_with("//")
-                && !line.contains("KIND_") {
+                && !line.contains("KIND_")
+            {
                 panic!("bare event_type literal in {}: {}", p, line);
             }
         }

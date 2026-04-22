@@ -83,7 +83,8 @@ impl PatternDetector {
                     signal_count: avoidance.len() as i32,
                     description: format!("Task avoidance detected {} times", avoidance.len()),
                     domain: ai_core::RecallDomain::Tasks,
-                    rule_text: "Break avoided tasks into smaller steps to overcome procrastination".into(),
+                    rule_text: "Break avoided tasks into smaller steps to overcome procrastination"
+                        .into(),
                 });
             }
         }
@@ -100,7 +101,8 @@ impl PatternDetector {
                         switches.len()
                     ),
                     domain: ai_core::RecallDomain::Productivity,
-                    rule_text: "Batch similar tasks together to reduce context switching overhead".into(),
+                    rule_text: "Batch similar tasks together to reduce context switching overhead"
+                        .into(),
                 });
             }
         }
@@ -290,7 +292,10 @@ mod tests {
             detector.record_trigger(&trigger("task_avoidance", "x"));
         }
         let patterns = detector.detect_patterns();
-        let p = patterns.iter().find(|p| p.name == "chronic_task_avoidance").unwrap();
+        let p = patterns
+            .iter()
+            .find(|p| p.name == "chronic_task_avoidance")
+            .unwrap();
         assert!(p.rule_text.contains("smaller steps"));
     }
 }

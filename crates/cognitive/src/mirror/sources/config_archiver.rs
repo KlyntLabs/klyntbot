@@ -3,11 +3,11 @@
 
 use std::sync::Arc;
 
-use ai_core::{AiSignal, MirrorSignalSource, MirrorSnapshotSpec}
+use ai_core::{AiSignal, MirrorSignalSource, MirrorSnapshotSpec};
 use async_trait::async_trait;
 use jiff::Timestamp;
 
-use crate::mirror::{AutotunerBridge, BrainVersion, MirrorRepo}
+use crate::mirror::{AutotunerBridge, BrainVersion, MirrorRepo};
 
 pub struct ConfigArchiverSource {
     repo: MirrorRepo,
@@ -44,7 +44,7 @@ impl ConfigArchiverSource {
             parent_version: None,
             metrics_at_promotion: serde_json::json!({}),
             reverted: false,
-        }
+        };
         self.repo.insert_brain_version(&v).await
     }
 
@@ -59,7 +59,7 @@ impl ConfigArchiverSource {
             self.repo.get_next_version_number()
         );
         let next = next?;
-        let parent = if next > 1 { Some(next - 1) } else { None }
+        let parent = if next > 1 { Some(next - 1) } else { None };
         let v = BrainVersion {
             version: next,
             trial_id,
@@ -69,7 +69,7 @@ impl ConfigArchiverSource {
             parent_version: parent,
             metrics_at_promotion: metrics,
             reverted: false,
-        }
+        };
         self.repo.insert_brain_version(&v).await
     }
 }
@@ -78,9 +78,10 @@ impl ConfigArchiverSource {
 impl MirrorSignalSource for ConfigArchiverSource {
     fn spec(&self) -> MirrorSnapshotSpec {
         MirrorSnapshotSpec {
-        name: "config_archiver",
-        subscribed_kinds: &["AutotunerDecision"],
-        flush_interval_secs: None,
+            name: "config_archiver",
+            subscribed_kinds: &["AutotunerDecision"],
+            flush_interval_secs: None,
+        }
     }
 
     fn name(&self) -> &'static str {

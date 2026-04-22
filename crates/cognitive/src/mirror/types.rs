@@ -158,7 +158,7 @@ pub struct GeneratedNarrative {
     pub improvement_highlights: Vec<String>,
 }
 
-/// Alert emitted by subscribers when patterns are detected
+/// Alert emitted by signal sources when patterns are detected
 #[derive(Debug, Clone)]
 pub enum MirrorAlert {
     RoutingDrift {
@@ -267,4 +267,44 @@ pub trait EarlyTrialEvaluator: Send + Sync {
         trial_id: &str,
         since: Timestamp,
     ) -> common::Result<TrialEarlySignals>;
+}
+
+// ---------------------------------------------------------------------------
+// Task Focus types
+// ---------------------------------------------------------------------------
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TaskFocusSnapshot {
+    pub id: Uuid,
+    pub captured_at: Timestamp,
+    pub window_hours: u8,
+    pub focus_changes: u32,
+    pub tasks_completed: u32,
+    pub completion_rate: f64,
+    pub longest_unfinished_secs: Option<i64>,
+    pub top_tasks: Vec<(String, u32)>,
+}
+
+// ---------------------------------------------------------------------------
+// Finance Drift types
+// ---------------------------------------------------------------------------
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct FinanceDriftSnapshot {
+    pub id: Uuid,
+    pub captured_at: Timestamp,
+    pub window_hours: u8,
+    pub total_transactions: u32,
+    pub over_budget_count: u32,
+    pub per_category: HashMap<String, CategorySpend>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CategorySpend {
+    pub total_amount: f64,
+    pub transaction_count: u32,
+    pub budget_alerts: u32,
 }

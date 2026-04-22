@@ -117,22 +117,26 @@ impl AppCore {
                     .to_string(),
                 times_deferred: payload["times_deferred"].as_i64().unwrap_or(1) as i32,
             },
-            bus::DomainEvent::KIND_ACTIVITY_SESSION_COMPLETED => bus::DomainEvent::ActivitySessionCompleted {
-                date: payload["date"]
-                    .as_str()
-                    .unwrap_or(&jiff::Zoned::now().strftime("%Y-%m-%d").to_string())
-                    .to_string(),
-                total_active_secs: payload["total_active_secs"].as_i64().unwrap_or(300),
-                productive_secs: payload["productive_secs"].as_i64().unwrap_or(240),
-                distracting_secs: payload["distracting_secs"].as_i64().unwrap_or(60),
-            },
-            bus::DomainEvent::KIND_PRODUCTIVITY_SCORE_COMPUTED => bus::DomainEvent::ProductivityScoreComputed {
-                date: payload["date"]
-                    .as_str()
-                    .unwrap_or(&jiff::Zoned::now().strftime("%Y-%m-%d").to_string())
-                    .to_string(),
-                score: payload["score"].as_f64().unwrap_or(0.0),
-            },
+            bus::DomainEvent::KIND_ACTIVITY_SESSION_COMPLETED => {
+                bus::DomainEvent::ActivitySessionCompleted {
+                    date: payload["date"]
+                        .as_str()
+                        .unwrap_or(&jiff::Zoned::now().strftime("%Y-%m-%d").to_string())
+                        .to_string(),
+                    total_active_secs: payload["total_active_secs"].as_i64().unwrap_or(300),
+                    productive_secs: payload["productive_secs"].as_i64().unwrap_or(240),
+                    distracting_secs: payload["distracting_secs"].as_i64().unwrap_or(60),
+                }
+            }
+            bus::DomainEvent::KIND_PRODUCTIVITY_SCORE_COMPUTED => {
+                bus::DomainEvent::ProductivityScoreComputed {
+                    date: payload["date"]
+                        .as_str()
+                        .unwrap_or(&jiff::Zoned::now().strftime("%Y-%m-%d").to_string())
+                        .to_string(),
+                    score: payload["score"].as_f64().unwrap_or(0.0),
+                }
+            }
             bus::DomainEvent::KIND_CHAT_TURN_COMPLETED => bus::DomainEvent::ChatTurnCompleted {
                 session_key: payload["session_key"]
                     .as_str()

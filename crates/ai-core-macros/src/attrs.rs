@@ -169,9 +169,7 @@ fn parse_salience(s: &str) -> syn::Result<SalienceSpec> {
     }
 }
 
-fn parse_coaching_signal(
-    meta: &syn::meta::ParseNestedMeta,
-) -> syn::Result<CoachingSignalSpec> {
+fn parse_coaching_signal(meta: &syn::meta::ParseNestedMeta) -> syn::Result<CoachingSignalSpec> {
     let mut app_from = None;
     let mut amount_from = None;
     let mut category_from = None;
@@ -220,9 +218,7 @@ fn parse_coaching_signal(
                 let s: syn::LitStr = inner.value()?.parse()?;
                 rule = Some(s.value());
             }
-            other => {
-                return Err(inner.error(format!("unknown coaching_signal key: {other}")))
-            }
+            other => return Err(inner.error(format!("unknown coaching_signal key: {other}"))),
         }
         Ok(())
     })?;
@@ -235,9 +231,15 @@ fn parse_coaching_signal(
 }
 
 pub fn parse_ai_feature_attr(attrs: &[syn::Attribute]) -> syn::Result<AiFeatureAttr> {
-    let ai_attr = attrs.iter().find(|a| a.path().is_ident("ai"))
-        .ok_or_else(|| syn::Error::new(proc_macro2::Span::call_site(),
-            "AiFeature derive requires #[ai(...)]"))?;
+    let ai_attr = attrs
+        .iter()
+        .find(|a| a.path().is_ident("ai"))
+        .ok_or_else(|| {
+            syn::Error::new(
+                proc_macro2::Span::call_site(),
+                "AiFeature derive requires #[ai(...)]",
+            )
+        })?;
 
     let mut recall_domain = None;
     let mut skill = None;
@@ -249,8 +251,11 @@ pub fn parse_ai_feature_attr(attrs: &[syn::Attribute]) -> syn::Result<AiFeatureA
     let mut mirror_snapshots: Vec<MirrorSnapshotAttr> = Vec::new();
 
     ai_attr.parse_nested_meta(|meta| {
-        let k = meta.path.get_ident()
-            .ok_or_else(|| meta.error("expected identifier"))?.to_string();
+        let k = meta
+            .path
+            .get_ident()
+            .ok_or_else(|| meta.error("expected identifier"))?
+            .to_string();
         match k.as_str() {
             "recall_domain" => {
                 let s: syn::LitStr = meta.value()?.parse()?;
@@ -289,12 +294,14 @@ pub fn parse_ai_feature_attr(attrs: &[syn::Attribute]) -> syn::Result<AiFeatureA
     })?;
 
     Ok(AiFeatureAttr {
-        recall_domain: recall_domain.ok_or_else(|| syn::Error::new(
-            proc_macro2::Span::call_site(), "recall_domain is required"))?,
-        skill: skill.ok_or_else(|| syn::Error::new(
-            proc_macro2::Span::call_site(), "skill is required"))?,
-        event: event.ok_or_else(|| syn::Error::new(
-            proc_macro2::Span::call_site(), "event path is required"))?,
+        recall_domain: recall_domain.ok_or_else(|| {
+            syn::Error::new(proc_macro2::Span::call_site(), "recall_domain is required")
+        })?,
+        skill: skill
+            .ok_or_else(|| syn::Error::new(proc_macro2::Span::call_site(), "skill is required"))?,
+        event: event.ok_or_else(|| {
+            syn::Error::new(proc_macro2::Span::call_site(), "event path is required")
+        })?,
         recall_boost_when,
         recall_priority_field,
         recall_recency_field,
@@ -303,9 +310,7 @@ pub fn parse_ai_feature_attr(attrs: &[syn::Attribute]) -> syn::Result<AiFeatureA
     })
 }
 
-fn parse_mirror_snapshot(
-    meta: &syn::meta::ParseNestedMeta,
-) -> syn::Result<MirrorSnapshotAttr> {
+fn parse_mirror_snapshot(meta: &syn::meta::ParseNestedMeta) -> syn::Result<MirrorSnapshotAttr> {
     let mut name: Option<String> = None;
     let mut flush_interval_secs: Option<u64> = None;
     let mut subscribed_kinds: Vec<String> = Vec::new();

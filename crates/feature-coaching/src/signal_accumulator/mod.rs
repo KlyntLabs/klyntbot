@@ -243,7 +243,11 @@ mod tests {
             entity: None,
             timestamp: jiff::Timestamp::now(),
             raw_event: None,
-            metrics: ai_core::AiMetrics { category: Some("food".into()), amount: Some(450.0), app: None },
+            metrics: ai_core::AiMetrics {
+                category: Some("food".into()),
+                amount: Some(450.0),
+                app: None,
+            },
             coaching_signal: true,
             coaching_rule: None,
         };

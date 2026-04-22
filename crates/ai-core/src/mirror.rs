@@ -101,7 +101,12 @@ impl<S: MirrorSignalSource> SignalConsumer for MirrorSubscriberRunner<S> {
     }
 
     async fn consume(&self, signal: &AiSignal) -> common::Result<()> {
-        if !self.source.spec().subscribed_kinds.contains(&signal.event_kind) {
+        if !self
+            .source
+            .spec()
+            .subscribed_kinds
+            .contains(&signal.event_kind)
+        {
             return Ok(());
         }
         self.source.accumulate(signal).await

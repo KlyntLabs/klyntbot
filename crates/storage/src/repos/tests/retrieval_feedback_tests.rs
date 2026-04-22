@@ -141,6 +141,7 @@ async fn avg_precision_by_domain_returns_typed_recall_domain() {
         .unwrap();
     }
 
-    let rows: Vec<(ai_core::RecallDomain, f64)> = repo.avg_precision_by_domain_since(1).await.unwrap();
+    let rows: Vec<(ai_core::RecallDomain, f64)> =
+        repo.avg_precision_by_domain_since(1).await.unwrap();
     assert!(rows.iter().any(|(d, _)| *d == ai_core::RecallDomain::Tasks));
 }

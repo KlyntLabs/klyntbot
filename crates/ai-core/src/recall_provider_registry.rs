@@ -7,7 +7,9 @@ pub struct RecallProviderRegistry {
 }
 
 impl RecallProviderRegistry {
-    pub fn new() -> Self { Self::default() }
+    pub fn new() -> Self {
+        Self::default()
+    }
 
     pub fn with<P: RecallProvider + 'static>(mut self, p: P) -> Self {
         self.providers.push(Arc::new(p));
@@ -21,7 +23,8 @@ impl RecallProviderRegistry {
     /// Score every provider for the query; return `(domain, score)` pairs
     /// sorted descending, dropping zeros.
     pub fn rank(&self, query: &RecallQuery) -> Vec<(RecallDomain, f64)> {
-        let mut out: Vec<_> = self.providers
+        let mut out: Vec<_> = self
+            .providers
             .iter()
             .map(|p| (p.domain(), p.score_query(query)))
             .filter(|(_, s)| *s > 0.0)

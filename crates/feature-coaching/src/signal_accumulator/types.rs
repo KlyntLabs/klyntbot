@@ -24,7 +24,9 @@ impl SignalMetadata {
     pub fn from_ai_signal(sig: &ai_core::AiSignal) -> Self {
         Self {
             app: sig.metrics.app.clone(),
-            task_id: sig.entity.as_ref()
+            task_id: sig
+                .entity
+                .as_ref()
                 .filter(|e| e.entity_type == "task")
                 .map(|e| e.id.clone()),
             category: sig.metrics.category.clone(),

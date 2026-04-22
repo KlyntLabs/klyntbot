@@ -8,10 +8,7 @@ pub enum FinanceEvent {
         importance = 0.5,
         salience = "accumulate",
         observation_template = "Transaction: {category} {amount} {currency}",
-        coaching_signal(
-            category_from = "category",
-            amount_from = "amount",
-        ),
+        coaching_signal(category_from = "category", amount_from = "amount",)
     )]
     TransactionRecorded {
         _tx_id: String,
@@ -34,7 +31,7 @@ pub enum FinanceEvent {
             category_from = "category",
             amount_from = "spent",
             rule = "Review spending patterns when budget pressure is detected",
-        ),
+        )
     )]
     BudgetAlert {
         category: String,

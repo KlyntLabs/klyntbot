@@ -2,12 +2,14 @@
 
 use common::Result;
 use jiff::Timestamp;
+use sqlx::Row;
+use std::collections::HashMap;
 use uuid::Uuid;
 
 use crate::mirror::{
-    BrainVersion, FeedbackTarget, MetaRule, MetaRuleAction, MetaRuleSource, MetaRuleStatus,
-    NarrativeSnippet, PreviewRecommendation, RoutingSnapshot, TrendNarrative, TrialEarlySignals,
-    TrialPreview, UserFeedback,
+    BrainVersion, CategorySpend, FeedbackTarget, FinanceDriftSnapshot, MetaRule, MetaRuleAction,
+    MetaRuleSource, MetaRuleStatus, NarrativeSnippet, PreviewRecommendation, RoutingSnapshot,
+    TaskFocusSnapshot, TrendNarrative, TrialEarlySignals, TrialPreview, UserFeedback,
 };
 
 // ---------------------------------------------------------------------------
@@ -514,7 +516,7 @@ impl MirrorRepo {
             Timestamp::now() - jiff::SignedDuration::from_secs(max_age_days as i64 * 86400);
         let result = sqlx::query(
             "DELETE FROM mirror_meta_rules
-             WHERE status = 'disabled' AND updated_at < ?1",
+             WHERE status = 'Disabled' AND updated_at < ?1",
         )
         .bind(cutoff.to_string())
         .execute(self.db())
@@ -771,6 +773,122 @@ impl MirrorRepo {
             .await
             .map_err(|e| common::KlyntbotError::Storage(e.to_string()))?;
         Ok(result.rows_affected())
+    }
+
+    // -----------------------------------------------------------------------
+    // Task focus snapshots
+    // -----------------------------------------------------------------------
+
+    pub async fn insert_task_focus_snapshot(&self, snap: &TaskFocusSnapshot) -> Result<()> {
+        let top_json = serde_json::to_string(&snap.top_tasks)
+            .map_err(|e| common::KlyntbotError::Storage(format!("serialize top_tasks: {e}")))?;
+        sqlx::query(
+            "INSERT INTO mirror_task_focus_snapshots
+             (id, captured_at, window_hours, focus_changes, tasks_completed,
+              completion_rate, longest_unfinished_secs, top_tasks_json)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+        )
+        .bind(snap.id.to_string())
+        .bind(snap.captured_at.to_string())
+        .bind(snap.window_hours as i64)
+        .bind(snap.focus_changes as i64)
+        .bind(snap.tasks_completed as i64)
+        .bind(snap.completion_rate)
+        .bind(snap.longest_unfinished_secs)
+        .bind(top_json)
+        .execute(self.db())
+        .await
+        .map_err(|e| common::KlyntbotError::Storage(format!("insert task focus: {e}")))?;
+        Ok(())
+    }
+
+    pub async fn get_latest_task_focus_snapshot(&self) -> Result<Option<TaskFocusSnapshot>> {
+        let row = sqlx::query(
+            "SELECT id, captured_at, window_hours, focus_changes, tasks_completed,
+                    completion_rate, longest_unfinished_secs, top_tasks_json
+             FROM mirror_task_focus_snapshots ORDER BY captured_at DESC LIMIT 1",
+        )
+        .fetch_optional(self.db())
+        .await
+        .map_err(|e| common::KlyntbotError::Storage(format!("latest task focus: {e}")))?;
+        let Some(row) = row else { return Ok(None) };
+        let id: String = row.try_get(0)?;
+        let captured_at: String = row.try_get(1)?;
+        let window_hours: i64 = row.try_get(2)?;
+        let focus_changes: i64 = row.try_get(3)?;
+        let tasks_completed: i64 = row.try_get(4)?;
+        let completion_rate: f64 = row.try_get(5)?;
+        let longest_unfinished_secs: Option<i64> = row.try_get(6)?;
+        let top_tasks_json: String = row.try_get(7)?;
+        let top_tasks: Vec<(String, u32)> = serde_json::from_str(&top_tasks_json)
+            .map_err(|e| common::KlyntbotError::Storage(format!("deserialize top_tasks: {e}")))?;
+        Ok(Some(TaskFocusSnapshot {
+            id: Uuid::parse_str(&id)
+                .map_err(|e| common::KlyntbotError::Storage(format!("uuid: {e}")))?,
+            captured_at: captured_at
+                .parse()
+                .map_err(|e| common::KlyntbotError::Storage(format!("ts: {e}")))?,
+            window_hours: window_hours as u8,
+            focus_changes: focus_changes as u32,
+            tasks_completed: tasks_completed as u32,
+            completion_rate,
+            longest_unfinished_secs,
+            top_tasks,
+        }))
+    }
+
+    // -----------------------------------------------------------------------
+    // Finance drift snapshots
+    // -----------------------------------------------------------------------
+
+    pub async fn insert_finance_drift_snapshot(&self, snap: &FinanceDriftSnapshot) -> Result<()> {
+        let cat_json = serde_json::to_string(&snap.per_category)
+            .map_err(|e| common::KlyntbotError::Storage(format!("serialize categories: {e}")))?;
+        sqlx::query(
+            "INSERT INTO mirror_finance_drift_snapshots
+             (id, captured_at, window_hours, total_transactions, over_budget_count, per_category_json)
+             VALUES (?, ?, ?, ?, ?, ?)",
+        )
+        .bind(snap.id.to_string())
+        .bind(snap.captured_at.to_string())
+        .bind(snap.window_hours as i64)
+        .bind(snap.total_transactions as i64)
+        .bind(snap.over_budget_count as i64)
+        .bind(cat_json)
+        .execute(self.db())
+        .await
+        .map_err(|e| common::KlyntbotError::Storage(format!("insert finance drift: {e}")))?;
+        Ok(())
+    }
+
+    pub async fn get_latest_finance_drift_snapshot(&self) -> Result<Option<FinanceDriftSnapshot>> {
+        let row = sqlx::query(
+            "SELECT id, captured_at, window_hours, total_transactions, over_budget_count, per_category_json
+             FROM mirror_finance_drift_snapshots ORDER BY captured_at DESC LIMIT 1",
+        )
+        .fetch_optional(self.db())
+        .await
+        .map_err(|e| common::KlyntbotError::Storage(format!("latest finance drift: {e}")))?;
+        let Some(row) = row else { return Ok(None) };
+        let id: String = row.try_get(0)?;
+        let captured_at: String = row.try_get(1)?;
+        let window_hours: i64 = row.try_get(2)?;
+        let total_transactions: i64 = row.try_get(3)?;
+        let over_budget_count: i64 = row.try_get(4)?;
+        let per_category_json: String = row.try_get(5)?;
+        let per_category: HashMap<String, CategorySpend> = serde_json::from_str(&per_category_json)
+            .map_err(|e| common::KlyntbotError::Storage(format!("deserialize categories: {e}")))?;
+        Ok(Some(FinanceDriftSnapshot {
+            id: Uuid::parse_str(&id)
+                .map_err(|e| common::KlyntbotError::Storage(format!("uuid: {e}")))?,
+            captured_at: captured_at
+                .parse()
+                .map_err(|e| common::KlyntbotError::Storage(format!("ts: {e}")))?,
+            window_hours: window_hours as u8,
+            total_transactions: total_transactions as u32,
+            over_budget_count: over_budget_count as u32,
+            per_category,
+        }))
     }
 }
 
@@ -1221,8 +1339,7 @@ mod tests {
         let repo = crate::mirror::test_mirror_repo().await;
         let old = TrendNarrative {
             id: Uuid::new_v4(),
-            generated_at: Timestamp::now()
-                - jiff::SignedDuration::from_secs(400 * 86400),
+            generated_at: Timestamp::now() - jiff::SignedDuration::from_secs(400 * 86400),
             period_start: Timestamp::now(),
             period_end: Timestamp::now(),
             routing_summary: "old".into(),
@@ -1279,11 +1396,17 @@ mod tests {
 
         // Active + recent disabled remain.
         assert_eq!(
-            repo.get_meta_rules_by_status(MetaRuleStatus::Active).await.unwrap().len(),
+            repo.get_meta_rules_by_status(MetaRuleStatus::Active)
+                .await
+                .unwrap()
+                .len(),
             1
         );
         assert_eq!(
-            repo.get_meta_rules_by_status(MetaRuleStatus::Disabled).await.unwrap().len(),
+            repo.get_meta_rules_by_status(MetaRuleStatus::Disabled)
+                .await
+                .unwrap()
+                .len(),
             1
         );
     }

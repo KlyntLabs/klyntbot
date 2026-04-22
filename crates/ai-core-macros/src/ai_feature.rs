@@ -20,10 +20,14 @@ pub fn expand(input: syn::DeriveInput) -> syn::Result<TokenStream> {
         None => quote! {},
     };
 
-    let priority = feat.recall_priority_field.as_ref()
+    let priority = feat
+        .recall_priority_field
+        .as_ref()
         .map(|i| quote! { Some(stringify!(#i)) })
         .unwrap_or_else(|| quote! { None });
-    let recency = feat.recall_recency_field.as_ref()
+    let recency = feat
+        .recall_recency_field
+        .as_ref()
         .map(|i| quote! { Some(stringify!(#i)) })
         .unwrap_or_else(|| quote! { None });
     let status = match &feat.recall_status_filter {

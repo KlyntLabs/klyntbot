@@ -2421,6 +2421,7 @@ dependencies = [
  "rust_decimal",
  "serde",
  "serde_json",
+ "sqlx",
  "thiserror 2.0.18",
  "tokio",
  "tracing",
@@ -7227,6 +7228,7 @@ version = "0.1.1"
 dependencies = [
  "agent",
  "ai-core",
+ "ai-core-macros",
  "app-core",
  "async-trait",
  "bus",
@@ -7235,6 +7237,7 @@ dependencies = [
  "common",
  "config",
  "context_engine",
+ "dashmap",
  "extism",
  "feature-coaching",
  "feature-finance",

@@ -419,7 +419,87 @@ impl AppCore {
             Some(repo)
         };
 
-        // ── Phase 8: AI Pipeline — SignalRouter + all v1.5 consumers ──────
+        // ── Phase 8: Mirror self-reflection layer (before SignalRouter so consumers can be wired in)
+        let (mirror_facade, mirror_consumers, mirror_flush_handles, mirror_shutdown) = {
+            let mirror_repo = ::cognitive::mirror::MirrorRepo::new(storage_pool.clone());
+            let narrative_handler: Option<Arc<dyn ::cognitive::mirror::NarrativeHandler>> =
+                cognitive_provider.as_ref().map(|cp| {
+                    let model = config
+                        .cognitive
+                        .model
+                        .as_deref()
+                        .unwrap_or(&config.agents.defaults.model)
+                        .to_string();
+                    Arc::new(::agent::mirror_handlers::LlmNarrativeHandler::new(
+                        cp.clone(),
+                        model,
+                    )) as Arc<dyn ::cognitive::mirror::NarrativeHandler>
+                });
+            let autotuner_bridge: Option<Arc<dyn ::cognitive::mirror::AutotunerBridge>> =
+                autotuner.as_ref().map(|orch| {
+                    Arc::new(crate::adapters::autotuner_bridge::AppAutotunerBridge::new(
+                        Arc::clone(orch),
+                    )) as Arc<dyn ::cognitive::mirror::AutotunerBridge>
+                });
+            let episodic_repo = Some(::cognitive::EpisodicMemoryRepo::new(
+                storage_pool.inner().clone(),
+            ));
+            let rule_repo = Some(::cognitive::ProceduralRuleRepo::new(
+                storage_pool.inner().clone(),
+            ));
+            let trial_evaluator: Option<Arc<dyn ::cognitive::mirror::EarlyTrialEvaluator>> = Some(
+                Arc::new(crate::adapters::trial_evaluator::AppTrialEvaluator::new(
+                    ::storage::StrategyRepo::new(storage_pool.inner().clone()),
+                )),
+            );
+            let started = ::cognitive::mirror::MirrorEngine::start(
+                mirror_repo.clone(),
+                narrative_handler,
+                autotuner_bridge,
+                episodic_repo,
+                rule_repo,
+                trial_evaluator,
+            );
+
+            // Bootstrap brain version 1 on first run
+            let bootstrap_archiver =
+                ::cognitive::mirror::sources::ConfigArchiverSource::new(mirror_repo.clone(), None);
+            tokio::spawn(async move {
+                let _ = bootstrap_archiver.bootstrap(serde_json::json!({})).await;
+            });
+
+            // Spawn retention sweep
+            let retention_cancel = shutdown_token.child_token();
+            let retention_handle = ::cognitive::mirror::MirrorRetentionService::spawn(
+                Arc::new(mirror_repo),
+                ::cognitive::mirror::MirrorRetentionConfig::default(),
+                retention_cancel.clone(),
+            );
+
+            let facade = {
+                let text_embedder: Arc<dyn ::cognitive::TextEmbedder> = Arc::new(
+                    ::agent::TextEmbedderImpl::new(Arc::clone(&embedding_engine)),
+                );
+                started.facade.with_text_embedder(text_embedder)
+            };
+
+            info!(
+                consumer_count = started.consumers.len(),
+                "mirror self-reflection engine started"
+            );
+
+            let mut all_handles = started.flush_handles;
+            all_handles.push(retention_handle);
+
+            (
+                Some(Arc::new(facade)),
+                started.consumers,
+                all_handles,
+                started.shutdown,
+            )
+        };
+
+        // ── Phase 9: AI Pipeline — SignalRouter + all consumers ───────────
         let ai_pipeline_router = {
             let observation_repo =
                 ::cognitive::repos::AccumulatedObservationRepo::new(storage_pool.inner().clone());
@@ -464,23 +544,26 @@ impl AppCore {
                 feature_coaching::CoachingSignalConsumer::new(coaching_signal_tx),
             );
 
-            let router = ai_pipeline::start(
-                Arc::clone(&domain_event_bus),
-                vec![
-                    ingestion,
-                    chat_turn,
-                    recall,
-                    session,
-                    atom,
-                    coaching_collector,
-                    coaching_consumer,
-                ],
+            // Build consumer list: 7 base + mirror consumers
+            let mut consumers: Vec<Arc<dyn ai_core::SignalConsumer>> = vec![
+                ingestion,
+                chat_turn,
+                recall,
+                session,
+                atom,
+                coaching_collector,
+                coaching_consumer,
+            ];
+            consumers.extend(mirror_consumers.iter().cloned());
+
+            let router = ai_pipeline::start(Arc::clone(&domain_event_bus), consumers);
+            info!(
+                "AI pipeline SignalRouter started with {} consumers (7 base + {} mirror)",
+                7 + mirror_consumers.len(),
+                mirror_consumers.len()
             );
-            info!("AI pipeline SignalRouter started with 7 consumers (ingestion + 5 cognitive + coaching)");
 
             // Launch the cognitive consolidator task (reads cognitive_rx)
-            // The background service already handles signal_rx/signal_tx internally;
-            // this is a temporary bridge until the full pipeline migration is complete.
             let _cognitive_handle = {
                 let repo = ::cognitive::SemanticFactRepo::new(storage_pool.inner().clone());
                 let rule_repo = ::cognitive::ProceduralRuleRepo::new(storage_pool.inner().clone());
@@ -544,94 +627,6 @@ impl AppCore {
             };
 
             Some(router)
-        };
-
-        // ── Phase 9: Mirror self-reflection layer ────────────────────────
-        let (mirror_facade, mirror_sources, mirror_active_timers) = {
-            let mirror_repo = ::cognitive::mirror::MirrorRepo::new(storage_pool.clone());
-            let narrative_handler: Option<Arc<dyn ::cognitive::mirror::NarrativeHandler>> =
-                cognitive_provider.as_ref().map(|cp| {
-                    let model = config
-                        .cognitive
-                        .model
-                        .as_deref()
-                        .unwrap_or(&config.agents.defaults.model)
-                        .to_string();
-                    Arc::new(::agent::mirror_handlers::LlmNarrativeHandler::new(
-                        cp.clone(),
-                        model,
-                    )) as Arc<dyn ::cognitive::mirror::NarrativeHandler>
-                });
-            let autotuner_bridge: Option<Arc<dyn ::cognitive::mirror::AutotunerBridge>> =
-                autotuner.as_ref().map(|orch| {
-                    Arc::new(crate::adapters::autotuner_bridge::AppAutotunerBridge::new(
-                        Arc::clone(orch),
-                    )) as Arc<dyn ::cognitive::mirror::AutotunerBridge>
-                });
-            let episodic_repo = Some(::cognitive::EpisodicMemoryRepo::new(
-                storage_pool.inner().clone(),
-            ));
-            let rule_repo = Some(::cognitive::ProceduralRuleRepo::new(
-                storage_pool.inner().clone(),
-            ));
-            let trial_evaluator: Option<Arc<dyn ::cognitive::mirror::EarlyTrialEvaluator>> = Some(
-                Arc::new(crate::adapters::trial_evaluator::AppTrialEvaluator::new(
-                    ::storage::StrategyRepo::new(storage_pool.inner().clone()),
-                )),
-            );
-            let (facade, sources, active_timers) = ::cognitive::mirror::MirrorEngine::start(
-                mirror_repo,
-                narrative_handler,
-                autotuner_bridge,
-                episodic_repo,
-                rule_repo,
-                trial_evaluator,
-            );
-
-            // Bootstrap brain version 1 on first run
-            let bootstrap_repo = ::cognitive::mirror::MirrorRepo::new(storage_pool.clone());
-            let bootstrap_archiver = ::cognitive::mirror::ConfigArchiverSource::new(bootstrap_repo, None);
-            tokio::spawn(async move {
-                let _ = bootstrap_archiver.bootstrap(serde_json::json!({})).await;
-            });
-
-            let facade = {
-                let text_embedder: Arc<dyn ::cognitive::TextEmbedder> = Arc::new(
-                    ::agent::TextEmbedderImpl::new(Arc::clone(&embedding_engine)),
-                );
-                facade.with_text_embedder(text_embedder)
-            };
-
-            info!("mirror self-reflection engine started");
-            (Some(Arc::new(facade)), sources, active_timers)
-        };
-
-        // Wire mirror sources into the SignalRouter as consumers
-        let mirror_handles: Vec<tokio::task::JoinHandle<()>> = if let Some(ref router) = ai_pipeline_router {
-            let cancel = shutdown_token.child_token();
-            mirror_sources
-                .into_iter()
-                .map(|source| {
-                    let runner = ai_core::MirrorSubscriberRunner::new(source, cancel.clone());
-                    let mut handles = vec![];
-                    
-                    // Register as SignalConsumer with the router
-                    // Note: This requires the SignalRouter to support dynamic consumer registration
-                    // For now, we just spawn the flush loop
-                    if let Some(handle) = runner.clone().spawn_declared_flush_loop() {
-                        handles.push(handle);
-                    }
-                    
-                    // Return a dummy handle if no flush loop
-                    if handles.is_empty() {
-                        tokio::spawn(async move {})
-                    } else {
-                        handles.into_iter().next().unwrap()
-                    }
-                })
-                .collect()
-        } else {
-            vec![]
         };
 
         // ── Journey tracker (needed by BrainVoice) ──────────────────────────
@@ -893,8 +888,8 @@ impl AppCore {
             _dnd_end_subscriber_handle: Some(_dnd_end_subscriber_handle),
             mirror_facade,
             pending_memory_repo,
-            _mirror_handles: mirror_handles,
-            _mirror_shutdown: mirror_shutdown,
+            _mirror_handles: Some(mirror_flush_handles),
+            _mirror_shutdown: Some(mirror_shutdown),
             notification_dispatcher_handle,
             _config_watcher_token: Some(config_watcher_token),
             _lifecycle_monitor: None,

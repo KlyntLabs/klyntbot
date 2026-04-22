@@ -121,6 +121,41 @@ fn translate_system_event(event: &DomainEvent) -> Option<AiSignal> {
             coaching_signal: true,
             ..base
         }),
+        DomainEvent::SkillRouted {
+            skill_name,
+            confidence,
+            ..
+        } => Some(AiSignal {
+            event_kind: "SkillRouted",
+            importance: *confidence,
+            content: skill_name.clone(),
+            ..base
+        }),
+        DomainEvent::UserCorrectedAI {
+            active_skill,
+            strength,
+            ..
+        } => Some(AiSignal {
+            event_kind: "UserCorrectedAI",
+            importance: *strength,
+            content: active_skill.clone().unwrap_or_default(),
+            ..base
+        }),
+        DomainEvent::AutotunerDecision {
+            verdict,
+            improvement_pct,
+            trial_id,
+            ..
+        } => Some(AiSignal {
+            event_kind: "AutotunerDecision",
+            importance: 0.6,
+            content: format!("{}: {} ({:.1}%)", trial_id, verdict, improvement_pct),
+            metrics: AiMetrics {
+                category: Some(verdict.clone()),
+                ..AiMetrics::default()
+            },
+            ..base
+        }),
         _ => None,
     }
 }
@@ -236,4 +271,48 @@ fn try_into_finance_event(e: &DomainEvent) -> Option<feature_finance::events::Fi
 
 pub fn start(bus: Arc<DomainEventBus>, consumers: Vec<Arc<dyn SignalConsumer>>) -> SignalRouter {
     SignalRouter::start(bus, consumers, translate)
+}
+
+#[cfg(test)]
+mod translate_mirror_tests {
+    use super::*;
+
+    #[test]
+    fn skill_routed_translates() {
+        let ev = bus::DomainEvent::SkillRouted {
+            skill_name: "general".into(),
+            confidence: 0.85,
+            source: "keyword".into(),
+            trigger_phrases: vec!["hi".into()],
+            session_key: "s".into(),
+        };
+        let sig = translate(&ev).expect("should translate");
+        assert_eq!(sig.event_kind, "SkillRouted");
+    }
+
+    #[test]
+    fn user_corrected_translates() {
+        let ev = bus::DomainEvent::UserCorrectedAI {
+            original: String::new(),
+            correction: String::new(),
+            kind: bus::CorrectionKind::Reaction,
+            strength: 0.8,
+            session_key: "s".into(),
+            active_skill: Some("general".into()),
+        };
+        let sig = translate(&ev).expect("should translate");
+        assert_eq!(sig.event_kind, "UserCorrectedAI");
+    }
+
+    #[test]
+    fn autotuner_decision_translates_activated() {
+        let ev = bus::DomainEvent::AutotunerDecision {
+            trial_id: "t1".into(),
+            verdict: "activated".into(),
+            improvement_pct: 0.0,
+            affected_params: vec!["x".into()],
+        };
+        let sig = translate(&ev).expect("should translate");
+        assert_eq!(sig.event_kind, "AutotunerDecision");
+    }
 }

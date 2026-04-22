@@ -48,6 +48,13 @@ pub enum KlyntbotError {
     Timeout(String),
 }
 
+#[cfg(feature = "sqlx")]
+impl From<sqlx::Error> for KlyntbotError {
+    fn from(e: sqlx::Error) -> Self {
+        KlyntbotError::Storage(e.to_string())
+    }
+}
+
 /// Tool-specific errors
 #[derive(Error, Debug)]
 pub enum ToolError {

@@ -61,7 +61,8 @@ impl ActionExecutor {
                     project_id: project.clone(),
                     priority: Some(3),
                     estimated_minutes: None,
-                }.into();
+                }
+                .into();
                 self.bus.publish(ev);
 
                 // INSERT task row into the tasks table.
@@ -95,7 +96,8 @@ impl ActionExecutor {
                     task_id: task_ref.clone(),
                     title: task_ref.clone(),
                     deviation_pct,
-                }.into();
+                }
+                .into();
                 self.bus.publish(ev);
 
                 if let (Some(est), Some(act)) = (estimated_duration_mins, actual_duration_mins) {
@@ -156,7 +158,8 @@ impl ActionExecutor {
                     amount: (*amount * 100.0) as i64,
                     currency: "VND".to_string(),
                     _is_over_budget: false,
-                }.into();
+                }
+                .into();
                 self.bus.publish(ev);
                 let _ = sqlx::query(
                     "INSERT INTO finance_transactions \

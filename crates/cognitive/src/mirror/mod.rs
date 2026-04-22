@@ -4,7 +4,6 @@ pub mod narratives;
 pub mod repo;
 pub mod retention;
 pub mod sources;
-pub mod subscribers;
 pub mod types;
 pub use engine::MirrorEngine;
 pub use facade::MirrorFacade;
@@ -16,11 +15,12 @@ pub use sources::{
     TaskFocusPatternSource, TrialPreviewSource,
 };
 pub use types::{
-    AutotunerBridge, BrainVersion, EarlyTrialEvaluator, FeedbackTarget, GeneratedNarrative,
-    MetaRule, MetaRuleAction, MetaRuleSource, MetaRuleStatus, MirrorAlert, MirrorAlertType,
-    MirrorResponse, MirrorState, NarrativeContext, NarrativeSnippet, PreviewRecommendation,
-    RoutingSnapshot, SkillRouteStats, SuggestedAction, TrendDirection, TrendNarrative,
-    TrialEarlySignals, TrialPreview, UserFeedback,
+    AutotunerBridge, BrainVersion, CategorySpend, EarlyTrialEvaluator, FeedbackTarget,
+    FinanceDriftSnapshot, GeneratedNarrative, MetaRule, MetaRuleAction, MetaRuleSource,
+    MetaRuleStatus, MirrorAlert, MirrorAlertType, MirrorResponse, MirrorState, NarrativeContext,
+    NarrativeSnippet, PreviewRecommendation, RoutingSnapshot, SkillRouteStats, SuggestedAction,
+    TaskFocusSnapshot, TrendDirection, TrendNarrative, TrialEarlySignals, TrialPreview,
+    UserFeedback,
 };
 
 #[cfg(test)]

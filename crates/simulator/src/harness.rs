@@ -66,8 +66,8 @@ pub struct SimulationHarness {
     /// Coaching pattern detector — records trigger firings and detects
     /// behavioral patterns (afternoon energy drop, task avoidance, etc.).
     coaching_detector: Arc<TokioMutex<feature_coaching::PatternDetector>>,
-    /// Meta-rule detector — tracks correction streaks and proposes meta-rules.
-    meta_rule_detector: TokioMutex<cognitive::mirror::MetaRuleDetector>,
+    /// Meta-rule source — tracks correction streaks and proposes meta-rules.
+    meta_rule_source: TokioMutex<cognitive::mirror::sources::MetaRuleSignalSource>,
 }
 
 impl SimulationHarness {
@@ -292,9 +292,9 @@ impl SimulationHarness {
             None
         };
 
-        let meta_rule_detector = TokioMutex::new(cognitive::mirror::MetaRuleDetector::new(
-            mirror_repo.clone(),
-        ));
+        let meta_rule_source = TokioMutex::new(
+            cognitive::mirror::sources::MetaRuleSignalSource::new(mirror_repo.clone()),
+        );
 
         Ok(Self {
             scenario,
@@ -319,7 +319,7 @@ impl SimulationHarness {
                 feature_coaching::SignalAccumulator::new(),
             )),
             coaching_detector: Arc::new(TokioMutex::new(feature_coaching::PatternDetector::new())),
-            meta_rule_detector,
+            meta_rule_source,
         })
     }
 
@@ -797,14 +797,15 @@ impl SimulationHarness {
                         active_skill: Some(msg.topic.clone()),
                     });
 
-                    // Drive the MetaRuleDetector so it proposes rules from
+                    // Drive the MetaRuleSignalSource so it proposes rules from
                     // correction streaks and persists them to mirror_meta_rules.
                     let alert = {
-                        let mut detector = self.meta_rule_detector.lock().await;
-                        detector.record_correction("sim-session", predicted_skill)
+                        let source = self.meta_rule_source.lock().await;
+                        source.record_correction("sim-session", predicted_skill)
                     };
                     if let Some(ref a) = alert {
-                        self.meta_rule_detector.lock().await.handle_alert(a).await;
+                        let source = self.meta_rule_source.lock().await;
+                        source.handle_alert(a).await;
                     }
 
                     // Flag BOTH trials' shadow log entries as user-corrected.
@@ -923,32 +924,37 @@ impl SimulationHarness {
 
                         // Salience: classify the domain event this action produced.
                         let salience_event: Option<DomainEvent> = match action {
-                            SimulatedToolAction::CreateTask { project, .. } => {
-                                Some(feature_tasks::events::TaskEvent::Created {
+                            SimulatedToolAction::CreateTask { project, .. } => Some(
+                                feature_tasks::events::TaskEvent::Created {
                                     task_id: String::new(),
                                     title: String::new(),
                                     area_id: "sim-area".to_string(),
                                     project_id: project.clone(),
                                     priority: Some(3),
                                     estimated_minutes: None,
-                                }.into())
-                            }
-                            SimulatedToolAction::CompleteTask { task_ref, .. } => {
-                                Some(feature_tasks::events::TaskEvent::Completed {
+                                }
+                                .into(),
+                            ),
+                            SimulatedToolAction::CompleteTask { task_ref, .. } => Some(
+                                feature_tasks::events::TaskEvent::Completed {
                                     task_id: task_ref.clone(),
                                     title: task_ref.clone(),
                                     deviation_pct: None,
-                                }.into())
-                            }
+                                }
+                                .into(),
+                            ),
                             SimulatedToolAction::RecordTransaction {
                                 category, amount, ..
-                            } => Some(feature_finance::events::FinanceEvent::TransactionRecorded {
-                                _tx_id: String::new(),
-                                category: category.clone(),
-                                amount: *amount as i64,
-                                currency: "VND".to_string(),
-                                _is_over_budget: false,
-                            }.into()),
+                            } => Some(
+                                feature_finance::events::FinanceEvent::TransactionRecorded {
+                                    _tx_id: String::new(),
+                                    category: category.clone(),
+                                    amount: *amount as i64,
+                                    currency: "VND".to_string(),
+                                    _is_over_budget: false,
+                                }
+                                .into(),
+                            ),
                             _ => None,
                         };
                         if let Some(ref event) = salience_event {

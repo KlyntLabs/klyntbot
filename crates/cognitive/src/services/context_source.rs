@@ -487,8 +487,8 @@ mod tests {
 
         let fact_repo = SemanticFactRepo::new(pool.clone());
         let rule_repo = ProceduralRuleRepo::new(pool);
-        let source = CognitiveContextSource::new(fact_repo, rule_repo)
-            .with_recall_registry(registry);
+        let source =
+            CognitiveContextSource::new(fact_repo, rule_repo).with_recall_registry(registry);
 
         let ctx = SourceContext {
             channel: "test".into(),

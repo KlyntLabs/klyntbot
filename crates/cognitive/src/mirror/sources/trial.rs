@@ -3,7 +3,7 @@
 
 use std::sync::Arc;
 
-use ai_core::{AiSignal, MirrorSignalSource, MirrorSnapshotSpec}
+use ai_core::{AiSignal, MirrorSignalSource, MirrorSnapshotSpec};
 use async_trait::async_trait;
 use dashmap::DashMap;
 use jiff::Timestamp;
@@ -13,7 +13,7 @@ use uuid::Uuid;
 use crate::mirror::{
     snippet_from_alert, EarlyTrialEvaluator, MirrorAlert, MirrorRepo, PreviewRecommendation,
     TrialEarlySignals, TrialPreview,
-}
+};
 
 const PREVIEW_DELAY_SECS: u64 = 4 * 60 * 60;
 const MIN_MESSAGES_FOR_KILL: u32 = 5;
@@ -37,10 +37,7 @@ impl TrialPreviewSource {
         }
     }
 
-    fn start_preview_timer(&self,
-        trial_id: String,
-        _hypothesis: String,
-    ) {
+    fn start_preview_timer(&self, trial_id: String, _hypothesis: String) {
         let repo = self.repo.clone();
         let evaluator = self.evaluator.clone();
         let timers = self.active_timers.clone();
@@ -56,7 +53,7 @@ impl TrialPreviewSource {
                     .unwrap_or_default()
             } else {
                 TrialEarlySignals::default()
-            }
+            };
 
             let messages_scored = signals.messages_scored;
             let recommendation = compute_recommendation(&signals, messages_scored);
@@ -81,7 +78,7 @@ impl TrialPreviewSource {
                 early_signals: signals,
                 recommendation: recommendation.clone(),
                 narrative: narrative.clone(),
-            }
+            };
 
             let _ = repo.insert_trial_preview(&preview).await;
 
@@ -89,7 +86,7 @@ impl TrialPreviewSource {
                 let alert = MirrorAlert::TrialUnpromising {
                     trial_id: trial_id.clone(),
                     reason: narrative,
-                }
+                };
                 let snippet = snippet_from_alert(&alert);
                 let _ = repo.insert_snippet(&snippet).await;
             }
@@ -108,9 +105,10 @@ impl TrialPreviewSource {
 impl MirrorSignalSource for TrialPreviewSource {
     fn spec(&self) -> MirrorSnapshotSpec {
         MirrorSnapshotSpec {
-        name: "trial_preview",
-        subscribed_kinds: &["AutotunerDecision"],
-        flush_interval_secs: None,
+            name: "trial_preview",
+            subscribed_kinds: &["AutotunerDecision"],
+            flush_interval_secs: None,
+        }
     }
 
     fn name(&self) -> &'static str {
@@ -120,9 +118,7 @@ impl MirrorSignalSource for TrialPreviewSource {
     async fn accumulate(&self, signal: &AiSignal) -> common::Result<()> {
         if let Some(raw) = &signal.raw_event {
             if let bus::DomainEvent::AutotunerDecision {
-                trial_id,
-                verdict,
-                ..
+                trial_id, verdict, ..
             } = raw
             {
                 if verdict == "activated" {

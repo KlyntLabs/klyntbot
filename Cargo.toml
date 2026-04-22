@@ -206,6 +206,7 @@ notifications.workspace = true
 
 [dev-dependencies]
 ai-core.workspace = true
+ai-core-macros.workspace = true
 app-core.workspace = true
 jiff.workspace = true
 tempfile.workspace = true
@@ -222,6 +223,7 @@ tools-core.workspace = true
 extism.workspace = true
 simulator.workspace = true
 walkdir = "2"
+dashmap.workspace = true
 
 [profile.dev]
 opt-level = 0
