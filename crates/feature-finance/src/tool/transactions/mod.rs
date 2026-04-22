@@ -216,11 +216,11 @@ impl FinanceTool {
 
             bus.publish(
                 crate::events::FinanceEvent::TransactionRecorded {
-                    tx_id: tx.id.clone(),
+                    _tx_id: tx.id.clone(),
                     category: category.clone().unwrap_or_default(),
                     amount,
                     currency: tx.currency.clone(),
-                    is_over_budget,
+                    _is_over_budget: is_over_budget,
                 }
                 .into(),
             );

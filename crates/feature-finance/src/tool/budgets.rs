@@ -122,7 +122,7 @@ impl FinanceTool {
         if let Some(ref bus) = self.domain_bus {
             bus.publish(
                 crate::events::FinanceEvent::BudgetCreated {
-                    budget_id: inserted.id.clone(),
+                    _budget_id: inserted.id.clone(),
                     name: inserted.name.clone(),
                     amount: inserted.amount,
                     currency: inserted.currency.clone(),

@@ -8,6 +8,7 @@ use tokio_util::sync::CancellationToken;
 /// has no pipeline registration (e.g. transient infra events).
 pub type Translator = Arc<dyn Fn(&DomainEvent) -> Option<AiSignal> + Send + Sync>;
 
+#[allow(dead_code)]
 pub struct SignalRouter {
     handle: JoinHandle<()>,
     cancel: CancellationToken,

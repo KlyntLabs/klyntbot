@@ -33,8 +33,8 @@ async fn every_feature_event_produces_a_typed_signal() {
             deviation_pct: Some(80.0),
         }.into(),
         feature_finance::events::FinanceEvent::TransactionRecorded {
-            tx_id: "tx".into(), category: "groceries".into(),
-            amount: 100, currency: "USD".into(), is_over_budget: false,
+            _tx_id: "tx".into(), category: "groceries".into(),
+            amount: 100, currency: "USD".into(), _is_over_budget: false,
         }.into(),
         feature_finance::events::FinanceEvent::BudgetAlert {
             category: "dining".into(), spent: 100, limit: 75,

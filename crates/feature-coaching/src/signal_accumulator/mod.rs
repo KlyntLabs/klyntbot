@@ -356,22 +356,23 @@ mod tests {
         assert_eq!(signal.metadata.amount, Some(25.0));
     }
 
-    #[test]
-    fn test_predictive_alert_signal() {
-        let mut acc = SignalAccumulator::new();
-
-        acc.push_event(&DomainEvent::PredictiveAlert {
-            forecast_type: "energy".into(),
-            window_start: "14:00".into(),
-            window_end: "16:00".into(),
-            predicted_value: 0.3,
-            suggested_action: Some("Take a break".into()),
-        });
-
-        let signal = acc.signals().front().unwrap();
-        assert_eq!(signal.event_type, "PredictiveAlert");
-        assert_eq!(signal.metadata.category, Some("energy".into()));
-    }
+    // Note: PredictiveAlert variant was removed in v1.
+    // #[test]
+    // fn test_predictive_alert_signal() {
+    //     let mut acc = SignalAccumulator::new();
+    //
+    //     acc.push_event(&DomainEvent::PredictiveAlert {
+    //         forecast_type: "energy".into(),
+    //         window_start: "14:00".into(),
+    //         window_end: "16:00".into(),
+    //         predicted_value: 0.3,
+    //         suggested_action: Some("Take a break".into()),
+    //     });
+    //
+    //     let signal = acc.signals().front().unwrap();
+    //     assert_eq!(signal.event_type, "PredictiveAlert");
+    //     assert_eq!(signal.metadata.category, Some("energy".into()));
+    // }
 
     #[test]
     fn test_context_switch_overload_disabled() {

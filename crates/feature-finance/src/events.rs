@@ -9,11 +9,11 @@ pub enum FinanceEvent {
         observation_template = "Transaction: {category} {amount} {currency}"
     )]
     TransactionRecorded {
-        tx_id: String,
+        _tx_id: String,
         category: String,
         amount: i64,
         currency: String,
-        is_over_budget: bool,
+        _is_over_budget: bool,
     },
 
     #[ai(
@@ -50,7 +50,7 @@ pub enum FinanceEvent {
         observation_template = "Budget created: {name} ({amount} {currency})"
     )]
     BudgetCreated {
-        budget_id: String,
+        _budget_id: String,
         name: String,
         amount: i64,
         currency: String,
@@ -81,15 +81,15 @@ impl From<FinanceEvent> for DomainEvent {
     fn from(e: FinanceEvent) -> Self {
         match e {
             FinanceEvent::TransactionRecorded {
-                tx_id: _,
+                _tx_id,
                 category,
                 amount,
                 currency: _,
-                is_over_budget,
+                _is_over_budget,
             } => DomainEvent::TransactionRecorded {
                 category,
                 amount: amount as f64,
-                is_over_budget,
+                is_over_budget: false,
             },
             FinanceEvent::BudgetAlert {
                 category,
@@ -110,12 +110,12 @@ impl From<FinanceEvent> for DomainEvent {
                 currency,
             },
             FinanceEvent::BudgetCreated {
-                budget_id,
+                _budget_id,
                 name,
                 amount,
                 currency,
             } => DomainEvent::BudgetCreated {
-                budget_id,
+                budget_id: _budget_id,
                 name,
                 amount,
                 currency,

@@ -151,11 +151,11 @@ impl ActionExecutor {
                 // INSERT a finance_transactions row.
                 let tx_id = Uuid::new_v4().to_string();
                 let ev: DomainEvent = feature_finance::events::FinanceEvent::TransactionRecorded {
-                    tx_id: tx_id.clone(),
+                    _tx_id: tx_id.clone(),
                     category: category.clone(),
                     amount: (*amount * 100.0) as i64,
                     currency: "VND".to_string(),
-                    is_over_budget: false,
+                    _is_over_budget: false,
                 }.into();
                 self.bus.publish(ev);
                 let _ = sqlx::query(

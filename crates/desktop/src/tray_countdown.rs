@@ -102,8 +102,7 @@ pub fn spawn(
 fn is_cache_invalidating(evt: &bus::DomainEvent) -> bool {
     matches!(
         evt,
-        bus::DomainEvent::TaskDueDateChanged { .. }
-            | bus::DomainEvent::TaskFocusChanged { .. }
+        bus::DomainEvent::TaskFocusChanged { .. }
             | bus::DomainEvent::AlarmFired { .. }
             | bus::DomainEvent::AlarmSnoozed { .. }
             | bus::DomainEvent::AlarmCancelled { .. }

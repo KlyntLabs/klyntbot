@@ -28,13 +28,13 @@ fn task_event_every_variant_produces_nonempty_signal() {
 fn finance_event_every_variant_produces_nonempty_signal() {
     use feature_finance::events::FinanceEvent;
     let samples: Vec<FinanceEvent> = vec![
-        FinanceEvent::TransactionRecorded { tx_id: "_".into(), category: "_".into(),
+        FinanceEvent::TransactionRecorded { _tx_id: "_".into(), category: "_".into(),
                                             amount: 0, currency: "_".into(),
-                                            is_over_budget: false },
+                                            _is_over_budget: false },
         FinanceEvent::BudgetAlert { category: "_".into(), spent: 0, limit: 0 },
         FinanceEvent::AccountCreated { account_id: "_".into(), name: "_".into(),
                                        currency: "_".into() },
-        FinanceEvent::BudgetCreated { budget_id: "_".into(), name: "_".into(),
+        FinanceEvent::BudgetCreated { _budget_id: "_".into(), name: "_".into(),
                                       amount: 0, currency: "_".into() },
         FinanceEvent::GoalCreated { goal_id: "_".into(), name: "_".into(),
                                     target_amount: 0 },

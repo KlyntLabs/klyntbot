@@ -9,6 +9,7 @@ pub struct AiEventAttr {
     pub entity_bridge: Option<EntityBridge>,
 }
 
+#[allow(clippy::large_enum_variant)]
 pub enum SalienceSpec {
     Accumulate,
     Extract,

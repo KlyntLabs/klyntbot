@@ -938,11 +938,11 @@ impl SimulationHarness {
                             SimulatedToolAction::RecordTransaction {
                                 category, amount, ..
                             } => Some(feature_finance::events::FinanceEvent::TransactionRecorded {
-                                tx_id: String::new(),
+                                _tx_id: String::new(),
                                 category: category.clone(),
                                 amount: *amount as i64,
                                 currency: "VND".to_string(),
-                                is_over_budget: false,
+                                _is_over_budget: false,
                             }.into()),
                             _ => None,
                         };

@@ -60,11 +60,11 @@ fn try_into_finance_event(e: &DomainEvent) -> Option<feature_finance::events::Fi
     match e {
         DomainEvent::TransactionRecorded { category, amount, is_over_budget } =>
             Some(FinanceEvent::TransactionRecorded {
-                tx_id: String::new(), // not in the old variant
+                _tx_id: String::new(), // not in the old variant
                 category: category.clone(),
                 amount: *amount as i64,
                 currency: String::new(), // not in the old variant
-                is_over_budget: *is_over_budget,
+                _is_over_budget: *is_over_budget,
             }),
         DomainEvent::BudgetAlert { category, spent, limit } =>
             Some(FinanceEvent::BudgetAlert {
@@ -80,7 +80,7 @@ fn try_into_finance_event(e: &DomainEvent) -> Option<feature_finance::events::Fi
             }),
         DomainEvent::BudgetCreated { budget_id, name, amount, currency } =>
             Some(FinanceEvent::BudgetCreated {
-                budget_id: budget_id.clone(),
+                _budget_id: budget_id.clone(),
                 name: name.clone(),
                 amount: *amount as i64,
                 currency: currency.clone(),

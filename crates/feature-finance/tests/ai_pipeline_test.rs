@@ -18,11 +18,11 @@ fn transaction_embed_text_concatenates_key_fields() {
 #[test]
 fn transaction_recorded_signal() {
     let e = FinanceEvent::TransactionRecorded {
-        tx_id: "t1".into(),
+        _tx_id: "t1".into(),
         category: "groceries".into(),
         amount: 4500,
         currency: "USD".into(),
-        is_over_budget: false,
+        _is_over_budget: false,
     };
     let sig = e.to_signal();
     assert_eq!(sig.event_kind, "TransactionRecorded");

@@ -6,7 +6,12 @@ impl AiEventMeta for TaskEvent {
     fn to_signal(&self) -> AiSignal { unimplemented!() }
     fn event_kind(&self) -> &'static str { "Created" }
 }
-impl From<TaskEvent> for bus::DomainEvent {
+
+// Stub DomainEvent for the test
+#[derive(Debug, Clone)]
+pub enum DomainEvent {}
+
+impl From<TaskEvent> for DomainEvent {
     fn from(_: TaskEvent) -> Self { unimplemented!() }
 }
 
