@@ -242,41 +242,15 @@ fn normalize_domain_event(e: cognitive::DomainEventRow) -> Option<TimelineEntry>
                 "var(--timeline-task)",
             )
         }
-        "TaskStatusChanged" => {
+        // Note: TaskStatusChanged, TaskPriorityChanged, and TaskFieldUpdated
+        // variants were removed in v1. These timeline entries are now handled
+        // through the AI pipeline's TaskEvent signals.
+        bus::DomainEvent::KIND_TASK_CREATED => {
             let task_id = field(inner, "task_id");
-            let from = field(inner, "from").unwrap_or("?");
-            let to = field(inner, "to").unwrap_or("?");
             (
-                TimelineEntryType::TaskStatusChanged,
+                TimelineEntryType::TaskCreated,
                 TimelineSource::Task,
-                format!("Status: {from} → {to}"),
-                task_id.map(String::from),
-                task_id.map(|id| format!("/task/{id}")),
-                "var(--timeline-task)",
-            )
-        }
-        "TaskPriorityChanged" => {
-            let task_id = field(inner, "task_id");
-            let from = field(inner, "from").unwrap_or("none");
-            let to = field(inner, "to").unwrap_or("none");
-            (
-                TimelineEntryType::TaskPriorityChanged,
-                TimelineSource::Task,
-                format!("Priority: {from} → {to}"),
-                task_id.map(String::from),
-                task_id.map(|id| format!("/task/{id}")),
-                "var(--timeline-task)",
-            )
-        }
-        "TaskFieldUpdated" => {
-            let task_id = field(inner, "task_id");
-            let field_name = field(inner, "field").unwrap_or("field");
-            let from = field(inner, "from").unwrap_or("");
-            let to = field(inner, "to").unwrap_or("");
-            (
-                TimelineEntryType::TaskFieldUpdated,
-                TimelineSource::Task,
-                format!("{field_name}: \"{from}\" → \"{to}\""),
+                format!("Task created: {}", task_id.unwrap_or("?")),
                 task_id.map(String::from),
                 task_id.map(|id| format!("/task/{id}")),
                 "var(--timeline-task)",

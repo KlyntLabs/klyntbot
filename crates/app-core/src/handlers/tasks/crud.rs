@@ -155,19 +155,8 @@ impl AppCore {
                 estimate_mins: created.estimated_minutes.map(|m| m as i64),
                 task_type: created.task_type.clone(),
             });
-            if let Some(ref project_id) = created.project_id {
-                bus.publish(bus::DomainEvent::TaskHierarchyChanged {
-                    project_id: project_id.clone(),
-                });
-            }
-
-            // Emit TaskDueDateChanged for downstream subscribers (alarms, tray countdown).
-            if created.due_date.is_some() {
-                bus.publish(bus::DomainEvent::TaskDueDateChanged {
-                    task_id: id.clone(),
-                    due_date: created.due_date.map(|d| d.to_string()),
-                });
-            }
+            // Note: TaskHierarchyChanged and TaskDueDateChanged variants were removed in v1.
+            // Downstream consumers should listen to TaskCreated and handle due_date from the task repo.
         }
 
         // Newly created task has no subtasks yet; resolve status label for the response
@@ -235,73 +224,9 @@ impl AppCore {
         // Diff old vs new and emit domain events
         if let Some(ref old) = old_task {
             if let Ok(bus) = self.domain_event_bus() {
-                if let Some(ref status) = new_status {
-                    if old.status != *status {
-                        bus.publish(bus::DomainEvent::TaskStatusChanged {
-                            task_id: task_id.clone(),
-                            from: old.status.clone(),
-                            to: status.clone(),
-                            actor: actor.clone(),
-                        });
-                    }
-                }
-
-                if let Some(ref priority_opt) = new_priority {
-                    let old_str = old.priority.map(|p| p.to_string()).unwrap_or_default();
-                    let new_str = priority_opt.map(|p| p.to_string()).unwrap_or_default();
-                    if old_str != new_str {
-                        bus.publish(bus::DomainEvent::TaskPriorityChanged {
-                            task_id: task_id.clone(),
-                            from: old_str,
-                            to: new_str,
-                            actor: actor.clone(),
-                        });
-                    }
-                }
-
-                if let Some(ref title) = new_title {
-                    if old.title != *title {
-                        bus.publish(bus::DomainEvent::TaskFieldUpdated {
-                            task_id: task_id.clone(),
-                            field: "title".to_string(),
-                            from: old.title.clone(),
-                            to: title.clone(),
-                            actor,
-                        });
-                    }
-                }
-
-                // Emit TaskHierarchyChanged when title or description changes
-                // (affects the task tree structure)
-                let title_changed = new_title.as_ref().is_some_and(|t| old.title != *t);
-                let desc_changed = patch
-                    .description
-                    .as_ref()
-                    .is_some_and(|new_desc| old.description != *new_desc);
-                let tree_changed = title_changed || desc_changed;
-                if tree_changed {
-                    if let Some(ref project_id) = updated.project_id {
-                        bus.publish(bus::DomainEvent::TaskHierarchyChanged {
-                            project_id: project_id.clone(),
-                        });
-                    }
-                }
-
-                // Emit TaskDueDateChanged for downstream subscribers (alarms, tray countdown).
-                if let Some(ref new_due) = patch.due_date {
-                    let old_due = old.due_date;
-                    let changed = match (old_due, new_due) {
-                        (None, None) => false,
-                        (Some(_), None) | (None, Some(_)) => true,
-                        (Some(a), Some(b)) => *a != *b,
-                    };
-                    if changed {
-                        bus.publish(bus::DomainEvent::TaskDueDateChanged {
-                            task_id: task_id.clone(),
-                            due_date: new_due.map(|d| d.to_string()),
-                        });
-                    }
-                }
+                // Note: TaskStatusChanged, TaskPriorityChanged, TaskFieldUpdated,
+                // TaskHierarchyChanged, and TaskDueDateChanged variants were removed in v1.
+                // The AI pipeline now handles task changes via TaskEvent signals.
             }
         }
 
@@ -321,16 +246,7 @@ impl AppCore {
             .map_err(map_storage_err)?;
 
         let updates = if deleted {
-            // Emit TaskHierarchyChanged so the task tree is rebuilt
-            if let Some(ref task) = task {
-                if let Some(ref project_id) = task.project_id {
-                    if let Ok(bus) = self.domain_event_bus() {
-                        bus.publish(bus::DomainEvent::TaskHierarchyChanged {
-                            project_id: project_id.clone(),
-                        });
-                    }
-                }
-            }
+            // Note: TaskHierarchyChanged variant was removed in v1.
             vec![EntityUpdate {
                 kind: EntityKind::Task,
                 id,

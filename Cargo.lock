@@ -331,6 +331,7 @@ version = "0.1.1"
 dependencies = [
  "activity-log",
  "agent",
+ "ai-core",
  "async-trait",
  "autotuner",
  "base64 0.22.1",

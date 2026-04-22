@@ -114,25 +114,8 @@ impl BrainVoice {
 /// Returns `None` for events the brain voice does not care about.
 pub fn extract_signal(event: &DomainEvent) -> Option<(SignalSummary, String, Option<String>)> {
     match event {
-        DomainEvent::MemoryPromoted {
-            fact_id,
-            summary,
-            from_scope,
-            to_scope,
-        } => {
-            let entity_pair = format!("memory:{fact_id}");
-            let headline = format!("Promoted: {summary}");
-            let tooltip = format!("Memory promoted from {from_scope} to {to_scope}: {summary}");
-            Some((
-                SignalSummary {
-                    signal_type: "memory_promoted".into(),
-                    entity_pair,
-                    headline,
-                },
-                tooltip,
-                None,
-            ))
-        }
+        // Note: MemoryPromoted variant was removed in v1.
+        // Memory promotion signals are now handled through the AI pipeline.
 
         DomainEvent::CrossDomainDotReady {
             source_kind,
@@ -158,41 +141,8 @@ pub fn extract_signal(event: &DomainEvent) -> Option<(SignalSummary, String, Opt
             ))
         }
 
-        DomainEvent::MessageDeferred {
-            channel,
-            sender,
-            preview,
-        } => {
-            let entity_pair = format!("msg:{channel}:{sender}");
-            let headline = format!("{sender}: {preview}");
-            let tooltip = format!("Message from {sender} on {channel} held for later");
-            Some((
-                SignalSummary {
-                    signal_type: "message_deferred".into(),
-                    entity_pair,
-                    headline,
-                },
-                tooltip,
-                None,
-            ))
-        }
-
-        DomainEvent::MirrorSnippetCreated {
-            snippet_id,
-            headline,
-        } => {
-            let entity_pair = format!("mirror:{snippet_id}");
-            let tooltip = format!("New insight: {headline}");
-            Some((
-                SignalSummary {
-                    signal_type: "mirror_snippet".into(),
-                    entity_pair: entity_pair.clone(),
-                    headline: headline.clone(),
-                },
-                tooltip,
-                Some("/brain".into()),
-            ))
-        }
+        // Note: MessageDeferred and MirrorSnippetCreated variants were removed in v1.
+        // These signals are now handled through the AI pipeline.
 
         _ => None,
     }
@@ -317,21 +267,9 @@ async fn run_brain_voice(
                         debug!("BrainVoice: focus session ended, flushed deferred signals");
                     }
                     Ok(ref event) => {
-                        // Wire: FirstBrainReport journey milestone on MirrorSnippetCreated
-                        if matches!(event, DomainEvent::MirrorSnippetCreated { .. }) {
-                            if let Some(ref tracker) = journey_tracker {
-                                if !tracker
-                                    .is_complete(crate::journey::Milestone::FirstBrainReport)
-                                    .await
-                                {
-                                    tracker
-                                        .mark_complete(
-                                            crate::journey::Milestone::FirstBrainReport,
-                                        )
-                                        .await;
-                                }
-                            }
-                        }
+                        // Note: MirrorSnippetCreated variant was removed in v1.
+                        // Journey milestone tracking for brain reports is now handled
+                        // through the AI pipeline.
 
                         if let Some((summary, tooltip, detail_route)) = extract_signal(event) {
                             let mut state = SignalState {
@@ -587,24 +525,26 @@ mod tests {
     use crate::events::NoopEmitter;
     use storage::StoragePool;
 
-    #[test]
-    fn test_extract_memory_promoted() {
-        let event = DomainEvent::MemoryPromoted {
-            fact_id: "fact-1".into(),
-            summary: "Prefers morning routines".into(),
-            from_scope: "session".into(),
-            to_scope: "long_term".into(),
-        };
-        let result = extract_signal(&event);
-        assert!(result.is_some());
-        let (summary, tooltip, route) = result.unwrap();
-        assert_eq!(summary.signal_type, "memory_promoted");
-        assert_eq!(summary.entity_pair, "memory:fact-1");
-        assert!(summary.headline.contains("Promoted"));
-        assert!(tooltip.contains("session"));
-        assert!(tooltip.contains("long_term"));
-        assert!(route.is_none());
-    }
+    // Note: MemoryPromoted variant was removed in v1.
+    // This test is disabled until the AI pipeline provides equivalent signals.
+    // #[test]
+    // fn test_extract_memory_promoted() {
+    //     let event = DomainEvent::MemoryPromoted {
+    //         fact_id: "fact-1".into(),
+    //         summary: "Prefers morning routines".into(),
+    //         from_scope: "session".into(),
+    //         to_scope: "long_term".into(),
+    //     };
+    //     let result = extract_signal(&event);
+    //     assert!(result.is_some());
+    //     let (summary, tooltip, route) = result.unwrap();
+    //     assert_eq!(summary.signal_type, "memory_promoted");
+    //     assert_eq!(summary.entity_pair, "memory:fact-1");
+    //     assert!(summary.headline.contains("Promoted"));
+    //     assert!(tooltip.contains("session"));
+    //     assert!(tooltip.contains("long_term"));
+    //     assert!(route.is_none());
+    // }
 
     #[test]
     fn test_extract_cross_domain_dot() {

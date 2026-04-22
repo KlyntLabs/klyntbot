@@ -715,54 +715,22 @@ async fn execute_direct_address(
         })
         .await;
 
-    // Emit domain event for interaction pattern tracking
-    if let Some(bus) = domain_event_bus {
-        bus.publish(bus::DomainEvent::SquadInteractionPattern {
-            squad_id: squad_id.to_string(),
-            mode: mode_label.to_string(),
-            persona_id: Some(persona.id.clone()),
-            domain_hint: None,
-        });
-    }
+    // Note: SquadInteractionPattern and SquadDebateCompleted variants were removed in v1.
+    // Squad-related events are no longer emitted as DomainEvents.
 
     Ok(())
 }
 
-/// Emit `SquadDebateCompleted` domain event after a successful debate.
+/// Note: SquadDebateCompleted was removed in v1.
+/// This function is kept for reference but no longer emits events.
+#[allow(dead_code)]
 fn emit_debate_completed_event(
-    domain_event_bus: Option<&Arc<bus::DomainEventBus>>,
-    squad_id: &str,
-    session_key: &str,
-    result: &DebateResult,
+    _domain_event_bus: Option<&Arc<bus::DomainEventBus>>,
+    _squad_id: &str,
+    _session_key: &str,
+    _result: &DebateResult,
 ) {
-    if let Some(bus) = domain_event_bus {
-        let persona_accuracies: Vec<(String, f64)> = result
-            .accuracy_outcomes
-            .iter()
-            .map(|a| (a.persona_id.clone(), a.consensus_alignment))
-            .collect();
-        let avg_score = if persona_accuracies.is_empty() {
-            0.0
-        } else {
-            persona_accuracies.iter().map(|(_, s)| s).sum::<f64>() / persona_accuracies.len() as f64
-        };
-        let top_performer = persona_accuracies
-            .iter()
-            .max_by(|a, b| a.1.partial_cmp(&b.1).unwrap_or(std::cmp::Ordering::Equal))
-            .map(|(id, _)| id.clone());
-
-        bus.publish(bus::DomainEvent::SquadDebateCompleted {
-            squad_id: squad_id.to_string(),
-            session_key: session_key.to_string(),
-            rounds_completed: result.rounds_completed,
-            consensus_score: result.final_consensus_score,
-            persona_accuracies,
-            was_partial: result.partial_reason.is_some(),
-            token_cost: result.token_usage.total,
-            average_consensus_score: avg_score,
-            top_performer_persona_id: top_performer,
-        });
-    }
+    // No-op: SquadDebateCompleted variant removed in v1.
 }
 
 // ── Public free functions ────────────────────────────────────────────────

@@ -8,10 +8,12 @@ mod launcher;
 mod productivity;
 mod storage;
 mod temporal_scheduler;
+pub mod ai_pipeline;
 
 use std::sync::Arc;
 
 use ::agent::AgentLoop;
+use ::agent::cognitive_handlers::LlmExtractionHandler;
 use ::channels::ChannelManager;
 use bus::MessageBus;
 use feature_productivity::auto_focus::AutoFocusEvent;
@@ -413,6 +415,37 @@ impl AppCore {
             Some(repo)
         };
 
+        // ── Phase 8: AI Pipeline — SignalRouter + IngestionConsumer ──────
+        let ai_pipeline_router = {
+            let observation_repo = ::cognitive::repos::AccumulatedObservationRepo::new(
+                storage_pool.inner().clone(),
+            );
+            let entity_repo = ::cognitive::repos::EntityRepo::new(storage_pool.inner().clone());
+            let episodic_repo = ::cognitive::EpisodicMemoryRepo::new(storage_pool.inner().clone());
+            let extraction_handler: Option<Arc<dyn ::cognitive::ExtractionHandler>> =
+                cognitive_provider.as_ref().map(|cp| {
+                    let params = providers::cognitive_chat_params(&config, 1024);
+                    Arc::new(
+                        LlmExtractionHandler::new(
+                            cp.clone(),
+                            params,
+                        ),
+                    ) as Arc<dyn ::cognitive::ExtractionHandler>
+                });
+            let ingestion = Arc::new(::cognitive::consumers::IngestionConsumer::new(
+                observation_repo,
+                entity_repo,
+                episodic_repo,
+                extraction_handler,
+            ));
+            let router = ai_pipeline::start(
+                Arc::clone(&domain_event_bus),
+                vec![ingestion],
+            );
+            info!("AI pipeline SignalRouter started with IngestionConsumer");
+            Some(router)
+        };
+
         // ── Phase 9: Mirror self-reflection layer ────────────────────────
         let (mirror_facade, mirror_handles, mirror_shutdown) = {
             let mirror_repo = ::cognitive::mirror::MirrorRepo::new(storage_pool.clone());
@@ -550,34 +583,8 @@ impl AppCore {
                         _ = token.cancelled() => break,
                         result = rx.recv() => {
                             match result {
-                                Ok(bus::DomainEvent::MirrorTrialKilled { trial_id }) => {
-                                    let now = feature_notes::repo::utc_now_str();
-                                    let row = feature_notes::models::NoteRow {
-                                        id: uuid::Uuid::new_v4().to_string(),
-                                        notebook_id: None,
-                                        title: format!("Killed experiment: {trial_id}"),
-                                        body: "Manually killed this experiment trial from the Mirror."
-                                            .to_string(),
-                                        body_html: None,
-                                        body_json: None,
-                                        pinned: 0,
-                                        archived: 0,
-                                        icon: None,
-                                        color: None,
-                                        embedding_updated_at: None,
-                                        split_content: None,
-                                        split_mode: None,
-                                        perspective_config: None,
-                                        last_visited_at: None,
-                                        created_at: now.clone(),
-                                        updated_at: now,
-                                    };
-                                    if let Err(e) = note_repo.create_note(&row).await {
-                                        tracing::warn!(
-                                            "mirror: failed to auto-create note for killed trial {trial_id}: {e}"
-                                        );
-                                    }
-                                }
+                                // Note: MirrorTrialKilled variant was removed in v1.
+                                // Auto-create note on trial kill is now handled through the AI pipeline.
                                 Ok(_) => {}
                                 Err(tokio::sync::broadcast::error::RecvError::Lagged(n)) => {
                                     tracing::warn!("trial-kill note task lagged by {n} events");
@@ -795,6 +802,7 @@ impl AppCore {
             voice_loop_handle: None,
             brain_voice,
             journey_tracker: Some(journey_tracker),
+            _ai_pipeline_router: ai_pipeline_router,
         };
 
         // ── Voice service initialization ────────────────────────────────

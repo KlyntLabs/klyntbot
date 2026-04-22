@@ -162,6 +162,8 @@ pub struct AppCore {
     pub brain_voice: Option<crate::brain_voice::BrainVoice>,
     /// Onboarding journey milestone tracker.
     pub journey_tracker: Option<crate::journey::JourneyTracker>,
+    /// AI pipeline SignalRouter — keeps the router alive for the app lifetime.
+    pub _ai_pipeline_router: Option<ai_core::SignalRouter>,
 }
 
 impl AppCore {
