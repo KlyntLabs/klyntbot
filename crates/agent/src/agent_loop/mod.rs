@@ -281,13 +281,7 @@ impl AgentLoop {
                             sender = %msg.sender_id,
                             "Deferring message during focus session"
                         );
-                        if let Some(ref bus) = self.domain_event_bus {
-                            bus.publish(bus::DomainEvent::MessageDeferred {
-                                channel: msg.channel.to_string(),
-                                sender: msg.sender_id.clone(),
-                                preview: msg.content.chars().take(100).collect(),
-                            });
-                        }
+                        // MessageDeferred variant deleted; no-op.
 
                         // Auto-reply once per sender per focus session when enabled.
                         let focus_bubble = &self.config.productivity.focus_bubble;

@@ -54,12 +54,15 @@ impl ActionExecutor {
             } => {
                 let task_id = Uuid::new_v4().to_string();
                 debug!(task_id = %task_id, "action: CreateTask");
-                self.bus.publish(DomainEvent::TaskCreated {
+                let ev: DomainEvent = feature_tasks::events::TaskEvent::Created {
                     task_id: task_id.clone(),
-                    project: project.clone(),
-                    estimate_mins: None,
-                    task_type: "todo".to_string(),
-                });
+                    title: title.clone(),
+                    area_id: "sim-area".to_string(),
+                    project_id: project.clone(),
+                    priority: Some(3),
+                    estimated_minutes: None,
+                }.into();
+                self.bus.publish(ev);
 
                 // INSERT task row into the tasks table.
                 let _ = sqlx::query(
@@ -88,12 +91,12 @@ impl ActionExecutor {
                     _ => None,
                 };
 
-                self.bus.publish(DomainEvent::TaskCompleted {
+                let ev: DomainEvent = feature_tasks::events::TaskEvent::Completed {
                     task_id: task_ref.clone(),
-                    actual_duration_mins: actual_duration_mins.map(|m| m as i64),
-                    estimated_duration_mins: estimated_duration_mins.map(|m| m as i64),
+                    title: task_ref.clone(),
                     deviation_pct,
-                });
+                }.into();
+                self.bus.publish(ev);
 
                 if let (Some(est), Some(act)) = (estimated_duration_mins, actual_duration_mins) {
                     self.bus.publish(DomainEvent::EstimationRecorded {
@@ -145,21 +148,23 @@ impl ActionExecutor {
                 description,
             } => {
                 debug!(category = %category, amount = %amount, "action: RecordTransaction");
-                self.bus.publish(DomainEvent::TransactionRecorded {
-                    category: category.clone(),
-                    amount: *amount,
-                    is_over_budget: false,
-                });
-
                 // INSERT a finance_transactions row.
                 let tx_id = Uuid::new_v4().to_string();
+                let ev: DomainEvent = feature_finance::events::FinanceEvent::TransactionRecorded {
+                    tx_id: tx_id.clone(),
+                    category: category.clone(),
+                    amount: (*amount * 100.0) as i64,
+                    currency: "VND".to_string(),
+                    is_over_budget: false,
+                }.into();
+                self.bus.publish(ev);
                 let _ = sqlx::query(
                     "INSERT INTO finance_transactions \
                      (id, account_id, tx_type, amount, currency, category, notes, tx_date, created_at, updated_at) \
                      VALUES (?, 'sim-account', 'expense', ?, 'VND', ?, ?, ?, ?, ?)",
                 )
                 .bind(&tx_id)
-                .bind(*amount as i64)
+                .bind((*amount * 100.0) as i64)
                 .bind(category)
                 .bind(description)
                 .bind(simulated_now.strftime("%Y-%m-%d").to_string())
@@ -187,11 +192,7 @@ impl ActionExecutor {
             } => {
                 let objective_id = Uuid::new_v4().to_string();
                 debug!(objective_id = %objective_id, "action: CreateObjective");
-                self.bus.publish(DomainEvent::GoalProgress {
-                    objective_id,
-                    progress: 0.0,
-                    target: 100.0,
-                });
+                // GoalProgress variant deleted; no-op in simulator.
             }
 
             SimulatedToolAction::RecordProductivityEvent {
@@ -434,7 +435,7 @@ mod tests {
         let event = rx.try_recv().expect("should receive TransactionRecorded");
         assert!(
             matches!(event, DomainEvent::TransactionRecorded { category, amount, .. }
-                     if category == "food" && (amount - 42.50).abs() < f64::EPSILON)
+                     if category == "food" && (amount - 4250.0).abs() < f64::EPSILON)
         );
     }
 

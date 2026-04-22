@@ -222,13 +222,7 @@ impl FinanceTreeBuilder {
             }
         }
 
-        // Emit TreeNodesRebuilt so EntityTreeLinker picks up the new nodes.
-        if let Some(ref bus) = self.domain_event_bus {
-            bus.publish(DomainEvent::TreeNodesRebuilt {
-                source_type: "finance".to_string(),
-                source_id: source_id.to_string(),
-            });
-        }
+        // TreeNodesRebuilt variant deleted; EntityTreeLinker no-op.
 
         // Push context update for live injection.
         if let Some(queue) = &self.context_update_queue {

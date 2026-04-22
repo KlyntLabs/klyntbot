@@ -88,18 +88,7 @@ pub(super) fn event_to_signal(event: &DomainEvent, timestamp: Timestamp) -> Sign
                 ..Default::default()
             },
         ),
-        DomainEvent::PredictiveAlert {
-            forecast_type,
-            predicted_value,
-            ..
-        } => (
-            "PredictiveAlert",
-            SignalMetadata {
-                category: Some(forecast_type.clone()),
-                amount: Some(*predicted_value),
-                ..Default::default()
-            },
-        ),
+
         DomainEvent::AtomFlashcardReviewed { quality, .. } => (
             "AtomFlashcardReviewed",
             SignalMetadata {

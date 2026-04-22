@@ -85,11 +85,7 @@ impl NarrativeGenerator {
         let excerpt = narrative_text.chars().take(100).collect::<String>();
         info!(date = %date, sentiment = %sentiment, "narrative generated");
 
-        self.event_bus.publish(DomainEvent::NarrativeGenerated {
-            date: date.to_string(),
-            sentiment,
-            excerpt,
-        });
+        // NarrativeGenerated variant deleted; no-op.
 
         Ok(narrative)
     }

@@ -64,11 +64,6 @@ impl TaskTreeBuilder {
                 }
                 result = rx.recv() => {
                     match result {
-                        Ok(DomainEvent::TaskHierarchyChanged { project_id }) => {
-                            if let Err(e) = self.handle_project_changed(&project_id).await {
-                                warn!(project_id = %project_id, "TaskTreeBuilder: failed: {e}");
-                            }
-                        }
                         Ok(_) => {}
                         Err(broadcast::error::RecvError::Lagged(n)) => {
                             warn!("TaskTreeBuilder: lagged, skipped {n} events");
@@ -167,13 +162,7 @@ impl TaskTreeBuilder {
             }
         }
 
-        // 7. Emit TreeNodesRebuilt so EntityTreeLinker picks it up
-        if let Some(ref bus) = self.domain_event_bus {
-            bus.publish(DomainEvent::TreeNodesRebuilt {
-                source_type: "task".to_string(),
-                source_id: project_id.to_string(),
-            });
-        }
+        // TreeNodesRebuilt variant deleted; EntityTreeLinker no-op.
 
         // 8. Push context update
         if let Some(queue) = &self.context_update_queue {

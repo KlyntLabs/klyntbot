@@ -58,11 +58,6 @@ impl EntityTreeLinker {
                 }
                 result = rx.recv() => {
                     match result {
-                        Ok(DomainEvent::TreeNodesRebuilt { source_type, source_id }) => {
-                            if let Err(e) = self.link_entities_for_source(&source_type, &source_id).await {
-                                warn!(source_type = %source_type, source_id = %source_id, "EntityTreeLinker: failed: {e}");
-                            }
-                        }
                         Ok(_) => {}
                         Err(broadcast::error::RecvError::Lagged(n)) => {
                             warn!("EntityTreeLinker: lagged, skipped {n} events");

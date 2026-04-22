@@ -73,10 +73,6 @@ impl CommunityBuilder {
                             pending_source_ids.insert(note_id);
                             debounce_deadline = Some(Instant::now() + DEBOUNCE_DURATION);
                         }
-                        Ok(DomainEvent::TaskHierarchyChanged { project_id }) => {
-                            pending_source_ids.insert(format!("task:{project_id}"));
-                            debounce_deadline = Some(Instant::now() + DEBOUNCE_DURATION);
-                        }
                         Ok(_) => {}
                         Err(broadcast::error::RecvError::Lagged(n)) => {
                             warn!("CommunityBuilder: lagged, skipped {n} events");

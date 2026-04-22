@@ -37,11 +37,7 @@ impl VoiceJournalProcessor {
             "voice journal processed"
         );
 
-        self.event_bus.publish(DomainEvent::VoiceJournalProcessed {
-            journal_id: entry.id.clone(),
-            extracted_fact_count: fact_count,
-            sentiment: entry.sentiment.clone(),
-        });
+        // VoiceJournalProcessed variant deleted; no-op.
 
         Ok(())
     }
@@ -73,7 +69,6 @@ mod tests {
     async fn test_process_stores_and_publishes() {
         let pool = setup_pool().await;
         let bus = make_bus();
-        let mut rx = bus.subscribe();
 
         let processor = VoiceJournalProcessor::new(VoiceJournalRepo::new(pool.clone()), bus);
 
@@ -95,15 +90,5 @@ mod tests {
         let repo = VoiceJournalRepo::new(pool);
         let fetched = repo.get("vj-proc-test-1").await.unwrap().unwrap();
         assert!(fetched.processed);
-
-        // Verify event published
-        let event = rx.recv().await.unwrap();
-        assert!(matches!(
-            event,
-            DomainEvent::VoiceJournalProcessed {
-                extracted_fact_count: 2,
-                ..
-            }
-        ));
     }
 }

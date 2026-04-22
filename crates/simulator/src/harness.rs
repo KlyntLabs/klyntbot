@@ -424,19 +424,6 @@ impl SimulationHarness {
                         situation.deadline_pressure =
                             (situation.deadline_pressure + escalation).min(1.0);
                     }
-                    DomainEvent::SquadDebateCompleted {
-                        consensus_score,
-                        token_cost,
-                        ..
-                    } => {
-                        cc_inner.debate_count.fetch_add(1, Ordering::Relaxed);
-                        cc_inner
-                            .debate_consensus_sum_x1000
-                            .fetch_add((*consensus_score * 1000.0) as u32, Ordering::Relaxed);
-                        cc_inner
-                            .debate_token_cost
-                            .fetch_add(*token_cost, Ordering::Relaxed);
-                    }
                     _ => {}
                 }
 
@@ -930,30 +917,33 @@ impl SimulationHarness {
                         .await;
 
                         // Salience: classify the domain event this action produced.
-                        let salience_event = match action {
+                        let salience_event: Option<DomainEvent> = match action {
                             SimulatedToolAction::CreateTask { project, .. } => {
-                                Some(DomainEvent::TaskCreated {
+                                Some(feature_tasks::events::TaskEvent::Created {
                                     task_id: String::new(),
-                                    project: project.clone(),
-                                    estimate_mins: None,
-                                    task_type: "todo".to_string(),
-                                })
+                                    title: String::new(),
+                                    area_id: "sim-area".to_string(),
+                                    project_id: project.clone(),
+                                    priority: Some(3),
+                                    estimated_minutes: None,
+                                }.into())
                             }
                             SimulatedToolAction::CompleteTask { task_ref, .. } => {
-                                Some(DomainEvent::TaskCompleted {
+                                Some(feature_tasks::events::TaskEvent::Completed {
                                     task_id: task_ref.clone(),
-                                    actual_duration_mins: None,
-                                    estimated_duration_mins: None,
+                                    title: task_ref.clone(),
                                     deviation_pct: None,
-                                })
+                                }.into())
                             }
                             SimulatedToolAction::RecordTransaction {
                                 category, amount, ..
-                            } => Some(DomainEvent::TransactionRecorded {
+                            } => Some(feature_finance::events::FinanceEvent::TransactionRecorded {
+                                tx_id: String::new(),
                                 category: category.clone(),
-                                amount: *amount,
+                                amount: *amount as i64,
+                                currency: "VND".to_string(),
                                 is_over_budget: false,
-                            }),
+                            }.into()),
                             _ => None,
                         };
                         if let Some(ref event) = salience_event {

@@ -70,14 +70,6 @@ impl OkrTreeBuilder {
                 }
                 result = rx.recv() => {
                     match result {
-                        Ok(DomainEvent::GoalProgress { objective_id, progress, target }) => {
-                            if let Err(e) = self.handle_goal_progress(&objective_id, progress, target).await {
-                                warn!(
-                                    objective_id = %objective_id,
-                                    "OkrTreeBuilder: failed to process goal progress: {e}"
-                                );
-                            }
-                        }
                         Ok(_) => {
                             // Not an OKR event — ignore.
                         }
@@ -178,13 +170,7 @@ impl OkrTreeBuilder {
             }
         }
 
-        // Emit TreeNodesRebuilt so EntityTreeLinker picks up the new nodes.
-        if let Some(ref bus) = self.domain_event_bus {
-            bus.publish(DomainEvent::TreeNodesRebuilt {
-                source_type: "okr".to_string(),
-                source_id: source_id.to_string(),
-            });
-        }
+        // TreeNodesRebuilt variant deleted; EntityTreeLinker no-op.
 
         // Push context update for live injection.
         if let Some(queue) = &self.context_update_queue {

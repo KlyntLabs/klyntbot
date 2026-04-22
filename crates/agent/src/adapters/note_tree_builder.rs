@@ -238,13 +238,7 @@ impl NoteTreeBuilder {
             });
         }
 
-        // 6. Emit TreeNodesRebuilt so EntityTreeLinker picks it up
-        if let Some(ref bus) = self.domain_event_bus {
-            bus.publish(DomainEvent::TreeNodesRebuilt {
-                source_type: "note".to_string(),
-                source_id: note_id.to_string(),
-            });
-        }
+        // TreeNodesRebuilt variant deleted; EntityTreeLinker no-op.
 
         info!(
             note_id = %note_id,
