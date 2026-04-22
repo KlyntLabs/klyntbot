@@ -4,6 +4,34 @@ use crate::repos::retrieval_feedback::RetrievalFeedbackRepo;
 async fn setup() -> (RetrievalFeedbackRepo, sqlx::SqlitePool) {
     let pool = StoragePool::connect_in_memory().await.unwrap();
     let inner = pool.inner().clone();
+    // Create semantic_facts table inline (minimal schema for testing)
+    sqlx::query(
+        "CREATE TABLE IF NOT EXISTS semantic_facts (
+            id TEXT PRIMARY KEY,
+            domain TEXT NOT NULL,
+            subject TEXT NOT NULL,
+            predicate TEXT NOT NULL,
+            object TEXT NOT NULL,
+            confidence REAL NOT NULL,
+            source TEXT NOT NULL,
+            valid_from TEXT NOT NULL,
+            valid_until TEXT,
+            recorded_at TEXT NOT NULL,
+            superseded_at TEXT,
+            superseded_by TEXT,
+            stability REAL NOT NULL,
+            last_accessed TEXT,
+            access_count INTEGER NOT NULL,
+            convergence_score REAL NOT NULL,
+            project_id TEXT,
+            memory_type TEXT NOT NULL,
+            scope_type TEXT NOT NULL,
+            scope_id TEXT
+        )",
+    )
+    .execute(&inner)
+    .await
+    .expect("create semantic_facts table");
     (RetrievalFeedbackRepo::new(inner.clone()), inner)
 }
 
@@ -83,4 +111,36 @@ async fn avg_precision_since_returns_nonzero_for_recent_rows() {
         avg > 0.0,
         "avg_precision should be > 0.0, got {avg}; was 0.0 before fix (TEXT vs INTEGER bug)"
     );
+}
+
+#[tokio::test]
+async fn avg_precision_by_domain_returns_typed_recall_domain() {
+    let (repo, pool) = setup().await;
+
+    // Insert semantic facts with a known domain.
+    for i in 0..3 {
+        sqlx::query(
+            "INSERT INTO semantic_facts (id, domain, subject, predicate, object, confidence, source, valid_from, recorded_at, stability, access_count, convergence_score, memory_type, scope_type)
+             VALUES (?1, 'tasks', 'user', 'has', 'deadline', 0.8, 'test', '2026-01-01', '2026-01-01', 1.0, 0, 0.0, 'fact', 'system')",
+        )
+        .bind(format!("fact-{}", i))
+        .execute(&pool)
+        .await
+        .unwrap();
+    }
+
+    // Insert retrieval feedback referencing those facts (need 3+ rows for HAVING clause).
+    for i in 0..3 {
+        repo.insert(
+            &[format!("fact-{}", i)],
+            &[format!("fact-{}", i)],
+            "sess-domain",
+            None,
+        )
+        .await
+        .unwrap();
+    }
+
+    let rows: Vec<(ai_core::RecallDomain, f64)> = repo.avg_precision_by_domain_since(1).await.unwrap();
+    assert!(rows.iter().any(|(d, _)| *d == ai_core::RecallDomain::Tasks));
 }

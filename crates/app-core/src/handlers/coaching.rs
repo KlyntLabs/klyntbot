@@ -86,7 +86,7 @@ impl AppCore {
                 confidence: p.confidence,
                 signal_count: p.signal_count,
                 description: p.description.clone(),
-                domain: p.domain.clone(),
+                domain: p.domain.as_str().to_string(),
             })
             .collect())
     }

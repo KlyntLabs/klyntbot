@@ -17,6 +17,7 @@ use klyntbot::cognitive::types::*;
 use klyntbot::cognitive::{ConsolidationHandler, ExtractionHandler};
 
 use super::common::test_pool;
+use ai_core::{AiMetrics, AiSignal, RecallDomain, SalienceVerdict};
 use bus::{DomainEvent, FeedbackResponse};
 use context_engine::source::{ContextSource, SourceContext};
 use feature_coaching::feedback::FeedbackTracker;
@@ -634,10 +635,22 @@ fn test_signal_accumulator_distraction_streak_removed() {
     // distraction_streak condition was removed — events are tracked for
     // pattern detection but no longer trigger coaching popups.
     for _ in 0..3 {
-        acc.push_event(&DomainEvent::DistractionDetected {
-            app: "reddit".into(),
-            duration_secs: None,
-            context: "browsing".into(),
+        acc.push_event(&AiSignal {
+            domain: RecallDomain::General,
+            event_kind: "DistractionDetected",
+            importance: 0.3,
+            salience: SalienceVerdict::Accumulate,
+            content: "reddit".into(),
+            entity: None,
+            timestamp: jiff::Timestamp::now(),
+            raw_event: Some(DomainEvent::DistractionDetected {
+                app: "reddit".into(),
+                duration_secs: None,
+                context: "browsing".into(),
+            }),
+            metrics: AiMetrics { app: Some("reddit".into()), ..AiMetrics::default() },
+            coaching_signal: true,
+            coaching_rule: None,
         });
     }
 
@@ -657,10 +670,22 @@ fn test_signal_accumulator_cooldown_prevents_refire() {
     // Use budget_warning trigger (distraction_streak was removed as a coaching trigger).
     // Push enough budget alerts to fire the condition.
     for _ in 0..3 {
-        acc.push_event(&DomainEvent::BudgetAlert {
-            category: "dining".into(),
-            spent: 280.0,
-            limit: 300.0,
+        acc.push_event(&AiSignal {
+            domain: RecallDomain::Finance,
+            event_kind: "BudgetAlert",
+            importance: 0.9,
+            salience: SalienceVerdict::Extract,
+            content: "Budget alert: dining spent 280 of 300".into(),
+            entity: None,
+            timestamp: jiff::Timestamp::now(),
+            raw_event: Some(DomainEvent::BudgetAlert {
+                category: "dining".into(),
+                spent: 280.0,
+                limit: 300.0,
+            }),
+            metrics: AiMetrics { category: Some("dining".into()), amount: Some(280.0), ..AiMetrics::default() },
+            coaching_signal: true,
+            coaching_rule: Some("Review spending patterns when budget pressure is detected".into()),
         });
     }
 
@@ -674,10 +699,22 @@ fn test_signal_accumulator_cooldown_prevents_refire() {
     );
 
     // Push another alert immediately
-    acc.push_event(&DomainEvent::BudgetAlert {
-        category: "dining".into(),
-        spent: 290.0,
-        limit: 300.0,
+    acc.push_event(&AiSignal {
+        domain: RecallDomain::Finance,
+        event_kind: "BudgetAlert",
+        importance: 0.9,
+        salience: SalienceVerdict::Extract,
+        content: "Budget alert: dining spent 290 of 300".into(),
+        entity: None,
+        timestamp: jiff::Timestamp::now(),
+        raw_event: Some(DomainEvent::BudgetAlert {
+            category: "dining".into(),
+            spent: 290.0,
+            limit: 300.0,
+        }),
+        metrics: AiMetrics { category: Some("dining".into()), amount: Some(290.0), ..AiMetrics::default() },
+        coaching_signal: true,
+        coaching_rule: Some("Review spending patterns when budget pressure is detected".into()),
     });
 
     // Second eval — cooldown blocks re-fire

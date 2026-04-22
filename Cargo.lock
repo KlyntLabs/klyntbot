@@ -57,6 +57,7 @@ version = "0.1.1"
 dependencies = [
  "activity-log",
  "aho-corasick",
+ "ai-core",
  "async-trait",
  "autotuner",
  "base64 0.22.1",
@@ -2356,7 +2357,9 @@ dependencies = [
  "config",
  "context_engine",
  "dashmap",
+ "feature-finance",
  "feature-notes",
+ "feature-tasks",
  "futures-util",
  "hex",
  "jiff",
@@ -4722,10 +4725,13 @@ dependencies = [
 name = "feature-coaching"
 version = "0.1.1"
 dependencies = [
+ "ai-core",
  "async-trait",
  "bus",
  "cognitive",
  "common",
+ "feature-finance",
+ "feature-tasks",
  "jiff",
  "serde",
  "serde_json",
@@ -12410,6 +12416,8 @@ version = "0.1.1"
 dependencies = [
  "activity-log",
  "agent",
+ "ai-core",
+ "app-core",
  "async-trait",
  "autotuner",
  "bus",
@@ -12936,6 +12944,7 @@ dependencies = [
 name = "storage"
 version = "0.1.1"
 dependencies = [
+ "ai-core",
  "arrow-array",
  "arrow-schema",
  "common",

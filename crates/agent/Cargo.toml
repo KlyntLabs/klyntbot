@@ -9,6 +9,7 @@ license.workspace = true
 activity-log.workspace = true
 autotuner.workspace = true
 aho-corasick.workspace = true
+ai-core.workspace = true
 common.workspace = true
 bus.workspace = true
 config.workspace = true

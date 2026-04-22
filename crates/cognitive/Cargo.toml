@@ -33,3 +33,5 @@ petgraph = "0.7"
 
 [dev-dependencies]
 tempfile = { workspace = true }
+feature-tasks = { workspace = true }
+feature-finance = { workspace = true }

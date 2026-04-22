@@ -3,6 +3,7 @@
 //! Records which retrieved facts the LLM actually referenced in its response,
 //! enabling the autotuner to evaluate retrieval quality.
 
+use ai_core::RecallDomain;
 use sqlx::SqlitePool;
 
 #[derive(Debug, Clone)]
@@ -66,7 +67,7 @@ impl RetrievalFeedbackRepo {
     pub async fn avg_precision_by_domain_since(
         &self,
         days: i64,
-    ) -> Result<Vec<(String, f64)>, sqlx::Error> {
+    ) -> Result<Vec<(RecallDomain, f64)>, sqlx::Error> {
         let since =
             (jiff::Timestamp::now() - jiff::SignedDuration::from_hours(days * 24)).as_millisecond();
         let rows: Vec<(String, f64)> = sqlx::query_as(
@@ -82,7 +83,10 @@ impl RetrievalFeedbackRepo {
         .bind(since)
         .fetch_all(&self.pool)
         .await?;
-        Ok(rows)
+        Ok(rows
+            .into_iter()
+            .map(|(s, score)| (parse_recall_domain(&s), score))
+            .collect())
     }
 
     /// Count feedback entries in the past N days.
@@ -95,5 +99,15 @@ impl RetrievalFeedbackRepo {
                 .fetch_one(&self.pool)
                 .await?;
         Ok(row.0)
+    }
+}
+
+fn parse_recall_domain(s: &str) -> RecallDomain {
+    match s {
+        "tasks" => RecallDomain::Tasks,
+        "finance" => RecallDomain::Finance,
+        "productivity" => RecallDomain::Productivity,
+        "learning" => RecallDomain::Learning,
+        _ => RecallDomain::General,
     }
 }

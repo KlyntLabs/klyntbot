@@ -22,6 +22,8 @@ feature-learning.workspace = true
 feature-coaching.workspace = true
 activity-log.workspace = true
 agent.workspace = true
+app-core.workspace = true
+ai-core.workspace = true
 tools.workspace = true
 tokio-util = { workspace = true }
 

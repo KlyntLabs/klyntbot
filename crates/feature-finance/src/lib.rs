@@ -43,21 +43,25 @@ use tools_core::{DynTool, FeatureMigration, HealthStatus};
 ///
 /// Exposes one tool ("finance") covering accounts, transactions, budgets,
 /// investments, goals, liabilities, and financial reports.
-#[derive(AiFeature)]
+#[derive(AiFeature, Default)]
 #[ai(
     recall_domain = "Finance",
     skill = "finance-management",
-    event = "crate::events::FinanceEvent"
+    event = "crate::events::FinanceEvent",
+    recall_boost_when = "query.message.to_lowercase().contains(\"spend\") || query.message.to_lowercase().contains(\"budget\") || query.message.to_lowercase().contains(\"money\")",
+    recall_priority_field = "amount",
+    recall_recency_field = "occurred_at",
+    recall_status_filter = "status != \"cancelled\"",
 )]
 pub struct FinanceFeature {
-    tool: Arc<FinanceTool>,
+    tool: Option<Arc<FinanceTool>>,
 }
 
 impl FinanceFeature {
     /// Create a new `FinanceFeature` wrapping a fully configured `FinanceTool`.
     pub fn new(tool: FinanceTool) -> Self {
         Self {
-            tool: Arc::new(tool),
+            tool: Some(Arc::new(tool)),
         }
     }
 
@@ -104,7 +108,10 @@ impl FeaturePackage for FinanceFeature {
     }
 
     fn tools(&self) -> Vec<DynTool> {
-        vec![self.tool.clone()]
+        match &self.tool {
+            Some(tool) => vec![tool.clone()],
+            None => vec![],
+        }
     }
 
     fn migrations(&self) -> Vec<FeatureMigration> {
@@ -112,8 +119,11 @@ impl FeaturePackage for FinanceFeature {
     }
 
     async fn health_check(&self) -> Result<HealthStatus> {
+        let Some(tool) = &self.tool else {
+            return Ok(HealthStatus::Healthy);
+        };
         match sqlx::query("SELECT 1 FROM finance_transactions LIMIT 1")
-            .fetch_optional(self.tool.storage.pool())
+            .fetch_optional(tool.storage.pool())
             .await
         {
             Ok(_) => Ok(HealthStatus::Healthy),

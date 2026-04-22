@@ -47,7 +47,7 @@ pub struct ReforgeCollected {
     pub autotuner_ctx: Option<AutotunerContext>,
     pub tool_failures: Vec<ToolFailureSummary>,
     pub correction_summaries: Vec<CorrectionSummary>,
-    pub retrieval_precision_by_domain: Vec<(String, f64)>,
+    pub retrieval_precision_by_domain: Vec<(ai_core::RecallDomain, f64)>,
     pub behavioral_metrics: BehavioralMetrics,
     pub graph_health: GraphHealthMetrics,
     pub previous_suggestions: Vec<ReforgeSuggestion>,

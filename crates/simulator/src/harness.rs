@@ -427,8 +427,13 @@ impl SimulationHarness {
                     _ => {}
                 }
 
+                // Convert DomainEvent to AiSignal for the accumulator.
+                let signal = match app_core::init::ai_pipeline::translate(&event) {
+                    Some(s) => s,
+                    None => continue,
+                };
                 let mut acc = coaching_acc.lock().await;
-                acc.push_event(&event);
+                acc.push_event(&signal);
                 let fired = acc.evaluate(&situation);
                 drop(acc);
 

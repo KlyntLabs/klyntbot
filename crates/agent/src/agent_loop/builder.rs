@@ -375,10 +375,14 @@ impl AgentLoopBuilder {
                 cognitive_embedder = cognitive_embedder_local.clone();
                 cognitive_retrieval_config = Some(retrieval_config);
 
+                let recall_registry = ai_core::RecallProviderRegistry::new()
+                    .with(feature_tasks::TasksFeature::default())
+                    .with(feature_finance::FinanceFeature::default());
                 let cog_source =
                     cognitive::CognitiveContextSource::new(fact_repo.clone(), rule_repo)
                         .with_static_fact_limit(config.cognitive.static_fact_limit)
-                        .with_confidence_threshold(Arc::clone(&confidence_bits));
+                        .with_confidence_threshold(Arc::clone(&confidence_bits))
+                        .with_recall_registry(recall_registry);
                 sources.push(Box::new(cog_source));
 
                 // Project context source — injects project instructions, role, and memories.

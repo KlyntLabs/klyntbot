@@ -100,6 +100,7 @@ pub struct CognitiveContextSource {
     cache: Mutex<Option<CachedModel>>,
     static_fact_limit: usize,
     confidence_bits: Option<Arc<AtomicU32>>,
+    recall_registry: Option<ai_core::RecallProviderRegistry>,
 }
 
 impl CognitiveContextSource {
@@ -110,6 +111,7 @@ impl CognitiveContextSource {
             cache: Mutex::new(None),
             static_fact_limit: CognitiveRetrievalConfig::default().static_fact_limit,
             confidence_bits: None,
+            recall_registry: None,
         }
     }
 
@@ -120,6 +122,11 @@ impl CognitiveContextSource {
 
     pub fn with_confidence_threshold(mut self, bits: Arc<AtomicU32>) -> Self {
         self.confidence_bits = Some(bits);
+        self
+    }
+
+    pub fn with_recall_registry(mut self, reg: ai_core::RecallProviderRegistry) -> Self {
+        self.recall_registry = Some(reg);
         self
     }
 
@@ -189,7 +196,7 @@ impl ContextSource for CognitiveContextSource {
         60
     }
 
-    async fn provide(&self, _ctx: &SourceContext) -> Option<String> {
+    async fn provide(&self, ctx: &SourceContext) -> Option<String> {
         let (model, rules_text) = self.get_cached_or_load().await;
 
         let mut sections = Vec::new();
@@ -245,6 +252,22 @@ impl ContextSource for CognitiveContextSource {
                  Current confidence threshold: {threshold:.2}. \
                  When uncertain about user intent, ask for clarification rather than guessing."
             ));
+        }
+
+        // ── Recall registry: ranked domain hints ──
+        if let (Some(reg), Some(msg)) = (&self.recall_registry, ctx.message.as_deref()) {
+            let query = ai_core::RecallQuery {
+                message: msg.to_string(),
+                intent_summary: ctx.intent_summary.clone(),
+            };
+            let ranked = reg.rank(&query);
+            if !ranked.is_empty() {
+                let lines: Vec<String> = ranked
+                    .iter()
+                    .map(|(d, s)| format!("- {} (score {:.2})", d.as_str(), s))
+                    .collect();
+                sections.push(format!("## Relevant Domains\n{}", lines.join("\n")));
+            }
         }
 
         let output = sections.join("\n\n");
@@ -453,6 +476,30 @@ mod tests {
         assert!(result.contains("Jayden"));
         // Dynamic section should NOT appear (moved to UnifiedMemoryService)
         assert!(!result.contains("Relevant Personal Context"));
+    }
+
+    #[tokio::test]
+    async fn context_source_uses_recall_registry() {
+        let pool = setup().await;
+        let registry = ai_core::RecallProviderRegistry::new()
+            .with(feature_tasks::TasksFeature::default())
+            .with(feature_finance::FinanceFeature::default());
+
+        let fact_repo = SemanticFactRepo::new(pool.clone());
+        let rule_repo = ProceduralRuleRepo::new(pool);
+        let source = CognitiveContextSource::new(fact_repo, rule_repo)
+            .with_recall_registry(registry);
+
+        let ctx = SourceContext {
+            channel: "test".into(),
+            chat_id: "c".into(),
+            message: Some("when is my deadline".into()),
+            intent_summary: None,
+            project_id: None,
+        };
+        let out = source.provide(&ctx).await.unwrap();
+        // Registry-ranked feature recommendations appear in the output
+        assert!(out.contains("Relevant Domains") || out.contains("tasks"));
     }
 
     #[tokio::test]

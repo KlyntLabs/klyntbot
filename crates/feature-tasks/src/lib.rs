@@ -40,7 +40,11 @@ use tools_core::{DynTool, FeatureMigration, FeaturePackage, HealthStatus};
 #[ai(
     recall_domain = "Tasks",
     skill = "task-management",
-    event = "crate::events::TaskEvent"
+    event = "crate::events::TaskEvent",
+    recall_boost_when = "query.message.to_lowercase().contains(\"deadline\") || query.message.to_lowercase().contains(\"task\") || query.message.to_lowercase().contains(\"overdue\")",
+    recall_priority_field = "priority",
+    recall_recency_field = "updated_at",
+    recall_status_filter = "status != \"archived\"",
 )]
 pub struct TasksFeature {
     pool: Option<storage::StoragePool>,
