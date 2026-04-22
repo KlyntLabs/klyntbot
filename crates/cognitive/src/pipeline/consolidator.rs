@@ -14,7 +14,7 @@ const GROUPING_THRESHOLD: f64 = 0.4;
 pub struct KnowledgeCluster {
     pub signals: Vec<CognitiveSignal>,
     pub merged_subject: String,
-    pub domain: String,
+    pub domain: ai_core::RecallDomain,
     pub source_diversity: u32,
     pub convergence_score: f64,
     pub max_confidence: f64,
@@ -27,20 +27,20 @@ pub enum PromotionOp {
         subject: String,
         predicate: String,
         object: String,
-        domain: String,
+        domain: ai_core::RecallDomain,
         confidence: f64,
         convergence: f64,
         source: String,
     },
     CreateRule {
         rule_text: String,
-        domain: String,
+        domain: ai_core::RecallDomain,
         confidence: f64,
     },
     CreateEpisode {
         content: String,
         summary: String,
-        domain: String,
+        domain: ai_core::RecallDomain,
         importance: f64,
     },
 }
@@ -203,11 +203,11 @@ mod tests {
     use crate::pipeline::signal::SignalContext;
     use jiff::Timestamp;
 
-    fn sig(source: SignalSource, content: &str, domain: &str, confidence: f64) -> CognitiveSignal {
+    fn sig(source: SignalSource, content: &str, domain: ai_core::RecallDomain, confidence: f64) -> CognitiveSignal {
         CognitiveSignal {
             source,
             content: content.into(),
-            domain: domain.into(),
+            domain,
             confidence,
             context: SignalContext::default(),
             timestamp: Timestamp::now(),
@@ -220,13 +220,13 @@ mod tests {
             sig(
                 SignalSource::ChatTurn,
                 "User is learning Rust programming language",
-                "learning",
+                ai_core::RecallDomain::Learning,
                 0.7,
             ),
             sig(
                 SignalSource::AtomReinforcement,
                 "Rust programming language concepts",
-                "learning",
+                ai_core::RecallDomain::Learning,
                 0.8,
             ),
         ];
@@ -241,13 +241,13 @@ mod tests {
             sig(
                 SignalSource::ChatTurn,
                 "User is learning Rust",
-                "learning",
+                ai_core::RecallDomain::Learning,
                 0.7,
             ),
             sig(
                 SignalSource::CoachingPattern,
                 "Take breaks in the afternoon",
-                "productivity",
+                ai_core::RecallDomain::Productivity,
                 0.8,
             ),
         ]);
@@ -259,7 +259,7 @@ mod tests {
         let clusters = group_signals(vec![sig(
             SignalSource::ChatTurn,
             "Jayden is a software engineer",
-            "identity",
+            ai_core::RecallDomain::General,
             0.8,
         )]);
         let ops = heuristic_promote(&clusters);
@@ -271,7 +271,7 @@ mod tests {
         let clusters = group_signals(vec![sig(
             SignalSource::CoachingPattern,
             "Schedule tasks in the morning",
-            "productivity",
+            ai_core::RecallDomain::Productivity,
             0.8,
         )]);
         let ops = heuristic_promote(&clusters);
@@ -283,7 +283,7 @@ mod tests {
         let clusters = group_signals(vec![sig(
             SignalSource::SessionEnd,
             "Fixed a tricky async bug in middleware",
-            "general",
+            ai_core::RecallDomain::General,
             0.55,
         )]);
         let ops = heuristic_promote(&clusters);
@@ -308,19 +308,19 @@ mod tests {
             sig(
                 SignalSource::ChatTurn,
                 "User is learning Rust language",
-                "learning",
+                ai_core::RecallDomain::Learning,
                 0.6,
             ),
             sig(
                 SignalSource::AtomReinforcement,
                 "Learning Rust language every day",
-                "learning",
+                ai_core::RecallDomain::Learning,
                 0.7,
             ),
             sig(
                 SignalSource::CoachingPattern,
                 "Rust language learning is important",
-                "learning",
+                ai_core::RecallDomain::Learning,
                 0.8,
             ),
         ]);

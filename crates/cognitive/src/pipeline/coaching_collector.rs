@@ -23,12 +23,19 @@ impl CoachingCollector {
                     result = event_rx.recv() => {
                         match result {
                             Ok(bus::DomainEvent::CoachingPatternDetected {
-                                pattern_name, confidence, description, domain, signal_count, rule_text, ..
+                                pattern_name: _, confidence, description: _, domain, signal_count, rule_text, ..
                             }) => {
+                                let recall_domain = match domain.as_str() {
+                                    "tasks" => ai_core::RecallDomain::Tasks,
+                                    "finance" => ai_core::RecallDomain::Finance,
+                                    "productivity" => ai_core::RecallDomain::Productivity,
+                                    "learning" => ai_core::RecallDomain::Learning,
+                                    _ => ai_core::RecallDomain::General,
+                                };
                                 let signal = CognitiveSignal {
                                     source: SignalSource::CoachingPattern,
                                     content: rule_text,
-                                    domain,
+                                    domain: recall_domain,
                                     confidence,
                                     context: SignalContext {
                                         source_count: signal_count as u32,

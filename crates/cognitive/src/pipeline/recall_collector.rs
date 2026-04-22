@@ -102,7 +102,7 @@ impl RecallCollector {
             let signal = CognitiveSignal {
                 source: SignalSource::ConversationRecall,
                 content: best.content.clone(),
-                domain: "general".into(),
+                domain: ai_core::RecallDomain::General,
                 confidence,
                 context: SignalContext {
                     source_count: sessions.len() as u32,

@@ -35,7 +35,7 @@ impl ChatTurnCollector {
                                     let signal = CognitiveSignal {
                                         source: SignalSource::ChatTurn,
                                         content: msg,
-                                        domain: "general".into(),
+                                        domain: ai_core::RecallDomain::General,
                                         confidence: 0.6,
                                         context: SignalContext {
                                             session_key: Some(session_key),

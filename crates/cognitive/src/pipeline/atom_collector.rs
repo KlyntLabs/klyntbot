@@ -28,10 +28,16 @@ impl AtomCollector {
                                 atom_id, subject, domain, reinforcement_count, ..
                             }) if reinforcement_count >= MIN_REINFORCEMENT => {
                                 let confidence = (0.5 + reinforcement_count as f64 * 0.15).min(0.95);
+                                let recall_domain = match domain.as_str() {
+                                    "tasks" => ai_core::RecallDomain::Tasks,
+                                    "finance" => ai_core::RecallDomain::Finance,
+                                    "learning" => ai_core::RecallDomain::Learning,
+                                    _ => ai_core::RecallDomain::General,
+                                };
                                 let signal = CognitiveSignal {
                                     source: SignalSource::AtomReinforcement,
                                     content: subject,
-                                    domain,
+                                    domain: recall_domain,
                                     confidence,
                                     context: SignalContext {
                                         related_atom_ids: vec![atom_id],

@@ -6,7 +6,7 @@ use jiff::Timestamp;
 pub struct CognitiveSignal {
     pub source: SignalSource,
     pub content: String,
-    pub domain: String,
+    pub domain: ai_core::RecallDomain,
     pub confidence: f64,
     pub context: SignalContext,
     pub timestamp: Timestamp,
@@ -46,7 +46,7 @@ mod tests {
         let signal = CognitiveSignal {
             source: SignalSource::ChatTurn,
             content: "User is a software engineer".into(),
-            domain: "identity".into(),
+            domain: ai_core::RecallDomain::General,
             confidence: 0.8,
             context: SignalContext {
                 session_key: Some("sess_1".into()),

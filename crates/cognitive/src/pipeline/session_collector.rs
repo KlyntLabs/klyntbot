@@ -78,7 +78,7 @@ impl SessionCollector {
         let signal = CognitiveSignal {
             source: SignalSource::SessionEnd,
             content: insights.join(" "),
-            domain: "general".into(),
+            domain: ai_core::RecallDomain::General,
             confidence,
             context: SignalContext {
                 session_key: Some(session_key.to_string()),

@@ -41,7 +41,7 @@ pub async fn execute_promotions(
                     let now = Timestamp::now().to_string();
                     let fact = SemanticFact {
                         id: Uuid::new_v4().to_string(),
-                        domain: domain.clone(),
+                        domain: domain.as_str().to_string(),
                         subject: subject.clone(),
                         predicate: predicate.clone(),
                         object: object.clone(),
@@ -75,7 +75,7 @@ pub async fn execute_promotions(
                 rule_text,
                 domain,
                 confidence,
-            } => match rule_repo.find_similar(rule_text, domain).await {
+            } => match rule_repo.find_similar(rule_text, domain.as_str()).await {
                 Ok(Some(existing)) => {
                     let _ = rule_repo.increment_signal_count(&existing.id).await;
                     debug!("Writer: reinforced rule '{}'", existing.id);
@@ -84,7 +84,7 @@ pub async fn execute_promotions(
                     let now = Timestamp::now().to_string();
                     let rule = ProceduralRule {
                         id: Uuid::new_v4().to_string(),
-                        domain: domain.clone(),
+                        domain: domain.as_str().to_string(),
                         rule_text: rule_text.clone(),
                         confidence: *confidence,
                         source: "pipeline".into(),
@@ -113,7 +113,7 @@ pub async fn execute_promotions(
                     let now = Timestamp::now().to_string();
                     let memory = EpisodicMemory {
                         id: Uuid::new_v4().to_string(),
-                        domain: domain.clone(),
+                        domain: domain.as_str().to_string(),
                         content: content.clone(),
                         summary: Some(summary.clone()),
                         importance: *importance,
