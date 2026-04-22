@@ -198,6 +198,7 @@ pub enum DomainEvent {
         description: String,
         domain: String,
         signal_count: i32,
+        rule_text: String,
     },
 
     // -- Behavioral learning --

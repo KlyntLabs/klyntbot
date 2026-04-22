@@ -1,5 +1,6 @@
-use ai_core::{AiEventMeta, AiSignal, SignalConsumer, SignalRouter};
+use ai_core::{AiEventMeta, AiMetrics, AiSignal, RecallDomain, SalienceVerdict, SignalConsumer, SignalRouter};
 use bus::{DomainEvent, DomainEventBus};
+use jiff::Timestamp;
 use std::sync::Arc;
 
 /// Translator: DomainEvent -> Option<AiSignal>. Returns None when the event
@@ -7,12 +8,102 @@ use std::sync::Arc;
 /// set by the feature's `#[derive(AiEvent)]` enum-level `#[ai(domain = ...)]`.
 pub fn translate(event: &DomainEvent) -> Option<AiSignal> {
     if let Some(e) = try_into_task_event(event) {
-        return Some(e.to_signal());
+        let mut sig = e.to_signal();
+        sig.domain = RecallDomain::Tasks;
+        return Some(sig);
     }
     if let Some(e) = try_into_finance_event(event) {
-        return Some(e.to_signal());
+        let mut sig = e.to_signal();
+        sig.domain = RecallDomain::Finance;
+        return Some(sig);
     }
-    None
+    translate_system_event(event)
+}
+
+fn translate_system_event(event: &DomainEvent) -> Option<AiSignal> {
+    let now = Timestamp::now();
+    let base = AiSignal {
+        domain: RecallDomain::General,
+        event_kind: "",
+        importance: 0.3,
+        salience: SalienceVerdict::Accumulate,
+        content: String::new(),
+        entity: None,
+        timestamp: now,
+        raw_event: None,
+        metrics: AiMetrics::default(),
+        coaching_signal: false,
+        coaching_rule: None,
+    };
+
+    match event {
+        DomainEvent::ChatTurnCompleted { user_message, .. } => Some(AiSignal {
+            event_kind: "ChatTurnCompleted",
+            content: user_message.clone().unwrap_or_default(),
+            ..base
+        }),
+        DomainEvent::SessionEnded { session_id, quality_score, .. } => Some(AiSignal {
+            event_kind: "SessionEnded",
+            importance: quality_score.unwrap_or(0.5),
+            content: session_id.clone(),
+            metrics: AiMetrics { amount: *quality_score, ..AiMetrics::default() },
+            ..base
+        }),
+        DomainEvent::CoachingPatternDetected {
+            pattern_name, confidence, rule_text, domain, ..
+        } => Some(AiSignal {
+            event_kind: "CoachingPatternDetected",
+            importance: *confidence,
+            content: rule_text.clone(),
+            metrics: AiMetrics {
+                category: Some(pattern_name.clone()),
+                ..AiMetrics::default()
+            },
+            domain: match domain.as_str() {
+                "tasks" => RecallDomain::Tasks,
+                "finance" => RecallDomain::Finance,
+                _ => RecallDomain::General,
+            },
+            ..base
+        }),
+        DomainEvent::AtomReinforced {
+            atom_id, subject, domain, reinforcement_count, ..
+        } => Some(AiSignal {
+            event_kind: "AtomReinforced",
+            importance: (0.5 + *reinforcement_count as f64 * 0.15).min(0.95),
+            content: subject.clone(),
+            metrics: AiMetrics {
+                category: Some(domain.clone()),
+                ..AiMetrics::default()
+            },
+            entity: Some(ai_core::EntityRef {
+                entity_type: "knowledge_atom",
+                id: atom_id.clone(),
+                name: subject.clone(),
+            }),
+            ..base
+        }),
+        DomainEvent::DistractionDetected { app, .. } => Some(AiSignal {
+            event_kind: "DistractionDetected",
+            content: app.clone(),
+            metrics: AiMetrics { app: Some(app.clone()), ..AiMetrics::default() },
+            coaching_signal: true,
+            ..base
+        }),
+        DomainEvent::FocusSessionStarted { .. } => Some(AiSignal {
+            event_kind: "FocusSessionStarted",
+            coaching_signal: true,
+            ..base
+        }),
+        DomainEvent::FocusSessionEnded { quality, .. } => Some(AiSignal {
+            event_kind: "FocusSessionEnded",
+            importance: *quality,
+            metrics: AiMetrics { amount: Some(*quality), ..AiMetrics::default() },
+            coaching_signal: true,
+            ..base
+        }),
+        _ => None,
+    }
 }
 
 fn try_into_task_event(e: &DomainEvent) -> Option<feature_tasks::events::TaskEvent> {
