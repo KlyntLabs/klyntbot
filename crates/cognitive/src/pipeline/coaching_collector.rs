@@ -1,93 +1,104 @@
 //! Collects signals from coaching pattern detection.
 
+use ai_core::{AiSignal, RecallDomain, SignalConsumer};
+use async_trait::async_trait;
 use jiff::Timestamp;
-use tokio::sync::broadcast;
-use tokio_util::sync::CancellationToken;
-use tracing::{debug, warn};
+use tracing::warn;
 
 use super::signal::{CognitiveSignal, SignalContext, SignalSource};
 use super::SignalSender;
 
-pub struct CoachingCollector;
+pub struct CoachingCollector {
+    tx: SignalSender,
+}
 
 impl CoachingCollector {
-    pub fn start(
-        mut event_rx: broadcast::Receiver<bus::DomainEvent>,
-        signal_tx: SignalSender,
-        cancel: CancellationToken,
-    ) -> tokio::task::JoinHandle<()> {
-        tokio::spawn(async move {
-            loop {
-                tokio::select! {
-                    _ = cancel.cancelled() => break,
-                    result = event_rx.recv() => {
-                        match result {
-                            Ok(bus::DomainEvent::CoachingPatternDetected {
-                                pattern_name: _, confidence, description: _, domain, signal_count, rule_text, ..
-                            }) => {
-                                let recall_domain = match domain.as_str() {
-                                    "tasks" => ai_core::RecallDomain::Tasks,
-                                    "finance" => ai_core::RecallDomain::Finance,
-                                    "productivity" => ai_core::RecallDomain::Productivity,
-                                    "learning" => ai_core::RecallDomain::Learning,
-                                    _ => ai_core::RecallDomain::General,
-                                };
-                                let signal = CognitiveSignal {
-                                    source: SignalSource::CoachingPattern,
-                                    content: rule_text,
-                                    domain: recall_domain,
-                                    confidence,
-                                    context: SignalContext {
-                                        source_count: signal_count as u32,
-                                        ..Default::default()
-                                    },
-                                    timestamp: Timestamp::now(),
-                                };
-                                let _ = signal_tx.send(signal).await;
-                            }
-                            Err(broadcast::error::RecvError::Closed) => break,
-                            Err(broadcast::error::RecvError::Lagged(n)) => {
-                                warn!("CoachingCollector lagged {n}");
-                            }
-                            _ => {}
-                        }
-                    }
-                }
-            }
-            debug!("CoachingCollector stopped");
-        })
+    pub fn new(tx: SignalSender) -> Self {
+        Self { tx }
     }
 }
 
-fn pattern_to_rule(name: &str, description: &str) -> String {
-    match name {
-        "afternoon_energy_drop" => "Schedule demanding tasks in the morning; take breaks in the afternoon when energy drops".into(),
-        "chronic_task_avoidance" => "Break avoided tasks into smaller steps to overcome procrastination".into(),
-        "habitual_context_switching" => "Batch similar tasks together to reduce context switching overhead".into(),
-        "declining_focus_quality" => "Take a break when focus quality starts declining".into(),
-        "recurring_budget_pressure" => "Review spending patterns when budget pressure is detected".into(),
-        "study_streak_at_risk" => "Complete at least one review session to maintain the study streak".into(),
-        "retention_decay_detected" => "Schedule review sessions for domains with declining retention".into(),
-        "learning_momentum_create_heavy" => "Balance content creation with review sessions to avoid review backlog".into(),
-        _ => description.to_string(),
+#[async_trait]
+impl SignalConsumer for CoachingCollector {
+    fn name(&self) -> &'static str {
+        "cognitive.coaching"
+    }
+
+    async fn consume(&self, signal: &AiSignal) -> common::Result<()> {
+        if signal.event_kind != "CoachingPatternDetected" {
+            return Ok(());
+        }
+        let Some(bus::DomainEvent::CoachingPatternDetected {
+            domain, signal_count, ..
+        }) = signal.raw_event.as_ref() else { return Ok(()); };
+
+        let recall_domain = match domain.as_str() {
+            "tasks" => RecallDomain::Tasks,
+            "finance" => RecallDomain::Finance,
+            "productivity" => RecallDomain::Productivity,
+            "learning" => RecallDomain::Learning,
+            _ => RecallDomain::General,
+        };
+
+        let out = CognitiveSignal {
+            source: SignalSource::CoachingPattern,
+            content: signal.content.clone(),  // rule_text lives here — no match required
+            domain: recall_domain,
+            confidence: signal.importance,
+            context: SignalContext {
+                source_count: *signal_count as u32,
+                ..Default::default()
+            },
+            timestamp: jiff::Timestamp::now(),
+        };
+        let _ = self.tx.send(out).await;
+        Ok(())
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use ai_core::{AiMetrics, SalienceVerdict};
 
-    #[test]
-    fn test_known_pattern() {
-        let text = pattern_to_rule("afternoon_energy_drop", "");
-        assert!(text.contains("morning"));
+    fn coaching_dummy() -> AiSignal {
+        AiSignal {
+            domain: ai_core::RecallDomain::General,
+            event_kind: "CoachingPatternDetected",
+            importance: 0.85,
+            salience: SalienceVerdict::Extract,
+            content: String::new(),
+            entity: None,
+            timestamp: jiff::Timestamp::now(),
+            raw_event: None,
+            metrics: AiMetrics::default(),
+            coaching_signal: false,
+            coaching_rule: None,
+        }
     }
 
-    #[test]
-    fn test_unknown_pattern_uses_description() {
-        assert_eq!(
-            pattern_to_rule("unknown", "Custom description"),
-            "Custom description"
-        );
+    #[tokio::test]
+    async fn coaching_consumer_uses_declared_rule_text() {
+        use ai_core::SignalConsumer;
+        let (tx, mut rx) = super::super::signal_queue(8);
+        let collector = CoachingCollector::new(tx);
+        let sig = AiSignal {
+            event_kind: "CoachingPatternDetected",
+            content: "Schedule demanding tasks in the morning".into(),
+            importance: 0.85,
+            raw_event: Some(bus::DomainEvent::CoachingPatternDetected {
+                pattern_name: "afternoon_energy_drop".into(),
+                confidence: 0.85,
+                description: "3/4 after 3pm".into(),
+                domain: "productivity".into(),
+                signal_count: 4,
+                rule_text: "Schedule demanding tasks in the morning".into(),
+            }),
+            ..coaching_dummy()
+        };
+        collector.consume(&sig).await.unwrap();
+        let out = rx.recv().await.unwrap();
+        assert_eq!(out.content, "Schedule demanding tasks in the morning");
+        assert_eq!(out.source, SignalSource::CoachingPattern);
     }
 }
