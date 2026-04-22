@@ -24,15 +24,13 @@ impl LanguageLearningFeature {
     fn migration_sql() -> &'static str {
         include_str!("../migrations/001_create_tables.sql")
     }
-
 }
 
 pub fn language_learning_migrations() -> Vec<FeatureMigration> {
     vec![FeatureMigration {
         feature_name: "language_learning".to_string(),
         version: 1,
-        description: "Create phoneme_mastery, pronunciation_logs, exam_attempts tables"
-            .to_string(),
+        description: "Create phoneme_mastery, pronunciation_logs, exam_attempts tables".to_string(),
         sql: LanguageLearningFeature::migration_sql().to_string(),
     }]
 }

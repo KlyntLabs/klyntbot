@@ -30,7 +30,9 @@ struct TestEntity {
 
 #[async_trait]
 impl SignalConsumer for TestConsumer {
-    fn name(&self) -> &'static str { "test_consumer" }
+    fn name(&self) -> &'static str {
+        "test_consumer"
+    }
 
     async fn consume(&self, signal: &AiSignal) -> common::Result<()> {
         self.observations.lock().unwrap().push(TestObservation {
@@ -88,15 +90,25 @@ async fn task_created_event_produces_signal_with_entity() {
     assert_eq!(obs[0].domain, "tasks");
     // Note: DomainEvent::TaskCreated doesn't include title, so content has empty title
     // This is a known limitation - the title would need to be fetched from the task repo
-    assert!(obs[0].content.contains("Created task:"), "content should start with 'Created task:'");
+    assert!(
+        obs[0].content.contains("Created task:"),
+        "content should start with 'Created task:'"
+    );
     assert!(obs[0].importance > 0.5, "importance should be > 0.5");
 
     // Note: Entity bridge creates entity with empty name since title isn't in DomainEvent::TaskCreated
     let ents = entities.lock().unwrap().clone();
-    assert_eq!(ents.len(), 1, "entity bridge creates entity even with empty title");
+    assert_eq!(
+        ents.len(),
+        1,
+        "entity bridge creates entity even with empty title"
+    );
     assert_eq!(ents[0].entity_type, "task");
     assert_eq!(ents[0].id, "task-123");
-    assert_eq!(ents[0].name, "", "name is empty because DomainEvent::TaskCreated has no title");
+    assert_eq!(
+        ents[0].name, "",
+        "name is empty because DomainEvent::TaskCreated has no title"
+    );
 }
 
 #[tokio::test]
@@ -121,7 +133,8 @@ async fn task_completed_high_deviation_extracts() {
         task_id: "task-456".into(),
         title: "Big feature".into(),
         deviation_pct: Some(80.0),
-    }.into();
+    }
+    .into();
 
     bus.publish(event);
     tokio::time::sleep(std::time::Duration::from_millis(50)).await;

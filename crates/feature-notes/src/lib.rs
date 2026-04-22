@@ -25,7 +25,6 @@ impl NotesFeature {
     pub fn migration_sql() -> &'static str {
         include_str!("../migrations/001_create_notes.sql")
     }
-
 }
 
 pub fn notes_migrations() -> Vec<FeatureMigration> {

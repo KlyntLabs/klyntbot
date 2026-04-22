@@ -1,4 +1,6 @@
-use crate::attrs::{parse_ai_enum_attr, parse_ai_event_attr, AiEventAttr, EntityBridge, SalienceSpec};
+use crate::attrs::{
+    parse_ai_enum_attr, parse_ai_event_attr, AiEventAttr, EntityBridge, SalienceSpec,
+};
 use proc_macro2::TokenStream;
 use quote::quote;
 use syn::{Data, DeriveInput, Fields, Variant};
