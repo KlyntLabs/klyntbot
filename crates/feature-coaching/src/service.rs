@@ -95,7 +95,13 @@ impl CoachingService {
                         // 1. Push signal into accumulator (always, even during focus)
                         {
                             let mut acc = accumulator.lock().await;
-                            acc.push_event(&event);
+                            // In the new architecture, CoachingSignalConsumer receives
+                            // AiSignal and forwards it to this service's mpsc channel.
+                            // For backward compatibility during migration, also translate
+                            // DomainEvent to AiSignal here.
+                            if let Some(sig) = translate_event(&event) {
+                                acc.push_event(&sig);
+                            }
                         }
 
                         // 2. Incrementally update situation from event
@@ -373,18 +379,42 @@ mod tests {
 
         let _service = CoachingService::start(
             event_rx,
-            accumulator,
+            accumulator.clone(),
             detector,
             router,
             feedback,
-            situation,
+            situation.clone(),
             reasoner,
             intervention_tx,
             None,
             cancel.clone(),
         );
 
-        // Push a budget alert to trigger budget_warning
+        // Push a budget alert AiSignal directly into accumulator
+        // (In production this flows through CoachingSignalConsumer)
+        let budget_signal = ai_core::AiSignal {
+            domain: ai_core::RecallDomain::Finance,
+            event_kind: "BudgetAlert",
+            importance: 0.9,
+            salience: ai_core::SalienceVerdict::Extract,
+            content: "food budget at 90%".into(),
+            entity: None,
+            timestamp: jiff::Timestamp::now(),
+            raw_event: None,
+            metrics: ai_core::AiMetrics {
+                category: Some("food".into()),
+                amount: Some(450.0),
+                ..Default::default()
+            },
+            coaching_signal: true,
+            coaching_rule: Some("Review spending patterns when budget pressure is detected".into()),
+        };
+        {
+            let mut acc = accumulator.lock().await;
+            acc.push_event(&budget_signal);
+        }
+
+        // Publish a DomainEvent to wake up the service loop
         bus.publish(DomainEvent::BudgetAlert {
             category: "food".into(),
             spent: 450.0,
@@ -442,5 +472,80 @@ mod tests {
 
         service.stop().await;
         // Should not panic or hang
+    }
+}
+
+/// Temporary translator: DomainEvent -> AiSignal for backward compatibility
+/// during the v1.5 migration. In production, CoachingSignalConsumer receives
+/// AiSignal directly from the SignalRouter.
+fn translate_event(event: &bus::DomainEvent) -> Option<ai_core::AiSignal> {
+    use ai_core::{AiMetrics, RecallDomain, SalienceVerdict};
+    use jiff::Timestamp;
+
+    let now = Timestamp::now();
+    let base = ai_core::AiSignal {
+        domain: RecallDomain::General,
+        event_kind: "",
+        importance: 0.3,
+        salience: SalienceVerdict::Accumulate,
+        content: String::new(),
+        entity: None,
+        timestamp: now,
+        raw_event: None,
+        metrics: AiMetrics::default(),
+        coaching_signal: false,
+        coaching_rule: None,
+    };
+
+    match event {
+        bus::DomainEvent::BudgetAlert { category, spent, .. } => Some(ai_core::AiSignal {
+            event_kind: "BudgetAlert",
+            content: format!("{} budget alert", category),
+            metrics: AiMetrics {
+                category: Some(category.clone()),
+                amount: Some(*spent),
+                ..AiMetrics::default()
+            },
+            coaching_signal: true,
+            ..base
+        }),
+        bus::DomainEvent::DistractionDetected { app, .. } => Some(ai_core::AiSignal {
+            event_kind: "DistractionDetected",
+            content: app.clone(),
+            metrics: AiMetrics { app: Some(app.clone()), ..AiMetrics::default() },
+            coaching_signal: true,
+            ..base
+        }),
+        bus::DomainEvent::FocusSessionStarted { .. } => Some(ai_core::AiSignal {
+            event_kind: "FocusSessionStarted",
+            coaching_signal: true,
+            ..base
+        }),
+        bus::DomainEvent::FocusSessionEnded { quality, .. } => Some(ai_core::AiSignal {
+            event_kind: "FocusSessionEnded",
+            importance: *quality,
+            metrics: AiMetrics { amount: Some(*quality), ..AiMetrics::default() },
+            coaching_signal: true,
+            ..base
+        }),
+        bus::DomainEvent::TaskDeferred { .. } => Some(ai_core::AiSignal {
+            event_kind: "TaskDeferred",
+            coaching_signal: true,
+            ..base
+        }),
+        bus::DomainEvent::SessionEnded { session_id, quality_score, .. } => Some(ai_core::AiSignal {
+            event_kind: "SessionEnded",
+            importance: quality_score.unwrap_or(0.5),
+            content: session_id.clone(),
+            metrics: AiMetrics { amount: *quality_score, ..AiMetrics::default() },
+            ..base
+        }),
+        bus::DomainEvent::QualityScored { overall_score, .. } => Some(ai_core::AiSignal {
+            event_kind: "QualityScored",
+            importance: *overall_score,
+            metrics: AiMetrics { amount: Some(*overall_score), ..AiMetrics::default() },
+            ..base
+        }),
+        _ => None,
     }
 }

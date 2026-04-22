@@ -1,7 +1,6 @@
 //! Signal accumulator — subscribes to DomainEventBus, maintains a rolling
 //! event window, and evaluates heuristic trigger conditions against UserSituation.
 
-mod conversion;
 mod types;
 
 pub use types::{Signal, SignalMetadata, TriggerCondition, TriggerFired};
@@ -10,10 +9,8 @@ use std::collections::VecDeque;
 
 use jiff::Timestamp;
 
-use bus::DomainEvent;
 use cognitive::situation::UserSituation;
 
-use conversion::event_to_signal;
 use types::default_conditions;
 
 /// Rolling window signal accumulator with heuristic trigger evaluation.
@@ -38,12 +35,11 @@ impl SignalAccumulator {
         }
     }
 
-    /// Add a signal from a domain event.
-    pub fn push_event(&mut self, event: &DomainEvent) {
-        let now = Timestamp::now();
-        let signal = event_to_signal(event, now);
-        self.window.push_back(signal);
-        self.prune_old(now);
+    /// Add a signal from an AiSignal.
+    pub fn push_event(&mut self, signal: &ai_core::AiSignal) {
+        let s = Signal::from_ai_signal(signal);
+        self.window.push_back(s);
+        self.prune_old(jiff::Timestamp::now());
     }
 
     /// Prune signals outside the window.
@@ -216,16 +212,55 @@ mod tests {
         }
     }
 
+    fn make_signal(event_type: &'static str, amount: Option<f64>) -> ai_core::AiSignal {
+        ai_core::AiSignal {
+            domain: ai_core::RecallDomain::General,
+            event_kind: event_type,
+            importance: 0.5,
+            salience: ai_core::SalienceVerdict::Accumulate,
+            content: String::new(),
+            entity: None,
+            timestamp: jiff::Timestamp::now(),
+            raw_event: None,
+            metrics: ai_core::AiMetrics {
+                amount,
+                ..Default::default()
+            },
+            coaching_signal: false,
+            coaching_rule: None,
+        }
+    }
+
+    #[test]
+    fn test_push_ai_signal_updates_window() {
+        let mut acc = SignalAccumulator::new();
+        let sig = ai_core::AiSignal {
+            domain: ai_core::RecallDomain::Finance,
+            event_kind: "BudgetAlert",
+            importance: 0.9,
+            salience: ai_core::SalienceVerdict::Extract,
+            content: "".into(),
+            entity: None,
+            timestamp: jiff::Timestamp::now(),
+            raw_event: None,
+            metrics: ai_core::AiMetrics { category: Some("food".into()), amount: Some(450.0), app: None },
+            coaching_signal: true,
+            coaching_rule: None,
+        };
+        acc.push_event(&sig);
+        assert_eq!(acc.window_size(), 1);
+        let front = acc.signals().front().unwrap();
+        assert_eq!(front.event_type, "BudgetAlert");
+        assert_eq!(front.metadata.category.as_deref(), Some("food"));
+        assert_eq!(front.metadata.amount, Some(450.0));
+    }
+
     #[test]
     fn test_distraction_events_no_longer_trigger() {
         let mut acc = SignalAccumulator::new();
 
         for _ in 0..5 {
-            acc.push_event(&DomainEvent::DistractionDetected {
-                app: "reddit".into(),
-                duration_secs: None,
-                context: "test".into(),
-            });
+            acc.push_event(&make_signal("DistractionDetected", None));
         }
 
         let sit = situation_with(0.5, 0.5, 0.2);
@@ -241,11 +276,7 @@ mod tests {
     fn test_no_trigger_below_threshold() {
         let mut acc = SignalAccumulator::new();
 
-        acc.push_event(&DomainEvent::DistractionDetected {
-            app: "reddit".into(),
-            duration_secs: None,
-            context: "test".into(),
-        });
+        acc.push_event(&make_signal("DistractionDetected", None));
 
         let sit = situation_with(0.2, 0.8, 0.1);
         let fired = acc.evaluate(&sit);
@@ -272,11 +303,7 @@ mod tests {
     fn test_cooldown_prevents_re_fire() {
         let mut acc = SignalAccumulator::new();
 
-        acc.push_event(&DomainEvent::BudgetAlert {
-            category: "food".into(),
-            spent: 450.0,
-            limit: 500.0,
-        });
+        acc.push_event(&make_signal("BudgetAlert", None));
 
         let sit = situation_with(0.0, 1.0, 0.0);
 
@@ -285,11 +312,7 @@ mod tests {
         assert!(fired1.iter().any(|t| t.condition_name == "budget_warning"));
 
         // Push another budget alert
-        acc.push_event(&DomainEvent::BudgetAlert {
-            category: "food".into(),
-            spent: 480.0,
-            limit: 500.0,
-        });
+        acc.push_event(&make_signal("BudgetAlert", None));
 
         // Second evaluation — cooldown blocks
         let fired2 = acc.evaluate(&sit);
@@ -300,11 +323,7 @@ mod tests {
     fn test_budget_warning_trigger() {
         let mut acc = SignalAccumulator::new();
 
-        acc.push_event(&DomainEvent::BudgetAlert {
-            category: "food".into(),
-            spent: 450.0,
-            limit: 500.0,
-        });
+        acc.push_event(&make_signal("BudgetAlert", None));
 
         let sit = situation_with(0.0, 1.0, 0.0);
         let fired = acc.evaluate(&sit);
@@ -326,17 +345,11 @@ mod tests {
     fn test_session_ended_signal() {
         let mut acc = SignalAccumulator::new();
 
-        acc.push_event(&DomainEvent::SessionEnded {
-            session_id: "s1".into(),
-            session_type: "focus".into(),
-            duration_secs: 3600,
-            quality_score: Some(85.0),
-            category_purity: 0.9,
-        });
+        acc.push_event(&make_signal("SessionEnded", Some(85.0)));
 
         assert_eq!(acc.window_size(), 1);
         let signal = acc.signals().front().unwrap();
-        assert_eq!(signal.event_type, bus::DomainEvent::KIND_SESSION_ENDED);
+        assert_eq!(signal.event_type, "SessionEnded");
         assert_eq!(signal.metadata.amount, Some(85.0));
     }
 
@@ -344,15 +357,10 @@ mod tests {
     fn test_quality_scored_signal() {
         let mut acc = SignalAccumulator::new();
 
-        acc.push_event(&DomainEvent::QualityScored {
-            score_date: "2026-03-09".into(),
-            session_id: None,
-            overall_score: 25.0,
-            components: "{}".into(),
-        });
+        acc.push_event(&make_signal("QualityScored", Some(25.0)));
 
         let signal = acc.signals().front().unwrap();
-        assert_eq!(signal.event_type, bus::DomainEvent::KIND_QUALITY_SCORED);
+        assert_eq!(signal.event_type, "QualityScored");
         assert_eq!(signal.metadata.amount, Some(25.0));
     }
 

@@ -20,6 +20,29 @@ pub struct SignalMetadata {
     pub amount: Option<f64>,
 }
 
+impl SignalMetadata {
+    pub fn from_ai_signal(sig: &ai_core::AiSignal) -> Self {
+        Self {
+            app: sig.metrics.app.clone(),
+            task_id: sig.entity.as_ref()
+                .filter(|e| e.entity_type == "task")
+                .map(|e| e.id.clone()),
+            category: sig.metrics.category.clone(),
+            amount: sig.metrics.amount,
+        }
+    }
+}
+
+impl Signal {
+    pub fn from_ai_signal(sig: &ai_core::AiSignal) -> Self {
+        Self {
+            event_type: sig.event_kind.to_string(),
+            timestamp: sig.timestamp,
+            metadata: SignalMetadata::from_ai_signal(sig),
+        }
+    }
+}
+
 /// Named trigger conditions with cooldown tracking.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TriggerCondition {
