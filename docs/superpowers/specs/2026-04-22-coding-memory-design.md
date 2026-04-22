@@ -167,9 +167,11 @@ bot/crates/
 | Target | Change |
 |---|---|
 | `semantic_facts` | `ADD COLUMN scope_repo_id TEXT NULL` |
-| `semantic_facts` | `ADD COLUMN metadata TEXT NULL` (JSON: provenance, anchored_symbols, etc.) |
-| `episodic_memories` | `ADD COLUMN kind TEXT DEFAULT 'general'` (values: `general | fix_attempt | test_run | refactor | review`) |
-| `ingest_event_log` | `CREATE TABLE` — append-only AgentEvent buffer with `processed BOOLEAN DEFAULT FALSE` |
+| `semantic_facts` | `ADD COLUMN metadata TEXT NULL` (JSON: provenance, anchored_symbols, sensitivity, etc.) |
+| `semantic_facts` | `ADD COLUMN actor_id TEXT DEFAULT 'local_user'` (forward-compat for future multi-user; implementation out of scope) |
+| `episodic_memories` | `ADD COLUMN kind TEXT DEFAULT 'general'` (values: `general \| fix_attempt \| test_run \| refactor \| review \| turn_trace`) |
+| `episodic_memories` | `ADD COLUMN actor_id TEXT DEFAULT 'local_user'` |
+| `ingest_event_log` | `CREATE TABLE` — append-only AgentEvent buffer with `processed BOOLEAN DEFAULT FALSE`, `actor_id TEXT DEFAULT 'local_user'` |
 | `memory_causal_edges` | `CREATE TABLE (id, from_id, to_id, edge_kind, confidence, inferred_at)` |
 | `memory_utilization` | `CREATE TABLE (memory_id, retrieved_at, cited_in_response BOOLEAN)` |
 | `skill_versions` | `ADD COLUMN scope TEXT DEFAULT 'global'` + `ADD COLUMN scope_repo_id TEXT NULL` |
@@ -280,6 +282,36 @@ klyntbot-hook → socket connect fails → open(O_APPEND) ~/.klyntbot/ingest-buf
 - Toggle writes hook stanza to the CLI's settings file (atomic write; pre-install backup).
 - Toggle OFF reverses cleanly.
 - UI "Diagnose" button invokes `klyntbot-hook` with a synthetic event to verify the install works.
+
+### Path-based exclusion (privacy — credentials must never reach the store)
+
+Sensitive files are filtered at the **hook level**, before an event enters `ingest_event_log`. A Distiller that reads `.env` or `secrets/*` would permanently memoize credentials — unacceptable.
+
+**Default `excludePaths`** (shipped, user can extend):
+```json
+{
+  "codingMemory": {
+    "ingest": {
+      "excludePaths": [
+        "**/.env", "**/.env.*",
+        "**/secrets/**", "**/private/**",
+        "**/*.key", "**/*.pem", "**/*.p12", "**/*.pfx",
+        "**/id_rsa", "**/id_ed25519", "**/known_hosts",
+        "**/.aws/credentials", "**/.gcloud/**", "**/.kube/config",
+        "**/node_modules/**", "**/target/**", "**/.git/**"
+      ]
+    }
+  }
+}
+```
+
+**Filtering behavior:**
+- `klyntbot-hook` evaluates `FileEdit.path` and `ToolCall.args_preview` against each glob; matches cause the event to be dropped **before** socket write (not even buffered on disk).
+- Compressed events (where `AssistantMsg.text` or `result_preview` contains a match against path patterns) are truncated with `"[redacted: sensitive path]"` marker.
+- The Distiller also applies the same globs as a defense-in-depth layer: even if an event somehow reaches `ingest_event_log`, facts derived from excluded paths are rejected.
+- User can add project-specific exclusions via per-repo config `<repo_root>/.klyntbot/ignore.toml`.
+
+**Not a content scanner.** We do not regex-grep file contents for secrets — that's out of scope (false-positive-heavy, infinite maintenance). Path-based exclusion is a coarse but reliable filter; users with stricter needs should set their editor to not open secret files.
 
 ---
 
@@ -412,6 +444,20 @@ The Distiller MUST NOT emit these. The `record_observation` tool schema enforces
 | `opinion` | Agent belief with confidence that can be revised on new evidence (Hindsight-style) |
 | `observation` | Raw observed behavior, pre-distillation |
 
+### Sensitivity tagging (privacy tier)
+
+Every memory carries `metadata.sensitivity: "normal" | "high" | "excluded"`:
+
+| Value | Behavior |
+|---|---|
+| `normal` *(default)* | Standard retrieval, standard externalization to rule artifacts |
+| `high` | Retrieved normally but **never** externalized to `CLAUDE.md` / `AGENTS.md` / `.cursorrules` or any on-disk artifact outside klyntbot's own SQLite |
+| `excluded` | Hidden from retrieval unless explicit `include_excluded: true` flag passed; used for "I tried a password but don't want this remembered" cases |
+
+The Distiller auto-tags `high` for facts derived from tool calls with paths matching an extended sensitivity set (auth-related paths, billing/payment paths). The user can promote/demote sensitivity via the workbench UI (see §11.5).
+
+Reforge's Rule Artifact Generation phase filters out `high` and `excluded` before calling the LLM — sensitive content never reaches the externalized markdown.
+
 ### Scope semantics and retrieval
 
 `semantic_facts.scope_repo_id` is the partitioning key:
@@ -454,7 +500,32 @@ These are already in klyntbot, waiting for coding data to flow in:
 
 **C2 — Symbol-grounded memory with git invalidation.** Schema: `anchored_symbols` in fact `metadata` JSON (Phase 1). Behavior (Phase 6): tree-sitter extraction at Distiller time adds `SymbolRef { file_path, symbol, git_hash }` to each coding fact. A git post-commit hook (a `klyntbot-hook` subcommand) fires on every commit, diffs changed files, queries fact store for anchored facts, invalidates bi-temporally if symbol deleted, marks `stale_candidate` if file changed but symbol survives. Reforge's deep validation runs a full tree-sitter pass against current codebase state.
 
-**C3 — Failure-state-aware retrieval (Skill-RAG-inspired).** Behavior (Phase 4): after the 12-factor scoring, compute `coverage_score = mean(top_k.sim) - min(top_k.sim)`. Below threshold → escalate via existing `EnhancementBudget` tiers: `deep_think` (query rewrite via existing `QueryPipeline`), `ultra` (query decomposition + evidence-focused raw-event scan via provenance pointers from B2). Reforge Phase 6 trains thresholds based on which escalations improved answer quality.
+**C3 — Failure-state-aware retrieval (Skill-RAG-inspired).** Behavior (Phase 4): after the 12-factor scoring, a `RetrievalQualityProbe` computes `coverage_score = mean(top_k.sim) - min(top_k.sim)`. Below threshold → dispatch to a **formalized retrieval-skill registry**:
+
+```rust
+pub trait RetrievalSkill: Send + Sync {
+    fn name(&self) -> &'static str;
+    fn description(&self) -> &'static str;
+    async fn apply(&self, ctx: &EscalationContext) -> Result<EscalationOutcome>;
+    fn effectiveness_score(&self) -> f32;   // EMA-updated from outcomes
+}
+```
+
+Phase-4 registrations (closed set):
+
+| Skill | Tier | Behavior |
+|---|---|---|
+| `QueryRewriter` | `deep_think` | Uses existing `QueryPipeline` PRF + multi-query expansion to generate 3 rewrites; re-retrieves and RRF-merges |
+| `QueryDecomposer` | `deep_think` | Splits compound queries into 2-4 sub-queries; retrieves per-sub; merges |
+| `EvidenceFocuser` | `deep_think` | Uses cross-encoder reranker on top-20 candidates to identify most relevant 5 |
+| `RawEventEscalator` | `ultra` | Bypasses summaries; uses provenance pointers (Tier B2) to retrieve raw `ingest_event_log` rows matching query |
+| `CausalContextExpander` | `ultra` | Walks `memory_causal_edges` from top-k results; surfaces causal chains as additional context |
+
+**Skill selection logic:** the probe passes `(coverage_score, query_shape, active_budget_tier)` to a selector; selector tries skills in order of `effectiveness_score`; each skill may succeed (coverage now acceptable), fail (try next), or escalate (increase budget tier).
+
+**Effectiveness tracking:** each `apply()` publishes `DomainEvent::RetrievalSkillApplied { skill, before_score, after_score, budget_used, session_id }`. `PatternEffectivenessSubscriber` (§10) updates per-skill EMA over outcomes measured via downstream `UserCorrectedAI` rate. Low-effectiveness skills get deprioritized in the selector.
+
+Reforge Phase 6 trains the coverage-score threshold itself as part of its autotuner surface.
 
 ---
 
@@ -694,11 +765,35 @@ DomainEvent::AssistantMsgCompleted { session_id, turn_id, cited_memory_ids }
 
 All route through existing `MetaRule` table with status `Pending`. User sees in Mirror UI; can approve/reject/snooze.
 
+### Alert severity and kind — closed enums
+
+```rust
+pub enum MirrorAlertSeverity { Low, Medium, High, Critical }
+
+pub enum MirrorAlertKind {
+    // Routing / skill alerts
+    ProjectSkillObsolete,        // skill activation dropped >50% in 7 days
+    UncapturedPattern,           // problem_hash recurred >=3x without matching WorkflowPattern
+    ScopeMisclassified,          // global fact retrieved heavily in repo sessions, irrelevant
+    SkillFileConflict,           // user edited managed block; auto-rewrite skipped
+    // Pattern / learning alerts
+    ProblemClassRefactor,        // same problem_hash fails >=3x across sessions
+    LowerDeadEndThreshold,       // >=3 dead-end overrides in same repo
+    PromoteToGlobal,             // preference observed across >=3 repos, low refutation
+    PromoteCounterfactualVisibility, // counterfactual retrieved >=5x, ignored
+    // Integrity alerts
+    StaleFactDetected,           // C2 git invalidation produced a stale_candidate
+    ProvenanceMissing,           // safety-net: fact somehow lacks valid provenance (should panic)
+    DistillerQueueBacklog,       // >50 pending distillations — LLM provider probably down
+}
+```
+
 ### Alert surfacing
 
 1. klyntbot desktop notification center — existing `MirrorState.pending_snippets` rendering.
-2. SessionStart context injection (opt-in, default on for `severity: high`): high-severity alerts render into the Section 8 markdown block.
-3. Mirror MCP tool — add coding-specific action filters: `mirror get_coding_alerts(repo?, severity?)`.
+2. SessionStart context injection (opt-in, default on for `severity: High`): high-severity alerts render into the §8 Recall-API markdown block.
+3. Mirror MCP tool — coding-specific action filters: `mirror get_coding_alerts(repo?, severity?, kind?)`.
+4. Workbench **Mirror Alerts Feed** panel (§11.5) — full alert browser with approve/dismiss/snooze actions.
 
 ### Pattern effectiveness feedback loop (the learning signal)
 
@@ -844,6 +939,92 @@ Per pattern/skill, `PatternEffectivenessSubscriber` executes:
 | Scope invariant | proptest |
 | No TODO regression | CI grep in shipped paths |
 | No panic paths | clippy `unwrap_used` / `expect_used` deny |
+| Workbench panel live | Every phase that lands a new data shape ships the matching workbench panel (see §11.5) |
+
+---
+
+## 11.5. Coding Memory Workbench (desktop UI)
+
+### Purpose
+
+A user-facing section of the klyntbot desktop app that gives visibility into coding-agent activity, accumulated memory, learning signals, and Reforge-driven changes. Helps users **trust, audit, and tune** the system. Precedent: moonshot ships a similar surface for kimi-cli — this is product UX, not ops infra.
+
+### Scope boundary
+
+**Is:** a window into data already persisted in klyntbot's stores. All reads, no writes-as-side-effect.
+
+**Is not:** ops observability. No Prometheus / OpenTelemetry exporters, no cross-machine aggregation, no admin/SRE audience, no external network endpoints. CLAUDE.md non-goal on observability is respected — this is product surface, not infrastructure.
+
+### Technology stack
+
+Extends existing `desktop-ui/` per CLAUDE.md conventions:
+- Tauri 2 + Vite + React + Tailwind v4 + Biome 2.0 + React Compiler
+- `useQuery(cmd, args)` for reads; `useMutation(cmd)` for alert actions
+- All IPC through `ipc()` wrapper; never direct `invoke`
+- `glass-panel` class for popovers/dialogs
+- Path aliases: `@features/coding-memory/*` → `desktop-ui/src/features/coding-memory/*`
+- New Tauri commands in `crates/desktop/src/commands/coding_memory.rs` — thin adapters over `app-core`; all registered in `DEV_COMMANDS` per CLAUDE.md
+
+New top-level route: `/coding-memory` with nested routes per panel.
+
+### Panels
+
+| Panel | Data source | Purpose |
+|---|---|---|
+| **Session Replay** | `ingest_event_log` ordered by `(session_id, occurred_at)` | Scrubbable timeline of every `AgentEvent`: tool calls, file edits, test runs, assistant messages. Per-turn cost breakdown. Click an event → show raw JSON + distillation outcome |
+| **Memory Browser** | `semantic_facts` + `episodic_memories` | Search + filter by repo, kind, date range, `memory_type`, `sensitivity`. Click a memory → full `metadata.provenance` chain with source event drill-down |
+| **Activity Timeline** | `episodic_memories` by `occurred_at` | Calendar heatmap of activity density per day; per-repo filter; click a day → day's episodes |
+| **Causal Graph Viewer** | `memory_causal_edges` + anchor memories | Force-directed graph: fix→broke→fixed-by chains; cluster by `problem_hash`; color by `edge_kind` |
+| **Mirror Alerts Feed** | `mirror_snippets` | Pending / dismissed alerts grouped by severity + kind. One-click approve / reject / snooze actions. Shows meta-rule proposals with before/after config diffs |
+| **Pattern Effectiveness Trends** | `workflow_patterns` + `skill_versions` effectiveness over time | Line charts of per-skill `effectiveness_score`; auto-highlight skills approaching decay or promotion thresholds |
+| **Reforge Cycle Diff** | `skill_versions` + rule-artifact history | Side-by-side diff of previous vs. current `CLAUDE.md`, AGENTS.md, project skills. Per-cycle rollup of what changed |
+| **Cost Tracker** | Distiller + Reforge telemetry | LLM spend per day / week / repo / provider. Breakdown: Distiller Phase B vs. Reforge Phase 2.5 vs. Phase 3.5. Alert when over user-configured ceiling |
+| **Stale Candidates** | facts with `metadata.status = 'stale_candidate'` | Facts flagged by C2 git invalidation awaiting review. One-click invalidate-now / keep / review later |
+| **CLI Health** | ingest socket state + toggle status + per-CLI event volumes | Per-CLI row: enabled/disabled, last event received, buffered event count, daemon liveness. Red-flag surface when desktop is off during user sessions |
+| **Sensitivity Inspector** | `semantic_facts.metadata.sensitivity` | Browse memories by sensitivity tier; demote/promote with explicit confirmation; review `excluded` memories that would otherwise be hidden |
+
+### Per-phase panel delivery
+
+Each phase that lands new data shape also ships its matching panel. No panel waits in a pile for Phase 8.
+
+| Phase | Panels added | Rationale |
+|---|---|---|
+| 2 | CLI Health (basic — Claude Code only). Session Replay (raw AgentEvent stream) | From the moment ingestion works, the user can see it working |
+| 3 | Memory Browser (semantic + episodic with provenance). Activity Timeline. Cost Tracker. Sensitivity Inspector | Every fact that lands is immediately browsable |
+| 4 | Session Replay gains recall-injection overlay + recall-tool invocation log | Shows the "why does the agent know X" chain |
+| 5 | Mirror Alerts Feed. Pattern Effectiveness Trends. Reforge Cycle Diff | Reflection subsystems are invisible without these panels |
+| 6 | Causal Graph Viewer. Stale Candidates panel | Game-changer tier becomes visible |
+| 7 | CLI Health gains multi-CLI rows + per-CLI ingest stats | Multi-CLI state is confusing without this |
+| 8 | Polish: accessibility audit; performance audit for large data (>100k facts); keyboard navigation; dark-mode-only → light-mode parity | Workbench graduates to production-quality |
+
+### Data access pattern
+
+All panels use `useQuery("coding_memory.<panel_name>", args)`. No panel ever reads the filesystem directly; Tauri commands are the only path. This keeps the web dev server (`bun run dev`) functional in browser-only mode (via the existing `dev_server/` HTTP bridge per CLAUDE.md).
+
+### Performance bounds
+
+- Session Replay pagination: 500 events per page with lazy-load scroll.
+- Memory Browser: SQL-level pagination via `LIMIT / OFFSET`; FTS5 search for text queries.
+- Causal Graph Viewer: max 200 nodes rendered; larger clusters auto-collapse to community summary.
+- Cost Tracker: pre-aggregated rollups in a materialized view refreshed on Reforge cycle.
+
+### Non-goals (workbench-scoped)
+
+- No external HTTP endpoints (not a local web server; all access through Tauri IPC).
+- No cross-machine data aggregation.
+- No admin/team/multi-user views (matches spec-level non-goal).
+- No log forwarding / SIEM integration.
+- Data never leaves the device; no "share this session" button.
+- No ML / ranking tuning UI (that's the autotuner's job, not the user's).
+
+### Accessibility + UX conventions
+
+Per CLAUDE.md desktop-ui rules:
+- All interactive elements keyboard-navigable.
+- Tokens from `src/styles/theme.css` only — no hardcoded hex.
+- Glassmorphism via `glass-panel` class for overlays.
+- No `overflow-x-auto` on containers with absolute-positioned dropdown children (CSS gotcha from CLAUDE.md).
+- Vitest coverage for panel logic; Biome 2.0 lint.
 
 ---
 
@@ -961,6 +1142,7 @@ After Phase 8:
 - `FixAttemptFailed { problem_hash, repo, attempt_count }`
 - `MemoryRetrieved { memory_ids, query, session_id, turn_id }`
 - `AssistantMsgCompleted { session_id, turn_id, cited_memory_ids }`
+- `RetrievalSkillApplied { skill, before_score, after_score, budget_used, session_id }` (§8 C3 formalization)
 
 ### B. MCP tool catalog (added to `default_exposed_tools()`)
 
@@ -994,11 +1176,26 @@ All configurable in `config.json` → `codingMemory.distiller.model`, etc.
       "maxInputTokens": 8000,
       "timeout": "30s"
     },
+    "ingest": {
+      "excludePaths": [
+        "**/.env", "**/.env.*",
+        "**/secrets/**", "**/private/**",
+        "**/*.key", "**/*.pem", "**/*.p12", "**/*.pfx",
+        "**/id_rsa", "**/id_ed25519", "**/known_hosts",
+        "**/.aws/credentials", "**/.gcloud/**", "**/.kube/config",
+        "**/node_modules/**", "**/target/**", "**/.git/**"
+      ]
+    },
+    "privacy": {
+      "defaultSensitivity": "normal",
+      "autoPromoteHighPaths": ["**/auth/**", "**/billing/**", "**/payment/**"]
+    },
     "recall": {
       "sessionStartBudget": 800,
       "userPromptBudget": 1500,
       "deadEndWarnings": true,
-      "escalationEnabled": true
+      "escalationEnabled": true,
+      "coverageThreshold": 0.25
     },
     "reforge": {
       "nightlyCron": "0 3 * * *",
@@ -1011,7 +1208,12 @@ All configurable in `config.json` → `codingMemory.distiller.model`, etc.
     },
     "skills": {
       "projectSkills": true,
-      "location": "private" // or "repo"
+      "location": "private"
+    },
+    "workbench": {
+      "enabled": true,
+      "sessionReplayPageSize": 500,
+      "causalGraphMaxNodes": 200
     },
     "cli": {
       "claudeCode": { "enabled": false },
@@ -1046,6 +1248,29 @@ All flags default to off; user enables per-CLI via desktop UI.
 - Skill-RAG (arxiv 2604.15771) — failure-state-aware retrieval
 - Hindsight (arxiv 2512.12818) — epistemic separation (facts vs. opinions)
 - empirical study arxiv 2505.16067 — selective add + selective delete = +10pp
+
+### G. Out of scope / Future integrations
+
+Explicit non-goals for this spec, with rationale — so future readers understand what was deliberately deferred vs. accidentally omitted.
+
+| Topic | Status | Rationale |
+|---|---|---|
+| Cloud sync / team sharing | Out of scope | Spec is local-first single-user. `actor_id` column added in Phase 1 as forward-compat so future multi-user design doesn't need migration. |
+| Full multi-user visibility model (private/team/public tiers) | Out of scope | Product design decision deferred until local-first is shipped and validated. Schema-level `actor_id` is the only hook. |
+| Ops observability (Prometheus / OpenTelemetry / admin dashboards) | Out of scope | CLAUDE.md non-goal: "single-user local app. Existing tracing logs and PipelineEvent SSE stream are sufficient." User-facing Workbench (§11.5) is a product feature, not ops infra. |
+| In-app encryption at rest | Out of scope | Wrong layer. OS-level full-disk encryption (FileVault on macOS, LUKS on Linux) is the correct defense. In-app encryption for a local SQLite is security theater. |
+| Claude-mem ecosystem bridge | Deferred | Interesting adjacent project — MCP tool translation layer that lets claude-mem users point at klyntbot as backend. Future design will be tracked separately under `docs/coding-memory/future-integrations.md`. |
+| Content-scanning secret detector | Rejected | Path-based `excludePaths` is coarse but reliable. Full content scanning for secrets is false-positive-heavy and impossible to maintain; stricter users set their editor to not open secret files. |
+| Per-fact manual merge UI (full "conflict resolution" flows) | Out of scope | Workbench provides promote/demote sensitivity and approve/reject alerts; deeper manual memory editing creates integrity risks not worth the UX trade. |
+| Log forwarding / SIEM integration | Out of scope | Data never leaves the device. Enterprises with SIEM requirements should reach klyntbot through the MCP server's audit-tool surface, not bulk log export. |
+| `klynt-cli` native coding CLI | Separate future project | This spec makes klynt-cli's future integration cheap — it will embed `coding-memory` as a Rust library + implement an `IngestAdapter`. The CLI itself is a separate brainstorm → spec → plan cycle. |
+
+### H. Amendment log
+
+| Date | Change |
+|---|---|
+| 2026-04-22 | Initial design committed (commit 59277459e) |
+| 2026-04-22 | Amendment 1: `actor_id` forward-compat, path-based `excludePaths`, `sensitivity` tagging, formalized retrieval-skill registry, closed Mirror alert enums, §11.5 Coding Memory Workbench, per-phase panel delivery, Out-of-scope appendix |
 
 ---
 
