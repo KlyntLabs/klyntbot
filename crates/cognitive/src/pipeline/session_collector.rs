@@ -1,9 +1,9 @@
 //! Collects knowledge signals from ended sessions by reading session scratchpads.
 
+use ai_core::{AiSignal, RecallDomain, SignalConsumer};
+use async_trait::async_trait;
 use jiff::Timestamp;
 use storage::SessionMemoryRepo;
-use tokio::sync::broadcast;
-use tokio_util::sync::CancellationToken;
 use tracing::{debug, warn};
 
 use super::signal::{CognitiveSignal, SignalContext, SignalSource};
@@ -31,35 +31,14 @@ const INSIGHT_KEYWORDS: &[&str] = &[
 ];
 const MIN_SCRATCHPAD_LEN: usize = 50;
 
-pub struct SessionCollector;
+pub struct SessionCollector {
+    tx: SignalSender,
+    repo: SessionMemoryRepo,
+}
 
 impl SessionCollector {
-    pub fn start(
-        mut event_rx: broadcast::Receiver<bus::DomainEvent>,
-        signal_tx: SignalSender,
-        memory_repo: SessionMemoryRepo,
-        cancel: CancellationToken,
-    ) -> tokio::task::JoinHandle<()> {
-        tokio::spawn(async move {
-            loop {
-                tokio::select! {
-                    _ = cancel.cancelled() => break,
-                    result = event_rx.recv() => {
-                        match result {
-                            Ok(bus::DomainEvent::SessionEnded { session_id, .. }) => {
-                                Self::handle(&session_id, &memory_repo, &signal_tx).await;
-                            }
-                            Err(broadcast::error::RecvError::Closed) => break,
-                            Err(broadcast::error::RecvError::Lagged(n)) => {
-                                warn!("SessionCollector lagged by {n} events");
-                            }
-                            _ => {}
-                        }
-                    }
-                }
-            }
-            debug!("SessionCollector stopped");
-        })
+    pub fn new(tx: SignalSender, repo: SessionMemoryRepo) -> Self {
+        Self { tx, repo }
     }
 
     async fn handle(session_key: &str, repo: &SessionMemoryRepo, tx: &SignalSender) {
@@ -78,7 +57,7 @@ impl SessionCollector {
         let signal = CognitiveSignal {
             source: SignalSource::SessionEnd,
             content: insights.join(" "),
-            domain: ai_core::RecallDomain::General,
+            domain: RecallDomain::General,
             confidence,
             context: SignalContext {
                 session_key: Some(session_key.to_string()),
@@ -89,6 +68,27 @@ impl SessionCollector {
             timestamp: Timestamp::now(),
         };
         let _ = tx.send(signal).await;
+    }
+}
+
+#[async_trait]
+impl SignalConsumer for SessionCollector {
+    fn name(&self) -> &'static str {
+        "cognitive.session"
+    }
+
+    async fn consume(&self, signal: &AiSignal) -> common::Result<()> {
+        if signal.event_kind != "SessionEnded" {
+            return Ok(());
+        }
+        let session_id = signal.raw_event.as_ref().and_then(|e| match e {
+            bus::DomainEvent::SessionEnded { session_id, .. } => Some(session_id.clone()),
+            _ => None,
+        });
+        let Some(session_id) = session_id else { return Ok(()); };
+
+        Self::handle(&session_id, &self.repo, &self.tx).await;
+        Ok(())
     }
 }
 
@@ -114,6 +114,23 @@ fn keyword_confidence(insights: &[String]) -> f64 {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use ai_core::{AiMetrics, SalienceVerdict};
+
+    fn session_dummy() -> AiSignal {
+        AiSignal {
+            domain: ai_core::RecallDomain::General,
+            event_kind: "SessionEnded",
+            importance: 0.5,
+            salience: SalienceVerdict::Accumulate,
+            content: String::new(),
+            entity: None,
+            timestamp: jiff::Timestamp::now(),
+            raw_event: None,
+            metrics: AiMetrics::default(),
+            coaching_signal: false,
+            coaching_rule: None,
+        }
+    }
 
     #[test]
     fn test_extract_insight_sentences() {
@@ -133,5 +150,20 @@ mod tests {
         let insights = vec!["Learned something new".into(), "Fixed a bug".into()];
         let conf = keyword_confidence(&insights);
         assert!((0.5..=0.8).contains(&conf));
+    }
+
+    #[tokio::test]
+    async fn session_consumer_ignores_non_session_events() {
+        use ai_core::SignalConsumer;
+        let (tx, mut rx) = super::super::signal_queue(8);
+        let pool = storage::StoragePool::connect_in_memory().await.unwrap();
+        let repo = storage::SessionMemoryRepo::new(pool.inner().clone());
+        let collector = SessionCollector::new(tx, repo);
+        let sig = AiSignal {
+            event_kind: "ChatTurnCompleted",
+            ..session_dummy()
+        };
+        collector.consume(&sig).await.unwrap();
+        assert!(rx.try_recv().is_err());
     }
 }
