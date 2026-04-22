@@ -38,9 +38,9 @@ pub trait SignalConsumer: Send + Sync {
 
 /// Optional retrieval-side interface for features that want custom recall behaviour.
 pub trait RecallProvider: Send + Sync {
-    fn domain(&self) -> &'static str;
+    fn domain(&self) -> RecallDomain;
     fn score_query(&self, _query: &RecallQuery) -> f64 {
-        0.0
+        0.3
     }
     fn candidates(&self, _query: &RecallQuery) -> Vec<RecallItem> {
         Vec::new()

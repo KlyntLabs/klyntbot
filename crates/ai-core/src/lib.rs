@@ -7,7 +7,7 @@ pub mod signal;
 pub mod traits;
 
 pub use metrics::AiMetrics;
-pub use recall::{RecallItem, RecallQuery};
+pub use recall::{RecallItem, RecallQuery, RecallSpec};
 pub use recall_domain::RecallDomain;
 pub use router::{SignalRouter, Translator};
 pub use signal::{AiSignal, EntityRef, SalienceVerdict};

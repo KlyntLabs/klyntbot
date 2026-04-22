@@ -15,3 +15,11 @@ pub struct RecallItem {
     pub score: f64,
     pub domain: RecallDomain,
 }
+
+/// Per-feature recall configuration emitted by `#[derive(AiFeature)]`.
+#[derive(Debug, Clone, Copy)]
+pub struct RecallSpec {
+    pub priority_field: Option<&'static str>,
+    pub recency_field: Option<&'static str>,
+    pub status_filter: Option<&'static str>,
+}
