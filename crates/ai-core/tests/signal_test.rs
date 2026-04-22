@@ -64,3 +64,10 @@ fn salience_verdict_variants() {
     let _ = SalienceVerdict::Accumulate;
     let _ = SalienceVerdict::Discard;
 }
+
+#[test]
+fn mirror_domain_roundtrips() {
+    use ai_core::RecallDomain;
+    assert_eq!(RecallDomain::Mirror.as_str(), "mirror");
+    assert_eq!(RecallDomain::from_str_or_general("mirror"), RecallDomain::Mirror);
+}
