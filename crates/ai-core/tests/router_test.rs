@@ -37,6 +37,9 @@ async fn router_broadcasts_signal_to_all_consumers() {
             entity: None,
             timestamp: jiff::Timestamp::now(),
             raw_event: None,
+            metrics: ai_core::AiMetrics::default(),
+            coaching_signal: false,
+            coaching_rule: None,
         })
     });
 

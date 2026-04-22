@@ -31,6 +31,9 @@ async fn consumer_receives_signal() {
         entity: None,
         timestamp: Timestamp::now(),
         raw_event: None,
+        metrics: ai_core::AiMetrics::default(),
+        coaching_signal: false,
+        coaching_rule: None,
     };
     consumer.consume(&sig).await.unwrap();
     assert_eq!(log.lock().unwrap().as_slice(), &["TaskCreated"]);

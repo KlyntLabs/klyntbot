@@ -144,6 +144,9 @@ fn render_variant(
             entity: #entity_expr,
             timestamp: ::jiff::Timestamp::now(),
             raw_event: None,
+            metrics: ::ai_core::AiMetrics::default(),
+            coaching_signal: false,
+            coaching_rule: None,
         },
     })
 }

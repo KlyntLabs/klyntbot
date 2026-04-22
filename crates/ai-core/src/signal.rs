@@ -1,3 +1,4 @@
+use crate::metrics::AiMetrics;
 use crate::RecallDomain;
 use bus::DomainEvent;
 use jiff::Timestamp;
@@ -17,6 +18,9 @@ pub struct AiSignal {
     pub entity: Option<EntityRef>,
     pub timestamp: Timestamp,
     pub raw_event: Option<DomainEvent>,
+    pub metrics: AiMetrics,
+    pub coaching_signal: bool,
+    pub coaching_rule: Option<String>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
