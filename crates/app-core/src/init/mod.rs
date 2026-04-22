@@ -547,7 +547,7 @@ impl AppCore {
         };
 
         // ── Phase 9: Mirror self-reflection layer ────────────────────────
-        let (mirror_facade, mirror_handles, mirror_shutdown) = {
+        let (mirror_facade, mirror_sources, mirror_active_timers) = {
             let mirror_repo = ::cognitive::mirror::MirrorRepo::new(storage_pool.clone());
             let narrative_handler: Option<Arc<dyn ::cognitive::mirror::NarrativeHandler>> =
                 cognitive_provider.as_ref().map(|cp| {
@@ -579,9 +579,8 @@ impl AppCore {
                     ::storage::StrategyRepo::new(storage_pool.inner().clone()),
                 )),
             );
-            let (facade, handles, shutdown) = ::cognitive::mirror::MirrorEngine::start(
+            let (facade, sources, active_timers) = ::cognitive::mirror::MirrorEngine::start(
                 mirror_repo,
-                Arc::clone(&domain_event_bus),
                 narrative_handler,
                 autotuner_bridge,
                 episodic_repo,
@@ -591,7 +590,7 @@ impl AppCore {
 
             // Bootstrap brain version 1 on first run
             let bootstrap_repo = ::cognitive::mirror::MirrorRepo::new(storage_pool.clone());
-            let bootstrap_archiver = ::cognitive::mirror::ConfigArchiver::new(bootstrap_repo, None);
+            let bootstrap_archiver = ::cognitive::mirror::ConfigArchiverSource::new(bootstrap_repo, None);
             tokio::spawn(async move {
                 let _ = bootstrap_archiver.bootstrap(serde_json::json!({})).await;
             });
@@ -604,7 +603,35 @@ impl AppCore {
             };
 
             info!("mirror self-reflection engine started");
-            (Some(Arc::new(facade)), Some(handles), Some(shutdown))
+            (Some(Arc::new(facade)), sources, active_timers)
+        };
+
+        // Wire mirror sources into the SignalRouter as consumers
+        let mirror_handles: Vec<tokio::task::JoinHandle<()>> = if let Some(ref router) = ai_pipeline_router {
+            let cancel = shutdown_token.child_token();
+            mirror_sources
+                .into_iter()
+                .map(|source| {
+                    let runner = ai_core::MirrorSubscriberRunner::new(source, cancel.clone());
+                    let mut handles = vec![];
+                    
+                    // Register as SignalConsumer with the router
+                    // Note: This requires the SignalRouter to support dynamic consumer registration
+                    // For now, we just spawn the flush loop
+                    if let Some(handle) = runner.clone().spawn_declared_flush_loop() {
+                        handles.push(handle);
+                    }
+                    
+                    // Return a dummy handle if no flush loop
+                    if handles.is_empty() {
+                        tokio::spawn(async move {})
+                    } else {
+                        handles.into_iter().next().unwrap()
+                    }
+                })
+                .collect()
+        } else {
+            vec![]
         };
 
         // ── Journey tracker (needed by BrainVoice) ──────────────────────────
