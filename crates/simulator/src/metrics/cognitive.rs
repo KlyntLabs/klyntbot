@@ -89,13 +89,9 @@ pub async fn count_meta_rules(pool: &sqlx::SqlitePool) -> u32 {
     count.map(|(n,)| n as u32).unwrap_or(0)
 }
 
-/// Record a domain event's salience verdict on the metric accumulator.
-pub fn record_salience(event: &bus::DomainEvent, acc: &mut super::EpochAccumulator) {
-    match cognitive::services::salience::evaluate_salience(event) {
-        cognitive::types::SalienceVerdict::Extract => acc.salience_extract += 1,
-        cognitive::types::SalienceVerdict::Accumulate => acc.salience_accumulate += 1,
-        cognitive::types::SalienceVerdict::Discard => acc.salience_discard += 1,
-    }
+/// Stub: salience classification has been removed. All events are treated as Extract.
+pub fn record_salience(_event: &bus::DomainEvent, acc: &mut super::EpochAccumulator) {
+    acc.salience_extract += 1;
 }
 
 /// Score a text against a reference answer using embedding cosine similarity.

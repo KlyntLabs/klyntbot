@@ -22,7 +22,7 @@ pub mod memory_promotion;
 pub mod memory_retriever;
 pub mod reforge;
 pub mod retrieval;
-pub mod salience;
+
 pub mod scoring;
 pub mod session_memory;
 pub mod situation;

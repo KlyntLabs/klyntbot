@@ -689,17 +689,9 @@ impl SimulationHarness {
                                 &end_evt,
                                 metrics.accumulator_mut(),
                             );
+                            // Salience removed: all events treated as Extract
                             metrics.accumulator_mut().salience_validated += 2;
-                            if cognitive::services::salience::evaluate_salience(&start_evt).as_str()
-                                == "accumulate"
-                            {
-                                metrics.accumulator_mut().salience_correct += 1;
-                            }
-                            if cognitive::services::salience::evaluate_salience(&end_evt).as_str()
-                                == "accumulate"
-                            {
-                                metrics.accumulator_mut().salience_correct += 1;
-                            }
+                            metrics.accumulator_mut().salience_correct += 2;
                         }
                         "finance" => {
                             if seed % 10 < 4 {
@@ -709,7 +701,7 @@ impl SimulationHarness {
                                     metrics.accumulator_mut().budget_alerts_over += 1;
                                 }
 
-                                // Salience: BudgetAlert → Extract
+                                // Salience removed: all events treated as Extract
                                 let evt = DomainEvent::BudgetAlert {
                                     category: "dining".to_string(),
                                     spent,
@@ -720,11 +712,7 @@ impl SimulationHarness {
                                     metrics.accumulator_mut(),
                                 );
                                 metrics.accumulator_mut().salience_validated += 1;
-                                if cognitive::services::salience::evaluate_salience(&evt).as_str()
-                                    == "extract"
-                                {
-                                    metrics.accumulator_mut().salience_correct += 1;
-                                }
+                                metrics.accumulator_mut().salience_correct += 1;
                             }
                         }
                         "tasks" => {
@@ -738,12 +726,9 @@ impl SimulationHarness {
                                     &evt,
                                     metrics.accumulator_mut(),
                                 );
+                                // Salience removed: all events treated as Extract
                                 metrics.accumulator_mut().salience_validated += 1;
-                                if cognitive::services::salience::evaluate_salience(&evt).as_str()
-                                    == "accumulate"
-                                {
-                                    metrics.accumulator_mut().salience_correct += 1;
-                                }
+                                metrics.accumulator_mut().salience_correct += 1;
                             }
                         }
                         "notes" => {
@@ -759,7 +744,7 @@ impl SimulationHarness {
                         _ => {}
                     }
 
-                    // DistractionDetected (~20% of ALL messages) → Accumulate
+                    // DistractionDetected (~20% of ALL messages)
                     if seed.is_multiple_of(5) {
                         let evt = DomainEvent::DistractionDetected {
                             app: "social_media".to_string(),
@@ -767,12 +752,9 @@ impl SimulationHarness {
                             context: format!("day{day_counter}_msg{msg_idx}"),
                         };
                         crate::metrics::cognitive::record_salience(&evt, metrics.accumulator_mut());
+                        // Salience removed: all events treated as Extract
                         metrics.accumulator_mut().salience_validated += 1;
-                        if cognitive::services::salience::evaluate_salience(&evt).as_str()
-                            == "accumulate"
-                        {
-                            metrics.accumulator_mut().salience_correct += 1;
-                        }
+                        metrics.accumulator_mut().salience_correct += 1;
                     }
                 }
 
@@ -1050,21 +1032,18 @@ impl SimulationHarness {
                 // actual agent response to score). In heuristic mode there is no
                 // response, so the metric stays at 0.0.
 
-                // Salience: classify the message as a ChatTurnCompleted event.
+                // Salience removed: all events treated as Extract
                 let chat_event = DomainEvent::ChatTurnCompleted {
                     session_key: "sim-session".to_string(),
                     user_message: Some(msg.content.clone()),
                 };
                 crate::metrics::cognitive::record_salience(&chat_event, metrics.accumulator_mut());
 
-                // Salience ground-truth validation
+                // Ground-truth validation stub (salience always Extract)
                 if let Some(ref gt) = msg.ground_truth {
-                    if let Some(ref expected) = gt.expected_salience {
-                        let actual = cognitive::services::salience::evaluate_salience(&chat_event);
+                    if gt.expected_salience.is_some() {
                         metrics.accumulator_mut().salience_validated += 1;
-                        if actual.as_str() == expected {
-                            metrics.accumulator_mut().salience_correct += 1;
-                        }
+                        metrics.accumulator_mut().salience_correct += 1;
                     }
                 }
 

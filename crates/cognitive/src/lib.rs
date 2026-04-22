@@ -13,7 +13,7 @@ pub mod types;
 // ── Module re-exports (backward-compatible paths) ──────────
 pub use services::{
     background, compaction, consolidation, context_source, conversation_recall, decay, extraction,
-    memory_retriever, retrieval, salience, session_memory, situation, temporal,
+    memory_retriever, retrieval, session_memory, situation, temporal,
 };
 
 // ── Type re-exports ────────────────────────────────────────

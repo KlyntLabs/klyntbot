@@ -271,8 +271,6 @@ pub(super) async fn cognitive_sse_handler(
                 } => {
                     match result {
                         Ok(event) => {
-                            let salience = cognitive::salience::evaluate_salience(&event);
-                            let salience_str = salience.as_str();
                             // Avoid serializing the full DomainEvent — large payloads
                             // (note content, chat turns) cause GB-scale heap pressure.
                             // Match the production path in app_core.rs: send only the
@@ -280,7 +278,7 @@ pub(super) async fn cognitive_sse_handler(
                             let event_type = event.variant_name().to_string();
                             let payload = serde_json::json!({
                                 "eventType": &event_type,
-                                "salience": salience_str,
+                                "salience": "extract",
                                 "domain": event.domain(),
                                 "timestamp": jiff::Timestamp::now().to_string(),
                                 "payload": event_type,

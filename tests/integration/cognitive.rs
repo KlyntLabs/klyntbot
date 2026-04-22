@@ -1,8 +1,9 @@
 //! Integration tests for the cognitive memory system and coaching engine.
 //!
-//! Covers the full pipeline: DomainEvent → salience filter → extraction →
-//! consolidation → retrieval, plus coaching trigger evaluation, rate limiting,
-//! and feedback tracking.
+//! Covers the full pipeline: DomainEvent → extraction → consolidation →
+//! retrieval, plus coaching trigger evaluation, rate limiting, and feedback
+//! tracking. The old salience filter has been removed; SignalRouter now
+//! handles event classification upstream.
 
 use klyntbot::agent::cognitive_handlers::{
     HeuristicConsolidationHandler, HeuristicExtractionHandler,
@@ -12,7 +13,6 @@ use klyntbot::cognitive::context_source::CognitiveContextSource;
 use klyntbot::cognitive::extraction::to_semantic_fact;
 use klyntbot::cognitive::repos::{cognitive_migrations, ProceduralRuleRepo, SemanticFactRepo};
 use klyntbot::cognitive::retrieval::{retrieve_relevant_facts, RetrievalParams};
-use klyntbot::cognitive::salience::evaluate_salience;
 use klyntbot::cognitive::types::*;
 use klyntbot::cognitive::{ConsolidationHandler, ExtractionHandler};
 
@@ -93,47 +93,6 @@ fn test_delivered_intervention(trigger: &str) -> DeliveredIntervention {
         trigger_name: trigger.into(),
         action_url: None,
     }
-}
-
-// ── Salience filter ────────────────────────────────────────────
-
-#[test]
-fn test_salience_user_stated_fact_is_extract() {
-    let verdict = evaluate_salience(&DomainEvent::UserStatedFact {
-        fact: "I work best in mornings".into(),
-        domain: "productivity".into(),
-    });
-    assert_eq!(verdict, SalienceVerdict::Extract);
-}
-
-#[test]
-fn test_salience_budget_alert_is_extract() {
-    let verdict = evaluate_salience(&DomainEvent::BudgetAlert {
-        category: "food".into(),
-        spent: 450.0,
-        limit: 500.0,
-    });
-    assert_eq!(verdict, SalienceVerdict::Extract);
-}
-
-#[test]
-fn test_salience_task_completed_is_accumulate() {
-    let verdict = evaluate_salience(&DomainEvent::TaskCompleted {
-        task_id: "t1".into(),
-        actual_duration_mins: Some(30),
-        estimated_duration_mins: Some(45),
-        deviation_pct: None,
-    });
-    assert_eq!(verdict, SalienceVerdict::Accumulate);
-}
-
-#[test]
-fn test_salience_productivity_score_is_accumulate() {
-    let verdict = evaluate_salience(&DomainEvent::ProductivityScoreComputed {
-        date: "2026-03-06".into(),
-        score: 72.0,
-    });
-    assert_eq!(verdict, SalienceVerdict::Accumulate);
 }
 
 // ── Extraction with heuristic handler ──────────────────────────

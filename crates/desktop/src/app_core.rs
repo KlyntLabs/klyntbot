@@ -310,10 +310,9 @@ fn wire_event_channels(
                     result = event_rx.recv() => {
                         match result {
                             Ok(event) => {
-                                let salience = cognitive::salience::evaluate_salience(&event);
                                 let event_type = event.variant_name().to_string();
                                 let payload = desktop_shared::cognitive_commands::DomainEventPayload {
-                                    salience: salience.as_str().to_string(),
+                                    salience: "extract".to_string(),
                                     domain: event.domain().to_string(),
                                     timestamp: jiff::Timestamp::now().to_string(),
                                     payload: serde_json::Value::String(event_type.clone()),

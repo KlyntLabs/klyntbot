@@ -1,8 +1,8 @@
 //! Background consolidation service for accumulated observations.
 //!
-//! Subscribes to `DomainEventBus`, applies salience filtering, and routes
-//! events through extraction → consolidation. Accumulated events are
-//! buffered and promoted to extraction when patterns emerge.
+//! Accumulated events are buffered and promoted to extraction when patterns
+//! emerge. The old salience-based event classification has been removed;
+//! SignalRouter now handles event-to-signal translation upstream.
 
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
@@ -24,8 +24,7 @@ use crate::extraction::ExtractionHandler;
 use crate::repos::accumulated_observation::AccumulatedObservationRepo;
 use crate::repos::failed_observation::FailedObservationRepo;
 use crate::repos::{EpisodicMemoryRepo, SemanticFactRepo};
-use crate::salience::{evaluate_salience, HIGH_DEVIATION_THRESHOLD};
-use crate::types::{EpisodicMemory, Observation, SalienceVerdict};
+use crate::types::{EpisodicMemory, Observation};
 
 /// Debug events emitted by the pipeline for the debug dashboard.
 #[derive(Debug, Clone, Serialize)]
@@ -130,28 +129,6 @@ async fn collect_batch(
         }
     }
     batch
-}
-
-/// Split a batch of domain events into extraction vs accumulation buckets.
-async fn classify_batch(
-    events: Vec<DomainEvent>,
-    session_repo: &Option<storage::SessionRepo>,
-) -> (Vec<Observation>, Vec<(String, Observation)>) {
-    let mut to_extract = Vec::new();
-    let mut to_accumulate = Vec::new();
-
-    for event in events {
-        let verdict = evaluate_salience(&event);
-        let key = event_type_key(&event);
-        if let Some(obs) = event_to_observation(&event, session_repo).await {
-            match verdict {
-                SalienceVerdict::Extract => to_extract.push(obs),
-                SalienceVerdict::Accumulate => to_accumulate.push((key, obs)),
-                SalienceVerdict::Discard => {}
-            }
-        }
-    }
-    (to_extract, to_accumulate)
 }
 
 /// For each extracted fact, concurrently look up existing similar facts from the repo.
@@ -360,8 +337,7 @@ impl BackgroundConsolidationService {
 
                 // ── Domain entity bridge ──────────────────────────────────
                 // Upsert structured domain objects into the entities table
-                // immediately, before salience filtering (which may delay or
-                // discard these events).
+                // immediately.
                 {
                     let entity_repo = crate::repos::EntityRepo::new(repo.pool().clone());
                     for event in &batch {
@@ -392,9 +368,13 @@ impl BackgroundConsolidationService {
                     }
                 }
 
-                let (mut to_extract, to_accumulate) = classify_batch(batch, &session_repo).await;
+                // SignalRouter now produces AiSignals upstream; this service only
+                // handles accumulated-observation promotion and periodic compaction.
+                // The old classify_batch + event_to_observation path has been removed.
+                let mut to_extract: Vec<Observation> = Vec::new();
+                let to_accumulate: Vec<(String, Observation)> = Vec::new();
 
-                // Prepend DLQ retries at indices 0..dlq_count, then promotions, then new events
+                // Prepend DLQ retries and promotions (kept for backward compat)
                 let dlq_ids_this_batch = std::mem::take(&mut dlq_reprocess_ids);
                 let dlq_items = std::mem::take(&mut dlq_reprocess_queue);
                 let promotion_items = std::mem::take(&mut promotion_queue);
@@ -780,7 +760,7 @@ impl BackgroundConsolidationService {
                     }
                 }
 
-                // Handle accumulation
+                // Handle accumulation (legacy path — now fed only by DLQ/promotions)
                 for (key, obs) in to_accumulate {
                     if let Some(ref ar) = accum_repo {
                         ar.insert(&key, &obs).await;
@@ -883,332 +863,6 @@ impl BackgroundConsolidationService {
             if let Err(e) = handle.await {
                 warn!("BackgroundConsolidation task panicked: {e}");
             }
-        }
-    }
-}
-
-/// Convert a `DomainEvent` to an `Observation` for processing.
-///
-/// For `ChatTurnCompleted`, loads the last 6 messages (3 user+assistant turns)
-/// from session history to give the extractor full conversation context.
-async fn event_to_observation(
-    event: &DomainEvent,
-    session_repo: &Option<storage::SessionRepo>,
-) -> Option<Observation> {
-    let now = Timestamp::now();
-    match event {
-        DomainEvent::ChatTurnCompleted {
-            session_key,
-            user_message,
-        } => {
-            let user_text = user_message.as_ref()?;
-
-            // Try to load recent session history for richer extraction context
-            let context = if let Some(repo) = session_repo {
-                match repo.get_recent_messages(session_key, 6).await {
-                    Ok(messages) if messages.len() >= 2 => {
-                        let history: String = messages
-                            .iter()
-                            .map(|m| {
-                                let truncated = if m.content.len() > 500 {
-                                    format!("{}...", &m.content[..500])
-                                } else {
-                                    m.content.clone()
-                                };
-                                format!("[{}]: {}", m.role, truncated)
-                            })
-                            .collect::<Vec<_>>()
-                            .join("\n");
-                        Some(history)
-                    }
-                    Ok(_) => None, // <2 messages, fall back to just user_text
-                    Err(e) => {
-                        debug!("Failed to load session history for {session_key}: {e}");
-                        None
-                    }
-                }
-            } else {
-                None
-            };
-
-            // Importance stays at 0.5 regardless of context richness.
-            // ChatTurnCompleted produces semantic facts (via extraction), not
-            // episodic memories. The 0.7 threshold in the episodic storage
-            // path should only trigger for distinct events (SessionEnded, etc.).
-            let content = context.unwrap_or_else(|| user_text.clone());
-
-            Some(Observation {
-                domain: "general".into(),
-                content,
-                importance: 0.5,
-                source_event: "ChatTurnCompleted".into(),
-                timestamp: now,
-            })
-        }
-        DomainEvent::UserStatedFact { fact, domain } => Some(Observation {
-            domain: domain.clone(),
-            content: fact.clone(),
-            importance: 1.0,
-            source_event: "UserStatedFact".into(),
-            timestamp: now,
-        }),
-        DomainEvent::UserCorrectedAI {
-            original,
-            correction,
-            ..
-        } => Some(Observation {
-            domain: "meta".into(),
-            content: format!("User corrected: '{original}' → '{correction}'"),
-            importance: 1.0,
-            source_event: "UserCorrectedAI".into(),
-            timestamp: now,
-        }),
-        DomainEvent::AutotunerDecision {
-            verdict,
-            improvement_pct,
-            affected_params,
-            ..
-        } => {
-            let params_text = if affected_params.is_empty() {
-                "general parameters".into()
-            } else {
-                affected_params.join(", ")
-            };
-            let content = if verdict == "reverted" {
-                format!(
-                    "I noticed a recent change to {params_text} wasn't working well and reverted to my previous approach."
-                )
-            } else {
-                format!(
-                    "I refined how I handle your requests — adjusted {params_text}, \
-                     improving response alignment by {improvement_pct:.1}%."
-                )
-            };
-            Some(Observation {
-                domain: "meta".into(),
-                content,
-                importance: if verdict == "reverted" { 0.9 } else { 0.8 },
-                source_event: "AutotunerDecision".into(),
-                timestamp: now,
-            })
-        }
-        DomainEvent::BudgetAlert {
-            category,
-            spent,
-            limit,
-        } => Some(Observation {
-            domain: "finance".into(),
-            content: format!("Budget alert: {category} at ${spent:.2} of ${limit:.2} limit"),
-            importance: 0.9,
-            source_event: "BudgetAlert".into(),
-            timestamp: now,
-        }),
-        DomainEvent::ProductivityScoreComputed { date, score } => Some(Observation {
-            domain: "productivity".into(),
-            content: format!("Productivity score for {date}: {score:.1}"),
-            importance: 0.5,
-            source_event: "ProductivityScoreComputed".into(),
-            timestamp: now,
-        }),
-        DomainEvent::TaskCompleted {
-            task_id,
-            actual_duration_mins,
-            estimated_duration_mins,
-            deviation_pct,
-        } => {
-            let detail = match (actual_duration_mins, estimated_duration_mins) {
-                (Some(actual), Some(est)) => {
-                    format!(" (actual: {actual}min, estimated: {est}min)")
-                }
-                _ => String::new(),
-            };
-            let dev_detail = deviation_pct
-                .map(|d| format!(", deviation: {d:.1}%"))
-                .unwrap_or_default();
-            Some(Observation {
-                domain: "tasks".into(),
-                content: format!("Task {task_id} completed{detail}{dev_detail}"),
-                importance: 0.5,
-                source_event: "TaskCompleted".into(),
-                timestamp: now,
-            })
-        }
-        DomainEvent::DistractionDetected { app, context, .. } => Some(Observation {
-            domain: "productivity".into(),
-            content: format!("Distraction: {app} ({context})"),
-            importance: 0.6,
-            source_event: "DistractionDetected".into(),
-            timestamp: now,
-        }),
-        DomainEvent::FocusSessionEnded {
-            duration_secs,
-            quality,
-            interruptions,
-        } => Some(Observation {
-            domain: "productivity".into(),
-            content: format!(
-                "Focus session: {}min, quality {quality:.0}%, {interruptions} interruptions",
-                duration_secs / 60
-            ),
-            importance: 0.5,
-            source_event: "FocusSessionEnded".into(),
-            timestamp: now,
-        }),
-        DomainEvent::TransactionRecorded {
-            category,
-            amount,
-            is_over_budget,
-        } => Some(Observation {
-            domain: "finance".into(),
-            content: format!(
-                "Transaction: ${amount:.2} in {category}{}",
-                if *is_over_budget {
-                    " (OVER BUDGET)"
-                } else {
-                    ""
-                }
-            ),
-            importance: if *is_over_budget { 0.8 } else { 0.4 },
-            source_event: "TransactionRecorded".into(),
-            timestamp: now,
-        }),
-        DomainEvent::CoachingFeedback {
-            intervention_id,
-            response,
-        } => Some(Observation {
-            domain: "coaching".into(),
-            content: format!("Coaching feedback for {intervention_id}: {response:?}"),
-            importance: 0.9,
-            source_event: "CoachingFeedback".into(),
-            timestamp: now,
-        }),
-        DomainEvent::SessionEnded {
-            session_type,
-            duration_secs,
-            quality_score,
-            ..
-        } => {
-            let quality = quality_score.map_or("N/A".to_string(), |q| format!("{q:.0}"));
-            Some(Observation {
-                domain: "productivity".into(),
-                content: format!(
-                    "{session_type} session ended: {}min, quality {quality}",
-                    duration_secs / 60
-                ),
-                importance: if quality_score.is_some_and(|q| q >= 80.0) {
-                    0.7
-                } else {
-                    0.5
-                },
-                source_event: "SessionEnded".into(),
-                timestamp: now,
-            })
-        }
-        DomainEvent::QualityScored {
-            score_date,
-            overall_score,
-            ..
-        } => Some(Observation {
-            domain: "productivity".into(),
-            content: format!("Quality score for {score_date}: {overall_score:.1}"),
-            importance: if *overall_score >= 85.0 || *overall_score <= 30.0 {
-                0.8
-            } else {
-                0.4
-            },
-            source_event: "QualityScored".into(),
-            timestamp: now,
-        }),
-        DomainEvent::NarrativeGenerated {
-            date,
-            sentiment,
-            excerpt,
-        } => Some(Observation {
-            domain: "productivity".into(),
-            content: format!("Daily narrative ({date}, {sentiment}): {excerpt}"),
-            importance: 0.7,
-            source_event: "NarrativeGenerated".into(),
-            timestamp: now,
-        }),
-        DomainEvent::VoiceJournalProcessed {
-            extracted_fact_count,
-            sentiment,
-            ..
-        } => {
-            let sent = sentiment.as_deref().unwrap_or("unknown");
-            Some(Observation {
-                domain: "productivity".into(),
-                content: format!(
-                    "Voice journal processed: {extracted_fact_count} facts extracted, sentiment {sent}"
-                ),
-                importance: 0.6,
-                source_event: "VoiceJournalProcessed".into(),
-                timestamp: now,
-            })
-        }
-        // Intelligence layer events that are discarded by salience — avoid Debug formatting
-        DomainEvent::SessionCreated { .. } | DomainEvent::RuleEvolved { .. } => None,
-        DomainEvent::PredictiveAlert {
-            forecast_type,
-            predicted_value,
-            suggested_action,
-            ..
-        } => Some(Observation {
-            domain: "productivity".into(),
-            content: format!(
-                "Predictive alert ({forecast_type}): value={predicted_value:.2}{}",
-                suggested_action
-                    .as_deref()
-                    .map(|a| format!(", action: {a}"))
-                    .unwrap_or_default()
-            ),
-            importance: 0.5,
-            source_event: "PredictiveAlert".into(),
-            timestamp: now,
-        }),
-        DomainEvent::EstimationRecorded {
-            task_id,
-            estimated_mins,
-            actual_mins,
-            deviation_pct,
-        } => {
-            let importance = if deviation_pct.abs() > HIGH_DEVIATION_THRESHOLD {
-                0.6
-            } else {
-                0.3
-            };
-            Some(Observation {
-                domain: "tasks".into(),
-                content: format!(
-                    "Estimation recorded for task {task_id}: estimated {estimated_mins}min, actual {actual_mins}min, deviation {deviation_pct:.1}%"
-                ),
-                importance,
-                source_event: "EstimationRecorded".into(),
-                timestamp: now,
-            })
-        }
-        // Events produced by this service or its downstream — ignore to prevent echo loops
-        DomainEvent::ContradictionDetected { .. }
-        | DomainEvent::MemoryPromoted { .. }
-        | DomainEvent::CrossDomainDotReady { .. }
-        | DomainEvent::MemoryPendingConfirmation { .. } => None,
-        _ => {
-            // TaskCreated, TaskDeferred, GoalProgress, ActivitySessionCompleted,
-            // and lower-priority agentic events (Accumulate-level).
-            // Cap the Debug output to avoid huge allocations from large event payloads.
-            let raw = format!("{event:?}");
-            let content = if raw.len() > 500 {
-                format!("{}…", &raw[..500])
-            } else {
-                raw
-            };
-            Some(Observation {
-                domain: "general".into(),
-                content,
-                importance: 0.3,
-                source_event: "Other".into(),
-                timestamp: now,
-            })
         }
     }
 }
@@ -1406,59 +1060,6 @@ fn summarize_observation(content: &str) -> String {
 mod tests {
     use super::*;
 
-    #[tokio::test]
-    async fn test_event_to_observation_user_stated_fact() {
-        let event = DomainEvent::UserStatedFact {
-            fact: "I work best in mornings".into(),
-            domain: "productivity".into(),
-        };
-        let obs = event_to_observation(&event, &None).await.unwrap();
-        assert_eq!(obs.domain, "productivity");
-        assert_eq!(obs.importance, 1.0);
-        assert_eq!(obs.content, "I work best in mornings");
-    }
-
-    #[tokio::test]
-    async fn event_to_observation_chat_turn_with_message() {
-        let event = DomainEvent::ChatTurnCompleted {
-            session_key: "session-1".into(),
-            user_message: Some("I'm a software engineer working on Rust projects".into()),
-        };
-        let obs = event_to_observation(&event, &None).await;
-        assert!(
-            obs.is_some(),
-            "should create observation when user_message is present"
-        );
-        let obs = obs.unwrap();
-        assert_eq!(obs.source_event, "ChatTurnCompleted");
-        assert!(obs.content.contains("software engineer"));
-        assert_eq!(obs.domain, "general");
-        // Without session_repo, falls back to user_message with importance 0.5
-        assert!((obs.importance - 0.5).abs() < f64::EPSILON);
-    }
-
-    #[tokio::test]
-    async fn event_to_observation_chat_turn_without_message() {
-        let event = DomainEvent::ChatTurnCompleted {
-            session_key: "session-1".into(),
-            user_message: None,
-        };
-        let obs = event_to_observation(&event, &None).await;
-        assert!(obs.is_none(), "should skip when user_message is None");
-    }
-
-    #[tokio::test]
-    async fn test_event_to_observation_budget_alert() {
-        let event = DomainEvent::BudgetAlert {
-            category: "food".into(),
-            spent: 450.0,
-            limit: 500.0,
-        };
-        let obs = event_to_observation(&event, &None).await.unwrap();
-        assert_eq!(obs.domain, "finance");
-        assert!(obs.content.contains("450.00"));
-    }
-
     #[test]
     fn test_accumulated_entry_promotion() {
         let mut entry = AccumulatedEntry::new();
@@ -1531,51 +1132,6 @@ mod tests {
         assert!(summary.content.contains("Score: 72"));
         assert!(summary.content.contains("Score: 78"));
         assert!(summary.content.contains("2 accumulated"));
-    }
-
-    #[tokio::test]
-    async fn test_event_to_observation_estimation_recorded() {
-        let event = DomainEvent::EstimationRecorded {
-            task_id: "t1".into(),
-            estimated_mins: 30,
-            actual_mins: 75,
-            deviation_pct: 150.0,
-        };
-        let obs = event_to_observation(&event, &None).await.unwrap();
-        assert_eq!(obs.domain, "tasks");
-        assert!(obs.content.contains("estimated 30min"));
-        assert!(obs.content.contains("actual 75min"));
-        assert!(obs.content.contains("150.0%"));
-        assert_eq!(obs.source_event, "EstimationRecorded");
-    }
-
-    #[tokio::test]
-    async fn test_event_to_observation_estimation_recorded_importance() {
-        let large_dev = DomainEvent::EstimationRecorded {
-            task_id: "t1".into(),
-            estimated_mins: 30,
-            actual_mins: 75,
-            deviation_pct: 150.0,
-        };
-        let obs = event_to_observation(&large_dev, &None).await.unwrap();
-        assert!(
-            obs.importance >= 0.6,
-            "Large deviation should have high importance, got {}",
-            obs.importance
-        );
-
-        let small_dev = DomainEvent::EstimationRecorded {
-            task_id: "t2".into(),
-            estimated_mins: 30,
-            actual_mins: 35,
-            deviation_pct: 16.7,
-        };
-        let obs2 = event_to_observation(&small_dev, &None).await.unwrap();
-        assert!(
-            obs2.importance <= 0.4,
-            "Small deviation should have low importance, got {}",
-            obs2.importance
-        );
     }
 
     #[test]

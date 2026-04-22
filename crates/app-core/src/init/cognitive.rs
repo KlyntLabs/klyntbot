@@ -204,9 +204,7 @@ fn spawn_event_log_persistence(
                     result = rx.recv() => {
                         match result {
                             Ok(event) => {
-                                let salience = cognitive::salience::evaluate_salience(&event);
                                 let domain = event.domain();
-                                let salience_str = salience.as_str();
                                 let event_type = event.variant_name().to_string();
                                 let payload = serde_json::to_string(&event)
                                     .unwrap_or_else(|e| {
@@ -217,7 +215,7 @@ fn spawn_event_log_persistence(
                                 let id = uuid::Uuid::new_v4().to_string();
 
                                 if let Err(e) = repo
-                                    .insert_domain_event(&id, &event_type, domain, salience_str, &payload, &ts)
+                                    .insert_domain_event(&id, &event_type, domain, "extract", &payload, &ts)
                                     .await
                                 {
                                     warn!("failed to persist domain event: {e}");
