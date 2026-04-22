@@ -34,3 +34,4 @@ tests/fixtures/hello_plugin/plugin.wasm
 
 .qwen/
 gha-creds-*.json
+.claude/scheduled_tasks.lock

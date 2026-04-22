@@ -2,8 +2,6 @@
 
 use ai_core::{AiSignal, RecallDomain, SignalConsumer};
 use async_trait::async_trait;
-use jiff::Timestamp;
-use tracing::warn;
 
 use super::signal::{CognitiveSignal, SignalContext, SignalSource};
 use super::SignalSender;
@@ -29,20 +27,19 @@ impl SignalConsumer for CoachingCollector {
             return Ok(());
         }
         let Some(bus::DomainEvent::CoachingPatternDetected {
-            domain, signal_count, ..
-        }) = signal.raw_event.as_ref() else { return Ok(()); };
-
-        let recall_domain = match domain.as_str() {
-            "tasks" => RecallDomain::Tasks,
-            "finance" => RecallDomain::Finance,
-            "productivity" => RecallDomain::Productivity,
-            "learning" => RecallDomain::Learning,
-            _ => RecallDomain::General,
+            domain,
+            signal_count,
+            ..
+        }) = signal.raw_event.as_ref()
+        else {
+            return Ok(());
         };
+
+        let recall_domain = RecallDomain::from_str_or_general(domain.as_str());
 
         let out = CognitiveSignal {
             source: SignalSource::CoachingPattern,
-            content: signal.content.clone(),  // rule_text lives here — no match required
+            content: signal.content.clone(), // rule_text lives here — no match required
             domain: recall_domain,
             confidence: signal.importance,
             context: SignalContext {
@@ -90,7 +87,7 @@ mod tests {
                 pattern_name: "afternoon_energy_drop".into(),
                 confidence: 0.85,
                 description: "3/4 after 3pm".into(),
-                domain: "productivity".into(),
+                domain: RecallDomain::Productivity.as_str().into(),
                 signal_count: 4,
                 rule_text: "Schedule demanding tasks in the morning".into(),
             }),

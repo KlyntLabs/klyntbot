@@ -13,8 +13,12 @@ mod temporal_scheduler;
 use std::sync::Arc;
 
 use ::agent::cognitive_handlers::LlmExtractionHandler;
+use ::agent::cognitive_handlers::{HeuristicCoachingReasonerHandler, LlmCoachingReasonerHandler};
 use ::agent::AgentLoop;
 use ::channels::ChannelManager;
+use ::cognitive::pipeline::{
+    AtomCollector, ChatTurnCollector, CoachingCollector, RecallCollector, SessionCollector,
+};
 use bus::MessageBus;
 use feature_productivity::auto_focus::AutoFocusEvent;
 use tokio::sync::{mpsc, Mutex, RwLock};
@@ -382,8 +386,8 @@ impl AppCore {
             pattern_detector,
             intervention_router,
             feedback_tracker,
-            coaching_service,
             coaching_intervention_log_repo,
+            intervention_tx,
         } = coaching::init_coaching(
             mode,
             &config,
@@ -415,7 +419,7 @@ impl AppCore {
             Some(repo)
         };
 
-        // ── Phase 8: AI Pipeline — SignalRouter + IngestionConsumer ──────
+        // ── Phase 8: AI Pipeline — SignalRouter + all v1.5 consumers ──────
         let ai_pipeline_router = {
             let observation_repo =
                 ::cognitive::repos::AccumulatedObservationRepo::new(storage_pool.inner().clone());
@@ -427,14 +431,118 @@ impl AppCore {
                     Arc::new(LlmExtractionHandler::new(cp.clone(), params))
                         as Arc<dyn ::cognitive::ExtractionHandler>
                 });
-            let ingestion = Arc::new(::cognitive::consumers::IngestionConsumer::new(
-                observation_repo,
-                entity_repo,
-                episodic_repo,
-                extraction_handler,
+            let ingestion: Arc<dyn ai_core::SignalConsumer> =
+                Arc::new(::cognitive::consumers::IngestionConsumer::new(
+                    observation_repo,
+                    entity_repo,
+                    episodic_repo,
+                    extraction_handler,
+                ));
+
+            // 5 cognitive collectors — each SignalConsumer pushes CognitiveSignals
+            // to the existing consolidator tx (signal_queue).
+            let (cognitive_tx, cognitive_rx): (
+                ::cognitive::pipeline::SignalSender,
+                ::cognitive::pipeline::SignalReceiver,
+            ) = ::cognitive::pipeline::signal_queue(128);
+            let chat_turn: Arc<dyn ai_core::SignalConsumer> =
+                Arc::new(ChatTurnCollector::new(cognitive_tx.clone()));
+            let recall: Arc<dyn ai_core::SignalConsumer> =
+                Arc::new(RecallCollector::new(cognitive_tx.clone()));
+            let session: Arc<dyn ai_core::SignalConsumer> = Arc::new(SessionCollector::new(
+                cognitive_tx.clone(),
+                repos.session_memory.clone(),
             ));
-            let router = ai_pipeline::start(Arc::clone(&domain_event_bus), vec![ingestion]);
-            info!("AI pipeline SignalRouter started with IngestionConsumer");
+            let atom: Arc<dyn ai_core::SignalConsumer> =
+                Arc::new(AtomCollector::new(cognitive_tx.clone()));
+            let coaching_collector: Arc<dyn ai_core::SignalConsumer> =
+                Arc::new(CoachingCollector::new(cognitive_tx.clone()));
+
+            // Coaching
+            let (coaching_signal_tx, coaching_signal_rx) = tokio::sync::mpsc::channel(256);
+            let coaching_consumer: Arc<dyn ai_core::SignalConsumer> = Arc::new(
+                feature_coaching::CoachingSignalConsumer::new(coaching_signal_tx),
+            );
+
+            let router = ai_pipeline::start(
+                Arc::clone(&domain_event_bus),
+                vec![
+                    ingestion,
+                    chat_turn,
+                    recall,
+                    session,
+                    atom,
+                    coaching_collector,
+                    coaching_consumer,
+                ],
+            );
+            info!("AI pipeline SignalRouter started with 7 consumers (ingestion + 5 cognitive + coaching)");
+
+            // Launch the cognitive consolidator task (reads cognitive_rx)
+            // The background service already handles signal_rx/signal_tx internally;
+            // this is a temporary bridge until the full pipeline migration is complete.
+            let _cognitive_handle = {
+                let repo = ::cognitive::SemanticFactRepo::new(storage_pool.inner().clone());
+                let rule_repo = ::cognitive::ProceduralRuleRepo::new(storage_pool.inner().clone());
+                let episodic_repo =
+                    ::cognitive::EpisodicMemoryRepo::new(storage_pool.inner().clone());
+                tokio::spawn(async move {
+                    let mut rx: ::cognitive::pipeline::SignalReceiver = cognitive_rx;
+                    let episodic = Some(episodic_repo);
+                    while let Some(signal) = rx.recv().await {
+                        let clusters = ::cognitive::pipeline::group_signals(vec![signal]);
+                        let ops = ::cognitive::pipeline::heuristic_promote(&clusters);
+                        if !ops.is_empty() {
+                            ::cognitive::pipeline::execute_promotions(
+                                &ops, &repo, &rule_repo, &episodic, None,
+                            )
+                            .await;
+                        }
+                    }
+                })
+            };
+
+            // CoachingService now reads AiSignals instead of DomainEvents
+            let _coaching_service = if let (
+                Some(ref acc),
+                Some(ref det),
+                Some(ref router),
+                Some(ref fb),
+                Some(ref log_repo),
+            ) = (
+                &signal_accumulator,
+                &pattern_detector,
+                &intervention_router,
+                &feedback_tracker,
+                &coaching_intervention_log_repo,
+            ) {
+                let coaching_reasoner: Arc<dyn feature_coaching::CoachingReasonerHandler> =
+                    if let Some(ref cp) = cognitive_provider {
+                        let params = providers::cognitive_chat_params(&config, 1024);
+                        Arc::new(LlmCoachingReasonerHandler::new(cp.clone(), params))
+                    } else {
+                        Arc::new(HeuristicCoachingReasonerHandler)
+                    };
+
+                let coaching_cancel = shutdown_token.child_token();
+                let service = feature_coaching::CoachingService::start(
+                    coaching_signal_rx,
+                    Arc::clone(acc),
+                    Arc::clone(det),
+                    Arc::clone(router),
+                    Arc::clone(fb),
+                    user_situation.clone(),
+                    coaching_reasoner,
+                    intervention_tx.clone(),
+                    Some(log_repo.clone()),
+                    coaching_cancel,
+                );
+                info!("coaching service started (reading AiSignals via CoachingSignalConsumer)");
+                Some(service)
+            } else {
+                None
+            };
+
             Some(router)
         };
 
@@ -706,7 +814,7 @@ impl AppCore {
             coaching_intervention_log_repo,
             user_situation: Some(user_situation),
             active_view: Some(active_view),
-            coaching_service: coaching_service.map(|cs| Arc::new(Mutex::new(cs))),
+            coaching_service: None,
             cognitive_provider,
             pipeline_broadcast: Some(pipeline_broadcast_tx),
             event_log_repo: Some(::cognitive::EventLogRepo::new(storage_pool.inner().clone())),

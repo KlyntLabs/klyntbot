@@ -85,7 +85,7 @@ impl RetrievalFeedbackRepo {
         .await?;
         Ok(rows
             .into_iter()
-            .map(|(s, score)| (parse_recall_domain(&s), score))
+            .map(|(s, score)| (RecallDomain::from_str_or_general(&s), score))
             .collect())
     }
 
@@ -99,15 +99,5 @@ impl RetrievalFeedbackRepo {
                 .fetch_one(&self.pool)
                 .await?;
         Ok(row.0)
-    }
-}
-
-fn parse_recall_domain(s: &str) -> RecallDomain {
-    match s {
-        "tasks" => RecallDomain::Tasks,
-        "finance" => RecallDomain::Finance,
-        "productivity" => RecallDomain::Productivity,
-        "learning" => RecallDomain::Learning,
-        _ => RecallDomain::General,
     }
 }

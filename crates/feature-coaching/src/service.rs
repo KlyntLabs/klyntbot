@@ -1,14 +1,15 @@
-//! CoachingService — subscribes to DomainEventBus and runs the full coaching
+//! CoachingService — receives AiSignals via mpsc channel and runs the full coaching
 //! pipeline: signal accumulation → trigger evaluation → pattern detection →
 //! reasoning → intervention routing → feedback tracking.
 
 use std::sync::Arc;
 
-use tokio::sync::{broadcast, mpsc, Mutex};
+use tokio::sync::{mpsc, Mutex};
 use tokio::task::JoinHandle;
 use tokio_util::sync::CancellationToken;
 use tracing::{debug, warn};
 
+use ai_core::AiSignal;
 use bus::DomainEvent;
 use cognitive::situation::UserSituation;
 
@@ -18,7 +19,7 @@ use crate::reasoner::{CoachingReasonerHandler, InterventionType, ReasonerInput};
 use crate::router::{DeliveredIntervention, InterventionRouter, RoutingResult};
 use crate::signal_accumulator::{SignalAccumulator, TriggerFired};
 
-/// Background service that processes domain events through the coaching pipeline.
+/// Background service that processes AiSignals through the coaching pipeline.
 pub struct CoachingService {
     cancel_token: CancellationToken,
     task_handle: Option<JoinHandle<()>>,
@@ -27,7 +28,7 @@ pub struct CoachingService {
 impl CoachingService {
     #[allow(clippy::too_many_arguments)]
     pub fn start(
-        mut event_rx: broadcast::Receiver<DomainEvent>,
+        mut signal_rx: mpsc::Receiver<AiSignal>,
         accumulator: Arc<Mutex<SignalAccumulator>>,
         detector: Arc<Mutex<PatternDetector>>,
         router: Arc<Mutex<InterventionRouter>>,
@@ -47,65 +48,52 @@ impl CoachingService {
             loop {
                 tokio::select! {
                     _ = cancel_clone.cancelled() => break,
-                    result = event_rx.recv() => {
-                        let event = match result {
-                            Ok(e) => e,
-                            Err(broadcast::error::RecvError::Lagged(n)) => {
-                                warn!("CoachingService lagged, skipped {n} events");
-                                continue;
-                            }
-                            Err(broadcast::error::RecvError::Closed) => break,
-                        };
-
-                        // Track focus mode state from events
-                        match &event {
-                            DomainEvent::FocusSessionStarted { .. } => {
-                                debug!("Focus session started — coaching delivery paused");
-                                focus_active = true;
-                            }
-                            DomainEvent::FocusSessionEnded { quality, interruptions, duration_secs } => {
-                                debug!("Focus session ended — draining queued triggers");
-                                let q = *quality;
-                                let i = *interruptions;
-                                let d = *duration_secs;
-                                focus_active = false;
-
-                                // Deliver post-session debrief if there were queued triggers
-                                if !queued_triggers.is_empty() {
-                                    let debrief = build_focus_debrief(
-                                        &queued_triggers, q, i, d,
-                                        &reasoner, &situation,
-                                    ).await;
-
-                                    if let Some(intervention) = debrief {
-                                        {
-                                            let mut fb = feedback.lock().await;
-                                            fb.record_delivery(&intervention);
-                                        }
-                                        persist_intervention(intervention_log.as_ref(), &intervention).await;
-                                        let _ = intervention_tx.send(intervention).await;
-                                    }
-
-                                    queued_triggers.clear();
+                    Some(signal) = signal_rx.recv() => {
+                        // Track focus mode state from raw_event
+                        if let Some(ref event) = signal.raw_event {
+                            match event {
+                                DomainEvent::FocusSessionStarted { .. } => {
+                                    debug!("Focus session started — coaching delivery paused");
+                                    focus_active = true;
                                 }
+                                DomainEvent::FocusSessionEnded { quality, interruptions, duration_secs } => {
+                                    debug!("Focus session ended — draining queued triggers");
+                                    let q = *quality;
+                                    let i = *interruptions;
+                                    let d = *duration_secs;
+                                    focus_active = false;
+
+                                    // Deliver post-session debrief if there were queued triggers
+                                    if !queued_triggers.is_empty() {
+                                        let debrief = build_focus_debrief(
+                                            &queued_triggers, q, i, d,
+                                            &reasoner, &situation,
+                                        ).await;
+
+                                        if let Some(intervention) = debrief {
+                                            {
+                                                let mut fb = feedback.lock().await;
+                                                fb.record_delivery(&intervention);
+                                            }
+                                            persist_intervention(intervention_log.as_ref(), &intervention).await;
+                                            let _ = intervention_tx.send(intervention).await;
+                                        }
+
+                                        queued_triggers.clear();
+                                    }
+                                }
+                                _ => {}
                             }
-                            _ => {}
                         }
 
                         // 1. Push signal into accumulator (always, even during focus)
                         {
                             let mut acc = accumulator.lock().await;
-                            // In the new architecture, CoachingSignalConsumer receives
-                            // AiSignal and forwards it to this service's mpsc channel.
-                            // For backward compatibility during migration, also translate
-                            // DomainEvent to AiSignal here.
-                            if let Some(sig) = translate_event(&event) {
-                                acc.push_event(&sig);
-                            }
+                            acc.push_event(&signal);
                         }
 
-                        // 2. Incrementally update situation from event
-                        update_situation_from_event(&situation, &event).await;
+                        // 2. Incrementally update situation from signal
+                        update_situation_from_signal(&situation, &signal).await;
 
                         // 3. Evaluate triggers
                         let sit = situation.lock().await.clone();
@@ -285,27 +273,29 @@ async fn build_focus_debrief(
     }
 }
 
-/// Incrementally update UserSituation from a domain event.
-async fn update_situation_from_event(situation: &Arc<Mutex<UserSituation>>, event: &DomainEvent) {
+/// Incrementally update UserSituation from an AiSignal.
+async fn update_situation_from_signal(situation: &Arc<Mutex<UserSituation>>, signal: &AiSignal) {
     let mut sit = situation.lock().await;
-    match event {
-        DomainEvent::DistractionDetected { .. } => {
+    match signal.event_kind {
+        "DistractionDetected" => {
             sit.distraction_risk = (sit.distraction_risk + 0.15).min(1.0);
         }
-        DomainEvent::FocusSessionStarted { .. } => {
+        "FocusSessionStarted" => {
             sit.focus_state = 0.9;
             sit.distraction_risk = (sit.distraction_risk - 0.2).max(0.0);
         }
-        DomainEvent::FocusSessionEnded { quality, .. } => {
-            sit.focus_state = *quality;
+        "FocusSessionEnded" => {
+            if let Some(amt) = signal.metrics.amount {
+                sit.focus_state = amt;
+            }
         }
-        DomainEvent::TaskDeferred { .. } => {
+        "TaskDeferred" => {
             sit.task_avoidance_detected = true;
         }
-        DomainEvent::BudgetAlert { .. } => {
+        "BudgetAlert" => {
             sit.deadline_pressure = (sit.deadline_pressure + 0.2).min(1.0);
         }
-        DomainEvent::ActivitySessionCompleted { .. } => {
+        "ActivitySessionCompleted" => {
             sit.hours_active_today += 0.5;
         }
         _ => {}
@@ -351,7 +341,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_coaching_service_processes_budget_events() {
+    async fn test_coaching_service_processes_budget_signals() {
         let accumulator = Arc::new(Mutex::new(SignalAccumulator::new()));
         let detector = Arc::new(Mutex::new(PatternDetector::new()));
         let router = Arc::new(Mutex::new(InterventionRouter::default()));
@@ -373,12 +363,11 @@ mod tests {
         });
 
         let (intervention_tx, mut intervention_rx) = tokio::sync::mpsc::channel(64);
+        let (signal_tx, signal_rx) = tokio::sync::mpsc::channel(64);
         let cancel = CancellationToken::new();
-        let bus = bus::DomainEventBus::new(16);
-        let event_rx = bus.subscribe();
 
         let _service = CoachingService::start(
-            event_rx,
+            signal_rx,
             accumulator.clone(),
             detector,
             router,
@@ -390,8 +379,7 @@ mod tests {
             cancel.clone(),
         );
 
-        // Push a budget alert AiSignal directly into accumulator
-        // (In production this flows through CoachingSignalConsumer)
+        // Send a budget alert AiSignal through the channel
         let budget_signal = ai_core::AiSignal {
             domain: ai_core::RecallDomain::Finance,
             event_kind: "BudgetAlert",
@@ -409,17 +397,7 @@ mod tests {
             coaching_signal: true,
             coaching_rule: Some("Review spending patterns when budget pressure is detected".into()),
         };
-        {
-            let mut acc = accumulator.lock().await;
-            acc.push_event(&budget_signal);
-        }
-
-        // Publish a DomainEvent to wake up the service loop
-        bus.publish(DomainEvent::BudgetAlert {
-            category: "food".into(),
-            spent: 450.0,
-            limit: 500.0,
-        });
+        let _ = signal_tx.send(budget_signal).await;
 
         // Wait briefly for processing
         tokio::time::sleep(std::time::Duration::from_millis(100)).await;
@@ -454,11 +432,11 @@ mod tests {
         });
 
         let (tx, _rx) = tokio::sync::mpsc::channel(64);
+        let (_signal_tx, signal_rx) = tokio::sync::mpsc::channel(64);
         let cancel = CancellationToken::new();
-        let bus = bus::DomainEventBus::new(16);
 
         let mut service = CoachingService::start(
-            bus.subscribe(),
+            signal_rx,
             accumulator,
             detector,
             router,
@@ -475,77 +453,3 @@ mod tests {
     }
 }
 
-/// Temporary translator: DomainEvent -> AiSignal for backward compatibility
-/// during the v1.5 migration. In production, CoachingSignalConsumer receives
-/// AiSignal directly from the SignalRouter.
-fn translate_event(event: &bus::DomainEvent) -> Option<ai_core::AiSignal> {
-    use ai_core::{AiMetrics, RecallDomain, SalienceVerdict};
-    use jiff::Timestamp;
-
-    let now = Timestamp::now();
-    let base = ai_core::AiSignal {
-        domain: RecallDomain::General,
-        event_kind: "",
-        importance: 0.3,
-        salience: SalienceVerdict::Accumulate,
-        content: String::new(),
-        entity: None,
-        timestamp: now,
-        raw_event: None,
-        metrics: AiMetrics::default(),
-        coaching_signal: false,
-        coaching_rule: None,
-    };
-
-    match event {
-        bus::DomainEvent::BudgetAlert { category, spent, .. } => Some(ai_core::AiSignal {
-            event_kind: "BudgetAlert",
-            content: format!("{} budget alert", category),
-            metrics: AiMetrics {
-                category: Some(category.clone()),
-                amount: Some(*spent),
-                ..AiMetrics::default()
-            },
-            coaching_signal: true,
-            ..base
-        }),
-        bus::DomainEvent::DistractionDetected { app, .. } => Some(ai_core::AiSignal {
-            event_kind: "DistractionDetected",
-            content: app.clone(),
-            metrics: AiMetrics { app: Some(app.clone()), ..AiMetrics::default() },
-            coaching_signal: true,
-            ..base
-        }),
-        bus::DomainEvent::FocusSessionStarted { .. } => Some(ai_core::AiSignal {
-            event_kind: "FocusSessionStarted",
-            coaching_signal: true,
-            ..base
-        }),
-        bus::DomainEvent::FocusSessionEnded { quality, .. } => Some(ai_core::AiSignal {
-            event_kind: "FocusSessionEnded",
-            importance: *quality,
-            metrics: AiMetrics { amount: Some(*quality), ..AiMetrics::default() },
-            coaching_signal: true,
-            ..base
-        }),
-        bus::DomainEvent::TaskDeferred { .. } => Some(ai_core::AiSignal {
-            event_kind: "TaskDeferred",
-            coaching_signal: true,
-            ..base
-        }),
-        bus::DomainEvent::SessionEnded { session_id, quality_score, .. } => Some(ai_core::AiSignal {
-            event_kind: "SessionEnded",
-            importance: quality_score.unwrap_or(0.5),
-            content: session_id.clone(),
-            metrics: AiMetrics { amount: *quality_score, ..AiMetrics::default() },
-            ..base
-        }),
-        bus::DomainEvent::QualityScored { overall_score, .. } => Some(ai_core::AiSignal {
-            event_kind: "QualityScored",
-            importance: *overall_score,
-            metrics: AiMetrics { amount: Some(*overall_score), ..AiMetrics::default() },
-            ..base
-        }),
-        _ => None,
-    }
-}

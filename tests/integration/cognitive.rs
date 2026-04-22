@@ -378,163 +378,81 @@ async fn test_full_pipeline_update_replaces_old_fact() {
     assert!(results[0].fact.object.contains("afternoons"));
 }
 
-// ── Live batch pipeline: BackgroundConsolidationService E2E ────
+// ── Live AI pipeline: SignalRouter -> IngestionConsumer E2E ────
+//
+// v1.5 migration replaced the BackgroundConsolidationService's
+// `event_to_observation` match with a SignalRouter that translates each
+// DomainEvent into an AiSignal and fans it out to SignalConsumers. This test
+// asserts that contract end-to-end: publishing a DomainEvent on the bus
+// causes IngestionConsumer to persist an `accumulated_observations` row.
+// Extraction/consolidation/retrieval is no longer the responsibility of this
+// boundary and is covered by the cognitive unit tests above.
 
 #[tokio::test]
-async fn test_batch_pipeline_processes_domain_events_end_to_end() {
-    use klyntbot::cognitive::background::{BackgroundConsolidationService, PipelineEvent};
-    use klyntbot::cognitive::{
-        AccumulatedObservationRepo, EpisodicMemoryRepo, FailedObservationRepo,
-    };
-    use tokio_util::sync::CancellationToken;
+async fn test_signal_router_persists_observation_via_ingestion_consumer() {
+    use ai_core::{SignalConsumer, SignalRouter};
+    use bus::DomainEventBus;
+    use klyntbot::cognitive::{AccumulatedObservationRepo, EpisodicMemoryRepo};
 
     let (_, inner) = cognitive_pool().await;
-    let repo = SemanticFactRepo::new(inner.clone());
+    let observation_repo = AccumulatedObservationRepo::new(inner.clone());
+    let entity_repo = klyntbot::cognitive::repos::EntityRepo::new(inner.clone());
     let episodic_repo = EpisodicMemoryRepo::new(inner.clone());
-    let accum_repo = AccumulatedObservationRepo::new(inner.clone());
-    let failed_obs_repo = FailedObservationRepo::new(inner.clone());
 
-    // Wire up broadcast channels (same as agent_loop/builder.rs)
-    let (domain_tx, domain_rx) = tokio::sync::broadcast::channel::<DomainEvent>(64);
-    let (pipeline_tx, mut pipeline_rx) = tokio::sync::broadcast::channel::<PipelineEvent>(64);
+    let bus = std::sync::Arc::new(DomainEventBus::new(64));
 
-    let cancel = CancellationToken::new();
-
-    // Start the real background service with heuristic handlers
+    // Heuristic extraction is spawned async by IngestionConsumer for
+    // Extract-salience signals; ChatTurnCompleted is Accumulate so it just
+    // exercises the observation-write path.
     let extraction: std::sync::Arc<dyn ExtractionHandler> =
         std::sync::Arc::new(HeuristicExtractionHandler);
-    let consolidation: std::sync::Arc<dyn ConsolidationHandler> =
-        std::sync::Arc::new(HeuristicConsolidationHandler);
 
-    let _service = BackgroundConsolidationService::start(
-        klyntbot::cognitive::background::BackgroundServiceConfig {
-            event_rx: domain_rx,
-            extraction,
-            consolidation,
-            repo: repo.clone(),
-            episodic_repo: Some(episodic_repo),
-            embedder: None, // no embedder needed for heuristic
-            cancel: cancel.clone(),
-            pipeline_tx: Some(pipeline_tx),
-            accum_repo: Some(accum_repo),
-            failed_obs_repo: Some(failed_obs_repo),
-            promote_threshold: 3,
-            min_days: 2,
-            domain_bus: None,
-            context_update_queue: None,
-            session_repo: None,
-            rule_repo: None,
-            signal_tx: None,
-            signal_rx: None,
-            session_memory_repo: None,
-            intelligence_mode: config::schema::IntelligenceMode::Standard,
-            deep_handler: None,
-            density_repo: None,
-            pending_repo: None,
-        },
+    let ingestion: std::sync::Arc<dyn SignalConsumer> =
+        std::sync::Arc::new(klyntbot::cognitive::consumers::IngestionConsumer::new(
+            observation_repo.clone(),
+            entity_repo,
+            episodic_repo,
+            Some(extraction),
+        ));
+
+    let _router = SignalRouter::start(
+        std::sync::Arc::clone(&bus),
+        vec![ingestion],
+        app_core::init::ai_pipeline::translate,
     );
 
-    // Verify DB is empty before we begin
-    let before = retrieve_relevant_facts(
-        &repo,
-        None,
-        "",
-        &["productivity"],
-        &RetrievalParams {
-            limit: 10,
-            situational_boost: 0.5,
-            ..RetrievalParams::new(0)
-        },
-        None,
-        None,
-        None,
-    )
-    .await
-    .unwrap();
-    assert!(before.is_empty(), "DB should be empty before pipeline runs");
+    bus.publish(DomainEvent::ChatTurnCompleted {
+        session_key: "test-session".into(),
+        user_message: Some("I prefer to work in dark mode in the mornings".into()),
+    });
 
-    // Send two UserStatedFact events (will be batched together)
-    domain_tx
-        .send(DomainEvent::UserStatedFact {
-            fact: "I work best between 10am and noon".into(),
-            domain: "productivity".into(),
-        })
-        .unwrap();
-    domain_tx
-        .send(DomainEvent::UserStatedFact {
-            fact: "I prefer dark mode in my IDE".into(),
-            domain: "productivity".into(),
-        })
-        .unwrap();
-
-    // Wait for pipeline events — we should see BatchStarted + Extractions + Consolidations
-    let mut saw_batch_started = false;
-    let mut extraction_count = 0;
-    let mut consolidation_count = 0;
-    let deadline = tokio::time::Instant::now() + std::time::Duration::from_secs(10);
-
+    // Poll for the observation row — the router fans out asynchronously.
+    let deadline = tokio::time::Instant::now() + std::time::Duration::from_secs(5);
     loop {
-        tokio::select! {
-            result = pipeline_rx.recv() => {
-                match result {
-                    Ok(PipelineEvent::BatchStarted { observation_count }) => {
-                        saw_batch_started = true;
-                        assert!(observation_count > 0, "Batch should have observations");
-                    }
-                    Ok(PipelineEvent::Extraction { facts_extracted, .. }) => {
-                        extraction_count += facts_extracted;
-                    }
-                    Ok(PipelineEvent::Consolidation { .. }) => {
-                        consolidation_count += 1;
-                    }
-                    Ok(_) => {} // DeadLetter events etc.
-                    Err(_) => break,
-                }
-                // Once we've seen extraction + consolidation, give execute_memory_ops
-                // time to flush to SQLite (events emit before DB write)
-                if saw_batch_started && extraction_count > 0 && consolidation_count > 0 {
-                    tokio::time::sleep(std::time::Duration::from_millis(200)).await;
-                    break;
-                }
-            }
-            _ = tokio::time::sleep_until(deadline) => {
-                panic!(
-                    "Timed out waiting for pipeline events (batch={}, extractions={}, consolidations={})",
-                    saw_batch_started, extraction_count, consolidation_count
-                );
-            }
+        let entries = observation_repo.load_all().await;
+        if let Some(entry) = entries.get("ChatTurnCompleted") {
+            assert!(
+                !entry.observations.is_empty(),
+                "ChatTurnCompleted entry should have at least one observation"
+            );
+            let obs = &entry.observations[0];
+            assert!(
+                obs.content.contains("dark mode"),
+                "observation content lost the user message: {:?}",
+                obs.content
+            );
+            assert_eq!(obs.source_event, "ChatTurnCompleted");
+            return;
         }
+        if tokio::time::Instant::now() >= deadline {
+            panic!(
+                "Timed out waiting for IngestionConsumer to persist a \
+                 ChatTurnCompleted observation; saw keys: {:?}",
+                entries.keys().collect::<Vec<_>>()
+            );
+        }
+        tokio::time::sleep(std::time::Duration::from_millis(50)).await;
     }
-
-    // Verify facts were actually stored in the database
-    let after = retrieve_relevant_facts(
-        &repo,
-        None,
-        "",
-        &["productivity"],
-        &RetrievalParams {
-            limit: 10,
-            situational_boost: 0.5,
-            ..RetrievalParams::new(0)
-        },
-        None,
-        None,
-        None,
-    )
-    .await
-    .unwrap();
-    assert!(
-        !after.is_empty(),
-        "Facts should be stored after pipeline processes events"
-    );
-    assert!(
-        after.len() >= 2,
-        "Should have at least 2 facts from 2 events, got {}",
-        after.len()
-    );
-
-    // Shut down cleanly
-    cancel.cancel();
 }
 
 // ── CognitiveContextSource integration ─────────────────────────
@@ -648,7 +566,10 @@ fn test_signal_accumulator_distraction_streak_removed() {
                 duration_secs: None,
                 context: "browsing".into(),
             }),
-            metrics: AiMetrics { app: Some("reddit".into()), ..AiMetrics::default() },
+            metrics: AiMetrics {
+                app: Some("reddit".into()),
+                ..AiMetrics::default()
+            },
             coaching_signal: true,
             coaching_rule: None,
         });
@@ -683,7 +604,11 @@ fn test_signal_accumulator_cooldown_prevents_refire() {
                 spent: 280.0,
                 limit: 300.0,
             }),
-            metrics: AiMetrics { category: Some("dining".into()), amount: Some(280.0), ..AiMetrics::default() },
+            metrics: AiMetrics {
+                category: Some("dining".into()),
+                amount: Some(280.0),
+                ..AiMetrics::default()
+            },
             coaching_signal: true,
             coaching_rule: Some("Review spending patterns when budget pressure is detected".into()),
         });
@@ -712,7 +637,11 @@ fn test_signal_accumulator_cooldown_prevents_refire() {
             spent: 290.0,
             limit: 300.0,
         }),
-        metrics: AiMetrics { category: Some("dining".into()), amount: Some(290.0), ..AiMetrics::default() },
+        metrics: AiMetrics {
+            category: Some("dining".into()),
+            amount: Some(290.0),
+            ..AiMetrics::default()
+        },
         coaching_signal: true,
         coaching_rule: Some("Review spending patterns when budget pressure is detected".into()),
     });

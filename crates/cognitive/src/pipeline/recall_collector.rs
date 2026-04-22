@@ -12,7 +12,7 @@ use ai_core::{AiSignal, RecallDomain, SignalConsumer};
 use async_trait::async_trait;
 use jiff::Timestamp;
 use tokio::sync::Mutex;
-use tracing::{debug, info, warn};
+use tracing::info;
 
 use super::signal::{CognitiveSignal, SignalContext, SignalSource};
 use super::SignalSender;
@@ -49,8 +49,9 @@ impl RecallCollector {
         }
     }
 
-    async fn flush_if_needed(&self) {
+    async fn push_and_maybe_flush(&self, msg: BufferedMessage) {
         let mut buf = self.buffer.lock().await;
+        buf.push(msg);
         if buf.len() >= BUFFER_FLUSH_SIZE {
             Self::flush_buffer(&mut buf, &self.tx).await;
         }
@@ -113,20 +114,23 @@ impl SignalConsumer for RecallCollector {
             return Ok(());
         }
 
-        let session_key = signal.raw_event.as_ref().and_then(|e| match e {
-            bus::DomainEvent::ChatTurnCompleted { session_key, .. } => Some(session_key.clone()),
-            _ => None,
-        }).unwrap_or_default();
+        let session_key = signal
+            .raw_event
+            .as_ref()
+            .and_then(|e| match e {
+                bus::DomainEvent::ChatTurnCompleted { session_key, .. } => {
+                    Some(session_key.clone())
+                }
+                _ => None,
+            })
+            .unwrap_or_default();
 
-        {
-            let mut buf = self.buffer.lock().await;
-            buf.push(BufferedMessage {
-                content: signal.content.clone(),
-                session_key,
-                timestamp: jiff::Timestamp::now(),
-            });
-        }
-        self.flush_if_needed().await;
+        self.push_and_maybe_flush(BufferedMessage {
+            content: signal.content.clone(),
+            session_key,
+            timestamp: jiff::Timestamp::now(),
+        })
+        .await;
         Ok(())
     }
 }

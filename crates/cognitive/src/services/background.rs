@@ -237,25 +237,18 @@ impl BackgroundConsolidationService {
             context_update_queue,
             session_repo: _session_repo,
             rule_repo,
-            signal_tx,
+            signal_tx: _signal_tx,
             mut signal_rx,
-            session_memory_repo,
+            session_memory_repo: _session_memory_repo,
             intelligence_mode,
             deep_handler,
             density_repo,
             pending_repo,
         } = config;
-        // ── Spawn unified pipeline collectors ─────────────────────────
-        let mut _collector_handles: Vec<JoinHandle<()>> = Vec::new();
-        if let (Some(ref sig_tx), Some(ref bus)) = (&signal_tx, &domain_bus) {
-            // Legacy broadcast-based collectors — will be removed once all
-            // collectors are SignalConsumer-based (v1.5 migration).
-            // All cognitive collectors are now SignalConsumers — started by app-core Phase 8.
-            info!(
-                "Unified pipeline: {} collector(s) started",
-                _collector_handles.len()
-            );
-        }
+        // Cognitive collectors are SignalConsumers wired by the app-core init
+        // layer; the legacy broadcast-collector startup that lived here is
+        // gone. `signal_rx` / `domain_bus` are still consumed by the downstream
+        // accumulator and rule-evolution paths below.
         let cancel_clone = cancel.clone();
         let handle = tokio::spawn(async move {
             // Restore accumulated entries from previous session

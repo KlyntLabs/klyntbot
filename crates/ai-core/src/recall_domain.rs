@@ -19,6 +19,19 @@ impl RecallDomain {
             RecallDomain::Learning => "learning",
         }
     }
+
+    /// Parse a domain string into a `RecallDomain`. Unknown values fall back
+    /// to `General` so callers can pass through `DomainEvent.domain: String`
+    /// without a per-site match.
+    pub fn from_str_or_general(s: &str) -> Self {
+        match s {
+            "tasks" => RecallDomain::Tasks,
+            "finance" => RecallDomain::Finance,
+            "productivity" => RecallDomain::Productivity,
+            "learning" => RecallDomain::Learning,
+            _ => RecallDomain::General,
+        }
+    }
 }
 
 impl std::fmt::Display for RecallDomain {

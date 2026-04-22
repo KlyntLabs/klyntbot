@@ -7256,6 +7256,7 @@ dependencies = [
  "tools",
  "tools-core",
  "uuid",
+ "walkdir",
 ]
 
 [[package]]

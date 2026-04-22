@@ -69,7 +69,7 @@ pub fn group_signals(signals: Vec<CognitiveSignal>) -> Vec<KnowledgeCluster> {
         // No existing cluster matched — create a new one.
         clusters.push(KnowledgeCluster {
             merged_subject: signal.content.clone(),
-            domain: signal.domain.clone(),
+            domain: signal.domain,
             source_diversity: 1,
             convergence_score: 0.2,
             max_confidence: signal.confidence,
@@ -91,7 +91,7 @@ pub fn heuristic_promote(clusters: &[KnowledgeCluster]) -> Vec<PromotionOp> {
         if has_coaching && cluster.max_confidence >= 0.7 {
             ops.push(PromotionOp::CreateRule {
                 rule_text: cluster.merged_subject.clone(),
-                domain: cluster.domain.clone(),
+                domain: cluster.domain,
                 confidence: cluster.max_confidence,
             });
         } else if cluster.max_confidence >= 0.6 || cluster.convergence_score >= 0.4 {
@@ -100,7 +100,7 @@ pub fn heuristic_promote(clusters: &[KnowledgeCluster]) -> Vec<PromotionOp> {
                 subject,
                 predicate,
                 object,
-                domain: cluster.domain.clone(),
+                domain: cluster.domain,
                 confidence: cluster.max_confidence,
                 convergence: cluster.convergence_score,
                 source: promotion_source(&cluster.signals),
@@ -114,7 +114,7 @@ pub fn heuristic_promote(clusters: &[KnowledgeCluster]) -> Vec<PromotionOp> {
             ops.push(PromotionOp::CreateEpisode {
                 content: cluster.merged_subject.clone(),
                 summary,
-                domain: cluster.domain.clone(),
+                domain: cluster.domain,
                 importance: cluster.max_confidence,
             });
         }

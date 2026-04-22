@@ -4,7 +4,6 @@ use ai_core::{AiSignal, RecallDomain, SignalConsumer};
 use async_trait::async_trait;
 use jiff::Timestamp;
 use storage::SessionMemoryRepo;
-use tracing::{debug, warn};
 
 use super::signal::{CognitiveSignal, SignalContext, SignalSource};
 use super::SignalSender;
@@ -85,7 +84,9 @@ impl SignalConsumer for SessionCollector {
             bus::DomainEvent::SessionEnded { session_id, .. } => Some(session_id.clone()),
             _ => None,
         });
-        let Some(session_id) = session_id else { return Ok(()); };
+        let Some(session_id) = session_id else {
+            return Ok(());
+        };
 
         Self::handle(&session_id, &self.repo, &self.tx).await;
         Ok(())

@@ -15,22 +15,24 @@ pub(super) struct CoachingResult {
     pub pattern_detector: Option<Arc<Mutex<PatternDetector>>>,
     pub intervention_router: Option<Arc<Mutex<InterventionRouter>>>,
     pub feedback_tracker: Option<Arc<Mutex<FeedbackTracker>>>,
-    pub coaching_service: Option<feature_coaching::CoachingService>,
     pub coaching_intervention_log_repo: Option<storage::CoachingInterventionLogRepo>,
+    pub intervention_tx: mpsc::Sender<feature_coaching::router::DeliveredIntervention>,
 }
 
-/// Initialize coaching pipeline (desktop mode only).
+/// Initialize coaching pipeline components (desktop mode only). The
+/// `CoachingService` itself is started after the `SignalRouter` exists, since
+/// it consumes `AiSignal`s from `CoachingSignalConsumer`.
 #[allow(clippy::too_many_arguments)]
 pub(super) async fn init_coaching(
     mode: common::AppMode,
-    config: &config::Config,
+    _config: &config::Config,
     storage_pool: &storage::StoragePool,
     repos: &Repos,
     productivity_repos: Option<&ProductivityRepos>,
     user_situation: &Arc<Mutex<UserSituation>>,
-    domain_event_bus: &Arc<bus::DomainEventBus>,
-    cognitive_provider: &Option<providers::DynProvider>,
-    shutdown_token: &CancellationToken,
+    _domain_event_bus: &Arc<bus::DomainEventBus>,
+    _cognitive_provider: &Option<providers::DynProvider>,
+    _shutdown_token: &CancellationToken,
 ) -> CoachingResult {
     // Always create the intervention channel pair (EventChannels requires it).
     let (intervention_tx, intervention_rx) =
@@ -41,7 +43,6 @@ pub(super) async fn init_coaching(
         pattern_detector,
         intervention_router,
         feedback_tracker,
-        coaching_service,
         coaching_intervention_log_repo,
     ) = if mode == common::AppMode::Desktop {
         // Initialize coaching engine state.
@@ -66,46 +67,18 @@ pub(super) async fn init_coaching(
             *user_situation.lock().await = real_situation;
         }
 
-        // Start CoachingService — processes domain events through coaching pipeline.
-        let coaching_reasoner: Arc<dyn feature_coaching::CoachingReasonerHandler> =
-            if let Some(ref cp) = cognitive_provider {
-                let params = providers::cognitive_chat_params(config, 1024);
-                Arc::new(agent::cognitive_handlers::LlmCoachingReasonerHandler::new(
-                    cp.clone(),
-                    params,
-                ))
-            } else {
-                Arc::new(agent::cognitive_handlers::HeuristicCoachingReasonerHandler)
-            };
-
-        let coaching_cancel = shutdown_token.child_token();
-        let coaching_service = feature_coaching::CoachingService::start(
-            domain_event_bus.subscribe(),
-            signal_accumulator.clone(),
-            pattern_detector.clone(),
-            intervention_router.clone(),
-            feedback_tracker.clone(),
-            user_situation.clone(),
-            coaching_reasoner,
-            intervention_tx.clone(),
-            Some(intervention_log_repo.clone()),
-            coaching_cancel,
-        );
-        info!("coaching service started");
+        info!("coaching components initialized (service starts after SignalRouter)");
 
         (
             Some(signal_accumulator),
             Some(pattern_detector),
             Some(intervention_router),
             Some(feedback_tracker),
-            Some(coaching_service),
             Some(intervention_log_repo),
         )
     } else {
-        // Server mode: drop intervention_tx so intervention_rx.recv() returns None immediately.
-        drop(intervention_tx);
-        info!("coaching service skipped (server mode)");
-        (None, None, None, None, None, None)
+        info!("coaching components skipped (server mode)");
+        (None, None, None, None, None)
     };
 
     CoachingResult {
@@ -114,8 +87,8 @@ pub(super) async fn init_coaching(
         pattern_detector,
         intervention_router,
         feedback_tracker,
-        coaching_service,
         coaching_intervention_log_repo,
+        intervention_tx,
     }
 }
 

@@ -221,6 +221,7 @@ plugin-runtime.workspace = true
 tools-core.workspace = true
 extism.workspace = true
 simulator.workspace = true
+walkdir = "2"
 
 [profile.dev]
 opt-level = 0

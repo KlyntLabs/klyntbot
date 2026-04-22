@@ -701,7 +701,7 @@ impl cognitive::pipeline::DeepConsolidationHandler for LlmDeepConsolidationHandl
                             subject,
                             predicate,
                             object,
-                            domain: cluster.domain.clone(),
+                            domain: cluster.domain,
                             confidence: decision.confidence.unwrap_or(cluster.max_confidence),
                             convergence: cluster.convergence_score,
                             source: format!(
@@ -715,7 +715,7 @@ impl cognitive::pipeline::DeepConsolidationHandler for LlmDeepConsolidationHandl
                     if let Some(rule_text) = decision.rule_text {
                         ops.push(cognitive::pipeline::PromotionOp::CreateRule {
                             rule_text,
-                            domain: cluster.domain.clone(),
+                            domain: cluster.domain,
                             confidence: decision.confidence.unwrap_or(cluster.max_confidence),
                         });
                     }
@@ -732,7 +732,7 @@ impl cognitive::pipeline::DeepConsolidationHandler for LlmDeepConsolidationHandl
                     ops.push(cognitive::pipeline::PromotionOp::CreateEpisode {
                         content,
                         summary,
-                        domain: cluster.domain.clone(),
+                        domain: cluster.domain,
                         importance: decision.importance.unwrap_or(0.5),
                     });
                 }

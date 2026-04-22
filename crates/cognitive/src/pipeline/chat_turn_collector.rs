@@ -8,7 +8,6 @@
 use ai_core::{AiSignal, RecallDomain, SignalConsumer};
 use async_trait::async_trait;
 use jiff::Timestamp;
-use tracing::{debug, warn};
 
 use super::signal::{CognitiveSignal, SignalContext, SignalSource};
 use super::SignalSender;

@@ -2,8 +2,6 @@
 
 use ai_core::{AiSignal, RecallDomain, SignalConsumer};
 use async_trait::async_trait;
-use jiff::Timestamp;
-use tracing::warn;
 
 use super::signal::{CognitiveSignal, SignalContext, SignalSource};
 use super::SignalSender;
@@ -31,19 +29,21 @@ impl SignalConsumer for AtomCollector {
             return Ok(());
         }
         let (atom_id, count) = match signal.raw_event.as_ref() {
-            Some(bus::DomainEvent::AtomReinforced { atom_id, reinforcement_count, .. })
-                if *reinforcement_count >= MIN_REINFORCEMENT =>
-                (atom_id.clone(), *reinforcement_count),
+            Some(bus::DomainEvent::AtomReinforced {
+                atom_id,
+                reinforcement_count,
+                ..
+            }) if *reinforcement_count >= MIN_REINFORCEMENT => {
+                (atom_id.clone(), *reinforcement_count)
+            }
             _ => return Ok(()),
         };
         let confidence = (0.5 + count as f64 * 0.15).min(0.95);
-        let domain = signal.metrics.category.as_deref()
-            .and_then(|s| match s {
-                "tasks" => Some(RecallDomain::Tasks),
-                "finance" => Some(RecallDomain::Finance),
-                "learning" => Some(RecallDomain::Learning),
-                _ => None,
-            })
+        let domain = signal
+            .metrics
+            .category
+            .as_deref()
+            .map(RecallDomain::from_str_or_general)
             .unwrap_or(RecallDomain::General);
         let out = CognitiveSignal {
             source: SignalSource::AtomReinforcement,
@@ -99,13 +99,16 @@ mod tests {
         let sig = AiSignal {
             event_kind: "AtomReinforced",
             content: "rust errors".into(),
-            metrics: AiMetrics { category: Some("learning".into()), ..Default::default() },
+            metrics: AiMetrics {
+                category: Some(RecallDomain::Learning.as_str().into()),
+                ..Default::default()
+            },
             raw_event: Some(bus::DomainEvent::AtomReinforced {
                 atom_id: "a1".into(),
                 referencing_note_id: "n1".into(),
                 new_salience: 0.8,
                 subject: "rust errors".into(),
-                domain: "learning".into(),
+                domain: RecallDomain::Learning.as_str().into(),
                 reinforcement_count: 3,
             }),
             ..atom_dummy()

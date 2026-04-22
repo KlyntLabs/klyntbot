@@ -1,4 +1,6 @@
-use ai_core::{AiEventMeta, AiMetrics, AiSignal, RecallDomain, SalienceVerdict, SignalConsumer, SignalRouter};
+use ai_core::{
+    AiEventMeta, AiMetrics, AiSignal, RecallDomain, SalienceVerdict, SignalConsumer, SignalRouter,
+};
 use bus::{DomainEvent, DomainEventBus};
 use jiff::Timestamp;
 use std::sync::Arc;
@@ -42,15 +44,26 @@ fn translate_system_event(event: &DomainEvent) -> Option<AiSignal> {
             content: user_message.clone().unwrap_or_default(),
             ..base
         }),
-        DomainEvent::SessionEnded { session_id, quality_score, .. } => Some(AiSignal {
+        DomainEvent::SessionEnded {
+            session_id,
+            quality_score,
+            ..
+        } => Some(AiSignal {
             event_kind: "SessionEnded",
             importance: quality_score.unwrap_or(0.5),
             content: session_id.clone(),
-            metrics: AiMetrics { amount: *quality_score, ..AiMetrics::default() },
+            metrics: AiMetrics {
+                amount: *quality_score,
+                ..AiMetrics::default()
+            },
             ..base
         }),
         DomainEvent::CoachingPatternDetected {
-            pattern_name, confidence, rule_text, domain, ..
+            pattern_name,
+            confidence,
+            rule_text,
+            domain,
+            ..
         } => Some(AiSignal {
             event_kind: "CoachingPatternDetected",
             importance: *confidence,
@@ -59,15 +72,15 @@ fn translate_system_event(event: &DomainEvent) -> Option<AiSignal> {
                 category: Some(pattern_name.clone()),
                 ..AiMetrics::default()
             },
-            domain: match domain.as_str() {
-                "tasks" => RecallDomain::Tasks,
-                "finance" => RecallDomain::Finance,
-                _ => RecallDomain::General,
-            },
+            domain: RecallDomain::from_str_or_general(domain.as_str()),
             ..base
         }),
         DomainEvent::AtomReinforced {
-            atom_id, subject, domain, reinforcement_count, ..
+            atom_id,
+            subject,
+            domain,
+            reinforcement_count,
+            ..
         } => Some(AiSignal {
             event_kind: "AtomReinforced",
             importance: (0.5 + *reinforcement_count as f64 * 0.15).min(0.95),
@@ -86,7 +99,10 @@ fn translate_system_event(event: &DomainEvent) -> Option<AiSignal> {
         DomainEvent::DistractionDetected { app, .. } => Some(AiSignal {
             event_kind: "DistractionDetected",
             content: app.clone(),
-            metrics: AiMetrics { app: Some(app.clone()), ..AiMetrics::default() },
+            metrics: AiMetrics {
+                app: Some(app.clone()),
+                ..AiMetrics::default()
+            },
             coaching_signal: true,
             ..base
         }),
@@ -98,7 +114,10 @@ fn translate_system_event(event: &DomainEvent) -> Option<AiSignal> {
         DomainEvent::FocusSessionEnded { quality, .. } => Some(AiSignal {
             event_kind: "FocusSessionEnded",
             importance: *quality,
-            metrics: AiMetrics { amount: Some(*quality), ..AiMetrics::default() },
+            metrics: AiMetrics {
+                amount: Some(*quality),
+                ..AiMetrics::default()
+            },
             coaching_signal: true,
             ..base
         }),
