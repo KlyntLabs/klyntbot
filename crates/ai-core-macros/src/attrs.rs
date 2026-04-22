@@ -7,6 +7,14 @@ pub struct AiEventAttr {
     pub salience: SalienceSpec,
     pub observation_template: Option<String>,
     pub entity_bridge: Option<EntityBridge>,
+    pub coaching: Option<CoachingSignalSpec>,
+}
+
+pub struct CoachingSignalSpec {
+    pub app_from: Option<syn::Ident>,
+    pub amount_from: Option<syn::Ident>,
+    pub category_from: Option<syn::Ident>,
+    pub rule: Option<String>,
 }
 
 #[allow(clippy::large_enum_variant)]
@@ -63,6 +71,7 @@ pub fn parse_ai_event_attr(attrs: &[Attribute]) -> syn::Result<AiEventAttr> {
     let mut salience = None;
     let mut observation_template = None;
     let mut entity_bridge = None;
+    let mut coaching = None;
 
     ai_attr.parse_nested_meta(|meta| {
         let name = meta
@@ -102,6 +111,9 @@ pub fn parse_ai_event_attr(attrs: &[Attribute]) -> syn::Result<AiEventAttr> {
             "entity_bridge" => {
                 entity_bridge = Some(parse_entity_bridge(&meta)?);
             }
+            "coaching_signal" => {
+                coaching = Some(parse_coaching_signal(&meta)?);
+            }
             other => return Err(meta.error(format!("unknown ai() key: {}", other))),
         }
         Ok(())
@@ -113,6 +125,7 @@ pub fn parse_ai_event_attr(attrs: &[Attribute]) -> syn::Result<AiEventAttr> {
         salience: salience.unwrap_or(SalienceSpec::Accumulate),
         observation_template,
         entity_bridge,
+        coaching,
     })
 }
 
@@ -137,6 +150,50 @@ fn parse_salience(s: &str) -> syn::Result<SalienceSpec> {
             format!("unknown salience verdict: {}", s),
         )),
     }
+}
+
+fn parse_coaching_signal(
+    meta: &syn::meta::ParseNestedMeta,
+) -> syn::Result<CoachingSignalSpec> {
+    let mut app_from = None;
+    let mut amount_from = None;
+    let mut category_from = None;
+    let mut rule = None;
+    meta.parse_nested_meta(|inner| {
+        let key = inner
+            .path
+            .get_ident()
+            .ok_or_else(|| inner.error("expected identifier"))?
+            .to_string();
+        match key.as_str() {
+            "app_from" => {
+                let s: syn::LitStr = inner.value()?.parse()?;
+                app_from = Some(syn::Ident::new(&s.value(), s.span()));
+            }
+            "amount_from" => {
+                let s: syn::LitStr = inner.value()?.parse()?;
+                amount_from = Some(syn::Ident::new(&s.value(), s.span()));
+            }
+            "category_from" => {
+                let s: syn::LitStr = inner.value()?.parse()?;
+                category_from = Some(syn::Ident::new(&s.value(), s.span()));
+            }
+            "rule" => {
+                let s: syn::LitStr = inner.value()?.parse()?;
+                rule = Some(s.value());
+            }
+            other => {
+                return Err(inner.error(format!("unknown coaching_signal key: {other}")))
+            }
+        }
+        Ok(())
+    })?;
+    Ok(CoachingSignalSpec {
+        app_from,
+        amount_from,
+        category_from,
+        rule,
+    })
 }
 
 fn parse_entity_bridge(meta: &syn::meta::ParseNestedMeta) -> syn::Result<EntityBridge> {

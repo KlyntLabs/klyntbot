@@ -134,6 +134,35 @@ fn render_variant(
     let entity_expr = render_entity(&attr.entity_bridge);
     let kind_lit = var_ident.to_string();
 
+    let (coaching_flag, rule_expr, app_expr, amount_expr, category_expr) = match &attr.coaching {
+        None => (
+            quote! { false },
+            quote! { None },
+            quote! { None },
+            quote! { None },
+            quote! { None },
+        ),
+        Some(c) => {
+            let rule = match &c.rule {
+                Some(s) => quote! { Some(#s.to_string()) },
+                None    => quote! { None },
+            };
+            let app = match &c.app_from {
+                Some(id) => quote! { Some(#id.to_string()) },
+                None     => quote! { None },
+            };
+            let amount = match &c.amount_from {
+                Some(id) => quote! { Some(*#id as f64) },
+                None     => quote! { None },
+            };
+            let category = match &c.category_from {
+                Some(id) => quote! { Some(#id.to_string()) },
+                None     => quote! { None },
+            };
+            (quote! { true }, rule, app, amount, category)
+        }
+    };
+
     Ok(quote! {
         #pattern => ::ai_core::AiSignal {
             domain: #domain_tokens,
@@ -144,9 +173,13 @@ fn render_variant(
             entity: #entity_expr,
             timestamp: ::jiff::Timestamp::now(),
             raw_event: None,
-            metrics: ::ai_core::AiMetrics::default(),
-            coaching_signal: false,
-            coaching_rule: None,
+            metrics: ::ai_core::AiMetrics {
+                app: #app_expr,
+                amount: #amount_expr,
+                category: #category_expr,
+            },
+            coaching_signal: #coaching_flag,
+            coaching_rule: #rule_expr,
         },
     })
 }
