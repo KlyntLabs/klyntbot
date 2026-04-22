@@ -7220,6 +7220,8 @@ name = "klyntbot"
 version = "0.1.1"
 dependencies = [
  "agent",
+ "ai-core",
+ "app-core",
  "async-trait",
  "bus",
  "channels",
@@ -7230,6 +7232,7 @@ dependencies = [
  "extism",
  "feature-coaching",
  "feature-finance",
+ "feature-tasks",
  "jiff",
  "mcp",
  "notifications",
