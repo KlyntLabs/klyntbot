@@ -592,8 +592,18 @@ impl AutoTunerOrchestrator {
 
                     // ── GENERATE step: create new trials via LLM ─────────────
                     match run_llm_generation(&orch).await {
-                        Ok(_created_trials) => {
-                            // TrialActivated variant deleted; no-op.
+                        Ok(created_trials) => {
+                            // Emit AutotunerDecision(activated) for each new trial.
+                            if let Some(ref bus) = domain_event_bus {
+                                for trial in &created_trials {
+                                    bus.publish(bus::DomainEvent::AutotunerDecision {
+                                        trial_id: trial.id.clone(),
+                                        verdict: "activated".to_string(),
+                                        improvement_pct: 0.0,
+                                        affected_params: Vec::new(),
+                                    });
+                                }
+                            }
                         }
                         Err(e) => {
                             error!("autotuner LLM generation failed (non-fatal): {e}");

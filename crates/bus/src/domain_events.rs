@@ -180,6 +180,10 @@ pub enum DomainEvent {
         session_key: String,
         active_skill: Option<String>,
     },
+    /// Autotuner lifecycle event. `verdict` is one of:
+    /// - `"activated"` — a new trial started running (emitted by `autotuner` at kickoff)
+    /// - `"promoted"` — trial beat champion and became new champion
+    /// - `"reverted"` — previous promotion was rolled back due to regression
     AutotunerDecision {
         trial_id: String,
         verdict: String,
