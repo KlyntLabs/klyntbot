@@ -39,6 +39,13 @@ pub struct AiFeatureAttr {
     pub recall_priority_field: Option<syn::Ident>,
     pub recall_recency_field: Option<syn::Ident>,
     pub recall_status_filter: Option<syn::Expr>,
+    pub mirror_snapshots: Vec<MirrorSnapshotAttr>,
+}
+
+pub struct MirrorSnapshotAttr {
+    pub name: String,
+    pub flush_interval_secs: Option<u64>,
+    pub subscribed_kinds: Vec<String>,
 }
 
 /// Parses an enum-level `#[ai(domain = "Tasks")]` attribute. The value must be
@@ -239,6 +246,7 @@ pub fn parse_ai_feature_attr(attrs: &[syn::Attribute]) -> syn::Result<AiFeatureA
     let mut recall_priority_field = None;
     let mut recall_recency_field = None;
     let mut recall_status_filter = None;
+    let mut mirror_snapshots: Vec<MirrorSnapshotAttr> = Vec::new();
 
     ai_attr.parse_nested_meta(|meta| {
         let k = meta.path.get_ident()
@@ -272,6 +280,9 @@ pub fn parse_ai_feature_attr(attrs: &[syn::Attribute]) -> syn::Result<AiFeatureA
                 let s: syn::LitStr = meta.value()?.parse()?;
                 recall_status_filter = Some(syn::parse_str(&s.value())?);
             }
+            "mirror_snapshot" => {
+                mirror_snapshots.push(parse_mirror_snapshot(&meta)?);
+            }
             other => return Err(meta.error(format!("unknown ai() key: {other}"))),
         }
         Ok(())
@@ -288,6 +299,66 @@ pub fn parse_ai_feature_attr(attrs: &[syn::Attribute]) -> syn::Result<AiFeatureA
         recall_priority_field,
         recall_recency_field,
         recall_status_filter,
+        mirror_snapshots,
+    })
+}
+
+fn parse_mirror_snapshot(
+    meta: &syn::meta::ParseNestedMeta,
+) -> syn::Result<MirrorSnapshotAttr> {
+    let mut name: Option<String> = None;
+    let mut flush_interval_secs: Option<u64> = None;
+    let mut subscribed_kinds: Vec<String> = Vec::new();
+
+    meta.parse_nested_meta(|inner| {
+        let key = inner
+            .path
+            .get_ident()
+            .ok_or_else(|| inner.error("expected identifier"))?
+            .to_string();
+        match key.as_str() {
+            "name" => {
+                let s: syn::LitStr = inner.value()?.parse()?;
+                name = Some(s.value());
+            }
+            "flush_interval_secs" => {
+                let value: syn::Expr = inner.value()?.parse()?;
+                let syn::Expr::Lit(syn::ExprLit { lit: syn::Lit::Int(i), .. }) = value else {
+                    return Err(inner.error("flush_interval_secs must be an integer literal"));
+                };
+                flush_interval_secs = Some(i.base10_parse::<u64>()?);
+            }
+            "event_kinds" => {
+                // `event_kinds = ["TaskFocusChanged", "TaskCompleted"]` (bracketed string list).
+                let arr: syn::ExprArray = inner.value()?.parse()?;
+                for elem in arr.elems {
+                    let syn::Expr::Lit(syn::ExprLit { lit: syn::Lit::Str(s), .. }) = elem else {
+                        return Err(inner.error(
+                            "event_kinds must be a list of string literals, e.g. [\"Foo\", \"Bar\"]",
+                        ));
+                    };
+                    subscribed_kinds.push(s.value());
+                }
+            }
+            other => {
+                return Err(inner.error(format!(
+                    "unknown mirror_snapshot key: {other} \
+                     (expected name / flush_interval_secs / event_kinds)"
+                )));
+            }
+        }
+        Ok(())
+    })?;
+
+    Ok(MirrorSnapshotAttr {
+        name: name.ok_or_else(|| {
+            syn::Error::new(
+                proc_macro2::Span::call_site(),
+                "mirror_snapshot requires name = \"...\"",
+            )
+        })?,
+        flush_interval_secs,
+        subscribed_kinds,
     })
 }
 
