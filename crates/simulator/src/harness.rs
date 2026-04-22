@@ -1743,9 +1743,9 @@ impl SimulationHarness {
             .as_ref()
             .and_then(|gt| gt.introduces_fact.as_ref());
         let (source_event, importance) = if introduces_fact.is_some() {
-            ("UserStatedFact".to_string(), 0.9)
+            (bus::DomainEvent::KIND_USER_STATED_FACT.to_string(), 0.9)
         } else {
-            ("ChatTurnCompleted".to_string(), 0.5)
+            (bus::DomainEvent::KIND_CHAT_TURN_COMPLETED.to_string(), 0.5)
         };
         let observation = cognitive::Observation {
             domain: msg.topic.clone(),

@@ -65,8 +65,8 @@ impl HeuristicExtractionHandler {
                     }]
                 }
             }
-            "BudgetAlert" => vec![fact("finance", "budget_pressure", 0.9, "observed")],
-            "CoachingFeedback" => vec![fact("coaching", "coaching_response", 0.9, "observed")],
+            bus::DomainEvent::KIND_BUDGET_ALERT => vec![fact("finance", "budget_pressure", 0.9, "observed")],
+            bus::DomainEvent::KIND_COACHING_FEEDBACK => vec![fact("coaching", "coaching_response", 0.9, "observed")],
             source if source.starts_with("accumulated:") => {
                 vec![fact(od, "pattern", 0.7, "inferred")]
             }
@@ -1146,7 +1146,7 @@ mod tests {
             domain: "productivity".into(),
             content: "User is most productive between 10am and 12pm".into(),
             importance: 0.8,
-            source_event: "ProductivityScoreComputed".into(),
+            source_event: bus::DomainEvent::KIND_PRODUCTIVITY_SCORE_COMPUTED.into(),
             timestamp: jiff::Timestamp::now(),
         };
         let result = handler.extract_facts_batch(&[obs]).await.unwrap();
@@ -1171,7 +1171,7 @@ mod tests {
             domain: "productivity".into(),
             content: "User stated: I like mornings".into(),
             importance: 1.0,
-            source_event: "UserStatedFact".into(),
+            source_event: bus::DomainEvent::KIND_USER_STATED_FACT.into(),
             timestamp: jiff::Timestamp::now(),
         };
         let result = handler.extract_facts_batch(&[obs]).await.unwrap();

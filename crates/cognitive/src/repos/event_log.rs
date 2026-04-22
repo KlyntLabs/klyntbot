@@ -265,7 +265,7 @@ mod tests {
 
         repo.insert_domain_event(
             "evt-1",
-            "ChatTurnCompleted",
+            bus::DomainEvent::KIND_CHAT_TURN_COMPLETED,
             "general",
             "extract",
             r#"{"msg":"hello"}"#,
@@ -276,7 +276,7 @@ mod tests {
 
         repo.insert_domain_event(
             "evt-2",
-            "DistractionDetected",
+            bus::DomainEvent::KIND_DISTRACTION_DETECTED,
             "energy",
             "accumulate",
             r#"{"app":"twitter"}"#,
@@ -298,7 +298,7 @@ mod tests {
 
         repo.insert_domain_event(
             "evt-a",
-            "TaskCreated",
+            bus::DomainEvent::KIND_TASK_CREATED,
             "tasks",
             "extract",
             r#"{"task_id":"t1"}"#,
@@ -309,7 +309,7 @@ mod tests {
 
         repo.insert_domain_event(
             "evt-b",
-            "NoteCreated",
+            bus::DomainEvent::KIND_NOTE_CREATED,
             "notes",
             "extract",
             r#"{"note_id":"n1"}"#,
@@ -320,7 +320,7 @@ mod tests {
 
         repo.insert_domain_event(
             "evt-c",
-            "TaskCompleted",
+            bus::DomainEvent::KIND_TASK_COMPLETED,
             "tasks",
             "extract",
             r#"{"task_id":"t2"}"#,
@@ -388,7 +388,7 @@ mod tests {
         // Insert events with different types and timestamps
         repo.insert_domain_event(
             "evt-c1",
-            "TaskCreated",
+            bus::DomainEvent::KIND_TASK_CREATED,
             "tasks",
             "extract",
             r#"{"task_id":"t1"}"#,
@@ -399,7 +399,7 @@ mod tests {
 
         repo.insert_domain_event(
             "evt-c2",
-            "TaskCreated",
+            bus::DomainEvent::KIND_TASK_CREATED,
             "tasks",
             "extract",
             r#"{"task_id":"t2"}"#,
@@ -410,7 +410,7 @@ mod tests {
 
         repo.insert_domain_event(
             "evt-c3",
-            "NoteCreated",
+            bus::DomainEvent::KIND_NOTE_CREATED,
             "notes",
             "extract",
             r#"{"note_id":"n1"}"#,
@@ -422,7 +422,7 @@ mod tests {
         // Old event that should be excluded by the since filter
         repo.insert_domain_event(
             "evt-c4",
-            "TaskCreated",
+            bus::DomainEvent::KIND_TASK_CREATED,
             "tasks",
             "extract",
             r#"{"task_id":"t0"}"#,
@@ -435,14 +435,14 @@ mod tests {
 
         // Should count only the two TaskCreated events on March 9
         let count = repo
-            .count_by_event_type("TaskCreated", since)
+            .count_by_event_type(bus::DomainEvent::KIND_TASK_CREATED, since)
             .await
             .unwrap();
         assert_eq!(count, 2);
 
         // NoteCreated should return 1
         let count = repo
-            .count_by_event_type("NoteCreated", since)
+            .count_by_event_type(bus::DomainEvent::KIND_NOTE_CREATED, since)
             .await
             .unwrap();
         assert_eq!(count, 1);
@@ -459,7 +459,7 @@ mod tests {
 
         repo.insert_domain_event(
             "evt-d1",
-            "TaskCreated",
+            bus::DomainEvent::KIND_TASK_CREATED,
             "tasks",
             "extract",
             r#"{"task_id":"t1"}"#,
@@ -471,13 +471,13 @@ mod tests {
         let since: Timestamp = "2026-03-09T00:00:00Z".parse().unwrap();
 
         let count = repo
-            .count_by_event_type_and_data("TaskCreated", "t1", since)
+            .count_by_event_type_and_data(bus::DomainEvent::KIND_TASK_CREATED, "t1", since)
             .await
             .unwrap();
         assert_eq!(count, 1);
 
         let count = repo
-            .count_by_event_type_and_data("TaskCreated", "nonexistent", since)
+            .count_by_event_type_and_data(bus::DomainEvent::KIND_TASK_CREATED, "nonexistent", since)
             .await
             .unwrap();
         assert_eq!(count, 0);

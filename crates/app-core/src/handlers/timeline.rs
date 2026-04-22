@@ -282,7 +282,7 @@ fn normalize_domain_event(e: cognitive::DomainEventRow) -> Option<TimelineEntry>
                 "var(--timeline-task)",
             )
         }
-        "NoteCreated" => {
+        bus::DomainEvent::KIND_NOTE_CREATED => {
             let title_str = field(inner, "title").unwrap_or("Untitled");
             (
                 TimelineEntryType::NoteCreated,
@@ -293,7 +293,7 @@ fn normalize_domain_event(e: cognitive::DomainEventRow) -> Option<TimelineEntry>
                 "var(--timeline-note)",
             )
         }
-        "NoteUpdated" => {
+        bus::DomainEvent::KIND_NOTE_UPDATED => {
             let title_str = field(inner, "title").unwrap_or("Untitled");
             (
                 TimelineEntryType::NoteUpdated,
@@ -304,7 +304,7 @@ fn normalize_domain_event(e: cognitive::DomainEventRow) -> Option<TimelineEntry>
                 "var(--timeline-note)",
             )
         }
-        "TransactionRecorded" => (
+        bus::DomainEvent::KIND_TRANSACTION_RECORDED => (
             TimelineEntryType::TransactionRecorded,
             TimelineSource::Finance,
             format!(

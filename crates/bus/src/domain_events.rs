@@ -535,6 +535,12 @@ impl DomainEvent {
     pub const KIND_COACHING_FEEDBACK: &'static str = "CoachingFeedback";
     /// `event_type` value for [`DomainEvent::ProductivityScoreComputed`].
     pub const KIND_PRODUCTIVITY_SCORE_COMPUTED: &'static str = "ProductivityScoreComputed";
+    /// `event_type` value for [`DomainEvent::SessionCreated`].
+    pub const KIND_SESSION_CREATED: &'static str = "SessionCreated";
+    /// `event_type` value for [`DomainEvent::SessionEnded`].
+    pub const KIND_SESSION_ENDED: &'static str = "SessionEnded";
+    /// `event_type` value for [`DomainEvent::QualityScored`].
+    pub const KIND_QUALITY_SCORED: &'static str = "QualityScored";
     /// `event_type` value for [`DomainEvent::TaskFocusChanged`].
     pub const KIND_TASK_FOCUS_CHANGED: &'static str = "TaskFocusChanged";
     /// `event_type` value for [`DomainEvent::EstimationRecorded`].
@@ -551,6 +557,16 @@ impl DomainEvent {
     pub const KIND_GOAL_CREATED: &'static str = "GoalCreated";
     /// `event_type` value for [`DomainEvent::GoalAchieved`].
     pub const KIND_GOAL_ACHIEVED: &'static str = "GoalAchieved";
+    /// `event_type` value for [`DomainEvent::NoteCreated`].
+    pub const KIND_NOTE_CREATED: &'static str = "NoteCreated";
+    /// `event_type` value for [`DomainEvent::NoteUpdated`].
+    pub const KIND_NOTE_UPDATED: &'static str = "NoteUpdated";
+    /// `event_type` value for [`DomainEvent::NoteContentChanged`].
+    pub const KIND_NOTE_CONTENT_CHANGED: &'static str = "NoteContentChanged";
+    /// `event_type` value for [`DomainEvent::NoteEditingFinished`].
+    pub const KIND_NOTE_EDITING_FINISHED: &'static str = "NoteEditingFinished";
+    /// `event_type` value for [`DomainEvent::NoteDeleted`].
+    pub const KIND_NOTE_DELETED: &'static str = "NoteDeleted";
     /// `event_type` value for [`DomainEvent::TaskDeferred`].
     pub const KIND_TASK_DEFERRED: &'static str = "TaskDeferred";
     /// `event_type` value for [`DomainEvent::FocusSessionStarted`].

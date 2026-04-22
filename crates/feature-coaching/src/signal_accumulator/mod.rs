@@ -119,7 +119,7 @@ impl SignalAccumulator {
                 }
             }
             "focus_quality_declining" => {
-                let focus_events = self.count_events("FocusSessionEnded");
+                let focus_events = self.count_events(bus::DomainEvent::KIND_FOCUS_SESSION_ENDED);
                 if focus_events >= 3 && situation.focus_state < 0.3 {
                     Some(TriggerFired {
                         condition_name: "focus_quality_declining".into(),
@@ -134,7 +134,7 @@ impl SignalAccumulator {
                 }
             }
             "budget_warning" => {
-                let budget_alerts = self.count_events("BudgetAlert");
+                let budget_alerts = self.count_events(bus::DomainEvent::KIND_BUDGET_ALERT);
                 if budget_alerts >= 1 {
                     Some(TriggerFired {
                         condition_name: "budget_warning".into(),
@@ -336,7 +336,7 @@ mod tests {
 
         assert_eq!(acc.window_size(), 1);
         let signal = acc.signals().front().unwrap();
-        assert_eq!(signal.event_type, "SessionEnded");
+        assert_eq!(signal.event_type, bus::DomainEvent::KIND_SESSION_ENDED);
         assert_eq!(signal.metadata.amount, Some(85.0));
     }
 
@@ -352,7 +352,7 @@ mod tests {
         });
 
         let signal = acc.signals().front().unwrap();
-        assert_eq!(signal.event_type, "QualityScored");
+        assert_eq!(signal.event_type, bus::DomainEvent::KIND_QUALITY_SCORED);
         assert_eq!(signal.metadata.amount, Some(25.0));
     }
 

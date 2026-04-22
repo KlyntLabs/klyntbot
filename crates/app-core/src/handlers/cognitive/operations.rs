@@ -85,7 +85,7 @@ impl AppCore {
                     .to_string(),
                 active_skill: payload["active_skill"].as_str().map(|s| s.to_string()),
             },
-            "BudgetAlert" => bus::DomainEvent::BudgetAlert {
+            bus::DomainEvent::KIND_BUDGET_ALERT => bus::DomainEvent::BudgetAlert {
                 category: payload["category"]
                     .as_str()
                     .unwrap_or("general")
@@ -93,31 +93,31 @@ impl AppCore {
                 spent: payload["spent"].as_f64().unwrap_or(0.0),
                 limit: payload["limit"].as_f64().unwrap_or(0.0),
             },
-            "DistractionDetected" => bus::DomainEvent::DistractionDetected {
+            bus::DomainEvent::KIND_DISTRACTION_DETECTED => bus::DomainEvent::DistractionDetected {
                 app: payload["app"].as_str().unwrap_or("unknown").to_string(),
                 duration_secs: payload["duration_secs"].as_i64(),
                 context: payload["context"].as_str().unwrap_or("").to_string(),
             },
-            "FocusSessionStarted" => bus::DomainEvent::FocusSessionStarted {
+            bus::DomainEvent::KIND_FOCUS_SESSION_STARTED => bus::DomainEvent::FocusSessionStarted {
                 session_type: payload["session_type"]
                     .as_str()
                     .unwrap_or("Focus")
                     .to_string(),
                 target_mins: payload["target_mins"].as_i64().unwrap_or(25),
             },
-            "FocusSessionEnded" => bus::DomainEvent::FocusSessionEnded {
+            bus::DomainEvent::KIND_FOCUS_SESSION_ENDED => bus::DomainEvent::FocusSessionEnded {
                 quality: payload["quality"].as_f64().unwrap_or(0.5),
                 duration_secs: payload["duration_secs"].as_i64().unwrap_or(1500),
                 interruptions: payload["interruptions"].as_i64().unwrap_or(0) as i32,
             },
-            "TaskDeferred" => bus::DomainEvent::TaskDeferred {
+            bus::DomainEvent::KIND_TASK_DEFERRED => bus::DomainEvent::TaskDeferred {
                 task_id: payload["task_id"]
                     .as_str()
                     .unwrap_or("test-task")
                     .to_string(),
                 times_deferred: payload["times_deferred"].as_i64().unwrap_or(1) as i32,
             },
-            "ActivitySessionCompleted" => bus::DomainEvent::ActivitySessionCompleted {
+            bus::DomainEvent::KIND_ACTIVITY_SESSION_COMPLETED => bus::DomainEvent::ActivitySessionCompleted {
                 date: payload["date"]
                     .as_str()
                     .unwrap_or(&jiff::Zoned::now().strftime("%Y-%m-%d").to_string())
@@ -126,7 +126,7 @@ impl AppCore {
                 productive_secs: payload["productive_secs"].as_i64().unwrap_or(240),
                 distracting_secs: payload["distracting_secs"].as_i64().unwrap_or(60),
             },
-            "ProductivityScoreComputed" => bus::DomainEvent::ProductivityScoreComputed {
+            bus::DomainEvent::KIND_PRODUCTIVITY_SCORE_COMPUTED => bus::DomainEvent::ProductivityScoreComputed {
                 date: payload["date"]
                     .as_str()
                     .unwrap_or(&jiff::Zoned::now().strftime("%Y-%m-%d").to_string())

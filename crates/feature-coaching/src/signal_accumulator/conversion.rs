@@ -10,32 +10,32 @@ use super::types::{Signal, SignalMetadata};
 pub(super) fn event_to_signal(event: &DomainEvent, timestamp: Timestamp) -> Signal {
     let (event_type, metadata) = match event {
         DomainEvent::DistractionDetected { app, .. } => (
-            "DistractionDetected",
+            bus::DomainEvent::KIND_DISTRACTION_DETECTED,
             SignalMetadata {
                 app: Some(app.clone()),
                 ..Default::default()
             },
         ),
-        DomainEvent::FocusSessionEnded { .. } => ("FocusSessionEnded", SignalMetadata::default()),
+        DomainEvent::FocusSessionEnded { .. } => (bus::DomainEvent::KIND_FOCUS_SESSION_ENDED, SignalMetadata::default()),
         DomainEvent::ProductivityScoreComputed { .. } => {
-            ("ProductivityScoreComputed", SignalMetadata::default())
+            (bus::DomainEvent::KIND_PRODUCTIVITY_SCORE_COMPUTED, SignalMetadata::default())
         }
         DomainEvent::TaskCompleted { task_id, .. } => (
-            "TaskCompleted",
+            bus::DomainEvent::KIND_TASK_COMPLETED,
             SignalMetadata {
                 task_id: Some(task_id.clone()),
                 ..Default::default()
             },
         ),
         DomainEvent::TaskDeferred { task_id, .. } => (
-            "TaskDeferred",
+            bus::DomainEvent::KIND_TASK_DEFERRED,
             SignalMetadata {
                 task_id: Some(task_id.clone()),
                 ..Default::default()
             },
         ),
         DomainEvent::BudgetAlert { category, .. } => (
-            "BudgetAlert",
+            bus::DomainEvent::KIND_BUDGET_ALERT,
             SignalMetadata {
                 category: Some(category.clone()),
                 ..Default::default()
@@ -44,7 +44,7 @@ pub(super) fn event_to_signal(event: &DomainEvent, timestamp: Timestamp) -> Sign
         DomainEvent::TransactionRecorded {
             category, amount, ..
         } => (
-            "TransactionRecorded",
+            bus::DomainEvent::KIND_TRANSACTION_RECORDED,
             SignalMetadata {
                 category: Some(category.clone()),
                 amount: Some(*amount),
@@ -57,7 +57,7 @@ pub(super) fn event_to_signal(event: &DomainEvent, timestamp: Timestamp) -> Sign
             dominant_category,
             ..
         } => (
-            "SessionCreated",
+            bus::DomainEvent::KIND_SESSION_CREATED,
             SignalMetadata {
                 category: Some(format!("{session_type}:{dominant_category}")),
                 ..Default::default()
@@ -69,7 +69,7 @@ pub(super) fn event_to_signal(event: &DomainEvent, timestamp: Timestamp) -> Sign
             session_type,
             ..
         } => (
-            "SessionEnded",
+            bus::DomainEvent::KIND_SESSION_ENDED,
             SignalMetadata {
                 category: Some(session_type.clone()),
                 amount: quality_score.or(Some(*duration_secs as f64)),
@@ -81,7 +81,7 @@ pub(super) fn event_to_signal(event: &DomainEvent, timestamp: Timestamp) -> Sign
             score_date,
             ..
         } => (
-            "QualityScored",
+            bus::DomainEvent::KIND_QUALITY_SCORED,
             SignalMetadata {
                 category: Some(score_date.clone()),
                 amount: Some(*overall_score),
@@ -90,21 +90,21 @@ pub(super) fn event_to_signal(event: &DomainEvent, timestamp: Timestamp) -> Sign
         ),
 
         DomainEvent::AtomFlashcardReviewed { quality, .. } => (
-            "AtomFlashcardReviewed",
+            bus::DomainEvent::KIND_ATOM_FLASHCARD_REVIEWED,
             SignalMetadata {
                 amount: Some(*quality as f64),
                 ..Default::default()
             },
         ),
         DomainEvent::KnowledgeAtomCreated { domain, .. } => (
-            "KnowledgeAtomCreated",
+            bus::DomainEvent::KIND_KNOWLEDGE_ATOM_CREATED,
             SignalMetadata {
                 category: Some(domain.clone()),
                 ..Default::default()
             },
         ),
         DomainEvent::KnowledgeAtomArchived { reason, .. } => (
-            "KnowledgeAtomArchived",
+            bus::DomainEvent::KIND_KNOWLEDGE_ATOM_ARCHIVED,
             SignalMetadata {
                 category: Some(reason.clone()),
                 ..Default::default()
@@ -113,7 +113,7 @@ pub(super) fn event_to_signal(event: &DomainEvent, timestamp: Timestamp) -> Sign
         DomainEvent::RetentionMilestoneReached {
             new_retention_pct, ..
         } => (
-            "RetentionMilestoneReached",
+            bus::DomainEvent::KIND_RETENTION_MILESTONE_REACHED,
             SignalMetadata {
                 amount: Some(*new_retention_pct),
                 ..Default::default()
@@ -125,7 +125,7 @@ pub(super) fn event_to_signal(event: &DomainEvent, timestamp: Timestamp) -> Sign
             confidence,
             ..
         } => (
-            "KnowledgeTransferDetected",
+            bus::DomainEvent::KIND_KNOWLEDGE_TRANSFER_DETECTED,
             SignalMetadata {
                 category: Some(format!("{from_domain}->{to_domain}")),
                 amount: Some(*confidence),
@@ -133,7 +133,7 @@ pub(super) fn event_to_signal(event: &DomainEvent, timestamp: Timestamp) -> Sign
             },
         ),
         DomainEvent::CoachingLearningDigest { fading_count, .. } => (
-            "CoachingLearningDigest",
+            bus::DomainEvent::KIND_COACHING_LEARNING_DIGEST,
             SignalMetadata {
                 amount: Some(*fading_count as f64),
                 ..Default::default()
