@@ -74,7 +74,7 @@ impl AppCore {
                 async {
                     match &self.event_log_repo {
                         Some(repo) => repo
-                            .count_by_event_type("UserCorrectedAI", seven_days_ago)
+                            .count_by_event_type(bus::DomainEvent::KIND_USER_CORRECTED_AI, seven_days_ago)
                             .await
                             .unwrap_or(0),
                         None => 0,

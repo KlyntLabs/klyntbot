@@ -65,9 +65,9 @@ impl MetricSource for AgentMetricCollector {
         ) = tokio::join!(
             self.strategy_repo.get_stats_since(since),
             self.event_log_repo
-                .count_by_event_type("UserCorrectedAI", since),
+                .count_by_event_type(bus::DomainEvent::KIND_USER_CORRECTED_AI, since),
             self.event_log_repo.count_by_event_type_and_data(
-                "UserCorrectedAI",
+                bus::DomainEvent::KIND_USER_CORRECTED_AI,
                 "memory_miss",
                 since
             ),
@@ -301,11 +301,11 @@ mod tests {
         };
         strategy_repo.create(&strategy_row_no_mem).await.unwrap();
 
-        // 2. Insert a domain event with event_type = "UserCorrectedAI"
+        // 2. Insert a domain event with event_type = UserCorrectedAI
         event_log_repo
             .insert_domain_event(
                 "evt-correction-1",
-                "UserCorrectedAI",
+                bus::DomainEvent::KIND_USER_CORRECTED_AI,
                 "general",
                 "extract",
                 r#"{"msg":"no that's wrong"}"#,

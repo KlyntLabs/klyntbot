@@ -35,9 +35,9 @@ impl HeuristicExtractionHandler {
         let od = observation.domain.as_str();
 
         match observation.source_event.as_str() {
-            "UserStatedFact" => vec![fact(od, "stated", 1.0, "user_stated")],
-            "UserCorrectedAI" => vec![fact(od, "corrected", 1.0, "user_stated")],
-            "ChatTurnCompleted" => {
+            bus::DomainEvent::KIND_USER_STATED_FACT => vec![fact(od, "stated", 1.0, "user_stated")],
+            bus::DomainEvent::KIND_USER_CORRECTED_AI => vec![fact(od, "corrected", 1.0, "user_stated")],
+            bus::DomainEvent::KIND_CHAT_TURN_COMPLETED => {
                 let content = observation.content.trim();
                 // Skip questions and very short messages — no facts to extract
                 if content.ends_with('?') || content.len() < 10 {

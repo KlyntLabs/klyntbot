@@ -69,11 +69,11 @@ impl AppCore {
     ) -> Result<bool, ApiError> {
         let bus = self.domain_event_bus()?;
         let event = match event_type.as_str() {
-            "UserStatedFact" => bus::DomainEvent::UserStatedFact {
+            bus::DomainEvent::KIND_USER_STATED_FACT => bus::DomainEvent::UserStatedFact {
                 fact: payload["fact"].as_str().unwrap_or("").to_string(),
                 domain: payload["domain"].as_str().unwrap_or("general").to_string(),
             },
-            "UserCorrectedAI" => bus::DomainEvent::UserCorrectedAI {
+            bus::DomainEvent::KIND_USER_CORRECTED_AI => bus::DomainEvent::UserCorrectedAI {
                 original: payload["original"].as_str().unwrap_or("").to_string(),
                 correction: payload["correction"].as_str().unwrap_or("").to_string(),
                 kind: serde_json::from_value(payload["kind"].clone())
@@ -133,7 +133,7 @@ impl AppCore {
                     .to_string(),
                 score: payload["score"].as_f64().unwrap_or(0.0),
             },
-            "ChatTurnCompleted" => bus::DomainEvent::ChatTurnCompleted {
+            bus::DomainEvent::KIND_CHAT_TURN_COMPLETED => bus::DomainEvent::ChatTurnCompleted {
                 session_key: payload["session_key"]
                     .as_str()
                     .unwrap_or("debug")

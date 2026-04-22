@@ -220,7 +220,7 @@ fn normalize_domain_event(e: cognitive::DomainEventRow) -> Option<TimelineEntry>
     }
 
     let (entry_type, source, title, entity_id, entity_route, color) = match e.event_type.as_str() {
-        "TaskCreated" => {
+        bus::DomainEvent::KIND_TASK_CREATED => {
             let task_id = field(inner, "task_id");
             (
                 TimelineEntryType::TaskCreated,
@@ -231,7 +231,7 @@ fn normalize_domain_event(e: cognitive::DomainEventRow) -> Option<TimelineEntry>
                 "var(--timeline-task)",
             )
         }
-        "TaskCompleted" => {
+        bus::DomainEvent::KIND_TASK_COMPLETED => {
             let task_id = field(inner, "task_id");
             (
                 TimelineEntryType::TaskCompleted,
@@ -316,11 +316,11 @@ fn normalize_domain_event(e: cognitive::DomainEventRow) -> Option<TimelineEntry>
             "var(--timeline-finance)",
         ),
         // Skip events we don't want on the timeline
-        "ChatTurnCompleted"
-        | "UserStatedFact"
-        | "UserCorrectedAI"
-        | "CoachingFeedback"
-        | "ProductivityScoreComputed" => return None,
+        bus::DomainEvent::KIND_CHAT_TURN_COMPLETED
+        | bus::DomainEvent::KIND_USER_STATED_FACT
+        | bus::DomainEvent::KIND_USER_CORRECTED_AI
+        | bus::DomainEvent::KIND_COACHING_FEEDBACK
+        | bus::DomainEvent::KIND_PRODUCTIVITY_SCORE_COMPUTED => return None,
         // Other events as System
         _ => (
             TimelineEntryType::SystemEvent,
@@ -730,11 +730,11 @@ mod tests {
     fn bare_variant_name_payload_returns_none() {
         let row = cognitive::DomainEventRow {
             id: "evt-bad".to_string(),
-            event_type: "TaskCreated".to_string(),
+            event_type: bus::DomainEvent::KIND_TASK_CREATED.to_string(),
             domain: "tasks".to_string(),
             salience: "accumulate".to_string(),
             // Old (buggy) writer stored just the variant name, not JSON
-            payload: "TaskCreated".to_string(),
+            payload: bus::DomainEvent::KIND_TASK_CREATED.to_string(),
             timestamp: "2026-04-21T10:00:00Z".to_string(),
         };
         let result = normalize_domain_event(row);

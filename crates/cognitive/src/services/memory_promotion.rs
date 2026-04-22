@@ -192,23 +192,11 @@ mod tests {
             .unwrap();
         assert!(promoted.is_some());
 
-        let event = rx
-            .try_recv()
-            .expect("MemoryPromoted event should be emitted");
-        match event {
-            bus::DomainEvent::MemoryPromoted {
-                fact_id,
-                summary,
-                from_scope,
-                to_scope,
-            } => {
-                assert_eq!(fact_id, promoted.unwrap().id);
-                assert!(summary.contains("deep work"));
-                assert_eq!(from_scope, "session");
-                assert_eq!(to_scope, "global");
-            }
-            _ => panic!("Expected MemoryPromoted event, got {event:?}"),
-        }
+        // MemoryPromoted event was removed; verify no event is emitted
+        assert!(
+            rx.try_recv().is_err(),
+            "MemoryPromoted event removed; no event should be emitted"
+        );
     }
 
     #[tokio::test]

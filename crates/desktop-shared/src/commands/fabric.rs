@@ -147,30 +147,6 @@ impl FabricGraphEvent {
     /// Map a fabric-relevant `DomainEvent` to a `FabricGraphEvent`, if applicable.
     pub fn from_domain_event(event: &bus::DomainEvent) -> Option<Self> {
         match event {
-            bus::DomainEvent::CommunityDiscovered { community_id, .. } => Some(Self {
-                event_type: "node_added".to_string(),
-                node_type: "community".to_string(),
-                id: community_id.clone(),
-                data: None,
-                animation_hint: "pulse".to_string(),
-                intensity: 0.8,
-            }),
-            bus::DomainEvent::CommunityUpdated { community_id, .. } => Some(Self {
-                event_type: "node_updated".to_string(),
-                node_type: "community".to_string(),
-                id: community_id.clone(),
-                data: None,
-                animation_hint: "grow".to_string(),
-                intensity: 0.5,
-            }),
-            bus::DomainEvent::CommunityWeakened { community_id, .. } => Some(Self {
-                event_type: "node_updated".to_string(),
-                node_type: "community".to_string(),
-                id: community_id.clone(),
-                data: None,
-                animation_hint: "fade".to_string(),
-                intensity: 0.7,
-            }),
             bus::DomainEvent::NoteContentChanged { note_id, .. } => Some(Self {
                 event_type: "node_updated".to_string(),
                 node_type: "note".to_string(),

@@ -10,7 +10,7 @@ use tracing::warn;
 use super::types::*;
 
 /// Event type string for user correction events in the domain_event_log.
-const EVENT_USER_CORRECTED_AI: &str = "UserCorrectedAI";
+const EVENT_USER_CORRECTED_AI: &str = bus::DomainEvent::KIND_USER_CORRECTED_AI;
 
 /// Load tool failure stats from the learning_outcomes table.
 pub async fn load_tool_failures(

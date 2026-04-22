@@ -521,6 +521,119 @@ impl DomainEvent {
         }
     }
 
+    /// `event_type` value for [`DomainEvent::UserCorrectedAI`].
+    pub const KIND_USER_CORRECTED_AI: &'static str = "UserCorrectedAI";
+    /// `event_type` value for [`DomainEvent::ChatTurnCompleted`].
+    pub const KIND_CHAT_TURN_COMPLETED: &'static str = "ChatTurnCompleted";
+    /// `event_type` value for [`DomainEvent::TaskCreated`].
+    pub const KIND_TASK_CREATED: &'static str = "TaskCreated";
+    /// `event_type` value for [`DomainEvent::TaskCompleted`].
+    pub const KIND_TASK_COMPLETED: &'static str = "TaskCompleted";
+    /// `event_type` value for [`DomainEvent::UserStatedFact`].
+    pub const KIND_USER_STATED_FACT: &'static str = "UserStatedFact";
+    /// `event_type` value for [`DomainEvent::CoachingFeedback`].
+    pub const KIND_COACHING_FEEDBACK: &'static str = "CoachingFeedback";
+    /// `event_type` value for [`DomainEvent::ProductivityScoreComputed`].
+    pub const KIND_PRODUCTIVITY_SCORE_COMPUTED: &'static str = "ProductivityScoreComputed";
+    /// `event_type` value for [`DomainEvent::TaskFocusChanged`].
+    pub const KIND_TASK_FOCUS_CHANGED: &'static str = "TaskFocusChanged";
+    /// `event_type` value for [`DomainEvent::EstimationRecorded`].
+    pub const KIND_ESTIMATION_RECORDED: &'static str = "EstimationRecorded";
+    /// `event_type` value for [`DomainEvent::TransactionRecorded`].
+    pub const KIND_TRANSACTION_RECORDED: &'static str = "TransactionRecorded";
+    /// `event_type` value for [`DomainEvent::BudgetAlert`].
+    pub const KIND_BUDGET_ALERT: &'static str = "BudgetAlert";
+    /// `event_type` value for [`DomainEvent::AccountCreated`].
+    pub const KIND_ACCOUNT_CREATED: &'static str = "AccountCreated";
+    /// `event_type` value for [`DomainEvent::BudgetCreated`].
+    pub const KIND_BUDGET_CREATED: &'static str = "BudgetCreated";
+    /// `event_type` value for [`DomainEvent::GoalCreated`].
+    pub const KIND_GOAL_CREATED: &'static str = "GoalCreated";
+    /// `event_type` value for [`DomainEvent::GoalAchieved`].
+    pub const KIND_GOAL_ACHIEVED: &'static str = "GoalAchieved";
+    /// `event_type` value for [`DomainEvent::TaskDeferred`].
+    pub const KIND_TASK_DEFERRED: &'static str = "TaskDeferred";
+    /// `event_type` value for [`DomainEvent::FocusSessionStarted`].
+    pub const KIND_FOCUS_SESSION_STARTED: &'static str = "FocusSessionStarted";
+    /// `event_type` value for [`DomainEvent::FocusSessionEnded`].
+    pub const KIND_FOCUS_SESSION_ENDED: &'static str = "FocusSessionEnded";
+    /// `event_type` value for [`DomainEvent::DistractionDetected`].
+    pub const KIND_DISTRACTION_DETECTED: &'static str = "DistractionDetected";
+    /// `event_type` value for [`DomainEvent::ActivitySessionCompleted`].
+    pub const KIND_ACTIVITY_SESSION_COMPLETED: &'static str = "ActivitySessionCompleted";
+    /// `event_type` value for [`DomainEvent::AutotunerDecision`].
+    pub const KIND_AUTOTUNER_DECISION: &'static str = "AutotunerDecision";
+    /// `event_type` value for [`DomainEvent::CoachingPatternDetected`].
+    pub const KIND_COACHING_PATTERN_DETECTED: &'static str = "CoachingPatternDetected";
+    /// `event_type` value for [`DomainEvent::BehavioralPatternDetected`].
+    pub const KIND_BEHAVIORAL_PATTERN_DETECTED: &'static str = "BehavioralPatternDetected";
+    /// `event_type` value for [`DomainEvent::KnowledgeAtomCreated`].
+    pub const KIND_KNOWLEDGE_ATOM_CREATED: &'static str = "KnowledgeAtomCreated";
+    /// `event_type` value for [`DomainEvent::KnowledgeAtomAccepted`].
+    pub const KIND_KNOWLEDGE_ATOM_ACCEPTED: &'static str = "KnowledgeAtomAccepted";
+    /// `event_type` value for [`DomainEvent::KnowledgeAtomArchived`].
+    pub const KIND_KNOWLEDGE_ATOM_ARCHIVED: &'static str = "KnowledgeAtomArchived";
+    /// `event_type` value for [`DomainEvent::AtomFlashcardReviewed`].
+    pub const KIND_ATOM_FLASHCARD_REVIEWED: &'static str = "AtomFlashcardReviewed";
+    /// `event_type` value for [`DomainEvent::AtomReinforced`].
+    pub const KIND_ATOM_REINFORCED: &'static str = "AtomReinforced";
+    /// `event_type` value for [`DomainEvent::AtomInteracted`].
+    pub const KIND_ATOM_INTERACTED: &'static str = "AtomInteracted";
+    /// `event_type` value for [`DomainEvent::RetentionMilestoneReached`].
+    pub const KIND_RETENTION_MILESTONE_REACHED: &'static str = "RetentionMilestoneReached";
+    /// `event_type` value for [`DomainEvent::TranslationCompleted`].
+    pub const KIND_TRANSLATION_COMPLETED: &'static str = "TranslationCompleted";
+    /// `event_type` value for [`DomainEvent::NoteStudied`].
+    pub const KIND_NOTE_STUDIED: &'static str = "NoteStudied";
+    /// `event_type` value for [`DomainEvent::PracticeUnitCompleted`].
+    pub const KIND_PRACTICE_UNIT_COMPLETED: &'static str = "PracticeUnitCompleted";
+    /// `event_type` value for [`DomainEvent::PracticeSessionCompleted`].
+    pub const KIND_PRACTICE_SESSION_COMPLETED: &'static str = "PracticeSessionCompleted";
+    /// `event_type` value for [`DomainEvent::KnowledgeTransferDetected`].
+    pub const KIND_KNOWLEDGE_TRANSFER_DETECTED: &'static str = "KnowledgeTransferDetected";
+    /// `event_type` value for [`DomainEvent::CoachingLearningDigest`].
+    pub const KIND_COACHING_LEARNING_DIGEST: &'static str = "CoachingLearningDigest";
+    /// `event_type` value for [`DomainEvent::FlashcardSessionCompleted`].
+    pub const KIND_FLASHCARD_SESSION_COMPLETED: &'static str = "FlashcardSessionCompleted";
+    /// `event_type` value for [`DomainEvent::InterventionTriggered`].
+    pub const KIND_INTERVENTION_TRIGGERED: &'static str = "InterventionTriggered";
+    /// `event_type` value for [`DomainEvent::MemoryPendingConfirmation`].
+    pub const KIND_MEMORY_PENDING_CONFIRMATION: &'static str = "MemoryPendingConfirmation";
+    /// `event_type` value for [`DomainEvent::ContradictionDetected`].
+    pub const KIND_CONTRADICTION_DETECTED: &'static str = "ContradictionDetected";
+    /// `event_type` value for [`DomainEvent::SkillRouted`].
+    pub const KIND_SKILL_ROUTED: &'static str = "SkillRouted";
+    /// `event_type` value for [`DomainEvent::CrossDomainDotReady`].
+    pub const KIND_CROSS_DOMAIN_DOT_READY: &'static str = "CrossDomainDotReady";
+    /// `event_type` value for [`DomainEvent::SystemWillSleep`].
+    pub const KIND_SYSTEM_WILL_SLEEP: &'static str = "SystemWillSleep";
+    /// `event_type` value for [`DomainEvent::SystemDidWake`].
+    pub const KIND_SYSTEM_DID_WAKE: &'static str = "SystemDidWake";
+    /// `event_type` value for [`DomainEvent::UserBecameIdle`].
+    pub const KIND_USER_BECAME_IDLE: &'static str = "UserBecameIdle";
+    /// `event_type` value for [`DomainEvent::UserReturned`].
+    pub const KIND_USER_RETURNED: &'static str = "UserReturned";
+    /// `event_type` value for [`DomainEvent::FocusSessionSuspended`].
+    pub const KIND_FOCUS_SESSION_SUSPENDED: &'static str = "FocusSessionSuspended";
+    /// `event_type` value for [`DomainEvent::CronCatchUpReady`].
+    pub const KIND_CRON_CATCH_UP_READY: &'static str = "CronCatchUpReady";
+    /// `event_type` value for [`DomainEvent::WakePanelReady`].
+    pub const KIND_WAKE_PANEL_READY: &'static str = "WakePanelReady";
+    /// `event_type` value for [`DomainEvent::HeldNotificationReleased`].
+    pub const KIND_HELD_NOTIFICATION_RELEASED: &'static str = "HeldNotificationReleased";
+    /// `event_type` value for [`DomainEvent::NotificationDeliveryFailed`].
+    pub const KIND_NOTIFICATION_DELIVERY_FAILED: &'static str = "NotificationDeliveryFailed";
+    /// `event_type` value for [`DomainEvent::TrayNotificationRequested`].
+    pub const KIND_TRAY_NOTIFICATION_REQUESTED: &'static str = "TrayNotificationRequested";
+    /// `event_type` value for [`DomainEvent::AlarmFired`].
+    pub const KIND_ALARM_FIRED: &'static str = "AlarmFired";
+    /// `event_type` value for [`DomainEvent::AlarmSnoozed`].
+    pub const KIND_ALARM_SNOOZED: &'static str = "AlarmSnoozed";
+    /// `event_type` value for [`DomainEvent::AlarmCancelled`].
+    pub const KIND_ALARM_CANCELLED: &'static str = "AlarmCancelled";
+    /// `event_type` value for [`DomainEvent::MissedAlarms`].
+    pub const KIND_MISSED_ALARMS: &'static str = "MissedAlarms";
+
     /// Map this event to its domain category string.
     ///
     /// Used by the cognitive pipeline, debug dashboard, and SSE streams.
