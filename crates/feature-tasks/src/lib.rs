@@ -45,6 +45,11 @@ use tools_core::{DynTool, FeatureMigration, FeaturePackage, HealthStatus};
     recall_priority_field = "priority",
     recall_recency_field = "updated_at",
     recall_status_filter = "status != \"archived\"",
+    mirror_snapshot(
+        name = "task_focus",
+        flush_interval_secs = 3600,
+        event_kinds = ["TaskFocusChanged", "TaskCompleted"],
+    ),
 )]
 pub struct TasksFeature {
     pool: Option<storage::StoragePool>,

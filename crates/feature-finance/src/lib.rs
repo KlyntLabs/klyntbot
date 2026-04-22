@@ -52,6 +52,11 @@ use tools_core::{DynTool, FeatureMigration, HealthStatus};
     recall_priority_field = "amount",
     recall_recency_field = "occurred_at",
     recall_status_filter = "status != \"cancelled\"",
+    mirror_snapshot(
+        name = "finance_drift",
+        flush_interval_secs = 3600,
+        event_kinds = ["BudgetAlert"],
+    ),
 )]
 pub struct FinanceFeature {
     tool: Option<Arc<FinanceTool>>,
