@@ -2,12 +2,14 @@ pub mod engine;
 pub mod facade;
 pub mod narratives;
 pub mod repo;
+pub mod retention;
 pub mod subscribers;
 pub mod types;
 pub use engine::MirrorEngine;
 pub use facade::MirrorFacade;
 pub use narratives::{snippet_from_alert, NarrativeHandler};
 pub use repo::MirrorRepo;
+pub use retention::{MirrorRetentionConfig, MirrorRetentionService};
 pub use subscribers::{
     ConfigArchiver, MetaRuleDetector, RoutingMirrorSubscriber, TrialPreviewSubscriber,
 };
