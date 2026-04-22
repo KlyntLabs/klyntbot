@@ -248,6 +248,8 @@ impl BackgroundConsolidationService {
         // ── Spawn unified pipeline collectors ─────────────────────────
         let mut _collector_handles: Vec<JoinHandle<()>> = Vec::new();
         if let (Some(ref sig_tx), Some(ref bus)) = (&signal_tx, &domain_bus) {
+            // Legacy broadcast-based collectors — will be removed once all
+            // collectors are SignalConsumer-based (v1.5 migration).
             _collector_handles.push(crate::pipeline::AtomCollector::start(
                 bus.subscribe(),
                 sig_tx.clone(),
@@ -263,12 +265,7 @@ impl BackgroundConsolidationService {
                 sig_tx.clone(),
                 cancel.clone(),
             ));
-            // ChatTurnCollector: runs alongside existing LLM extraction for convergence tracking.
-            _collector_handles.push(crate::pipeline::ChatTurnCollector::start(
-                bus.subscribe(),
-                sig_tx.clone(),
-                cancel.clone(),
-            ));
+            // ChatTurnCollector is now a SignalConsumer — started by app-core Phase 8.
             if let Some(ref mem_repo) = session_memory_repo {
                 _collector_handles.push(crate::pipeline::SessionCollector::start(
                     bus.subscribe(),
