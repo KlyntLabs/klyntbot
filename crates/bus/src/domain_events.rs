@@ -66,37 +66,7 @@ pub enum DomainEvent {
         overall_score: f64,
         components: String,
     },
-    PredictiveAlert {
-        forecast_type: String,
-        window_start: String,
-        window_end: String,
-        predicted_value: f64,
-        suggested_action: Option<String>,
-    },
-    NarrativeGenerated {
-        date: String,
-        sentiment: String,
-        excerpt: String,
-    },
-    RuleEvolved {
-        rule_id: String,
-        action: String,
-        category: String,
-        confidence: f64,
-        source: String,
-    },
-    VoiceJournalProcessed {
-        journal_id: String,
-        extracted_fact_count: usize,
-        sentiment: Option<String>,
-    },
-    VoiceCapture {
-        session_id: String,
-        language: String,
-        overall_confidence: f32,
-        duration_secs: f32,
-        engine: String,
-    },
+
 
     // -- Tasks --
     TaskCreated {
@@ -116,40 +86,7 @@ pub enum DomainEvent {
         times_deferred: i32,
     },
 
-    TaskBlocked {
-        task_id: String,
-        blocker_id: String,
-    },
-    TaskUnblocked {
-        task_id: String,
-        was_blocked_by: String,
-    },
-    TaskStatusChanged {
-        task_id: String,
-        from: String,
-        to: String,
-        actor: Option<String>,
-    },
-    TaskPriorityChanged {
-        task_id: String,
-        from: String,
-        to: String,
-        actor: Option<String>,
-    },
-    TaskFieldUpdated {
-        task_id: String,
-        field: String,
-        from: String,
-        to: String,
-        actor: Option<String>,
-    },
 
-    /// Emitted when a task's due date is set or changed. Consumed by feature_tasks::focus_alarms.
-    TaskDueDateChanged {
-        task_id: String,
-        /// None means the due date was cleared.
-        due_date: Option<String>,
-    },
 
     /// Emitted when a task is focused/unfocused with a deadline. Consumed by feature_tasks::focus_alarms.
     TaskFocusChanged {
@@ -158,22 +95,11 @@ pub enum DomainEvent {
         focus_deadline: Option<String>,
     },
 
-    /// Emitted when a recurring template's next_instance_date changes.
-    RecurringTemplateAdvanced {
-        template_id: String,
-        next_instance_date: Option<String>,
-    },
-
     EstimationRecorded {
         task_id: String,
         estimated_mins: u32,
         actual_mins: u32,
         deviation_pct: f64,
-    },
-    GoalProgress {
-        objective_id: String,
-        progress: f64,
-        target: f64,
     },
 
     // -- Finance --
@@ -225,17 +151,6 @@ pub enum DomainEvent {
     },
     NoteDeleted {
         note_id: String,
-    },
-
-    // -- Task hierarchy (BookIndex) --
-    TaskHierarchyChanged {
-        project_id: String,
-    },
-
-    /// Emitted after tree nodes have been rebuilt and embedded for a source.
-    TreeNodesRebuilt {
-        source_type: String,
-        source_id: String,
     },
 
     // -- Chat --
@@ -427,25 +342,6 @@ pub enum DomainEvent {
         session_key: String,
     },
 
-    // -- Autotuner trials --
-    /// Emitted when the autotuner creates a new trial for evaluation.
-    TrialActivated {
-        trial_id: String,
-        hypothesis: String,
-        params_summary: String,
-    },
-
-    // -- Mirror self-reflection --
-    /// Emitted when user kills an experiment trial via the Mirror UI.
-    MirrorTrialKilled {
-        trial_id: String,
-    },
-    /// Emitted when the Mirror layer creates a new NarrativeSnippet for the user.
-    MirrorSnippetCreated {
-        snippet_id: String,
-        headline: String,
-    },
-
     // -- Lifecycle events --
     /// macOS is about to sleep.
     SystemWillSleep,
@@ -481,54 +377,7 @@ pub enum DomainEvent {
         away_secs: u64,
     },
 
-    // -- Knowledge Fabric communities --
-    /// Emitted when a new community is detected in the note graph.
-    CommunityDiscovered {
-        community_id: String,
-        name: String,
-        member_count: u32,
-    },
-    /// Emitted when an existing community's membership or properties change.
-    CommunityUpdated {
-        community_id: String,
-        member_count: u32,
-        stability: f64,
-    },
-    /// Emitted when a community's cohesion weakens below a threshold.
-    CommunityWeakened {
-        community_id: String,
-        stability: f64,
-    },
 
-    // -- Squad debates --
-    /// Emitted when a squad debate (multi-persona deliberation) completes.
-    SquadDebateCompleted {
-        squad_id: String,
-        session_key: String,
-        rounds_completed: u8,
-        consensus_score: f64,
-        persona_accuracies: Vec<(String, f64)>,
-        was_partial: bool,
-        token_cost: u64,
-        average_consensus_score: f64,
-        top_performer_persona_id: Option<String>,
-    },
-    /// Emitted when a squad interaction pattern is detected or updated.
-    SquadInteractionPattern {
-        squad_id: String,
-        mode: String,
-        persona_id: Option<String>,
-        domain_hint: Option<String>,
-    },
-
-    // ── Brain ambient signals ──────────────────────────────────
-    /// Emitted when a memory fact is promoted to a wider scope (e.g. session → long-term).
-    MemoryPromoted {
-        fact_id: String,
-        summary: String,
-        from_scope: String,
-        to_scope: String,
-    },
     /// Emitted when a cross-domain connection dot is ready for UI display.
     CrossDomainDotReady {
         source_kind: String,
@@ -541,13 +390,6 @@ pub enum DomainEvent {
         tooltip: String,
         detail_route: Option<String>,
     },
-    /// Emitted when an incoming message is deferred rather than processed immediately.
-    MessageDeferred {
-        channel: String,
-        sender: String,
-        preview: String,
-    },
-
     // -- Notifications --
     /// Emitted when a held notification is released (e.g. quiet hours ended).
     HeldNotificationReleased {
@@ -623,24 +465,11 @@ impl DomainEvent {
             Self::SessionCreated { .. } => "SessionCreated",
             Self::SessionEnded { .. } => "SessionEnded",
             Self::QualityScored { .. } => "QualityScored",
-            Self::PredictiveAlert { .. } => "PredictiveAlert",
-            Self::NarrativeGenerated { .. } => "NarrativeGenerated",
-            Self::RuleEvolved { .. } => "RuleEvolved",
-            Self::VoiceJournalProcessed { .. } => "VoiceJournalProcessed",
-            Self::VoiceCapture { .. } => "VoiceCapture",
             Self::TaskCreated { .. } => "TaskCreated",
             Self::TaskCompleted { .. } => "TaskCompleted",
             Self::TaskDeferred { .. } => "TaskDeferred",
-            Self::TaskBlocked { .. } => "TaskBlocked",
-            Self::TaskUnblocked { .. } => "TaskUnblocked",
-            Self::TaskStatusChanged { .. } => "TaskStatusChanged",
-            Self::TaskPriorityChanged { .. } => "TaskPriorityChanged",
-            Self::TaskFieldUpdated { .. } => "TaskFieldUpdated",
-            Self::TaskDueDateChanged { .. } => "TaskDueDateChanged",
             Self::TaskFocusChanged { .. } => "TaskFocusChanged",
-            Self::RecurringTemplateAdvanced { .. } => "RecurringTemplateAdvanced",
             Self::EstimationRecorded { .. } => "EstimationRecorded",
-            Self::GoalProgress { .. } => "GoalProgress",
             Self::TransactionRecorded { .. } => "TransactionRecorded",
             Self::BudgetAlert { .. } => "BudgetAlert",
             Self::AccountCreated { .. } => "AccountCreated",
@@ -652,8 +481,6 @@ impl DomainEvent {
             Self::NoteContentChanged { .. } => "NoteContentChanged",
             Self::NoteEditingFinished { .. } => "NoteEditingFinished",
             Self::NoteDeleted { .. } => "NoteDeleted",
-            Self::TaskHierarchyChanged { .. } => "TaskHierarchyChanged",
-            Self::TreeNodesRebuilt { .. } => "TreeNodesRebuilt",
             Self::ChatTurnCompleted { .. } => "ChatTurnCompleted",
             Self::ToolCallExecuted { .. } => "ToolCallExecuted",
             Self::UserStatedFact { .. } => "UserStatedFact",
@@ -680,17 +507,7 @@ impl DomainEvent {
             Self::MemoryPendingConfirmation { .. } => "MemoryPendingConfirmation",
             Self::ContradictionDetected { .. } => "ContradictionDetected",
             Self::SkillRouted { .. } => "SkillRouted",
-            Self::TrialActivated { .. } => "TrialActivated",
-            Self::MirrorTrialKilled { .. } => "MirrorTrialKilled",
-            Self::MirrorSnippetCreated { .. } => "MirrorSnippetCreated",
-            Self::CommunityDiscovered { .. } => "CommunityDiscovered",
-            Self::CommunityUpdated { .. } => "CommunityUpdated",
-            Self::CommunityWeakened { .. } => "CommunityWeakened",
-            Self::SquadDebateCompleted { .. } => "SquadDebateCompleted",
-            Self::SquadInteractionPattern { .. } => "SquadInteractionPattern",
-            Self::MemoryPromoted { .. } => "MemoryPromoted",
             Self::CrossDomainDotReady { .. } => "CrossDomainDotReady",
-            Self::MessageDeferred { .. } => "MessageDeferred",
             Self::SystemWillSleep => "SystemWillSleep",
             Self::SystemDidWake { .. } => "SystemDidWake",
             Self::UserBecameIdle { .. } => "UserBecameIdle",
@@ -716,18 +533,8 @@ impl DomainEvent {
             Self::TaskCreated { .. }
             | Self::TaskCompleted { .. }
             | Self::TaskDeferred { .. }
-            | Self::GoalProgress { .. }
-            | Self::TaskBlocked { .. }
-            | Self::TaskUnblocked { .. }
             | Self::EstimationRecorded { .. }
-            | Self::TaskStatusChanged { .. }
-            | Self::TaskPriorityChanged { .. }
-            | Self::TaskFieldUpdated { .. }
-            | Self::TaskDueDateChanged { .. }
-            | Self::TaskFocusChanged { .. }
-            | Self::RecurringTemplateAdvanced { .. }
-            | Self::TaskHierarchyChanged { .. }
-            | Self::TreeNodesRebuilt { .. } => "work",
+            | Self::TaskFocusChanged { .. } => "work",
 
             Self::ActivitySessionCompleted { .. }
             | Self::FocusSessionStarted { .. }
@@ -736,12 +543,7 @@ impl DomainEvent {
             | Self::ProductivityScoreComputed { .. }
             | Self::SessionCreated { .. }
             | Self::SessionEnded { .. }
-            | Self::QualityScored { .. }
-            | Self::PredictiveAlert { .. }
-            | Self::NarrativeGenerated { .. }
-            | Self::RuleEvolved { .. }
-            | Self::VoiceJournalProcessed { .. }
-            | Self::VoiceCapture { .. } => "energy",
+            | Self::QualityScored { .. } => "energy",
 
             Self::TransactionRecorded { .. }
             | Self::BudgetAlert { .. }
@@ -782,18 +584,7 @@ impl DomainEvent {
             Self::InterventionTriggered { .. } => "productivity",
             Self::MemoryPendingConfirmation { .. } => "memory",
             Self::SkillRouted { .. } => "agent",
-            Self::TrialActivated { .. } => "autotuner",
-            Self::MirrorTrialKilled { .. } | Self::MirrorSnippetCreated { .. } => "mirror",
-
-            Self::CommunityDiscovered { .. }
-            | Self::CommunityUpdated { .. }
-            | Self::CommunityWeakened { .. } => "fabric",
-
-            Self::SquadDebateCompleted { .. } | Self::SquadInteractionPattern { .. } => "agent",
-
-            Self::MemoryPromoted { .. } => "memory",
             Self::CrossDomainDotReady { .. } => "fabric",
-            Self::MessageDeferred { .. } => "general",
 
             Self::SystemWillSleep
             | Self::SystemDidWake { .. }
