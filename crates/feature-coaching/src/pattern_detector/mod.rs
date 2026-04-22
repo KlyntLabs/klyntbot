@@ -17,7 +17,8 @@ pub struct DetectedPattern {
     pub confidence: f64,
     pub signal_count: i32,
     pub description: String,
-    pub domain: String,
+    pub domain: ai_core::RecallDomain,
+    pub rule_text: String,
 }
 
 /// Tracks historical trigger data to detect recurring patterns.
@@ -67,7 +68,8 @@ impl PatternDetector {
                     description: format!(
                         "{afternoon_count}/{total} distraction streaks occur after 3pm"
                     ),
-                    domain: "productivity".into(),
+                    domain: ai_core::RecallDomain::Productivity,
+                    rule_text: "Schedule demanding tasks in the morning; take breaks in the afternoon when energy drops".into(),
                 });
             }
         }
@@ -80,7 +82,8 @@ impl PatternDetector {
                     confidence: (avoidance.len() as f64 / 10.0).min(0.9),
                     signal_count: avoidance.len() as i32,
                     description: format!("Task avoidance detected {} times", avoidance.len()),
-                    domain: "tasks".into(),
+                    domain: ai_core::RecallDomain::Tasks,
+                    rule_text: "Break avoided tasks into smaller steps to overcome procrastination".into(),
                 });
             }
         }
@@ -96,7 +99,8 @@ impl PatternDetector {
                         "Context switch overload triggered {} times",
                         switches.len()
                     ),
-                    domain: "productivity".into(),
+                    domain: ai_core::RecallDomain::Productivity,
+                    rule_text: "Batch similar tasks together to reduce context switching overhead".into(),
                 });
             }
         }
@@ -109,7 +113,8 @@ impl PatternDetector {
                     confidence: (budget.len() as f64 / 5.0).min(0.9),
                     signal_count: budget.len() as i32,
                     description: format!("Budget warnings triggered {} times", budget.len()),
-                    domain: "finance".into(),
+                    domain: ai_core::RecallDomain::Finance,
+                    rule_text: "Review spending patterns when budget pressure is detected".into(),
                 });
             }
         }
@@ -122,7 +127,8 @@ impl PatternDetector {
                     confidence: (focus.len() as f64 / 10.0).min(0.8),
                     signal_count: focus.len() as i32,
                     description: format!("Focus quality declining triggered {} times", focus.len()),
-                    domain: "productivity".into(),
+                    domain: ai_core::RecallDomain::Productivity,
+                    rule_text: "Take a break when focus quality starts declining".into(),
                 });
             }
         }
@@ -275,5 +281,16 @@ mod tests {
             .find(|p| p.name == "chronic_task_avoidance")
             .unwrap();
         assert!(avoidance.confidence <= 0.9);
+    }
+
+    #[test]
+    fn test_detected_pattern_carries_rule_text() {
+        let mut detector = PatternDetector::new();
+        for _ in 0..4 {
+            detector.record_trigger(&trigger("task_avoidance", "x"));
+        }
+        let patterns = detector.detect_patterns();
+        let p = patterns.iter().find(|p| p.name == "chronic_task_avoidance").unwrap();
+        assert!(p.rule_text.contains("smaller steps"));
     }
 }

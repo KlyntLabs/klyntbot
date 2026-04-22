@@ -47,6 +47,9 @@ async fn extract_verdict_writes_observation() {
         entity: None,
         timestamp: Timestamp::now(),
         raw_event: None,
+        metrics: ai_core::AiMetrics::default(),
+        coaching_signal: false,
+        coaching_rule: None,
     };
 
     consumer.consume(&sig).await.unwrap();
@@ -78,6 +81,9 @@ async fn discard_verdict_skips_observation() {
         entity: None,
         timestamp: Timestamp::now(),
         raw_event: None,
+        metrics: ai_core::AiMetrics::default(),
+        coaching_signal: false,
+        coaching_rule: None,
     };
 
     consumer.consume(&sig).await.unwrap();
@@ -105,6 +111,9 @@ async fn high_importance_creates_episodic_memory() {
         entity: None,
         timestamp: Timestamp::now(),
         raw_event: None,
+        metrics: ai_core::AiMetrics::default(),
+        coaching_signal: false,
+        coaching_rule: None,
     };
 
     consumer.consume(&sig).await.unwrap();
@@ -134,6 +143,9 @@ async fn low_importance_skips_episodic_memory() {
         entity: None,
         timestamp: Timestamp::now(),
         raw_event: None,
+        metrics: ai_core::AiMetrics::default(),
+        coaching_signal: false,
+        coaching_rule: None,
     };
 
     consumer.consume(&sig).await.unwrap();
@@ -165,6 +177,9 @@ async fn entity_signal_upserts_entity() {
         }),
         timestamp: Timestamp::now(),
         raw_event: None,
+        metrics: ai_core::AiMetrics::default(),
+        coaching_signal: false,
+        coaching_rule: None,
     };
 
     consumer.consume(&sig).await.unwrap();

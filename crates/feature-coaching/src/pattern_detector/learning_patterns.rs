@@ -50,7 +50,8 @@ pub fn detect_study_streak(reviews: &VecDeque<(Timestamp, String)>) -> Option<De
             confidence: 0.85,
             signal_count: streak as i32,
             description: format!("{streak}-day study streak at risk — no review yet today"),
-            domain: "learning".into(),
+            domain: ai_core::RecallDomain::Learning,
+            rule_text: "Complete at least one review session to maintain the study streak".into(),
         });
     }
 
@@ -67,7 +68,8 @@ pub fn detect_study_streak(reviews: &VecDeque<(Timestamp, String)>) -> Option<De
         confidence: (0.7 + (streak as f64 / 100.0)).min(0.95),
         signal_count: streak as i32,
         description: format!("{streak}-day study streak! Milestone: {m} days"),
-        domain: "learning".into(),
+        domain: ai_core::RecallDomain::Learning,
+        rule_text: "Complete at least one review session to maintain the study streak".into(),
     })
 }
 
@@ -93,7 +95,8 @@ pub fn detect_retention_decay(digests: &VecDeque<(Timestamp, String)>) -> Option
             "{} learning digest signal(s) in the last 24h indicate fading atoms",
             recent.len()
         ),
-        domain: "learning".into(),
+        domain: ai_core::RecallDomain::Learning,
+        rule_text: "Schedule review sessions for domains with declining retention".into(),
     })
 }
 
@@ -117,7 +120,8 @@ pub fn detect_learning_momentum(
             description: format!(
                 "Created {created_count} atoms but reviewed {reviewed_count} in the last 7 days — review backlog growing"
             ),
-            domain: "learning".into(),
+            domain: ai_core::RecallDomain::Learning,
+            rule_text: "Balance content creation with review sessions to avoid review backlog".into(),
         });
     }
 
@@ -131,7 +135,8 @@ pub fn detect_learning_momentum(
                 description: format!(
                     "Created {created_count} atoms but only reviewed {reviewed_count} in the last 7 days — review backlog growing"
                 ),
-                domain: "learning".into(),
+                domain: ai_core::RecallDomain::Learning,
+                rule_text: "Balance content creation with review sessions to avoid review backlog".into(),
             });
         }
     }
@@ -151,7 +156,8 @@ pub fn detect_learning_momentum(
                 description: format!(
                     "Reviewed {reviewed_count} atoms vs {created_count} created in the last 7 days — strong review habit"
                 ),
-                domain: "learning".into(),
+                domain: ai_core::RecallDomain::Learning,
+                rule_text: "Balance content creation with review sessions to avoid review backlog".into(),
             });
         }
     }
@@ -172,7 +178,8 @@ pub fn detect_domain_gap(digests: &VecDeque<(Timestamp, String)>) -> Option<Dete
             description: format!(
                 "{recent_count} digest signals in the last 7 days suggest a domain retention gap"
             ),
-            domain: "learning".into(),
+            domain: ai_core::RecallDomain::Learning,
+            rule_text: "Schedule review sessions for domains with declining retention".into(),
         })
     } else {
         None
@@ -198,7 +205,8 @@ pub fn detect_knowledge_transfer(
             "{} knowledge transfer event(s) detected in the last 24h",
             recent.len()
         ),
-        domain: "learning".into(),
+        domain: ai_core::RecallDomain::Learning,
+        rule_text: "Balance content creation with review sessions to avoid review backlog".into(),
     })
 }
 
@@ -230,7 +238,7 @@ mod tests {
         let p = pattern.unwrap();
         assert_eq!(p.name, "study_streak_7_days");
         assert_eq!(p.signal_count, 7);
-        assert_eq!(p.domain, "learning");
+        assert_eq!(p.domain, ai_core::RecallDomain::Learning);
     }
 
     #[test]

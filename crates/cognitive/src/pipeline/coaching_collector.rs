@@ -23,9 +23,8 @@ impl CoachingCollector {
                     result = event_rx.recv() => {
                         match result {
                             Ok(bus::DomainEvent::CoachingPatternDetected {
-                                pattern_name, confidence, description, domain, signal_count, ..
+                                pattern_name, confidence, description, domain, signal_count, rule_text, ..
                             }) => {
-                                let rule_text = pattern_to_rule(&pattern_name, &description);
                                 let signal = CognitiveSignal {
                                     source: SignalSource::CoachingPattern,
                                     content: rule_text,

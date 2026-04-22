@@ -1,9 +1,12 @@
 /// Workspace-global enumeration of feature domains.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "snake_case")]
 pub enum RecallDomain {
     General,
     Tasks,
     Finance,
+    Productivity,
+    Learning,
 }
 
 impl RecallDomain {
@@ -12,6 +15,8 @@ impl RecallDomain {
             RecallDomain::General => "general",
             RecallDomain::Tasks => "tasks",
             RecallDomain::Finance => "finance",
+            RecallDomain::Productivity => "productivity",
+            RecallDomain::Learning => "learning",
         }
     }
 }
