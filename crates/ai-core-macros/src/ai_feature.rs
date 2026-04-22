@@ -1,4 +1,4 @@
-use crate::attrs::parse_ai_feature_attr;
+use crate::attrs::{parse_ai_feature_attr, MirrorSnapshotAttr};
 use proc_macro2::TokenStream;
 use quote::quote;
 
@@ -34,6 +34,8 @@ pub fn expand(input: syn::DeriveInput) -> syn::Result<TokenStream> {
         None => quote! { None },
     };
 
+    let mirror_specs_tokens = render_mirror_specs(&feat.mirror_snapshots);
+
     Ok(quote! {
         impl ::ai_core::AiFeature for #struct_ident {
             const DOMAIN: ::ai_core::RecallDomain = ::ai_core::RecallDomain::#recall_domain_ident;
@@ -54,6 +56,31 @@ pub fn expand(input: syn::DeriveInput) -> syn::Result<TokenStream> {
                 recency_field: #recency,
                 status_filter: #status,
             };
+
+            pub const MIRROR_SNAPSHOTS: &'static [::ai_core::MirrorSnapshotSpec] =
+                #mirror_specs_tokens;
         }
     })
+}
+
+fn render_mirror_specs(snapshots: &[MirrorSnapshotAttr]) -> TokenStream {
+    if snapshots.is_empty() {
+        return quote! { &[] };
+    }
+    let entries = snapshots.iter().map(|s| {
+        let name = &s.name;
+        let interval = match s.flush_interval_secs {
+            Some(v) => quote! { Some(#v) },
+            None => quote! { None },
+        };
+        let kinds = s.subscribed_kinds.iter().map(|k| quote! { #k });
+        quote! {
+            ::ai_core::MirrorSnapshotSpec {
+                name: #name,
+                subscribed_kinds: &[ #(#kinds),* ],
+                flush_interval_secs: #interval,
+            }
+        }
+    });
+    quote! { &[ #(#entries),* ] }
 }
