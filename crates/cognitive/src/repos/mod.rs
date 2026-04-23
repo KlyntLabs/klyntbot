@@ -17,7 +17,6 @@ pub mod failed_observation;
 pub mod flashcard;
 pub mod fsrs_params;
 pub mod gt_link;
-pub mod insight_cache;
 pub mod knowledge_atom;
 pub mod markdown_parser;
 pub mod pending_memory;
@@ -55,8 +54,6 @@ pub use flashcard::{
 };
 pub use fsrs_params::FsrsParamsRepo;
 pub use gt_link::SqliteGTLinkRepo;
-#[allow(deprecated)]
-pub use insight_cache::{InsightCacheRepo, InsightCacheRow};
 pub use knowledge_atom::{
     KnowledgeAtomRepo, KnowledgeAtomRow, KnowledgeTopicRow, NewKnowledgeAtom,
 };

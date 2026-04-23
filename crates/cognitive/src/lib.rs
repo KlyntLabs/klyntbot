@@ -48,8 +48,6 @@ pub use repos::{
 pub use repos::{DailyRetentionPoint, DomainRetentionHistory, RetentionHistoryRepo};
 pub use repos::{DailyReviewStat, DomainRetentionStat, ReviewStatsRepo};
 pub use repos::{DeckPreferenceRepo, DeckPreferenceRow};
-#[allow(deprecated)]
-pub use repos::{InsightCacheRepo, InsightCacheRow};
 pub use repos::{KnowledgeAtomRepo, KnowledgeAtomRow, KnowledgeTopicRow, NewKnowledgeAtom};
 pub use repos::{NewPersona, PersonaRepo, PersonaRow, PersonaUpdate};
 pub use repos::{NewSquad, ResolvedSquad, SquadMemberRow, SquadRepo, SquadRow};
