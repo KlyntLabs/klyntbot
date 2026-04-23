@@ -390,14 +390,6 @@ pub enum DomainEvent {
         confidence: f64,
     },
 
-    /// A memory write is below the confidence threshold and needs user confirmation.
-    MemoryPendingConfirmation {
-        fact_id: String,
-        subject: String,
-        predicate: String,
-        object: String,
-    },
-
     // -- Agent routing --
     /// Emitted when AgentRuntime selects an orchestrator skill for a message.
     SkillRouted {
@@ -614,7 +606,6 @@ impl DomainEvent {
             Self::PhoneticMasteryGained { .. } => "PhoneticMasteryGained",
             Self::LanguagePracticeSessionCompleted { .. } => "LanguagePracticeSessionCompleted",
             Self::InterventionTriggered { .. } => "InterventionTriggered",
-            Self::MemoryPendingConfirmation { .. } => "MemoryPendingConfirmation",
             Self::ContradictionDetected { .. } => "ContradictionDetected",
             Self::SkillRouted { .. } => "SkillRouted",
             Self::CrossDomainDotReady { .. } => "CrossDomainDotReady",
@@ -720,8 +711,6 @@ impl DomainEvent {
     pub const KIND_LANGUAGE_PRACTICE_SESSION_COMPLETED: &'static str = "LanguagePracticeSessionCompleted";
     /// `event_type` value for [`DomainEvent::InterventionTriggered`].
     pub const KIND_INTERVENTION_TRIGGERED: &'static str = "InterventionTriggered";
-    /// `event_type` value for [`DomainEvent::MemoryPendingConfirmation`].
-    pub const KIND_MEMORY_PENDING_CONFIRMATION: &'static str = "MemoryPendingConfirmation";
     /// `event_type` value for [`DomainEvent::ContradictionDetected`].
     pub const KIND_CONTRADICTION_DETECTED: &'static str = "ContradictionDetected";
     /// `event_type` value for [`DomainEvent::SkillRouted`].
@@ -848,7 +837,6 @@ impl DomainEvent {
             | Self::LanguagePracticeSessionCompleted { .. } => "language_learning",
 
             Self::InterventionTriggered { .. } => "productivity",
-            Self::MemoryPendingConfirmation { .. } => "memory",
             Self::PluginEvent { .. } => "plugin",
             Self::SkillRouted { .. } => "agent",
             Self::CrossDomainDotReady { .. } => "fabric",

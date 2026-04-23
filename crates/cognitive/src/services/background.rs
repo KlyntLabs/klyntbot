@@ -897,7 +897,6 @@ fn event_type_key(event: &DomainEvent) -> &'static str {
         DomainEvent::CoachingLearningDigest { .. } => "CoachingLearningDigest",
         DomainEvent::FlashcardSessionCompleted { .. } => "FlashcardSessionCompleted",
         DomainEvent::InterventionTriggered { .. } => "InterventionTriggered",
-        DomainEvent::MemoryPendingConfirmation { .. } => "MemoryPendingConfirmation",
         DomainEvent::SkillRouted { .. } => "SkillRouted",
 
         DomainEvent::NoteEditingFinished { .. } => "NoteEditingFinished",
