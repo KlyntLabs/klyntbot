@@ -8,7 +8,14 @@ pub enum FinanceEvent {
         importance = 0.5,
         salience = "accumulate",
         observation_template = "Transaction: {category} {amount} {currency}",
-        coaching_signal(category_from = "category", amount_from = "amount",)
+        coaching_signal(category_from = "category", amount_from = "amount",),
+        metric(
+            name = "budget_overrun_frequency",
+            value_from = 0.0_f64,
+            window = "30d",
+            min_samples = 3,
+            aggregation = "avg",
+        ),
     )]
     TransactionRecorded {
         _tx_id: String,
@@ -31,7 +38,14 @@ pub enum FinanceEvent {
             category_from = "category",
             amount_from = "spent",
             rule = "Review spending patterns when budget pressure is detected",
-        )
+        ),
+        metric(
+            name = "budget_overrun_frequency",
+            value_from = 1.0_f64,
+            window = "30d",
+            min_samples = 3,
+            aggregation = "avg",
+        ),
     )]
     BudgetAlert {
         category: String,
