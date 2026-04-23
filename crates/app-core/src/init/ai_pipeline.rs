@@ -237,6 +237,10 @@ fn try_into_task_event(e: &DomainEvent) -> Option<feature_tasks::events::TaskEve
             title: String::new(), // title not in DomainEvent::TaskFocusChanged
             focus_deadline: focus_deadline.as_ref().and_then(|d| d.parse().ok()),
         }),
+        DomainEvent::TaskFocusExpired { task_id, title } => Some(TaskEvent::FocusExpired {
+            task_id: task_id.clone(),
+            title: title.clone(),
+        }),
         DomainEvent::EstimationRecorded {
             task_id,
             estimated_mins,

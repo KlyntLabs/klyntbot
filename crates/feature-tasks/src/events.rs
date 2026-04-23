@@ -25,12 +25,37 @@ pub enum TaskEvent {
         salience = "extract_if(deviation_pct.unwrap_or(0.0) > 50.0)",
         observation_template = "Completed {title} (deviation {deviation_pct:?}%)",
         entity_bridge(type = "task", name_from = "title", id_from = "task_id"),
-        coaching_signal
+        coaching_signal,
+        metric(
+            name = "focus_expiration_rate",
+            value_from = 0.0_f64,
+            window = "7d",
+            min_samples = 3,
+            aggregation = "avg",
+        ),
     )]
     Completed {
         task_id: String,
         title: String,
         deviation_pct: Option<f64>,
+    },
+
+    #[ai(
+        importance = 0.6,
+        salience = "accumulate",
+        observation_template = "Focus expired on task: {title}",
+        entity_bridge(type = "task", name_from = "title", id_from = "task_id"),
+        metric(
+            name = "focus_expiration_rate",
+            value_from = 1.0_f64,
+            window = "7d",
+            min_samples = 3,
+            aggregation = "avg",
+        ),
+    )]
+    FocusExpired {
+        task_id: String,
+        title: String,
     },
 
     #[ai(
@@ -90,6 +115,13 @@ impl From<TaskEvent> for DomainEvent {
                 actual_duration_mins: None,
                 estimated_duration_mins: None,
                 deviation_pct,
+            },
+            TaskEvent::FocusExpired {
+                task_id,
+                title: _,
+            } => DomainEvent::TaskFocusExpired {
+                task_id,
+                title: String::new(),
             },
             TaskEvent::FocusChanged {
                 task_id,

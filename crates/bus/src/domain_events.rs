@@ -97,6 +97,11 @@ pub enum DomainEvent {
         /// None means unfocused.
         focus_deadline: Option<String>,
     },
+    /// Emitted when a focused task's deadline passes without completion.
+    TaskFocusExpired {
+        task_id: String,
+        title: String,
+    },
 
     EstimationRecorded {
         task_id: String,
@@ -483,6 +488,7 @@ impl DomainEvent {
             Self::TaskCompleted { .. } => "TaskCompleted",
             Self::TaskDeferred { .. } => "TaskDeferred",
             Self::TaskFocusChanged { .. } => "TaskFocusChanged",
+            Self::TaskFocusExpired { .. } => "TaskFocusExpired",
             Self::EstimationRecorded { .. } => "EstimationRecorded",
             Self::TransactionRecorded { .. } => "TransactionRecorded",
             Self::BudgetAlert { .. } => "BudgetAlert",
@@ -606,6 +612,8 @@ impl DomainEvent {
     pub const KIND_USER_RETURNED: &'static str = "UserReturned";
     /// `event_type` value for [`DomainEvent::FocusSessionEnded`].
     pub const KIND_FOCUS_SESSION_ENDED: &'static str = "FocusSessionEnded";
+    /// `event_type` value for [`DomainEvent::TaskFocusExpired`].
+    pub const KIND_TASK_FOCUS_EXPIRED: &'static str = "TaskFocusExpired";
     /// `event_type` value for [`DomainEvent::ProductivitySessionEnded`].
     pub const KIND_PRODUCTIVITY_SESSION_ENDED: &'static str = "ProductivitySessionEnded";
     /// `event_type` value for [`DomainEvent::BudgetAlert`].
@@ -640,7 +648,8 @@ impl DomainEvent {
             | Self::TaskCompleted { .. }
             | Self::TaskDeferred { .. }
             | Self::EstimationRecorded { .. }
-            | Self::TaskFocusChanged { .. } => "work",
+            | Self::TaskFocusChanged { .. }
+            | Self::TaskFocusExpired { .. } => "work",
 
             Self::ActivitySessionCompleted { .. }
             | Self::FocusSessionStarted { .. }
