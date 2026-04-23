@@ -1,6 +1,6 @@
 //! Input/output types for the Reforge cycle phases.
 
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap};
 use std::fmt;
 
 use serde::{Deserialize, Serialize};
@@ -343,13 +343,21 @@ pub struct CorrectionSummary {
 }
 
 /// Behavioral metrics collected from feature crates.
+/// Backed by a `BTreeMap` so metrics are registry-driven, not hard-coded.
 #[derive(Debug, Clone, Serialize, Default)]
 pub struct BehavioralMetrics {
-    pub task_estimation_bias: Option<f64>,
-    pub coaching_acceptance_rate: Option<f64>,
-    pub focus_quality_trend: Option<f64>,
-    pub suggestion_dismiss_rate: Option<f64>,
-    pub forecast_accuracy: Option<f64>,
+    #[serde(flatten)]
+    pub values: BTreeMap<String, f64>,
+}
+
+impl BehavioralMetrics {
+    pub fn get(&self, name: &str) -> Option<f64> {
+        self.values.get(name).copied()
+    }
+
+    pub fn insert(&mut self, name: impl Into<String>, value: f64) {
+        self.values.insert(name.into(), value);
+    }
 }
 
 /// Knowledge graph health snapshot.

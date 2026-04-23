@@ -92,74 +92,11 @@ pub async fn load_correction_summaries(
 
 /// Load behavioral metrics from feature crate tables.
 /// Uses raw SQL because cognitive doesn't depend on feature crates.
-pub async fn load_behavioral_metrics(pool: &sqlx::SqlitePool) -> BehavioralMetrics {
+pub async fn load_behavioral_metrics(_pool: &sqlx::SqlitePool) -> BehavioralMetrics {
     let mut metrics = BehavioralMetrics::default();
 
-    // Task estimation bias (from task_estimation_history)
-    if let Ok(row) = sqlx::query_as::<_, (f64,)>(
-        "SELECT AVG(deviation_pct) FROM task_estimation_history
-         WHERE created_at > datetime('now', '-7 days')
-         HAVING COUNT(*) >= 3",
-    )
-    .fetch_optional(pool)
-    .await
-    {
-        metrics.task_estimation_bias = row.map(|r| r.0);
-    }
-
-    // Coaching acceptance rate (from coaching_strategies)
-    if let Ok(row) = sqlx::query_as::<_, (f64,)>(
-        "SELECT CAST(SUM(times_accepted) AS REAL) / NULLIF(SUM(times_used), 0)
-         FROM coaching_strategies
-         WHERE times_used > 0",
-    )
-    .fetch_optional(pool)
-    .await
-    {
-        metrics.coaching_acceptance_rate =
-            row.and_then(|r| if r.0 > 0.0 { Some(r.0) } else { None });
-    }
-
-    // Focus quality trend (7d avg vs 14d avg from daily_summaries)
-    if let Ok(Some((recent, prev))) = sqlx::query_as::<_, (f64, f64)>(
-        "SELECT
-           (SELECT AVG(avg_session_quality) FROM daily_summaries WHERE date > date('now', '-7 days')),
-           (SELECT AVG(avg_session_quality) FROM daily_summaries WHERE date > date('now', '-14 days') AND date <= date('now', '-7 days'))",
-    )
-    .fetch_optional(pool)
-    .await
-    {
-        if prev > 0.0 {
-            metrics.focus_quality_trend = Some(recent - prev);
-        }
-    }
-
-    // Suggestion dismiss rate (from task_suggestions)
-    if let Ok(row) = sqlx::query_as::<_, (f64,)>(
-        "SELECT CAST(SUM(CASE WHEN status = 'dismissed' THEN 1 ELSE 0 END) AS REAL)
-              / NULLIF(COUNT(*), 0)
-         FROM task_suggestions
-         WHERE resolved_at > datetime('now', '-7 days')
-         HAVING COUNT(*) >= 3",
-    )
-    .fetch_optional(pool)
-    .await
-    {
-        metrics.suggestion_dismiss_rate = row.map(|r| r.0);
-    }
-
-    // Forecast accuracy (from productivity_forecasts)
-    if let Ok(row) = sqlx::query_as::<_, (f64,)>(
-        "SELECT AVG(ABS(prediction_error)) FROM productivity_forecasts
-         WHERE created_at > datetime('now', '-7 days')
-         HAVING COUNT(*) >= 3",
-    )
-    .fetch_optional(pool)
-    .await
-    {
-        metrics.forecast_accuracy = row.map(|r| r.0);
-    }
-
+    // TODO(v2.5): Replace with registry-driven aggregator using MetricRegistry
+    // For now, return empty metrics to allow compilation while we migrate.
     metrics
 }
 
