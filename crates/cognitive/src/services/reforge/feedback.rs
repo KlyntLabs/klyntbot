@@ -90,13 +90,27 @@ pub async fn load_correction_summaries(
         .collect()
 }
 
-/// Load behavioral metrics from feature crate tables.
-/// Uses raw SQL because cognitive doesn't depend on feature crates.
-pub async fn load_behavioral_metrics(_pool: &sqlx::SqlitePool) -> BehavioralMetrics {
+/// Load behavioral metrics from the unified `ai_metric_samples` table.
+/// Iterates the `MetricRegistry` and runs one aggregate query per `MetricSpec`.
+pub async fn load_behavioral_metrics(
+    repo: &crate::repos::MetricRepo,
+    registry: &ai_core::MetricRegistry,
+) -> BehavioralMetrics {
     let mut metrics = BehavioralMetrics::default();
+    let now = jiff::Timestamp::now().as_second();
 
-    // TODO(v2.5): Replace with registry-driven aggregator using MetricRegistry
-    // For now, return empty metrics to allow compilation while we migrate.
+    for spec in registry.all() {
+        match repo.aggregate_metric(spec, now).await {
+            Ok(Some(value)) => {
+                metrics.insert(spec.name, value);
+            }
+            Ok(None) => {}
+            Err(e) => {
+                tracing::warn!("Failed to aggregate metric {}: {}", spec.name, e);
+            }
+        }
+    }
+
     metrics
 }
 

@@ -71,6 +71,8 @@ pub struct FeedbackSources<'a> {
     pub suggestion_repo: Option<&'a storage::ReforgeSuggestionRepo>,
     pub pool: Option<&'a sqlx::SqlitePool>,
     pub density_repo: Option<&'a crate::repos::ConversationDensityRepo>,
+    pub metric_repo: Option<&'a crate::repos::MetricRepo>,
+    pub metric_registry: Option<&'a ai_core::MetricRegistry>,
 }
 
 /// Days elapsed since an RFC 3339 timestamp, defaulting to 7 if missing or unparseable.
@@ -247,8 +249,8 @@ pub async fn collect(
             vec![]
         };
 
-        let behavioral_metrics = if let Some(pool) = fb.pool {
-            super::feedback::load_behavioral_metrics(pool).await
+        let behavioral_metrics = if let (Some(repo), Some(registry)) = (fb.metric_repo, fb.metric_registry) {
+            super::feedback::load_behavioral_metrics(repo, registry).await
         } else {
             BehavioralMetrics::default()
         };

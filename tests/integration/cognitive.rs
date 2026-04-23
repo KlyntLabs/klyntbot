@@ -11,13 +11,13 @@ use klyntbot::agent::cognitive_handlers::{
 use klyntbot::cognitive::consolidation::{execute_memory_ops, ConsolidationCandidate};
 use klyntbot::cognitive::context_source::CognitiveContextSource;
 use klyntbot::cognitive::extraction::to_semantic_fact;
-use klyntbot::cognitive::repos::{cognitive_migrations, ProceduralRuleRepo, SemanticFactRepo};
+use klyntbot::cognitive::repos::{cognitive_migrations, MetricRepo, ProceduralRuleRepo, SemanticFactRepo};
 use klyntbot::cognitive::retrieval::{retrieve_relevant_facts, RetrievalParams};
 use klyntbot::cognitive::types::*;
 use klyntbot::cognitive::{ConsolidationHandler, ExtractionHandler};
 
 use super::common::test_pool;
-use ai_core::{AiMetrics, AiSignal, RecallDomain, SalienceVerdict};
+use ai_core::{AiMetrics, AiSignal, MetricRegistry, RecallDomain, SalienceVerdict};
 use bus::{DomainEvent, FeedbackResponse};
 use context_engine::source::{ContextSource, SourceContext};
 use feature_coaching::feedback::FeedbackTracker;
@@ -1287,6 +1287,8 @@ async fn test_reforge_with_feedback_signals() {
 
     // 7. Run Reforge with feedback sources
     let handler = MockReforgeHandler;
+    let metric_repo = MetricRepo::new(inner.clone());
+    let metric_registry = MetricRegistry::new();
     let feedback_sources = FeedbackSources {
         outcome_repo: Some(&outcome_repo),
         event_log_repo: Some(&event_log_repo),
@@ -1294,6 +1296,8 @@ async fn test_reforge_with_feedback_signals() {
         suggestion_repo: Some(&suggestion_repo),
         pool: Some(&inner),
         density_repo: None,
+        metric_repo: Some(&metric_repo),
+        metric_registry: Some(&metric_registry),
     };
 
     let result = run_reforge(

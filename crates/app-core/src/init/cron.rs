@@ -514,6 +514,8 @@ fn register_cron_callbacks(
                         let density_repo = cognitive::ConversationDensityRepo::new(pool.clone());
                         let entity_repo = cognitive::EntityRepo::new(pool.clone());
                         let snapshot_repo = cognitive::KnowledgeSnapshotRepo::new(pool.clone());
+                        let metric_repo = cognitive::MetricRepo::new(pool.clone());
+                        let metric_registry = ai_core::MetricRegistry::new();
                         let feedback_sources =
                             cognitive::services::reforge::collector::FeedbackSources {
                                 outcome_repo: Some(&repos_reforge.outcomes),
@@ -522,6 +524,8 @@ fn register_cron_callbacks(
                                 suggestion_repo: Some(&suggestion_repo),
                                 pool: Some(&pool),
                                 density_repo: Some(&density_repo),
+                                metric_repo: Some(&metric_repo),
+                                metric_registry: Some(&metric_registry),
                             };
 
                         match cognitive::services::reforge::service::run_reforge(
