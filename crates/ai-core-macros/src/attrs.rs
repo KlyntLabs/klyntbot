@@ -41,6 +41,7 @@ pub struct AiFeatureAttr {
     pub recall_recency_field: Option<syn::Ident>,
     pub recall_status_filter: Option<syn::Expr>,
     pub mirror_snapshots: Vec<MirrorSnapshotAttr>,
+    pub promotion_threshold: Option<u32>,
 }
 
 pub struct MirrorSnapshotAttr {
@@ -308,6 +309,7 @@ pub fn parse_ai_feature_attr(attrs: &[syn::Attribute]) -> syn::Result<AiFeatureA
     let mut recall_recency_field = None;
     let mut recall_status_filter = None;
     let mut mirror_snapshots: Vec<MirrorSnapshotAttr> = Vec::new();
+    let mut promotion_threshold: Option<u32> = None;
 
     ai_attr.parse_nested_meta(|meta| {
         let k = meta
@@ -347,6 +349,10 @@ pub fn parse_ai_feature_attr(attrs: &[syn::Attribute]) -> syn::Result<AiFeatureA
             "mirror_snapshot" => {
                 mirror_snapshots.push(parse_mirror_snapshot(&meta)?);
             }
+            "promotion_threshold" => {
+                let n: syn::LitInt = meta.value()?.parse()?;
+                promotion_threshold = Some(n.base10_parse()?);
+            }
             other => return Err(meta.error(format!("unknown ai() key: {other}"))),
         }
         Ok(())
@@ -366,6 +372,7 @@ pub fn parse_ai_feature_attr(attrs: &[syn::Attribute]) -> syn::Result<AiFeatureA
         recall_recency_field,
         recall_status_filter,
         mirror_snapshots,
+        promotion_threshold,
     })
 }
 
