@@ -15,7 +15,7 @@ pub enum FinanceEvent {
             window = "30d",
             min_samples = 3,
             aggregation = "avg",
-        ),
+        )
     )]
     TransactionRecorded {
         _tx_id: String,
@@ -45,7 +45,7 @@ pub enum FinanceEvent {
             window = "30d",
             min_samples = 3,
             aggregation = "avg",
-        ),
+        )
     )]
     BudgetAlert {
         category: String,
@@ -185,7 +185,7 @@ impl From<FinanceEvent> for DomainEvent {
                 current_amount,
                 target_amount,
                 delta,
-            }
+            },
         }
     }
 }

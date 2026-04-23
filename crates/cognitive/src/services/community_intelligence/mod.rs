@@ -4,8 +4,8 @@
 //! decide splits. This module defines the input/output types and the
 //! execution functions that apply structural changes.
 
-pub mod events;
 pub mod co_activation_events;
+pub mod events;
 
 use std::collections::HashMap;
 

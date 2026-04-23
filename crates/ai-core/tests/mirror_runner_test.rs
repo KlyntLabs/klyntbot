@@ -53,6 +53,7 @@ fn dummy_signal(kind: &'static str) -> AiSignal {
         metrics: AiMetrics::default(),
         coaching_signal: false,
         coaching_rule: None,
+        metric_samples: Vec::new(),
     }
 }
 

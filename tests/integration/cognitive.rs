@@ -11,7 +11,9 @@ use klyntbot::agent::cognitive_handlers::{
 use klyntbot::cognitive::consolidation::{execute_memory_ops, ConsolidationCandidate};
 use klyntbot::cognitive::context_source::CognitiveContextSource;
 use klyntbot::cognitive::extraction::to_semantic_fact;
-use klyntbot::cognitive::repos::{cognitive_migrations, MetricRepo, ProceduralRuleRepo, SemanticFactRepo};
+use klyntbot::cognitive::repos::{
+    cognitive_migrations, MetricRepo, ProceduralRuleRepo, SemanticFactRepo,
+};
 use klyntbot::cognitive::retrieval::{retrieve_relevant_facts, RetrievalParams};
 use klyntbot::cognitive::types::*;
 use klyntbot::cognitive::{ConsolidationHandler, ExtractionHandler};
@@ -572,6 +574,7 @@ fn test_signal_accumulator_distraction_streak_removed() {
             },
             coaching_signal: true,
             coaching_rule: None,
+            metric_samples: vec![],
         });
     }
 
@@ -611,6 +614,7 @@ fn test_signal_accumulator_cooldown_prevents_refire() {
             },
             coaching_signal: true,
             coaching_rule: Some("Review spending patterns when budget pressure is detected".into()),
+            metric_samples: vec![],
         });
     }
 
@@ -644,6 +648,7 @@ fn test_signal_accumulator_cooldown_prevents_refire() {
         },
         coaching_signal: true,
         coaching_rule: Some("Review spending patterns when budget pressure is detected".into()),
+        metric_samples: vec![],
     });
 
     // Second eval — cooldown blocks re-fire

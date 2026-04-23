@@ -2,6 +2,7 @@ use ai_core::{Aggregation, MetricSpec};
 use sqlx::SqlitePool;
 
 /// Repository for the unified `ai_metric_samples` table.
+#[derive(Clone)]
 pub struct MetricRepo {
     pool: SqlitePool,
 }

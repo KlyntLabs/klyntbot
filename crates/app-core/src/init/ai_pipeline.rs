@@ -58,7 +58,9 @@ fn try_into_coaching_event(e: &DomainEvent) -> Option<feature_coaching::events::
     }
 }
 
-fn try_into_productivity_event(e: &DomainEvent) -> Option<feature_productivity::events::ProductivityEvent> {
+fn try_into_productivity_event(
+    e: &DomainEvent,
+) -> Option<feature_productivity::events::ProductivityEvent> {
     use feature_productivity::events::ProductivityEvent;
     match e {
         DomainEvent::ProductivitySessionEnded {
@@ -74,7 +76,9 @@ fn try_into_productivity_event(e: &DomainEvent) -> Option<feature_productivity::
     }
 }
 
-fn try_into_community_event(e: &DomainEvent) -> Option<cognitive::services::community_intelligence::events::CommunityEvent> {
+fn try_into_community_event(
+    e: &DomainEvent,
+) -> Option<cognitive::services::community_intelligence::events::CommunityEvent> {
     use cognitive::services::community_intelligence::events::CommunityEvent;
     match e {
         DomainEvent::CommunityDiscovered {
@@ -108,7 +112,9 @@ fn try_into_community_event(e: &DomainEvent) -> Option<cognitive::services::comm
     }
 }
 
-fn try_into_co_activation_event(e: &DomainEvent) -> Option<cognitive::services::community_intelligence::co_activation_events::CoActivationEvent> {
+fn try_into_co_activation_event(
+    e: &DomainEvent,
+) -> Option<cognitive::services::community_intelligence::co_activation_events::CoActivationEvent> {
     use cognitive::services::community_intelligence::co_activation_events::CoActivationEvent;
     match e {
         DomainEvent::CoActivationStrengthened {
@@ -403,7 +409,9 @@ pub fn build_metric_registry() -> ai_core::MetricRegistry {
     reg.register_all(feature_finance::FinanceEvent::FEATURE_METRICS);
     reg.register_all(feature_coaching::events::CoachingEvent::FEATURE_METRICS);
     reg.register_all(feature_productivity::events::ProductivityEvent::FEATURE_METRICS);
-    reg.register_all(cognitive::services::community_intelligence::events::CommunityEvent::FEATURE_METRICS);
+    reg.register_all(
+        cognitive::services::community_intelligence::events::CommunityEvent::FEATURE_METRICS,
+    );
     reg.register_all(cognitive::services::community_intelligence::co_activation_events::CoActivationEvent::FEATURE_METRICS);
     reg
 }

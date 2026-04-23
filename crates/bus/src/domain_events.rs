@@ -620,7 +620,23 @@ impl DomainEvent {
     pub const KIND_RETENTION_MILESTONE_REACHED: &'static str = "RetentionMilestoneReached";
     /// `event_type` value for [`DomainEvent::TranslationCompleted`].
     pub const KIND_TRANSLATION_COMPLETED: &'static str = "TranslationCompleted";
-    /// `event_type` value for [`DomainEvent::NoteStudied`].
+    /// `event_type` value for [`DomainEvent::NoteCreated`].
+    pub const KIND_NOTE_CREATED: &'static str = "NoteCreated";
+    /// `event_type` value for [`DomainEvent::NoteUpdated`].
+    pub const KIND_NOTE_UPDATED: &'static str = "NoteUpdated";
+    /// `event_type` value for [`DomainEvent::DistractionDetected`].
+    pub const KIND_DISTRACTION_DETECTED: &'static str = "DistractionDetected";
+    /// `event_type` value for [`DomainEvent::ActivitySessionCompleted`].
+    pub const KIND_ACTIVITY_SESSION_COMPLETED: &'static str = "ActivitySessionCompleted";
+    /// `event_type` value for [`DomainEvent::FocusSessionStarted`].
+    pub const KIND_FOCUS_SESSION_STARTED: &'static str = "FocusSessionStarted";
+    /// `event_type` value for [`DomainEvent::ProductivityScoreComputed`].
+    pub const KIND_PRODUCTIVITY_SCORE_COMPUTED: &'static str = "ProductivityScoreComputed";
+    /// `event_type` value for [`DomainEvent::TaskDeferred`].
+    pub const KIND_TASK_DEFERRED: &'static str = "TaskDeferred";
+    /// `event_type` value for [`DomainEvent::TransactionRecorded`].
+    pub const KIND_TRANSACTION_RECORDED: &'static str = "TransactionRecorded";
+    /// `event_type` value for [`DomainEvent::NoteStudied"].
     pub const KIND_NOTE_STUDIED: &'static str = "NoteStudied";
     /// `event_type` value for [`DomainEvent::PracticeUnitCompleted`].
     pub const KIND_PRACTICE_UNIT_COMPLETED: &'static str = "PracticeUnitCompleted";

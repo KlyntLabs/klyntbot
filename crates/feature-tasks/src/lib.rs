@@ -23,6 +23,7 @@ pub mod types;
 
 pub use complexity::{evaluate_task_complexity, TaskComplexitySignals};
 pub use config::{SearchConfig, TasksConfig};
+pub use events::TaskEvent;
 pub use handlers::{EmbeddingHandler, ProgressHandler};
 pub use rrule_utils::{humanize_rrule, next_occurrence, should_spawn_instance, validate_rrule};
 pub use search::hybrid_merge;

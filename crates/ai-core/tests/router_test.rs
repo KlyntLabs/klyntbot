@@ -40,6 +40,7 @@ async fn router_broadcasts_signal_to_all_consumers() {
             metrics: ai_core::AiMetrics::default(),
             coaching_signal: false,
             coaching_rule: None,
+            metric_samples: Vec::new(),
         })
     });
 

@@ -249,11 +249,12 @@ pub async fn collect(
             vec![]
         };
 
-        let behavioral_metrics = if let (Some(repo), Some(registry)) = (fb.metric_repo, fb.metric_registry) {
-            super::feedback::load_behavioral_metrics(repo, registry).await
-        } else {
-            BehavioralMetrics::default()
-        };
+        let behavioral_metrics =
+            if let (Some(repo), Some(registry)) = (fb.metric_repo, fb.metric_registry) {
+                super::feedback::load_behavioral_metrics(repo, registry).await
+            } else {
+                BehavioralMetrics::default()
+            };
 
         let graph_health = super::feedback::load_graph_health(
             fact_repo,

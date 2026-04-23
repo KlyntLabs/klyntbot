@@ -21,6 +21,7 @@ impl AiEventMeta for TinyEvent {
             metrics: ai_core::AiMetrics::default(),
             coaching_signal: false,
             coaching_rule: None,
+            metric_samples: vec![],
         }
     }
     fn event_kind(&self) -> &'static str {

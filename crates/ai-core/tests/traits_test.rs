@@ -34,6 +34,7 @@ async fn consumer_receives_signal() {
         metrics: ai_core::AiMetrics::default(),
         coaching_signal: false,
         coaching_rule: None,
+        metric_samples: Vec::new(),
     };
     consumer.consume(&sig).await.unwrap();
     assert_eq!(log.lock().unwrap().as_slice(), &["TaskCreated"]);

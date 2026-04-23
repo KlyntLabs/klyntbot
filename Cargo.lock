@@ -7245,6 +7245,7 @@ dependencies = [
  "extism",
  "feature-coaching",
  "feature-finance",
+ "feature-productivity",
  "feature-tasks",
  "jiff",
  "mcp",

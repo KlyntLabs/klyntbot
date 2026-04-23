@@ -21,9 +21,7 @@ impl SignalConsumer for MetricHarvestConsumer {
         "metric_harvest"
     }
 
-    async fn consume(&self,
-        signal: &AiSignal,
-    ) -> common::Result<()> {
+    async fn consume(&self, signal: &AiSignal) -> common::Result<()> {
         if signal.metric_samples.is_empty() {
             return Ok(());
         }

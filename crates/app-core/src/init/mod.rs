@@ -546,8 +546,9 @@ impl AppCore {
 
             // Metric harvest consumer
             let metric_repo = ::cognitive::MetricRepo::new(storage_pool.inner().clone());
-            let metric_harvest: Arc<dyn ai_core::SignalConsumer> =
-                Arc::new(::cognitive::consumers::MetricHarvestConsumer::new(metric_repo));
+            let metric_harvest: Arc<dyn ai_core::SignalConsumer> = Arc::new(
+                ::cognitive::consumers::MetricHarvestConsumer::new(metric_repo),
+            );
 
             // Build consumer list: 8 base + mirror consumers
             let mut consumers: Vec<Arc<dyn ai_core::SignalConsumer>> = vec![

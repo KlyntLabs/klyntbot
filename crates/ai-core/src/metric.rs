@@ -54,19 +54,15 @@ impl MetricRegistry {
         Self { specs: Vec::new() }
     }
 
-    /// Panics on duplicate name. Use `try_register` to check first.
+    /// Registers a spec, silently skipping duplicates (same name).
+    /// Different variants of the same enum may declare the same metric name
+    /// with different value_from expressions (e.g. BudgetAlert vs TransactionRecorded
+    /// both sampling budget_overrun_frequency with 1.0 and 0.0 respectively).
     pub fn register(&mut self, spec: &'static MetricSpec) {
-        if let Err(e) = self.try_register(spec) {
-            panic!("MetricRegistry: {}", e);
-        }
-    }
-
-    pub fn try_register(&mut self, spec: &'static MetricSpec) -> Result<(), String> {
         if self.specs.iter().any(|s| s.name == spec.name) {
-            return Err(format!("duplicate metric name: {}", spec.name));
+            return; // skip duplicate
         }
         self.specs.push(spec);
-        Ok(())
     }
 
     pub fn register_all(&mut self, specs: &[&'static MetricSpec]) {

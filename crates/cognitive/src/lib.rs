@@ -37,8 +37,8 @@ pub use repos::AtomExtractionCache;
 pub use repos::{
     cognitive_migrations, AccumulatedObservationRepo, AnnotationRepo, CoActivationRepo,
     CommunityRepo, ConversationDensityRepo, EntityRepo, EpisodicMemoryRepo, EventLogRepo,
-    FactChangelogRepo, FailedObservationRepo, KnowledgeSnapshotRepo, MetricRepo, ProceduralRuleRepo,
-    SemanticFactRepo,
+    FactChangelogRepo, FailedObservationRepo, KnowledgeSnapshotRepo, MetricRepo,
+    ProceduralRuleRepo, SemanticFactRepo,
 };
 pub use repos::{BlackboardEntry, BlackboardRepo, NewBlackboardEntry};
 pub use repos::{

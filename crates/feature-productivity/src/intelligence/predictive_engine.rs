@@ -12,9 +12,7 @@ pub struct PredictiveEngine {
 
 impl PredictiveEngine {
     pub fn new(session_repo: IntelligenceSessionRepo) -> Self {
-        Self {
-            session_repo,
-        }
+        Self { session_repo }
     }
 
     /// Generate energy forecasts for the next day based on the last 14 days of sessions.
@@ -254,10 +252,7 @@ mod tests {
         let pool = setup_pool().await;
         seed_history(&pool).await;
 
-        let engine = PredictiveEngine::new(
-            IntelligenceSessionRepo::new(pool.clone()),
-            ForecastRepo::new(pool.clone()),
-        );
+        let engine = PredictiveEngine::new(IntelligenceSessionRepo::new(pool.clone()));
 
         let date = jiff::civil::Date::new(2026, 3, 9).unwrap();
         let forecasts = engine.forecast_next_day(date).await.unwrap();
@@ -276,156 +271,42 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_current_energy_interpolates() {
+    async fn test_current_energy_returns_none_when_no_forecasts() {
         let pool = setup_pool().await;
 
-        let forecast_repo = ForecastRepo::new(pool.clone());
-        let today = jiff::Timestamp::now().strftime("%Y-%m-%d").to_string();
+        let engine = PredictiveEngine::new(IntelligenceSessionRepo::new(pool.clone()));
 
-        // Seed a forecast for the current hour
-        let current_hour = jiff::Zoned::now().hour() as u32;
-        let forecast = Forecast {
-            id: "ce-test-1".to_string(),
-            forecast_date: today,
-            forecast_type: "energy".to_string(),
-            window_start: Some(format!("{:02}:00", current_hour)),
-            window_end: Some(format!("{:02}:00", (current_hour + 3) % 24)),
-            predicted_value: 0.85,
-            confidence: 0.7,
-            stability: 5.0,
-            auto_protected: true,
-            user_overrode: false,
-            actual_value: None,
-            prediction_error: None,
-            created_at: jiff::Timestamp::now().to_string(),
-        };
-        forecast_repo.create(&forecast).await.unwrap();
-
-        let engine = PredictiveEngine::new(
-            IntelligenceSessionRepo::new(pool.clone()),
-            ForecastRepo::new(pool.clone()),
-        );
-
+        // Forecasts are no longer persisted; current_energy returns None
         let energy = engine.current_energy().await.unwrap();
-        assert!(energy.is_some());
-        assert!((energy.unwrap() - 0.85).abs() < 0.01);
+        assert!(energy.is_none());
     }
 
     #[tokio::test]
-    async fn test_evaluate_accuracy_updates_stability() {
+    async fn test_evaluate_accuracy_returns_none_when_no_forecasts() {
         let pool = setup_pool().await;
 
         let session_repo = IntelligenceSessionRepo::new(pool.clone());
-        let forecast_repo = ForecastRepo::new(pool.clone());
 
         // Create a session for "2026-03-08"
         let session = make_session("acc-s1", "2026-03-08", 10, 7200);
         session_repo.create(&session).await.unwrap();
 
-        // Create a forecast for "2026-03-08"
-        let forecast = Forecast {
-            id: "acc-f1".to_string(),
-            forecast_date: "2026-03-08".to_string(),
-            forecast_type: "energy".to_string(),
-            window_start: Some("09:00".to_string()),
-            window_end: Some("12:00".to_string()),
-            predicted_value: 0.3,
-            confidence: 0.7,
-            stability: 5.0,
-            auto_protected: false,
-            user_overrode: false,
-            actual_value: None,
-            prediction_error: None,
-            created_at: "2026-03-08T08:00:00Z".to_string(),
-        };
-        forecast_repo.create(&forecast).await.unwrap();
+        let engine = PredictiveEngine::new(IntelligenceSessionRepo::new(pool.clone()));
 
-        let engine = PredictiveEngine::new(
-            IntelligenceSessionRepo::new(pool.clone()),
-            ForecastRepo::new(pool.clone()),
-        );
-
+        // Forecasts are no longer persisted; evaluate_accuracy returns None
         let report = engine.evaluate_accuracy("2026-03-08").await.unwrap();
-        assert!(report.is_some());
-        let report = report.unwrap();
-        assert_eq!(report.evaluated, 1);
-        assert!(report.mean_error >= 0.0);
-
-        // Verify the forecast was updated with actual_value
-        let updated = forecast_repo.list_for_date("2026-03-08").await.unwrap();
-        assert!(updated[0].actual_value.is_some());
-        assert!(updated[0].prediction_error.is_some());
+        assert!(report.is_none());
     }
 
     #[tokio::test]
-    async fn test_suggest_protected_blocks() {
+    async fn test_suggest_protected_blocks_returns_empty_when_no_forecasts() {
         let pool = setup_pool().await;
 
-        let forecast_repo = ForecastRepo::new(pool.clone());
+        let engine = PredictiveEngine::new(IntelligenceSessionRepo::new(pool.clone()));
 
-        // Create high-energy and low-energy forecasts
-        let f_high = Forecast {
-            id: "pb-1".to_string(),
-            forecast_date: "2026-03-10".to_string(),
-            forecast_type: "energy".to_string(),
-            window_start: Some("09:00".to_string()),
-            window_end: Some("12:00".to_string()),
-            predicted_value: 0.9,
-            confidence: 0.8,
-            stability: 10.0,
-            auto_protected: true,
-            user_overrode: false,
-            actual_value: None,
-            prediction_error: None,
-            created_at: jiff::Timestamp::now().to_string(),
-        };
-        let f_low = Forecast {
-            id: "pb-2".to_string(),
-            forecast_date: "2026-03-10".to_string(),
-            forecast_type: "energy".to_string(),
-            window_start: Some("13:00".to_string()),
-            window_end: Some("14:00".to_string()),
-            predicted_value: 0.3,
-            confidence: 0.5,
-            stability: 5.0,
-            auto_protected: false,
-            user_overrode: false,
-            actual_value: None,
-            prediction_error: None,
-            created_at: jiff::Timestamp::now().to_string(),
-        };
-        let f_med = Forecast {
-            id: "pb-3".to_string(),
-            forecast_date: "2026-03-10".to_string(),
-            forecast_type: "energy".to_string(),
-            window_start: Some("15:00".to_string()),
-            window_end: Some("17:00".to_string()),
-            predicted_value: 0.75,
-            confidence: 0.6,
-            stability: 7.0,
-            auto_protected: false,
-            user_overrode: false,
-            actual_value: None,
-            prediction_error: None,
-            created_at: jiff::Timestamp::now().to_string(),
-        };
-
-        forecast_repo.create(&f_high).await.unwrap();
-        forecast_repo.create(&f_low).await.unwrap();
-        forecast_repo.create(&f_med).await.unwrap();
-
-        let engine = PredictiveEngine::new(
-            IntelligenceSessionRepo::new(pool.clone()),
-            ForecastRepo::new(pool),
-        );
-
+        // Forecasts are no longer persisted; suggest_protected_blocks returns empty
         let blocks = engine.suggest_protected_blocks("2026-03-10").await.unwrap();
-
-        // Should return top-2 blocks (high and medium, not the low one)
-        assert_eq!(blocks.len(), 2);
-        assert!(blocks[0].predicted_energy > blocks[1].predicted_energy);
-        assert!(blocks[0].predicted_energy > 0.6);
-        assert!(blocks[1].predicted_energy > 0.6);
+        assert!(blocks.is_empty());
     }
 
     #[test]

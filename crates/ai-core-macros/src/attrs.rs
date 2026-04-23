@@ -92,7 +92,9 @@ pub fn parse_window_secs(s: &str) -> Result<u64, String> {
         return Err("window must be non-empty (e.g. \"7d\")".into());
     }
     let (n, unit) = s.split_at(s.len() - 1);
-    let n: u64 = n.parse().map_err(|_| format!("window prefix must be numeric: {}", s))?;
+    let n: u64 = n
+        .parse()
+        .map_err(|_| format!("window prefix must be numeric: {}", s))?;
     let mult = match unit {
         "s" => 1,
         "m" => 60,
@@ -465,9 +467,8 @@ pub(crate) fn parse_metric_attr(meta: &syn::meta::ParseNestedMeta) -> syn::Resul
             }
             "aggregation" => {
                 let s: LitStr = nested.value()?.parse()?;
-                aggregation = Some(
-                    Aggregation::parse_str(&s.value()).map_err(|e| nested.error(e))?,
-                );
+                aggregation =
+                    Some(Aggregation::parse_str(&s.value()).map_err(|e| nested.error(e))?);
             }
             other => return Err(nested.error(format!("unknown metric() key: {}", other))),
         }
@@ -476,12 +477,10 @@ pub(crate) fn parse_metric_attr(meta: &syn::meta::ParseNestedMeta) -> syn::Resul
 
     Ok(MetricAttr {
         name: name.ok_or_else(|| meta.error("metric: name is required"))?,
-        value_from: value_from
-            .ok_or_else(|| meta.error("metric: value_from is required"))?,
+        value_from: value_from.ok_or_else(|| meta.error("metric: value_from is required"))?,
         window_secs: window.ok_or_else(|| meta.error("metric: window is required"))?,
         min_samples,
-        aggregation: aggregation
-            .ok_or_else(|| meta.error("metric: aggregation is required"))?,
+        aggregation: aggregation.ok_or_else(|| meta.error("metric: aggregation is required"))?,
     })
 }
 

@@ -8,7 +8,7 @@ pub enum CommunityEvent {
     #[ai(
         importance = 0.6,
         salience = "accumulate",
-        observation_template = "Community discovered: {name} ({member_count} members)",
+        observation_template = "Community discovered: {name} ({member_count} members)"
     )]
     Discovered {
         community_id: String,
@@ -19,7 +19,7 @@ pub enum CommunityEvent {
     #[ai(
         importance = 0.4,
         salience = "accumulate",
-        observation_template = "Community {name} updated: {reason}",
+        observation_template = "Community {name} updated: {reason}"
     )]
     Updated {
         community_id: String,
@@ -30,7 +30,7 @@ pub enum CommunityEvent {
     #[ai(
         importance = 0.3,
         salience = "accumulate",
-        observation_template = "Community {name} weakened (stability {stability:.2})",
+        observation_template = "Community {name} weakened (stability {stability:.2})"
     )]
     Weakened {
         community_id: String,

@@ -23,14 +23,20 @@ fn aggregation_variants() {
 
 #[test]
 fn metric_sample_carries_name_and_value() {
-    let s = MetricSample { name: "coaching_acceptance_rate", value: 1.0 };
+    let s = MetricSample {
+        name: "coaching_acceptance_rate",
+        value: 1.0,
+    };
     assert_eq!(s.name, "coaching_acceptance_rate");
     assert_eq!(s.value, 1.0);
 }
 
 #[test]
 fn metric_sample_is_copy() {
-    let s = MetricSample { name: "x", value: 0.5 };
+    let s = MetricSample {
+        name: "x",
+        value: 0.5,
+    };
     let _s2 = s;
     let _s3 = s;
 }
@@ -74,7 +80,7 @@ fn registry_collects_specs() {
 }
 
 #[test]
-fn registry_rejects_duplicate_names() {
+fn registry_skips_duplicate_names() {
     static SPEC_1: MetricSpec = MetricSpec {
         name: "dup",
         window_secs: 60,
@@ -90,6 +96,7 @@ fn registry_rejects_duplicate_names() {
 
     let mut r = MetricRegistry::new();
     r.register(&SPEC_1);
-    let err = r.try_register(&SPEC_2).unwrap_err();
-    assert!(err.contains("dup"));
+    r.register(&SPEC_2); // should silently skip
+    assert_eq!(r.all().len(), 1);
+    assert_eq!(r.all()[0].window_secs, 60); // first one wins
 }
