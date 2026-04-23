@@ -1,5 +1,5 @@
 use proc_macro2::Span;
-use syn::{Attribute, Expr, ExprLit, Lit};
+use syn::{meta::ParseNestedMeta, Attribute, Expr, ExprLit, Ident, Lit, LitInt, LitStr};
 
 pub struct AiEventAttr {
     pub importance: Option<f64>,
@@ -8,6 +8,7 @@ pub struct AiEventAttr {
     pub observation_template: Option<String>,
     pub entity_bridge: Option<EntityBridge>,
     pub coaching: Option<CoachingSignalSpec>,
+    pub metric: Option<MetricAttr>,
 }
 
 pub struct CoachingSignalSpec {
@@ -46,6 +47,59 @@ pub struct MirrorSnapshotAttr {
     pub name: String,
     pub flush_interval_secs: Option<u64>,
     pub subscribed_kinds: Vec<String>,
+}
+
+#[derive(Debug, Clone)]
+pub struct MetricAttr {
+    pub name: String,
+    pub value_from: Expr,
+    pub window_secs: u64,
+    pub min_samples: u32,
+    pub aggregation: Aggregation,
+}
+
+/// Mirror of `ai_core::metric::Aggregation` used only within the proc-macro crate.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Aggregation {
+    Avg,
+    Sum,
+    Count,
+}
+
+impl Aggregation {
+    pub fn emit_tokens(&self) -> proc_macro2::TokenStream {
+        match self {
+            Aggregation::Avg => quote::quote!(::ai_core::Aggregation::Avg),
+            Aggregation::Sum => quote::quote!(::ai_core::Aggregation::Sum),
+            Aggregation::Count => quote::quote!(::ai_core::Aggregation::Count),
+        }
+    }
+
+    pub fn parse_str(s: &str) -> Result<Self, String> {
+        match s {
+            "avg" => Ok(Aggregation::Avg),
+            "sum" => Ok(Aggregation::Sum),
+            "count" => Ok(Aggregation::Count),
+            _ => Err(format!("aggregation must be avg|sum|count: {}", s)),
+        }
+    }
+}
+
+/// Compile-time parse of `"7d"` / `"1h"` / `"30m"` / `"15s"` into u64 seconds.
+pub fn parse_window_secs(s: &str) -> Result<u64, String> {
+    if s.is_empty() {
+        return Err("window must be non-empty (e.g. \"7d\")".into());
+    }
+    let (n, unit) = s.split_at(s.len() - 1);
+    let n: u64 = n.parse().map_err(|_| format!("window prefix must be numeric: {}", s))?;
+    let mult = match unit {
+        "s" => 1,
+        "m" => 60,
+        "h" => 3_600,
+        "d" => 86_400,
+        _ => return Err(format!("window unit must be s|m|h|d: {}", s)),
+    };
+    Ok(n.saturating_mul(mult))
 }
 
 /// Parses an enum-level `#[ai(domain = "Tasks")]` attribute. The value must be
@@ -89,6 +143,7 @@ pub fn parse_ai_event_attr(attrs: &[Attribute]) -> syn::Result<AiEventAttr> {
     let mut observation_template = None;
     let mut entity_bridge = None;
     let mut coaching = None;
+    let mut metric = None;
 
     ai_attr.parse_nested_meta(|meta| {
         let name = meta
@@ -131,6 +186,9 @@ pub fn parse_ai_event_attr(attrs: &[Attribute]) -> syn::Result<AiEventAttr> {
             "coaching_signal" => {
                 coaching = Some(parse_coaching_signal(&meta)?);
             }
+            "metric" => {
+                metric = Some(parse_metric_attr(&meta)?);
+            }
             other => return Err(meta.error(format!("unknown ai() key: {}", other))),
         }
         Ok(())
@@ -143,6 +201,7 @@ pub fn parse_ai_event_attr(attrs: &[Attribute]) -> syn::Result<AiEventAttr> {
         observation_template,
         entity_bridge,
         coaching,
+        metric,
     })
 }
 
@@ -364,6 +423,58 @@ fn parse_mirror_snapshot(meta: &syn::meta::ParseNestedMeta) -> syn::Result<Mirro
         })?,
         flush_interval_secs,
         subscribed_kinds,
+    })
+}
+
+pub(crate) fn parse_metric_attr(meta: &syn::meta::ParseNestedMeta) -> syn::Result<MetricAttr> {
+    let mut name: Option<String> = None;
+    let mut value_from: Option<Expr> = None;
+    let mut window: Option<u64> = None;
+    let mut min_samples: u32 = 3; // default
+    let mut aggregation: Option<Aggregation> = None;
+
+    meta.parse_nested_meta(|nested| {
+        let key = nested
+            .path
+            .get_ident()
+            .ok_or_else(|| nested.error("expected identifier"))?
+            .to_string();
+        match key.as_str() {
+            "name" => {
+                let s: LitStr = nested.value()?.parse()?;
+                name = Some(s.value());
+            }
+            "value_from" => {
+                let e: Expr = nested.value()?.parse()?;
+                value_from = Some(e);
+            }
+            "window" => {
+                let s: LitStr = nested.value()?.parse()?;
+                window = Some(parse_window_secs(&s.value()).map_err(|e| nested.error(e))?);
+            }
+            "min_samples" => {
+                let n: LitInt = nested.value()?.parse()?;
+                min_samples = n.base10_parse()?;
+            }
+            "aggregation" => {
+                let s: LitStr = nested.value()?.parse()?;
+                aggregation = Some(
+                    Aggregation::parse_str(&s.value()).map_err(|e| nested.error(e))?,
+                );
+            }
+            other => return Err(nested.error(format!("unknown metric() key: {}", other))),
+        }
+        Ok(())
+    })?;
+
+    Ok(MetricAttr {
+        name: name.ok_or_else(|| meta.error("metric: name is required"))?,
+        value_from: value_from
+            .ok_or_else(|| meta.error("metric: value_from is required"))?,
+        window_secs: window.ok_or_else(|| meta.error("metric: window is required"))?,
+        min_samples,
+        aggregation: aggregation
+            .ok_or_else(|| meta.error("metric: aggregation is required"))?,
     })
 }
 
