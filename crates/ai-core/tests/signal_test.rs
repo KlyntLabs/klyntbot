@@ -122,3 +122,13 @@ fn signal_metric_samples_default_empty() {
     };
     assert!(sig.metric_samples.is_empty());
 }
+
+#[test]
+fn coaching_domain_roundtrips() {
+    use ai_core::RecallDomain;
+    assert_eq!(RecallDomain::Coaching.as_str(), "coaching");
+    assert_eq!(
+        RecallDomain::from_str_or_general("coaching"),
+        RecallDomain::Coaching
+    );
+}
