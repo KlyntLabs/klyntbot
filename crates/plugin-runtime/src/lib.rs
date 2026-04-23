@@ -4,6 +4,8 @@
 //! wraps each plugin's tools as `Tool` impls, and registers them
 //! into the agent's `ToolRegistry` via `PluginPackage`.
 
+pub mod event_schema;
+pub use event_schema::{PluginEmittedEvent, PluginEventValidationError};
 pub mod host;
 pub mod manager;
 pub mod manifest;

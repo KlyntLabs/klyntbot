@@ -1515,6 +1515,7 @@ impl AgentLoopBuilder {
                 storage_pool.inner().clone(),
                 &config.plugins,
                 Some(bus.outbound_sender()),
+                self.domain_event_bus.clone(),
             ) {
                 Ok(plugin_manager) => {
                     let loaded_count = plugin_manager.packages().len();

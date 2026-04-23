@@ -103,7 +103,7 @@ mod plugin_integration {
         let pool = storage::StoragePool::connect_in_memory().await.unwrap();
         let config = PluginsConfig::default();
         let manager =
-            PluginManager::load_all(tmp.path(), pool.inner().clone(), &config, None).unwrap();
+            PluginManager::load_all(tmp.path(), pool.inner().clone(), &config, None, None).unwrap();
 
         assert_eq!(manager.packages().len(), 1);
         assert_eq!(manager.packages()[0].name(), "hello-plugin");

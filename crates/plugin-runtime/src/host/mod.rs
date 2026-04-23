@@ -3,6 +3,8 @@
 //! Five namespaces: db, log, http, agent, tool.
 //! Each host function checks permissions before executing.
 
+use std::sync::Arc;
+
 use extism::{Function, UserData, PTR};
 use tracing::{debug, error, info, warn};
 
@@ -16,6 +18,7 @@ struct HostContext {
     plugin_id: String,
     permissions: Vec<PluginPermission>,
     bus_sender: Option<tokio::sync::mpsc::Sender<bus::OutboundMessage>>,
+    domain_event_bus: Option<Arc<bus::DomainEventBus>>,
     http_client: reqwest::Client,
 }
 
@@ -120,12 +123,14 @@ pub fn build_host_functions(
     plugin_id: String,
     permissions: Vec<PluginPermission>,
     bus_sender: Option<tokio::sync::mpsc::Sender<bus::OutboundMessage>>,
+    domain_event_bus: Option<Arc<bus::DomainEventBus>>,
 ) -> Vec<Function> {
     let ctx = HostContext {
         pool,
         plugin_id,
         permissions,
         bus_sender,
+        domain_event_bus,
         http_client: shared_http_client().clone(),
     };
     let ud = UserData::new(ctx);
@@ -502,7 +507,7 @@ pub fn build_host_functions(
         functions.push(f);
     }
 
-    // agent_emit_event: emit a custom event
+    // agent_emit_event: parse, validate, publish to DomainEventBus
     {
         let f = Function::new(
             "agent_emit_event",
@@ -515,16 +520,47 @@ pub fn build_host_functions(
                 let ctx = data.lock().unwrap();
 
                 if !ctx.permissions.contains(&PluginPermission::Agent) {
-                    let handle = plugin.memory_new("error: agent permission denied")?;
+                    let handle =
+                        plugin.memory_new(r#"{"error":"agent permission denied"}"#)?;
                     outputs[0] = plugin.memory_to_val(handle);
                     return Ok(());
                 }
 
-                info!(
-                    plugin_id = %ctx.plugin_id,
-                    event = %input,
-                    "plugin event emitted"
-                );
+                let event: crate::PluginEmittedEvent = match serde_json::from_str(&input) {
+                    Ok(e) => e,
+                    Err(e) => {
+                        let msg = format!(r#"{{"error":"invalid JSON: {}"}}"#, e);
+                        let handle = plugin.memory_new(&msg)?;
+                        outputs[0] = plugin.memory_to_val(handle);
+                        return Ok(());
+                    }
+                };
+
+                if let Err(e) = event.validate() {
+                    let msg = format!(r#"{{"error":"validation failed: {}"}}"#, e);
+                    let handle = plugin.memory_new(&msg)?;
+                    outputs[0] = plugin.memory_to_val(handle);
+                    return Ok(());
+                }
+
+                // Publish to bus.
+                if let Some(ref bus) = ctx.domain_event_bus {
+                    bus.publish(bus::DomainEvent::PluginEvent {
+                        plugin_id: ctx.plugin_id.clone(),
+                        kind: event.kind.clone(),
+                        payload: event.payload.clone(),
+                    });
+                    info!(
+                        plugin_id = %ctx.plugin_id,
+                        kind = %event.kind,
+                        "plugin event published"
+                    );
+                } else {
+                    warn!(
+                        plugin_id = %ctx.plugin_id,
+                        "plugin event dropped: no DomainEventBus wired"
+                    );
+                }
 
                 let handle = plugin.memory_new(r#"{"ok":true}"#)?;
                 outputs[0] = plugin.memory_to_val(handle);

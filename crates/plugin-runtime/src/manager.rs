@@ -1,6 +1,7 @@
 //! PluginManager: discovers and loads all WASM plugins from disk.
 
 use std::path::{Path, PathBuf};
+use std::sync::Arc;
 
 use config::schema::PluginsConfig;
 use tracing::{info, warn};
@@ -71,6 +72,7 @@ impl PluginManager {
         pool: sqlx::SqlitePool,
         config: &PluginsConfig,
         bus_sender: Option<tokio::sync::mpsc::Sender<bus::OutboundMessage>>,
+        domain_event_bus: Option<Arc<bus::DomainEventBus>>,
     ) -> common::Result<Self> {
         if !config.enabled {
             info!("plugin system disabled, skipping plugin loading");
@@ -99,6 +101,7 @@ impl PluginManager {
                 pool.clone(),
                 config,
                 bus_sender.clone(),
+                domain_event_bus.clone(),
             ) {
                 Ok(pkg) => {
                     info!(plugin_id = %plugin_id, "loaded plugin");
@@ -125,6 +128,7 @@ impl PluginManager {
         pool: sqlx::SqlitePool,
         config: &PluginsConfig,
         bus_sender: Option<tokio::sync::mpsc::Sender<bus::OutboundMessage>>,
+        domain_event_bus: Option<Arc<bus::DomainEventBus>>,
     ) -> common::Result<PluginPackage> {
         let wasm_bytes = std::fs::read(wasm_path)?;
 
@@ -133,6 +137,7 @@ impl PluginManager {
             manifest.id.clone(),
             manifest.permissions.clone(),
             bus_sender,
+            domain_event_bus,
         );
 
         // Convert sandbox_memory_mb to wasm pages (1 page = 64KB)
@@ -226,7 +231,7 @@ mod tests {
             ..PluginsConfig::default()
         };
         let pool = storage::StoragePool::connect_in_memory().await.unwrap();
-        let mgr = PluginManager::load_all(tmp.path(), pool.inner().clone(), &config, None).unwrap();
+        let mgr = PluginManager::load_all(tmp.path(), pool.inner().clone(), &config, None, None).unwrap();
         assert!(mgr.packages().is_empty());
     }
 
@@ -238,6 +243,7 @@ mod tests {
             Path::new("/nonexistent"),
             pool.inner().clone(),
             &config,
+            None,
             None,
         )
         .unwrap();
