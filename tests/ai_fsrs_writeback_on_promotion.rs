@@ -24,12 +24,11 @@ async fn promotion_writes_desired_retention_to_table() {
         .await
         .expect("writeback ok");
 
-    let (_w, ret): (String, f64) = sqlx::query_as(
-        "SELECT weights, desired_retention FROM fsrs_parameters WHERE id = 'local'",
-    )
-    .fetch_one(pool.inner())
-    .await
-    .unwrap();
+    let (_w, ret): (String, f64) =
+        sqlx::query_as("SELECT weights, desired_retention FROM fsrs_parameters WHERE id = 'local'")
+            .fetch_one(pool.inner())
+            .await
+            .unwrap();
 
     assert!((ret - 0.88).abs() < 1e-9, "expected 0.88, got {ret}");
 }
@@ -57,12 +56,14 @@ async fn promotion_with_none_retention_is_no_op() {
         .await
         .expect("no-op writeback ok");
 
-    let (_w, ret): (String, f64) = sqlx::query_as(
-        "SELECT weights, desired_retention FROM fsrs_parameters WHERE id = 'local'",
-    )
-    .fetch_one(pool.inner())
-    .await
-    .unwrap();
+    let (_w, ret): (String, f64) =
+        sqlx::query_as("SELECT weights, desired_retention FROM fsrs_parameters WHERE id = 'local'")
+            .fetch_one(pool.inner())
+            .await
+            .unwrap();
 
-    assert!((ret - 0.80).abs() < 1e-9, "expected 0.80 unchanged, got {ret}");
+    assert!(
+        (ret - 0.80).abs() < 1e-9,
+        "expected 0.80 unchanged, got {ret}"
+    );
 }

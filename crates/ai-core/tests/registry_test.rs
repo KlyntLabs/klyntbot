@@ -11,7 +11,9 @@ fn registry_register_and_lookup_by_domain() {
         entity_kind: Some("task"),
     });
 
-    let rec = reg.by_domain(&RecallDomain::Tasks).expect("tasks registered");
+    let rec = reg
+        .by_domain(&RecallDomain::Tasks)
+        .expect("tasks registered");
     assert_eq!(rec.skill, "task-management");
     assert_eq!(rec.tool_name, Some("tasks"));
     assert_eq!(rec.entity_kind, Some("task"));
@@ -33,8 +35,7 @@ fn registry_iteration_is_stable_in_insertion_order() {
         entity_kind: Some("finance_transaction"),
     });
 
-    let names: Vec<&'static str> =
-        reg.iter().filter_map(|r| r.tool_name).collect();
+    let names: Vec<&'static str> = reg.iter().filter_map(|r| r.tool_name).collect();
     assert_eq!(names, vec!["tasks", "finance"]);
 }
 
@@ -44,7 +45,7 @@ fn registry_tool_names_returns_only_some() {
     reg.register(FeatureRecord {
         domain: RecallDomain::Coaching,
         skill: "coaching",
-        tool_name: None,                    // coaching has no tool exposed
+        tool_name: None, // coaching has no tool exposed
         entity_kind: None,
     });
     reg.register(FeatureRecord {
@@ -91,5 +92,8 @@ fn registry_register_panics_on_duplicate_domain() {
             entity_kind: None,
         });
     });
-    assert!(result.is_err(), "registering same domain twice should panic");
+    assert!(
+        result.is_err(),
+        "registering same domain twice should panic"
+    );
 }

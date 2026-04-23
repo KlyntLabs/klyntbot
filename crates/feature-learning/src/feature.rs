@@ -12,7 +12,7 @@ use tools_core::{DynTool, FeatureMigration, FeaturePackage, HealthStatus};
     skill = "learning",
     tool_name = "learning",
     entity_kind = "knowledge_atom",
-    event = "crate::events::LearningEvent",
+    event = "crate::events::LearningEvent"
 )]
 pub struct LearningFeature {
     pool: Option<storage::StoragePool>,

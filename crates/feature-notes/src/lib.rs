@@ -23,7 +23,7 @@ use tools_core::{FeatureMigration, FeaturePackage, HealthStatus};
     skill = "notebook",
     tool_name = "notes",
     entity_kind = "note",
-    event = "crate::events::NoteEvent",
+    event = "crate::events::NoteEvent"
 )]
 pub struct NotesFeature {
     repo: repo::NoteRepo,

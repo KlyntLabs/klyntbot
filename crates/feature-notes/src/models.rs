@@ -212,7 +212,6 @@ impl From<NoteVersionRow> for NoteVersion {
     }
 }
 
-
 #[cfg(test)]
 mod ai_entity_tests {
     use super::*;

@@ -15,14 +15,13 @@ pub mod work_context_repo;
 pub mod work_context_tool;
 pub mod work_resource_repo;
 
+pub use consumer::NormalizerSignalConsumer;
 pub use context_action_repo::ContextTaskRepo;
 pub use context_resource_repo::ContextResourceRepo;
 pub use context_source::WorkContextSource;
-pub use consumer::NormalizerSignalConsumer;
 pub use normalizers::{
-    parse_rfc3339, ActivityNormalizer, ChatMessageInput,
-    ChatMessageNormalizer, ToolCallInput, ToolCallNormalizer,
-    WindowEventInput, WindowEventNormalizer,
+    parse_rfc3339, ActivityNormalizer, ChatMessageInput, ChatMessageNormalizer, ToolCallInput,
+    ToolCallNormalizer, WindowEventInput, WindowEventNormalizer,
 };
 pub use privacy::PrivacyFilter;
 pub use repo::ActivityLogRepo;

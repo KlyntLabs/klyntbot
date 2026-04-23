@@ -506,7 +506,10 @@ impl AppCore {
 
         // ── Phase 9: AI Pipeline — SignalRouter + all consumers ───────────
         let feature_registry = Arc::new(ai_pipeline::build_feature_registry());
-        tracing::info!(features = feature_registry.len(), "ai feature registry built");
+        tracing::info!(
+            features = feature_registry.len(),
+            "ai feature registry built"
+        );
 
         // Post-load fill: if the user hasn't overridden exposed_tools, derive it
         // from the registry so new features are auto-exposed without config edits.

@@ -22,7 +22,9 @@ pub struct AiFeatureRegistry {
 
 impl AiFeatureRegistry {
     pub fn new() -> Self {
-        Self { records: Vec::new() }
+        Self {
+            records: Vec::new(),
+        }
     }
 
     /// Register a feature. Panics if the same `RecallDomain` is registered twice

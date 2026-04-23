@@ -207,7 +207,13 @@ mod tests {
 
     #[test]
     fn task_created_maps_correctly() {
-        let sig = test_signal_with_entity("TaskCreated", RecallDomain::Tasks, "Task created", "task", "t-123");
+        let sig = test_signal_with_entity(
+            "TaskCreated",
+            RecallDomain::Tasks,
+            "Task created",
+            "task",
+            "t-123",
+        );
         let entry = signal_to_entry(&sig);
         assert_eq!(entry.source, ActivitySource::Task);
         assert_eq!(entry.action, "create");
@@ -217,7 +223,13 @@ mod tests {
 
     #[test]
     fn focus_session_started_maps_correctly() {
-        let sig = test_signal_with_entity("FocusSessionStarted", RecallDomain::Productivity, "Focus started", "focus_session", "fs-1");
+        let sig = test_signal_with_entity(
+            "FocusSessionStarted",
+            RecallDomain::Productivity,
+            "Focus started",
+            "focus_session",
+            "fs-1",
+        );
         let entry = signal_to_entry(&sig);
         assert_eq!(entry.source, ActivitySource::FocusSession);
         assert_eq!(entry.action, "start");
@@ -225,7 +237,13 @@ mod tests {
 
     #[test]
     fn note_created_maps_correctly() {
-        let sig = test_signal_with_entity("NoteCreated", RecallDomain::Notes, "Note created", "note", "n-1");
+        let sig = test_signal_with_entity(
+            "NoteCreated",
+            RecallDomain::Notes,
+            "Note created",
+            "note",
+            "n-1",
+        );
         let entry = signal_to_entry(&sig);
         assert_eq!(entry.source, ActivitySource::Note);
         assert_eq!(entry.action, "create");
@@ -234,7 +252,11 @@ mod tests {
 
     #[test]
     fn system_events_use_system_actor() {
-        let sig = test_signal("ProductivityScoreComputed", RecallDomain::Productivity, "Score computed");
+        let sig = test_signal(
+            "ProductivityScoreComputed",
+            RecallDomain::Productivity,
+            "Score computed",
+        );
         let entry = signal_to_entry(&sig);
         assert_eq!(entry.actor, ActivityActor::System);
         assert_eq!(entry.action, "compute");

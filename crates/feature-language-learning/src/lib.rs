@@ -22,7 +22,7 @@ use tools_core::{FeatureMigration, FeaturePackage, HealthStatus};
     skill = "learning",
     tool_name = "language_practice",
     entity_kind = "pronunciation_report",
-    event = "crate::events::LanguageLearningEvent",
+    event = "crate::events::LanguageLearningEvent"
 )]
 pub struct LanguageLearningFeature;
 

@@ -49,8 +49,7 @@ mod plugin_integration {
         let pool = storage::StoragePool::connect_in_memory().await.unwrap();
         let config = PluginsConfig::default();
         let manager =
-            PluginManager::load_all(tmp.path(), pool.inner().clone(), &config, None, None)
-                .unwrap();
+            PluginManager::load_all(tmp.path(), pool.inner().clone(), &config, None, None).unwrap();
 
         assert_eq!(manager.packages().len(), 1);
 
@@ -59,7 +58,10 @@ mod plugin_integration {
         let hello_idx = tools.iter().position(|t| t.name() == "hello_tool").unwrap();
 
         let args = serde_json::json!({"name": "klyntbot"});
-        let result = tools[hello_idx].execute(args, &routing_ctx()).await.unwrap();
+        let result = tools[hello_idx]
+            .execute(args, &routing_ctx())
+            .await
+            .unwrap();
         assert!(result.contains("hello from wasm"));
         assert!(result.contains("klyntbot"));
     }
@@ -125,7 +127,10 @@ mod plugin_integration {
         assert_eq!(tools.len(), 2);
 
         let args = serde_json::json!({"name": "integration-test"});
-        let result = tools[hello_idx].execute(args, &routing_ctx()).await.unwrap();
+        let result = tools[hello_idx]
+            .execute(args, &routing_ctx())
+            .await
+            .unwrap();
         assert!(result.contains("hello from wasm"));
         assert!(result.contains("integration-test"));
     }

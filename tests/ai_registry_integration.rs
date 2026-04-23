@@ -13,7 +13,9 @@ fn tasks_and_finance_register_into_registry() {
     assert_eq!(tasks.tool_name, Some("tasks"));
     assert_eq!(tasks.entity_kind, Some("task"));
 
-    let finance = reg.by_domain(&ai_core::RecallDomain::Finance).expect("finance");
+    let finance = reg
+        .by_domain(&ai_core::RecallDomain::Finance)
+        .expect("finance");
     assert_eq!(finance.skill, "finance-management");
     assert_eq!(finance.tool_name, Some("finance"));
     assert_eq!(finance.entity_kind, Some("finance_transaction"));

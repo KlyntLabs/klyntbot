@@ -559,7 +559,6 @@ pub struct WeeklyAssessment {
     pub created_at: String,
 }
 
-
 #[cfg(test)]
 mod ai_entity_tests {
     use super::*;

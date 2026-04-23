@@ -12,7 +12,7 @@ use tools_core::{DynTool, FeatureMigration, FeaturePackage, HealthStatus};
 #[ai(
     recall_domain = "Coaching",
     skill = "automation",
-    event = "crate::events::CoachingEvent",
+    event = "crate::events::CoachingEvent"
 )]
 pub struct CoachingFeature;
 

@@ -26,7 +26,6 @@ pub fn content_hash(content: &str) -> String {
     format!("{:x}", hasher.finalize())
 }
 
-
 // ── Chat message normalizer ─────────────────────────────────────
 
 /// Input for ChatMessageNormalizer: (session_key, role, content)

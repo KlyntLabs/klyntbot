@@ -708,7 +708,8 @@ impl DomainEvent {
     /// `event_type` value for [`DomainEvent::PhoneticMasteryGained`].
     pub const KIND_PHONETIC_MASTERY_GAINED: &'static str = "PhoneticMasteryGained";
     /// `event_type` value for [`DomainEvent::LanguagePracticeSessionCompleted`].
-    pub const KIND_LANGUAGE_PRACTICE_SESSION_COMPLETED: &'static str = "LanguagePracticeSessionCompleted";
+    pub const KIND_LANGUAGE_PRACTICE_SESSION_COMPLETED: &'static str =
+        "LanguagePracticeSessionCompleted";
     /// `event_type` value for [`DomainEvent::InterventionTriggered`].
     pub const KIND_INTERVENTION_TRIGGERED: &'static str = "InterventionTriggered";
     /// `event_type` value for [`DomainEvent::ContradictionDetected`].

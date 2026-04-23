@@ -6,14 +6,18 @@ use std::collections::HashSet;
 fn exposed_tools_post_init_equals_registry_plus_allowlist() {
     let reg = app_core::init::ai_pipeline::build_feature_registry();
     let registry_tools: HashSet<&'static str> = reg.tool_names().into_iter().collect();
-    let allowlist: HashSet<&'static str> =
-        config::schema::EXPLICIT_TOOL_ALLOWLIST.iter().copied().collect();
+    let allowlist: HashSet<&'static str> = config::schema::EXPLICIT_TOOL_ALLOWLIST
+        .iter()
+        .copied()
+        .collect();
 
-    let expected: HashSet<&'static str> =
-        registry_tools.union(&allowlist).copied().collect();
+    let expected: HashSet<&'static str> = registry_tools.union(&allowlist).copied().collect();
 
     // Simulate the app-core post-load fill:
-    let mut filled: Vec<String> = registry_tools.iter().map(|s: &&str| s.to_string()).collect();
+    let mut filled: Vec<String> = registry_tools
+        .iter()
+        .map(|s: &&str| s.to_string())
+        .collect();
     filled.extend(allowlist.iter().map(|s| s.to_string()));
     let filled_set: HashSet<String> = filled.into_iter().collect();
 
@@ -25,8 +29,10 @@ fn exposed_tools_post_init_equals_registry_plus_allowlist() {
 fn no_overlap_between_registry_and_allowlist() {
     let reg = app_core::init::ai_pipeline::build_feature_registry();
     let registry_tools: HashSet<&'static str> = reg.tool_names().into_iter().collect();
-    let allowlist: HashSet<&'static str> =
-        config::schema::EXPLICIT_TOOL_ALLOWLIST.iter().copied().collect();
+    let allowlist: HashSet<&'static str> = config::schema::EXPLICIT_TOOL_ALLOWLIST
+        .iter()
+        .copied()
+        .collect();
     let overlap: HashSet<_> = registry_tools.intersection(&allowlist).collect();
     assert!(
         overlap.is_empty(),

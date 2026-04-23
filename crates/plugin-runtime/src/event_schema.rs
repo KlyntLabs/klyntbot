@@ -29,8 +29,14 @@ impl PluginEmittedEvent {
         if self.kind.len() > 64 {
             return Err(PluginEventValidationError::KindTooLong);
         }
-        if !self.kind.chars().all(|c| c.is_ascii_alphanumeric() || c == '_') {
-            return Err(PluginEventValidationError::InvalidKindChars(self.kind.clone()));
+        if !self
+            .kind
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || c == '_')
+        {
+            return Err(PluginEventValidationError::InvalidKindChars(
+                self.kind.clone(),
+            ));
         }
         let payload_size = serde_json::to_vec(&self.payload)
             .map(|v| v.len())
@@ -60,7 +66,10 @@ mod tests {
             kind: "".to_string(),
             payload: serde_json::Value::Null,
         };
-        assert!(matches!(e.validate(), Err(PluginEventValidationError::EmptyKind)));
+        assert!(matches!(
+            e.validate(),
+            Err(PluginEventValidationError::EmptyKind)
+        ));
     }
 
     #[test]

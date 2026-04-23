@@ -231,7 +231,8 @@ mod tests {
             ..PluginsConfig::default()
         };
         let pool = storage::StoragePool::connect_in_memory().await.unwrap();
-        let mgr = PluginManager::load_all(tmp.path(), pool.inner().clone(), &config, None, None).unwrap();
+        let mgr =
+            PluginManager::load_all(tmp.path(), pool.inner().clone(), &config, None, None).unwrap();
         assert!(mgr.packages().is_empty());
     }
 

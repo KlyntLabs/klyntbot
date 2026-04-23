@@ -2,13 +2,13 @@
 
 #![cfg(feature = "plugin-integration")]
 
-use std::path::PathBuf;
-use std::sync::Arc;
 use bus::{DomainEvent, DomainEventBus};
 use common::{ChannelName, ChatId};
 use plugin_runtime::PluginManager;
-use tools_core::FeaturePackage;
+use std::path::PathBuf;
+use std::sync::Arc;
 use tokio::time::{timeout, Duration};
+use tools_core::FeaturePackage;
 
 #[tokio::test]
 async fn fixture_plugin_emit_published_to_bus() {
@@ -54,8 +54,7 @@ async fn fixture_plugin_emit_published_to_bus() {
         .find(|t: &&tools_core::DynTool| t.name() == "emit_test_event")
         .expect("emit_test_event tool found");
 
-    let routing_ctx =
-        tools_core::RoutingContext::new(ChannelName::new("cli"), ChatId::new("test"));
+    let routing_ctx = tools_core::RoutingContext::new(ChannelName::new("cli"), ChatId::new("test"));
     let result = emit_tool
         .execute(serde_json::json!({}), &routing_ctx)
         .await

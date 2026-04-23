@@ -520,8 +520,7 @@ pub fn build_host_functions(
                 let ctx = data.lock().unwrap();
 
                 if !ctx.permissions.contains(&PluginPermission::Agent) {
-                    let handle =
-                        plugin.memory_new(r#"{"error":"agent permission denied"}"#)?;
+                    let handle = plugin.memory_new(r#"{"error":"agent permission denied"}"#)?;
                     outputs[0] = plugin.memory_to_val(handle);
                     return Ok(());
                 }

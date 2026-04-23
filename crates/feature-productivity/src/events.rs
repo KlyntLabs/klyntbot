@@ -26,7 +26,7 @@ pub enum ProductivityEvent {
     #[ai(
         importance = 0.4,
         salience = "accumulate",
-        observation_template = "Focus session started: {session_type} ({target_mins}m)",
+        observation_template = "Focus session started: {session_type} ({target_mins}m)"
     )]
     FocusSessionStarted {
         session_type: String,
@@ -36,7 +36,7 @@ pub enum ProductivityEvent {
     #[ai(
         importance = 0.5,
         salience = "accumulate",
-        observation_template = "Focus session ended: {duration_secs}s, quality {quality:.2}",
+        observation_template = "Focus session ended: {duration_secs}s, quality {quality:.2}"
     )]
     FocusSessionEnded {
         duration_secs: i64,
@@ -48,7 +48,7 @@ pub enum ProductivityEvent {
         importance = 0.6,
         salience = "accumulate",
         observation_template = "Distraction: {app} — {context}",
-        coaching_signal,
+        coaching_signal
     )]
     DistractionDetected {
         app: String,
@@ -59,7 +59,7 @@ pub enum ProductivityEvent {
     #[ai(
         importance = 0.4,
         salience = "accumulate",
-        observation_template = "Activity completed: {date} ({total_active_secs}s active)",
+        observation_template = "Activity completed: {date} ({total_active_secs}s active)"
     )]
     ActivitySessionCompleted {
         date: String,
@@ -71,12 +71,9 @@ pub enum ProductivityEvent {
     #[ai(
         importance = 0.4,
         salience = "extract_if(*score > 0.8 || *score < 0.3)",
-        observation_template = "Productivity score: {score:.2}",
+        observation_template = "Productivity score: {score:.2}"
     )]
-    ProductivityScoreComputed {
-        date: String,
-        score: f64,
-    },
+    ProductivityScoreComputed { date: String, score: f64 },
 }
 
 impl From<ProductivityEvent> for DomainEvent {

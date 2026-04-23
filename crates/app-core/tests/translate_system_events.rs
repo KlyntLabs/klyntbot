@@ -38,7 +38,10 @@ fn coaching_pattern_translates() {
     };
     let sig = translate(&e).expect("should translate");
     assert_eq!(sig.event_kind, "PatternDetected");
-    assert_eq!(sig.content, "Coaching pattern detected: afternoon_energy_drop (severity 0.8)");
+    assert_eq!(
+        sig.content,
+        "Coaching pattern detected: afternoon_energy_drop (severity 0.8)"
+    );
 }
 
 #[test]

@@ -246,21 +246,15 @@ fn try_into_learning_event(e: &DomainEvent) -> Option<feature_learning::Learning
             note_id: note_id.clone(),
             text: text.clone(),
         }),
-        DomainEvent::KnowledgeAtomCreated { atom_id, .. } => {
-            Some(LearningEvent::AtomCreated {
-                atom_id: atom_id.clone(),
-            })
-        }
-        DomainEvent::KnowledgeAtomAccepted { atom_id, .. } => {
-            Some(LearningEvent::AtomAccepted {
-                atom_id: atom_id.clone(),
-            })
-        }
-        DomainEvent::KnowledgeAtomArchived { atom_id, .. } => {
-            Some(LearningEvent::AtomArchived {
-                atom_id: atom_id.clone(),
-            })
-        }
+        DomainEvent::KnowledgeAtomCreated { atom_id, .. } => Some(LearningEvent::AtomCreated {
+            atom_id: atom_id.clone(),
+        }),
+        DomainEvent::KnowledgeAtomAccepted { atom_id, .. } => Some(LearningEvent::AtomAccepted {
+            atom_id: atom_id.clone(),
+        }),
+        DomainEvent::KnowledgeAtomArchived { atom_id, .. } => Some(LearningEvent::AtomArchived {
+            atom_id: atom_id.clone(),
+        }),
         DomainEvent::AtomFlashcardReviewed {
             atom_id,
             card_id,
@@ -276,11 +270,9 @@ fn try_into_learning_event(e: &DomainEvent) -> Option<feature_learning::Learning
             new_retention_pct: *new_retention_pct,
             source_note_id: source_note_id.clone(),
         }),
-        DomainEvent::AtomReinforced { atom_id, .. } => {
-            Some(LearningEvent::AtomReinforced {
-                atom_id: atom_id.clone(),
-            })
-        }
+        DomainEvent::AtomReinforced { atom_id, .. } => Some(LearningEvent::AtomReinforced {
+            atom_id: atom_id.clone(),
+        }),
         DomainEvent::FlashcardScheduled {
             flashcard_id,
             atom_id,

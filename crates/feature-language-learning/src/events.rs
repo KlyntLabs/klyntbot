@@ -7,7 +7,7 @@ pub enum LanguageLearningEvent {
     #[ai(
         importance = 0.6,
         salience = "extract_if(*overall_score < 0.6 || !weak_phonemes.is_empty())",
-        observation_template = "Pronunciation scored {overall_score} (session {session_id})",
+        observation_template = "Pronunciation scored {overall_score} (session {session_id})"
     )]
     PronunciationScored {
         session_id: String,
@@ -18,7 +18,7 @@ pub enum LanguageLearningEvent {
     #[ai(
         importance = 0.7,
         salience = "extract",
-        observation_template = "Exam {exam_id}: {score} ({passed})",
+        observation_template = "Exam {exam_id}: {score} ({passed})"
     )]
     ExamAttempted {
         exam_id: String,
@@ -29,17 +29,14 @@ pub enum LanguageLearningEvent {
     #[ai(
         importance = 0.5,
         salience = "extract",
-        observation_template = "Phoneme mastery: /{phoneme}/ at {mastery_level}",
+        observation_template = "Phoneme mastery: /{phoneme}/ at {mastery_level}"
     )]
-    PhoneticMasteryGained {
-        phoneme: String,
-        mastery_level: f64,
-    },
+    PhoneticMasteryGained { phoneme: String, mastery_level: f64 },
 
     #[ai(
         importance = 0.4,
         salience = "accumulate",
-        observation_template = "Practice session ({language}) done: {success_rate} success",
+        observation_template = "Practice session ({language}) done: {success_rate} success"
     )]
     PracticeSessionCompleted {
         session_id: String,

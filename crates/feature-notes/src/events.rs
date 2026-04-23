@@ -8,58 +8,46 @@ pub enum NoteEvent {
         importance = 0.5,
         salience = "accumulate",
         observation_template = "Created note '{title}'",
-        entity_bridge(type = "note", name_from = "title", id_from = "note_id"),
+        entity_bridge(type = "note", name_from = "title", id_from = "note_id")
     )]
-    Created {
-        note_id: String,
-        title: String,
-    },
+    Created { note_id: String, title: String },
 
     #[ai(
         importance = 0.4,
         salience = "accumulate",
         observation_template = "Updated note '{title}'",
-        entity_bridge(type = "note", name_from = "title", id_from = "note_id"),
+        entity_bridge(type = "note", name_from = "title", id_from = "note_id")
     )]
-    Updated {
-        note_id: String,
-        title: String,
-    },
+    Updated { note_id: String, title: String },
 
     #[ai(
         importance = 0.3,
         salience = "accumulate",
         observation_template = "Note content changed",
-        entity_bridge(type = "note", name_from = "note_id", id_from = "note_id"),
+        entity_bridge(type = "note", name_from = "note_id", id_from = "note_id")
     )]
-    ContentChanged {
-        note_id: String,
-    },
+    ContentChanged { note_id: String },
 
     #[ai(
         importance = 0.4,
         salience = "extract",
         observation_template = "Finished editing note",
-        entity_bridge(type = "note", name_from = "note_id", id_from = "note_id"),
+        entity_bridge(type = "note", name_from = "note_id", id_from = "note_id")
     )]
-    EditingFinished {
-        note_id: String,
-    },
+    EditingFinished { note_id: String },
 
     #[ai(
         importance = 0.4,
         salience = "accumulate",
-        observation_template = "Deleted note",
+        observation_template = "Deleted note"
     )]
-    Deleted {
-        note_id: String,
-    },
+    Deleted { note_id: String },
 
     #[ai(
         importance = 0.5,
         salience = "extract",
         observation_template = "Studied note for {duration_secs}s",
-        entity_bridge(type = "note", name_from = "note_id", id_from = "note_id"),
+        entity_bridge(type = "note", name_from = "note_id", id_from = "note_id")
     )]
     Studied {
         note_id: String,
@@ -72,7 +60,7 @@ pub enum NoteEvent {
         importance = 0.5,
         salience = "accumulate",
         observation_template = "Practice unit completed for note {note_id}",
-        entity_bridge(type = "note", name_from = "note_id", id_from = "note_id"),
+        entity_bridge(type = "note", name_from = "note_id", id_from = "note_id")
     )]
     PracticeUnitCompleted {
         session_id: String,
@@ -87,7 +75,7 @@ pub enum NoteEvent {
     #[ai(
         importance = 0.6,
         salience = "extract",
-        observation_template = "Practice session done: {average_score:.1}",
+        observation_template = "Practice session done: {average_score:.1}"
     )]
     PracticeSessionCompleted {
         session_id: String,
@@ -102,7 +90,7 @@ pub enum NoteEvent {
     #[ai(
         importance = 0.4,
         salience = "accumulate",
-        observation_template = "Translation completed for note {note_id}",
+        observation_template = "Translation completed for note {note_id}"
     )]
     TranslationCompleted {
         note_id: String,

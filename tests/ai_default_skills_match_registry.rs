@@ -8,8 +8,7 @@ use std::collections::HashSet;
 #[test]
 fn every_default_skill_filename_corresponds_to_registered_feature_skill() {
     let reg = klyntbot::app_core::init::ai_pipeline::build_feature_registry();
-    let registered_skills: HashSet<&'static str> =
-        reg.iter().map(|r| r.skill).collect();
+    let registered_skills: HashSet<&'static str> = reg.iter().map(|r| r.skill).collect();
 
     // Hardcoded DEFAULT_SKILLS filenames (must match crates/skill-system/src/store.rs).
     // The skill-name is the filename minus ".md".

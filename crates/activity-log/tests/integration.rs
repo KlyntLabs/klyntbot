@@ -246,10 +246,7 @@ async fn test_count_by_source() {
     ));
     let consumer = NormalizerSignalConsumer::new(Arc::clone(&svc));
 
-    consumer
-        .consume(&task_created_signal("t1"))
-        .await
-        .unwrap();
+    consumer.consume(&task_created_signal("t1")).await.unwrap();
     consumer
         .consume(&task_completed_signal("t1"))
         .await

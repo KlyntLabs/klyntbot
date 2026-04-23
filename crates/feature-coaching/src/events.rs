@@ -31,12 +31,9 @@ pub enum CoachingEvent {
     #[ai(
         importance = 0.6,
         salience = "extract",
-        observation_template = "Coaching pattern detected: {pattern_name} (severity {severity})",
+        observation_template = "Coaching pattern detected: {pattern_name} (severity {severity})"
     )]
-    PatternDetected {
-        pattern_name: String,
-        severity: f64,
-    },
+    PatternDetected { pattern_name: String, severity: f64 },
 
     #[ai(
         importance = 0.5,

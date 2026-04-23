@@ -8,7 +8,7 @@ pub enum LearningEvent {
         importance = 0.6,
         salience = "extract",
         observation_template = "Knowledge atom extracted from note {note_id}: {text}",
-        entity_bridge(type = "knowledge_atom", name_from = "text", id_from = "atom_id"),
+        entity_bridge(type = "knowledge_atom", name_from = "text", id_from = "atom_id")
     )]
     AtomExtracted {
         atom_id: String,
@@ -19,34 +19,28 @@ pub enum LearningEvent {
     #[ai(
         importance = 0.4,
         salience = "accumulate",
-        observation_template = "Knowledge atom created: {atom_id}",
+        observation_template = "Knowledge atom created: {atom_id}"
     )]
-    AtomCreated {
-        atom_id: String,
-    },
+    AtomCreated { atom_id: String },
 
     #[ai(
         importance = 0.5,
         salience = "extract",
-        observation_template = "Knowledge atom accepted: {atom_id}",
+        observation_template = "Knowledge atom accepted: {atom_id}"
     )]
-    AtomAccepted {
-        atom_id: String,
-    },
+    AtomAccepted { atom_id: String },
 
     #[ai(
         importance = 0.3,
         salience = "accumulate",
-        observation_template = "Knowledge atom archived: {atom_id}",
+        observation_template = "Knowledge atom archived: {atom_id}"
     )]
-    AtomArchived {
-        atom_id: String,
-    },
+    AtomArchived { atom_id: String },
 
     #[ai(
         importance = 0.5,
         salience = "accumulate",
-        observation_template = "Flashcard reviewed (quality {quality}): {card_id}",
+        observation_template = "Flashcard reviewed (quality {quality}): {card_id}"
     )]
     FlashcardReviewed {
         atom_id: String,
@@ -60,17 +54,15 @@ pub enum LearningEvent {
     #[ai(
         importance = 0.4,
         salience = "accumulate",
-        observation_template = "Atom reinforced: {atom_id}",
+        observation_template = "Atom reinforced: {atom_id}"
     )]
-    AtomReinforced {
-        atom_id: String,
-    },
+    AtomReinforced { atom_id: String },
 
     #[ai(
         importance = 0.4,
         salience = "extract",
         observation_template = "Flashcard scheduled: {card_id} due at {due_at}",
-        entity_bridge(type = "knowledge_atom", name_from = "atom_id", id_from = "atom_id"),
+        entity_bridge(type = "knowledge_atom", name_from = "atom_id", id_from = "atom_id")
     )]
     FlashcardScheduled {
         card_id: String,
@@ -81,17 +73,14 @@ pub enum LearningEvent {
     #[ai(
         importance = 0.3,
         salience = "accumulate",
-        observation_template = "Atom retention decayed to {retention}: {atom_id}",
+        observation_template = "Atom retention decayed to {retention}: {atom_id}"
     )]
-    RetentionDecayed {
-        atom_id: String,
-        retention: f64,
-    },
+    RetentionDecayed { atom_id: String, retention: f64 },
 
     #[ai(
         importance = 0.5,
         salience = "extract",
-        observation_template = "Atom linked to semantic fact: {atom_id} -> {fact_id} ({similarity})",
+        observation_template = "Atom linked to semantic fact: {atom_id} -> {fact_id} ({similarity})"
     )]
     SemanticFactLinked {
         atom_id: String,

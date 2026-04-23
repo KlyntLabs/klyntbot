@@ -269,7 +269,12 @@ impl AppCore {
 
         if deleted {
             if let Ok(bus) = self.domain_event_bus() {
-                bus.publish(NoteEvent::Deleted { note_id: id.clone() }.into());
+                bus.publish(
+                    NoteEvent::Deleted {
+                        note_id: id.clone(),
+                    }
+                    .into(),
+                );
             }
         }
 
@@ -550,7 +555,12 @@ impl AppCore {
         if let Some(note) = note {
             if let Ok(bus) = self.domain_event_bus() {
                 if !note.body.is_empty() {
-                    bus.publish(NoteEvent::EditingFinished { note_id: params.note_id }.into());
+                    bus.publish(
+                        NoteEvent::EditingFinished {
+                            note_id: params.note_id,
+                        }
+                        .into(),
+                    );
                 }
             }
         }

@@ -15,7 +15,7 @@ use crate::tool::ProductivityTool;
     skill = "automation",
     tool_name = "productivity",
     entity_kind = "focus_session",
-    event = "crate::events::ProductivityEvent",
+    event = "crate::events::ProductivityEvent"
 )]
 pub struct ProductivityFeature {
     tool: Option<DynTool>,
@@ -48,7 +48,8 @@ impl ProductivityFeature {
     }
 
     pub fn default_config_static() -> serde_json::Value {
-        serde_json::to_value(crate::config::ProductivityConfig::default()).unwrap_or(serde_json::Value::Null)
+        serde_json::to_value(crate::config::ProductivityConfig::default())
+            .unwrap_or(serde_json::Value::Null)
     }
 }
 
