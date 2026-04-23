@@ -1,3 +1,4 @@
+pub mod consumer;
 pub mod context_action_repo;
 pub mod context_resource_repo;
 pub mod context_source;
@@ -8,7 +9,7 @@ pub mod privacy;
 pub mod repo;
 pub mod resource_edge_repo;
 pub mod service;
-pub mod subscriber;
+
 pub mod types;
 pub mod work_context_repo;
 pub mod work_context_tool;
@@ -17,16 +18,17 @@ pub mod work_resource_repo;
 pub use context_action_repo::ContextTaskRepo;
 pub use context_resource_repo::ContextResourceRepo;
 pub use context_source::WorkContextSource;
+pub use consumer::NormalizerSignalConsumer;
 pub use normalizers::{
-    normalize_domain_event, parse_rfc3339, ActivityNormalizer, ChatMessageInput,
-    ChatMessageNormalizer, DomainEventNormalizer, ToolCallInput, ToolCallNormalizer,
+    parse_rfc3339, ActivityNormalizer, ChatMessageInput,
+    ChatMessageNormalizer, ToolCallInput, ToolCallNormalizer,
     WindowEventInput, WindowEventNormalizer,
 };
 pub use privacy::PrivacyFilter;
 pub use repo::ActivityLogRepo;
 pub use resource_edge_repo::ResourceEdgeRepo;
 pub use service::{ActivityIngestionService, BatchIngestionService};
-pub use subscriber::ActivityLogSubscriber;
+
 pub use types::{
     ActivityActor, ActivityLogEntry, ActivitySource, ContextAssignment, ResourceEdge, WorkContext,
     WorkContextStatus, WorkContextType, WorkResource, MAX_PREVIEW_LEN,

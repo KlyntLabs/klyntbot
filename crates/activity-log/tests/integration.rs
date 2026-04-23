@@ -2,13 +2,13 @@
 
 use std::sync::Arc;
 
+use ai_core::{AiSignal, RecallDomain, SalienceVerdict, SignalConsumer};
 use jiff::{SignedDuration, Timestamp};
 use storage::StoragePool;
-use tokio_util::sync::CancellationToken;
 
 use activity_log::{
     ActivityIngestionService, ActivityLog, ActivityLogRepo, ActivitySource, ChatMessageInput,
-    ChatMessageNormalizer, DomainEventNormalizer, PrivacyFilter, WindowEventInput,
+    ChatMessageNormalizer, NormalizerSignalConsumer, PrivacyFilter, WindowEventInput,
     WindowEventNormalizer,
 };
 
@@ -20,31 +20,104 @@ async fn setup() -> StoragePool {
     pool
 }
 
-/// Full flow: DomainEvent fires → subscriber catches → normalizes → ingests → query returns it.
+fn task_created_signal(task_id: &str) -> AiSignal {
+    AiSignal {
+        domain: RecallDomain::Tasks,
+        event_kind: "TaskCreated",
+        importance: 0.5,
+        salience: SalienceVerdict::Accumulate,
+        content: format!("Task created: {task_id}"),
+        entity: Some(ai_core::EntityRef {
+            entity_type: "task",
+            id: task_id.into(),
+            name: String::new(),
+        }),
+        timestamp: Timestamp::now(),
+        raw_event: None,
+        metrics: ai_core::AiMetrics::default(),
+        coaching_signal: false,
+        coaching_rule: None,
+        metric_samples: Vec::new(),
+    }
+}
+
+fn task_completed_signal(task_id: &str) -> AiSignal {
+    AiSignal {
+        domain: RecallDomain::Tasks,
+        event_kind: "TaskCompleted",
+        importance: 0.5,
+        salience: SalienceVerdict::Accumulate,
+        content: format!("Task completed: {task_id}"),
+        entity: Some(ai_core::EntityRef {
+            entity_type: "task",
+            id: task_id.into(),
+            name: String::new(),
+        }),
+        timestamp: Timestamp::now(),
+        raw_event: None,
+        metrics: ai_core::AiMetrics::default(),
+        coaching_signal: false,
+        coaching_rule: None,
+        metric_samples: Vec::new(),
+    }
+}
+
+fn note_created_signal(note_id: &str, title: &str) -> AiSignal {
+    AiSignal {
+        domain: RecallDomain::Notes,
+        event_kind: "NoteCreated",
+        importance: 0.5,
+        salience: SalienceVerdict::Accumulate,
+        content: format!("Note created: {title}"),
+        entity: Some(ai_core::EntityRef {
+            entity_type: "note",
+            id: note_id.into(),
+            name: title.into(),
+        }),
+        timestamp: Timestamp::now(),
+        raw_event: None,
+        metrics: ai_core::AiMetrics::default(),
+        coaching_signal: false,
+        coaching_rule: None,
+        metric_samples: Vec::new(),
+    }
+}
+
+fn focus_session_started_signal(session_type: &str) -> AiSignal {
+    AiSignal {
+        domain: RecallDomain::Productivity,
+        event_kind: "FocusSessionStarted",
+        importance: 0.5,
+        salience: SalienceVerdict::Accumulate,
+        content: format!("Focus session started: {session_type}"),
+        entity: Some(ai_core::EntityRef {
+            entity_type: "focus_session",
+            id: String::new(),
+            name: session_type.into(),
+        }),
+        timestamp: Timestamp::now(),
+        raw_event: None,
+        metrics: ai_core::AiMetrics::default(),
+        coaching_signal: false,
+        coaching_rule: None,
+        metric_samples: Vec::new(),
+    }
+}
+
+/// Full flow: AiSignal → consumer normalizes → ingests → query returns it.
 #[tokio::test]
-async fn test_domain_event_full_flow() {
+async fn test_signal_consumer_full_flow() {
     let pool = setup().await;
     let svc = Arc::new(ActivityIngestionService::new(
         pool.clone(),
         PrivacyFilter::default(),
     ));
+    let consumer = NormalizerSignalConsumer::new(Arc::clone(&svc));
 
-    let domain_bus = bus::DomainEventBus::new(64);
-    let cancel = CancellationToken::new();
-
-    let _subscriber =
-        activity_log::ActivityLogSubscriber::start(&domain_bus, Arc::clone(&svc), cancel.clone());
-
-    // Publish a TaskCreated event
-    domain_bus.publish(bus::DomainEvent::TaskCreated {
-        task_id: "integration-t1".into(),
-        project: Some("test-project".into()),
-        estimate_mins: Some(60),
-        task_type: "manual".into(),
-    });
-
-    // Give the subscriber time to process
-    tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+    consumer
+        .consume(&task_created_signal("integration-t1"))
+        .await
+        .unwrap();
 
     let start = Timestamp::now() - SignedDuration::from_secs(3600);
     let end = Timestamp::now() + SignedDuration::from_secs(3600);
@@ -57,35 +130,26 @@ async fn test_domain_event_full_flow() {
     assert_eq!(entry.source, ActivitySource::Task);
     assert_eq!(entry.action, "create");
     assert_eq!(entry.resource_id.as_deref(), Some("integration-t1"));
-
-    cancel.cancel();
 }
 
-/// Full flow: DomainEvent fires multiple events → subscriber ingests all → query returns them.
+/// Full flow: multiple signals → consumer ingests all → query returns them.
 #[tokio::test]
-async fn test_multiple_domain_events() {
+async fn test_multiple_signals() {
     let pool = setup().await;
     let svc = Arc::new(ActivityIngestionService::new(
         pool.clone(),
         PrivacyFilter::default(),
     ));
+    let consumer = NormalizerSignalConsumer::new(Arc::clone(&svc));
 
-    let domain_bus = bus::DomainEventBus::new(64);
-    let cancel = CancellationToken::new();
-
-    let _subscriber =
-        activity_log::ActivityLogSubscriber::start(&domain_bus, Arc::clone(&svc), cancel.clone());
-
-    domain_bus.publish(bus::DomainEvent::FocusSessionStarted {
-        session_type: "deep_work".into(),
-        target_mins: 25,
-    });
-    domain_bus.publish(bus::DomainEvent::NoteCreated {
-        note_id: "n-100".into(),
-        title: "Integration Note".into(),
-    });
-
-    tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+    consumer
+        .consume(&focus_session_started_signal("deep_work"))
+        .await
+        .unwrap();
+    consumer
+        .consume(&note_created_signal("n-100", "Integration Note"))
+        .await
+        .unwrap();
 
     let start = Timestamp::now() - SignedDuration::from_secs(3600);
     let end = Timestamp::now() + SignedDuration::from_secs(3600);
@@ -102,8 +166,6 @@ async fn test_multiple_domain_events() {
         .unwrap();
     assert!(!notes.is_empty());
     assert_eq!(notes[0].action, "create");
-
-    cancel.cancel();
 }
 
 /// Chat message flow: normalize → ingest → query_by_session returns it.
@@ -139,7 +201,6 @@ async fn test_chat_message_flow() {
         .unwrap();
 
     assert_eq!(results.len(), 2);
-    // Results are DESC, so assistant reply comes first
     assert!(results.iter().any(|e| e.action == "prompt"));
     assert!(results.iter().any(|e| e.action == "reply"));
 }
@@ -183,30 +244,20 @@ async fn test_count_by_source() {
         pool.clone(),
         PrivacyFilter::default(),
     ));
+    let consumer = NormalizerSignalConsumer::new(Arc::clone(&svc));
 
-    let domain_bus = bus::DomainEventBus::new(64);
-    let cancel = CancellationToken::new();
-    let _subscriber =
-        activity_log::ActivityLogSubscriber::start(&domain_bus, Arc::clone(&svc), cancel.clone());
-
-    domain_bus.publish(bus::DomainEvent::TaskCreated {
-        task_id: "t1".into(),
-        project: None,
-        estimate_mins: None,
-        task_type: "manual".into(),
-    });
-    domain_bus.publish(bus::DomainEvent::TaskCompleted {
-        task_id: "t1".into(),
-        actual_duration_mins: Some(30),
-        estimated_duration_mins: Some(45),
-        deviation_pct: None,
-    });
-    domain_bus.publish(bus::DomainEvent::NoteCreated {
-        note_id: "n1".into(),
-        title: "Test".into(),
-    });
-
-    tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+    consumer
+        .consume(&task_created_signal("t1"))
+        .await
+        .unwrap();
+    consumer
+        .consume(&task_completed_signal("t1"))
+        .await
+        .unwrap();
+    consumer
+        .consume(&note_created_signal("n1", "Test"))
+        .await
+        .unwrap();
 
     let start = Timestamp::now() - SignedDuration::from_secs(3600);
     let end = Timestamp::now() + SignedDuration::from_secs(3600);
@@ -217,8 +268,6 @@ async fn test_count_by_source() {
 
     assert_eq!(counts.get("task"), Some(&2));
     assert_eq!(counts.get("note"), Some(&1));
-
-    cancel.cancel();
 }
 
 /// Dedup: same content_hash → only first is stored.
@@ -226,27 +275,21 @@ async fn test_count_by_source() {
 async fn test_dedup_across_ingestion() {
     let pool = setup().await;
     let svc = ActivityIngestionService::new(pool.clone(), PrivacyFilter::default());
+    let consumer = NormalizerSignalConsumer::new(Arc::new(svc));
 
-    let normalizer = DomainEventNormalizer;
-    let event = bus::DomainEvent::TaskCreated {
-        task_id: "dedup-test".into(),
-        project: None,
-        estimate_mins: None,
-        task_type: "manual".into(),
-    };
+    let signal = task_created_signal("dedup-test");
 
-    // Normalize twice — same event produces same content_hash
-    let entry1 = activity_log::ActivityNormalizer::normalize(&normalizer, &event).unwrap();
-    let hash = entry1.content_hash.clone();
+    // Consume twice — same signal produces same content_hash
+    consumer.consume(&signal).await.unwrap();
+    consumer.consume(&signal).await.unwrap();
 
-    let id1 = svc.ingest(entry1).await.unwrap();
-    assert!(id1.is_some());
+    let start = Timestamp::now() - SignedDuration::from_secs(3600);
+    let end = Timestamp::now() + SignedDuration::from_secs(3600);
+    let results = ActivityLogRepo::query_range(&pool, start, end, 100, 0)
+        .await
+        .unwrap();
 
-    // Create another entry with the same hash
-    let mut entry2 = activity_log::ActivityNormalizer::normalize(&normalizer, &event).unwrap();
-    entry2.content_hash = hash;
-    let id2 = svc.ingest(entry2).await.unwrap();
-    assert!(id2.is_none(), "Duplicate should be skipped");
+    assert_eq!(results.len(), 1, "Duplicate should be skipped by dedup");
 }
 
 /// Retention cleanup: delete_older_than removes old entries.
@@ -254,23 +297,15 @@ async fn test_dedup_across_ingestion() {
 async fn test_retention_cleanup() {
     let pool = setup().await;
     let svc = ActivityIngestionService::new(pool.clone(), PrivacyFilter::default());
+    let consumer = NormalizerSignalConsumer::new(Arc::new(svc));
 
-    // Insert an entry with a timestamp 400 days ago
-    let mut entry = activity_log::normalize_domain_event(&bus::DomainEvent::NoteCreated {
-        note_id: "old-note".into(),
-        title: "Old".into(),
-    });
-    entry.timestamp = Timestamp::now() - SignedDuration::from_secs(400 * 86400);
-    entry.content_hash = Some("unique-old".into());
-    svc.ingest(entry).await.unwrap();
+    let mut old_signal = note_created_signal("old-note", "Old");
+    old_signal.timestamp = Timestamp::now() - SignedDuration::from_secs(400 * 86400);
+    consumer.consume(&old_signal).await.unwrap();
 
-    // Insert a recent entry
-    let mut entry2 = activity_log::normalize_domain_event(&bus::DomainEvent::NoteCreated {
-        note_id: "new-note".into(),
-        title: "New".into(),
-    });
-    entry2.content_hash = Some("unique-new".into());
-    svc.ingest(entry2).await.unwrap();
+    let mut new_signal = note_created_signal("new-note", "New");
+    new_signal.timestamp = Timestamp::now();
+    consumer.consume(&new_signal).await.unwrap();
 
     let deleted = ActivityLogRepo::delete_older_than(&pool, 365)
         .await
