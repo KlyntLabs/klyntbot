@@ -4,9 +4,10 @@ use std::sync::Arc;
 
 use uuid::Uuid;
 
-use bus::{DomainEvent, DomainEventBus};
+use bus::DomainEventBus;
 
 use crate::config::FocusConfig;
+use crate::events::ProductivityEvent;
 use crate::repos::ProductivityRepos;
 use crate::types::{DistractionEvent, FocusSession, SessionSource, SessionType};
 
@@ -93,12 +94,6 @@ impl FocusManager {
         self.repos.sessions.update(&session).await?;
 
         if let Some(ref bus) = self.domain_bus {
-            bus.publish(DomainEvent::FocusSessionEnded {
-                duration_secs: session.actual_mins.unwrap_or(0) * 60,
-                quality: session.quality_score.unwrap_or(0.0),
-                interruptions: session.interruptions as i32,
-            });
-
             let duration_mins = session.actual_mins.unwrap_or(0).max(0) as u32;
             let quality = if let Some(q) = session.quality_score {
                 q.clamp(0.0, 1.0)
@@ -107,11 +102,22 @@ impl FocusManager {
             } else {
                 0.0
             };
-            bus.publish(DomainEvent::ProductivitySessionEnded {
-                session_id: session.id.clone(),
-                quality,
-                duration_mins,
-            });
+            bus.publish(
+                ProductivityEvent::FocusSessionEnded {
+                    duration_secs: session.actual_mins.unwrap_or(0) * 60,
+                    quality: session.quality_score.unwrap_or(0.0),
+                    interruptions: session.interruptions as i32,
+                }
+                .into(),
+            );
+            bus.publish(
+                ProductivityEvent::SessionEnded {
+                    session_id: session.id.clone(),
+                    quality,
+                    duration_mins,
+                }
+                .into(),
+            );
         }
 
         Ok(Some(session))
@@ -158,10 +164,13 @@ impl FocusManager {
 
     fn publish_focus_started(&self, session_type: &SessionType, target_mins: i64) {
         if let Some(ref bus) = self.domain_bus {
-            bus.publish(DomainEvent::FocusSessionStarted {
-                session_type: session_type.to_string(),
-                target_mins,
-            });
+            bus.publish(
+                ProductivityEvent::FocusSessionStarted {
+                    session_type: session_type.to_string(),
+                    target_mins,
+                }
+                .into(),
+            );
         }
     }
 

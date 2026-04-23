@@ -72,6 +72,48 @@ fn try_into_productivity_event(
             quality: *quality,
             duration_mins: *duration_mins,
         }),
+        DomainEvent::FocusSessionStarted {
+            session_type,
+            target_mins,
+        } => Some(ProductivityEvent::FocusSessionStarted {
+            session_type: session_type.clone(),
+            target_mins: *target_mins,
+        }),
+        DomainEvent::FocusSessionEnded {
+            duration_secs,
+            quality,
+            interruptions,
+        } => Some(ProductivityEvent::FocusSessionEnded {
+            duration_secs: *duration_secs,
+            quality: *quality,
+            interruptions: *interruptions,
+        }),
+        DomainEvent::DistractionDetected {
+            app,
+            duration_secs,
+            context,
+        } => Some(ProductivityEvent::DistractionDetected {
+            app: app.clone(),
+            duration_secs: *duration_secs,
+            context: context.clone(),
+        }),
+        DomainEvent::ActivitySessionCompleted {
+            date,
+            total_active_secs,
+            productive_secs,
+            distracting_secs,
+        } => Some(ProductivityEvent::ActivitySessionCompleted {
+            date: date.clone(),
+            total_active_secs: *total_active_secs,
+            productive_secs: *productive_secs,
+            distracting_secs: *distracting_secs,
+        }),
+        DomainEvent::ProductivityScoreComputed { date, score } => {
+            Some(ProductivityEvent::ProductivityScoreComputed {
+                date: date.clone(),
+                score: *score,
+            })
+        }
         _ => None,
     }
 }
@@ -205,31 +247,9 @@ fn translate_system_event(event: &DomainEvent) -> Option<AiSignal> {
             }),
             ..base
         }),
-        DomainEvent::DistractionDetected { app, .. } => Some(AiSignal {
-            event_kind: "DistractionDetected",
-            content: app.clone(),
-            metrics: AiMetrics {
-                app: Some(app.clone()),
-                ..AiMetrics::default()
-            },
-            coaching_signal: true,
-            ..base
-        }),
-        DomainEvent::FocusSessionStarted { .. } => Some(AiSignal {
-            event_kind: "FocusSessionStarted",
-            coaching_signal: true,
-            ..base
-        }),
-        DomainEvent::FocusSessionEnded { quality, .. } => Some(AiSignal {
-            event_kind: "FocusSessionEnded",
-            importance: *quality,
-            metrics: AiMetrics {
-                amount: Some(*quality),
-                ..AiMetrics::default()
-            },
-            coaching_signal: true,
-            ..base
-        }),
+        // DistractionDetected, FocusSessionStarted, FocusSessionEnded, ActivitySessionCompleted,
+        // and ProductivityScoreComputed are now handled by try_into_productivity_event →
+        // ProductivityEvent::From → AiSignal via the macro-generated to_signal().
         DomainEvent::SkillRouted {
             skill_name,
             confidence,

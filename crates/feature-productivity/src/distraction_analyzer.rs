@@ -8,8 +8,9 @@ use tokio::task::JoinHandle;
 use tokio_util::sync::CancellationToken;
 use tracing::{debug, warn};
 
-use bus::{DomainEvent, DomainEventBus};
+use bus::DomainEventBus;
 
+use crate::events::ProductivityEvent;
 use crate::repos::ProductivityRepos;
 use crate::types::{ActivityTick, CategoryType, DistractionPattern};
 
@@ -124,11 +125,14 @@ impl DistractionAnalyzer {
                                         prev.app_name, tick.app_name
                                     );
                                     if let Some(ref bus) = domain_bus {
-                                        bus.publish(DomainEvent::DistractionDetected {
-                                            app: tick.app_name.clone(),
-                                            duration_secs: None,
-                                            context: format!("after {} ({}min streak)", prev.app_name, preceding_duration_mins.unwrap_or(0.0) as i64),
-                                        });
+                                        bus.publish(
+                                            ProductivityEvent::DistractionDetected {
+                                                app: tick.app_name.clone(),
+                                                duration_secs: None,
+                                                context: format!("after {} ({}min streak)", prev.app_name, preceding_duration_mins.unwrap_or(0.0) as i64),
+                                            }
+                                            .into(),
+                                        );
                                     }
                                 }
                                 Err(e) => {

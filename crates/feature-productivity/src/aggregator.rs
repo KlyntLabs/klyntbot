@@ -7,8 +7,9 @@ use jiff::SignedDuration;
 
 use std::sync::Arc;
 
-use bus::{DomainEvent, DomainEventBus};
+use bus::DomainEventBus;
 
+use crate::events::ProductivityEvent;
 use crate::handler::ProductivityHandler;
 use crate::intelligence::quality_scorer::QualityScorer;
 use crate::repos::ProductivityRepos;
@@ -283,10 +284,13 @@ impl DailyAggregator {
 
         if let Some(ref bus) = self.domain_bus {
             if let Some(score) = summary.productivity_score {
-                bus.publish(DomainEvent::ProductivityScoreComputed {
-                    date: summary.date.clone(),
-                    score,
-                });
+                bus.publish(
+                    ProductivityEvent::ProductivityScoreComputed {
+                        date: summary.date.clone(),
+                        score,
+                    }
+                    .into(),
+                );
             }
         }
 

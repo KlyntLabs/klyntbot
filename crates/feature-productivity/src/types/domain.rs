@@ -125,8 +125,9 @@ impl std::str::FromStr for SessionType {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, ai_core_macros::AiEntity)]
 #[serde(rename_all = "camelCase")]
+#[ai(entity_type = "focus_session", embed_on = ["notes"])]
 pub struct FocusSession {
     pub id: String,
     pub action_id: Option<String>,
@@ -556,4 +557,40 @@ pub struct WeeklyAssessment {
     pub top_apps: Option<String>,
     pub summary: Option<String>,
     pub created_at: String,
+}
+
+
+#[cfg(test)]
+mod ai_entity_tests {
+    use super::*;
+    use ai_core::AiEntity;
+
+    #[test]
+    fn focus_session_entity_type() {
+        assert_eq!(FocusSession::entity_type(), "focus_session");
+    }
+
+    #[test]
+    fn focus_session_embed_text_uses_notes() {
+        let mut session = FocusSession {
+            id: "fs-1".into(),
+            action_id: None,
+            project_id: None,
+            session_type: SessionType::Focus,
+            target_mins: Some(25),
+            started_at: jiff::Timestamp::now(),
+            ended_at: None,
+            actual_mins: None,
+            interruptions: 0,
+            distraction_events: vec![],
+            quality_score: None,
+            completed: false,
+            notes: Some("deep work block".into()),
+            source: SessionSource::Manual,
+        };
+        assert_eq!(session.embed_text(), "deep work block");
+
+        session.notes = None;
+        assert_eq!(session.embed_text(), "");
+    }
 }
