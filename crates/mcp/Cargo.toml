@@ -6,6 +6,7 @@ rust-version.workspace = true
 license.workspace = true
 
 [dependencies]
+ai-core = { path = "../ai-core" }
 common.workspace = true
 config.workspace = true
 tools-core.workspace = true

@@ -5,11 +5,13 @@
 //! - `McpTool`: adapts MCP server tools to `tools_core::Tool`
 
 pub mod client;
+pub mod dispatch;
 pub mod server;
 
 // Re-export the types consumers actually need.
 pub use config::McpConfig;
 
+pub use dispatch::{dispatch_entity_update, EntityUpdate};
 pub use client::events::McpStartupEvent;
 pub use client::handler::SamplingDelegate;
 pub use client::manager::{McpClientOptions, McpManager};
