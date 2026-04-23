@@ -152,6 +152,10 @@ pub struct McpServerSettings {
     pub host: String,
     #[serde(default = "default_exposed_tools")]
     pub exposed_tools: Vec<String>,
+    /// Whether the exposed_tools list was auto-filled from the registry at startup.
+    /// Used by diagnostics to distinguish user overrides from defaults.
+    #[serde(default, skip_serializing)]
+    pub exposed_tools_auto_filled: bool,
     #[serde(default)]
     pub auth: McpAuthConfig,
 }
@@ -163,6 +167,7 @@ impl Default for McpServerSettings {
             port: default_mcp_port(),
             host: default_localhost(),
             exposed_tools: default_exposed_tools(),
+            exposed_tools_auto_filled: false,
             auth: McpAuthConfig::default(),
         }
     }
@@ -174,28 +179,24 @@ fn default_mcp_port() -> u16 {
 fn default_localhost() -> String {
     "127.0.0.1".to_string()
 }
+
+/// Empty default — app-core fills this from `AiFeatureRegistry::tool_names()`
+/// ∪ `EXPLICIT_TOOL_ALLOWLIST` post-load when the user hasn't overridden it.
 fn default_exposed_tools() -> Vec<String> {
-    [
-        "tasks",
-        "project",
-        "area",
-        "notes",
-        "memory",
-        "okr",
-        "finance",
-        "productivity",
-        "work_context",
-        "agent",
-        "annotate",
-        "learning",
-        "cron",
-        "alarm",
-        "mirror",
-        "temporal",
-    ]
-    .map(String::from)
-    .to_vec()
+    Vec::new()
 }
+
+/// Cross-cutting tools that don't have a `FeaturePackage` and so don't appear
+/// in `AiFeatureRegistry`. Concatenated with registry tool names by app-core.
+pub const EXPLICIT_TOOL_ALLOWLIST: &[&str] = &[
+    "memory",
+    "agent",
+    "annotate",
+    "cron",
+    "alarm",
+    "mirror",
+    "temporal",
+];
 
 #[cfg(test)]
 mod tests {
@@ -209,6 +210,10 @@ mod tests {
         assert!(!cfg.server.enabled);
         assert_eq!(cfg.server.port, 3100);
         assert_eq!(cfg.server.host, "127.0.0.1");
+        assert!(
+            cfg.server.exposed_tools.is_empty(),
+            "default exposed_tools is empty; app-core fills from AiFeatureRegistry"
+        );
     }
 
     #[test]

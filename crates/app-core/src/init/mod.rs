@@ -508,6 +508,27 @@ impl AppCore {
         let feature_registry = Arc::new(ai_pipeline::build_feature_registry());
         tracing::info!(features = feature_registry.len(), "ai feature registry built");
 
+        // Post-load fill: if the user hasn't overridden exposed_tools, derive it
+        // from the registry so new features are auto-exposed without config edits.
+        if config.mcp.server.exposed_tools.is_empty() {
+            let mut tools: Vec<String> = feature_registry
+                .tool_names()
+                .into_iter()
+                .map(|s| s.to_string())
+                .collect();
+            tools.extend(
+                config::schema::EXPLICIT_TOOL_ALLOWLIST
+                    .iter()
+                    .map(|s| s.to_string()),
+            );
+            config.mcp.server.exposed_tools = tools;
+            config.mcp.server.exposed_tools_auto_filled = true;
+            tracing::info!(
+                tools = ?config.mcp.server.exposed_tools,
+                "mcp exposed_tools auto-filled from AiFeatureRegistry"
+            );
+        }
+
         let ai_pipeline_router = {
             let observation_repo =
                 ::cognitive::repos::AccumulatedObservationRepo::new(storage_pool.inner().clone());

@@ -35,6 +35,7 @@ mod launcher;
 mod learning;
 mod lifecycle;
 mod mcp;
+pub use mcp::EXPLICIT_TOOL_ALLOWLIST;
 mod notes;
 mod notifications;
 mod packs;
