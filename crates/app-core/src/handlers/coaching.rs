@@ -234,16 +234,21 @@ impl AppCore {
         debug!("coaching consecutive ignores reset (explicit feedback)");
 
         // Record in FeedbackTracker (single lock scope — record_explicit removes
-        // the pending entry, so we must extract trigger_name first)
-        let trigger_name = {
+        // the pending entry, so we must extract trigger_name + message first)
+        let (trigger_name, intervention_message) = {
             let mut tracker = self.feedback_tracker()?.lock().await;
-            let trigger_name = tracker
+            let pending = tracker
                 .pending_interventions()
                 .iter()
                 .find(|p| p.intervention.id == intervention_id)
-                .map(|p| p.intervention.trigger_name.clone());
+                .map(|p| {
+                    (
+                        p.intervention.trigger_name.clone(),
+                        p.intervention.message.clone(),
+                    )
+                });
             tracker.record_explicit(&intervention_id, &feedback_response);
-            trigger_name
+            pending.map_or((None, None), |(t, m)| (Some(t), Some(m)))
         };
 
         // Persist feedback to intervention log (works for both live and retroactive feedback)
@@ -271,10 +276,22 @@ impl AppCore {
 
         // Publish domain event so coaching service can react
         if let Ok(bus) = self.domain_event_bus() {
+            let accepted = matches!(feedback_response, bus::FeedbackResponse::Helpful);
             bus.publish(bus::DomainEvent::CoachingFeedback {
-                intervention_id,
+                intervention_id: intervention_id.clone(),
                 response: feedback_response,
             });
+
+            // Emit strategy-applied event for AI pipeline metrics (coaching_acceptance_rate).
+            // strategy_id = trigger_name; rule_text = intervention message.
+            // accepted = true only for Helpful; Dismissed and StopSuggesting = false.
+            if let (Some(strategy_id), Some(rule_text)) = (trigger_name, intervention_message) {
+                bus.publish(bus::DomainEvent::CoachingStrategyApplied {
+                    strategy_id,
+                    rule_text,
+                    accepted,
+                });
+            }
         }
 
         Ok(true)

@@ -14,6 +14,7 @@ pub mod complexity;
 pub mod config;
 pub mod events;
 pub mod focus_alarms;
+pub mod focus_watcher;
 pub mod handlers;
 pub mod recurrence_repo;
 pub mod rrule_utils;

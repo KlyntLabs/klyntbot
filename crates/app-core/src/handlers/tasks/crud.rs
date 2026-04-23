@@ -168,6 +168,22 @@ impl AppCore {
         params: TaskUpdateParams,
         _actor: Option<String>,
     ) -> HandlerResult<TaskResponse> {
+        // Capture previous due_date before update so we can detect deferrals.
+        let previous_due: Option<jiff::civil::Date> = if params.due_date.is_some() {
+            self.repos
+                .tasks
+                .get(&params.id)
+                .await
+                .map_err(map_storage_err)?
+                .and_then(|r| r.due_date)
+                .map(|ts| {
+                    let ts: jiff::Timestamp = ts.into();
+                    ts.to_zoned(jiff::tz::TimeZone::UTC).date()
+                })
+        } else {
+            None
+        };
+
         let patch = TaskPatch {
             id: params.id.clone(),
             title: params.title,
@@ -199,6 +215,28 @@ impl AppCore {
             .update(&patch)
             .await
             .map_err(map_storage_err)?;
+
+        // Emit TaskDeferred when due_date was pushed to a later date.
+        if let Some(new_due_ts) = &updated.due_date {
+            let new_due: jiff::civil::Date = {
+                let ts: jiff::Timestamp = (*new_due_ts).clone().into();
+                ts.to_zoned(jiff::tz::TimeZone::UTC).date()
+            };
+            let is_deferred = match previous_due {
+                Some(prev) => new_due > prev,
+                // No previous due date → moving from "no deadline" to a future date
+                // is not a deferral — only pushes of an existing date count.
+                None => false,
+            };
+            if is_deferred {
+                if let Ok(bus) = self.domain_event_bus() {
+                    bus.publish(bus::DomainEvent::TaskDeferred {
+                        task_id: params.id.clone(),
+                        times_deferred: 1,
+                    });
+                }
+            }
+        }
 
         let updates = vec![EntityUpdate {
             kind: EntityKind::Task,
@@ -278,6 +316,18 @@ impl AppCore {
                     estimated_duration_mins: estimated_mins,
                     deviation_pct,
                 });
+
+                // Emit EstimationRecorded when all three values are present.
+                if let (Some(est_mins), Some(act_mins), Some(dev)) =
+                    (estimated_mins, actual_mins, deviation_pct)
+                {
+                    bus.publish(bus::DomainEvent::EstimationRecorded {
+                        task_id: id.clone(),
+                        estimated_mins: est_mins as u32,
+                        actual_mins: act_mins as u32,
+                        deviation_pct: dev,
+                    });
+                }
             }
         }
 

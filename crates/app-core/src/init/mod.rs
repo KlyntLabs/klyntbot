@@ -349,6 +349,11 @@ impl AppCore {
             repos.tasks.clone(),
             shutdown_token.clone(),
         );
+        let _focus_watcher_handle = feature_tasks::focus_watcher::spawn(
+            Arc::clone(&domain_event_bus),
+            repos.tasks.clone(),
+            shutdown_token.clone(),
+        );
 
         // ── Phases 5 & 8: Run independent init phases concurrently ─────
         let (productivity_result, launcher_result) = tokio::join!(

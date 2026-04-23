@@ -139,6 +139,20 @@ impl AppCore {
             status: params.status,
             ..Default::default()
         };
+        // Capture old current_amount before the update (for delta).
+        let old_current = if params.current_amount.is_some() {
+            self.repos
+                .finance
+                .goals
+                .get(&params.id)
+                .await
+                .ok()
+                .flatten()
+                .map(|g| g.current_amount)
+        } else {
+            None
+        };
+
         let row = self
             .repos
             .finance
@@ -146,6 +160,23 @@ impl AppCore {
             .update(&patch)
             .await
             .map_err(map_storage_err)?;
+
+        // Emit FinanceGoalProgress when current_amount changed.
+        if let Some(prev) = old_current {
+            let delta = row.current_amount - prev;
+            if delta != 0 {
+                if let Ok(bus) = self.domain_event_bus() {
+                    bus.publish(bus::DomainEvent::FinanceGoalProgress {
+                        goal_id: row.id.clone(),
+                        name: row.name.clone(),
+                        current_amount: row.current_amount,
+                        target_amount: row.target_amount,
+                        delta,
+                    });
+                }
+            }
+        }
+
         Ok((row, Self::finance_updates(params.id)))
     }
 

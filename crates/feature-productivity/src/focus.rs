@@ -98,6 +98,20 @@ impl FocusManager {
                 quality: session.quality_score.unwrap_or(0.0),
                 interruptions: session.interruptions as i32,
             });
+
+            let duration_mins = session.actual_mins.unwrap_or(0).max(0) as u32;
+            let quality = if let Some(q) = session.quality_score {
+                q.clamp(0.0, 1.0)
+            } else if duration_mins > 0 {
+                (1.0 - session.interruptions as f64 / duration_mins as f64).clamp(0.0, 1.0)
+            } else {
+                0.0
+            };
+            bus.publish(DomainEvent::ProductivitySessionEnded {
+                session_id: session.id.clone(),
+                quality,
+                duration_mins,
+            });
         }
 
         Ok(Some(session))
