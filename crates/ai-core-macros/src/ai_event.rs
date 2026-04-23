@@ -163,6 +163,19 @@ fn render_variant(
         }
     };
 
+    let metric_samples_ts = if let Some(metric) = &attr.metric {
+        let m_name = &metric.name;
+        let m_value = &metric.value_from;
+        quote! {
+            vec![::ai_core::MetricSample {
+                name: #m_name,
+                value: (#m_value) as f64,
+            }]
+        }
+    } else {
+        quote! { Vec::new() }
+    };
+
     Ok(quote! {
         #pattern => ::ai_core::AiSignal {
             domain: #domain_tokens,
@@ -180,7 +193,7 @@ fn render_variant(
             },
             coaching_signal: #coaching_flag,
             coaching_rule: #rule_expr,
-            metric_samples: Vec::new(),
+            metric_samples: #metric_samples_ts,
         },
     })
 }
