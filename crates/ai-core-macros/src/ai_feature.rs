@@ -40,6 +40,11 @@ pub fn expand(input: syn::DeriveInput) -> syn::Result<TokenStream> {
 
     let mirror_specs_tokens = render_mirror_specs(&feat.mirror_snapshots);
 
+    let promote_threshold_ts = match feat.promotion_threshold {
+        Some(n) => quote! { Some(#n as usize) },
+        None => quote! { None },
+    };
+
     Ok(quote! {
         impl ::ai_core::AiFeature for #struct_ident {
             const DOMAIN: ::ai_core::RecallDomain = ::ai_core::RecallDomain::#recall_domain_ident;
@@ -63,6 +68,10 @@ pub fn expand(input: syn::DeriveInput) -> syn::Result<TokenStream> {
 
             pub const MIRROR_SNAPSHOTS: &'static [::ai_core::MirrorSnapshotSpec] =
                 #mirror_specs_tokens;
+
+            /// Per-domain promotion threshold override. When `Some`, beats the global
+            /// `accumulate_promote_threshold` config in `BackgroundConsolidationService`.
+            pub const PROMOTE_THRESHOLD_OVERRIDE: Option<usize> = #promote_threshold_ts;
         }
     })
 }
