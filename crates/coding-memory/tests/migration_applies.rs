@@ -7,7 +7,6 @@
 
 use coding_memory::coding_memory_migrations;
 use cognitive::cognitive_migrations;
-use sqlx::Row;
 use storage::StoragePool;
 
 #[tokio::test]
@@ -55,11 +54,11 @@ async fn phase1_migration_applies_over_cognitive_base() {
         "memory_utilization",
         "klynt_sessions",
     ] {
-        let row = sqlx::query(
+        let row: Option<sqlx::sqlite::SqliteRow> = sqlx::query(
             "SELECT name FROM sqlite_master WHERE type='table' AND name = ?",
         )
         .bind(table)
-        .fetch_optional(pool.sqlx_pool())
+        .fetch_optional(pool.inner())
         .await
         .unwrap();
         assert!(row.is_some(), "missing table: {table}");
@@ -98,4 +97,4 @@ async fn row_count_check(pool: &StoragePool) -> sqlx::Result<()> {
 }
 
 /// Silence clippy about the unused helper trait method.
-const _ = ();
+const _: () = ();

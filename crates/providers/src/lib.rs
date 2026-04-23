@@ -4,6 +4,18 @@
 //! various LLM APIs (Anthropic native, OpenAI-compatible, transcription).
 //! The [`factory`] module handles provider creation from [`Config`](config::Config).
 
+/// Identifies the role a provider invocation serves.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ProviderRole {
+    /// Per-turn Distiller (Phase 3+).
+    Distiller,
+    /// Reforge Phase 2.5 — Coding Synthesis.
+    ReforgeSynth,
+    /// Reforge Phase 3.5 — Rule Artifact Generation.
+    ReforgeRules,
+}
+
 pub mod adapters;
 mod factory;
 pub mod manager;
@@ -11,20 +23,20 @@ pub mod registry;
 pub(crate) mod streaming;
 pub mod types;
 
-// ── Adapters ──────────────────────────────────────────────
+// -- Adapters --
 pub use adapters::{
     AnthropicNativeProvider, NoopProvider, OpenAiCompatProvider, TranscriptionProvider,
 };
 
-// ── Manager ───────────────────────────────────────────────
+// -- Manager --
 pub use manager::{
     CircuitBreakerConfig, DegradationLevel, OnCircuitOpen, OnProviderDegraded, ProviderManager,
 };
 
-// ── Registry ──────────────────────────────────────────────
+// -- Registry --
 pub use registry::{ProviderRegistry, ProviderSpec, PROVIDERS};
 
-// ── Types ─────────────────────────────────────────────────
+// -- Types --
 pub use types::{
     tool_calls_to_messages, ChatParams, ContentPart, DynProvider, FunctionCall, ImageUrl,
     LlmProvider, LlmResponse, LlmStream, LlmStreamChunk, Message, ProviderCapabilities,
@@ -32,7 +44,7 @@ pub use types::{
     DEFAULT_CONTEXT_WINDOW,
 };
 
-// ── Factory ───────────────────────────────────────────────
+// -- Factory --
 pub use factory::{
     cognitive_chat_params, create_cognitive_provider, create_provider,
     create_provider_with_failover, create_provider_with_failover_full,

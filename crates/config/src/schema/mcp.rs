@@ -189,7 +189,22 @@ fn default_exposed_tools() -> Vec<String> {
 /// Cross-cutting tools that don't have a `FeaturePackage` and so don't appear
 /// in `AiFeatureRegistry`. Concatenated with registry tool names by app-core.
 pub const EXPLICIT_TOOL_ALLOWLIST: &[&str] = &[
-    "memory", "agent", "annotate", "cron", "alarm", "mirror", "temporal",
+    "memory",
+    "agent",
+    "annotate",
+    "cron",
+    "alarm",
+    "mirror",
+    "temporal",
+    // coding-memory tools
+    "recall_index",
+    "recall_timeline",
+    "recall_fetch",
+    "trace_causes",
+    "check_dead_ends",
+    "recall_facts_as_of",
+    "recall_change_history",
+    "recall_decision_points",
 ];
 
 #[cfg(test)]

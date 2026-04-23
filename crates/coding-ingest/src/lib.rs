@@ -1,7 +1,5 @@
 //! `coding-ingest` — transport + adapters that accept `AgentEvent` streams
 //! from external coding CLIs and the native `klynt-cli` source.
-//!
-//! Phase 1 lands the module surface; implementations follow in later tasks.
 
 #![deny(missing_docs)]
 
@@ -9,9 +7,15 @@
 pub mod adapters;
 /// Daemon stub — see Task 8.
 pub mod daemon;
-/// `AgentEvent` contract — see Task 3/4.
+/// `AgentEvent` contract.
 pub mod event;
-/// `RepoScope` — see Task 3.
+/// `RepoScope` — repo identity attached to events.
 pub mod scope;
 /// Transport stubs — see Task 7.
 pub mod transport;
+
+pub use event::{
+    AgentEvent, AgentEventV1, AgentSource, DiagnosticsDelta, EventKind, FileOp,
+    SkillScore, SymbolRef, TestFailure, TokenUsage,
+};
+pub use scope::RepoScope;
