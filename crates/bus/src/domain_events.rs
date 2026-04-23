@@ -36,6 +36,12 @@ pub enum DomainEvent {
         quality: f64,
         interruptions: i32,
     },
+    /// Productivity session ended with quality score for focus_quality_trend metric.
+    ProductivitySessionEnded {
+        session_id: String,
+        quality: f64,
+        duration_mins: u32,
+    },
     DistractionDetected {
         app: String,
         duration_secs: Option<i64>,
@@ -467,6 +473,7 @@ impl DomainEvent {
             Self::ActivitySessionCompleted { .. } => "ActivitySessionCompleted",
             Self::FocusSessionStarted { .. } => "FocusSessionStarted",
             Self::FocusSessionEnded { .. } => "FocusSessionEnded",
+            Self::ProductivitySessionEnded { .. } => "ProductivitySessionEnded",
             Self::DistractionDetected { .. } => "DistractionDetected",
             Self::ProductivityScoreComputed { .. } => "ProductivityScoreComputed",
             Self::SessionCreated { .. } => "SessionCreated",
@@ -599,6 +606,8 @@ impl DomainEvent {
     pub const KIND_USER_RETURNED: &'static str = "UserReturned";
     /// `event_type` value for [`DomainEvent::FocusSessionEnded`].
     pub const KIND_FOCUS_SESSION_ENDED: &'static str = "FocusSessionEnded";
+    /// `event_type` value for [`DomainEvent::ProductivitySessionEnded`].
+    pub const KIND_PRODUCTIVITY_SESSION_ENDED: &'static str = "ProductivitySessionEnded";
     /// `event_type` value for [`DomainEvent::BudgetAlert`].
     pub const KIND_BUDGET_ALERT: &'static str = "BudgetAlert";
     /// `event_type` value for [`DomainEvent::FocusSessionSuspended`].
@@ -636,6 +645,7 @@ impl DomainEvent {
             Self::ActivitySessionCompleted { .. }
             | Self::FocusSessionStarted { .. }
             | Self::FocusSessionEnded { .. }
+            | Self::ProductivitySessionEnded { .. }
             | Self::DistractionDetected { .. }
             | Self::ProductivityScoreComputed { .. }
             | Self::SessionCreated { .. }

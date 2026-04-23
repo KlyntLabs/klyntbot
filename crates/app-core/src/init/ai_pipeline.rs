@@ -24,6 +24,11 @@ pub fn translate(event: &DomainEvent) -> Option<AiSignal> {
         sig.domain = RecallDomain::Coaching;
         return Some(sig);
     }
+    if let Some(e) = try_into_productivity_event(event) {
+        let mut sig = e.to_signal();
+        sig.domain = RecallDomain::Productivity;
+        return Some(sig);
+    }
     translate_system_event(event)
 }
 
@@ -38,6 +43,22 @@ fn try_into_coaching_event(e: &DomainEvent) -> Option<feature_coaching::events::
             strategy_id: strategy_id.clone(),
             rule_text: rule_text.clone(),
             accepted: *accepted,
+        }),
+        _ => None,
+    }
+}
+
+fn try_into_productivity_event(e: &DomainEvent) -> Option<feature_productivity::events::ProductivityEvent> {
+    use feature_productivity::events::ProductivityEvent;
+    match e {
+        DomainEvent::ProductivitySessionEnded {
+            session_id,
+            quality,
+            duration_mins,
+        } => Some(ProductivityEvent::SessionEnded {
+            session_id: session_id.clone(),
+            quality: *quality,
+            duration_mins: *duration_mins,
         }),
         _ => None,
     }
@@ -298,7 +319,7 @@ pub fn build_metric_registry() -> ai_core::MetricRegistry {
     reg.register_all(feature_tasks::TaskEvent::FEATURE_METRICS);
     reg.register_all(feature_finance::FinanceEvent::FEATURE_METRICS);
     reg.register_all(feature_coaching::events::CoachingEvent::FEATURE_METRICS);
-    // Task 22: reg.register_all(feature_productivity::events::ProductivityEvent::FEATURE_METRICS);
+    reg.register_all(feature_productivity::events::ProductivityEvent::FEATURE_METRICS);
     reg
 }
 

@@ -7,6 +7,7 @@ pub mod dashboard_emitter;
 pub mod distraction;
 pub mod distraction_analyzer;
 pub mod engine;
+pub mod events;
 pub mod focus;
 pub mod handler;
 pub mod insights;
