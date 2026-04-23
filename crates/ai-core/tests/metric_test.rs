@@ -1,4 +1,4 @@
-use ai_core::metric::{Aggregation, MetricSample, MetricSpec};
+use ai_core::metric::{Aggregation, MetricRegistry, MetricSample, MetricSpec};
 
 #[test]
 fn metric_spec_fields_constructable_at_const() {
@@ -40,4 +40,56 @@ fn aggregation_as_sql_expr() {
     assert_eq!(Aggregation::Avg.as_sql_expr(), "AVG(value)");
     assert_eq!(Aggregation::Sum.as_sql_expr(), "SUM(value)");
     assert_eq!(Aggregation::Count.as_sql_expr(), "CAST(COUNT(*) AS REAL)");
+}
+
+#[test]
+fn registry_starts_empty() {
+    let r = MetricRegistry::new();
+    assert_eq!(r.all().len(), 0);
+    assert!(r.get("anything").is_none());
+}
+
+#[test]
+fn registry_collects_specs() {
+    static SPEC_A: MetricSpec = MetricSpec {
+        name: "a",
+        window_secs: 60,
+        min_samples: 1,
+        aggregation: Aggregation::Avg,
+    };
+    static SPEC_B: MetricSpec = MetricSpec {
+        name: "b",
+        window_secs: 3600,
+        min_samples: 2,
+        aggregation: Aggregation::Sum,
+    };
+
+    let mut r = MetricRegistry::new();
+    r.register(&SPEC_A);
+    r.register_all(&[&SPEC_B]);
+
+    assert_eq!(r.all().len(), 2);
+    assert_eq!(r.get("a").unwrap().name, "a");
+    assert_eq!(r.get("b").unwrap().window_secs, 3600);
+}
+
+#[test]
+fn registry_rejects_duplicate_names() {
+    static SPEC_1: MetricSpec = MetricSpec {
+        name: "dup",
+        window_secs: 60,
+        min_samples: 1,
+        aggregation: Aggregation::Avg,
+    };
+    static SPEC_2: MetricSpec = MetricSpec {
+        name: "dup",
+        window_secs: 120,
+        min_samples: 2,
+        aggregation: Aggregation::Sum,
+    };
+
+    let mut r = MetricRegistry::new();
+    r.register(&SPEC_1);
+    let err = r.try_register(&SPEC_2).unwrap_err();
+    assert!(err.contains("dup"));
 }

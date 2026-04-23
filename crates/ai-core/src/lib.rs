@@ -9,7 +9,7 @@ pub mod router;
 pub mod signal;
 pub mod traits;
 
-pub use metric::{Aggregation, MetricSample, MetricSpec};
+pub use metric::{Aggregation, MetricRegistry, MetricSample, MetricSpec};
 pub use metrics::AiMetrics;
 pub use mirror::{MirrorSignalSource, MirrorSnapshotSpec, MirrorSubscriberRunner};
 pub use recall::{RecallItem, RecallQuery, RecallSpec};

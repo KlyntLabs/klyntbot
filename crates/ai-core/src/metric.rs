@@ -40,3 +40,46 @@ pub struct MetricSample {
     pub name: &'static str,
     pub value: f64,
 }
+
+/// Workspace-global registry of `MetricSpec`s. Populated explicitly at startup
+/// by app-core calling `register_all(Feature::FEATURE_METRICS)` for each feature.
+/// Duplicate names are a programming error — fail fast at startup.
+#[derive(Debug, Default)]
+pub struct MetricRegistry {
+    specs: Vec<&'static MetricSpec>,
+}
+
+impl MetricRegistry {
+    pub fn new() -> Self {
+        Self { specs: Vec::new() }
+    }
+
+    /// Panics on duplicate name. Use `try_register` to check first.
+    pub fn register(&mut self, spec: &'static MetricSpec) {
+        if let Err(e) = self.try_register(spec) {
+            panic!("MetricRegistry: {}", e);
+        }
+    }
+
+    pub fn try_register(&mut self, spec: &'static MetricSpec) -> Result<(), String> {
+        if self.specs.iter().any(|s| s.name == spec.name) {
+            return Err(format!("duplicate metric name: {}", spec.name));
+        }
+        self.specs.push(spec);
+        Ok(())
+    }
+
+    pub fn register_all(&mut self, specs: &[&'static MetricSpec]) {
+        for s in specs {
+            self.register(s);
+        }
+    }
+
+    pub fn all(&self) -> &[&'static MetricSpec] {
+        &self.specs
+    }
+
+    pub fn get(&self, name: &str) -> Option<&'static MetricSpec> {
+        self.specs.iter().copied().find(|s| s.name == name)
+    }
+}
