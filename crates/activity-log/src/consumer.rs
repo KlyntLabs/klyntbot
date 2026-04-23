@@ -37,7 +37,7 @@ impl SignalConsumer for NormalizerSignalConsumer {
 }
 
 /// Build an `ActivityLogEntry` from an `AiSignal`.
-pub(crate) fn signal_to_entry(signal: &AiSignal) -> ActivityLogEntry {
+pub fn signal_to_entry(signal: &AiSignal) -> ActivityLogEntry {
     let preview = if signal.content.is_empty() {
         None
     } else {

@@ -58,6 +58,7 @@ klyntbot already owns most of the memory infrastructure the field is converging 
 | User install path | Desktop UI settings page (no separate CLI install command). |
 | Rule artifacts | Reforge writes managed-block sections of `CLAUDE.md`, `AGENTS.md`, `.cursorrules`. User hand-edits preserved outside the markers. |
 | Schema approach | Consolidated Phase-1 migration for every column/table across all 8 phases. Pre-release authorizes direct schema changes. |
+| klynt-cli source class | **klynt-cli is a first-class source emitting the rich variant set** (10 net-new `EventKind` variants beyond the 9 used by external CLIs); external CLIs emit a subset. See linked spec at `docs/superpowers/specs/2026-04-23-klynt-cli-design.md`. |
 
 ### The invariants
 
@@ -175,6 +176,7 @@ bot/crates/
 | `memory_causal_edges` | `CREATE TABLE (id, from_id, to_id, edge_kind, confidence, inferred_at)` |
 | `memory_utilization` | `CREATE TABLE (memory_id, retrieved_at, cited_in_response BOOLEAN)` |
 | `skill_versions` | `ADD COLUMN scope TEXT DEFAULT 'global'` + `ADD COLUMN scope_repo_id TEXT NULL` |
+| `klynt_sessions` | `CREATE TABLE` per klynt-cli spec §10. Owner: klynt-cli spec, but consolidated into this Phase-1 migration so all schema lands together. Single migration story per CLAUDE.md. |
 
 All additions. No renames, no drops, no breaking changes.
 
@@ -239,6 +241,19 @@ pub enum EventKind {
     TestRun      { command: String, framework: Option<String>, passed: u32, failed: u32, duration_ms: u32 },
     CompactEvent { trigger: String, token_count: u32 },
     Error        { tool: Option<String>, message: String },
+
+    // ---- klynt-cli rich variants (added per Amendment 2; see klynt-cli spec §8) ----
+    // External CLIs do not emit these. klynt-cli always emits them when applicable.
+    SkillActivated     { skill_id: String, source_path: PathBuf, trigger: String },
+    RecallInjected     { memory_ids: Vec<String>, coverage_score: f32, dead_end_warning: bool },
+    ApprovalDecision   { tool: String, decision: String, layer: String },
+    SandboxApplied     { tool: String, policy_summary: String, fallback_unsandboxed: bool },
+    FileEditEnriched   { path: PathBuf, op: FileOp, anchored_symbols: Vec<SymbolRef>, lsp_diagnostics_delta: Option<DiagnosticsDelta> },
+    TestRunEnriched    { command: String, passed_tests: Vec<String>, failed_tests: Vec<TestFailure>, newly_failing: Vec<String> },
+    ProviderCall       { model: String, prompt_tokens: u32, completion_tokens: u32, cost_usd: f64, latency_ms: u64, retries: u32 },
+    CompressionApplied { before_tokens: u32, after_tokens: u32, messages_condensed: u32 },
+    MirrorAlert        { alert_id: String, severity: String, kind: String },
+    SkillRoutingTrace  { considered: Vec<SkillScore>, chosen: Vec<String> },
 }
 ```
 
@@ -250,6 +265,32 @@ pub enum EventKind {
 | Codex | shell hook (TOML config) → `klyntbot-hook codex` | 5 hook events | `tool_kind` provides richer semantic hints |
 | kimi-cli | shell hook (tier 1) or Wire client (tier 2) | 13 hook events; Wire adds streaming text | Wire path enables richer `AssistantMsg` capture |
 | opencode | SQLite WAL polling (500ms) | messages table diff | best-effort only; opt-in |
+| klynt-cli | **Native (in-process emit)** via `MemorySink` trait — `InProcessSink` when desktop is off, `IngestSocketSink` when desktop is alive | **All 19 events (9 base + 10 rich)** | First-class source; emits the full klynt-rich variant set from §5 above. See "Native source: klynt-cli" subsection below. Linked spec: `docs/superpowers/specs/2026-04-23-klynt-cli-design.md`. |
+
+### Native source: klynt-cli
+
+klynt-cli is the first (and currently only) native source — it runs in-process with the klyntbot cognitive crates and does not go through `klyntbot-hook`. Instead, its event broker publishes events directly to a `MemorySink` trait object defined in the `coding-memory` crate:
+
+```rust
+// coding-memory/src/sink.rs
+#[async_trait]
+pub trait MemorySink: Send + Sync {
+    async fn accept_event(&self, event: AgentEvent) -> Result<()>;
+    async fn flush(&self) -> Result<()>;
+}
+
+pub struct InProcessSink { /* Distiller handle, turn-buffer */ }
+pub struct IngestSocketSink { /* Unix socket writer */ }
+```
+
+Two concrete implementations:
+
+- **`InProcessSink`** — invokes `Distiller::accept_event(...)` directly when klyntbot desktop is not running. Events accumulate in the per-turn buffer; Distiller runs on turn boundaries as described in §6. This is the "solo CLI" mode from the klynt-cli spec.
+- **`IngestSocketSink`** — writes length-prefixed JSON to `~/.klyntbot/ingest.sock` (exactly the same transport external CLIs use). Used when klyntbot desktop is alive, as detected by the `~/.klyntbot/desktop.lock` heartbeat file (30-second heartbeat, 60-second staleness threshold).
+
+State transitions happen at event boundaries — if desktop starts or dies mid-session, klynt-cli's `MemorySink` switches impls on the next event. No buffering needed; events flow to whichever path is active. Desktop starting mid-session immediately begins owning the Distiller cycle; desktop dying mid-session transparently falls back to in-process distillation with a status-line warning in the TUI.
+
+**The `MemorySink` trait is part of `coding-memory`'s Phase-1 surface** (not a klynt-cli-specific addition). This lets both the klynt-cli binary and the desktop consume the same trait without circular dependencies.
 
 ### Transport
 
@@ -361,6 +402,27 @@ record_observation(
 ```
 
 **Model:** whatever the user has configured in `ProviderManager`. No hardcoded Claude. New provider role declared: `ProviderRole::Distiller` (defaults to user's small-tier model).
+
+### Rich-variant handling (klynt-cli first-class source)
+
+External CLIs emit the 9 base `EventKind` variants; klynt-cli additionally emits 10 rich variants (see §5). The Distiller dispatches these richer variants along a largely-extractive path because they arrive pre-structured — the LLM Phase B doesn't need to re-derive what klynt-cli already computed.
+
+| Variant | Distiller handling | Destination |
+|---|---|---|
+| `SkillActivated` | Extractive — captured for skill-effectiveness telemetry (Mirror subscriber feed) | `mirror_snippets`, autotuner telemetry |
+| `RecallInjected` | Extractive — feeds `PatternEffectivenessSubscriber` directly; no LLM needed | Mirror real-time channel |
+| `ApprovalDecision` | Extractive — captured for autotuner training (which rules fire most often per repo) | autotuner telemetry, workbench panel |
+| `SandboxApplied` | Extractive — captured but **not** surfaced to LLM Phase B (no facts to extract) | rollout + workbench only |
+| `FileEditEnriched` | Replaces existing `FileEdit` for klynt-cli sources. `anchored_symbols` feed directly into C2 (symbol-grounded memory with git invalidation) without extra tree-sitter pass; `lsp_diagnostics_delta` informs failure-state retrieval | `episodic_memories { kind: 'refactor' }`, `anchored_symbols` index |
+| `TestRunEnriched` | Replaces existing `TestRun` for klynt-cli. Per-test failures + `newly_failing` list improve `FailurePattern` extraction precision | `episodic_memories { kind: 'test_run' }`, `FailurePattern` input |
+| `ProviderCall` | Extractive — captured for cost analysis + provider-tier autotuner | cost tracker, autotuner telemetry |
+| `CompressionApplied` | Extractive — captured for autotuner training (which compression strategies correlate with bad outcomes) | autotuner telemetry |
+| `MirrorAlert` | Surfaced to user via existing alert pipeline (`mirror_snippets`); no Distiller action | `mirror_snippets` passthrough |
+| `SkillRoutingTrace` | Extractive — feeds existing `RoutingMirrorSubscriber` (§10); drift detection uses the trace directly | Mirror real-time channel |
+
+**Default behavior for variants without explicit handling** (safety net): Distiller writes an `episodic_memories { kind: 'turn_trace' }` row with the full payload in metadata. This means a future `EventKind` variant we haven't categorized still gets recorded — the ingestion path never silently drops data.
+
+**Cost implication:** klynt-cli sessions often need only Phase A (extractive) because the rich variants are already structured. LLM Phase B fires only when `RecallInjected` + `AssistantMsg` suggest novel `FixAttempt`/`StylePreference`/etc. content — dropping distillation cost for klynt-cli sessions substantially compared to external-CLI sessions.
 
 ### Phase C — Reconciliation (Mem0-style, no DELETE)
 
@@ -1227,6 +1289,23 @@ All configurable in `config.json` → `codingMemory.distiller.model`, etc.
 
 All flags default to off; user enables per-CLI via desktop UI.
 
+#### Keys shared with klynt-cli (do not rename without coordinating both specs)
+
+klynt-cli consumes these coding-memory keys directly. Renaming any of them requires a coordinated update in the klynt-cli spec (`docs/superpowers/specs/2026-04-23-klynt-cli-design.md`):
+
+| Shared key | Consumer in klynt-cli | Notes |
+|---|---|---|
+| `codingMemory.distiller.model` | klynt-cli respects this when desktop is off and runs the in-process Distiller | Not overridden in `codingCli.*` |
+| `codingMemory.ingest.excludePaths` | klynt-cli's **privacy guard** (the always-first layer in the approval stack, per klynt-cli §6) reads this same list | Privacy guard is inviolable per klynt-cli invariant K6 — cannot be bypassed by `--yolo` |
+| `codingMemory.privacy.defaultSensitivity` | klynt-cli's sensitivity tagging on emitted events inherits this default | |
+| `codingMemory.privacy.autoPromoteHighPaths` | klynt-cli tags matching paths as `high` sensitivity at emission time | Distiller defense-in-depth still applies |
+| `codingMemory.recall.sessionStartBudget` | klynt-cli's recall injection at session start is capped at this token budget | Enforced by klynt-cli invariant mapped to coding-memory invariant #9 |
+| `codingMemory.recall.userPromptBudget` | klynt-cli's per-turn recall injection is capped at this budget | Same invariant mapping |
+| `codingMemory.recall.deadEndWarnings` | klynt-cli's TUI shows dead-end warnings when enabled | |
+| `codingMemory.recall.coverageThreshold` | klynt-cli's failure-state-aware retrieval (C3) uses this threshold | |
+
+Klynt-cli's own configuration lives under the namespace `codingCli.*`; see its spec Appendix D for the full tree. The namespaces never collide.
+
 ### E. Key file paths
 
 - Socket: `~/.klyntbot/ingest.sock`
@@ -1263,7 +1342,7 @@ Explicit non-goals for this spec, with rationale — so future readers understan
 | Content-scanning secret detector | Rejected | Path-based `excludePaths` is coarse but reliable. Full content scanning for secrets is false-positive-heavy and impossible to maintain; stricter users set their editor to not open secret files. |
 | Per-fact manual merge UI (full "conflict resolution" flows) | Out of scope | Workbench provides promote/demote sensitivity and approve/reject alerts; deeper manual memory editing creates integrity risks not worth the UX trade. |
 | Log forwarding / SIEM integration | Out of scope | Data never leaves the device. Enterprises with SIEM requirements should reach klyntbot through the MCP server's audit-tool surface, not bulk log export. |
-| `klynt-cli` native coding CLI | Separate future project | This spec makes klynt-cli's future integration cheap — it will embed `coding-memory` as a Rust library + implement an `IngestAdapter`. The CLI itself is a separate brainstorm → spec → plan cycle. |
+| `klynt-cli` native coding CLI | **Linked spec at `docs/superpowers/specs/2026-04-23-klynt-cli-design.md`** | **Implementation order: coding-memory first (this spec), then klynt-cli (linked spec).** Klynt-cli is a first-class source of this spec's `AgentEvent` stream; its 10 rich variants are listed in §5 above and its rich-variant Distiller handling is tabulated in §6. Klynt-cli consumes the `MemorySink` trait defined in this spec's §5 Native source subsection. |
 
 ### H. Amendment log
 
@@ -1271,6 +1350,7 @@ Explicit non-goals for this spec, with rationale — so future readers understan
 |---|---|
 | 2026-04-22 | Initial design committed (commit 59277459e) |
 | 2026-04-22 | Amendment 1: `actor_id` forward-compat, path-based `excludePaths`, `sensitivity` tagging, formalized retrieval-skill registry, closed Mirror alert enums, §11.5 Coding Memory Workbench, per-phase panel delivery, Out-of-scope appendix |
+| 2026-04-23 | Amendment 2: klynt-cli first-class source coordination — 10 rich `EventKind` variants (§5), klynt-cli adapter row (§5), Native source subsection with `MemorySink` trait (§5), rich-variant Distiller handling table (§6), `klynt_sessions` table added to consolidated Phase-1 migration (§4), shared config keys marked (§13.D), klynt-cli key decision row (§3), klynt-cli row updated in Out-of-scope table (§13.G). Coordinated with `docs/superpowers/specs/2026-04-23-klynt-cli-design.md`. |
 
 ---
 

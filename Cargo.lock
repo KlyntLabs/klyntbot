@@ -7248,6 +7248,7 @@ dependencies = [
 name = "klyntbot"
 version = "0.1.1"
 dependencies = [
+ "activity-log",
  "agent",
  "ai-core",
  "ai-core-macros",

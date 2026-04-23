@@ -3,7 +3,9 @@
 //! This is the root library crate that re-exports all workspace crates.
 
 // Re-export all workspace crates
+pub use activity_log;
 pub use agent;
+pub use app_core;
 pub use bus;
 pub use channels;
 pub use cognitive;
