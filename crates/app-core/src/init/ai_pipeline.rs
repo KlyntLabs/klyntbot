@@ -34,6 +34,11 @@ pub fn translate(event: &DomainEvent) -> Option<AiSignal> {
         sig.domain = RecallDomain::Notes;
         return Some(sig);
     }
+    if let Some(e) = try_into_learning_event(event) {
+        let mut sig = e.to_signal();
+        sig.domain = RecallDomain::Learning;
+        return Some(sig);
+    }
     if let Some(e) = try_into_community_event(event) {
         let mut sig = e.to_signal();
         sig.domain = RecallDomain::General;
@@ -205,6 +210,81 @@ fn try_into_note_event(e: &DomainEvent) -> Option<feature_notes::events::NoteEve
     }
 }
 
+fn try_into_learning_event(e: &DomainEvent) -> Option<feature_learning::LearningEvent> {
+    use feature_learning::LearningEvent;
+    match e {
+        DomainEvent::KnowledgeAtomExtracted {
+            atom_id,
+            note_id,
+            text,
+        } => Some(LearningEvent::AtomExtracted {
+            atom_id: atom_id.clone(),
+            note_id: note_id.clone(),
+            text: text.clone(),
+        }),
+        DomainEvent::KnowledgeAtomCreated { atom_id, .. } => {
+            Some(LearningEvent::AtomCreated {
+                atom_id: atom_id.clone(),
+            })
+        }
+        DomainEvent::KnowledgeAtomAccepted { atom_id, .. } => {
+            Some(LearningEvent::AtomAccepted {
+                atom_id: atom_id.clone(),
+            })
+        }
+        DomainEvent::KnowledgeAtomArchived { atom_id, .. } => {
+            Some(LearningEvent::AtomArchived {
+                atom_id: atom_id.clone(),
+            })
+        }
+        DomainEvent::AtomFlashcardReviewed {
+            atom_id,
+            card_id,
+            quality,
+            recall_speed_ms,
+            new_retention_pct,
+            source_note_id,
+        } => Some(LearningEvent::FlashcardReviewed {
+            atom_id: atom_id.clone(),
+            card_id: card_id.clone(),
+            quality: *quality,
+            recall_speed_ms: *recall_speed_ms,
+            new_retention_pct: *new_retention_pct,
+            source_note_id: source_note_id.clone(),
+        }),
+        DomainEvent::AtomReinforced { atom_id, .. } => {
+            Some(LearningEvent::AtomReinforced {
+                atom_id: atom_id.clone(),
+            })
+        }
+        DomainEvent::FlashcardScheduled {
+            flashcard_id,
+            atom_id,
+            due_at,
+        } => Some(LearningEvent::FlashcardScheduled {
+            card_id: flashcard_id.clone(),
+            atom_id: atom_id.clone(),
+            due_at: due_at.clone(),
+        }),
+        DomainEvent::AtomRetentionDecayed { atom_id, retention } => {
+            Some(LearningEvent::RetentionDecayed {
+                atom_id: atom_id.clone(),
+                retention: *retention,
+            })
+        }
+        DomainEvent::AtomSemanticFactLinked {
+            atom_id,
+            fact_id,
+            similarity,
+        } => Some(LearningEvent::SemanticFactLinked {
+            atom_id: atom_id.clone(),
+            fact_id: fact_id.clone(),
+            similarity: *similarity,
+        }),
+        _ => None,
+    }
+}
+
 fn try_into_community_event(
     e: &DomainEvent,
 ) -> Option<cognitive::services::community_intelligence::events::CommunityEvent> {
@@ -313,30 +393,10 @@ fn translate_system_event(event: &DomainEvent) -> Option<AiSignal> {
             domain: RecallDomain::from_str_or_general(domain.as_str()),
             ..base
         }),
-        DomainEvent::AtomReinforced {
-            atom_id,
-            subject,
-            domain,
-            reinforcement_count,
-            ..
-        } => Some(AiSignal {
-            event_kind: "AtomReinforced",
-            importance: (0.5 + *reinforcement_count as f64 * 0.15).min(0.95),
-            content: subject.clone(),
-            metrics: AiMetrics {
-                category: Some(domain.clone()),
-                ..AiMetrics::default()
-            },
-            entity: Some(ai_core::EntityRef {
-                entity_type: "knowledge_atom",
-                id: atom_id.clone(),
-                name: subject.clone(),
-            }),
-            ..base
-        }),
         // DistractionDetected, FocusSessionStarted, FocusSessionEnded, ActivitySessionCompleted,
         // and ProductivityScoreComputed are now handled by try_into_productivity_event →
         // ProductivityEvent::From → AiSignal via the macro-generated to_signal().
+        // AtomReinforced is now handled by try_into_learning_event.
         DomainEvent::SkillRouted {
             skill_name,
             confidence,
@@ -517,8 +577,7 @@ pub fn build_feature_registry() -> ai_core::AiFeatureRegistry {
     feature_finance::FinanceFeature::register(&mut reg);
     feature_productivity::ProductivityFeature::register(&mut reg);
     feature_notes::NotesFeature::register(&mut reg);
-    // Learning, LanguageLearning, Coaching are added by
-    // their respective tasks (34, 39, 46).
+    feature_learning::LearningFeature::register(&mut reg);
     reg
 }
 
@@ -530,6 +589,7 @@ pub fn build_metric_registry() -> ai_core::MetricRegistry {
     reg.register_all(feature_finance::FinanceEvent::FEATURE_METRICS);
     reg.register_all(feature_coaching::events::CoachingEvent::FEATURE_METRICS);
     reg.register_all(feature_productivity::events::ProductivityEvent::FEATURE_METRICS);
+    reg.register_all(feature_learning::LearningEvent::FEATURE_METRICS);
     reg.register_all(
         cognitive::services::community_intelligence::events::CommunityEvent::FEATURE_METRICS,
     );
@@ -597,5 +657,6 @@ mod registry_build_test {
         assert!(reg.by_domain(&RecallDomain::Finance).is_some());
         assert!(reg.by_domain(&RecallDomain::Productivity).is_some());
         assert!(reg.by_domain(&RecallDomain::Notes).is_some());
+        assert!(reg.by_domain(&RecallDomain::Learning).is_some());
     }
 }

@@ -270,6 +270,25 @@ pub enum DomainEvent {
         domain: String,
         reinforcement_count: i64,
     },
+    KnowledgeAtomExtracted {
+        atom_id: String,
+        note_id: String,
+        text: String,
+    },
+    FlashcardScheduled {
+        flashcard_id: String,
+        atom_id: String,
+        due_at: String,
+    },
+    AtomRetentionDecayed {
+        atom_id: String,
+        retention: f64,
+    },
+    AtomSemanticFactLinked {
+        atom_id: String,
+        fact_id: String,
+        similarity: f64,
+    },
     AtomInteracted {
         atom_id: String,
         interaction_type: String,
@@ -500,6 +519,12 @@ pub enum DomainEvent {
         oldest_fire_at_ms: i64,
         newest_fire_at_ms: i64,
     },
+
+    PluginEvent {
+        plugin_id: String,
+        kind: String,
+        payload: serde_json::Value,
+    },
 }
 
 impl DomainEvent {
@@ -551,6 +576,10 @@ impl DomainEvent {
             Self::KnowledgeAtomArchived { .. } => "KnowledgeAtomArchived",
             Self::AtomFlashcardReviewed { .. } => "AtomFlashcardReviewed",
             Self::AtomReinforced { .. } => "AtomReinforced",
+            Self::KnowledgeAtomExtracted { .. } => "KnowledgeAtomExtracted",
+            Self::FlashcardScheduled { .. } => "FlashcardScheduled",
+            Self::AtomRetentionDecayed { .. } => "AtomRetentionDecayed",
+            Self::AtomSemanticFactLinked { .. } => "AtomSemanticFactLinked",
             Self::AtomInteracted { .. } => "AtomInteracted",
             Self::RetentionMilestoneReached { .. } => "RetentionMilestoneReached",
             Self::TranslationCompleted { .. } => "TranslationCompleted",
@@ -583,6 +612,7 @@ impl DomainEvent {
             Self::AlarmSnoozed { .. } => "AlarmSnoozed",
             Self::AlarmCancelled { .. } => "AlarmCancelled",
             Self::MissedAlarms { .. } => "MissedAlarms",
+            Self::PluginEvent { .. } => "PluginEvent",
         }
     }
 
@@ -614,6 +644,14 @@ impl DomainEvent {
     pub const KIND_ATOM_FLASHCARD_REVIEWED: &'static str = "AtomFlashcardReviewed";
     /// `event_type` value for [`DomainEvent::AtomReinforced`].
     pub const KIND_ATOM_REINFORCED: &'static str = "AtomReinforced";
+    /// `event_type` value for [`DomainEvent::KnowledgeAtomExtracted`].
+    pub const KIND_KNOWLEDGE_ATOM_EXTRACTED: &'static str = "KnowledgeAtomExtracted";
+    /// `event_type` value for [`DomainEvent::FlashcardScheduled`].
+    pub const KIND_FLASHCARD_SCHEDULED: &'static str = "FlashcardScheduled";
+    /// `event_type` value for [`DomainEvent::AtomRetentionDecayed`].
+    pub const KIND_ATOM_RETENTION_DECAYED: &'static str = "AtomRetentionDecayed";
+    /// `event_type` value for [`DomainEvent::AtomSemanticFactLinked`].
+    pub const KIND_ATOM_SEMANTIC_FACT_LINKED: &'static str = "AtomSemanticFactLinked";
     /// `event_type` value for [`DomainEvent::AtomInteracted`].
     pub const KIND_ATOM_INTERACTED: &'static str = "AtomInteracted";
     /// `event_type` value for [`DomainEvent::RetentionMilestoneReached`].
@@ -704,6 +742,8 @@ impl DomainEvent {
     pub const KIND_ALARM_CANCELLED: &'static str = "AlarmCancelled";
     /// `event_type` value for [`DomainEvent::MissedAlarms`].
     pub const KIND_MISSED_ALARMS: &'static str = "MissedAlarms";
+    /// `event_type` value for [`DomainEvent::PluginEvent`].
+    pub const KIND_PLUGIN_EVENT: &'static str = "PluginEvent";
 
     /// Map this event to its domain category string.
     ///
@@ -756,6 +796,10 @@ impl DomainEvent {
             | Self::KnowledgeAtomArchived { .. }
             | Self::AtomFlashcardReviewed { .. }
             | Self::AtomReinforced { .. }
+            | Self::KnowledgeAtomExtracted { .. }
+            | Self::FlashcardScheduled { .. }
+            | Self::AtomRetentionDecayed { .. }
+            | Self::AtomSemanticFactLinked { .. }
             | Self::AtomInteracted { .. }
             | Self::RetentionMilestoneReached { .. }
             | Self::TranslationCompleted { .. }
@@ -768,6 +812,7 @@ impl DomainEvent {
 
             Self::InterventionTriggered { .. } => "productivity",
             Self::MemoryPendingConfirmation { .. } => "memory",
+            Self::PluginEvent { .. } => "plugin",
             Self::SkillRouted { .. } => "agent",
             Self::CrossDomainDotReady { .. } => "fabric",
             Self::CommunityDiscovered { .. }

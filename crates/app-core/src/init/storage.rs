@@ -144,6 +144,14 @@ pub(super) async fn init_storage(
     .await
     .map_err(|e| format!("focus migration failed: {e}"))?;
 
+    // Run learning feature migrations (placeholder in v3; tables live in cognitive).
+    StoragePool::run_feature_migrations(
+        storage_pool.inner(),
+        &feature_learning::LearningFeature::migrations_static(),
+    )
+    .await
+    .map_err(|e| format!("learning migration failed: {e}"))?;
+
     // 3. Create LLM provider (graceful — falls back to noop for setup wizard).
     // Use the "full" variant to get the inner ProviderManager (when a fallback is configured)
     // so we can wire circuit breaker persistence before the manager starts handling calls.

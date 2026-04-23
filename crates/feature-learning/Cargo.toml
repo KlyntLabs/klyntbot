@@ -6,10 +6,18 @@ rust-version.workspace = true
 license.workspace = true
 
 [dependencies]
-common.workspace = true
-serde.workspace = true
-serde_json.workspace = true
-tracing.workspace = true
+ai-core = { path = "../ai-core" }
+ai-core-macros = { path = "../ai-core-macros" }
+async-trait = { workspace = true }
+bus = { workspace = true }
+common = { workspace = true }
+jiff = { workspace = true }
+serde = { workspace = true, features = ["derive"] }
+serde_json = { workspace = true }
+sqlx = { workspace = true }
+storage = { workspace = true }
+tools-core = { workspace = true }
+tracing = { workspace = true }
 
 [dev-dependencies]
 tokio = { workspace = true, features = ["macros", "rt-multi-thread"] }

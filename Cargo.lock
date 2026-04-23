@@ -4867,10 +4867,18 @@ dependencies = [
 name = "feature-learning"
 version = "0.1.1"
 dependencies = [
+ "ai-core",
+ "ai-core-macros",
+ "async-trait",
+ "bus",
  "common",
+ "jiff",
  "serde",
  "serde_json",
+ "sqlx",
+ "storage",
  "tokio",
+ "tools-core",
  "tracing",
 ]
 

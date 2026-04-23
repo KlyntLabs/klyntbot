@@ -123,14 +123,17 @@ impl AppCore {
             let retention_pct = 0.9_f64;
 
             if let Some(bus) = &self.domain_event_bus {
-                bus.publish(bus::DomainEvent::AtomFlashcardReviewed {
-                    atom_id: atom_id.clone(),
-                    card_id: card.id.clone(),
-                    quality: quality as u8,
-                    recall_speed_ms: params.recall_speed_ms.unwrap_or(0) as u64,
-                    new_retention_pct: retention_pct,
-                    source_note_id: card.source_note_id.clone(),
-                });
+                bus.publish(
+                    feature_learning::LearningEvent::FlashcardReviewed {
+                        atom_id: atom_id.clone(),
+                        card_id: card.id.clone(),
+                        quality: quality as u8,
+                        recall_speed_ms: params.recall_speed_ms.unwrap_or(0) as u64,
+                        new_retention_pct: retention_pct,
+                        source_note_id: card.source_note_id.clone(),
+                    }
+                    .into(),
+                );
                 // NOTE: RetentionMilestoneReached is emitted by the Phase 2 decay cron
                 // when retention drops below thresholds and then recovers via review.
                 // Not meaningful here since retention_pct is a static 0.9 estimate.
