@@ -96,6 +96,27 @@ pub enum FinanceEvent {
         entity_bridge(type = "finance_goal", name_from = "name", id_from = "goal_id")
     )]
     GoalAchieved { goal_id: String, name: String },
+
+    #[ai(
+        importance = 0.5,
+        salience = "accumulate",
+        observation_template = "Goal '{name}' advanced by {delta} → {current_amount}/{target_amount}",
+        entity_bridge(type = "finance_goal", name_from = "name", id_from = "goal_id"),
+        metric(
+            name = "goal_progress_velocity",
+            value_from = *delta as f64,
+            window = "30d",
+            min_samples = 3,
+            aggregation = "sum",
+        ),
+    )]
+    GoalProgress {
+        goal_id: String,
+        name: String,
+        current_amount: i64,
+        target_amount: i64,
+        delta: i64,
+    },
 }
 
 impl From<FinanceEvent> for DomainEvent {
@@ -151,6 +172,19 @@ impl From<FinanceEvent> for DomainEvent {
             },
             FinanceEvent::GoalAchieved { goal_id, name } => {
                 DomainEvent::GoalAchieved { goal_id, name }
+            }
+            FinanceEvent::GoalProgress {
+                goal_id,
+                name,
+                current_amount,
+                target_amount,
+                delta,
+            } => DomainEvent::FinanceGoalProgress {
+                goal_id,
+                name,
+                current_amount,
+                target_amount,
+                delta,
             }
         }
     }

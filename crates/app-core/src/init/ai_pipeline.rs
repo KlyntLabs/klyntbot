@@ -318,6 +318,19 @@ fn try_into_finance_event(e: &DomainEvent) -> Option<feature_finance::events::Fi
             goal_id: goal_id.clone(),
             name: name.clone(),
         }),
+        DomainEvent::FinanceGoalProgress {
+            goal_id,
+            name,
+            current_amount,
+            target_amount,
+            delta,
+        } => Some(FinanceEvent::GoalProgress {
+            goal_id: goal_id.clone(),
+            name: name.clone(),
+            current_amount: *current_amount,
+            target_amount: *target_amount,
+            delta: *delta,
+        }),
         _ => None,
     }
 }
