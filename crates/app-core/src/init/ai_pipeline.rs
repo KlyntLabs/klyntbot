@@ -241,6 +241,12 @@ fn try_into_task_event(e: &DomainEvent) -> Option<feature_tasks::events::TaskEve
             task_id: task_id.clone(),
             title: title.clone(),
         }),
+        DomainEvent::TaskDeferred { task_id, .. } => Some(TaskEvent::Deferred {
+            task_id: task_id.clone(),
+            title: String::new(),
+            previous_due: None,
+            new_due: None,
+        }),
         DomainEvent::EstimationRecorded {
             task_id,
             estimated_mins,

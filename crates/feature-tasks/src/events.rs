@@ -73,6 +73,26 @@ pub enum TaskEvent {
     #[ai(
         importance = 0.5,
         salience = "accumulate",
+        observation_template = "Deferred '{title}' from {previous_due:?} to {new_due:?}",
+        entity_bridge(type = "task", name_from = "title", id_from = "task_id"),
+        metric(
+            name = "task_deferrals_per_week",
+            value_from = 1.0_f64,
+            window = "7d",
+            min_samples = 3,
+            aggregation = "sum",
+        ),
+    )]
+    Deferred {
+        task_id: String,
+        title: String,
+        previous_due: Option<String>,
+        new_due: Option<String>,
+    },
+
+    #[ai(
+        importance = 0.5,
+        salience = "accumulate",
         observation_template = "Estimation recorded: est {estimated_minutes:?}m vs actual {actual_minutes:?}m",
         metric(
             name = "task_estimation_bias",
@@ -130,6 +150,15 @@ impl From<TaskEvent> for DomainEvent {
             } => DomainEvent::TaskFocusChanged {
                 task_id,
                 focus_deadline: focus_deadline.map(|d| d.to_string()),
+            },
+            TaskEvent::Deferred {
+                task_id,
+                title: _,
+                previous_due,
+                new_due,
+            } => DomainEvent::TaskDeferred {
+                task_id,
+                times_deferred: 1,
             },
             TaskEvent::EstimationRecorded {
                 task_id,
