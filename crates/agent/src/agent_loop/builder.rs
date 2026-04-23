@@ -447,6 +447,7 @@ impl AgentLoopBuilder {
                             accum_repo: Some(accum_repo),
                             failed_obs_repo: Some(failed_obs_repo),
                             promote_threshold: config.cognitive.accumulate_promote_threshold,
+                            promote_overrides: std::collections::HashMap::new(),
                             min_days: config.cognitive.accumulate_min_days,
                             domain_bus: self.domain_event_bus.clone(),
                             context_update_queue: self.context_update_queue.clone(),

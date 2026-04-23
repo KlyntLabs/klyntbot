@@ -94,6 +94,26 @@ impl AccumulatedEntry {
     fn should_promote(&self, promote_threshold: usize, min_days: usize) -> bool {
         self.observations.len() >= promote_threshold && self.days_seen.len() >= min_days
     }
+
+    /// Returns the effective promotion threshold for a given `RecallDomain`.
+    pub fn effective_threshold(
+        domain: &ai_core::RecallDomain,
+        overrides: &std::collections::HashMap<ai_core::RecallDomain, usize>,
+        global: usize,
+    ) -> usize {
+        overrides.get(domain).copied().unwrap_or(global)
+    }
+
+    pub fn should_promote_for_domain(
+        &self,
+        domain: &ai_core::RecallDomain,
+        overrides: &std::collections::HashMap<ai_core::RecallDomain, usize>,
+        global_threshold: usize,
+        min_days: usize,
+    ) -> bool {
+        let t = Self::effective_threshold(domain, overrides, global_threshold);
+        self.observations.len() >= t && self.days_seen.len() >= min_days
+    }
 }
 
 /// Collect domain events into a batch.
@@ -189,6 +209,7 @@ pub struct BackgroundServiceConfig {
     pub accum_repo: Option<AccumulatedObservationRepo>,
     pub failed_obs_repo: Option<FailedObservationRepo>,
     pub promote_threshold: usize,
+    pub promote_overrides: std::collections::HashMap<ai_core::RecallDomain, usize>,
     pub min_days: usize,
     pub domain_bus: Option<Arc<bus::DomainEventBus>>,
     pub context_update_queue: Option<Arc<bus::ContextUpdateQueue>>,
@@ -232,6 +253,7 @@ impl BackgroundConsolidationService {
             accum_repo,
             failed_obs_repo,
             promote_threshold,
+            promote_overrides,
             min_days,
             domain_bus,
             context_update_queue,
@@ -729,7 +751,13 @@ impl BackgroundConsolidationService {
                         .or_insert_with(AccumulatedEntry::new);
                     entry.add(obs);
 
-                    if entry.should_promote(promote_threshold, min_days) {
+                    // Use General domain as default since accumulator doesn't track per-domain
+                    if entry.should_promote_for_domain(
+                        &ai_core::RecallDomain::General,
+                        &promote_overrides,
+                        promote_threshold,
+                        min_days,
+                    ) {
                         debug!(
                             "Promoting accumulated events for '{key}' ({} events, {} days)",
                             entry.observations.len(),
