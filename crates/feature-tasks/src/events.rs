@@ -48,7 +48,14 @@ pub enum TaskEvent {
     #[ai(
         importance = 0.5,
         salience = "accumulate",
-        observation_template = "Estimation recorded: est {estimated_minutes:?}m vs actual {actual_minutes:?}m"
+        observation_template = "Estimation recorded: est {estimated_minutes:?}m vs actual {actual_minutes:?}m",
+        metric(
+            name = "task_estimation_bias",
+            value_from = *deviation_pct,
+            window = "7d",
+            min_samples = 3,
+            aggregation = "avg",
+        ),
     )]
     EstimationRecorded {
         task_id: String,
