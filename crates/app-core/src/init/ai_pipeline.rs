@@ -29,6 +29,16 @@ pub fn translate(event: &DomainEvent) -> Option<AiSignal> {
         sig.domain = RecallDomain::Productivity;
         return Some(sig);
     }
+    if let Some(e) = try_into_community_event(event) {
+        let mut sig = e.to_signal();
+        sig.domain = RecallDomain::General;
+        return Some(sig);
+    }
+    if let Some(e) = try_into_co_activation_event(event) {
+        let mut sig = e.to_signal();
+        sig.domain = RecallDomain::General;
+        return Some(sig);
+    }
     translate_system_event(event)
 }
 
@@ -59,6 +69,56 @@ fn try_into_productivity_event(e: &DomainEvent) -> Option<feature_productivity::
             session_id: session_id.clone(),
             quality: *quality,
             duration_mins: *duration_mins,
+        }),
+        _ => None,
+    }
+}
+
+fn try_into_community_event(e: &DomainEvent) -> Option<cognitive::services::community_intelligence::events::CommunityEvent> {
+    use cognitive::services::community_intelligence::events::CommunityEvent;
+    match e {
+        DomainEvent::CommunityDiscovered {
+            community_id,
+            name,
+            member_count,
+        } => Some(CommunityEvent::Discovered {
+            community_id: community_id.clone(),
+            name: name.clone(),
+            member_count: *member_count,
+        }),
+        DomainEvent::CommunityUpdated {
+            community_id,
+            name,
+            reason,
+        } => Some(CommunityEvent::Updated {
+            community_id: community_id.clone(),
+            name: name.clone(),
+            reason: reason.clone(),
+        }),
+        DomainEvent::CommunityWeakened {
+            community_id,
+            name,
+            stability,
+        } => Some(CommunityEvent::Weakened {
+            community_id: community_id.clone(),
+            name: name.clone(),
+            stability: *stability,
+        }),
+        _ => None,
+    }
+}
+
+fn try_into_co_activation_event(e: &DomainEvent) -> Option<cognitive::services::community_intelligence::co_activation_events::CoActivationEvent> {
+    use cognitive::services::community_intelligence::co_activation_events::CoActivationEvent;
+    match e {
+        DomainEvent::CoActivationStrengthened {
+            fact_id_a,
+            fact_id_b,
+            strength,
+        } => Some(CoActivationEvent::Strengthened {
+            fact_id_a: fact_id_a.clone(),
+            fact_id_b: fact_id_b.clone(),
+            strength: *strength,
         }),
         _ => None,
     }
@@ -343,6 +403,8 @@ pub fn build_metric_registry() -> ai_core::MetricRegistry {
     reg.register_all(feature_finance::FinanceEvent::FEATURE_METRICS);
     reg.register_all(feature_coaching::events::CoachingEvent::FEATURE_METRICS);
     reg.register_all(feature_productivity::events::ProductivityEvent::FEATURE_METRICS);
+    reg.register_all(cognitive::services::community_intelligence::events::CommunityEvent::FEATURE_METRICS);
+    reg.register_all(cognitive::services::community_intelligence::co_activation_events::CoActivationEvent::FEATURE_METRICS);
     reg
 }
 

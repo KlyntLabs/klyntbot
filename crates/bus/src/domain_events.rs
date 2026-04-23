@@ -416,6 +416,33 @@ pub enum DomainEvent {
         tooltip: String,
         detail_route: Option<String>,
     },
+
+    // -- Community lifecycle --
+    /// A new community was discovered by Phase 6.5 restructuring.
+    CommunityDiscovered {
+        community_id: String,
+        name: String,
+        member_count: u32,
+    },
+    /// A community's composition or metadata changed.
+    CommunityUpdated {
+        community_id: String,
+        name: String,
+        reason: String,
+    },
+    /// A community's stability dropped enough to mark it for deletion on the next sweep.
+    CommunityWeakened {
+        community_id: String,
+        name: String,
+        stability: f64,
+    },
+    /// Co-activation strengthened between two facts.
+    CoActivationStrengthened {
+        fact_id_a: String,
+        fact_id_b: String,
+        strength: f64,
+    },
+
     // -- Notifications --
     /// Emitted when a held notification is released (e.g. quiet hours ended).
     HeldNotificationReleased {
@@ -538,6 +565,10 @@ impl DomainEvent {
             Self::ContradictionDetected { .. } => "ContradictionDetected",
             Self::SkillRouted { .. } => "SkillRouted",
             Self::CrossDomainDotReady { .. } => "CrossDomainDotReady",
+            Self::CommunityDiscovered { .. } => "CommunityDiscovered",
+            Self::CommunityUpdated { .. } => "CommunityUpdated",
+            Self::CommunityWeakened { .. } => "CommunityWeakened",
+            Self::CoActivationStrengthened { .. } => "CoActivationStrengthened",
             Self::SystemWillSleep => "SystemWillSleep",
             Self::SystemDidWake { .. } => "SystemDidWake",
             Self::UserBecameIdle { .. } => "UserBecameIdle",
@@ -611,6 +642,14 @@ impl DomainEvent {
     pub const KIND_SKILL_ROUTED: &'static str = "SkillRouted";
     /// `event_type` value for [`DomainEvent::CrossDomainDotReady`].
     pub const KIND_CROSS_DOMAIN_DOT_READY: &'static str = "CrossDomainDotReady";
+    /// `event_type` value for [`DomainEvent::CommunityDiscovered`].
+    pub const KIND_COMMUNITY_DISCOVERED: &'static str = "CommunityDiscovered";
+    /// `event_type` value for [`DomainEvent::CommunityUpdated`].
+    pub const KIND_COMMUNITY_UPDATED: &'static str = "CommunityUpdated";
+    /// `event_type` value for [`DomainEvent::CommunityWeakened`].
+    pub const KIND_COMMUNITY_WEAKENED: &'static str = "CommunityWeakened";
+    /// `event_type` value for [`DomainEvent::CoActivationStrengthened`].
+    pub const KIND_CO_ACTIVATION_STRENGTHENED: &'static str = "CoActivationStrengthened";
     /// `event_type` value for [`DomainEvent::SystemWillSleep`].
     pub const KIND_SYSTEM_WILL_SLEEP: &'static str = "SystemWillSleep";
     /// `event_type` value for [`DomainEvent::SystemDidWake`].
@@ -715,6 +754,10 @@ impl DomainEvent {
             Self::MemoryPendingConfirmation { .. } => "memory",
             Self::SkillRouted { .. } => "agent",
             Self::CrossDomainDotReady { .. } => "fabric",
+            Self::CommunityDiscovered { .. }
+            | Self::CommunityUpdated { .. }
+            | Self::CommunityWeakened { .. }
+            | Self::CoActivationStrengthened { .. } => "community",
 
             Self::SystemWillSleep
             | Self::SystemDidWake { .. }
