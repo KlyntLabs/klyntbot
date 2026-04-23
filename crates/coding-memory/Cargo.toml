@@ -1,0 +1,31 @@
+[package]
+name = "coding-memory"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[dependencies]
+common = { workspace = true }
+bus = { workspace = true }
+storage = { workspace = true }
+providers = { workspace = true }
+context_engine = { workspace = true }
+cognitive = { workspace = true }
+coding-ingest = { path = "../coding-ingest" }
+tools-core = { workspace = true }
+serde = { workspace = true, features = ["derive"] }
+serde_json = { workspace = true }
+sqlx = { workspace = true }
+tokio = { workspace = true }
+async-trait = { workspace = true }
+tracing = { workspace = true }
+uuid = { workspace = true, features = ["v4", "serde"] }
+jiff = { workspace = true, features = ["serde"] }
+thiserror = { workspace = true }
+
+[dev-dependencies]
+tempfile = { workspace = true }
+
+[lints]
+workspace = true
