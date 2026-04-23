@@ -180,6 +180,7 @@ fn render_variant(
             },
             coaching_signal: #coaching_flag,
             coaching_rule: #rule_expr,
+            metric_samples: Vec::new(),
         },
     })
 }

@@ -36,6 +36,7 @@ fn translate_system_event(event: &DomainEvent) -> Option<AiSignal> {
         metrics: AiMetrics::default(),
         coaching_signal: false,
         coaching_rule: None,
+        metric_samples: Vec::new(),
     };
 
     match event {

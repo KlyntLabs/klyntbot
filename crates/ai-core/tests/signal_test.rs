@@ -19,6 +19,7 @@ fn signal_construction_sets_all_fields() {
         metrics: AiMetrics::default(),
         coaching_signal: false,
         coaching_rule: None,
+        metric_samples: Vec::new(),
     };
     assert_eq!(sig.event_kind, "TaskCreated");
     assert_eq!(sig.importance, 0.7);
@@ -45,6 +46,7 @@ fn signal_carries_metrics_and_coaching_flags() {
         metrics: metrics.clone(),
         coaching_signal: true,
         coaching_rule: Some("Review spending when budget pressure rises".into()),
+        metric_samples: Vec::new(),
     };
     assert_eq!(sig.metrics.app.as_deref(), Some("reddit"));
     assert_eq!(sig.metrics.amount, Some(42.0));
@@ -73,4 +75,50 @@ fn mirror_domain_roundtrips() {
         RecallDomain::from_str_or_general("mirror"),
         RecallDomain::Mirror
     );
+}
+
+#[test]
+fn signal_carries_metric_samples() {
+    use ai_core::{AiSignal, MetricSample, RecallDomain, SalienceVerdict};
+
+    let sig = AiSignal {
+        domain: RecallDomain::Tasks,
+        event_kind: "EstimationRecorded",
+        importance: 0.5,
+        salience: SalienceVerdict::Accumulate,
+        content: "est 30m actual 45m".into(),
+        entity: None,
+        timestamp: jiff::Timestamp::now(),
+        raw_event: None,
+        metrics: ai_core::AiMetrics::default(),
+        coaching_signal: false,
+        coaching_rule: None,
+        metric_samples: vec![MetricSample {
+            name: "task_estimation_bias",
+            value: 0.5,
+        }],
+    };
+    assert_eq!(sig.metric_samples.len(), 1);
+    assert_eq!(sig.metric_samples[0].name, "task_estimation_bias");
+}
+
+#[test]
+fn signal_metric_samples_default_empty() {
+    use ai_core::{AiSignal, RecallDomain, SalienceVerdict};
+
+    let sig = AiSignal {
+        domain: RecallDomain::Tasks,
+        event_kind: "Created",
+        importance: 0.7,
+        salience: SalienceVerdict::Accumulate,
+        content: "Task created".into(),
+        entity: None,
+        timestamp: jiff::Timestamp::now(),
+        raw_event: None,
+        metrics: ai_core::AiMetrics::default(),
+        coaching_signal: false,
+        coaching_rule: None,
+        metric_samples: Vec::new(),
+    };
+    assert!(sig.metric_samples.is_empty());
 }

@@ -1,3 +1,4 @@
+use crate::metric::MetricSample;
 use crate::metrics::AiMetrics;
 use crate::RecallDomain;
 use bus::DomainEvent;
@@ -21,6 +22,9 @@ pub struct AiSignal {
     pub metrics: AiMetrics,
     pub coaching_signal: bool,
     pub coaching_rule: Option<String>,
+    /// Metric samples emitted by this event, one per `#[ai(metric(...))]` declaration.
+    /// Consumed by `MetricHarvestConsumer` and persisted to `ai_metric_samples`.
+    pub metric_samples: Vec<MetricSample>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
