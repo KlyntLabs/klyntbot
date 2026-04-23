@@ -1,4 +1,5 @@
 pub mod accumulated_observation;
+pub mod ai_metric_samples;
 pub mod annotation;
 pub mod atom_extraction_cache;
 pub mod blackboard;
@@ -29,6 +30,7 @@ pub mod semantic_fact;
 pub mod squad;
 
 pub use accumulated_observation::AccumulatedObservationRepo;
+pub use ai_metric_samples::MetricRepo;
 pub use annotation::AnnotationRepo;
 pub use atom_extraction_cache::AtomExtractionCache;
 pub use blackboard::{BlackboardEntry, BlackboardRepo, NewBlackboardEntry};
@@ -116,6 +118,12 @@ pub fn cognitive_migrations() -> Vec<FeatureMigration> {
             description: "Mirror tables (routing snapshots, trend narratives, snippets, meta_rules, brain_versions, trial_previews)"
                 .to_string(),
             sql: include_str!("../../migrations/003_mirror_tables.sql").to_string(),
+        },
+        FeatureMigration {
+            feature_name: "cognitive_metrics".to_string(),
+            version: 1,
+            description: "Unified AI metric samples table".to_string(),
+            sql: include_str!("../../migrations/005_ai_metric_samples.sql").to_string(),
         },
     ]
 }
