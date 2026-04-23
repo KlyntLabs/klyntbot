@@ -57,6 +57,7 @@ use tools_core::{DynTool, FeatureMigration, HealthStatus};
         flush_interval_secs = 3600,
         event_kinds = ["BudgetAlert"],
     ),
+    promotion_threshold = 2,
 )]
 pub struct FinanceFeature {
     tool: Option<Arc<FinanceTool>>,

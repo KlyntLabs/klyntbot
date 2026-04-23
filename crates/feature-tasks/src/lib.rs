@@ -50,6 +50,7 @@ use tools_core::{DynTool, FeatureMigration, FeaturePackage, HealthStatus};
         flush_interval_secs = 3600,
         event_kinds = ["TaskFocusChanged", "TaskCompleted"],
     ),
+    promotion_threshold = 3,
 )]
 pub struct TasksFeature {
     pool: Option<storage::StoragePool>,
