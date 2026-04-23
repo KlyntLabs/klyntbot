@@ -7,6 +7,7 @@ use desktop_shared::errors::ApiError;
 use feature_notes::front_matter;
 use feature_notes::models::{NoteRow, NotebookRow};
 use feature_notes::repo::utc_now_str;
+use feature_notes::NoteEvent;
 
 use crate::errors::map_storage_err;
 use crate::state::AppCore;
@@ -194,14 +195,20 @@ impl AppCore {
         // Phase 3: Post-commit — fire domain events and queue embeddings
         if let Ok(bus) = self.domain_event_bus() {
             for (note, _) in &created_notes {
-                bus.publish(bus::DomainEvent::NoteCreated {
-                    note_id: note.id.clone(),
-                    title: note.title.clone(),
-                });
-                if !note.body.is_empty() {
-                    bus.publish(bus::DomainEvent::NoteContentChanged {
+                bus.publish(
+                    NoteEvent::Created {
                         note_id: note.id.clone(),
-                    });
+                        title: note.title.clone(),
+                    }
+                    .into(),
+                );
+                if !note.body.is_empty() {
+                    bus.publish(
+                        NoteEvent::ContentChanged {
+                            note_id: note.id.clone(),
+                        }
+                        .into(),
+                    );
                 }
             }
         }

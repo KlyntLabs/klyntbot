@@ -1,5 +1,6 @@
 //! feature-notes: Notes and knowledge management feature package for klyntbot.
 
+pub mod events;
 pub mod front_matter;
 pub mod handlers;
 pub mod link_parser;
@@ -7,12 +8,23 @@ pub mod models;
 pub mod repo;
 pub mod tool;
 
+pub use events::NoteEvent;
+
 use std::sync::Arc;
 
+use ai_core_macros::AiFeature;
 use async_trait::async_trait;
 use common::Result;
 use tools_core::{FeatureMigration, FeaturePackage, HealthStatus};
 
+#[derive(AiFeature)]
+#[ai(
+    recall_domain = "Notes",
+    skill = "notebook",
+    tool_name = "notes",
+    entity_kind = "note",
+    event = "crate::events::NoteEvent",
+)]
 pub struct NotesFeature {
     repo: repo::NoteRepo,
 }

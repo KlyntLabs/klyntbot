@@ -29,6 +29,11 @@ pub fn translate(event: &DomainEvent) -> Option<AiSignal> {
         sig.domain = RecallDomain::Productivity;
         return Some(sig);
     }
+    if let Some(e) = try_into_note_event(event) {
+        let mut sig = e.to_signal();
+        sig.domain = RecallDomain::Notes;
+        return Some(sig);
+    }
     if let Some(e) = try_into_community_event(event) {
         let mut sig = e.to_signal();
         sig.domain = RecallDomain::General;
@@ -114,6 +119,88 @@ fn try_into_productivity_event(
                 score: *score,
             })
         }
+        _ => None,
+    }
+}
+
+fn try_into_note_event(e: &DomainEvent) -> Option<feature_notes::events::NoteEvent> {
+    use feature_notes::events::NoteEvent;
+    match e {
+        DomainEvent::NoteCreated { note_id, title } => Some(NoteEvent::Created {
+            note_id: note_id.clone(),
+            title: title.clone(),
+        }),
+        DomainEvent::NoteUpdated { note_id, title } => Some(NoteEvent::Updated {
+            note_id: note_id.clone(),
+            title: title.clone(),
+        }),
+        DomainEvent::NoteContentChanged { note_id } => Some(NoteEvent::ContentChanged {
+            note_id: note_id.clone(),
+        }),
+        DomainEvent::NoteEditingFinished { note_id } => Some(NoteEvent::EditingFinished {
+            note_id: note_id.clone(),
+        }),
+        DomainEvent::NoteDeleted { note_id } => Some(NoteEvent::Deleted {
+            note_id: note_id.clone(),
+        }),
+        DomainEvent::NoteStudied {
+            note_id,
+            duration_secs,
+            atoms_reviewed,
+            mode,
+        } => Some(NoteEvent::Studied {
+            note_id: note_id.clone(),
+            duration_secs: *duration_secs,
+            atoms_reviewed: *atoms_reviewed,
+            mode: mode.clone(),
+        }),
+        DomainEvent::PracticeUnitCompleted {
+            session_id,
+            note_id,
+            unit_index,
+            grade,
+            scores,
+            confidence_rating,
+            edited,
+        } => Some(NoteEvent::PracticeUnitCompleted {
+            session_id: session_id.clone(),
+            note_id: note_id.clone(),
+            unit_index: *unit_index,
+            grade: grade.clone(),
+            scores: scores.clone(),
+            confidence_rating: *confidence_rating,
+            edited: *edited,
+        }),
+        DomainEvent::PracticeSessionCompleted {
+            session_id,
+            note_id,
+            units_completed,
+            average_score,
+            source_lang,
+            target_lang,
+            weak_unit_count,
+        } => Some(NoteEvent::PracticeSessionCompleted {
+            session_id: session_id.clone(),
+            note_id: note_id.clone(),
+            units_completed: *units_completed,
+            average_score: *average_score,
+            source_lang: source_lang.clone(),
+            target_lang: target_lang.clone(),
+            weak_unit_count: *weak_unit_count,
+        }),
+        DomainEvent::TranslationCompleted {
+            note_id,
+            source_lang,
+            target_lang,
+            word_count,
+            is_selection,
+        } => Some(NoteEvent::TranslationCompleted {
+            note_id: note_id.clone(),
+            source_lang: source_lang.clone(),
+            target_lang: target_lang.clone(),
+            word_count: *word_count,
+            is_selection: *is_selection,
+        }),
         _ => None,
     }
 }
@@ -428,8 +515,10 @@ pub fn build_feature_registry() -> ai_core::AiFeatureRegistry {
     let mut reg = ai_core::AiFeatureRegistry::new();
     feature_tasks::TasksFeature::register(&mut reg);
     feature_finance::FinanceFeature::register(&mut reg);
-    // Productivity, Notes, Learning, LanguageLearning, Coaching are added by
-    // their respective tasks (12, 24, 34, 39, 46).
+    feature_productivity::ProductivityFeature::register(&mut reg);
+    feature_notes::NotesFeature::register(&mut reg);
+    // Learning, LanguageLearning, Coaching are added by
+    // their respective tasks (34, 39, 46).
     reg
 }
 
@@ -506,5 +595,7 @@ mod registry_build_test {
         let reg = build_feature_registry();
         assert!(reg.by_domain(&RecallDomain::Tasks).is_some());
         assert!(reg.by_domain(&RecallDomain::Finance).is_some());
+        assert!(reg.by_domain(&RecallDomain::Productivity).is_some());
+        assert!(reg.by_domain(&RecallDomain::Notes).is_some());
     }
 }

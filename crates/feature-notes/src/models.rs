@@ -16,8 +16,9 @@ pub struct Notebook {
     pub updated_at: Timestamp,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, ai_core_macros::AiEntity)]
 #[serde(rename_all = "camelCase")]
+#[ai(entity_type = "note", embed_on = ["title", "body"])]
 pub struct Note {
     pub id: String,
     pub notebook_id: Option<String>,
@@ -208,5 +209,38 @@ impl From<NoteVersionRow> for NoteVersion {
                 Timestamp::UNIX_EPOCH
             }),
         }
+    }
+}
+
+
+#[cfg(test)]
+mod ai_entity_tests {
+    use super::*;
+    use ai_core::AiEntity;
+
+    #[test]
+    fn note_entity_type() {
+        assert_eq!(Note::entity_type(), "note");
+    }
+
+    #[test]
+    fn note_embed_text_concatenates_title_and_body() {
+        let n = Note {
+            id: "n1".into(),
+            notebook_id: None,
+            title: "My note".into(),
+            body: "content".into(),
+            body_html: None,
+            pinned: false,
+            archived: false,
+            icon: None,
+            color: None,
+            tags: vec![],
+            created_at: jiff::Timestamp::now(),
+            updated_at: jiff::Timestamp::now(),
+        };
+        let s = n.embed_text();
+        assert!(s.contains("My note"));
+        assert!(s.contains("content"));
     }
 }

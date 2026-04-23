@@ -10,6 +10,8 @@ use desktop_shared::commands::{
 use desktop_shared::errors::ApiError;
 
 use super::language_prompts;
+use feature_notes::NoteEvent;
+
 use crate::errors::map_cognitive_err;
 use crate::state::AppCore;
 
@@ -65,13 +67,16 @@ impl AppCore {
         // Emit TranslationCompleted event
         if let Some(note_id) = &params.note_id {
             if let Some(bus) = &self.domain_event_bus {
-                bus.publish(bus::DomainEvent::TranslationCompleted {
-                    note_id: note_id.clone(),
-                    source_lang: params.source_lang.clone(),
-                    target_lang: params.target_lang.clone(),
-                    word_count: result.words.len(),
-                    is_selection: params.is_selection,
-                });
+                bus.publish(
+                    NoteEvent::TranslationCompleted {
+                        note_id: note_id.clone(),
+                        source_lang: params.source_lang.clone(),
+                        target_lang: params.target_lang.clone(),
+                        word_count: result.words.len(),
+                        is_selection: params.is_selection,
+                    }
+                    .into(),
+                );
             }
         }
 

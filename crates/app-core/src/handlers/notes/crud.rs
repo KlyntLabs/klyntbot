@@ -8,6 +8,7 @@ use desktop_shared::errors::ApiError;
 use desktop_shared::types::EntityKind;
 use feature_notes::models::{NoteRow, NoteVersionRow};
 use feature_notes::repo::utc_now_str;
+use feature_notes::NoteEvent;
 
 use super::converters::{
     extract_links_and_mentions, note_row_to_response, note_with_tags, notes_list_items_batch,
@@ -147,14 +148,20 @@ impl AppCore {
 
         // Emit domain events for timeline tracking + BookIndex
         if let Ok(bus) = self.domain_event_bus() {
-            bus.publish(bus::DomainEvent::NoteCreated {
-                note_id: id.clone(),
-                title: created.title.clone(),
-            });
-            if !created.body.is_empty() {
-                bus.publish(bus::DomainEvent::NoteContentChanged {
+            bus.publish(
+                NoteEvent::Created {
                     note_id: id.clone(),
-                });
+                    title: created.title.clone(),
+                }
+                .into(),
+            );
+            if !created.body.is_empty() {
+                bus.publish(
+                    NoteEvent::ContentChanged {
+                        note_id: id.clone(),
+                    }
+                    .into(),
+                );
             }
         }
 
@@ -214,14 +221,20 @@ impl AppCore {
 
         // Emit domain events for timeline tracking + BookIndex
         if let Ok(bus) = self.domain_event_bus() {
-            bus.publish(bus::DomainEvent::NoteUpdated {
-                note_id: params.id.clone(),
-                title: updated.title.clone(),
-            });
-            if params.body.is_some() || params.body_html.is_some() {
-                bus.publish(bus::DomainEvent::NoteContentChanged {
+            bus.publish(
+                NoteEvent::Updated {
                     note_id: params.id.clone(),
-                });
+                    title: updated.title.clone(),
+                }
+                .into(),
+            );
+            if params.body.is_some() || params.body_html.is_some() {
+                bus.publish(
+                    NoteEvent::ContentChanged {
+                        note_id: params.id.clone(),
+                    }
+                    .into(),
+                );
             }
         }
 
@@ -256,9 +269,7 @@ impl AppCore {
 
         if deleted {
             if let Ok(bus) = self.domain_event_bus() {
-                bus.publish(bus::DomainEvent::NoteDeleted {
-                    note_id: id.clone(),
-                });
+                bus.publish(NoteEvent::Deleted { note_id: id.clone() }.into());
             }
         }
 
@@ -539,9 +550,7 @@ impl AppCore {
         if let Some(note) = note {
             if let Ok(bus) = self.domain_event_bus() {
                 if !note.body.is_empty() {
-                    bus.publish(bus::DomainEvent::NoteEditingFinished {
-                        note_id: params.note_id,
-                    });
+                    bus.publish(NoteEvent::EditingFinished { note_id: params.note_id }.into());
                 }
             }
         }

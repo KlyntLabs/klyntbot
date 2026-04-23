@@ -9,6 +9,7 @@ use desktop_shared::commands::{
 };
 use desktop_shared::errors::ApiError;
 use feature_notes::repo::PracticeSessionRow;
+use feature_notes::NoteEvent;
 
 use super::practice_prompts;
 use crate::errors::map_cognitive_err;
@@ -390,15 +391,18 @@ impl AppCore {
 
         // Emit PracticeUnitCompleted event
         if let Some(bus) = &self.domain_event_bus {
-            bus.publish(bus::DomainEvent::PracticeUnitCompleted {
-                session_id: session.id.clone(),
-                note_id: session.note_id.clone(),
-                unit_index: params.index,
-                grade: params.overall_grade.clone(),
-                scores: params.scores_json.clone().unwrap_or_default(),
-                confidence_rating: params.confidence_rating,
-                edited: params.edited,
-            });
+            bus.publish(
+                NoteEvent::PracticeUnitCompleted {
+                    session_id: session.id.clone(),
+                    note_id: session.note_id.clone(),
+                    unit_index: params.index,
+                    grade: params.overall_grade.clone(),
+                    scores: params.scores_json.clone().unwrap_or_default(),
+                    confidence_rating: params.confidence_rating,
+                    edited: params.edited,
+                }
+                .into(),
+            );
         }
 
         Ok(PracticeConfirmResponse {
@@ -508,15 +512,18 @@ impl AppCore {
 
         // Emit PracticeSessionCompleted event
         if let Some(bus) = &self.domain_event_bus {
-            bus.publish(bus::DomainEvent::PracticeSessionCompleted {
-                session_id: session.id.clone(),
-                note_id: session.note_id.clone(),
-                units_completed: results.len() as u32,
-                average_score,
-                source_lang: session.source_lang.clone(),
-                target_lang: session.target_lang.clone(),
-                weak_unit_count,
-            });
+            bus.publish(
+                NoteEvent::PracticeSessionCompleted {
+                    session_id: session.id.clone(),
+                    note_id: session.note_id.clone(),
+                    units_completed: results.len() as u32,
+                    average_score,
+                    source_lang: session.source_lang.clone(),
+                    target_lang: session.target_lang.clone(),
+                    weak_unit_count,
+                }
+                .into(),
+            );
         }
 
         // If save_to_sr: create flashcards for weak units (independent of bus)
