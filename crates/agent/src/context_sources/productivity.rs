@@ -141,29 +141,6 @@ impl ProductivityContextSource {
             }
         }
 
-        // Energy forecasts for today
-        if let Ok(forecasts) = self.repos.forecasts.list_for_date(&today).await {
-            if !forecasts.is_empty() {
-                let energy_lines: Vec<String> = forecasts
-                    .iter()
-                    .filter(|f| f.forecast_type == "energy")
-                    .take(3)
-                    .map(|f| {
-                        format!(
-                            "- {}-{}: energy {:.0}% (confidence {:.0}%)",
-                            f.window_start.as_deref().unwrap_or("?"),
-                            f.window_end.as_deref().unwrap_or("?"),
-                            f.predicted_value * 100.0,
-                            f.confidence * 100.0,
-                        )
-                    })
-                    .collect();
-                if !energy_lines.is_empty() {
-                    sections.push(format!("## Energy Forecast\n{}", energy_lines.join("\n")));
-                }
-            }
-        }
-
         // Tier 1 fallback: old-style active focus session
         if sections.is_empty() {
             if let Ok(Some(session)) = self.repos.sessions.get_active().await {

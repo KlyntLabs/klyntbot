@@ -36,5 +36,6 @@ fn dummy_signal() -> AiSignal {
         metrics: ai_core::AiMetrics::default(),
         coaching_signal: true,
         coaching_rule: None,
+        metric_samples: Vec::new(),
     }
 }

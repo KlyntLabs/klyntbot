@@ -2,6 +2,7 @@
 //! LLM-powered coaching, intervention routing, and closed-loop feedback.
 
 pub mod consumer;
+pub mod events;
 pub mod feedback;
 pub mod learning_templates;
 pub mod pattern_detector;

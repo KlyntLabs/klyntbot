@@ -6,7 +6,6 @@ pub mod categorization_cache;
 pub mod daily_summary;
 pub mod distraction_pattern;
 pub mod focus_session;
-pub mod forecast;
 pub mod goal;
 pub mod insight;
 pub mod intelligence_session;
@@ -30,7 +29,6 @@ pub use categorization_cache::CategorizationCacheRepo;
 pub use daily_summary::DailySummaryRepo;
 pub use distraction_pattern::DistractionPatternRepo;
 pub use focus_session::FocusSessionRepo;
-pub use forecast::ForecastRepo;
 pub use goal::GoalRepo;
 pub use insight::InsightRepo;
 pub use intelligence_session::IntelligenceSessionRepo;
@@ -64,7 +62,6 @@ pub struct ProductivityRepos {
     pub tracking_rules: TrackingRuleRepo,
     pub intelligence_sessions: IntelligenceSessionRepo,
     pub quality_scores: QualityScoreRepo,
-    pub forecasts: ForecastRepo,
     pub narratives: NarrativeRepo,
     pub voice_journals: VoiceJournalRepo,
     pub categorization_cache: CategorizationCacheRepo,
@@ -92,7 +89,6 @@ impl ProductivityRepos {
             tracking_rules: TrackingRuleRepo::new(pool.clone()),
             intelligence_sessions: IntelligenceSessionRepo::new(pool.clone()),
             quality_scores: QualityScoreRepo::new(pool.clone()),
-            forecasts: ForecastRepo::new(pool.clone()),
             narratives: NarrativeRepo::new(pool.clone()),
             voice_journals: VoiceJournalRepo::new(pool.clone()),
             categorization_cache: CategorizationCacheRepo::new(pool.clone()),

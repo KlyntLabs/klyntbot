@@ -337,24 +337,6 @@ CREATE TABLE IF NOT EXISTS productivity_quality_scores (
 CREATE UNIQUE INDEX IF NOT EXISTS idx_quality_daily ON productivity_quality_scores(score_date) WHERE session_id IS NULL;
 CREATE INDEX IF NOT EXISTS idx_quality_session ON productivity_quality_scores(session_id);
 
-CREATE TABLE IF NOT EXISTS productivity_forecasts (
-    id               TEXT PRIMARY KEY,
-    forecast_date    TEXT NOT NULL,
-    forecast_type    TEXT NOT NULL CHECK (forecast_type IN ('energy', 'focus_window', 'meeting_load', 'burnout_risk')),
-    window_start     TEXT,
-    window_end       TEXT,
-    predicted_value  REAL NOT NULL,
-    confidence       REAL NOT NULL DEFAULT 0.5,
-    stability        REAL NOT NULL DEFAULT 1.0,
-    auto_protected   BOOLEAN NOT NULL DEFAULT FALSE,
-    user_overrode    BOOLEAN NOT NULL DEFAULT FALSE,
-    actual_value     REAL,
-    prediction_error REAL,
-    created_at       TEXT NOT NULL DEFAULT (datetime('now'))
-);
-
-CREATE INDEX IF NOT EXISTS idx_forecasts_date ON productivity_forecasts(forecast_date, forecast_type);
-
 CREATE TABLE IF NOT EXISTS productivity_narratives (
     id                 TEXT PRIMARY KEY,
     narrative_date     TEXT NOT NULL UNIQUE,

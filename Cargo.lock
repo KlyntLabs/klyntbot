@@ -4727,6 +4727,7 @@ name = "feature-coaching"
 version = "0.1.1"
 dependencies = [
  "ai-core",
+ "ai-core-macros",
  "async-trait",
  "bus",
  "cognitive",

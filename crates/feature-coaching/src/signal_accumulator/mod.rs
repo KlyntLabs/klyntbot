@@ -228,6 +228,7 @@ mod tests {
             },
             coaching_signal: false,
             coaching_rule: None,
+            metric_samples: Vec::new(),
         }
     }
 
@@ -250,6 +251,7 @@ mod tests {
             },
             coaching_signal: true,
             coaching_rule: None,
+            metric_samples: Vec::new(),
         };
         acc.push_event(&sig);
         assert_eq!(acc.window_size(), 1);

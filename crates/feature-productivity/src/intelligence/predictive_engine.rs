@@ -1,6 +1,6 @@
 use tracing::info;
 
-use crate::repos::{ForecastRepo, IntelligenceSessionRepo};
+use crate::repos::IntelligenceSessionRepo;
 use crate::types::*;
 
 /// Maximum FSRS stability for forecast confidence (same constant as cognitive::decay).
@@ -8,14 +8,12 @@ const MAX_STABILITY: f64 = 30.0;
 
 pub struct PredictiveEngine {
     session_repo: IntelligenceSessionRepo,
-    forecast_repo: ForecastRepo,
 }
 
 impl PredictiveEngine {
-    pub fn new(session_repo: IntelligenceSessionRepo, forecast_repo: ForecastRepo) -> Self {
+    pub fn new(session_repo: IntelligenceSessionRepo) -> Self {
         Self {
             session_repo,
-            forecast_repo,
         }
     }
 
@@ -100,7 +98,6 @@ impl PredictiveEngine {
                 created_at: now.clone(),
             };
 
-            self.forecast_repo.create(&forecast).await?;
             forecasts.push(forecast);
         }
 
@@ -117,126 +114,23 @@ impl PredictiveEngine {
 
     /// Get the predicted energy level for the current time by interpolating forecasts.
     pub async fn current_energy(&self) -> common::Result<Option<f64>> {
-        let today = jiff::Timestamp::now().strftime("%Y-%m-%d").to_string();
-        let forecasts = self.forecast_repo.list_for_date(&today).await?;
-
-        let energy_forecasts: Vec<&Forecast> = forecasts
-            .iter()
-            .filter(|f| f.forecast_type == "energy")
-            .collect();
-
-        if energy_forecasts.is_empty() {
-            return Ok(None);
-        }
-
-        let now_zoned = jiff::Zoned::now();
-        let now_hour = now_zoned.hour() as f64 + now_zoned.minute() as f64 / 60.0;
-        let mut best: Option<(f64, f64)> = None; // (distance, energy)
-
-        for f in &energy_forecasts {
-            let (ws, we) = match (&f.window_start, &f.window_end) {
-                (Some(s), Some(e)) => (parse_time_frac(s), parse_time_frac(e)),
-                _ => continue,
-            };
-            if now_hour >= ws && now_hour <= we {
-                return Ok(Some(f.predicted_value));
-            }
-            let dist = (now_hour - (ws + we) / 2.0).abs();
-            if best.is_none() || dist < best.unwrap().0 {
-                best = Some((dist, f.predicted_value));
-            }
-        }
-
-        Ok(best.map(|(_, e)| e))
+        // Forecasts are no longer persisted; return None.
+        Ok(None)
     }
 
     /// Evaluate forecast accuracy for a past date, update prediction_error and stability.
-    pub async fn evaluate_accuracy(&self, date: &str) -> common::Result<Option<AccuracyReport>> {
-        let forecasts = self.forecast_repo.list_for_date(date).await?;
-        if forecasts.is_empty() {
-            return Ok(None);
-        }
-
-        // Compute actual energy from sessions for that date
-        let start = format!("{date}T00:00:00Z");
-        let end = format!("{date}T23:59:59Z");
-        let sessions = self.session_repo.list_range(&start, &end).await?;
-
-        let actual_focus_secs: i64 = sessions
-            .iter()
-            .filter(|s| s.session_type == "focus")
-            .filter_map(|s| s.duration_secs)
-            .sum();
-        let actual_energy = (actual_focus_secs as f64 / 3600.0 / 8.0).min(1.0); // Normalize: 8h = 1.0
-
-        let mut total_error = 0.0;
-        let mut total_stability = 0.0;
-        let mut evaluated = 0;
-
-        for f in &forecasts {
-            if f.actual_value.is_some() {
-                continue; // Already evaluated
-            }
-            self.forecast_repo
-                .update_actual(&f.id, actual_energy)
-                .await?;
-
-            let error = (f.predicted_value - actual_energy).abs();
-            let success = error < 0.2; // Within 20% = success
-            let new_stability = fsrs_update_stability(f.stability, success, MAX_STABILITY);
-            total_error += error;
-            total_stability += new_stability;
-            evaluated += 1;
-        }
-
-        if evaluated == 0 {
-            return Ok(None);
-        }
-
-        let report_date = date
-            .parse::<jiff::civil::Date>()
-            .unwrap_or_else(|_| jiff::Zoned::now().date());
-
-        Ok(Some(AccuracyReport {
-            forecast_date: report_date,
-            total_forecasts: forecasts.len(),
-            evaluated,
-            mean_error: total_error / evaluated as f64,
-            mean_stability: total_stability / evaluated as f64,
-        }))
+    pub async fn evaluate_accuracy(&self, _date: &str) -> common::Result<Option<AccuracyReport>> {
+        // Forecasts are no longer persisted; return None.
+        Ok(None)
     }
 
     /// Suggest protected blocks based on peak energy forecast windows.
     pub async fn suggest_protected_blocks(
         &self,
-        date: &str,
+        _date: &str,
     ) -> common::Result<Vec<ProtectedBlock>> {
-        let forecasts = self.forecast_repo.list_for_date(date).await?;
-
-        let mut blocks: Vec<ProtectedBlock> = forecasts
-            .iter()
-            .filter(|f| f.forecast_type == "energy" && f.predicted_value > 0.6)
-            .filter_map(|f| {
-                Some(ProtectedBlock {
-                    window_start: f.window_start.clone()?,
-                    window_end: f.window_end.clone()?,
-                    predicted_energy: f.predicted_value,
-                    reason: format!(
-                        "Peak energy window ({:.0}% predicted)",
-                        f.predicted_value * 100.0
-                    ),
-                })
-            })
-            .collect();
-
-        blocks.sort_by(|a, b| {
-            b.predicted_energy
-                .partial_cmp(&a.predicted_energy)
-                .unwrap_or(std::cmp::Ordering::Equal)
-        });
-        blocks.truncate(2); // Top-2 windows
-
-        Ok(blocks)
+        // Forecasts are no longer persisted; return empty.
+        Ok(vec![])
     }
 }
 

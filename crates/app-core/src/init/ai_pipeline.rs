@@ -19,7 +19,28 @@ pub fn translate(event: &DomainEvent) -> Option<AiSignal> {
         sig.domain = RecallDomain::Finance;
         return Some(sig);
     }
+    if let Some(e) = try_into_coaching_event(event) {
+        let mut sig = e.to_signal();
+        sig.domain = RecallDomain::Coaching;
+        return Some(sig);
+    }
     translate_system_event(event)
+}
+
+fn try_into_coaching_event(e: &DomainEvent) -> Option<feature_coaching::events::CoachingEvent> {
+    use feature_coaching::events::CoachingEvent;
+    match e {
+        DomainEvent::CoachingStrategyApplied {
+            strategy_id,
+            rule_text,
+            accepted,
+        } => Some(CoachingEvent::StrategyApplied {
+            strategy_id: strategy_id.clone(),
+            rule_text: rule_text.clone(),
+            accepted: *accepted,
+        }),
+        _ => None,
+    }
 }
 
 fn translate_system_event(event: &DomainEvent) -> Option<AiSignal> {
@@ -268,6 +289,17 @@ fn try_into_finance_event(e: &DomainEvent) -> Option<feature_finance::events::Fi
         }),
         _ => None,
     }
+}
+
+/// Build a workspace-global MetricRegistry populated from every registered AiFeature's
+/// event enum `FEATURE_METRICS` const. Called exactly once at startup.
+pub fn build_metric_registry() -> ai_core::MetricRegistry {
+    let mut reg = ai_core::MetricRegistry::new();
+    reg.register_all(feature_tasks::TaskEvent::FEATURE_METRICS);
+    reg.register_all(feature_finance::FinanceEvent::FEATURE_METRICS);
+    reg.register_all(feature_coaching::events::CoachingEvent::FEATURE_METRICS);
+    // Task 22: reg.register_all(feature_productivity::events::ProductivityEvent::FEATURE_METRICS);
+    reg
 }
 
 pub fn start(bus: Arc<DomainEventBus>, consumers: Vec<Arc<dyn SignalConsumer>>) -> SignalRouter {

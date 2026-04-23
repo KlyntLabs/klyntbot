@@ -396,6 +396,7 @@ mod tests {
             },
             coaching_signal: true,
             coaching_rule: Some("Review spending patterns when budget pressure is detected".into()),
+            metric_samples: Vec::new(),
         };
         let _ = signal_tx.send(budget_signal).await;
 

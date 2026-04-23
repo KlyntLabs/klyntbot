@@ -196,6 +196,12 @@ pub enum DomainEvent {
         intervention_id: String,
         response: FeedbackResponse,
     },
+    /// Coaching strategy was applied; carries acceptance verdict for `coaching_acceptance_rate`.
+    CoachingStrategyApplied {
+        strategy_id: String,
+        rule_text: String,
+        accepted: bool,
+    },
     CoachingPatternDetected {
         pattern_name: String,
         confidence: f64,
@@ -488,6 +494,7 @@ impl DomainEvent {
             Self::UserCorrectedAI { .. } => "UserCorrectedAI",
             Self::AutotunerDecision { .. } => "AutotunerDecision",
             Self::CoachingFeedback { .. } => "CoachingFeedback",
+            Self::CoachingStrategyApplied { .. } => "CoachingStrategyApplied",
             Self::CoachingPatternDetected { .. } => "CoachingPatternDetected",
             Self::BehavioralPatternDetected { .. } => "BehavioralPatternDetected",
             Self::KnowledgeAtomCreated { .. } => "KnowledgeAtomCreated",
@@ -538,52 +545,8 @@ impl DomainEvent {
     pub const KIND_USER_STATED_FACT: &'static str = "UserStatedFact";
     /// `event_type` value for [`DomainEvent::CoachingFeedback`].
     pub const KIND_COACHING_FEEDBACK: &'static str = "CoachingFeedback";
-    /// `event_type` value for [`DomainEvent::ProductivityScoreComputed`].
-    pub const KIND_PRODUCTIVITY_SCORE_COMPUTED: &'static str = "ProductivityScoreComputed";
-    /// `event_type` value for [`DomainEvent::SessionCreated`].
-    pub const KIND_SESSION_CREATED: &'static str = "SessionCreated";
-    /// `event_type` value for [`DomainEvent::SessionEnded`].
-    pub const KIND_SESSION_ENDED: &'static str = "SessionEnded";
-    /// `event_type` value for [`DomainEvent::QualityScored`].
-    pub const KIND_QUALITY_SCORED: &'static str = "QualityScored";
-    /// `event_type` value for [`DomainEvent::TaskFocusChanged`].
-    pub const KIND_TASK_FOCUS_CHANGED: &'static str = "TaskFocusChanged";
-    /// `event_type` value for [`DomainEvent::EstimationRecorded`].
-    pub const KIND_ESTIMATION_RECORDED: &'static str = "EstimationRecorded";
-    /// `event_type` value for [`DomainEvent::TransactionRecorded`].
-    pub const KIND_TRANSACTION_RECORDED: &'static str = "TransactionRecorded";
-    /// `event_type` value for [`DomainEvent::BudgetAlert`].
-    pub const KIND_BUDGET_ALERT: &'static str = "BudgetAlert";
-    /// `event_type` value for [`DomainEvent::AccountCreated`].
-    pub const KIND_ACCOUNT_CREATED: &'static str = "AccountCreated";
-    /// `event_type` value for [`DomainEvent::BudgetCreated`].
-    pub const KIND_BUDGET_CREATED: &'static str = "BudgetCreated";
-    /// `event_type` value for [`DomainEvent::GoalCreated`].
-    pub const KIND_GOAL_CREATED: &'static str = "GoalCreated";
-    /// `event_type` value for [`DomainEvent::GoalAchieved`].
-    pub const KIND_GOAL_ACHIEVED: &'static str = "GoalAchieved";
-    /// `event_type` value for [`DomainEvent::NoteCreated`].
-    pub const KIND_NOTE_CREATED: &'static str = "NoteCreated";
-    /// `event_type` value for [`DomainEvent::NoteUpdated`].
-    pub const KIND_NOTE_UPDATED: &'static str = "NoteUpdated";
-    /// `event_type` value for [`DomainEvent::NoteContentChanged`].
-    pub const KIND_NOTE_CONTENT_CHANGED: &'static str = "NoteContentChanged";
-    /// `event_type` value for [`DomainEvent::NoteEditingFinished`].
-    pub const KIND_NOTE_EDITING_FINISHED: &'static str = "NoteEditingFinished";
-    /// `event_type` value for [`DomainEvent::NoteDeleted`].
-    pub const KIND_NOTE_DELETED: &'static str = "NoteDeleted";
-    /// `event_type` value for [`DomainEvent::TaskDeferred`].
-    pub const KIND_TASK_DEFERRED: &'static str = "TaskDeferred";
-    /// `event_type` value for [`DomainEvent::FocusSessionStarted`].
-    pub const KIND_FOCUS_SESSION_STARTED: &'static str = "FocusSessionStarted";
-    /// `event_type` value for [`DomainEvent::FocusSessionEnded`].
-    pub const KIND_FOCUS_SESSION_ENDED: &'static str = "FocusSessionEnded";
-    /// `event_type` value for [`DomainEvent::DistractionDetected`].
-    pub const KIND_DISTRACTION_DETECTED: &'static str = "DistractionDetected";
-    /// `event_type` value for [`DomainEvent::ActivitySessionCompleted`].
-    pub const KIND_ACTIVITY_SESSION_COMPLETED: &'static str = "ActivitySessionCompleted";
-    /// `event_type` value for [`DomainEvent::AutotunerDecision`].
-    pub const KIND_AUTOTUNER_DECISION: &'static str = "AutotunerDecision";
+    /// `event_type` value for [`DomainEvent::CoachingStrategyApplied`].
+    pub const KIND_COACHING_STRATEGY_APPLIED: &'static str = "CoachingStrategyApplied";
     /// `event_type` value for [`DomainEvent::CoachingPatternDetected`].
     pub const KIND_COACHING_PATTERN_DETECTED: &'static str = "CoachingPatternDetected";
     /// `event_type` value for [`DomainEvent::BehavioralPatternDetected`].
@@ -634,6 +597,10 @@ impl DomainEvent {
     pub const KIND_USER_BECAME_IDLE: &'static str = "UserBecameIdle";
     /// `event_type` value for [`DomainEvent::UserReturned`].
     pub const KIND_USER_RETURNED: &'static str = "UserReturned";
+    /// `event_type` value for [`DomainEvent::FocusSessionEnded`].
+    pub const KIND_FOCUS_SESSION_ENDED: &'static str = "FocusSessionEnded";
+    /// `event_type` value for [`DomainEvent::BudgetAlert`].
+    pub const KIND_BUDGET_ALERT: &'static str = "BudgetAlert";
     /// `event_type` value for [`DomainEvent::FocusSessionSuspended`].
     pub const KIND_FOCUS_SESSION_SUSPENDED: &'static str = "FocusSessionSuspended";
     /// `event_type` value for [`DomainEvent::CronCatchUpReady`].
@@ -684,7 +651,9 @@ impl DomainEvent {
 
             Self::UserStatedFact { domain, .. } => domain.as_str(),
             Self::UserCorrectedAI { .. } => "learning",
-            Self::CoachingFeedback { .. } | Self::CoachingPatternDetected { .. } => "coaching",
+            Self::CoachingFeedback { .. }
+            | Self::CoachingStrategyApplied { .. }
+            | Self::CoachingPatternDetected { .. } => "coaching",
             Self::ChatTurnCompleted { .. } | Self::ToolCallExecuted { .. } => "general",
 
             Self::NoteCreated { .. }
