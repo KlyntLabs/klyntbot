@@ -1,19 +1,29 @@
 //! feature-language-learning: Pronunciation coaching, practice sessions,
 //! and exam tracking for English and Chinese language learning.
 
+pub mod events;
 pub mod practice_tool;
 pub mod pronunciation_provider;
 pub mod types;
 
+pub use events::LanguageLearningEvent;
 pub use pronunciation_provider::AppPronunciationProvider;
 
 use std::sync::Arc;
 
+use ai_core_macros::AiFeature;
 use async_trait::async_trait;
 use common::Result;
 use tools_core::{FeatureMigration, FeaturePackage, HealthStatus};
 
-#[derive(Default)]
+#[derive(AiFeature, Default)]
+#[ai(
+    recall_domain = "LanguageLearning",
+    skill = "learning",
+    tool_name = "language_practice",
+    entity_kind = "pronunciation_report",
+    event = "crate::events::LanguageLearningEvent",
+)]
 pub struct LanguageLearningFeature;
 
 impl LanguageLearningFeature {

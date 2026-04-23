@@ -4742,6 +4742,7 @@ dependencies = [
  "storage",
  "tokio",
  "tokio-util",
+ "tools-core",
  "tracing",
  "uuid",
 ]
@@ -4817,9 +4818,13 @@ dependencies = [
 name = "feature-language-learning"
 version = "0.1.1"
 dependencies = [
+ "ai-core",
+ "ai-core-macros",
  "async-trait",
+ "bus",
  "common",
  "config",
+ "jiff",
  "serde",
  "serde_json",
  "storage",

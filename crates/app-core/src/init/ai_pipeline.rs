@@ -39,6 +39,11 @@ pub fn translate(event: &DomainEvent) -> Option<AiSignal> {
         sig.domain = RecallDomain::Learning;
         return Some(sig);
     }
+    if let Some(e) = try_into_language_learning_event(event) {
+        let mut sig = e.to_signal();
+        sig.domain = RecallDomain::LanguageLearning;
+        return Some(sig);
+    }
     if let Some(e) = try_into_community_event(event) {
         let mut sig = e.to_signal();
         sig.domain = RecallDomain::General;
@@ -63,6 +68,25 @@ fn try_into_coaching_event(e: &DomainEvent) -> Option<feature_coaching::events::
             strategy_id: strategy_id.clone(),
             rule_text: rule_text.clone(),
             accepted: *accepted,
+        }),
+        DomainEvent::CoachingPatternDetected {
+            pattern_name,
+            confidence,
+            ..
+        } => Some(CoachingEvent::PatternDetected {
+            pattern_name: pattern_name.clone(),
+            severity: *confidence,
+        }),
+        DomainEvent::CoachingFeedback {
+            intervention_id,
+            response,
+        } => Some(CoachingEvent::FeedbackReceived {
+            strategy_id: intervention_id.clone(),
+            response: match response {
+                bus::FeedbackResponse::Helpful => "accept".to_string(),
+                bus::FeedbackResponse::Dismissed => "dismiss".to_string(),
+                bus::FeedbackResponse::StopSuggesting => "stop".to_string(),
+            },
         }),
         _ => None,
     }
@@ -285,6 +309,51 @@ fn try_into_learning_event(e: &DomainEvent) -> Option<feature_learning::Learning
     }
 }
 
+fn try_into_language_learning_event(
+    e: &DomainEvent,
+) -> Option<feature_language_learning::LanguageLearningEvent> {
+    use feature_language_learning::LanguageLearningEvent;
+    match e {
+        DomainEvent::PronunciationScored {
+            session_id,
+            overall_score,
+            weak_phonemes,
+        } => Some(LanguageLearningEvent::PronunciationScored {
+            session_id: session_id.clone(),
+            overall_score: *overall_score,
+            weak_phonemes: weak_phonemes.clone(),
+        }),
+        DomainEvent::ExamAttempted {
+            exam_id,
+            score,
+            passed,
+        } => Some(LanguageLearningEvent::ExamAttempted {
+            exam_id: exam_id.clone(),
+            score: *score,
+            passed: *passed,
+        }),
+        DomainEvent::PhoneticMasteryGained {
+            phoneme,
+            mastery_level,
+        } => Some(LanguageLearningEvent::PhoneticMasteryGained {
+            phoneme: phoneme.clone(),
+            mastery_level: *mastery_level,
+        }),
+        DomainEvent::LanguagePracticeSessionCompleted {
+            session_id,
+            language,
+            duration_secs,
+            success_rate,
+        } => Some(LanguageLearningEvent::PracticeSessionCompleted {
+            session_id: session_id.clone(),
+            language: language.clone(),
+            duration_secs: *duration_secs,
+            success_rate: *success_rate,
+        }),
+        _ => None,
+    }
+}
+
 fn try_into_community_event(
     e: &DomainEvent,
 ) -> Option<cognitive::services::community_intelligence::events::CommunityEvent> {
@@ -374,23 +443,6 @@ fn translate_system_event(event: &DomainEvent) -> Option<AiSignal> {
                 amount: *quality_score,
                 ..AiMetrics::default()
             },
-            ..base
-        }),
-        DomainEvent::CoachingPatternDetected {
-            pattern_name,
-            confidence,
-            rule_text,
-            domain,
-            ..
-        } => Some(AiSignal {
-            event_kind: "CoachingPatternDetected",
-            importance: *confidence,
-            content: rule_text.clone(),
-            metrics: AiMetrics {
-                category: Some(pattern_name.clone()),
-                ..AiMetrics::default()
-            },
-            domain: RecallDomain::from_str_or_general(domain.as_str()),
             ..base
         }),
         // DistractionDetected, FocusSessionStarted, FocusSessionEnded, ActivitySessionCompleted,
@@ -578,6 +630,8 @@ pub fn build_feature_registry() -> ai_core::AiFeatureRegistry {
     feature_productivity::ProductivityFeature::register(&mut reg);
     feature_notes::NotesFeature::register(&mut reg);
     feature_learning::LearningFeature::register(&mut reg);
+    feature_language_learning::LanguageLearningFeature::register(&mut reg);
+    feature_coaching::CoachingFeature::register(&mut reg);
     reg
 }
 
@@ -589,6 +643,8 @@ pub fn build_metric_registry() -> ai_core::MetricRegistry {
     reg.register_all(feature_finance::FinanceEvent::FEATURE_METRICS);
     reg.register_all(feature_coaching::events::CoachingEvent::FEATURE_METRICS);
     reg.register_all(feature_productivity::events::ProductivityEvent::FEATURE_METRICS);
+    reg.register_all(feature_language_learning::LanguageLearningEvent::FEATURE_METRICS);
+    reg.register_all(feature_coaching::events::CoachingEvent::FEATURE_METRICS);
     reg.register_all(feature_learning::LearningEvent::FEATURE_METRICS);
     reg.register_all(
         cognitive::services::community_intelligence::events::CommunityEvent::FEATURE_METRICS,
@@ -651,12 +707,18 @@ mod registry_build_test {
     use ai_core::RecallDomain;
 
     #[test]
-    fn registry_seeded_with_tasks_and_finance() {
+    fn registry_seeded_with_all_v3_features() {
         let reg = build_feature_registry();
-        assert!(reg.by_domain(&RecallDomain::Tasks).is_some());
-        assert!(reg.by_domain(&RecallDomain::Finance).is_some());
-        assert!(reg.by_domain(&RecallDomain::Productivity).is_some());
-        assert!(reg.by_domain(&RecallDomain::Notes).is_some());
-        assert!(reg.by_domain(&RecallDomain::Learning).is_some());
+        for d in [
+            RecallDomain::Tasks,
+            RecallDomain::Finance,
+            RecallDomain::Productivity,
+            RecallDomain::Notes,
+            RecallDomain::Learning,
+            RecallDomain::LanguageLearning,
+            RecallDomain::Coaching,
+        ] {
+            assert!(reg.by_domain(&d).is_some(), "missing {:?}", d);
+        }
     }
 }

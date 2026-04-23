@@ -3,6 +3,7 @@
 
 pub mod consumer;
 pub mod events;
+pub mod feature;
 pub mod feedback;
 pub mod learning_templates;
 pub mod pattern_detector;
@@ -12,6 +13,8 @@ pub mod service;
 pub mod signal_accumulator;
 
 pub use consumer::CoachingSignalConsumer;
+pub use events::CoachingEvent;
+pub use feature::CoachingFeature;
 pub use feedback::{FeedbackTracker, PendingBehavioral};
 pub use pattern_detector::PatternDetector;
 pub use reasoner::{CoachingDecision, CoachingReasonerHandler};

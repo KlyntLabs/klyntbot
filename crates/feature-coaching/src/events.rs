@@ -1,5 +1,5 @@
 use ai_core_macros::AiEvent;
-use bus::DomainEvent;
+use bus::{DomainEvent, FeedbackResponse};
 use serde::{Deserialize, Serialize};
 
 /// Typed events emitted by the coaching subsystem.
@@ -27,6 +27,33 @@ pub enum CoachingEvent {
         rule_text: String,
         accepted: bool,
     },
+
+    #[ai(
+        importance = 0.6,
+        salience = "extract",
+        observation_template = "Coaching pattern detected: {pattern_name} (severity {severity})",
+    )]
+    PatternDetected {
+        pattern_name: String,
+        severity: f64,
+    },
+
+    #[ai(
+        importance = 0.5,
+        salience = "accumulate",
+        observation_template = "Coaching feedback: {response} on strategy {strategy_id}",
+        metric(
+            name = "coaching_feedback_response_rate",
+            value_from = if response == "accept" { 1.0_f64 } else { 0.0_f64 },
+            window = "30d",
+            min_samples = 5,
+            aggregation = "avg",
+        ),
+    )]
+    FeedbackReceived {
+        strategy_id: String,
+        response: String,
+    },
 }
 
 impl From<CoachingEvent> for DomainEvent {
@@ -40,6 +67,29 @@ impl From<CoachingEvent> for DomainEvent {
                 strategy_id,
                 rule_text,
                 accepted,
+            },
+            CoachingEvent::PatternDetected {
+                pattern_name,
+                severity,
+            } => DomainEvent::CoachingPatternDetected {
+                pattern_name,
+                confidence: severity,
+                description: String::new(),
+                domain: String::new(),
+                signal_count: 0,
+                rule_text: String::new(),
+            },
+            CoachingEvent::FeedbackReceived {
+                strategy_id,
+                response,
+            } => DomainEvent::CoachingFeedback {
+                intervention_id: strategy_id,
+                response: match response.as_str() {
+                    "accept" => FeedbackResponse::Helpful,
+                    "dismiss" => FeedbackResponse::Dismissed,
+                    "stop" => FeedbackResponse::StopSuggesting,
+                    _ => FeedbackResponse::Dismissed,
+                },
             },
         }
     }

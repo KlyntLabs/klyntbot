@@ -339,6 +339,26 @@ pub enum DomainEvent {
         weak_domains: Vec<String>,
         propagation_count: usize,
     },
+    PronunciationScored {
+        session_id: String,
+        overall_score: f64,
+        weak_phonemes: Vec<String>,
+    },
+    ExamAttempted {
+        exam_id: String,
+        score: u32,
+        passed: bool,
+    },
+    PhoneticMasteryGained {
+        phoneme: String,
+        mastery_level: f64,
+    },
+    LanguagePracticeSessionCompleted {
+        session_id: String,
+        language: String,
+        duration_secs: u64,
+        success_rate: f64,
+    },
     KnowledgeTransferDetected {
         atom_id: String,
         from_domain: String,
@@ -589,6 +609,10 @@ impl DomainEvent {
             Self::KnowledgeTransferDetected { .. } => "KnowledgeTransferDetected",
             Self::CoachingLearningDigest { .. } => "CoachingLearningDigest",
             Self::FlashcardSessionCompleted { .. } => "FlashcardSessionCompleted",
+            Self::PronunciationScored { .. } => "PronunciationScored",
+            Self::ExamAttempted { .. } => "ExamAttempted",
+            Self::PhoneticMasteryGained { .. } => "PhoneticMasteryGained",
+            Self::LanguagePracticeSessionCompleted { .. } => "LanguagePracticeSessionCompleted",
             Self::InterventionTriggered { .. } => "InterventionTriggered",
             Self::MemoryPendingConfirmation { .. } => "MemoryPendingConfirmation",
             Self::ContradictionDetected { .. } => "ContradictionDetected",
@@ -686,6 +710,14 @@ impl DomainEvent {
     pub const KIND_COACHING_LEARNING_DIGEST: &'static str = "CoachingLearningDigest";
     /// `event_type` value for [`DomainEvent::FlashcardSessionCompleted`].
     pub const KIND_FLASHCARD_SESSION_COMPLETED: &'static str = "FlashcardSessionCompleted";
+    /// `event_type` value for [`DomainEvent::PronunciationScored`].
+    pub const KIND_PRONUNCIATION_SCORED: &'static str = "PronunciationScored";
+    /// `event_type` value for [`DomainEvent::ExamAttempted`].
+    pub const KIND_EXAM_ATTEMPTED: &'static str = "ExamAttempted";
+    /// `event_type` value for [`DomainEvent::PhoneticMasteryGained`].
+    pub const KIND_PHONETIC_MASTERY_GAINED: &'static str = "PhoneticMasteryGained";
+    /// `event_type` value for [`DomainEvent::LanguagePracticeSessionCompleted`].
+    pub const KIND_LANGUAGE_PRACTICE_SESSION_COMPLETED: &'static str = "LanguagePracticeSessionCompleted";
     /// `event_type` value for [`DomainEvent::InterventionTriggered`].
     pub const KIND_INTERVENTION_TRIGGERED: &'static str = "InterventionTriggered";
     /// `event_type` value for [`DomainEvent::MemoryPendingConfirmation`].
@@ -809,6 +841,11 @@ impl DomainEvent {
             | Self::KnowledgeTransferDetected { .. }
             | Self::CoachingLearningDigest { .. }
             | Self::FlashcardSessionCompleted { .. } => "learning",
+
+            Self::PronunciationScored { .. }
+            | Self::ExamAttempted { .. }
+            | Self::PhoneticMasteryGained { .. }
+            | Self::LanguagePracticeSessionCompleted { .. } => "language_learning",
 
             Self::InterventionTriggered { .. } => "productivity",
             Self::MemoryPendingConfirmation { .. } => "memory",

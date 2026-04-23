@@ -37,8 +37,8 @@ fn coaching_pattern_translates() {
         rule_text: "Schedule demanding tasks in the morning".into(),
     };
     let sig = translate(&e).expect("should translate");
-    assert_eq!(sig.event_kind, "CoachingPatternDetected");
-    assert_eq!(sig.content, "Schedule demanding tasks in the morning");
+    assert_eq!(sig.event_kind, "PatternDetected");
+    assert_eq!(sig.content, "Coaching pattern detected: afternoon_energy_drop (severity 0.8)");
 }
 
 #[test]
