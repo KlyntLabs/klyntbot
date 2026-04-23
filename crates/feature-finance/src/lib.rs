@@ -47,6 +47,8 @@ use tools_core::{DynTool, FeatureMigration, HealthStatus};
 #[ai(
     recall_domain = "Finance",
     skill = "finance-management",
+    tool_name = "finance",
+    entity_kind = "finance_transaction",
     event = "crate::events::FinanceEvent",
     recall_boost_when = "query.message.to_lowercase().contains(\"spend\") || query.message.to_lowercase().contains(\"budget\") || query.message.to_lowercase().contains(\"money\")",
     recall_priority_field = "amount",

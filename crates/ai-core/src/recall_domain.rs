@@ -9,6 +9,8 @@ pub enum RecallDomain {
     Learning,
     Mirror,
     Coaching,
+    Notes,
+    LanguageLearning,
 }
 
 impl RecallDomain {
@@ -21,6 +23,8 @@ impl RecallDomain {
             RecallDomain::Learning => "learning",
             RecallDomain::Mirror => "mirror",
             RecallDomain::Coaching => "coaching",
+            RecallDomain::Notes => "notes",
+            RecallDomain::LanguageLearning => "language_learning",
         }
     }
 
@@ -35,6 +39,8 @@ impl RecallDomain {
             "learning" => RecallDomain::Learning,
             "mirror" => RecallDomain::Mirror,
             "coaching" => RecallDomain::Coaching,
+            "notes" => RecallDomain::Notes,
+            "language_learning" => RecallDomain::LanguageLearning,
             _ => RecallDomain::General,
         }
     }

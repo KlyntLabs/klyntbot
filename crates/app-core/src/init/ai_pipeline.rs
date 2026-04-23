@@ -401,6 +401,18 @@ fn try_into_finance_event(e: &DomainEvent) -> Option<feature_finance::events::Fi
     }
 }
 
+/// Build the workspace `AiFeatureRegistry`. Every feature crate that derives
+/// `AiFeature` must be listed here; new features are added in v3+ as a single
+/// line per crate.
+pub fn build_feature_registry() -> ai_core::AiFeatureRegistry {
+    let mut reg = ai_core::AiFeatureRegistry::new();
+    feature_tasks::TasksFeature::register(&mut reg);
+    feature_finance::FinanceFeature::register(&mut reg);
+    // Productivity, Notes, Learning, LanguageLearning, Coaching are added by
+    // their respective tasks (12, 24, 34, 39, 46).
+    reg
+}
+
 /// Build a workspace-global MetricRegistry populated from every registered AiFeature's
 /// event enum `FEATURE_METRICS` const. Called exactly once at startup.
 pub fn build_metric_registry() -> ai_core::MetricRegistry {
@@ -461,5 +473,18 @@ mod translate_mirror_tests {
         };
         let sig = translate(&ev).expect("should translate");
         assert_eq!(sig.event_kind, "AutotunerDecision");
+    }
+}
+
+#[cfg(test)]
+mod registry_build_test {
+    use super::build_feature_registry;
+    use ai_core::RecallDomain;
+
+    #[test]
+    fn registry_seeded_with_tasks_and_finance() {
+        let reg = build_feature_registry();
+        assert!(reg.by_domain(&RecallDomain::Tasks).is_some());
+        assert!(reg.by_domain(&RecallDomain::Finance).is_some());
     }
 }

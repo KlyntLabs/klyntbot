@@ -45,6 +45,15 @@ pub fn expand(input: syn::DeriveInput) -> syn::Result<TokenStream> {
         None => quote! { None },
     };
 
+    let tool_name_const = match &feat.tool_name {
+        Some(s) => quote! { Some(#s) },
+        None => quote! { None },
+    };
+    let entity_kind_const = match &feat.entity_kind {
+        Some(s) => quote! { Some(#s) },
+        None => quote! { None },
+    };
+
     Ok(quote! {
         impl ::ai_core::AiFeature for #struct_ident {
             const DOMAIN: ::ai_core::RecallDomain = ::ai_core::RecallDomain::#recall_domain_ident;
@@ -72,6 +81,18 @@ pub fn expand(input: syn::DeriveInput) -> syn::Result<TokenStream> {
             /// Per-domain promotion threshold override. When `Some`, beats the global
             /// `accumulate_promote_threshold` config in `BackgroundConsolidationService`.
             pub const PROMOTE_THRESHOLD_OVERRIDE: Option<usize> = #promote_threshold_ts;
+
+            pub const TOOL_NAME: Option<&'static str> = #tool_name_const;
+            pub const ENTITY_KIND: Option<&'static str> = #entity_kind_const;
+
+            pub fn register(reg: &mut ::ai_core::AiFeatureRegistry) {
+                reg.register(::ai_core::FeatureRecord {
+                    domain: <Self as ::ai_core::AiFeature>::DOMAIN,
+                    skill: <Self as ::ai_core::AiFeature>::SKILL,
+                    tool_name: Self::TOOL_NAME,
+                    entity_kind: Self::ENTITY_KIND,
+                });
+            }
         }
     })
 }

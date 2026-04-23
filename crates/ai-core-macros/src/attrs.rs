@@ -1,5 +1,5 @@
 use proc_macro2::Span;
-use syn::{meta::ParseNestedMeta, Attribute, Expr, ExprLit, Ident, Lit, LitInt, LitStr};
+use syn::{Attribute, Expr, ExprLit, Lit, LitInt, LitStr};
 
 pub struct AiEventAttr {
     pub importance: Option<f64>,
@@ -35,6 +35,8 @@ pub struct EntityBridge {
 pub struct AiFeatureAttr {
     pub recall_domain: syn::Ident,
     pub skill: String,
+    pub tool_name: Option<String>,
+    pub entity_kind: Option<String>,
     pub event: syn::Path,
     pub recall_boost_when: Option<syn::Expr>,
     pub recall_priority_field: Option<syn::Ident>,
@@ -305,6 +307,8 @@ pub fn parse_ai_feature_attr(attrs: &[syn::Attribute]) -> syn::Result<AiFeatureA
 
     let mut recall_domain = None;
     let mut skill = None;
+    let mut tool_name = None;
+    let mut entity_kind = None;
     let mut event = None;
     let mut recall_boost_when = None;
     let mut recall_priority_field = None;
@@ -327,6 +331,14 @@ pub fn parse_ai_feature_attr(attrs: &[syn::Attribute]) -> syn::Result<AiFeatureA
             "skill" => {
                 let s: syn::LitStr = meta.value()?.parse()?;
                 skill = Some(s.value());
+            }
+            "tool_name" => {
+                let s: syn::LitStr = meta.value()?.parse()?;
+                tool_name = Some(s.value());
+            }
+            "entity_kind" => {
+                let s: syn::LitStr = meta.value()?.parse()?;
+                entity_kind = Some(s.value());
             }
             "event" => {
                 let s: syn::LitStr = meta.value()?.parse()?;
@@ -366,6 +378,8 @@ pub fn parse_ai_feature_attr(attrs: &[syn::Attribute]) -> syn::Result<AiFeatureA
         })?,
         skill: skill
             .ok_or_else(|| syn::Error::new(proc_macro2::Span::call_site(), "skill is required"))?,
+        tool_name,
+        entity_kind,
         event: event.ok_or_else(|| {
             syn::Error::new(proc_macro2::Span::call_site(), "event path is required")
         })?,

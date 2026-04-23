@@ -42,6 +42,8 @@ use tools_core::{DynTool, FeatureMigration, FeaturePackage, HealthStatus};
 #[ai(
     recall_domain = "Tasks",
     skill = "task-management",
+    tool_name = "tasks",
+    entity_kind = "task",
     event = "crate::events::TaskEvent",
     recall_boost_when = "query.message.to_lowercase().contains(\"deadline\") || query.message.to_lowercase().contains(\"task\") || query.message.to_lowercase().contains(\"overdue\")",
     recall_priority_field = "priority",

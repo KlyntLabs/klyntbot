@@ -505,6 +505,9 @@ impl AppCore {
         };
 
         // ── Phase 9: AI Pipeline — SignalRouter + all consumers ───────────
+        let feature_registry = Arc::new(ai_pipeline::build_feature_registry());
+        tracing::info!(features = feature_registry.len(), "ai feature registry built");
+
         let ai_pipeline_router = {
             let observation_repo =
                 ::cognitive::repos::AccumulatedObservationRepo::new(storage_pool.inner().clone());
@@ -912,6 +915,7 @@ impl AppCore {
             brain_voice,
             journey_tracker: Some(journey_tracker),
             _ai_pipeline_router: ai_pipeline_router,
+            feature_registry,
         };
 
         // ── Voice service initialization ────────────────────────────────

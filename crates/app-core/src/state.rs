@@ -164,6 +164,8 @@ pub struct AppCore {
     pub journey_tracker: Option<crate::journey::JourneyTracker>,
     /// AI pipeline SignalRouter — keeps the router alive for the app lifetime.
     pub _ai_pipeline_router: Option<ai_core::SignalRouter>,
+    /// Registry of all AiFeature-derived features in the workspace.
+    pub feature_registry: Arc<ai_core::AiFeatureRegistry>,
 }
 
 impl AppCore {
