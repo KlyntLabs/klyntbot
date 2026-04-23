@@ -91,10 +91,6 @@ impl AccumulatedEntry {
         }
     }
 
-    fn should_promote(&self, promote_threshold: usize, min_days: usize) -> bool {
-        self.observations.len() >= promote_threshold && self.days_seen.len() >= min_days
-    }
-
     /// Returns the effective promotion threshold for a given `RecallDomain`.
     pub fn effective_threshold(
         domain: &ai_core::RecallDomain,
@@ -1061,7 +1057,12 @@ mod tests {
             });
         }
 
-        assert!(entry.should_promote(5, 3));
+        assert!(entry.should_promote_for_domain(
+            &ai_core::RecallDomain::General,
+            &std::collections::HashMap::new(),
+            5,
+            3,
+        ));
         assert_eq!(entry.observations.len(), 5);
         assert_eq!(entry.days_seen.len(), 3);
     }
@@ -1081,7 +1082,12 @@ mod tests {
             });
         }
 
-        assert!(!entry.should_promote(5, 3)); // Not enough days
+        assert!(!entry.should_promote_for_domain(
+            &ai_core::RecallDomain::General,
+            &std::collections::HashMap::new(),
+            5,
+            3,
+        )); // Not enough days
     }
 
     #[test]

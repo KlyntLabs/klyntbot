@@ -5,6 +5,7 @@
 //! a single failure does not abort the remaining phases.
 
 use std::collections::HashMap;
+use std::sync::Arc;
 
 use jiff::Timestamp;
 use sqlx;
@@ -48,6 +49,7 @@ pub async fn run_reforge(
     community_intelligence_handler: Option<&dyn super::CommunityIntelligenceHandler>,
     community_repo: Option<&crate::repos::CommunityRepo>,
     co_activation_repo_for_split: Option<&crate::repos::CoActivationRepo>,
+    domain_event_bus: Option<Arc<bus::DomainEventBus>>,
 ) -> Option<ReforgeResult> {
     let mut result = ReforgeResult::default();
 
@@ -455,6 +457,7 @@ pub async fn run_reforge(
                                 &output,
                                 community_repo,
                                 co_act,
+                                domain_event_bus.clone(),
                             )
                             .await
                         } else {
@@ -471,6 +474,7 @@ pub async fn run_reforge(
                                 &no_splits,
                                 community_repo,
                                 &fallback_co_act,
+                                domain_event_bus.clone(),
                             )
                             .await
                         };

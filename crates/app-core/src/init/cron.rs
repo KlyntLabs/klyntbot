@@ -406,6 +406,7 @@ fn register_cron_callbacks(
         let metric_source_for_reforge = metric_source;
         let trial_repo_for_reforge = trial_repo;
         let orchestrator_for_reforge = orchestrator.clone();
+        let domain_event_bus_for_reforge = Arc::clone(domain_event_bus);
         cron_executor.register(
             JOB_REFORGE_NIGHTLY,
             Arc::new(move |_job: &scheduling::CronJob| {
@@ -417,6 +418,7 @@ fn register_cron_callbacks(
                 let metric_source = metric_source_for_reforge.clone();
                 let trial_repo = trial_repo_for_reforge.clone();
                 let orchestrator = orchestrator_for_reforge.clone();
+                let domain_event_bus = domain_event_bus_for_reforge.clone();
                 tokio::task::block_in_place(|| {
                     rt.block_on(async move {
                         let fact_repo = cognitive::SemanticFactRepo::new(pool.clone());
@@ -558,6 +560,7 @@ fn register_cron_callbacks(
                             .as_deref(),
                             Some(&cognitive::CommunityRepo::new(pool.clone())),
                             Some(&co_activation_repo),
+                            Some(domain_event_bus),
                         )
                         .await
                         {

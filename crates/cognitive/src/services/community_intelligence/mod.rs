@@ -65,12 +65,19 @@ const MIN_AGE_FOR_RESTRUCTURE: u32 = 3;
 
 /// Apply community intelligence output: renames, merges, splits.
 ///
+/// Publishes `CommunityEvent::Updated` on successful renames/merges and
+/// `CommunityEvent::Weakened` on splits (the source community is fragmented).
+/// Pass `None` for `bus` to skip publishing.
+///
 /// Returns (renamed, merged, split) counts.
 pub async fn apply_intelligence(
     output: &CommunityIntelligenceOutput,
     community_repo: &CommunityRepo,
     co_activation_repo: &crate::repos::CoActivationRepo,
+    bus: Option<std::sync::Arc<bus::DomainEventBus>>,
 ) -> (u32, u32, u32) {
+    use events::CommunityEvent;
+
     let mut renamed = 0u32;
     let mut merged = 0u32;
     let mut split = 0u32;
@@ -83,6 +90,15 @@ pub async fn apply_intelligence(
         {
             tracing::debug!("Community rename failed for {}: {e}", rename.community_id);
         } else {
+            if let Some(b) = &bus {
+                let event: bus::DomainEvent = CommunityEvent::Updated {
+                    community_id: rename.community_id.clone(),
+                    name: rename.label.clone(),
+                    reason: "renamed".into(),
+                }
+                .into();
+                b.publish(event);
+            }
             renamed += 1;
         }
     }
@@ -108,6 +124,15 @@ pub async fn apply_intelligence(
                 reason = %merge.reason,
                 "Community merged"
             );
+            if let Some(b) = &bus {
+                let event: bus::DomainEvent = CommunityEvent::Updated {
+                    community_id: merge.into_id.clone(),
+                    name: String::new(),
+                    reason: format!("merged:{}", merge.reason),
+                }
+                .into();
+                b.publish(event);
+            }
             merged += 1;
         }
     }
@@ -125,6 +150,15 @@ pub async fn apply_intelligence(
                     reason = %split_req.reason,
                     "Community split"
                 );
+                if let Some(b) = &bus {
+                    let event: bus::DomainEvent = CommunityEvent::Weakened {
+                        community_id: split_req.community_id.clone(),
+                        name: String::new(),
+                        stability: 0.0,
+                    }
+                    .into();
+                    b.publish(event);
+                }
                 split += 1;
             }
             Ok(_) => {

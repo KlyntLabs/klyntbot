@@ -4,21 +4,55 @@
 //! strength (Hebbian learning). This enables the retrieval system to boost facts
 //! that historically co-occur in useful retrievals.
 
+use std::sync::Arc;
+
 use jiff::Timestamp;
 use sqlx::SqlitePool;
 
-#[derive(Debug, Clone)]
+/// Cumulative co-activation strength threshold above which a pair is considered
+/// "hardened". A `CoActivationStrengthened` domain event is published the first
+/// time a pair crosses this boundary (i.e. prev < threshold and new >= threshold).
+const STRENGTH_THRESHOLD: f64 = 2.0;
+
 pub struct CoActivationRepo {
     pool: SqlitePool,
+    bus: Option<Arc<bus::DomainEventBus>>,
+}
+
+impl std::fmt::Debug for CoActivationRepo {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("CoActivationRepo")
+            .field("pool", &self.pool)
+            .field("bus", &self.bus.as_ref().map(|_| "<DomainEventBus>"))
+            .finish()
+    }
+}
+
+impl Clone for CoActivationRepo {
+    fn clone(&self) -> Self {
+        Self {
+            pool: self.pool.clone(),
+            bus: self.bus.clone(),
+        }
+    }
 }
 
 impl CoActivationRepo {
     pub fn new(pool: SqlitePool) -> Self {
-        Self { pool }
+        Self { pool, bus: None }
+    }
+
+    /// Attach a domain event bus for threshold-crossing notifications.
+    pub fn with_bus(mut self, bus: Arc<bus::DomainEventBus>) -> Self {
+        self.bus = Some(bus);
+        self
     }
 
     /// Record that a set of facts were co-retrieved. Inserts/increments strength
     /// for every ordered pair (a, b) where a < b.
+    ///
+    /// Publishes `CoActivationStrengthened` the first time a pair's cumulative
+    /// strength crosses [`STRENGTH_THRESHOLD`], if a bus is wired.
     pub async fn record_co_retrieval(&self, fact_ids: &[String]) -> Result<(), sqlx::Error> {
         if fact_ids.len() < 2 {
             return Ok(());
@@ -30,17 +64,52 @@ impl CoActivationRepo {
 
         for i in 0..sorted.len() {
             for j in (i + 1)..sorted.len() {
-                sqlx::query(
+                let a = &sorted[i];
+                let b = &sorted[j];
+
+                // Read previous strength only when a bus is wired (avoid extra DB round-trip
+                // in the common case where no consumer is registered).
+                let prev_strength: f64 = if self.bus.is_some() {
+                    let row: Option<(f64,)> = sqlx::query_as(
+                        "SELECT strength FROM co_activation \
+                         WHERE fact_id_a = ?1 AND fact_id_b = ?2",
+                    )
+                    .bind(a)
+                    .bind(b)
+                    .fetch_optional(&self.pool)
+                    .await?;
+                    row.map(|(s,)| s).unwrap_or(0.0)
+                } else {
+                    0.0
+                };
+
+                let new_row: (f64,) = sqlx::query_as(
                     "INSERT INTO co_activation (fact_id_a, fact_id_b, strength, last_fired)
                      VALUES (?1, ?2, 1.0, ?3)
                      ON CONFLICT(fact_id_a, fact_id_b)
-                     DO UPDATE SET strength = strength + 1.0, last_fired = ?3",
+                     DO UPDATE SET strength = strength + 1.0, last_fired = ?3
+                     RETURNING strength",
                 )
-                .bind(&sorted[i])
-                .bind(&sorted[j])
+                .bind(a)
+                .bind(b)
                 .bind(&now)
-                .execute(&self.pool)
+                .fetch_one(&self.pool)
                 .await?;
+
+                let new_strength = new_row.0;
+
+                if let Some(bus) = &self.bus {
+                    if prev_strength < STRENGTH_THRESHOLD && new_strength >= STRENGTH_THRESHOLD {
+                        use crate::services::community_intelligence::co_activation_events::CoActivationEvent;
+                        let event: bus::DomainEvent = CoActivationEvent::Strengthened {
+                            fact_id_a: a.clone(),
+                            fact_id_b: b.clone(),
+                            strength: new_strength,
+                        }
+                        .into();
+                        bus.publish(event);
+                    }
+                }
             }
         }
         Ok(())
@@ -213,5 +282,35 @@ mod tests {
         let expired = repo.expire_stale(90).await.unwrap();
         assert_eq!(expired, 1);
         assert_eq!(repo.count_all().await.unwrap(), 0);
+    }
+
+    #[tokio::test]
+    async fn co_activation_strengthened_published_on_threshold_crossing() {
+        let pool = cognitive_test_pool().await;
+        let bus = Arc::new(bus::DomainEventBus::new(32));
+        let mut rx = bus.subscribe();
+        let repo = CoActivationRepo::new(pool).with_bus(Arc::clone(&bus));
+
+        let ids = vec!["fact_a".into(), "fact_b".into()];
+        // First retrieval: strength goes 0 -> 1.0, below threshold — no event
+        repo.record_co_retrieval(&ids).await.unwrap();
+        assert!(rx.try_recv().is_err(), "no event below threshold");
+
+        // Second retrieval: strength goes 1.0 -> 2.0, crosses threshold — event published
+        repo.record_co_retrieval(&ids).await.unwrap();
+        let event = rx
+            .try_recv()
+            .expect("expected CoActivationStrengthened event");
+        assert!(
+            matches!(
+                event,
+                bus::DomainEvent::CoActivationStrengthened { strength, .. } if (strength - 2.0).abs() < f64::EPSILON
+            ),
+            "unexpected event: {event:?}"
+        );
+
+        // Third retrieval: strength 2.0 -> 3.0, already past threshold — no new event
+        repo.record_co_retrieval(&ids).await.unwrap();
+        assert!(rx.try_recv().is_err(), "no second event above threshold");
     }
 }

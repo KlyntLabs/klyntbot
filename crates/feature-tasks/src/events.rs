@@ -66,11 +66,11 @@ pub enum TaskEvent {
         observation_template = "Deferred '{title}' from {previous_due:?} to {new_due:?}",
         entity_bridge(type = "task", name_from = "title", id_from = "task_id"),
         metric(
-            name = "task_deferrals_per_week",
+            name = "task_deferral_rate",
             value_from = 1.0_f64,
             window = "7d",
             min_samples = 3,
-            aggregation = "sum",
+            aggregation = "avg",
         )
     )]
     Deferred {

@@ -447,7 +447,21 @@ impl AgentLoopBuilder {
                             accum_repo: Some(accum_repo),
                             failed_obs_repo: Some(failed_obs_repo),
                             promote_threshold: config.cognitive.accumulate_promote_threshold,
-                            promote_overrides: std::collections::HashMap::new(),
+                            promote_overrides: {
+                                let mut m: std::collections::HashMap<ai_core::RecallDomain, usize> =
+                                    std::collections::HashMap::new();
+                                if let Some(n) =
+                                    feature_tasks::TasksFeature::PROMOTE_THRESHOLD_OVERRIDE
+                                {
+                                    m.insert(ai_core::RecallDomain::Tasks, n);
+                                }
+                                if let Some(n) =
+                                    feature_finance::FinanceFeature::PROMOTE_THRESHOLD_OVERRIDE
+                                {
+                                    m.insert(ai_core::RecallDomain::Finance, n);
+                                }
+                                m
+                            },
                             min_days: config.cognitive.accumulate_min_days,
                             domain_bus: self.domain_event_bus.clone(),
                             context_update_queue: self.context_update_queue.clone(),
