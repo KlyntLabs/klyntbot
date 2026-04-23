@@ -25,6 +25,7 @@ pub fn expand(input: DeriveInput) -> syn::Result<TokenStream> {
 
     let mut arms = Vec::new();
     let mut kind_arms = Vec::new();
+    let mut metric_specs_ts: Vec<proc_macro2::TokenStream> = Vec::new();
 
     for variant in &data_enum.variants {
         arms.push(render_variant(enum_ident, variant, &domain_tokens)?);
@@ -37,6 +38,30 @@ pub fn expand(input: DeriveInput) -> syn::Result<TokenStream> {
             Fields::Unnamed(_) => quote! { #enum_ident::#id(..) },
         };
         kind_arms.push(quote! { #pattern => #kind });
+
+        // Collect metric specs for FEATURE_METRICS constant
+        let attr = parse_ai_event_attr(&variant.attrs)?;
+        if let Some(metric) = &attr.metric {
+            let m_name = &metric.name;
+            let m_window = metric.window_secs;
+            let m_min = metric.min_samples;
+            let m_agg_ts = metric.aggregation.emit_tokens();
+            let const_ident = syn::Ident::new(
+                &format!("METRIC_SPEC_{}", id.to_string().to_uppercase()),
+                id.span(),
+            );
+            metric_specs_ts.push(quote! {
+                {
+                    static #const_ident: ::ai_core::MetricSpec = ::ai_core::MetricSpec {
+                        name: #m_name,
+                        window_secs: #m_window,
+                        min_samples: #m_min,
+                        aggregation: #m_agg_ts,
+                    };
+                    &#const_ident
+                }
+            });
+        }
     }
 
     // Handle empty enums by adding a wildcard arm
@@ -68,6 +93,16 @@ pub fn expand(input: DeriveInput) -> syn::Result<TokenStream> {
         }
     };
 
+    let feature_metrics_impl = quote! {
+        impl #enum_ident {
+            /// All `MetricSpec`s declared by variants of this enum via `#[ai(metric(...))]`.
+            /// Registered by app-core at startup via `MetricRegistry::register_all`.
+            pub const FEATURE_METRICS: &'static [&'static ::ai_core::MetricSpec] = &[
+                #(#metric_specs_ts),*
+            ];
+        }
+    };
+
     Ok(quote! {
         #[allow(unused_variables, unused_assignments)]
         impl ::ai_core::AiEventMeta for #enum_ident {
@@ -79,6 +114,8 @@ pub fn expand(input: DeriveInput) -> syn::Result<TokenStream> {
                 #event_kind_match
             }
         }
+
+        #feature_metrics_impl
     })
 }
 
