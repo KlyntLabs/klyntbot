@@ -8423,6 +8423,7 @@ dependencies = [
 name = "mcp"
 version = "0.1.1"
 dependencies = [
+ "ai-core",
  "anyhow",
  "async-trait",
  "common",

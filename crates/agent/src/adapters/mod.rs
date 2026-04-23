@@ -6,6 +6,7 @@
 pub mod agent_task;
 pub mod autotuner_bridge;
 pub mod book_index_skill_builder;
+pub mod fsrs_writeback;
 pub mod book_index_task_builder;
 pub mod cognitive_embedder;
 pub mod cognitive_handlers;

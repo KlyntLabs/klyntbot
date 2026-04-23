@@ -15,6 +15,7 @@ pub mod event_log;
 pub mod fact_changelog;
 pub mod failed_observation;
 pub mod flashcard;
+pub mod fsrs_params;
 pub mod gt_link;
 pub mod insight_cache;
 pub mod knowledge_atom;
@@ -52,6 +53,7 @@ pub use failed_observation::FailedObservationRepo;
 pub use flashcard::{
     CardType, DeckSummary, FlashcardRepo, FlashcardRow, NewFlashcard, ReviewLogEntry, ReviewQuality,
 };
+pub use fsrs_params::FsrsParamsRepo;
 pub use gt_link::SqliteGTLinkRepo;
 #[allow(deprecated)]
 pub use insight_cache::{InsightCacheRepo, InsightCacheRow};

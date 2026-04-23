@@ -96,12 +96,16 @@ pub(super) async fn init_cron(
         trial_repo.clone(),
         Arc::clone(&metric_source),
     ));
+    let fsrs_params_repo = Arc::new(cognitive::FsrsParamsRepo::new(
+        storage::StoragePool::from_existing(repos.pool().clone()),
+    ));
     let autotuner_bridge: Option<Arc<dyn cognitive::services::reforge::AutotunerBridge>> =
         Some(Arc::new(
             agent::adapters::autotuner_bridge::AgentAutotunerBridge::new(
                 Arc::clone(&orchestrator),
                 nightly_cycle,
                 Some(Arc::clone(domain_event_bus)),
+                Some(fsrs_params_repo),
             ),
         ));
     info!("autotuner orchestrator + Reforge Phase 6 bridge built");

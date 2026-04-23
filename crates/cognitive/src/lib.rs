@@ -41,6 +41,7 @@ pub use repos::{
     ProceduralRuleRepo, SemanticFactRepo,
 };
 pub use repos::{BlackboardEntry, BlackboardRepo, NewBlackboardEntry};
+pub use repos::FsrsParamsRepo;
 pub use repos::{
     CardType, DeckSummary, FlashcardRepo, FlashcardRow, NewFlashcard, ReviewLogEntry, ReviewQuality,
 };

@@ -12,12 +12,14 @@ use common::TrialParams;
 use storage::rows::trial::{ExperimentRow, TrialRow};
 use tracing::{info, warn};
 
+use crate::adapters::fsrs_writeback;
 use crate::autotuner::AutoTunerOrchestrator;
 
 pub struct AgentAutotunerBridge {
     orchestrator: Arc<AutoTunerOrchestrator>,
     nightly_cycle: Arc<autotuner::NightlyCycle>,
     domain_event_bus: Option<Arc<bus::DomainEventBus>>,
+    fsrs_params_repo: Option<Arc<cognitive::FsrsParamsRepo>>,
 }
 
 impl AgentAutotunerBridge {
@@ -25,11 +27,13 @@ impl AgentAutotunerBridge {
         orchestrator: Arc<AutoTunerOrchestrator>,
         nightly_cycle: Arc<autotuner::NightlyCycle>,
         domain_event_bus: Option<Arc<bus::DomainEventBus>>,
+        fsrs_params_repo: Option<Arc<cognitive::FsrsParamsRepo>>,
     ) -> Self {
         Self {
             orchestrator,
             nightly_cycle,
             domain_event_bus,
+            fsrs_params_repo,
         }
     }
 }
@@ -59,9 +63,18 @@ impl AutotunerBridge for AgentAutotunerBridge {
             };
             let affected_params = autotuner::affected_param_names(&champion.params, &params);
 
+            // Write FSRS desired_retention back to cognitive repo
+            if let Some(ref repo) = self.fsrs_params_repo {
+                if let Err(e) = fsrs_writeback::apply_fsrs_writeback(repo, &params).await {
+                    warn!("Failed to write fsrs_desired_retention: {e}");
+                } else {
+                    info!("Wrote fsrs_desired_retention to cognitive repo");
+                }
+            }
+
             let new_champion = autotuner::Champion {
                 trial_id: Some(trial_id),
-                params,
+                params: params.clone(),
                 promoted_at: jiff::Timestamp::now(),
                 baseline_metrics: trial_result.clone(),
                 reason_for_promotion: format!("Promoted by Reforge Phase 6 (trial {trial_id})"),
