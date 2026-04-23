@@ -544,7 +544,12 @@ impl AppCore {
                 feature_coaching::CoachingSignalConsumer::new(coaching_signal_tx),
             );
 
-            // Build consumer list: 7 base + mirror consumers
+            // Metric harvest consumer
+            let metric_repo = ::cognitive::MetricRepo::new(storage_pool.inner().clone());
+            let metric_harvest: Arc<dyn ai_core::SignalConsumer> =
+                Arc::new(::cognitive::consumers::MetricHarvestConsumer::new(metric_repo));
+
+            // Build consumer list: 8 base + mirror consumers
             let mut consumers: Vec<Arc<dyn ai_core::SignalConsumer>> = vec![
                 ingestion,
                 chat_turn,
@@ -553,13 +558,14 @@ impl AppCore {
                 atom,
                 coaching_collector,
                 coaching_consumer,
+                metric_harvest,
             ];
             consumers.extend(mirror_consumers.iter().cloned());
 
             let router = ai_pipeline::start(Arc::clone(&domain_event_bus), consumers);
             info!(
-                "AI pipeline SignalRouter started with {} consumers (7 base + {} mirror)",
-                7 + mirror_consumers.len(),
+                "AI pipeline SignalRouter started with {} consumers (8 base + {} mirror)",
+                8 + mirror_consumers.len(),
                 mirror_consumers.len()
             );
 
