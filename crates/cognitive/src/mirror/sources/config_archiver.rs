@@ -89,23 +89,21 @@ impl MirrorSignalSource for ConfigArchiverSource {
     }
 
     async fn accumulate(&self, signal: &AiSignal) -> common::Result<()> {
-        if let Some(raw) = &signal.raw_event {
-            if let bus::DomainEvent::AutotunerDecision {
-                trial_id,
-                verdict,
-                improvement_pct,
-                ..
-            } = raw
-            {
-                if verdict == "promoted" {
-                    let _ = self
-                        .record_promotion(
-                            Some(trial_id.clone()),
-                            format!("Promoted: {:.1}% improvement", improvement_pct),
-                            serde_json::json!({"improvement_pct": improvement_pct}),
-                        )
-                        .await;
-                }
+        if let Some(bus::DomainEvent::AutotunerDecision {
+            trial_id,
+            verdict,
+            improvement_pct,
+            ..
+        }) = &signal.raw_event
+        {
+            if verdict == "promoted" {
+                let _ = self
+                    .record_promotion(
+                        Some(trial_id.clone()),
+                        format!("Promoted: {:.1}% improvement", improvement_pct),
+                        serde_json::json!({"improvement_pct": improvement_pct}),
+                    )
+                    .await;
             }
         }
         Ok(())

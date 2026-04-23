@@ -206,7 +206,7 @@ fn render_variant(
         quote! {
             vec![::ai_core::MetricSample {
                 name: #m_name,
-                value: (#m_value) as f64,
+                value: (#m_value),
             }]
         }
     } else {

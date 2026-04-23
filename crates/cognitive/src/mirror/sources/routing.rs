@@ -214,16 +214,14 @@ impl MirrorSignalSource for RoutingSignalSource {
     }
 
     async fn accumulate(&self, signal: &AiSignal) -> common::Result<()> {
-        if let Some(raw) = &signal.raw_event {
-            if let bus::DomainEvent::SkillRouted {
-                skill_name,
-                confidence,
-                trigger_phrases,
-                ..
-            } = raw
-            {
-                self.accumulate_signal(skill_name, *confidence, trigger_phrases.clone());
-            }
+        if let Some(bus::DomainEvent::SkillRouted {
+            skill_name,
+            confidence,
+            trigger_phrases,
+            ..
+        }) = &signal.raw_event
+        {
+            self.accumulate_signal(skill_name, *confidence, trigger_phrases.clone());
         }
         Ok(())
     }

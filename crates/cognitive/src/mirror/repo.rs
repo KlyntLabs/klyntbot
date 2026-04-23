@@ -1367,7 +1367,7 @@ mod tests {
     #[tokio::test]
     async fn cleanup_old_meta_rules_only_disabled() {
         let repo = crate::mirror::test_mirror_repo().await;
-        let mut mk = |status: MetaRuleStatus, created_at: Timestamp| MetaRule {
+        let mk = |status: MetaRuleStatus, created_at: Timestamp| MetaRule {
             id: Uuid::new_v4(),
             trigger_condition: String::new(),
             action: MetaRuleAction::ForceClarification,

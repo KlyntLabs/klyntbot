@@ -105,7 +105,6 @@ impl MirrorEngine {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use ai_core::{MirrorSubscriberRunner, SignalConsumer};
 
     #[tokio::test]
     async fn start_produces_six_consumers() {
