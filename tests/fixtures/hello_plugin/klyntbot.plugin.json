@@ -14,7 +14,15 @@
                     "name": {"type": "string", "description": "Name to greet"}
                 }
             }
+        },
+        {
+            "name": "emit_test_event",
+            "description": "Emit a test event via agent_emit_event",
+            "parameters": {
+                "type": "object",
+                "properties": {}
+            }
         }
     ],
-    "permissions": []
+    "permissions": ["agent"]
 }

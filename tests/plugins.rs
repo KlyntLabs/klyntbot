@@ -11,8 +11,9 @@ mod plugin_integration {
     use std::path::PathBuf;
 
     use common::ChannelName;
-    use plugin_runtime::{PluginManifest, PluginPackage, PluginPermission};
-    use tools_core::{FeaturePackage, RoutingContext};
+    use config::schema::PluginsConfig;
+    use plugin_runtime::{PluginManager, PluginManifest, PluginPermission};
+    use tools_core::{DynTool, FeaturePackage, RoutingContext};
 
     fn fixtures_dir() -> PathBuf {
         PathBuf::from(env!("CARGO_MANIFEST_DIR"))
@@ -29,28 +30,36 @@ mod plugin_integration {
 
     #[tokio::test]
     async fn hello_plugin_executes() {
-        let wasm_path = fixtures_dir().join("plugin.wasm");
+        let fixtures = fixtures_dir();
         assert!(
-            wasm_path.exists(),
+            fixtures.join("plugin.wasm").exists(),
             "Build the hello plugin first: cd tests/fixtures/hello_plugin && ./build.sh"
         );
 
-        let manifest_path = fixtures_dir().join("klyntbot.plugin.json");
-        let manifest = PluginManifest::from_file(&manifest_path).unwrap();
+        let tmp = tempfile::TempDir::new().unwrap();
+        let plugin_dir = tmp.path().join("hello-plugin");
+        std::fs::create_dir_all(&plugin_dir).unwrap();
+        std::fs::copy(fixtures.join("plugin.wasm"), plugin_dir.join("plugin.wasm")).unwrap();
+        std::fs::copy(
+            fixtures.join("klyntbot.plugin.json"),
+            plugin_dir.join("klyntbot.plugin.json"),
+        )
+        .unwrap();
 
-        let wasm_bytes = std::fs::read(&wasm_path).unwrap();
-        let extism_manifest = extism::Manifest::new([extism::Wasm::data(wasm_bytes)]);
-        let plugin = extism::Plugin::new(&extism_manifest, [], true).unwrap();
+        let pool = storage::StoragePool::connect_in_memory().await.unwrap();
+        let config = PluginsConfig::default();
+        let manager =
+            PluginManager::load_all(tmp.path(), pool.inner().clone(), &config, None, None)
+                .unwrap();
 
-        let mut pkg = PluginPackage::from_manifest(manifest);
-        pkg.attach_plugin(plugin);
+        assert_eq!(manager.packages().len(), 1);
 
-        let tools = pkg.tools();
-        assert_eq!(tools.len(), 1);
-        assert_eq!(tools[0].name(), "hello_tool");
+        let packages = manager.into_packages();
+        let tools: Vec<DynTool> = packages[0].tools();
+        let hello_idx = tools.iter().position(|t| t.name() == "hello_tool").unwrap();
 
         let args = serde_json::json!({"name": "klyntbot"});
-        let result = tools[0].execute(args, &routing_ctx()).await.unwrap();
+        let result = tools[hello_idx].execute(args, &routing_ctx()).await.unwrap();
         assert!(result.contains("hello from wasm"));
         assert!(result.contains("klyntbot"));
     }
@@ -63,17 +72,19 @@ mod plugin_integration {
         let manifest = PluginManifest::from_file(&manifest_path).unwrap();
         assert_eq!(manifest.id, "hello-plugin");
         assert_eq!(manifest.version, "0.1.0");
-        assert_eq!(manifest.tools.len(), 1);
+        assert_eq!(manifest.tools.len(), 2);
         assert_eq!(manifest.tools[0].name, "hello_tool");
+        assert_eq!(manifest.tools[1].name, "emit_test_event");
+        assert!(manifest.has_permission(&PluginPermission::Agent));
     }
 
     #[test]
-    fn permission_level_standard_no_network() {
+    fn permission_level_agent_permission_present() {
         let manifest_path = fixtures_dir().join("klyntbot.plugin.json");
         let manifest = PluginManifest::from_file(&manifest_path).unwrap();
         assert!(!manifest.has_permission(&PluginPermission::Network));
-        assert!(!manifest.has_permission(&PluginPermission::Agent));
-        assert!(manifest.permissions.is_empty());
+        assert!(manifest.has_permission(&PluginPermission::Agent));
+        assert_eq!(manifest.permissions.len(), 1);
     }
 
     // ── Plugin Manager ──────────────────────────────────────────
@@ -109,12 +120,12 @@ mod plugin_integration {
         assert_eq!(manager.packages()[0].name(), "hello-plugin");
 
         let packages = manager.into_packages();
-        let tools = packages[0].tools();
-        assert_eq!(tools.len(), 1);
-        assert_eq!(tools[0].name(), "hello_tool");
+        let tools: Vec<DynTool> = packages[0].tools();
+        let hello_idx = tools.iter().position(|t| t.name() == "hello_tool").unwrap();
+        assert_eq!(tools.len(), 2);
 
         let args = serde_json::json!({"name": "integration-test"});
-        let result = tools[0].execute(args, &routing_ctx()).await.unwrap();
+        let result = tools[hello_idx].execute(args, &routing_ctx()).await.unwrap();
         assert!(result.contains("hello from wasm"));
         assert!(result.contains("integration-test"));
     }
