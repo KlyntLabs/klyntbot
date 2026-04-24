@@ -340,6 +340,7 @@ dependencies = [
  "base64 0.22.1",
  "bus",
  "channels",
+ "coding-memory",
  "cognitive",
  "common",
  "config",

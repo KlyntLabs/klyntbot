@@ -93,6 +93,8 @@ voice-engine = { path = "crates/voice-engine" }
 feature-language-learning = { path = "crates/feature-language-learning" }
 ai-core = { path = "crates/ai-core" }
 ai-core-macros = { path = "crates/ai-core-macros" }
+coding-ingest = { path = "crates/coding-ingest" }
+coding-memory = { path = "crates/coding-memory" }
 extism = "1"
 mcp = { path = "crates/mcp" }
 notifications = { path = "crates/notifications" }

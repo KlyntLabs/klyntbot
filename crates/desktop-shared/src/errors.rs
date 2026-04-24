@@ -134,6 +134,7 @@ impl From<KlyntbotError> for ApiError {
             KlyntbotError::Io(e) => ApiError::new("IO_ERROR", e.to_string()),
             KlyntbotError::Json(e) => ApiError::new("JSON_ERROR", e.to_string()),
             KlyntbotError::Timeout(msg) => ApiError::new("TIMEOUT", msg),
+            KlyntbotError::NotImplemented(msg) => ApiError::new("NOT_IMPLEMENTED", msg),
         }
     }
 }
