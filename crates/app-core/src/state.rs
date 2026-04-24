@@ -166,6 +166,8 @@ pub struct AppCore {
     pub _ai_pipeline_router: Option<ai_core::SignalRouter>,
     /// Registry of all AiFeature-derived features in the workspace.
     pub feature_registry: Arc<ai_core::AiFeatureRegistry>,
+    /// Ingestion daemon handle; `None` when spawn failed or not yet wired.
+    pub ingest_daemon: std::sync::Mutex<Option<coding_ingest::daemon::IngestDaemonHandle>>,
 }
 
 impl AppCore {

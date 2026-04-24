@@ -837,6 +837,26 @@ impl AppCore {
             Some(handle)
         };
 
+        // ── Spawn coding-ingest daemon ───────────────────────────────────
+        let ingest_daemon_handle = {
+            let data_dir = config.data_dir_path();
+            let daemon_cfg = coding_ingest::daemon::IngestDaemonConfig {
+                socket_path: data_dir.join("ingest.sock"),
+                buffer_path: data_dir.join("ingest-buffer.jsonl"),
+                lock_path: data_dir.join("desktop.lock"),
+                repo: std::sync::Arc::new(coding_ingest::store::IngestEventLogRepo::new(
+                    storage_pool.inner().clone(),
+                )),
+            };
+            match coding_ingest::daemon::spawn(daemon_cfg).await {
+                Ok(h) => Some(h),
+                Err(e) => {
+                    tracing::warn!(error = %e, "ingest daemon failed to spawn — coding CLI ingestion disabled");
+                    None
+                }
+            }
+        };
+
         // ── Snapshot lifecycle config before moving config into Arc ──────
         let lifecycle_config_snapshot = config.lifecycle.clone();
 
@@ -962,6 +982,7 @@ impl AppCore {
             journey_tracker: Some(journey_tracker),
             _ai_pipeline_router: ai_pipeline_router,
             feature_registry,
+            ingest_daemon: std::sync::Mutex::new(ingest_daemon_handle),
         };
 
         // ── Voice service initialization ────────────────────────────────
