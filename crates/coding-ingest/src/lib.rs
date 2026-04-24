@@ -17,6 +17,8 @@ pub mod transport;
 pub mod store;
 /// Touch-file rate-limited stderr warnings.
 pub mod warn;
+/// `HookClient` — socket-first-else-buffer dispatcher.
+pub mod hook_client;
 
 pub use event::{
     AgentEvent, AgentEventV1, AgentSource, DiagnosticsDelta, EventKind, FileOp,
