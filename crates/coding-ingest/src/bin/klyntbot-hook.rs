@@ -1,55 +1,117 @@
 //! `klyntbot-hook` — shell binary users' coding CLIs spawn per hook.
 //!
-//! Phase 1: parses CLI arg (which adapter to use), reads stdin, logs to
-//! stderr only. No socket writes — wire-up lands in Phase 2.
-//!
-//! Usage: `klyntbot-hook <source> [hook-event-name]`
+//! Usage:
+//!   klyntbot-hook <source> [hook-event]     # normal forwarding
+//!   klyntbot-hook status                    # socket/buffer/daemon report
 //!
 //!   source ∈ { claude-code, codex, kimi-cli, opencode }
 //!
-//! Exits 0 on success, 2 on bad args, 1 on read failure. Never blocks the
-//! parent CLI — all IO has a hard timeout in Phase 2.
+//! Exits 0 on success, 2 on bad args, 1 on fatal IO. Never blocks the parent.
 
+use coding_ingest::adapters::{claude_code::ClaudeCodeAdapter, IngestAdapter};
+use coding_ingest::desktop_lock::is_desktop_alive;
+use coding_ingest::event::AgentEvent;
+use coding_ingest::excludes::{default_exclude_globs, ExcludeSet};
+use coding_ingest::hook_client::HookClient;
+use coding_ingest::scope_resolver::resolve_scope;
 use std::io::{self, Read};
+use std::path::PathBuf;
 use std::process::ExitCode;
 
 const USAGE: &str = "\
-usage: klyntbot-hook <source> [hook-event]
+usage:
+  klyntbot-hook <source> [hook-event]
+  klyntbot-hook status
   source ∈ { claude-code, codex, kimi-cli, opencode }
 ";
 
 fn main() -> ExitCode {
-    let mut args = std::env::args().skip(1);
-    let source = match args.next() {
-        Some(s) => s,
-        None => {
-            eprintln!("{USAGE}");
-            return ExitCode::from(2);
-        }
-    };
+    let args: Vec<String> = std::env::args().skip(1).collect();
+    let Some(first) = args.first() else { eprintln!("{USAGE}"); return ExitCode::from(2); };
 
-    let source_ok = matches!(
-        source.as_str(),
-        "claude-code" | "codex" | "kimi-cli" | "opencode"
-    );
-    if !source_ok {
+    if first == "status" {
+        return run_status();
+    }
+
+    let source = first.clone();
+    let hook_event = args.get(1).cloned().unwrap_or_else(|| "unknown".into());
+
+    if !matches!(source.as_str(), "claude-code" | "codex" | "kimi-cli" | "opencode") {
         eprintln!("unknown source `{source}`\n{USAGE}");
         return ExitCode::from(2);
     }
 
-    let hook_event = args.next().unwrap_or_else(|| "unknown".to_string());
-
     let mut raw = Vec::with_capacity(8 * 1024);
     if let Err(e) = io::stdin().read_to_end(&mut raw) {
-        eprintln!("klyntbot-hook: stdin read failed: {e}");
+        eprintln!("klyntbot-hook: stdin read: {e}");
         return ExitCode::from(1);
     }
 
-    // Phase 1: observational only — log presence, never transmit.
-    eprintln!(
-        "klyntbot-hook: source={source} hook_event={hook_event} bytes={} (phase 1 stub — not forwarded)",
-        raw.len()
-    );
+    // Only Claude Code is implemented end-to-end in Phase 2.
+    if source != "claude-code" {
+        eprintln!("klyntbot-hook: source `{source}` not yet wired (Phase 7)");
+        return ExitCode::SUCCESS;
+    }
 
+    let event = match ClaudeCodeAdapter.parse(&hook_event, &raw) {
+        Ok(Some(e)) => e,
+        Ok(None) => return ExitCode::SUCCESS, // silently ignore hooks we don't record
+        Err(e) => { eprintln!("klyntbot-hook: parse: {e}"); return ExitCode::from(1); }
+    };
+    let event = enrich_with_scope(event);
+
+    // Defense-in-depth: drop excluded events before they hit transport.
+    let excludes = ExcludeSet::compile(&default_exclude_globs())
+        .unwrap_or_else(|_| ExcludeSet::compile(&[]).expect("empty glob set"));
+    if excludes.should_drop(&event) { return ExitCode::SUCCESS; }
+
+    let home = home_dir();
+    let client = HookClient::new(
+        home.join("ingest.sock"),
+        home.join("ingest-buffer.jsonl"),
+        home.join(".hook-warn.stamp"),
+    );
+    // Fire-and-forget — bounded by 200ms socket deadline inside HookClient.
+    let rt = match tokio::runtime::Builder::new_current_thread().enable_all().build() {
+        Ok(rt) => rt,
+        Err(e) => { eprintln!("klyntbot-hook: runtime: {e}"); return ExitCode::from(1); }
+    };
+    if let Err(e) = rt.block_on(client.send(&event)) {
+        eprintln!("klyntbot-hook: send: {e}");
+        return ExitCode::from(1);
+    }
     ExitCode::SUCCESS
+}
+
+fn run_status() -> ExitCode {
+    let home = home_dir();
+    let sock = home.join("ingest.sock");
+    let lock = home.join("desktop.lock");
+    let buf = home.join("ingest-buffer.jsonl");
+    let alive = is_desktop_alive(&lock);
+    let buf_size = std::fs::metadata(&buf).map(|m| m.len()).unwrap_or(0);
+    println!("socket:        {} ({})", sock.display(), if sock.exists() {"present"} else {"absent"});
+    println!("desktop.lock:  {} ({})", lock.display(), if alive {"alive"} else {"stale or missing"});
+    println!("buffer:        {} ({} bytes)", buf.display(), buf_size);
+    ExitCode::SUCCESS
+}
+
+fn home_dir() -> PathBuf {
+    let root = std::env::var("KLYNTBOT_HOME")
+        .ok()
+        .map(PathBuf::from)
+        .unwrap_or_else(|| {
+            let h = std::env::var("HOME").unwrap_or_else(|_| "/tmp".into());
+            PathBuf::from(h).join(".klyntbot")
+        });
+    let _ = std::fs::create_dir_all(&root);
+    root
+}
+
+fn enrich_with_scope(event: AgentEvent) -> AgentEvent {
+    let AgentEvent::V1(mut v1) = event;
+    if v1.repo.is_none() {
+        v1.repo = resolve_scope(&v1.cwd);
+    }
+    AgentEvent::V1(v1)
 }
