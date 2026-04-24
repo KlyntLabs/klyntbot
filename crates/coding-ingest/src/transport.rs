@@ -105,9 +105,72 @@ impl FileBufferFallback {
 
 #[async_trait]
 impl IngestSocket for FileBufferFallback {
-    async fn send(&self, _event: &AgentEvent) -> Result<()> {
-        Err(KlyntbotError::NotImplemented(
-            "FileBufferFallback::send lands in Phase 2".into(),
-        ))
+    async fn send(&self, event: &AgentEvent) -> Result<()> {
+        // Hard cap check — primary file only (rotated siblings counted by `prune_older`).
+        if let Ok(meta) = tokio::fs::metadata(&self.path).await {
+            if meta.len() > BUFFER_HARD_CAP_BYTES {
+                return Err(KlyntbotError::Storage(format!(
+                    "ingest buffer over hard cap ({} > {} bytes)",
+                    meta.len(), BUFFER_HARD_CAP_BYTES
+                )));
+            }
+            if meta.len() > BUFFER_ROTATE_BYTES {
+                let rotated = self.path.with_extension(format!(
+                    "jsonl.{}",
+                    jiff::Timestamp::now().as_millisecond()
+                ));
+                tokio::fs::rename(&self.path, &rotated).await.map_err(|e| {
+                    KlyntbotError::Storage(format!("rotate buffer: {e}"))
+                })?;
+            }
+        }
+
+        let mut line = serde_json::to_vec(event)
+            .map_err(|e| KlyntbotError::Storage(format!("serialize: {e}")))?;
+        line.push(b'\n');
+
+        let mut f = tokio::fs::OpenOptions::new()
+            .create(true)
+            .append(true)
+            .open(&self.path)
+            .await
+            .map_err(|e| KlyntbotError::Storage(format!("open buffer: {e}")))?;
+        tokio::io::AsyncWriteExt::write_all(&mut f, &line).await
+            .map_err(|e| KlyntbotError::Storage(format!("write buffer: {e}")))?;
+        tokio::io::AsyncWriteExt::flush(&mut f).await.ok();
+        Ok(())
+    }
+}
+
+impl FileBufferFallback {
+    /// Delete rotated sibling files older than `BUFFER_TTL_DAYS`. Safe to call
+    /// periodically; errors are logged, never returned. Caller: daemon startup.
+    pub async fn prune_older(&self) -> Result<usize> {
+        let parent = match self.path.parent() {
+            Some(p) => p.to_path_buf(),
+            None => return Ok(0),
+        };
+        let prefix = self.path.file_name()
+            .and_then(|n| n.to_str())
+            .map(|s| format!("{s}."))
+            .unwrap_or_default();
+        let ttl = std::time::Duration::from_secs(60 * 60 * 24 * BUFFER_TTL_DAYS);
+        let now = std::time::SystemTime::now();
+        let mut removed = 0usize;
+        let mut rd = tokio::fs::read_dir(&parent).await
+            .map_err(|e| KlyntbotError::Storage(format!("readdir: {e}")))?;
+        while let Some(entry) = rd.next_entry().await
+            .map_err(|e| KlyntbotError::Storage(format!("readdir next: {e}")))?
+        {
+            let name = entry.file_name().to_string_lossy().to_string();
+            if !name.starts_with(&prefix) { continue; }
+            let Ok(meta) = entry.metadata().await else { continue };
+            let Ok(modified) = meta.modified() else { continue };
+            if now.duration_since(modified).map(|d| d > ttl).unwrap_or(false) {
+                let _ = tokio::fs::remove_file(entry.path()).await;
+                removed += 1;
+            }
+        }
+        Ok(removed)
     }
 }
