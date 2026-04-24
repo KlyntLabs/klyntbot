@@ -126,6 +126,7 @@ pub struct DistillationReport {
 #[async_trait]
 pub trait RecordObservationTool: Send + Sync {
     /// Handle an observation the LLM emitted.
+    #[allow(clippy::too_many_arguments)]
     async fn record_observation(
         &self,
         kind: crate::facts::CodingKind,

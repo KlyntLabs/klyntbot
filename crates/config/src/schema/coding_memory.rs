@@ -3,7 +3,7 @@
 use serde::{Deserialize, Serialize};
 
 /// Root config for coding memory.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", default)]
 pub struct CodingMemoryConfig {
     pub enabled: bool,
@@ -15,22 +15,6 @@ pub struct CodingMemoryConfig {
     pub skills: CodingSkillsConfig,
     pub workbench: CodingWorkbenchConfig,
     pub cli: CodingCliToggles,
-}
-
-impl Default for CodingMemoryConfig {
-    fn default() -> Self {
-        Self {
-            enabled: false,
-            distiller: CodingDistillerConfig::default(),
-            ingest: CodingIngestConfig::default(),
-            privacy: CodingPrivacyConfig::default(),
-            recall: CodingRecallConfig::default(),
-            reforge: CodingReforgeConfig::default(),
-            skills: CodingSkillsConfig::default(),
-            workbench: CodingWorkbenchConfig::default(),
-            cli: CodingCliToggles::default(),
-        }
-    }
 }
 
 /// Distiller config.

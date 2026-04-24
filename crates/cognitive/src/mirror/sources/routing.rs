@@ -3,7 +3,6 @@
 
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicU32, Ordering};
-use std::sync::Arc;
 
 use ai_core::{mirror::mirror_flush_secs, AiSignal, MirrorSignalSource, MirrorSnapshotSpec};
 use async_trait::async_trait;
@@ -266,6 +265,7 @@ impl MirrorSignalSource for RoutingSignalSource {
 
 #[cfg(test)]
 mod tests {
+    use std::sync::Arc;
     use super::*;
     use ai_core::{AiMetrics, RecallDomain, SalienceVerdict};
 

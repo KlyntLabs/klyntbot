@@ -1,4 +1,4 @@
-use ai_core::{Aggregation, MetricSpec};
+use ai_core::MetricSpec;
 use sqlx::SqlitePool;
 
 /// Repository for the unified `ai_metric_samples` table.

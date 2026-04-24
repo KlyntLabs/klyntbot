@@ -13,6 +13,8 @@ pub mod event;
 pub mod scope;
 /// Transport stubs — see Task 7.
 pub mod transport;
+/// `ingest_event_log` persistence.
+pub mod store;
 
 pub use event::{
     AgentEvent, AgentEventV1, AgentSource, DiagnosticsDelta, EventKind, FileOp,
