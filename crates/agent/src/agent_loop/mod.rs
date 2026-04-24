@@ -1329,9 +1329,6 @@ mod correction_tests {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::time::Duration;
-
-    use bus::{LearningEvent, LearningEventBus};
 
     #[test]
     fn test_reaction_to_satisfaction_positive() {

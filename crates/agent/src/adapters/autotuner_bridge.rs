@@ -70,6 +70,26 @@ impl AutotunerBridge for AgentAutotunerBridge {
                 } else {
                     info!("Wrote fsrs_desired_retention to cognitive repo");
                 }
+
+                // Re-train the 19 FSRS-5 weights at most once a week. The
+                // optimiser is holdout-validated: if trained weights don't
+                // beat baseline on unseen data the write is skipped.
+                const WEEK_SECS: i64 = 7 * 24 * 60 * 60;
+                let should_train = match repo.seconds_since_trained().await {
+                    Ok(Some(secs)) => secs >= WEEK_SECS,
+                    Ok(None) => true,
+                    Err(e) => {
+                        warn!("fsrs trained_at lookup failed: {e}");
+                        false
+                    }
+                };
+                if should_train {
+                    match fsrs_writeback::train_fsrs_weights(repo.pool(), repo).await {
+                        Ok(true) => info!("fsrs weights re-trained and persisted"),
+                        Ok(false) => {}
+                        Err(e) => warn!("fsrs weight training failed: {e}"),
+                    }
+                }
             }
 
             let new_champion = autotuner::Champion {

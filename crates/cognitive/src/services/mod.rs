@@ -15,6 +15,7 @@ pub mod conversation_recall;
 pub mod decay;
 pub mod extraction;
 pub mod fsrs5;
+pub mod fsrs_optimizer;
 pub mod graph_enrichment;
 pub mod graph_retrieval;
 pub mod louvain;
