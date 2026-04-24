@@ -1,5 +1,6 @@
 //! Repository for the `domain_event_log` and `pipeline_event_log` tables.
 
+use bus::EventDomain;
 use jiff::Timestamp;
 use serde::{Deserialize, Serialize};
 use sqlx::SqlitePool;
@@ -48,12 +49,14 @@ impl EventLogRepo {
         Self { pool }
     }
 
-    /// Insert a domain event into the log.
+    /// Insert a domain event into the log. `domain` is the typed
+    /// `EventDomain`; it's converted to string once at the SQL binding
+    /// boundary, eliminating stringly-typed call sites.
     pub async fn insert_domain_event(
         &self,
         id: &str,
         event_type: &str,
-        domain: &str,
+        domain: &EventDomain,
         salience: &str,
         payload: &str,
         timestamp: &str,
@@ -66,7 +69,7 @@ impl EventLogRepo {
         )
         .bind(id)
         .bind(event_type)
-        .bind(domain)
+        .bind(domain.as_str())
         .bind(salience)
         .bind(payload)
         .bind(timestamp)
@@ -266,7 +269,7 @@ mod tests {
         repo.insert_domain_event(
             "evt-1",
             bus::DomainEvent::KIND_CHAT_TURN_COMPLETED,
-            "general",
+            &EventDomain::General,
             "extract",
             r#"{"msg":"hello"}"#,
             "2026-03-09T00:00:00Z",
@@ -277,7 +280,7 @@ mod tests {
         repo.insert_domain_event(
             "evt-2",
             bus::DomainEvent::KIND_DISTRACTION_DETECTED,
-            "energy",
+            &EventDomain::Energy,
             "accumulate",
             r#"{"app":"twitter"}"#,
             "2026-03-09T00:01:00Z",
@@ -299,7 +302,7 @@ mod tests {
         repo.insert_domain_event(
             "evt-a",
             bus::DomainEvent::KIND_TASK_CREATED,
-            "tasks",
+            &EventDomain::Work,
             "extract",
             r#"{"task_id":"t1"}"#,
             "2026-03-08T10:00:00Z",
@@ -310,7 +313,7 @@ mod tests {
         repo.insert_domain_event(
             "evt-b",
             bus::DomainEvent::KIND_NOTE_CREATED,
-            "notes",
+            &EventDomain::Notes,
             "extract",
             r#"{"note_id":"n1"}"#,
             "2026-03-09T14:30:00Z",
@@ -321,7 +324,7 @@ mod tests {
         repo.insert_domain_event(
             "evt-c",
             bus::DomainEvent::KIND_TASK_COMPLETED,
-            "tasks",
+            &EventDomain::Work,
             "extract",
             r#"{"task_id":"t2"}"#,
             "2026-03-10T08:00:00Z",
@@ -389,7 +392,7 @@ mod tests {
         repo.insert_domain_event(
             "evt-c1",
             bus::DomainEvent::KIND_TASK_CREATED,
-            "tasks",
+            &EventDomain::Work,
             "extract",
             r#"{"task_id":"t1"}"#,
             "2026-03-09T10:00:00Z",
@@ -400,7 +403,7 @@ mod tests {
         repo.insert_domain_event(
             "evt-c2",
             bus::DomainEvent::KIND_TASK_CREATED,
-            "tasks",
+            &EventDomain::Work,
             "extract",
             r#"{"task_id":"t2"}"#,
             "2026-03-09T14:00:00Z",
@@ -411,7 +414,7 @@ mod tests {
         repo.insert_domain_event(
             "evt-c3",
             bus::DomainEvent::KIND_NOTE_CREATED,
-            "notes",
+            &EventDomain::Notes,
             "extract",
             r#"{"note_id":"n1"}"#,
             "2026-03-09T12:00:00Z",
@@ -423,7 +426,7 @@ mod tests {
         repo.insert_domain_event(
             "evt-c4",
             bus::DomainEvent::KIND_TASK_CREATED,
-            "tasks",
+            &EventDomain::Work,
             "extract",
             r#"{"task_id":"t0"}"#,
             "2026-03-08T09:00:00Z",
@@ -460,7 +463,7 @@ mod tests {
         repo.insert_domain_event(
             "evt-d1",
             bus::DomainEvent::KIND_TASK_CREATED,
-            "tasks",
+            &EventDomain::Work,
             "extract",
             r#"{"task_id":"t1"}"#,
             "2026-03-09T10:00:00Z",

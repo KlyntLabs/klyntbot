@@ -209,7 +209,7 @@ fn spawn_event_log_persistence(
                                 let id = uuid::Uuid::new_v4().to_string();
 
                                 if let Err(e) = repo
-                                    .insert_domain_event(&id, &event_type, domain, "extract", &payload, &ts)
+                                    .insert_domain_event(&id, &event_type, &domain, "extract", &payload, &ts)
                                     .await
                                 {
                                     warn!("failed to persist domain event: {e}");

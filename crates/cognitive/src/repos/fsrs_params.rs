@@ -32,9 +32,9 @@ impl FsrsParamsRepo {
         let Some((Some(ts),)) = row else {
             return Ok(None);
         };
-        let trained: jiff::Timestamp = ts.parse().map_err(|e| {
-            common::KlyntbotError::Storage(format!("fsrs trained_at parse: {e}"))
-        })?;
+        let trained: jiff::Timestamp = ts
+            .parse()
+            .map_err(|e| common::KlyntbotError::Storage(format!("fsrs trained_at parse: {e}")))?;
         let now = jiff::Timestamp::now();
         Ok(Some((now.as_second() - trained.as_second()).max(0)))
     }
@@ -66,9 +66,8 @@ impl FsrsParamsRepo {
                 "fsrs weights contain NaN or infinity".to_string(),
             ));
         }
-        let json = serde_json::to_string(weights).map_err(|e| {
-            common::KlyntbotError::Storage(format!("fsrs weights serialise: {e}"))
-        })?;
+        let json = serde_json::to_string(weights)
+            .map_err(|e| common::KlyntbotError::Storage(format!("fsrs weights serialise: {e}")))?;
         sqlx::query(
             "UPDATE fsrs_parameters SET weights = ?, trained_at = datetime('now') WHERE id = 'local'",
         )

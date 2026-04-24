@@ -74,6 +74,13 @@ use tracing::warn;
 use crate::types::UserModel;
 
 /// Shared domain list for user model fields.
+///
+/// This is the semantic-fact taxonomy — it categorizes what a *fact about the
+/// user* is about. It is **orthogonal** to `bus::EventDomain` (event category)
+/// and `ai_core::RecallDomain` (AI-feature retrieval axis). Overlapping
+/// strings (`finance`, `tasks`, `coaching`, ...) are coincidence, not shared
+/// meaning. A fact tagged `"energy"` is not the same thing as an event
+/// tagged `EventDomain::Energy`.
 pub const USER_MODEL_DOMAINS: &[&str] = &[
     "identity",
     "energy",
@@ -87,7 +94,8 @@ pub const USER_MODEL_DOMAINS: &[&str] = &[
     "meta",
 ];
 
-/// Shared domain list for procedural rules.
+/// Shared domain list for procedural rules. Like `USER_MODEL_DOMAINS`, this is
+/// a rule-side taxonomy, not the pipeline event domain.
 pub const RULE_DOMAINS: &[&str] = &["productivity", "tasks", "finance", "coaching", "general"];
 
 /// Return cognitive feature migrations for use with `StoragePool::run_feature_migrations`.

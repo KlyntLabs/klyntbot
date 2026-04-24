@@ -306,7 +306,7 @@ mod tests {
             .insert_domain_event(
                 "evt-correction-1",
                 bus::DomainEvent::KIND_USER_CORRECTED_AI,
-                "general",
+                &bus::EventDomain::Learning,
                 "extract",
                 r#"{"msg":"no that's wrong"}"#,
                 &jiff::Timestamp::now().to_string(),

@@ -251,7 +251,10 @@ fn sequence_loss(sequences: &[ReviewSequence], w: &[f64; 19]) -> f64 {
 }
 
 fn initial_state(first_rating: u8, w: &[f64; 19]) -> (f64, f64) {
-    (initial_stability(first_rating, w), initial_difficulty(first_rating, w))
+    (
+        initial_stability(first_rating, w),
+        initial_difficulty(first_rating, w),
+    )
 }
 
 /// Holdout loss: replays `[0, score_from)` to rebuild per-card state, then
@@ -292,11 +295,7 @@ fn binary_cross_entropy(y: f64, p: f64) -> f64 {
     -(y * p.ln() + (1.0 - y) * (1.0 - p).ln())
 }
 
-fn finite_diff_gradient(
-    sequences: &[ReviewSequence],
-    w: &[f64; 19],
-    h_relative: f64,
-) -> [f64; 19] {
+fn finite_diff_gradient(sequences: &[ReviewSequence], w: &[f64; 19], h_relative: f64) -> [f64; 19] {
     let mut grad = [0.0; 19];
     for i in 0..19 {
         let h = (w[i].abs().max(1.0)) * h_relative;
@@ -452,7 +451,10 @@ mod tests {
         let mut v = [0.0; 19];
         adam_step(&mut w, &grad, &mut m, &mut v, 1, 0.1);
         for i in 0..19 {
-            assert!(w[i] < 1.0, "Adam step with positive grad must decrease w[{i}]");
+            assert!(
+                w[i] < 1.0,
+                "Adam step with positive grad must decrease w[{i}]"
+            );
         }
     }
 
@@ -505,7 +507,10 @@ mod tests {
 
         let seqs = load_review_sequences(&pool).await.unwrap();
         assert_eq!(seqs.len(), 2, "two cards");
-        let card_a = seqs.iter().find(|s| s.reviews.len() == 3).expect("cardA has 3 reviews");
+        let card_a = seqs
+            .iter()
+            .find(|s| s.reviews.len() == 3)
+            .expect("cardA has 3 reviews");
         assert_eq!(card_a.reviews[0].0, 3);
         assert_eq!(card_a.reviews[2].0, 1);
     }

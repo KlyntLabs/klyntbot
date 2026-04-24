@@ -767,17 +767,21 @@ impl DomainEvent {
     /// `event_type` value for [`DomainEvent::PluginEvent`].
     pub const KIND_PLUGIN_EVENT: &'static str = "PluginEvent";
 
-    /// Map this event to its domain category string.
+    /// Map this event to its domain category.
     ///
     /// Used by the cognitive pipeline, debug dashboard, and SSE streams.
-    pub fn domain(&self) -> &str {
+    /// `UserStatedFact` returns `EventDomain::Custom(..)` carrying the
+    /// user-supplied tag — every other variant resolves to a fixed enum
+    /// variant known at compile time.
+    pub fn domain(&self) -> crate::EventDomain {
+        use crate::EventDomain as D;
         match self {
             Self::TaskCreated { .. }
             | Self::TaskCompleted { .. }
             | Self::TaskDeferred { .. }
             | Self::EstimationRecorded { .. }
             | Self::TaskFocusChanged { .. }
-            | Self::TaskFocusExpired { .. } => "work",
+            | Self::TaskFocusExpired { .. } => D::Work,
 
             Self::ActivitySessionCompleted { .. }
             | Self::FocusSessionStarted { .. }
@@ -787,7 +791,7 @@ impl DomainEvent {
             | Self::ProductivityScoreComputed { .. }
             | Self::SessionCreated { .. }
             | Self::SessionEnded { .. }
-            | Self::QualityScored { .. } => "energy",
+            | Self::QualityScored { .. } => D::Energy,
 
             Self::TransactionRecorded { .. }
             | Self::BudgetAlert { .. }
@@ -795,20 +799,20 @@ impl DomainEvent {
             | Self::BudgetCreated { .. }
             | Self::GoalCreated { .. }
             | Self::GoalAchieved { .. }
-            | Self::FinanceGoalProgress { .. } => "finance",
+            | Self::FinanceGoalProgress { .. } => D::Finance,
 
-            Self::UserStatedFact { domain, .. } => domain.as_str(),
-            Self::UserCorrectedAI { .. } => "learning",
+            Self::UserStatedFact { domain, .. } => D::Custom(domain.clone()),
+            Self::UserCorrectedAI { .. } => D::Learning,
             Self::CoachingFeedback { .. }
             | Self::CoachingStrategyApplied { .. }
-            | Self::CoachingPatternDetected { .. } => "coaching",
-            Self::ChatTurnCompleted { .. } | Self::ToolCallExecuted { .. } => "general",
+            | Self::CoachingPatternDetected { .. } => D::Coaching,
+            Self::ChatTurnCompleted { .. } | Self::ToolCallExecuted { .. } => D::General,
 
             Self::NoteCreated { .. }
             | Self::NoteUpdated { .. }
             | Self::NoteContentChanged { .. }
             | Self::NoteDeleted { .. }
-            | Self::NoteEditingFinished { .. } => "notes",
+            | Self::NoteEditingFinished { .. } => D::Notes,
 
             Self::BehavioralPatternDetected { .. }
             | Self::ContradictionDetected { .. }
@@ -830,21 +834,21 @@ impl DomainEvent {
             | Self::PracticeSessionCompleted { .. }
             | Self::KnowledgeTransferDetected { .. }
             | Self::CoachingLearningDigest { .. }
-            | Self::FlashcardSessionCompleted { .. } => "learning",
+            | Self::FlashcardSessionCompleted { .. } => D::Learning,
 
             Self::PronunciationScored { .. }
             | Self::ExamAttempted { .. }
             | Self::PhoneticMasteryGained { .. }
-            | Self::LanguagePracticeSessionCompleted { .. } => "language_learning",
+            | Self::LanguagePracticeSessionCompleted { .. } => D::LanguageLearning,
 
-            Self::InterventionTriggered { .. } => "productivity",
-            Self::PluginEvent { .. } => "plugin",
-            Self::SkillRouted { .. } => "agent",
-            Self::CrossDomainDotReady { .. } => "fabric",
+            Self::InterventionTriggered { .. } => D::Productivity,
+            Self::PluginEvent { .. } => D::Plugin,
+            Self::SkillRouted { .. } => D::Agent,
+            Self::CrossDomainDotReady { .. } => D::Fabric,
             Self::CommunityDiscovered { .. }
             | Self::CommunityUpdated { .. }
             | Self::CommunityWeakened { .. }
-            | Self::CoActivationStrengthened { .. } => "community",
+            | Self::CoActivationStrengthened { .. } => D::Community,
 
             Self::SystemWillSleep
             | Self::SystemDidWake { .. }
@@ -852,16 +856,16 @@ impl DomainEvent {
             | Self::UserReturned { .. }
             | Self::FocusSessionSuspended { .. }
             | Self::CronCatchUpReady { .. }
-            | Self::WakePanelReady { .. } => "lifecycle",
+            | Self::WakePanelReady { .. } => D::Lifecycle,
 
             Self::HeldNotificationReleased { .. }
             | Self::NotificationDeliveryFailed { .. }
-            | Self::TrayNotificationRequested { .. } => "notifications",
+            | Self::TrayNotificationRequested { .. } => D::Notifications,
 
             Self::AlarmFired { .. }
             | Self::AlarmSnoozed { .. }
             | Self::AlarmCancelled { .. }
-            | Self::MissedAlarms { .. } => "scheduler",
+            | Self::MissedAlarms { .. } => D::Scheduler,
         }
     }
 }

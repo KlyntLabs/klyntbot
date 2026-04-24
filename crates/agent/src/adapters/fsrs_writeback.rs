@@ -55,9 +55,7 @@ pub async fn train_fsrs_weights(
         "fsrs weight training complete"
     );
     if !outcome.improved {
-        warn!(
-            "fsrs trained weights did not beat baseline on holdout — keeping current weights"
-        );
+        warn!("fsrs trained weights did not beat baseline on holdout — keeping current weights");
         return Ok(false);
     }
     repo.update_weights(&outcome.trained_weights).await?;
@@ -75,7 +73,12 @@ mod tests {
     /// Seed `review_log` with enough synthetic history to clear the optimiser
     /// gate. Generates deterministic review sequences under a given ground-truth
     /// weight vector — reviews succeed when predicted retrievability ≥ 0.5.
-    async fn seed_reviews(pool: &StoragePool, card_count: usize, reviews_per_card: usize, w_true: &[f64; 19]) {
+    async fn seed_reviews(
+        pool: &StoragePool,
+        card_count: usize,
+        reviews_per_card: usize,
+        w_true: &[f64; 19],
+    ) {
         let migrations = cognitive::repos::cognitive_migrations();
         StoragePool::run_feature_migrations(pool.inner(), &migrations)
             .await
