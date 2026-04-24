@@ -340,6 +340,7 @@ dependencies = [
  "base64 0.22.1",
  "bus",
  "channels",
+ "coding-memory",
  "cognitive",
  "common",
  "config",
@@ -2346,6 +2347,48 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0fa961b519f0b462e3a3b4a34b64d119eeaca1d59af726fe450bbba07a9fc0a1"
 dependencies = [
  "thiserror 2.0.18",
+]
+
+[[package]]
+name = "coding-ingest"
+version = "0.1.1"
+dependencies = [
+ "async-trait",
+ "bus",
+ "common",
+ "jiff",
+ "serde",
+ "serde_json",
+ "storage",
+ "tempfile",
+ "thiserror 2.0.18",
+ "tokio",
+ "tracing",
+ "uuid",
+]
+
+[[package]]
+name = "coding-memory"
+version = "0.1.1"
+dependencies = [
+ "async-trait",
+ "bus",
+ "coding-ingest",
+ "cognitive",
+ "common",
+ "context_engine",
+ "jiff",
+ "providers",
+ "serde",
+ "serde_json",
+ "sqlx",
+ "storage",
+ "tempfile",
+ "thiserror 2.0.18",
+ "tokio",
+ "tools-core",
+ "tracing",
+ "uuid",
 ]
 
 [[package]]

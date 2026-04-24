@@ -43,6 +43,8 @@ members = [
     "crates/feature-language-learning",
     "crates/ai-core",
     "crates/ai-core-macros",
+    "crates/coding-ingest",
+    "crates/coding-memory",
 ]
 
 [workspace.package]
@@ -91,6 +93,8 @@ voice-engine = { path = "crates/voice-engine" }
 feature-language-learning = { path = "crates/feature-language-learning" }
 ai-core = { path = "crates/ai-core" }
 ai-core-macros = { path = "crates/ai-core-macros" }
+coding-ingest = { path = "crates/coding-ingest" }
+coding-memory = { path = "crates/coding-memory" }
 extism = "1"
 mcp = { path = "crates/mcp" }
 notifications = { path = "crates/notifications" }
@@ -292,6 +296,8 @@ opt-level = 2
 opt-level = 2
 [profile.dev.package.tokio]
 opt-level = 2
+
+[workspace.lints]
 
 [profile.release]
 opt-level = 3

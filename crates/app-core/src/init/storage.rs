@@ -154,6 +154,23 @@ pub(super) async fn init_storage(
     .await
     .map_err(|e| format!("learning migration failed: {e}"))?;
 
+    // Run cognitive migrations up-front so downstream crates (coding-memory) can
+    // ALTER their tables. Cognitive migrations are idempotent; the agent builder
+    // also invokes them later without conflict.
+    StoragePool::run_feature_migrations(storage_pool.inner(), &cognitive::cognitive_migrations())
+        .await
+        .map_err(|e| format!("cognitive migration failed: {e}"))?;
+
+    // Run coding-memory migrations (scope/provenance columns on semantic_facts,
+    // episodic_memories, skill_versions; causal-edge / ingest-log / klynt_sessions
+    // tables). Must run AFTER cognitive migrations create the base tables.
+    StoragePool::run_feature_migrations(
+        storage_pool.inner(),
+        &coding_memory::coding_memory_migrations(),
+    )
+    .await
+    .map_err(|e| format!("coding-memory migration failed: {e}"))?;
+
     // 3. Create LLM provider (graceful — falls back to noop for setup wizard).
     // Use the "full" variant to get the inner ProviderManager (when a fallback is configured)
     // so we can wire circuit breaker persistence before the manager starts handling calls.

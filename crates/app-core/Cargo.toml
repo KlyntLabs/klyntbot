@@ -10,6 +10,7 @@ agent = { workspace = true }
 autotuner = { workspace = true }
 bus = { workspace = true }
 channels = { workspace = true }
+coding-memory = { workspace = true }
 cognitive = { workspace = true }
 common = { workspace = true }
 config = { workspace = true }

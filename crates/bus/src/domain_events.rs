@@ -537,6 +537,43 @@ pub enum DomainEvent {
         kind: String,
         payload: serde_json::Value,
     },
+
+    // -- Coding memory --
+    PatternApplied {
+        pattern_id: String,
+        session_id: String,
+        repo: Option<String>,
+        source: String,
+    },
+    PatternOutcome {
+        pattern_id: String,
+        outcome: String,
+        evidence: String,
+        measured_at: String,
+    },
+    FixAttemptFailed {
+        problem_hash: String,
+        repo: Option<String>,
+        attempt_count: u32,
+    },
+    MemoryRetrieved {
+        memory_ids: Vec<String>,
+        query: String,
+        session_id: String,
+        turn_id: Option<String>,
+    },
+    AssistantMsgCompleted {
+        session_id: String,
+        turn_id: Option<String>,
+        cited_memory_ids: Vec<String>,
+    },
+    RetrievalSkillApplied {
+        skill: String,
+        before_score: f32,
+        after_score: f32,
+        budget_used: String,
+        session_id: String,
+    },
 }
 
 impl DomainEvent {
@@ -628,6 +665,12 @@ impl DomainEvent {
             Self::AlarmCancelled { .. } => "AlarmCancelled",
             Self::MissedAlarms { .. } => "MissedAlarms",
             Self::PluginEvent { .. } => "PluginEvent",
+            Self::PatternApplied { .. } => "PatternApplied",
+            Self::PatternOutcome { .. } => "PatternOutcome",
+            Self::FixAttemptFailed { .. } => "FixAttemptFailed",
+            Self::MemoryRetrieved { .. } => "MemoryRetrieved",
+            Self::AssistantMsgCompleted { .. } => "AssistantMsgCompleted",
+            Self::RetrievalSkillApplied { .. } => "RetrievalSkillApplied",
         }
     }
 
@@ -766,6 +809,12 @@ impl DomainEvent {
     pub const KIND_MISSED_ALARMS: &'static str = "MissedAlarms";
     /// `event_type` value for [`DomainEvent::PluginEvent`].
     pub const KIND_PLUGIN_EVENT: &'static str = "PluginEvent";
+    pub const KIND_PATTERN_APPLIED: &'static str = "PatternApplied";
+    pub const KIND_PATTERN_OUTCOME: &'static str = "PatternOutcome";
+    pub const KIND_FIX_ATTEMPT_FAILED: &'static str = "FixAttemptFailed";
+    pub const KIND_MEMORY_RETRIEVED: &'static str = "MemoryRetrieved";
+    pub const KIND_ASSISTANT_MSG_COMPLETED: &'static str = "AssistantMsgCompleted";
+    pub const KIND_RETRIEVAL_SKILL_APPLIED: &'static str = "RetrievalSkillApplied";
 
     /// Map this event to its domain category.
     ///
@@ -866,6 +915,13 @@ impl DomainEvent {
             | Self::AlarmSnoozed { .. }
             | Self::AlarmCancelled { .. }
             | Self::MissedAlarms { .. } => D::Scheduler,
+
+            Self::PatternApplied { .. }
+            | Self::PatternOutcome { .. }
+            | Self::FixAttemptFailed { .. }
+            | Self::MemoryRetrieved { .. }
+            | Self::AssistantMsgCompleted { .. }
+            | Self::RetrievalSkillApplied { .. } => D::CodingMemory,
         }
     }
 }
@@ -1131,6 +1187,31 @@ mod tests {
     }
 
     #[test]
+    fn pattern_applied_roundtrips() {
+        let e = DomainEvent::PatternApplied {
+            pattern_id: "fp-1".into(),
+            session_id: "s-1".into(),
+            repo: Some("github.com/klynt/bot".into()),
+            source: "recall_injection".into(),
+        };
+        let json = serde_json::to_string(&e).unwrap();
+        let parsed: DomainEvent = serde_json::from_str(&json).unwrap();
+        assert!(matches!(parsed, DomainEvent::PatternApplied { .. }));
+    }
+
+    #[test]
+    fn retrieval_skill_applied_roundtrips() {
+        let e = DomainEvent::RetrievalSkillApplied {
+            skill: "query_rewriter".into(),
+            before_score: 0.1,
+            after_score: 0.7,
+            budget_used: "deep_think".into(),
+            session_id: "s-1".into(),
+        };
+        let json = serde_json::to_string(&e).unwrap();
+        let parsed: DomainEvent = serde_json::from_str(&json).unwrap();
+        assert!(matches!(parsed, DomainEvent::RetrievalSkillApplied { .. }));
+    }
     fn autotuner_decision_roundtrip() {
         let event = DomainEvent::AutotunerDecision {
             trial_id: "abc-123".into(),

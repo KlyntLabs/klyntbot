@@ -9,6 +9,7 @@ use super::autotuner::AutoTunerConfig;
 
 use super::capture::CaptureConfig;
 use super::channels::ChannelsConfig;
+use super::coding_memory::CodingMemoryConfig;
 use super::cognitive::CognitiveConfig;
 use super::confidence::ConfidenceConfig;
 use super::content::ContentConfig;
@@ -158,6 +159,10 @@ pub struct Config {
     /// Plugin system configuration.
     #[serde(default)]
     pub plugins: PluginsConfig,
+
+    /// Coding memory subsystem configuration.
+    #[serde(default)]
+    pub coding_memory: CodingMemoryConfig,
 
     /// Cognitive memory & coaching configuration.
     #[serde(default)]

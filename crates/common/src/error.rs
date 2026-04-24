@@ -38,6 +38,10 @@ pub enum KlyntbotError {
     #[error("Storage conflict: {0}")]
     StorageConflict(String),
 
+    /// An operation is a Phase-1 stub; implementation lands in a later phase.
+    #[error("not implemented: {0}")]
+    NotImplemented(String),
+
     #[error("IO error: {0}")]
     Io(#[from] std::io::Error),
 
