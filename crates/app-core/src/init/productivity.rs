@@ -63,10 +63,10 @@ pub(super) async fn init_productivity(
         } else {
             let prod_repos = ProductivityRepos::new(pool);
             let prod_config = &config.productivity;
-            let mgr = Arc::new(FocusManager::new(
-                prod_repos.clone(),
-                prod_config.focus.clone(),
-            ));
+            let mgr = Arc::new(
+                FocusManager::new(prod_repos.clone(), prod_config.focus.clone())
+                    .with_domain_bus(Arc::clone(domain_event_bus)),
+            );
 
             let interceptor = Arc::new(Mutex::new(
                 feature_productivity::distraction::DistractionInterceptor::new(
