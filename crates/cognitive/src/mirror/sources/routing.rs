@@ -5,7 +5,7 @@ use std::collections::HashMap;
 use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::Arc;
 
-use ai_core::{AiSignal, MirrorSignalSource, MirrorSnapshotSpec};
+use ai_core::{AiSignal, MirrorSignalSource, MirrorSnapshotSpec, mirror::mirror_flush_secs};
 use async_trait::async_trait;
 use dashmap::DashMap;
 use jiff::Timestamp;
@@ -205,7 +205,7 @@ impl MirrorSignalSource for RoutingSignalSource {
         MirrorSnapshotSpec {
             name: "routing",
             subscribed_kinds: &["SkillRouted"],
-            flush_interval_secs: Some(3600),
+            flush_interval_secs: Some(mirror_flush_secs(3600)),
         }
     }
 

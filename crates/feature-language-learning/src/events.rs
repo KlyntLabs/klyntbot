@@ -7,7 +7,14 @@ pub enum LanguageLearningEvent {
     #[ai(
         importance = 0.6,
         salience = "extract_if(*overall_score < 0.6 || !weak_phonemes.is_empty())",
-        observation_template = "Pronunciation scored {overall_score} (session {session_id})"
+        observation_template = "Pronunciation scored {overall_score} (session {session_id})",
+        metric(
+            name = "pronunciation_accuracy",
+            value_from = *overall_score,
+            window = "30d",
+            min_samples = 5,
+            aggregation = "avg",
+        )
     )]
     PronunciationScored {
         session_id: String,
@@ -18,7 +25,14 @@ pub enum LanguageLearningEvent {
     #[ai(
         importance = 0.7,
         salience = "extract",
-        observation_template = "Exam {exam_id}: {score} ({passed})"
+        observation_template = "Exam {exam_id}: {score} ({passed})",
+        metric(
+            name = "exam_score_trend",
+            value_from = *score as f64,
+            window = "90d",
+            min_samples = 2,
+            aggregation = "avg",
+        )
     )]
     ExamAttempted {
         exam_id: String,
@@ -36,7 +50,14 @@ pub enum LanguageLearningEvent {
     #[ai(
         importance = 0.4,
         salience = "accumulate",
-        observation_template = "Practice session ({language}) done: {success_rate} success"
+        observation_template = "Practice session ({language}) done: {success_rate} success",
+        metric(
+            name = "language_practice_success_rate",
+            value_from = *success_rate,
+            window = "30d",
+            min_samples = 5,
+            aggregation = "avg",
+        )
     )]
     PracticeSessionCompleted {
         session_id: String,

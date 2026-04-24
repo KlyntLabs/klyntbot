@@ -36,7 +36,14 @@ pub enum ProductivityEvent {
     #[ai(
         importance = 0.5,
         salience = "accumulate",
-        observation_template = "Focus session ended: {duration_secs}s, quality {quality:.2}"
+        observation_template = "Focus session ended: {duration_secs}s, quality {quality:.2}",
+        metric(
+            name = "focus_session_duration_trend",
+            value_from = *duration_secs as f64,
+            window = "7d",
+            min_samples = 3,
+            aggregation = "avg",
+        )
     )]
     FocusSessionEnded {
         duration_secs: i64,
@@ -48,7 +55,14 @@ pub enum ProductivityEvent {
         importance = 0.6,
         salience = "accumulate",
         observation_template = "Distraction: {app} — {context}",
-        coaching_signal
+        coaching_signal,
+        metric(
+            name = "distraction_frequency",
+            value_from = 1.0_f64,
+            window = "7d",
+            min_samples = 3,
+            aggregation = "sum",
+        )
     )]
     DistractionDetected {
         app: String,
@@ -71,7 +85,14 @@ pub enum ProductivityEvent {
     #[ai(
         importance = 0.4,
         salience = "extract_if(*score > 0.8 || *score < 0.3)",
-        observation_template = "Productivity score: {score:.2}"
+        observation_template = "Productivity score: {score:.2}",
+        metric(
+            name = "productivity_score_trend",
+            value_from = *score,
+            window = "14d",
+            min_samples = 3,
+            aggregation = "avg",
+        )
     )]
     ProductivityScoreComputed { date: String, score: f64 },
 }

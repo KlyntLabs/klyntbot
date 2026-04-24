@@ -1,6 +1,6 @@
 //! FinanceSpendingDriftSource — accumulates budget alert signals and flushes periodically.
 
-use ai_core::{AiSignal, MirrorSignalSource, MirrorSnapshotSpec};
+use ai_core::{AiSignal, MirrorSignalSource, MirrorSnapshotSpec, mirror::mirror_flush_secs};
 use async_trait::async_trait;
 use jiff::Timestamp;
 use std::collections::HashMap;
@@ -36,7 +36,7 @@ impl MirrorSignalSource for FinanceSpendingDriftSource {
                 bus::DomainEvent::KIND_TRANSACTION_RECORDED,
                 bus::DomainEvent::KIND_BUDGET_ALERT,
             ],
-            flush_interval_secs: Some(3600),
+            flush_interval_secs: Some(mirror_flush_secs(3600)),
         }
     }
 

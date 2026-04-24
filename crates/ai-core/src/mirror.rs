@@ -9,6 +9,20 @@ use std::time::Duration;
 use tokio::task::JoinHandle;
 use tokio_util::sync::CancellationToken;
 
+/// Resolve the mirror flush interval for a source.
+///
+/// Returns the value of `KLYNTBOT_MIRROR_FLUSH_SECS` if it parses to a positive
+/// integer, otherwise `default`. Lets dev sessions override the production
+/// 3600s cadence to something like 60s so mirror tables populate during
+/// interactive testing. Sources call this at struct construction time.
+pub fn mirror_flush_secs(default: u64) -> u64 {
+    std::env::var("KLYNTBOT_MIRROR_FLUSH_SECS")
+        .ok()
+        .and_then(|s| s.parse::<u64>().ok())
+        .filter(|n| *n > 0)
+        .unwrap_or(default)
+}
+
 /// Declarative description of one mirror snapshot type.
 #[derive(Debug, Clone, Copy)]
 pub struct MirrorSnapshotSpec {

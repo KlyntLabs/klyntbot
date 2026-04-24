@@ -55,41 +55,7 @@ Non-blocking issues deferred for later. Not part of any active plan; pick up onc
 
 ---
 
-## 4. Metric coverage gaps — `notes`, `productivity`, `language-learning` under-instrumented
-
-**Observed (2026-04-24):**
-
-| Feature | DomainEvent variants | `metric(...)` decls |
-|---|---:|---:|
-| `feature-notes` | 9 | **0** |
-| `feature-productivity` | 6 | 1 (only `SessionEnded`) |
-| `feature-language-learning` | 4 | **0** |
-
-Entire knowledge-workflow telemetry is invisible to reforge. No signal from note creation/edit/delete cycles. No signal from pronunciation scoring or practice session quality.
-
-**Fix:** Add metric decls to high-value variants (examples; not exhaustive):
-
-- `feature-notes`: `note_creation_rate` on `NoteCreated`, `note_retention_decay` on `NoteEditingFinished` with staleness.
-- `feature-productivity`: `distraction_frequency` on `DistractionDetected`, `focus_session_duration_trend` on `FocusSessionEnded` with `duration_secs`.
-- `feature-language-learning`: `pronunciation_accuracy` on `PronunciationScored`, `practice_session_completion_rate` on `PracticeSessionCompleted`.
-
-**Gotcha:** Avoid the constant-value-avg trap that tripped the earlier `task_deferral_rate` / `focus_expiration_rate` / `atom_retention_decay_frequency` declarations (now fixed with `aggregation = "sum"`). Use `sum` for counts, `avg` only when `value_from` has a meaningful range.
-
----
-
-## 5. Mirror sources time-gated; wait for hourly flush to populate
-
-**Observed (2026-04-24):** `mirror_routing_snapshots = 0`, `mirror_task_focus_snapshots = 0`, `mirror_finance_drift_snapshots = 0`, `mirror_meta_rules = 0`, `mirror_trend_narratives = 0`, `mirror_snippets = 0`. Only `mirror_brain_versions = 1` (bootstrap row).
-
-**Scope:** Not a wiring bug. Mirror sources flush on a 3600-second timer (`flush_interval_secs: Some(3600)` in `crates/cognitive/src/mirror/sources/routing.rs`), not on signal-count thresholds. With `SkillRouted` now publishing (after the agent_loop fix), `mirror_routing_snapshots` will auto-populate on the next hourly flush after enough `SkillRouted` events accumulate.
-
-**Next steps:**
-- Verify by leaving the dev session running for ≥1 hour with occasional chat activity; then `sqlite3 data.db "SELECT COUNT(*) FROM mirror_routing_snapshots"` should be non-zero.
-- Optional dev-UX improvement: make `flush_interval_secs` configurable per environment so dev/test sessions can flush in 60s instead of 3600s.
-
----
-
-## 6. Heuristic consolidator lacks a real extractor wire-up
+## 4. Heuristic consolidator lacks a real extractor wire-up
 
 **Observed (2026-04-24):** The `extraction` module exists at `crates/cognitive/src/extraction/` with `ExtractedEntity`, `ExtractedRelationship`, and `extract_facts_from_observation` shapes, but `heuristic_promote` in `pipeline/consolidator.rs` doesn't call any of them. Word-boundary matching now prevents the worst parse artifacts, but this remains a shortcut rather than proper extraction.
 

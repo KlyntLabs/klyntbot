@@ -8,7 +8,14 @@ pub enum NoteEvent {
         importance = 0.5,
         salience = "accumulate",
         observation_template = "Created note '{title}'",
-        entity_bridge(type = "note", name_from = "title", id_from = "note_id")
+        entity_bridge(type = "note", name_from = "title", id_from = "note_id"),
+        metric(
+            name = "note_creation_rate",
+            value_from = 1.0_f64,
+            window = "7d",
+            min_samples = 3,
+            aggregation = "sum",
+        )
     )]
     Created { note_id: String, title: String },
 
@@ -32,7 +39,14 @@ pub enum NoteEvent {
         importance = 0.4,
         salience = "extract",
         observation_template = "Finished editing note",
-        entity_bridge(type = "note", name_from = "note_id", id_from = "note_id")
+        entity_bridge(type = "note", name_from = "note_id", id_from = "note_id"),
+        metric(
+            name = "note_edit_frequency",
+            value_from = 1.0_f64,
+            window = "7d",
+            min_samples = 3,
+            aggregation = "sum",
+        )
     )]
     EditingFinished { note_id: String },
 
@@ -75,7 +89,14 @@ pub enum NoteEvent {
     #[ai(
         importance = 0.6,
         salience = "extract",
-        observation_template = "Practice session done: {average_score:.1}"
+        observation_template = "Practice session done: {average_score:.1}",
+        metric(
+            name = "practice_session_quality",
+            value_from = *average_score,
+            window = "30d",
+            min_samples = 5,
+            aggregation = "avg",
+        )
     )]
     PracticeSessionCompleted {
         session_id: String,
