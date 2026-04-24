@@ -14,6 +14,8 @@ pub struct MirrorRetentionConfig {
     pub disabled_meta_rule_days: u32,
     pub reverted_brain_version_days: u32,
     pub trial_preview_days: u32,
+    pub task_focus_snapshot_days: u32,
+    pub finance_drift_snapshot_days: u32,
     pub sweep_interval_secs: u64,
 }
 
@@ -26,6 +28,8 @@ impl Default for MirrorRetentionConfig {
             disabled_meta_rule_days: 180,
             reverted_brain_version_days: 730,
             trial_preview_days: 180,
+            task_focus_snapshot_days: 90,
+            finance_drift_snapshot_days: 90,
             sweep_interval_secs: 24 * 3600, // daily
         }
     }
@@ -72,6 +76,12 @@ impl MirrorRetentionService {
             .await;
         let _ = repo
             .cleanup_old_trial_previews(config.trial_preview_days)
+            .await;
+        let _ = repo
+            .cleanup_old_task_focus_snapshots(config.task_focus_snapshot_days)
+            .await;
+        let _ = repo
+            .cleanup_old_finance_drift_snapshots(config.finance_drift_snapshot_days)
             .await;
         tracing::debug!("mirror retention sweep completed");
     }

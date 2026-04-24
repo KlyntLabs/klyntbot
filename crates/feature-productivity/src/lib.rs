@@ -24,7 +24,7 @@ pub mod types;
 pub use aggregator::DailyAggregator;
 pub use config::ProductivityConfig;
 pub use engine::ProductivityEngine;
-pub use feature::ProductivityFeature;
+pub use feature::{productivity_migrations, ProductivityFeature};
 pub use focus::FocusManager;
 pub use handler::ProductivityHandler;
 pub use nudge::NudgeService;

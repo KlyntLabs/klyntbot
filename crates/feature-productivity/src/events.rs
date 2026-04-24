@@ -130,3 +130,62 @@ impl From<ProductivityEvent> for DomainEvent {
         }
     }
 }
+
+/// Translate a bus::DomainEvent into the typed ProductivityEvent form, if applicable.
+pub fn try_from_domain_event(e: &bus::DomainEvent) -> Option<ProductivityEvent> {
+    use bus::DomainEvent;
+    match e {
+        DomainEvent::ProductivitySessionEnded {
+            session_id,
+            quality,
+            duration_mins,
+        } => Some(ProductivityEvent::SessionEnded {
+            session_id: session_id.clone(),
+            quality: *quality,
+            duration_mins: *duration_mins,
+        }),
+        DomainEvent::FocusSessionStarted {
+            session_type,
+            target_mins,
+        } => Some(ProductivityEvent::FocusSessionStarted {
+            session_type: session_type.clone(),
+            target_mins: *target_mins,
+        }),
+        DomainEvent::FocusSessionEnded {
+            duration_secs,
+            quality,
+            interruptions,
+        } => Some(ProductivityEvent::FocusSessionEnded {
+            duration_secs: *duration_secs,
+            quality: *quality,
+            interruptions: *interruptions,
+        }),
+        DomainEvent::DistractionDetected {
+            app,
+            duration_secs,
+            context,
+        } => Some(ProductivityEvent::DistractionDetected {
+            app: app.clone(),
+            duration_secs: *duration_secs,
+            context: context.clone(),
+        }),
+        DomainEvent::ActivitySessionCompleted {
+            date,
+            total_active_secs,
+            productive_secs,
+            distracting_secs,
+        } => Some(ProductivityEvent::ActivitySessionCompleted {
+            date: date.clone(),
+            total_active_secs: *total_active_secs,
+            productive_secs: *productive_secs,
+            distracting_secs: *distracting_secs,
+        }),
+        DomainEvent::ProductivityScoreComputed { date, score } => {
+            Some(ProductivityEvent::ProductivityScoreComputed {
+                date: date.clone(),
+                score: *score,
+            })
+        }
+        _ => None,
+    }
+}

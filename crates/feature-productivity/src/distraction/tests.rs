@@ -2,14 +2,14 @@
 
 use crate::config::FocusConfig;
 use crate::distraction::interceptor::{DistractionInterceptor, InterceptDecision};
+use crate::productivity_migrations;
 use crate::repos::learned_rule::{LearnedRule, LearnedRuleRepo};
-use crate::ProductivityFeature;
 use jiff::Timestamp;
 
 async fn setup() -> (DistractionInterceptor, LearnedRuleRepo) {
     let pool = storage::StoragePool::connect_in_memory().await.unwrap();
     let inner = pool.inner().clone();
-    storage::StoragePool::run_feature_migrations(&inner, &ProductivityFeature::migrations_static())
+    storage::StoragePool::run_feature_migrations(&inner, &productivity_migrations())
         .await
         .unwrap();
     let repo = LearnedRuleRepo::new(inner);

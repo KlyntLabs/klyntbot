@@ -144,7 +144,7 @@ mod tests {
         // Run migration
         storage::StoragePool::run_feature_migrations(
             pool.inner(),
-            &crate::ActivityLog::migrations_static(),
+            &crate::activity_log_migrations(),
         )
         .await
         .unwrap();
@@ -199,7 +199,7 @@ mod tests {
         let pool = StoragePool::connect_in_memory().await.unwrap();
         storage::StoragePool::run_feature_migrations(
             pool.inner(),
-            &crate::ActivityLog::migrations_static(),
+            &crate::activity_log_migrations(),
         )
         .await
         .unwrap();

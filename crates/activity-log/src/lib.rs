@@ -40,21 +40,21 @@ use tools_core::FeatureMigration;
 
 pub struct ActivityLog;
 
-impl ActivityLog {
-    pub fn migrations_static() -> Vec<FeatureMigration> {
-        vec![FeatureMigration {
-            feature_name: "activity_log".to_string(),
-            version: 1,
-            description: "Activity log tables".to_string(),
-            sql: include_str!("../migrations/001_unified_activity_log.sql").to_string(),
-        }]
-    }
+/// Activity-log schema migrations. Free function so callers don't need to
+/// instantiate the feature just to run migrations.
+pub fn activity_log_migrations() -> Vec<FeatureMigration> {
+    vec![FeatureMigration {
+        feature_name: "activity_log".to_string(),
+        version: 1,
+        description: "Activity log tables".to_string(),
+        sql: include_str!("../migrations/001_unified_activity_log.sql").to_string(),
+    }]
 }
 
 #[cfg(test)]
 pub(crate) async fn test_pool() -> storage::StoragePool {
     let pool = storage::StoragePool::connect_in_memory().await.unwrap();
-    storage::StoragePool::run_feature_migrations(pool.inner(), &ActivityLog::migrations_static())
+    storage::StoragePool::run_feature_migrations(pool.inner(), &activity_log_migrations())
         .await
         .unwrap();
     pool

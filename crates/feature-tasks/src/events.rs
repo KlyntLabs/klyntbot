@@ -161,3 +161,62 @@ impl From<TaskEvent> for DomainEvent {
         }
     }
 }
+
+/// Translate a bus::DomainEvent into the typed TaskEvent form, if it's a task event.
+pub fn try_from_domain_event(e: &DomainEvent) -> Option<TaskEvent> {
+    match e {
+        DomainEvent::TaskCreated {
+            task_id,
+            project,
+            estimate_mins,
+            ..
+        } => Some(TaskEvent::Created {
+            task_id: task_id.clone(),
+            title: String::new(),
+            area_id: String::new(),
+            project_id: project.clone(),
+            priority: None,
+            estimated_minutes: estimate_mins.map(|m| m as i32),
+        }),
+        DomainEvent::TaskCompleted {
+            task_id,
+            deviation_pct,
+            ..
+        } => Some(TaskEvent::Completed {
+            task_id: task_id.clone(),
+            title: String::new(),
+            deviation_pct: *deviation_pct,
+        }),
+        DomainEvent::TaskFocusChanged {
+            task_id,
+            focus_deadline,
+            ..
+        } => Some(TaskEvent::FocusChanged {
+            task_id: task_id.clone(),
+            title: String::new(),
+            focus_deadline: focus_deadline.as_ref().and_then(|d| d.parse().ok()),
+        }),
+        DomainEvent::TaskFocusExpired { task_id, title } => Some(TaskEvent::FocusExpired {
+            task_id: task_id.clone(),
+            title: title.clone(),
+        }),
+        DomainEvent::TaskDeferred { task_id, .. } => Some(TaskEvent::Deferred {
+            task_id: task_id.clone(),
+            title: String::new(),
+            previous_due: None,
+            new_due: None,
+        }),
+        DomainEvent::EstimationRecorded {
+            task_id,
+            estimated_mins,
+            actual_mins,
+            ..
+        } => Some(TaskEvent::EstimationRecorded {
+            task_id: task_id.clone(),
+            estimated_minutes: Some(*estimated_mins as i32),
+            actual_minutes: Some(*actual_mins as i32),
+            deviation_pct: 0.0,
+        }),
+        _ => None,
+    }
+}

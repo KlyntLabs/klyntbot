@@ -88,7 +88,7 @@ mod tests {
     fn sample_signal(imp: f64, salience: SalienceVerdict) -> AiSignal {
         AiSignal {
             domain: RecallDomain::Tasks,
-            event_kind: "TaskCreated",
+            event_kind: bus::DomainEvent::KIND_TASK_CREATED,
             importance: imp,
             salience,
             content: "user created a task".into(),
@@ -165,7 +165,7 @@ mod tests {
             .await
             .unwrap();
         assert_eq!(recent.len(), 1);
-        assert_eq!(recent[0].event_kind, "TaskCreated");
+        assert_eq!(recent[0].event_kind, bus::DomainEvent::KIND_TASK_CREATED);
         assert_eq!(recent[0].entity_type.as_deref(), Some("task"));
         assert_eq!(recent[0].entity_id.as_deref(), Some("t1"));
     }

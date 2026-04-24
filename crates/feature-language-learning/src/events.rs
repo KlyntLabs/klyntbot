@@ -88,3 +88,47 @@ impl From<LanguageLearningEvent> for DomainEvent {
         }
     }
 }
+
+/// Translate a bus::DomainEvent into the typed LanguageLearningEvent, if applicable.
+pub fn try_from_domain_event(e: &bus::DomainEvent) -> Option<LanguageLearningEvent> {
+    use bus::DomainEvent;
+    match e {
+        DomainEvent::PronunciationScored {
+            session_id,
+            overall_score,
+            weak_phonemes,
+        } => Some(LanguageLearningEvent::PronunciationScored {
+            session_id: session_id.clone(),
+            overall_score: *overall_score,
+            weak_phonemes: weak_phonemes.clone(),
+        }),
+        DomainEvent::ExamAttempted {
+            exam_id,
+            score,
+            passed,
+        } => Some(LanguageLearningEvent::ExamAttempted {
+            exam_id: exam_id.clone(),
+            score: *score,
+            passed: *passed,
+        }),
+        DomainEvent::PhoneticMasteryGained {
+            phoneme,
+            mastery_level,
+        } => Some(LanguageLearningEvent::PhoneticMasteryGained {
+            phoneme: phoneme.clone(),
+            mastery_level: *mastery_level,
+        }),
+        DomainEvent::LanguagePracticeSessionCompleted {
+            session_id,
+            language,
+            duration_secs,
+            success_rate,
+        } => Some(LanguageLearningEvent::PracticeSessionCompleted {
+            session_id: session_id.clone(),
+            language: language.clone(),
+            duration_secs: *duration_secs,
+            success_rate: *success_rate,
+        }),
+        _ => None,
+    }
+}

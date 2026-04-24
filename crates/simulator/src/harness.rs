@@ -118,7 +118,7 @@ impl SimulationHarness {
                     common::KlyntbotError::Storage(format!("finance migration failed: {e}"))
                 })?;
             // Activity log tables
-            for m in activity_log::ActivityLog::migrations_static() {
+            for m in activity_log::activity_log_migrations() {
                 sqlx::query(&m.sql)
                     .execute(&inner_pool)
                     .await
@@ -131,7 +131,7 @@ impl SimulationHarness {
             // Productivity tables
             storage::StoragePool::run_feature_migrations(
                 &inner_pool,
-                &feature_productivity::ProductivityFeature::migrations_static(),
+                &feature_productivity::productivity_migrations(),
             )
             .await?;
         }

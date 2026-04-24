@@ -12,7 +12,7 @@ use tools::Tool;
 use super::common;
 use common::MockConversationRecallHandler;
 
-use klyntbot::agent::context_sources::{BootstrapSource, ConfidenceSource, IdentitySource};
+use klyntbot::agent::context_sources::{BootstrapSource, IdentitySource};
 use klyntbot::context_engine::{ContextEngine, ContextSource, SourceContext};
 use tempfile::TempDir;
 
@@ -92,7 +92,6 @@ async fn test_context_engine(workspace: std::path::PathBuf) -> ContextEngine {
     let sources: Vec<Box<dyn ContextSource>> = vec![
         Box::new(IdentitySource::new(workspace.clone(), "UTC".to_string())),
         Box::new(BootstrapSource::new(workspace)),
-        Box::new(ConfidenceSource::new(0.7)),
     ];
 
     ContextEngine::new(config::schema::HistoryCompressionConfig::default()).with_sources(sources)
@@ -567,20 +566,6 @@ async fn identity_source_content() {
 }
 
 #[tokio::test]
-async fn confidence_source_threshold() {
-    let source = ConfidenceSource::new(0.70);
-    let ctx = test_source_ctx();
-
-    let content = source.provide(&ctx).await.unwrap();
-    assert!(content.contains("0.70"));
-
-    // Update threshold
-    source.set_threshold(0.85);
-    let content = source.provide(&ctx).await.unwrap();
-    assert!(content.contains("0.85"));
-}
-
-#[tokio::test]
 async fn context_engine_source_ordering() {
     let temp_dir = TempDir::new().unwrap();
     let workspace = temp_dir.path().join("workspace");
@@ -589,12 +574,10 @@ async fn context_engine_source_ordering() {
     let engine = test_context_engine(workspace).await;
     let prompt = engine.build_system_prompt("test", "chat123", None).await;
 
-    // Identity (priority 100) should appear before confidence (priority 50)
-    let identity_pos = prompt.find("# Identity").unwrap();
-    let confidence_pos = prompt.find("Confidence").unwrap();
+    // Identity should render in the system prompt.
     assert!(
-        identity_pos < confidence_pos,
-        "Identity should appear before confidence"
+        prompt.find("# Identity").is_some(),
+        "Identity section should appear in system prompt"
     );
 }
 

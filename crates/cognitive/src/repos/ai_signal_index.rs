@@ -161,7 +161,7 @@ mod tests {
         repo.insert(
             "s1",
             RecallDomain::Tasks,
-            "TaskCreated",
+            bus::DomainEvent::KIND_TASK_CREATED,
             "wrote a task",
             0.7,
             "extract",
@@ -174,7 +174,7 @@ mod tests {
         repo.insert(
             "s2",
             RecallDomain::Tasks,
-            "TaskCompleted",
+            bus::DomainEvent::KIND_TASK_COMPLETED,
             "finished a task",
             0.8,
             "extract",

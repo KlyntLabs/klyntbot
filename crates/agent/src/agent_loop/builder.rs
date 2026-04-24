@@ -1476,7 +1476,7 @@ impl AgentLoopBuilder {
                 // Run feature migrations (idempotent — skips already-applied)
                 storage::StoragePool::run_feature_migrations(
                     pool,
-                    &feature_productivity::ProductivityFeature::migrations_static(),
+                    &feature_productivity::productivity_migrations(),
                 )
                 .await
                 .map_err(|e| {

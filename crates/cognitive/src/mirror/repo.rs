@@ -775,6 +775,29 @@ impl MirrorRepo {
         Ok(result.rows_affected())
     }
 
+    pub async fn cleanup_old_task_focus_snapshots(&self, max_age_days: u32) -> Result<u64> {
+        let cutoff =
+            Timestamp::now() - jiff::SignedDuration::from_secs(max_age_days as i64 * 86400);
+        let result = sqlx::query("DELETE FROM mirror_task_focus_snapshots WHERE captured_at < ?1")
+            .bind(cutoff.to_string())
+            .execute(self.db())
+            .await
+            .map_err(|e| common::KlyntbotError::Storage(e.to_string()))?;
+        Ok(result.rows_affected())
+    }
+
+    pub async fn cleanup_old_finance_drift_snapshots(&self, max_age_days: u32) -> Result<u64> {
+        let cutoff =
+            Timestamp::now() - jiff::SignedDuration::from_secs(max_age_days as i64 * 86400);
+        let result =
+            sqlx::query("DELETE FROM mirror_finance_drift_snapshots WHERE captured_at < ?1")
+                .bind(cutoff.to_string())
+                .execute(self.db())
+                .await
+                .map_err(|e| common::KlyntbotError::Storage(e.to_string()))?;
+        Ok(result.rows_affected())
+    }
+
     // -----------------------------------------------------------------------
     // Task focus snapshots
     // -----------------------------------------------------------------------

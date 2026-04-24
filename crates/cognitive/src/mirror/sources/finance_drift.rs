@@ -32,7 +32,10 @@ impl MirrorSignalSource for FinanceSpendingDriftSource {
     fn spec(&self) -> MirrorSnapshotSpec {
         MirrorSnapshotSpec {
             name: "finance_drift",
-            subscribed_kinds: &["TransactionRecorded", "BudgetAlert"],
+            subscribed_kinds: &[
+                bus::DomainEvent::KIND_TRANSACTION_RECORDED,
+                bus::DomainEvent::KIND_BUDGET_ALERT,
+            ],
             flush_interval_secs: Some(3600),
         }
     }

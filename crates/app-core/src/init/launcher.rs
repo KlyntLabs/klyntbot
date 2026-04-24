@@ -26,7 +26,7 @@ pub(super) async fn init_launcher(
     // Run feature migrations
     if let Err(e) = StoragePool::run_feature_migrations(
         &pool,
-        &feature_launcher::LauncherFeature::migrations_static(),
+        &feature_launcher::launcher_migrations(),
     )
     .await
     {

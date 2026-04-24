@@ -183,12 +183,9 @@ mod tests {
     async fn setup_pool() -> SqlitePool {
         let pool = storage::StoragePool::connect_in_memory().await.unwrap();
         let inner = pool.inner().clone();
-        storage::StoragePool::run_feature_migrations(
-            &inner,
-            &ProductivityFeature::migrations_static(),
-        )
-        .await
-        .unwrap();
+        storage::StoragePool::run_feature_migrations(&inner, &crate::productivity_migrations())
+            .await
+            .unwrap();
         inner
     }
 

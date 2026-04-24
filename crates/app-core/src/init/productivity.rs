@@ -54,7 +54,7 @@ pub(super) async fn init_productivity(
         // Run feature migrations before creating repos.
         if let Err(e) = StoragePool::run_feature_migrations(
             &pool,
-            &feature_productivity::ProductivityFeature::migrations_static(),
+            &feature_productivity::productivity_migrations(),
         )
         .await
         {

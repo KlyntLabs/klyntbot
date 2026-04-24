@@ -91,3 +91,28 @@ impl From<CoachingEvent> for DomainEvent {
         }
     }
 }
+
+/// Translate a bus::DomainEvent into the typed CoachingEvent form, if it's a coaching event.
+pub fn try_from_domain_event(e: &bus::DomainEvent) -> Option<CoachingEvent> {
+    use bus::DomainEvent;
+    match e {
+        DomainEvent::CoachingStrategyApplied { strategy_id, rule_text, accepted } => Some(CoachingEvent::StrategyApplied {
+            strategy_id: strategy_id.clone(),
+            rule_text: rule_text.clone(),
+            accepted: *accepted,
+        }),
+        DomainEvent::CoachingPatternDetected { pattern_name, confidence, .. } => Some(CoachingEvent::PatternDetected {
+            pattern_name: pattern_name.clone(),
+            severity: *confidence,
+        }),
+        DomainEvent::CoachingFeedback { intervention_id, response } => Some(CoachingEvent::FeedbackReceived {
+            strategy_id: intervention_id.clone(),
+            response: match response {
+                bus::FeedbackResponse::Helpful => "accept".to_string(),
+                bus::FeedbackResponse::Dismissed => "dismiss".to_string(),
+                bus::FeedbackResponse::StopSuggesting => "stop".to_string(),
+            },
+        }),
+        _ => None,
+    }
+}

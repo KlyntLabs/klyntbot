@@ -15,7 +15,7 @@ async fn setup_pool() -> sqlx::SqlitePool {
     let inner = pool.inner().clone();
     storage::StoragePool::run_feature_migrations(
         &inner,
-        &feature_productivity::ProductivityFeature::migrations_static(),
+        &feature_productivity::productivity_migrations(),
     )
     .await
     .unwrap();

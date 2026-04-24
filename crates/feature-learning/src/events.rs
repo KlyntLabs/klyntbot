@@ -40,7 +40,14 @@ pub enum LearningEvent {
     #[ai(
         importance = 0.5,
         salience = "accumulate",
-        observation_template = "Flashcard reviewed (quality {quality}): {card_id}"
+        observation_template = "Flashcard reviewed (quality {quality}): {card_id}",
+        metric(
+            name = "atom_retention_rate",
+            value_from = *new_retention_pct,
+            window = "30d",
+            min_samples = 5,
+            aggregation = "avg",
+        )
     )]
     FlashcardReviewed {
         atom_id: String,
@@ -73,7 +80,14 @@ pub enum LearningEvent {
     #[ai(
         importance = 0.3,
         salience = "accumulate",
-        observation_template = "Atom retention decayed to {retention}: {atom_id}"
+        observation_template = "Atom retention decayed to {retention}: {atom_id}",
+        metric(
+            name = "atom_retention_decay_frequency",
+            value_from = 1.0_f64,
+            window = "7d",
+            min_samples = 3,
+            aggregation = "avg",
+        )
     )]
     RetentionDecayed { atom_id: String, retention: f64 },
 
@@ -161,5 +175,72 @@ impl From<LearningEvent> for DomainEvent {
                 similarity,
             },
         }
+    }
+}
+
+/// Translate a bus::DomainEvent into the typed LearningEvent form, if applicable.
+pub fn try_from_domain_event(e: &DomainEvent) -> Option<LearningEvent> {
+    match e {
+        DomainEvent::KnowledgeAtomExtracted {
+            atom_id,
+            note_id,
+            text,
+        } => Some(LearningEvent::AtomExtracted {
+            atom_id: atom_id.clone(),
+            note_id: note_id.clone(),
+            text: text.clone(),
+        }),
+        DomainEvent::KnowledgeAtomCreated { atom_id, .. } => Some(LearningEvent::AtomCreated {
+            atom_id: atom_id.clone(),
+        }),
+        DomainEvent::KnowledgeAtomAccepted { atom_id, .. } => Some(LearningEvent::AtomAccepted {
+            atom_id: atom_id.clone(),
+        }),
+        DomainEvent::KnowledgeAtomArchived { atom_id, .. } => Some(LearningEvent::AtomArchived {
+            atom_id: atom_id.clone(),
+        }),
+        DomainEvent::AtomFlashcardReviewed {
+            atom_id,
+            card_id,
+            quality,
+            recall_speed_ms,
+            new_retention_pct,
+            source_note_id,
+        } => Some(LearningEvent::FlashcardReviewed {
+            atom_id: atom_id.clone(),
+            card_id: card_id.clone(),
+            quality: *quality,
+            recall_speed_ms: *recall_speed_ms,
+            new_retention_pct: *new_retention_pct,
+            source_note_id: source_note_id.clone(),
+        }),
+        DomainEvent::AtomReinforced { atom_id, .. } => Some(LearningEvent::AtomReinforced {
+            atom_id: atom_id.clone(),
+        }),
+        DomainEvent::FlashcardScheduled {
+            flashcard_id,
+            atom_id,
+            due_at,
+        } => Some(LearningEvent::FlashcardScheduled {
+            card_id: flashcard_id.clone(),
+            atom_id: atom_id.clone(),
+            due_at: due_at.clone(),
+        }),
+        DomainEvent::AtomRetentionDecayed { atom_id, retention } => {
+            Some(LearningEvent::RetentionDecayed {
+                atom_id: atom_id.clone(),
+                retention: *retention,
+            })
+        }
+        DomainEvent::AtomSemanticFactLinked {
+            atom_id,
+            fact_id,
+            similarity,
+        } => Some(LearningEvent::SemanticFactLinked {
+            atom_id: atom_id.clone(),
+            fact_id: fact_id.clone(),
+            similarity: *similarity,
+        }),
+        _ => None,
     }
 }

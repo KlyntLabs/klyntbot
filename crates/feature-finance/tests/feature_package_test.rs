@@ -2,7 +2,7 @@
 //!
 //! Verifies that FinanceFeature correctly implements the FeaturePackage trait:
 //! - name(), config_key(), tools(), migrations(), default_config()
-//! - Static methods: migrations_static(), default_config_static()
+//! - Module functions: finance_migrations()
 
 use feature_finance::{FeaturePackage, FinanceFeature};
 
@@ -53,7 +53,7 @@ fn test_finance_feature_migrations_not_empty() {
     let migrations = feature_finance::finance_migrations();
     assert!(
         !migrations.is_empty(),
-        "migrations_static() must return at least one migration"
+        "finance_migrations() must return at least one migration"
     );
 }
 

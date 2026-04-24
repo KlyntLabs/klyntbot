@@ -169,12 +169,9 @@ mod tests {
 
     async fn setup() -> ClipboardRepo {
         let pool = StoragePool::connect_in_memory().await.unwrap();
-        StoragePool::run_feature_migrations(
-            pool.inner(),
-            &crate::LauncherFeature::migrations_static(),
-        )
-        .await
-        .unwrap();
+        StoragePool::run_feature_migrations(pool.inner(), &crate::launcher_migrations())
+            .await
+            .unwrap();
         ClipboardRepo::new(pool.inner().clone())
     }
 

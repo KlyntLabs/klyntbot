@@ -7,14 +7,14 @@ use jiff::{SignedDuration, Timestamp};
 use storage::StoragePool;
 
 use activity_log::{
-    ActivityIngestionService, ActivityLog, ActivityLogRepo, ActivitySource, ChatMessageInput,
-    ChatMessageNormalizer, NormalizerSignalConsumer, PrivacyFilter, WindowEventInput,
-    WindowEventNormalizer,
+    activity_log_migrations, ActivityIngestionService, ActivityLog, ActivityLogRepo,
+    ActivitySource, ChatMessageInput, ChatMessageNormalizer, NormalizerSignalConsumer,
+    PrivacyFilter, WindowEventInput, WindowEventNormalizer,
 };
 
 async fn setup() -> StoragePool {
     let pool = StoragePool::connect_in_memory().await.unwrap();
-    StoragePool::run_feature_migrations(pool.inner(), &ActivityLog::migrations_static())
+    StoragePool::run_feature_migrations(pool.inner(), &activity_log_migrations())
         .await
         .unwrap();
     pool

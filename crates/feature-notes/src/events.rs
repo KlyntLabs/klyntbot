@@ -170,3 +170,59 @@ impl From<NoteEvent> for DomainEvent {
         }
     }
 }
+
+/// Translate a bus::DomainEvent into the typed NoteEvent form, if applicable.
+pub fn try_from_domain_event(e: &bus::DomainEvent) -> Option<NoteEvent> {
+    use bus::DomainEvent;
+    match e {
+        DomainEvent::NoteCreated { note_id, title } => Some(NoteEvent::Created {
+            note_id: note_id.clone(),
+            title: title.clone(),
+        }),
+        DomainEvent::NoteUpdated { note_id, title } => Some(NoteEvent::Updated {
+            note_id: note_id.clone(),
+            title: title.clone(),
+        }),
+        DomainEvent::NoteContentChanged { note_id } => Some(NoteEvent::ContentChanged {
+            note_id: note_id.clone(),
+        }),
+        DomainEvent::NoteEditingFinished { note_id } => Some(NoteEvent::EditingFinished {
+            note_id: note_id.clone(),
+        }),
+        DomainEvent::NoteDeleted { note_id } => Some(NoteEvent::Deleted {
+            note_id: note_id.clone(),
+        }),
+        DomainEvent::NoteStudied { note_id, duration_secs, atoms_reviewed, mode } => Some(NoteEvent::Studied {
+            note_id: note_id.clone(),
+            duration_secs: *duration_secs,
+            atoms_reviewed: *atoms_reviewed,
+            mode: mode.clone(),
+        }),
+        DomainEvent::PracticeUnitCompleted { session_id, note_id, unit_index, grade, scores, confidence_rating, edited } => Some(NoteEvent::PracticeUnitCompleted {
+            session_id: session_id.clone(),
+            note_id: note_id.clone(),
+            unit_index: *unit_index,
+            grade: grade.clone(),
+            scores: scores.clone(),
+            confidence_rating: *confidence_rating,
+            edited: *edited,
+        }),
+        DomainEvent::PracticeSessionCompleted { session_id, note_id, units_completed, average_score, source_lang, target_lang, weak_unit_count } => Some(NoteEvent::PracticeSessionCompleted {
+            session_id: session_id.clone(),
+            note_id: note_id.clone(),
+            units_completed: *units_completed,
+            average_score: *average_score,
+            source_lang: source_lang.clone(),
+            target_lang: target_lang.clone(),
+            weak_unit_count: *weak_unit_count,
+        }),
+        DomainEvent::TranslationCompleted { note_id, source_lang, target_lang, word_count, is_selection } => Some(NoteEvent::TranslationCompleted {
+            note_id: note_id.clone(),
+            source_lang: source_lang.clone(),
+            target_lang: target_lang.clone(),
+            word_count: *word_count,
+            is_selection: *is_selection,
+        }),
+        _ => None,
+    }
+}

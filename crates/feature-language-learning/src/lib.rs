@@ -6,7 +6,7 @@ pub mod practice_tool;
 pub mod pronunciation_provider;
 pub mod types;
 
-pub use events::LanguageLearningEvent;
+pub use events::{try_from_domain_event, LanguageLearningEvent};
 pub use pronunciation_provider::AppPronunciationProvider;
 
 use std::sync::Arc;

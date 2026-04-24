@@ -23,25 +23,23 @@ impl LauncherFeature {
     pub fn new() -> Self {
         Self
     }
-
-    pub fn migration_sql() -> &'static str {
-        include_str!("../migrations/001_launcher_tables.sql")
-    }
-
-    pub fn migrations_static() -> Vec<FeatureMigration> {
-        vec![FeatureMigration {
-            feature_name: "launcher".to_string(),
-            version: 1,
-            description: "Launcher tables: frequencies, clipboard history, FTS5".to_string(),
-            sql: Self::migration_sql().to_string(),
-        }]
-    }
 }
 
 impl Default for LauncherFeature {
     fn default() -> Self {
         Self::new()
     }
+}
+
+/// Launcher schema migrations. Free function so callers don't need to
+/// instantiate the feature just to run migrations.
+pub fn launcher_migrations() -> Vec<FeatureMigration> {
+    vec![FeatureMigration {
+        feature_name: "launcher".to_string(),
+        version: 1,
+        description: "Launcher tables: frequencies, clipboard history, FTS5".to_string(),
+        sql: include_str!("../migrations/001_launcher_tables.sql").to_string(),
+    }]
 }
 
 #[async_trait]
@@ -55,7 +53,7 @@ impl FeaturePackage for LauncherFeature {
     }
 
     fn migrations(&self) -> Vec<FeatureMigration> {
-        Self::migrations_static()
+        launcher_migrations()
     }
 
     async fn health_check(&self) -> Result<HealthStatus> {

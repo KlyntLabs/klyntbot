@@ -27,36 +27,24 @@ impl ProductivityFeature {
             tool: Some(Arc::new(tool)),
         }
     }
-
-    /// Create without a tool (for migration-only usage or tests).
-    pub fn migrations_only() -> Self {
-        Self { tool: None }
-    }
-
-    pub fn migration_sql() -> &'static str {
-        include_str!("../migrations/001_productivity_tables.sql")
-    }
-
-    pub fn migrations_static() -> Vec<FeatureMigration> {
-        vec![FeatureMigration {
-            feature_name: "productivity".to_string(),
-            version: 2,
-            description: "Create productivity tracking tables (removed legacy focus_sessions)"
-                .to_string(),
-            sql: Self::migration_sql().to_string(),
-        }]
-    }
-
-    pub fn default_config_static() -> serde_json::Value {
-        serde_json::to_value(crate::config::ProductivityConfig::default())
-            .unwrap_or(serde_json::Value::Null)
-    }
 }
 
 impl Default for ProductivityFeature {
     fn default() -> Self {
-        Self::migrations_only()
+        Self { tool: None }
     }
+}
+
+/// Productivity schema migrations. Free function so callers don't need to
+/// instantiate the feature just to run migrations.
+pub fn productivity_migrations() -> Vec<FeatureMigration> {
+    vec![FeatureMigration {
+        feature_name: "productivity".to_string(),
+        version: 2,
+        description: "Create productivity tracking tables (removed legacy focus_sessions)"
+            .to_string(),
+        sql: include_str!("../migrations/001_productivity_tables.sql").to_string(),
+    }]
 }
 
 #[async_trait]
@@ -70,7 +58,7 @@ impl FeaturePackage for ProductivityFeature {
     }
 
     fn migrations(&self) -> Vec<FeatureMigration> {
-        Self::migrations_static()
+        productivity_migrations()
     }
 
     async fn health_check(&self) -> Result<HealthStatus> {

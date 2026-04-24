@@ -144,12 +144,9 @@ mod tests {
 
     async fn setup() -> FrequencyRepo {
         let pool = StoragePool::connect_in_memory().await.unwrap();
-        StoragePool::run_feature_migrations(
-            pool.inner(),
-            &crate::LauncherFeature::migrations_static(),
-        )
-        .await
-        .unwrap();
+        StoragePool::run_feature_migrations(pool.inner(), &crate::launcher_migrations())
+            .await
+            .unwrap();
         FrequencyRepo::new(pool.inner().clone())
     }
 

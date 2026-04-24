@@ -148,9 +148,25 @@ async fn main() -> Result<()> {
         }
         Command::Tools { list, schema } => {
             if list {
-                let cfg = config::load_with_env_overrides()
+                let mut cfg = config::load_with_env_overrides()
                     .await
                     .map_err(|e| anyhow::anyhow!("config load failed: {e}"))?;
+                // Mirror app-core init's post-load fill so `tools --list` reflects
+                // the same exposed tool set the server would advertise.
+                if cfg.mcp.server.exposed_tools.is_empty() {
+                    let registry = app_core::init::ai_pipeline::build_feature_registry();
+                    let mut tools: Vec<String> = registry
+                        .tool_names()
+                        .into_iter()
+                        .map(|s| s.to_string())
+                        .collect();
+                    tools.extend(
+                        config::schema::EXPLICIT_TOOL_ALLOWLIST
+                            .iter()
+                            .map(|s| s.to_string()),
+                    );
+                    cfg.mcp.server.exposed_tools = tools;
+                }
                 println!("Exposed MCP tools:");
                 for name in &cfg.mcp.server.exposed_tools {
                     println!("  - {name}");

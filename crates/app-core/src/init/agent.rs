@@ -52,7 +52,7 @@ pub(super) async fn init_agent(
     // Run activity-log migrations (unified activity log).
     StoragePool::run_feature_migrations(
         storage_pool.inner(),
-        &activity_log::ActivityLog::migrations_static(),
+        &activity_log::activity_log_migrations(),
     )
     .await
     .map_err(|e| format!("activity-log migration failed: {e}"))?;

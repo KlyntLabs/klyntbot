@@ -55,7 +55,7 @@ fn signal_with_entity(
 #[tokio::test]
 async fn normalizer_consumes_every_translator_signal() {
     let pool = storage::StoragePool::connect_in_memory().await.unwrap();
-    activity_log::ActivityLog::migrations_static()
+    activity_log::activity_log_migrations()
         .into_iter()
         .for_each(|m| {
             // We can't easily run migrations here without async block_in_place,

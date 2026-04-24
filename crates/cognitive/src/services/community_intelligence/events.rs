@@ -72,3 +72,25 @@ impl From<CommunityEvent> for DomainEvent {
         }
     }
 }
+
+/// Translate a bus::DomainEvent into the typed CommunityEvent, if applicable.
+pub fn try_from_domain_event(e: &DomainEvent) -> Option<CommunityEvent> {
+    match e {
+        DomainEvent::CommunityDiscovered { community_id, name, member_count } => Some(CommunityEvent::Discovered {
+            community_id: community_id.clone(),
+            name: name.clone(),
+            member_count: *member_count,
+        }),
+        DomainEvent::CommunityUpdated { community_id, name, reason } => Some(CommunityEvent::Updated {
+            community_id: community_id.clone(),
+            name: name.clone(),
+            reason: reason.clone(),
+        }),
+        DomainEvent::CommunityWeakened { community_id, name, stability } => Some(CommunityEvent::Weakened {
+            community_id: community_id.clone(),
+            name: name.clone(),
+            stability: *stability,
+        }),
+        _ => None,
+    }
+}
