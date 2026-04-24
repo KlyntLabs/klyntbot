@@ -43,7 +43,7 @@ pub enum TaskEvent {
             value_from = 1.0_f64,
             window = "7d",
             min_samples = 3,
-            aggregation = "avg",
+            aggregation = "sum",
         )
     )]
     FocusExpired { task_id: String, title: String },
@@ -70,7 +70,7 @@ pub enum TaskEvent {
             value_from = 1.0_f64,
             window = "7d",
             min_samples = 3,
-            aggregation = "avg",
+            aggregation = "sum",
         )
     )]
     Deferred {

@@ -8,6 +8,7 @@ use tracing::warn;
 use super::super::TaskTool;
 use crate::events::TaskEvent;
 use crate::types::Task;
+use bus::DomainEvent;
 use storage::TaskPatch;
 
 impl TaskTool {
@@ -17,8 +18,10 @@ impl TaskTool {
         // Parse optional alarms before any DB writes — surface shape errors early.
         let alarm_specs = Self::parse_alarms_param(p)?;
 
-        // Capture old values for activity logging
-        let old_row = if self.config.auto_log_activity {
+        // Capture old values for activity logging — also needed to detect
+        // due-date deferrals (new due > old due) for TaskDeferred emission.
+        let needs_old_row = self.config.auto_log_activity || p.has("due_date");
+        let old_row = if needs_old_row {
             self.repo.get(id).await?
         } else {
             None
@@ -91,6 +94,19 @@ impl TaskTool {
                 if self.config.auto_log_activity {
                     if let Some(ref old) = old_row {
                         self.log_field_changes(id, old, &task).await;
+                    }
+                }
+
+                // Detect deferral: due date moved later. Publishes TaskDeferred
+                // so the `task_deferral_rate` metric (feature-tasks) records a sample.
+                if let (Some(ref old), Some(ref bus)) = (&old_row, &self.domain_bus) {
+                    if let (Some(prev), Some(next)) = (old.due_date, task.due_date) {
+                        if next > *prev {
+                            bus.publish(DomainEvent::TaskDeferred {
+                                task_id: task.id.clone(),
+                                times_deferred: 1,
+                            });
+                        }
                     }
                 }
 

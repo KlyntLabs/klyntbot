@@ -540,6 +540,123 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn test_deferral_publishes_task_deferred() {
+        use bus::{DomainEvent, DomainEventBus};
+        use std::sync::Arc;
+
+        let pool = storage::StoragePool::connect_in_memory().await.unwrap();
+        let db = pool.inner().clone();
+        create_test_tables(&db).await;
+        let repo = storage::TaskRepo::new(db);
+        let bus = Arc::new(DomainEventBus::new(32));
+        let mut rx = bus.subscribe();
+        let tool = TaskTool::new(repo, 3, 8, "UTC".to_string()).with_domain_bus(Arc::clone(&bus));
+        let ctx = test_ctx();
+
+        let create = tool
+            .execute(
+                serde_json::json!({
+                    "action": "create",
+                    "title": "defer probe",
+                    "area_id": "test-area",
+                    "due_date": "2026-05-01T12:00:00Z"
+                }),
+                &ctx,
+            )
+            .await
+            .unwrap();
+        let id = create
+            .split("ID: ")
+            .nth(1)
+            .unwrap()
+            .split(',')
+            .next()
+            .unwrap()
+            .trim_end_matches(')');
+
+        // Drain any events from creation
+        while rx.try_recv().is_ok() {}
+
+        tool.execute(
+            serde_json::json!({
+                "action": "update",
+                "id": id,
+                "due_date": "2026-05-10T12:00:00Z"
+            }),
+            &ctx,
+        )
+        .await
+        .unwrap();
+
+        let mut saw_deferred = false;
+        while let Ok(ev) = rx.try_recv() {
+            if matches!(ev, DomainEvent::TaskDeferred { .. }) {
+                saw_deferred = true;
+                break;
+            }
+        }
+        assert!(
+            saw_deferred,
+            "expected DomainEvent::TaskDeferred after due-date moved later"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_pull_forward_does_not_publish_task_deferred() {
+        use bus::{DomainEvent, DomainEventBus};
+        use std::sync::Arc;
+
+        let pool = storage::StoragePool::connect_in_memory().await.unwrap();
+        let db = pool.inner().clone();
+        create_test_tables(&db).await;
+        let repo = storage::TaskRepo::new(db);
+        let bus = Arc::new(DomainEventBus::new(32));
+        let mut rx = bus.subscribe();
+        let tool = TaskTool::new(repo, 3, 8, "UTC".to_string()).with_domain_bus(Arc::clone(&bus));
+        let ctx = test_ctx();
+
+        let create = tool
+            .execute(
+                serde_json::json!({
+                    "action": "create",
+                    "title": "pull forward",
+                    "area_id": "test-area",
+                    "due_date": "2026-05-10T12:00:00Z"
+                }),
+                &ctx,
+            )
+            .await
+            .unwrap();
+        let id = create
+            .split("ID: ")
+            .nth(1)
+            .unwrap()
+            .split(',')
+            .next()
+            .unwrap()
+            .trim_end_matches(')');
+        while rx.try_recv().is_ok() {}
+
+        tool.execute(
+            serde_json::json!({
+                "action": "update",
+                "id": id,
+                "due_date": "2026-05-01T12:00:00Z"
+            }),
+            &ctx,
+        )
+        .await
+        .unwrap();
+
+        while let Ok(ev) = rx.try_recv() {
+            assert!(
+                !matches!(ev, DomainEvent::TaskDeferred { .. }),
+                "pulling a task earlier should NOT emit TaskDeferred"
+            );
+        }
+    }
+
+    #[tokio::test]
     async fn test_complete_task() {
         let tool = make_tool().await;
         let ctx = test_ctx();

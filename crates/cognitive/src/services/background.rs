@@ -812,6 +812,7 @@ impl BackgroundConsolidationService {
                                 rr,
                                 &episodic_repo,
                                 embedder.as_deref(),
+                                pipeline_tx.as_ref(),
                             )
                             .await;
                         }

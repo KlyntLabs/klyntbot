@@ -8,14 +8,7 @@ pub enum FinanceEvent {
         importance = 0.5,
         salience = "accumulate",
         observation_template = "Transaction: {category} {amount} {currency}",
-        coaching_signal(category_from = "category", amount_from = "amount",),
-        metric(
-            name = "budget_overrun_frequency",
-            value_from = 0.0_f64,
-            window = "30d",
-            min_samples = 3,
-            aggregation = "avg",
-        )
+        coaching_signal(category_from = "category", amount_from = "amount",)
     )]
     TransactionRecorded {
         _tx_id: String,
@@ -44,7 +37,7 @@ pub enum FinanceEvent {
             value_from = 1.0_f64,
             window = "30d",
             min_samples = 3,
-            aggregation = "avg",
+            aggregation = "sum",
         )
     )]
     BudgetAlert {
@@ -193,30 +186,51 @@ impl From<FinanceEvent> for DomainEvent {
 /// Translate a bus::DomainEvent into the typed FinanceEvent form, if it's a finance event.
 pub fn try_from_domain_event(e: &DomainEvent) -> Option<FinanceEvent> {
     match e {
-        DomainEvent::TransactionRecorded { category, amount, is_over_budget } => Some(FinanceEvent::TransactionRecorded {
+        DomainEvent::TransactionRecorded {
+            category,
+            amount,
+            is_over_budget,
+        } => Some(FinanceEvent::TransactionRecorded {
             _tx_id: String::new(),
             category: category.clone(),
             amount: *amount as i64,
             currency: String::new(),
             _is_over_budget: *is_over_budget,
         }),
-        DomainEvent::BudgetAlert { category, spent, limit } => Some(FinanceEvent::BudgetAlert {
+        DomainEvent::BudgetAlert {
+            category,
+            spent,
+            limit,
+        } => Some(FinanceEvent::BudgetAlert {
             category: category.clone(),
             spent: *spent as i64,
             limit: *limit as i64,
         }),
-        DomainEvent::AccountCreated { account_id, name, currency } => Some(FinanceEvent::AccountCreated {
+        DomainEvent::AccountCreated {
+            account_id,
+            name,
+            currency,
+        } => Some(FinanceEvent::AccountCreated {
             account_id: account_id.clone(),
             name: name.clone(),
             currency: currency.clone(),
         }),
-        DomainEvent::BudgetCreated { budget_id, name, amount, currency } => Some(FinanceEvent::BudgetCreated {
+        DomainEvent::BudgetCreated {
+            budget_id,
+            name,
+            amount,
+            currency,
+        } => Some(FinanceEvent::BudgetCreated {
             _budget_id: budget_id.clone(),
             name: name.clone(),
             amount: *amount,
             currency: currency.clone(),
         }),
-        DomainEvent::GoalCreated { goal_id, name, target_amount } => Some(FinanceEvent::GoalCreated {
+        DomainEvent::GoalCreated {
+            goal_id,
+            name,
+            target_amount,
+        } => Some(FinanceEvent::GoalCreated {
             goal_id: goal_id.clone(),
             name: name.clone(),
             target_amount: *target_amount,
@@ -225,7 +239,13 @@ pub fn try_from_domain_event(e: &DomainEvent) -> Option<FinanceEvent> {
             goal_id: goal_id.clone(),
             name: name.clone(),
         }),
-        DomainEvent::FinanceGoalProgress { goal_id, name, current_amount, target_amount, delta } => Some(FinanceEvent::GoalProgress {
+        DomainEvent::FinanceGoalProgress {
+            goal_id,
+            name,
+            current_amount,
+            target_amount,
+            delta,
+        } => Some(FinanceEvent::GoalProgress {
             goal_id: goal_id.clone(),
             name: name.clone(),
             current_amount: *current_amount,

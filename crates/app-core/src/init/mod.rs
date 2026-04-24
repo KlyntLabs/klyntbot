@@ -624,6 +624,7 @@ impl AppCore {
                 let rule_repo = ::cognitive::ProceduralRuleRepo::new(storage_pool.inner().clone());
                 let episodic_repo =
                     ::cognitive::EpisodicMemoryRepo::new(storage_pool.inner().clone());
+                let pipeline_tx = pipeline_broadcast_tx.clone();
                 tokio::spawn(async move {
                     let mut rx: ::cognitive::pipeline::SignalReceiver = cognitive_rx;
                     let episodic = Some(episodic_repo);
@@ -632,7 +633,12 @@ impl AppCore {
                         let ops = ::cognitive::pipeline::heuristic_promote(&clusters);
                         if !ops.is_empty() {
                             ::cognitive::pipeline::execute_promotions(
-                                &ops, &repo, &rule_repo, &episodic, None,
+                                &ops,
+                                &repo,
+                                &rule_repo,
+                                &episodic,
+                                None,
+                                Some(&pipeline_tx),
                             )
                             .await;
                         }

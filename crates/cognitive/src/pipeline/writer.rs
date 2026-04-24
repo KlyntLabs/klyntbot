@@ -1,12 +1,14 @@
 //! Stage 3: executes PromotionOps against repos.
 
 use jiff::Timestamp;
+use tokio::sync::broadcast;
 use tracing::{debug, info, warn};
 use uuid::Uuid;
 
 use super::consolidator::PromotionOp;
 use crate::embedder::SemanticFactEmbedder;
 use crate::repos::{EpisodicMemoryRepo, ProceduralRuleRepo, SemanticFactRepo};
+use crate::services::background::PipelineEvent;
 use crate::types::{EpisodicMemory, ProceduralRule, SemanticFact};
 
 pub async fn execute_promotions(
@@ -15,7 +17,16 @@ pub async fn execute_promotions(
     rule_repo: &ProceduralRuleRepo,
     episodic_repo: &Option<EpisodicMemoryRepo>,
     embedder: Option<&dyn SemanticFactEmbedder>,
+    pipeline_tx: Option<&broadcast::Sender<PipelineEvent>>,
 ) {
+    let emit = |operation: &str, fact: String| {
+        if let Some(tx) = pipeline_tx {
+            let _ = tx.send(PipelineEvent::Consolidation {
+                operation: operation.to_string(),
+                fact,
+            });
+        }
+    };
     let (mut facts, mut rules, mut episodes) = (0u32, 0u32, 0u32);
 
     for op in ops {
@@ -36,6 +47,7 @@ pub async fn execute_promotions(
                         .await;
                     let _ = fact_repo.update_convergence(&best.id, *convergence).await;
                     debug!("Writer: reinforced fact '{}'", best.id);
+                    emit("update", format!("{subject}.{predicate} = {object}"));
                 }
                 _ => {
                     let now = Timestamp::now().to_string();
@@ -68,6 +80,7 @@ pub async fn execute_promotions(
                             let _ = emb.embed_and_store_fact(&fact).await;
                         }
                         facts += 1;
+                        emit("add", format!("{subject}.{predicate} = {object}"));
                     }
                 }
             },
@@ -79,6 +92,7 @@ pub async fn execute_promotions(
                 Ok(Some(existing)) => {
                     let _ = rule_repo.increment_signal_count(&existing.id).await;
                     debug!("Writer: reinforced rule '{}'", existing.id);
+                    emit("update", format!("rule/{}: {rule_text}", domain.as_str()));
                 }
                 _ => {
                     let now = Timestamp::now().to_string();
@@ -100,6 +114,7 @@ pub async fn execute_promotions(
                         warn!("Writer: failed to create rule: {e}");
                     } else {
                         rules += 1;
+                        emit("add", format!("rule/{}: {rule_text}", domain.as_str()));
                     }
                 }
             },
@@ -130,6 +145,7 @@ pub async fn execute_promotions(
                         warn!("Writer: failed to create episode: {e}");
                     } else {
                         episodes += 1;
+                        emit("add", format!("episode/{}: {summary}", domain.as_str()));
                     }
                 }
             }

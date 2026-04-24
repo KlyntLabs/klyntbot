@@ -24,11 +24,8 @@ pub(super) async fn init_launcher(
     let pool = storage_pool.inner().clone();
 
     // Run feature migrations
-    if let Err(e) = StoragePool::run_feature_migrations(
-        &pool,
-        &feature_launcher::launcher_migrations(),
-    )
-    .await
+    if let Err(e) =
+        StoragePool::run_feature_migrations(&pool, &feature_launcher::launcher_migrations()).await
     {
         error!("launcher migration failed — feature disabled: {e}");
         return LauncherResult {

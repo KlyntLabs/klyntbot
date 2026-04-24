@@ -165,15 +165,28 @@ pub async fn deep_promote(
 }
 
 fn extract_spo(text: &str) -> (String, String, String) {
+    // Match predicates only at word boundaries so "is" matches the
+    // word "is" but not the substring "th**is**" or "task**s**".
+    // Without this, chat turns like "what tasks are due this week" get
+    // split into ("what task", "s", "...") or ("what task", "is", "week"),
+    // polluting `semantic_facts` with parse artifacts (see backlog item 6).
+    let lower = text.to_lowercase();
     for pred in [
         "is a", "is", "has", "prefers", "uses", "works", "likes", "wants", "needs",
     ] {
-        if let Some(idx) = text.to_lowercase().find(pred) {
-            let subject = text[..idx].trim().to_string();
-            let object = text[idx + pred.len()..].trim().to_string();
-            if !subject.is_empty() && !object.is_empty() {
-                return (subject, pred.to_string(), object);
-            }
+        let needle_before = format!(" {pred} ");
+        let needle_start = format!("{pred} ");
+        let (idx, skip) = if let Some(i) = lower.find(&needle_before) {
+            (i + 1, pred.len())
+        } else if lower.starts_with(&needle_start) {
+            (0, pred.len())
+        } else {
+            continue;
+        };
+        let subject = text[..idx].trim().to_string();
+        let object = text[idx + skip..].trim().to_string();
+        if !subject.is_empty() && !object.is_empty() {
+            return (subject, pred.to_string(), object);
         }
     }
     ("user".into(), "noted".into(), text.to_string())
@@ -301,6 +314,19 @@ mod tests {
         assert_eq!(s, "Jayden");
         assert_eq!(p, "is a");
         assert_eq!(o, "software engineer");
+    }
+
+    #[test]
+    fn test_extract_spo_does_not_match_substrings() {
+        // Regression: `extract_spo` used to return ("what tasks are due th", "is", "week")
+        // by matching "is" inside "this". Must only match at word boundaries.
+        let (s, p, o) = extract_spo("what tasks are due this week");
+        assert_eq!(
+            s, "user",
+            "substring match produced a fake subject: {s:?}/{p:?}/{o:?}"
+        );
+        assert_eq!(p, "noted");
+        assert_eq!(o, "what tasks are due this week");
     }
 
     #[test]

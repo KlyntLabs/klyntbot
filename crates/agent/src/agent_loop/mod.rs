@@ -918,6 +918,21 @@ impl AgentLoop {
             result.agent_name, result.mode_used
         );
 
+        // Publish SkillRouted so mirror sources and the routing metric registry
+        // observe one event per message. In the flat runtime there is no
+        // discrete skill-selection step, so the agent + mode serve as the
+        // effective routing decision. Confidence is fixed at 1.0 because this
+        // is a deterministic passthrough, not a scored selection.
+        if let Some(ref bus) = self.domain_event_bus {
+            bus.publish(bus::DomainEvent::SkillRouted {
+                skill_name: result.mode_used.clone(),
+                confidence: 1.0,
+                source: format!("flat_runtime/{}", result.agent_name),
+                trigger_phrases: Vec::new(),
+                session_key: routing_ctx.chat_id.as_str().to_string(),
+            });
+        }
+
         Ok(result.content)
     }
 

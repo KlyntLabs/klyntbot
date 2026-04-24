@@ -86,7 +86,7 @@ pub enum LearningEvent {
             value_from = 1.0_f64,
             window = "7d",
             min_samples = 3,
-            aggregation = "avg",
+            aggregation = "sum",
         )
     )]
     RetentionDecayed { atom_id: String, retention: f64 },
