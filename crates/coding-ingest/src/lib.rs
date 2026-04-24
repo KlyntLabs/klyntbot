@@ -23,6 +23,8 @@ pub mod hook_client;
 pub mod desktop_lock;
 /// Path-based privacy exclusion filter.
 pub mod excludes;
+/// Cwd → `RepoScope` resolver (cached).
+pub mod scope_resolver;
 
 pub use event::{
     AgentEvent, AgentEventV1, AgentSource, DiagnosticsDelta, EventKind, FileOp,
