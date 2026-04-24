@@ -126,7 +126,12 @@ impl CronBridge {
                 });
             }
             crate::types::CronSchedule::Cron { expr, tz } => {
-                (expr, tz.unwrap_or_else(|| "UTC".to_string()))
+                // Treat missing OR empty tz as UTC — seed jobs historically
+                // stored `Some("")` which breaks chrono_tz parsing.
+                let tz_name = tz
+                    .filter(|s| !s.trim().is_empty())
+                    .unwrap_or_else(|| "UTC".to_string());
+                (expr, tz_name)
             }
         };
 

@@ -1,8 +1,11 @@
 //! NotesTool — feature-notes Tool implementation.
 
+use std::sync::Arc;
+
 use async_trait::async_trait;
 use serde_json::Value;
 
+use bus::{DomainEvent, DomainEventBus};
 use common::{Result, ToolError};
 use tools_core::{ParamExtractor, RoutingContext, Tool};
 
@@ -11,11 +14,26 @@ use crate::repo::{utc_now_str, NoteRepo};
 
 pub struct NotesTool {
     repo: NoteRepo,
+    domain_bus: Option<Arc<DomainEventBus>>,
 }
 
 impl NotesTool {
     pub fn new(repo: NoteRepo) -> Self {
-        Self { repo }
+        Self {
+            repo,
+            domain_bus: None,
+        }
+    }
+
+    pub fn with_domain_bus(mut self, bus: Arc<DomainEventBus>) -> Self {
+        self.domain_bus = Some(bus);
+        self
+    }
+
+    fn publish(&self, event: DomainEvent) {
+        if let Some(ref bus) = self.domain_bus {
+            bus.publish(event);
+        }
     }
 }
 
@@ -137,6 +155,11 @@ impl NotesTool {
         self.repo.create_note(&row).await?;
         self.maybe_set_tags(p, &id).await?;
 
+        self.publish(DomainEvent::NoteCreated {
+            note_id: id.clone(),
+            title: title.to_string(),
+        });
+
         Ok(format!("Created note \"{title}\" (id: {id})"))
     }
 
@@ -207,6 +230,16 @@ impl NotesTool {
             .await?;
         self.maybe_set_tags(p, id).await?;
 
+        self.publish(DomainEvent::NoteUpdated {
+            note_id: updated.id.clone(),
+            title: updated.title.clone(),
+        });
+        if body.is_some() {
+            self.publish(DomainEvent::NoteContentChanged {
+                note_id: updated.id.clone(),
+            });
+        }
+
         Ok(format!(
             "Updated note \"{}\" (id: {})",
             updated.title, updated.id
@@ -216,6 +249,9 @@ impl NotesTool {
     async fn handle_delete_note(&self, p: &ParamExtractor<'_>) -> Result<String> {
         let id = p.required_str("id")?;
         if self.repo.delete_note(id).await? {
+            self.publish(DomainEvent::NoteDeleted {
+                note_id: id.to_string(),
+            });
             Ok(format!("Deleted note {id}"))
         } else {
             Err(ToolError::InvalidParams(format!("Note not found: {id}")).into())

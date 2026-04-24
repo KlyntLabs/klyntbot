@@ -65,7 +65,10 @@ async fn main() -> Result<()> {
                 }
             });
 
-            let whitelist = config.mcp.server.exposed_tools.clone();
+            // Read whitelist from AppCore's finalized config (it auto-fills from
+            // AiFeatureRegistry when the user leaves exposed_tools empty). Reading
+            // from the local `config` here would observe the pre-fill empty list.
+            let whitelist = app.config.read().await.mcp.server.exposed_tools.clone();
 
             if http {
                 let bind_host = host.unwrap_or_else(|| config.mcp.server.host.clone());

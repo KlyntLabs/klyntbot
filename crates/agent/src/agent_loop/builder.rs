@@ -1454,7 +1454,11 @@ impl AgentLoopBuilder {
         // redundant SQL queries on boot (~50ms savings).
         if let Some(pool) = &self.pool {
             let note_repo = feature_notes::repo::NoteRepo::new(pool.clone());
-            tool_registry.register(feature_notes::tool::NotesTool::new(note_repo));
+            let mut notes_tool = feature_notes::tool::NotesTool::new(note_repo);
+            if let Some(ref bus) = self.domain_event_bus {
+                notes_tool = notes_tool.with_domain_bus(bus.clone());
+            }
+            tool_registry.register(notes_tool);
             info!("Notes tool registered");
         }
 
