@@ -15,6 +15,8 @@ pub mod scope;
 pub mod transport;
 /// `ingest_event_log` persistence.
 pub mod store;
+/// Touch-file rate-limited stderr warnings.
+pub mod warn;
 
 pub use event::{
     AgentEvent, AgentEventV1, AgentSource, DiagnosticsDelta, EventKind, FileOp,

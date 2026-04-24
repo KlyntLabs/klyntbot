@@ -24,6 +24,7 @@ tempfile = { workspace = true }
 cognitive = { workspace = true }
 coding-memory = { path = "../coding-memory" }
 storage = { workspace = true }
+filetime = "0.2"
 
 [[bin]]
 name = "klyntbot-hook"
