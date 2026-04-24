@@ -53,17 +53,3 @@ Non-blocking issues deferred for later. Not part of any active plan; pick up onc
 **Next steps:**
 - Not a bug. To exercise in test: either wait for real usage over days, or write a one-off integration test that seeds many episodic memories, forces `record_co_retrieval` with repeated fact pairs, and asserts `co_activation.strength >= 2.0` triggers a `CoActivationStrengthened` event.
 
----
-
-## 4. Heuristic consolidator lacks a real extractor wire-up
-
-**Observed (2026-04-24):** The `extraction` module exists at `crates/cognitive/src/extraction/` with `ExtractedEntity`, `ExtractedRelationship`, and `extract_facts_from_observation` shapes, but `heuristic_promote` in `pipeline/consolidator.rs` doesn't call any of them. Word-boundary matching now prevents the worst parse artifacts, but this remains a shortcut rather than proper extraction.
-
-**Scope:** Architectural decision deferred. Either:
-- (a) LLM-based extraction (high quality, high cost) in a nightly reforge pass.
-- (b) Rule-based extraction (regex/templates) in the live path.
-- (c) Hybrid: episodes now, facts from nightly reforge.
-
-**Recommend (c).** Episodes are effectively free and content-preserving. Facts are knowledge claims that deserve a higher bar — batch them in reforge where extraction quality can be audited and reworked.
-
-**Interim state:** Word-boundary `extract_spo` in `consolidator.rs` prevents the blatant substring-matching pollution ("th.is", "task.s") from reaching `semantic_facts`, but still produces approximate SVOs from chat turns. Good enough to ship; not good enough to train reforge on without the full extractor.

@@ -94,8 +94,16 @@ pub fn heuristic_promote(clusters: &[KnowledgeCluster]) -> Vec<PromotionOp> {
                 domain: cluster.domain,
                 confidence: cluster.max_confidence,
             });
-        } else if cluster.max_confidence >= 0.6 || cluster.convergence_score >= 0.4 {
-            let (subject, predicate, object) = extract_spo(&cluster.merged_subject);
+        } else if let Some((subject, predicate, object)) = (cluster.max_confidence >= 0.6
+            || cluster.convergence_score >= 0.4)
+            .then(|| extract_spo(&cluster.merged_subject))
+            .flatten()
+        {
+            // Only promote to a fact when we can extract a real predicate.
+            // Otherwise fall through to the episode branch — an approximate
+            // SVO like ("user", "noted", raw_text) is noise in semantic_facts
+            // and the LLM-driven path (LlmExtractionHandler / Deep mode) is
+            // where high-quality facts should come from. See backlog item 6.
             ops.push(PromotionOp::CreateFact {
                 subject,
                 predicate,
@@ -164,12 +172,14 @@ pub async fn deep_promote(
     }
 }
 
-fn extract_spo(text: &str) -> (String, String, String) {
+fn extract_spo(text: &str) -> Option<(String, String, String)> {
     // Match predicates only at word boundaries so "is" matches the
     // word "is" but not the substring "th**is**" or "task**s**".
-    // Without this, chat turns like "what tasks are due this week" get
-    // split into ("what task", "s", "...") or ("what task", "is", "week"),
-    // polluting `semantic_facts` with parse artifacts (see backlog item 6).
+    // Returns `None` when no real predicate is found — the caller must
+    // promote the cluster to an Episode rather than emit a synthetic
+    // ("user", "noted", text) fact that pollutes semantic_facts. The
+    // LLM extractor path (`LlmExtractionHandler`, Deep mode) is where
+    // high-quality facts are sourced.
     let lower = text.to_lowercase();
     for pred in [
         "is a", "is", "has", "prefers", "uses", "works", "likes", "wants", "needs",
@@ -186,10 +196,10 @@ fn extract_spo(text: &str) -> (String, String, String) {
         let subject = text[..idx].trim().to_string();
         let object = text[idx + skip..].trim().to_string();
         if !subject.is_empty() && !object.is_empty() {
-            return (subject, pred.to_string(), object);
+            return Some((subject, pred.to_string(), object));
         }
     }
-    ("user".into(), "noted".into(), text.to_string())
+    None
 }
 
 pub fn promotion_source(signals: &[CognitiveSignal]) -> String {
@@ -310,23 +320,37 @@ mod tests {
 
     #[test]
     fn test_extract_spo() {
-        let (s, p, o) = extract_spo("Jayden is a software engineer");
+        let (s, p, o) = extract_spo("Jayden is a software engineer").unwrap();
         assert_eq!(s, "Jayden");
         assert_eq!(p, "is a");
         assert_eq!(o, "software engineer");
     }
 
     #[test]
-    fn test_extract_spo_does_not_match_substrings() {
-        // Regression: `extract_spo` used to return ("what tasks are due th", "is", "week")
-        // by matching "is" inside "this". Must only match at word boundaries.
-        let (s, p, o) = extract_spo("what tasks are due this week");
-        assert_eq!(
-            s, "user",
-            "substring match produced a fake subject: {s:?}/{p:?}/{o:?}"
+    fn test_extract_spo_returns_none_on_no_predicate() {
+        // Regression: used to return ("user", "noted", text) — a garbage
+        // fact. Must now return None so the caller promotes to an Episode.
+        assert!(extract_spo("what tasks are due this week").is_none());
+        assert!(extract_spo("random chat turn with no predicate").is_none());
+    }
+
+    #[test]
+    fn test_promote_no_predicate_falls_to_episode() {
+        // Cluster above the fact threshold but without a real predicate
+        // should become an Episode, not a ("user", "noted", ...) fact.
+        let clusters = group_signals(vec![sig(
+            SignalSource::ChatTurn,
+            "what tasks are due this week",
+            ai_core::RecallDomain::General,
+            0.7,
+        )]);
+        let ops = heuristic_promote(&clusters);
+        assert_eq!(ops.len(), 1);
+        assert!(
+            matches!(&ops[0], PromotionOp::CreateEpisode { .. }),
+            "expected Episode, got {:?}",
+            ops[0]
         );
-        assert_eq!(p, "noted");
-        assert_eq!(o, "what tasks are due this week");
     }
 
     #[test]
