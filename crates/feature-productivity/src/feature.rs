@@ -9,7 +9,7 @@ use tools_core::{DynTool, FeatureMigration, FeaturePackage, HealthStatus};
 
 use crate::tool::ProductivityTool;
 
-#[derive(AiFeature)]
+#[derive(AiFeature, Default)]
 #[ai(
     recall_domain = "Productivity",
     skill = "automation",
@@ -26,12 +26,6 @@ impl ProductivityFeature {
         Self {
             tool: Some(Arc::new(tool)),
         }
-    }
-}
-
-impl Default for ProductivityFeature {
-    fn default() -> Self {
-        Self { tool: None }
     }
 }
 

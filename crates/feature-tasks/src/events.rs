@@ -141,8 +141,8 @@ impl From<TaskEvent> for DomainEvent {
             TaskEvent::Deferred {
                 task_id,
                 title: _,
-                previous_due,
-                new_due,
+                previous_due: _,
+                new_due: _,
             } => DomainEvent::TaskDeferred {
                 task_id,
                 times_deferred: 1,

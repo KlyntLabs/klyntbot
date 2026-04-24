@@ -134,6 +134,7 @@ impl PredictiveEngine {
 
 /// FSRS-inspired stability update (same formula as cognitive::decay::update_stability).
 /// Inlined to avoid L4→L5 dependency violation.
+#[allow(dead_code)]
 fn fsrs_update_stability(current: f64, success: bool, max: f64) -> f64 {
     if success {
         (current + (1.0 + current).ln().max(0.1)).min(max)
@@ -163,6 +164,7 @@ fn parse_hour(iso: &str) -> Option<usize> {
     Some(hour)
 }
 
+#[allow(dead_code)]
 fn parse_time_frac(time_str: &str) -> f64 {
     jiff::civil::Time::strptime("%H:%M", time_str)
         .map(|t| t.hour() as f64 + t.minute() as f64 / 60.0)

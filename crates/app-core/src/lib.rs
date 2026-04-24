@@ -1,5 +1,6 @@
 pub mod adapters;
 pub mod brain_voice;
+pub mod coding_memory;
 pub mod errors;
 pub mod events;
 pub mod focus;

@@ -51,7 +51,7 @@ async fn check_expired(bus: &DomainEventBus, task_repo: &TaskRepo) {
 
         let deadline = match &row.focus_deadline {
             Some(d) => {
-                let ts: jiff::Timestamp = (*d).clone().into();
+                let ts: jiff::Timestamp = (*d).into();
                 ts
             }
             None => continue,

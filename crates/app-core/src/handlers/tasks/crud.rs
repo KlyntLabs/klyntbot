@@ -219,7 +219,7 @@ impl AppCore {
         // Emit TaskDeferred when due_date was pushed to a later date.
         if let Some(new_due_ts) = &updated.due_date {
             let new_due: jiff::civil::Date = {
-                let ts: jiff::Timestamp = (*new_due_ts).clone().into();
+                let ts: jiff::Timestamp = (*new_due_ts).into();
                 ts.to_zoned(jiff::tz::TimeZone::UTC).date()
             };
             let is_deferred = match previous_due {
