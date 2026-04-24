@@ -21,6 +21,8 @@ pub mod warn;
 pub mod hook_client;
 /// `desktop.lock` heartbeat helpers.
 pub mod desktop_lock;
+/// Path-based privacy exclusion filter.
+pub mod excludes;
 
 pub use event::{
     AgentEvent, AgentEventV1, AgentSource, DiagnosticsDelta, EventKind, FileOp,
