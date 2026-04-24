@@ -36,10 +36,10 @@ pub use repos::semantic_fact::DomainHealthRow;
 pub use repos::AtomExtractionCache;
 pub use repos::FsrsParamsRepo;
 pub use repos::{
-    cognitive_migrations, AccumulatedObservationRepo, AnnotationRepo, CoActivationRepo,
-    CommunityRepo, ConversationDensityRepo, EntityRepo, EpisodicMemoryRepo, EventLogRepo,
-    FactChangelogRepo, FailedObservationRepo, KnowledgeSnapshotRepo, MetricRepo,
-    ProceduralRuleRepo, SemanticFactRepo,
+    cognitive_migrations, AccumulatedObservationRepo, AiSignalIndexRepo, AnnotationRepo,
+    CoActivationRepo, CommunityRepo, ConversationDensityRepo, EntityRepo, EpisodicMemoryRepo,
+    EventLogRepo, FactChangelogRepo, FailedObservationRepo, IndexedSignal, KnowledgeSnapshotRepo,
+    MetricRepo, ProceduralRuleRepo, SemanticFactRepo,
 };
 pub use repos::{BlackboardEntry, BlackboardRepo, NewBlackboardEntry};
 pub use repos::{

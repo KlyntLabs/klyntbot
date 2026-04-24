@@ -145,10 +145,7 @@ mod tests {
     #[test]
     fn display_matches_as_str() {
         assert_eq!(format!("{}", EventDomain::Finance), "finance");
-        assert_eq!(
-            format!("{}", EventDomain::Custom("x".to_string())),
-            "x"
-        );
+        assert_eq!(format!("{}", EventDomain::Custom("x".to_string())), "x");
     }
 
     #[test]

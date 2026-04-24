@@ -4,6 +4,7 @@
 //! in `voice_engine::error_classifier` and `voice_engine::pronunciation_analyzer`.
 //! This module re-exports them and adds feature-specific report types.
 
+use ai_core_macros::AiEntity;
 use serde::{Deserialize, Serialize};
 
 // Re-export canonical pipeline types.
@@ -32,12 +33,32 @@ pub struct FluencyMetrics {
 }
 
 /// A phoneme that the learner consistently struggles with.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, AiEntity)]
 #[serde(rename_all = "camelCase")]
+#[ai(entity_type = "weak_phoneme", embed_on = ["phoneme", "language"])]
 pub struct WeakPhoneme {
     pub phoneme: String,
     pub language: String,
     pub stability: f32,
     pub encounters: u32,
     pub error_rate: f32,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use ai_core::AiEntity;
+
+    #[test]
+    fn weak_phoneme_ai_entity() {
+        let w = WeakPhoneme {
+            phoneme: "θ".into(),
+            language: "en".into(),
+            stability: 0.3,
+            encounters: 12,
+            error_rate: 0.7,
+        };
+        assert_eq!(WeakPhoneme::entity_type(), "weak_phoneme");
+        assert_eq!(w.embed_text(), "θ\nen");
+    }
 }

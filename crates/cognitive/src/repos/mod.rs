@@ -1,5 +1,6 @@
 pub mod accumulated_observation;
 pub mod ai_metric_samples;
+pub mod ai_signal_index;
 pub mod annotation;
 pub mod atom_extraction_cache;
 pub mod blackboard;
@@ -31,6 +32,7 @@ pub mod squad;
 
 pub use accumulated_observation::AccumulatedObservationRepo;
 pub use ai_metric_samples::MetricRepo;
+pub use ai_signal_index::{AiSignalIndexRepo, IndexedSignal};
 pub use annotation::AnnotationRepo;
 pub use atom_extraction_cache::AtomExtractionCache;
 pub use blackboard::{BlackboardEntry, BlackboardRepo, NewBlackboardEntry};
@@ -131,6 +133,13 @@ pub fn cognitive_migrations() -> Vec<FeatureMigration> {
             version: 1,
             description: "Unified AI metric samples table".to_string(),
             sql: include_str!("../../migrations/005_ai_metric_samples.sql").to_string(),
+        },
+        FeatureMigration {
+            feature_name: "cognitive_retrieval_index".to_string(),
+            version: 1,
+            description: "ai_signal_index table — retrieval-side projection of AiSignal stream"
+                .to_string(),
+            sql: include_str!("../../migrations/006_retrieval_index.sql").to_string(),
         },
     ]
 }

@@ -587,7 +587,16 @@ impl AppCore {
                 activity_log::NormalizerSignalConsumer::new(Arc::clone(&activity_svc)),
             );
 
-            // Build consumer list: 9 base + mirror consumers
+            // Retrieval indexer — projects AiSignals into ai_signal_index for
+            // CognitiveContextSource to query on recall. Skips Discard-salience
+            // signals and any below the default 0.2 importance floor.
+            let signal_index_repo =
+                ::cognitive::AiSignalIndexRepo::new(storage_pool.inner().clone());
+            let retrieval_indexer: Arc<dyn ai_core::SignalConsumer> = Arc::new(
+                ::cognitive::consumers::RetrievalIndexer::new(signal_index_repo),
+            );
+
+            // Build consumer list: 10 base + mirror consumers
             let mut consumers: Vec<Arc<dyn ai_core::SignalConsumer>> = vec![
                 ingestion,
                 chat_turn,
@@ -598,13 +607,14 @@ impl AppCore {
                 coaching_consumer,
                 metric_harvest,
                 activity_normalizer,
+                retrieval_indexer,
             ];
             consumers.extend(mirror_consumers.iter().cloned());
 
             let router = ai_pipeline::start(Arc::clone(&domain_event_bus), consumers);
             info!(
-                "AI pipeline SignalRouter started with {} consumers (9 base + {} mirror)",
-                9 + mirror_consumers.len(),
+                "AI pipeline SignalRouter started with {} consumers (10 base + {} mirror)",
+                10 + mirror_consumers.len(),
                 mirror_consumers.len()
             );
 
