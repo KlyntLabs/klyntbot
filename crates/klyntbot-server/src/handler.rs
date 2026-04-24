@@ -304,7 +304,7 @@ impl ServerHandler for KlyntbotServerHandler {
                     .bridge
                     .execute(name, params.clone(), &self.session_id)
                     .await?;
-                emit_entity_update_for_tool(&self.app.event_emitter, name, &params);
+                emit_entity_update_for_tool(&self.app, &self.app.event_emitter, name, &params);
                 Ok(result)
             }
         }
@@ -322,9 +322,29 @@ impl ServerHandler for KlyntbotServerHandler {
 /// Read-only actions that should not trigger entity update events.
 const READ_ONLY_ACTIONS: &[&str] = &["list", "show", "get", "search", "status", "stats", "query"];
 
+/// Non-AiFeature tools that still need entity-update fan-out. These are tools
+/// registered directly in the agent builder (OkrTool, ProjectTool, AreaTool,
+/// WorkContextTool) rather than via `FeaturePackage::tools()`. If a tool is
+/// later promoted to an `AiFeature`, its mapping moves into the registry and
+/// this fallback entry becomes dead.
+const NON_FEATURE_TOOL_ENTITY_KINDS: &[(&str, EntityKind)] = &[
+    ("okr", EntityKind::Objective),
+    ("project", EntityKind::Project),
+    ("area", EntityKind::Area),
+    ("work_context", EntityKind::Productivity),
+    ("productivity", EntityKind::Productivity),
+];
+
 /// Emit an `entity:updated` event after a successful MCP tool call,
 /// but only for mutating actions (create, update, delete, etc.).
+///
+/// Dispatch source of truth:
+/// 1. `AiFeatureRegistry` — any tool declared via `#[derive(AiFeature)]` with
+///    `tool_name` + `entity_kind` dispatches automatically.
+/// 2. `NON_FEATURE_TOOL_ENTITY_KINDS` — fallback for tools registered outside
+///    the `FeaturePackage` path (OKR / project / area / work_context).
 fn emit_entity_update_for_tool(
+    app: &Arc<AppCore>,
     emitter: &Arc<dyn AppEventEmitter>,
     tool_name: &str,
     params: &serde_json::Value,
@@ -335,21 +355,25 @@ fn emit_entity_update_for_tool(
         return;
     }
 
-    let entity_kind = match tool_name {
-        "tasks" => EntityKind::Task,
-        "project" => EntityKind::Project,
-        "area" => EntityKind::Area,
-        "notes" => EntityKind::Note,
-        "okr" => EntityKind::Objective,
-        "finance" => EntityKind::Finance,
-        "productivity" => EntityKind::Productivity,
-        "work_context" => EntityKind::Productivity,
-        _ => return,
+    let entity_kind = app
+        .feature_registry
+        .iter()
+        .find(|r| r.tool_name == Some(tool_name))
+        .and_then(|r| r.entity_kind.and_then(EntityKind::parse))
+        .or_else(|| {
+            NON_FEATURE_TOOL_ENTITY_KINDS
+                .iter()
+                .find(|(n, _)| *n == tool_name)
+                .map(|(_, k)| k.clone())
+        });
+
+    let Some(entity_kind) = entity_kind else {
+        return;
     };
 
     let id = params.get("id").and_then(|v| v.as_str()).unwrap_or("*");
 
-    emitter.emit_entity_updated(entity_kind.clone(), id);
+    emitter.emit_entity_updated(entity_kind, id);
 
     // OKR tool can mutate both objectives and key results.
     if tool_name == "okr" {

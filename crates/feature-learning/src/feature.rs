@@ -30,15 +30,6 @@ impl LearningFeature {
     pub fn migration_sql() -> &'static str {
         include_str!("../migrations/001_create_learning.sql")
     }
-
-    pub fn migrations_static() -> Vec<FeatureMigration> {
-        vec![FeatureMigration {
-            feature_name: "learning".to_string(),
-            version: 1,
-            description: "Placeholder: tables owned by cognitive in v3".to_string(),
-            sql: Self::migration_sql().to_string(),
-        }]
-    }
 }
 
 #[async_trait]
@@ -54,7 +45,12 @@ impl FeaturePackage for LearningFeature {
     }
 
     fn migrations(&self) -> Vec<FeatureMigration> {
-        Self::migrations_static()
+        vec![FeatureMigration {
+            feature_name: "learning".to_string(),
+            version: 1,
+            description: "Placeholder: tables owned by cognitive in v3".to_string(),
+            sql: Self::migration_sql().to_string(),
+        }]
     }
 
     async fn health_check(&self) -> Result<HealthStatus> {

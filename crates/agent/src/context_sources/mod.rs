@@ -6,7 +6,6 @@
 pub mod annotation;
 pub mod area;
 pub mod bootstrap;
-pub mod confidence;
 pub mod identity;
 pub mod page_context;
 pub mod persona;
@@ -19,7 +18,6 @@ pub mod todo;
 pub use annotation::AnnotationContextSource;
 pub use area::AreaSource;
 pub use bootstrap::BootstrapSource;
-pub use confidence::ConfidenceSource;
 pub use identity::IdentitySource;
 pub use page_context::PageContextSource;
 pub use persona::PersonaContextSource;

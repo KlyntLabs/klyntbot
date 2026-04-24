@@ -46,7 +46,6 @@ pub use agent_loop::{AgentLoop, StreamingHandle};
 pub use agent_runtime::{AgentRuntime, RuntimeConfig, RuntimeResult};
 pub use cognitive_embedder::TextEmbedderImpl;
 pub use confidence::{ConfidenceAssessment, ConfidenceEvaluator, DecisionAction, DecisionLogger};
-pub use context_sources::ConfidenceSource;
 pub use conversation_recall::ConversationRecallHandlerImpl;
 pub use cron::CronHandlerAdapter;
 pub use events::AgentEvent;

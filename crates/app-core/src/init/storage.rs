@@ -147,7 +147,9 @@ pub(super) async fn init_storage(
     // Run learning feature migrations (placeholder in v3; tables live in cognitive).
     StoragePool::run_feature_migrations(
         storage_pool.inner(),
-        &feature_learning::LearningFeature::migrations_static(),
+        &<feature_learning::LearningFeature as tools_core::FeaturePackage>::migrations(
+            &feature_learning::LearningFeature::default(),
+        ),
     )
     .await
     .map_err(|e| format!("learning migration failed: {e}"))?;

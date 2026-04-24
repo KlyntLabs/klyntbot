@@ -1353,46 +1353,4 @@ mod tests {
         assert_eq!(reaction_to_satisfaction("hello"), None);
         assert_eq!(reaction_to_satisfaction(""), None);
     }
-
-    /// AC-I2.3/2.4: Learning subscriber updates ConfidenceSource threshold
-    /// when LearningService publishes a ThresholdChanged event.
-    #[tokio::test]
-    async fn test_learning_subscriber_updates_confidence_threshold() {
-        use crate::context_sources::ConfidenceSource;
-        use std::sync::atomic::Ordering;
-
-        let source = ConfidenceSource::new(0.70);
-        let threshold_handle = source.threshold_handle();
-
-        let event_bus = Arc::new(LearningEventBus::new(16));
-        let handle_for_subscriber = threshold_handle.clone();
-        let mut rx = event_bus.subscribe();
-
-        // Spawn subscriber (same pattern as AgentLoop::new_with_cron wires it)
-        let handle = tokio::spawn(async move {
-            while let Ok(event) = rx.recv().await {
-                if let LearningEvent::ThresholdChanged { new_threshold, .. } = event {
-                    handle_for_subscriber.store(new_threshold.to_bits(), Ordering::Relaxed);
-                }
-            }
-        });
-
-        // Publish threshold change (what LearningService will do)
-        event_bus.publish(LearningEvent::ThresholdChanged {
-            old_threshold: 0.70,
-            new_threshold: 0.82,
-            reason: "test_subscriber".to_string(),
-        });
-
-        tokio::time::sleep(Duration::from_millis(50)).await;
-
-        let actual = f32::from_bits(threshold_handle.load(Ordering::Relaxed));
-        assert!(
-            (actual - 0.82).abs() < f32::EPSILON,
-            "Expected threshold 0.82, got {}",
-            actual
-        );
-
-        handle.abort();
-    }
 }
