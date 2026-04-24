@@ -78,7 +78,8 @@ impl FocusManager {
         };
 
         let now = jiff::Timestamp::now();
-        let actual_mins = (now.as_second() - session.started_at.as_second()) / 60;
+        let duration_secs = (now.as_second() - session.started_at.as_second()).max(0);
+        let actual_mins = duration_secs / 60;
         let target = session
             .target_mins
             .unwrap_or(self.config.default_duration_mins as i64);
@@ -94,7 +95,10 @@ impl FocusManager {
         self.repos.sessions.update(&session).await?;
 
         if let Some(ref bus) = self.domain_bus {
-            let duration_mins = session.actual_mins.unwrap_or(0).max(0) as u32;
+            // Fallback quality when QualityScorer hasn't run yet: 1 - (interruptions
+            // per minute), clamped 0..1. Shared across both events so they stay
+            // consistent; the real post-hoc score lands on the session row later.
+            let duration_mins = (duration_secs / 60).max(0) as u32;
             let quality = if let Some(q) = session.quality_score {
                 q.clamp(0.0, 1.0)
             } else if duration_mins > 0 {
@@ -104,8 +108,8 @@ impl FocusManager {
             };
             bus.publish(
                 ProductivityEvent::FocusSessionEnded {
-                    duration_secs: session.actual_mins.unwrap_or(0) * 60,
-                    quality: session.quality_score.unwrap_or(0.0),
+                    duration_secs,
+                    quality,
                     interruptions: session.interruptions as i32,
                 }
                 .into(),
