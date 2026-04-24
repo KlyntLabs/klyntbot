@@ -96,5 +96,19 @@ async fn row_count_check(pool: &StoragePool) -> sqlx::Result<()> {
     Ok(())
 }
 
+#[tokio::test]
+async fn migration_is_idempotent() {
+    use cognitive::cognitive_migrations;
+    let pool = StoragePool::connect_in_memory().await.expect("pool");
+    let migs = coding_memory::coding_memory_migrations();
+    StoragePool::run_feature_migrations(pool.inner(), &cognitive_migrations()).await.expect("cog");
+    StoragePool::run_feature_migrations(pool.inner(), &migs).await.expect("first");
+    // Second run must not fail (pre-release policy: versioned idempotent).
+    StoragePool::run_feature_migrations(pool.inner(), &migs).await.expect("second");
+    let row: (i64,) = sqlx::query_as("SELECT COUNT(*) FROM ingest_event_log")
+        .fetch_one(pool.inner()).await.expect("count");
+    assert_eq!(row.0, 0);
+}
+
 /// Silence clippy about the unused helper trait method.
 const _: () = ();

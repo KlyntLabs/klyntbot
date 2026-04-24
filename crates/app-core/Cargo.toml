@@ -11,6 +11,7 @@ autotuner = { workspace = true }
 bus = { workspace = true }
 channels = { workspace = true }
 coding-memory = { workspace = true }
+coding-ingest = { path = "../coding-ingest" }
 cognitive = { workspace = true }
 common = { workspace = true }
 config = { workspace = true }
