@@ -45,12 +45,46 @@ impl UnixIngestSocket {
     }
 }
 
+const MAX_PAYLOAD_BYTES: usize = 1024 * 1024;
+const SEND_TIMEOUT_MS: u64 = 200;
+
 #[async_trait]
 impl IngestSocket for UnixIngestSocket {
-    async fn send(&self, _event: &AgentEvent) -> Result<()> {
-        Err(KlyntbotError::NotImplemented(
-            "UnixIngestSocket::send lands in Phase 2".into(),
-        ))
+    async fn send(&self, event: &AgentEvent) -> Result<()> {
+        use tokio::io::AsyncWriteExt;
+        use tokio::net::UnixStream;
+        use tokio::time::{timeout, Duration};
+
+        let body = serde_json::to_vec(event)
+            .map_err(|e| KlyntbotError::Storage(format!("serialize: {e}")))?;
+        if body.len() > MAX_PAYLOAD_BYTES {
+            return Err(KlyntbotError::Storage(format!(
+                "payload {} > {} bytes",
+                body.len(),
+                MAX_PAYLOAD_BYTES
+            )));
+        }
+        let len = u32::try_from(body.len())
+            .map_err(|_| KlyntbotError::Storage("payload overflow".into()))?
+            .to_le_bytes();
+
+        let dl = Duration::from_millis(SEND_TIMEOUT_MS);
+        let mut stream = timeout(dl, UnixStream::connect(&self.path))
+            .await
+            .map_err(|_| KlyntbotError::Storage("socket connect timeout".into()))?
+            .map_err(|e| KlyntbotError::Storage(format!("socket connect: {e}")))?;
+
+        timeout(dl, async {
+            stream.write_all(&len).await?;
+            stream.write_all(&body).await?;
+            stream.shutdown().await?;
+            Ok::<_, std::io::Error>(())
+        })
+        .await
+        .map_err(|_| KlyntbotError::Storage("socket write timeout".into()))?
+        .map_err(|e| KlyntbotError::Storage(format!("socket write: {e}")))?;
+
+        Ok(())
     }
 }
 
