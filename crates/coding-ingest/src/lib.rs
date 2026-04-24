@@ -19,6 +19,8 @@ pub mod store;
 pub mod warn;
 /// `HookClient` — socket-first-else-buffer dispatcher.
 pub mod hook_client;
+/// `desktop.lock` heartbeat helpers.
+pub mod desktop_lock;
 
 pub use event::{
     AgentEvent, AgentEventV1, AgentSource, DiagnosticsDelta, EventKind, FileOp,
