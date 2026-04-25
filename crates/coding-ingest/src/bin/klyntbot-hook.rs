@@ -153,15 +153,33 @@ fn read_last_distilled(db_path: &std::path::Path) -> Option<String> {
 }
 
 fn home_dir() -> PathBuf {
-    let root = std::env::var("KLYNTBOT_HOME")
-        .ok()
-        .map(PathBuf::from)
-        .unwrap_or_else(|| {
+    let raw = std::env::var("KLYNTBOT_HOME").ok();
+    let root = match raw.as_deref() {
+        Some(p) if !p.trim().is_empty() => expand_tilde(p),
+        _ => {
             let h = std::env::var("HOME").unwrap_or_else(|_| "/tmp".into());
             PathBuf::from(h).join(".klyntbot")
-        });
+        }
+    };
     let _ = std::fs::create_dir_all(&root);
     root
+}
+
+/// Expand a leading `~` against `$HOME`. dotenv-loaded env vars carry the
+/// literal string (no shell expansion), so `KLYNTBOT_HOME=~/.klyntbot-dev`
+/// would otherwise create a relative `~/` directory under cwd.
+fn expand_tilde(p: &str) -> PathBuf {
+    if let Some(rest) = p.strip_prefix("~/") {
+        if let Ok(h) = std::env::var("HOME") {
+            return PathBuf::from(h).join(rest);
+        }
+    }
+    if p == "~" {
+        if let Ok(h) = std::env::var("HOME") {
+            return PathBuf::from(h);
+        }
+    }
+    PathBuf::from(p)
 }
 
 fn enrich_with_scope(event: AgentEvent) -> AgentEvent {
