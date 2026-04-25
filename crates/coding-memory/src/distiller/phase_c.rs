@@ -48,17 +48,25 @@ pub enum ReconcileDecision {
 /// Decide how to reconcile `candidate` against pre-fetched `similar` rows.
 #[must_use]
 pub fn reconcile(candidate: &SemanticFact, similar: &[SimilarFact]) -> ReconcileDecision {
-    let Some(top) = similar.iter().max_by(|a, b| a.similarity.partial_cmp(&b.similarity).unwrap_or(std::cmp::Ordering::Equal)) else {
+    let Some(top) = similar.iter().max_by(|a, b| {
+        a.similarity
+            .partial_cmp(&b.similarity)
+            .unwrap_or(std::cmp::Ordering::Equal)
+    }) else {
         return ReconcileDecision::Add;
     };
     if top.similarity > NOOP_THRESHOLD
         && top.fact.subject == candidate.subject
         && top.fact.predicate == candidate.predicate
     {
-        return ReconcileDecision::Noop { predecessor_id: top.fact.id.clone() };
+        return ReconcileDecision::Noop {
+            predecessor_id: top.fact.id.clone(),
+        };
     }
     if top.similarity > SUPERSEDE_THRESHOLD {
-        return ReconcileDecision::Supersede { predecessor_id: top.fact.id.clone() };
+        return ReconcileDecision::Supersede {
+            predecessor_id: top.fact.id.clone(),
+        };
     }
     ReconcileDecision::Add
 }

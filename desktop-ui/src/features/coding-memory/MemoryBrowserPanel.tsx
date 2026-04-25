@@ -13,7 +13,9 @@ export function MemoryBrowserPanel() {
       <div className="space-y-2">
         {data?.map((row) => (
           <div key={row.id} className="glass-surface rounded-xl p-3 text-sm">
-            <div className="font-medium">{row.subject} → {row.predicate}</div>
+            <div className="font-medium">
+              {row.subject} → {row.predicate}
+            </div>
             <div className="text-muted-foreground">{row.object}</div>
           </div>
         ))}

@@ -4,11 +4,9 @@
 //! two `record_observation` tool calls. We include the Phase-A turn trace
 //! (compact JSON), the user's prompt, and the assistant's final message.
 
-use super::{TestOutcome, TurnTrace};
 use super::error::DistillerError;
-use super::record_observation::{
-    decode_observations, record_observation_tool_def, Observation,
-};
+use super::record_observation::{decode_observations, record_observation_tool_def, Observation};
+use super::{TestOutcome, TurnTrace};
 
 /// Built prompt ready to hand to `ProviderManager::chat`.
 #[derive(Debug, Clone)]
@@ -32,7 +30,9 @@ pub fn build_prompt(
     let system = SYSTEM_PROMPT.to_string();
 
     let trace_summary = summarize_trace(trace);
-    let scope = repo_id.map(|r| format!("repo:{r}")).unwrap_or_else(|| "global".into());
+    let scope = repo_id
+        .map(|r| format!("repo:{r}"))
+        .unwrap_or_else(|| "global".into());
 
     let mut user = String::new();
     user.push_str(&format!("## Scope\n{scope}\n\n"));
@@ -52,13 +52,18 @@ pub fn build_prompt(
         user.push_str("\n[truncated]");
     }
 
-    DistillerPrompt { system, user_message: user }
+    DistillerPrompt {
+        system,
+        user_message: user,
+    }
 }
 
 fn truncate(s: &str, max: usize) -> &str {
     if s.len() > max {
         let mut end = max;
-        while !s.is_char_boundary(end) { end -= 1; }
+        while !s.is_char_boundary(end) {
+            end -= 1;
+        }
         &s[..end]
     } else {
         s
@@ -71,35 +76,66 @@ fn summarize_trace(t: &TurnTrace) -> String {
         out.push_str(&format!("- filesRead: {}\n", path_list(&t.files_read)));
     }
     if !t.files_modified.is_empty() {
-        let modified: Vec<String> = t.files_modified.iter()
+        let modified: Vec<String> = t
+            .files_modified
+            .iter()
             .map(|(p, n)| format!("{} ({}b)", p.to_string_lossy(), n))
             .collect();
         out.push_str(&format!("- filesModified: {}\n", modified.join(", ")));
     }
     if !t.commands_run.is_empty() {
-        let cmds = t.commands_run.iter().take(20).cloned().collect::<Vec<_>>().join(" | ");
+        let cmds = t
+            .commands_run
+            .iter()
+            .take(20)
+            .cloned()
+            .collect::<Vec<_>>()
+            .join(" | ");
         out.push_str(&format!("- commandsRun: {cmds}\n"));
     }
     if !t.test_outcomes.is_empty() {
         out.push_str("- testOutcomes:\n");
         for t in &t.test_outcomes {
-            out.push_str(&format!("  - {} ({}/{} passed/failed)\n",
-                t.framework.clone().unwrap_or_else(|| "?".into()), t.passed, t.failed));
-            let _ = TestOutcome { command: String::new(), framework: None, passed: 0, failed: 0 };
+            out.push_str(&format!(
+                "  - {} ({}/{} passed/failed)\n",
+                t.framework.clone().unwrap_or_else(|| "?".into()),
+                t.passed,
+                t.failed
+            ));
+            let _ = TestOutcome {
+                command: String::new(),
+                framework: None,
+                passed: 0,
+                failed: 0,
+            };
         }
     }
     if !t.errors_encountered.is_empty() {
-        out.push_str(&format!("- errors: {} encountered\n", t.errors_encountered.len()));
+        out.push_str(&format!(
+            "- errors: {} encountered\n",
+            t.errors_encountered.len()
+        ));
     }
     if let Some(u) = t.token_usage {
-        out.push_str(&format!("- tokenUsage: prompt={} completion={} cached={}\n",
-            u.prompt, u.completion, u.cached));
+        out.push_str(&format!(
+            "- tokenUsage: prompt={} completion={} cached={}\n",
+            u.prompt, u.completion, u.cached
+        ));
     }
-    if out.is_empty() { "- (no extractive signal)".into() } else { out }
+    if out.is_empty() {
+        "- (no extractive signal)".into()
+    } else {
+        out
+    }
 }
 
 fn path_list(paths: &[std::path::PathBuf]) -> String {
-    paths.iter().take(10).map(|p| p.to_string_lossy().to_string()).collect::<Vec<_>>().join(", ")
+    paths
+        .iter()
+        .take(10)
+        .map(|p| p.to_string_lossy().to_string())
+        .collect::<Vec<_>>()
+        .join(", ")
 }
 
 const SYSTEM_PROMPT: &str = "You are a memory distiller for a coding assistant. From this \
@@ -131,10 +167,19 @@ pub struct LlmInvocation<'a> {
 
 /// Run the Phase-B LLM call. Returns the list of decoded observations (may be empty).
 pub async fn invoke_llm(inv: LlmInvocation<'_>) -> Result<Vec<Observation>, DistillerError> {
-    let prompt = build_prompt(inv.user_prompt_text, inv.assistant_text, inv.trace, inv.repo_id);
+    let prompt = build_prompt(
+        inv.user_prompt_text,
+        inv.assistant_text,
+        inv.trace,
+        inv.repo_id,
+    );
     let messages: Vec<providers::types::Message> = vec![
-        providers::types::Message::System { content: prompt.system },
-        providers::types::Message::User { content: providers::types::UserContent::Text(prompt.user_message) },
+        providers::types::Message::System {
+            content: prompt.system,
+        },
+        providers::types::Message::User {
+            content: providers::types::UserContent::Text(prompt.user_message),
+        },
     ];
     let tools = Some(vec![record_observation_tool_def()]);
     let params = providers::types::ChatParams::new(inv.model.clone())
@@ -145,10 +190,15 @@ pub async fn invoke_llm(inv: LlmInvocation<'_>) -> Result<Vec<Observation>, Dist
     let fut = inv.provider.chat(&messages, tools.as_deref(), &params);
     let resp = tokio::time::timeout(inv.timeout, fut)
         .await
-        .map_err(|_| DistillerError::LlmTimeout { timeout_ms: inv.timeout.as_millis() as u64 })?
-        .map_err(|e| DistillerError::LlmProvider { detail: e.to_string() })?;
+        .map_err(|_| DistillerError::LlmTimeout {
+            timeout_ms: inv.timeout.as_millis() as u64,
+        })?
+        .map_err(|e| DistillerError::LlmProvider {
+            detail: e.to_string(),
+        })?;
 
-    let args: Vec<serde_json::Value> = resp.tool_calls
+    let args: Vec<serde_json::Value> = resp
+        .tool_calls
         .into_iter()
         .filter(|tc| tc.name == super::record_observation::RECORD_OBSERVATION_TOOL_NAME)
         .map(|tc| tc.arguments)

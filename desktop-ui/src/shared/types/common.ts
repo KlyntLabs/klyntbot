@@ -65,6 +65,7 @@ export type SidebarItem =
   | "Coaching"
   | "Brain"
   | "Automations"
+  | "CodingMemory"
   | "System"
   | "Settings";
 export type ViewMode = "table" | "board" | "tree";

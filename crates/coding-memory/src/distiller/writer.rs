@@ -61,8 +61,10 @@ impl DistillerWriter {
         }
 
         let metadata_json = merge_provenance(prepared.metadata_json, &prepared.provenance)?;
-        let json_str = serde_json::to_string(&metadata_json)
-            .map_err(|e| DistillerError::Storage { detail: format!("metadata serialize: {e}") })?;
+        let json_str =
+            serde_json::to_string(&metadata_json).map_err(|e| DistillerError::Storage {
+                detail: format!("metadata serialize: {e}"),
+            })?;
 
         self.facts
             .upsert_with_metadata(
@@ -71,7 +73,9 @@ impl DistillerWriter {
                 Some(&json_str),
             )
             .await
-            .map_err(|e| DistillerError::Storage { detail: format!("upsert_with_metadata: {e}") })?;
+            .map_err(|e| DistillerError::Storage {
+                detail: format!("upsert_with_metadata: {e}"),
+            })?;
         Ok(())
     }
 
@@ -82,8 +86,10 @@ impl DistillerWriter {
         }
 
         let metadata_json = merge_provenance(prepared.metadata_json, &prepared.provenance)?;
-        let json_str = serde_json::to_string(&metadata_json)
-            .map_err(|e| DistillerError::Storage { detail: format!("metadata serialize: {e}") })?;
+        let json_str =
+            serde_json::to_string(&metadata_json).map_err(|e| DistillerError::Storage {
+                detail: format!("metadata serialize: {e}"),
+            })?;
 
         self.episodes
             .insert_with_kind_and_metadata(
@@ -93,21 +99,29 @@ impl DistillerWriter {
                 Some(&json_str),
             )
             .await
-            .map_err(|e| DistillerError::Storage { detail: format!("insert_with_kind: {e}") })?;
+            .map_err(|e| DistillerError::Storage {
+                detail: format!("insert_with_kind: {e}"),
+            })?;
         Ok(())
     }
 
     /// Borrow the underlying fact repo (read-only discovery).
-    pub fn facts(&self) -> &SemanticFactRepo { &self.facts }
+    pub fn facts(&self) -> &SemanticFactRepo {
+        &self.facts
+    }
     /// Borrow the underlying episode repo.
-    pub fn episodes(&self) -> &EpisodicMemoryRepo { &self.episodes }
+    pub fn episodes(&self) -> &EpisodicMemoryRepo {
+        &self.episodes
+    }
 
     /// Bump access_count on a fact by id.
     pub async fn bump_access(&self, id: &str) -> Result<(), DistillerError> {
         self.facts
             .record_access(id, 1.0)
             .await
-            .map_err(|e| DistillerError::Storage { detail: format!("bump_access: {e}") })
+            .map_err(|e| DistillerError::Storage {
+                detail: format!("bump_access: {e}"),
+            })
     }
 
     /// Complete a supersede chain: set predecessor's valid_until and superseded_by.
@@ -120,7 +134,9 @@ impl DistillerWriter {
         self.facts
             .supersede(predecessor_id, successor_id)
             .await
-            .map_err(|e| DistillerError::Storage { detail: format!("complete_supersede: {e}") })
+            .map_err(|e| DistillerError::Storage {
+                detail: format!("complete_supersede: {e}"),
+            })
     }
 }
 
@@ -128,12 +144,13 @@ fn merge_provenance(
     base: Option<serde_json::Value>,
     prov: &ProvenanceMetadata,
 ) -> Result<serde_json::Value, DistillerError> {
-    let prov_value = serde_json::to_value(prov)
-        .map_err(|e| DistillerError::Storage { detail: format!("prov serialize: {e}") })?;
+    let prov_value = serde_json::to_value(prov).map_err(|e| DistillerError::Storage {
+        detail: format!("prov serialize: {e}"),
+    })?;
     let mut out = base.unwrap_or_else(|| json!({}));
-    let obj = out
-        .as_object_mut()
-        .ok_or_else(|| DistillerError::Storage { detail: "base metadata not object".into() })?;
+    let obj = out.as_object_mut().ok_or_else(|| DistillerError::Storage {
+        detail: "base metadata not object".into(),
+    })?;
     obj.insert("provenance".into(), prov_value);
     Ok(out)
 }

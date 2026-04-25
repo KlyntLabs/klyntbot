@@ -27,6 +27,7 @@ fn repo_context_becomes_prepared_fact() {
         confidence: 0.9,
         scope: ObservationScope::Repo,
         reasoning: "Cargo.toml lists tauri 2".into(),
+        outcome: None,
     };
     let built = build_prepared(&o, Some("github.com/klynt/bot"), &prov()).unwrap();
     let PreparedFact { fact, scope_repo_id, .. } = match built {
@@ -50,6 +51,7 @@ fn style_preference_becomes_prepared_fact_with_preferences_domain() {
         confidence: 0.7,
         scope: ObservationScope::Global,
         reasoning: "observed 3x".into(),
+        outcome: None,
     };
     let built = build_prepared(&o, None, &prov()).unwrap();
     let fact = match built {
@@ -70,6 +72,7 @@ fn fix_attempt_becomes_prepared_episode_with_kind() {
         confidence: 0.8,
         scope: ObservationScope::Repo,
         reasoning: "tests now pass".into(),
+        outcome: None,
     };
     let built = build_prepared(&o, Some("github.com/klynt/bot"), &prov()).unwrap();
     let ep = match built {
@@ -90,6 +93,7 @@ fn workflow_pattern_becomes_prepared_fact_with_pattern_memory_type() {
         confidence: 0.6,
         scope: ObservationScope::Repo,
         reasoning: "observed 4x".into(),
+        outcome: None,
     };
     let built = build_prepared(&o, Some("x"), &prov()).unwrap();
     let fact = match built {

@@ -24,12 +24,34 @@ export const useMemoryBrowser = () =>
 export const useActivityTimeline = () =>
   useQuery<{ date: string; count: number }[] | null>("coding_memory_activity", undefined, null);
 
-export const useCostRollup = () =>
-  useQuery<{ period: string; cost_usd: number }[] | null>("coding_memory_cost", undefined, null);
+export interface CostBreakdownRow {
+  date: string;
+  model: string;
+  source: string;
+  requests: number;
+  inputTokens: number;
+  outputTokens: number;
+  cachedTokens: number;
+  inputCostUsd: number;
+  outputCostUsd: number;
+  totalCostUsd: number;
+}
+export interface CostBreakdown {
+  rows: CostBreakdownRow[];
+  totalCostUsd: number;
+  totalInputTokens: number;
+  totalOutputTokens: number;
+  totalCachedTokens: number;
+  totalRequests: number;
+  bucketCount: number;
+  modelCount: number;
+  dayCount: number;
+}
+
+export const useCostBreakdown = (days = 30) =>
+  useQuery<CostBreakdown | null>("coding_memory_cost", { days }, null);
 
 export const useSensitivityInspector = () =>
-  useQuery<{ id: string; subject: string; predicate: string; object: string; sensitivity: string }[] | null>(
-    "coding_memory_sensitivity",
-    undefined,
-    null,
-  );
+  useQuery<
+    { id: string; subject: string; predicate: string; object: string; sensitivity: string }[] | null
+  >("coding_memory_sensitivity", undefined, null);

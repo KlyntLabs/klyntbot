@@ -7,7 +7,7 @@
 //! rejected at decode time.
 
 use super::error::DistillerError;
-use crate::facts::CodingKind;
+use crate::facts::{CodingKind, FixOutcome};
 
 /// Tool name the model must use.
 pub const RECORD_OBSERVATION_TOOL_NAME: &str = "record_observation";
@@ -40,6 +40,11 @@ pub struct Observation {
     pub scope: ObservationScope,
     /// Free-text justification — stored in metadata, never user-surfaced.
     pub reasoning: String,
+    /// Optional outcome — only meaningful for `kind = FixAttempt`. When set
+    /// to `Failure` or `Abandoned`, the Distiller derives a counterfactual
+    /// `DeadEndAttempt` semantic fact alongside the episodic memory.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub outcome: Option<FixOutcome>,
 }
 
 /// Build the `ToolDefinition` for the Distiller's Phase B LLM call.
@@ -61,7 +66,12 @@ pub fn record_observation_tool_def() -> serde_json::Value {
                 "object": { "type": "string" },
                 "confidence": { "type": "number", "minimum": 0.0, "maximum": 1.0 },
                 "scope": { "type": "string", "enum": ["global", "repo"] },
-                "reasoning": { "type": "string" }
+                "reasoning": { "type": "string" },
+                "outcome": {
+                    "type": "string",
+                    "enum": ["success", "partial", "failure", "abandoned"],
+                    "description": "Only for kind=fix_attempt. failure/abandoned triggers a counterfactual dead-end fact."
+                }
             },
             "additionalProperties": false
         }
@@ -70,13 +80,13 @@ pub fn record_observation_tool_def() -> serde_json::Value {
 
 /// Decode a batch of tool-call arg-objects into `Observation`s.
 /// `kind` values outside the 5-value `CodingKind` enum produce `DistillerError::LlmMalformed`.
-pub fn decode_observations(
-    raw: &[serde_json::Value],
-) -> Result<Vec<Observation>, DistillerError> {
+pub fn decode_observations(raw: &[serde_json::Value]) -> Result<Vec<Observation>, DistillerError> {
     let mut out = Vec::with_capacity(raw.len());
     for v in raw {
-        let mut obs: Observation = serde_json::from_value(v.clone())
-            .map_err(|e| DistillerError::LlmMalformed { detail: format!("observation decode: {e}") })?;
+        let mut obs: Observation =
+            serde_json::from_value(v.clone()).map_err(|e| DistillerError::LlmMalformed {
+                detail: format!("observation decode: {e}"),
+            })?;
         obs.confidence = obs.confidence.clamp(0.0, 1.0);
         out.push(obs);
     }

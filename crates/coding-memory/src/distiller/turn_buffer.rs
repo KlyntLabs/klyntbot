@@ -55,7 +55,9 @@ impl TurnBuffer {
     /// Construct an empty buffer.
     #[must_use]
     pub fn new() -> Self {
-        Self { active: HashMap::new() }
+        Self {
+            active: HashMap::new(),
+        }
     }
 
     /// Accept an event and return whether a boundary fires.
@@ -64,34 +66,55 @@ impl TurnBuffer {
         let key = (v1.session_id.clone(), v1.turn_id.clone());
 
         match &v1.kind {
-            EventKind::AssistantMsg { token_usage: Some(_), .. } => {
+            EventKind::AssistantMsg {
+                token_usage: Some(_),
+                ..
+            } => {
                 self.active.remove(&key);
-                TurnBoundary::Fire { session_id: key.0, turn_id: key.1 }
+                TurnBoundary::Fire {
+                    session_id: key.0,
+                    turn_id: key.1,
+                }
             }
             EventKind::SessionEnd { .. } => {
                 // Flush every active turn for this session — caller iterates fires.
                 // Convention: emit a Fire for the most recent turn; caller should
                 // additionally call `fire_idle_turns(Duration::ZERO)` after SessionEnd
                 // to sweep any remaining.
-                let still_active: Vec<_> = self.active.keys()
+                let still_active: Vec<_> = self
+                    .active
+                    .keys()
                     .filter(|(s, _)| s == &v1.session_id)
                     .cloned()
                     .collect();
                 for k in &still_active {
                     self.active.remove(k);
                 }
-                TurnBoundary::Fire { session_id: v1.session_id.clone(), turn_id: None }
+                TurnBoundary::Fire {
+                    session_id: v1.session_id.clone(),
+                    turn_id: None,
+                }
             }
             EventKind::UserPrompt { .. } => {
                 // If any distinct prior turn exists for this session, flush the most recent.
-                let prior: Option<(String, Option<String>)> = self.active.keys()
+                let prior: Option<(String, Option<String>)> = self
+                    .active
+                    .keys()
                     .find(|(s, t)| s == &v1.session_id && t != &v1.turn_id)
                     .cloned();
-                self.active.insert(key, TurnState { last_seen_at: Instant::now() });
+                self.active.insert(
+                    key,
+                    TurnState {
+                        last_seen_at: Instant::now(),
+                    },
+                );
                 match prior {
                     Some((s, t)) => {
                         self.active.remove(&(s.clone(), t.clone()));
-                        TurnBoundary::Fire { session_id: s, turn_id: t }
+                        TurnBoundary::Fire {
+                            session_id: s,
+                            turn_id: t,
+                        }
                     }
                     None => TurnBoundary::None,
                 }
@@ -100,7 +123,9 @@ impl TurnBuffer {
                 self.active
                     .entry(key)
                     .and_modify(|st| st.last_seen_at = Instant::now())
-                    .or_insert(TurnState { last_seen_at: Instant::now() });
+                    .or_insert(TurnState {
+                        last_seen_at: Instant::now(),
+                    });
                 TurnBoundary::None
             }
         }
@@ -111,7 +136,9 @@ impl TurnBuffer {
     pub fn fire_idle_turns(&mut self, timeout: std::time::Duration) -> Vec<TurnRef> {
         let now = Instant::now();
         let mut out = Vec::new();
-        let stale: Vec<_> = self.active.iter()
+        let stale: Vec<_> = self
+            .active
+            .iter()
             .filter_map(|(k, st)| {
                 if now.saturating_duration_since(st.last_seen_at) >= timeout {
                     Some(k.clone())
@@ -122,7 +149,10 @@ impl TurnBuffer {
             .collect();
         for k in stale {
             self.active.remove(&k);
-            out.push(TurnRef { session_id: k.0, turn_id: k.1 });
+            out.push(TurnRef {
+                session_id: k.0,
+                turn_id: k.1,
+            });
         }
         out
     }

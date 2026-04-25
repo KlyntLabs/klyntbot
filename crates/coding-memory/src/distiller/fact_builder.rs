@@ -78,16 +78,32 @@ pub fn build_prepared(
             }))
         }
         CodingKind::StylePreference => Ok(Prepared::Fact(build_fact(
-            obs, "preferences", "fact", effective_scope_repo, provenance,
+            obs,
+            "preferences",
+            "fact",
+            effective_scope_repo,
+            provenance,
         ))),
         CodingKind::WorkflowPattern => Ok(Prepared::Fact(build_fact(
-            obs, "procedural", "pattern", effective_scope_repo, provenance,
+            obs,
+            "procedural",
+            "pattern",
+            effective_scope_repo,
+            provenance,
         ))),
         CodingKind::RepoContext => Ok(Prepared::Fact(build_fact(
-            obs, "work", "fact", effective_scope_repo, provenance,
+            obs,
+            "work",
+            "fact",
+            effective_scope_repo,
+            provenance,
         ))),
         CodingKind::FailurePattern => Ok(Prepared::Fact(build_fact(
-            obs, "procedural", "failure_pattern", effective_scope_repo, provenance,
+            obs,
+            "procedural",
+            "failure_pattern",
+            effective_scope_repo,
+            provenance,
         ))),
     }
 }
@@ -130,7 +146,11 @@ fn build_fact(
 }
 
 fn scope_type_for(scope_repo: &Option<String>) -> String {
-    if scope_repo.is_some() { "project".into() } else { "user".into() }
+    if scope_repo.is_some() {
+        "project".into()
+    } else {
+        "user".into()
+    }
 }
 
 fn importance_from_confidence(c: f32) -> f64 {

@@ -5,6 +5,7 @@ import { KlyntLogo } from "@shared/ui/KlyntLogo";
 import {
   Brain,
   CheckSquare,
+  Code2,
   Cpu,
   FileText,
   GraduationCap,
@@ -36,6 +37,7 @@ const items: { key: SidebarItem; icon: typeof MessageSquare; path?: string; bott
   { key: "Coaching", icon: Sparkles, path: "/coaching" },
   { key: "Brain", icon: Brain, path: "/brain" },
   { key: "Automations", icon: Timer, path: "/automations" },
+  { key: "CodingMemory", icon: Code2, path: "/coding-memory" },
   { key: "System", icon: Cpu, path: "/system", bottom: true },
   { key: "Settings", icon: Settings, path: "/settings", bottom: true },
 ];

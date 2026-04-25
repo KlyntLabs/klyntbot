@@ -47,7 +47,7 @@ impl ClaudeCodeInstaller {
                 "matcher": MATCHER_TAG,
                 "hooks": [{
                     "type": "command",
-                    "command": format!("{} claude-code {}", hook_binary.display(), event),
+                    "command": format!("{} --hook claude-code {}", hook_binary.display(), event),
                 }]
             }));
         }

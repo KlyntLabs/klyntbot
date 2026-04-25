@@ -12,9 +12,14 @@ export function SensitivityInspectorPanel() {
       )}
       <div className="space-y-2">
         {data?.map((fact) => (
-          <div key={fact.id} className="glass-surface rounded-xl p-3 text-sm flex items-center justify-between">
+          <div
+            key={fact.id}
+            className="glass-surface rounded-xl p-3 text-sm flex items-center justify-between"
+          >
             <div>
-              <div className="font-medium">{fact.subject} → {fact.predicate}</div>
+              <div className="font-medium">
+                {fact.subject} → {fact.predicate}
+              </div>
               <div className="text-muted-foreground">{fact.object}</div>
             </div>
             <div className="px-2 py-1 rounded bg-accent text-xs uppercase">{fact.sensitivity}</div>

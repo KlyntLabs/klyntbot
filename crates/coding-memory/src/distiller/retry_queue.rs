@@ -58,7 +58,12 @@ impl DistillationRetryRepo {
     }
 
     /// Enqueue a turn for retry. Duplicates are allowed — each attempt gets a row.
-    pub async fn enqueue(&self, session_id: &str, turn_id: Option<&str>, reason: RetryReason) -> Result<()> {
+    pub async fn enqueue(
+        &self,
+        session_id: &str,
+        turn_id: Option<&str>,
+        reason: RetryReason,
+    ) -> Result<()> {
         let id = Uuid::new_v4().to_string();
         sqlx::query(
             "INSERT INTO ingest_distillation_retry (id, session_id, turn_id, reason)
@@ -87,13 +92,16 @@ impl DistillationRetryRepo {
         .fetch_all(&self.pool)
         .await
         .map_err(|e| KlyntbotError::Storage(format!("retry list: {e}")))?;
-        Ok(rows.into_iter().map(|r| RetryRow {
-            id: r.get("id"),
-            session_id: r.get("session_id"),
-            turn_id: r.get("turn_id"),
-            attempt_count: r.get("attempt_count"),
-            reason: r.get("reason"),
-        }).collect())
+        Ok(rows
+            .into_iter()
+            .map(|r| RetryRow {
+                id: r.get("id"),
+                session_id: r.get("session_id"),
+                turn_id: r.get("turn_id"),
+                attempt_count: r.get("attempt_count"),
+                reason: r.get("reason"),
+            })
+            .collect())
     }
 
     /// Record a failed attempt. Backoff: 1m / 5m / 30m.

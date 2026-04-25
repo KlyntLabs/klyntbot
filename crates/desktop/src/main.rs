@@ -96,6 +96,15 @@ fn position_orb_bottom_right(window: &tauri::WebviewWindow) {
 }
 
 fn main() {
+    // `--hook` short-circuit — runs as a tiny CLI client to the ingest socket.
+    // Lives BEFORE `configure_mimalloc()` and clap parsing so hook spawns stay
+    // sub-10ms (no Tauri runtime, no SQLite pool, no config watcher).
+    let raw_args: Vec<String> = std::env::args().collect();
+    if raw_args.get(1).map(String::as_str) == Some("--hook") {
+        let hook_args: Vec<String> = raw_args.into_iter().skip(2).collect();
+        std::process::exit(coding_ingest::hook_cli::run(hook_args));
+    }
+
     configure_mimalloc();
     let cli = Cli::parse();
 
@@ -1015,6 +1024,11 @@ fn run_desktop_app() {
             commands::coding_memory::coding_memory_diagnose_cli,
             commands::coding_memory::coding_memory_session_replay,
             commands::coding_memory::coding_memory_cli_health,
+            commands::coding_memory::coding_memory_browser,
+            commands::coding_memory::coding_memory_activity,
+            commands::coding_memory::coding_memory_cost,
+            commands::coding_memory::coding_memory_sensitivity,
+            commands::coding_memory::coding_memory_distill_now,
             // Shortcuts
             commands::shortcuts::shortcuts_get,
             commands::shortcuts::shortcuts_update,

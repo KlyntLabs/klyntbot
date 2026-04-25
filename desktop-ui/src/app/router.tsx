@@ -397,6 +397,7 @@ export const router = createHashRouter([
         path: "/coding-memory",
         element: <CodingMemoryLayout />,
         children: [
+          { index: true, element: <Navigate to="memory" replace /> },
           { path: "cli-health", element: <CliHealthPanel /> },
           { path: "session-replay", element: <SessionReplayPanel /> },
           { path: "memory", element: <MemoryBrowserPanel /> },

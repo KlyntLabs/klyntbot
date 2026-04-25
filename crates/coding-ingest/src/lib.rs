@@ -15,6 +15,8 @@ pub mod event;
 pub mod excludes;
 /// `HookClient` — socket-first-else-buffer dispatcher.
 pub mod hook_client;
+/// Hook CLI entry point — shared by `klyntbot-hook` binary and desktop's `--hook` mode.
+pub mod hook_cli;
 /// `RepoScope` — repo identity attached to events.
 pub mod scope;
 /// Cwd → `RepoScope` resolver (cached).

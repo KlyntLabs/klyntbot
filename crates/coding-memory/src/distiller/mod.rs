@@ -3,7 +3,6 @@
 //! Phase A (extractive, always runs) + Phase B (LLM synthesis) + Phase C
 //! (reconciliation). Phase 1 defines types; bodies land in Phase 3.
 
-
 use async_trait::async_trait;
 use coding_ingest::event::AgentEvent;
 use coding_ingest::store::IngestEventLogRepo;
@@ -189,7 +188,8 @@ impl Distiller {
 
     /// Attach a retry-repo — enables transient-failure re-distillation.
     pub fn with_retry_repo(mut self, repo: DistillationRetryRepo) -> Self {
-        let inner = Arc::get_mut(&mut self.inner).expect("Distiller::with_retry_repo called after clone");
+        let inner =
+            Arc::get_mut(&mut self.inner).expect("Distiller::with_retry_repo called after clone");
         inner.retry_repo = Some(repo);
         self
     }
@@ -200,11 +200,18 @@ impl Distiller {
             let mut buf = self.inner.buffer.lock().await;
             buf.accept(&event)
         };
-        if let TurnBoundary::Fire { session_id, turn_id } = boundary {
+        if let TurnBoundary::Fire {
+            session_id,
+            turn_id,
+        } = boundary
+        {
             let distiller = self.clone();
             // Fire-and-forget — Distiller failures never propagate back to ingestion.
             tokio::spawn(async move {
-                if let Err(e) = distiller.distill_turn(&session_id, turn_id.as_deref()).await {
+                if let Err(e) = distiller
+                    .distill_turn(&session_id, turn_id.as_deref())
+                    .await
+                {
                     tracing::warn!(session_id, ?turn_id, error = %e, "distill_turn failed");
                 }
             });
@@ -233,7 +240,10 @@ impl Distiller {
         let due = retry.list_due(50).await?;
         let mut processed = 0u32;
         for row in due {
-            match self.distill_turn(&row.session_id, row.turn_id.as_deref()).await {
+            match self
+                .distill_turn(&row.session_id, row.turn_id.as_deref())
+                .await
+            {
                 Ok(_) => {
                     let _ = retry.mark_done(&row.id).await;
                     processed += 1;
@@ -266,7 +276,11 @@ impl Distiller {
             return Ok(DistillationReport::default());
         }
 
-        let rows = self.inner.ingest_repo.fetch_turn(session_id, turn_id).await?;
+        let rows = self
+            .inner
+            .ingest_repo
+            .fetch_turn(session_id, turn_id)
+            .await?;
         let events: Vec<AgentEvent> = rows
             .iter()
             .filter_map(|r| serde_json::from_str::<AgentEvent>(&r.payload).ok())
@@ -294,26 +308,37 @@ impl Distiller {
             distiller_model: self.inner.config.model.clone(),
             source_kind: crate::scope::ProvenanceKind::DistillerExtractive,
         };
-        let trace_id = phase_a::persist_turn_trace(
-            &self.inner.writer,
-            &trace,
-            repo_id.as_deref(),
-            &prov_ext,
-        )
-        .await
-        .map_err(common::KlyntbotError::from)?;
+        let trace_id =
+            phase_a::persist_turn_trace(&self.inner.writer, &trace, repo_id.as_deref(), &prov_ext)
+                .await
+                .map_err(common::KlyntbotError::from)?;
         report.episodic_writes += 1;
         report.turn_trace_id = Some(trace_id);
 
         // Phase B — LLM synthesis. Failures are non-fatal — Phase A already lands.
-        let user_prompt_text = events.iter().find_map(|e| {
-            let AgentEvent::V1(v1) = e;
-            if let EventKind::UserPrompt { text, .. } = &v1.kind { Some(text.clone()) } else { None }
-        }).unwrap_or_default();
-        let assistant_text = events.iter().rev().find_map(|e| {
-            let AgentEvent::V1(v1) = e;
-            if let EventKind::AssistantMsg { text, .. } = &v1.kind { Some(text.clone()) } else { None }
-        }).unwrap_or_default();
+        let user_prompt_text = events
+            .iter()
+            .find_map(|e| {
+                let AgentEvent::V1(v1) = e;
+                if let EventKind::UserPrompt { text, .. } = &v1.kind {
+                    Some(text.clone())
+                } else {
+                    None
+                }
+            })
+            .unwrap_or_default();
+        let assistant_text = events
+            .iter()
+            .rev()
+            .find_map(|e| {
+                let AgentEvent::V1(v1) = e;
+                if let EventKind::AssistantMsg { text, .. } = &v1.kind {
+                    Some(text.clone())
+                } else {
+                    None
+                }
+            })
+            .unwrap_or_default();
 
         let observations = match phase_b::invoke_llm(LlmInvocation {
             provider: self.inner.provider.clone(),
@@ -323,10 +348,26 @@ impl Distiller {
             trace: &trace,
             repo_id: repo_id.as_deref(),
             timeout: self.inner.config.timeout,
-        }).await {
-            Ok(v) => { report.llm_calls += 1; v }
-            Err(ref e) if matches!(e, DistillerError::LlmTimeout { .. } | DistillerError::LlmProvider { .. } | DistillerError::Transient { .. }) => {
-                tracing::warn!(session_id, ?turn_id, "Phase B transient failure — skipping LLM observations");
+        })
+        .await
+        {
+            Ok(v) => {
+                report.llm_calls += 1;
+                v
+            }
+            Err(ref e)
+                if matches!(
+                    e,
+                    DistillerError::LlmTimeout { .. }
+                        | DistillerError::LlmProvider { .. }
+                        | DistillerError::Transient { .. }
+                ) =>
+            {
+                tracing::warn!(
+                    session_id,
+                    ?turn_id,
+                    "Phase B transient failure — skipping LLM observations"
+                );
                 if let Some(ref retry) = self.inner.retry_repo {
                     let reason = match e {
                         DistillerError::LlmTimeout { .. } => RetryReason::LlmTimeout,
@@ -357,30 +398,103 @@ impl Distiller {
             };
             match prepared {
                 fact_builder::Prepared::Episode(ep) => {
-                    self.inner.writer.write_episode(ep).await.map_err(common::KlyntbotError::from)?;
+                    self.inner
+                        .writer
+                        .write_episode(ep)
+                        .await
+                        .map_err(common::KlyntbotError::from)?;
                     report.episodic_writes += 1;
+                    // Task 27 — Tier B1 counterfactual derivation.
+                    // When a FixAttempt observation reports outcome ∈ {failure, abandoned},
+                    // emit a derived `DeadEndAttempt` semantic fact via `derive_dead_end`.
+                    if matches!(obs.kind, crate::facts::CodingKind::FixAttempt)
+                        && matches!(
+                            obs.outcome,
+                            Some(crate::facts::FixOutcome::Failure)
+                                | Some(crate::facts::FixOutcome::Abandoned)
+                        )
+                    {
+                        let synthetic = crate::facts::FixAttempt {
+                            problem_hash: crate::problem_hash::ProblemHash::of(&obs.subject)
+                                .as_str()
+                                .to_string(),
+                            problem: obs.subject.clone(),
+                            files: vec![],
+                            approach: obs.object.clone(),
+                            outcome: obs.outcome.unwrap(),
+                            insight: Some(obs.reasoning.clone()),
+                            duration_ms: 0,
+                            test_before: None,
+                            test_after: None,
+                            anchored_symbols: vec![],
+                            provenance: prov_llm.clone(),
+                            sensitivity: crate::scope::Sensitivity::Normal,
+                        };
+                        if let Some(fact) =
+                            crate::counterfactual::derive_dead_end(&synthetic, &prov_llm)
+                        {
+                            let prepared_fact = crate::distiller::writer::PreparedFact {
+                                fact,
+                                metadata_json: None,
+                                scope_repo_id: match obs.scope {
+                                    record_observation::ObservationScope::Repo => repo_id.clone(),
+                                    record_observation::ObservationScope::Global => None,
+                                },
+                                provenance: prov_llm.clone(),
+                            };
+                            self.inner
+                                .writer
+                                .write_fact(prepared_fact)
+                                .await
+                                .map_err(common::KlyntbotError::from)?;
+                            report.semantic_writes += 1;
+                        }
+                    }
                 }
                 fact_builder::Prepared::Fact(pf) => {
                     // Simple reconciliation: exact subject+predicate match via find_similar
-                    let similar = self.inner.writer.facts().find_similar(&pf.fact.subject, &pf.fact.predicate).await.ok().unwrap_or_default();
-                    let similar_scored: Vec<phase_c::SimilarFact> = similar.into_iter().map(|f| {
-                        // Simple similarity: exact object match = 1.0, else 0.5
-                        let sim = if f.object == pf.fact.object { 1.0 } else { 0.5 };
-                        phase_c::SimilarFact { fact: f, similarity: sim }
-                    }).collect();
+                    let similar = self
+                        .inner
+                        .writer
+                        .facts()
+                        .find_similar(&pf.fact.subject, &pf.fact.predicate)
+                        .await
+                        .ok()
+                        .unwrap_or_default();
+                    let similar_scored: Vec<phase_c::SimilarFact> = similar
+                        .into_iter()
+                        .map(|f| {
+                            // Simple similarity: exact object match = 1.0, else 0.5
+                            let sim = if f.object == pf.fact.object { 1.0 } else { 0.5 };
+                            phase_c::SimilarFact {
+                                fact: f,
+                                similarity: sim,
+                            }
+                        })
+                        .collect();
                     match reconcile(&pf.fact, &similar_scored) {
                         ReconcileDecision::Noop { predecessor_id } => {
                             let _ = self.inner.writer.bump_access(&predecessor_id).await;
                         }
                         ReconcileDecision::Add => {
-                            self.inner.writer.write_fact(pf).await.map_err(common::KlyntbotError::from)?;
+                            self.inner
+                                .writer
+                                .write_fact(pf)
+                                .await
+                                .map_err(common::KlyntbotError::from)?;
                             report.semantic_writes += 1;
                         }
                         ReconcileDecision::Supersede { predecessor_id } => {
                             let succ_id = pf.fact.id.clone();
                             let succ_valid_from = pf.fact.valid_from.clone();
-                            self.inner.writer.write_fact(pf).await.map_err(common::KlyntbotError::from)?;
-                            let _ = self.inner.writer
+                            self.inner
+                                .writer
+                                .write_fact(pf)
+                                .await
+                                .map_err(common::KlyntbotError::from)?;
+                            let _ = self
+                                .inner
+                                .writer
                                 .complete_supersede(&predecessor_id, &succ_id, &succ_valid_from)
                                 .await;
                             report.semantic_writes += 1;
@@ -390,7 +504,10 @@ impl Distiller {
             }
         }
 
-        self.inner.ingest_repo.mark_processed_iter(row_ids.iter().copied()).await?;
+        self.inner
+            .ingest_repo
+            .mark_processed_iter(row_ids.iter().copied())
+            .await?;
         Ok(report)
     }
 }
@@ -426,5 +543,3 @@ pub trait RecordObservationTool: Send + Sync {
         reasoning: String,
     ) -> Result<()>;
 }
-
-

@@ -5,7 +5,13 @@ vi.mock("../hooks", () => ({
   useSensitivityInspector: () => ({
     data: [
       { id: "1", subject: "repo:bot", predicate: "api_key", object: "sk-***", sensitivity: "high" },
-      { id: "2", subject: "repo:bot", predicate: "framework", object: "tauri", sensitivity: "normal" },
+      {
+        id: "2",
+        subject: "repo:bot",
+        predicate: "framework",
+        object: "tauri",
+        sensitivity: "normal",
+      },
     ],
     isLoading: false,
   }),

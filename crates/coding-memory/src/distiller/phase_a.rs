@@ -36,7 +36,9 @@ pub fn compute_turn_trace(
         ended_at = Some(v1.occurred_at);
 
         match &v1.kind {
-            EventKind::FileEdit { path, op, bytes, .. } => match op {
+            EventKind::FileEdit {
+                path, op, bytes, ..
+            } => match op {
                 FileOp::Read => files_read.push(path.clone()),
                 FileOp::Create | FileOp::Modify | FileOp::Delete => {
                     files_modified.push((path.clone(), *bytes as i64));
@@ -46,10 +48,18 @@ pub fn compute_turn_trace(
                 FileOp::Read => files_read.push(path.clone()),
                 _ => files_modified.push((path.clone(), 0)),
             },
-            EventKind::ToolCall { tool, args_preview, .. } if tool.eq_ignore_ascii_case("bash") => {
+            EventKind::ToolCall {
+                tool, args_preview, ..
+            } if tool.eq_ignore_ascii_case("bash") => {
                 commands_run.push(args_preview.clone());
             }
-            EventKind::TestRun { command, framework, passed, failed, .. } => {
+            EventKind::TestRun {
+                command,
+                framework,
+                passed,
+                failed,
+                ..
+            } => {
                 test_outcomes.push(TestOutcome {
                     command: command.clone(),
                     framework: framework.clone(),
@@ -57,7 +67,12 @@ pub fn compute_turn_trace(
                     failed: *failed,
                 });
             }
-            EventKind::TestRunEnriched { command, passed_tests, failed_tests, .. } => {
+            EventKind::TestRunEnriched {
+                command,
+                passed_tests,
+                failed_tests,
+                ..
+            } => {
                 test_outcomes.push(TestOutcome {
                     command: command.clone(),
                     framework: None,
@@ -68,7 +83,10 @@ pub fn compute_turn_trace(
             EventKind::Error { tool, message } => {
                 errors_encountered.push((tool.clone(), message.clone()));
             }
-            EventKind::AssistantMsg { token_usage: Some(u), .. } => {
+            EventKind::AssistantMsg {
+                token_usage: Some(u),
+                ..
+            } => {
                 token_usage = Some(TurnTokenUsage {
                     prompt: u.prompt_tokens,
                     completion: u.completion_tokens,
@@ -93,8 +111,8 @@ pub fn compute_turn_trace(
     }
 }
 
-use super::writer::{DistillerWriter, PreparedEpisode};
 use super::error::DistillerError;
+use super::writer::{DistillerWriter, PreparedEpisode};
 use crate::scope::ProvenanceMetadata;
 use cognitive::types::EpisodicMemory;
 use uuid::Uuid;
@@ -140,24 +158,36 @@ pub async fn persist_turn_trace(
         last_accessed: None,
         access_count: 0,
         project_id: None,
-        scope_type: if scope_repo_id.is_some() { "project".into() } else { "user".into() },
+        scope_type: if scope_repo_id.is_some() {
+            "project".into()
+        } else {
+            "user".into()
+        },
         scope_id: scope_repo_id.map(str::to_string),
     };
 
-    writer.write_episode(PreparedEpisode {
-        episode,
-        kind: "turn_trace".into(),
-        metadata_json: None,
-        scope_repo_id: scope_repo_id.map(str::to_string),
-        provenance: provenance.clone(),
-    }).await?;
+    writer
+        .write_episode(PreparedEpisode {
+            episode,
+            kind: "turn_trace".into(),
+            metadata_json: None,
+            scope_repo_id: scope_repo_id.map(str::to_string),
+            provenance: provenance.clone(),
+        })
+        .await?;
     Ok(id)
 }
 
 fn importance_for_trace(t: &TurnTrace) -> f64 {
     let mut score: f64 = 0.3;
-    if !t.files_modified.is_empty() { score += 0.2; }
-    if t.test_outcomes.iter().any(|x| x.failed > 0) { score += 0.2; }
-    if !t.errors_encountered.is_empty() { score += 0.2; }
+    if !t.files_modified.is_empty() {
+        score += 0.2;
+    }
+    if t.test_outcomes.iter().any(|x| x.failed > 0) {
+        score += 0.2;
+    }
+    if !t.errors_encountered.is_empty() {
+        score += 0.2;
+    }
     score.min(1.0)
 }
