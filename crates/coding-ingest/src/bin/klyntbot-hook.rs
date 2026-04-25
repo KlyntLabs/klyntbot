@@ -14,6 +14,8 @@ use coding_ingest::event::AgentEvent;
 use coding_ingest::excludes::{default_exclude_globs, ExcludeSet};
 use coding_ingest::hook_client::HookClient;
 use coding_ingest::scope_resolver::resolve_scope;
+use coding_ingest::store::IngestEventLogRepo;
+use sqlx::sqlite::{SqliteConnectOptions, SqlitePoolOptions};
 use std::io::{self, Read};
 use std::path::PathBuf;
 use std::process::ExitCode;
@@ -105,20 +107,49 @@ fn run_status() -> ExitCode {
     let sock = home.join("ingest.sock");
     let lock = home.join("desktop.lock");
     let buf = home.join("ingest-buffer.jsonl");
+    let db = home.join("data.db");
     let alive = is_desktop_alive(&lock);
     let buf_size = std::fs::metadata(&buf).map(|m| m.len()).unwrap_or(0);
+    let last_distilled = read_last_distilled(&db).unwrap_or_else(|| "unknown".into());
+
     println!(
-        "socket:        {} ({})",
+        "socket:           {} ({})",
         sock.display(),
         if sock.exists() { "present" } else { "absent" }
     );
     println!(
-        "desktop.lock:  {} ({})",
+        "desktop.lock:     {} ({})",
         lock.display(),
         if alive { "alive" } else { "stale or missing" }
     );
-    println!("buffer:        {} ({} bytes)", buf.display(), buf_size);
+    println!("buffer:           {} ({} bytes)", buf.display(), buf_size);
+    println!("last distilled:   {last_distilled}");
     ExitCode::SUCCESS
+}
+
+/// Best-effort read of the most recent processed-row timestamp. Returns
+/// `None` on any failure — status must always succeed.
+fn read_last_distilled(db_path: &std::path::Path) -> Option<String> {
+    if !db_path.exists() {
+        return None;
+    }
+    let rt = tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()
+        .ok()?;
+    rt.block_on(async {
+        let opts = SqliteConnectOptions::new()
+            .filename(db_path)
+            .read_only(true);
+        let pool = SqlitePoolOptions::new()
+            .max_connections(1)
+            .acquire_timeout(std::time::Duration::from_millis(500))
+            .connect_with(opts)
+            .await
+            .ok()?;
+        let repo = IngestEventLogRepo::new(pool);
+        repo.last_distilled_at().await.ok().flatten()
+    })
 }
 
 fn home_dir() -> PathBuf {
