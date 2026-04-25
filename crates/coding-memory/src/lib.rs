@@ -75,5 +75,13 @@ pub fn coding_memory_migrations() -> Vec<FeatureMigration> {
             description: "Phase-4: recall_invocations telemetry table.".to_string(),
             sql: include_str!("../migrations/003_recall_invocations.sql").to_string(),
         },
+        FeatureMigration {
+            feature_name: "coding_memory".to_string(),
+            version: 4,
+            description: "Phase-5: session_summaries, pattern_effectiveness_log, \
+                          selective_delete_log; mirror_snippets coding alert columns."
+                .to_string(),
+            sql: include_str!("../migrations/004_phase5_reflection.sql").to_string(),
+        },
     ]
 }
