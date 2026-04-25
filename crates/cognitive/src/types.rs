@@ -17,6 +17,7 @@ pub const DEFAULT_MEMORY_TYPE: &str = "fact";
 
 /// A semantic fact with bi-temporal markers and FSRS decay.
 #[derive(Debug, Clone, Default, Serialize, Deserialize, sqlx::FromRow)]
+#[sqlx(default)]
 pub struct SemanticFact {
     pub id: String,
     pub domain: String,
@@ -46,6 +47,7 @@ pub struct SemanticFact {
 
 /// An episodic memory entry.
 #[derive(Debug, Clone, Default, Serialize, Deserialize, sqlx::FromRow)]
+#[sqlx(default)]
 pub struct EpisodicMemory {
     pub id: String,
     pub domain: String,

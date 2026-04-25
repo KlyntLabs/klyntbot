@@ -266,5 +266,6 @@ export type {
   CliHealthRow,
   CodingMemoryStatusResponse,
   DiagnoseResult,
+  RecallInvocationRow,
   SessionReplayEntry,
 } from "./coding-memory";

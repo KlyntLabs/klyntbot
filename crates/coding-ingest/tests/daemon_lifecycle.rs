@@ -27,6 +27,7 @@ async fn daemon_accepts_event_and_writes_row() {
         lock_path: dir.path().join("desktop.lock"),
         repo: repo.clone(),
         event_tx: None,
+        op_handler: None,
     };
     let handle = spawn(cfg.clone()).await.expect("spawn");
 

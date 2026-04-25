@@ -72,6 +72,8 @@ fn test_fact(id: &str, predicate: &str, object: &str) -> SemanticFact {
         project_id: None,
         memory_type: DEFAULT_MEMORY_TYPE.to_string(),
         scope_type: "system".to_string(),
+        scope_repo_id: None,
+        metadata: None,
         scope_id: None,
     }
 }
@@ -951,6 +953,9 @@ async fn test_reforge_cycle_end_to_end() {
         project_id: None,
         scope_type: "system".into(),
         scope_id: None,
+        scope_repo_id: None,
+        metadata: None,
+        kind: None,
     };
     episodic_repo.insert(&episodic).await.unwrap();
 
@@ -1130,6 +1135,9 @@ async fn test_reforge_phase6_with_autotuner_bridge() {
         project_id: None,
         scope_type: "system".into(),
         scope_id: None,
+        scope_repo_id: None,
+        metadata: None,
+        kind: None,
     };
     episodic_repo.insert(&episodic).await.unwrap();
 
@@ -1258,6 +1266,9 @@ async fn test_reforge_with_feedback_signals() {
         project_id: None,
         scope_type: "system".into(),
         scope_id: None,
+        scope_repo_id: None,
+        metadata: None,
+        kind: None,
     };
     episodic_repo.insert(&episodic).await.unwrap();
 

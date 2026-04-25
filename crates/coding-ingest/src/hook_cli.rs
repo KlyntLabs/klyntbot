@@ -19,6 +19,7 @@ const USAGE: &str = "\
 usage:
   klyntbot-hook <source> [hook-event]
   klyntbot-hook status
+  klyntbot-hook context [--session-start | --user-prompt-submit <text>] [--repo <repo>]
   source ∈ { claude-code, codex, kimi-cli, opencode }
 ";
 
@@ -31,6 +32,10 @@ pub fn run(args: Vec<String>) -> i32 {
 
     if first == "status" {
         return run_status();
+    }
+
+    if first == "context" {
+        return run_context(args);
     }
 
     let source = first.clone();
@@ -90,6 +95,63 @@ pub fn run(args: Vec<String>) -> i32 {
     if let Err(e) = rt.block_on(client.send(&event)) {
         eprintln!("klyntbot-hook: send: {e}");
         return 1;
+    }
+    0
+}
+
+fn run_context(args: Vec<String>) -> i32 {
+    let mut session_start = false;
+    let mut user_prompt: Option<String> = None;
+    let mut repo: Option<String> = None;
+    let mut iter = args.iter().skip(1);
+    while let Some(a) = iter.next() {
+        match a.as_str() {
+            "--session-start" => session_start = true,
+            "--user-prompt-submit" => {
+                user_prompt = iter.next().map(|s| s.to_string());
+            }
+            "--repo" => repo = iter.next().map(|s| s.to_string()),
+            _ => {}
+        }
+    }
+
+    let home = home_dir();
+    let socket = crate::transport::UnixIngestSocket::new(home.join("ingest.sock"));
+    let payload = if session_start {
+        serde_json::json!({"op": "render_session_start", "repo": repo})
+    } else if let Some(q) = user_prompt {
+        serde_json::json!({"op": "render_user_prompt", "query": q, "repo": repo})
+    } else {
+        eprintln!("context requires --session-start or --user-prompt-submit");
+        return 2;
+    };
+
+    let rt = match tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()
+    {
+        Ok(rt) => rt,
+        Err(e) => {
+            eprintln!("klyntbot-hook: runtime: {e}");
+            return 1;
+        }
+    };
+
+    match rt.block_on(crate::transport::request_response(
+        &socket,
+        &payload,
+        std::time::Duration::from_millis(800),
+    )) {
+        Ok(resp) => {
+            if let Some(md) = resp.get("markdown").and_then(|v| v.as_str()) {
+                print!("{md}");
+            } else {
+                print!("<!-- klyntbot recall unavailable -->");
+            }
+        }
+        Err(_) => {
+            print!("<!-- klyntbot recall unavailable -->");
+        }
     }
     0
 }

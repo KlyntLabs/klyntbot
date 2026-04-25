@@ -7,12 +7,12 @@ use crate::transport::FileBufferFallback;
 use common::{KlyntbotError, Result};
 use std::path::PathBuf;
 use std::sync::Arc;
-use tokio::io::AsyncReadExt;
+use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::UnixListener;
 use tokio::sync::oneshot;
 
 /// Configuration for the ingestion daemon.
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct IngestDaemonConfig {
     /// Where the Unix socket is bound.
     pub socket_path: PathBuf,
@@ -24,6 +24,19 @@ pub struct IngestDaemonConfig {
     pub repo: Arc<IngestEventLogRepo>,
     /// Optional real-time event forwarder — e.g. to the coding-memory Distiller.
     pub event_tx: Option<tokio::sync::mpsc::UnboundedSender<crate::event::AgentEvent>>,
+    /// Optional request/response handler for `op` frames (e.g. recall context).
+    pub op_handler: Option<Arc<dyn OpHandler>>,
+}
+
+impl std::fmt::Debug for IngestDaemonConfig {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("IngestDaemonConfig")
+            .field("socket_path", &self.socket_path)
+            .field("buffer_path", &self.buffer_path)
+            .field("lock_path", &self.lock_path)
+            .field("op_handler", &self.op_handler.is_some())
+            .finish_non_exhaustive()
+    }
 }
 
 /// Handle returned by [`spawn`]; used to shutdown cleanly.
@@ -70,6 +83,7 @@ pub async fn spawn(cfg: IngestDaemonConfig) -> Result<IngestDaemonHandle> {
     let repo = cfg.repo.clone();
 
     let event_tx = cfg.event_tx.clone();
+    let op_handler = cfg.op_handler.clone();
     let accept_task = tokio::spawn(async move {
         loop {
             tokio::select! {
@@ -79,8 +93,9 @@ pub async fn spawn(cfg: IngestDaemonConfig) -> Result<IngestDaemonHandle> {
                         Ok((stream, _)) => {
                             let repo = repo.clone();
                             let event_tx = event_tx.clone();
+                            let op_handler = op_handler.clone();
                             tokio::spawn(async move {
-                                if let Err(e) = handle_connection(stream, repo, event_tx).await {
+                                if let Err(e) = handle_connection(stream, repo, event_tx, op_handler).await {
                                     tracing::warn!(error = %e, "ingest handler failed");
                                 }
                             });
@@ -114,10 +129,18 @@ pub async fn spawn(cfg: IngestDaemonConfig) -> Result<IngestDaemonHandle> {
 
 const MAX_PAYLOAD_BYTES: usize = 1024 * 1024;
 
+/// Handler for JSON `op` request/response frames sent over the ingest socket.
+#[async_trait::async_trait]
+pub trait OpHandler: Send + Sync {
+    /// Handle an `op` payload and return a JSON response.
+    async fn handle(&self, payload: serde_json::Value) -> common::Result<serde_json::Value>;
+}
+
 async fn handle_connection(
     mut stream: tokio::net::UnixStream,
     repo: Arc<IngestEventLogRepo>,
     event_tx: Option<tokio::sync::mpsc::UnboundedSender<AgentEvent>>,
+    op_handler: Option<Arc<dyn OpHandler>>,
 ) -> Result<()> {
     let mut len_buf = [0u8; 4];
     stream
@@ -133,7 +156,30 @@ async fn handle_connection(
         .read_exact(&mut body)
         .await
         .map_err(|e| KlyntbotError::Storage(format!("read body: {e}")))?;
-    let event: AgentEvent = serde_json::from_slice(&body)
+
+    // Try to parse as a generic JSON value first to inspect for `op` field.
+    let json_val: serde_json::Value = serde_json::from_slice(&body)
+        .map_err(|e| KlyntbotError::Storage(format!("decode json: {e}")))?;
+
+    if json_val.get("op").is_some() {
+        // Route through op_handler if available.
+        if let Some(handler) = op_handler {
+            let resp = handler.handle(json_val).await.unwrap_or_else(|e| {
+                serde_json::json!({"error": e.to_string()})
+            });
+            let resp_bytes = serde_json::to_vec(&resp)
+                .map_err(|e| KlyntbotError::Storage(format!("encode resp: {e}")))?;
+            let resp_len = (resp_bytes.len() as u32).to_le_bytes();
+            stream.write_all(&resp_len).await
+                .map_err(|e| KlyntbotError::Storage(format!("write resp len: {e}")))?;
+            stream.write_all(&resp_bytes).await
+                .map_err(|e| KlyntbotError::Storage(format!("write resp body: {e}")))?;
+        }
+        return Ok(());
+    }
+
+    // Otherwise treat as AgentEvent (fire-and-forget).
+    let event: AgentEvent = serde_json::from_value(json_val)
         .map_err(|e| KlyntbotError::Storage(format!("decode event: {e}")))?;
     repo.insert(&event).await?;
     if let Some(tx) = event_tx {

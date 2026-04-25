@@ -879,6 +879,30 @@ impl AppCore {
             Arc::new(d)
         };
 
+        // ── Construct coding-memory Recall service (Phase 4) ──────────────
+        let recall = {
+            let fact_repo = Arc::new(::cognitive::SemanticFactRepo::new(storage_pool.inner().clone()));
+            let ep_repo = Arc::new(::cognitive::EpisodicMemoryRepo::new(storage_pool.inner().clone()));
+            let ums = Arc::new(::cognitive::UnifiedMemoryService::new((*fact_repo).clone()));
+            let telem = coding_memory::RecallInvocationRepo::new(storage_pool.clone());
+            let budgeter = coding_memory::recall::budget::default_budgeter();
+            Arc::new(coding_memory::recall::CodingRecallService::new(
+                coding_memory::recall::CodingRecallServiceConfig::default(),
+                ums, fact_repo, ep_repo, telem, budgeter,
+            ))
+        };
+        let toolset = coding_memory::CodingMemoryToolset::new(recall.clone());
+
+        // ── Register coding-memory recall tools in agent's tool registry ──
+        {
+            let reg = agent.tool_registry();
+            let mut registry = reg.write().await;
+            for tool in toolset.mcp_tools() {
+                registry.register_dyn(tool);
+            }
+            info!("Coding-memory recall tools registered in MCP registry");
+        }
+
         // ── Spawn coding-ingest daemon (with real-time event forwarding) ─
         let ingest_daemon_handle = {
             let data_dir = config.data_dir_path();
@@ -890,6 +914,9 @@ impl AppCore {
                     storage_pool.inner().clone(),
                 )),
                 event_tx: Some(ingest_event_tx),
+                op_handler: Some(std::sync::Arc::new(
+                    crate::coding_memory::recall::RecallOpHandler::new(recall.clone()),
+                )),
             };
             match coding_ingest::daemon::spawn(daemon_cfg).await {
                 Ok(h) => Some(h),
@@ -1027,6 +1054,8 @@ impl AppCore {
             feature_registry,
             ingest_daemon: std::sync::Mutex::new(ingest_daemon_handle),
             distiller: Some(distiller.clone()),
+            recall: Some(recall.clone()),
+            coding_toolset: Some(toolset),
         };
 
         // ── Distiller event receiver + sweep timers ──────────────────────

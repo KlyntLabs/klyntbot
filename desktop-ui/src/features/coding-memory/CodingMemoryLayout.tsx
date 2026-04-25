@@ -8,6 +8,7 @@ const tabs = [
   { to: "activity", label: "Activity Timeline" },
   { to: "cost", label: "Cost Tracker" },
   { to: "sensitivity", label: "Sensitivity Inspector" },
+  { to: "recall-log", label: "Recall Log" },
 ];
 
 export function CodingMemoryLayout() {

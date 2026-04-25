@@ -16,6 +16,8 @@ fn bi_temporal_monotone_for_new_fact() {
         stability: 1.0, last_accessed: None, access_count: 0,
         convergence_score: 1.0, project_id: None,
         memory_type: "fact".into(), scope_type: "user".into(), scope_id: None,
+        scope_repo_id: None,
+        metadata: None,
     };
     assert!(f.valid_until.is_none() || f.valid_until >= Some(f.valid_from.clone()));
 }

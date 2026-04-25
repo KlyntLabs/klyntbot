@@ -365,6 +365,8 @@ impl AppCore {
                         memory_type: "translation_unit".to_string(),
                         scope_type: "system".to_string(),
                         scope_id: None,
+                        metadata: None,
+                        scope_repo_id: None,
                     };
                     let _ = sf_repo.upsert(&fact).await;
 

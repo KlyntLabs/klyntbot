@@ -161,6 +161,9 @@ const CostTrackerPanel = lazy(() =>
 const SensitivityInspectorPanel = lazy(() =>
   import("../features/coding-memory").then((m) => ({ default: m.SensitivityInspectorPanel })),
 );
+const RecallToolLogPanel = lazy(() =>
+  import("../features/coding-memory").then((m) => ({ default: m.RecallToolLogPanel })),
+);
 
 // (Debug feature — now integrated into System page)
 
@@ -404,6 +407,7 @@ export const router = createHashRouter([
           { path: "activity", element: <ActivityTimelinePanel /> },
           { path: "cost", element: <CostTrackerPanel /> },
           { path: "sensitivity", element: <SensitivityInspectorPanel /> },
+          { path: "recall-log", element: <RecallToolLogPanel /> },
         ],
       },
       { path: "/projects", element: <ProjectsListPage /> },

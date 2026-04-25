@@ -1,7 +1,25 @@
 import type { SessionReplayEntry } from "@shared/types";
 import { ChevronLeft, ChevronRight, X } from "lucide-react";
 import { useState } from "react";
-import { useSessionReplay } from "./hooks";
+import { useSessionRecallOverlay, useSessionReplay } from "./hooks";
+
+function SessionRecallOverlay({ sessionId }: { sessionId: string }) {
+  const { data: overlay } = useSessionRecallOverlay(sessionId);
+  if (!overlay || overlay.length === 0) return null;
+  return (
+    <div className="space-y-2">
+      <h4 className="text-xs font-semibold text-foreground uppercase tracking-wider">
+        Recall on this session
+      </h4>
+      {overlay.map((row) => (
+        <div key={row.id} className="text-xs text-foreground border-l-2 border-brand pl-2">
+          <div className="font-mono">{row.layer}</div>
+          <div className="text-muted-foreground truncate">{row.query}</div>
+        </div>
+      ))}
+    </div>
+  );
+}
 
 export function SessionReplayPanel() {
   const [offset, setOffset] = useState(0);
@@ -56,7 +74,7 @@ export function SessionReplayPanel() {
         </ul>
       </div>
       {selected && (
-        <aside className="w-1/3 border-l border-border p-6 overflow-auto">
+        <aside className="w-1/3 border-l border-border p-6 overflow-auto space-y-4">
           <header className="mb-3 flex items-center justify-between">
             <h3 className="text-sm font-semibold text-foreground">Event detail</h3>
             <button
@@ -70,6 +88,7 @@ export function SessionReplayPanel() {
           <pre className="whitespace-pre-wrap break-words rounded-lg bg-accent/30 p-3 text-xs text-foreground">
             {JSON.stringify(JSON.parse(selected.payload), null, 2)}
           </pre>
+          <SessionRecallOverlay sessionId={selected.sessionId} />
         </aside>
       )}
     </section>

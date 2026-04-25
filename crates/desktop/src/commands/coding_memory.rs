@@ -22,6 +22,15 @@ pub(crate) const DEV_COMMANDS: &[&str] = &[
     "coding_memory_cost",
     "coding_memory_sensitivity",
     "coding_memory_distill_now",
+    "coding_memory_recall_index",
+    "coding_memory_recall_timeline",
+    "coding_memory_recall_fetch",
+    "coding_memory_check_dead_ends",
+    "coding_memory_recall_facts_as_of",
+    "coding_memory_recall_change_history",
+    "coding_memory_recall_decision_points",
+    "coding_memory_recall_log",
+    "coding_memory_session_replay_recall_overlay",
 ];
 
 #[tauri::command]
@@ -115,6 +124,97 @@ pub async fn coding_memory_distill_now(
     turn_id: Option<String>,
 ) -> Result<serde_json::Value, ApiError> {
     state.coding_memory_distill_now(session_id, turn_id).await
+}
+
+#[tauri::command]
+pub async fn coding_memory_recall_index(
+    state: State<'_, Arc<AppCore>>,
+    args: serde_json::Value,
+) -> Result<serde_json::Value, String> {
+    let svc = state.recall.as_ref().ok_or("recall service unavailable")?;
+    app_core::coding_memory::recall::recall_index_handler(svc, args)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn coding_memory_recall_timeline(
+    state: State<'_, Arc<AppCore>>,
+    args: serde_json::Value,
+) -> Result<serde_json::Value, String> {
+    let svc = state.recall.as_ref().ok_or("recall service unavailable")?;
+    app_core::coding_memory::recall::recall_timeline_handler(svc, args)
+        .await.map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn coding_memory_recall_fetch(
+    state: State<'_, Arc<AppCore>>,
+    args: serde_json::Value,
+) -> Result<serde_json::Value, String> {
+    let svc = state.recall.as_ref().ok_or("recall service unavailable")?;
+    app_core::coding_memory::recall::recall_fetch_handler(svc, args)
+        .await.map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn coding_memory_check_dead_ends(
+    state: State<'_, Arc<AppCore>>,
+    args: serde_json::Value,
+) -> Result<serde_json::Value, String> {
+    let svc = state.recall.as_ref().ok_or("recall service unavailable")?;
+    app_core::coding_memory::recall::check_dead_ends_handler(svc, args)
+        .await.map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn coding_memory_recall_facts_as_of(
+    state: State<'_, Arc<AppCore>>,
+    args: serde_json::Value,
+) -> Result<serde_json::Value, String> {
+    let svc = state.recall.as_ref().ok_or("recall service unavailable")?;
+    app_core::coding_memory::recall::recall_facts_as_of_handler(svc, args)
+        .await.map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn coding_memory_recall_change_history(
+    state: State<'_, Arc<AppCore>>,
+    args: serde_json::Value,
+) -> Result<serde_json::Value, String> {
+    let svc = state.recall.as_ref().ok_or("recall service unavailable")?;
+    app_core::coding_memory::recall::recall_change_history_handler(svc, args)
+        .await.map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn coding_memory_recall_decision_points(
+    state: State<'_, Arc<AppCore>>,
+    args: serde_json::Value,
+) -> Result<serde_json::Value, String> {
+    let svc = state.recall.as_ref().ok_or("recall service unavailable")?;
+    app_core::coding_memory::recall::recall_decision_points_handler(svc, args)
+        .await.map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn coding_memory_recall_log(
+    state: State<'_, Arc<AppCore>>,
+    args: RecallLogArgs,
+) -> Result<Vec<coding_memory::RecallInvocationRow>, String> {
+    let svc = state.recall.as_ref().ok_or("recall service unavailable")?;
+    app_core::coding_memory::recall::recall_log_handler(svc, args.layer, args.limit, args.offset)
+        .await.map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn coding_memory_session_replay_recall_overlay(
+    state: State<'_, Arc<AppCore>>,
+    args: SessionRecallOverlayArgs,
+) -> Result<Vec<coding_memory::RecallInvocationRow>, String> {
+    let svc = state.recall.as_ref().ok_or("recall service unavailable")?;
+    app_core::coding_memory::recall::session_recall_overlay_handler(svc, args.session_id, args.limit, args.offset)
+        .await.map_err(|e| e.to_string())
 }
 
 /// dev_server dispatcher — wired by dev_server/mod.rs.
@@ -240,6 +340,21 @@ pub(crate) async fn dispatch_dev(
                 core.coding_memory_distill_now(a.session_id, a.turn_id)
                     .await,
             )
+        }
+        "coding_memory_recall_index" => dev::val(app_core::coding_memory::recall::recall_index_handler(core.recall.as_ref()?, body.clone()).await.map_err(|e| ApiError::new("INTERNAL_ERROR", e.to_string()))),
+        "coding_memory_recall_timeline" => dev::val(app_core::coding_memory::recall::recall_timeline_handler(core.recall.as_ref()?, body.clone()).await.map_err(|e| ApiError::new("INTERNAL_ERROR", e.to_string()))),
+        "coding_memory_recall_fetch" => dev::val(app_core::coding_memory::recall::recall_fetch_handler(core.recall.as_ref()?, body.clone()).await.map_err(|e| ApiError::new("INTERNAL_ERROR", e.to_string()))),
+        "coding_memory_check_dead_ends" => dev::val(app_core::coding_memory::recall::check_dead_ends_handler(core.recall.as_ref()?, body.clone()).await.map_err(|e| ApiError::new("INTERNAL_ERROR", e.to_string()))),
+        "coding_memory_recall_facts_as_of" => dev::val(app_core::coding_memory::recall::recall_facts_as_of_handler(core.recall.as_ref()?, body.clone()).await.map_err(|e| ApiError::new("INTERNAL_ERROR", e.to_string()))),
+        "coding_memory_recall_change_history" => dev::val(app_core::coding_memory::recall::recall_change_history_handler(core.recall.as_ref()?, body.clone()).await.map_err(|e| ApiError::new("INTERNAL_ERROR", e.to_string()))),
+        "coding_memory_recall_decision_points" => dev::val(app_core::coding_memory::recall::recall_decision_points_handler(core.recall.as_ref()?, body.clone()).await.map_err(|e| ApiError::new("INTERNAL_ERROR", e.to_string()))),
+        "coding_memory_recall_log" => {
+            let a: RecallLogArgs = match dev::parse_params(body) { Ok(v) => v, Err(e) => return Some(Err(e)) };
+            dev::val(app_core::coding_memory::recall::recall_log_handler(core.recall.as_ref()?, a.layer, a.limit, a.offset).await.map_err(|e| ApiError::new("INTERNAL_ERROR", e.to_string())))
+        }
+        "coding_memory_session_replay_recall_overlay" => {
+            let a: SessionRecallOverlayArgs = match dev::parse_params(body) { Ok(v) => v, Err(e) => return Some(Err(e)) };
+            dev::val(app_core::coding_memory::recall::session_recall_overlay_handler(core.recall.as_ref()?, a.session_id, a.limit, a.offset).await.map_err(|e| ApiError::new("INTERNAL_ERROR", e.to_string())))
         }
         _ => return None,
     })

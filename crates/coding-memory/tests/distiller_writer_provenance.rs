@@ -49,6 +49,8 @@ fn dummy_fact() -> SemanticFact {
         memory_type: "fact".into(),
         scope_type: "user".into(),
         scope_id: None,
+        scope_repo_id: None,
+        metadata: None,
     }
 }
 
@@ -67,6 +69,9 @@ fn dummy_episode() -> EpisodicMemory {
         project_id: None,
         scope_type: "user".into(),
         scope_id: None,
+        scope_repo_id: None,
+        metadata: None,
+        kind: None,
     }
 }
 

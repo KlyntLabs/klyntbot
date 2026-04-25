@@ -21,6 +21,22 @@ export interface SessionReplayEntry {
   payload: string;
 }
 
+export interface RecallInvocationRow {
+  id: string;
+  occurredAt: string;
+  sessionId: string | null;
+  turnId: string | null;
+  repoId: string | null;
+  layer: string;
+  query: string;
+  coverageScore: number | null;
+  skillUsed: string | null;
+  latencyMs: number;
+  resultIds: string[];
+  renderedTokens: number | null;
+  metadata: unknown;
+}
+
 export interface DiagnoseResult {
   ok: boolean;
   message: string;

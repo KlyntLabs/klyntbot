@@ -1,5 +1,27 @@
 # Coding Memory
 
+## Phase 4 — Recall pipeline + MCP tools + passive injection (shipped 2026-04-25)
+
+The read path: facts written by Phase-3 Distiller are now retrievable via MCP tools and passive hook injection.
+
+**Passive injection.** `klyntbot-hook context --session-start` emits an 800-token markdown block; `--user-prompt-submit <query>` emits a 1500-token block including a dead-end warning when the approach matches a prior counterfactual. Both speak JSON-over-Unix-socket to the daemon's `OpHandler` and print `<!-- klyntbot recall unavailable -->` when the desktop is offline (never blocks Claude Code).
+
+**Active retrieval (MCP).** 7 tools are live: `recall_index`, `recall_timeline`, `recall_fetch`, `check_dead_ends`, `recall_facts_as_of`, `recall_change_history`, `recall_decision_points`. Each is a `CodingMemoryMcpTool` registered in the agent's `ToolRegistry` at boot. `trace_causes` stays a Phase-6 stub.
+
+**C3 escalation.** When `RetrievalQualityProbe` reports coverage < threshold, the `RetrievalSkillRegistry` tries skills in EMA-descending order within the active budget tier (`Fast` → `DeepThink` → `Ultra`). The closed set of 5 skills: `QueryRewriter`, `QueryDecomposer`, `EvidenceFocuser`, `RawEventEscalator`, `CausalContextExpander` (last two stubs until Phase 6).
+
+**Telemetry.** Every recall invocation writes a row to `recall_invocations` with `(query, layer, coverage_score, skill_used, latency_ms, result_ids[])`. The Workbench Recall Tool Log panel and Session Replay overlay both consume this table.
+
+**Workbench additions.** Recall Tool Log panel (paginated, layer-filtered) + Session Replay per-session recall overlay strip.
+
+**Invariants under property test:**
+
+1. Truncate-to never exceeds budget — `tests/prop_injection_budget.rs`
+2. Recall idempotent for same query — `tests/prop_recall_idempotent.rs`
+3. Next session sees prior memory — `tests/integration/coding_memory_phase4_next_session.rs`
+4. Dead-end warning triggers on repeat — `tests/integration/coding_memory_phase4_dead_end.rs`
+5. C3 escalation lifts coverage and bumps EMA — `tests/integration/coding_memory_phase4_c3_escalation.rs`
+
 ## Phase 3 — Distiller write path + Tier A/B activation (shipped 2026-04-25)
 
 The Distiller turns persisted ingest events into cognitive memory rows.

@@ -6,7 +6,7 @@
 use coding_memory::distiller::{Distiller, TurnTrace};
 use coding_memory::error::NotImplementedInPhase;
 use coding_memory::facts::{CodingKind, FixAttempt, FixOutcome, StyleScope};
-use coding_memory::mcp::{stub_handler, CODING_MEMORY_MCP_TOOLS};
+use coding_memory::mcp::CODING_MEMORY_MCP_TOOLS;
 use coding_memory::recall::{CodingRecallService, IndexEntry, RecallQuery};
 use coding_memory::reforge_phase::{
     CodingSynthesisPhase, RuleArtifact, RuleArtifactGenerationPhase,
@@ -35,11 +35,10 @@ fn phase1_types_are_constructable() {
 }
 
 #[test]
-fn phase1_mcp_tool_constant_matches_handler() {
+fn phase1_mcp_tool_constant_is_populated() {
     assert_eq!(CODING_MEMORY_MCP_TOOLS.len(), 8);
     for t in CODING_MEMORY_MCP_TOOLS {
-        let err = stub_handler(t).unwrap_err();
-        assert!(err.to_string().contains(t));
+        assert!(!t.is_empty());
     }
 }
 
@@ -53,16 +52,10 @@ async fn phase1_stub_services_return_not_implemented() {
     assert!(sink.accept_event(dummy_event()).await.is_ok());
     assert!(sink.flush().await.is_ok());
 
-    let recall = CodingRecallService::new();
-    assert!(recall
-        .recall_index("q", None, None, None, 10)
-        .await
-        .is_err());
-    assert!(recall
-        .recall_timeline(RecallQuery::Text("q".into()), None, 7)
-        .await
-        .is_err());
-    assert!(recall.check_dead_ends("approach", None).await.is_err());
+    // CodingRecallService is no longer a stub — verify type exists only.
+    let _: Option<CodingRecallService> = None;
+    // Verify query structs compile.
+    let _: Option<RecallQuery> = None;
 
     let phase = CodingSynthesisPhase::default();
     assert!(coding_memory::reforge_phase::ReforgePhaseRun::run(&phase)
@@ -73,14 +66,19 @@ async fn phase1_stub_services_return_not_implemented() {
         .await
         .is_err());
 
-    let skill = QueryRewriter;
+    // QueryRewriter is no longer a unit struct — construct with dummy retrieve fn.
+    let skill = QueryRewriter::new(std::sync::Arc::new(|_q| {
+        Box::pin(async { Ok((vec![], vec![])) })
+    }));
     let ctx = EscalationContext {
         query: "q".into(),
         coverage_score: 0.1,
         budget_tier: BudgetTier::DeepThink,
+        repo: None,
     };
-    assert!(skill.apply(&ctx).await.is_err());
-    assert!((skill.effectiveness_score() - 0.5).abs() < f32::EPSILON);
+    // apply returns Result<EscalationOutcome> — just verify it compiles + runs.
+    let out = skill.apply(&ctx).await;
+    assert!(out.is_ok());
 
     let evolver = PhaseStubEvolver;
     use coding_memory::skills::ProjectSkillEvolver;

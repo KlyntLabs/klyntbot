@@ -105,3 +105,23 @@ pub struct SensitivityRow {
     /// when present, else `"public"`.
     pub sensitivity: String,
 }
+
+/// Args for `coding_memory_recall_log`.
+#[derive(serde::Deserialize, serde::Serialize, Debug, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct RecallLogArgs {
+    pub layer: Option<String>,
+    #[serde(default = "default_limit_50")] pub limit: i64,
+    #[serde(default)] pub offset: i64,
+}
+fn default_limit_50() -> i64 { 50 }
+
+/// Args for `coding_memory_session_replay_recall_overlay`.
+#[derive(serde::Deserialize, serde::Serialize, Debug, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct SessionRecallOverlayArgs {
+    pub session_id: String,
+    #[serde(default = "default_limit_200")] pub limit: i64,
+    #[serde(default)] pub offset: i64,
+}
+fn default_limit_200() -> i64 { 200 }

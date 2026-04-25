@@ -4,6 +4,8 @@
 pub mod handlers;
 /// Claude Code settings.json installer.
 pub mod installer;
+/// Phase-4 recall handlers.
+pub mod recall;
 
 use desktop_shared::errors::ApiError;
 

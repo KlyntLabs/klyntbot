@@ -1,5 +1,10 @@
 import { useQuery } from "@shared/hooks";
-import type { CliHealthRow, CodingMemoryStatusResponse, SessionReplayEntry } from "@shared/types";
+import type {
+  CliHealthRow,
+  CodingMemoryStatusResponse,
+  RecallInvocationRow,
+  SessionReplayEntry,
+} from "@shared/types";
 
 export const useCodingMemoryStatus = () =>
   useQuery<CodingMemoryStatusResponse | null>("coding_memory_status", undefined, null);
@@ -55,3 +60,27 @@ export const useSensitivityInspector = () =>
   useQuery<
     { id: string; subject: string; predicate: string; object: string; sensitivity: string }[] | null
   >("coding_memory_sensitivity", undefined, null);
+
+export function useRecallLog(layer?: string, limit = 50, offset = 0) {
+  return useQuery<RecallInvocationRow[] | null>(
+    "coding_memory_recall_log",
+    {
+      layer: layer ?? null,
+      limit,
+      offset,
+    },
+    null,
+  );
+}
+
+export function useSessionRecallOverlay(sessionId: string, limit = 200, offset = 0) {
+  return useQuery<RecallInvocationRow[] | null>(
+    "coding_memory_session_replay_recall_overlay",
+    {
+      sessionId,
+      limit,
+      offset,
+    },
+    null,
+  );
+}

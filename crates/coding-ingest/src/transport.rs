@@ -143,6 +143,40 @@ impl IngestSocket for FileBufferFallback {
     }
 }
 
+/// Send a JSON request, await one JSON response within `timeout`.
+pub async fn request_response(
+    socket: &UnixIngestSocket,
+    payload: &serde_json::Value,
+    timeout: std::time::Duration,
+) -> common::Result<serde_json::Value> {
+    use tokio::io::{AsyncReadExt, AsyncWriteExt};
+    let mut stream = tokio::time::timeout(timeout, tokio::net::UnixStream::connect(&socket.path))
+        .await
+        .map_err(|_| common::KlyntbotError::Storage("socket connect timeout".into()))?
+        .map_err(|e| common::KlyntbotError::Storage(format!("connect: {e}")))?;
+    let buf = serde_json::to_vec(payload)
+        .map_err(|e| common::KlyntbotError::Storage(format!("encode: {e}")))?;
+    let len = (buf.len() as u32).to_le_bytes();
+    stream.write_all(&len).await
+        .map_err(|e| common::KlyntbotError::Storage(format!("write len: {e}")))?;
+    stream.write_all(&buf).await
+        .map_err(|e| common::KlyntbotError::Storage(format!("write buf: {e}")))?;
+    stream.shutdown().await.ok();
+    let mut len_buf = [0u8; 4];
+    tokio::time::timeout(timeout, stream.read_exact(&mut len_buf))
+        .await
+        .map_err(|_| common::KlyntbotError::Storage("read len timeout".into()))?
+        .map_err(|e| common::KlyntbotError::Storage(format!("read len: {e}")))?;
+    let resp_len = u32::from_be_bytes(len_buf) as usize;
+    let mut data = vec![0u8; resp_len];
+    tokio::time::timeout(timeout, stream.read_exact(&mut data))
+        .await
+        .map_err(|_| common::KlyntbotError::Storage("read body timeout".into()))?
+        .map_err(|e| common::KlyntbotError::Storage(format!("read body: {e}")))?;
+    serde_json::from_slice(&data)
+        .map_err(|e| common::KlyntbotError::Storage(format!("decode: {e}")))
+}
+
 impl FileBufferFallback {
     /// Delete rotated sibling files older than `BUFFER_TTL_DAYS`. Safe to call
     /// periodically; errors are logged, never returned. Caller: daemon startup.

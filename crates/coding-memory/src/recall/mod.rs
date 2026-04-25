@@ -4,7 +4,7 @@
 //! `QueryPipeline`, `UnifiedMemoryService`, the C3 failure-state probe, and
 //! the dead-end check.
 
-use common::Result;
+
 use jiff::Timestamp;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;

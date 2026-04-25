@@ -1926,6 +1926,9 @@ impl SimulationHarness {
                 project_id: None,
                 scope_type: "system".to_string(),
                 scope_id: None,
+                scope_repo_id: None,
+                metadata: None,
+                kind: None,
             };
             let _ = self.episodic_repo.insert(&episode).await;
         }

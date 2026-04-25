@@ -34,6 +34,8 @@ async fn provenance_always_non_empty_for_facts() {
         stability: 1.0, last_accessed: None, access_count: 0,
         convergence_score: 1.0, project_id: None,
         memory_type: "fact".into(), scope_type: "user".into(), scope_id: None,
+        scope_repo_id: None,
+        metadata: None,
     };
     writer.write_fact(PreparedFact { fact, metadata_json: None, scope_repo_id: None, provenance: prov }).await.unwrap();
 

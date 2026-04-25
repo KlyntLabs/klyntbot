@@ -199,6 +199,8 @@ impl AppCore {
                 memory_type: "vocabulary".to_string(),
                 scope_type: "system".to_string(),
                 scope_id: None,
+                metadata: None,
+                scope_repo_id: None,
             };
             sf_repo.upsert(&fact).await.map_err(map_cognitive_err)?;
         }

@@ -28,6 +28,8 @@ pub mod transport;
 /// Touch-file rate-limited stderr warnings.
 pub mod warn;
 
+pub use daemon::OpHandler;
+
 pub use event::{
     AgentEvent, AgentEventV1, AgentSource, DiagnosticsDelta, EventKind, FileOp, SkillScore,
     SymbolRef, TestFailure, TokenUsage,

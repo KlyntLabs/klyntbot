@@ -170,6 +170,10 @@ pub struct AppCore {
     pub ingest_daemon: std::sync::Mutex<Option<coding_ingest::daemon::IngestDaemonHandle>>,
     /// Coding-memory Distiller — processes ingest events into semantic facts & episodic memories.
     pub distiller: Option<Arc<coding_memory::distiller::Distiller>>,
+    /// Coding-memory recall service (Phase 4).
+    pub recall: Option<Arc<coding_memory::recall::CodingRecallService>>,
+    /// MCP toolset for coding-memory recall tools.
+    pub coding_toolset: Option<coding_memory::CodingMemoryToolset>,
 }
 
 impl AppCore {
