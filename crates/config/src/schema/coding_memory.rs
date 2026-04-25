@@ -206,10 +206,18 @@ pub struct CodingCliToggles {
 }
 
 /// One CLI's toggle entry.
-#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", default)]
 pub struct CodingCliEntry {
     pub enabled: bool,
+}
+
+impl Default for CodingCliEntry {
+    fn default() -> Self {
+        // Default to enabled so the hook is installed on first run without
+        // requiring the user to toggle it manually.
+        Self { enabled: true }
+    }
 }
 
 #[cfg(test)]

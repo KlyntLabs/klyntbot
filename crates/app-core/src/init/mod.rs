@@ -841,7 +841,8 @@ impl AppCore {
         };
 
         // ── Construct coding-memory Distiller + event-forwarding channel ─
-        let (ingest_event_tx, mut ingest_event_rx) = tokio::sync::mpsc::unbounded_channel::<coding_ingest::event::AgentEvent>();
+        let (ingest_event_tx, mut ingest_event_rx) =
+            tokio::sync::mpsc::unbounded_channel::<coding_ingest::event::AgentEvent>();
 
         let distiller = {
             let ingest_repo = Arc::new(coding_ingest::store::IngestEventLogRepo::new(
@@ -849,10 +850,15 @@ impl AppCore {
             ));
             let fact_repo = ::cognitive::SemanticFactRepo::new(storage_pool.inner().clone());
             let episode_repo = ::cognitive::EpisodicMemoryRepo::new(storage_pool.inner().clone());
-            let writer = coding_memory::distiller::DistillerWriter::new(fact_repo.clone(), episode_repo);
-            let distiller_provider = provider_manager
-                .clone()
-                .unwrap_or_else(|| Arc::new(providers::ProviderManager::new(provider_for_distiller.clone(), None, None)));
+            let writer =
+                coding_memory::distiller::DistillerWriter::new(fact_repo.clone(), episode_repo);
+            let distiller_provider = provider_manager.clone().unwrap_or_else(|| {
+                Arc::new(providers::ProviderManager::new(
+                    provider_for_distiller.clone(),
+                    None,
+                    None,
+                ))
+            });
             let retriever = Arc::new(::cognitive::UnifiedMemoryService::new(fact_repo))
                 as Arc<dyn context_engine::MemoryRetriever>;
             let mut distiller_cfg = coding_memory::distiller::DistillerConfig::default();
@@ -1055,13 +1061,36 @@ impl AppCore {
                 let d = d_retry.clone();
                 tokio::spawn(async move {
                     match d.sweep_retries().await {
-                        Ok(n) if n > 0 => tracing::info!(count = n, "distiller retry sweep processed rows"),
+                        Ok(n) if n > 0 => {
+                            tracing::info!(count = n, "distiller retry sweep processed rows")
+                        }
                         Ok(_) => {}
                         Err(e) => tracing::warn!(error = %e, "distiller retry sweep failed"),
                     }
                 });
             });
             info!("coding-memory Distiller wired — event receiver + sweepers started");
+
+            // Auto-install the Claude Code hook if enabled (default: true).
+            // Idempotent — re-running over an existing install just refreshes
+            // the absolute path of the desktop binary in case it moved.
+            {
+                let cfg = shared_config.read().await;
+                if cfg.coding_memory.cli.claude_code.enabled {
+                    if let (Ok(home), Ok(exe)) = (std::env::var("HOME"), std::env::current_exe()) {
+                        let settings = std::path::PathBuf::from(home)
+                            .join(".claude")
+                            .join("settings.json");
+                        let _ = tokio::task::spawn_blocking(move || {
+                            crate::coding_memory::installer::ClaudeCodeInstaller::install(
+                                &settings, &exe,
+                            )
+                        })
+                        .await;
+                        info!("coding-memory: Claude Code hook auto-installed");
+                    }
+                }
+            }
         }
 
         // ── Voice service initialization ────────────────────────────────
