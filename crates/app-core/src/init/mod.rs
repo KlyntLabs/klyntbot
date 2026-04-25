@@ -1103,7 +1103,26 @@ impl AppCore {
             distiller: Some(distiller.clone()),
             recall: Some(recall.clone()),
             coding_toolset: Some(toolset),
+            session_end_pass: None,
         };
+
+        // ── Phase-5 SessionEndPass wiring ────────────────────────────────
+        {
+            let session_summary_repo = coding_memory::reforge::SessionSummaryRepo::new(storage_pool.clone());
+            let co_act = ::cognitive::CoActivationRepo::new(storage_pool.inner().clone());
+            let utilization = coding_memory::recall::telemetry::RecallInvocationRepo::new(storage_pool.clone());
+            let session_end_pass = Arc::new(coding_memory::reforge::SessionEndPass::new(
+                session_summary_repo.clone(),
+                co_act,
+                utilization,
+            ));
+            crate::coding_memory::reforge::register_session_end_dispatch(
+                domain_event_bus.clone(),
+                session_end_pass.clone(),
+            )
+            .await;
+            core.session_end_pass = Some(session_end_pass);
+        }
 
         // ── Distiller event receiver + sweep timers ──────────────────────
         {

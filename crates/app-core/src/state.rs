@@ -174,6 +174,8 @@ pub struct AppCore {
     pub recall: Option<Arc<coding_memory::recall::CodingRecallService>>,
     /// MCP toolset for coding-memory recall tools.
     pub coding_toolset: Option<coding_memory::CodingMemoryToolset>,
+    /// Phase-5 session-end light pass.
+    pub session_end_pass: Option<Arc<coding_memory::reforge::SessionEndPass>>,
 }
 
 impl AppCore {

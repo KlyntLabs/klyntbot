@@ -574,6 +574,13 @@ pub enum DomainEvent {
         budget_used: String,
         session_id: String,
     },
+    /// Coding session ended — fired after Distiller drains the final turn.
+    CodingSessionEnded {
+        /// Session id from `AgentEvent`.
+        session_id: String,
+        /// Repo id (if resolved).
+        repo_id: Option<String>,
+    },
 }
 
 impl DomainEvent {
@@ -671,6 +678,7 @@ impl DomainEvent {
             Self::MemoryRetrieved { .. } => "MemoryRetrieved",
             Self::AssistantMsgCompleted { .. } => "AssistantMsgCompleted",
             Self::RetrievalSkillApplied { .. } => "RetrievalSkillApplied",
+            Self::CodingSessionEnded { .. } => "CodingSessionEnded",
         }
     }
 
@@ -815,6 +823,8 @@ impl DomainEvent {
     pub const KIND_MEMORY_RETRIEVED: &'static str = "MemoryRetrieved";
     pub const KIND_ASSISTANT_MSG_COMPLETED: &'static str = "AssistantMsgCompleted";
     pub const KIND_RETRIEVAL_SKILL_APPLIED: &'static str = "RetrievalSkillApplied";
+    /// `event_type` value for [`DomainEvent::CodingSessionEnded`].
+    pub const KIND_CODING_SESSION_ENDED: &'static str = "CodingSessionEnded";
 
     /// Map this event to its domain category.
     ///
@@ -921,7 +931,8 @@ impl DomainEvent {
             | Self::FixAttemptFailed { .. }
             | Self::MemoryRetrieved { .. }
             | Self::AssistantMsgCompleted { .. }
-            | Self::RetrievalSkillApplied { .. } => D::CodingMemory,
+            | Self::RetrievalSkillApplied { .. }
+            | Self::CodingSessionEnded { .. } => D::CodingMemory,
         }
     }
 }

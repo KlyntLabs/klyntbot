@@ -6,6 +6,8 @@ pub mod handlers;
 pub mod installer;
 /// Phase-4 recall handlers.
 pub mod recall;
+/// Phase-5 Reforge wiring (session-end pass, coding phase handlers).
+pub mod reforge;
 
 use desktop_shared::errors::ApiError;
 
