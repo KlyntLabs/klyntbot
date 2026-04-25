@@ -111,6 +111,12 @@ pub async fn execute_promotions(
                         project_id: None,
                         scope_type: "system".into(),
                         scope_id: None,
+                        effectiveness_score: 0.5,
+                        stability: 1.0,
+                        scope_repo_id: None,
+                        last_applied: None,
+                        application_count: 0,
+                        metadata: None,
                     };
                     if let Err(e) = rule_repo.upsert(&rule).await {
                         warn!("Writer: failed to create rule: {e}");

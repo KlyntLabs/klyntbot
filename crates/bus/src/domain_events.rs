@@ -581,6 +581,15 @@ pub enum DomainEvent {
         /// Repo id (if resolved).
         repo_id: Option<String>,
     },
+    /// Coding-specific Mirror alert (closed-enum extension).
+    CodingMirrorAlert {
+        /// `CodingMirrorAlertKind` as string.
+        kind: String,
+        /// `MirrorAlertSeverity` as string.
+        severity: String,
+        /// JSON-encoded payload.
+        payload: String,
+    },
 }
 
 impl DomainEvent {
@@ -679,6 +688,7 @@ impl DomainEvent {
             Self::AssistantMsgCompleted { .. } => "AssistantMsgCompleted",
             Self::RetrievalSkillApplied { .. } => "RetrievalSkillApplied",
             Self::CodingSessionEnded { .. } => "CodingSessionEnded",
+            Self::CodingMirrorAlert { .. } => "CodingMirrorAlert",
         }
     }
 
@@ -825,6 +835,8 @@ impl DomainEvent {
     pub const KIND_RETRIEVAL_SKILL_APPLIED: &'static str = "RetrievalSkillApplied";
     /// `event_type` value for [`DomainEvent::CodingSessionEnded`].
     pub const KIND_CODING_SESSION_ENDED: &'static str = "CodingSessionEnded";
+    /// `event_type` value for [`DomainEvent::CodingMirrorAlert`].
+    pub const KIND_CODING_MIRROR_ALERT: &'static str = "CodingMirrorAlert";
 
     /// Map this event to its domain category.
     ///
@@ -932,7 +944,8 @@ impl DomainEvent {
             | Self::MemoryRetrieved { .. }
             | Self::AssistantMsgCompleted { .. }
             | Self::RetrievalSkillApplied { .. }
-            | Self::CodingSessionEnded { .. } => D::CodingMemory,
+            | Self::CodingSessionEnded { .. }
+            | Self::CodingMirrorAlert { .. } => D::CodingMemory,
         }
     }
 }

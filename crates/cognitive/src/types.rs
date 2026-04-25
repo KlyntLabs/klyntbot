@@ -82,6 +82,12 @@ pub struct ProceduralRule {
     pub project_id: Option<String>,
     pub scope_type: String,
     pub scope_id: Option<String>,
+    pub effectiveness_score: f64,
+    pub stability: f64,
+    pub scope_repo_id: Option<String>,
+    pub last_applied: Option<String>,
+    pub application_count: i64,
+    pub metadata: Option<String>,
 }
 
 /// Minimum priority level considered "critical" for context injection.

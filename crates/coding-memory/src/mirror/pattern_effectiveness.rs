@@ -1,6 +1,6 @@
-//! Pattern effectiveness EMA source. Filled in by Task 5.
+//! Pattern effectiveness EMA log repo. Filled in by Task 19.
 
-/// Log repo for pattern effectiveness rows.
+/// Repo for the `pattern_effectiveness_log` table.
 #[derive(Debug, Clone)]
 pub struct PatternEffectivenessLogRepo {
     pool: storage::StoragePool,

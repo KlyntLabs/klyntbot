@@ -51,15 +51,22 @@ impl ProceduralRuleRepo {
         sqlx::query(
             r#"
             INSERT INTO procedural_rules (id, domain, rule_text, confidence, source,
-                signal_count, created_at, updated_at, active, project_id)
-            VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)
+                signal_count, created_at, updated_at, active, project_id,
+                effectiveness_score, stability, scope_repo_id, last_applied, application_count, metadata)
+            VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16)
             ON CONFLICT (id) DO UPDATE SET
                 rule_text = excluded.rule_text,
                 confidence = excluded.confidence,
                 signal_count = excluded.signal_count,
                 updated_at = datetime('now'),
                 active = excluded.active,
-                project_id = excluded.project_id
+                project_id = excluded.project_id,
+                effectiveness_score = excluded.effectiveness_score,
+                stability = excluded.stability,
+                scope_repo_id = excluded.scope_repo_id,
+                last_applied = excluded.last_applied,
+                application_count = excluded.application_count,
+                metadata = excluded.metadata
             "#,
         )
         .bind(&rule.id)
@@ -72,9 +79,20 @@ impl ProceduralRuleRepo {
         .bind(&rule.updated_at)
         .bind(rule.active)
         .bind(&rule.project_id)
+        .bind(rule.effectiveness_score)
+        .bind(rule.stability)
+        .bind(&rule.scope_repo_id)
+        .bind(&rule.last_applied)
+        .bind(rule.application_count)
+        .bind(&rule.metadata)
         .execute(&self.pool)
         .await?;
         Ok(())
+    }
+
+    /// Insert a procedural rule (convenience alias for coding-memory phases).
+    pub async fn insert(&self, rule: &ProceduralRule) -> Result<(), sqlx::Error> {
+        self.upsert(rule).await
     }
 
     /// List all active rules for a domain.
@@ -215,6 +233,12 @@ mod tests {
             project_id: None,
             scope_type: "system".to_string(),
             scope_id: None,
+            effectiveness_score: 0.5,
+            stability: 1.0,
+            scope_repo_id: None,
+            last_applied: None,
+            application_count: 0,
+            metadata: None,
         }
     }
 

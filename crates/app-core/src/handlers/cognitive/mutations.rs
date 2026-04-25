@@ -108,6 +108,12 @@ impl AppCore {
             project_id: None,
             scope_type: "system".to_string(),
             scope_id: None,
+            effectiveness_score: 0.5,
+            stability: 1.0,
+            scope_repo_id: None,
+            last_applied: None,
+            application_count: 0,
+            metadata: None,
         };
 
         repo.upsert(&rule).await.map_err(map_cognitive_err)?;

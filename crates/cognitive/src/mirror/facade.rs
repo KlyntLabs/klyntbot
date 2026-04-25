@@ -244,6 +244,12 @@ impl MirrorFacade {
                             project_id: None,
                             scope_type: "system".to_string(),
                             scope_id: None,
+                            effectiveness_score: meta.effectiveness_score,
+                            stability: 1.0,
+                            scope_repo_id: None,
+                            last_applied: None,
+                            application_count: 0,
+                            metadata: None,
                         };
                         if let Err(e) = rule_repo.upsert(&procedural).await {
                             tracing::warn!("mirror: failed to promote meta-rule {rule_id} to procedural rule: {e}");

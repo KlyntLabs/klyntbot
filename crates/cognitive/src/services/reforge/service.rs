@@ -840,6 +840,12 @@ async fn apply_knowledge(
                         project_id: None,
                         scope_type: "system".to_string(),
                         scope_id: None,
+                        effectiveness_score: 0.5,
+                        stability: 1.0,
+                        scope_repo_id: None,
+                        last_applied: None,
+                        application_count: 0,
+                        metadata: None,
                     };
                     if let Err(e) = rule_repo.upsert(&rule).await {
                         warn!("Reforge: failed to add rule: {e}");

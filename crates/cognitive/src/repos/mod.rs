@@ -141,6 +141,14 @@ pub fn cognitive_migrations() -> Vec<FeatureMigration> {
                 .to_string(),
             sql: include_str!("../../migrations/006_retrieval_index.sql").to_string(),
         },
+        FeatureMigration {
+            feature_name: "cognitive".to_string(),
+            version: 5,
+            description: "Extend procedural_rules with effectiveness_score, stability, \
+                          scope_repo_id, last_applied, application_count, metadata."
+                .to_string(),
+            sql: include_str!("../../migrations/007_procedural_rules_extension.sql").to_string(),
+        },
     ]
 }
 
