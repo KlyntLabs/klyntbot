@@ -164,6 +164,9 @@ pub async fn persist_turn_trace(
             "user".into()
         },
         scope_id: scope_repo_id.map(str::to_string),
+        scope_repo_id: scope_repo_id.map(str::to_string),
+        metadata: None,
+        kind: Some("turn_trace".into()),
     };
 
     writer

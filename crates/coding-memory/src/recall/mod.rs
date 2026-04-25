@@ -11,8 +11,16 @@ use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
 pub mod budget;
+pub mod change_history;
+pub mod dead_end;
+pub mod decision_points;
+pub mod facts_as_of;
+pub mod fetch_builder;
+pub mod index_builder;
+pub mod probe;
 pub mod renderers;
 pub mod telemetry;
+pub mod timeline_builder;
 
 /// One recall "level" for progressive disclosure.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

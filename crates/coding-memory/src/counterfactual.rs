@@ -46,5 +46,7 @@ pub fn derive_dead_end(
         memory_type: "counterfactual".into(),
         scope_type: "user".into(),
         scope_id: None,
+        scope_repo_id: None,
+        metadata: None,
     })
 }
