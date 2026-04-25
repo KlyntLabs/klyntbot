@@ -54,13 +54,12 @@ async fn phase1_migration_applies_over_cognitive_base() {
         "memory_utilization",
         "klynt_sessions",
     ] {
-        let row: Option<sqlx::sqlite::SqliteRow> = sqlx::query(
-            "SELECT name FROM sqlite_master WHERE type='table' AND name = ?",
-        )
-        .bind(table)
-        .fetch_optional(pool.inner())
-        .await
-        .unwrap();
+        let row: Option<sqlx::sqlite::SqliteRow> =
+            sqlx::query("SELECT name FROM sqlite_master WHERE type='table' AND name = ?")
+                .bind(table)
+                .fetch_optional(pool.inner())
+                .await
+                .unwrap();
         assert!(row.is_some(), "missing table: {table}");
     }
 
@@ -101,12 +100,20 @@ async fn migration_is_idempotent() {
     use cognitive::cognitive_migrations;
     let pool = StoragePool::connect_in_memory().await.expect("pool");
     let migs = coding_memory::coding_memory_migrations();
-    StoragePool::run_feature_migrations(pool.inner(), &cognitive_migrations()).await.expect("cog");
-    StoragePool::run_feature_migrations(pool.inner(), &migs).await.expect("first");
+    StoragePool::run_feature_migrations(pool.inner(), &cognitive_migrations())
+        .await
+        .expect("cog");
+    StoragePool::run_feature_migrations(pool.inner(), &migs)
+        .await
+        .expect("first");
     // Second run must not fail (pre-release policy: versioned idempotent).
-    StoragePool::run_feature_migrations(pool.inner(), &migs).await.expect("second");
+    StoragePool::run_feature_migrations(pool.inner(), &migs)
+        .await
+        .expect("second");
     let row: (i64,) = sqlx::query_as("SELECT COUNT(*) FROM ingest_event_log")
-        .fetch_one(pool.inner()).await.expect("count");
+        .fetch_one(pool.inner())
+        .await
+        .expect("count");
     assert_eq!(row.0, 0);
 }
 

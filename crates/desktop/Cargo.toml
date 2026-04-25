@@ -9,6 +9,8 @@ tauri-build = { version = "2", features = [] }
 [dependencies]
 app-core = { workspace = true }
 autotuner = { workspace = true }
+coding-ingest = { workspace = true }
+coding-memory = { workspace = true }
 desktop-shared = { workspace = true }
 agent = { workspace = true }
 bus = { workspace = true }

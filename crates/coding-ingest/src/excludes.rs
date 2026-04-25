@@ -8,13 +8,27 @@ use globset::{Glob, GlobSet, GlobSetBuilder};
 #[must_use]
 pub fn default_exclude_globs() -> Vec<String> {
     vec![
-        "**/.env", "**/.env.*",
-        "**/secrets/**", "**/private/**",
-        "**/*.key", "**/*.pem", "**/*.p12", "**/*.pfx",
-        "**/id_rsa", "**/id_ed25519", "**/known_hosts",
-        "**/.aws/credentials", "**/.gcloud/**", "**/.kube/config",
-        "**/node_modules/**", "**/target/**", "**/.git/**",
-    ].into_iter().map(String::from).collect()
+        "**/.env",
+        "**/.env.*",
+        "**/secrets/**",
+        "**/private/**",
+        "**/*.key",
+        "**/*.pem",
+        "**/*.p12",
+        "**/*.pfx",
+        "**/id_rsa",
+        "**/id_ed25519",
+        "**/known_hosts",
+        "**/.aws/credentials",
+        "**/.gcloud/**",
+        "**/.kube/config",
+        "**/node_modules/**",
+        "**/target/**",
+        "**/.git/**",
+    ]
+    .into_iter()
+    .map(String::from)
+    .collect()
 }
 
 /// Compiled glob matcher.
@@ -27,7 +41,9 @@ impl ExcludeSet {
     /// Compile a set of glob patterns.
     pub fn compile(patterns: &[String]) -> Result<Self, globset::Error> {
         let mut b = GlobSetBuilder::new();
-        for p in patterns { b.add(Glob::new(p)?); }
+        for p in patterns {
+            b.add(Glob::new(p)?);
+        }
         Ok(Self { set: b.build()? })
     }
 
@@ -46,7 +62,8 @@ impl ExcludeSet {
 
     fn any_token_match(&self, haystack: &str) -> bool {
         // Split on common separators; match any token that looks like a path.
-        haystack.split(|c: char| c.is_whitespace() || c == '=' || c == ',' || c == '"')
+        haystack
+            .split(|c: char| c.is_whitespace() || c == '=' || c == ',' || c == '"')
             .any(|tok| !tok.is_empty() && self.set.is_match(tok))
     }
 }

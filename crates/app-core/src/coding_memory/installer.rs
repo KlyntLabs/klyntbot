@@ -31,9 +31,7 @@ impl ClaudeCodeInstaller {
         if settings_path.exists() {
             backup(settings_path)?;
         }
-        let hooks = doc.get_mut("hooks")
-            .and_then(Value::as_object_mut)
-            .cloned();
+        let hooks = doc.get_mut("hooks").and_then(Value::as_object_mut).cloned();
         let mut hooks = hooks.unwrap_or_default();
 
         for event in HOOK_EVENTS {
@@ -57,7 +55,9 @@ impl ClaudeCodeInstaller {
 
     /// Remove klyntbot-managed entries. Leaves user entries intact.
     pub fn uninstall(settings_path: &Path) -> Result<()> {
-        if !settings_path.exists() { return Ok(()); }
+        if !settings_path.exists() {
+            return Ok(());
+        }
         let mut doc: Value = read_or_empty(settings_path)?;
         if let Some(hooks) = doc.get_mut("hooks").and_then(Value::as_object_mut) {
             for event in HOOK_EVENTS {
@@ -82,31 +82,41 @@ impl ClaudeCodeInstaller {
             .spawn()
             .map_err(|e| KlyntbotError::Storage(format!("spawn hook: {e}")))?;
         let body = br#"{"session_id":"diagnose","cwd":"/tmp","source":"diagnose"}"#;
-        child.stdin.as_mut().unwrap().write_all(body)
+        child
+            .stdin
+            .as_mut()
+            .unwrap()
+            .write_all(body)
             .map_err(|e| KlyntbotError::Storage(format!("write stdin: {e}")))?;
-        let status = child.wait()
+        let status = child
+            .wait()
             .map_err(|e| KlyntbotError::Storage(format!("wait: {e}")))?;
         if !status.success() {
-            return Err(KlyntbotError::Storage(format!("hook exited {}", status.code().unwrap_or(-1))));
+            return Err(KlyntbotError::Storage(format!(
+                "hook exited {}",
+                status.code().unwrap_or(-1)
+            )));
         }
         Ok(())
     }
 }
 
 fn read_or_empty(path: &Path) -> Result<Value> {
-    if !path.exists() { return Ok(json!({})); }
+    if !path.exists() {
+        return Ok(json!({}));
+    }
     let raw = std::fs::read_to_string(path)
         .map_err(|e| KlyntbotError::Storage(format!("read settings: {e}")))?;
-    if raw.trim().is_empty() { return Ok(json!({})); }
-    serde_json::from_str(&raw)
-        .map_err(|e| KlyntbotError::Storage(format!("parse settings: {e}")))
+    if raw.trim().is_empty() {
+        return Ok(json!({}));
+    }
+    serde_json::from_str(&raw).map_err(|e| KlyntbotError::Storage(format!("parse settings: {e}")))
 }
 
 fn backup(path: &Path) -> Result<()> {
     let ts = Timestamp::now().as_millisecond();
     let bak: PathBuf = path.with_extension(format!("json.klyntbot-backup.{ts}"));
-    std::fs::copy(path, &bak)
-        .map_err(|e| KlyntbotError::Storage(format!("backup: {e}")))?;
+    std::fs::copy(path, &bak).map_err(|e| KlyntbotError::Storage(format!("backup: {e}")))?;
     Ok(())
 }
 
@@ -118,9 +128,7 @@ fn atomic_write(path: &Path, doc: &Value) -> Result<()> {
     let body = serde_json::to_vec_pretty(doc)
         .map_err(|e| KlyntbotError::Storage(format!("serialize: {e}")))?;
     let tmp = path.with_extension(format!("json.tmp.{}", std::process::id()));
-    std::fs::write(&tmp, &body)
-        .map_err(|e| KlyntbotError::Storage(format!("write tmp: {e}")))?;
-    std::fs::rename(&tmp, path)
-        .map_err(|e| KlyntbotError::Storage(format!("rename: {e}")))?;
+    std::fs::write(&tmp, &body).map_err(|e| KlyntbotError::Storage(format!("write tmp: {e}")))?;
+    std::fs::rename(&tmp, path).map_err(|e| KlyntbotError::Storage(format!("rename: {e}")))?;
     Ok(())
 }

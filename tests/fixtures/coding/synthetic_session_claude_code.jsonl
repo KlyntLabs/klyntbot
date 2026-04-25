@@ -1,0 +1,10 @@
+{"hookEvent":"SessionStart","body":{"session_id":"fx-1","cwd":"/tmp/fx","source":"cli","model":"claude-sonnet-4-6"}}
+{"hookEvent":"UserPromptSubmit","body":{"session_id":"fx-1","cwd":"/tmp/fx","prompt":"fix the failing test","attachments":[]}}
+{"hookEvent":"PostToolUse","body":{"session_id":"fx-1","cwd":"/tmp/fx","tool_name":"Read","tool_input":{"file_path":"/tmp/fx/src/lib.rs"},"tool_response":{"bytes":1200},"duration_ms":5}}
+{"hookEvent":"PostToolUse","body":{"session_id":"fx-1","cwd":"/tmp/fx","tool_name":"Bash","tool_input":{"command":"cargo test --workspace"},"tool_response":{"stdout":"test result: ok. 12 passed; 3 failed; 0 ignored","stderr":"","exit_code":1},"duration_ms":4200}}
+{"hookEvent":"PostToolUse","body":{"session_id":"fx-1","cwd":"/tmp/fx","tool_name":"Edit","tool_input":{"file_path":"/tmp/fx/src/lib.rs","old_string":"a","new_string":"b"},"tool_response":{"bytes":1205},"duration_ms":12}}
+{"hookEvent":"PostToolUse","body":{"session_id":"fx-1","cwd":"/tmp/fx","tool_name":"Bash","tool_input":{"command":"cargo test --workspace"},"tool_response":{"stdout":"test result: ok. 15 passed; 0 failed; 0 ignored","stderr":"","exit_code":0},"duration_ms":4100}}
+{"hookEvent":"Stop","body":{"session_id":"fx-1","cwd":"/tmp/fx","transcript_path":"/tmp/fx/.tr","stop_hook_active":false}}
+{"hookEvent":"PreCompact","body":{"session_id":"fx-1","cwd":"/tmp/fx","trigger":"auto"}}
+{"hookEvent":"UserPromptSubmit","body":{"session_id":"fx-1","cwd":"/tmp/fx","prompt":"what else needs doing?","attachments":[]}}
+{"hookEvent":"SessionEnd","body":{"session_id":"fx-1","cwd":"/tmp/fx","reason":"user-quit"}}

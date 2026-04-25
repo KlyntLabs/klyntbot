@@ -14,7 +14,15 @@ fn install_into_empty_dir_creates_settings_file() {
     ClaudeCodeInstaller::install(&settings, &hook).unwrap();
     let v = read(&settings);
     let hooks = v.get("hooks").unwrap().as_object().unwrap();
-    for event in ["SessionStart","SessionEnd","UserPromptSubmit","PreToolUse","PostToolUse","Stop","PreCompact"] {
+    for event in [
+        "SessionStart",
+        "SessionEnd",
+        "UserPromptSubmit",
+        "PreToolUse",
+        "PostToolUse",
+        "Stop",
+        "PreCompact",
+    ] {
         assert!(hooks.contains_key(event), "missing {event}");
     }
 }
@@ -71,7 +79,8 @@ fn install_creates_backup_of_preexisting_file() {
     let settings = dir.path().join("settings.json");
     std::fs::write(&settings, r#"{"hooks":{}}"#).unwrap();
     ClaudeCodeInstaller::install(&settings, &std::path::PathBuf::from("/bin/kh")).unwrap();
-    let backups: Vec<_> = std::fs::read_dir(dir.path()).unwrap()
+    let backups: Vec<_> = std::fs::read_dir(dir.path())
+        .unwrap()
         .filter_map(|e| e.ok().map(|e| e.file_name().into_string().unwrap()))
         .filter(|n| n.contains("klyntbot-backup"))
         .collect();

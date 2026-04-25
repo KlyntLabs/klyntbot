@@ -51,10 +51,7 @@ pub trait RetrievalSkill: Send + Sync {
     fn description(&self) -> &'static str;
 
     /// Apply the skill against an escalation context. Phase 4.
-    async fn apply(
-        &self,
-        ctx: &EscalationContext,
-    ) -> Result<EscalationOutcome>;
+    async fn apply(&self, ctx: &EscalationContext) -> Result<EscalationOutcome>;
 
     /// Current EMA-updated effectiveness (0.0 – 1.0).
     fn effectiveness_score(&self) -> f32;
@@ -74,10 +71,7 @@ macro_rules! phase_stub_skill {
             fn description(&self) -> &'static str {
                 $d
             }
-            async fn apply(
-                &self,
-                _ctx: &EscalationContext,
-            ) -> Result<EscalationOutcome> {
+            async fn apply(&self, _ctx: &EscalationContext) -> Result<EscalationOutcome> {
                 Err(phase(4))
             }
             fn effectiveness_score(&self) -> f32 {
@@ -114,8 +108,5 @@ phase_stub_skill!(
 );
 
 fn phase(p: u8) -> KlyntbotError {
-    KlyntbotError::NotImplemented(format!(
-        "{:?}",
-        NotImplementedInPhase::new(p)
-    ))
+    KlyntbotError::NotImplemented(format!("{:?}", NotImplementedInPhase::new(p)))
 }

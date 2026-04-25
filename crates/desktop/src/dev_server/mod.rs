@@ -223,6 +223,7 @@ mod tests {
             commands::groups::DEV_COMMANDS,
             commands::workflows::DEV_COMMANDS,
             commands::columns::DEV_COMMANDS,
+            commands::coding_memory::DEV_COMMANDS,
             commands::cognitive::DEV_COMMANDS,
             commands::timeline::DEV_COMMANDS,
             commands::cron::DEV_COMMANDS,

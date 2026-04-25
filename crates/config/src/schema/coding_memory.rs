@@ -54,12 +54,27 @@ impl Default for CodingIngestConfig {
 #[must_use]
 pub fn default_exclude_paths() -> Vec<String> {
     [
-        "**/.env", "**/.env.*", "**/secrets/**", "**/private/**", "**/*.key",
-        "**/*.pem", "**/*.p12", "**/*.pfx", "**/id_rsa", "**/id_ed25519",
-        "**/known_hosts", "**/.aws/credentials", "**/.gcloud/**",
-        "**/.kube/config", "**/node_modules/**", "**/target/**", "**/.git/**",
+        "**/.env",
+        "**/.env.*",
+        "**/secrets/**",
+        "**/private/**",
+        "**/*.key",
+        "**/*.pem",
+        "**/*.p12",
+        "**/*.pfx",
+        "**/id_rsa",
+        "**/id_ed25519",
+        "**/known_hosts",
+        "**/.aws/credentials",
+        "**/.gcloud/**",
+        "**/.kube/config",
+        "**/node_modules/**",
+        "**/target/**",
+        "**/.git/**",
     ]
-    .iter().map(|s| (*s).to_string()).collect()
+    .iter()
+    .map(|s| (*s).to_string())
+    .collect()
 }
 
 /// Privacy config.

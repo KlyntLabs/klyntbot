@@ -9,26 +9,26 @@
 
 #![deny(missing_docs)]
 
-/// Error surface for phased stubs.
-pub mod error;
-/// Scope partitioning, provenance, anchored symbols, causal edges.
-pub mod scope;
-/// Coding fact taxonomy (`FixAttempt`, `RepoContext`, …).
-pub mod facts;
-/// `MemorySink` trait + `InProcessSink` / `IngestSocketSink` stubs.
-pub mod sink;
 /// Distiller — online writer stub.
 pub mod distiller;
+/// Error surface for phased stubs.
+pub mod error;
+/// Coding fact taxonomy (`FixAttempt`, `RepoContext`, …).
+pub mod facts;
+/// MCP tool stubs — registered with `default_exposed_tools()`.
+pub mod mcp;
 /// Recall service — MCP + passive injection stub.
 pub mod recall;
 /// Reforge coding phases (2.5, 3.5) stubs.
 pub mod reforge_phase;
-/// Scope-aware skill store extension + project skill evolution.
-pub mod skills;
 /// C3 retrieval-skill registry stubs.
 pub mod retrieval_skills;
-/// MCP tool stubs — registered with `default_exposed_tools()`.
-pub mod mcp;
+/// Scope partitioning, provenance, anchored symbols, causal edges.
+pub mod scope;
+/// `MemorySink` trait + `InProcessSink` / `IngestSocketSink` stubs.
+pub mod sink;
+/// Scope-aware skill store extension + project skill evolution.
+pub mod skills;
 
 pub use error::{CodingMemoryError, NotImplementedInPhase};
 

@@ -37,7 +37,11 @@ impl From<CoActivationEvent> for DomainEvent {
 pub fn try_from_domain_event(e: &bus::DomainEvent) -> Option<CoActivationEvent> {
     use bus::DomainEvent;
     match e {
-        DomainEvent::CoActivationStrengthened { fact_id_a, fact_id_b, strength } => Some(CoActivationEvent::Strengthened {
+        DomainEvent::CoActivationStrengthened {
+            fact_id_a,
+            fact_id_b,
+            strength,
+        } => Some(CoActivationEvent::Strengthened {
             fact_id_a: fact_id_a.clone(),
             fact_id_b: fact_id_b.clone(),
             strength: *strength,

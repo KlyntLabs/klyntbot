@@ -232,6 +232,10 @@ extism.workspace = true
 simulator.workspace = true
 walkdir = "2"
 dashmap.workspace = true
+assert_cmd = "2"
+coding-ingest = { path = "crates/coding-ingest" }
+coding-memory = { path = "crates/coding-memory" }
+serde.workspace = true
 
 [profile.dev]
 opt-level = 0

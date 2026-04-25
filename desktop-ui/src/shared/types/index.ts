@@ -259,3 +259,12 @@ export type {
   FabricNote,
   FabricTreeNode,
 } from "./fabric";
+
+// ── Coding Memory Types ───────────────────────────────────
+
+export type {
+  CliHealthRow,
+  CodingMemoryStatusResponse,
+  DiagnoseResult,
+  SessionReplayEntry,
+} from "./coding-memory";

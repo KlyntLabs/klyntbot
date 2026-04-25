@@ -18,10 +18,18 @@ pub(super) fn parse_post_tool_use(raw: &[u8]) -> Result<AgentEventV1> {
 }
 
 fn classify_bash(b: &payload::ToolUseBody) -> EventKind {
-    let cmd = b.tool_input.get("command").and_then(|v| v.as_str()).unwrap_or("");
+    let cmd = b
+        .tool_input
+        .get("command")
+        .and_then(|v| v.as_str())
+        .unwrap_or("");
     let trimmed = cmd.trim();
     if let Some(fw) = detect_framework(trimmed) {
-        let stdout = b.tool_response.get("stdout").and_then(|v| v.as_str()).unwrap_or("");
+        let stdout = b
+            .tool_response
+            .get("stdout")
+            .and_then(|v| v.as_str())
+            .unwrap_or("");
         let (passed, failed) = parse_results(fw, stdout);
         return EventKind::TestRun {
             command: trimmed.to_string(),
@@ -39,39 +47,64 @@ fn tool_call(b: &payload::ToolUseBody) -> EventKind {
     let args_preview = truncate(&args, 512);
     let result = serde_json::to_string(&b.tool_response).unwrap_or_default();
     let result_preview = truncate(&result, 512);
-    let ok = b.tool_response.get("exit_code")
+    let ok = b
+        .tool_response
+        .get("exit_code")
         .and_then(|v| v.as_i64())
         .map(|c| c == 0)
         .unwrap_or(true);
     EventKind::ToolCall {
         tool: b.tool_name.clone(),
-        args_preview, ok,
+        args_preview,
+        ok,
         duration_ms: b.duration_ms,
         result_preview,
     }
 }
 
 fn file_edit(b: &payload::ToolUseBody, op: FileOp) -> EventKind {
-    let path = b.tool_input.get("file_path")
+    let path = b
+        .tool_input
+        .get("file_path")
         .and_then(|v| v.as_str())
         .map(PathBuf::from)
         .unwrap_or_default();
-    let bytes = b.tool_response.get("bytes")
+    let bytes = b
+        .tool_response
+        .get("bytes")
         .and_then(|v| v.as_u64())
         .unwrap_or(0);
-    EventKind::FileEdit { path, op, bytes, diff_preview: None }
+    EventKind::FileEdit {
+        path,
+        op,
+        bytes,
+        diff_preview: None,
+    }
 }
 
 fn detect_framework(cmd: &str) -> Option<&'static str> {
     let first = cmd.split_whitespace().next()?;
     let looks_like = |n: &str| first == n || cmd.starts_with(&format!("{n} "));
-    if looks_like("pytest") { return Some("pytest"); }
-    if looks_like("cargo") && cmd.contains("test") { return Some("cargo"); }
+    if looks_like("pytest") {
+        return Some("pytest");
+    }
+    if looks_like("cargo") && cmd.contains("test") {
+        return Some("cargo");
+    }
     if (looks_like("npm") || looks_like("pnpm") || looks_like("yarn") || looks_like("bun"))
-        && cmd.contains("test") { return Some("node"); }
-    if looks_like("go") && cmd.contains("test") { return Some("go"); }
-    if looks_like("jest") { return Some("jest"); }
-    if looks_like("vitest") { return Some("vitest"); }
+        && cmd.contains("test")
+    {
+        return Some("node");
+    }
+    if looks_like("go") && cmd.contains("test") {
+        return Some("go");
+    }
+    if looks_like("jest") {
+        return Some("jest");
+    }
+    if looks_like("vitest") {
+        return Some("vitest");
+    }
     None
 }
 
@@ -98,16 +131,29 @@ fn parse_results(framework: &str, stdout: &str) -> (u32, u32) {
 fn capture_u32(text: &str, pat: &str) -> Option<u32> {
     // Cheap non-regex scan: find the pattern fragment (e.g., "passed"), walk backwards
     // over whitespace/digits to extract the number. Avoids pulling in the regex crate.
-    let marker = pat.split(')').nth(1)?.trim_start_matches("\\s+").trim_start_matches('+');
+    let marker = pat
+        .split(')')
+        .nth(1)?
+        .trim_start_matches("\\s+")
+        .trim_start_matches('+');
     let idx = text.find(marker)?;
     let prefix = &text[..idx];
-    let digits: String = prefix.chars().rev()
+    let digits: String = prefix
+        .chars()
+        .rev()
         .skip_while(|c| c.is_whitespace())
         .take_while(|c| c.is_ascii_digit())
-        .collect::<String>().chars().rev().collect();
+        .collect::<String>()
+        .chars()
+        .rev()
+        .collect();
     digits.parse().ok()
 }
 
 fn truncate(s: &str, max: usize) -> String {
-    if s.len() <= max { s.to_string() } else { format!("{}…", &s[..max]) }
+    if s.len() <= max {
+        s.to_string()
+    } else {
+        format!("{}…", &s[..max])
+    }
 }

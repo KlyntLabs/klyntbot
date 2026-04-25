@@ -12,8 +12,12 @@ use uuid::Uuid;
 #[tokio::test]
 async fn daemon_accepts_event_and_writes_row() {
     let pool = StoragePool::connect_in_memory().await.unwrap();
-    StoragePool::run_feature_migrations(pool.inner(), &cognitive::cognitive_migrations()).await.unwrap();
-    StoragePool::run_feature_migrations(pool.inner(), &coding_memory::coding_memory_migrations()).await.unwrap();
+    StoragePool::run_feature_migrations(pool.inner(), &cognitive::cognitive_migrations())
+        .await
+        .unwrap();
+    StoragePool::run_feature_migrations(pool.inner(), &coding_memory::coding_memory_migrations())
+        .await
+        .unwrap();
     let repo = Arc::new(IngestEventLogRepo::new(pool.inner().clone()));
 
     let dir = TempDir::new().unwrap();
@@ -34,13 +38,18 @@ async fn daemon_accepts_event_and_writes_row() {
         cwd: PathBuf::from("/tmp"),
         repo: None,
         occurred_at: Timestamp::now(),
-        kind: EventKind::UserPrompt { text: "hi".into(), attachments: vec![] },
+        kind: EventKind::UserPrompt {
+            text: "hi".into(),
+            attachments: vec![],
+        },
     });
     sink.send(&evt).await.unwrap();
 
     // Poll briefly — daemon handles inserts async.
     for _ in 0..50 {
-        if repo.count_by_session("s1").await.unwrap() > 0 { break; }
+        if repo.count_by_session("s1").await.unwrap() > 0 {
+            break;
+        }
         tokio::time::sleep(std::time::Duration::from_millis(20)).await;
     }
     assert_eq!(repo.count_by_session("s1").await.unwrap(), 1);

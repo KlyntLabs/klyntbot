@@ -7,22 +7,16 @@ use coding_memory::distiller::{Distiller, TurnTrace};
 use coding_memory::error::NotImplementedInPhase;
 use coding_memory::facts::{CodingKind, FixAttempt, FixOutcome, StyleScope};
 use coding_memory::mcp::{stub_handler, CODING_MEMORY_MCP_TOOLS};
-use coding_memory::recall::{
-    CodingRecallService, IndexEntry, RecallQuery,
-};
+use coding_memory::recall::{CodingRecallService, IndexEntry, RecallQuery};
 use coding_memory::reforge_phase::{
     CodingSynthesisPhase, RuleArtifact, RuleArtifactGenerationPhase,
 };
 use coding_memory::retrieval_skills::{
     BudgetTier, EscalationContext, QueryRewriter, RetrievalSkill,
 };
-use coding_memory::scope::{
-    AnchoredSymbol, CausalEdgeKind, ProvenanceKind, Sensitivity,
-};
+use coding_memory::scope::{AnchoredSymbol, CausalEdgeKind, ProvenanceKind, Sensitivity};
 use coding_memory::sink::{InProcessSink, MemorySink};
-use coding_memory::skills::{
-    PhaseStubEvolver, ProjectSkillLocation, SkillId, SkillScope,
-};
+use coding_memory::skills::{PhaseStubEvolver, ProjectSkillLocation, SkillId, SkillScope};
 
 #[test]
 fn phase1_types_are_constructable() {
@@ -70,17 +64,13 @@ async fn phase1_stub_services_return_not_implemented() {
     assert!(recall.check_dead_ends("approach", None).await.is_err());
 
     let phase = CodingSynthesisPhase::default();
-    assert!(
-        coding_memory::reforge_phase::ReforgePhaseRun::run(&phase)
-            .await
-            .is_err()
-    );
+    assert!(coding_memory::reforge_phase::ReforgePhaseRun::run(&phase)
+        .await
+        .is_err());
     let phase = RuleArtifactGenerationPhase::default();
-    assert!(
-        coding_memory::reforge_phase::ReforgePhaseRun::run(&phase)
-            .await
-            .is_err()
-    );
+    assert!(coding_memory::reforge_phase::ReforgePhaseRun::run(&phase)
+        .await
+        .is_err());
 
     let skill = QueryRewriter;
     let ctx = EscalationContext {

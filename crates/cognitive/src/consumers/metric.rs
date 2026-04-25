@@ -1,6 +1,6 @@
+use crate::repos::MetricRepo;
 use ai_core::{AiSignal, SignalConsumer};
 use async_trait::async_trait;
-use crate::repos::MetricRepo;
 
 /// Consumes `AiSignal::metric_samples` and persists them to `ai_metric_samples`.
 pub struct MetricHarvestConsumer {

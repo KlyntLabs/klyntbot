@@ -135,6 +135,20 @@ const WorkContextSettings = lazy(() =>
 const VoiceSettings = lazy(() =>
   import("../features/settings").then((m) => ({ default: m.VoiceSettings })),
 );
+const CodingCliSettings = lazy(() =>
+  import("../features/settings").then((m) => ({ default: m.CodingCliSettings })),
+);
+
+// ── Coding Memory Feature ────────────────────────────────────────
+const CodingMemoryLayout = lazy(() =>
+  import("../features/coding-memory").then((m) => ({ default: m.CodingMemoryLayout })),
+);
+const CliHealthPanel = lazy(() =>
+  import("../features/coding-memory").then((m) => ({ default: m.CliHealthPanel })),
+);
+const SessionReplayPanel = lazy(() =>
+  import("../features/coding-memory").then((m) => ({ default: m.SessionReplayPanel })),
+);
 
 // (Debug feature — now integrated into System page)
 
@@ -358,6 +372,22 @@ export const router = createHashRouter([
             <ArchivedSettings />
           </SettingsLayout>
         ),
+      },
+      {
+        path: "/settings/coding-cli",
+        element: (
+          <SettingsLayout>
+            <CodingCliSettings />
+          </SettingsLayout>
+        ),
+      },
+      {
+        path: "/coding-memory",
+        element: <CodingMemoryLayout />,
+        children: [
+          { path: "cli-health", element: <CliHealthPanel /> },
+          { path: "session-replay", element: <SessionReplayPanel /> },
+        ],
       },
       { path: "/projects", element: <ProjectsListPage /> },
       { path: "/project/:id", element: <ProjectDetailPage /> },

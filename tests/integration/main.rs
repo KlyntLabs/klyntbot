@@ -3,6 +3,8 @@ mod common;
 
 mod alarm_lifecycle;
 mod channels;
+mod coding_memory_phase2_desktop_off;
+mod coding_memory_phase2_roundtrip;
 mod cognitive;
 mod cron_bridge_restart;
 mod finance;

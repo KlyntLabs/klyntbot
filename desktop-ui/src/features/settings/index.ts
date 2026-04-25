@@ -6,6 +6,7 @@ export { recommendedServers } from "./components/mcp/recommendedServers";
 export { PermissionsCard } from "./components/PermissionsCard";
 export { SettingsLayout } from "./components/SettingsLayout";
 export { ArchivedSettings } from "./pages/ArchivedSettings";
+export { CodingCliSettings } from "./pages/CodingCliSettings";
 export { ConfigurationSettings } from "./pages/ConfigurationSettings";
 export { EnvironmentsSettings } from "./pages/EnvironmentsSettings";
 // Pages

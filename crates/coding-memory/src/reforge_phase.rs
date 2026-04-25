@@ -93,9 +93,7 @@ impl RuleArtifact {
             RuleArtifact::ClaudeMd => PathBuf::from("CLAUDE.md"),
             RuleArtifact::AgentsMd => PathBuf::from("AGENTS.md"),
             RuleArtifact::CursorRules => PathBuf::from(".cursorrules"),
-            RuleArtifact::ContinueRules => {
-                PathBuf::from(".continue/rules/klyntbot.md")
-            }
+            RuleArtifact::ContinueRules => PathBuf::from(".continue/rules/klyntbot.md"),
         }
     }
 }

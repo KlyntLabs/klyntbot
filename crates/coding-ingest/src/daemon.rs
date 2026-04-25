@@ -35,7 +35,9 @@ pub struct IngestDaemonHandle {
 impl IngestDaemonHandle {
     /// Signal shutdown and wait for the accept loop + heartbeat to exit.
     pub async fn shutdown(mut self) {
-        if let Some(tx) = self.shutdown_tx.take() { let _ = tx.send(()); }
+        if let Some(tx) = self.shutdown_tx.take() {
+            let _ = tx.send(());
+        }
         let _ = self.accept_task.await;
         self.heartbeat_task.abort();
         let _ = self.heartbeat_task.await;
@@ -113,14 +115,18 @@ async fn handle_connection(
     repo: Arc<IngestEventLogRepo>,
 ) -> Result<()> {
     let mut len_buf = [0u8; 4];
-    stream.read_exact(&mut len_buf).await
+    stream
+        .read_exact(&mut len_buf)
+        .await
         .map_err(|e| KlyntbotError::Storage(format!("read len: {e}")))?;
     let len = u32::from_le_bytes(len_buf) as usize;
     if len > MAX_PAYLOAD_BYTES {
         return Err(KlyntbotError::Storage(format!("payload too large: {len}")));
     }
     let mut body = vec![0u8; len];
-    stream.read_exact(&mut body).await
+    stream
+        .read_exact(&mut body)
+        .await
         .map_err(|e| KlyntbotError::Storage(format!("read body: {e}")))?;
     let event: AgentEvent = serde_json::from_slice(&body)
         .map_err(|e| KlyntbotError::Storage(format!("decode event: {e}")))?;
@@ -131,14 +137,19 @@ async fn handle_connection(
 /// Read the JSONL buffer line-by-line, insert each event, then archive the file.
 pub async fn drain_buffer(path: &std::path::Path, repo: &IngestEventLogRepo) -> Result<usize> {
     use tokio::io::{AsyncBufReadExt, BufReader};
-    let f = tokio::fs::File::open(path).await
+    let f = tokio::fs::File::open(path)
+        .await
         .map_err(|e| KlyntbotError::Storage(format!("open buffer: {e}")))?;
     let mut lines = BufReader::new(f).lines();
     let mut n = 0usize;
-    while let Some(line) = lines.next_line().await
+    while let Some(line) = lines
+        .next_line()
+        .await
         .map_err(|e| KlyntbotError::Storage(format!("read buffer: {e}")))?
     {
-        if line.trim().is_empty() { continue; }
+        if line.trim().is_empty() {
+            continue;
+        }
         match serde_json::from_str::<AgentEvent>(&line) {
             Ok(evt) => {
                 if let Err(e) = repo.insert(&evt).await {
@@ -155,7 +166,8 @@ pub async fn drain_buffer(path: &std::path::Path, repo: &IngestEventLogRepo) -> 
         "jsonl.done.{}",
         jiff::Timestamp::now().as_millisecond()
     ));
-    tokio::fs::rename(path, &archive).await
+    tokio::fs::rename(path, &archive)
+        .await
         .map_err(|e| KlyntbotError::Storage(format!("archive buffer: {e}")))?;
     Ok(n)
 }

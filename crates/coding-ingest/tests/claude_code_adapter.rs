@@ -59,7 +59,8 @@ fn session_end() {
 
 #[test]
 fn pre_compact_becomes_compact_event() {
-    let body = r#"{"session_id": "s", "cwd": "/tmp", "trigger": "auto", "custom_instructions": ""}"#;
+    let body =
+        r#"{"session_id": "s", "cwd": "/tmp", "trigger": "auto", "custom_instructions": ""}"#;
     let AgentEvent::V1(v1) = parse("PreCompact", body).unwrap();
     matches!(v1.kind, EventKind::CompactEvent { .. });
 }
@@ -84,7 +85,13 @@ fn post_tool_use_bash_test_becomes_test_run() {
     }"#;
     let AgentEvent::V1(v1) = parse("PostToolUse", body).unwrap();
     match v1.kind {
-        EventKind::TestRun { framework, passed, failed, duration_ms, .. } => {
+        EventKind::TestRun {
+            framework,
+            passed,
+            failed,
+            duration_ms,
+            ..
+        } => {
             assert_eq!(framework.as_deref(), Some("cargo"));
             assert_eq!(passed, 12);
             assert_eq!(failed, 3);
@@ -172,7 +179,12 @@ fn post_tool_use_pytest_framework_detected() {
     }"#;
     let AgentEvent::V1(v1) = parse("PostToolUse", body).unwrap();
     match v1.kind {
-        EventKind::TestRun { framework, passed, failed, .. } => {
+        EventKind::TestRun {
+            framework,
+            passed,
+            failed,
+            ..
+        } => {
             assert_eq!(framework.as_deref(), Some("pytest"));
             assert_eq!(passed, 5);
             assert_eq!(failed, 1);

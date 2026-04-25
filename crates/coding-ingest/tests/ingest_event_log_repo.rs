@@ -25,9 +25,11 @@ fn sample_event() -> AgentEvent {
 async fn repo_inserts_and_lists_unprocessed() {
     let pool = StoragePool::connect_in_memory().await.unwrap();
     StoragePool::run_feature_migrations(pool.inner(), &cognitive::cognitive_migrations())
-        .await.unwrap();
+        .await
+        .unwrap();
     StoragePool::run_feature_migrations(pool.inner(), &coding_memory::coding_memory_migrations())
-        .await.unwrap();
+        .await
+        .unwrap();
 
     let repo = IngestEventLogRepo::new(pool.inner().clone());
     let evt = sample_event();
@@ -42,8 +44,12 @@ async fn repo_inserts_and_lists_unprocessed() {
 #[tokio::test]
 async fn repo_count_by_session() {
     let pool = StoragePool::connect_in_memory().await.unwrap();
-    StoragePool::run_feature_migrations(pool.inner(), &cognitive::cognitive_migrations()).await.unwrap();
-    StoragePool::run_feature_migrations(pool.inner(), &coding_memory::coding_memory_migrations()).await.unwrap();
+    StoragePool::run_feature_migrations(pool.inner(), &cognitive::cognitive_migrations())
+        .await
+        .unwrap();
+    StoragePool::run_feature_migrations(pool.inner(), &coding_memory::coding_memory_migrations())
+        .await
+        .unwrap();
     let repo = IngestEventLogRepo::new(pool.inner().clone());
     repo.insert(&sample_event()).await.unwrap();
     repo.insert(&sample_event()).await.unwrap();

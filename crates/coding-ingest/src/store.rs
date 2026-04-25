@@ -104,24 +104,24 @@ impl IngestEventLogRepo {
 
     /// Count rows for a session (processed + unprocessed).
     pub async fn count_by_session(&self, session_id: &str) -> Result<i64> {
-        let row: (i64,) = sqlx::query_as(
-            "SELECT COUNT(*) FROM ingest_event_log WHERE session_id = ?",
-        )
-        .bind(session_id)
-        .fetch_one(&self.pool)
-        .await
-        .map_err(|e| KlyntbotError::Storage(format!("ingest_event_log count: {e}")))?;
+        let row: (i64,) =
+            sqlx::query_as("SELECT COUNT(*) FROM ingest_event_log WHERE session_id = ?")
+                .bind(session_id)
+                .fetch_one(&self.pool)
+                .await
+                .map_err(|e| KlyntbotError::Storage(format!("ingest_event_log count: {e}")))?;
         Ok(row.0)
     }
 
     /// Count unprocessed rows (buffered events awaiting distillation).
     pub async fn count_unprocessed(&self) -> Result<i64> {
-        let row: (i64,) = sqlx::query_as(
-            "SELECT COUNT(*) FROM ingest_event_log WHERE processed = 0",
-        )
-        .fetch_one(&self.pool)
-        .await
-        .map_err(|e| KlyntbotError::Storage(format!("ingest_event_log count_unprocessed: {e}")))?;
+        let row: (i64,) =
+            sqlx::query_as("SELECT COUNT(*) FROM ingest_event_log WHERE processed = 0")
+                .fetch_one(&self.pool)
+                .await
+                .map_err(|e| {
+                    KlyntbotError::Storage(format!("ingest_event_log count_unprocessed: {e}"))
+                })?;
         Ok(row.0)
     }
 }

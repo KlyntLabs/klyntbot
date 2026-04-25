@@ -17,16 +17,24 @@ pub struct WarnLimiter {
 impl WarnLimiter {
     /// Construct.
     #[must_use]
-    pub fn new(stamp_path: PathBuf) -> Self { Self { stamp_path } }
+    pub fn new(stamp_path: PathBuf) -> Self {
+        Self { stamp_path }
+    }
 
     /// Should we emit the warning now? Touches the file if yes.
     pub fn should_warn(&self) -> bool {
         let now = SystemTime::now();
         let due = std::fs::metadata(&self.stamp_path)
             .and_then(|m| m.modified())
-            .map(|t| now.duration_since(t).map(|d| d >= WARN_INTERVAL).unwrap_or(true))
+            .map(|t| {
+                now.duration_since(t)
+                    .map(|d| d >= WARN_INTERVAL)
+                    .unwrap_or(true)
+            })
             .unwrap_or(true);
-        if due { let _ = touch(&self.stamp_path); }
+        if due {
+            let _ = touch(&self.stamp_path);
+        }
         due
     }
 }

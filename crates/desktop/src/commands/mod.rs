@@ -4,6 +4,7 @@ pub mod areas;
 pub mod autotuner;
 pub mod capture;
 pub mod chat;
+pub mod coding_memory;
 pub mod cognitive;
 pub mod columns;
 pub mod cron;

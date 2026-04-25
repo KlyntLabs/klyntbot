@@ -32,7 +32,8 @@ async fn uses_socket_when_available() {
     );
     let task = tokio::spawn(async move { client.send(&evt()).await });
     let (mut s, _) = listener.accept().await.unwrap();
-    let mut len = [0u8; 4]; s.read_exact(&mut len).await.unwrap();
+    let mut len = [0u8; 4];
+    s.read_exact(&mut len).await.unwrap();
     let mut body = vec![0u8; u32::from_le_bytes(len) as usize];
     s.read_exact(&mut body).await.unwrap();
     task.await.unwrap().unwrap();
@@ -48,7 +49,9 @@ async fn falls_back_to_buffer_when_socket_absent() {
         dir.path().join(".stamp"),
     );
     client.send(&evt()).await.unwrap();
-    let contents = tokio::fs::read_to_string(dir.path().join("buf.jsonl")).await.unwrap();
+    let contents = tokio::fs::read_to_string(dir.path().join("buf.jsonl"))
+        .await
+        .unwrap();
     assert_eq!(contents.lines().count(), 1);
     // Stamp was touched → warning was issued once.
     assert!(dir.path().join(".stamp").exists());

@@ -6,13 +6,18 @@ use uuid::Uuid;
 
 fn file_edit(path: &str) -> AgentEvent {
     AgentEvent::V1(AgentEventV1 {
-        id: Uuid::new_v4(), source: AgentSource::ClaudeCode,
-        session_id: "s".into(), turn_id: None,
-        cwd: PathBuf::from("/tmp"), repo: None,
+        id: Uuid::new_v4(),
+        source: AgentSource::ClaudeCode,
+        session_id: "s".into(),
+        turn_id: None,
+        cwd: PathBuf::from("/tmp"),
+        repo: None,
         occurred_at: Timestamp::now(),
         kind: EventKind::FileEdit {
-            path: PathBuf::from(path), op: FileOp::Modify,
-            bytes: 0, diff_preview: None,
+            path: PathBuf::from(path),
+            op: FileOp::Modify,
+            bytes: 0,
+            diff_preview: None,
         },
     })
 }
@@ -31,14 +36,19 @@ fn defaults_block_env_and_keys() {
 fn tool_call_args_are_scanned() {
     let s = ExcludeSet::compile(&["**/*.key".to_string()]).unwrap();
     let evt = AgentEvent::V1(AgentEventV1 {
-        id: Uuid::new_v4(), source: AgentSource::ClaudeCode,
-        session_id: "s".into(), turn_id: None,
-        cwd: PathBuf::from("/tmp"), repo: None,
+        id: Uuid::new_v4(),
+        source: AgentSource::ClaudeCode,
+        session_id: "s".into(),
+        turn_id: None,
+        cwd: PathBuf::from("/tmp"),
+        repo: None,
         occurred_at: Timestamp::now(),
         kind: EventKind::ToolCall {
             tool: "Read".into(),
             args_preview: "path=/home/u/keys/deploy.key".into(),
-            ok: true, duration_ms: 2, result_preview: String::new(),
+            ok: true,
+            duration_ms: 2,
+            result_preview: String::new(),
         },
     });
     assert!(s.should_drop(&evt));

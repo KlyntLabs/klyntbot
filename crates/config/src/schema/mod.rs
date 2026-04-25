@@ -58,9 +58,8 @@ pub use self::capture::*;
 pub use self::channels::*;
 pub use self::coding_memory::{
     CodingCliEntry, CodingCliToggles, CodingDistillerConfig, CodingIngestConfig,
-    CodingMemoryConfig, CodingPrivacyConfig, CodingRecallConfig,
-    CodingReforgeConfig, CodingRuleArtifactsConfig, CodingSkillsConfig,
-    CodingWorkbenchConfig,
+    CodingMemoryConfig, CodingPrivacyConfig, CodingRecallConfig, CodingReforgeConfig,
+    CodingRuleArtifactsConfig, CodingSkillsConfig, CodingWorkbenchConfig,
 };
 pub use self::cognitive::*;
 pub use self::confidence::*;

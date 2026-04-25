@@ -17,10 +17,7 @@ pub async fn render_session_start_block(_repo: Option<&str>) -> Result<String> {
 }
 
 /// Render the UserPromptSubmit injection block.
-pub async fn render_user_prompt_block(
-    _query: &str,
-    _repo: Option<&str>,
-) -> Result<String> {
+pub async fn render_user_prompt_block(_query: &str, _repo: Option<&str>) -> Result<String> {
     Err(phase(4))
 }
 

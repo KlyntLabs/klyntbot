@@ -27,7 +27,10 @@ usage:
 
 fn main() -> ExitCode {
     let args: Vec<String> = std::env::args().skip(1).collect();
-    let Some(first) = args.first() else { eprintln!("{USAGE}"); return ExitCode::from(2); };
+    let Some(first) = args.first() else {
+        eprintln!("{USAGE}");
+        return ExitCode::from(2);
+    };
 
     if first == "status" {
         return run_status();
@@ -36,7 +39,10 @@ fn main() -> ExitCode {
     let source = first.clone();
     let hook_event = args.get(1).cloned().unwrap_or_else(|| "unknown".into());
 
-    if !matches!(source.as_str(), "claude-code" | "codex" | "kimi-cli" | "opencode") {
+    if !matches!(
+        source.as_str(),
+        "claude-code" | "codex" | "kimi-cli" | "opencode"
+    ) {
         eprintln!("unknown source `{source}`\n{USAGE}");
         return ExitCode::from(2);
     }
@@ -56,14 +62,19 @@ fn main() -> ExitCode {
     let event = match ClaudeCodeAdapter.parse(&hook_event, &raw) {
         Ok(Some(e)) => e,
         Ok(None) => return ExitCode::SUCCESS, // silently ignore hooks we don't record
-        Err(e) => { eprintln!("klyntbot-hook: parse: {e}"); return ExitCode::from(1); }
+        Err(e) => {
+            eprintln!("klyntbot-hook: parse: {e}");
+            return ExitCode::from(1);
+        }
     };
     let event = enrich_with_scope(event);
 
     // Defense-in-depth: drop excluded events before they hit transport.
     let excludes = ExcludeSet::compile(&default_exclude_globs())
         .unwrap_or_else(|_| ExcludeSet::compile(&[]).expect("empty glob set"));
-    if excludes.should_drop(&event) { return ExitCode::SUCCESS; }
+    if excludes.should_drop(&event) {
+        return ExitCode::SUCCESS;
+    }
 
     let home = home_dir();
     let client = HookClient::new(
@@ -72,9 +83,15 @@ fn main() -> ExitCode {
         home.join(".hook-warn.stamp"),
     );
     // Fire-and-forget — bounded by 200ms socket deadline inside HookClient.
-    let rt = match tokio::runtime::Builder::new_current_thread().enable_all().build() {
+    let rt = match tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()
+    {
         Ok(rt) => rt,
-        Err(e) => { eprintln!("klyntbot-hook: runtime: {e}"); return ExitCode::from(1); }
+        Err(e) => {
+            eprintln!("klyntbot-hook: runtime: {e}");
+            return ExitCode::from(1);
+        }
     };
     if let Err(e) = rt.block_on(client.send(&event)) {
         eprintln!("klyntbot-hook: send: {e}");
@@ -90,8 +107,16 @@ fn run_status() -> ExitCode {
     let buf = home.join("ingest-buffer.jsonl");
     let alive = is_desktop_alive(&lock);
     let buf_size = std::fs::metadata(&buf).map(|m| m.len()).unwrap_or(0);
-    println!("socket:        {} ({})", sock.display(), if sock.exists() {"present"} else {"absent"});
-    println!("desktop.lock:  {} ({})", lock.display(), if alive {"alive"} else {"stale or missing"});
+    println!(
+        "socket:        {} ({})",
+        sock.display(),
+        if sock.exists() { "present" } else { "absent" }
+    );
+    println!(
+        "desktop.lock:  {} ({})",
+        lock.display(),
+        if alive { "alive" } else { "stale or missing" }
+    );
     println!("buffer:        {} ({} bytes)", buf.display(), buf_size);
     ExitCode::SUCCESS
 }

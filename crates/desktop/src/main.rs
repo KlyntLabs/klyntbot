@@ -1008,6 +1008,13 @@ fn run_desktop_app() {
             commands::settings::config_get_section,
             commands::settings::config_update_section,
             commands::settings::config_mark_setup_completed,
+            // Coding Memory
+            commands::coding_memory::coding_memory_status,
+            commands::coding_memory::coding_memory_enable_cli,
+            commands::coding_memory::coding_memory_disable_cli,
+            commands::coding_memory::coding_memory_diagnose_cli,
+            commands::coding_memory::coding_memory_session_replay,
+            commands::coding_memory::coding_memory_cli_health,
             // Shortcuts
             commands::shortcuts::shortcuts_get,
             commands::shortcuts::shortcuts_update,

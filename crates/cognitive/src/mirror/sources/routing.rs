@@ -265,9 +265,9 @@ impl MirrorSignalSource for RoutingSignalSource {
 
 #[cfg(test)]
 mod tests {
-    use std::sync::Arc;
     use super::*;
     use ai_core::{AiMetrics, RecallDomain, SalienceVerdict};
+    use std::sync::Arc;
 
     fn skill_routed_signal(skill: &str, confidence: f64) -> AiSignal {
         AiSignal {

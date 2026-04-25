@@ -127,6 +127,9 @@ pub(super) async fn dispatch(
     if let Some(r) = commands::columns::dispatch_dev(cmd, core, &body).await {
         return into_api_result(r);
     }
+    if let Some(r) = commands::coding_memory::dispatch_dev(cmd, core, &body).await {
+        return into_api_result(r);
+    }
     if let Some(r) = commands::cognitive::dispatch_dev(cmd, core, &body).await {
         return into_api_result(r);
     }

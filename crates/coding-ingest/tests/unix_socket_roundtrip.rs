@@ -21,7 +21,10 @@ async fn send_writes_length_prefix_then_json() {
         cwd: PathBuf::from("/tmp"),
         repo: None,
         occurred_at: Timestamp::now(),
-        kind: EventKind::UserPrompt { text: "hi".into(), attachments: vec![] },
+        kind: EventKind::UserPrompt {
+            text: "hi".into(),
+            attachments: vec![],
+        },
     });
 
     let sink = UnixIngestSocket::new(sock.clone());

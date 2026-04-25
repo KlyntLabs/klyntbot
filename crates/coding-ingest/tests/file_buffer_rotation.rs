@@ -16,7 +16,10 @@ fn evt(i: u32) -> AgentEvent {
         cwd: PathBuf::from("/tmp"),
         repo: None,
         occurred_at: Timestamp::now(),
-        kind: EventKind::UserPrompt { text: "x".into(), attachments: vec![] },
+        kind: EventKind::UserPrompt {
+            text: "x".into(),
+            attachments: vec![],
+        },
     })
 }
 
@@ -39,14 +42,17 @@ async fn rotates_when_over_rotate_threshold() {
     let dir = TempDir::new().unwrap();
     let path = dir.path().join("buf.jsonl");
     // Seed file just over rotate threshold.
-    tokio::fs::write(&path, vec![b'x'; (BUFFER_ROTATE_BYTES as usize) + 1]).await.unwrap();
+    tokio::fs::write(&path, vec![b'x'; (BUFFER_ROTATE_BYTES as usize) + 1])
+        .await
+        .unwrap();
     let sink = FileBufferFallback::new(path.clone());
     sink.send(&evt(0)).await.unwrap();
     // After rotation, primary file contains only the new event.
     let contents = tokio::fs::read_to_string(&path).await.unwrap();
     assert_eq!(contents.lines().count(), 1);
     // A rotated file exists alongside.
-    let siblings: Vec<_> = std::fs::read_dir(dir.path()).unwrap()
+    let siblings: Vec<_> = std::fs::read_dir(dir.path())
+        .unwrap()
         .filter_map(|e| e.ok().map(|e| e.file_name().into_string().unwrap()))
         .filter(|n| n.starts_with("buf.jsonl."))
         .collect();
@@ -59,7 +65,9 @@ async fn refuses_when_over_hard_cap() {
     let path = dir.path().join("buf.jsonl");
     // Create many fake rotated siblings totalling > hard cap.
     // We assert hard cap by monkeying the primary.
-    tokio::fs::write(&path, vec![b'x'; (BUFFER_HARD_CAP_BYTES as usize) + 1]).await.unwrap();
+    tokio::fs::write(&path, vec![b'x'; (BUFFER_HARD_CAP_BYTES as usize) + 1])
+        .await
+        .unwrap();
     let sink = FileBufferFallback::new(path.clone());
     let r = sink.send(&evt(0)).await;
     assert!(r.is_err(), "expected hard-cap error");
