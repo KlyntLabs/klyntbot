@@ -72,6 +72,8 @@ pub async fn execute_promotions(
                         memory_type: "fact".into(),
                         scope_type: "system".into(),
                         scope_id: None,
+                        scope_repo_id: None,
+                        metadata: None,
                     };
                     if let Err(e) = fact_repo.upsert(&fact).await {
                         warn!("Writer: failed to create fact: {e}");
@@ -140,6 +142,9 @@ pub async fn execute_promotions(
                         project_id: None,
                         scope_type: "system".into(),
                         scope_id: None,
+                        kind: None,
+                        scope_repo_id: None,
+                        metadata: None,
                     };
                     if let Err(e) = ep_repo.insert(&memory).await {
                         warn!("Writer: failed to create episode: {e}");

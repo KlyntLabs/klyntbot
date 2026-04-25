@@ -156,6 +156,33 @@ impl EpisodicMemoryRepo {
         Ok(())
     }
 
+    /// List episodes whose `kind` is in the given closed set, optionally scoped.
+    pub async fn list_by_kinds(
+        &self,
+        kinds: &[&str],
+        repo: Option<&str>,
+        limit: i64,
+    ) -> Result<Vec<EpisodicMemory>, sqlx::Error> {
+        let placeholders = (0..kinds.len()).map(|_| "?").collect::<Vec<_>>().join(",");
+        let mut q = format!(
+            "SELECT * FROM episodic_memories WHERE kind IN ({placeholders})"
+        );
+        if repo.is_some() {
+            q.push_str(" AND scope_repo_id = ?");
+        }
+        q.push_str(" ORDER BY occurred_at DESC LIMIT ?");
+        let mut bound = sqlx::query_as::<_, EpisodicMemory>(&q);
+        for k in kinds {
+            bound = bound.bind(*k);
+        }
+        if let Some(r) = repo {
+            bound = bound.bind(r);
+        }
+        bound = bound.bind(limit);
+        let rows = bound.fetch_all(&self.pool).await?;
+        Ok(rows)
+    }
+
     /// Delete old episodic memories with low access count (for archival).
     pub async fn delete_old(
         &self,

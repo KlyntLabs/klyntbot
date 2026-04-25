@@ -105,6 +105,9 @@ impl SignalConsumer for IngestionConsumer {
                 project_id: None,
                 scope_type: "system".to_string(),
                 scope_id: None,
+                kind: None,
+                scope_repo_id: None,
+                metadata: None,
             };
             self.episodic_repo.insert(&mem).await.map_err(map_sqlx)?;
         }

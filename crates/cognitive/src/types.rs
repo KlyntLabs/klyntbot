@@ -16,7 +16,7 @@ pub enum MemoryOp {
 pub const DEFAULT_MEMORY_TYPE: &str = "fact";
 
 /// A semantic fact with bi-temporal markers and FSRS decay.
-#[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize, sqlx::FromRow)]
 pub struct SemanticFact {
     pub id: String,
     pub domain: String,
@@ -40,10 +40,12 @@ pub struct SemanticFact {
     pub memory_type: String,
     pub scope_type: String,
     pub scope_id: Option<String>,
+    pub scope_repo_id: Option<String>,
+    pub metadata: Option<String>,
 }
 
 /// An episodic memory entry.
-#[derive(Debug, Clone, Serialize, Deserialize, sqlx::FromRow)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize, sqlx::FromRow)]
 pub struct EpisodicMemory {
     pub id: String,
     pub domain: String,
@@ -58,6 +60,9 @@ pub struct EpisodicMemory {
     pub project_id: Option<String>,
     pub scope_type: String,
     pub scope_id: Option<String>,
+    pub scope_repo_id: Option<String>,
+    pub metadata: Option<String>,
+    pub kind: Option<String>,
 }
 
 /// A procedural rule learned from reflection.

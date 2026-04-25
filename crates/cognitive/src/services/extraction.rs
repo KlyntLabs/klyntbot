@@ -134,6 +134,8 @@ pub fn to_semantic_fact(candidate: &ExtractedFact, observation: &Observation) ->
         memory_type: classify_memory_type(&combined_text).to_string(),
         scope_type: "system".to_string(),
         scope_id: None,
+        scope_repo_id: None,
+        metadata: None,
     }
 }
 

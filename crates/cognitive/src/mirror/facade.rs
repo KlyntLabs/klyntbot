@@ -491,6 +491,9 @@ impl MirrorFacade {
                     project_id: None,
                     scope_type: "system".to_string(),
                     scope_id: None,
+                    kind: None,
+                    scope_repo_id: None,
+                    metadata: None,
                 };
                 if let Err(e) = repo.insert(&mem).await {
                     tracing::warn!("mirror: failed to write episodic memory: {e}");

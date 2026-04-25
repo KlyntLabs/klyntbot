@@ -460,6 +460,9 @@ impl BackgroundConsolidationService {
                                     project_id: None,
                                     scope_type: "system".to_string(),
                                     scope_id: None,
+                                    kind: None,
+                                    scope_repo_id: None,
+                                    metadata: None,
                                 };
                                 if let Err(e) = ep_repo.insert(&mem).await {
                                     warn!("Failed to store episodic memory: {e}");

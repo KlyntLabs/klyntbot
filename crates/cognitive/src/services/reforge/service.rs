@@ -148,6 +148,9 @@ pub async fn run_reforge(
                     project_id: None,
                     scope_type: "system".to_string(),
                     scope_id: None,
+                    kind: None,
+                    scope_repo_id: None,
+                    metadata: None,
                 };
                 if let Err(e) = episodic_repo.insert(&mem).await {
                     warn!("Reforge: failed to persist cross-session pattern: {e}");
@@ -258,6 +261,9 @@ pub async fn run_reforge(
         project_id: None,
         scope_type: "system".to_string(),
         scope_id: None,
+        kind: None,
+        scope_repo_id: None,
+        metadata: None,
     };
     if let Err(e) = episodic_repo.insert(&narrative_mem).await {
         warn!("Reforge: failed to store narrative memory: {e}");
@@ -1174,6 +1180,8 @@ fn new_semantic_fact(id: &str, fu: &FactUpdate, now: &str) -> SemanticFact {
         memory_type: DEFAULT_MEMORY_TYPE.to_string(),
         scope_type: "system".to_string(),
         scope_id: None,
+        scope_repo_id: None,
+        metadata: None,
     }
 }
 

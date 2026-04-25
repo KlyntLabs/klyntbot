@@ -77,6 +77,8 @@ pub async fn promote_from_blackboard(
             memory_type: "squad_knowledge".into(),
             scope_type: "squad".into(),
             scope_id: Some(squad_id.to_string()),
+            scope_repo_id: None,
+            metadata: None,
         };
 
         if fact_repo.upsert(&fact).await.is_ok() {

@@ -665,6 +665,94 @@ impl SemanticFactRepo {
         Ok(())
     }
 
+    /// List facts whose `metadata.memory_type` matches.
+    pub async fn list_by_memory_type(
+        &self,
+        memory_type: &str,
+        repo_filter: Option<&str>,
+        limit: i64,
+    ) -> Result<Vec<SemanticFact>, sqlx::Error> {
+        let mut q = String::from(
+            "SELECT * FROM semantic_facts
+             WHERE json_extract(metadata, '$.memory_type') = ?1",
+        );
+        if repo_filter.is_some() {
+            q.push_str(" AND scope_repo_id = ?2");
+        }
+        q.push_str(" ORDER BY recorded_at DESC LIMIT ?3");
+        let rows = if let Some(repo) = repo_filter {
+            sqlx::query_as::<_, SemanticFact>(&q)
+                .bind(memory_type)
+                .bind(repo)
+                .bind(limit)
+                .fetch_all(&self.pool)
+                .await
+        } else {
+            let q2 = q.replace("?3", "?2");
+            sqlx::query_as::<_, SemanticFact>(&q2)
+                .bind(memory_type)
+                .bind(limit)
+                .fetch_all(&self.pool)
+                .await
+        }?;
+        Ok(rows)
+    }
+
+    /// List facts where `(subject, predicate)` matches and the bi-temporal
+    /// validity range covers `as_of`.
+    pub async fn list_valid_at(
+        &self,
+        subject: &str,
+        predicate: &str,
+        as_of: &str,
+    ) -> Result<Vec<SemanticFact>, sqlx::Error> {
+        let rows = sqlx::query_as::<_, SemanticFact>(
+            "SELECT * FROM semantic_facts
+             WHERE subject = ?1 AND predicate = ?2
+               AND (valid_from IS NULL OR valid_from <= ?3)
+               AND (valid_until IS NULL OR valid_until > ?3)
+             ORDER BY recorded_at DESC",
+        )
+        .bind(subject)
+        .bind(predicate)
+        .bind(as_of)
+        .fetch_all(&self.pool)
+        .await?;
+        Ok(rows)
+    }
+
+    /// All facts (any version) matching `(subject, predicate)` plus optional repo.
+    pub async fn list_chain_for(
+        &self,
+        subject: &str,
+        predicate: &str,
+        repo: Option<&str>,
+    ) -> Result<Vec<SemanticFact>, sqlx::Error> {
+        let rows = if let Some(r) = repo {
+            sqlx::query_as::<_, SemanticFact>(
+                "SELECT * FROM semantic_facts
+                 WHERE subject = ?1 AND predicate = ?2 AND scope_repo_id = ?3
+                 ORDER BY recorded_at ASC",
+            )
+            .bind(subject)
+            .bind(predicate)
+            .bind(r)
+            .fetch_all(&self.pool)
+            .await
+        } else {
+            sqlx::query_as::<_, SemanticFact>(
+                "SELECT * FROM semantic_facts
+                 WHERE subject = ?1 AND predicate = ?2
+                 ORDER BY recorded_at ASC",
+            )
+            .bind(subject)
+            .bind(predicate)
+            .fetch_all(&self.pool)
+            .await
+        }?;
+        Ok(rows)
+    }
+
     /// Find vocabulary facts with subjects similar to the given word.
     /// For CJK: matches any fact containing a character from the word.
     /// For Latin: uses prefix match on the first 3 characters.

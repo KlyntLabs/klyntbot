@@ -205,6 +205,92 @@ impl Default for CodingRecallService {
     }
 }
 
+/// Row in a `recall_facts_as_of` response.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct FactAsOfRow {
+    /// Fact id.
+    pub id: String,
+    /// Subject.
+    pub subject: String,
+    /// Predicate.
+    pub predicate: String,
+    /// Object value at `as_of`.
+    pub object: String,
+    /// `valid_from`.
+    pub valid_from: String,
+    /// `valid_until` if closed.
+    pub valid_until: Option<String>,
+    /// Confidence at the time.
+    pub confidence: f32,
+}
+
+/// Response from `recall_facts_as_of`.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct FactsAsOfResponse {
+    /// Subject queried.
+    pub subject: String,
+    /// Predicate queried.
+    pub predicate: String,
+    /// `as_of` timestamp.
+    pub as_of: Timestamp,
+    /// Matching rows.
+    pub rows: Vec<FactAsOfRow>,
+}
+
+/// One step in a SUPERSEDE chain.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct ChangeHistoryStep {
+    /// Fact id at this step.
+    pub id: String,
+    /// Object value.
+    pub object: String,
+    /// `valid_from`.
+    pub valid_from: String,
+    /// `valid_until`.
+    pub valid_until: Option<String>,
+}
+
+/// Response from `recall_change_history`.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct ChangeHistoryResponse {
+    /// Subject.
+    pub subject: String,
+    /// Predicate.
+    pub predicate: String,
+    /// Chain ordered oldest-first.
+    pub steps: Vec<ChangeHistoryStep>,
+}
+
+/// One decision point row.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct DecisionPointRow {
+    /// Episode id.
+    pub id: String,
+    /// Episode kind.
+    pub kind: String,
+    /// When.
+    pub when: String,
+    /// Summary.
+    pub summary: String,
+    /// Repo scope.
+    pub scope: String,
+}
+
+/// Response from `recall_decision_points`.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct DecisionPointsResponse {
+    /// Domain (always `"code"` here).
+    pub domain: String,
+    /// Rows ordered newest-first.
+    pub rows: Vec<DecisionPointRow>,
+}
+
 /// Union accepted by `recall_timeline`.
 #[derive(Debug, Clone)]
 pub enum RecallQuery {
