@@ -116,7 +116,15 @@ fn claude_code_settings_path() -> Result<std::path::PathBuf, desktop_shared::err
 }
 
 fn hook_binary_path() -> Result<std::path::PathBuf, desktop_shared::errors::ApiError> {
-    // Prefer the co-located binary shipped with the desktop app bundle; fall back to PATH lookup.
+    // Resolution order:
+    //   1. KLYNTBOT_HOOK_BINARY env var (production override, packaging story).
+    //   2. Co-located binary next to the running executable (dev + bundled app).
+    //   3. Bare `klyntbot-hook` — relies on PATH.
+    if let Ok(p) = std::env::var("KLYNTBOT_HOOK_BINARY") {
+        if !p.trim().is_empty() {
+            return Ok(std::path::PathBuf::from(p));
+        }
+    }
     let exe = std::env::current_exe()
         .map_err(|e| desktop_shared::errors::ApiError::new("INTERNAL_ERROR", e.to_string()))?;
     let dir = exe
