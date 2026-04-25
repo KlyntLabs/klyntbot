@@ -58,8 +58,8 @@ impl DomainSearcher for CodeDomainSearcher {
                         id: m.id,
                         source: MemorySource::EpisodicMemory,
                         content: m.content,
-                        score: m.importance as f64,
-                        raw_score: m.importance as f64,
+                        score: m.importance,
+                        raw_score: m.importance,
                     });
                 }
             }

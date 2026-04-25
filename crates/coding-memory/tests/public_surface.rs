@@ -49,8 +49,9 @@ async fn phase1_stub_services_return_not_implemented() {
     let _: Option<Distiller> = None;
 
     let sink = InProcessSink::new();
-    assert!(sink.accept_event(dummy_event()).await.is_err());
-    assert!(sink.flush().await.is_err());
+    // Sink without a distiller wired is a no-op — returns Ok.
+    assert!(sink.accept_event(dummy_event()).await.is_ok());
+    assert!(sink.flush().await.is_ok());
 
     let recall = CodingRecallService::new();
     assert!(recall

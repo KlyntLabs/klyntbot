@@ -1,9 +1,9 @@
 //! Invariant 1 — every Distiller-authored row has non-empty `source_events`.
 
-use coding_memory::distiller::writer::{DistillerWriter, PreparedFact, PreparedEpisode};
+use coding_memory::distiller::writer::{DistillerWriter, PreparedFact};
 use coding_memory::scope::{ProvenanceKind, ProvenanceMetadata};
 use cognitive::{EpisodicMemoryRepo, SemanticFactRepo};
-use cognitive::types::{EpisodicMemory, SemanticFact};
+use cognitive::types::SemanticFact;
 use jiff::Timestamp;
 use storage::StoragePool;
 use uuid::Uuid;

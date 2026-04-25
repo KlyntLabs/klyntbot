@@ -1,6 +1,6 @@
 use coding_memory::distiller::fact_builder::build_prepared;
 use coding_memory::distiller::record_observation::{Observation, ObservationScope};
-use coding_memory::distiller::{PreparedEpisode, PreparedFact};
+use coding_memory::distiller::PreparedFact;
 use coding_memory::facts::CodingKind;
 use coding_memory::scope::{ProvenanceKind, ProvenanceMetadata};
 use jiff::Timestamp;

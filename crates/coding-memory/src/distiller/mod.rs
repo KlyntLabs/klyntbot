@@ -3,7 +3,7 @@
 //! Phase A (extractive, always runs) + Phase B (LLM synthesis) + Phase C
 //! (reconciliation). Phase 1 defines types; bodies land in Phase 3.
 
-use crate::scope::{ProvenanceKind, ProvenanceMetadata};
+
 use async_trait::async_trait;
 use coding_ingest::event::AgentEvent;
 use coding_ingest::store::IngestEventLogRepo;
@@ -142,6 +142,7 @@ struct DistillerInner {
     ingest_repo: Arc<IngestEventLogRepo>,
     writer: writer::DistillerWriter,
     provider: Arc<ProviderManager>,
+    #[allow(dead_code)]
     retriever: Arc<dyn context_engine::MemoryRetriever>,
     buffer: Mutex<TurnBuffer>,
 }

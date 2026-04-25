@@ -100,7 +100,7 @@ async fn write_fact_persists_metadata_and_scope_repo_id() {
     assert_eq!(row.0.as_deref(), Some("github.com/klynt/bot"));
     let meta: serde_json::Value = serde_json::from_str(&row.1.unwrap()).unwrap();
     assert!(meta["provenance"]["sourceEvents"].is_array());
-    assert!(meta["provenance"]["sourceEvents"].as_array().unwrap().len() > 0);
+    assert!(!meta["provenance"]["sourceEvents"].as_array().unwrap().is_empty());
 }
 
 #[tokio::test]
