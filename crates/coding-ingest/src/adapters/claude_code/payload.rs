@@ -58,6 +58,22 @@ pub(super) struct PreCompactBody {
 }
 
 #[derive(Debug, Deserialize)]
+pub(super) struct NotificationBody {
+    #[serde(flatten)]
+    pub common: CommonEnvelope,
+    #[serde(default)]
+    pub message: Option<String>,
+}
+
+#[derive(Debug, Deserialize)]
+pub(super) struct SubagentStopBody {
+    #[serde(flatten)]
+    pub common: CommonEnvelope,
+    #[serde(default)]
+    pub stop_hook_active: bool,
+}
+
+#[derive(Debug, Deserialize)]
 pub(super) struct ToolUseBody {
     #[serde(flatten)]
     pub common: CommonEnvelope,

@@ -25,6 +25,8 @@ impl IngestAdapter for ClaudeCodeAdapter {
             "UserPromptSubmit" => Ok(Some(wrap(parse_user_prompt(raw)?))),
             "Stop" => Ok(Some(wrap(parse_stop(raw)?))),
             "PreCompact" => Ok(Some(wrap(parse_pre_compact(raw)?))),
+            "Notification" => Ok(Some(wrap(parse_notification(raw)?))),
+            "SubagentStop" => Ok(Some(wrap(parse_subagent_stop(raw)?))),
             "PreToolUse" => Ok(None), // not recorded — used for approval layer only
             "PostToolUse" => dispatch::parse_post_tool_use(raw)
                 .map(Some)
@@ -84,6 +86,27 @@ fn parse_user_prompt(raw: &[u8]) -> Result<AgentEventV1> {
 
 fn parse_stop(raw: &[u8]) -> Result<AgentEventV1> {
     let b: payload::StopBody = decode(raw)?;
+    let kind = EventKind::AssistantMsg {
+        text: String::new(),
+        truncated: false,
+        token_usage: None::<TokenUsage>,
+    };
+    Ok(base(b.common, kind))
+}
+
+fn parse_notification(raw: &[u8]) -> Result<AgentEventV1> {
+    let b: payload::NotificationBody = decode(raw)?;
+    let kind = EventKind::Error {
+        tool: None,
+        message: b
+            .message
+            .unwrap_or_else(|| "claude-code notification".into()),
+    };
+    Ok(base(b.common, kind))
+}
+
+fn parse_subagent_stop(raw: &[u8]) -> Result<AgentEventV1> {
+    let b: payload::SubagentStopBody = decode(raw)?;
     let kind = EventKind::AssistantMsg {
         text: String::new(),
         truncated: false,

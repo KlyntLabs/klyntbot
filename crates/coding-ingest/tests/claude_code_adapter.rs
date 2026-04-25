@@ -66,6 +66,26 @@ fn pre_compact_becomes_compact_event() {
 }
 
 #[test]
+fn notification_becomes_error_event() {
+    let body = r#"{"session_id": "s", "cwd": "/tmp", "message": "needs permission"}"#;
+    let AgentEvent::V1(v1) = parse("Notification", body).unwrap();
+    match v1.kind {
+        EventKind::Error { tool, message } => {
+            assert!(tool.is_none());
+            assert_eq!(message, "needs permission");
+        }
+        other => panic!("expected Error, got {other:?}"),
+    }
+}
+
+#[test]
+fn subagent_stop_becomes_assistant_msg() {
+    let body = r#"{"session_id": "s", "cwd": "/tmp", "stop_hook_active": false}"#;
+    let AgentEvent::V1(v1) = parse("SubagentStop", body).unwrap();
+    matches!(v1.kind, EventKind::AssistantMsg { .. });
+}
+
+#[test]
 fn unknown_hook_returns_none() {
     let body = r#"{}"#;
     assert!(parse("Unknown", body).is_none());
