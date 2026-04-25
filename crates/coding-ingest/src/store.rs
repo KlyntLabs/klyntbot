@@ -113,6 +113,41 @@ impl IngestEventLogRepo {
         Ok(row.0)
     }
 
+    /// Mark rows as processed by id. Returns rows affected.
+    ///
+    /// Idempotent — already-processed ids are no-ops. Empty input is a no-op.
+    pub async fn mark_processed(&self, ids: &[&str]) -> Result<u64> {
+        if ids.is_empty() {
+            return Ok(0);
+        }
+        let placeholders = std::iter::repeat_n("?", ids.len())
+            .collect::<Vec<_>>()
+            .join(",");
+        let sql = format!("UPDATE ingest_event_log SET processed = 1 WHERE id IN ({placeholders})");
+        let mut q = sqlx::query(&sql);
+        for id in ids {
+            q = q.bind(*id);
+        }
+        let res = q
+            .execute(&self.pool)
+            .await
+            .map_err(|e| KlyntbotError::Storage(format!("ingest_event_log mark_processed: {e}")))?;
+        Ok(res.rows_affected())
+    }
+
+    /// Latest distillation timestamp — `received_at` of the most recently
+    /// processed row, in RFC3339. `None` if nothing has been distilled yet.
+    pub async fn last_distilled_at(&self) -> Result<Option<String>> {
+        let row: Option<(Option<String>,)> =
+            sqlx::query_as("SELECT MAX(received_at) FROM ingest_event_log WHERE processed = 1")
+                .fetch_optional(&self.pool)
+                .await
+                .map_err(|e| {
+                    KlyntbotError::Storage(format!("ingest_event_log last_distilled_at: {e}"))
+                })?;
+        Ok(row.and_then(|(ts,)| ts))
+    }
+
     /// Count unprocessed rows (buffered events awaiting distillation).
     pub async fn count_unprocessed(&self) -> Result<i64> {
         let row: (i64,) =
