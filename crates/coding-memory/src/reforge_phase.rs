@@ -8,6 +8,7 @@
 use crate::error::NotImplementedInPhase;
 use async_trait::async_trait;
 use common::{KlyntbotError, Result};
+use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 
 /// A single Reforge phase run — plugs into the existing nightly cycle.
@@ -73,7 +74,8 @@ pub const MANAGED_BLOCK_START: &str = "<!-- klyntbot:managed:start";
 pub const MANAGED_BLOCK_END: &str = "<!-- klyntbot:managed:end -->";
 
 /// Which on-disk rule artifact is being generated.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub enum RuleArtifact {
     /// `<repo_root>/CLAUDE.md`.
     ClaudeMd,

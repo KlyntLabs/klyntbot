@@ -27,6 +27,11 @@ pub mod mcp;
 pub mod problem_hash;
 /// Recall service — MCP + passive injection stub.
 pub mod recall;
+/// Mirror integration — alerts, effectiveness, stale-memory signals.
+pub mod mirror;
+/// Reforge coding phases — 2.5 (synthesis), 3.5 (rule artifacts),
+/// session-end pass, selective-delete, cross-session dedup.
+pub mod reforge;
 /// Reforge coding phases (2.5, 3.5) stubs.
 pub mod reforge_phase;
 /// C3 retrieval-skill registry stubs.
@@ -45,6 +50,12 @@ pub use recall::CodingRecallService;
 pub use retrieval_skills::{
     BudgetTier, EscalationContext, EscalationOutcome, RetrievalSkill, RetrievalSkillRegistry,
 };
+pub use reforge::{
+    CodingSynthesisPhase as CodingSynthesisPhaseImpl, RuleArtifactGenerationPhase as RuleArtifactGenerationPhaseImpl,
+    SessionEndPass, SessionSummaryRepo, SessionSummaryRow,
+};
+pub use reforge::types::{CodingPhaseHandlers, CodingSynthesisInput, CodingSynthesisOutput, PromoteAction, RuleArtifactInput, RuleArtifactOutput};
+pub use reforge::synth_handler::{CodingSynthesisHandler, RuleArtifactsHandler};
 
 use tools_core::FeatureMigration;
 
