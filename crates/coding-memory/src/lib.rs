@@ -40,6 +40,7 @@ pub mod skills;
 
 pub use error::{CodingMemoryError, NotImplementedInPhase};
 pub use recall::telemetry::{RecallInvocationRepo, RecallInvocationRow};
+pub use retrieval_skills::{RetrievalSkill, RetrievalSkillRegistry, BudgetTier, EscalationContext, EscalationOutcome};
 
 use tools_core::FeatureMigration;
 
