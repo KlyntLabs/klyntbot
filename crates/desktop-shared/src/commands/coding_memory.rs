@@ -118,33 +118,34 @@ pub struct RecallIndexArgs {
     pub limit: u32,
 }
 
-/// Args for `coding_memory_recall_timeline`.
+/// Args for `coding_memory_recall_timeline`. One of `ids` or `query` is required.
 #[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct RecallTimelineArgs {
-    pub query: String,
+    pub ids: Option<Vec<String>>,
+    pub query: Option<String>,
     pub repo: Option<String>,
-    pub days: Option<u32>,
-    #[serde(default = "default_limit_50_u32")]
-    pub limit: u32,
+    #[serde(default = "default_days_30")]
+    pub days: u32,
 }
 
-/// Args for `coding_memory_recall_fetch`.
+/// Args for `coding_memory_recall_fetch`. `includeProvenance` defaults to true.
 #[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct RecallFetchArgs {
     pub ids: Vec<String>,
-    #[serde(default)]
+    #[serde(default = "default_true")]
     pub include_provenance: bool,
     #[serde(default)]
     pub include_causal_graph: bool,
 }
 
-/// Args for `coding_memory_check_dead_ends`.
+/// Args for `coding_memory_check_dead_ends`. `approach` is the candidate fix
+/// being evaluated against historical FixAttempt outcomes.
 #[derive(Deserialize, Serialize, Debug, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct DeadEndArgs {
-    pub problem: String,
+    pub approach: String,
     pub repo: Option<String>,
 }
 
@@ -153,10 +154,9 @@ pub struct DeadEndArgs {
 #[serde(rename_all = "camelCase")]
 pub struct FactsAsOfArgs {
     pub subject: String,
-    pub predicate: Option<String>,
+    pub predicate: String,
     /// RFC-3339 timestamp.
     pub as_of: String,
-    pub repo: Option<String>,
 }
 
 /// Args for `coding_memory_recall_change_history`.
@@ -186,6 +186,12 @@ fn default_limit_20() -> u32 {
 }
 fn default_limit_50_u32() -> u32 {
     50
+}
+fn default_days_30() -> u32 {
+    30
+}
+fn default_true() -> bool {
+    true
 }
 
 /// One telemetry row in the Recall Log panel — mirrors
