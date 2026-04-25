@@ -10,14 +10,16 @@ use serde_json::{json, Value};
 use std::path::{Path, PathBuf};
 
 const MATCHER_TAG: &str = "klyntbot-managed";
-const HOOK_EVENTS: [&str; 7] = [
+const HOOK_EVENTS: [&str; 9] = [
     "SessionStart",
     "SessionEnd",
     "UserPromptSubmit",
     "PreToolUse",
     "PostToolUse",
     "Stop",
+    "SubagentStop",
     "PreCompact",
+    "Notification",
 ];
 
 /// Claude Code settings installer.
@@ -65,7 +67,16 @@ impl ClaudeCodeInstaller {
                     arr.retain(|entry| {
                         entry.get("matcher").and_then(|m| m.as_str()) != Some(MATCHER_TAG)
                     });
+                    // Drop the hook-event key entirely if no matchers remain —
+                    // avoids littering settings.json with empty arrays.
+                    if arr.is_empty() {
+                        hooks.remove(event);
+                    }
                 }
+            }
+            // Drop the top-level "hooks" key if every event was emptied.
+            if hooks.is_empty() {
+                doc.as_object_mut().map(|m| m.remove("hooks"));
             }
         }
         atomic_write(settings_path, &doc)

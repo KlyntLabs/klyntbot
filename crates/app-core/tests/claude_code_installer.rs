@@ -21,7 +21,9 @@ fn install_into_empty_dir_creates_settings_file() {
         "PreToolUse",
         "PostToolUse",
         "Stop",
+        "SubagentStop",
         "PreCompact",
+        "Notification",
     ] {
         assert!(hooks.contains_key(event), "missing {event}");
     }
@@ -71,6 +73,50 @@ fn uninstall_removes_managed_entries_and_leaves_user_ones() {
     let arr = v["hooks"]["SessionStart"].as_array().unwrap();
     assert_eq!(arr.len(), 1);
     assert_eq!(arr[0]["matcher"], "my-own");
+}
+
+#[test]
+fn uninstall_drops_empty_hook_event_keys() {
+    let dir = TempDir::new().unwrap();
+    let settings = dir.path().join("settings.json");
+    let hook = std::path::PathBuf::from("/bin/kh");
+    ClaudeCodeInstaller::install(&settings, &hook).unwrap();
+    ClaudeCodeInstaller::uninstall(&settings).unwrap();
+    let v = read(&settings);
+    // After full uninstall the top-level "hooks" key itself should be gone,
+    // since every event was klyntbot-only and now empty.
+    assert!(
+        v.get("hooks").is_none(),
+        "expected hooks key to be removed; got {}",
+        v
+    );
+}
+
+#[test]
+fn uninstall_keeps_hook_event_when_user_entries_remain() {
+    let dir = TempDir::new().unwrap();
+    let settings = dir.path().join("settings.json");
+    std::fs::write(
+        &settings,
+        r#"{
+        "hooks": {
+            "SessionStart": [{"matcher":"my-own","hooks":[{"type":"command","command":"echo mine"}]}],
+            "Notification": [{"matcher":"my-own","hooks":[{"type":"command","command":"echo notify"}]}]
+        }
+    }"#,
+    )
+    .unwrap();
+    ClaudeCodeInstaller::install(&settings, &std::path::PathBuf::from("/bin/kh")).unwrap();
+    ClaudeCodeInstaller::uninstall(&settings).unwrap();
+    let v = read(&settings);
+    let hooks = v["hooks"].as_object().unwrap();
+    // SessionStart + Notification still present (user entries); the others
+    // (Stop, SubagentStop, PreCompact, etc.) should have been dropped clean.
+    assert!(hooks.contains_key("SessionStart"));
+    assert!(hooks.contains_key("Notification"));
+    assert!(!hooks.contains_key("Stop"));
+    assert!(!hooks.contains_key("SubagentStop"));
+    assert!(!hooks.contains_key("PreCompact"));
 }
 
 #[test]
