@@ -10,6 +10,12 @@ pub enum CodingMemoryError {
     NotImplemented(NotImplementedInPhase),
 }
 
+impl From<CodingMemoryError> for common::KlyntbotError {
+    fn from(e: CodingMemoryError) -> Self {
+        common::KlyntbotError::NotImplemented(e.to_string())
+    }
+}
+
 /// Indicates the phase that must be completed before this operation is wired.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct NotImplementedInPhase {

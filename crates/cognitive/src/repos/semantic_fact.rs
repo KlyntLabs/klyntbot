@@ -646,6 +646,25 @@ impl SemanticFactRepo {
         .await
     }
 
+    /// Upsert a fact carrying coding-memory `scope_repo_id` + JSON `metadata` (Phase-1 columns).
+    pub async fn upsert_with_metadata(
+        &self,
+        fact: &crate::SemanticFact,
+        scope_repo_id: Option<&str>,
+        metadata_json: Option<&str>,
+    ) -> Result<(), sqlx::Error> {
+        self.upsert(fact).await?;
+        sqlx::query(
+            "UPDATE semantic_facts SET scope_repo_id = ?2, metadata = ?3 WHERE id = ?1",
+        )
+        .bind(&fact.id)
+        .bind(scope_repo_id)
+        .bind(metadata_json)
+        .execute(&self.pool)
+        .await?;
+        Ok(())
+    }
+
     /// Find vocabulary facts with subjects similar to the given word.
     /// For CJK: matches any fact containing a character from the word.
     /// For Latin: uses prefix match on the first 3 characters.

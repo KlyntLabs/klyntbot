@@ -4,6 +4,10 @@ import { NavLink, Outlet } from "react-router-dom";
 const tabs = [
   { to: "cli-health", label: "CLI Health" },
   { to: "session-replay", label: "Session Replay" },
+  { to: "memory", label: "Memory Browser" },
+  { to: "activity", label: "Activity Timeline" },
+  { to: "cost", label: "Cost Tracker" },
+  { to: "sensitivity", label: "Sensitivity Inspector" },
 ];
 
 export function CodingMemoryLayout() {

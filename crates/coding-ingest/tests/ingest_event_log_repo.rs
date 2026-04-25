@@ -97,4 +97,13 @@ async fn repo_mark_processed_advances_cursor() {
     // Mark the second row.
     repo.mark_processed(&[id2.as_str()]).await.unwrap();
     assert_eq!(repo.count_unprocessed().await.unwrap(), 0);
+
+    // Generic iterator version also works.
+    let e3 = sample_event();
+    repo.insert(&e3).await.unwrap();
+    let AgentEvent::V1(v3) = &e3;
+    let id3 = v3.id.to_string();
+    let n = repo.mark_processed_iter(std::iter::once(id3.as_str())).await.unwrap();
+    assert_eq!(n, 1);
+    assert_eq!(repo.mark_processed_iter(std::iter::empty::<&str>()).await.unwrap(), 0);
 }

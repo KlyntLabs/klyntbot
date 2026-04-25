@@ -135,6 +135,27 @@ impl EpisodicMemoryRepo {
             .await
     }
 
+    /// Insert an episode carrying the coding-memory `kind`, `scope_repo_id`, and JSON `metadata` columns.
+    pub async fn insert_with_kind_and_metadata(
+        &self,
+        mem: &crate::EpisodicMemory,
+        kind: &str,
+        scope_repo_id: Option<&str>,
+        metadata_json: Option<&str>,
+    ) -> Result<(), sqlx::Error> {
+        self.insert(mem).await?;
+        sqlx::query(
+            "UPDATE episodic_memories SET kind = ?2, scope_repo_id = ?3, metadata = ?4 WHERE id = ?1",
+        )
+        .bind(&mem.id)
+        .bind(kind)
+        .bind(scope_repo_id)
+        .bind(metadata_json)
+        .execute(&self.pool)
+        .await?;
+        Ok(())
+    }
+
     /// Delete old episodic memories with low access count (for archival).
     pub async fn delete_old(
         &self,

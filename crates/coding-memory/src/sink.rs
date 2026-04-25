@@ -4,11 +4,12 @@
 //!
 //! See coding-memory design §5 "Native source: klynt-cli".
 
-use crate::error::NotImplementedInPhase;
+use crate::distiller::Distiller;
 use async_trait::async_trait;
 use coding_ingest::AgentEvent;
 use common::{KlyntbotError, Result};
 use std::path::PathBuf;
+use std::sync::Arc;
 
 /// Abstraction over "accept an `AgentEvent` from a native source".
 #[async_trait]
@@ -19,28 +20,42 @@ pub trait MemorySink: Send + Sync {
     async fn flush(&self) -> Result<()>;
 }
 
-/// In-process sink — when desktop is off, klynt-cli calls the Distiller directly.
-#[derive(Debug, Default, Clone)]
+/// In-process sink — forwards events to an injected `Distiller`.
+#[derive(Debug, Clone)]
 pub struct InProcessSink {
-    /// Phase-2+ wiring will carry a `Distiller` handle here.
-    _phase_stub: (),
+    distiller: Option<Arc<Distiller>>,
 }
 
 impl InProcessSink {
-    /// Construct an in-process sink. Phase 1 stub.
+    /// Construct a sink with no distiller wired (events are dropped).
     #[must_use]
     pub fn new() -> Self {
-        Self { _phase_stub: () }
+        Self { distiller: None }
     }
+
+    /// Wire a distiller handle — called during `AppCore::init`.
+    pub fn set_distiller(&mut self, distiller: Arc<Distiller>) {
+        self.distiller = Some(distiller);
+    }
+}
+
+impl Default for InProcessSink {
+    fn default() -> Self { Self::new() }
 }
 
 #[async_trait]
 impl MemorySink for InProcessSink {
-    async fn accept_event(&self, _event: AgentEvent) -> Result<()> {
-        Err(phase(2))
+    async fn accept_event(&self, event: AgentEvent) -> Result<()> {
+        if let Some(d) = &self.distiller {
+            d.accept_event(event).await?;
+        }
+        Ok(())
     }
     async fn flush(&self) -> Result<()> {
-        Err(phase(2))
+        if let Some(d) = &self.distiller {
+            d.sweep_idle().await?;
+        }
+        Ok(())
     }
 }
 
@@ -70,5 +85,5 @@ impl MemorySink for IngestSocketSink {
 }
 
 fn phase(p: u8) -> KlyntbotError {
-    KlyntbotError::NotImplemented(format!("{:?}", NotImplementedInPhase::new(p)))
+    KlyntbotError::NotImplemented(format!("sink not implemented until phase {p}"))
 }

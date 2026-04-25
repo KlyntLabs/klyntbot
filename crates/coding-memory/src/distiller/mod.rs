@@ -3,13 +3,49 @@
 //! Phase A (extractive, always runs) + Phase B (LLM synthesis) + Phase C
 //! (reconciliation). Phase 1 defines types; bodies land in Phase 3.
 
-use crate::error::NotImplementedInPhase;
+use crate::scope::{ProvenanceKind, ProvenanceMetadata};
 use async_trait::async_trait;
-use coding_ingest::AgentEvent;
-use common::{KlyntbotError, Result};
+use coding_ingest::event::AgentEvent;
+use coding_ingest::store::IngestEventLogRepo;
+use common::Result;
 use jiff::Timestamp;
+use providers::ProviderManager;
 use std::path::PathBuf;
+use std::sync::Arc;
+use tokio::sync::Mutex;
+use turn_buffer::{TurnBoundary, TurnBuffer};
 use uuid::Uuid;
+
+/// Distiller-scoped error taxonomy.
+pub mod error;
+
+pub use error::DistillerError;
+
+/// Write chokepoint enforcing provenance-always invariant.
+pub mod writer;
+
+pub use writer::{DistillerWriter, PreparedEpisode, PreparedFact};
+
+/// Turn boundary detection.
+pub mod turn_buffer;
+
+/// Phase A extractive pass.
+pub mod phase_a;
+
+/// `record_observation` LLM tool schema + decoder.
+pub mod record_observation;
+
+/// Observation → row-ready conversion.
+pub mod fact_builder;
+
+/// Phase B — LLM synthesis (prompt + invocation).
+pub mod phase_b;
+
+/// Distillation retry queue.
+pub mod retry_queue;
+
+/// Phase C — reconciliation (ADD/SUPERSEDE/NOOP).
+pub mod phase_c;
 
 /// Which distiller phase produced a write.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -71,39 +107,251 @@ pub struct TurnTokenUsage {
     pub cached: u32,
 }
 
-/// Distiller handle — constructed once per desktop; accepts events per turn.
-#[derive(Debug)]
+/// Runtime config for the Distiller.
+#[derive(Debug, Clone)]
+pub struct DistillerConfig {
+    /// Model id (pulled from `codingMemory.distiller.model`).
+    pub model: String,
+    /// Max tokens the synthesis prompt can consume.
+    pub max_input_tokens: u32,
+    /// LLM call timeout.
+    pub timeout: std::time::Duration,
+    /// Idle-turn sweep period.
+    pub idle_timeout: std::time::Duration,
+}
+
+impl Default for DistillerConfig {
+    fn default() -> Self {
+        Self {
+            model: "claude-haiku-4-5-20251001".into(),
+            max_input_tokens: 8000,
+            timeout: std::time::Duration::from_secs(30),
+            idle_timeout: std::time::Duration::from_secs(120),
+        }
+    }
+}
+
+/// Distiller handle. Clone freely — internal state behind `Arc<Mutex<...>>`.
+#[derive(Clone)]
 pub struct Distiller {
-    /// Phase-3+ wiring will carry repo handles, provider manager, etc.
-    _phase_stub: (),
+    inner: Arc<DistillerInner>,
+}
+
+struct DistillerInner {
+    config: DistillerConfig,
+    ingest_repo: Arc<IngestEventLogRepo>,
+    writer: writer::DistillerWriter,
+    provider: Arc<ProviderManager>,
+    retriever: Arc<dyn context_engine::MemoryRetriever>,
+    buffer: Mutex<TurnBuffer>,
+}
+
+impl std::fmt::Debug for DistillerInner {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("DistillerInner")
+            .field("model", &self.config.model)
+            .finish_non_exhaustive()
+    }
+}
+
+impl std::fmt::Debug for Distiller {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Distiller").finish_non_exhaustive()
+    }
 }
 
 impl Distiller {
-    /// Construct a Distiller. Phase 1 stub (no deps wired).
+    /// Construct. Called once during `AppCore::init`.
     #[must_use]
-    pub fn new() -> Self {
-        Self { _phase_stub: () }
+    pub fn new(
+        config: DistillerConfig,
+        ingest_repo: Arc<IngestEventLogRepo>,
+        writer: writer::DistillerWriter,
+        provider: Arc<ProviderManager>,
+        retriever: Arc<dyn context_engine::MemoryRetriever>,
+    ) -> Self {
+        Self {
+            inner: Arc::new(DistillerInner {
+                config,
+                ingest_repo,
+                writer,
+                provider,
+                retriever,
+                buffer: Mutex::new(TurnBuffer::new()),
+            }),
+        }
     }
 
-    /// Accept a single event into the per-turn buffer. Phase 3.
-    pub async fn accept_event(&self, _event: AgentEvent) -> Result<()> {
-        Err(phase(3))
+    /// Accept an event into the per-turn buffer. Triggers `distill_turn` on boundary.
+    pub async fn accept_event(&self, event: AgentEvent) -> Result<()> {
+        let boundary = {
+            let mut buf = self.inner.buffer.lock().await;
+            buf.accept(&event)
+        };
+        if let TurnBoundary::Fire { session_id, turn_id } = boundary {
+            let distiller = self.clone();
+            // Fire-and-forget — Distiller failures never propagate back to ingestion.
+            tokio::spawn(async move {
+                if let Err(e) = distiller.distill_turn(&session_id, turn_id.as_deref()).await {
+                    tracing::warn!(session_id, ?turn_id, error = %e, "distill_turn failed");
+                }
+            });
+        }
+        Ok(())
     }
 
-    /// Trigger distillation for one turn (typically on `SessionEnd` or
-    /// `AssistantMsg` with `token_usage`). Phase 3.
+    /// Flush any buffered turns that have gone idle.
+    pub async fn sweep_idle(&self) -> Result<()> {
+        let stale = {
+            let mut buf = self.inner.buffer.lock().await;
+            buf.fire_idle_turns(self.inner.config.idle_timeout)
+        };
+        for t in stale {
+            let _ = self.distill_turn(&t.session_id, t.turn_id.as_deref()).await;
+        }
+        Ok(())
+    }
+
+    /// Distill one turn — implemented incrementally in Tasks 9–22.
     pub async fn distill_turn(
         &self,
-        _session_id: &str,
-        _turn_id: Option<&str>,
+        session_id: &str,
+        turn_id: Option<&str>,
     ) -> Result<DistillationReport> {
-        Err(phase(3))
-    }
-}
+        use coding_ingest::event::{AgentEvent, EventKind};
+        use error::DistillerError;
+        use phase_b::LlmInvocation;
+        use phase_c::{reconcile, ReconcileDecision};
 
-impl Default for Distiller {
-    fn default() -> Self {
-        Self::new()
+        let claimed = self
+            .inner
+            .ingest_repo
+            .mark_processing(session_id, turn_id)
+            .await?;
+        if claimed == 0 {
+            return Ok(DistillationReport::default());
+        }
+
+        let rows = self.inner.ingest_repo.fetch_turn(session_id, turn_id).await?;
+        let events: Vec<AgentEvent> = rows
+            .iter()
+            .filter_map(|r| serde_json::from_str::<AgentEvent>(&r.payload).ok())
+            .collect();
+        let source_event_ids: Vec<uuid::Uuid> = rows
+            .iter()
+            .filter_map(|r| uuid::Uuid::parse_str(&r.id).ok())
+            .collect();
+        let row_ids: Vec<&str> = rows.iter().map(|r| r.id.as_str()).collect();
+
+        let repo_id = events.iter().find_map(|e| {
+            let AgentEvent::V1(v1) = e;
+            v1.repo.as_ref().map(|r| r.repo_id.clone())
+        });
+
+        // Phase A — extractive.
+        let trace = phase_a::compute_turn_trace(session_id, turn_id, &events);
+        let mut report = DistillationReport::default();
+
+        let prov_ext = crate::scope::ProvenanceMetadata {
+            source_events: source_event_ids.clone(),
+            session_id: session_id.to_string(),
+            turn_id: turn_id.map(str::to_string),
+            distilled_at: jiff::Timestamp::now(),
+            distiller_model: self.inner.config.model.clone(),
+            source_kind: crate::scope::ProvenanceKind::DistillerExtractive,
+        };
+        let trace_id = phase_a::persist_turn_trace(
+            &self.inner.writer,
+            &trace,
+            repo_id.as_deref(),
+            &prov_ext,
+        )
+        .await
+        .map_err(common::KlyntbotError::from)?;
+        report.episodic_writes += 1;
+        report.turn_trace_id = Some(trace_id);
+
+        // Phase B — LLM synthesis. Failures are non-fatal — Phase A already lands.
+        let user_prompt_text = events.iter().find_map(|e| {
+            let AgentEvent::V1(v1) = e;
+            if let EventKind::UserPrompt { text, .. } = &v1.kind { Some(text.clone()) } else { None }
+        }).unwrap_or_default();
+        let assistant_text = events.iter().rev().find_map(|e| {
+            let AgentEvent::V1(v1) = e;
+            if let EventKind::AssistantMsg { text, .. } = &v1.kind { Some(text.clone()) } else { None }
+        }).unwrap_or_default();
+
+        let observations = match phase_b::invoke_llm(LlmInvocation {
+            provider: self.inner.provider.clone(),
+            model: self.inner.config.model.clone(),
+            user_prompt_text: &user_prompt_text,
+            assistant_text: &assistant_text,
+            trace: &trace,
+            repo_id: repo_id.as_deref(),
+            timeout: self.inner.config.timeout,
+        }).await {
+            Ok(v) => { report.llm_calls += 1; v }
+            Err(DistillerError::LlmTimeout { .. })
+            | Err(DistillerError::LlmProvider { .. })
+            | Err(DistillerError::Transient { .. }) => {
+                tracing::warn!(session_id, ?turn_id, "Phase B transient failure — skipping LLM observations");
+                vec![]
+            }
+            Err(DistillerError::LlmMalformed { detail }) => {
+                tracing::warn!(session_id, ?turn_id, %detail, "Phase B malformed — dropping observations");
+                vec![]
+            }
+            Err(e) => return Err(e.into()),
+        };
+
+        let prov_llm = crate::scope::ProvenanceMetadata {
+            source_kind: crate::scope::ProvenanceKind::DistillerLlm,
+            ..prov_ext.clone()
+        };
+
+        // Phase C per observation.
+        for obs in &observations {
+            let prepared = match fact_builder::build_prepared(obs, repo_id.as_deref(), &prov_llm) {
+                Ok(p) => p,
+                Err(_) => continue,
+            };
+            match prepared {
+                fact_builder::Prepared::Episode(ep) => {
+                    self.inner.writer.write_episode(ep).await.map_err(common::KlyntbotError::from)?;
+                    report.episodic_writes += 1;
+                }
+                fact_builder::Prepared::Fact(pf) => {
+                    // Simple reconciliation: exact subject+predicate match via find_similar
+                    let similar = self.inner.writer.facts().find_similar(&pf.fact.subject, &pf.fact.predicate).await.ok().unwrap_or_default();
+                    let similar_scored: Vec<phase_c::SimilarFact> = similar.into_iter().map(|f| {
+                        // Simple similarity: exact object match = 1.0, else 0.5
+                        let sim = if f.object == pf.fact.object { 1.0 } else { 0.5 };
+                        phase_c::SimilarFact { fact: f, similarity: sim }
+                    }).collect();
+                    match reconcile(&pf.fact, &similar_scored) {
+                        ReconcileDecision::Noop { predecessor_id } => {
+                            let _ = self.inner.writer.bump_access(&predecessor_id).await;
+                        }
+                        ReconcileDecision::Add => {
+                            self.inner.writer.write_fact(pf).await.map_err(common::KlyntbotError::from)?;
+                            report.semantic_writes += 1;
+                        }
+                        ReconcileDecision::Supersede { predecessor_id } => {
+                            let succ_id = pf.fact.id.clone();
+                            let succ_valid_from = pf.fact.valid_from.clone();
+                            self.inner.writer.write_fact(pf).await.map_err(common::KlyntbotError::from)?;
+                            let _ = self.inner.writer
+                                .complete_supersede(&predecessor_id, &succ_id, &succ_valid_from)
+                                .await;
+                            report.semantic_writes += 1;
+                        }
+                    }
+                }
+            }
+        }
+
+        self.inner.ingest_repo.mark_processed_iter(row_ids.iter().copied()).await?;
+        Ok(report)
     }
 }
 
@@ -139,6 +387,4 @@ pub trait RecordObservationTool: Send + Sync {
     ) -> Result<()>;
 }
 
-fn phase(p: u8) -> KlyntbotError {
-    KlyntbotError::NotImplemented(format!("{:?}", NotImplementedInPhase::new(p)))
-}
+

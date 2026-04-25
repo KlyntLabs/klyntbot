@@ -15,6 +15,14 @@ pub mod distiller;
 pub mod error;
 /// Coding fact taxonomy (`FixAttempt`, `RepoContext`, …).
 pub mod facts;
+/// Canonical bug-problem hashing (`blake3`-based).
+pub mod problem_hash;
+/// Counterfactual memory derivation (Tier B1).
+pub mod counterfactual;
+/// Coding session state enum (Tier B3).
+pub mod code_state;
+/// Coding-domain searcher for InsightForge (Tier B4).
+pub mod code_domain_searcher;
 /// MCP tool stubs — registered with `default_exposed_tools()`.
 pub mod mcp;
 /// Recall service — MCP + passive injection stub.
@@ -36,14 +44,23 @@ use tools_core::FeatureMigration;
 
 /// Coding-memory migrations. Caller: `AppCore::init_storage` (app-core crate).
 pub fn coding_memory_migrations() -> Vec<FeatureMigration> {
-    vec![FeatureMigration {
-        feature_name: "coding_memory".to_string(),
-        version: 1,
-        description: "Consolidated Phase-1 schema: scope_repo_id, metadata, \
-                      actor_id columns; memory_causal_edges, memory_utilization, \
-                      ingest_event_log, klynt_sessions tables; skill_versions \
-                      scope columns."
-            .to_string(),
-        sql: include_str!("../migrations/001_coding_memory.sql").to_string(),
-    }]
+    vec![
+        FeatureMigration {
+            feature_name: "coding_memory".to_string(),
+            version: 1,
+            description: "Consolidated Phase-1 schema: scope_repo_id, metadata, \
+                          actor_id columns; memory_causal_edges, memory_utilization, \
+                          ingest_event_log, klynt_sessions tables; skill_versions \
+                          scope columns."
+                .to_string(),
+            sql: include_str!("../migrations/001_coding_memory.sql").to_string(),
+        },
+        FeatureMigration {
+            feature_name: "coding_memory".to_string(),
+            version: 2,
+            description: "Phase-3: ingest_distillation_retry queue for transient \
+                          LLM failures.".to_string(),
+            sql: include_str!("../migrations/002_retry_queue.sql").to_string(),
+        },
+    ]
 }

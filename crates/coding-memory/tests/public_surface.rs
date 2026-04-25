@@ -45,8 +45,8 @@ fn phase1_mcp_tool_constant_matches_handler() {
 
 #[tokio::test]
 async fn phase1_stub_services_return_not_implemented() {
-    let distiller = Distiller::new();
-    assert!(distiller.accept_event(dummy_event()).await.is_err());
+    // Distiller is no longer a stub — real construction tested in turn_boundary.rs.
+    let _: Option<Distiller> = None;
 
     let sink = InProcessSink::new();
     assert!(sink.accept_event(dummy_event()).await.is_err());

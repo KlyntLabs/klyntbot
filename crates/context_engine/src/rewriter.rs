@@ -15,12 +15,17 @@ pub enum RewriteSource {
     Llm,
 }
 
-#[derive(Debug, Clone, Default)]
+/// String-typed coding session state snapshot (avoids L5 deps in L3).
+pub type CodeStateSnapshot = String;
+
+#[derive(Debug, Clone)]
 pub struct UserSituationSnapshot {
     pub energy_level: f64,
     pub focus_state: f64,
     pub deadline_pressure: f64,
     pub distraction_risk: f64,
+    /// Coding session state snapshot (Tier B3) — serialized `CodeState` string.
+    pub code_state: Option<String>,
 }
 
 #[derive(Debug, Clone, Default)]

@@ -25,6 +25,8 @@ pub trait MetricSource: Send + Sync {
 pub struct ShadowContext {
     pub chat_id: String,
     pub session_key: String,
+    /// Coding session type — drives autotuner trial param selection (Tier B5).
+    pub session_type: Option<String>,
 }
 
 #[derive(Debug, Clone)]

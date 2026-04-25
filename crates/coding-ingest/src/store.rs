@@ -135,6 +135,116 @@ impl IngestEventLogRepo {
         Ok(res.rows_affected())
     }
 
+    /// Fetch every event row for a given (session, turn) pair, ordered by `occurred_at`.
+    /// `turn_id = None` matches rows where the column is NULL.
+    pub async fn fetch_turn(
+        &self,
+        session_id: &str,
+        turn_id: Option<&str>,
+    ) -> Result<Vec<IngestEventLogRow>> {
+        let rows = match turn_id {
+            Some(tid) => {
+                sqlx::query(
+                    "SELECT id, source, session_id, turn_id, repo_id, kind, payload, processed, occurred_at
+                     FROM ingest_event_log
+                     WHERE session_id = ? AND turn_id = ?
+                     ORDER BY occurred_at ASC",
+                )
+                .bind(session_id)
+                .bind(tid)
+                .fetch_all(&self.pool)
+                .await
+            }
+            None => {
+                sqlx::query(
+                    "SELECT id, source, session_id, turn_id, repo_id, kind, payload, processed, occurred_at
+                     FROM ingest_event_log
+                     WHERE session_id = ? AND turn_id IS NULL
+                     ORDER BY occurred_at ASC",
+                )
+                .bind(session_id)
+                .fetch_all(&self.pool)
+                .await
+            }
+        }
+        .map_err(|e| KlyntbotError::Storage(format!("fetch_turn: {e}")))?;
+        Ok(rows
+            .into_iter()
+            .map(|r| IngestEventLogRow {
+                id: r.get("id"),
+                source: r.get("source"),
+                session_id: r.get("session_id"),
+                turn_id: r.get("turn_id"),
+                repo_id: r.get("repo_id"),
+                kind: r.get("kind"),
+                payload: r.get("payload"),
+                processed: r.get::<bool, _>("processed"),
+                occurred_at: r.get("occurred_at"),
+            })
+            .collect())
+    }
+
+    /// Atomically flip `processing` from 0→1 for every row in the turn. Returns the count flipped.
+    /// Already-processing rows are skipped — making the call idempotent.
+    pub async fn mark_processing(
+        &self,
+        session_id: &str,
+        turn_id: Option<&str>,
+    ) -> Result<u64> {
+        let res = match turn_id {
+            Some(tid) => {
+                sqlx::query(
+                    "UPDATE ingest_event_log SET processing = 1
+                     WHERE session_id = ? AND turn_id = ?
+                       AND processed = 0 AND processing = 0",
+                )
+                .bind(session_id)
+                .bind(tid)
+                .execute(&self.pool)
+                .await
+            }
+            None => {
+                sqlx::query(
+                    "UPDATE ingest_event_log SET processing = 1
+                     WHERE session_id = ? AND turn_id IS NULL
+                       AND processed = 0 AND processing = 0",
+                )
+                .bind(session_id)
+                .execute(&self.pool)
+                .await
+            }
+        }
+        .map_err(|e| KlyntbotError::Storage(format!("mark_processing: {e}")))?;
+        Ok(res.rows_affected())
+    }
+
+    /// Mark a set of row ids as `processed=1, processing=0` — called after a successful distill cycle.
+    pub async fn mark_processed_iter<'a, I: IntoIterator<Item = &'a str>>(
+        &self,
+        ids: I,
+    ) -> Result<u64> {
+        let ids: Vec<&str> = ids.into_iter().collect();
+        if ids.is_empty() {
+            return Ok(0);
+        }
+        let mut total: u64 = 0;
+        let mut tx = self.pool.begin().await
+            .map_err(|e| KlyntbotError::Storage(format!("mark_processed tx: {e}")))?;
+        for id in ids {
+            let res = sqlx::query(
+                "UPDATE ingest_event_log SET processed = 1, processing = 0 WHERE id = ?",
+            )
+            .bind(id)
+            .execute(&mut *tx)
+            .await
+            .map_err(|e| KlyntbotError::Storage(format!("mark_processed row: {e}")))?;
+            total += res.rows_affected();
+        }
+        tx.commit().await
+            .map_err(|e| KlyntbotError::Storage(format!("mark_processed commit: {e}")))?;
+        Ok(total)
+    }
+
     /// Latest distillation timestamp — `received_at` of the most recently
     /// processed row, in RFC3339. `None` if nothing has been distilled yet.
     pub async fn last_distilled_at(&self) -> Result<Option<String>> {

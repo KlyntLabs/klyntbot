@@ -149,6 +149,18 @@ const CliHealthPanel = lazy(() =>
 const SessionReplayPanel = lazy(() =>
   import("../features/coding-memory").then((m) => ({ default: m.SessionReplayPanel })),
 );
+const MemoryBrowserPanel = lazy(() =>
+  import("../features/coding-memory").then((m) => ({ default: m.MemoryBrowserPanel })),
+);
+const ActivityTimelinePanel = lazy(() =>
+  import("../features/coding-memory").then((m) => ({ default: m.ActivityTimelinePanel })),
+);
+const CostTrackerPanel = lazy(() =>
+  import("../features/coding-memory").then((m) => ({ default: m.CostTrackerPanel })),
+);
+const SensitivityInspectorPanel = lazy(() =>
+  import("../features/coding-memory").then((m) => ({ default: m.SensitivityInspectorPanel })),
+);
 
 // (Debug feature — now integrated into System page)
 
@@ -387,6 +399,10 @@ export const router = createHashRouter([
         children: [
           { path: "cli-health", element: <CliHealthPanel /> },
           { path: "session-replay", element: <SessionReplayPanel /> },
+          { path: "memory", element: <MemoryBrowserPanel /> },
+          { path: "activity", element: <ActivityTimelinePanel /> },
+          { path: "cost", element: <CostTrackerPanel /> },
+          { path: "sensitivity", element: <SensitivityInspectorPanel /> },
         ],
       },
       { path: "/projects", element: <ProjectsListPage /> },

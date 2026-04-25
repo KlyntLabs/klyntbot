@@ -13,3 +13,23 @@ export const useSessionReplay = (sessionId?: string, limit = 500, offset = 0) =>
     limit,
     offset,
   });
+
+export const useMemoryBrowser = () =>
+  useQuery<{ id: string; subject: string; predicate: string; object: string }[] | null>(
+    "coding_memory_browser",
+    undefined,
+    null,
+  );
+
+export const useActivityTimeline = () =>
+  useQuery<{ date: string; count: number }[] | null>("coding_memory_activity", undefined, null);
+
+export const useCostRollup = () =>
+  useQuery<{ period: string; cost_usd: number }[] | null>("coding_memory_cost", undefined, null);
+
+export const useSensitivityInspector = () =>
+  useQuery<{ id: string; subject: string; predicate: string; object: string; sensitivity: string }[] | null>(
+    "coding_memory_sensitivity",
+    undefined,
+    null,
+  );
