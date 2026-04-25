@@ -4,8 +4,7 @@
 //! `QueryPipeline`, `UnifiedMemoryService`, the C3 failure-state probe, and
 //! the dead-end check.
 
-use crate::error::NotImplementedInPhase;
-use common::{KlyntbotError, Result};
+use common::Result;
 use jiff::Timestamp;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
@@ -141,77 +140,8 @@ pub struct CausalTraceResponse {
     pub depth: u32,
 }
 
-/// The single service both passive injection and MCP tools call.
-#[derive(Debug)]
-pub struct CodingRecallService {
-    /// Phase-4 wiring will carry `UnifiedMemoryService`, `QueryPipeline`.
-    _phase_stub: (),
-}
-
-impl CodingRecallService {
-    /// Construct. Phase 1 stub.
-    #[must_use]
-    pub fn new() -> Self {
-        Self { _phase_stub: () }
-    }
-
-    /// Layer-1 compact index. Phase 4.
-    pub async fn recall_index(
-        &self,
-        _query: &str,
-        _repo: Option<&str>,
-        _kinds: Option<&[&str]>,
-        _days: Option<u32>,
-        _limit: u32,
-    ) -> Result<RecallIndexResponse> {
-        Err(phase(4))
-    }
-
-    /// Layer-2 timeline. Phase 4.
-    pub async fn recall_timeline(
-        &self,
-        _ids_or_query: RecallQuery,
-        _repo: Option<&str>,
-        _days: u32,
-    ) -> Result<Vec<TimelineEntry>> {
-        Err(phase(4))
-    }
-
-    /// Layer-3 full fetch. Phase 4.
-    pub async fn recall_fetch(
-        &self,
-        _ids: &[Uuid],
-        _include_provenance: bool,
-        _include_causal_graph: bool,
-    ) -> Result<Vec<FullEntry>> {
-        Err(phase(4))
-    }
-
-    /// Counterfactual check. Phase 4.
-    pub async fn check_dead_ends(
-        &self,
-        _approach: &str,
-        _repo: Option<&str>,
-    ) -> Result<DeadEndResponse> {
-        Err(phase(4))
-    }
-
-    /// Causal graph walk. Phase 6.
-    pub async fn trace_causes(
-        &self,
-        _subject: Uuid,
-        _repo: Option<&str>,
-        _depth: u32,
-    ) -> Result<CausalTraceResponse> {
-        Err(phase(6))
-    }
-}
-
-impl Default for CodingRecallService {
-    fn default() -> Self {
-        Self::new()
-    }
-}
+pub mod service;
+pub use service::{CodingRecallService, CodingRecallServiceConfig};
 
 /// Row in a `recall_facts_as_of` response.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -303,11 +233,7 @@ pub struct DecisionPointsResponse {
 #[derive(Debug, Clone)]
 pub enum RecallQuery {
     /// Pre-selected memory ids.
-    Ids(Vec<Uuid>),
+    Ids(Vec<String>),
     /// Free-text query.
     Text(String),
-}
-
-fn phase(p: u8) -> KlyntbotError {
-    KlyntbotError::NotImplemented(format!("{:?}", NotImplementedInPhase::new(p)))
 }
