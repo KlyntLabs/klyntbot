@@ -24,6 +24,8 @@ uuid = { workspace = true, features = ["v4", "serde"] }
 jiff = { workspace = true, features = ["serde"] }
 thiserror = { workspace = true }
 blake3 = "1"
+tiktoken-rs = "0.5"
+regex = "1"
 
 [dev-dependencies]
 tempfile = { workspace = true }

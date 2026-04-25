@@ -10,7 +10,9 @@ use jiff::Timestamp;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
+pub mod budget;
 pub mod renderers;
+pub mod telemetry;
 
 /// One recall "level" for progressive disclosure.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

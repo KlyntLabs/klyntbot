@@ -39,6 +39,7 @@ pub mod sink;
 pub mod skills;
 
 pub use error::{CodingMemoryError, NotImplementedInPhase};
+pub use recall::telemetry::{RecallInvocationRepo, RecallInvocationRow};
 
 use tools_core::FeatureMigration;
 
@@ -61,6 +62,12 @@ pub fn coding_memory_migrations() -> Vec<FeatureMigration> {
             description: "Phase-3: ingest_distillation_retry queue for transient \
                           LLM failures.".to_string(),
             sql: include_str!("../migrations/002_retry_queue.sql").to_string(),
+        },
+        FeatureMigration {
+            feature_name: "coding_memory".to_string(),
+            version: 3,
+            description: "Phase-4: recall_invocations telemetry table.".to_string(),
+            sql: include_str!("../migrations/003_recall_invocations.sql").to_string(),
         },
     ]
 }

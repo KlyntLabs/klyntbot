@@ -119,3 +119,20 @@ async fn migration_is_idempotent() {
 
 /// Silence clippy about the unused helper trait method.
 const _: () = ();
+
+#[tokio::test]
+async fn recall_invocations_table_exists_after_migration() {
+    use storage::StoragePool;
+    let pool = StoragePool::connect_in_memory().await.expect("pool");
+    StoragePool::run_feature_migrations(pool.inner(), &cognitive::cognitive_migrations())
+        .await
+        .expect("cognitive migs");
+    StoragePool::run_feature_migrations(pool.inner(), &coding_memory::coding_memory_migrations())
+        .await
+        .expect("coding-memory migs");
+    let row: (i64,) = sqlx::query_as("SELECT COUNT(*) FROM recall_invocations")
+        .fetch_one(pool.inner())
+        .await
+        .expect("count");
+    assert_eq!(row.0, 0);
+}
