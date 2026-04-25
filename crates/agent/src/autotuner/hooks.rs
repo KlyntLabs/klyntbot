@@ -100,6 +100,7 @@ impl AutoTunerHook for AutoTunerHookImpl {
         let context = ShadowContext {
             chat_id: chat_id.to_string(),
             session_key: format!("shadow:{chat_id}"),
+            session_type: None,
         };
 
         // Parse trial params once — reused for retrieval.

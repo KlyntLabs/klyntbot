@@ -41,6 +41,7 @@ async fn desktop_off_buffers_then_drains_on_startup() {
         buffer_path: buffer_path.clone(),
         lock_path: home.path().join("desktop.lock"),
         repo: repo.clone(),
+        event_tx: None,
     };
     let handle = spawn(cfg).await.expect("spawn");
 

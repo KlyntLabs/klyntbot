@@ -168,6 +168,8 @@ pub struct AppCore {
     pub feature_registry: Arc<ai_core::AiFeatureRegistry>,
     /// Ingestion daemon handle; `None` when spawn failed or not yet wired.
     pub ingest_daemon: std::sync::Mutex<Option<coding_ingest::daemon::IngestDaemonHandle>>,
+    /// Coding-memory Distiller — processes ingest events into semantic facts & episodic memories.
+    pub distiller: Option<Arc<coding_memory::distiller::Distiller>>,
 }
 
 impl AppCore {

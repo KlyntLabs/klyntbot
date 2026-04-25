@@ -22,6 +22,8 @@ pub struct IngestDaemonConfig {
     pub lock_path: PathBuf,
     /// Repo that receives decoded events.
     pub repo: Arc<IngestEventLogRepo>,
+    /// Optional real-time event forwarder — e.g. to the coding-memory Distiller.
+    pub event_tx: Option<tokio::sync::mpsc::UnboundedSender<crate::event::AgentEvent>>,
 }
 
 /// Handle returned by [`spawn`]; used to shutdown cleanly.
@@ -67,6 +69,7 @@ pub async fn spawn(cfg: IngestDaemonConfig) -> Result<IngestDaemonHandle> {
     let (shutdown_tx, mut shutdown_rx) = oneshot::channel::<()>();
     let repo = cfg.repo.clone();
 
+    let event_tx = cfg.event_tx.clone();
     let accept_task = tokio::spawn(async move {
         loop {
             tokio::select! {
@@ -75,8 +78,9 @@ pub async fn spawn(cfg: IngestDaemonConfig) -> Result<IngestDaemonHandle> {
                     match accept {
                         Ok((stream, _)) => {
                             let repo = repo.clone();
+                            let event_tx = event_tx.clone();
                             tokio::spawn(async move {
-                                if let Err(e) = handle_connection(stream, repo).await {
+                                if let Err(e) = handle_connection(stream, repo, event_tx).await {
                                     tracing::warn!(error = %e, "ingest handler failed");
                                 }
                             });
@@ -113,6 +117,7 @@ const MAX_PAYLOAD_BYTES: usize = 1024 * 1024;
 async fn handle_connection(
     mut stream: tokio::net::UnixStream,
     repo: Arc<IngestEventLogRepo>,
+    event_tx: Option<tokio::sync::mpsc::UnboundedSender<AgentEvent>>,
 ) -> Result<()> {
     let mut len_buf = [0u8; 4];
     stream
@@ -131,6 +136,9 @@ async fn handle_connection(
     let event: AgentEvent = serde_json::from_slice(&body)
         .map_err(|e| KlyntbotError::Storage(format!("decode event: {e}")))?;
     repo.insert(&event).await?;
+    if let Some(tx) = event_tx {
+        let _ = tx.send(event);
+    }
     Ok(())
 }
 

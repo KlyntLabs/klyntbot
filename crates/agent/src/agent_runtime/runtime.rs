@@ -522,6 +522,7 @@ impl AgentRuntime {
                 focus_state: s.focus_state,
                 deadline_pressure: s.deadline_pressure,
                 distraction_risk: s.distraction_risk,
+                code_state: None,
             })
         } else {
             None

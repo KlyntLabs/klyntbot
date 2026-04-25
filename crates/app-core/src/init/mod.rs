@@ -101,6 +101,9 @@ impl AppCore {
             provider_manager,
         } = storage::init_storage(config_override).await?;
 
+        // Keep a clone for the Distiller (constructed after agent init).
+        let provider_for_distiller = provider.clone();
+
         // Wire provider-degraded event forwarding to the frontend.
         // Done here (not inside init_storage) because the emitter isn't available there.
         if let Some(ref manager) = provider_manager {
@@ -837,7 +840,40 @@ impl AppCore {
             Some(handle)
         };
 
-        // ── Spawn coding-ingest daemon ───────────────────────────────────
+        // ── Construct coding-memory Distiller + event-forwarding channel ─
+        let (ingest_event_tx, mut ingest_event_rx) = tokio::sync::mpsc::unbounded_channel::<coding_ingest::event::AgentEvent>();
+
+        let distiller = {
+            let ingest_repo = Arc::new(coding_ingest::store::IngestEventLogRepo::new(
+                storage_pool.inner().clone(),
+            ));
+            let fact_repo = ::cognitive::SemanticFactRepo::new(storage_pool.inner().clone());
+            let episode_repo = ::cognitive::EpisodicMemoryRepo::new(storage_pool.inner().clone());
+            let writer = coding_memory::distiller::DistillerWriter::new(fact_repo.clone(), episode_repo);
+            let distiller_provider = provider_manager
+                .clone()
+                .unwrap_or_else(|| Arc::new(providers::ProviderManager::new(provider_for_distiller.clone(), None, None)));
+            let retriever = Arc::new(::cognitive::UnifiedMemoryService::new(fact_repo))
+                as Arc<dyn context_engine::MemoryRetriever>;
+            let mut distiller_cfg = coding_memory::distiller::DistillerConfig::default();
+            // Respect app config model if set.
+            if let Some(ref m) = config.cognitive.model {
+                distiller_cfg.model.clone_from(m);
+            }
+            let mut d = coding_memory::distiller::Distiller::new(
+                distiller_cfg,
+                ingest_repo,
+                writer,
+                distiller_provider,
+                retriever,
+            );
+            d = d.with_retry_repo(coding_memory::distiller::DistillationRetryRepo::new(
+                storage_pool.inner().clone(),
+            ));
+            Arc::new(d)
+        };
+
+        // ── Spawn coding-ingest daemon (with real-time event forwarding) ─
         let ingest_daemon_handle = {
             let data_dir = config.data_dir_path();
             let daemon_cfg = coding_ingest::daemon::IngestDaemonConfig {
@@ -847,6 +883,7 @@ impl AppCore {
                 repo: std::sync::Arc::new(coding_ingest::store::IngestEventLogRepo::new(
                     storage_pool.inner().clone(),
                 )),
+                event_tx: Some(ingest_event_tx),
             };
             match coding_ingest::daemon::spawn(daemon_cfg).await {
                 Ok(h) => Some(h),
@@ -983,7 +1020,49 @@ impl AppCore {
             _ai_pipeline_router: ai_pipeline_router,
             feature_registry,
             ingest_daemon: std::sync::Mutex::new(ingest_daemon_handle),
+            distiller: Some(distiller.clone()),
         };
+
+        // ── Distiller event receiver + sweep timers ──────────────────────
+        {
+            let d = distiller.clone();
+            let token = shutdown_token.clone();
+            tokio::spawn(async move {
+                loop {
+                    tokio::select! {
+                        _ = token.cancelled() => break,
+                        Some(event) = ingest_event_rx.recv() => {
+                            if let Err(e) = d.accept_event(event).await {
+                                tracing::debug!(error = %e, "distiller accept_event failed");
+                            }
+                        }
+                    }
+                }
+            });
+
+            let d_idle = distiller.clone();
+            spawn_periodic_timer(&shutdown_token, 60, move || {
+                let d = d_idle.clone();
+                tokio::spawn(async move {
+                    if let Err(e) = d.sweep_idle().await {
+                        tracing::warn!(error = %e, "distiller idle sweep failed");
+                    }
+                });
+            });
+
+            let d_retry = distiller.clone();
+            spawn_periodic_timer(&shutdown_token, 60, move || {
+                let d = d_retry.clone();
+                tokio::spawn(async move {
+                    match d.sweep_retries().await {
+                        Ok(n) if n > 0 => tracing::info!(count = n, "distiller retry sweep processed rows"),
+                        Ok(_) => {}
+                        Err(e) => tracing::warn!(error = %e, "distiller retry sweep failed"),
+                    }
+                });
+            });
+            info!("coding-memory Distiller wired — event receiver + sweepers started");
+        }
 
         // ── Voice service initialization ────────────────────────────────
         {

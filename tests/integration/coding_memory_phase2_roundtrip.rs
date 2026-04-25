@@ -32,6 +32,7 @@ async fn synthetic_claude_code_session_round_trips() {
         buffer_path: home.path().join("ingest-buffer.jsonl"),
         lock_path: home.path().join("desktop.lock"),
         repo: repo.clone(),
+        event_tx: None,
     };
     let handle = spawn(cfg).await.expect("daemon spawn");
 

@@ -78,6 +78,7 @@ async fn daemon_start_drains_pre_existing_buffer() {
         buffer_path: buffer_path.clone(),
         lock_path: dir.path().join("desktop.lock"),
         repo: repo.clone(),
+        event_tx: None,
     })
     .await
     .unwrap();

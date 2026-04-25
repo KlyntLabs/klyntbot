@@ -16,6 +16,8 @@ use tokio::sync::Mutex;
 use turn_buffer::{TurnBoundary, TurnBuffer};
 use uuid::Uuid;
 
+pub use retry_queue::{DistillationRetryRepo, RetryReason, RetryRow};
+
 /// Distiller-scoped error taxonomy.
 pub mod error;
 
@@ -144,6 +146,7 @@ struct DistillerInner {
     provider: Arc<ProviderManager>,
     #[allow(dead_code)]
     retriever: Arc<dyn context_engine::MemoryRetriever>,
+    retry_repo: Option<DistillationRetryRepo>,
     buffer: Mutex<TurnBuffer>,
 }
 
@@ -178,9 +181,17 @@ impl Distiller {
                 writer,
                 provider,
                 retriever,
+                retry_repo: None,
                 buffer: Mutex::new(TurnBuffer::new()),
             }),
         }
+    }
+
+    /// Attach a retry-repo — enables transient-failure re-distillation.
+    pub fn with_retry_repo(mut self, repo: DistillationRetryRepo) -> Self {
+        let inner = Arc::get_mut(&mut self.inner).expect("Distiller::with_retry_repo called after clone");
+        inner.retry_repo = Some(repo);
+        self
     }
 
     /// Accept an event into the per-turn buffer. Triggers `distill_turn` on boundary.
@@ -211,6 +222,28 @@ impl Distiller {
             let _ = self.distill_turn(&t.session_id, t.turn_id.as_deref()).await;
         }
         Ok(())
+    }
+
+    /// Re-run distillation for every due retry-queue row.
+    pub async fn sweep_retries(&self) -> Result<u32> {
+        let retry = match &self.inner.retry_repo {
+            Some(r) => r,
+            None => return Ok(0),
+        };
+        let due = retry.list_due(50).await?;
+        let mut processed = 0u32;
+        for row in due {
+            match self.distill_turn(&row.session_id, row.turn_id.as_deref()).await {
+                Ok(_) => {
+                    let _ = retry.mark_done(&row.id).await;
+                    processed += 1;
+                }
+                Err(_) => {
+                    let _ = retry.record_attempt(&row.id).await;
+                }
+            }
+        }
+        Ok(processed)
     }
 
     /// Distill one turn — implemented incrementally in Tasks 9–22.
@@ -292,10 +325,16 @@ impl Distiller {
             timeout: self.inner.config.timeout,
         }).await {
             Ok(v) => { report.llm_calls += 1; v }
-            Err(DistillerError::LlmTimeout { .. })
-            | Err(DistillerError::LlmProvider { .. })
-            | Err(DistillerError::Transient { .. }) => {
+            Err(ref e) if matches!(e, DistillerError::LlmTimeout { .. } | DistillerError::LlmProvider { .. } | DistillerError::Transient { .. }) => {
                 tracing::warn!(session_id, ?turn_id, "Phase B transient failure — skipping LLM observations");
+                if let Some(ref retry) = self.inner.retry_repo {
+                    let reason = match e {
+                        DistillerError::LlmTimeout { .. } => RetryReason::LlmTimeout,
+                        DistillerError::LlmProvider { .. } => RetryReason::LlmProvider,
+                        _ => RetryReason::Transient,
+                    };
+                    let _ = retry.enqueue(session_id, turn_id, reason).await;
+                }
                 vec![]
             }
             Err(DistillerError::LlmMalformed { detail }) => {

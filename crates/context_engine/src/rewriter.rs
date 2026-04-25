@@ -18,7 +18,7 @@ pub enum RewriteSource {
 /// String-typed coding session state snapshot (avoids L5 deps in L3).
 pub type CodeStateSnapshot = String;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct UserSituationSnapshot {
     pub energy_level: f64,
     pub focus_state: f64,
