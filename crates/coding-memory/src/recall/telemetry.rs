@@ -108,6 +108,15 @@ impl RecallInvocationRepo {
         rows.into_iter().map(RawRow::into_row).collect()
     }
 
+    /// List invocations for a session (newest-first, no offset).
+    pub async fn list_for_session(
+        &self,
+        session_id: &str,
+        limit: i64,
+    ) -> common::Result<Vec<RecallInvocationRow>> {
+        self.list_by_session(session_id, limit, 0).await
+    }
+
     /// List recent invocations across all sessions, paginated.
     pub async fn list_recent(
         &self,

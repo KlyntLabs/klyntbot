@@ -48,6 +48,11 @@ impl CoActivationRepo {
         self
     }
 
+    /// Increment co-activation for a single pair.
+    pub async fn increment_pair(&self, a: &str, b: &str) -> Result<(), sqlx::Error> {
+        self.record_co_retrieval(&[a.to_string(), b.to_string()]).await
+    }
+
     /// Record that a set of facts were co-retrieved. Inserts/increments strength
     /// for every ordered pair (a, b) where a < b.
     ///

@@ -24,8 +24,9 @@ impl EpisodicMemoryRepo {
         sqlx::query(
             r#"
             INSERT INTO episodic_memories (id, domain, content, summary, importance,
-                occurred_at, recorded_at, stability, last_accessed, access_count, project_id)
-            VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11)
+                occurred_at, recorded_at, stability, last_accessed, access_count, project_id,
+                scope_type, scope_id, scope_repo_id, metadata, kind)
+            VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16)
             "#,
         )
         .bind(&mem.id)
@@ -39,6 +40,11 @@ impl EpisodicMemoryRepo {
         .bind(&mem.last_accessed)
         .bind(mem.access_count)
         .bind(&mem.project_id)
+        .bind(&mem.scope_type)
+        .bind(&mem.scope_id)
+        .bind(&mem.scope_repo_id)
+        .bind(&mem.metadata)
+        .bind(&mem.kind)
         .execute(&self.pool)
         .await?;
         Ok(())
@@ -181,6 +187,15 @@ impl EpisodicMemoryRepo {
         bound = bound.bind(limit);
         let rows = bound.fetch_all(&self.pool).await?;
         Ok(rows)
+    }
+
+    /// Delete a row by id. Used by `coding-memory`'s session-end dedup pass.
+    pub async fn delete_by_id(&self, id: &str) -> Result<(), sqlx::Error> {
+        sqlx::query("DELETE FROM episodic_memories WHERE id = ?1")
+            .bind(id)
+            .execute(&self.pool)
+            .await?;
+        Ok(())
     }
 
     /// Delete old episodic memories with low access count (for archival).
