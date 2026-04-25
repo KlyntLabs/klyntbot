@@ -25,7 +25,12 @@ impl CodingMemoryMcpTool {
         parameters: serde_json::Value,
         toolset: CodingMemoryToolset,
     ) -> Self {
-        Self { name, description, parameters, toolset }
+        Self {
+            name,
+            description,
+            parameters,
+            toolset,
+        }
     }
 }
 
@@ -65,7 +70,6 @@ impl tools_core::Tool for CodingMemoryMcpTool {
         }
     }
 }
-
 
 /// Public tool names — must match `EXPLICIT_TOOL_ALLOWLIST` in config.
 pub const CODING_MEMORY_MCP_TOOLS: &[&str] = &[
@@ -245,16 +249,27 @@ impl CodingMemoryToolset {
         struct A {
             query: String,
             repo: Option<String>,
-            #[serde(default)] kinds: Option<Vec<String>>,
+            #[serde(default)]
+            kinds: Option<Vec<String>>,
             days: Option<u32>,
-            #[serde(default = "default_limit")] limit: u32,
+            #[serde(default = "default_limit")]
+            limit: u32,
         }
-        fn default_limit() -> u32 { 10 }
+        fn default_limit() -> u32 {
+            10
+        }
         let a: A = serde_json::from_value(args).map_err(decode_err)?;
         let kinds_owned = a.kinds.clone().unwrap_or_default();
         let kinds_borrow: Vec<&str> = kinds_owned.iter().map(|s| s.as_str()).collect();
-        let kinds_opt: Option<&[&str]> = if kinds_borrow.is_empty() { None } else { Some(&kinds_borrow) };
-        let resp = self.svc.recall_index(&a.query, a.repo.as_deref(), kinds_opt, a.days, a.limit).await?;
+        let kinds_opt: Option<&[&str]> = if kinds_borrow.is_empty() {
+            None
+        } else {
+            Some(&kinds_borrow)
+        };
+        let resp = self
+            .svc
+            .recall_index(&a.query, a.repo.as_deref(), kinds_opt, a.days, a.limit)
+            .await?;
         serde_json::to_value(resp).map_err(encode_err)
     }
 
@@ -265,16 +280,26 @@ impl CodingMemoryToolset {
             ids: Option<Vec<String>>,
             query: Option<String>,
             repo: Option<String>,
-            #[serde(default = "default_days")] days: u32,
+            #[serde(default = "default_days")]
+            days: u32,
         }
-        fn default_days() -> u32 { 30 }
+        fn default_days() -> u32 {
+            30
+        }
         let a: A = serde_json::from_value(args).map_err(decode_err)?;
         let q = match (a.ids, a.query) {
             (Some(ids), _) => RecallQuery::Ids(ids),
             (_, Some(q)) => RecallQuery::Text(q),
-            _ => return Err(common::KlyntbotError::Storage("missing ids or query".into())),
+            _ => {
+                return Err(common::KlyntbotError::Storage(
+                    "missing ids or query".into(),
+                ))
+            }
         };
-        let resp = self.svc.recall_timeline(q, a.repo.as_deref(), a.days).await?;
+        let resp = self
+            .svc
+            .recall_timeline(q, a.repo.as_deref(), a.days)
+            .await?;
         serde_json::to_value(resp).map_err(encode_err)
     }
 
@@ -283,53 +308,96 @@ impl CodingMemoryToolset {
         #[serde(rename_all = "camelCase")]
         struct A {
             ids: Vec<String>,
-            #[serde(default = "default_true")] include_provenance: bool,
-            #[serde(default)] include_causal_graph: bool,
+            #[serde(default = "default_true")]
+            include_provenance: bool,
+            #[serde(default)]
+            include_causal_graph: bool,
         }
-        fn default_true() -> bool { true }
+        fn default_true() -> bool {
+            true
+        }
         let a: A = serde_json::from_value(args).map_err(decode_err)?;
-        let resp = self.svc.recall_fetch(&a.ids, a.include_provenance, a.include_causal_graph).await?;
+        let resp = self
+            .svc
+            .recall_fetch(&a.ids, a.include_provenance, a.include_causal_graph)
+            .await?;
         serde_json::to_value(resp).map_err(encode_err)
     }
 
     async fn check_dead_ends(&self, args: serde_json::Value) -> common::Result<serde_json::Value> {
         #[derive(serde::Deserialize)]
         #[serde(rename_all = "camelCase")]
-        struct A { approach: String, repo: Option<String> }
+        struct A {
+            approach: String,
+            repo: Option<String>,
+        }
         let a: A = serde_json::from_value(args).map_err(decode_err)?;
-        let resp = self.svc.check_dead_ends(&a.approach, a.repo.as_deref()).await?;
+        let resp = self
+            .svc
+            .check_dead_ends(&a.approach, a.repo.as_deref())
+            .await?;
         serde_json::to_value(resp).map_err(encode_err)
     }
 
-    async fn recall_facts_as_of(&self, args: serde_json::Value) -> common::Result<serde_json::Value> {
-        #[derive(serde::Deserialize)]
-        #[serde(rename_all = "camelCase")]
-        struct A { subject: String, predicate: String, as_of: Timestamp }
-        let a: A = serde_json::from_value(args).map_err(decode_err)?;
-        let resp = self.svc.recall_facts_as_of(&a.subject, &a.predicate, a.as_of).await?;
-        serde_json::to_value(resp).map_err(encode_err)
-    }
-
-    async fn recall_change_history(&self, args: serde_json::Value) -> common::Result<serde_json::Value> {
-        #[derive(serde::Deserialize)]
-        #[serde(rename_all = "camelCase")]
-        struct A { subject: String, predicate: String, repo: Option<String> }
-        let a: A = serde_json::from_value(args).map_err(decode_err)?;
-        let resp = self.svc.recall_change_history(&a.subject, &a.predicate, a.repo.as_deref()).await?;
-        serde_json::to_value(resp).map_err(encode_err)
-    }
-
-    async fn recall_decision_points(&self, args: serde_json::Value) -> common::Result<serde_json::Value> {
+    async fn recall_facts_as_of(
+        &self,
+        args: serde_json::Value,
+    ) -> common::Result<serde_json::Value> {
         #[derive(serde::Deserialize)]
         #[serde(rename_all = "camelCase")]
         struct A {
-            #[serde(default)] domain: Option<String>,
-            repo: Option<String>,
-            #[serde(default = "default_dp_limit")] limit: i64,
+            subject: String,
+            predicate: String,
+            as_of: Timestamp,
         }
-        fn default_dp_limit() -> i64 { 50 }
         let a: A = serde_json::from_value(args).map_err(decode_err)?;
-        let resp = self.svc.recall_decision_points(a.repo.as_deref(), a.limit).await?;
+        let resp = self
+            .svc
+            .recall_facts_as_of(&a.subject, &a.predicate, a.as_of)
+            .await?;
+        serde_json::to_value(resp).map_err(encode_err)
+    }
+
+    async fn recall_change_history(
+        &self,
+        args: serde_json::Value,
+    ) -> common::Result<serde_json::Value> {
+        #[derive(serde::Deserialize)]
+        #[serde(rename_all = "camelCase")]
+        struct A {
+            subject: String,
+            predicate: String,
+            repo: Option<String>,
+        }
+        let a: A = serde_json::from_value(args).map_err(decode_err)?;
+        let resp = self
+            .svc
+            .recall_change_history(&a.subject, &a.predicate, a.repo.as_deref())
+            .await?;
+        serde_json::to_value(resp).map_err(encode_err)
+    }
+
+    async fn recall_decision_points(
+        &self,
+        args: serde_json::Value,
+    ) -> common::Result<serde_json::Value> {
+        #[derive(serde::Deserialize)]
+        #[serde(rename_all = "camelCase")]
+        struct A {
+            #[serde(default)]
+            domain: Option<String>,
+            repo: Option<String>,
+            #[serde(default = "default_dp_limit")]
+            limit: i64,
+        }
+        fn default_dp_limit() -> i64 {
+            50
+        }
+        let a: A = serde_json::from_value(args).map_err(decode_err)?;
+        let resp = self
+            .svc
+            .recall_decision_points(a.repo.as_deref(), a.limit)
+            .await?;
         let _ = a.domain;
         serde_json::to_value(resp).map_err(encode_err)
     }
@@ -350,8 +418,14 @@ mod tests {
     #[test]
     fn allowlist_matches_design() {
         let expected = [
-            "recall_index","recall_timeline","recall_fetch","trace_causes",
-            "check_dead_ends","recall_facts_as_of","recall_change_history","recall_decision_points",
+            "recall_index",
+            "recall_timeline",
+            "recall_fetch",
+            "trace_causes",
+            "check_dead_ends",
+            "recall_facts_as_of",
+            "recall_change_history",
+            "recall_decision_points",
         ];
         assert_eq!(CODING_MEMORY_MCP_TOOLS, expected);
     }

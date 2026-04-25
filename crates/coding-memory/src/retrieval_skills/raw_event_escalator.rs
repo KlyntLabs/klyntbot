@@ -10,8 +10,11 @@ pub type ProvenanceIdsFn = Arc<dyn Fn() -> Vec<String> + Send + Sync>;
 
 /// Closure looking up raw ingest events by id.
 pub type EventLookupFn = Arc<
-    dyn Fn(Vec<String>) -> Pin<Box<dyn std::future::Future<Output = common::Result<Vec<serde_json::Value>>> + Send>>
-        + Send
+    dyn Fn(
+            Vec<String>,
+        ) -> Pin<
+            Box<dyn std::future::Future<Output = common::Result<Vec<serde_json::Value>>> + Send>,
+        > + Send
         + Sync,
 >;
 
@@ -37,9 +40,15 @@ impl RawEventEscalator {
 
 #[async_trait]
 impl RetrievalSkill for RawEventEscalator {
-    fn name(&self) -> &'static str { "raw_event_escalator" }
-    fn description(&self) -> &'static str { "Surface raw ingest events for top-k provenance." }
-    fn tier(&self) -> BudgetTier { BudgetTier::Ultra }
+    fn name(&self) -> &'static str {
+        "raw_event_escalator"
+    }
+    fn description(&self) -> &'static str {
+        "Surface raw ingest events for top-k provenance."
+    }
+    fn tier(&self) -> BudgetTier {
+        BudgetTier::Ultra
+    }
     async fn apply(&self, ctx: &EscalationContext) -> common::Result<EscalationOutcome> {
         let ids = (self.provenance)();
         if ids.is_empty() {

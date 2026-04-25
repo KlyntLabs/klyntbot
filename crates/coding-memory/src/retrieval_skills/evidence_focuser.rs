@@ -9,7 +9,10 @@ use uuid::Uuid;
 
 /// Closure returning a list of `(id, text)` for the supplied candidate ids.
 pub type FetchTextsFn = Arc<
-    dyn Fn(Vec<Uuid>) -> Pin<Box<dyn std::future::Future<Output = common::Result<Vec<(Uuid, String)>>> + Send>>
+    dyn Fn(
+            Vec<Uuid>,
+        )
+            -> Pin<Box<dyn std::future::Future<Output = common::Result<Vec<(Uuid, String)>>> + Send>>
         + Send
         + Sync,
 >;
@@ -33,15 +36,24 @@ impl EvidenceFocuser {
     /// Construct.
     #[must_use]
     pub fn new(initial: InitialIdsFn, fetch_texts: FetchTextsFn) -> Self {
-        Self { initial, fetch_texts }
+        Self {
+            initial,
+            fetch_texts,
+        }
     }
 }
 
 #[async_trait]
 impl RetrievalSkill for EvidenceFocuser {
-    fn name(&self) -> &'static str { "evidence_focuser" }
-    fn description(&self) -> &'static str { "Token-cosine rerank on top-20 → top 5." }
-    fn tier(&self) -> BudgetTier { BudgetTier::DeepThink }
+    fn name(&self) -> &'static str {
+        "evidence_focuser"
+    }
+    fn description(&self) -> &'static str {
+        "Token-cosine rerank on top-20 → top 5."
+    }
+    fn tier(&self) -> BudgetTier {
+        BudgetTier::DeepThink
+    }
     async fn apply(&self, ctx: &EscalationContext) -> common::Result<EscalationOutcome> {
         let candidate_ids = (self.initial)();
         if candidate_ids.is_empty() {

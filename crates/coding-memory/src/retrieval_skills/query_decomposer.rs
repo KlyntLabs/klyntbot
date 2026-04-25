@@ -9,8 +9,11 @@ use uuid::Uuid;
 
 /// Same retrieval callback shape as `QueryRewriter`.
 pub type RetrieveFn = Arc<
-    dyn Fn(String) -> Pin<Box<dyn std::future::Future<Output = common::Result<(Vec<f32>, Vec<Uuid>)>> + Send>>
-        + Send
+    dyn Fn(
+            String,
+        ) -> Pin<
+            Box<dyn std::future::Future<Output = common::Result<(Vec<f32>, Vec<Uuid>)>> + Send>,
+        > + Send
         + Sync,
 >;
 
@@ -35,9 +38,15 @@ impl QueryDecomposer {
 
 #[async_trait]
 impl RetrievalSkill for QueryDecomposer {
-    fn name(&self) -> &'static str { "query_decomposer" }
-    fn description(&self) -> &'static str { "Split compound queries into 2-4 sub-queries." }
-    fn tier(&self) -> BudgetTier { BudgetTier::DeepThink }
+    fn name(&self) -> &'static str {
+        "query_decomposer"
+    }
+    fn description(&self) -> &'static str {
+        "Split compound queries into 2-4 sub-queries."
+    }
+    fn tier(&self) -> BudgetTier {
+        BudgetTier::DeepThink
+    }
     async fn apply(&self, ctx: &EscalationContext) -> common::Result<EscalationOutcome> {
         let subs = decompose(&ctx.query);
         let mut id_rank: HashMap<Uuid, f32> = HashMap::new();

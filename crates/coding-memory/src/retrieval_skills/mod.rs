@@ -3,19 +3,19 @@
 
 use async_trait::async_trait;
 
-pub mod registry;
-pub mod query_rewriter;
-pub mod query_decomposer;
-pub mod evidence_focuser;
-pub mod raw_event_escalator;
 pub mod causal_context_expander;
+pub mod evidence_focuser;
+pub mod query_decomposer;
+pub mod query_rewriter;
+pub mod raw_event_escalator;
+pub mod registry;
 
-pub use registry::{RetrievalSkillRegistry, SelectorOutcome};
-pub use query_rewriter::QueryRewriter;
-pub use query_decomposer::QueryDecomposer;
-pub use evidence_focuser::EvidenceFocuser;
-pub use raw_event_escalator::RawEventEscalator;
 pub use causal_context_expander::CausalContextExpander;
+pub use evidence_focuser::EvidenceFocuser;
+pub use query_decomposer::QueryDecomposer;
+pub use query_rewriter::QueryRewriter;
+pub use raw_event_escalator::RawEventEscalator;
+pub use registry::{RetrievalSkillRegistry, SelectorOutcome};
 
 /// Budget tier at which a retrieval skill can operate.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -67,8 +67,5 @@ pub trait RetrievalSkill: Send + Sync {
     fn tier(&self) -> BudgetTier;
 
     /// Apply the skill against an escalation context.
-    async fn apply(
-        &self,
-        ctx: &EscalationContext,
-    ) -> common::Result<EscalationOutcome>;
+    async fn apply(&self, ctx: &EscalationContext) -> common::Result<EscalationOutcome>;
 }

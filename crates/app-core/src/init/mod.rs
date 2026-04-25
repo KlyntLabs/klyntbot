@@ -879,17 +879,64 @@ impl AppCore {
             Arc::new(d)
         };
 
-        // ── Construct coding-memory Recall service (Phase 4) ──────────────
         let recall = {
-            let fact_repo = Arc::new(::cognitive::SemanticFactRepo::new(storage_pool.inner().clone()));
-            let ep_repo = Arc::new(::cognitive::EpisodicMemoryRepo::new(storage_pool.inner().clone()));
+            let fact_repo = Arc::new(::cognitive::SemanticFactRepo::new(
+                storage_pool.inner().clone(),
+            ));
+            let ep_repo = Arc::new(::cognitive::EpisodicMemoryRepo::new(
+                storage_pool.inner().clone(),
+            ));
             let ums = Arc::new(::cognitive::UnifiedMemoryService::new((*fact_repo).clone()));
             let telem = coding_memory::RecallInvocationRepo::new(storage_pool.clone());
             let budgeter = coding_memory::recall::budget::default_budgeter();
-            Arc::new(coding_memory::recall::CodingRecallService::new(
-                coding_memory::recall::CodingRecallServiceConfig::default(),
-                ums, fact_repo, ep_repo, telem, budgeter,
-            ))
+
+            let skills: Vec<std::sync::Arc<dyn coding_memory::RetrievalSkill>> = {
+                use coding_memory::retrieval_skills::{QueryDecomposer, QueryRewriter};
+                let ums_for_retrieve = ums.clone();
+                let retrieve: coding_memory::retrieval_skills::query_rewriter::RetrieveFn =
+                    std::sync::Arc::new(move |q: String| {
+                        let ums = ums_for_retrieve.clone();
+                        Box::pin(async move {
+                            let scored = ums
+                                .retrieve_with_overrides(
+                                    &q,
+                                    20,
+                                    0.0,
+                                    coding_memory::recall::default_weights(),
+                                )
+                                .await?;
+                            let mut sims = Vec::with_capacity(scored.len());
+                            let mut ids = Vec::with_capacity(scored.len());
+                            for s in scored {
+                                sims.push(s.score as f32);
+                                if let Ok(u) = s.fact.id.parse::<uuid::Uuid>() {
+                                    ids.push(u);
+                                }
+                            }
+                            Ok((sims, ids))
+                        })
+                    });
+                vec![
+                    std::sync::Arc::new(QueryRewriter::new(retrieve.clone())),
+                    std::sync::Arc::new(QueryDecomposer::new(retrieve)),
+                ]
+            };
+            let registry = std::sync::Arc::new(coding_memory::RetrievalSkillRegistry::new(
+                skills,
+                domain_event_bus.clone(),
+            ));
+
+            Arc::new(
+                coding_memory::recall::CodingRecallService::new(
+                    coding_memory::recall::CodingRecallServiceConfig::default(),
+                    ums,
+                    fact_repo,
+                    ep_repo,
+                    telem,
+                    budgeter,
+                )
+                .with_skills(registry),
+            )
         };
         let toolset = coding_memory::CodingMemoryToolset::new(recall.clone());
 

@@ -14,8 +14,14 @@ pub type TopKIdsFn = Arc<dyn Fn() -> Vec<Uuid> + Send + Sync>;
 
 /// Closure: lookup causal edges for the given subject ids.
 pub type EdgeLookupFn = Arc<
-    dyn Fn(Vec<Uuid>) -> Pin<Box<dyn std::future::Future<Output = common::Result<Vec<crate::scope::CausalEdge>>> + Send>>
-        + Send
+    dyn Fn(
+            Vec<Uuid>,
+        ) -> Pin<
+            Box<
+                dyn std::future::Future<Output = common::Result<Vec<crate::scope::CausalEdge>>>
+                    + Send,
+            >,
+        > + Send
         + Sync,
 >;
 
@@ -41,9 +47,15 @@ impl CausalContextExpander {
 
 #[async_trait]
 impl RetrievalSkill for CausalContextExpander {
-    fn name(&self) -> &'static str { "causal_context_expander" }
-    fn description(&self) -> &'static str { "Walk memory_causal_edges from top-k." }
-    fn tier(&self) -> BudgetTier { BudgetTier::Ultra }
+    fn name(&self) -> &'static str {
+        "causal_context_expander"
+    }
+    fn description(&self) -> &'static str {
+        "Walk memory_causal_edges from top-k."
+    }
+    fn tier(&self) -> BudgetTier {
+        BudgetTier::Ultra
+    }
     async fn apply(&self, ctx: &EscalationContext) -> common::Result<EscalationOutcome> {
         let ids = (self.top_k)();
         let edges = (self.lookup)(ids).await?;

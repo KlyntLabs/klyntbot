@@ -30,13 +30,22 @@ impl FetchBuilder {
         &self,
         ids: &[String],
         include_provenance: bool,
-        include_causal_graph: bool,
+        _include_causal_graph: bool,
     ) -> common::Result<Vec<FullEntry>> {
         let mut out = Vec::new();
         for id in ids {
-            if let Some(fact) = self.fact_repo.get(id).await.map_err(|e| common::KlyntbotError::Storage(format!("get: {e}")))? {
+            if let Some(fact) = self
+                .fact_repo
+                .get(id)
+                .await
+                .map_err(|e| common::KlyntbotError::Storage(format!("get: {e}")))?
+            {
                 let metadata = if include_provenance {
-                    fact.metadata.as_deref().unwrap_or("{}").parse().unwrap_or_default()
+                    fact.metadata
+                        .as_deref()
+                        .unwrap_or("{}")
+                        .parse()
+                        .unwrap_or_default()
                 } else {
                     serde_json::Value::Object(Default::default())
                 };
@@ -50,22 +59,34 @@ impl FetchBuilder {
                         "confidence": fact.confidence,
                     }),
                     metadata,
-                    causal_edges: if include_causal_graph { Vec::new() } else { Vec::new() },
+                    causal_edges: Vec::new(),
                     supersedes: None,
                     superseded_by: fact.superseded_by.as_deref().and_then(|s| s.parse().ok()),
                 });
                 continue;
             }
-            if let Some(ep) = self.ep_repo.get(id).await.map_err(|e| common::KlyntbotError::Storage(format!("get: {e}")))? {
+            if let Some(ep) = self
+                .ep_repo
+                .get(id)
+                .await
+                .map_err(|e| common::KlyntbotError::Storage(format!("get: {e}")))?
+            {
                 let metadata = if include_provenance {
-                    ep.metadata.as_deref().unwrap_or("{}").parse().unwrap_or_default()
+                    ep.metadata
+                        .as_deref()
+                        .unwrap_or("{}")
+                        .parse()
+                        .unwrap_or_default()
                 } else {
                     serde_json::Value::Object(Default::default())
                 };
                 out.push(FullEntry {
                     id: ep.id.parse().unwrap_or_else(|_| uuid::Uuid::nil()),
                     kind: ep.kind.clone().unwrap_or_else(|| "episode".to_string()),
-                    content: ep.content.parse().unwrap_or_else(|_| serde_json::json!(ep.content)),
+                    content: ep
+                        .content
+                        .parse()
+                        .unwrap_or_else(|_| serde_json::json!(ep.content)),
                     metadata,
                     causal_edges: Vec::new(),
                     supersedes: None,

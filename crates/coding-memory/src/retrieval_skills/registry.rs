@@ -66,10 +66,7 @@ impl RetrievalSkillRegistry {
 
     /// Run the selector — try skills in highest-EMA order within the active tier.
     /// Stops on first success; otherwise returns the final failed outcome.
-    pub async fn escalate(
-        &self,
-        ctx: &EscalationContext,
-    ) -> common::Result<SelectorOutcome> {
+    pub async fn escalate(&self, ctx: &EscalationContext) -> common::Result<SelectorOutcome> {
         // Pick candidates: skills whose tier <= active tier.
         let active = ctx.budget_tier;
         let mut candidates: Vec<Arc<dyn RetrievalSkill>> = self
@@ -95,7 +92,7 @@ impl RetrievalSkillRegistry {
             let before = ctx.coverage_score;
             let out = skill.apply(ctx).await?;
             let after = out.coverage_after;
-            let _ = self.bus.publish(DomainEvent::RetrievalSkillApplied {
+            self.bus.publish(DomainEvent::RetrievalSkillApplied {
                 skill: name.clone(),
                 before_score: before,
                 after_score: after,

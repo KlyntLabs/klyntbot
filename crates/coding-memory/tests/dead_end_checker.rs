@@ -1,5 +1,4 @@
 use coding_memory::recall::dead_end::{DeadEndChecker, DeadEndConfig};
-use coding_memory::recall::{DeadEndResponse};
 
 #[tokio::test]
 async fn no_facts_returns_empty() {

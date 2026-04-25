@@ -26,11 +26,14 @@ async fn fact_fetch_round_trip() {
         metadata: Some(r#"{"provenance": {"source_events": ["evt1"]}}"#.into()),
         ..Default::default()
     };
-    fact_repo.upsert_with_metadata(&fact, Some("repo:x"), fact.metadata.as_deref()).await.unwrap();
+    fact_repo
+        .upsert_with_metadata(&fact, Some("repo:x"), fact.metadata.as_deref())
+        .await
+        .unwrap();
 
     let builder = FetchBuilder::new(fact_repo.clone(), ep_repo.clone());
     let out = builder
-        .fetch(&[fact.id.clone()], true, false)
+        .fetch(std::slice::from_ref(&fact.id), true, false)
         .await
         .unwrap();
     assert_eq!(out.len(), 1);

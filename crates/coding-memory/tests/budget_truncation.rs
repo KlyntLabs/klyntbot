@@ -4,7 +4,7 @@ use coding_memory::recall::budget::{HeuristicBudgeter, TokenBudgeter};
 fn heuristic_count_is_chars_over_four() {
     let b = HeuristicBudgeter;
     let n = b.count("abcdefghij"); // 10 chars
-    assert!(n >= 2 && n <= 3, "got {n}");
+    assert!((2..=3).contains(&n), "got {n}");
 }
 
 #[test]

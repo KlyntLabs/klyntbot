@@ -4,10 +4,10 @@
 //! coding facts and episodes in its blended results.
 
 use async_trait::async_trait;
+use cognitive::{EpisodicMemoryRepo, SemanticFactRepo};
 use context_engine::insight_forge::DomainSearcher;
 use context_engine::memory_retriever::MemoryEntry;
 use context_engine::MemorySource;
-use cognitive::{SemanticFactRepo, EpisodicMemoryRepo};
 
 /// Searches coding-domain semantic facts and episodic memories.
 pub struct CodeDomainSearcher {
@@ -69,7 +69,11 @@ impl DomainSearcher for CodeDomainSearcher {
         }
 
         // Sort by relevance and truncate
-        out.sort_by(|a, b| b.score.partial_cmp(&a.score).unwrap_or(std::cmp::Ordering::Equal));
+        out.sort_by(|a, b| {
+            b.score
+                .partial_cmp(&a.score)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
         out.truncate(limit);
         out
     }

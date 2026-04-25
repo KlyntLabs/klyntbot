@@ -1,9 +1,9 @@
 //! Build `IndexEntry` rows from cognitive `ScoredFact` / `EpisodicMemory`.
 
-use crate::recall::IndexEntry;
 use crate::recall::budget::TokenBudgeter;
-use cognitive::EpisodicMemory;
+use crate::recall::IndexEntry;
 use cognitive::retrieval::ScoredFact;
+use cognitive::EpisodicMemory;
 use std::sync::Arc;
 
 /// `IndexEntry` builder.
@@ -22,7 +22,9 @@ impl IndexBuilder {
     /// Construct with the default budgeter.
     #[must_use]
     pub fn new() -> Self {
-        Self { budgeter: crate::recall::budget::default_budgeter() }
+        Self {
+            budgeter: crate::recall::budget::default_budgeter(),
+        }
     }
 
     /// Construct with a specific budgeter (test seam).
@@ -44,7 +46,10 @@ impl IndexBuilder {
             .unwrap_or_else(|| "global".to_string());
         let est = format!("{title}\n{}", f.metadata.as_deref().unwrap_or(""));
         let token_cost = self.budgeter.count(&est) as u32;
-        let when = f.recorded_at.parse().unwrap_or_else(|_| jiff::Timestamp::now());
+        let when = f
+            .recorded_at
+            .parse()
+            .unwrap_or_else(|_| jiff::Timestamp::now());
         IndexEntry {
             id: f.id.parse().unwrap_or_else(|_| uuid::Uuid::nil()),
             kind,
@@ -66,7 +71,10 @@ impl IndexBuilder {
             .unwrap_or_else(|| "global".to_string());
         let est = ep.content.clone();
         let token_cost = self.budgeter.count(&est) as u32;
-        let when = ep.occurred_at.parse().unwrap_or_else(|_| jiff::Timestamp::now());
+        let when = ep
+            .occurred_at
+            .parse()
+            .unwrap_or_else(|_| jiff::Timestamp::now());
         IndexEntry {
             id: ep.id.parse().unwrap_or_else(|_| uuid::Uuid::nil()),
             kind: ep.kind.clone().unwrap_or_else(|| "episode".to_string()),

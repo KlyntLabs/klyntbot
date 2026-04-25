@@ -15,6 +15,7 @@ vi.mock("../hooks", () => ({
       },
     ],
   }),
+  useSessionRecallOverlay: () => ({ data: [] }),
 }));
 
 describe("SessionReplayPanel", () => {

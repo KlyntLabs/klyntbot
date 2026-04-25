@@ -11,8 +11,8 @@ use crate::recall::{
     probe::{ProbeVerdict, RetrievalQualityProbe},
     telemetry::{RecallInvocationRepo, RecallInvocationRow},
     timeline_builder::{TimelineBuilder, TimelineInput},
-    ChangeHistoryResponse, DeadEndResponse, DecisionPointsResponse,
-    FactsAsOfResponse, FullEntry, IndexEntry, RecallIndexResponse, RecallQuery, TimelineEntry,
+    ChangeHistoryResponse, DeadEndResponse, DecisionPointsResponse, FactsAsOfResponse, FullEntry,
+    IndexEntry, RecallIndexResponse, RecallQuery, TimelineEntry,
 };
 use crate::retrieval_skills::RetrievalSkillRegistry;
 use cognitive::UnifiedMemoryService;
@@ -112,8 +112,14 @@ impl CodingRecallService {
         limit: u32,
     ) -> common::Result<RecallIndexResponse> {
         let started = Instant::now();
-        let limit = if limit == 0 { self.config.default_limit } else { limit };
-        let scope = repo.map(|r| vec![("repo".to_string(), Some(r.to_string()))]).unwrap_or_default();
+        let limit = if limit == 0 {
+            self.config.default_limit
+        } else {
+            limit
+        };
+        let scope = repo
+            .map(|r| vec![("repo".to_string(), Some(r.to_string()))])
+            .unwrap_or_default();
         let scored = self
             .ums
             .retrieve_with_overrides(query, limit as usize, 0.0, default_weights())
@@ -199,7 +205,10 @@ impl CodingRecallService {
                     .collect()
             }
             RecallQuery::Text(q) => {
-                let scored = self.ums.retrieve_with_overrides(&q, 25, 0.0, default_weights()).await?;
+                let scored = self
+                    .ums
+                    .retrieve_with_overrides(&q, 25, 0.0, default_weights())
+                    .await?;
                 let _ = days;
                 let _ = repo;
                 scored
@@ -207,8 +216,15 @@ impl CodingRecallService {
                     .map(|s| TimelineInput {
                         id: s.fact.id.parse().unwrap_or_else(|_| Uuid::nil()),
                         kind: s.fact.memory_type.clone(),
-                        when: s.fact.recorded_at.parse().unwrap_or_else(|_| Timestamp::now()),
-                        snippet: format!("{} {} {}", s.fact.subject, s.fact.predicate, s.fact.object),
+                        when: s
+                            .fact
+                            .recorded_at
+                            .parse()
+                            .unwrap_or_else(|_| Timestamp::now()),
+                        snippet: format!(
+                            "{} {} {}",
+                            s.fact.subject, s.fact.predicate, s.fact.object
+                        ),
                         related_ids: vec![],
                     })
                     .collect()
@@ -304,7 +320,11 @@ impl CodingRecallService {
     }
 }
 
-fn default_weights() -> [f64; 12] {
+/// Default 12-axis relevance weight vector used by the recall service. Public
+/// so registry-wiring sites in `app-core` can reuse the same weights.
+pub fn default_weights() -> [f64; 12] {
     // Modestly bias for semantic + recency + path coherence; train in Phase 6.
-    [0.35, 0.05, 0.10, 0.05, 0.05, 0.20, 0.05, 0.05, 0.02, 0.02, 0.05, 0.01]
+    [
+        0.35, 0.05, 0.10, 0.05, 0.05, 0.20, 0.05, 0.05, 0.02, 0.02, 0.05, 0.01,
+    ]
 }

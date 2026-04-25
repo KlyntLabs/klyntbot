@@ -27,10 +27,7 @@ pub async fn render_session_start_block(
     repo: Option<&str>,
 ) -> common::Result<String> {
     let budgeter: Arc<dyn TokenBudgeter> = default_budgeter();
-    let header = format!(
-        "## Project memory — {}\n\n",
-        repo.unwrap_or("(no repo)")
-    );
+    let header = format!("## Project memory — {}\n\n", repo.unwrap_or("(no repo)"));
 
     // Section 1 — repo context facts.
     let repo_ctx = svc
@@ -56,11 +53,12 @@ pub async fn render_session_start_block(
     let recent = svc
         .recall_timeline(RecallQuery::Text("recent".into()), repo, 7)
         .await?;
-    let mut s3 = String::from("### Recent activity (last 7 days)\n| when | what | id |\n|---|---|---|\n");
+    let mut s3 =
+        String::from("### Recent activity (last 7 days)\n| when | what | id |\n|---|---|---|\n");
     for e in recent.iter().take(8) {
         s3.push_str(&format!(
             "| {} | {} | `{}` |\n",
-            e.when.to_string(),
+            e.when,
             crop(&e.snippet, 60),
             short_id(&e.id.to_string())
         ));
@@ -104,7 +102,12 @@ pub async fn render_user_prompt_block(
     let idx = svc.recall_index(query, repo, None, None, 6).await?;
     let mut likely = String::from("### Likely relevant\n");
     for r in idx.results.iter().take(6) {
-        likely.push_str(&format!("- [`{}`] {} {}\n", short_id(&r.id.to_string()), r.kind, crop(&r.title, 80)));
+        likely.push_str(&format!(
+            "- [`{}`] {} {}\n",
+            short_id(&r.id.to_string()),
+            r.kind,
+            crop(&r.title, 80)
+        ));
     }
     likely.push('\n');
 
@@ -125,9 +128,7 @@ pub async fn render_user_prompt_block(
         String::new()
     };
 
-    let full = format!(
-        "## Relevant memory for this turn\n\n{warn}{likely}{causal}{footer}\n"
-    );
+    let full = format!("## Relevant memory for this turn\n\n{warn}{likely}{causal}{footer}\n");
     Ok(budgeter.truncate_to(&full, USER_PROMPT_BUDGET_TOKENS as usize))
 }
 

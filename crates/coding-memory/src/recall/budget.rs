@@ -29,10 +29,8 @@ pub trait TokenBudgeter: Send + Sync {
             }
         }
         let mut out: String = chars[..lo].iter().collect();
-        if out.len() < s.len() {
-            if self.count(&out) + 1 <= budget {
-                out.push('…');
-            }
+        if out.len() < s.len() && self.count(&out) < budget {
+            out.push('…');
         }
         out
     }
@@ -57,9 +55,9 @@ pub struct TiktokenBudgeter {
 impl TiktokenBudgeter {
     /// Try to load cl100k_base. Returns `None` if the encoding cannot be built.
     pub fn try_new() -> Option<Self> {
-        tiktoken_rs::cl100k_base()
-            .ok()
-            .map(|bpe| Self { bpe: std::sync::Arc::new(bpe) })
+        tiktoken_rs::cl100k_base().ok().map(|bpe| Self {
+            bpe: std::sync::Arc::new(bpe),
+        })
     }
 }
 

@@ -28,22 +28,15 @@ impl coding_ingest::daemon::OpHandler for RecallOpHandler {
 
         match op {
             "render_session_start" => {
-                let md = coding_memory::recall::renderers::render_session_start_block(
-                    &self.svc,
-                    repo,
-                )
-                .await?;
+                let md =
+                    coding_memory::recall::renderers::render_session_start_block(&self.svc, repo)
+                        .await?;
                 Ok(serde_json::json!({"markdown": md}))
             }
             "render_user_prompt" => {
-                let query = payload
-                    .get("query")
-                    .and_then(|v| v.as_str())
-                    .unwrap_or("");
+                let query = payload.get("query").and_then(|v| v.as_str()).unwrap_or("");
                 let md = coding_memory::recall::renderers::render_user_prompt_block(
-                    &self.svc,
-                    query,
-                    repo,
+                    &self.svc, query, repo,
                 )
                 .await?;
                 Ok(serde_json::json!({"markdown": md}))
@@ -53,7 +46,7 @@ impl coding_ingest::daemon::OpHandler for RecallOpHandler {
     }
 }
 
-/// Handler functions (Tauri / dev-server adapters call these).
+// Handler functions (Tauri / dev-server adapters call these).
 
 /// `coding_memory_recall_index` — wraps the toolset.
 pub async fn recall_index_handler(
@@ -70,7 +63,8 @@ pub async fn recall_timeline_handler(
     args: serde_json::Value,
 ) -> common::Result<serde_json::Value> {
     coding_memory::CodingMemoryToolset::new(svc.clone())
-        .dispatch("recall_timeline", args).await
+        .dispatch("recall_timeline", args)
+        .await
 }
 
 /// `coding_memory_recall_fetch`.
@@ -79,7 +73,8 @@ pub async fn recall_fetch_handler(
     args: serde_json::Value,
 ) -> common::Result<serde_json::Value> {
     coding_memory::CodingMemoryToolset::new(svc.clone())
-        .dispatch("recall_fetch", args).await
+        .dispatch("recall_fetch", args)
+        .await
 }
 
 /// `coding_memory_check_dead_ends`.
@@ -88,7 +83,8 @@ pub async fn check_dead_ends_handler(
     args: serde_json::Value,
 ) -> common::Result<serde_json::Value> {
     coding_memory::CodingMemoryToolset::new(svc.clone())
-        .dispatch("check_dead_ends", args).await
+        .dispatch("check_dead_ends", args)
+        .await
 }
 
 /// `coding_memory_recall_facts_as_of`.
@@ -97,7 +93,8 @@ pub async fn recall_facts_as_of_handler(
     args: serde_json::Value,
 ) -> common::Result<serde_json::Value> {
     coding_memory::CodingMemoryToolset::new(svc.clone())
-        .dispatch("recall_facts_as_of", args).await
+        .dispatch("recall_facts_as_of", args)
+        .await
 }
 
 /// `coding_memory_recall_change_history`.
@@ -106,7 +103,8 @@ pub async fn recall_change_history_handler(
     args: serde_json::Value,
 ) -> common::Result<serde_json::Value> {
     coding_memory::CodingMemoryToolset::new(svc.clone())
-        .dispatch("recall_change_history", args).await
+        .dispatch("recall_change_history", args)
+        .await
 }
 
 /// `coding_memory_recall_decision_points`.
@@ -115,7 +113,8 @@ pub async fn recall_decision_points_handler(
     args: serde_json::Value,
 ) -> common::Result<serde_json::Value> {
     coding_memory::CodingMemoryToolset::new(svc.clone())
-        .dispatch("recall_decision_points", args).await
+        .dispatch("recall_decision_points", args)
+        .await
 }
 
 /// `coding_memory_recall_log` — paginated list of telemetry rows.

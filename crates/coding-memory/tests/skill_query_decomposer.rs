@@ -23,5 +23,5 @@ async fn compound_query_yields_multiple_subs() {
     };
     let _ = skill.apply(&ctx).await.unwrap();
     let count = calls.lock().unwrap().len();
-    assert!(count >= 2 && count <= 4, "got {count}");
+    assert!((2..=4).contains(&count), "got {count}");
 }

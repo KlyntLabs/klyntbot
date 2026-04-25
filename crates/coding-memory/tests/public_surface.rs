@@ -7,7 +7,11 @@ use coding_memory::distiller::{Distiller, TurnTrace};
 use coding_memory::error::NotImplementedInPhase;
 use coding_memory::facts::{CodingKind, FixAttempt, FixOutcome, StyleScope};
 use coding_memory::mcp::CODING_MEMORY_MCP_TOOLS;
-use coding_memory::recall::{CodingRecallService, IndexEntry, RecallQuery};
+use coding_memory::recall::budget::{HeuristicBudgeter, TokenBudgeter};
+use coding_memory::recall::{
+    ChangeHistoryResponse, CodingRecallService, DecisionPointsResponse, FactsAsOfResponse,
+    IndexEntry, RecallQuery,
+};
 use coding_memory::reforge_phase::{
     CodingSynthesisPhase, RuleArtifact, RuleArtifactGenerationPhase,
 };
@@ -17,6 +21,7 @@ use coding_memory::retrieval_skills::{
 use coding_memory::scope::{AnchoredSymbol, CausalEdgeKind, ProvenanceKind, Sensitivity};
 use coding_memory::sink::{InProcessSink, MemorySink};
 use coding_memory::skills::{PhaseStubEvolver, ProjectSkillLocation, SkillId, SkillScope};
+use coding_memory::{RecallInvocationRow, RetrievalSkillRegistry};
 
 #[test]
 fn phase1_types_are_constructable() {
@@ -89,6 +94,35 @@ async fn phase1_stub_services_return_not_implemented() {
     let _ = dummy_fix_attempt();
     let _: Option<IndexEntry> = None;
     let _: Option<AnchoredSymbol> = None;
+}
+
+#[test]
+fn phase4_recall_surface_is_constructable() {
+    // Response DTOs — surface-only assertion.
+    let _: Option<FactsAsOfResponse> = None;
+    let _: Option<ChangeHistoryResponse> = None;
+    let _: Option<DecisionPointsResponse> = None;
+    let _: Option<RecallInvocationRow> = None;
+
+    // Budgeter trait + heuristic impl callable.
+    let budgeter = HeuristicBudgeter;
+    assert!(<HeuristicBudgeter as TokenBudgeter>::count(&budgeter, "abcd") >= 1);
+
+    // Registry constructable (with empty skill set + ambient bus).
+    let bus = std::sync::Arc::new(bus::DomainEventBus::new(8));
+    let _ = RetrievalSkillRegistry::new(vec![], bus);
+
+    // Top-level facade re-export of the recall service is wired.
+    let _: Option<CodingRecallService> = None;
+
+    // EscalationOutcome is a value type, not just a comment.
+    use coding_memory::retrieval_skills::EscalationOutcome;
+    let _ = EscalationOutcome {
+        succeeded: false,
+        coverage_after: 0.0,
+        added_context: String::new(),
+        added_ids: vec![],
+    };
 }
 
 fn dummy_event() -> coding_ingest::AgentEvent {

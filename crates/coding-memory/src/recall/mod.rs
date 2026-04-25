@@ -4,7 +4,6 @@
 //! `QueryPipeline`, `UnifiedMemoryService`, the C3 failure-state probe, and
 //! the dead-end check.
 
-
 use jiff::Timestamp;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
@@ -18,6 +17,7 @@ pub mod fetch_builder;
 pub mod index_builder;
 pub mod probe;
 pub mod renderers;
+pub mod scope_resolve;
 pub mod telemetry;
 pub mod timeline_builder;
 
@@ -141,7 +141,7 @@ pub struct CausalTraceResponse {
 }
 
 pub mod service;
-pub use service::{CodingRecallService, CodingRecallServiceConfig};
+pub use service::{default_weights, CodingRecallService, CodingRecallServiceConfig};
 
 /// Row in a `recall_facts_as_of` response.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]

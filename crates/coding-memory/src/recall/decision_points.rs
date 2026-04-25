@@ -5,8 +5,7 @@ use cognitive::EpisodicMemoryRepo;
 use std::sync::Arc;
 
 /// Closed kind set considered "decision points" in the coding domain.
-pub const DECISION_KINDS: &[&str] =
-    &["fix_attempt", "dead_end_attempt", "refactor_episode"];
+pub const DECISION_KINDS: &[&str] = &["fix_attempt", "dead_end_attempt", "refactor_episode"];
 
 /// Service.
 #[derive(Debug, Clone)]

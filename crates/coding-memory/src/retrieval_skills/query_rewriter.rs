@@ -9,8 +9,11 @@ use uuid::Uuid;
 
 /// Async retrieval callback — caller injects the host service's retrieve fn.
 pub type RetrieveFn = Arc<
-    dyn Fn(String) -> Pin<Box<dyn std::future::Future<Output = common::Result<(Vec<f32>, Vec<Uuid>)>> + Send>>
-        + Send
+    dyn Fn(
+            String,
+        ) -> Pin<
+            Box<dyn std::future::Future<Output = common::Result<(Vec<f32>, Vec<Uuid>)>> + Send>,
+        > + Send
         + Sync,
 >;
 
@@ -35,9 +38,15 @@ impl QueryRewriter {
 
 #[async_trait]
 impl RetrievalSkill for QueryRewriter {
-    fn name(&self) -> &'static str { "query_rewriter" }
-    fn description(&self) -> &'static str { "PRF + multi-query expansion." }
-    fn tier(&self) -> BudgetTier { BudgetTier::DeepThink }
+    fn name(&self) -> &'static str {
+        "query_rewriter"
+    }
+    fn description(&self) -> &'static str {
+        "PRF + multi-query expansion."
+    }
+    fn tier(&self) -> BudgetTier {
+        BudgetTier::DeepThink
+    }
     async fn apply(&self, ctx: &EscalationContext) -> common::Result<EscalationOutcome> {
         let rewrites = generate_rewrites(&ctx.query);
         let mut id_to_rank_sum: std::collections::HashMap<Uuid, f32> = Default::default();
@@ -86,7 +95,11 @@ fn generate_rewrites(q: &str) -> Vec<String> {
         .filter(|w| !stop.contains(*w))
         .collect::<Vec<_>>()
         .join(" ");
-    out.push(if stripped.is_empty() { q.to_string() } else { stripped });
+    out.push(if stripped.is_empty() {
+        q.to_string()
+    } else {
+        stripped
+    });
     // Rewrite 3: synonym-expanded.
     let syn = expand_synonyms(q);
     out.push(syn);

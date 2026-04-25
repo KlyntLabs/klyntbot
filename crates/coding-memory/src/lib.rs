@@ -9,22 +9,22 @@
 
 #![deny(missing_docs)]
 
+/// Coding-domain searcher for InsightForge (Tier B4).
+pub mod code_domain_searcher;
+/// Coding session state enum (Tier B3).
+pub mod code_state;
+/// Counterfactual memory derivation (Tier B1).
+pub mod counterfactual;
 /// Distiller — online writer stub.
 pub mod distiller;
 /// Error surface for phased stubs.
 pub mod error;
 /// Coding fact taxonomy (`FixAttempt`, `RepoContext`, …).
 pub mod facts;
-/// Canonical bug-problem hashing (`blake3`-based).
-pub mod problem_hash;
-/// Counterfactual memory derivation (Tier B1).
-pub mod counterfactual;
-/// Coding session state enum (Tier B3).
-pub mod code_state;
-/// Coding-domain searcher for InsightForge (Tier B4).
-pub mod code_domain_searcher;
 /// MCP tool stubs — registered with `default_exposed_tools()`.
 pub mod mcp;
+/// Canonical bug-problem hashing (`blake3`-based).
+pub mod problem_hash;
 /// Recall service — MCP + passive injection stub.
 pub mod recall;
 /// Reforge coding phases (2.5, 3.5) stubs.
@@ -39,9 +39,12 @@ pub mod sink;
 pub mod skills;
 
 pub use error::{CodingMemoryError, NotImplementedInPhase};
-pub use recall::telemetry::{RecallInvocationRepo, RecallInvocationRow};
-pub use retrieval_skills::{RetrievalSkill, RetrievalSkillRegistry, BudgetTier, EscalationContext, EscalationOutcome};
 pub use mcp::{CodingMemoryToolset, CODING_MEMORY_MCP_TOOLS};
+pub use recall::telemetry::{RecallInvocationRepo, RecallInvocationRow};
+pub use recall::CodingRecallService;
+pub use retrieval_skills::{
+    BudgetTier, EscalationContext, EscalationOutcome, RetrievalSkill, RetrievalSkillRegistry,
+};
 
 use tools_core::FeatureMigration;
 
@@ -62,7 +65,8 @@ pub fn coding_memory_migrations() -> Vec<FeatureMigration> {
             feature_name: "coding_memory".to_string(),
             version: 2,
             description: "Phase-3: ingest_distillation_retry queue for transient \
-                          LLM failures.".to_string(),
+                          LLM failures."
+                .to_string(),
             sql: include_str!("../migrations/002_retry_queue.sql").to_string(),
         },
         FeatureMigration {

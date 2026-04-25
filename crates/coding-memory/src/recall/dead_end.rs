@@ -87,7 +87,10 @@ impl DeadEndChecker {
                 .and_then(|v| v.as_str())
                 .and_then(|s| s.parse().ok())
                 .unwrap_or_else(|| fact.id.parse().unwrap_or_else(|_| uuid::Uuid::nil()));
-            let when = fact.recorded_at.parse().unwrap_or_else(|_| jiff::Timestamp::now());
+            let when = fact
+                .recorded_at
+                .parse()
+                .unwrap_or_else(|_| jiff::Timestamp::now());
             matches.push((
                 confidence,
                 DeadEndMatch {
@@ -101,10 +104,7 @@ impl DeadEndChecker {
         }
         matches.sort_by(|a, b| b.0.partial_cmp(&a.0).unwrap_or(std::cmp::Ordering::Equal));
         matches.truncate(self.config.limit);
-        let aggregate_confidence = matches
-            .iter()
-            .map(|(c, _)| *c)
-            .fold(0.0f32, f32::max);
+        let aggregate_confidence = matches.iter().map(|(c, _)| *c).fold(0.0f32, f32::max);
         Ok(DeadEndResponse {
             matches: matches.into_iter().map(|(_, m)| m).collect(),
             aggregate_confidence,
