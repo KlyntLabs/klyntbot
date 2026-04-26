@@ -134,12 +134,26 @@ export function useGitPanelController({
     isLoading: isDiffLoading,
     error: diffError,
     refresh: refreshGitDiffs,
-  } = useGitDiffs(
-    activeWorkspace,
-    gitStatus.files,
-    shouldLoadLocalDiffs,
-    gitDiffIgnoreWhitespaceChanges,
-  );
+  } = useGitDiffs(activeWorkspace);
+
+  const orderedGitDiffs = useMemo(() => {
+    const diffByPath = new Map(gitDiffs.map((entry) => [entry.path, entry]));
+    return gitStatus.files.map((file) => {
+      const entry = diffByPath.get(file.path);
+      return {
+        path: file.path,
+        status: file.status,
+        diff: entry?.diff ?? "",
+        oldLines: entry?.oldLines,
+        newLines: entry?.newLines,
+        isImage: entry?.isImage,
+        oldImageData: entry?.oldImageData,
+        newImageData: entry?.newImageData,
+        oldImageMime: entry?.oldImageMime,
+        newImageMime: entry?.newImageMime,
+      };
+    });
+  }, [gitDiffs, gitStatus.files]);
 
   useEffect(() => {
     if (!activeWorkspace || !shouldPreloadDiffs) {
@@ -188,7 +202,7 @@ export function useGitPanelController({
         ? perFileDiffs
       : diffSource === "pr"
         ? prDiffs
-        : gitDiffs;
+        : orderedGitDiffs;
   const activeDiffLoading =
     diffSource === "commit"
       ? gitCommitDiffsLoading
