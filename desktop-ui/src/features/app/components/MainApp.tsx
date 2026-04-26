@@ -400,7 +400,7 @@ export default function MainApp() {
 		movePrompt,
 		getWorkspacePromptsDir,
 		getGlobalPromptsDir,
-	} = useCustomPrompts({ activeWorkspace, onDebug: addDebugEntry });
+	} = useCustomPrompts(activeWorkspace);
 	const resolvedModel = selectedModel?.model ?? null;
 	const resolvedEffort = reasoningSupported ? selectedEffort : null;
 

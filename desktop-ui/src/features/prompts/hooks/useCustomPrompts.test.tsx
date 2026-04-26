@@ -28,7 +28,7 @@ const workspace: WorkspaceInfo = {
 describe("useCustomPrompts", () => {
   it("returns null when no workspace is selected", async () => {
     const { result } = renderHook(() =>
-      useCustomPrompts({ activeWorkspace: null }),
+      useCustomPrompts(null),
     );
 
     let path: string | null = "unset";
@@ -43,7 +43,7 @@ describe("useCustomPrompts", () => {
   it("requests the global prompts dir when a workspace is selected", async () => {
     getGlobalPromptsDirMock.mockResolvedValue("/tmp/.codex/prompts");
     const { result } = renderHook(() =>
-      useCustomPrompts({ activeWorkspace: workspace }),
+      useCustomPrompts(workspace),
     );
 
     let path: string | null = null;
