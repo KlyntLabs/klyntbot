@@ -16,7 +16,9 @@ export type EntityKind =
   | "conversation"
   | "mirrorSnippet"
   | "brainVersion"
-  | "pendingMemory";
+  | "pendingMemory"
+  | "codingFact"
+  | "codingEpisode";
 
 // Ordered longest-prefix-first so "notebook_" wins over "note_".
 const PREFIX_TABLE: ReadonlyArray<readonly [string, EntityKind]> = [
@@ -32,6 +34,7 @@ const PREFIX_TABLE: ReadonlyArray<readonly [string, EntityKind]> = [
   ["finance_", "finance"],
   ["source_", "source"],
   ["conversation_", "conversation"],
+  ["coding_memory_", "codingFact"],
 ];
 
 export function entityKindForCommand(cmd: string): EntityKind | null {

@@ -82,3 +82,17 @@ describe("queryKeys — phase 2 domains", () => {
     expect(qk.system.mcpServers()).toEqual(["system", "mcpServers"]);
   });
 });
+
+
+describe("codingMemory keys", () => {
+  it("all is the root", () => {
+    expect(qk.codingMemory.all()).toEqual(["codingMemory"]);
+  });
+  it("facts / episodes / recallIndex / memoryBrowser / status are stable", () => {
+    expect(qk.codingMemory.facts()).toEqual(["codingMemory", "facts"]);
+    expect(qk.codingMemory.episodes()).toEqual(["codingMemory", "episodes"]);
+    expect(qk.codingMemory.recallIndex()).toEqual(["codingMemory", "recallIndex"]);
+    expect(qk.codingMemory.memoryBrowser()).toEqual(["codingMemory", "memoryBrowser"]);
+    expect(qk.codingMemory.status()).toEqual(["codingMemory", "status"]);
+  });
+});

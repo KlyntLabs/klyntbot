@@ -154,3 +154,46 @@ it("focus:state_changed invalidates dndActive too", async () => {
   expect(spy).toHaveBeenCalledWith({ queryKey: qk.launcher.dndActive() });
   stop();
 });
+
+
+describe("coding memory + data_version", () => {
+  it("entity:updated{kind:'codingFact'} invalidates codingMemory.all()", async () => {
+    const client = new QueryClient();
+    const spy = vi.spyOn(client, "invalidateQueries");
+    const { listen, fire } = fakeListenFactory();
+
+    const stop = await startTauriEventBridge(client, listen as any);
+    fire("entity:updated", { entityKind: "codingFact", id: "fact-1" });
+
+    expect(spy).toHaveBeenCalledWith({ queryKey: qk.codingMemory.all() });
+    stop();
+  });
+
+  it("entity:updated{kind:'codingEpisode'} invalidates codingMemory.all()", async () => {
+    const client = new QueryClient();
+    const spy = vi.spyOn(client, "invalidateQueries");
+    const { listen, fire } = fakeListenFactory();
+
+    const stop = await startTauriEventBridge(client, listen as any);
+    fire("entity:updated", { entityKind: "codingEpisode", id: "ep-1" });
+
+    expect(spy).toHaveBeenCalledWith({ queryKey: qk.codingMemory.all() });
+    stop();
+  });
+
+  it("data:version_bumped triggers a broad invalidate (no key prefix)", async () => {
+    const client = new QueryClient();
+    // Seed two unrelated queries so we can prove BOTH refetch.
+    client.setQueryData(qk.tasks.today(), [{ id: "t1" }]);
+    client.setQueryData(qk.codingMemory.facts(), [{ id: "f1" }]);
+    const spy = vi.spyOn(client, "invalidateQueries");
+    const { listen, fire } = fakeListenFactory();
+
+    const stop = await startTauriEventBridge(client, listen as any);
+    fire("data:version_bumped", { previous: 41, current: 42 });
+
+    // Broad invalidate: called with no queryKey filter.
+    expect(spy).toHaveBeenCalledWith();
+    stop();
+  });
+});

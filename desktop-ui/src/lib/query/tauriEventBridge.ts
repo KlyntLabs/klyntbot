@@ -29,6 +29,8 @@ const ENTITY_INVALIDATIONS: Record<EntityKind, QueryKey[]> = {
   mirrorSnippet: [],
   brainVersion: [],
   pendingMemory: [],
+  codingFact: [qk.codingMemory.all()],
+  codingEpisode: [qk.codingMemory.all()],
 };
 
 // Static list of (event_name, queryKeys) for non-entity events that still
@@ -48,7 +50,11 @@ const STATIC_ROUTES: ReadonlyArray<readonly [string, QueryKey[]]> = [
   ["bucket:completed", [qk.launcher.dashboard()]],
 ];
 
-const ALL_EVENTS = ["entity:updated", ...STATIC_ROUTES.map(([n]) => n)];
+const ALL_EVENTS = [
+  "entity:updated",
+  "data:version_bumped",
+  ...STATIC_ROUTES.map(([n]) => n),
+];
 
 export async function startTauriEventBridge(
   client: QueryClient,
@@ -74,6 +80,17 @@ export async function startTauriEventBridge(
     });
     unlisteners.push(off);
   }
+
+  // Phase 4 broad-invalidate fallback. Fired by the desktop's
+  // `start_data_version_watcher` when a foreign connection wrote and
+  // we never saw the matching `entity:updated`. Invalidating with no
+  // query-key filter matches every query in the cache — refetches are
+  // de-duped by TanStack so the cost is one network round-trip per
+  // distinct query, not per cached entry.
+  const offBroad = await listen("data:version_bumped", () => {
+    client.invalidateQueries();
+  });
+  unlisteners.push(offBroad);
 
   return () => {
     for (const off of unlisteners) off();
