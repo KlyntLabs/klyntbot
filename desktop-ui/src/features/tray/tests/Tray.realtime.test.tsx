@@ -49,7 +49,7 @@ describe("Tray real-time", () => {
 			if (cmd === "productivity_calendar_events") return [];
 			if (cmd === "focus_session_status")
 				return { active: false, sync: null, session: null };
-			if (cmd === "focus_today_sessions") return [];
+			if (cmd === "productivity_sessions") return [];
 			if (cmd === "flashcard_total_due") return 0;
 			return null;
 		});
