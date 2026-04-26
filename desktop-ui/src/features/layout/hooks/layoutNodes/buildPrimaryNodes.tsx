@@ -2,6 +2,7 @@ import ArrowLeft from "lucide-react/dist/esm/icons/arrow-left";
 import { ApprovalToasts } from "@app/components/ApprovalToasts";
 import { MainHeader } from "@app/components/MainHeader";
 import { SidebarChatLayout } from "@app/components/SidebarChatLayout";
+import { ChatPanel } from "@/features/chat/components/ChatPanel";
 import { Composer } from "@/features/composer/components/Composer";
 import { Home } from "@/features/home/components/Home";
 import { Messages } from "@/features/messages/components/Messages";
@@ -27,18 +28,34 @@ type PrimaryLayoutNodes = Pick<
 export function buildPrimaryNodes(
 	options: PrimaryLayoutNodesOptions,
 ): PrimaryLayoutNodes {
+	const { chatViewProps } = options;
+	const chatActive = chatViewProps.active && chatViewProps.sessionKey !== null;
+
 	const sidebarNode = (
 		<SidebarChatLayout
 			onSelectHome={options.sidebarProps.onSelectHome}
 			onOpenSettings={options.sidebarProps.onOpenSettings}
+			onNewChat={options.sidebarProps.onNewChat}
+			threads={options.sidebarProps.threads}
+			selectedSessionKey={options.sidebarProps.selectedSessionKey}
+			onSelectThread={options.sidebarProps.onSelectThread}
 		/>
 	);
 
-	const messagesNode = <Messages {...options.messagesProps} />;
+	const messagesNode = chatActive ? (
+		<ChatPanel
+			sessionKey={chatViewProps.sessionKey as string}
+			onThreadsChanged={chatViewProps.onThreadsChanged}
+		/>
+	) : (
+		<Messages {...options.messagesProps} />
+	);
 
-	const composerNode = options.composerProps ? (
-		<Composer {...options.composerProps} />
-	) : null;
+	const composerNode = chatActive
+		? null
+		: options.composerProps
+			? <Composer {...options.composerProps} />
+			: null;
 
 	const approvalToastsNode = (
 		<ApprovalToasts {...options.approvalToastsProps} />
