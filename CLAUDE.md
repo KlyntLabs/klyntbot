@@ -42,6 +42,8 @@ Always use these in imports, never relative `../../` paths. Note: there is **no*
 
 **Styling:** Plain CSS. No Tailwind. All styles in `src/styles/*.css`, imported through `src/styles/index.css`. Design tokens in `src/styles/ds-tokens.css`; themes in `src/styles/themes.{dark,light,dim,system}.css`. Class naming is BEM-ish (e.g. `sidebar-chat__nav-item`). When adding a new feature with its own CSS file, add an `@import` line to `src/styles/index.css`.
 
+**Typography tokens:** Never hardcode `font-size: Npx` in CSS. Use the scale in `src/styles/ds-tokens.css`: `--fs-2xs` (10.5px) / `--fs-xs` (11.5px) / `--fs-sm` (12.5px, default body — also exposed as `--fs-base`) / `--fs-md` (13.5px) / `--fs-lg` (15px) / `--fs-xl` (17px). Pick by role, not number — default text uses `var(--fs-base)`, secondary/labels step down to `--fs-xs`, headings step up to `--fs-lg`/`--fs-xl`. If no token fits (e.g. display headings ≥20px), add a new `--fs-*` to ds-tokens.css rather than hardcoding.
+
 **Tauri IPC:** Direct `invoke()` from `@/api/client` (which re-exports `@tauri-apps/api/core`). There is no `useQuery` / `useMutation` / `ipc()` wrapper — call `invoke()` from a `useEffect` and manage state with `useState`. For Tauri events, import `listen` from `@tauri-apps/api/event` directly, or use the per-event hubs in `src/services/events.ts`. Endpoint definitions live under `src/api/endpoints/`.
 
 **Markdown rendering:** Reuse `Markdown` from `@/features/messages/components/Markdown` rather than importing `react-markdown` directly.

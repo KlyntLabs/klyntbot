@@ -35,7 +35,7 @@ type UseMainAppPromptActionsArgs = {
   updatePrompt: (data: PromptUpdatePayload) => Promise<void>;
   deletePrompt: (path: string) => Promise<void>;
   movePrompt: (data: { path: string; scope: "workspace" | "global" }) => Promise<void>;
-  getWorkspacePromptsDir: () => Promise<string>;
+  getWorkspacePromptsDir: () => Promise<string | null>;
   getGlobalPromptsDir: () => Promise<string | null>;
   alertError: (error: unknown) => void;
 };
@@ -95,6 +95,9 @@ export function useMainAppPromptActions({
   const handleRevealWorkspacePrompts = useCallback(async () => {
     await runPromptAction(async () => {
       const path = await getWorkspacePromptsDir();
+      if (!path) {
+        return;
+      }
       await revealItemInDir(path);
     });
   }, [getWorkspacePromptsDir, runPromptAction]);

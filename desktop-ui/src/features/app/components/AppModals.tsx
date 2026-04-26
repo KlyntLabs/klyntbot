@@ -173,9 +173,9 @@ export const AppModals = memo(function AppModals({
   SettingsViewComponent,
   settingsProps,
 }: AppModalsProps) {
-  const { branches: worktreeBranches } = useGitBranches({
-    activeWorkspace: worktreePrompt?.workspace ?? null,
-  });
+  const { branches: worktreeBranches } = useGitBranches(
+    worktreePrompt?.workspace ?? null,
+  );
 
   return (
     <>

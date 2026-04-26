@@ -1,335 +1,312 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import { ask } from "@tauri-apps/plugin-dialog";
-import {
-  applyWorktreeChanges as applyWorktreeChangesService,
-  createGitHubRepo as createGitHubRepoService,
-  initGitRepo as initGitRepoService,
-  revertGitAll,
-  revertGitFile as revertGitFileService,
-  stageGitAll as stageGitAllService,
-  stageGitFile as stageGitFileService,
-  unstageGitFile as unstageGitFileService,
-} from "@services/tauri";
 import type { WorkspaceInfo } from "@/types";
-
-type UseGitActionsOptions = {
-  activeWorkspace: WorkspaceInfo | null;
-  onRefreshGitStatus: () => void;
-  onRefreshGitDiffs: () => void;
-  onClearGitRootCandidates?: () => void;
-  onError?: (error: unknown) => void;
-};
+import {
+	applyWorktreeChanges as applyWorktreeChangesService,
+	createGitHubRepo as createGitHubRepoService,
+	initGitRepo as initGitRepoService,
+	revertGitAll,
+	revertGitFile as revertGitFileService,
+	stageGitAll as stageGitAllService,
+	stageGitFile as stageGitFileService,
+	unstageGitFile as unstageGitFileService,
+} from "@services/tauri";
+import { qk, useTauriMutation } from "@/lib/query";
 
 export type InitGitRepoOutcome = "initialized" | "cancelled" | "failed";
 
-export function useGitActions({
-  activeWorkspace,
-  onRefreshGitStatus,
-  onRefreshGitDiffs,
-  onClearGitRootCandidates,
-  onError,
-}: UseGitActionsOptions) {
-  const [worktreeApplyError, setWorktreeApplyError] = useState<string | null>(null);
-  const [worktreeApplyLoading, setWorktreeApplyLoading] = useState(false);
-  const [worktreeApplySuccess, setWorktreeApplySuccess] = useState(false);
-  const [initGitRepoLoading, setInitGitRepoLoading] = useState(false);
-  const [createGitHubRepoLoading, setCreateGitHubRepoLoading] = useState(false);
-  const worktreeApplyTimerRef = useRef<number | null>(null);
-  const workspaceIdRef = useRef<string | null>(activeWorkspace?.id ?? null);
-  const workspaceId = activeWorkspace?.id ?? null;
-  const isWorktree = activeWorkspace?.kind === "worktree";
+export function useGitActions(activeWorkspace: WorkspaceInfo | null) {
+	const workspaceId = activeWorkspace?.id ?? null;
+	const workspaceIdRef = useRef<string | null>(workspaceId);
+	const isWorktree = activeWorkspace?.kind === "worktree";
 
-  useEffect(() => {
-    workspaceIdRef.current = workspaceId;
-  }, [workspaceId]);
+	const [worktreeApplyError, setWorktreeApplyError] = useState<string | null>(
+		null,
+	);
+	const [worktreeApplySuccess, setWorktreeApplySuccess] = useState(false);
 
-  useEffect(() => {
-    setWorktreeApplyError(null);
-    setWorktreeApplyLoading(false);
-    setWorktreeApplySuccess(false);
-    setInitGitRepoLoading(false);
-    setCreateGitHubRepoLoading(false);
-    if (worktreeApplyTimerRef.current) {
-      window.clearTimeout(worktreeApplyTimerRef.current);
-      worktreeApplyTimerRef.current = null;
-    }
-  }, [workspaceId]);
+	const invalidatesGit = workspaceId
+		? [
+				qk.git.status(workspaceId),
+				qk.git.diffs(workspaceId),
+				qk.git.log(workspaceId),
+				qk.git.branches(workspaceId),
+			]
+		: [];
 
-  const refreshGitData = useCallback(() => {
-    onRefreshGitStatus();
-    onRefreshGitDiffs();
-  }, [onRefreshGitDiffs, onRefreshGitStatus]);
+	const stageFileMut = useTauriMutation({
+		mutationFn: ({ path }: { path: string }) => {
+			if (!workspaceId) throw new Error("no workspace");
+			return stageGitFileService(workspaceId, path);
+		},
+		invalidates: invalidatesGit,
+	});
 
-  const stageGitFile = useCallback(
-    async (path: string) => {
-      if (!workspaceId) {
-        return;
-      }
-      const actionWorkspaceId = workspaceId;
-      try {
-        await stageGitFileService(actionWorkspaceId, path);
-      } catch (error) {
-        onError?.(error);
-      } finally {
-        if (workspaceIdRef.current === actionWorkspaceId) {
-          refreshGitData();
-        }
-      }
-    },
-    [onError, refreshGitData, workspaceId],
-  );
+	const stageAllMut = useTauriMutation({
+		mutationFn: () => {
+			if (!workspaceId) throw new Error("no workspace");
+			return stageGitAllService(workspaceId);
+		},
+		invalidates: invalidatesGit,
+	});
 
-  const stageGitAll = useCallback(async () => {
-    if (!workspaceId) {
-      return;
-    }
-    const actionWorkspaceId = workspaceId;
-    try {
-      await stageGitAllService(actionWorkspaceId);
-    } catch (error) {
-      onError?.(error);
-    } finally {
-      if (workspaceIdRef.current === actionWorkspaceId) {
-        refreshGitData();
-      }
-    }
-  }, [onError, refreshGitData, workspaceId]);
+	const unstageFileMut = useTauriMutation({
+		mutationFn: ({ path }: { path: string }) => {
+			if (!workspaceId) throw new Error("no workspace");
+			return unstageGitFileService(workspaceId, path);
+		},
+		invalidates: invalidatesGit,
+	});
 
-  const unstageGitFile = useCallback(
-    async (path: string) => {
-      if (!workspaceId) {
-        return;
-      }
-      const actionWorkspaceId = workspaceId;
-      try {
-        await unstageGitFileService(actionWorkspaceId, path);
-      } catch (error) {
-        onError?.(error);
-      } finally {
-        if (workspaceIdRef.current === actionWorkspaceId) {
-          refreshGitData();
-        }
-      }
-    },
-    [onError, refreshGitData, workspaceId],
-  );
+	const revertFileMut = useTauriMutation({
+		mutationFn: ({ path }: { path: string }) => {
+			if (!workspaceId) throw new Error("no workspace");
+			return revertGitFileService(workspaceId, path);
+		},
+		invalidates: invalidatesGit,
+	});
 
-  const revertGitFile = useCallback(
-    async (path: string) => {
-      if (!workspaceId) {
-        return;
-      }
-      const actionWorkspaceId = workspaceId;
-      try {
-        await revertGitFileService(actionWorkspaceId, path);
-      } catch (error) {
-        onError?.(error);
-      } finally {
-        if (workspaceIdRef.current === actionWorkspaceId) {
-          refreshGitData();
-        }
-      }
-    },
-    [onError, refreshGitData, workspaceId],
-  );
+	const revertAllMut = useTauriMutation({
+		mutationFn: () => {
+			if (!workspaceId) throw new Error("no workspace");
+			return revertGitAll(workspaceId);
+		},
+		invalidates: invalidatesGit,
+	});
 
-  const revertAllGitChanges = useCallback(async () => {
-    if (!workspaceId) {
-      return;
-    }
-    const confirmed = await ask(
-      "Revert all changes in this repo?\n\nThis will discard all staged and unstaged changes, including untracked files.",
-      { title: "Revert all changes", kind: "warning" },
-    );
-    if (!confirmed) {
-      return;
-    }
-    try {
-      await revertGitAll(workspaceId);
-      refreshGitData();
-    } catch (error) {
-      onError?.(error);
-    }
-  }, [onError, refreshGitData, workspaceId]);
+	const applyWorktreeMut = useTauriMutation({
+		mutationFn: () => {
+			if (!workspaceId) throw new Error("no workspace");
+			return applyWorktreeChangesService(workspaceId);
+		},
+		invalidates: invalidatesGit,
+	});
 
-  const applyWorktreeChanges = useCallback(async () => {
-    if (!workspaceId || !isWorktree) {
-      return;
-    }
-    const applyWorkspaceId = workspaceId;
-    setWorktreeApplyError(null);
-    setWorktreeApplySuccess(false);
-    setWorktreeApplyLoading(true);
-    try {
-      await applyWorktreeChangesService(applyWorkspaceId);
-      if (workspaceIdRef.current !== applyWorkspaceId) {
-        return;
-      }
-      if (worktreeApplyTimerRef.current) {
-        window.clearTimeout(worktreeApplyTimerRef.current);
-      }
-      setWorktreeApplySuccess(true);
-      worktreeApplyTimerRef.current = window.setTimeout(() => {
-        if (workspaceIdRef.current !== applyWorkspaceId) {
-          return;
-        }
-        setWorktreeApplySuccess(false);
-        worktreeApplyTimerRef.current = null;
-      }, 2500);
-    } catch (error) {
-      if (workspaceIdRef.current !== applyWorkspaceId) {
-        return;
-      }
-      setWorktreeApplyError(
-        error instanceof Error ? error.message : String(error),
-      );
-    } finally {
-      if (workspaceIdRef.current === applyWorkspaceId) {
-        setWorktreeApplyLoading(false);
-      }
-    }
-  }, [isWorktree, workspaceId]);
+	const initRepoMut = useTauriMutation({
+		mutationFn: async ({
+			branch,
+			force = false,
+		}: {
+			branch: string;
+			force?: boolean;
+		}) => {
+			if (!workspaceId) throw new Error("no workspace");
+			return await initGitRepoService(workspaceId, branch, force);
+		},
+		invalidates: invalidatesGit,
+	});
 
-  const initGitRepo = useCallback(async (branch: string): Promise<InitGitRepoOutcome> => {
-    if (!workspaceId) {
-      return "failed";
-    }
-    const actionWorkspaceId = workspaceId;
-    setInitGitRepoLoading(true);
-    let shouldRefresh = false;
-    let outcome: InitGitRepoOutcome = "failed";
-    let commitError: string | null = null;
-    try {
-      const response = await initGitRepoService(actionWorkspaceId, branch, false);
-      if (workspaceIdRef.current !== actionWorkspaceId) {
-        return "cancelled";
-      }
+	const createGitHubRepoMut = useTauriMutation({
+		mutationFn: async ({
+			repo,
+			visibility,
+			branch,
+		}: {
+			repo: string;
+			visibility: "private" | "public";
+			branch: string;
+		}) => {
+			if (!workspaceId) throw new Error("no workspace");
+			return await createGitHubRepoService(
+				workspaceId,
+				repo,
+				visibility,
+				branch,
+			);
+		},
+		invalidates: invalidatesGit,
+	});
 
-      if (response.status === "needs_confirmation") {
-        const entryCount = response.entryCount ?? 0;
-        const plural = entryCount === 1 ? "" : "s";
-        const confirmed = await ask(
-          `Initialize Git in this folder?\n\nThis will create a .git directory, set the initial branch to "${branch}", and create an initial commit.\n\nThis folder contains ${entryCount} existing item${plural}.`,
-          {
-            title: "Initialize Git",
-            kind: "warning",
-            okLabel: "Initialize",
-            cancelLabel: "Cancel",
-          },
-        );
-        if (!confirmed) {
-          return "cancelled";
-        }
+	const stageGitFile = useCallback(
+		(path: string) => {
+			stageFileMut.mutate({ path });
+		},
+		[stageFileMut],
+	);
+	const stageGitAll = useCallback(() => {
+		stageAllMut.mutate();
+	}, [stageAllMut]);
+	const unstageGitFile = useCallback(
+		(path: string) => {
+			unstageFileMut.mutate({ path });
+		},
+		[unstageFileMut],
+	);
+	const revertGitFile = useCallback(
+		(path: string) => {
+			revertFileMut.mutate({ path });
+		},
+		[revertFileMut],
+	);
 
-        if (workspaceIdRef.current !== actionWorkspaceId) {
-          return "cancelled";
-        }
+	const revertAllGitChanges = useCallback(async () => {
+		if (!workspaceId) {
+			return;
+		}
+		const confirmed = await ask(
+			"Revert all changes in this repo?\n\nThis will discard all staged and unstaged changes, including untracked files.",
+			{ title: "Revert all changes", kind: "warning" },
+		);
+		if (!confirmed) {
+			return;
+		}
+		await revertAllMut.mutate();
+	}, [revertAllMut, workspaceId]);
 
-        const forced = await initGitRepoService(actionWorkspaceId, branch, true);
-        shouldRefresh = forced.status === "initialized" || forced.status === "already_initialized";
-        if (forced.status === "initialized") {
-          commitError = forced.commitError ?? null;
-        }
-        outcome = shouldRefresh ? "initialized" : "failed";
-      } else {
-        shouldRefresh = response.status === "initialized" || response.status === "already_initialized";
-        if (response.status === "initialized") {
-          commitError = response.commitError ?? null;
-        }
-        outcome = shouldRefresh ? "initialized" : "failed";
-      }
+	const applyWorktreeChanges = useCallback(async () => {
+		if (!workspaceId || !isWorktree) {
+			return;
+		}
+		setWorktreeApplyError(null);
+		setWorktreeApplySuccess(false);
+		try {
+			await applyWorktreeMut.mutate();
+			setWorktreeApplySuccess(true);
+		} catch (error) {
+			setWorktreeApplyError(
+				error instanceof Error ? error.message : String(error),
+			);
+		}
+	}, [applyWorktreeMut, isWorktree, workspaceId]);
 
-      if (commitError) {
-        onError?.(
-          new Error(
-            `Git was initialized, but the initial commit failed.\n\n${commitError}\n\nYou may need to set git user.name and user.email, then commit manually.`,
-          ),
-        );
-      }
-    } catch (error) {
-      onError?.(error);
-      outcome = "failed";
-    } finally {
-      if (workspaceIdRef.current === actionWorkspaceId) {
-        setInitGitRepoLoading(false);
-        if (shouldRefresh) {
-          onClearGitRootCandidates?.();
-          refreshGitData();
-        }
-      }
-    }
-    return outcome;
-  }, [onClearGitRootCandidates, onError, refreshGitData, workspaceId]);
+	const initGitRepo = useCallback(
+		async (branch: string): Promise<InitGitRepoOutcome> => {
+			if (!workspaceId) {
+				return "failed";
+			}
+			const actionWorkspaceId = workspaceId;
+			let shouldRefresh = false;
+			let outcome: InitGitRepoOutcome = "failed";
+			let commitError: string | null = null;
+			try {
+				const response = await initRepoMut.mutate({
+					branch,
+					force: false,
+				});
+				if (workspaceIdRef.current !== actionWorkspaceId) {
+					return "cancelled";
+				}
 
-  const createGitHubRepo = useCallback(
-    async (
-      repo: string,
-      visibility: "private" | "public",
-      branch: string,
-    ): Promise<{ ok: true } | { ok: false; error: string }> => {
-      if (!workspaceId) {
-        return { ok: false, error: "No active workspace." };
-      }
+				if (response.status === "needs_confirmation") {
+					const entryCount = response.entryCount ?? 0;
+					const plural = entryCount === 1 ? "" : "s";
+					const confirmed = await ask(
+						`Initialize Git in this folder?\n\nThis will create a .git directory, set the initial branch to "${branch}", and create an initial commit.\n\nThis folder contains ${entryCount} existing item${plural}.`,
+						{
+							title: "Initialize Git",
+							kind: "warning",
+							okLabel: "Initialize",
+							cancelLabel: "Cancel",
+						},
+					);
+					if (!confirmed) {
+						return "cancelled";
+					}
 
-      const actionWorkspaceId = workspaceId;
-      setCreateGitHubRepoLoading(true);
-      try {
-        const response = await createGitHubRepoService(
-          actionWorkspaceId,
-          repo,
-          visibility,
-          branch,
-        );
-        if (workspaceIdRef.current !== actionWorkspaceId) {
-          return { ok: false, error: "Workspace changed." };
-        }
+					if (workspaceIdRef.current !== actionWorkspaceId) {
+						return "cancelled";
+					}
 
-        if (response.status === "ok") {
-          return { ok: true };
-        }
+					const forced = await initRepoMut.mutate({
+						branch,
+						force: true,
+					});
+					shouldRefresh =
+						forced.status === "initialized" ||
+						forced.status === "already_initialized";
+					if (forced.status === "initialized") {
+						commitError = forced.commitError ?? null;
+					}
+					outcome = shouldRefresh ? "initialized" : "failed";
+				} else {
+					shouldRefresh =
+						response.status === "initialized" ||
+						response.status === "already_initialized";
+					if (response.status === "initialized") {
+						commitError = response.commitError ?? null;
+					}
+					outcome = shouldRefresh ? "initialized" : "failed";
+				}
 
-        const pushError = response.pushError?.trim() ?? "";
-        const defaultBranchError = response.defaultBranchError?.trim() ?? "";
-        const parts = [];
-        if (pushError) {
-          parts.push(`Push failed:\n${pushError}`);
-        }
-        if (defaultBranchError) {
-          parts.push(`Failed to set default branch:\n${defaultBranchError}`);
-        }
-        const errorMessage =
-          parts.length > 0 ? parts.join("\n\n") : "Remote repo was created, but setup was incomplete.";
-        return { ok: false, error: errorMessage };
-      } catch (error) {
-        if (workspaceIdRef.current !== actionWorkspaceId) {
-          return { ok: false, error: "Workspace changed." };
-        }
-        return {
-          ok: false,
-          error: error instanceof Error ? error.message : String(error),
-        };
-      } finally {
-        if (workspaceIdRef.current === actionWorkspaceId) {
-          setCreateGitHubRepoLoading(false);
-        }
-      }
-    },
-    [workspaceId],
-  );
+				if (commitError) {
+					// eslint-disable-next-line no-console
+					console.error(
+						`Git was initialized, but the initial commit failed.\n\n${commitError}\n\nYou may need to set git user.name and user.email, then commit manually.`,
+					);
+				}
+			} catch {
+				outcome = "failed";
+			}
+			return outcome;
+		},
+		[initRepoMut, workspaceId],
+	);
 
-  return {
-    applyWorktreeChanges,
-    createGitHubRepo,
-    createGitHubRepoLoading,
-    initGitRepo,
-    initGitRepoLoading,
-    revertAllGitChanges,
-    revertGitFile,
-    stageGitAll,
-    stageGitFile,
-    unstageGitFile,
-    worktreeApplyError,
-    worktreeApplyLoading,
-    worktreeApplySuccess,
-  };
+	const createGitHubRepo = useCallback(
+		async (
+			repo: string,
+			visibility: "private" | "public",
+			branch: string,
+		): Promise<{ ok: true } | { ok: false; error: string }> => {
+			if (!workspaceId) {
+				return { ok: false, error: "No active workspace." };
+			}
+
+			const actionWorkspaceId = workspaceId;
+			try {
+				const response = await createGitHubRepoMut.mutate({
+					repo,
+					visibility,
+					branch,
+				});
+				if (workspaceIdRef.current !== actionWorkspaceId) {
+					return { ok: false, error: "Workspace changed." };
+				}
+
+				if (response.status === "ok") {
+					return { ok: true };
+				}
+
+				const pushError = response.pushError?.trim() ?? "";
+				const defaultBranchError = response.defaultBranchError?.trim() ?? "";
+				const parts = [];
+				if (pushError) {
+					parts.push(`Push failed:\n${pushError}`);
+				}
+				if (defaultBranchError) {
+					parts.push(`Failed to set default branch:\n${defaultBranchError}`);
+				}
+				const errorMessage =
+					parts.length > 0
+						? parts.join("\n\n")
+						: "Remote repo was created, but setup was incomplete.";
+				return { ok: false, error: errorMessage };
+			} catch (error) {
+				if (workspaceIdRef.current !== actionWorkspaceId) {
+					return { ok: false, error: "Workspace changed." };
+				}
+				return {
+					ok: false,
+					error: error instanceof Error ? error.message : String(error),
+				};
+			}
+		},
+		[createGitHubRepoMut, workspaceId],
+	);
+
+	return {
+		applyWorktreeChanges,
+		createGitHubRepo,
+		createGitHubRepoLoading: createGitHubRepoMut.isLoading,
+		initGitRepo,
+		initGitRepoLoading: initRepoMut.isLoading,
+		revertAllGitChanges,
+		revertGitFile,
+		stageGitAll,
+		stageGitFile,
+		unstageGitFile,
+		worktreeApplyError,
+		worktreeApplyLoading: applyWorktreeMut.isLoading,
+		worktreeApplySuccess,
+	};
 }

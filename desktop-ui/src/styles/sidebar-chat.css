@@ -156,6 +156,7 @@
   background: var(--surface-hover);
   border-color: var(--border-strong, rgba(255, 255, 255, 0.24));
 }
+
 .sidebar-chat__thread-list {
   list-style: none;
   margin: 0;

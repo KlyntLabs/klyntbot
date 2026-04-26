@@ -51,7 +51,7 @@ describe("useSkills", () => {
         },
       });
 
-    const { result } = renderHook(() => useSkills({ activeWorkspace: workspace }));
+    const { result } = renderHook(() => useSkills(workspace));
 
     await waitFor(() => {
       expect(getSkillsList).toHaveBeenCalledTimes(1);
@@ -77,7 +77,7 @@ describe("useSkills", () => {
     vi.mocked(getSkillsList)
       .mockResolvedValueOnce({ result: { skills: [{ name: "first", path: "/skills/first" }] } });
 
-    const { result } = renderHook(() => useSkills({ activeWorkspace: workspace }));
+    const { result } = renderHook(() => useSkills(workspace));
 
     await waitFor(() => {
       expect(getSkillsList).toHaveBeenCalledTimes(1);
@@ -101,7 +101,7 @@ describe("useSkills", () => {
       result: { skills: [{ name: "first", path: "/skills/first" }] },
     });
 
-    renderHook(() => useSkills({ activeWorkspace: workspace }));
+    renderHook(() => useSkills(workspace));
 
     await waitFor(() => {
       expect(getSkillsList).toHaveBeenCalledTimes(1);

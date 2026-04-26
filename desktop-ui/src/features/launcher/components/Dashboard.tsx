@@ -1,4 +1,4 @@
-import { useLauncherState } from "../store";
+import { useDashboardData } from "../hooks/useDashboardData";
 import type { DashboardData } from "../types";
 
 interface DashboardProps {
@@ -17,7 +17,7 @@ function formatTime(iso: string): string {
 }
 
 export function Dashboard({ onOpenTask }: DashboardProps) {
-	const dashboard = useLauncherState((s) => s.dashboard);
+	const { data: dashboard } = useDashboardData();
 
 	if (!dashboard) {
 		return <div className="lc-dash-loading">Loading...</div>;

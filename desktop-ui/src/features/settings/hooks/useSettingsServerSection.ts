@@ -16,6 +16,7 @@ import {
 } from "@services/tauri";
 import { isMobilePlatform } from "@utils/platformPaths";
 import { DEFAULT_REMOTE_HOST } from "@settings/components/settingsViewConstants";
+import { qk, useTauriMutation, useTauriQuery } from "@/lib/query";
 
 type UseSettingsServerSectionArgs = {
   appSettings: AppSettings;
@@ -155,17 +156,37 @@ export const useSettingsServerSection = ({
   const [remoteStatusError, setRemoteStatusError] = useState(false);
   const [remoteNameError, setRemoteNameError] = useState<string | null>(null);
   const [remoteHostError, setRemoteHostError] = useState<string | null>(null);
-  const [tailscaleStatus, setTailscaleStatus] = useState<TailscaleStatus | null>(null);
-  const [tailscaleStatusBusy, setTailscaleStatusBusy] = useState(false);
-  const [tailscaleStatusError, setTailscaleStatusError] = useState<string | null>(null);
-  const [tailscaleCommandPreview, setTailscaleCommandPreview] =
-    useState<TailscaleDaemonCommandPreview | null>(null);
-  const [tailscaleCommandBusy, setTailscaleCommandBusy] = useState(false);
-  const [tailscaleCommandError, setTailscaleCommandError] = useState<string | null>(null);
-  const [tcpDaemonStatus, setTcpDaemonStatus] = useState<TcpDaemonStatus | null>(null);
   const [tcpDaemonBusyAction, setTcpDaemonBusyAction] = useState<
     "start" | "stop" | "status" | null
   >(null);
+
+  const tailscaleStatusQuery = useTauriQuery<TailscaleStatus | null>({
+    queryKey: qk.settings.tailscaleStatus(),
+    queryFn: () => fetchTailscaleStatus(),
+    fallback: null,
+  });
+
+  const tailscaleCommandPreviewQuery =
+    useTauriQuery<TailscaleDaemonCommandPreview | null>({
+      queryKey: qk.settings.tailscaleCommandPreview(),
+      queryFn: () => fetchTailscaleDaemonCommandPreview(),
+      fallback: null,
+    });
+
+  const tcpDaemonStatusQuery = useTauriQuery<TcpDaemonStatus | null>({
+    queryKey: qk.settings.tcpDaemonStatus(),
+    queryFn: () => tailscaleDaemonStatus(),
+    fallback: null,
+  });
+
+  const tcpDaemonStart = useTauriMutation<TcpDaemonStatus, void>({
+    mutationFn: () => tailscaleDaemonStart(),
+    invalidates: [qk.settings.tcpDaemonStatus()],
+  });
+  const tcpDaemonStop = useTauriMutation<TcpDaemonStatus, void>({
+    mutationFn: () => tailscaleDaemonStop(),
+    invalidates: [qk.settings.tcpDaemonStatus()],
+  });
   const [mobileConnectBusy, setMobileConnectBusy] = useState(false);
   const [mobileConnectStatusText, setMobileConnectStatusText] = useState<string | null>(null);
   const [mobileConnectStatusError, setMobileConnectStatusError] = useState(false);
@@ -538,108 +559,49 @@ export const useSettingsServerSection = ({
     setMobileConnectStatusError(false);
   }, [mobilePlatform, remoteHostDraft, remoteTokenDraft]);
 
-  const handleRefreshTailscaleStatus = useCallback(() => {
-    void (async () => {
-      setTailscaleStatusBusy(true);
-      setTailscaleStatusError(null);
-      try {
-        const status = await fetchTailscaleStatus();
-        setTailscaleStatus(status);
-      } catch (error) {
-        setTailscaleStatusError(
-          formatErrorMessage(error, "Unable to load Tailscale status."),
-        );
-      } finally {
-        setTailscaleStatusBusy(false);
-      }
-    })();
-  }, []);
+  const handleRefreshTailscaleStatus = () => {
+    void tailscaleStatusQuery.refetch();
+  };
 
-  const handleRefreshTailscaleCommandPreview = useCallback(() => {
-    void (async () => {
-      setTailscaleCommandBusy(true);
-      setTailscaleCommandError(null);
-      try {
-        const preview = await fetchTailscaleDaemonCommandPreview();
-        setTailscaleCommandPreview(preview);
-      } catch (error) {
-        setTailscaleCommandError(
-          formatErrorMessage(error, "Unable to build Tailscale daemon command."),
-        );
-      } finally {
-        setTailscaleCommandBusy(false);
-      }
-    })();
-  }, []);
+  const handleRefreshTailscaleCommandPreview = () => {
+    void tailscaleCommandPreviewQuery.refetch();
+  };
 
   const handleUseSuggestedTailscaleHost = async () => {
-    const suggestedHost = tailscaleStatus?.suggestedRemoteHost ?? null;
+    const suggestedHost = tailscaleStatusQuery.data?.suggestedRemoteHost ?? null;
     if (!suggestedHost) {
       return;
     }
     await applyRemoteHost(suggestedHost);
   };
 
-  const runTcpDaemonAction = useCallback(
-    async (
-      action: "start" | "stop" | "status",
-      run: () => Promise<TcpDaemonStatus>,
-    ) => {
-      setTcpDaemonBusyAction(action);
-      try {
-        const status = await run();
-        setTcpDaemonStatus(status);
-      } catch (error) {
-        const errorMessage =
-          error instanceof Error
-            ? error.message
-            : typeof error === "string"
-              ? error
-              : "Unable to update mobile access daemon status.";
-        setTcpDaemonStatus((prev) => ({
-          state: "error",
-          pid: null,
-          startedAtMs: null,
-          lastError: errorMessage,
-          listenAddr: prev?.listenAddr ?? null,
-        }));
-      } finally {
-        setTcpDaemonBusyAction(null);
-      }
-    },
-    [],
-  );
-
-  const handleTcpDaemonStart = useCallback(async () => {
-    await runTcpDaemonAction("start", tailscaleDaemonStart);
-  }, [runTcpDaemonAction]);
-
-  const handleTcpDaemonStop = useCallback(async () => {
-    await runTcpDaemonAction("stop", tailscaleDaemonStop);
-  }, [runTcpDaemonAction]);
-
-  const handleTcpDaemonStatus = useCallback(async () => {
-    await runTcpDaemonAction("status", tailscaleDaemonStatus);
-  }, [runTcpDaemonAction]);
-
-  useEffect(() => {
-    if (!mobilePlatform) {
-      handleRefreshTailscaleCommandPreview();
-      void handleTcpDaemonStatus();
+  const runTcpDaemonAction = async (
+    action: "start" | "stop" | "status",
+    run: () => Promise<unknown>,
+  ) => {
+    setTcpDaemonBusyAction(action);
+    try {
+      await run();
+    } catch {
+      // errors surface through query/mutation state if needed
+    } finally {
+      setTcpDaemonBusyAction(null);
     }
-    if (tailscaleStatus === null && !tailscaleStatusBusy && !tailscaleStatusError) {
-      handleRefreshTailscaleStatus();
-    }
-  }, [
-    appSettings.remoteBackendToken,
-    handleRefreshTailscaleCommandPreview,
-    handleRefreshTailscaleStatus,
-    handleTcpDaemonStatus,
-    mobilePlatform,
-    tailscaleStatus,
-    tailscaleStatusBusy,
-    tailscaleStatusError,
-  ]);
+  };
+
+  const handleTcpDaemonStart = async () => {
+    await runTcpDaemonAction("start", () => tcpDaemonStart.mutate());
+  };
+
+  const handleTcpDaemonStop = async () => {
+    await runTcpDaemonAction("stop", () => tcpDaemonStop.mutate());
+  };
+
+  const handleTcpDaemonStatus = async () => {
+    await runTcpDaemonAction("status", () => tcpDaemonStatusQuery.refetch());
+  };
+
+
 
   return {
     appSettings,
@@ -655,13 +617,17 @@ export const useSettingsServerSection = ({
     remoteHostDraft,
     remoteTokenDraft,
     nextRemoteNameSuggestion: buildNextRemoteName(getConfiguredRemoteBackends(appSettings)),
-    tailscaleStatus,
-    tailscaleStatusBusy,
-    tailscaleStatusError,
-    tailscaleCommandPreview,
-    tailscaleCommandBusy,
-    tailscaleCommandError,
-    tcpDaemonStatus,
+    tailscaleStatus: tailscaleStatusQuery.data,
+    tailscaleStatusBusy: tailscaleStatusQuery.isLoading,
+    tailscaleStatusError: tailscaleStatusQuery.error
+      ? formatErrorMessage(tailscaleStatusQuery.error, "Unable to load Tailscale status.")
+      : null,
+    tailscaleCommandPreview: tailscaleCommandPreviewQuery.data,
+    tailscaleCommandBusy: tailscaleCommandPreviewQuery.isLoading,
+    tailscaleCommandError: tailscaleCommandPreviewQuery.error
+      ? formatErrorMessage(tailscaleCommandPreviewQuery.error, "Unable to build Tailscale daemon command.")
+      : null,
+    tcpDaemonStatus: tcpDaemonStatusQuery.data,
     tcpDaemonBusyAction,
     onSetRemoteNameDraft: handleSetRemoteNameDraft,
     onSetRemoteHostDraft: handleSetRemoteHostDraft,

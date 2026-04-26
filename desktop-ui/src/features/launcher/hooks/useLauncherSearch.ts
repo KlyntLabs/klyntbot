@@ -1,51 +1,42 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useState } from "react";
+import { qk, useTauriQuery } from "@/lib/query";
 import { useLauncherApi, useLauncherState } from "../store";
-import { ipc } from "../tauri-bridge";
 import type { LauncherItem } from "../types";
+
+const DEBOUNCE_MS = 30;
 
 export function useLauncherSearch() {
 	const query = useLauncherState((s) => s.query);
 	const { setResults, setIsSearching } = useLauncherApi();
-	const timerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
-	const versionRef = useRef(0);
+
+	// Debounce the raw query so we don't fire 1 query per keystroke. The
+	// queryKey change cancels the in-flight TQ fetch automatically.
+	const debounced = useDebounced(query, DEBOUNCE_MS);
+
+	const search = useTauriQuery<LauncherItem[]>({
+		queryKey: qk.launcher.search(debounced),
+		command: "launcher_search",
+		args: { query: debounced },
+		fallback: [],
+		// Search results are inherently stale-fast; tighter than the global
+		// 30s default so an exact-string repeat within ~5s reuses the cache.
+		staleTime: 5_000,
+	});
 
 	useEffect(() => {
-		ipc<LauncherItem[]>("launcher_search", { query: "" })
-			.then(setResults)
-			.catch(() => {});
-	}, [setResults]);
+		setIsSearching(search.isFetching);
+	}, [search.isFetching, setIsSearching]);
 
 	useEffect(() => {
-		if (!query.trim()) {
-			const v = ++versionRef.current;
-			ipc<LauncherItem[]>("launcher_search", { query: "" })
-				.then((results) => {
-					if (versionRef.current === v) setResults(results);
-				})
-				.catch(() => {});
-			return;
-		}
+		if (search.data) setResults(search.data);
+	}, [search.data, setResults]);
+}
 
-		setIsSearching(true);
-		clearTimeout(timerRef.current);
-		const version = ++versionRef.current;
-
-		timerRef.current = setTimeout(async () => {
-			try {
-				const results = await ipc<LauncherItem[]>("launcher_search", { query });
-				if (versionRef.current === version) {
-					setResults(results);
-					setIsSearching(false);
-				}
-			} catch (e) {
-				if (versionRef.current === version) {
-					console.error("Launcher search failed:", e);
-					setResults([]);
-					setIsSearching(false);
-				}
-			}
-		}, 30);
-
-		return () => clearTimeout(timerRef.current);
-	}, [query, setResults, setIsSearching]);
+function useDebounced<T>(value: T, ms: number): T {
+	const [v, setV] = useState(value);
+	useEffect(() => {
+		const t = setTimeout(() => setV(value), ms);
+		return () => clearTimeout(t);
+	}, [value, ms]);
+	return v;
 }

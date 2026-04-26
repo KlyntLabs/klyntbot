@@ -101,14 +101,48 @@ export function currentWindowLabel(): string {
 	};
 	const label = w.__TAURI_INTERNALS__?.metadata?.currentWindow?.label;
 	if (label) return label;
-	// Browser-only dev fallback so `localhost:1420/#/launcher` still routes.
-	if (
-		typeof window.location !== "undefined" &&
-		window.location.hash === "#/launcher"
-	) {
-		return "launcher";
+	// Browser-only dev fallbacks so the `#/<window>` URLs route correctly
+	// without a real Tauri runtime.
+	if (typeof window.location !== "undefined") {
+		if (window.location.hash === "#/launcher") return "launcher";
+		if (window.location.hash === "#/tray") return "tray";
+		if (window.location.hash === "#/distraction-overlay")
+			return "distraction-overlay";
 	}
 	return "main";
+}
+
+// Build a CurrentWindow facade for any window label. Tauri 2's window plugin
+// commands accept an optional `label` arg that targets that window instead of
+// the current one — lets the tray raise the main window after emitting
+// `navigate`, mirroring the .bak's `WebviewWindow.getByLabel("main")` pattern.
+export function getWindowByLabel(label: string): CurrentWindow {
+	return {
+		label,
+		hide: () => invoke<void>("plugin:window|hide", { label }),
+		show: () => invoke<void>("plugin:window|show", { label }),
+		setFocus: () => invoke<void>("plugin:window|set_focus", { label }),
+		startDragging: () =>
+			invoke<void>("plugin:window|start_dragging", { label }),
+		setSize: (width, height) =>
+			invoke<void>("plugin:window|set_size", {
+				label,
+				value: { Logical: { width, height } },
+			}),
+		onFocusChanged: async (handler) => {
+			const offFocus = await listen<null>("tauri://focus", () =>
+				handler({ payload: true }),
+			);
+			const offBlur = await listen<null>("tauri://blur", () =>
+				handler({ payload: false }),
+			);
+			return () => {
+				offFocus();
+				offBlur();
+			};
+		},
+		listen: (event, handler) => listen(event, handler),
+	};
 }
 
 export function getCurrentWindow(): CurrentWindow {

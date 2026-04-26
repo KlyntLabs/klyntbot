@@ -1,171 +1,78 @@
 import { useCallback, useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
+import { qk } from "@/lib/query";
 import type {
-  GitHubIssue,
-  GitHubPullRequest,
-  GitHubPullRequestComment,
-  GitHubPullRequestDiff,
+	GitHubIssue,
+	GitHubPullRequest,
+	GitHubPullRequestComment,
+	GitHubPullRequestDiff,
+	WorkspaceInfo,
 } from "@/types";
 
-type GitHubIssuesState = {
-  issues: GitHubIssue[];
-  total: number;
-  isLoading: boolean;
-  error: string | null;
-};
+export function useGitHubPanelController(
+	activeWorkspace: WorkspaceInfo | null,
+) {
+	const queryClient = useQueryClient();
+	const workspaceId = activeWorkspace?.id ?? "";
 
-type GitHubPullRequestsState = {
-  pullRequests: GitHubPullRequest[];
-  total: number;
-  isLoading: boolean;
-  error: string | null;
-};
+	const [selectedPrNumber, setSelectedPrNumber] = useState<number | null>(
+		null,
+	);
 
-type GitHubPullRequestDiffsState = {
-  diffs: GitHubPullRequestDiff[];
-  isLoading: boolean;
-  error: string | null;
-};
+	const issues =
+		queryClient.getQueryData<{
+			issues: GitHubIssue[];
+			total: number;
+		}>(qk.github.issues(workspaceId)) ?? { issues: [], total: 0 };
 
-type GitHubPullRequestCommentsState = {
-  comments: GitHubPullRequestComment[];
-  isLoading: boolean;
-  error: string | null;
-};
+	const pullRequests =
+		queryClient.getQueryData<{
+			pullRequests: GitHubPullRequest[];
+			total: number;
+		}>(qk.github.pulls(workspaceId)) ?? {
+			pullRequests: [],
+			total: 0,
+		};
 
-export function useGitHubPanelController() {
-  const [gitIssuesState, setGitIssuesState] = useState<GitHubIssuesState>({
-    issues: [],
-    total: 0,
-    isLoading: false,
-    error: null,
-  });
-  const [gitPullRequestsState, setGitPullRequestsState] =
-    useState<GitHubPullRequestsState>({
-      pullRequests: [],
-      total: 0,
-      isLoading: false,
-      error: null,
-    });
-  const [gitPullRequestDiffsState, setGitPullRequestDiffsState] =
-    useState<GitHubPullRequestDiffsState>({
-      diffs: [],
-      isLoading: false,
-      error: null,
-    });
-  const [gitPullRequestCommentsState, setGitPullRequestCommentsState] =
-    useState<GitHubPullRequestCommentsState>({
-      comments: [],
-      isLoading: false,
-      error: null,
-    });
+	const diffs = selectedPrNumber
+		? queryClient.getQueryData<GitHubPullRequestDiff[]>(
+				qk.github.diffsForPr(workspaceId, selectedPrNumber),
+			) ?? []
+		: [];
 
-  const handleGitIssuesChange = useCallback((next: GitHubIssuesState) => {
-    setGitIssuesState((prev) => {
-      if (
-        prev.issues === next.issues &&
-        prev.total === next.total &&
-        prev.isLoading === next.isLoading &&
-        prev.error === next.error
-      ) {
-        return prev;
-      }
-      return next;
-    });
-  }, []);
+	const comments = selectedPrNumber
+		? queryClient.getQueryData<GitHubPullRequestComment[]>(
+				qk.github.commentsForPr(workspaceId, selectedPrNumber),
+			) ?? []
+		: [];
 
-  const handleGitPullRequestsChange = useCallback(
-    (next: GitHubPullRequestsState) => {
-      setGitPullRequestsState((prev) => {
-        if (
-          prev.pullRequests === next.pullRequests &&
-          prev.total === next.total &&
-          prev.isLoading === next.isLoading &&
-          prev.error === next.error
-        ) {
-          return prev;
-        }
-        return next;
-      });
-    },
-    [],
-  );
+	const resetGitHubPanelState = useCallback(() => {
+		setSelectedPrNumber(null);
+	}, []);
 
-  const handleGitPullRequestDiffsChange = useCallback(
-    (next: GitHubPullRequestDiffsState) => {
-      setGitPullRequestDiffsState((prev) => {
-        if (
-          prev.diffs === next.diffs &&
-          prev.isLoading === next.isLoading &&
-          prev.error === next.error
-        ) {
-          return prev;
-        }
-        return next;
-      });
-    },
-    [],
-  );
-
-  const handleGitPullRequestCommentsChange = useCallback(
-    (next: GitHubPullRequestCommentsState) => {
-      setGitPullRequestCommentsState((prev) => {
-        if (
-          prev.comments === next.comments &&
-          prev.isLoading === next.isLoading &&
-          prev.error === next.error
-        ) {
-          return prev;
-        }
-        return next;
-      });
-    },
-    [],
-  );
-
-  const resetGitHubPanelState = useCallback(() => {
-    setGitIssuesState({
-      issues: [],
-      total: 0,
-      isLoading: false,
-      error: null,
-    });
-    setGitPullRequestsState({
-      pullRequests: [],
-      total: 0,
-      isLoading: false,
-      error: null,
-    });
-    setGitPullRequestDiffsState({
-      diffs: [],
-      isLoading: false,
-      error: null,
-    });
-    setGitPullRequestCommentsState({
-      comments: [],
-      isLoading: false,
-      error: null,
-    });
-  }, []);
-
-  return {
-    gitIssues: gitIssuesState.issues,
-    gitIssuesTotal: gitIssuesState.total,
-    gitIssuesLoading: gitIssuesState.isLoading,
-    gitIssuesError: gitIssuesState.error,
-    gitPullRequests: gitPullRequestsState.pullRequests,
-    gitPullRequestsTotal: gitPullRequestsState.total,
-    gitPullRequestsLoading: gitPullRequestsState.isLoading,
-    gitPullRequestsError: gitPullRequestsState.error,
-    gitPullRequestDiffs: gitPullRequestDiffsState.diffs,
-    gitPullRequestDiffsLoading: gitPullRequestDiffsState.isLoading,
-    gitPullRequestDiffsError: gitPullRequestDiffsState.error,
-    gitPullRequestComments: gitPullRequestCommentsState.comments,
-    gitPullRequestCommentsLoading: gitPullRequestCommentsState.isLoading,
-    gitPullRequestCommentsError: gitPullRequestCommentsState.error,
-    handleGitIssuesChange,
-    handleGitPullRequestsChange,
-    handleGitPullRequestDiffsChange,
-    handleGitPullRequestCommentsChange,
-    resetGitHubPanelState,
-  };
+	return {
+		gitIssues: issues.issues,
+		gitIssuesTotal: issues.total,
+		gitIssuesLoading: false,
+		gitIssuesError: null,
+		gitPullRequests: pullRequests.pullRequests,
+		gitPullRequestsTotal: pullRequests.total,
+		gitPullRequestsLoading: false,
+		gitPullRequestsError: null,
+		gitPullRequestDiffs: diffs,
+		gitPullRequestDiffsLoading: false,
+		gitPullRequestDiffsError: null,
+		gitPullRequestComments: comments,
+		gitPullRequestCommentsLoading: false,
+		gitPullRequestCommentsError: null,
+		// Setters become noops — child hooks now write directly to the cache.
+		// Kept for back-compat with caller signatures.
+		handleGitIssuesChange: () => {},
+		handleGitPullRequestsChange: () => {},
+		handleGitPullRequestDiffsChange: () => {},
+		handleGitPullRequestCommentsChange: () => {},
+		resetGitHubPanelState,
+		selectedPrNumber,
+		setSelectedPrNumber,
+	};
 }

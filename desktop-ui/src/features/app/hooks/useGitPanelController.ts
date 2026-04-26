@@ -58,6 +58,7 @@ export function useGitPanelController({
     null,
   );
   const [diffSource, setDiffSource] = useState<GitDiffSource>("local");
+  void gitDiffIgnoreWhitespaceChanges;
 
   const { groups: perFileDiffGroups, viewerEntries: perFileDiffs } = useMemo(
     () => buildPerFileThreadDiffs(activeItems),
@@ -126,20 +127,31 @@ export function useGitPanelController({
   const shouldLoadDiffs =
     Boolean(activeWorkspace) &&
     (diffSource === "local" ? shouldLoadLocalDiffs : diffUiVisible);
-  const shouldLoadGitLog =
-    Boolean(activeWorkspace) && (gitPanelMode === "log" || diffUiVisible);
-
   const {
     diffs: gitDiffs,
     isLoading: isDiffLoading,
     error: diffError,
     refresh: refreshGitDiffs,
-  } = useGitDiffs(
-    activeWorkspace,
-    gitStatus.files,
-    shouldLoadLocalDiffs,
-    gitDiffIgnoreWhitespaceChanges,
-  );
+  } = useGitDiffs(activeWorkspace);
+
+  const orderedGitDiffs = useMemo(() => {
+    const diffByPath = new Map(gitDiffs.map((entry) => [entry.path, entry]));
+    return gitStatus.files.map((file) => {
+      const entry = diffByPath.get(file.path);
+      return {
+        path: file.path,
+        status: file.status,
+        diff: entry?.diff ?? "",
+        oldLines: entry?.oldLines,
+        newLines: entry?.newLines,
+        isImage: entry?.isImage,
+        oldImageData: entry?.oldImageData,
+        newImageData: entry?.newImageData,
+        oldImageMime: entry?.oldImageMime,
+        newImageMime: entry?.newImageMime,
+      };
+    });
+  }, [gitDiffs, gitStatus.files]);
 
   useEffect(() => {
     if (!activeWorkspace || !shouldPreloadDiffs) {
@@ -168,18 +180,13 @@ export function useGitPanelController({
     isLoading: gitLogLoading,
     error: gitLogError,
     refresh: refreshGitLog,
-  } = useGitLog(activeWorkspace, shouldLoadGitLog);
+  } = useGitLog(activeWorkspace);
 
   const {
     diffs: gitCommitDiffs,
     isLoading: gitCommitDiffsLoading,
     error: gitCommitDiffsError,
-  } = useGitCommitDiffs(
-    activeWorkspace,
-    selectedCommitSha,
-    shouldLoadDiffs && diffSource === "commit",
-    gitDiffIgnoreWhitespaceChanges,
-  );
+  } = useGitCommitDiffs(activeWorkspace, selectedCommitSha);
 
   const activeDiffs =
     diffSource === "commit"
@@ -188,7 +195,7 @@ export function useGitPanelController({
         ? perFileDiffs
       : diffSource === "pr"
         ? prDiffs
-        : gitDiffs;
+        : orderedGitDiffs;
   const activeDiffLoading =
     diffSource === "commit"
       ? gitCommitDiffsLoading

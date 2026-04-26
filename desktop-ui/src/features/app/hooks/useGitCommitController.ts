@@ -1,352 +1,296 @@
-import { useCallback, useEffect, useMemo, useState, type RefObject } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import type { WorkspaceInfo } from "@/types";
 import {
-  commitGit,
-  generateCommitMessage,
-  fetchGit,
-  pullGit,
-  pushGit,
-  stageGitAll,
-  syncGit,
+	commitGit,
+	fetchGit,
+	generateCommitMessage,
+	pullGit,
+	pushGit,
+	stageGitAll,
+	syncGit,
 } from "@services/tauri";
 import { shouldApplyCommitMessage } from "@utils/commitMessage";
 import { useGitStatus } from "@/features/git/hooks/useGitStatus";
+import { useTauriMutation } from "@/lib/query";
 
 type GitStatusState = ReturnType<typeof useGitStatus>["status"];
 
 type GitCommitControllerOptions = {
-  activeWorkspace: WorkspaceInfo | null;
-  activeWorkspaceId: string | null;
-  activeWorkspaceIdRef: RefObject<string | null>;
-  commitMessageModelId: string | null;
-  gitStatus: GitStatusState;
-  refreshGitStatus: () => void;
-  refreshGitLog?: () => void;
+	activeWorkspace: WorkspaceInfo | null;
+	activeWorkspaceId: string | null;
+	commitMessageModelId: string | null;
+	gitStatus: GitStatusState;
 };
 
 type GitCommitController = {
-  commitMessage: string;
-  commitMessageLoading: boolean;
-  commitMessageError: string | null;
-  commitLoading: boolean;
-  pullLoading: boolean;
-  fetchLoading: boolean;
-  pushLoading: boolean;
-  syncLoading: boolean;
-  commitError: string | null;
-  pullError: string | null;
-  fetchError: string | null;
-  pushError: string | null;
-  syncError: string | null;
-  hasWorktreeChanges: boolean;
-  onCommitMessageChange: (value: string) => void;
-  onGenerateCommitMessage: () => Promise<void>;
-  onCommit: () => Promise<void>;
-  onCommitAndPush: () => Promise<void>;
-  onCommitAndSync: () => Promise<void>;
-  onPull: () => Promise<void>;
-  onFetch: () => Promise<void>;
-  onPush: () => Promise<void>;
-  onSync: () => Promise<void>;
+	commitMessage: string;
+	commitMessageLoading: boolean;
+	commitMessageError: string | null;
+	commitLoading: boolean;
+	pullLoading: boolean;
+	fetchLoading: boolean;
+	pushLoading: boolean;
+	syncLoading: boolean;
+	commitError: string | null;
+	pullError: string | null;
+	fetchError: string | null;
+	pushError: string | null;
+	syncError: string | null;
+	hasWorktreeChanges: boolean;
+	onCommitMessageChange: (value: string) => void;
+	onGenerateCommitMessage: () => Promise<void>;
+	onCommit: () => Promise<void>;
+	onCommitAndPush: () => Promise<void>;
+	onCommitAndSync: () => Promise<void>;
+	onPull: () => Promise<void>;
+	onFetch: () => Promise<void>;
+	onPush: () => Promise<void>;
+	onSync: () => Promise<void>;
 };
 
+function extractErrorMessage(error: unknown): string {
+	return error instanceof Error ? error.message : String(error);
+}
+
 export function useGitCommitController({
-  activeWorkspace,
-  activeWorkspaceId,
-  activeWorkspaceIdRef,
-  commitMessageModelId,
-  gitStatus,
-  refreshGitStatus,
-  refreshGitLog,
+	activeWorkspace,
+	activeWorkspaceId,
+	commitMessageModelId,
+	gitStatus,
 }: GitCommitControllerOptions): GitCommitController {
-  const [commitMessage, setCommitMessage] = useState("");
-  const [commitMessageLoading, setCommitMessageLoading] = useState(false);
-  const [commitMessageError, setCommitMessageError] = useState<string | null>(
-    null,
-  );
-  const [commitLoading, setCommitLoading] = useState(false);
-  const [pullLoading, setPullLoading] = useState(false);
-  const [fetchLoading, setFetchLoading] = useState(false);
-  const [pushLoading, setPushLoading] = useState(false);
-  const [syncLoading, setSyncLoading] = useState(false);
-  const [commitError, setCommitError] = useState<string | null>(null);
-  const [pullError, setPullError] = useState<string | null>(null);
-  const [fetchError, setFetchError] = useState<string | null>(null);
-  const [pushError, setPushError] = useState<string | null>(null);
-  const [syncError, setSyncError] = useState<string | null>(null);
+	const [commitMessage, setCommitMessage] = useState("");
+	const [commitMessageLoading, setCommitMessageLoading] = useState(false);
+	const [commitMessageError, setCommitMessageError] = useState<string | null>(
+		null,
+	);
 
-  const hasWorktreeChanges = useMemo(() => {
-    const hasStagedChanges = gitStatus.stagedFiles.length > 0;
-    const hasUnstagedChanges = gitStatus.unstagedFiles.length > 0;
-    return hasStagedChanges || hasUnstagedChanges;
-  }, [gitStatus.stagedFiles.length, gitStatus.unstagedFiles.length]);
+	const [isCommitAndPushRunning, setIsCommitAndPushRunning] = useState(false);
+	const [isCommitAndSyncRunning, setIsCommitAndSyncRunning] = useState(false);
 
-  const ensureStagedForCommit = useCallback(async () => {
-    const hasStagedChanges = gitStatus.stagedFiles.length > 0;
-    const hasUnstagedChanges = gitStatus.unstagedFiles.length > 0;
-    if (!activeWorkspace || hasStagedChanges || !hasUnstagedChanges) {
-      return;
-    }
-    await stageGitAll(activeWorkspace.id);
-  }, [activeWorkspace, gitStatus.stagedFiles.length, gitStatus.unstagedFiles.length]);
+	const hasWorktreeChanges = useMemo(() => {
+		const hasStagedChanges = gitStatus.stagedFiles.length > 0;
+		const hasUnstagedChanges = gitStatus.unstagedFiles.length > 0;
+		return hasStagedChanges || hasUnstagedChanges;
+	}, [gitStatus.stagedFiles.length, gitStatus.unstagedFiles.length]);
 
-  const handleCommitMessageChange = useCallback((value: string) => {
-    setCommitMessage(value);
-  }, []);
+	const ensureStagedForCommit = useCallback(async () => {
+		const hasStagedChanges = gitStatus.stagedFiles.length > 0;
+		const hasUnstagedChanges = gitStatus.unstagedFiles.length > 0;
+		if (!activeWorkspace || hasStagedChanges || !hasUnstagedChanges) {
+			return;
+		}
+		await stageGitAll(activeWorkspace.id);
+	}, [activeWorkspace, gitStatus.stagedFiles.length, gitStatus.unstagedFiles.length]);
 
-  const handleGenerateCommitMessage = useCallback(async () => {
-    if (!activeWorkspace || commitMessageLoading) {
-      return;
-    }
-    const workspaceId = activeWorkspace.id;
-    setCommitMessageLoading(true);
-    setCommitMessageError(null);
-    try {
-      const message = await generateCommitMessage(workspaceId, commitMessageModelId);
-      if (!shouldApplyCommitMessage(activeWorkspaceIdRef.current, workspaceId)) {
-        return;
-      }
-      setCommitMessage(message);
-    } catch (error) {
-      if (!shouldApplyCommitMessage(activeWorkspaceIdRef.current, workspaceId)) {
-        return;
-      }
-      setCommitMessageError(
-        error instanceof Error ? error.message : String(error),
-      );
-    } finally {
-      if (shouldApplyCommitMessage(activeWorkspaceIdRef.current, workspaceId)) {
-        setCommitMessageLoading(false);
-      }
-    }
-  }, [activeWorkspace, commitMessageLoading, activeWorkspaceIdRef, commitMessageModelId]);
+	const generateMsg = useTauriMutation({
+		mutationFn: async () => {
+			if (!activeWorkspace) throw new Error("no workspace");
+			return await generateCommitMessage(
+				activeWorkspace.id,
+				commitMessageModelId,
+			);
+		},
+	});
 
-  useEffect(() => {
-    setCommitMessage("");
-    setCommitMessageError(null);
-    setCommitMessageLoading(false);
-  }, [activeWorkspaceId]);
+	const commit = useTauriMutation({
+		mutationFn: async () => {
+			if (!activeWorkspace) throw new Error("no workspace");
+			await ensureStagedForCommit();
+			await commitGit(activeWorkspace.id, commitMessage.trim());
+		},
+	});
 
-  const handleCommit = useCallback(async () => {
-    if (
-      !activeWorkspace ||
-      commitLoading ||
-      !commitMessage.trim() ||
-      !hasWorktreeChanges
-    ) {
-      return;
-    }
-    setCommitLoading(true);
-    setCommitError(null);
-    try {
-      await ensureStagedForCommit();
-      await commitGit(activeWorkspace.id, commitMessage.trim());
-      setCommitMessage("");
-      refreshGitStatus();
-      refreshGitLog?.();
-    } catch (error) {
-      setCommitError(error instanceof Error ? error.message : String(error));
-    } finally {
-      setCommitLoading(false);
-    }
-  }, [
-    activeWorkspace,
-    commitLoading,
-    commitMessage,
-    ensureStagedForCommit,
-    hasWorktreeChanges,
-    refreshGitLog,
-    refreshGitStatus,
-  ]);
+	const push = useTauriMutation({
+		mutationFn: async () => {
+			if (!activeWorkspace) throw new Error("no workspace");
+			await pushGit(activeWorkspace.id);
+		},
+	});
 
-  const handleCommitAndPush = useCallback(async () => {
-    if (
-      !activeWorkspace ||
-      commitLoading ||
-      pushLoading ||
-      !commitMessage.trim() ||
-      !hasWorktreeChanges
-    ) {
-      return;
-    }
-    let commitSucceeded = false;
-    setCommitLoading(true);
-    setPushLoading(true);
-    setCommitError(null);
-    setPushError(null);
-    try {
-      await ensureStagedForCommit();
-      await commitGit(activeWorkspace.id, commitMessage.trim());
-      commitSucceeded = true;
-      setCommitMessage("");
-      setCommitLoading(false);
-      await pushGit(activeWorkspace.id);
-      refreshGitStatus();
-      refreshGitLog?.();
-    } catch (error) {
-      const errorMsg = error instanceof Error ? error.message : String(error);
-      if (!commitSucceeded) {
-        setCommitError(errorMsg);
-      } else {
-        setPushError(errorMsg);
-      }
-    } finally {
-      setCommitLoading(false);
-      setPushLoading(false);
-    }
-  }, [
-    activeWorkspace,
-    commitLoading,
-    pushLoading,
-    commitMessage,
-    ensureStagedForCommit,
-    hasWorktreeChanges,
-    refreshGitLog,
-    refreshGitStatus,
-  ]);
+	const pull = useTauriMutation({
+		mutationFn: async () => {
+			if (!activeWorkspace) throw new Error("no workspace");
+			await pullGit(activeWorkspace.id);
+		},
+	});
 
-  const handleCommitAndSync = useCallback(async () => {
-    if (
-      !activeWorkspace ||
-      commitLoading ||
-      syncLoading ||
-      !commitMessage.trim() ||
-      !hasWorktreeChanges
-    ) {
-      return;
-    }
-    let commitSucceeded = false;
-    setCommitLoading(true);
-    setSyncLoading(true);
-    setCommitError(null);
-    setSyncError(null);
-    try {
-      await ensureStagedForCommit();
-      await commitGit(activeWorkspace.id, commitMessage.trim());
-      commitSucceeded = true;
-      setCommitMessage("");
-      setCommitLoading(false);
-      await syncGit(activeWorkspace.id);
-      refreshGitStatus();
-      refreshGitLog?.();
-    } catch (error) {
-      const errorMsg = error instanceof Error ? error.message : String(error);
-      if (!commitSucceeded) {
-        setCommitError(errorMsg);
-      } else {
-        setSyncError(errorMsg);
-      }
-    } finally {
-      setCommitLoading(false);
-      setSyncLoading(false);
-    }
-  }, [
-    activeWorkspace,
-    commitLoading,
-    syncLoading,
-    commitMessage,
-    ensureStagedForCommit,
-    hasWorktreeChanges,
-    refreshGitLog,
-    refreshGitStatus,
-  ]);
+	const fetch = useTauriMutation({
+		mutationFn: async () => {
+			if (!activeWorkspace) throw new Error("no workspace");
+			await fetchGit(activeWorkspace.id);
+		},
+	});
 
-  const handlePull = useCallback(async () => {
-    if (!activeWorkspace || pullLoading) {
-      return;
-    }
-    setPullLoading(true);
-    setPullError(null);
-    try {
-      await pullGit(activeWorkspace.id);
-      setPushError(null);
-      refreshGitStatus();
-      refreshGitLog?.();
-    } catch (error) {
-      setPullError(error instanceof Error ? error.message : String(error));
-    } finally {
-      setPullLoading(false);
-    }
-  }, [activeWorkspace, pullLoading, refreshGitLog, refreshGitStatus]);
+	const sync = useTauriMutation({
+		mutationFn: async () => {
+			if (!activeWorkspace) throw new Error("no workspace");
+			await syncGit(activeWorkspace.id);
+		},
+	});
 
-  const handlePush = useCallback(async () => {
-    if (!activeWorkspace || pushLoading) {
-      return;
-    }
-    setPushLoading(true);
-    setPushError(null);
-    try {
-      await pushGit(activeWorkspace.id);
-      setPullError(null);
-      refreshGitStatus();
-      refreshGitLog?.();
-    } catch (error) {
-      setPushError(error instanceof Error ? error.message : String(error));
-    } finally {
-      setPushLoading(false);
-    }
-  }, [activeWorkspace, pushLoading, refreshGitLog, refreshGitStatus]);
+	const handleCommitMessageChange = useCallback((value: string) => {
+		setCommitMessage(value);
+	}, []);
 
-  const handleFetch = useCallback(async () => {
-    if (!activeWorkspace || fetchLoading) {
-      return;
-    }
-    setFetchLoading(true);
-    setFetchError(null);
-    try {
-      await fetchGit(activeWorkspace.id);
-      refreshGitStatus();
-      refreshGitLog?.();
-    } catch (error) {
-      setFetchError(error instanceof Error ? error.message : String(error));
-    } finally {
-      setFetchLoading(false);
-    }
-  }, [activeWorkspace, fetchLoading, refreshGitLog, refreshGitStatus]);
+	const handleGenerateCommitMessage = useCallback(async () => {
+		if (!activeWorkspace || commitMessageLoading) {
+			return;
+		}
+		const workspaceId = activeWorkspace.id;
+		setCommitMessageLoading(true);
+		setCommitMessageError(null);
+		try {
+			const message = await generateMsg.mutate();
+			if (!shouldApplyCommitMessage(activeWorkspaceId, workspaceId)) {
+				return;
+			}
+			setCommitMessage(message);
+		} catch (error) {
+			if (!shouldApplyCommitMessage(activeWorkspaceId, workspaceId)) {
+				return;
+			}
+			setCommitMessageError(extractErrorMessage(error));
+		} finally {
+			if (shouldApplyCommitMessage(activeWorkspaceId, workspaceId)) {
+				setCommitMessageLoading(false);
+			}
+		}
+	}, [activeWorkspace, activeWorkspaceId, commitMessageLoading, generateMsg, commitMessageModelId]);
 
-  const handleSync = useCallback(async () => {
-    if (!activeWorkspace || syncLoading) {
-      return;
-    }
-    setSyncLoading(true);
-    setSyncError(null);
-    try {
-      await syncGit(activeWorkspace.id);
-      setPullError(null);
-      setPushError(null);
-      setSyncError(null);
-      refreshGitStatus();
-      refreshGitLog?.();
-    } catch (error) {
-      setSyncError(error instanceof Error ? error.message : String(error));
-    } finally {
-      setSyncLoading(false);
-    }
-  }, [activeWorkspace, refreshGitLog, refreshGitStatus, syncLoading]);
+	useEffect(() => {
+		setCommitMessage("");
+		setCommitMessageError(null);
+		setCommitMessageLoading(false);
+	}, [activeWorkspaceId]);
 
-  return {
-    commitMessage,
-    commitMessageLoading,
-    commitMessageError,
-    commitLoading,
-    pullLoading,
-    fetchLoading,
-    pushLoading,
-    syncLoading,
-    commitError,
-    pullError,
-    fetchError,
-    pushError,
-    syncError,
-    hasWorktreeChanges,
-    onCommitMessageChange: handleCommitMessageChange,
-    onGenerateCommitMessage: handleGenerateCommitMessage,
-    onCommit: handleCommit,
-    onCommitAndPush: handleCommitAndPush,
-    onCommitAndSync: handleCommitAndSync,
-    onPull: handlePull,
-    onFetch: handleFetch,
-    onPush: handlePush,
-    onSync: handleSync,
-  };
+	const handleCommit = useCallback(async () => {
+		if (
+			!activeWorkspace ||
+			commit.isLoading ||
+			!commitMessage.trim() ||
+			!hasWorktreeChanges
+		) {
+			return;
+		}
+		try {
+			await commit.mutate();
+			setCommitMessage("");
+		} catch {
+			// error is surfaced via commit.error
+		}
+	}, [activeWorkspace, commit, commitMessage, hasWorktreeChanges]);
+
+	const handleCommitAndPush = useCallback(async () => {
+		if (
+			!activeWorkspace ||
+			commit.isLoading ||
+			push.isLoading ||
+			!commitMessage.trim() ||
+			!hasWorktreeChanges
+		) {
+			return;
+		}
+		setIsCommitAndPushRunning(true);
+		try {
+			await commit.mutate();
+			setCommitMessage("");
+			await push.mutate();
+		} catch {
+			// error surfaced via mutation.error
+		} finally {
+			setIsCommitAndPushRunning(false);
+		}
+	}, [activeWorkspace, commit, push, commitMessage, hasWorktreeChanges]);
+
+	const handleCommitAndSync = useCallback(async () => {
+		if (
+			!activeWorkspace ||
+			commit.isLoading ||
+			sync.isLoading ||
+			!commitMessage.trim() ||
+			!hasWorktreeChanges
+		) {
+			return;
+		}
+		setIsCommitAndSyncRunning(true);
+		try {
+			await commit.mutate();
+			setCommitMessage("");
+			await sync.mutate();
+		} catch {
+			// error surfaced via mutation.error
+		} finally {
+			setIsCommitAndSyncRunning(false);
+		}
+	}, [activeWorkspace, commit, sync, commitMessage, hasWorktreeChanges]);
+
+	const handlePull = useCallback(async () => {
+		if (!activeWorkspace || pull.isLoading) {
+			return;
+		}
+		try {
+			await pull.mutate();
+		} catch {
+			// error surfaced via pull.error
+		}
+	}, [activeWorkspace, pull]);
+
+	const handlePush = useCallback(async () => {
+		if (!activeWorkspace || push.isLoading) {
+			return;
+		}
+		try {
+			await push.mutate();
+		} catch {
+			// error surfaced via push.error
+		}
+	}, [activeWorkspace, push]);
+
+	const handleFetch = useCallback(async () => {
+		if (!activeWorkspace || fetch.isLoading) {
+			return;
+		}
+		try {
+			await fetch.mutate();
+		} catch {
+			// error surfaced via fetch.error
+		}
+	}, [activeWorkspace, fetch]);
+
+	const handleSync = useCallback(async () => {
+		if (!activeWorkspace || sync.isLoading) {
+			return;
+		}
+		try {
+			await sync.mutate();
+		} catch {
+			// error surfaced via sync.error
+		}
+	}, [activeWorkspace, sync]);
+
+	return {
+		commitMessage,
+		commitMessageLoading,
+		commitMessageError,
+		commitLoading: commit.isLoading || isCommitAndPushRunning || isCommitAndSyncRunning,
+		pullLoading: pull.isLoading,
+		fetchLoading: fetch.isLoading,
+		pushLoading: push.isLoading || isCommitAndPushRunning,
+		syncLoading: sync.isLoading || isCommitAndSyncRunning,
+		commitError: commit.error ? extractErrorMessage(commit.error) : null,
+		pullError: pull.error ? extractErrorMessage(pull.error) : null,
+		fetchError: fetch.error ? extractErrorMessage(fetch.error) : null,
+		pushError: push.error ? extractErrorMessage(push.error) : null,
+		syncError: sync.error ? extractErrorMessage(sync.error) : null,
+		hasWorktreeChanges,
+		onCommitMessageChange: handleCommitMessageChange,
+		onGenerateCommitMessage: handleGenerateCommitMessage,
+		onCommit: handleCommit,
+		onCommitAndPush: handleCommitAndPush,
+		onCommitAndSync: handleCommitAndSync,
+		onPull: handlePull,
+		onFetch: handleFetch,
+		onPush: handlePush,
+		onSync: handleSync,
+	};
 }

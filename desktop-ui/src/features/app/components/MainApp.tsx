@@ -406,7 +406,7 @@ export default function MainApp() {
 		reasoningSupported,
 		onFocusComposer: () => composerInputRef.current?.focus(),
 	});
-	const { skills } = useSkills({ activeWorkspace, onDebug: addDebugEntry });
+	const { skills } = useSkills(activeWorkspace);
 	const {
 		prompts,
 		createPrompt,
@@ -415,7 +415,7 @@ export default function MainApp() {
 		movePrompt,
 		getWorkspacePromptsDir,
 		getGlobalPromptsDir,
-	} = useCustomPrompts({ activeWorkspace, onDebug: addDebugEntry });
+	} = useCustomPrompts(activeWorkspace);
 	const resolvedModel = selectedModel?.model ?? null;
 	const resolvedEffort = reasoningSupported ? selectedEffort : null;
 
@@ -620,10 +620,6 @@ export default function MainApp() {
 		activeDiffLoading,
 		activeDiffError,
 		shouldLoadGitHubPanelData,
-		handleGitIssuesChange,
-		handleGitPullRequestsChange,
-		handleGitPullRequestDiffsChange,
-		handleGitPullRequestCommentsChange,
 		refreshGitRemote,
 		branches,
 		currentBranch,
@@ -669,8 +665,6 @@ export default function MainApp() {
 	const { apps } = useApps({
 		activeWorkspace,
 		activeThreadId,
-		enabled: appSettings.experimentalAppsEnabled,
-		onDebug: addDebugEntry,
 	});
 
 	useThreadCodexSyncOrchestration({
@@ -1823,10 +1817,6 @@ export default function MainApp() {
 			shouldLoadDiffs,
 			diffSource,
 			selectedPullRequestNumber: selectedPullRequest?.number ?? null,
-			onIssuesChange: handleGitIssuesChange,
-			onPullRequestsChange: handleGitPullRequestsChange,
-			onPullRequestDiffsChange: handleGitPullRequestDiffsChange,
-			onPullRequestCommentsChange: handleGitPullRequestCommentsChange,
 		},
 		appLayout: {
 			showHome: showHome && appView !== "chat",

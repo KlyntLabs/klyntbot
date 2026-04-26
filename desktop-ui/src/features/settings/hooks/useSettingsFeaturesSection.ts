@@ -1,11 +1,12 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { revealItemInDir } from "@tauri-apps/plugin-opener";
-import type { AppSettings, CodexFeature, CodexFeatureStage } from "@/types";
+import type { AppSettings, CodexFeature } from "@/types";
 import {
   getCodexConfigPath,
   getExperimentalFeatureList,
   setCodexFeatureFlag,
 } from "@services/tauri";
+import { qk, useTauriMutation, useTauriQuery } from "@/lib/query";
 
 type UseSettingsFeaturesSectionArgs = {
   appSettings: AppSettings;
@@ -34,89 +35,6 @@ export type SettingsFeaturesSectionProps = {
   onUpdateAppSettings: (next: AppSettings) => Promise<void>;
 };
 
-function normalizeStage(value: unknown): CodexFeatureStage | null {
-  const raw = String(value ?? "")
-    .trim()
-    .toLowerCase();
-  if (raw === "underdevelopment" || raw === "under_development") {
-    return "under_development";
-  }
-  if (raw === "beta" || raw === "experimental") {
-    return "beta";
-  }
-  if (raw === "stable") {
-    return "stable";
-  }
-  if (raw === "deprecated") {
-    return "deprecated";
-  }
-  if (raw === "removed") {
-    return "removed";
-  }
-  return null;
-}
-
-function normalizeFeature(item: unknown): CodexFeature | null {
-  if (!item || typeof item !== "object") {
-    return null;
-  }
-  const record = item as Record<string, unknown>;
-  const name = String(record.name ?? "").trim();
-  const stage = normalizeStage(record.stage);
-  if (!name || !stage) {
-    return null;
-  }
-  const displayName =
-    typeof record.displayName === "string"
-      ? record.displayName
-      : typeof record.display_name === "string"
-        ? record.display_name
-        : null;
-  const description =
-    typeof record.description === "string" ? record.description : null;
-  const announcement =
-    typeof record.announcement === "string" ? record.announcement : null;
-  const enabled = Boolean(record.enabled);
-  const defaultEnabled =
-    typeof record.defaultEnabled === "boolean"
-      ? record.defaultEnabled
-      : Boolean(record.default_enabled);
-  return {
-    name,
-    stage,
-    enabled,
-    defaultEnabled,
-    displayName,
-    description,
-    announcement,
-  };
-}
-
-function parseFeaturePage(response: unknown): {
-  data: CodexFeature[];
-  nextCursor: string | null;
-} {
-  if (!response || typeof response !== "object") {
-    return { data: [], nextCursor: null };
-  }
-  const root = response as Record<string, unknown>;
-  const result =
-    root.result && typeof root.result === "object"
-      ? (root.result as Record<string, unknown>)
-      : root;
-  const dataRaw = Array.isArray(result.data) ? result.data : [];
-  const data = dataRaw
-    .map((item) => normalizeFeature(item))
-    .filter((item): item is CodexFeature => item !== null);
-  const nextCursorRaw =
-    typeof result.nextCursor === "string"
-      ? result.nextCursor
-      : typeof result.next_cursor === "string"
-        ? result.next_cursor
-        : null;
-  return { data, nextCursor: nextCursorRaw };
-}
-
 function mapFeatureToAppSettings(
   appSettings: AppSettings,
   featureKey: string,
@@ -144,105 +62,79 @@ export const useSettingsFeaturesSection = ({
 }: UseSettingsFeaturesSectionArgs): SettingsFeaturesSectionProps => {
   const [openConfigError, setOpenConfigError] = useState<string | null>(null);
   const [featureError, setFeatureError] = useState<string | null>(null);
-  const [featuresLoading, setFeaturesLoading] = useState(false);
-  const [featureUpdatingKey, setFeatureUpdatingKey] = useState<string | null>(null);
-  const [features, setFeatures] = useState<CodexFeature[]>([]);
+  const [featureUpdatingKey, setFeatureUpdatingKey] = useState<string | null>(
+    null,
+  );
+
+  const featuresQuery = useTauriQuery<CodexFeature[]>({
+    queryKey: qk.settings.features(featureWorkspaceId),
+    queryFn: async () => {
+      if (!featureWorkspaceId) return [];
+      const collected: CodexFeature[] = [];
+      let cursor: string | null = null;
+      for (let page = 0; page < 20; page += 1) {
+        const result = await getExperimentalFeatureList(
+          featureWorkspaceId,
+          cursor,
+          100,
+        );
+        collected.push(...result.features);
+        if (!result.nextCursor) break;
+        cursor = result.nextCursor;
+      }
+      return collected;
+    },
+    fallback: [],
+    enabled: featureWorkspaceId !== null,
+  });
+
+  const configPathQuery = useTauriQuery<string | null>({
+    queryKey: qk.settings.codexConfigPath(),
+    queryFn: () => getCodexConfigPath(),
+    fallback: null,
+  });
+
+  const toggleFeature = useTauriMutation<
+    void,
+    { name: string; enabled: boolean }
+  >({
+    mutationFn: (input) => setCodexFeatureFlag(input.name, input.enabled),
+    invalidates: [qk.settings.features(featureWorkspaceId)],
+  });
 
   const handleOpenConfig = useCallback(async () => {
     setOpenConfigError(null);
     try {
-      const configPath = await getCodexConfigPath();
+      const configPath = configPathQuery.data;
+      if (!configPath) return;
       await revealItemInDir(configPath);
     } catch (error) {
       setOpenConfigError(
         error instanceof Error ? error.message : "Unable to open config.",
       );
     }
-  }, []);
-
-  useEffect(() => {
-    let active = true;
-    if (!featureWorkspaceId) {
-      setFeatures([]);
-      setFeatureError(null);
-      setFeaturesLoading(false);
-      return () => {
-        active = false;
-      };
-    }
-
-    void (async () => {
-      setFeatureError(null);
-      setFeaturesLoading(true);
-      try {
-        const loaded: CodexFeature[] = [];
-        const seen = new Set<string>();
-        let cursor: string | null = null;
-        for (let page = 0; page < 20; page += 1) {
-          const response = await getExperimentalFeatureList(
-            featureWorkspaceId,
-            cursor,
-            100,
-          );
-          const parsed = parseFeaturePage(response);
-          for (const item of parsed.data) {
-            if (seen.has(item.name)) {
-              continue;
-            }
-            seen.add(item.name);
-            loaded.push(item);
-          }
-          if (!parsed.nextCursor) {
-            break;
-          }
-          cursor = parsed.nextCursor;
-        }
-        if (!active) {
-          return;
-        }
-        loaded.sort((left, right) => left.name.localeCompare(right.name));
-        setFeatures(loaded);
-      } catch (error) {
-        if (!active) {
-          return;
-        }
-        setFeatures([]);
-        setFeatureError(
-          error instanceof Error
-            ? error.message
-            : "Unable to load Codex feature flags.",
-        );
-      } finally {
-        if (active) {
-          setFeaturesLoading(false);
-        }
-      }
-    })();
-
-    return () => {
-      active = false;
-    };
-  }, [featureWorkspaceId]);
+  }, [configPathQuery.data]);
 
   const stableFeatures = useMemo(
     () =>
-      features.filter(
+      featuresQuery.data.filter(
         (feature) =>
           feature.stage === "stable" &&
           !HIDDEN_DYNAMIC_FEATURE_KEYS.has(feature.name),
       ),
-    [features],
+    [featuresQuery.data],
   );
   const experimentalFeatures = useMemo(
     () =>
-      features.filter(
+      featuresQuery.data.filter(
         (feature) =>
           (feature.stage === "beta" || feature.stage === "under_development") &&
           !HIDDEN_DYNAMIC_FEATURE_KEYS.has(feature.name),
       ),
-    [features],
+    [featuresQuery.data],
   );
-  const hasDynamicFeatureRows = stableFeatures.length > 0 || experimentalFeatures.length > 0;
+  const hasDynamicFeatureRows =
+    stableFeatures.length > 0 || experimentalFeatures.length > 0;
 
   const onToggleCodexFeature = useCallback(
     (feature: CodexFeature) => {
@@ -259,13 +151,11 @@ export const useSettingsFeaturesSection = ({
           if (nextSettings) {
             await onUpdateAppSettings(nextSettings);
           } else {
-            await setCodexFeatureFlag(feature.name, nextEnabled);
+            await toggleFeature.mutate({
+              name: feature.name,
+              enabled: nextEnabled,
+            });
           }
-          setFeatures((current) =>
-            current.map((item) =>
-              item.name === feature.name ? { ...item, enabled: nextEnabled } : item,
-            ),
-          );
         } catch (error) {
           setFeatureError(
             error instanceof Error
@@ -279,7 +169,7 @@ export const useSettingsFeaturesSection = ({
         }
       })();
     },
-    [appSettings, onUpdateAppSettings],
+    [appSettings, onUpdateAppSettings, toggleFeature],
   );
 
   return {
@@ -287,7 +177,7 @@ export const useSettingsFeaturesSection = ({
     hasFeatureWorkspace: featureWorkspaceId != null,
     openConfigError,
     featureError,
-    featuresLoading,
+    featuresLoading: featuresQuery.isLoading,
     featureUpdatingKey,
     stableFeatures,
     experimentalFeatures,

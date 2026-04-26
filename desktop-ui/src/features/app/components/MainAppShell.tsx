@@ -27,10 +27,6 @@ type MainAppShellProps = {
     shouldLoadDiffs: ComponentProps<typeof GitHubPanelData>["shouldLoadDiffs"];
     diffSource: ComponentProps<typeof GitHubPanelData>["diffSource"];
     selectedPullRequestNumber: ComponentProps<typeof GitHubPanelData>["selectedPullRequestNumber"];
-    onIssuesChange: ComponentProps<typeof GitHubPanelData>["onIssuesChange"];
-    onPullRequestsChange: ComponentProps<typeof GitHubPanelData>["onPullRequestsChange"];
-    onPullRequestDiffsChange: ComponentProps<typeof GitHubPanelData>["onPullRequestDiffsChange"];
-    onPullRequestCommentsChange: ComponentProps<typeof GitHubPanelData>["onPullRequestCommentsChange"];
   };
   appLayoutProps: ComponentProps<typeof AppLayout>;
   appModalsProps: AppModalsProps;

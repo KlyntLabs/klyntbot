@@ -59,7 +59,7 @@ describe("useApps", () => {
       ({ activeWorkspace }) =>
         useApps({
           activeWorkspace,
-          enabled: true,
+          activeThreadId: null,
         }),
       { initialProps: { activeWorkspace: workspace } },
     );
@@ -126,7 +126,7 @@ describe("useApps", () => {
     const { result } = renderHook(() =>
       useApps({
         activeWorkspace: workspace,
-        enabled: true,
+        activeThreadId: null,
       }),
     );
 
@@ -160,7 +160,6 @@ describe("useApps", () => {
         useApps({
           activeWorkspace: workspace,
           activeThreadId,
-          enabled: true,
         }),
       { initialProps: { activeThreadId: "thread-1" } },
     );
@@ -209,7 +208,6 @@ describe("useApps", () => {
         useApps({
           activeWorkspace: workspace,
           activeThreadId,
-          enabled: true,
         }),
       { initialProps: { activeThreadId: "thread-1" } },
     );
@@ -247,7 +245,6 @@ describe("useApps", () => {
       useApps({
         activeWorkspace: workspace,
         activeThreadId: "thread-1",
-        enabled: true,
       }),
     );
 
@@ -288,7 +285,6 @@ describe("useApps", () => {
       useApps({
         activeWorkspace: workspace,
         activeThreadId: "thread-2",
-        enabled: true,
       }),
     );
 

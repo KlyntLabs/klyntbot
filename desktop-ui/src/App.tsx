@@ -2,8 +2,9 @@ import { lazy, Suspense } from "react";
 import "./styles/index.css";
 
 import MainApp from "@app/components/MainApp";
-import { currentWindowLabel } from "@/features/launcher/tauri-bridge";
 import { useWindowLabel } from "@/features/layout/hooks/useWindowLabel";
+import { currentWindowLabel } from "@/utils/tauri-bridge";
+import { QueryProvider } from "@/lib/query";
 
 const AboutView = lazy(() =>
 	import("@/features/about/components/AboutView").then((module) => ({
@@ -17,6 +18,18 @@ const Launcher = lazy(() =>
 	})),
 );
 
+const Tray = lazy(() =>
+	import("@/features/tray/components/Tray").then((module) => ({
+		default: module.Tray,
+	})),
+);
+
+const DistractionOverlay = lazy(() =>
+	import("@/features/distraction/components/DistractionOverlay").then(
+		(module) => ({ default: module.DistractionOverlay }),
+	),
+);
+
 // Tauri 2 sets the label synchronously before any React render, so we read it
 // once at module init from the real internals (the project-wide
 // useWindowLabel hook is intercepted by a mock that always returns "main").
@@ -27,19 +40,50 @@ export default function App() {
 
 	if (realLabel === "launcher" || windowLabel === "launcher") {
 		return (
-			<Suspense fallback={null}>
-				<Launcher />
-			</Suspense>
+			<QueryProvider>
+				<Suspense fallback={null}>
+					<Launcher />
+				</Suspense>
+			</QueryProvider>
+		);
+	}
+
+	if (realLabel === "tray" || windowLabel === "tray") {
+		return (
+			<QueryProvider>
+				<Suspense fallback={null}>
+					<Tray />
+				</Suspense>
+			</QueryProvider>
+		);
+	}
+
+	if (
+		realLabel === "distraction-overlay" ||
+		windowLabel === "distraction-overlay"
+	) {
+		return (
+			<QueryProvider>
+				<Suspense fallback={null}>
+					<DistractionOverlay />
+				</Suspense>
+			</QueryProvider>
 		);
 	}
 
 	if (windowLabel === "about") {
 		return (
-			<Suspense fallback={null}>
-				<AboutView />
-			</Suspense>
+			<QueryProvider>
+				<Suspense fallback={null}>
+					<AboutView />
+				</Suspense>
+			</QueryProvider>
 		);
 	}
 
-	return <MainApp />;
+	return (
+		<QueryProvider>
+			<MainApp />
+		</QueryProvider>
+	);
 }
