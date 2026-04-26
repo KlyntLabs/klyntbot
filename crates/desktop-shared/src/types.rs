@@ -61,6 +61,8 @@ pub enum EntityKind {
     MirrorSnippet,
     BrainVersion,
     PendingMemory,
+    CodingFact,
+    CodingEpisode,
 }
 
 impl EntityKind {
@@ -89,6 +91,8 @@ impl EntityKind {
             "mirrorsnippet" | "mirror_snippet" => Some(Self::MirrorSnippet),
             "brainversion" | "brain_version" => Some(Self::BrainVersion),
             "pending_memory" | "pendingmemory" => Some(Self::PendingMemory),
+            "coding_fact" | "codingfact" => Some(Self::CodingFact),
+            "coding_episode" | "codingepisode" => Some(Self::CodingEpisode),
             _ => None,
         }
     }
@@ -168,4 +172,30 @@ pub struct CronStatusResponse {
     pub enabled: bool,
     pub jobs: usize,
     pub next_wake_at_ms: Option<i64>,
+}
+
+
+#[cfg(test)]
+mod phase4_kind_tests {
+    use super::*;
+
+    #[test]
+    fn coding_fact_serializes_camel_case() {
+        let v = serde_json::to_value(EntityKind::CodingFact).unwrap();
+        assert_eq!(v, serde_json::json!("codingFact"));
+    }
+
+    #[test]
+    fn coding_episode_serializes_camel_case() {
+        let v = serde_json::to_value(EntityKind::CodingEpisode).unwrap();
+        assert_eq!(v, serde_json::json!("codingEpisode"));
+    }
+
+    #[test]
+    fn parse_coding_kinds() {
+        assert!(matches!(EntityKind::parse("coding_fact"), Some(EntityKind::CodingFact)));
+        assert!(matches!(EntityKind::parse("codingfact"), Some(EntityKind::CodingFact)));
+        assert!(matches!(EntityKind::parse("coding_episode"), Some(EntityKind::CodingEpisode)));
+        assert!(matches!(EntityKind::parse("codingepisode"), Some(EntityKind::CodingEpisode)));
+    }
 }
