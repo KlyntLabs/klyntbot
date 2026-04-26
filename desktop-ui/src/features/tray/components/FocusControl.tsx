@@ -13,6 +13,7 @@ import { useEffect, useRef, useState } from "react";
 import {
 	emit,
 	getCurrentWindow,
+	getWindowByLabel,
 	isTauri,
 } from "@/utils/tauri-bridge";
 import { FOCUS_PRESETS, type useFocusTimer } from "../hooks/useFocusTimer";
@@ -154,13 +155,15 @@ function TimerView({
 
 	const handleReviewAccept = async () => {
 		setReviewPromptDismissed(true);
-		if (isTauri()) {
-			try {
-				await emit("navigate", { path: "/learn?review=true" });
-				await getCurrentWindow().hide();
-			} catch {
-				// silent
-			}
+		if (!isTauri()) return;
+		try {
+			await emit("navigate", { path: "/learn?review=true" });
+			const main = getWindowByLabel("main");
+			await main.show();
+			await main.setFocus();
+			await getCurrentWindow().hide();
+		} catch {
+			// silent
 		}
 	};
 
@@ -199,10 +202,10 @@ function TimerView({
 				: formatElapsed(settings.focusDuration * 60);
 
 	const ringColor = showWarning
-		? "var(--warning, #fbbf24)"
+		? "var(--tray-warning)"
 		: isBreak
-			? "var(--info, #60a5fa)"
-			: "var(--brand, #6ea8fe)";
+			? "var(--tray-info)"
+			: "var(--tray-brand)";
 
 	const dotsCount = longBreakAfter;
 	const filledDots = cyclePosition;

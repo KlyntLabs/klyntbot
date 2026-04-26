@@ -13,6 +13,7 @@ import { useWindowAutoResize } from "@/hooks/window/useWindowAutoResize";
 import {
 	emit,
 	getCurrentWindow,
+	getWindowByLabel,
 	ipc,
 	isTauri,
 } from "@/utils/tauri-bridge";
@@ -70,25 +71,25 @@ export function Tray() {
 		await toggleComplete.mutate({ id: taskId });
 	};
 
-	const handleOpenTask = async (taskId: string) => {
+	// Mirrors .bak: emit `navigate` so the main window's router picks the path,
+	// THEN raise the main window via its label, THEN hide the tray. The tray's
+	// own `getCurrentWindow()` only knows itself — without `getWindowByLabel`
+	// the main window stays hidden and the navigate event has no audience.
+	const navigateMain = async (path: string) => {
 		if (!isTauri()) return;
 		try {
-			await emit("navigate", { path: `/task/${taskId}` });
+			await emit("navigate", { path });
+			const main = getWindowByLabel("main");
+			await main.show();
+			await main.setFocus();
 			await getCurrentWindow().hide();
 		} catch {
-			// silent
+			// silent — dev/browser
 		}
 	};
 
-	const handleOpenSettings = async () => {
-		if (!isTauri()) return;
-		try {
-			await emit("navigate", { path: "/settings" });
-			await getCurrentWindow().hide();
-		} catch {
-			// silent
-		}
-	};
+	const handleOpenTask = (taskId: string) => navigateMain(`/task/${taskId}`);
+	const handleOpenSettings = () => navigateMain("/settings");
 
 	const handleOpenDashboard = async () => {
 		try {
@@ -250,7 +251,7 @@ export function Tray() {
 											<div
 												className="tray-event-color"
 												style={{
-													backgroundColor: event.color ?? "var(--brand)",
+													backgroundColor: event.color ?? "var(--tray-brand)",
 												}}
 											/>
 											<div className="tray-event-body">

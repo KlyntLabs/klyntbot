@@ -18,3 +18,24 @@ html[data-launcher] #root {
 html[data-launcher] #root {
 	display: flex;
 }
+
+/* Neutralize the project-wide `button { padding:8px 14px; font-weight:600 }`
+   and the `button:hover { transform: translateY(-1px); box-shadow: … }`
+   defaults from `styles/buttons.css`. Aux windows lean on tightly-sized
+   icon buttons (28–32px squares) where 14px horizontal padding leaves
+   2–4px for the SVG — which is why the lucide icons were rendering as
+   dots. `:where(html[data-launcher])` keeps the selector at 0,0,1
+   specificity (same as the global `button` rule), so per-class overrides
+   inside each feature still win the cascade. Because aux-window.css is
+   side-imported by useTransparentBackground (and thus loaded after
+   buttons.css), source order resolves the tie in our favor. */
+:where(html[data-launcher]) button {
+	padding: 0;
+	font-weight: 300;
+	font-size: inherit;
+}
+:where(html[data-launcher]) button:hover:not(:disabled),
+:where(html[data-launcher]) button:active:not(:disabled) {
+	transform: none;
+	box-shadow: none;
+}

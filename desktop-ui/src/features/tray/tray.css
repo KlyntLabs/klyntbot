@@ -1,5 +1,10 @@
 /* Tray window — plain CSS using project tokens. Class prefixes:
-   `tray-*` for the outer page, `tc-*` for FocusControl. */
+   `tray-*` for the outer page, `tc-*` for FocusControl.
+
+   Semantic aliases (--tray-brand, --tray-destructive, …) are scoped to the
+   tray shell so they don't leak into other features. They map to the project's
+   real palette (`themes.dark.css` / `themes.light.css` / `themes.dim.css`),
+   so theme switches reach the tray automatically. */
 
 @keyframes tray-glass-appear {
 	from { opacity: 0; transform: scale(0.98); }
@@ -10,6 +15,10 @@
 	to { opacity: 1; transform: translateY(0); }
 }
 
+/* The global `button { padding:8px 14px; font-weight:600 }` reset that was
+   squashing icon buttons into dots lives in src/hooks/window/aux-window.css
+   so all three aux windows share it. */
+
 .tray-root {
 	width: 100%;
 	height: 100%;
@@ -17,6 +26,19 @@
 	color: var(--text-primary);
 	font-family: var(--ui-font-family, system-ui);
 	font-size: 13px;
+
+	/* The accent family in this project is a cyan-blue (rgba(100, 200, 255, …)).
+	   `--text-accent` itself is dim (0.7α), so for solid brand text we use a
+	   stronger cyan; for surfaces we lean on the existing accent layer. */
+	--tray-brand: rgba(100, 200, 255, 0.95);
+	--tray-brand-bg: var(--surface-active, rgba(100, 200, 255, 0.14));
+	--tray-brand-border: var(--border-accent-soft, rgba(100, 200, 255, 0.3));
+	--tray-info: rgba(100, 200, 255, 0.95);
+	--tray-destructive: var(--status-error, rgba(255, 110, 110, 0.95));
+	--tray-destructive-bg: rgba(255, 110, 110, 0.14);
+	--tray-warning: var(--status-warning, rgba(255, 175, 85, 0.95));
+	--tray-warning-bg: rgba(255, 175, 85, 0.18);
+	--tray-success: var(--status-success, rgba(120, 235, 190, 0.95));
 }
 
 .tray-shell {
@@ -92,10 +114,10 @@
 .tray-task:hover {
 	background: var(--surface-control, rgba(255, 255, 255, 0.06));
 }
-.tray-task.is-overdue { border-left-color: var(--destructive, #f87171); }
-.tray-task.is-today { border-left-color: var(--brand, #6ea8fe); }
-.tray-task.is-doing { border-left-color: var(--info, #60a5fa); }
-.tray-task.is-dim { border-left-color: var(--text-dim, rgba(255, 255, 255, 0.35)); }
+.tray-task.is-overdue { border-left-color: var(--tray-destructive); }
+.tray-task.is-today { border-left-color: var(--tray-brand); }
+.tray-task.is-doing { border-left-color: var(--tray-info); }
+.tray-task.is-dim { border-left-color: var(--text-dim); }
 
 .tray-task-title {
 	flex: 1;
@@ -112,7 +134,7 @@
 }
 .tray-task-title:hover { text-decoration: underline; }
 .tray-task-title.is-done {
-	color: var(--text-dim, rgba(255, 255, 255, 0.35));
+	color: var(--text-dim);
 	text-decoration: line-through;
 }
 .tray-task-title.is-overdue { color: var(--text-primary); }
@@ -123,7 +145,7 @@
 	color: var(--text-muted);
 	flex-shrink: 0;
 }
-.tray-task-due.is-overdue { color: var(--destructive, #f87171); }
+.tray-task-due.is-overdue { color: var(--tray-destructive); }
 
 .tray-event-list { display: flex; flex-direction: column; gap: 8px; margin-top: 8px; }
 .tray-event { display: flex; align-items: center; gap: 10px; }
@@ -146,7 +168,7 @@
 .tray-event-time {
 	font-size: 11px;
 	font-weight: 300;
-	color: var(--text-dim, rgba(255, 255, 255, 0.35));
+	color: var(--text-dim);
 	flex-shrink: 0;
 }
 
@@ -188,39 +210,46 @@
 	background: var(--surface-control, rgba(255, 255, 255, 0.06));
 	color: var(--text-primary);
 }
-.tray-nudge-action.is-success:hover { color: var(--success, #4ade80); }
-.tray-nudge-action.is-danger:hover { color: var(--destructive, #f87171); }
+.tray-nudge-action.is-success:hover { color: var(--tray-success); }
+.tray-nudge-action.is-danger:hover { color: var(--tray-destructive); }
 
 /* ── Footer ────────────────────────────────────────────────────── */
 .tray-footer {
 	display: flex;
 	align-items: center;
 	justify-content: flex-end;
-	gap: 4px;
-	padding: 8px 12px;
+	gap: 2px;
+	padding: 6px 10px;
 }
 .tray-footer-btn {
-	width: 28px;
-	height: 28px;
+	width: 30px;
+	height: 30px;
 	display: flex;
 	align-items: center;
 	justify-content: center;
 	border-radius: 8px;
 	background: transparent;
 	border: none;
-	color: var(--text-muted);
+	/* Step up from --text-muted (0.7α) to --text-faint (0.5α) so the toolbar
+	   reads as secondary chrome but doesn't fade into the panel; it lifts on
+	   hover via --surface-hover (the same surface the sidebar item rows use). */
+	color: var(--text-faint);
 	cursor: pointer;
 	transition: background-color 120ms ease, color 120ms ease;
 }
 .tray-footer-btn:hover {
-	background: var(--surface-control, rgba(255, 255, 255, 0.06));
-	color: var(--text-primary);
+	background: var(--surface-hover);
+	color: var(--text-strong);
 }
-.tray-footer-btn.is-danger:hover { color: var(--destructive, #f87171); }
+.tray-footer-btn.is-danger:hover {
+	color: var(--tray-destructive);
+	background: var(--tray-destructive-bg);
+}
+.tray-footer-btn .tray-icon-xs { width: 15px; height: 15px; }
 
 /* ── Generic helpers ───────────────────────────────────────────── */
 .tray-icon-xs { width: 14px; height: 14px; }
-.tray-icon-xs.is-info { color: var(--info, #60a5fa); }
+.tray-icon-xs.is-info { color: var(--tray-info); }
 .tray-muted-xs { font-size: 11px; color: var(--text-muted); font-weight: 300; }
 
 /* ── Badge ─────────────────────────────────────────────────────── */
@@ -233,12 +262,12 @@
 	color: var(--text-muted);
 }
 .tray-badge.variant-brand {
-	background: rgba(110, 168, 254, 0.18);
-	color: var(--brand, #6ea8fe);
+	background: var(--tray-brand-bg);
+	color: var(--tray-brand);
 }
 .tray-badge.variant-destructive {
-	background: rgba(248, 113, 113, 0.18);
-	color: var(--destructive, #f87171);
+	background: var(--tray-destructive-bg);
+	color: var(--tray-destructive);
 }
 
 /* ── Checkbox ──────────────────────────────────────────────────── */
@@ -247,7 +276,7 @@
 	height: 16px;
 	flex-shrink: 0;
 	border-radius: 4px;
-	border: 1px solid var(--border-subtle, rgba(255, 255, 255, 0.2));
+	border: 1px solid var(--border-strong, rgba(255, 255, 255, 0.2));
 	background: transparent;
 	cursor: pointer;
 	display: inline-flex;
@@ -257,9 +286,9 @@
 	transition: background-color 120ms ease, border-color 120ms ease;
 }
 .tray-checkbox.is-checked {
-	background: var(--brand, #6ea8fe);
-	border-color: var(--brand, #6ea8fe);
-	color: #fff;
+	background: var(--tray-brand);
+	border-color: var(--tray-brand);
+	color: #0a0e14;
 }
 .tray-checkbox svg { width: 12px; height: 12px; }
 
@@ -296,8 +325,8 @@
 }
 .tray-pill:disabled { opacity: 0.5; cursor: default; }
 .tray-pill.is-brand {
-	background: var(--brand, #6ea8fe);
-	color: #fff;
+	background: var(--tray-brand);
+	color: #0a0e14;
 }
 
 /* ──────────────────────────────────────────────────────────────── */
@@ -314,19 +343,23 @@
 	width: 32px;
 	height: 32px;
 	border-radius: 999px;
-	border: 1px solid var(--border-subtle, rgba(255, 255, 255, 0.12));
+	/* Step up to --border-strong (0.14α) so the circle bezel is visibly there
+	   on the translucent shell — at 0.08α the border read as "missing". */
+	border: 1px solid var(--border-strong, rgba(255, 255, 255, 0.18));
 	background: transparent;
 	display: flex;
 	align-items: center;
 	justify-content: center;
 	color: var(--text-muted);
 	cursor: pointer;
-	transition: color 120ms ease, border-color 120ms ease;
+	transition: color 120ms ease, border-color 120ms ease, background-color 120ms ease;
 }
 .tc-icon-btn:hover:not(:disabled) {
 	color: var(--text-primary);
-	border-color: var(--border-strong, rgba(255, 255, 255, 0.2));
+	border-color: var(--border-stronger, rgba(255, 255, 255, 0.28));
+	background: var(--surface-hover);
 }
+.tc-icon-btn:disabled { opacity: 0.4; cursor: default; }
 .tc-icon-sm { width: 14px; height: 14px; }
 .tc-icon-xs { width: 12px; height: 12px; }
 
@@ -353,9 +386,9 @@
 	justify-content: center;
 }
 .tc-mode-icon { width: 16px; height: 16px; margin-bottom: 8px; }
-.tc-mode-icon.is-info { color: var(--info, #60a5fa); }
-.tc-mode-icon.is-brand { color: var(--brand, #6ea8fe); }
-.tc-mode-icon.is-dim { color: var(--text-dim, rgba(255, 255, 255, 0.35)); }
+.tc-mode-icon.is-info { color: var(--tray-info); }
+.tc-mode-icon.is-brand { color: var(--tray-brand); }
+.tc-mode-icon.is-dim { color: var(--text-dim); }
 
 .tc-time-edit-row { display: flex; align-items: baseline; justify-content: center; gap: 4px; }
 .tc-time-edit-input {
@@ -402,7 +435,7 @@
 	background: var(--surface-control, rgba(255, 255, 255, 0.18));
 	transition: background-color 300ms ease;
 }
-.tc-dot.is-filled { background: var(--brand, #6ea8fe); }
+.tc-dot.is-filled { background: var(--tray-brand); }
 
 .tc-phase-label {
 	font-size: 10px;
@@ -448,9 +481,9 @@
 }
 .tc-preset:hover { color: var(--text-primary); }
 .tc-preset.is-active {
-	background: rgba(110, 168, 254, 0.18);
-	color: var(--brand, #6ea8fe);
-	border-color: rgba(110, 168, 254, 0.3);
+	background: var(--tray-brand-bg);
+	color: var(--tray-brand);
+	border-color: var(--tray-brand-border);
 }
 
 .tc-review-wrap { margin-top: 12px; padding: 0 4px; width: 100%; }
@@ -484,7 +517,7 @@
 }
 .tc-warning-text {
 	font-size: 11px;
-	color: var(--warning, #fbbf24);
+	color: var(--tray-warning);
 	font-weight: 300;
 	text-align: center;
 }
@@ -510,16 +543,21 @@
 }
 .tc-pill:disabled { opacity: 0.5; cursor: default; }
 .tc-pill.is-wide { padding: 8px 32px; }
+/* Mirrors the .bak: STOP is RED at rest, RED-tinted on hover.
+   The previous rule only colored on hover, which made the dangerous action
+   look like a neutral pill until cursored — wrong visual hierarchy. */
+.tc-pill.is-danger {
+	color: var(--tray-destructive);
+}
 .tc-pill.is-danger:hover:not(:disabled) {
-	color: var(--destructive, #f87171);
-	background: rgba(248, 113, 113, 0.12);
+	background: var(--tray-destructive-bg);
 }
 .tc-pill.is-warning {
-	background: rgba(251, 191, 36, 0.18);
-	color: var(--warning, #fbbf24);
+	background: var(--tray-warning-bg);
+	color: var(--tray-warning);
 }
 .tc-pill.is-warning:hover:not(:disabled) {
-	background: rgba(251, 191, 36, 0.28);
+	background: rgba(255, 175, 85, 0.28);
 }
 
 .tc-break-pending {
@@ -539,13 +577,13 @@
 	margin: 8px;
 	padding: 10px;
 	border-radius: 8px;
-	background: rgba(110, 168, 254, 0.1);
-	border: 1px solid rgba(110, 168, 254, 0.2);
+	background: var(--tray-brand-bg);
+	border: 1px solid var(--tray-brand-border);
 }
 .tc-coaching-row { display: flex; align-items: flex-start; gap: 8px; }
 .tc-coaching-icon {
 	width: 14px; height: 14px;
-	color: var(--brand, #6ea8fe);
+	color: var(--tray-brand);
 	margin-top: 2px;
 	flex-shrink: 0;
 }
@@ -584,7 +622,7 @@
 }
 .tc-dnd-hint-text {
 	font-size: 10px;
-	color: rgba(251, 191, 36, 0.7);
+	color: rgba(255, 175, 85, 0.7);
 	font-weight: 300;
 	line-height: 1.3;
 	flex: 1;

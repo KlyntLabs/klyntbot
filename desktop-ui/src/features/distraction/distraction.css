@@ -13,6 +13,10 @@
 	40% { transform: translateY(-3px); opacity: 1; }
 }
 
+/* Global button reset (neutralizing styles/buttons.css padding/weight/lift)
+   lives in src/hooks/window/aux-window.css alongside the transparent-bg
+   rules — shared by all three aux windows. */
+
 .dx-root {
 	width: 100%;
 	height: 100%;
@@ -20,6 +24,13 @@
 	color: var(--text-primary);
 	font-family: var(--ui-font-family, system-ui);
 	font-size: 13px;
+
+	/* Same semantic alias scheme as tray.css — pulls in real project tokens
+	   so theme switches reach the distraction overlay automatically. */
+	--dx-destructive: var(--status-error, rgba(255, 110, 110, 0.95));
+	--dx-destructive-bg: rgba(255, 110, 110, 0.14);
+	--dx-destructive-border: rgba(255, 110, 110, 0.28);
+	--dx-success: var(--status-success, rgba(120, 235, 190, 0.95));
 }
 
 .dx-shell {
@@ -66,7 +77,7 @@
 	width: 6px;
 	height: 6px;
 	border-radius: 50%;
-	background: var(--destructive, #f87171);
+	background: var(--dx-destructive);
 	animation: dx-pulse 1.6s ease-in-out infinite;
 }
 
@@ -75,7 +86,7 @@
 	font-weight: 500;
 	text-transform: uppercase;
 	letter-spacing: 0.08em;
-	color: var(--destructive, #f87171);
+	color: var(--dx-destructive);
 }
 
 .dx-verdict {
@@ -85,8 +96,8 @@
 	font-size: 10px;
 	color: var(--text-muted);
 }
-.dx-verdict .is-positive { color: var(--success, #4ade80); }
-.dx-verdict .is-negative { color: var(--destructive, #f87171); }
+.dx-verdict .is-positive { color: var(--dx-success); }
+.dx-verdict .is-negative { color: var(--dx-destructive); }
 
 .dx-dots {
 	display: flex;
@@ -150,10 +161,10 @@
 	color: var(--text-primary);
 }
 .dx-btn.is-primary {
-	background: rgba(248, 113, 113, 0.12);
-	border-color: rgba(248, 113, 113, 0.2);
-	color: var(--destructive, #f87171);
+	background: var(--dx-destructive-bg);
+	border-color: var(--dx-destructive-border);
+	color: var(--dx-destructive);
 }
 .dx-btn.is-primary:hover {
-	background: rgba(248, 113, 113, 0.2);
+	background: rgba(255, 110, 110, 0.22);
 }
