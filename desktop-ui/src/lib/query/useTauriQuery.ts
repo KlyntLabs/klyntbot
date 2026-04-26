@@ -7,31 +7,40 @@ import { ipc } from "@/utils/tauri-bridge";
 
 export interface TauriQueryOptions<TData> {
 	queryKey: QueryKey;
-	command: string;
+	/** Tauri command name. Mutually exclusive with `queryFn`. */
+	command?: string;
 	args?: Record<string, unknown>;
+	/**
+	 * Custom fetch function. Use this when the data source is a typed wrapper
+	 * (e.g. `@services/tauri`'s `getGitStatus(workspaceId)`) rather than a
+	 * string-named ipc command. Mutually exclusive with `command`.
+	 */
+	queryFn?: () => Promise<TData>;
 	/** Returned as `data` until the first successful fetch. */
 	fallback?: TData;
-	/** Disable the query (e.g. wait for a prerequisite). */
 	enabled?: boolean;
-	/** Override the cache stale time for this query. Default 30s (client.ts). */
 	staleTime?: number;
 }
 
 export function useTauriQuery<TData>(
 	opts: TauriQueryOptions<TData>,
 ): UseQueryResult<TData> & { data: TData } {
+	if (!opts.command && !opts.queryFn) {
+		throw new Error(
+			"useTauriQuery: either `command` or `queryFn` must be provided",
+		);
+	}
+
 	const result = useQuery<TData>({
 		queryKey: opts.queryKey,
-		queryFn: () => ipc<TData>(opts.command, opts.args),
+		queryFn: opts.queryFn ?? (() => ipc<TData>(opts.command!, opts.args)),
 		enabled: opts.enabled,
 		staleTime: opts.staleTime,
-		placeholderData: opts.fallback as any,
+		placeholderData: opts.fallback as never,
 	});
 
 	return {
 		...result,
-		// `placeholderData` keeps the fallback as `data` until the query
-		// succeeds, so the cast is safe.
 		data: (result.data ?? opts.fallback) as TData,
 	} as UseQueryResult<TData> & { data: TData };
 }

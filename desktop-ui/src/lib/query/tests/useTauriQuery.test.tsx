@@ -88,3 +88,33 @@ describe("useTauriQuery", () => {
 		);
 	});
 });
+
+describe("useTauriQuery — queryFn escape hatch", () => {
+	it("uses queryFn when provided and ignores command", async () => {
+		const queryFn = vi.fn().mockResolvedValue({ id: 1, name: "x" });
+		const client = new QueryClient({
+			defaultOptions: { queries: { retry: 0 } },
+		});
+
+		const { result } = renderHook(
+			() =>
+				useTauriQuery({
+					queryKey: ["custom", "thing"],
+					queryFn,
+				}),
+			{ wrapper: wrapper(client) },
+		);
+
+		await waitFor(() =>
+			expect(result.current.data).toEqual({ id: 1, name: "x" }),
+		);
+		expect(queryFn).toHaveBeenCalledTimes(1);
+		expect(mockedIpc).not.toHaveBeenCalled();
+	});
+
+	it("throws if neither command nor queryFn is provided", () => {
+		expect(() => {
+			useTauriQuery({ queryKey: ["empty"] } as never);
+		}).toThrow("useTauriQuery: either `command` or `queryFn` must be provided");
+	});
+});
