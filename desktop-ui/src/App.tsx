@@ -4,6 +4,7 @@ import "./styles/index.css";
 import MainApp from "@app/components/MainApp";
 import { useWindowLabel } from "@/features/layout/hooks/useWindowLabel";
 import { currentWindowLabel } from "@/utils/tauri-bridge";
+import { QueryProvider } from "@/lib/query";
 
 const AboutView = lazy(() =>
 	import("@/features/about/components/AboutView").then((module) => ({
@@ -39,17 +40,21 @@ export default function App() {
 
 	if (realLabel === "launcher" || windowLabel === "launcher") {
 		return (
-			<Suspense fallback={null}>
-				<Launcher />
-			</Suspense>
+			<QueryProvider>
+				<Suspense fallback={null}>
+					<Launcher />
+				</Suspense>
+			</QueryProvider>
 		);
 	}
 
 	if (realLabel === "tray" || windowLabel === "tray") {
 		return (
-			<Suspense fallback={null}>
-				<Tray />
-			</Suspense>
+			<QueryProvider>
+				<Suspense fallback={null}>
+					<Tray />
+				</Suspense>
+			</QueryProvider>
 		);
 	}
 
@@ -58,19 +63,27 @@ export default function App() {
 		windowLabel === "distraction-overlay"
 	) {
 		return (
-			<Suspense fallback={null}>
-				<DistractionOverlay />
-			</Suspense>
+			<QueryProvider>
+				<Suspense fallback={null}>
+					<DistractionOverlay />
+				</Suspense>
+			</QueryProvider>
 		);
 	}
 
 	if (windowLabel === "about") {
 		return (
-			<Suspense fallback={null}>
-				<AboutView />
-			</Suspense>
+			<QueryProvider>
+				<Suspense fallback={null}>
+					<AboutView />
+				</Suspense>
+			</QueryProvider>
 		);
 	}
 
-	return <MainApp />;
+	return (
+		<QueryProvider>
+			<MainApp />
+		</QueryProvider>
+	);
 }
