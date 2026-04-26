@@ -20,6 +20,81 @@ export const qk = {
 		all: () => ["flashcards"] as const,
 		dueCount: () => ["flashcards", "dueCount"] as const,
 	},
+	launcher: {
+		all: () => ["launcher"] as const,
+		dashboard: () => ["launcher", "dashboard"] as const,
+		search: (query: string) => ["launcher", "search", query] as const,
+		dndActive: () => ["launcher", "dndActive"] as const,
+	},
+	settings: {
+		all: () => ["settings"] as const,
+		app: () => ["settings", "app"] as const,
+		codexConfigPath: () => ["settings", "codexConfigPath"] as const,
+		features: (workspaceId: string | null) =>
+			["settings", "features", workspaceId ?? "global"] as const,
+		tailscaleStatus: () => ["settings", "tailscaleStatus"] as const,
+		tailscaleCommandPreview: () =>
+			["settings", "tailscaleCommandPreview"] as const,
+		tcpDaemonStatus: () => ["settings", "tcpDaemonStatus"] as const,
+		workspaces: () => ["settings", "workspaces"] as const,
+	},
+	agents: {
+		all: () => ["agents"] as const,
+		settings: () => ["agents", "settings"] as const,
+		configToml: (agentName: string) =>
+			["agents", "configToml", agentName] as const,
+	},
+	models: {
+		all: () => ["models"] as const,
+		list: (workspaceId: string) => ["models", "list", workspaceId] as const,
+		configModel: (workspaceId: string) =>
+			["models", "configModel", workspaceId] as const,
+	},
+	skills: {
+		all: () => ["skills"] as const,
+		list: (workspaceId: string) => ["skills", "list", workspaceId] as const,
+	},
+	apps: {
+		all: () => ["apps"] as const,
+		list: (workspaceId: string, threadId: string | null) =>
+			["apps", "list", workspaceId, threadId ?? "no-thread"] as const,
+	},
+	prompts: {
+		all: () => ["prompts"] as const,
+		list: (workspaceId: string) => ["prompts", "list", workspaceId] as const,
+	},
+	git: {
+		all: () => ["git"] as const,
+		status: (workspaceId: string) => ["git", "status", workspaceId] as const,
+		branches: (workspaceId: string) =>
+			["git", "branches", workspaceId] as const,
+		diffs: (workspaceId: string) => ["git", "diffs", workspaceId] as const,
+		log: (workspaceId: string) => ["git", "log", workspaceId] as const,
+		remote: (workspaceId: string) => ["git", "remote", workspaceId] as const,
+		commitDiffs: (workspaceId: string, sha: string) =>
+			["git", "commitDiffs", workspaceId, sha] as const,
+		repoScan: (workspaceId: string, depth: number) =>
+			["git", "repoScan", workspaceId, depth] as const,
+	},
+	github: {
+		all: () => ["github"] as const,
+		issues: (workspaceId: string) =>
+			["github", "issues", workspaceId] as const,
+		pulls: (workspaceId: string) => ["github", "pulls", workspaceId] as const,
+		diffsForPr: (workspaceId: string, n: number) =>
+			["github", "pulls", workspaceId, n, "diffs"] as const,
+		commentsForPr: (workspaceId: string, n: number) =>
+			["github", "pulls", workspaceId, n, "comments"] as const,
+	},
+	threads: {
+		all: () => ["threads"] as const,
+		list: () => ["threads", "list"] as const,
+		byId: (id: string) => ["threads", "byId", id] as const,
+	},
+	system: {
+		all: () => ["system"] as const,
+		mcpServers: () => ["system", "mcpServers"] as const,
+	},
 } as const;
 
 type QkType = typeof qk;
