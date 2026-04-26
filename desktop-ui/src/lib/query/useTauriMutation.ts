@@ -12,14 +12,12 @@ export interface OptimisticConfig<TVars, TPrev> {
 }
 
 export interface TauriMutationOptions<TData, TVars> {
-	command: string;
-	/**
-	 * Override the auto-derived invalidation. Pass an empty array to skip.
-	 * Default: invalidates the entity-domain bucket inferred from the command.
-	 */
+	/** Tauri command name. Mutually exclusive with `mutationFn`. */
+	command?: string;
+	/** Custom mutation function for typed-wrapper service calls. */
+	mutationFn?: (vars: TVars) => Promise<TData>;
 	invalidates?: QueryKey[];
-	/** Opt-in optimistic patch. Rolls back on error. */
-	// biome-ignore lint/suspicious/noExplicitAny: TPrev is opaque to the hook
+	// biome-ignore lint/suspicious/noExplicitAny: TPrev is opaque
 	optimistic?: OptimisticConfig<TVars, any>;
 	onSuccess?: (data: TData, vars: TVars) => void;
 	onError?: (error: unknown, vars: TVars) => void;
@@ -28,6 +26,11 @@ export interface TauriMutationOptions<TData, TVars> {
 export function useTauriMutation<TData = unknown, TVars = void>(
 	opts: TauriMutationOptions<TData, TVars>,
 ) {
+	if (!opts.command && !opts.mutationFn) {
+		throw new Error(
+			"useTauriMutation: either `command` or `mutationFn` must be provided",
+		);
+	}
 	const client = useQueryClient();
 
 	const mutation = useMutation<
@@ -37,7 +40,12 @@ export function useTauriMutation<TData = unknown, TVars = void>(
 		{ rollback?: () => void }
 	>({
 		mutationFn: (vars) =>
-			ipc<TData>(opts.command, vars as Record<string, unknown> | undefined),
+			opts.mutationFn
+				? opts.mutationFn(vars)
+				: ipc<TData>(
+						opts.command!,
+						vars as Record<string, unknown> | undefined,
+					),
 
 		onMutate: async (vars) => {
 			if (!opts.optimistic) return {};
@@ -60,13 +68,14 @@ export function useTauriMutation<TData = unknown, TVars = void>(
 		onSettled: () => {
 			const overrides = opts.invalidates;
 			if (overrides) {
-				for (const key of overrides) client.invalidateQueries({ queryKey: key });
+				for (const key of overrides) {
+					client.invalidateQueries({ queryKey: key });
+				}
 				return;
 			}
+			if (!opts.command) return;
 			const kind = entityKindForCommand(opts.command);
 			if (kind) {
-				// Broad-prefix invalidation: queries starting with [kindRoot]
-				// match. e.g. ["tasks"] invalidates ["tasks","today"], etc.
 				const root = kind === "task" ? "tasks" : kind;
 				client.invalidateQueries({ queryKey: [root] });
 			}

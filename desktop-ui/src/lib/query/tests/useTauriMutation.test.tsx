@@ -122,3 +122,33 @@ describe("useTauriMutation", () => {
 		);
 	});
 });
+
+
+describe("useTauriMutation — mutationFn escape hatch", () => {
+	it("uses mutationFn when provided", async () => {
+		const mutationFn = vi.fn().mockResolvedValue({ ok: true });
+		const client = new QueryClient();
+
+		const { result } = renderHook(
+			() =>
+				useTauriMutation<{ ok: boolean }, { name: string }>({
+					mutationFn,
+					invalidates: [],
+				}),
+			{ wrapper: wrap(client) },
+		);
+
+		await act(async () => {
+			await result.current.mutate({ name: "abc" });
+		});
+
+		expect(mutationFn).toHaveBeenCalledWith({ name: "abc" });
+		expect(mockedIpc).not.toHaveBeenCalled();
+	});
+
+	it("throws if neither command nor mutationFn is provided", () => {
+		expect(() => {
+			useTauriMutation({} as never);
+		}).toThrow("useTauriMutation: either `command` or `mutationFn` must be provided");
+	});
+});
