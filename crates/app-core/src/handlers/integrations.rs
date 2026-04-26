@@ -387,11 +387,17 @@ fn format_gemini_section(skill: &SkillDef) -> String {
 
 // ── MCP config snippets ──────────────────────────────────────────────
 
-/// MCP server config JSON for klyntbot.
+/// MCP server config JSON for klyntbot. Uses the absolute path of the currently
+/// running binary so the registered command works even when `klyntbot` isn't on `$PATH`
+/// (e.g., when launched from a `.app` bundle).
 fn mcp_server_json() -> serde_json::Value {
+    let command = std::env::current_exe()
+        .ok()
+        .map(|p| p.to_string_lossy().to_string())
+        .unwrap_or_else(|| "klyntbot".to_string());
     serde_json::json!({
-        "command": "klyntbot-mcp",
-        "args": ["serve", "--stdio"]
+        "command": command,
+        "args": ["mcp", "serve", "--stdio"]
     })
 }
 
@@ -590,10 +596,14 @@ fn install_copilot() -> Result<Vec<String>, String> {
         if config.get("servers").is_none() {
             config["servers"] = serde_json::json!({});
         }
+        let command = std::env::current_exe()
+            .ok()
+            .map(|p| p.to_string_lossy().to_string())
+            .unwrap_or_else(|| "klyntbot".to_string());
         config["servers"]["klyntbot"] = serde_json::json!({
             "type": "stdio",
-            "command": "klyntbot-mcp",
-            "args": ["serve", "--stdio"]
+            "command": command,
+            "args": ["mcp", "serve", "--stdio"]
         });
         let content =
             serde_json::to_string_pretty(&config).map_err(|e| format!("JSON error: {e}"))?;

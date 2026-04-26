@@ -7390,8 +7390,6 @@ dependencies = [
  "agent",
  "anyhow",
  "app-core",
- "axum",
- "clap 4.6.1",
  "common",
  "config",
  "desktop-shared",
@@ -7399,11 +7397,8 @@ dependencies = [
  "rmcp",
  "serde_json",
  "tokio",
- "tokio-util",
  "tools-core",
- "tower-http",
  "tracing",
- "tracing-subscriber",
  "uuid",
 ]
 

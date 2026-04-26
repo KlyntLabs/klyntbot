@@ -97,15 +97,15 @@ Claude Code skills (`.claude/skills/klyntbot-*/SKILL.md`) are a separate layer t
 
 ### MCP server — exposing tools to Claude Code
 
-Klyntbot exposes tools to external AI clients (Claude Code, Cursor, etc.) via MCP stdio transport (`klyntbot-mcp serve --stdio`). The desktop app also embeds the MCP server (config: `mcp.server` in `config.json`).
+Klyntbot exposes tools to external AI clients (Claude Code, Cursor, etc.) via MCP stdio transport. The MCP server is merged into the desktop binary as a subcommand (`klyntbot mcp serve --stdio`) — there is no separate `klyntbot-mcp` binary. Claude Code spawns the binary as a child process per session; it shares `~/.klyntbot/data.db` with the desktop process via SQLite WAL. The desktop app also embeds an MCP HTTP server (config: `mcp.server` in `config.json`). On first launch the desktop app auto-registers itself with Claude Code via `claude mcp add` if the CLI is detected — gated by a one-time marker file at `~/.klyntbot/.claude-code-integration-offered`.
 
 **Architecture:** `ToolRegistryBridge` translates MCP calls → internal `Tool::execute()`. The `agent` tool delegates natural language to the full AI pipeline via `AgentBridge`. Tool names must match the `ToolRegistry` key exactly (e.g. `tasks` not `task`, `notes` not `note`).
 
 **Currently exposed tools:** `tasks`, `project`, `area`, `notes`, `memory`, `okr`, `finance`, `productivity`, `work_context`, `agent`, `annotate`, `learning`, `cron`, `mirror`, `temporal` — configured in `default_exposed_tools()` at `crates/config/src/schema/mcp.rs`.
 
-**To expose a new tool via MCP:** (1) `#[derive(Tool)]` in a `feature-*` crate, register via `FeaturePackage::tools()`. (2) Add registry name to `default_exposed_tools()` in `crates/config/src/schema/mcp.rs`. (3) Verify: `cargo nextest run -p klyntbot-server`. Common mistake: plural/singular mismatch (`tasks` vs `task`). (4) Rebuild: `cargo build -p klyntbot-mcp`. Users can override the whitelist in `config.json` → `mcp.server.exposedTools`.
+**To expose a new tool via MCP:** (1) `#[derive(Tool)]` in a `feature-*` crate, register via `FeaturePackage::tools()`. (2) Add registry name to `default_exposed_tools()` in `crates/config/src/schema/mcp.rs`. (3) Verify: `cargo nextest run -p klyntbot-server`. Common mistake: plural/singular mismatch (`tasks` vs `task`). (4) Rebuild the desktop binary (`cargo build -p desktop`) — the MCP server ships inside it. Users can override the whitelist in `config.json` → `mcp.server.exposedTools`.
 
-**Debug CLI:** `klyntbot-mcp tools --list` | `klyntbot-mcp tools --schema <name>`.
+**Debug CLI:** `klyntbot mcp tools --list` (lists exposed tools the embedded server would advertise).
 
 ### Cognitive subsystems
 

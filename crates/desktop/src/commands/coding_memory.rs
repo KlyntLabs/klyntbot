@@ -150,7 +150,8 @@ pub async fn coding_memory_recall_timeline(
 ) -> Result<serde_json::Value, String> {
     let svc = state.recall.as_ref().ok_or("recall service unavailable")?;
     app_core::coding_memory::recall::recall_timeline_handler(svc, args)
-        .await.map_err(|e| e.to_string())
+        .await
+        .map_err(|e| e.to_string())
 }
 
 #[tauri::command]
@@ -160,7 +161,8 @@ pub async fn coding_memory_recall_fetch(
 ) -> Result<serde_json::Value, String> {
     let svc = state.recall.as_ref().ok_or("recall service unavailable")?;
     app_core::coding_memory::recall::recall_fetch_handler(svc, args)
-        .await.map_err(|e| e.to_string())
+        .await
+        .map_err(|e| e.to_string())
 }
 
 #[tauri::command]
@@ -170,7 +172,8 @@ pub async fn coding_memory_check_dead_ends(
 ) -> Result<serde_json::Value, String> {
     let svc = state.recall.as_ref().ok_or("recall service unavailable")?;
     app_core::coding_memory::recall::check_dead_ends_handler(svc, args)
-        .await.map_err(|e| e.to_string())
+        .await
+        .map_err(|e| e.to_string())
 }
 
 #[tauri::command]
@@ -180,7 +183,8 @@ pub async fn coding_memory_recall_facts_as_of(
 ) -> Result<serde_json::Value, String> {
     let svc = state.recall.as_ref().ok_or("recall service unavailable")?;
     app_core::coding_memory::recall::recall_facts_as_of_handler(svc, args)
-        .await.map_err(|e| e.to_string())
+        .await
+        .map_err(|e| e.to_string())
 }
 
 #[tauri::command]
@@ -190,7 +194,8 @@ pub async fn coding_memory_recall_change_history(
 ) -> Result<serde_json::Value, String> {
     let svc = state.recall.as_ref().ok_or("recall service unavailable")?;
     app_core::coding_memory::recall::recall_change_history_handler(svc, args)
-        .await.map_err(|e| e.to_string())
+        .await
+        .map_err(|e| e.to_string())
 }
 
 #[tauri::command]
@@ -200,7 +205,8 @@ pub async fn coding_memory_recall_decision_points(
 ) -> Result<serde_json::Value, String> {
     let svc = state.recall.as_ref().ok_or("recall service unavailable")?;
     app_core::coding_memory::recall::recall_decision_points_handler(svc, args)
-        .await.map_err(|e| e.to_string())
+        .await
+        .map_err(|e| e.to_string())
 }
 
 #[tauri::command]
@@ -210,7 +216,8 @@ pub async fn coding_memory_recall_log(
 ) -> Result<Vec<coding_memory::RecallInvocationRow>, String> {
     let svc = state.recall.as_ref().ok_or("recall service unavailable")?;
     app_core::coding_memory::recall::recall_log_handler(svc, args.layer, args.limit, args.offset)
-        .await.map_err(|e| e.to_string())
+        .await
+        .map_err(|e| e.to_string())
 }
 
 #[tauri::command]
@@ -219,8 +226,14 @@ pub async fn coding_memory_session_replay_recall_overlay(
     args: SessionRecallOverlayArgs,
 ) -> Result<Vec<coding_memory::RecallInvocationRow>, String> {
     let svc = state.recall.as_ref().ok_or("recall service unavailable")?;
-    app_core::coding_memory::recall::session_recall_overlay_handler(svc, args.session_id, args.limit, args.offset)
-        .await.map_err(|e| e.to_string())
+    app_core::coding_memory::recall::session_recall_overlay_handler(
+        svc,
+        args.session_id,
+        args.limit,
+        args.offset,
+    )
+    .await
+    .map_err(|e| e.to_string())
 }
 
 #[tauri::command]
@@ -248,9 +261,12 @@ pub async fn coding_memory_effectiveness_trends(
     state: State<'_, Arc<AppCore>>,
     pattern_id: String,
 ) -> Result<EffectivenessTrendsResponse, ApiError> {
-    app_core::coding_memory::panels_phase5::effectiveness_trends(state.storage_pool.clone(), pattern_id)
-        .await
-        .map_err(|e| ApiError::new("INTERNAL_ERROR", e.to_string()))
+    app_core::coding_memory::panels_phase5::effectiveness_trends(
+        state.storage_pool.clone(),
+        pattern_id,
+    )
+    .await
+    .map_err(|e| ApiError::new("INTERNAL_ERROR", e.to_string()))
 }
 
 #[tauri::command]
@@ -277,9 +293,12 @@ pub async fn coding_memory_project_skills_for_repo(
     state: State<'_, Arc<AppCore>>,
     repo_id: String,
 ) -> Result<Vec<ProjectSkillRow>, ApiError> {
-    app_core::coding_memory::panels_phase5::project_skills_for_repo(state.storage_pool.clone(), repo_id)
-        .await
-        .map_err(|e| ApiError::new("INTERNAL_ERROR", e.to_string()))
+    app_core::coding_memory::panels_phase5::project_skills_for_repo(
+        state.storage_pool.clone(),
+        repo_id,
+    )
+    .await
+    .map_err(|e| ApiError::new("INTERNAL_ERROR", e.to_string()))
 }
 
 /// dev_server dispatcher — wired by dev_server/mod.rs.
@@ -406,47 +425,176 @@ pub(crate) async fn dispatch_dev(
                     .await,
             )
         }
-        "coding_memory_recall_index" => dev::val(app_core::coding_memory::recall::recall_index_handler(core.recall.as_ref()?, body.clone()).await.map_err(|e| ApiError::new("INTERNAL_ERROR", e.to_string()))),
-        "coding_memory_recall_timeline" => dev::val(app_core::coding_memory::recall::recall_timeline_handler(core.recall.as_ref()?, body.clone()).await.map_err(|e| ApiError::new("INTERNAL_ERROR", e.to_string()))),
-        "coding_memory_recall_fetch" => dev::val(app_core::coding_memory::recall::recall_fetch_handler(core.recall.as_ref()?, body.clone()).await.map_err(|e| ApiError::new("INTERNAL_ERROR", e.to_string()))),
-        "coding_memory_check_dead_ends" => dev::val(app_core::coding_memory::recall::check_dead_ends_handler(core.recall.as_ref()?, body.clone()).await.map_err(|e| ApiError::new("INTERNAL_ERROR", e.to_string()))),
-        "coding_memory_recall_facts_as_of" => dev::val(app_core::coding_memory::recall::recall_facts_as_of_handler(core.recall.as_ref()?, body.clone()).await.map_err(|e| ApiError::new("INTERNAL_ERROR", e.to_string()))),
-        "coding_memory_recall_change_history" => dev::val(app_core::coding_memory::recall::recall_change_history_handler(core.recall.as_ref()?, body.clone()).await.map_err(|e| ApiError::new("INTERNAL_ERROR", e.to_string()))),
-        "coding_memory_recall_decision_points" => dev::val(app_core::coding_memory::recall::recall_decision_points_handler(core.recall.as_ref()?, body.clone()).await.map_err(|e| ApiError::new("INTERNAL_ERROR", e.to_string()))),
+        "coding_memory_recall_index" => dev::val(
+            app_core::coding_memory::recall::recall_index_handler(
+                core.recall.as_ref()?,
+                body.clone(),
+            )
+            .await
+            .map_err(|e| ApiError::new("INTERNAL_ERROR", e.to_string())),
+        ),
+        "coding_memory_recall_timeline" => dev::val(
+            app_core::coding_memory::recall::recall_timeline_handler(
+                core.recall.as_ref()?,
+                body.clone(),
+            )
+            .await
+            .map_err(|e| ApiError::new("INTERNAL_ERROR", e.to_string())),
+        ),
+        "coding_memory_recall_fetch" => dev::val(
+            app_core::coding_memory::recall::recall_fetch_handler(
+                core.recall.as_ref()?,
+                body.clone(),
+            )
+            .await
+            .map_err(|e| ApiError::new("INTERNAL_ERROR", e.to_string())),
+        ),
+        "coding_memory_check_dead_ends" => dev::val(
+            app_core::coding_memory::recall::check_dead_ends_handler(
+                core.recall.as_ref()?,
+                body.clone(),
+            )
+            .await
+            .map_err(|e| ApiError::new("INTERNAL_ERROR", e.to_string())),
+        ),
+        "coding_memory_recall_facts_as_of" => dev::val(
+            app_core::coding_memory::recall::recall_facts_as_of_handler(
+                core.recall.as_ref()?,
+                body.clone(),
+            )
+            .await
+            .map_err(|e| ApiError::new("INTERNAL_ERROR", e.to_string())),
+        ),
+        "coding_memory_recall_change_history" => dev::val(
+            app_core::coding_memory::recall::recall_change_history_handler(
+                core.recall.as_ref()?,
+                body.clone(),
+            )
+            .await
+            .map_err(|e| ApiError::new("INTERNAL_ERROR", e.to_string())),
+        ),
+        "coding_memory_recall_decision_points" => dev::val(
+            app_core::coding_memory::recall::recall_decision_points_handler(
+                core.recall.as_ref()?,
+                body.clone(),
+            )
+            .await
+            .map_err(|e| ApiError::new("INTERNAL_ERROR", e.to_string())),
+        ),
         "coding_memory_recall_log" => {
-            let a: RecallLogArgs = match dev::parse_params(body) { Ok(v) => v, Err(e) => return Some(Err(e)) };
-            dev::val(app_core::coding_memory::recall::recall_log_handler(core.recall.as_ref()?, a.layer, a.limit, a.offset).await.map_err(|e| ApiError::new("INTERNAL_ERROR", e.to_string())))
+            let a: RecallLogArgs = match dev::parse_params(body) {
+                Ok(v) => v,
+                Err(e) => return Some(Err(e)),
+            };
+            dev::val(
+                app_core::coding_memory::recall::recall_log_handler(
+                    core.recall.as_ref()?,
+                    a.layer,
+                    a.limit,
+                    a.offset,
+                )
+                .await
+                .map_err(|e| ApiError::new("INTERNAL_ERROR", e.to_string())),
+            )
         }
         "coding_memory_session_replay_recall_overlay" => {
-            let a: SessionRecallOverlayArgs = match dev::parse_params(body) { Ok(v) => v, Err(e) => return Some(Err(e)) };
-            dev::val(app_core::coding_memory::recall::session_recall_overlay_handler(core.recall.as_ref()?, a.session_id, a.limit, a.offset).await.map_err(|e| ApiError::new("INTERNAL_ERROR", e.to_string())))
+            let a: SessionRecallOverlayArgs = match dev::parse_params(body) {
+                Ok(v) => v,
+                Err(e) => return Some(Err(e)),
+            };
+            dev::val(
+                app_core::coding_memory::recall::session_recall_overlay_handler(
+                    core.recall.as_ref()?,
+                    a.session_id,
+                    a.limit,
+                    a.offset,
+                )
+                .await
+                .map_err(|e| ApiError::new("INTERNAL_ERROR", e.to_string())),
+            )
         }
         "coding_memory_mirror_alerts_feed" => {
-            let a: MirrorAlertsFeedArgs = match dev::parse_params(body) { Ok(v) => v, Err(e) => return Some(Err(e)) };
-            dev::val(app_core::coding_memory::panels_phase5::mirror_alerts_feed(core.storage_pool.clone(), a).await.map_err(|e| ApiError::new("INTERNAL_ERROR", e.to_string())))
+            let a: MirrorAlertsFeedArgs = match dev::parse_params(body) {
+                Ok(v) => v,
+                Err(e) => return Some(Err(e)),
+            };
+            dev::val(
+                app_core::coding_memory::panels_phase5::mirror_alerts_feed(
+                    core.storage_pool.clone(),
+                    a,
+                )
+                .await
+                .map_err(|e| ApiError::new("INTERNAL_ERROR", e.to_string())),
+            )
         }
         "coding_memory_mirror_alert_action" => {
-            let a: MirrorAlertActionArgs = match dev::parse_params(body) { Ok(v) => v, Err(e) => return Some(Err(e)) };
-            dev::val(app_core::coding_memory::panels_phase5::mirror_alert_action(core.storage_pool.clone(), a).await.map_err(|e| ApiError::new("INTERNAL_ERROR", e.to_string())))
+            let a: MirrorAlertActionArgs = match dev::parse_params(body) {
+                Ok(v) => v,
+                Err(e) => return Some(Err(e)),
+            };
+            dev::val(
+                app_core::coding_memory::panels_phase5::mirror_alert_action(
+                    core.storage_pool.clone(),
+                    a,
+                )
+                .await
+                .map_err(|e| ApiError::new("INTERNAL_ERROR", e.to_string())),
+            )
         }
         "coding_memory_effectiveness_trends" => {
             #[derive(serde::Deserialize)]
-            struct A { pattern_id: String }
-            let a: A = match dev::parse_params(body) { Ok(v) => v, Err(e) => return Some(Err(e)) };
-            dev::val(app_core::coding_memory::panels_phase5::effectiveness_trends(core.storage_pool.clone(), a.pattern_id).await.map_err(|e| ApiError::new("INTERNAL_ERROR", e.to_string())))
+            struct A {
+                pattern_id: String,
+            }
+            let a: A = match dev::parse_params(body) {
+                Ok(v) => v,
+                Err(e) => return Some(Err(e)),
+            };
+            dev::val(
+                app_core::coding_memory::panels_phase5::effectiveness_trends(
+                    core.storage_pool.clone(),
+                    a.pattern_id,
+                )
+                .await
+                .map_err(|e| ApiError::new("INTERNAL_ERROR", e.to_string())),
+            )
         }
-        "coding_memory_reforge_cycle_list" => {
-            dev::val(app_core::coding_memory::panels_phase5::reforge_cycle_list(core.storage_pool.clone()).await.map_err(|e| ApiError::new("INTERNAL_ERROR", e.to_string())))
-        }
+        "coding_memory_reforge_cycle_list" => dev::val(
+            app_core::coding_memory::panels_phase5::reforge_cycle_list(core.storage_pool.clone())
+                .await
+                .map_err(|e| ApiError::new("INTERNAL_ERROR", e.to_string())),
+        ),
         "coding_memory_reforge_cycle_diff" => {
-            let a: ReforgeCycleDiffArgs = match dev::parse_params(body) { Ok(v) => v, Err(e) => return Some(Err(e)) };
-            dev::val(app_core::coding_memory::panels_phase5::reforge_cycle_diff(core.storage_pool.clone(), a).await.map_err(|e| ApiError::new("INTERNAL_ERROR", e.to_string())))
+            let a: ReforgeCycleDiffArgs = match dev::parse_params(body) {
+                Ok(v) => v,
+                Err(e) => return Some(Err(e)),
+            };
+            dev::val(
+                app_core::coding_memory::panels_phase5::reforge_cycle_diff(
+                    core.storage_pool.clone(),
+                    a,
+                )
+                .await
+                .map_err(|e| ApiError::new("INTERNAL_ERROR", e.to_string())),
+            )
         }
         "coding_memory_project_skills_for_repo" => {
             #[derive(serde::Deserialize)]
-            struct A { repo_id: String }
-            let a: A = match dev::parse_params(body) { Ok(v) => v, Err(e) => return Some(Err(e)) };
-            dev::val(app_core::coding_memory::panels_phase5::project_skills_for_repo(core.storage_pool.clone(), a.repo_id).await.map_err(|e| ApiError::new("INTERNAL_ERROR", e.to_string())))
+            struct A {
+                repo_id: String,
+            }
+            let a: A = match dev::parse_params(body) {
+                Ok(v) => v,
+                Err(e) => return Some(Err(e)),
+            };
+            dev::val(
+                app_core::coding_memory::panels_phase5::project_skills_for_repo(
+                    core.storage_pool.clone(),
+                    a.repo_id,
+                )
+                .await
+                .map_err(|e| ApiError::new("INTERNAL_ERROR", e.to_string())),
+            )
         }
         _ => return None,
     })

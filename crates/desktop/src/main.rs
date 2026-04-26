@@ -37,6 +37,7 @@ fn configure_mimalloc() {
 }
 
 mod app_core;
+mod claude_code_integration;
 mod commands;
 #[cfg(debug_assertions)]
 mod dev_server;
@@ -81,6 +82,12 @@ enum McpCommands {
         #[arg(long)]
         stdio: bool,
     },
+    /// Inspect MCP tool surface
+    Tools {
+        /// List all exposed tool names
+        #[arg(long)]
+        list: bool,
+    },
 }
 
 /// Position the voice orb at the bottom-right of the window's current monitor.
@@ -118,6 +125,14 @@ fn main() {
                     std::process::exit(1);
                 }
             }
+            McpCommands::Tools { list } => {
+                if list {
+                    run_mcp_tools_list();
+                } else {
+                    eprintln!("Use --list to print exposed tools");
+                    std::process::exit(1);
+                }
+            }
         },
         None => {
             run_desktop_app();
@@ -127,8 +142,6 @@ fn main() {
 
 fn run_mcp_stdio() {
     common::memory::set_purge_hook(purge_mimalloc);
-    use klyntbot_server::handler::KlyntbotServerHandler;
-    use rmcp::service::ServiceExt;
     use tracing_subscriber::EnvFilter;
 
     // Init tracing to stderr (stdout is reserved for MCP transport)
@@ -144,13 +157,12 @@ fn run_mcp_stdio() {
         .build()
         .expect("Failed to create tokio runtime");
     rt.block_on(async {
-        // Load config
+        // Read whitelist from AppCore's finalised config (auto-filled from
+        // AiFeatureRegistry when the user leaves exposed_tools empty).
         let config = config::load_with_env_overrides()
             .await
             .expect("config load failed");
-
-        // Init AppCore in Server mode
-        let (app, events) = app_core::AppCore::init(common::AppMode::Server, Some(config.clone()))
+        let (app, events) = app_core::AppCore::init(common::AppMode::Server, Some(config))
             .await
             .expect("init failed");
         let app = Arc::new(app);
@@ -173,32 +185,23 @@ fn run_mcp_stdio() {
             }
         });
 
-        // Build MCP handler
-        let whitelist = config.mcp.server.exposed_tools.clone();
-        let handler = KlyntbotServerHandler::new(app.clone(), whitelist);
-
-        // Serve over stdio
-        tracing::info!("Starting MCP server (stdio)");
-        let transport = rmcp::transport::io::stdio();
-        let service = match handler.serve(transport).await {
-            Ok(s) => s,
-            Err(e) => {
-                tracing::error!("Failed to serve MCP: {e}");
-                app.shutdown().await;
-                return;
-            }
-        };
-
-        tokio::select! {
-            result = service.waiting() => {
-                if let Err(e) = result { eprintln!("Server error: {e}"); }
-            }
-            _ = tokio::signal::ctrl_c() => {
-                tracing::info!("Shutting down...");
-            }
+        let whitelist = app.config.read().await.mcp.server.exposed_tools.clone();
+        if let Err(e) = klyntbot_server::serve_stdio(app, whitelist).await {
+            tracing::error!("MCP serve failed: {e}");
         }
+    });
+}
 
-        app.shutdown().await;
+fn run_mcp_tools_list() {
+    let rt = tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()
+        .expect("Failed to create tokio runtime");
+    rt.block_on(async {
+        if let Err(e) = klyntbot_server::print_exposed_tools().await {
+            eprintln!("Error: {e}");
+            std::process::exit(1);
+        }
     });
 }
 
@@ -250,6 +253,10 @@ fn run_desktop_app() {
                 tauri::async_runtime::block_on(app_core::init(handle))
                     .expect("failed to initialize app core");
             let core = Arc::new(core_inner);
+
+            // First-launch: register klyntbot's MCP server with Claude Code if present.
+            // Idempotent — uses a marker file in ~/.klyntbot/ to run only once.
+            std::thread::spawn(claude_code_integration::run_first_launch_check);
 
             // Start dev HTTP server (debug builds only) so localhost:1420 works in Chrome
             #[cfg(debug_assertions)]

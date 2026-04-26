@@ -5,10 +5,6 @@ edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
 
-[[bin]]
-name = "klyntbot-mcp"
-path = "src/main.rs"
-
 [dependencies]
 agent.workspace = true
 app-core.workspace = true
@@ -17,19 +13,9 @@ mcp.workspace = true
 tools-core.workspace = true
 common.workspace = true
 config.workspace = true
-rmcp = { workspace = true, features = [
-    "server",
-    "transport-io",
-    "transport-streamable-http-server",
-    "macros",
-] }
+rmcp = { workspace = true, features = ["server", "transport-io", "macros"] }
 tokio.workspace = true
-tokio-util.workspace = true
-axum.workspace = true
-tower-http.workspace = true
-clap = { version = "4", features = ["derive"] }
 tracing.workspace = true
-tracing-subscriber.workspace = true
 anyhow.workspace = true
 serde_json.workspace = true
 uuid.workspace = true
