@@ -1,3 +1,8 @@
+// `executeItem` invokes Tauri commands that are pure side effects (open
+// app, paste clipboard, focus window). It deliberately does not go through
+// useTauriMutation because there's no cache state to invalidate; promoting
+// it would just add a layer for no benefit.
+
 import { parseDurationToEndsAt } from "../lib/parseDuration";
 import type { LauncherStoreApi } from "../store";
 import { ipc } from "@/utils/tauri-bridge";
