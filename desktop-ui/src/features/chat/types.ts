@@ -3,14 +3,16 @@ export interface DelegationInfo {
   fromAgent: string;
   toAgent: string;
   query: string;
-  durationMs: number;
-  success: boolean;
+  durationMs?: number;
+  success?: boolean;
+  depth?: number;
+  status?: "active" | "completed" | "failed";
 }
 
 export interface PlanData {
   steps: string[];
-  rawPlan: string;
-  completedSteps: { stepIndex: number; description: string; toolName: string }[];
+  rawPlan?: string;
+  completedSteps: (number | { stepIndex: number; description: string; toolName: string })[];
 }
 
 // ── Message Segments ────────────────────────────────────────
