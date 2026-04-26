@@ -53,3 +53,46 @@ async fn client_send_reaches_server_handler() {
     .await;
     assert!(!path.exists(), "socket file should be removed on shutdown");
 }
+
+#[tokio::test]
+async fn emit_entity_updated_through_bridge_arrives_with_camel_case_payload() {
+    use app_core::events::AppEventEmitter;
+    use desktop_shared::types::EntityKind;
+    use mcp_bridge::SocketBridgeEmitter;
+
+    let dir = tempdir().unwrap();
+    let path = dir.path().join("emit.sock");
+    let received: Arc<Mutex<Vec<BridgeFrame>>> = Arc::new(Mutex::new(Vec::new()));
+    let received_clone = received.clone();
+    let server = BridgeServer::start(
+        path.clone(),
+        Box::new(move |f| received_clone.lock().unwrap().push(f)),
+    )
+    .await
+    .unwrap();
+    tokio::time::sleep(Duration::from_millis(20)).await;
+
+    let emitter = SocketBridgeEmitter::new(BridgeClient::new(path));
+    emitter.emit_entity_updated(EntityKind::FocusSession, "fs-9");
+
+    let deadline = std::time::Instant::now() + Duration::from_millis(500);
+    loop {
+        if !received.lock().unwrap().is_empty() {
+            break;
+        }
+        if std::time::Instant::now() > deadline {
+            panic!("frame did not arrive");
+        }
+        tokio::time::sleep(Duration::from_millis(10)).await;
+    }
+    let frames = received.lock().unwrap().clone();
+    assert_eq!(frames.len(), 1);
+    assert_eq!(frames[0].event, "entity:updated");
+    // EntityKind serializes as camelCase per #[serde(rename_all = "camelCase"]
+    // on `desktop-shared/src/types.rs:48`.
+    assert_eq!(
+        frames[0].payload,
+        serde_json::json!({ "entityKind": "focusSession", "id": "fs-9" })
+    );
+    server.shutdown();
+}
