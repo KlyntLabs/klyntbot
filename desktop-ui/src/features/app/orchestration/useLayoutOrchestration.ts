@@ -3,9 +3,6 @@ import type { AppSettings } from "@/types";
 import { isWindowsPlatform } from "@utils/platformPaths";
 
 type UseAppShellOrchestrationOptions = {
-  isCompact: boolean;
-  isPhone: boolean;
-  isTablet: boolean;
   sidebarCollapsed: boolean;
   rightPanelCollapsed: boolean;
   shouldReduceTransparency: boolean;
@@ -24,9 +21,6 @@ type UseAppShellOrchestrationOptions = {
 };
 
 export function useAppShellOrchestration({
-  isCompact,
-  isPhone,
-  isTablet,
   sidebarCollapsed,
   rightPanelCollapsed,
   shouldReduceTransparency,
@@ -44,23 +38,19 @@ export function useAppShellOrchestration({
   appSettings,
 }: UseAppShellOrchestrationOptions) {
   const isWindows = isWindowsPlatform();
-  const showGitDetail = Boolean(selectedDiffPath) && isPhone && centerMode === "diff";
+  const showGitDetail = Boolean(selectedDiffPath) && centerMode === "diff";
   const isThreadOpen = Boolean(activeThreadId && showComposer);
 
-  const appClassName = `app ${isCompact ? "layout-compact" : "layout-desktop"}${
-    isPhone ? " layout-phone" : ""
-  }${isTablet ? " layout-tablet" : ""}${
+  const appClassName = `app layout-desktop${
     shouldReduceTransparency ? " reduced-transparency" : ""
-  }${!isCompact && sidebarCollapsed ? " sidebar-collapsed" : ""}${
-    !isCompact && rightPanelCollapsed ? " right-panel-collapsed" : ""
+  }${sidebarCollapsed ? " sidebar-collapsed" : ""}${
+    rightPanelCollapsed ? " right-panel-collapsed" : ""
   }${isWindows ? " is-windows" : ""}`;
 
   const appStyle = useMemo<CSSProperties>(
     () => ({
-      "--sidebar-width": `${isCompact ? sidebarWidth : sidebarCollapsed ? 0 : sidebarWidth}px`,
-      "--right-panel-width": `${
-        isCompact ? rightPanelWidth : rightPanelCollapsed ? 0 : rightPanelWidth
-      }px`,
+      "--sidebar-width": `${sidebarCollapsed ? 0 : sidebarWidth}px`,
+      "--right-panel-width": `${rightPanelCollapsed ? 0 : rightPanelWidth}px`,
       "--chat-diff-split-position-percent": `${chatDiffSplitPositionPercent}%`,
       "--plan-panel-height": `${planPanelHeight}px`,
       "--terminal-panel-height": `${terminalPanelHeight}px`,
@@ -98,7 +88,6 @@ export function useAppShellOrchestration({
       chatDiffSplitPositionPercent,
       debugPanelHeight,
       isWindows,
-      isCompact,
       planPanelHeight,
       rightPanelCollapsed,
       rightPanelWidth,

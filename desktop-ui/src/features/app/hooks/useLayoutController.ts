@@ -1,4 +1,3 @@
-import { useLayoutMode } from "../../layout/hooks/useLayoutMode";
 import { useResizablePanels } from "../../layout/hooks/useResizablePanels";
 import { useSidebarToggles } from "../../layout/hooks/useSidebarToggles";
 import { usePanelVisibility } from "../../layout/hooks/usePanelVisibility";
@@ -34,10 +33,9 @@ export function useLayoutController({
     onDebugPanelResizeStart,
   } = useResizablePanels();
 
-  const layoutMode = useLayoutMode();
-  const isCompact = layoutMode !== "desktop";
-  const isTablet = layoutMode === "tablet";
-  const isPhone = layoutMode === "phone";
+  const isCompact = false;
+  const isTablet = false;
+  const isPhone = false;
 
   const {
     sidebarCollapsed,
@@ -71,7 +69,6 @@ export function useLayoutController({
   return {
     appRef,
     isResizing,
-    layoutMode,
     isCompact,
     isTablet,
     isPhone,

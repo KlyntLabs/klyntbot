@@ -1159,8 +1159,40 @@
   pointer-events: none;
 }
 
+@media (max-width: 1100px) {
+  .app.layout-desktop .right-panel {
+    display: none;
+  }
+
+  .app.layout-desktop .right-panel-resizer {
+    display: none;
+  }
+
+  .app.layout-desktop .main {
+    grid-template-columns: 1fr;
+  }
+}
+
 @media (max-width: 960px) {
   .right-panel-resizer {
     display: none;
+  }
+}
+
+@media (max-width: 520px) {
+  .app.layout-desktop .main-topbar {
+    padding: 8px 12px;
+  }
+
+  .app.layout-desktop .messages-full {
+    padding: 8px 12px calc(8px + var(--composer-overlay-height, 0px));
+  }
+
+  .app.layout-desktop .composer {
+    padding: 8px 12px;
+  }
+
+  .app.layout-desktop .workspace-title {
+    max-width: min(50vw, 280px);
   }
 }

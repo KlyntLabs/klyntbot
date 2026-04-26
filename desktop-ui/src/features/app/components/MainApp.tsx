@@ -10,7 +10,6 @@ import { useMainAppDisplayNodes } from "@app/hooks/useMainAppDisplayNodes";
 import { useMainAppGitState } from "@app/hooks/useMainAppGitState";
 import { useMainAppLayoutNodes } from "@app/hooks/useMainAppLayoutNodes";
 import { useMainAppLayoutSurfaces } from "@app/hooks/useMainAppLayoutSurfaces";
-import { useMainAppMobileThreadRefresh } from "@app/hooks/useMainAppMobileThreadRefresh";
 import { useMainAppModals } from "@app/hooks/useMainAppModals";
 import { useMainAppPromptActions } from "@app/hooks/useMainAppPromptActions";
 import { useMainAppSettingsActions } from "@app/hooks/useMainAppSettingsActions";
@@ -126,11 +125,9 @@ export default function MainApp() {
 		threadListOrganizeMode,
 		setThreadListOrganizeMode,
 	} = useThreadListSortKey();
-	const [activeTab, setActiveTab] = useState<
-		"home" | "projects" | "codex" | "git" | "log"
-	>("codex");
-	const tabletTab =
-		activeTab === "projects" || activeTab === "home" ? "codex" : activeTab;
+	const activeTab = "codex";
+	const setActiveTab = (_tab: "home" | "projects" | "codex" | "git" | "log" | ((prev: "home" | "projects" | "codex" | "git" | "log") => "home" | "projects" | "codex" | "git" | "log")) => {};
+	const tabletTab = "codex";
 	const {
 		workspaces,
 		workspaceGroups,
@@ -229,7 +226,6 @@ export default function MainApp() {
 		onDebugPanelResizeStart,
 		isCompact,
 		isTablet,
-		isPhone,
 		sidebarCollapsed,
 		rightPanelCollapsed,
 		collapseSidebar,
@@ -520,7 +516,7 @@ export default function MainApp() {
 		threadSortKey: threadListSortKey,
 		onThreadCodexMetadataDetected: handleThreadCodexMetadataDetected,
 	});
-	const { connectionState: remoteThreadConnectionState, reconnectLive } =
+	const { connectionState: remoteThreadConnectionState } =
 		useRemoteThreadLiveConnection({
 			backendMode: appSettings.backendMode,
 			activeWorkspace,
@@ -533,14 +529,6 @@ export default function MainApp() {
 			reconnectWorkspace: connectWorkspace,
 		});
 
-	const { mobileThreadRefreshLoading, handleMobileThreadRefresh } =
-		useMainAppMobileThreadRefresh({
-			activeWorkspace,
-			activeThreadId,
-			startThreadForWorkspace,
-			refreshThread,
-			reconnectLive,
-		});
 	const {
 		updaterState,
 		startUpdate,
@@ -1361,10 +1349,9 @@ export default function MainApp() {
 
 	const handleOpenThreadLinkFromExternal = useCallback(
 		(workspaceId: string, threadId: string) => {
-			setActiveTab("codex");
 			handleOpenThreadLink(threadId, workspaceId);
 		},
-		[handleOpenThreadLink, setActiveTab],
+		[handleOpenThreadLink],
 	);
 
 	const { recordPendingThreadLink, openThreadLinkOrQueue } =
@@ -1403,16 +1390,12 @@ export default function MainApp() {
 	});
 
 	const {
-		showGitDetail,
 		isThreadOpen,
 		dropOverlayActive,
 		dropOverlayText,
 		appClassName,
 		appStyle,
 	} = useAppShellOrchestration({
-		isCompact,
-		isPhone,
-		isTablet,
 		sidebarCollapsed,
 		rightPanelCollapsed,
 		shouldReduceTransparency,
@@ -1494,15 +1477,6 @@ export default function MainApp() {
 		shortcut: appSettings.archiveThreadShortcut,
 		onTrigger: handleArchiveActiveThread,
 	});
-	const showCompactCodexThreadActions =
-		Boolean(activeWorkspace) &&
-		isCompact &&
-		((isPhone && activeTab === "codex") || (isTablet && tabletTab === "codex"));
-	const showMobilePollingFetchStatus =
-		showCompactCodexThreadActions &&
-		Boolean(activeWorkspace?.connected) &&
-		appSettings.backendMode === "remote" &&
-		remoteThreadConnectionState === "polling";
 	const gitRootOverride = activeWorkspace?.settings.gitRoot;
 	const hasGitRootOverride =
 		typeof gitRootOverride === "string" && gitRootOverride.trim().length > 0;
@@ -1511,9 +1485,6 @@ export default function MainApp() {
 		!hasGitRootOverride &&
 		isMissingRepo(gitStatus.error);
 	const displayNodes = useMainAppDisplayNodes({
-		showCompactCodexThreadActions,
-		handleMobileThreadRefresh,
-		mobileThreadRefreshLoading,
 		centerMode,
 		gitDiffViewStyle,
 		setGitDiffViewStyle,
@@ -1779,11 +1750,6 @@ export default function MainApp() {
 		onResizeDebug: onDebugPanelResizeStart,
 		onResizeTerminal: onTerminalPanelResizeStart,
 		isCompact,
-		isPhone,
-		activeTab,
-		setActiveTab,
-		tabletTab,
-		showMobilePollingFetchStatus,
 		appModalsAboutOpen:
 			appModalsProps.settingsOpen && appModalsProps.settingsSection === "about",
 		updaterState,
@@ -1805,18 +1771,12 @@ export default function MainApp() {
 		updateToastNode,
 		errorToastsNode,
 		homeNode,
-		mainHeaderNode,
 		desktopTopbarLeftNode,
-		tabBarNode,
 		gitDiffPanelNode,
 		gitDiffViewerNode,
 		planPanelNode,
 		debugPanelNode,
-		debugPanelFullNode,
 		terminalDockNode,
-		compactEmptyCodexNode,
-		compactEmptyGitNode,
-		compactGitBackNode,
 	} = useMainAppLayoutNodes(layoutSurfaces);
 
 	const mainMessagesNode = showWorkspaceHome ? workspaceHomeNode : messagesNode;
@@ -1846,12 +1806,7 @@ export default function MainApp() {
 			onPullRequestCommentsChange: handleGitPullRequestCommentsChange,
 		},
 		appLayout: {
-			isPhone,
-			isTablet,
 			showHome,
-			showGitDetail,
-			activeTab,
-			tabletTab,
 			centerMode,
 			preloadGitDiffs: appSettings.preloadGitDiffs,
 			splitChatDiffView: appSettings.splitChatDiffView,
@@ -1864,17 +1819,11 @@ export default function MainApp() {
 			updateToastNode,
 			errorToastsNode,
 			homeNode,
-			mainHeaderNode,
-			tabBarNode,
 			gitDiffPanelNode,
 			gitDiffViewerNode,
 			planPanelNode,
 			debugPanelNode,
-			debugPanelFullNode,
 			terminalDockNode,
-			compactEmptyCodexNode,
-			compactEmptyGitNode,
-			compactGitBackNode,
 			onSidebarResizeStart,
 			onChatDiffSplitPositionResizeStart,
 			onRightPanelResizeStart,

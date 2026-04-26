@@ -2,7 +2,6 @@ import ArrowLeft from "lucide-react/dist/esm/icons/arrow-left";
 import { ApprovalToasts } from "../../../app/components/ApprovalToasts";
 import { MainHeader } from "../../../app/components/MainHeader";
 import { Sidebar } from "../../../app/components/Sidebar";
-import { TabBar } from "../../../app/components/TabBar";
 import { Composer } from "../../../composer/components/Composer";
 import { Home } from "../../../home/components/Home";
 import { Messages } from "../../../messages/components/Messages";
@@ -23,7 +22,6 @@ type PrimaryLayoutNodes = Pick<
 	| "homeNode"
 	| "mainHeaderNode"
 	| "desktopTopbarLeftNode"
-	| "tabBarNode"
 >;
 
 export function buildPrimaryNodes(
@@ -66,8 +64,6 @@ export function buildPrimaryNodes(
 		</>
 	);
 
-	const tabBarNode = <TabBar {...options.tabBarProps} />;
-
 	return {
 		sidebarNode,
 		messagesNode,
@@ -78,6 +74,5 @@ export function buildPrimaryNodes(
 		homeNode,
 		mainHeaderNode,
 		desktopTopbarLeftNode,
-		tabBarNode,
 	};
 }

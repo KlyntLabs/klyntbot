@@ -230,11 +230,6 @@ type UseMainAppLayoutSurfacesArgs = {
 	onResizeDebug: LayoutNodesOptions["secondary"]["debugPanelProps"]["onResizeStart"];
 	onResizeTerminal: LayoutNodesOptions["secondary"]["terminalDockProps"]["onResizeStart"];
 	isCompact: boolean;
-	isPhone: boolean;
-	activeTab: LayoutNodesOptions["primary"]["tabBarProps"]["activeTab"];
-	setActiveTab: (tab: "home" | "projects" | "codex" | "git" | "log") => void;
-	tabletTab: "codex" | "git" | "log";
-	showMobilePollingFetchStatus: boolean;
 	appModalsAboutOpen: boolean;
 	updaterState: LayoutNodesOptions["primary"]["updateToastProps"]["state"];
 	startUpdate: LayoutNodesOptions["primary"]["updateToastProps"]["onUpdate"];
@@ -380,10 +375,6 @@ function buildPrimarySurface({
 	interruptTurn,
 	terminalOpen,
 	isCompact,
-	activeTab,
-	setActiveTab,
-	tabletTab,
-	showMobilePollingFetchStatus,
 	appModalsAboutOpen,
 	updaterState,
 	startUpdate,
@@ -483,7 +474,7 @@ function buildPrimarySurface({
 			lastDurationMs: activeThreadId
 				? (threadStatusById[activeThreadId]?.lastDurationMs ?? null)
 				: null,
-			showPollingFetchStatus: showMobilePollingFetchStatus,
+			showPollingFetchStatus: false,
 			pollingIntervalMs: REMOTE_THREAD_POLL_INTERVAL_MS,
 		},
 		composerProps: composerWorkspaceState.showComposer
@@ -624,7 +615,6 @@ function buildPrimarySurface({
 				threadNavigation.selectWorkspace(workspaceId);
 				threadNavigation.setActiveThreadId(threadId, workspaceId);
 				if (isCompact) {
-					setActiveTab("codex");
 				}
 			},
 		},
@@ -674,18 +664,6 @@ function buildPrimarySurface({
 				gitState.setSelectedDiffPath(null);
 			},
 		},
-		tabBarProps: {
-			activeTab,
-			onSelect: (tab) => {
-				if (tab === "home") {
-					threadNavigation.resetPullRequestSelection();
-					threadNavigation.clearDraftState();
-					threadNavigation.selectHome();
-					return;
-				}
-				setActiveTab(tab);
-			},
-		},
 	};
 }
 
@@ -702,7 +680,6 @@ function buildGitSurface({
 	startUncommittedReview,
 	handleSelectOpenAppId,
 	prompts,
-	isPhone,
 }: MainAppLayoutSurfacesContext): LayoutNodesOptions["git"] {
 	return {
 		filePanelMode: gitState.filePanelMode,
@@ -883,7 +860,6 @@ function buildGitSurface({
 		},
 		diffViewProps: {
 			centerMode: gitState.centerMode,
-			isPhone,
 			splitChatDiffView: appSettings.splitChatDiffView,
 			gitDiffViewStyle: gitState.gitDiffViewStyle,
 		},
@@ -893,7 +869,6 @@ function buildGitSurface({
 function buildSecondarySurface({
 	activePlan,
 	composerWorkspaceState,
-	gitState,
 	terminalOpen,
 	debugOpen,
 	debugEntries,
@@ -907,8 +882,6 @@ function buildSecondarySurface({
 	onCopyDebug,
 	onResizeDebug,
 	onResizeTerminal,
-	isPhone,
-	setActiveTab,
 }: MainAppLayoutSurfacesContext): LayoutNodesOptions["secondary"] {
 	return {
 		planPanelProps: {
@@ -931,32 +904,6 @@ function buildSecondarySurface({
 			onClear: onClearDebug,
 			onCopy: onCopyDebug,
 			onResizeStart: onResizeDebug,
-		},
-		compactNavProps: {
-			onGoProjects: () => setActiveTab("projects"),
-			centerMode: gitState.centerMode,
-			selectedDiffPath: gitState.selectedDiffPath,
-			onBackFromDiff: () => {
-				gitState.setCenterMode("chat");
-			},
-			onShowSelectedDiff: () => {
-				const fallbackPath =
-					gitState.selectedDiffPath ?? gitState.activeDiffs[0]?.path;
-
-				if (!fallbackPath) {
-					return;
-				}
-
-				if (!gitState.selectedDiffPath) {
-					gitState.setSelectedDiffPath(fallbackPath);
-				}
-
-				gitState.setCenterMode("diff");
-				if (isPhone) {
-					setActiveTab("git");
-				}
-			},
-			hasActiveGitDiffs: gitState.activeDiffs.length > 0,
 		},
 	};
 }
@@ -1105,11 +1052,6 @@ export function useMainAppLayoutSurfaces({
 	onResizeDebug,
 	onResizeTerminal,
 	isCompact,
-	isPhone,
-	activeTab,
-	setActiveTab,
-	tabletTab,
-	showMobilePollingFetchStatus,
 	appModalsAboutOpen,
 	updaterState,
 	startUpdate,
@@ -1267,11 +1209,6 @@ export function useMainAppLayoutSurfaces({
 		onResizeDebug,
 		onResizeTerminal,
 		isCompact,
-		isPhone,
-		activeTab,
-		setActiveTab,
-		tabletTab,
-		showMobilePollingFetchStatus,
 		appModalsAboutOpen,
 		updaterState,
 		startUpdate,

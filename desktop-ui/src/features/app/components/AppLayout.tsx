@@ -1,161 +1,88 @@
 import type { MouseEvent, ReactNode } from "react";
 import { memo } from "react";
 import { DesktopLayout } from "../../layout/components/DesktopLayout";
-import { PhoneLayout } from "../../layout/components/PhoneLayout";
-import { TabletLayout } from "../../layout/components/TabletLayout";
 
 type AppLayoutProps = {
-	isPhone: boolean;
-	isTablet: boolean;
-	showHome: boolean;
-	showGitDetail: boolean;
-	activeTab: "home" | "projects" | "codex" | "git" | "log";
-	tabletTab: "codex" | "git" | "log";
-	centerMode: "chat" | "diff";
-	preloadGitDiffs: boolean;
-	splitChatDiffView: boolean;
-	hasActivePlan: boolean;
-	activeWorkspace: boolean;
-	sidebarNode: ReactNode;
-	messagesNode: ReactNode;
-	composerNode: ReactNode;
-	approvalToastsNode: ReactNode;
-	updateToastNode: ReactNode;
-	errorToastsNode: ReactNode;
-	homeNode: ReactNode;
-	mainHeaderNode: ReactNode;
-	desktopTopbarLeftNode: ReactNode;
-	topbarActionsNode?: ReactNode;
-	tabBarNode: ReactNode;
-	gitDiffPanelNode: ReactNode;
-	gitDiffViewerNode: ReactNode;
-	planPanelNode: ReactNode;
-	debugPanelNode: ReactNode;
-	debugPanelFullNode: ReactNode;
-	terminalDockNode: ReactNode;
-	compactEmptyCodexNode: ReactNode;
-	compactEmptyGitNode: ReactNode;
-	compactGitBackNode: ReactNode;
-	onSidebarResizeStart: (event: MouseEvent<HTMLDivElement>) => void;
-	onChatDiffSplitPositionResizeStart: (
-		event: MouseEvent<HTMLDivElement>,
-	) => void;
-	onRightPanelResizeStart: (event: MouseEvent<HTMLDivElement>) => void;
-	onPlanPanelResizeStart: (event: MouseEvent<HTMLDivElement>) => void;
+  showHome: boolean;
+  centerMode: "chat" | "diff";
+  preloadGitDiffs: boolean;
+  splitChatDiffView: boolean;
+  hasActivePlan: boolean;
+  activeWorkspace: boolean;
+  sidebarNode: ReactNode;
+  messagesNode: ReactNode;
+  composerNode: ReactNode;
+  approvalToastsNode: ReactNode;
+  updateToastNode: ReactNode;
+  errorToastsNode: ReactNode;
+  homeNode: ReactNode;
+  desktopTopbarLeftNode: ReactNode;
+  topbarActionsNode?: ReactNode;
+  gitDiffPanelNode: ReactNode;
+  gitDiffViewerNode: ReactNode;
+  planPanelNode: ReactNode;
+  debugPanelNode: ReactNode;
+  terminalDockNode: ReactNode;
+  onSidebarResizeStart: (event: MouseEvent<HTMLDivElement>) => void;
+  onChatDiffSplitPositionResizeStart: (
+    event: MouseEvent<HTMLDivElement>,
+  ) => void;
+  onRightPanelResizeStart: (event: MouseEvent<HTMLDivElement>) => void;
+  onPlanPanelResizeStart: (event: MouseEvent<HTMLDivElement>) => void;
 };
 
 export const AppLayout = memo(function AppLayout({
-	isPhone,
-	isTablet,
-	showHome,
-	showGitDetail,
-	activeTab,
-	tabletTab,
-	centerMode,
-	preloadGitDiffs,
-	splitChatDiffView,
-	hasActivePlan,
-	activeWorkspace,
-	sidebarNode,
-	messagesNode,
-	composerNode,
-	approvalToastsNode,
-	updateToastNode,
-	errorToastsNode,
-	homeNode,
-	mainHeaderNode,
-	desktopTopbarLeftNode,
-	topbarActionsNode,
-	tabBarNode,
-	gitDiffPanelNode,
-	gitDiffViewerNode,
-	planPanelNode,
-	debugPanelNode,
-	debugPanelFullNode,
-	terminalDockNode,
-	compactEmptyCodexNode,
-	compactEmptyGitNode,
-	compactGitBackNode,
-	onSidebarResizeStart,
-	onChatDiffSplitPositionResizeStart,
-	onRightPanelResizeStart,
-	onPlanPanelResizeStart,
+  showHome,
+  centerMode,
+  preloadGitDiffs,
+  splitChatDiffView,
+  hasActivePlan,
+  activeWorkspace,
+  sidebarNode,
+  messagesNode,
+  composerNode,
+  approvalToastsNode,
+  updateToastNode,
+  errorToastsNode,
+  homeNode,
+  desktopTopbarLeftNode,
+  topbarActionsNode,
+  gitDiffPanelNode,
+  gitDiffViewerNode,
+  planPanelNode,
+  debugPanelNode,
+  terminalDockNode,
+  onSidebarResizeStart,
+  onChatDiffSplitPositionResizeStart,
+  onRightPanelResizeStart,
+  onPlanPanelResizeStart,
 }: AppLayoutProps) {
-	if (isPhone) {
-		return (
-			<PhoneLayout
-				approvalToastsNode={approvalToastsNode}
-				updateToastNode={updateToastNode}
-				errorToastsNode={errorToastsNode}
-				tabBarNode={tabBarNode}
-				homeNode={homeNode}
-				sidebarNode={sidebarNode}
-				activeTab={activeTab}
-				activeWorkspace={activeWorkspace}
-				showGitDetail={showGitDetail}
-				compactEmptyCodexNode={compactEmptyCodexNode}
-				compactEmptyGitNode={compactEmptyGitNode}
-				compactGitBackNode={compactGitBackNode}
-				topbarLeftNode={mainHeaderNode}
-				topbarActionsNode={topbarActionsNode}
-				messagesNode={messagesNode}
-				composerNode={composerNode}
-				gitDiffPanelNode={gitDiffPanelNode}
-				gitDiffViewerNode={gitDiffViewerNode}
-				debugPanelNode={debugPanelFullNode}
-			/>
-		);
-	}
-
-	if (isTablet) {
-		return (
-			<TabletLayout
-				approvalToastsNode={approvalToastsNode}
-				updateToastNode={updateToastNode}
-				errorToastsNode={errorToastsNode}
-				homeNode={homeNode}
-				showHome={showHome}
-				showWorkspace={activeWorkspace && !showHome}
-				sidebarNode={sidebarNode}
-				tabletTab={tabletTab}
-				onSidebarResizeStart={onSidebarResizeStart}
-				topbarLeftNode={mainHeaderNode}
-				topbarActionsNode={topbarActionsNode}
-				messagesNode={messagesNode}
-				composerNode={composerNode}
-				gitDiffPanelNode={gitDiffPanelNode}
-				gitDiffViewerNode={gitDiffViewerNode}
-				debugPanelNode={debugPanelFullNode}
-			/>
-		);
-	}
-
-	return (
-		<DesktopLayout
-			sidebarNode={sidebarNode}
-			updateToastNode={updateToastNode}
-			approvalToastsNode={approvalToastsNode}
-			errorToastsNode={errorToastsNode}
-			homeNode={homeNode}
-			showHome={showHome}
-			showWorkspace={activeWorkspace && !showHome}
-			topbarLeftNode={desktopTopbarLeftNode}
-			topbarActionsNode={topbarActionsNode}
-			centerMode={centerMode}
-			preloadGitDiffs={preloadGitDiffs}
-			splitChatDiffView={splitChatDiffView}
-			messagesNode={messagesNode}
-			gitDiffViewerNode={gitDiffViewerNode}
-			gitDiffPanelNode={gitDiffPanelNode}
-			planPanelNode={planPanelNode}
-			composerNode={composerNode}
-			terminalDockNode={terminalDockNode}
-			debugPanelNode={debugPanelNode}
-			hasActivePlan={hasActivePlan}
-			onSidebarResizeStart={onSidebarResizeStart}
-			onChatDiffSplitPositionResizeStart={onChatDiffSplitPositionResizeStart}
-			onRightPanelResizeStart={onRightPanelResizeStart}
-			onPlanPanelResizeStart={onPlanPanelResizeStart}
-		/>
-	);
+  return (
+    <DesktopLayout
+      sidebarNode={sidebarNode}
+      updateToastNode={updateToastNode}
+      approvalToastsNode={approvalToastsNode}
+      errorToastsNode={errorToastsNode}
+      homeNode={homeNode}
+      showHome={showHome}
+      showWorkspace={activeWorkspace && !showHome}
+      topbarLeftNode={desktopTopbarLeftNode}
+      topbarActionsNode={topbarActionsNode}
+      centerMode={centerMode}
+      preloadGitDiffs={preloadGitDiffs}
+      splitChatDiffView={splitChatDiffView}
+      messagesNode={messagesNode}
+      gitDiffViewerNode={gitDiffViewerNode}
+      gitDiffPanelNode={gitDiffPanelNode}
+      planPanelNode={planPanelNode}
+      composerNode={composerNode}
+      terminalDockNode={terminalDockNode}
+      debugPanelNode={debugPanelNode}
+      hasActivePlan={hasActivePlan}
+      onSidebarResizeStart={onSidebarResizeStart}
+      onChatDiffSplitPositionResizeStart={onChatDiffSplitPositionResizeStart}
+      onRightPanelResizeStart={onRightPanelResizeStart}
+      onPlanPanelResizeStart={onPlanPanelResizeStart}
+    />
+  );
 });

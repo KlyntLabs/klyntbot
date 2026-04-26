@@ -2,7 +2,6 @@ import type { ComponentProps, ReactNode } from "react";
 import type { ApprovalToasts } from "../../../app/components/ApprovalToasts";
 import type { MainHeader } from "../../../app/components/MainHeader";
 import type { Sidebar } from "../../../app/components/Sidebar";
-import type { TabBar } from "../../../app/components/TabBar";
 import type { Composer } from "../../../composer/components/Composer";
 import type { DebugPanel } from "../../../debug/components/DebugPanel";
 import type { FileTreePanel } from "../../../files/components/FileTreePanel";
@@ -49,7 +48,6 @@ export type LayoutPrimarySurface = {
 		showBackToChat: boolean;
 		onExitDiff: () => void;
 	};
-	tabBarProps: ComponentProps<typeof TabBar>;
 };
 
 export type LayoutGitSurface = {
@@ -60,7 +58,6 @@ export type LayoutGitSurface = {
 	gitDiffViewerProps: ComponentProps<typeof GitDiffViewer>;
 	diffViewProps: {
 		centerMode: "chat" | "diff";
-		isPhone: boolean;
 		splitChatDiffView: boolean;
 		gitDiffViewStyle: "split" | "unified";
 	};
@@ -71,14 +68,6 @@ export type LayoutSecondarySurface = {
 	terminalDockProps: Omit<ComponentProps<typeof TerminalDock>, "terminalNode">;
 	terminalState: TerminalSessionState | null;
 	debugPanelProps: ComponentProps<typeof DebugPanel>;
-	compactNavProps: {
-		onGoProjects: () => void;
-		centerMode: "chat" | "diff";
-		selectedDiffPath: string | null;
-		onBackFromDiff: () => void;
-		onShowSelectedDiff: () => void;
-		hasActiveGitDiffs: boolean;
-	};
 };
 
 export type LayoutNodesOptions = {
@@ -97,14 +86,9 @@ export type LayoutNodesResult = {
 	homeNode: ReactNode;
 	mainHeaderNode: ReactNode;
 	desktopTopbarLeftNode: ReactNode;
-	tabBarNode: ReactNode;
 	gitDiffPanelNode: ReactNode;
 	gitDiffViewerNode: ReactNode;
 	planPanelNode: ReactNode;
 	debugPanelNode: ReactNode;
-	debugPanelFullNode: ReactNode;
 	terminalDockNode: ReactNode;
-	compactEmptyCodexNode: ReactNode;
-	compactEmptyGitNode: ReactNode;
-	compactGitBackNode: ReactNode;
 };

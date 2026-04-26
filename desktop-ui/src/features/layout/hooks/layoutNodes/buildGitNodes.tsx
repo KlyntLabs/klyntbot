@@ -12,18 +12,15 @@ export type GitLayoutNodesOptions = LayoutGitSurface;
 type GitLayoutNodes = Pick<LayoutNodesResult, "gitDiffPanelNode" | "gitDiffViewerNode">;
 
 function resolveGitDiffStyle({
-  isPhone,
   splitChatDiffView,
   centerMode,
   userPreference,
 }: {
-  isPhone: boolean;
   splitChatDiffView: boolean;
   centerMode: GitLayoutNodesOptions["diffViewProps"]["centerMode"];
   userPreference: GitLayoutNodesOptions["diffViewProps"]["gitDiffViewStyle"];
 }): GitLayoutNodesOptions["diffViewProps"]["gitDiffViewStyle"] {
-  const shouldForceSingleColumn =
-    isPhone || (splitChatDiffView && centerMode === "chat");
+  const shouldForceSingleColumn = splitChatDiffView && centerMode === "chat";
   return shouldForceSingleColumn ? "unified" : userPreference;
 }
 
@@ -52,7 +49,6 @@ function buildGitDiffViewerNode(options: GitLayoutNodesOptions) {
     <GitDiffViewer
       {...options.gitDiffViewerProps}
       diffStyle={resolveGitDiffStyle({
-        isPhone: options.diffViewProps.isPhone,
         splitChatDiffView: options.diffViewProps.splitChatDiffView,
         centerMode: options.diffViewProps.centerMode,
         userPreference: options.diffViewProps.gitDiffViewStyle,

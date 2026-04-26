@@ -236,22 +236,16 @@ button.window-caption-control:focus-visible,
 }
 
 
-@media (max-width: 960px) {
-  .app {
+@media (max-width: 768px) {
+  .app.layout-desktop {
     grid-template-columns: 1fr;
   }
 
-  .sidebar {
-    flex-direction: row;
-    align-items: center;
-    overflow-x: auto;
+  .app.layout-desktop .sidebar {
+    display: none;
   }
 
-  .content {
-    grid-template-columns: 1fr;
-  }
-
-  .sidebar-resizer {
+  .app.layout-desktop .sidebar-resizer {
     display: none;
   }
 }
