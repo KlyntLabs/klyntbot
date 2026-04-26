@@ -1,5 +1,7 @@
 // @vitest-environment jsdom
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { act, cleanup, renderHook, waitFor } from "@testing-library/react";
+import { createElement } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { AppSettings, CodexDoctorResult } from "@/types";
 import { useAppSettings } from "./useAppSettings";
@@ -9,6 +11,13 @@ import {
   updateAppSettings,
 } from "@services/tauri";
 import { UI_SCALE_DEFAULT, UI_SCALE_MAX } from "@utils/uiScale";
+
+function withQuery({ children }: { children: React.ReactNode }) {
+	const client = new QueryClient({
+		defaultOptions: { queries: { retry: 0 } },
+	});
+	return createElement(QueryClientProvider, { client }, children);
+}
 
 vi.mock("@services/tauri", () => ({
   getAppSettings: vi.fn(),
@@ -43,9 +52,9 @@ describe("useAppSettings", () => {
       } as unknown) as AppSettings,
     );
 
-    const { result } = renderHook(() => useAppSettings());
+    const { result } = renderHook(() => useAppSettings(), { wrapper: withQuery });
 
-    await waitFor(() => expect(result.current.isLoading).toBe(false));
+    await waitFor(() => expect(result.current.settings.uiScale).toBe(UI_SCALE_MAX));
 
     expect(result.current.settings.uiScale).toBe(UI_SCALE_MAX);
     expect(result.current.settings.theme).toBe("system");
@@ -60,9 +69,9 @@ describe("useAppSettings", () => {
   it("keeps defaults when getAppSettings fails", async () => {
     getAppSettingsMock.mockRejectedValue(new Error("boom"));
 
-    const { result } = renderHook(() => useAppSettings());
+    const { result } = renderHook(() => useAppSettings(), { wrapper: withQuery });
 
-    await waitFor(() => expect(result.current.isLoading).toBe(false));
+    await waitFor(() => expect(result.current.settings.uiScale).toBe(UI_SCALE_DEFAULT));
 
     expect(result.current.settings.uiScale).toBe(UI_SCALE_DEFAULT);
     expect(result.current.settings.theme).toBe("system");
@@ -75,9 +84,9 @@ describe("useAppSettings", () => {
 
   it("persists settings via updateAppSettings and updates local state", async () => {
     getAppSettingsMock.mockResolvedValue({} as AppSettings);
-    const { result } = renderHook(() => useAppSettings());
+    const { result } = renderHook(() => useAppSettings(), { wrapper: withQuery });
 
-    await waitFor(() => expect(result.current.isLoading).toBe(false));
+    await waitFor(() => expect(result.current.settings.backendMode).toBe("local"));
 
     const next: AppSettings = {
       ...result.current.settings,
@@ -100,6 +109,7 @@ describe("useAppSettings", () => {
       notificationSoundsEnabled: false,
     };
     updateAppSettingsMock.mockResolvedValue(saved);
+    getAppSettingsMock.mockResolvedValue(saved);
 
     let returned: AppSettings | undefined;
     await act(async () => {
@@ -117,16 +127,16 @@ describe("useAppSettings", () => {
       }),
     );
     expect(returned).toEqual(saved);
-    expect(result.current.settings.theme).toBe("dark");
+    await waitFor(() => expect(result.current.settings.theme).toBe("dark"));
     expect(result.current.settings.uiScale).toBe(2.4);
   });
 
   it("surfaces doctor errors", async () => {
     getAppSettingsMock.mockResolvedValue({} as AppSettings);
     runCodexDoctorMock.mockRejectedValue(new Error("doctor fail"));
-    const { result } = renderHook(() => useAppSettings());
+    const { result } = renderHook(() => useAppSettings(), { wrapper: withQuery });
 
-    await waitFor(() => expect(result.current.isLoading).toBe(false));
+    await waitFor(() => expect(result.current.settings.backendMode).toBe("local"));
 
     await expect(result.current.doctor("/bin/codex", "--profile test")).rejects.toThrow(
       "doctor fail",
@@ -151,9 +161,9 @@ describe("useAppSettings", () => {
       nodeDetails: null,
     };
     runCodexDoctorMock.mockResolvedValue(response);
-    const { result } = renderHook(() => useAppSettings());
+    const { result } = renderHook(() => useAppSettings(), { wrapper: withQuery });
 
-    await waitFor(() => expect(result.current.isLoading).toBe(false));
+    await waitFor(() => expect(result.current.settings.backendMode).toBe("local"));
 
     await expect(result.current.doctor("/bin/codex", null)).resolves.toEqual(
       response,

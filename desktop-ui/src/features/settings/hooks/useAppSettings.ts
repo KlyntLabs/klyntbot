@@ -1,4 +1,6 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useMemo } from "react";
+import { useQueryClient } from "@tanstack/react-query";
+import { qk, useTauriMutation, useTauriQuery } from "@/lib/query";
 import type { AppSettings } from "@/types";
 import { getAppSettings, runCodexDoctor, updateAppSettings } from "@services/tauri";
 import { clampUiScale, UI_SCALE_DEFAULT } from "@utils/uiScale";
@@ -280,60 +282,65 @@ function normalizeAppSettings(settings: AppSettings): AppSettings {
 }
 
 export function useAppSettings() {
-  const defaultSettings = useMemo(() => buildDefaultSettings(), []);
-  const [settings, setSettings] = useState<AppSettings>(defaultSettings);
-  const [isLoading, setIsLoading] = useState(true);
+	const defaultSettings = useMemo(() => buildDefaultSettings(), []);
+	const queryClient = useQueryClient();
 
-  useEffect(() => {
-    let active = true;
-    void (async () => {
-      try {
-        const response = await getAppSettings();
-        if (active) {
-          setSettings(
-            normalizeAppSettings({
-              ...defaultSettings,
-              ...response,
-            }),
-          );
-        }
-      } catch {
-        // Defaults stay in place if loading settings fails.
-      } finally {
-        if (active) {
-          setIsLoading(false);
-        }
-      }
-    })();
-    return () => {
-      active = false;
-    };
-  }, [defaultSettings]);
+	const query = useTauriQuery<AppSettings>({
+		queryKey: qk.settings.app(),
+		queryFn: async () => {
+			try {
+				const response = await getAppSettings();
+				return normalizeAppSettings({
+					...defaultSettings,
+					...response,
+				});
+			} catch {
+				// Fall back to defaults if loading settings fails.
+				return defaultSettings;
+			}
+		},
+		fallback: defaultSettings,
+	});
 
-  const saveSettings = useCallback(async (next: AppSettings) => {
-    const normalized = normalizeAppSettings(next);
-    const saved = await updateAppSettings(normalized);
-    setSettings(
-      normalizeAppSettings({
-        ...defaultSettings,
-        ...saved,
-      }),
-    );
-    return saved;
-  }, [defaultSettings]);
+	const save = useTauriMutation<AppSettings, AppSettings>({
+		mutationFn: async (next) => {
+			const normalized = normalizeAppSettings(next);
+			const saved = await updateAppSettings(normalized);
+			return saved;
+		},
+		invalidates: [qk.settings.app()],
+		onSuccess: (saved) => {
+			queryClient.setQueryData<AppSettings>(
+				qk.settings.app(),
+				normalizeAppSettings({ ...defaultSettings, ...saved }),
+			);
+		},
+	});
 
-  const doctor = useCallback(
-    async (codexBin: string | null, codexArgs: string | null) => {
-      return runCodexDoctor(codexBin, codexArgs);
-    },
-    [],
-  );
+	const setSettings = useCallback(
+		(updater: AppSettings | ((prev: AppSettings) => AppSettings)) => {
+			queryClient.setQueryData<AppSettings>(qk.settings.app(), (prev) => {
+				const base = prev ?? defaultSettings;
+				return typeof updater === "function"
+					? (updater as (p: AppSettings) => AppSettings)(base)
+					: updater;
+			});
+		},
+		[queryClient, defaultSettings],
+	);
 
-  return {
-    settings,
-    setSettings,
-    saveSettings,
-    doctor,
-    isLoading,
-  };
+	const doctor = useCallback(
+		async (codexBin: string | null, codexArgs: string | null) => {
+			return runCodexDoctor(codexBin, codexArgs);
+		},
+		[],
+	);
+
+	return {
+		settings: query.data,
+		setSettings,
+		saveSettings: save.mutate,
+		doctor,
+		isLoading: query.isLoading,
+	};
 }
