@@ -85,21 +85,16 @@ function resolveShouldLoadGitHubPanelData({
 
 function useMainAppGitBranchActions({
   activeWorkspace,
-  addDebugEntry,
   refreshGitStatus,
   refreshGitLog,
   currentBranch,
 }: {
   activeWorkspace: WorkspaceInfo | null;
-  addDebugEntry: (entry: DebugEntry) => void;
   refreshGitStatus: () => void;
   refreshGitLog: () => void;
   currentBranch: string | null;
 }) {
-  const { branches, checkoutBranch, checkoutPullRequest, createBranch } = useGitBranches({
-    activeWorkspace,
-    onDebug: addDebugEntry,
-  });
+  const { branches, checkoutBranch, checkoutPullRequest, createBranch } = useGitBranches(activeWorkspace);
 
   const alertError = useCallback((error: unknown) => {
     alert(error instanceof Error ? error.message : String(error));
@@ -204,6 +199,7 @@ export function useMainAppGitState({
   startThreadForWorkspace,
   sendUserMessageToThread,
 }: UseMainAppGitStateOptions) {
+  void addDebugEntry;
   const alertError = useCallback((error: unknown) => {
     alert(error instanceof Error ? error.message : String(error));
   }, []);
@@ -322,7 +318,6 @@ export function useMainAppGitState({
     handleCreateBranch,
   } = useMainAppGitBranchActions({
     activeWorkspace,
-    addDebugEntry,
     refreshGitStatus,
     refreshGitLog,
     currentBranch: gitStatus.branchName ?? null,
