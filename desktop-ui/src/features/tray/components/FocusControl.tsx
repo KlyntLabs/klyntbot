@@ -17,7 +17,7 @@ import {
 	isTauri,
 } from "@/utils/tauri-bridge";
 import { FOCUS_PRESETS, type useFocusTimer } from "../hooks/useFocusTimer";
-import { useTrayQuery } from "../hooks/useTrayQuery";
+import { qk, useTauriQuery } from "@/lib/query";
 import { formatElapsed, formatHumanDuration } from "../lib/dates";
 import type { FocusSettings } from "../types";
 import { Checkbox } from "./Checkbox";
@@ -37,7 +37,7 @@ function PauseResumeButton({ timer }: { timer: Timer }) {
 			type="button"
 			className="tc-icon-btn"
 			onClick={timer.paused ? timer.resume : timer.pause}
-			disabled={timer.loading}
+			disabled={timer.isLoading}
 			title={timer.paused ? "Resume" : "Pause"}
 		>
 			{timer.paused ? (
@@ -134,7 +134,7 @@ function TimerView({
 		settings,
 		cyclePosition,
 		longBreakAfter,
-		loading,
+		isLoading: loading,
 		showWarning,
 		dndHint,
 	} = timer;
@@ -146,11 +146,11 @@ function TimerView({
 	const { data: autotunerStatus } = useAutoTunerStatus();
 	const [learningBannerDismissed, setLearningBannerDismissed] = useState(false);
 
-	const { data: dueCount } = useTrayQuery<number>(
-		"flashcard_total_due",
-		undefined,
-		0,
-	);
+	const { data: dueCount } = useTauriQuery<number>({
+		queryKey: qk.flashcards.dueCount(),
+		command: "flashcard_total_due",
+		fallback: 0,
+	});
 	const [reviewPromptDismissed, setReviewPromptDismissed] = useState(false);
 
 	const handleReviewAccept = async () => {
@@ -520,7 +520,7 @@ function WarningBanner({
 						key={opt.secs}
 						type="button"
 						onClick={() => timer.extend(opt.secs)}
-						disabled={timer.loading}
+						disabled={timer.isLoading}
 						className="tc-pill is-warning"
 					>
 						{opt.label}
@@ -529,7 +529,7 @@ function WarningBanner({
 				<button
 					type="button"
 					onClick={() => timer.stop()}
-					disabled={timer.loading}
+					disabled={timer.isLoading}
 					className="tc-pill"
 				>
 					End now
@@ -549,7 +549,7 @@ function BreakPendingActions({ timer }: { timer: Timer }) {
 						key={mins}
 						type="button"
 						onClick={() => timer.extendWork(mins)}
-						disabled={timer.loading}
+						disabled={timer.isLoading}
 						className="tc-pill"
 					>
 						+{mins}m work
@@ -560,7 +560,7 @@ function BreakPendingActions({ timer }: { timer: Timer }) {
 				<button
 					type="button"
 					onClick={timer.startBreak}
-					disabled={timer.loading}
+					disabled={timer.isLoading}
 					className="tc-pill"
 				>
 					<Coffee className="tc-icon-xs" strokeWidth={1.5} />
@@ -569,7 +569,7 @@ function BreakPendingActions({ timer }: { timer: Timer }) {
 				<button
 					type="button"
 					onClick={() => timer.stop()}
-					disabled={timer.loading}
+					disabled={timer.isLoading}
 					className="tc-pill"
 				>
 					<Square className="tc-icon-xs" strokeWidth={1.5} />
