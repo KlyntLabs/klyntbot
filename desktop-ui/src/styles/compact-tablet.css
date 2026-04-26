@@ -1,67 +1,7 @@
 .app.layout-tablet {
   display: grid;
-  grid-template-columns: var(--tablet-nav-width, 72px) var(--sidebar-width, 280px) minmax(0, 1fr);
+  grid-template-columns: var(--sidebar-width, 280px) minmax(0, 1fr);
   grid-template-rows: 1fr;
-  --tablet-nav-width: 72px;
-}
-
-.tablet-nav {
-  display: flex;
-  flex-direction: column;
-  align-items: stretch;
-  gap: 10px;
-  padding: 36px 8px 16px;
-  background: var(--surface-topbar);
-  border-right: 1px solid var(--border-subtle);
-  min-height: 0;
-  height: 100%;
-}
-
-.tablet-nav-group {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-
-.tablet-nav-item {
-  border: 1px solid transparent;
-  background: transparent;
-  color: var(--text-subtle);
-  border-radius: 12px;
-  padding: 10px 6px;
-  font-size: 11px;
-  font-weight: 600;
-  letter-spacing: 0.02em;
-  cursor: pointer;
-  text-align: center;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 6px;
-  transition: color 0.15s ease, background-color 0.15s ease, border-color 0.15s ease;
-}
-
-.tablet-nav-item:hover {
-  color: var(--text-stronger);
-  background: var(--surface-hover);
-}
-
-.tablet-nav-item.active {
-  color: var(--text-strong);
-  background: var(--surface-control-hover);
-  border-color: var(--border-accent-soft);
-}
-
-.tablet-nav-label {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 100%;
-}
-
-.tablet-nav-icon {
-  width: 20px;
-  height: 20px;
 }
 
 .tablet-projects {

@@ -23,12 +23,15 @@
   --text-faint: rgba(255, 255, 255, 0.5);
   --text-fainter: rgba(255, 255, 255, 0.45);
   --text-dim: rgba(255, 255, 255, 0.35);
-  --surface-sidebar: rgba(18, 18, 18, 0.5);
-  --surface-sidebar-opaque: rgb(18, 18, 18);
-  --surface-topbar: rgba(10, 14, 20, 0.45);
-  --surface-right-panel: rgba(9, 12, 20, 0.4);
-  --surface-composer: rgba(10, 14, 20, 0.45);
-  --surface-messages: rgba(8, 10, 16, 0.45);
+  /* Codex-matched palette. Fully opaque so the window tint is stable
+     regardless of wallpaper or vibrancy material behind it.
+     Sidebar slightly lighter than main for Codex's subtle separation. */
+  --surface-sidebar: rgb(22, 24, 28);
+  --surface-sidebar-opaque: rgb(22, 24, 28);
+  --surface-topbar: rgb(20, 22, 26);
+  --surface-right-panel: rgb(18, 20, 24);
+  --surface-composer: rgb(18, 20, 24);
+  --surface-messages: rgb(15, 16, 20);
   --surface-card: rgba(255, 255, 255, 0.04);
   --surface-card-strong: rgba(255, 255, 255, 0.12);
   --surface-card-muted: rgba(255, 255, 255, 0.06);

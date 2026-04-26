@@ -6,8 +6,9 @@
   "scripts": {
     "sync:material-icons": "node scripts/sync-material-icons.mjs",
     "postinstall": "bun run sync:material-icons",
-    "predev": "bun run sync:material-icons",
-    "dev": "vite",
+    "predev:vite": "bun run sync:material-icons",
+    "dev:vite": "exec vite",
+    "dev": "cd .. && cargo tauri dev",
     "prebuild": "bun run sync:material-icons",
     "build": "tsc && vite build",
     "build:appimage": "NO_STRIP=1 tauri build --bundles appimage",

@@ -42,12 +42,31 @@ export class MenuItem extends MockMenuBase {}
 export class PredefinedMenuItem extends MockMenuBase {}
 
 // ---- @tauri-apps/api/webview ----
+// Proxy: explicit methods take precedence; any other method becomes a no-op
+// async stub (resolves to undefined) so we don't have to enumerate Tauri's
+// full API surface. TODO(klynt-integration): swap for the real webview handle.
+function makeMockHandle(explicit: Record<string, unknown>) {
+	return new Proxy(explicit, {
+		get(target, prop) {
+			if (prop in target) {
+				return (target as Record<string | symbol, unknown>)[prop];
+			}
+			if (typeof prop === "symbol") {
+				return undefined;
+			}
+			// Default: any unknown method returns a resolved promise.
+			return (..._args: unknown[]) => Promise.resolve(undefined);
+		},
+	});
+}
+
 export function getCurrentWebview() {
-	return {
+	return makeMockHandle({
+		label: "main",
 		async onDragDropEvent(_handler: unknown): Promise<() => void> {
 			return () => {};
 		},
-	};
+	});
 }
 
 // ---- @tauri-apps/api/window ----
@@ -70,7 +89,7 @@ export const EffectState = {
 } as const;
 
 export function getCurrentWindow() {
-	return {
+	return makeMockHandle({
 		label: "main",
 		async setTitle(_t: string): Promise<void> {},
 		async setSize(_s: unknown): Promise<void> {},
@@ -114,7 +133,7 @@ export function getCurrentWindow() {
 		async listen(_event: string, _cb: unknown): Promise<() => void> {
 			return () => {};
 		},
-	};
+	});
 }
 
 // ---- @tauri-apps/plugin-dialog ----

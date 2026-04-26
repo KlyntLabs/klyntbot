@@ -52,7 +52,9 @@ body {
   display: grid;
   grid-template-columns: var(--sidebar-width, 280px) 1fr;
   background: transparent;
-  border-radius: 0;
+  /* Match macOS native window radius so the panel fills the rounded
+     window without a fringe. Tauri rounds the window itself at ~10px. */
+  border-radius: 10px;
   overflow: hidden;
   position: relative;
   --main-topbar-height: 44px;

@@ -8,6 +8,8 @@
   -webkit-app-region: no-drag;
   min-height: 0;
   min-width: 0;
+  /* Codex-style: deeper slate than sidebar, fully opaque. */
+  background: var(--surface-messages);
   --main-panel-padding: 24px;
   --conversation-column-width: 900px;
   transition: grid-template-columns 220ms ease;

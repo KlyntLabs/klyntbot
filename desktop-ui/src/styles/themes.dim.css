@@ -1,11 +1,11 @@
 :root[data-theme="dim"] {
   color-scheme: dark;
-  --surface-sidebar: rgba(41, 44, 51, 0.78);
-  --surface-sidebar-opaque: rgb(41, 44, 51);
-  --surface-topbar: rgba(35, 38, 45, 0.72);
-  --surface-right-panel: rgba(36, 39, 46, 0.72);
-  --surface-composer: rgba(35, 38, 45, 0.75);
-  --surface-messages: rgba(32, 35, 42, 0.72);
+  --surface-sidebar: rgba(22, 24, 28, 0.94);
+  --surface-sidebar-opaque: rgb(22, 24, 28);
+  --surface-topbar: rgba(20, 22, 26, 0.96);
+  --surface-right-panel: rgba(20, 22, 26, 0.96);
+  --surface-composer: rgba(20, 22, 26, 0.96);
+  --surface-messages: rgba(18, 20, 24, 0.96);
   --surface-card: rgba(255, 255, 255, 0.06);
   --surface-card-strong: rgba(255, 255, 255, 0.14);
   --surface-card-muted: rgba(255, 255, 255, 0.08);

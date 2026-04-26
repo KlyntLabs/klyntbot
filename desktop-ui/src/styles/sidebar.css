@@ -1,6 +1,7 @@
 .sidebar {
   --sidebar-padding: 20px;
   padding: var(--sidebar-top-padding, 36px) var(--sidebar-padding) 20px;
+  /* Codex-style solid dark slate — no vibrancy bleed. */
   background: var(--surface-sidebar);
   backdrop-filter: none;
   border-right: 1px solid var(--border-subtle);

@@ -1,0 +1,14 @@
+{
+  "name": "klynt-workspace",
+  "private": true,
+  "description": "Root delegation scripts for Klynt. Frontend lives in desktop-ui/.",
+  "scripts": {
+    "dev": "cd desktop-ui && bun run dev",
+    "dev:vite": "cd desktop-ui && bun run dev:vite",
+    "build": "cd desktop-ui && bun run build",
+    "test": "cd desktop-ui && bun run test",
+    "typecheck": "cd desktop-ui && bun run typecheck",
+    "lint": "cd desktop-ui && bun run lint",
+    "tauri:build": "cd desktop-ui && bun run tauri:build"
+  }
+}

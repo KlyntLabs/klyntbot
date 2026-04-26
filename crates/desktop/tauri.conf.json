@@ -3,7 +3,10 @@
   "version": "0.1.1",
   "identifier": "com.klynt.app",
   "build": {
-    "beforeDevCommand": "",
+    "beforeDevCommand": {
+      "script": "bun run dev:vite",
+      "cwd": "../../desktop-ui"
+    },
     "beforeBuildCommand": {
       "script": "bun run build",
       "cwd": "../../desktop-ui"
@@ -22,9 +25,13 @@
         "decorations": true,
         "titleBarStyle": "Overlay",
         "hiddenTitle": true,
-        "transparent": false,
+        "transparent": true,
         "visible": false,
-        "dragDropEnabled": false
+        "dragDropEnabled": false,
+        "windowEffects": {
+          "effects": ["hudWindow"],
+          "state": "active"
+        }
       }
     ],
     "macOSPrivateApi": true,
