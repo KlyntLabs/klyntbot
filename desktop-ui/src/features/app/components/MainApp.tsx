@@ -1,4 +1,5 @@
 import { useAppBootstrapOrchestration } from "@app/bootstrap/useAppBootstrapOrchestration";
+import { useChatThreads } from "@/features/chat/hooks/useChatThreads";
 import { MainAppShell } from "@app/components/MainAppShell";
 import { useAccountSwitching } from "@app/hooks/useAccountSwitching";
 import { useArchiveShortcut } from "@app/hooks/useArchiveShortcut";
@@ -317,6 +318,20 @@ export default function MainApp() {
 	useEffect(() => {
 		setSelectedServiceTier(preferredServiceTier);
 	}, [preferredServiceTier, threadCodexSelectionKey]);
+
+	const [appView, setAppView] = useState<"home" | "chat">("home");
+	const [selectedSessionKey, setSelectedSessionKey] = useState<string | null>(null);
+	const { threads: chatThreads, refetch: refetchChatThreads } = useChatThreads();
+
+	const onNewChat = useCallback(() => {
+		setSelectedSessionKey(`chat:${crypto.randomUUID()}`);
+		setAppView("chat");
+	}, []);
+
+	const onSelectThread = useCallback((sessionKey: string) => {
+		setSelectedSessionKey(sessionKey);
+		setAppView("chat");
+	}, []);
 
 	const {
 		handleSelectModel,
@@ -1755,6 +1770,14 @@ export default function MainApp() {
 		dismissErrorToast,
 		showDebugButton,
 		handleDebugClick,
+		chatView: {
+			appView,
+			selectedSessionKey,
+			onNewChat,
+			onSelectThread,
+			chatThreads,
+			refetchChatThreads,
+		},
 	});
 
 	const {
@@ -1773,7 +1796,7 @@ export default function MainApp() {
 		terminalDockNode,
 	} = useMainAppLayoutNodes(layoutSurfaces);
 
-	const mainMessagesNode = showWorkspaceHome ? workspaceHomeNode : messagesNode;
+	const mainMessagesNode = showWorkspaceHome && appView !== "chat" ? workspaceHomeNode : messagesNode;
 	const compactThreadConnectionState: "live" | "polling" | "disconnected" =
 		!activeWorkspace?.connected ? "disconnected" : remoteThreadConnectionState;
 	const mainAppShellProps = useMainAppShellProps({
@@ -1796,12 +1819,12 @@ export default function MainApp() {
 			selectedPullRequestNumber: selectedPullRequest?.number ?? null,
 		},
 		appLayout: {
-			showHome,
-			centerMode,
+			showHome: showHome && appView !== "chat",
+			centerMode: appView === "chat" ? "chat" : centerMode,
 			preloadGitDiffs: appSettings.preloadGitDiffs,
 			splitChatDiffView: appSettings.splitChatDiffView,
 			hasActivePlan: hasActivePlan,
-			activeWorkspace: Boolean(activeWorkspace),
+			activeWorkspace: Boolean(activeWorkspace) || appView === "chat",
 			sidebarNode,
 			messagesNode: mainMessagesNode,
 			composerNode,

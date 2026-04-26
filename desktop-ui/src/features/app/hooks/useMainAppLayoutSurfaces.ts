@@ -7,6 +7,7 @@ import type { useMainAppWorktreeState } from "@app/hooks/useMainAppWorktreeState
 import { REMOTE_THREAD_POLL_INTERVAL_MS } from "@app/hooks/useRemoteThreadRefreshOnFocus";
 import type { WorkspaceLaunchScriptsState } from "@app/hooks/useWorkspaceLaunchScripts";
 import type { RefObject } from "react";
+import type { SidebarProps } from "@app/components/Sidebar";
 import type { LayoutNodesOptions } from "@/features/layout/hooks/layoutNodes/types";
 import type { ThreadState } from "@/features/threads/hooks/useThreadsReducer";
 import type {
@@ -14,8 +15,6 @@ import type {
 	ComposerEditorSettings,
 	WorkspaceInfo,
 } from "@/types";
-
-type SidebarProps = LayoutNodesOptions["primary"]["sidebarProps"];
 type ComposerProps = NonNullable<
 	LayoutNodesOptions["primary"]["composerProps"]
 >;
@@ -240,47 +239,30 @@ type UseMainAppLayoutSurfacesArgs = {
 	dismissErrorToast: LayoutNodesOptions["primary"]["errorToastsProps"]["onDismiss"];
 	showDebugButton: boolean;
 	handleDebugClick: () => void;
+	chatView: {
+		appView: "home" | "chat";
+		selectedSessionKey: string | null;
+		onNewChat: () => void;
+		onSelectThread: (sessionKey: string) => void;
+		chatThreads: import("@/features/chat/types").ChatThread[];
+		refetchChatThreads: () => Promise<void>;
+	};
 };
 
-type MainAppLayoutSurfacesContext = UseMainAppLayoutSurfacesArgs & {
-	sidebarRateLimits: SidebarProps["accountRateLimits"];
-	sidebarAccount: SidebarProps["accountInfo"];
-};
+type MainAppLayoutSurfacesContext = UseMainAppLayoutSurfacesArgs;
 
 function buildPrimarySurface({
 	appSettings,
 	workspaces,
-	groupedWorkspaces,
-	workspaceGroupsCount,
-	deletingWorktreeIds,
-	newAgentDraftWorkspaceId,
-	startingDraftThreadWorkspaceId,
-	threadsByWorkspace,
-	threadParentById,
 	threadStatusById,
 	threadResumeLoadingById,
-	threadListLoadingByWorkspace,
-	threadListPagingByWorkspace,
-	threadListCursorByWorkspace,
-	pinnedThreadsVersion,
-	threadListSortKey,
-	onSetThreadListSortKey,
-	threadListOrganizeMode,
-	onSetThreadListOrganizeMode,
-	onRefreshAllThreads,
 	activeWorkspace,
-	activeWorkspaceId,
 	activeThreadId,
 	activeItems,
 	userInputRequests,
 	approvals,
-	sidebarRateLimits,
-	sidebarAccount,
 	homeRateLimits,
 	homeAccount,
-	accountSwitching,
-	onSwitchAccount,
-	onCancelSwitchAccount,
 	onDecision,
 	onRemember,
 	onUserInputSubmit,
@@ -303,17 +285,12 @@ function buildPrimarySurface({
 	worktreeState,
 	sidebarHandlers,
 	displayNodes,
-	threadPinning,
-	workspaceDrop,
 	threadNavigation,
 	pullRequestComposer,
 	dictationUi,
 	openAppIconById,
 	handleAddWorkspace,
 	openWorkspaceFromUrlPrompt,
-	handleAddAgent,
-	handleAddWorktreeAgent,
-	handleAddCloneAgent,
 	handleOpenThreadLink,
 	handleSelectOpenAppId,
 	handleCopyThread,
@@ -383,69 +360,20 @@ function buildPrimarySurface({
 	dismissPostUpdateNotice,
 	errorToasts,
 	dismissErrorToast,
-	showDebugButton,
-	handleDebugClick,
+	chatView,
 }: MainAppLayoutSurfacesContext): LayoutNodesOptions["primary"] {
 	return {
 		sidebarProps: {
-			workspaces,
-			groupedWorkspaces,
-			hasWorkspaceGroups: workspaceGroupsCount > 0,
-			deletingWorktreeIds,
-			newAgentDraftWorkspaceId,
-			startingDraftThreadWorkspaceId,
-			threadsByWorkspace,
-			threadParentById,
-			threadStatusById,
-			threadListLoadingByWorkspace,
-			threadListPagingByWorkspace,
-			threadListCursorByWorkspace,
-			pinnedThreadsVersion,
-			threadListSortKey,
-			onSetThreadListSortKey,
-			threadListOrganizeMode,
-			onSetThreadListOrganizeMode,
-			onRefreshAllThreads,
-			activeWorkspaceId,
-			activeThreadId,
-			userInputRequests,
-			accountRateLimits: sidebarRateLimits,
-			usageShowRemaining: appSettings.usageShowRemaining,
-			accountInfo: sidebarAccount,
-			onSwitchAccount,
-			onCancelSwitchAccount,
-			accountSwitching,
 			onOpenSettings: sidebarHandlers.onOpenSettings,
-			onOpenDebug: handleDebugClick,
-			showDebugButton,
-			onAddWorkspace: handleAddWorkspace,
-			onSelectHome: sidebarHandlers.onSelectHome,
-			onSelectWorkspace: sidebarHandlers.onSelectWorkspace,
-			onConnectWorkspace: sidebarHandlers.onConnectWorkspace,
-			onAddAgent: handleAddAgent,
-			onAddWorktreeAgent: handleAddWorktreeAgent,
-			onAddCloneAgent: handleAddCloneAgent,
-			onToggleWorkspaceCollapse: sidebarHandlers.onToggleWorkspaceCollapse,
-			onSelectThread: sidebarHandlers.onSelectThread,
-			onDeleteThread: sidebarHandlers.onDeleteThread,
-			onSyncThread: sidebarHandlers.onSyncThread,
-			pinThread: threadPinning.pinThread,
-			unpinThread: threadPinning.unpinThread,
-			isThreadPinned: threadPinning.isThreadPinned,
-			getPinTimestamp: threadPinning.getPinTimestamp,
-			getThreadArgsBadge: threadPinning.getThreadArgsBadge,
-			onRenameThread: sidebarHandlers.onRenameThread,
-			onDeleteWorkspace: sidebarHandlers.onDeleteWorkspace,
-			onDeleteWorktree: sidebarHandlers.onDeleteWorktree,
-			onLoadOlderThreads: sidebarHandlers.onLoadOlderThreads,
-			onReloadWorkspaceThreads: sidebarHandlers.onReloadWorkspaceThreads,
-			workspaceDropTargetRef: workspaceDrop.workspaceDropTargetRef,
-			isWorkspaceDropActive: workspaceDrop.isWorkspaceDropActive,
-			workspaceDropText: workspaceDrop.workspaceDropText,
-			onWorkspaceDragOver: workspaceDrop.onWorkspaceDragOver,
-			onWorkspaceDragEnter: workspaceDrop.onWorkspaceDragEnter,
-			onWorkspaceDragLeave: workspaceDrop.onWorkspaceDragLeave,
-			onWorkspaceDrop: workspaceDrop.onWorkspaceDrop,
+			onNewChat: chatView.onNewChat,
+			threads: chatView.chatThreads,
+			selectedSessionKey: chatView.selectedSessionKey,
+			onSelectThread: chatView.onSelectThread,
+		},
+		chatViewProps: {
+			active: chatView.appView === "chat",
+			sessionKey: chatView.selectedSessionKey,
+			onThreadsChanged: chatView.refetchChatThreads,
 		},
 		messagesProps: {
 			items: activeItems,
@@ -1062,9 +990,8 @@ export function useMainAppLayoutSurfaces({
 	dismissErrorToast,
 	showDebugButton,
 	handleDebugClick,
+	chatView,
 }: UseMainAppLayoutSurfacesArgs): LayoutNodesOptions {
-	const sidebarRateLimits = activeWorkspace ? activeRateLimits : homeRateLimits;
-	const sidebarAccount = activeWorkspace ? activeAccount : homeAccount;
 	const context: MainAppLayoutSurfacesContext = {
 		appSettings,
 		workspaces,
@@ -1219,8 +1146,7 @@ export function useMainAppLayoutSurfaces({
 		dismissErrorToast,
 		showDebugButton,
 		handleDebugClick,
-		sidebarRateLimits,
-		sidebarAccount,
+		chatView,
 	};
 
 	return {

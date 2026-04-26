@@ -7,10 +7,14 @@ import {
   Settings,
   SquarePen,
 } from "lucide-react";
+import type { ChatThread } from "@/features/chat/types";
 
 type SidebarChatLayoutProps = {
-  onSelectHome: () => void;
   onOpenSettings: () => void;
+  onNewChat: () => void;
+  threads: ChatThread[];
+  selectedSessionKey: string | null;
+  onSelectThread: (sessionKey: string) => void;
 };
 
 type NavItem = {
@@ -21,11 +25,14 @@ type NavItem = {
 };
 
 export const SidebarChatLayout = memo(function SidebarChatLayout({
-  onSelectHome,
   onOpenSettings,
+  onNewChat,
+  threads,
+  selectedSessionKey,
+  onSelectThread,
 }: SidebarChatLayoutProps) {
   const navItems: NavItem[] = [
-    { id: "new-chat", label: "New chat", icon: <SquarePen aria-hidden />, onClick: onSelectHome },
+    { id: "new-chat", label: "New chat", icon: <SquarePen aria-hidden />, onClick: onNewChat },
     { id: "search", label: "Search", icon: <Search aria-hidden /> },
     { id: "plugins", label: "Plugins", icon: <LayoutGrid aria-hidden /> },
     { id: "automations", label: "Automations", icon: <Clock aria-hidden /> },
@@ -35,9 +42,7 @@ export const SidebarChatLayout = memo(function SidebarChatLayout({
   return (
     <aside className="sidebar-chat">
       <div className="sidebar-chat__drag-strip" />
-
       <div className="sidebar-chat__topbar" aria-hidden />
-
 
       <nav className="sidebar-chat__nav" aria-label="Primary">
         {navItems.map((item) => (
@@ -55,7 +60,29 @@ export const SidebarChatLayout = memo(function SidebarChatLayout({
 
       <div className="sidebar-chat__chats">
         <div className="sidebar-chat__section-title">Chats</div>
-        <div className="sidebar-chat__chats-empty">No chats</div>
+        {threads.length === 0 ? (
+          <div className="sidebar-chat__chats-empty">No chats</div>
+        ) : (
+          <ul className="sidebar-chat__thread-list">
+            {threads.map((t) => (
+              <li key={t.sessionKey}>
+                <button
+                  type="button"
+                  className={
+                    "sidebar-chat__thread-item" +
+                    (t.sessionKey === selectedSessionKey
+                      ? " sidebar-chat__thread-item--active"
+                      : "")
+                  }
+                  onClick={() => onSelectThread(t.sessionKey)}
+                  title={t.title}
+                >
+                  {t.title || "Untitled"}
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
       </div>
 
       <div className="sidebar-chat__spacer" />

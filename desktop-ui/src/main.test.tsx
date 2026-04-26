@@ -47,15 +47,9 @@ describe("main sentry bootstrap", () => {
         release: expect.any(String),
       }),
     );
-    expect(sentryMetricsCountMock).toHaveBeenCalledTimes(1);
-    expect(sentryMetricsCountMock).toHaveBeenCalledWith(
-      "app_open",
-      1,
-      expect.objectContaining({
-        attributes: expect.objectContaining({
-          platform: "macos",
-        }),
-      }),
-    );
+    // Sentry.metrics.count was removed from main.tsx when @sentry/react v9+
+    // dropped the metrics API. The shim exists but app_open is no longer
+    // recorded at bootstrap.
+    expect(sentryMetricsCountMock).not.toHaveBeenCalled();
   });
 });

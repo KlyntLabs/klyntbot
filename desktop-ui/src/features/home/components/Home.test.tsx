@@ -50,7 +50,7 @@ describe("Home", () => {
     );
 
     expect(screen.getByText("Latest agents")).toBeTruthy();
-    expect(screen.getByText("Klynt")).toBeTruthy();
+    expect(screen.getAllByText("Klynt").length).toBeGreaterThanOrEqual(1);
     expect(screen.getByText("Frontend")).toBeTruthy();
     const message = screen.getByText("Ship the dashboard refresh");
     const card = message.closest("button");

@@ -1,7 +1,6 @@
 import type { ComponentProps, ReactNode } from "react";
 import type { ApprovalToasts } from "@app/components/ApprovalToasts";
 import type { MainHeader } from "@app/components/MainHeader";
-import type { Sidebar } from "@app/components/Sidebar";
 import type { Composer } from "@/features/composer/components/Composer";
 import type { DebugPanel } from "@/features/debug/components/DebugPanel";
 import type { FileTreePanel } from "@/features/files/components/FileTreePanel";
@@ -35,19 +34,34 @@ export type WorktreeRenameState = {
 	onCommit: () => void;
 };
 
+export type ChatViewProps = {
+  active: boolean;
+  sessionKey: string | null;
+  onThreadsChanged: () => void;
+};
+
+export type SidebarChatProps = {
+  onOpenSettings: () => void;
+  onNewChat: () => void;
+  threads: import("@/features/chat/types").ChatThread[];
+  selectedSessionKey: string | null;
+  onSelectThread: (sessionKey: string) => void;
+};
+
 export type LayoutPrimarySurface = {
-	sidebarProps: ComponentProps<typeof Sidebar>;
-	messagesProps: ComponentProps<typeof Messages>;
-	composerProps: ComponentProps<typeof Composer> | null;
-	approvalToastsProps: ComponentProps<typeof ApprovalToasts>;
-	updateToastProps: ComponentProps<typeof UpdateToast>;
-	errorToastsProps: ComponentProps<typeof ErrorToasts>;
-	homeProps: ComponentProps<typeof Home>;
-	mainHeaderProps: ComponentProps<typeof MainHeader> | null;
-	desktopTopbarProps: {
-		showBackToChat: boolean;
-		onExitDiff: () => void;
-	};
+  sidebarProps: SidebarChatProps;
+  messagesProps: ComponentProps<typeof Messages>;
+  composerProps: ComponentProps<typeof Composer> | null;
+  approvalToastsProps: ComponentProps<typeof ApprovalToasts>;
+  updateToastProps: ComponentProps<typeof UpdateToast>;
+  errorToastsProps: ComponentProps<typeof ErrorToasts>;
+  homeProps: ComponentProps<typeof Home>;
+  mainHeaderProps: ComponentProps<typeof MainHeader> | null;
+  desktopTopbarProps: {
+    showBackToChat: boolean;
+    onExitDiff: () => void;
+  };
+  chatViewProps: ChatViewProps;
 };
 
 export type LayoutGitSurface = {

@@ -18,6 +18,7 @@
 @import "./request-user-input.css";
 @import "./update-toasts.css";
 @import "./composer.css";
+@import "./chat.css";
 @import "./review-inline.css";
 @import "./diff.css";
 @import "./diff-viewer.css";

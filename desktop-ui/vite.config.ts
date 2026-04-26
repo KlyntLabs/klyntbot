@@ -102,24 +102,7 @@ export default defineConfig({
       // TODO(klynt-integration): remove these Tauri-mock aliases once the Rust
       // backend is wired up. The mock modules log every call and return
       // null/empty defaults so the UI can boot without a Tauri runtime.
-      {
-        find: /^@tauri-apps\/api\/core$/,
-        replacement: fileURLToPath(
-          new URL(
-            "./src/services/__mocks__/tauri-api-core.ts",
-            import.meta.url,
-          ),
-        ),
-      },
-      {
-        find: /^@tauri-apps\/api\/event$/,
-        replacement: fileURLToPath(
-          new URL(
-            "./src/services/__mocks__/tauri-api-event.ts",
-            import.meta.url,
-          ),
-        ),
-      },
+
       {
         find: /^@tauri-apps\/api\/app$/,
         replacement: fileURLToPath(
