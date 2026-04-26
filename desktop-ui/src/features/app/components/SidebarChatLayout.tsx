@@ -10,7 +10,6 @@ import {
 import type { ChatThread } from "@/features/chat/types";
 
 type SidebarChatLayoutProps = {
-  onSelectHome: () => void;
   onOpenSettings: () => void;
   onNewChat: () => void;
   threads: ChatThread[];
@@ -26,7 +25,6 @@ type NavItem = {
 };
 
 export const SidebarChatLayout = memo(function SidebarChatLayout({
-  onSelectHome: _onSelectHome,
   onOpenSettings,
   onNewChat,
   threads,

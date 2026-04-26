@@ -96,7 +96,7 @@ function groupFlatThreadRowsByTimeBucket(
     }));
 }
 
-type SidebarProps = {
+export type SidebarProps = {
   workspaces: WorkspaceInfo[];
   groupedWorkspaces: WorkspaceGroupSection[];
   hasWorkspaceGroups: boolean;

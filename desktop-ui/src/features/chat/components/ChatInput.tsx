@@ -1,5 +1,5 @@
 import { useEffect, useRef, type KeyboardEvent } from "react";
-import SendIcon from "lucide-react/dist/esm/icons/send";
+import { Send } from "lucide-react";
 
 type ChatInputProps = {
   value: string;
@@ -54,7 +54,7 @@ export function ChatInput({
         disabled={disabled}
         aria-label="Send message"
       >
-        <SendIcon aria-hidden />
+        <Send aria-hidden />
       </button>
     </div>
   );

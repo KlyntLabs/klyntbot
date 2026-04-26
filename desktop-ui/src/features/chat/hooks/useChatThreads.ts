@@ -28,11 +28,21 @@ export function useChatThreads(): UseChatThreadsResult {
   }, [refetch]);
 
   useEffect(() => {
-    const unsubCreated = listen("chat:thread_created", () => refetch());
-    const unsubUpdated = listen("chat:thread_updated", () => refetch());
+    let active = true;
+    let unsubCreated: (() => void) | undefined;
+    let unsubUpdated: (() => void) | undefined;
+    listen("chat:thread_created", () => refetch()).then((fn) => {
+      if (active) unsubCreated = fn;
+      else fn();
+    });
+    listen("chat:thread_updated", () => refetch()).then((fn) => {
+      if (active) unsubUpdated = fn;
+      else fn();
+    });
     return () => {
-      unsubCreated.then((fn) => fn()).catch(() => {});
-      unsubUpdated.then((fn) => fn()).catch(() => {});
+      active = false;
+      unsubCreated?.();
+      unsubUpdated?.();
     };
   }, [refetch]);
 

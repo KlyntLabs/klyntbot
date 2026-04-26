@@ -7,8 +7,7 @@ import type { useMainAppWorktreeState } from "@app/hooks/useMainAppWorktreeState
 import { REMOTE_THREAD_POLL_INTERVAL_MS } from "@app/hooks/useRemoteThreadRefreshOnFocus";
 import type { WorkspaceLaunchScriptsState } from "@app/hooks/useWorkspaceLaunchScripts";
 import type { RefObject } from "react";
-import type { ComponentProps } from "react";
-import type { Sidebar } from "@app/components/Sidebar";
+import type { SidebarProps } from "@app/components/Sidebar";
 import type { LayoutNodesOptions } from "@/features/layout/hooks/layoutNodes/types";
 import type { ThreadState } from "@/features/threads/hooks/useThreadsReducer";
 import type {
@@ -16,8 +15,6 @@ import type {
 	ComposerEditorSettings,
 	WorkspaceInfo,
 } from "@/types";
-
-type SidebarProps = ComponentProps<typeof Sidebar>;
 type ComposerProps = NonNullable<
 	LayoutNodesOptions["primary"]["composerProps"]
 >;
@@ -367,7 +364,6 @@ function buildPrimarySurface({
 }: MainAppLayoutSurfacesContext): LayoutNodesOptions["primary"] {
 	return {
 		sidebarProps: {
-			onSelectHome: sidebarHandlers.onSelectHome,
 			onOpenSettings: sidebarHandlers.onOpenSettings,
 			onNewChat: chatView.onNewChat,
 			threads: chatView.chatThreads,

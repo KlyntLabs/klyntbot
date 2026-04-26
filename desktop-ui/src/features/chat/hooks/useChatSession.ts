@@ -79,13 +79,19 @@ export function useChatSession(
 
   useEffect(() => {
     if (!sessionKey) return;
-    const unsub = listen<{ sessionKey?: string }>("chat:message_added", (event) => {
+    let active = true;
+    let unsub: (() => void) | undefined;
+    listen<{ sessionKey?: string }>("chat:message_added", (event) => {
       if (event.payload?.sessionKey === sessionKey) {
         refetch();
       }
+    }).then((fn) => {
+      if (active) unsub = fn;
+      else fn();
     });
     return () => {
-      unsub.then((fn) => fn()).catch(() => {});
+      active = false;
+      unsub?.();
     };
   }, [sessionKey, refetch]);
 
@@ -101,7 +107,7 @@ export function useChatSession(
   // Clear streaming segments only when a NEW assistant message arrives from refetch.
   // Tracks assistant count to avoid clearing before the refetch completes — the old
   // approach fired on isStreaming→false before the new message existed, causing a flash.
-  const { isStreaming, clearSegments, clearTransparency, clearPersonaMessages, segments } = stream;
+  const { isStreaming, clearSegments, clearTransparency, clearPersonaMessages, segments, startStreaming, failStreaming } = stream;
   const hasSegmentsRef = useRef(false);
   hasSegmentsRef.current = segments.length > 0;
   const assistantCountRef = useRef(0);
@@ -124,12 +130,12 @@ export function useChatSession(
   const squadId = options?.squadId;
   const send = useCallback(
     async (extraPayload?: Record<string, unknown>) => {
-      if (!input.trim() || stream.isStreaming) return;
+      if (!input.trim() || isStreaming) return;
       const text = input;
       setInput("");
 
       setPendingUserMsg(text);
-      stream.startStreaming();
+      startStreaming();
 
       try {
         const payload: Record<string, unknown> = {
@@ -146,10 +152,10 @@ export function useChatSession(
         }
         await invoke<ChatMessage>("chat_send", payload);
       } catch (e: unknown) {
-        stream.failStreaming(parseApiError(e).message);
+        failStreaming(parseApiError(e).message);
       }
     },
-    [input, sessionKey, stream, squadId, options?.squadMode],
+    [input, sessionKey, isStreaming, startStreaming, failStreaming, squadId, options?.squadMode],
   );
 
   return {

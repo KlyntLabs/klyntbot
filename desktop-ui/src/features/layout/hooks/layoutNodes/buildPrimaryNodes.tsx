@@ -33,7 +33,6 @@ export function buildPrimaryNodes(
 
 	const sidebarNode = (
 		<SidebarChatLayout
-			onSelectHome={options.sidebarProps.onSelectHome}
 			onOpenSettings={options.sidebarProps.onOpenSettings}
 			onNewChat={options.sidebarProps.onNewChat}
 			threads={options.sidebarProps.threads}

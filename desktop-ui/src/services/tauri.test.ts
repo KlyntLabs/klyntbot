@@ -234,6 +234,14 @@ describe("tauri invoke wrappers", () => {
     expect(invokeMock).toHaveBeenCalledWith("list_workspaces");
   });
 
+  it("returns an empty list when the command is not registered in Tauri", async () => {
+    const invokeMock = vi.mocked(invoke);
+    invokeMock.mockRejectedValueOnce(new Error("Command list_workspaces not found"));
+
+    await expect(listWorkspaces()).resolves.toEqual([]);
+    expect(invokeMock).toHaveBeenCalledWith("list_workspaces");
+  });
+
   it("applies default limit for git log", async () => {
     const invokeMock = vi.mocked(invoke);
     invokeMock.mockResolvedValueOnce({

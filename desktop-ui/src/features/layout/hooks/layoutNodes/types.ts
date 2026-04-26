@@ -41,7 +41,6 @@ export type ChatViewProps = {
 };
 
 export type SidebarChatProps = {
-  onSelectHome: () => void;
   onOpenSettings: () => void;
   onNewChat: () => void;
   threads: import("@/features/chat/types").ChatThread[];
