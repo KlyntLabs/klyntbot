@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 import { createContext, useContext, useMemo, useReducer, useRef } from "react";
-import type { DashboardData, LauncherItem, LauncherMode } from "./types";
+import type { LauncherItem, LauncherMode } from "./types";
 
 interface State {
 	mode: LauncherMode;
@@ -8,7 +8,6 @@ interface State {
 	results: LauncherItem[];
 	selectedIndex: number;
 	isSearching: boolean;
-	dashboard: DashboardData | null;
 	queryHistory: string[];
 	historyIndex: number;
 	detailItem: LauncherItem | null;
@@ -22,7 +21,6 @@ const initial: State = {
 	results: [],
 	selectedIndex: 0,
 	isSearching: false,
-	dashboard: null,
 	queryHistory: [],
 	historyIndex: -1,
 	detailItem: null,
@@ -78,7 +76,6 @@ export interface LauncherStoreApi {
 	setResults: (r: LauncherItem[]) => void;
 	setSelectedIndex: (i: number) => void;
 	setIsSearching: (v: boolean) => void;
-	setDashboard: (d: DashboardData) => void;
 	moveSelection: (delta: number) => void;
 	pushHistory: (q: string) => void;
 	navigateHistory: (direction: "up" | "down") => void;
@@ -107,8 +104,7 @@ export function LauncherStoreProvider({ children }: { children: ReactNode }) {
 				dispatch({ type: "patch", patch: { selectedIndex } }),
 			setIsSearching: (isSearching) =>
 				dispatch({ type: "patch", patch: { isSearching } }),
-			setDashboard: (dashboard) =>
-				dispatch({ type: "patch", patch: { dashboard } }),
+
 			moveSelection: (delta) => dispatch({ type: "moveSelection", delta }),
 			pushHistory: (query) => dispatch({ type: "pushHistory", query }),
 			navigateHistory: (direction) =>
