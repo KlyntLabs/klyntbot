@@ -12,7 +12,26 @@
   background: var(--surface-messages);
   --main-panel-padding: 24px;
   --conversation-column-width: 900px;
-  transition: grid-template-columns 220ms ease;
+  /* Rounded top-left so the main panel reads as a separate surface
+     against the translucent sidebar — Codex-style. */
+  /* Codex-style floating panel: rounded on all corners that face the
+     sidebar / window edge. Top-right & bottom-right stay flat because
+     the right panel docks against them. */
+  border-top-left-radius: 12px;
+  border-bottom-left-radius: 12px;
+  /* Subtle hairline so the panel reads as a separate surface even when
+     the sidebar tint nearly matches it. */
+  box-shadow: inset 1px 0 0 var(--border-subtle);
+  overflow: hidden;
+  transition: grid-template-columns 220ms ease,
+    border-top-left-radius 280ms cubic-bezier(0.32, 0.72, 0.24, 1),
+    border-bottom-left-radius 280ms cubic-bezier(0.32, 0.72, 0.24, 1);
+}
+
+.app.sidebar-collapsed .main {
+  border-top-left-radius: 0;
+  border-bottom-left-radius: 0;
+  box-shadow: none;
 }
 
 .app.reduced-transparency .main {
@@ -359,15 +378,14 @@
   justify-content: space-between;
   align-items: center;
   padding: 10px var(--main-panel-padding) 12px;
-  border-bottom: 1px solid var(--cm-border-default);
-  background: var(--cm-surface-topbar);
+  border-bottom: none;
+  background: transparent;
   -webkit-app-region: drag;
   grid-column: 1;
   grid-row: 1;
   position: sticky;
   top: 0;
   z-index: 3;
-  backdrop-filter: blur(18px) saturate(1.2);
   min-height: var(--main-topbar-height);
   transition: padding-left 180ms ease, padding-right 180ms ease;
 }

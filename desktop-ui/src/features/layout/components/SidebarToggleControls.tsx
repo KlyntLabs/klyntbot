@@ -88,29 +88,33 @@ export function RightPanelExpandButton({
 export function TitlebarExpandControls({
   isCompact,
   sidebarCollapsed,
+  onCollapseSidebar,
   onExpandSidebar,
 }: SidebarToggleProps) {
-  if (isCompact || !sidebarCollapsed) {
+  if (isCompact) {
     return null;
   }
+  const label = sidebarCollapsed ? "Show threads sidebar" : "Hide threads sidebar";
   return (
     <div className="titlebar-controls">
-      {sidebarCollapsed && (
-        <div className="titlebar-toggle titlebar-toggle-left">
-          <button
-            type="button"
-            className="ghost main-header-action ds-tooltip-trigger"
-            onClick={onExpandSidebar}
-            data-tauri-drag-region="false"
-            aria-label="Show threads sidebar"
-            title="Show threads sidebar"
-            data-tooltip="Show threads sidebar"
-            data-tooltip-placement="bottom"
-          >
+      <div className="titlebar-toggle titlebar-toggle-left">
+        <button
+          type="button"
+          className="ghost main-header-action ds-tooltip-trigger"
+          onClick={sidebarCollapsed ? onExpandSidebar : onCollapseSidebar}
+          data-tauri-drag-region="false"
+          aria-label={label}
+          title={label}
+          data-tooltip={label}
+          data-tooltip-placement="bottom"
+        >
+          {sidebarCollapsed ? (
             <PanelLeftOpen size={14} aria-hidden />
-          </button>
-        </div>
-      )}
+          ) : (
+            <PanelLeftClose size={14} aria-hidden />
+          )}
+        </button>
+      </div>
     </div>
   );
 }

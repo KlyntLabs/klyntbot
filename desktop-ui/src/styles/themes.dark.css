@@ -28,10 +28,10 @@
      Sidebar slightly lighter than main for Codex's subtle separation. */
   --surface-sidebar: rgba(22, 24, 28, 0.55);
   --surface-sidebar-opaque: rgb(22, 24, 28);
-  --surface-topbar: rgb(20, 22, 26);
-  --surface-right-panel: rgb(18, 20, 24);
-  --surface-composer: rgb(18, 20, 24);
-  --surface-messages: rgb(15, 16, 20);
+  --surface-topbar: rgb(10, 11, 14);
+  --surface-right-panel: rgb(10, 11, 14);
+  --surface-composer: rgb(10, 11, 14);
+  --surface-messages: rgb(8, 9, 12);
   --surface-card: rgba(255, 255, 255, 0.04);
   --surface-card-strong: rgba(255, 255, 255, 0.12);
   --surface-card-muted: rgba(255, 255, 255, 0.06);

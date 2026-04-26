@@ -1,11 +1,10 @@
 .sidebar {
   --sidebar-padding: 20px;
   padding: var(--sidebar-top-padding, 36px) var(--sidebar-padding) 20px;
-  /* Translucent fill — let native window vibrancy (HudWindow/liquid-glass) bleed through. */
-  background: var(--surface-sidebar);
-  -webkit-backdrop-filter: blur(40px) saturate(1.4);
-  backdrop-filter: blur(40px) saturate(1.4);
-  border-right: 1px solid var(--border-subtle);
+  /* Tint comes from .app — keep sidebar transparent so the corners of
+     the rounded .main panel sit on the same fill as the sidebar. */
+  background: transparent;
+  border-right: none;
   display: flex;
   flex-direction: column;
   gap: 6px;
@@ -13,6 +12,10 @@
   min-height: 0;
   overflow: hidden;
   position: relative;
+  transition:
+    opacity 220ms cubic-bezier(0.32, 0.72, 0.24, 1),
+    transform 260ms cubic-bezier(0.32, 0.72, 0.24, 1);
+  will-change: opacity, transform;
   transition: opacity 200ms ease, transform 200ms ease, padding-top 180ms ease;
 }
 
@@ -1976,18 +1979,20 @@
     background-position: -200% 0;
   }
 }
-.app.reduced-transparency .sidebar {
+.app.reduced-transparency {
   background: var(--surface-sidebar-opaque);
+  -webkit-backdrop-filter: none;
   backdrop-filter: none;
 }
 
 .app.sidebar-collapsed .sidebar {
   opacity: 0;
-  transform: translateX(-12px);
+  transform: translateX(-16px) scale(0.985);
   pointer-events: none;
 }
 
 .app.sidebar-collapsed .sidebar-resizer {
   opacity: 0;
   pointer-events: none;
+  transition: opacity 160ms ease;
 }
