@@ -25,7 +25,11 @@ export interface TauriMutationOptions<TData, TVars> {
 
 export function useTauriMutation<TData = unknown, TVars = void>(
 	opts: TauriMutationOptions<TData, TVars>,
-) {
+): {
+	mutate: (vars: TVars) => Promise<TData>;
+	isLoading: boolean;
+	error: unknown;
+} {
 	if (!opts.command && !opts.mutationFn) {
 		throw new Error(
 			"useTauriMutation: either `command` or `mutationFn` must be provided",
