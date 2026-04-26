@@ -45,6 +45,7 @@ members = [
     "crates/ai-core-macros",
     "crates/coding-ingest",
     "crates/coding-memory",
+    "crates/mcp-bridge",
 ]
 
 [workspace.package]

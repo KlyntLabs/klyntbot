@@ -1,0 +1,23 @@
+[package]
+name = "mcp-bridge"
+version = "0.1.0"
+edition = "2024"
+publish = false
+
+[dependencies]
+tokio = { workspace = true, features = ["net", "io-util", "sync", "rt-multi-thread", "macros", "time"] }
+tokio-util = { workspace = true }
+serde = { workspace = true, features = ["derive"] }
+serde_json = { workspace = true }
+tracing = { workspace = true }
+thiserror = { workspace = true }
+
+# Used only by `emitter` (MCP side)
+app-core = { path = "../app-core" }
+desktop-shared = { path = "../desktop-shared" }
+config = { path = "../config" }
+common = { path = "../common" }
+
+[dev-dependencies]
+tokio = { workspace = true, features = ["test-util", "time", "macros"] }
+tempfile = { workspace = true }
