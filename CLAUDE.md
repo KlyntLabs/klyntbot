@@ -21,30 +21,34 @@ Root facade crate has 5 test binaries in `tests/`: `integration/` (cross-crate v
 ## Desktop UI (desktop-ui/)
 
 ```bash
-cd desktop-ui && bun install            # Install deps (always bun, never npm)
-cd desktop-ui && bun run dev            # Vite dev server (port 1420)
-cd desktop-ui && bun run build          # Production build
-cd desktop-ui && bun run lint:fix       # Biome 2.0 auto-fix (lint + format + imports)
-cd desktop-ui && bun run test           # Vitest (run once)
-cd desktop-ui && bun run test:watch     # Vitest (watch mode)
-cd desktop-ui && bun run lint           # Biome check only (no auto-fix)
+cd desktop-ui && bun install        # Install deps (always bun, never npm)
+cd desktop-ui && bun run dev:vite   # Vite dev server (port 1420)
+cd desktop-ui && bun run build      # Production build (tsc + vite build)
+cd desktop-ui && bun run lint       # ESLint check
+cd desktop-ui && bun run typecheck  # tsc --noEmit
+cd desktop-ui && bun run test       # Vitest (run once)
+cd desktop-ui && bun run test:watch # Vitest (watch mode)
 ```
 
-**Path aliases:** `@/*` → `src/*`, `@shared/*` → `src/shared/*`, `@features/*` → `src/features/*`, `@app/*` → `src/app/*`. Always use these in imports, never relative `../../` paths.
+**Path aliases** (`vite.config.ts` + `tsconfig.json`):
+- `@/*` → `src/*`
+- `@app/*` → `src/features/app/*`
+- `@settings/*` → `src/features/settings/*`
+- `@threads/*` → `src/features/threads/*`
+- `@services/*` → `src/services/*`
+- `@utils/*` → `src/utils/*`
 
-**Tailwind v4 + CSS tokens:** All theming in `src/styles/theme.css` via CSS variables + `@theme inline`. No `tailwind.config.js`. Never hardcode hex/rgba — use token utilities (`bg-surface-base`, `text-muted`, `border-border`). For new visual patterns, add a CSS variable to `:root` first, register in `@theme inline`, then use via Tailwind.
+Always use these in imports, never relative `../../` paths. Note: there is **no** `@shared` or `@features` alias — those were the old UI's conventions.
 
-**Typography tokens:** Never hardcode `font-size: Npx` in CSS. Use the scale in `src/styles/ds-tokens.css`: `--fs-2xs` (10.5px) / `--fs-xs` (11.5px) / `--fs-sm` (12.5px, default body — also exposed as `--fs-base`) / `--fs-md` (13.5px) / `--fs-lg` (15px) / `--fs-xl` (17px). Pick by role, not number — default text uses `var(--fs-base)`, secondary/labels step down to `--fs-xs`, headings step up to `--fs-lg`/`--fs-xl`. If no token fits (e.g. display headings ≥20px), add a new `--fs-*` to ds-tokens.css rather than hardcoding.
+**Styling:** Plain CSS. No Tailwind. All styles in `src/styles/*.css`, imported through `src/styles/index.css`. Design tokens in `src/styles/ds-tokens.css`; themes in `src/styles/themes.{dark,light,dim,system}.css`. Class naming is BEM-ish (e.g. `sidebar-chat__nav-item`). When adding a new feature with its own CSS file, add an `@import` line to `src/styles/index.css`.
 
-**`glass-panel`:** Glassmorphism class for dropdowns/popups/dialogs. Uses `@apply backdrop-blur-[80px] backdrop-saturate-150`.
+**Tauri IPC:** Direct `invoke()` from `@/api/client` (which re-exports `@tauri-apps/api/core`). There is no `useQuery` / `useMutation` / `ipc()` wrapper — call `invoke()` from a `useEffect` and manage state with `useState`. For Tauri events, import `listen` from `@tauri-apps/api/event` directly, or use the per-event hubs in `src/services/events.ts`. Endpoint definitions live under `src/api/endpoints/`.
 
-**Biome 2.0:** Line width 100. Organizes imports automatically. Warnings (not errors) on `noArrayIndexKey`, `noNonNullAssertion`, `noStaticElementInteractions`, `noImportantStyles`.
+**Markdown rendering:** Reuse `Markdown` from `@/features/messages/components/Markdown` rather than importing `react-markdown` directly.
 
-**React Compiler:** Enabled via `babel-plugin-react-compiler` in `vite.config.ts`. Auto-memoizes components — don't manually wrap with `React.memo`/`useMemo`/`useCallback` unless profiling shows a specific need.
+**Testing:** Vitest + `@testing-library/react`. Test files colocated as `Component.test.tsx`. Mock Tauri APIs per-test via `vi.mock("@tauri-apps/api/core", ...)`.
 
-**Data fetching:** `useQuery(cmd, args)` for reads (SWR caching, 30s stale time), `useMutation(cmd)` for writes. Both use `ipc()` which calls Tauri `invoke` in desktop or `fetch("/api/{cmd}")` in browser dev mode. Never call `invoke` directly — always go through `ipc()`.
-
-**CSS gotchas:** (1) Never write raw `backdrop-filter: blur() saturate()` — minifier breaks it. Use Tailwind's `@apply backdrop-blur-* backdrop-saturate-*`. Parent `backdrop-blur` blocks child `backdrop-filter`. (2) Never use `overflow-x-auto`/`overflow: hidden` on containers with absolute dropdown children — clips them. Use portals instead.
+**Linter:** ESLint via `bun run lint`. No Biome.
 
 ## Desktop App (Tauri 2)
 
