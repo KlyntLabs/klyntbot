@@ -156,3 +156,36 @@
   background: var(--surface-hover);
   border-color: var(--border-strong, rgba(255, 255, 255, 0.24));
 }
+.sidebar-chat__thread-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.sidebar-chat__thread-item {
+  display: block;
+  width: 100%;
+  text-align: left;
+  background: transparent;
+  border: none;
+  color: inherit;
+  font-size: var(--fs-xs, 11.5px);
+  padding: 6px 10px;
+  border-radius: 6px;
+  cursor: pointer;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.sidebar-chat__thread-item:hover {
+  background: var(--color-surface-raised, rgba(255, 255, 255, 0.05));
+}
+
+.sidebar-chat__thread-item--active {
+  background: var(--color-surface-raised, rgba(255, 255, 255, 0.08));
+  font-weight: 500;
+}
