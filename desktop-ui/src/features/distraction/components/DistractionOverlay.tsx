@@ -2,7 +2,8 @@ import { useRef, useState } from "react";
 import { useEvent } from "@/hooks/useEvent";
 import { useTransparentBackground } from "@/hooks/window/useTransparentBackground";
 import { useWindowAutoResize } from "@/hooks/window/useWindowAutoResize";
-import { getCurrentWindow, ipc, isTauri } from "@/utils/tauri-bridge";
+import { useTauriMutation } from "@/lib/query";
+import { getCurrentWindow, isTauri } from "@/utils/tauri-bridge";
 
 import "../distraction.css";
 
@@ -42,6 +43,22 @@ export function DistractionOverlay() {
 		setLoading(false);
 	});
 
+	const dismiss = useTauriMutation<void, { appName: string }>({
+		command: "distraction_dismiss",
+		invalidates: [],
+	});
+	const allowTemp = useTauriMutation<void, { pattern: string }>({
+		command: "distraction_allow_temp",
+		invalidates: [],
+	});
+	const allowSession = useTauriMutation<
+		void,
+		{ appName: string; windowTitle: string | null; classification: string }
+	>({
+		command: "distraction_allow_session",
+		invalidates: [],
+	});
+
 	const titleExcerpt =
 		intervention?.windowTitle && intervention.windowTitle.length > 50
 			? `${intervention.windowTitle.slice(0, 50)}…`
@@ -65,27 +82,29 @@ export function DistractionOverlay() {
 
 	const handleDismiss = async () => {
 		if (!intervention) return;
-		await ipc("distraction_dismiss", { appName: intervention.appName }).catch(
-			(e) => console.error("Failed to dismiss distraction:", e),
-		);
+		await dismiss
+			.mutate({ appName: intervention.appName })
+			.catch((e) => console.error("Failed to dismiss distraction:", e));
 		await hideWindow();
 	};
 
 	const handleAllowTemp = async () => {
 		if (!pattern) return;
-		await ipc("distraction_allow_temp", { pattern }).catch((e) =>
-			console.error("Failed to allow temp:", e),
-		);
+		await allowTemp
+			.mutate({ pattern })
+			.catch((e) => console.error("Failed to allow temp:", e));
 		await hideWindow();
 	};
 
 	const handleAllowSession = async () => {
 		if (!intervention) return;
-		await ipc("distraction_allow_session", {
-			appName: intervention.appName,
-			windowTitle: intervention.windowTitle,
-			classification: verdict?.classification ?? "work_research",
-		}).catch((e) => console.error("Failed to allow session:", e));
+		await allowSession
+			.mutate({
+				appName: intervention.appName,
+				windowTitle: intervention.windowTitle,
+				classification: verdict?.classification ?? "work_research",
+			})
+			.catch((e) => console.error("Failed to allow session:", e));
 		await hideWindow();
 	};
 
