@@ -147,6 +147,9 @@ pub struct AppCore {
     pub notification_dispatcher_handle: Option<notifications::NotificationDispatcherHandle>,
     /// Cancellation token for the config file watcher background service.
     pub _config_watcher_token: Option<CancellationToken>,
+    /// Phase 4 polling fallback. Held forever so the watcher runs for the
+    /// process lifetime; cancelled implicitly on `AppCore` drop.
+    pub _data_version_watcher_token: Option<CancellationToken>,
     /// Lifecycle monitor handle (macOS sleep/wake + idle detection).
     pub _lifecycle_monitor: Option<platform_macos::lifecycle::LifecycleMonitor>,
     /// Wake orchestrator background task handle.

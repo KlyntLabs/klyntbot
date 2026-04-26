@@ -21,6 +21,11 @@ use tracing::{debug, info, warn};
 /// `Drop` impl unlinks the socket.
 static BRIDGE_SERVER: OnceLock<mcp_bridge::BridgeServer> = OnceLock::new();
 
+/// Process-wide token for the PRAGMA data_version polling fallback.
+/// The watcher task exits when this token is cancelled (on graceful
+/// shutdown) or when the runtime drops (on process exit).
+static DATA_VERSION_WATCHER: OnceLock<tokio_util::sync::CancellationToken> = OnceLock::new();
+
 /// Bridges `AppEventEmitter` to Tauri's native event system.
 struct TauriEventEmitter {
     app_handle: tauri::AppHandle,
@@ -88,6 +93,21 @@ pub async fn init(
     } else {
         tracing::warn!("mcp-bridge: cannot resolve socket path; bridge disabled");
     }
+
+    // Phase 4: PRAGMA data_version polling fallback. Catches writes that
+    // bypassed the bridge (e.g. a CLI mutation, or the MCP child running
+    // with the bridge socket unreachable). 5s cadence is conservative —
+    // this is a safety net, not a primary signal.
+    let dv_token = core.storage_pool
+        .start_data_version_watcher(
+            channels.domain_event_bus.clone(),
+            std::time::Duration::from_secs(5),
+        )
+        .await;
+    if DATA_VERSION_WATCHER.set(dv_token).is_err() {
+        tracing::warn!("data_version_watcher: already initialized");
+    }
+
     wire_event_channels(&core, channels, &app_handle, &global_event_tx);
     Ok((core, global_event_tx))
 }

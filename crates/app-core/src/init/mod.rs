@@ -1106,6 +1106,7 @@ impl AppCore {
             _mirror_shutdown: Some(mirror_shutdown),
             notification_dispatcher_handle,
             _config_watcher_token: Some(config_watcher_token),
+            _data_version_watcher_token: None,
             _lifecycle_monitor: None,
             _wake_orchestrator_handle: None,
             voice_service: None,
