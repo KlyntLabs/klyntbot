@@ -8,17 +8,17 @@
 //! `"tasks"` (core task tool).  A TODO marks the alarm assertion so it can be
 //! uncommented when AlarmTool lands.
 
-/// Resolve the path to the `klyntbot` binary built by the `desktop` crate.
+/// Resolve the path to the `desktop` binary built by the `desktop` crate.
 /// Cargo places integration test binaries in `target/debug/deps/`; the desktop
-/// app binary is one level up at `target/debug/klyntbot`.
+/// app binary is one level up at `target/debug/desktop`.
 fn klyntbot_bin() -> std::path::PathBuf {
     let test_exe = std::env::current_exe().expect("current_exe");
     let deps_dir = test_exe.parent().expect("deps dir");
     let target_dir = deps_dir.parent().expect("target/debug/");
-    let bin = target_dir.join("klyntbot");
+    let bin = target_dir.join("desktop");
     assert!(
         bin.exists(),
-        "klyntbot binary not found at {}: run `cargo build -p desktop` first",
+        "desktop binary not found at {}: run `cargo build -p desktop` first",
         bin.display()
     );
     bin
