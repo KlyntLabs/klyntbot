@@ -17,10 +17,8 @@ import {
 	ipc,
 	isTauri,
 } from "@/utils/tauri-bridge";
+import { qk, useTauriMutation, useTauriQuery } from "@/lib/query";
 import { useFocusTimer } from "../hooks/useFocusTimer";
-import { useSetToggle } from "../hooks/useSetToggle";
-import { useTrayMutation } from "../hooks/useTrayMutation";
-import { useTrayQuery } from "../hooks/useTrayQuery";
 import { todayISO } from "../lib/dates";
 import type { CalendarEvent, TodayTask } from "../types";
 import { Badge } from "./Badge";
@@ -43,31 +41,38 @@ function taskIndicatorClass(task: TodayTask, isCompleted: boolean): string {
 }
 
 export function Tray() {
-	const todayTasksQuery = useTrayQuery<TodayTask[]>(
-		"today_tasks",
-		undefined,
-		[],
-	);
+	const todayTasksQuery = useTauriQuery<TodayTask[]>({
+		queryKey: qk.tasks.today(),
+		command: "today_tasks",
+		fallback: [],
+	});
 	const todayTasks = todayTasksQuery.data;
-	const calendarQuery = useTrayQuery<CalendarEvent[]>(
-		"productivity_calendar_events",
-		{ date: todayISO() },
-		[],
-	);
+	const dateKey = todayISO();
+	const calendarQuery = useTauriQuery<CalendarEvent[]>({
+		queryKey: qk.calendar.eventsForDate(dateKey),
+		command: "productivity_calendar_events",
+		args: { date: dateKey },
+		fallback: [],
+	});
 	const calendarEvents = calendarQuery.data;
 
 	const { nudge: coachingNudge, handleFeedback: handleCoachingFeedback } =
 		useCoachingNudge({ autoCollapseMs: 30_000 });
 
-	const toggleComplete = useTrayMutation<TodayTask, { id: string }>(
-		"task_toggle_complete",
-	);
-	const [completedIds, toggleCompletedId] = useSetToggle();
+	const toggleComplete = useTauriMutation<TodayTask, { id: string }>({
+		command: "task_toggle_complete",
+		optimistic: {
+			queryKey: qk.tasks.today(),
+			update: (vars, prev: TodayTask[] = []) =>
+				prev.map((t) =>
+					t.id === vars.id ? { ...t, completed: !t.completed } : t,
+				),
+		},
+	});
 
 	const focusTimer = useFocusTimer();
 
 	const handleToggleTask = async (taskId: string) => {
-		toggleCompletedId(taskId);
 		await toggleComplete.mutate({ id: taskId });
 	};
 
@@ -117,8 +122,8 @@ export function Tray() {
 	};
 
 	const isTaskCompleted = useCallback(
-		(t: TodayTask) => t.completed || completedIds.has(t.id),
-		[completedIds],
+		(t: TodayTask) => t.completed,
+		[],
 	);
 	const sortedTasks = useMemo(
 		() =>
