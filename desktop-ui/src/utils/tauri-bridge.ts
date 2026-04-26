@@ -101,11 +101,13 @@ export function currentWindowLabel(): string {
 	};
 	const label = w.__TAURI_INTERNALS__?.metadata?.currentWindow?.label;
 	if (label) return label;
-	// Browser-only dev fallbacks so `localhost:1420/#/launcher` and `#/tray`
-	// still route to the right component.
+	// Browser-only dev fallbacks so the `#/<window>` URLs route correctly
+	// without a real Tauri runtime.
 	if (typeof window.location !== "undefined") {
 		if (window.location.hash === "#/launcher") return "launcher";
 		if (window.location.hash === "#/tray") return "tray";
+		if (window.location.hash === "#/distraction-overlay")
+			return "distraction-overlay";
 	}
 	return "main";
 }

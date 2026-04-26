@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useEvent } from "@/hooks/useEvent";
 import { todayISO } from "../lib/dates";
 import type {
 	FocusDndUnavailablePayload,
@@ -10,7 +11,6 @@ import type {
 	FocusSyncPayload,
 	FocusWarningPayload,
 } from "../types";
-import { useEvent } from "./useEvent";
 import { useTrayMutation } from "./useTrayMutation";
 import { useTrayQuery } from "./useTrayQuery";
 

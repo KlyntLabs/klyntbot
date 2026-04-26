@@ -27,7 +27,9 @@
 	overflow: hidden;
 	background: var(--surface-sidebar, rgba(22, 24, 28, 0.55));
 	border: 1px solid var(--border-subtle, rgba(255, 255, 255, 0.08));
-	border-radius: 14px;
+	/* Match Tauri's HUD effect radius (16px) — same curve as the window
+	   bezel so no vibrancy halo bleeds at the corners. */
+	border-radius: 16px;
 	backdrop-filter: blur(40px) saturate(1.4);
 	-webkit-backdrop-filter: blur(40px) saturate(1.4);
 	box-shadow: 0 18px 48px rgba(0, 0, 0, 0.45);

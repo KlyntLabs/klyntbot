@@ -2,8 +2,8 @@ import { lazy, Suspense } from "react";
 import "./styles/index.css";
 
 import MainApp from "@app/components/MainApp";
-import { currentWindowLabel } from "@/utils/tauri-bridge";
 import { useWindowLabel } from "@/features/layout/hooks/useWindowLabel";
+import { currentWindowLabel } from "@/utils/tauri-bridge";
 
 const AboutView = lazy(() =>
 	import("@/features/about/components/AboutView").then((module) => ({
@@ -21,6 +21,12 @@ const Tray = lazy(() =>
 	import("@/features/tray/components/Tray").then((module) => ({
 		default: module.Tray,
 	})),
+);
+
+const DistractionOverlay = lazy(() =>
+	import("@/features/distraction/components/DistractionOverlay").then(
+		(module) => ({ default: module.DistractionOverlay }),
+	),
 );
 
 // Tauri 2 sets the label synchronously before any React render, so we read it
@@ -43,6 +49,17 @@ export default function App() {
 		return (
 			<Suspense fallback={null}>
 				<Tray />
+			</Suspense>
+		);
+	}
+
+	if (
+		realLabel === "distraction-overlay" ||
+		windowLabel === "distraction-overlay"
+	) {
+		return (
+			<Suspense fallback={null}>
+				<DistractionOverlay />
 			</Suspense>
 		);
 	}

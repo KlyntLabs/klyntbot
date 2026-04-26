@@ -1,0 +1,20 @@
+/* Aux Tauri windows (launcher, tray, distraction) opt into this layout by
+   having `useTransparentBackground` set `data-launcher="true"` on <html>.
+
+   Why CSS, not inline styles: inline styles on body/#root were tested and
+   did NOT take effect on macOS transparent webviews — the engine paints
+   its own compositor mask before our inline styles apply. CSS classes
+   targeting the data-attribute work reliably across all three windows. */
+
+html[data-launcher],
+html[data-launcher] body,
+html[data-launcher] #root {
+	background: transparent !important;
+	background-color: transparent !important;
+	border-radius: 14px;
+	overflow: hidden;
+}
+
+html[data-launcher] #root {
+	display: flex;
+}
