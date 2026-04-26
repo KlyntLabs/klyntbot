@@ -1,7 +1,7 @@
-import { FileTreePanel } from "../../../files/components/FileTreePanel";
-import { GitDiffPanel } from "../../../git/components/GitDiffPanel";
-import { GitDiffViewer } from "../../../git/components/GitDiffViewer";
-import { PromptPanel } from "../../../prompts/components/PromptPanel";
+import { FileTreePanel } from "@/features/files/components/FileTreePanel";
+import { GitDiffPanel } from "@/features/git/components/GitDiffPanel";
+import { GitDiffViewer } from "@/features/git/components/GitDiffViewer";
+import { PromptPanel } from "@/features/prompts/components/PromptPanel";
 import type {
   LayoutGitSurface,
   LayoutNodesResult,

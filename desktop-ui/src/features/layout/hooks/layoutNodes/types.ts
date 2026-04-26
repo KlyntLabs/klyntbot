@@ -1,20 +1,20 @@
 import type { ComponentProps, ReactNode } from "react";
-import type { ApprovalToasts } from "../../../app/components/ApprovalToasts";
-import type { MainHeader } from "../../../app/components/MainHeader";
-import type { Sidebar } from "../../../app/components/Sidebar";
-import type { Composer } from "../../../composer/components/Composer";
-import type { DebugPanel } from "../../../debug/components/DebugPanel";
-import type { FileTreePanel } from "../../../files/components/FileTreePanel";
-import type { GitDiffPanel } from "../../../git/components/GitDiffPanel";
-import type { GitDiffViewer } from "../../../git/components/GitDiffViewer";
-import type { Home } from "../../../home/components/Home";
-import type { Messages } from "../../../messages/components/Messages";
-import type { ErrorToasts } from "../../../notifications/components/ErrorToasts";
-import type { PlanPanel } from "../../../plan/components/PlanPanel";
-import type { PromptPanel } from "../../../prompts/components/PromptPanel";
-import type { TerminalDock } from "../../../terminal/components/TerminalDock";
-import type { TerminalSessionState } from "../../../terminal/hooks/useTerminalSession";
-import type { UpdateToast } from "../../../update/components/UpdateToast";
+import type { ApprovalToasts } from "@app/components/ApprovalToasts";
+import type { MainHeader } from "@app/components/MainHeader";
+import type { Sidebar } from "@app/components/Sidebar";
+import type { Composer } from "@/features/composer/components/Composer";
+import type { DebugPanel } from "@/features/debug/components/DebugPanel";
+import type { FileTreePanel } from "@/features/files/components/FileTreePanel";
+import type { GitDiffPanel } from "@/features/git/components/GitDiffPanel";
+import type { GitDiffViewer } from "@/features/git/components/GitDiffViewer";
+import type { Home } from "@/features/home/components/Home";
+import type { Messages } from "@/features/messages/components/Messages";
+import type { ErrorToasts } from "@/features/notifications/components/ErrorToasts";
+import type { PlanPanel } from "@/features/plan/components/PlanPanel";
+import type { PromptPanel } from "@/features/prompts/components/PromptPanel";
+import type { TerminalDock } from "@/features/terminal/components/TerminalDock";
+import type { TerminalSessionState } from "@/features/terminal/hooks/useTerminalSession";
+import type { UpdateToast } from "@/features/update/components/UpdateToast";
 
 export type WorktreeRenameState = {
 	name: string;

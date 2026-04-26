@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import type { CollaborationModeOption } from "../../../types";
+import type { CollaborationModeOption } from "@/types";
 
 type UseCollaborationModeSelectionOptions = {
   selectedCollaborationMode: CollaborationModeOption | null;

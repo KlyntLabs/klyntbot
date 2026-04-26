@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState, type RefObject } from "react";
-import type { WorkspaceInfo } from "../../../types";
+import type { WorkspaceInfo } from "@/types";
 import {
   commitGit,
   generateCommitMessage,
@@ -8,9 +8,9 @@ import {
   pushGit,
   stageGitAll,
   syncGit,
-} from "../../../services/tauri";
-import { shouldApplyCommitMessage } from "../../../utils/commitMessage";
-import { useGitStatus } from "../../git/hooks/useGitStatus";
+} from "@services/tauri";
+import { shouldApplyCommitMessage } from "@utils/commitMessage";
+import { useGitStatus } from "@/features/git/hooks/useGitStatus";
 
 type GitStatusState = ReturnType<typeof useGitStatus>["status"];
 

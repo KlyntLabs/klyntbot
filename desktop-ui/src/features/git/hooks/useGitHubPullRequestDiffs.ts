@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import type { GitHubPullRequestDiff, WorkspaceInfo } from "../../../types";
-import { getGitHubPullRequestDiff } from "../../../services/tauri";
+import type { GitHubPullRequestDiff, WorkspaceInfo } from "@/types";
+import { getGitHubPullRequestDiff } from "@services/tauri";
 
 type PullRequestDiffState = {
   diffs: GitHubPullRequestDiff[];

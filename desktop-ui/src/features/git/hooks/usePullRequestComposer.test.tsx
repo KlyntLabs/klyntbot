@@ -6,8 +6,8 @@ import type {
   GitHubPullRequest,
   PullRequestReviewAction,
   WorkspaceInfo,
-} from "../../../types";
-import { buildPullRequestDraft } from "../../../utils/pullRequestPrompt";
+} from "@/types";
+import { buildPullRequestDraft } from "@utils/pullRequestPrompt";
 import { usePullRequestComposer } from "./usePullRequestComposer";
 
 vi.mock("../../../utils/pullRequestPrompt", () => ({
@@ -41,7 +41,7 @@ const selectedCommit: GitLogEntry = {
 
 const connectedWorkspace: WorkspaceInfo = {
   id: "workspace-1",
-  name: "CodexMonitor",
+  name: "Klynt",
   path: "/tmp/codex",
   connected: true,
   settings: { sidebarCollapsed: false },

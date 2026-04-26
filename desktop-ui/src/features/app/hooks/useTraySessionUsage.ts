@@ -1,7 +1,7 @@
 import { isTauri } from "@tauri-apps/api/core";
 import { useEffect, useMemo, useRef } from "react";
 import { setTraySessionUsage } from "@services/tauri";
-import type { RateLimitSnapshot, TraySessionUsage } from "../../../types";
+import type { RateLimitSnapshot, TraySessionUsage } from "@/types";
 import { getUsageLabels } from "../utils/usageLabels";
 
 const SYNC_DEBOUNCE_MS = 150;

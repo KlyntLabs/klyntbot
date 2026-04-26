@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { getGitDiffs } from "../../../services/tauri";
-import type { GitFileDiff, GitFileStatus, WorkspaceInfo } from "../../../types";
+import { getGitDiffs } from "@services/tauri";
+import type { GitFileDiff, GitFileStatus, WorkspaceInfo } from "@/types";
 
 type GitDiffState = {
   diffs: GitFileDiff[];

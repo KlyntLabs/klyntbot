@@ -7,9 +7,9 @@ import type {
   PullRequestReviewAction,
   PullRequestReviewIntent,
   WorkspaceInfo,
-} from "../../../types";
+} from "@/types";
 import type { GitDiffSource, GitPanelMode } from "../types";
-import { buildPullRequestDraft } from "../../../utils/pullRequestPrompt";
+import { buildPullRequestDraft } from "@utils/pullRequestPrompt";
 import { parsePullRequestReviewCommand } from "../utils/pullRequestReviewCommands";
 
 const KNOWN_SLASH_COMMAND_REGEX = /^\/(?:apps|fast|fork|mcp|new|resume|status)\b/i;

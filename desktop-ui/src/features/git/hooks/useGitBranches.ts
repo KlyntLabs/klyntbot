@@ -1,11 +1,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type { BranchInfo, DebugEntry, WorkspaceInfo } from "../../../types";
+import type { BranchInfo, DebugEntry, WorkspaceInfo } from "@/types";
 import {
   checkoutGitHubPullRequest,
   checkoutGitBranch,
   createGitBranch,
   listGitBranches,
-} from "../../../services/tauri";
+} from "@services/tauri";
 
 type UseGitBranchesOptions = {
   activeWorkspace: WorkspaceInfo | null;

@@ -12,7 +12,7 @@ import {
   resolveMessageFileHref,
   toFileLink,
 } from "../utils/messageFileLinks";
-import type { ParsedFileLocation } from "../../../utils/fileLinks";
+import type { ParsedFileLocation } from "@utils/fileLinks";
 
 type MarkdownProps = {
   value: string;

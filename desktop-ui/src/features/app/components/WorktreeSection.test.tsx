@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
-import type { WorkspaceInfo } from "../../../types";
+import type { WorkspaceInfo } from "@/types";
 import { WorktreeSection } from "./WorktreeSection";
 
 const worktree: WorkspaceInfo = {

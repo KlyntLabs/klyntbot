@@ -1,13 +1,13 @@
 import { useCallback, useRef } from "react";
-import { useUpdater } from "../../update/hooks/useUpdater";
-import { useAgentSoundNotifications } from "../../notifications/hooks/useAgentSoundNotifications";
-import { useAgentSystemNotifications } from "../../notifications/hooks/useAgentSystemNotifications";
-import { useWindowFocusState } from "../../layout/hooks/useWindowFocusState";
+import { useUpdater } from "@/features/update/hooks/useUpdater";
+import { useAgentSoundNotifications } from "@/features/notifications/hooks/useAgentSoundNotifications";
+import { useAgentSystemNotifications } from "@/features/notifications/hooks/useAgentSystemNotifications";
+import { useWindowFocusState } from "@/features/layout/hooks/useWindowFocusState";
 import { useTauriEvent } from "./useTauriEvent";
-import { playNotificationSound } from "../../../utils/notificationSounds";
-import { subscribeUpdaterCheck } from "../../../services/events";
-import { sendNotification } from "../../../services/tauri";
-import type { DebugEntry } from "../../../types";
+import { playNotificationSound } from "@utils/notificationSounds";
+import { subscribeUpdaterCheck } from "@services/events";
+import { sendNotification } from "@services/tauri";
+import type { DebugEntry } from "@/types";
 
 type Params = {
   enabled?: boolean;
@@ -105,7 +105,7 @@ export function useUpdaterController({
     }
     void sendNotification(
       "Test Notification",
-      "This is a test notification from CodexMonitor.",
+      "This is a test notification from Klynt.",
     ).catch((error) => {
       onDebug({
         id: `${Date.now()}-client-notification-test-error`,

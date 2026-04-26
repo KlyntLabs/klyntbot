@@ -1,4 +1,4 @@
-import type { AppSettings, OpenAppTarget } from "../../../types";
+import type { AppSettings, OpenAppTarget } from "@/types";
 import { DEFAULT_OPEN_APP_ID } from "../constants";
 
 export function normalizeOpenAppTargets(targets: OpenAppTarget[]): OpenAppTarget[] {

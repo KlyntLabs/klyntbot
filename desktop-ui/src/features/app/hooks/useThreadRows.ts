@@ -1,6 +1,6 @@
 import { useCallback, useRef } from "react";
 
-import type { ThreadSummary } from "../../../types";
+import type { ThreadSummary } from "@/types";
 
 type ThreadRow = {
   thread: ThreadSummary;

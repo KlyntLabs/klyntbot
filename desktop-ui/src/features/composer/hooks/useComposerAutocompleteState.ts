@@ -1,15 +1,15 @@
 import { useCallback, useMemo } from "react";
 import type { AutocompleteItem } from "./useComposerAutocomplete";
 import { useComposerAutocomplete } from "./useComposerAutocomplete";
-import type { AppOption, CustomPromptOption } from "../../../types";
-import { connectorMentionSlug } from "../../apps/utils/appMentions";
+import type { AppOption, CustomPromptOption } from "@/types";
+import { connectorMentionSlug } from "@/features/apps/utils/appMentions";
 import {
   buildPromptInsertText,
   findNextPromptArgCursor,
   findPromptArgRangeAtCursor,
   getPromptArgumentHint,
-} from "../../../utils/customPrompts";
-import { isComposingEvent } from "../../../utils/keys";
+} from "@utils/customPrompts";
+import { isComposingEvent } from "@utils/keys";
 
 type Skill = { name: string; description?: string };
 type UseComposerAutocompleteStateArgs = {

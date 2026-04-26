@@ -1,4 +1,4 @@
-import type { ParsedDiffLine } from "../../../utils/diff";
+import type { ParsedDiffLine } from "@utils/diff";
 import type { DiffStats, GitDiffViewerItem } from "./GitDiffViewer.types";
 
 const DIFF_METADATA_PREFIXES = [

@@ -4,12 +4,12 @@ import Copy from "lucide-react/dist/esm/icons/copy";
 import GitBranch from "lucide-react/dist/esm/icons/git-branch";
 import Plus from "lucide-react/dist/esm/icons/plus";
 
-import type { ThreadSummary, WorkspaceInfo } from "../../../types";
-import type { ThreadStatusById } from "../../../utils/threadStatus";
+import type { ThreadSummary, WorkspaceInfo } from "@/types";
+import type { ThreadStatusById } from "@utils/threadStatus";
 import {
   PopoverMenuItem,
   PopoverSurface,
-} from "../../design-system/components/popover/PopoverPrimitives";
+} from "@/features/design-system/components/popover/PopoverPrimitives";
 import { ThreadList } from "./ThreadList";
 import { ThreadLoading } from "./ThreadLoading";
 import { WorkspaceCard } from "./WorkspaceCard";

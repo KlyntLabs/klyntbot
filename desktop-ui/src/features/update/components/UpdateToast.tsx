@@ -10,7 +10,7 @@ import {
   ToastHeader,
   ToastTitle,
   ToastViewport,
-} from "../../design-system/components/toast/ToastPrimitives";
+} from "@/features/design-system/components/toast/ToastPrimitives";
 
 type UpdateToastProps = {
   state: UpdateState;

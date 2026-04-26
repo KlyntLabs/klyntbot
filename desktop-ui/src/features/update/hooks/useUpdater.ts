@@ -3,7 +3,7 @@ import { isTauri } from "@tauri-apps/api/core";
 import { check } from "@tauri-apps/plugin-updater";
 import { relaunch } from "@tauri-apps/plugin-process";
 import type { DownloadEvent, Update } from "@tauri-apps/plugin-updater";
-import type { DebugEntry } from "../../../types";
+import type { DebugEntry } from "@/types";
 import {
   buildReleaseTagUrl,
   clearPendingPostUpdateVersion,

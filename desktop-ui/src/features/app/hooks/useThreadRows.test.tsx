@@ -2,7 +2,7 @@
 import { renderHook } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
-import type { ThreadSummary } from "../../../types";
+import type { ThreadSummary } from "@/types";
 import { useThreadRows } from "./useThreadRows";
 
 describe("useThreadRows", () => {

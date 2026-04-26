@@ -1,4 +1,4 @@
-import { isAbsolutePath as isAbsolutePathForPlatform } from "../../../utils/platformPaths";
+import { isAbsolutePath as isAbsolutePathForPlatform } from "@utils/platformPaths";
 export { isGitRootNotFound, isMissingRepo } from "../utils/repoErrors";
 
 export const DEPTH_OPTIONS = [1, 2, 3, 4, 5, 6];

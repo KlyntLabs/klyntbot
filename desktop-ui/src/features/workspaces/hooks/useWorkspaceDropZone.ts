@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { DragEvent } from "react";
-import { subscribeWindowDragDrop } from "../../../services/dragDrop";
+import { subscribeWindowDragDrop } from "@/services/dragDrop";
 
 function isDragFileTransfer(types: readonly string[] | undefined) {
   if (!types || types.length === 0) {

@@ -17,23 +17,23 @@ import type {
   QueuedMessage,
   ServiceTier,
   ThreadTokenUsage,
-} from "../../../types";
+} from "@/types";
 import type {
   ReviewPromptState,
   ReviewPromptStep,
-} from "../../threads/hooks/useReviewPrompt";
+} from "@threads/hooks/useReviewPrompt";
 import {
   connectorMentionSlug,
   resolveBoundAppMentions,
   type AppMentionBinding,
-} from "../../apps/utils/appMentions";
+} from "@/features/apps/utils/appMentions";
 import {
   getFenceTriggerLine,
   getLineIndent,
   isCodeLikeSingleLine,
   isCursorInsideFence,
   normalizePastedText,
-} from "../../../utils/composerText";
+} from "@utils/composerText";
 import { useComposerAutocompleteState } from "../hooks/useComposerAutocompleteState";
 import { useComposerDraftEffects } from "../hooks/useComposerDraftEffects";
 import { useComposerKeyDown } from "../hooks/useComposerKeyDown";
@@ -42,8 +42,8 @@ import { usePromptHistory } from "../hooks/usePromptHistory";
 import { ComposerInput } from "./ComposerInput";
 import { ComposerMetaBar } from "./ComposerMetaBar";
 import { ComposerQueue } from "./ComposerQueue";
-import { isMacPlatform } from "../../../utils/platformPaths";
-import type { CodexArgsOption } from "../../threads/utils/codexArgsProfiles";
+import { isMacPlatform } from "@utils/platformPaths";
+import type { CodexArgsOption } from "@threads/utils/codexArgsProfiles";
 
 type ComposerProps = {
   onSend: (

@@ -2,9 +2,9 @@
 import { act, renderHook, waitFor } from "@testing-library/react";
 import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
 import { useApps } from "./useApps";
-import { getAppsList } from "../../../services/tauri";
-import { subscribeAppServerEvents } from "../../../services/events";
-import type { AppServerEvent, WorkspaceInfo } from "../../../types";
+import { getAppsList } from "@services/tauri";
+import { subscribeAppServerEvents } from "@services/events";
+import type { AppServerEvent, WorkspaceInfo } from "@/types";
 
 vi.mock("../../../services/tauri", () => ({
   getAppsList: vi.fn(),
@@ -19,7 +19,7 @@ const subscribeAppServerEventsMock = vi.mocked(subscribeAppServerEvents);
 
 const workspace: WorkspaceInfo = {
   id: "workspace-1",
-  name: "CodexMonitor",
+  name: "Klynt",
   path: "/tmp/codex",
   connected: true,
   settings: { sidebarCollapsed: false },

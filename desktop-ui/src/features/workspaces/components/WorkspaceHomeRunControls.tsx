@@ -1,5 +1,5 @@
 import { useCallback } from "react";
-import type { ModelOption, WorkspaceInfo } from "../../../types";
+import type { ModelOption, WorkspaceInfo } from "@/types";
 import type { WorkspaceRunMode } from "../hooks/useWorkspaceHome";
 import Laptop from "lucide-react/dist/esm/icons/laptop";
 import GitBranch from "lucide-react/dist/esm/icons/git-branch";
@@ -9,8 +9,8 @@ import Cpu from "lucide-react/dist/esm/icons/cpu";
 import {
   PopoverMenuItem,
   SplitActionMenu,
-} from "../../design-system/components/popover/PopoverPrimitives";
-import { useMenuController } from "../../app/hooks/useMenuController";
+} from "@/features/design-system/components/popover/PopoverPrimitives";
+import { useMenuController } from "@app/hooks/useMenuController";
 import {
   buildModelSummary,
   INSTANCE_OPTIONS,

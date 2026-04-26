@@ -1,5 +1,5 @@
 import { useEffect } from "react";
-import type { AppSettings } from "../../../types";
+import type { AppSettings } from "@/types";
 
 export function useCodeCssVars(appSettings: AppSettings) {
   useEffect(() => {

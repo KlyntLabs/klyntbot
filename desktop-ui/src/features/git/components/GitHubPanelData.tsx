@@ -5,7 +5,7 @@ import type {
   GitHubPullRequestComment,
   GitHubPullRequestDiff,
   WorkspaceInfo,
-} from "../../../types";
+} from "@/types";
 import type { GitDiffSource, GitPanelMode } from "../types";
 import { useGitHubIssues } from "../hooks/useGitHubIssues";
 import { useGitHubPullRequests } from "../hooks/useGitHubPullRequests";

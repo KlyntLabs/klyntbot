@@ -2,9 +2,9 @@ import { useMemo } from "react";
 import ChevronDown from "lucide-react/dist/esm/icons/chevron-down";
 import { revealItemInDir } from "@tauri-apps/plugin-opener";
 import * as Sentry from "@sentry/react";
-import { openWorkspaceIn } from "../../../services/tauri";
-import { pushErrorToast } from "../../../services/toasts";
-import type { OpenAppTarget } from "../../../types";
+import { openWorkspaceIn } from "@services/tauri";
+import { pushErrorToast } from "@services/toasts";
+import type { OpenAppTarget } from "@/types";
 import {
   DEFAULT_OPEN_APP_ID,
   DEFAULT_OPEN_APP_TARGETS,
@@ -13,7 +13,7 @@ import {
 import {
   PopoverMenuItem,
   SplitActionMenu,
-} from "../../design-system/components/popover/PopoverPrimitives";
+} from "@/features/design-system/components/popover/PopoverPrimitives";
 import { GENERIC_APP_ICON, getKnownOpenAppIcon } from "../utils/openAppIcons";
 import { useMenuController } from "../hooks/useMenuController";
 

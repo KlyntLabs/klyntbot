@@ -4,7 +4,7 @@ import {
   type CSSProperties,
   type RefObject,
 } from "react";
-import { getCaretPosition } from "../../../utils/caretPosition";
+import { getCaretPosition } from "@utils/caretPosition";
 import { CARET_ANCHOR_GAP } from "../components/workspaceHomeHelpers";
 
 type UseWorkspaceHomeSuggestionsStyleParams = {

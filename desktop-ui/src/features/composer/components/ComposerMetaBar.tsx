@@ -1,7 +1,7 @@
 import type { CSSProperties } from "react";
 import { BrainCog, SlidersHorizontal, Zap } from "lucide-react";
-import type { AccessMode, ServiceTier, ThreadTokenUsage } from "../../../types";
-import type { CodexArgsOption } from "../../threads/utils/codexArgsProfiles";
+import type { AccessMode, ServiceTier, ThreadTokenUsage } from "@/types";
+import type { CodexArgsOption } from "@threads/utils/codexArgsProfiles";
 
 type ComposerMetaBarProps = {
   disabled: boolean;

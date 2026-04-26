@@ -9,8 +9,8 @@ import {
   stageGitAll as stageGitAllService,
   stageGitFile as stageGitFileService,
   unstageGitFile as unstageGitFileService,
-} from "../../../services/tauri";
-import type { WorkspaceInfo } from "../../../types";
+} from "@services/tauri";
+import type { WorkspaceInfo } from "@/types";
 
 type UseGitActionsOptions = {
   activeWorkspace: WorkspaceInfo | null;

@@ -1,10 +1,10 @@
 import { useMemo } from "react";
 import type { CSSProperties, MouseEvent } from "react";
 import X from "lucide-react/dist/esm/icons/x";
-import { highlightLine, languageFromPath } from "../../../utils/syntax";
-import { OpenAppMenu } from "../../app/components/OpenAppMenu";
-import { PopoverSurface } from "../../design-system/components/popover/PopoverPrimitives";
-import type { OpenAppTarget } from "../../../types";
+import { highlightLine, languageFromPath } from "@utils/syntax";
+import { OpenAppMenu } from "@app/components/OpenAppMenu";
+import { PopoverSurface } from "@/features/design-system/components/popover/PopoverPrimitives";
+import type { OpenAppTarget } from "@/types";
 
 type FilePreviewPopoverProps = {
   path: string;

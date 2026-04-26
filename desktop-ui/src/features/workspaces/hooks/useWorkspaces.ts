@@ -5,7 +5,7 @@ import type {
   WorkspaceGroup,
   WorkspaceInfo,
   WorkspaceSettings,
-} from "../../../types";
+} from "@/types";
 import {
   RESERVED_GROUP_NAME,
   buildGroupedWorkspaces,

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { ConversationItem } from "../../../types";
+import type { ConversationItem } from "@/types";
 import { buildPerFileThreadDiffs } from "./perFileThreadDiffs";
 
 function fileChangeItem(

@@ -1,12 +1,12 @@
 import { useMemo } from "react";
-import type { AccessMode } from "../../../types";
-import { useTauriEvent } from "../../app/hooks/useTauriEvent";
+import type { AccessMode } from "@/types";
+import { useTauriEvent } from "@app/hooks/useTauriEvent";
 import {
   subscribeMenuCycleAccessMode,
   subscribeMenuCycleCollaborationMode,
   subscribeMenuCycleModel,
   subscribeMenuCycleReasoning,
-} from "../../../services/events";
+} from "@services/events";
 
 type ModelOption = { id: string; displayName: string; model: string };
 

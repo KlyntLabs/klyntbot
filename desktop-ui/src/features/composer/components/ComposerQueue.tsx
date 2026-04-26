@@ -1,11 +1,11 @@
 import { useCallback } from "react";
 import type { MouseEvent as ReactMouseEvent } from "react";
-import type { QueuedMessage } from "../../../types";
+import type { QueuedMessage } from "@/types";
 import {
   PopoverMenuItem,
   PopoverSurface,
-} from "../../design-system/components/popover/PopoverPrimitives";
-import { useMenuController } from "../../app/hooks/useMenuController";
+} from "@/features/design-system/components/popover/PopoverPrimitives";
+import { useMenuController } from "@app/hooks/useMenuController";
 
 type ComposerQueueProps = {
   queuedMessages: QueuedMessage[];

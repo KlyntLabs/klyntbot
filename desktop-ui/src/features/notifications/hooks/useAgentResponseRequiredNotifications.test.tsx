@@ -4,8 +4,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type {
   ApprovalRequest,
   RequestUserInputRequest,
-} from "../../../types";
-import { sendNotification } from "../../../services/tauri";
+} from "@/types";
+import { sendNotification } from "@services/tauri";
 import { useAgentResponseRequiredNotifications } from "./useAgentResponseRequiredNotifications";
 
 const useAppServerEventsMock = vi.fn();

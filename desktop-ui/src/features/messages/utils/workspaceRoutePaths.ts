@@ -1,5 +1,5 @@
 import { SETTINGS_ROUTE_SECTION_IDS } from "@settings/components/settingsTypes";
-import { parseFileLocation } from "../../../utils/fileLinks";
+import { parseFileLocation } from "@utils/fileLinks";
 
 export const WORKSPACE_MOUNT_PREFIX = "/workspace/";
 export const WORKSPACES_MOUNT_PREFIX = "/workspaces/";

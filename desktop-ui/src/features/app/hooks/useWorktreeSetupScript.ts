@@ -1,12 +1,12 @@
 import { useCallback, useRef } from "react";
-import type { DebugEntry, WorkspaceInfo } from "../../../types";
-import { buildErrorDebugEntry } from "../../../utils/debugEntries";
+import type { DebugEntry, WorkspaceInfo } from "@/types";
+import { buildErrorDebugEntry } from "@utils/debugEntries";
 import {
   getWorktreeSetupStatus,
   markWorktreeSetupRan,
   openTerminalSession,
   writeTerminalSession,
-} from "../../../services/tauri";
+} from "@services/tauri";
 
 const WORKTREE_SETUP_TERMINAL_ID = "worktree-setup";
 const WORKTREE_SETUP_TERMINAL_TITLE = "Setup";

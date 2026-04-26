@@ -17,11 +17,11 @@ import { useComposerImageDrop } from "../hooks/useComposerImageDrop";
 import { ComposerMobileActionsMenu } from "./ComposerMobileActionsMenu";
 import { ComposerSuggestionsPopover } from "./ComposerSuggestionsPopover";
 import { ComposerAttachments } from "./ComposerAttachments";
-import { DictationWaveform } from "../../dictation/components/DictationWaveform";
+import { DictationWaveform } from "@/features/dictation/components/DictationWaveform";
 import { useComposerDictationControls } from "../hooks/useComposerDictationControls";
 import { useComposerInputLayout } from "../hooks/useComposerInputLayout";
 import { useComposerMobileActions } from "../hooks/useComposerMobileActions";
-import type { ReviewPromptState, ReviewPromptStep } from "../../threads/hooks/useReviewPrompt";
+import type { ReviewPromptState, ReviewPromptStep } from "@threads/hooks/useReviewPrompt";
 
 type ComposerInputProps = {
   text: string;

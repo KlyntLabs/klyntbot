@@ -1,4 +1,4 @@
-import type { ConversationItem } from "../../../types";
+import type { ConversationItem } from "@/types";
 
 export type PerFileDiffEdit = {
   id: string;

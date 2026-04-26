@@ -1,6 +1,6 @@
 import type { MouseEvent, ReactNode } from "react";
 import { memo } from "react";
-import { DesktopLayout } from "../../layout/components/DesktopLayout";
+import { DesktopLayout } from "@/features/layout/components/DesktopLayout";
 
 type AppLayoutProps = {
   showHome: boolean;

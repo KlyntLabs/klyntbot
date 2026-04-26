@@ -1,9 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { FocusEvent } from "react";
-import type { BranchInfo } from "../../../types";
-import { ModalShell } from "../../design-system/components/modal/ModalShell";
-import { BranchList } from "../../git/components/BranchList";
-import { filterBranches } from "../../git/utils/branchSearch";
+import type { BranchInfo } from "@/types";
+import { ModalShell } from "@/features/design-system/components/modal/ModalShell";
+import { BranchList } from "@/features/git/components/BranchList";
+import { filterBranches } from "@/features/git/utils/branchSearch";
 
 type WorktreePromptProps = {
   workspaceName: string;

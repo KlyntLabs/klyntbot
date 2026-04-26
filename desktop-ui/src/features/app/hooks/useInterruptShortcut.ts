@@ -1,5 +1,5 @@
 import { useEffect } from "react";
-import { matchesShortcut } from "../../../utils/shortcuts";
+import { matchesShortcut } from "@utils/shortcuts";
 
 type UseInterruptShortcutOptions = {
   isEnabled: boolean;

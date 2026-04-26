@@ -1,9 +1,9 @@
 export const STORAGE_KEY_PENDING_POST_UPDATE_VERSION =
-  "codexmonitor.pendingPostUpdateVersion";
+  "klynt.pendingPostUpdateVersion";
 const GITHUB_RELEASES_API_BASE =
-  "https://api.github.com/repos/Dimillian/CodexMonitor/releases";
+  "https://api.github.com/repos/Dimillian/Klynt/releases";
 const GITHUB_RELEASES_WEB_BASE =
-  "https://github.com/Dimillian/CodexMonitor/releases";
+  "https://github.com/Dimillian/Klynt/releases";
 
 type GitHubReleaseResponse = {
   tag_name?: string;

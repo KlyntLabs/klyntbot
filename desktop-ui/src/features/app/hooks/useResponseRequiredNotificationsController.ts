@@ -1,6 +1,6 @@
-import type { ApprovalRequest, DebugEntry, RequestUserInputRequest } from "../../../types";
-import { useWindowFocusState } from "../../layout/hooks/useWindowFocusState";
-import { useAgentResponseRequiredNotifications } from "../../notifications/hooks/useAgentResponseRequiredNotifications";
+import type { ApprovalRequest, DebugEntry, RequestUserInputRequest } from "@/types";
+import { useWindowFocusState } from "@/features/layout/hooks/useWindowFocusState";
+import { useAgentResponseRequiredNotifications } from "@/features/notifications/hooks/useAgentResponseRequiredNotifications";
 
 type Params = {
   systemNotificationsEnabled: boolean;

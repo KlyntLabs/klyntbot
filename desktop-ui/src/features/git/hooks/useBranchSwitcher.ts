@@ -1,5 +1,5 @@
 import { useCallback, useState } from "react";
-import type { WorkspaceInfo } from "../../../types";
+import type { WorkspaceInfo } from "@/types";
 
 type UseBranchSwitcherOptions = {
   activeWorkspace: WorkspaceInfo | null;

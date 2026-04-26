@@ -6,7 +6,7 @@ import type {
   ThreadListSortKey,
   ThreadSummary,
   WorkspaceInfo,
-} from "../../../types";
+} from "@/types";
 import { memo, useCallback, useEffect, useMemo, useState } from "react";
 import type { MouseEvent, RefObject } from "react";
 import { FolderOpen } from "lucide-react";
@@ -35,12 +35,12 @@ import { useMenuController } from "../hooks/useMenuController";
 import { useSidebarMenus } from "../hooks/useSidebarMenus";
 import { useSidebarScrollFade } from "../hooks/useSidebarScrollFade";
 import { useThreadRows } from "../hooks/useThreadRows";
-import { useDebouncedValue } from "../../../hooks/useDebouncedValue";
+import { useDebouncedValue } from "@/hooks/useDebouncedValue";
 import { getUsageLabels } from "../utils/usageLabels";
-import { formatRelativeTimeShort } from "../../../utils/time";
-import type { ThreadStatusById } from "../../../utils/threadStatus";
+import { formatRelativeTimeShort } from "@utils/time";
+import type { ThreadStatusById } from "@utils/threadStatus";
 
-const COLLAPSED_GROUPS_STORAGE_KEY = "codexmonitor.collapsedGroups";
+const COLLAPSED_GROUPS_STORAGE_KEY = "klynt.collapsedGroups";
 const UNGROUPED_COLLAPSE_ID = "__ungrouped__";
 const ADD_MENU_WIDTH = 200;
 const ALL_THREADS_ADD_MENU_WIDTH = 220;

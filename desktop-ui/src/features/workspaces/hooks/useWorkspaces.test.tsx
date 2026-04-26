@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { act, renderHook } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { WorkspaceInfo } from "../../../types";
+import type { WorkspaceInfo } from "@/types";
 import {
   addWorkspace,
   addWorkspaceFromGitUrl,
@@ -11,7 +11,7 @@ import {
   renameWorktree,
   renameWorktreeUpstream,
   updateWorkspaceSettings,
-} from "../../../services/tauri";
+} from "@services/tauri";
 import { useWorkspaces } from "./useWorkspaces";
 
 vi.mock("../../../services/tauri", () => ({
@@ -366,7 +366,7 @@ describe("useWorkspaces.addWorkspacesFromPaths", () => {
       {
         ...workspaceOne,
         id: "existing-win",
-        path: "I:\\gpt-projects\\CodexMonitor",
+        path: "I:\\gpt-projects\\Klynt",
       },
     ]);
     isWorkspacePathDirMock.mockResolvedValue(true);
@@ -380,16 +380,16 @@ describe("useWorkspaces.addWorkspacesFromPaths", () => {
     let addResult: Awaited<ReturnType<typeof result.current.addWorkspacesFromPaths>>;
     await act(async () => {
       addResult = await result.current.addWorkspacesFromPaths([
-        "\\\\?\\I:\\gpt-projects\\CodexMonitor",
+        "\\\\?\\I:\\gpt-projects\\Klynt",
       ]);
     });
 
     expect(isWorkspacePathDirMock).toHaveBeenCalledWith(
-      "\\\\?\\I:\\gpt-projects\\CodexMonitor",
+      "\\\\?\\I:\\gpt-projects\\Klynt",
     );
     expect(addWorkspaceMock).not.toHaveBeenCalled();
     expect(addResult!.added).toHaveLength(0);
-    expect(addResult!.skippedExisting).toEqual(["\\\\?\\I:\\gpt-projects\\CodexMonitor"]);
+    expect(addResult!.skippedExisting).toEqual(["\\\\?\\I:\\gpt-projects\\Klynt"]);
     expect(addResult!.skippedInvalid).toHaveLength(0);
     expect(addResult!.failures).toHaveLength(0);
   });
@@ -403,7 +403,7 @@ describe("useWorkspaces.addWorkspacesFromPaths", () => {
       {
         ...workspaceOne,
         id: "existing-unc",
-        path: "\\\\SERVER\\Share\\CodexMonitor",
+        path: "\\\\SERVER\\Share\\Klynt",
       },
     ]);
     isWorkspacePathDirMock.mockResolvedValue(true);
@@ -417,17 +417,17 @@ describe("useWorkspaces.addWorkspacesFromPaths", () => {
     let addResult: Awaited<ReturnType<typeof result.current.addWorkspacesFromPaths>>;
     await act(async () => {
       addResult = await result.current.addWorkspacesFromPaths([
-        "\\\\?\\UNC\\SERVER\\Share\\CodexMonitor",
+        "\\\\?\\UNC\\SERVER\\Share\\Klynt",
       ]);
     });
 
     expect(isWorkspacePathDirMock).toHaveBeenCalledWith(
-      "\\\\?\\UNC\\SERVER\\Share\\CodexMonitor",
+      "\\\\?\\UNC\\SERVER\\Share\\Klynt",
     );
     expect(addWorkspaceMock).not.toHaveBeenCalled();
     expect(addResult!.added).toHaveLength(0);
     expect(addResult!.skippedExisting).toEqual([
-      "\\\\?\\UNC\\SERVER\\Share\\CodexMonitor",
+      "\\\\?\\UNC\\SERVER\\Share\\Klynt",
     ]);
     expect(addResult!.skippedInvalid).toHaveLength(0);
     expect(addResult!.failures).toHaveLength(0);
@@ -553,7 +553,7 @@ describe("useWorkspaces.addWorkspacesFromPaths", () => {
       {
         ...workspaceOne,
         id: "existing-srv",
-        path: "/srv/codex-monitor/project",
+        path: "/srv/klynt/project",
       },
       {
         ...workspaceTwo,
@@ -565,7 +565,7 @@ describe("useWorkspaces.addWorkspacesFromPaths", () => {
       if (path === "~/project") {
         return false;
       }
-      if (path === "/srv/codex-monitor/project") {
+      if (path === "/srv/klynt/project") {
         return true;
       }
       return path === "/Users/vlad/project";
@@ -588,7 +588,7 @@ describe("useWorkspaces.addWorkspacesFromPaths", () => {
     });
 
     expect(isWorkspacePathDirMock).toHaveBeenNthCalledWith(1, "~/project");
-    expect(isWorkspacePathDirMock).toHaveBeenNthCalledWith(2, "/srv/codex-monitor/project");
+    expect(isWorkspacePathDirMock).toHaveBeenNthCalledWith(2, "/srv/klynt/project");
     expect(isWorkspacePathDirMock).toHaveBeenNthCalledWith(3, "/Users/vlad/project");
     expect(addWorkspaceMock).toHaveBeenCalledWith("/Users/vlad/project");
     expect(addResult!.added).toHaveLength(1);

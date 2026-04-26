@@ -1,6 +1,6 @@
 import "../../../styles/mobile-setup-wizard.css";
 import X from "lucide-react/dist/esm/icons/x";
-import { ModalShell } from "../../design-system/components/modal/ModalShell";
+import { ModalShell } from "@/features/design-system/components/modal/ModalShell";
 
 export type MobileServerSetupWizardProps = {
   remoteHostDraft: string;
@@ -47,7 +47,7 @@ export function MobileServerSetupWizard({
         <h2 className="mobile-setup-wizard-title">Connect to your desktop backend</h2>
         <p className="mobile-setup-wizard-subtitle">
           Complete this setup before using the app. Use the same connection details configured on
-          your desktop CodexMonitor server settings.
+          your desktop Klynt server settings.
         </p>
       </div>
 

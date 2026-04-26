@@ -1,9 +1,9 @@
 /** @vitest-environment jsdom */
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
-import type { GitLogEntry } from "../../../types";
+import type { GitLogEntry } from "@/types";
 import { GitDiffPanel } from "./GitDiffPanel";
-import { fileManagerName } from "../../../utils/platformPaths";
+import { fileManagerName } from "@utils/platformPaths";
 
 const menuNew = vi.hoisted(() =>
   vi.fn(async ({ items }) => ({ popup: vi.fn(), items })),

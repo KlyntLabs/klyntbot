@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import type { WorkspaceInfo } from "../../../types";
+import type { WorkspaceInfo } from "@/types";
 import { validateBranchName } from "../utils/branchValidation";
 import type { InitGitRepoOutcome } from "./useGitActions";
 

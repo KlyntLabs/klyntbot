@@ -1,7 +1,7 @@
-import { DebugPanel } from "../../../debug/components/DebugPanel";
-import { PlanPanel } from "../../../plan/components/PlanPanel";
-import { TerminalDock } from "../../../terminal/components/TerminalDock";
-import { TerminalPanel } from "../../../terminal/components/TerminalPanel";
+import { DebugPanel } from "@/features/debug/components/DebugPanel";
+import { PlanPanel } from "@/features/plan/components/PlanPanel";
+import { TerminalDock } from "@/features/terminal/components/TerminalDock";
+import { TerminalPanel } from "@/features/terminal/components/TerminalPanel";
 import type {
   LayoutNodesResult,
   LayoutSecondarySurface,

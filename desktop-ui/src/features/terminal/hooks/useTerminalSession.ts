@@ -3,19 +3,19 @@ import type { RefObject } from "react";
 import { Terminal } from "@xterm/xterm";
 import { FitAddon } from "@xterm/addon-fit";
 import "@xterm/xterm/css/xterm.css";
-import type { DebugEntry, TerminalStatus, WorkspaceInfo } from "../../../types";
-import { buildErrorDebugEntry } from "../../../utils/debugEntries";
+import type { DebugEntry, TerminalStatus, WorkspaceInfo } from "@/types";
+import { buildErrorDebugEntry } from "@utils/debugEntries";
 import {
   subscribeTerminalExit,
   subscribeTerminalOutput,
   type TerminalExitEvent,
   type TerminalOutputEvent,
-} from "../../../services/events";
+} from "@services/events";
 import {
   openTerminalSession,
   resizeTerminalSession,
   writeTerminalSession,
-} from "../../../services/tauri";
+} from "@services/tauri";
 
 const MAX_BUFFER_CHARS = 200_000;
 

@@ -3,9 +3,9 @@ import type {
   DictationEvent,
   DictationSessionState,
   DictationTranscript,
-} from "../../../types";
-import { cancelDictation, startDictation, stopDictation } from "../../../services/tauri";
-import { subscribeDictationEvents } from "../../../services/events";
+} from "@/types";
+import { cancelDictation, startDictation, stopDictation } from "@services/tauri";
+import { subscribeDictationEvents } from "@services/events";
 
 type UseDictationResult = {
   state: DictationSessionState;

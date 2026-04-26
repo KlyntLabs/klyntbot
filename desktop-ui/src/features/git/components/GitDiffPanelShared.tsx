@@ -1,4 +1,4 @@
-import type { GitLogEntry } from "../../../types";
+import type { GitLogEntry } from "@/types";
 import type { MouseEvent as ReactMouseEvent } from "react";
 import Check from "lucide-react/dist/esm/icons/check";
 import Minus from "lucide-react/dist/esm/icons/minus";
@@ -6,8 +6,8 @@ import Plus from "lucide-react/dist/esm/icons/plus";
 import RotateCcw from "lucide-react/dist/esm/icons/rotate-ccw";
 import Upload from "lucide-react/dist/esm/icons/upload";
 import X from "lucide-react/dist/esm/icons/x";
-import { MagicSparkleIcon } from "../../shared/components/MagicSparkleIcon";
-import { formatRelativeTime } from "../../../utils/time";
+import { MagicSparkleIcon } from "@/features/shared/components/MagicSparkleIcon";
+import { formatRelativeTime } from "@utils/time";
 import {
   getStatusClass,
   getStatusSymbol,

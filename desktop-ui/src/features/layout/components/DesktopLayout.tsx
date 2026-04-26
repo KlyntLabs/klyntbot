@@ -1,5 +1,5 @@
 import { useEffect, useRef, type MouseEvent, type ReactNode } from "react";
-import { MainTopbar } from "../../app/components/MainTopbar";
+import { MainTopbar } from "@app/components/MainTopbar";
 import { ChatPane } from "./ChatPane";
 
 type CenterMode = "chat" | "diff";

@@ -6,7 +6,7 @@ import type {
   AccountSnapshot,
   LocalUsageSnapshot,
   RateLimitSnapshot,
-} from "../../../types";
+} from "@/types";
 import {
   formatCount,
   formatDayLabel,
@@ -194,7 +194,7 @@ export function HomeUsageSection({
         <div className="home-usage-empty">
           <div className="home-usage-empty-title">No usage data yet</div>
           <div className="home-usage-empty-subtitle">
-            Run a Codex session to start tracking local usage.
+            Run a session to start tracking local usage.
           </div>
           {localUsageError && (
             <div className="home-usage-error">{localUsageError}</div>

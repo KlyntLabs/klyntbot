@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { renderHook } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { RateLimitSnapshot } from "../../../types";
+import type { RateLimitSnapshot } from "@/types";
 import {
   buildTraySessionUsage,
   useTraySessionUsage,

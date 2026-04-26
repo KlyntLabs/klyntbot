@@ -1,5 +1,5 @@
 import { convertFileSrc } from "@tauri-apps/api/core";
-import type { ConversationItem } from "../../../types";
+import type { ConversationItem } from "@/types";
 
 export type ToolSummary = {
   label: string;

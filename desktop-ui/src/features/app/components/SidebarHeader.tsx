@@ -8,12 +8,12 @@ import ListTree from "lucide-react/dist/esm/icons/list-tree";
 import RefreshCw from "lucide-react/dist/esm/icons/refresh-cw";
 import Search from "lucide-react/dist/esm/icons/search";
 import { useCallback, useEffect, useRef, useState } from "react";
-import type { ThreadListOrganizeMode, ThreadListSortKey } from "../../../types";
+import type { ThreadListOrganizeMode, ThreadListSortKey } from "@/types";
 import {
   MenuTrigger,
   PopoverMenuItem,
   PopoverSurface,
-} from "../../design-system/components/popover/PopoverPrimitives";
+} from "@/features/design-system/components/popover/PopoverPrimitives";
 import { useMenuController } from "../hooks/useMenuController";
 
 type SidebarHeaderProps = {

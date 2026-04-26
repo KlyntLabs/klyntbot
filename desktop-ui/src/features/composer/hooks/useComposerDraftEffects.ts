@@ -1,7 +1,7 @@
 import { useEffect, type RefObject } from "react";
-import type { AppMention, DictationTranscript, QueuedMessage } from "../../../types";
-import { computeDictationInsertion } from "../../../utils/dictation";
-import type { AppMentionBinding } from "../../apps/utils/appMentions";
+import type { AppMention, DictationTranscript, QueuedMessage } from "@/types";
+import { computeDictationInsertion } from "@utils/dictation";
+import type { AppMentionBinding } from "@/features/apps/utils/appMentions";
 
 type UseComposerDraftEffectsArgs = {
   draftText: string;

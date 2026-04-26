@@ -1,7 +1,7 @@
 import { useCallback, useMemo, useRef } from "react";
-import type { DebugEntry } from "../../../types";
-import { sendNotification } from "../../../services/tauri";
-import { useAppServerEvents } from "../../app/hooks/useAppServerEvents";
+import type { DebugEntry } from "@/types";
+import { sendNotification } from "@services/tauri";
+import { useAppServerEvents } from "@app/hooks/useAppServerEvents";
 
 const DEFAULT_MIN_DURATION_MS = 60_000; // 1 minute
 const MAX_BODY_LENGTH = 200;

@@ -3,9 +3,9 @@ import type { MouseEvent as ReactMouseEvent } from "react";
 import { renderHook } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
-import type { WorkspaceInfo } from "../../../types";
+import type { WorkspaceInfo } from "@/types";
 import { useSidebarMenus } from "./useSidebarMenus";
-import { fileManagerName } from "../../../utils/platformPaths";
+import { fileManagerName } from "@utils/platformPaths";
 
 const menuNew = vi.hoisted(() =>
   vi.fn(async ({ items }) => ({ popup: vi.fn(), items })),

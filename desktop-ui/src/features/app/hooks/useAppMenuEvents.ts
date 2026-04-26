@@ -15,8 +15,8 @@ import {
   subscribeMenuToggleGitSidebar,
   subscribeMenuToggleProjectsSidebar,
   subscribeMenuToggleTerminal,
-} from "../../../services/events";
-import type { WorkspaceInfo } from "../../../types";
+} from "@services/events";
+import type { WorkspaceInfo } from "@/types";
 
 type Params = {
   activeWorkspaceRef: MutableRefObject<WorkspaceInfo | null>;

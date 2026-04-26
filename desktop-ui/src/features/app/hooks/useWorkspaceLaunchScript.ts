@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import type { WorkspaceInfo } from "../../../types";
-import type { TerminalSessionState } from "../../terminal/hooks/useTerminalSession";
-import type { WorkspaceSettings } from "../../../types";
-import { writeTerminalSession } from "../../../services/tauri";
+import type { WorkspaceInfo } from "@/types";
+import type { TerminalSessionState } from "@/features/terminal/hooks/useTerminalSession";
+import type { WorkspaceSettings } from "@/types";
+import { writeTerminalSession } from "@services/tauri";
 
 type PendingLaunch = {
   workspaceId: string;

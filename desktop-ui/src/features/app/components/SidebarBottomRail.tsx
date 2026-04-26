@@ -6,7 +6,7 @@ import { useEffect } from "react";
 import {
   MenuTrigger,
   PopoverSurface,
-} from "../../design-system/components/popover/PopoverPrimitives";
+} from "@/features/design-system/components/popover/PopoverPrimitives";
 import { useMenuController } from "../hooks/useMenuController";
 
 type SidebarBottomRailProps = {

@@ -1,8 +1,8 @@
-import { useThemePreference } from "../../layout/hooks/useThemePreference";
-import { useTransparencyPreference } from "../../layout/hooks/useTransparencyPreference";
-import { useUiScaleShortcuts } from "../../layout/hooks/useUiScaleShortcuts";
-import { useAppSettings } from "../../settings/hooks/useAppSettings";
-import { runCodexUpdate } from "../../../services/tauri";
+import { useThemePreference } from "@/features/layout/hooks/useThemePreference";
+import { useTransparencyPreference } from "@/features/layout/hooks/useTransparencyPreference";
+import { useUiScaleShortcuts } from "@/features/layout/hooks/useUiScaleShortcuts";
+import { useAppSettings } from "@settings/hooks/useAppSettings";
+import { runCodexUpdate } from "@services/tauri";
 
 export function useAppSettingsController() {
   const {

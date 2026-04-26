@@ -1,6 +1,6 @@
 import { useEffect, useRef } from "react";
-import { matchesHoldKey } from "../../../utils/keys";
-import type { DictationSessionState } from "../../../types";
+import { matchesHoldKey } from "@utils/keys";
+import type { DictationSessionState } from "@/types";
 
 type UseHoldToDictateArgs = {
   enabled: boolean;

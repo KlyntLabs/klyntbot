@@ -1,6 +1,6 @@
 import { useCallback } from "react";
 
-import type { WorkspaceInfo, WorkspaceSettings } from "../../../types";
+import type { WorkspaceInfo, WorkspaceSettings } from "@/types";
 
 type AppTab = "home" | "projects" | "codex" | "git" | "log";
 

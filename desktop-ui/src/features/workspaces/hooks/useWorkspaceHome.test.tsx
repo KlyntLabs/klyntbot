@@ -1,8 +1,8 @@
 // @vitest-environment jsdom
 import { act, renderHook } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
-import type { ModelOption, WorkspaceInfo } from "../../../types";
-import { generateRunMetadata } from "../../../services/tauri";
+import type { ModelOption, WorkspaceInfo } from "@/types";
+import { generateRunMetadata } from "@services/tauri";
 import { useWorkspaceHome } from "./useWorkspaceHome";
 
 vi.mock("../../../services/tauri", () => ({

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef } from "react";
-import { ModalShell } from "../../design-system/components/modal/ModalShell";
+import { ModalShell } from "@/features/design-system/components/modal/ModalShell";
 import { validateBranchName } from "../utils/branchValidation";
 
 type InitGitRepoPromptProps = {

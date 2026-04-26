@@ -4,13 +4,13 @@ import type {
   GitHubPullRequest,
   GitHubPullRequestDiff,
   WorkspaceInfo,
-} from "../../../types";
-import { useGitStatus } from "../../git/hooks/useGitStatus";
-import { useGitDiffs } from "../../git/hooks/useGitDiffs";
-import { useGitLog } from "../../git/hooks/useGitLog";
-import { useGitCommitDiffs } from "../../git/hooks/useGitCommitDiffs";
-import type { GitDiffSource, GitPanelMode } from "../../git/types";
-import { buildPerFileThreadDiffs } from "../../git/utils/perFileThreadDiffs";
+} from "@/types";
+import { useGitStatus } from "@/features/git/hooks/useGitStatus";
+import { useGitDiffs } from "@/features/git/hooks/useGitDiffs";
+import { useGitLog } from "@/features/git/hooks/useGitLog";
+import { useGitCommitDiffs } from "@/features/git/hooks/useGitCommitDiffs";
+import type { GitDiffSource, GitPanelMode } from "@/features/git/types";
+import { buildPerFileThreadDiffs } from "@/features/git/utils/perFileThreadDiffs";
 
 export function useGitPanelController({
   activeWorkspace,

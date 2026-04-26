@@ -1,6 +1,6 @@
 import { useCallback, useMemo } from "react";
 import { useMenuAccelerators } from "./useMenuAccelerators";
-import type { AppSettings, DebugEntry } from "../../../types";
+import type { AppSettings, DebugEntry } from "@/types";
 
 type Params = {
   appSettings: AppSettings;

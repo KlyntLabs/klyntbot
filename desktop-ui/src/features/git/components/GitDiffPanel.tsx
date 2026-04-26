@@ -1,4 +1,4 @@
-import type { GitHubIssue, GitHubPullRequest, GitLogEntry } from "../../../types";
+import type { GitHubIssue, GitHubPullRequest, GitLogEntry } from "@/types";
 import type { MouseEvent as ReactMouseEvent } from "react";
 import { Menu, MenuItem } from "@tauri-apps/api/menu";
 import { LogicalPosition } from "@tauri-apps/api/dpi";
@@ -10,13 +10,13 @@ import GitBranch from "lucide-react/dist/esm/icons/git-branch";
 import ScrollText from "lucide-react/dist/esm/icons/scroll-text";
 import Search from "lucide-react/dist/esm/icons/search";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import type { PanelTabId } from "../../layout/components/PanelTabs";
-import { PanelShell } from "../../layout/components/PanelShell";
-import { pushErrorToast } from "../../../services/toasts";
+import type { PanelTabId } from "@/features/layout/components/PanelTabs";
+import { PanelShell } from "@/features/layout/components/PanelShell";
+import { pushErrorToast } from "@services/toasts";
 import {
   fileManagerName,
   isAbsolutePath as isAbsolutePathForPlatform,
-} from "../../../utils/platformPaths";
+} from "@utils/platformPaths";
 import {
   GitBranchRow,
   GitDiffModeContent,

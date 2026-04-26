@@ -50,7 +50,7 @@ vi.mock("@services/tauri", () => ({
 
 const workspace: WorkspaceInfo = {
   id: "ws-1",
-  name: "CodexMonitor",
+  name: "Klynt",
   path: "/tmp/codex",
   connected: true,
   settings: { sidebarCollapsed: false },

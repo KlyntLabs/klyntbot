@@ -3,10 +3,10 @@ import type {
   ApprovalRequest,
   DebugEntry,
   RequestUserInputRequest,
-} from "../../../types";
-import { sendNotification } from "../../../services/tauri";
-import { getApprovalCommandInfo } from "../../../utils/approvalRules";
-import { useAppServerEvents } from "../../app/hooks/useAppServerEvents";
+} from "@/types";
+import { sendNotification } from "@services/tauri";
+import { getApprovalCommandInfo } from "@utils/approvalRules";
+import { useAppServerEvents } from "@app/hooks/useAppServerEvents";
 
 const MAX_BODY_LENGTH = 200;
 const MIN_NOTIFICATION_SPACING_MS = 1500;
@@ -359,7 +359,7 @@ export function useAgentResponseRequiredNotifications({
       const text = String(item.text ?? "").trim();
       const body = text
         ? truncateText(text.split("\n")[0] ?? text, MAX_BODY_LENGTH)
-        : "Plan is ready. Open CodexMonitor to respond.";
+        : "Plan is ready. Open Klynt to respond.";
       const extra = {
         kind: "response_required",
         type: "plan",

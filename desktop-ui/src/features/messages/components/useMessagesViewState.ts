@@ -6,8 +6,8 @@ import {
   useRef,
   useState,
 } from "react";
-import type { ConversationItem } from "../../../types";
-import { isPlanReadyTaggedMessage } from "../../../utils/internalPlanReadyMessages";
+import type { ConversationItem } from "@/types";
+import { isPlanReadyTaggedMessage } from "@utils/internalPlanReadyMessages";
 import {
   SCROLL_THRESHOLD_PX,
   buildToolGroups,

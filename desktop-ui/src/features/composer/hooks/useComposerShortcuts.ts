@@ -1,6 +1,6 @@
 import { useEffect } from "react";
-import type { AccessMode } from "../../../types";
-import { matchesShortcut } from "../../../utils/shortcuts";
+import type { AccessMode } from "@/types";
+import { matchesShortcut } from "@utils/shortcuts";
 
 type ModelOption = { id: string; displayName: string; model: string };
 

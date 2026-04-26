@@ -1,5 +1,5 @@
 import type { ReactNode, Ref } from "react";
-import type { BranchInfo } from "../../../types";
+import type { BranchInfo } from "@/types";
 
 type BranchListProps = {
   branches: BranchInfo[];

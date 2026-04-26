@@ -1,8 +1,8 @@
-import { formatRelativeTime } from "../../../utils/time";
+import { formatRelativeTime } from "@utils/time";
 import {
   getWorkspaceHomeThreadState,
   type ThreadStatusById,
-} from "../../../utils/threadStatus";
+} from "@utils/threadStatus";
 import type {
   WorkspaceHomeRun,
   WorkspaceHomeRunInstance,

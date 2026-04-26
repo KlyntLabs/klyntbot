@@ -1,7 +1,7 @@
 import type { CSSProperties, MouseEvent } from "react";
 
-import type { ThreadSummary } from "../../../types";
-import { getThreadStatusClass, type ThreadStatusById } from "../../../utils/threadStatus";
+import type { ThreadSummary } from "@/types";
+import { getThreadStatusClass, type ThreadStatusById } from "@utils/threadStatus";
 
 function hashString(value: string) {
   let hash = 0;

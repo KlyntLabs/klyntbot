@@ -1,5 +1,5 @@
 import { expect, vi } from "vitest";
-import { parseFileLocation, type ParsedFileLocation } from "../../../utils/fileLinks";
+import { parseFileLocation, type ParsedFileLocation } from "@utils/fileLinks";
 
 export function expectOpenedFileTarget(
   mock: ReturnType<typeof vi.fn>,

@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { act, renderHook } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { ThreadSummary, WorkspaceInfo } from "../../../types";
+import type { ThreadSummary, WorkspaceInfo } from "@/types";
 import {
   buildTrayRecentThreadEntries,
   useTrayRecentThreads,

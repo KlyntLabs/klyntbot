@@ -3,11 +3,11 @@ import type {
   CollaborationModeOption,
   SendMessageResult,
   WorkspaceInfo,
-} from "../../../types";
+} from "@/types";
 import {
   makePlanReadyAcceptMessage,
   makePlanReadyChangesMessage,
-} from "../../../utils/internalPlanReadyMessages";
+} from "@utils/internalPlanReadyMessages";
 
 type SendUserMessageOptions = {
   collaborationMode?: Record<string, unknown> | null;

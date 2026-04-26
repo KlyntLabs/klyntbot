@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { act, renderHook } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { sendNotification } from "../../../services/tauri";
+import { sendNotification } from "@services/tauri";
 import { useAgentSystemNotifications } from "./useAgentSystemNotifications";
 
 const useAppServerEventsMock = vi.fn();

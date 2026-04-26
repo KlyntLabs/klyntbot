@@ -1,7 +1,7 @@
 import { useEffect } from "react";
-import type { GitCommitDiff, GitHubPullRequestDiff } from "../../../types";
-import type { GitDiffSource } from "../../git/types";
-import type { PerFileDiffGroup } from "../../git/utils/perFileThreadDiffs";
+import type { GitCommitDiff, GitHubPullRequestDiff } from "@/types";
+import type { GitDiffSource } from "@/features/git/types";
+import type { PerFileDiffGroup } from "@/features/git/utils/perFileThreadDiffs";
 
 type Params = {
   diffSource: GitDiffSource;

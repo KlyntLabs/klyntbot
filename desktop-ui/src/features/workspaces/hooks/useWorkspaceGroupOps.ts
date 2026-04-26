@@ -1,5 +1,5 @@
 import { useCallback } from "react";
-import type { AppSettings, WorkspaceGroup, WorkspaceInfo, WorkspaceSettings } from "../../../types";
+import type { AppSettings, WorkspaceGroup, WorkspaceInfo, WorkspaceSettings } from "@/types";
 import {
   RESERVED_GROUP_NAME,
   createGroupId,

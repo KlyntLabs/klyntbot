@@ -6,9 +6,9 @@ import type {
   OpenAppTarget,
   RequestUserInputRequest,
   RequestUserInputResponse,
-} from "../../../types";
-import { PlanReadyFollowupMessage } from "../../app/components/PlanReadyFollowupMessage";
-import { RequestUserInputMessage } from "../../app/components/RequestUserInputMessage";
+} from "@/types";
+import { PlanReadyFollowupMessage } from "@app/components/PlanReadyFollowupMessage";
+import { RequestUserInputMessage } from "@app/components/RequestUserInputMessage";
 import { useFileLinkOpener } from "../hooks/useFileLinkOpener";
 import { formatCount, parseReasoning } from "../utils/messageRenderUtils";
 import {

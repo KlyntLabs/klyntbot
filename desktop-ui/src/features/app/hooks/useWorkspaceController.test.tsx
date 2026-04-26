@@ -2,15 +2,15 @@
 import { act, renderHook } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { ask, message } from "@tauri-apps/plugin-dialog";
-import type { AppSettings, WorkspaceInfo } from "../../../types";
+import type { AppSettings, WorkspaceInfo } from "@/types";
 import {
   addWorkspace,
   isWorkspacePathDir,
   listWorkspaces,
   pickWorkspacePaths,
   removeWorkspace,
-} from "../../../services/tauri";
-import { isMobilePlatform } from "../../../utils/platformPaths";
+} from "@services/tauri";
+import { isMobilePlatform } from "@utils/platformPaths";
 import { useWorkspaceController } from "./useWorkspaceController";
 
 vi.mock("@tauri-apps/plugin-dialog", () => ({
@@ -162,7 +162,7 @@ describe("useWorkspaceController dialogs", () => {
     expect(pickWorkspacePaths).not.toHaveBeenCalled();
 
     await act(async () => {
-      result.current.updateMobileRemoteWorkspacePathInput("/srv/codex-monitor");
+      result.current.updateMobileRemoteWorkspacePathInput("/srv/klynt");
     });
 
     await act(async () => {
@@ -175,7 +175,7 @@ describe("useWorkspaceController dialogs", () => {
     });
 
     expect(added).toMatchObject({ id: workspaceOne.id });
-    expect(isWorkspacePathDir).toHaveBeenCalledWith("/srv/codex-monitor");
+    expect(isWorkspacePathDir).toHaveBeenCalledWith("/srv/klynt");
     expect(result.current.mobileRemoteWorkspacePathPrompt).toBeNull();
     expect(window.localStorage.getItem("mobile-remote-workspace-recent-paths")).toBe(
       JSON.stringify(["/tmp/ws-1"]),

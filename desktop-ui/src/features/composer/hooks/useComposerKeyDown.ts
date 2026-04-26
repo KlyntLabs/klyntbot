@@ -1,8 +1,8 @@
 import { useCallback, type KeyboardEvent, type RefObject } from "react";
-import type { ComposerSendIntent } from "../../../types";
-import { getListContinuation } from "../../../utils/composerText";
-import { isComposingEvent } from "../../../utils/keys";
-import { isMobilePlatform } from "../../../utils/platformPaths";
+import type { ComposerSendIntent } from "@/types";
+import { getListContinuation } from "@utils/composerText";
+import { isComposingEvent } from "@utils/keys";
+import { isMobilePlatform } from "@utils/platformPaths";
 
 type ReviewPromptKeyEvent = {
   key: string;

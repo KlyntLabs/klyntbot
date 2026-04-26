@@ -1,12 +1,12 @@
 import ArrowLeft from "lucide-react/dist/esm/icons/arrow-left";
-import { ApprovalToasts } from "../../../app/components/ApprovalToasts";
-import { MainHeader } from "../../../app/components/MainHeader";
-import { Sidebar } from "../../../app/components/Sidebar";
-import { Composer } from "../../../composer/components/Composer";
-import { Home } from "../../../home/components/Home";
-import { Messages } from "../../../messages/components/Messages";
-import { ErrorToasts } from "../../../notifications/components/ErrorToasts";
-import { UpdateToast } from "../../../update/components/UpdateToast";
+import { ApprovalToasts } from "@app/components/ApprovalToasts";
+import { MainHeader } from "@app/components/MainHeader";
+import { Sidebar } from "@app/components/Sidebar";
+import { Composer } from "@/features/composer/components/Composer";
+import { Home } from "@/features/home/components/Home";
+import { Messages } from "@/features/messages/components/Messages";
+import { ErrorToasts } from "@/features/notifications/components/ErrorToasts";
+import { UpdateToast } from "@/features/update/components/UpdateToast";
 import type { LayoutNodesResult, LayoutPrimarySurface } from "./types";
 
 export type PrimaryLayoutNodesOptions = LayoutPrimarySurface;

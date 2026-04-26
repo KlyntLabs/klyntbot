@@ -1,9 +1,9 @@
 import { useCallback } from "react";
-import { useWorkspaces } from "../../workspaces/hooks/useWorkspaces";
-import type { AppSettings, WorkspaceInfo } from "../../../types";
-import type { DebugEntry } from "../../../types";
+import { useWorkspaces } from "@/features/workspaces/hooks/useWorkspaces";
+import type { AppSettings, WorkspaceInfo } from "@/types";
+import type { DebugEntry } from "@/types";
 import { useWorkspaceDialogs } from "./useWorkspaceDialogs";
-import { isMobilePlatform } from "../../../utils/platformPaths";
+import { isMobilePlatform } from "@utils/platformPaths";
 
 type WorkspaceControllerOptions = {
   appSettings: AppSettings;

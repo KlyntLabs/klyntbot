@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import type { GitLogEntry, WorkspaceInfo } from "../../../types";
-import { getGitLog } from "../../../services/tauri";
+import type { GitLogEntry, WorkspaceInfo } from "@/types";
+import { getGitLog } from "@services/tauri";
 
 type GitLogState = {
   entries: GitLogEntry[];

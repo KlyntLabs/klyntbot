@@ -1,10 +1,10 @@
-import type { GitHubIssue, GitHubPullRequest, GitLogEntry } from "../../../types";
+import type { GitHubIssue, GitHubPullRequest, GitLogEntry } from "@/types";
 import type { MouseEvent as ReactMouseEvent } from "react";
 import { useCallback, useEffect, useState } from "react";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import ChevronDown from "lucide-react/dist/esm/icons/chevron-down";
 import ChevronRight from "lucide-react/dist/esm/icons/chevron-right";
-import { formatRelativeTime } from "../../../utils/time";
+import { formatRelativeTime } from "@utils/time";
 import type { PerFileDiffGroup } from "../utils/perFileThreadDiffs";
 import { GitLogEntryRow } from "./GitDiffPanelShared";
 import { splitPath } from "./GitDiffPanel.utils";

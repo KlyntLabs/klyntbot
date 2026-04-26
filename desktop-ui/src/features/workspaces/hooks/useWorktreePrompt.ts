@@ -1,5 +1,5 @@
 import { useCallback, useState } from "react";
-import type { WorkspaceInfo, WorkspaceSettings } from "../../../types";
+import type { WorkspaceInfo, WorkspaceSettings } from "@/types";
 
 type WorktreePromptState = {
   workspace: WorkspaceInfo;

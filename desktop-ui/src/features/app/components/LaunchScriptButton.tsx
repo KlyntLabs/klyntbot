@@ -1,6 +1,6 @@
 import Play from "lucide-react/dist/esm/icons/play";
-import type { LaunchScriptIconId } from "../../../types";
-import { PopoverSurface } from "../../design-system/components/popover/PopoverPrimitives";
+import type { LaunchScriptIconId } from "@/types";
+import { PopoverSurface } from "@/features/design-system/components/popover/PopoverPrimitives";
 import { useMenuController } from "../hooks/useMenuController";
 import { LaunchScriptIconPicker } from "./LaunchScriptIconPicker";
 import { DEFAULT_LAUNCH_SCRIPT_ICON } from "../utils/launchScriptIcons";

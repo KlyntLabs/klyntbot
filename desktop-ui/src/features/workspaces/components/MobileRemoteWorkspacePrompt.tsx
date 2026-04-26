@@ -1,5 +1,5 @@
 import { useEffect, useRef } from "react";
-import { ModalShell } from "../../design-system/components/modal/ModalShell";
+import { ModalShell } from "@/features/design-system/components/modal/ModalShell";
 
 type MobileRemoteWorkspacePromptProps = {
   value: string;

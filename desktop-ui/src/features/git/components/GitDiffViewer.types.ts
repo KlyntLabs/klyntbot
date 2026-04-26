@@ -4,7 +4,7 @@ import type {
   PullRequestReviewAction,
   PullRequestReviewIntent,
   PullRequestSelectionRange,
-} from "../../../types";
+} from "@/types";
 
 export type GitDiffViewerItem = {
   path: string;

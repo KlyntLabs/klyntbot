@@ -1,7 +1,7 @@
 import { isTauri } from "@tauri-apps/api/core";
 import { useEffect, useMemo, useRef } from "react";
 import { setTrayRecentThreads } from "@services/tauri";
-import type { ThreadSummary, TrayRecentThreadEntry, WorkspaceInfo } from "../../../types";
+import type { ThreadSummary, TrayRecentThreadEntry, WorkspaceInfo } from "@/types";
 
 const SYNC_DEBOUNCE_MS = 150;
 

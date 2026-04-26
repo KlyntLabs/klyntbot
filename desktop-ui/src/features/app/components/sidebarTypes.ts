@@ -1,4 +1,4 @@
-import type { ThreadSummary, WorkspaceInfo } from "../../../types";
+import type { ThreadSummary, WorkspaceInfo } from "@/types";
 
 export type WorkspaceGroupSection = {
   id: string | null;

@@ -5,7 +5,7 @@ import {
   normalizeFileLinkPath,
   parseFileLocation,
   parseFileUrlLocation,
-} from "../../../utils/fileLinks";
+} from "@utils/fileLinks";
 import { resolveMountedWorkspacePath } from "./mountedWorkspacePaths";
 import {
   isKnownLocalWorkspaceRoutePath,

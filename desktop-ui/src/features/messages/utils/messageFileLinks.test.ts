@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { formatFileLocation } from "../../../utils/fileLinks";
+import { formatFileLocation } from "@utils/fileLinks";
 import { resolveMessageFileHref } from "./messageFileLinks";
 
 function expectResolvedHref(url: string, expected: string | null) {

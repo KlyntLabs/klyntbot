@@ -1,9 +1,9 @@
 // @vitest-environment jsdom
 import { act, renderHook, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { AppServerEvent, WorkspaceInfo } from "../../../types";
-import { getSkillsList } from "../../../services/tauri";
-import { subscribeAppServerEvents } from "../../../services/events";
+import type { AppServerEvent, WorkspaceInfo } from "@/types";
+import { getSkillsList } from "@services/tauri";
+import { subscribeAppServerEvents } from "@services/events";
 import { useSkills } from "./useSkills";
 
 vi.mock("../../../services/tauri", () => ({

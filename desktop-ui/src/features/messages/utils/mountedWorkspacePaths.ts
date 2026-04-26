@@ -1,4 +1,4 @@
-import { joinWorkspacePath } from "../../../utils/platformPaths";
+import { joinWorkspacePath } from "@utils/platformPaths";
 import {
   isKnownLocalWorkspaceRoutePath,
   splitWorkspaceRoutePath,

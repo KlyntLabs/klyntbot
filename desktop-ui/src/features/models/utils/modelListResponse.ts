@@ -1,4 +1,4 @@
-import type { ModelOption } from "../../../types";
+import type { ModelOption } from "@/types";
 
 export function normalizeEffortValue(value: unknown): string | null {
   if (typeof value !== "string") {

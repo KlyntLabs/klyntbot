@@ -1,6 +1,6 @@
 import { useEffect, useMemo } from "react";
-import type { ApprovalRequest, WorkspaceInfo } from "../../../types";
-import { getApprovalCommandInfo } from "../../../utils/approvalRules";
+import type { ApprovalRequest, WorkspaceInfo } from "@/types";
+import { getApprovalCommandInfo } from "@utils/approvalRules";
 import {
   ToastActions,
   ToastBody,
@@ -9,7 +9,7 @@ import {
   ToastHeader,
   ToastTitle,
   ToastViewport,
-} from "../../design-system/components/toast/ToastPrimitives";
+} from "@/features/design-system/components/toast/ToastPrimitives";
 
 type ApprovalToastsProps = {
   approvals: ApprovalRequest[];

@@ -462,13 +462,13 @@ describe("threadItems", () => {
     const item = buildConversationItem({
       type: "webSearch",
       id: "web-1",
-      query: "codex monitor",
+      query: "klynt",
     });
     expect(item).not.toBeNull();
     if (item && item.kind === "tool") {
       expect(item.toolType).toBe("webSearch");
       expect(item.status).toBe("completed");
-      expect(item.detail).toBe("codex monitor");
+      expect(item.detail).toBe("klynt");
     }
   });
 

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import type { BranchInfo, WorkspaceInfo } from "../../../types";
-import { ModalShell } from "../../design-system/components/modal/ModalShell";
+import type { BranchInfo, WorkspaceInfo } from "@/types";
+import { ModalShell } from "@/features/design-system/components/modal/ModalShell";
 import { BranchList } from "./BranchList";
 import { filterBranches } from "../utils/branchSearch";
 

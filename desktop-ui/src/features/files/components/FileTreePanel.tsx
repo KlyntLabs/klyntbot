@@ -13,18 +13,18 @@ import File from "lucide-react/dist/esm/icons/file";
 import Folder from "lucide-react/dist/esm/icons/folder";
 import GitBranch from "lucide-react/dist/esm/icons/git-branch";
 import Search from "lucide-react/dist/esm/icons/search";
-import type { PanelTabId } from "../../layout/components/PanelTabs";
-import { PanelShell } from "../../layout/components/PanelShell";
+import type { PanelTabId } from "@/features/layout/components/PanelTabs";
+import { PanelShell } from "@/features/layout/components/PanelShell";
 import {
   PanelMeta,
   PanelSearchField,
-} from "../../design-system/components/panel/PanelPrimitives";
-import { readWorkspaceFile } from "../../../services/tauri";
-import type { OpenAppTarget } from "../../../types";
-import { useDebouncedValue } from "../../../hooks/useDebouncedValue";
-import { languageFromPath } from "../../../utils/syntax";
-import { joinWorkspacePath, revealInFileManagerLabel } from "../../../utils/platformPaths";
-import { getFileTypeIconUrl } from "../../../utils/fileTypeIcons";
+} from "@/features/design-system/components/panel/PanelPrimitives";
+import { readWorkspaceFile } from "@services/tauri";
+import type { OpenAppTarget } from "@/types";
+import { useDebouncedValue } from "@/hooks/useDebouncedValue";
+import { languageFromPath } from "@utils/syntax";
+import { joinWorkspacePath, revealInFileManagerLabel } from "@utils/platformPaths";
+import { getFileTypeIconUrl } from "@utils/fileTypeIcons";
 import { FilePreviewPopover } from "./FilePreviewPopover";
 
 type FileTreeNode = {

@@ -6,9 +6,9 @@ import type {
   QueuedMessage,
   SendMessageResult,
   WorkspaceInfo,
-} from "../../../types";
-import { useComposerImages } from "../../composer/hooks/useComposerImages";
-import { useQueuedSend } from "../../threads/hooks/useQueuedSend";
+} from "@/types";
+import { useComposerImages } from "@/features/composer/hooks/useComposerImages";
+import { useQueuedSend } from "@threads/hooks/useQueuedSend";
 
 export function useComposerController({
   activeThreadId,

@@ -1,4 +1,4 @@
-import type { ModelOption } from "../../../types";
+import type { ModelOption } from "@/types";
 import type { WorkspaceHomeRunInstance } from "../hooks/useWorkspaceHome";
 
 export const INSTANCE_OPTIONS = [1, 2, 3, 4];

@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
-import type { DebugEntry, WorkspaceInfo } from "../../../types";
-import { useWorkspaceFiles } from "../../workspaces/hooks/useWorkspaceFiles";
+import type { DebugEntry, WorkspaceInfo } from "@/types";
+import { useWorkspaceFiles } from "@/features/workspaces/hooks/useWorkspaceFiles";
 
 type FilePanelMode = "git" | "files" | "prompts";
 type TabKey = "home" | "projects" | "codex" | "git" | "log";

@@ -1,6 +1,6 @@
 import { useCallback, useMemo, useState } from "react";
-import type { WorkspaceInfo } from "../../../types";
-import { pickWorkspacePath } from "../../../services/tauri";
+import type { WorkspaceInfo } from "@/types";
+import { pickWorkspacePath } from "@services/tauri";
 
 type ClonePromptState = {
   workspace: WorkspaceInfo;

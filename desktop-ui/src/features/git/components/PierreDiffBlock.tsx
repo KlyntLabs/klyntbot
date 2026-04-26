@@ -1,13 +1,13 @@
 import { type FileDiffMetadata, parsePatchFiles } from "@pierre/diffs";
 import { FileDiff, WorkerPoolContextProvider } from "@pierre/diffs/react";
 import { useMemo } from "react";
-import { parseDiff } from "../../../utils/diff";
-import { workerFactory } from "../../../utils/diffsWorker";
-import { highlightLine, languageFromPath } from "../../../utils/syntax";
+import { parseDiff } from "@utils/diff";
+import { workerFactory } from "@utils/diffsWorker";
+import { highlightLine, languageFromPath } from "@utils/syntax";
 import {
 	DIFF_VIEWER_HIGHLIGHTER_OPTIONS,
 	DIFF_VIEWER_SCROLL_CSS,
-} from "../../design-system/diff/diffViewerTheme";
+} from "@/features/design-system/diff/diffViewerTheme";
 import {
 	isFallbackRawDiffLineHighlightable,
 	normalizePatchName,

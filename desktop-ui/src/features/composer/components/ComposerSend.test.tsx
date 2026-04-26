@@ -2,14 +2,14 @@
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { useRef, useState } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { isMobilePlatform } from "../../../utils/platformPaths";
+import { isMobilePlatform } from "@utils/platformPaths";
 import { Composer } from "./Composer";
 import type {
   AppOption,
   AppMention,
   ComposerSendIntent,
   FollowUpMessageBehavior,
-} from "../../../types";
+} from "@/types";
 
 vi.mock("../../../services/dragDrop", () => ({
   subscribeWindowDragDrop: vi.fn(() => () => {}),

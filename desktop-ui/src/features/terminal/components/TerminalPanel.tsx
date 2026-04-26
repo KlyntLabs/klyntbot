@@ -1,5 +1,5 @@
 import type { RefObject } from "react";
-import type { TerminalStatus } from "../../../types";
+import type { TerminalStatus } from "@/types";
 
 type TerminalPanelProps = {
   containerRef: RefObject<HTMLDivElement | null>;

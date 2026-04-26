@@ -1,6 +1,6 @@
 import type { MouseEvent } from "react";
 
-import type { WorkspaceInfo } from "../../../types";
+import type { WorkspaceInfo } from "@/types";
 
 type WorktreeCardProps = {
   worktree: WorkspaceInfo;

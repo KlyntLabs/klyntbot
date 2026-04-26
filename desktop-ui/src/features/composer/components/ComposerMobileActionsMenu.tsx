@@ -9,7 +9,7 @@ import X from "lucide-react/dist/esm/icons/x";
 import {
   PopoverMenuItem,
   PopoverSurface,
-} from "../../design-system/components/popover/PopoverPrimitives";
+} from "@/features/design-system/components/popover/PopoverPrimitives";
 
 type ComposerMobileActionsMenuProps = {
   disabled: boolean;

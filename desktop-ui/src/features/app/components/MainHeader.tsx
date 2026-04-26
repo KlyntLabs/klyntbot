@@ -3,16 +3,16 @@ import Check from "lucide-react/dist/esm/icons/check";
 import Copy from "lucide-react/dist/esm/icons/copy";
 import Terminal from "lucide-react/dist/esm/icons/terminal";
 import { revealItemInDir } from "@tauri-apps/plugin-opener";
-import type { BranchInfo, OpenAppTarget, WorkspaceInfo } from "../../../types";
+import type { BranchInfo, OpenAppTarget, WorkspaceInfo } from "@/types";
 import type { ReactNode } from "react";
-import { revealInFileManagerLabel } from "../../../utils/platformPaths";
-import { BranchList } from "../../git/components/BranchList";
-import { filterBranches, findExactBranch } from "../../git/utils/branchSearch";
-import { validateBranchName } from "../../git/utils/branchValidation";
+import { revealInFileManagerLabel } from "@utils/platformPaths";
+import { BranchList } from "@/features/git/components/BranchList";
+import { filterBranches, findExactBranch } from "@/features/git/utils/branchSearch";
+import { validateBranchName } from "@/features/git/utils/branchValidation";
 import {
   MenuTrigger,
   PopoverSurface,
-} from "../../design-system/components/popover/PopoverPrimitives";
+} from "@/features/design-system/components/popover/PopoverPrimitives";
 import { OpenAppMenu } from "./OpenAppMenu";
 import { LaunchScriptButton } from "./LaunchScriptButton";
 import { LaunchScriptEntryButton } from "./LaunchScriptEntryButton";

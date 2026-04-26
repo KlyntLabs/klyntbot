@@ -5,19 +5,19 @@ import { LogicalPosition } from "@tauri-apps/api/dpi";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { revealItemInDir } from "@tauri-apps/plugin-opener";
 import * as Sentry from "@sentry/react";
-import { openWorkspaceIn } from "../../../services/tauri";
-import { pushErrorToast } from "../../../services/toasts";
-import type { OpenAppTarget } from "../../../types";
+import { openWorkspaceIn } from "@services/tauri";
+import { pushErrorToast } from "@services/toasts";
+import type { OpenAppTarget } from "@/types";
 import {
   type ParsedFileLocation,
   formatFileLocation,
   toFileUrl,
-} from "../../../utils/fileLinks";
+} from "@utils/fileLinks";
 import {
   isAbsolutePath,
   joinWorkspacePath,
   revealInFileManagerLabel,
-} from "../../../utils/platformPaths";
+} from "@utils/platformPaths";
 import { resolveMountedWorkspacePath } from "../utils/mountedWorkspacePaths";
 
 type OpenTarget = {

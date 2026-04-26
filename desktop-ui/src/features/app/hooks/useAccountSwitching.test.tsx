@@ -2,9 +2,9 @@
 import { act } from "react";
 import { createRoot } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { AppServerEvent, AccountSnapshot } from "../../../types";
-import { cancelCodexLogin, runCodexLogin } from "../../../services/tauri";
-import { subscribeAppServerEvents } from "../../../services/events";
+import type { AppServerEvent, AccountSnapshot } from "@/types";
+import { cancelCodexLogin, runCodexLogin } from "@services/tauri";
+import { subscribeAppServerEvents } from "@services/events";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import { useAccountSwitching } from "./useAccountSwitching";
 

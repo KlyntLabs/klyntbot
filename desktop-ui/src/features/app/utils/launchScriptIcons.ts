@@ -1,6 +1,6 @@
 import type { LucideIcon } from "lucide-react";
-import type { LaunchScriptIconId } from "../../../types";
-export type { LaunchScriptIconId } from "../../../types";
+import type { LaunchScriptIconId } from "@/types";
+export type { LaunchScriptIconId } from "@/types";
 import Play from "lucide-react/dist/esm/icons/play";
 import Hammer from "lucide-react/dist/esm/icons/hammer";
 import Bug from "lucide-react/dist/esm/icons/bug";

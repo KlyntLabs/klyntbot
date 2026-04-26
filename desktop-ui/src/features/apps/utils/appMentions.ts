@@ -1,4 +1,4 @@
-import type { AppMention } from "../../../types";
+import type { AppMention } from "@/types";
 
 export type AppMentionBinding = {
   slug: string;

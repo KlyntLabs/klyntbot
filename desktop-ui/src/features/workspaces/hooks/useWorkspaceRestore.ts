@@ -1,5 +1,5 @@
 import { useEffect, useRef } from "react";
-import type { WorkspaceInfo } from "../../../types";
+import type { WorkspaceInfo } from "@/types";
 
 const INITIAL_THREAD_LIST_MAX_PAGES = 6;
 

@@ -1,6 +1,6 @@
 import type { MutableRefObject } from "react";
 import { useCallback, useMemo } from "react";
-import type { ThreadSummary, WorkspaceInfo } from "../../../types";
+import type { ThreadSummary, WorkspaceInfo } from "@/types";
 
 type ThreadRowsFn = (
   threads: ThreadSummary[],

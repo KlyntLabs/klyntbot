@@ -3,8 +3,8 @@ import type {
   CollaborationModeOption,
   DebugEntry,
   WorkspaceInfo,
-} from "../../../types";
-import { getCollaborationModes } from "../../../services/tauri";
+} from "@/types";
+import { getCollaborationModes } from "@services/tauri";
 
 type UseCollaborationModesOptions = {
   activeWorkspace: WorkspaceInfo | null;

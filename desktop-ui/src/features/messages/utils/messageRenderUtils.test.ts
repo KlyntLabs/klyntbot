@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { ConversationItem } from "../../../types";
+import type { ConversationItem } from "@/types";
 import { buildToolSummary, statusToneFromText } from "./messageRenderUtils";
 
 function makeToolItem(
@@ -10,7 +10,7 @@ function makeToolItem(
     kind: "tool",
     toolType: "webSearch",
     title: "Web search",
-    detail: "codex monitor",
+    detail: "klynt",
     status: "completed",
     output: "",
     ...overrides,
@@ -21,7 +21,7 @@ describe("messageRenderUtils", () => {
   it("renders web search as searching while in progress", () => {
     const summary = buildToolSummary(makeToolItem({ status: "inProgress" }), "");
     expect(summary.label).toBe("searching");
-    expect(summary.value).toBe("codex monitor");
+    expect(summary.value).toBe("klynt");
   });
 
   it("renders mcp search calls as searching while in progress", () => {
@@ -29,13 +29,13 @@ describe("messageRenderUtils", () => {
       makeToolItem({
         toolType: "mcpToolCall",
         title: "Tool: web / search_query",
-        detail: '{\n  "query": "codex monitor"\n}',
+        detail: '{\n  "query": "klynt"\n}',
         status: "inProgress",
       }),
       "",
     );
     expect(summary.label).toBe("searching");
-    expect(summary.value).toBe("codex monitor");
+    expect(summary.value).toBe("klynt");
   });
 
   it("classifies camelCase inProgress as processing", () => {

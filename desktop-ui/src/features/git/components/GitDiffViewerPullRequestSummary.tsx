@@ -1,7 +1,7 @@
 import { memo, useEffect, useMemo, useState } from "react";
-import type { GitHubPullRequest, GitHubPullRequestComment } from "../../../types";
-import { formatRelativeTime } from "../../../utils/time";
-import { Markdown } from "../../messages/components/Markdown";
+import type { GitHubPullRequest, GitHubPullRequestComment } from "@/types";
+import { formatRelativeTime } from "@utils/time";
+import { Markdown } from "@/features/messages/components/Markdown";
 import type { DiffStats } from "./GitDiffViewer.types";
 
 export type PullRequestSummaryProps = {

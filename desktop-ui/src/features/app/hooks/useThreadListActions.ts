@@ -1,5 +1,5 @@
 import { useCallback } from "react";
-import type { ThreadListSortKey, WorkspaceInfo } from "../../../types";
+import type { ThreadListSortKey, WorkspaceInfo } from "@/types";
 
 type ListThreadsOptions = {
   sortKey?: ThreadListSortKey;

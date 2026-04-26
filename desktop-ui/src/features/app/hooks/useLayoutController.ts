@@ -1,7 +1,7 @@
-import { useResizablePanels } from "../../layout/hooks/useResizablePanels";
-import { useSidebarToggles } from "../../layout/hooks/useSidebarToggles";
-import { usePanelVisibility } from "../../layout/hooks/usePanelVisibility";
-import { usePanelShortcuts } from "../../layout/hooks/usePanelShortcuts";
+import { useResizablePanels } from "@/features/layout/hooks/useResizablePanels";
+import { useSidebarToggles } from "@/features/layout/hooks/useSidebarToggles";
+import { usePanelVisibility } from "@/features/layout/hooks/usePanelVisibility";
+import { usePanelShortcuts } from "@/features/layout/hooks/usePanelShortcuts";
 
 export function useLayoutController({
   activeWorkspaceId,

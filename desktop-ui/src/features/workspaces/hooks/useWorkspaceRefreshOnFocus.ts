@@ -1,5 +1,5 @@
 import { useEffect, useRef } from "react";
-import type { WorkspaceInfo } from "../../../types";
+import type { WorkspaceInfo } from "@/types";
 
 export const REMOTE_WORKSPACE_REFRESH_INTERVAL_MS = 15_000;
 

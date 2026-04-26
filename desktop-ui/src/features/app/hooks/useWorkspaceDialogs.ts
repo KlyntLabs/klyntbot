@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ask, message } from "@tauri-apps/plugin-dialog";
-import type { WorkspaceInfo } from "../../../types";
-import { isMobilePlatform } from "../../../utils/platformPaths";
-import { pickWorkspacePaths } from "../../../services/tauri";
-import type { AddWorkspacesFromPathsResult } from "../../workspaces/hooks/useWorkspaceCrud";
+import type { WorkspaceInfo } from "@/types";
+import { isMobilePlatform } from "@utils/platformPaths";
+import { pickWorkspacePaths } from "@services/tauri";
+import type { AddWorkspacesFromPathsResult } from "@/features/workspaces/hooks/useWorkspaceCrud";
 
 const RECENT_REMOTE_WORKSPACE_PATHS_STORAGE_KEY = "mobile-remote-workspace-recent-paths";
 const RECENT_REMOTE_WORKSPACE_PATHS_LIMIT = 5;
@@ -279,7 +279,7 @@ export function useWorkspaceDialogs() {
           : "";
 
       return ask(
-        `Are you sure you want to delete "${workspaceName}"?\n\nThis will remove the workspace from CodexMonitor.${detail}`,
+        `Are you sure you want to delete "${workspaceName}"?\n\nThis will remove the workspace from Klynt.${detail}`,
         {
           title: "Delete Workspace",
           kind: "warning",
@@ -296,7 +296,7 @@ export function useWorkspaceDialogs() {
       const workspace = workspaces.find((entry) => entry.id === workspaceId);
       const workspaceName = workspace?.name || "this worktree";
       return ask(
-        `Are you sure you want to delete "${workspaceName}"?\n\nThis will close the agent, remove its worktree, and delete it from CodexMonitor.`,
+        `Are you sure you want to delete "${workspaceName}"?\n\nThis will close the agent, remove its worktree, and delete it from Klynt.`,
         {
           title: "Delete Worktree",
           kind: "warning",

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { BranchInfo } from "../../../types";
+import type { BranchInfo } from "@/types";
 import { filterBranches, findExactBranch, fuzzyMatch } from "./branchSearch";
 
 const branches: BranchInfo[] = [

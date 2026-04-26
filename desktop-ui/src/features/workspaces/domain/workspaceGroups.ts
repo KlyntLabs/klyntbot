@@ -1,4 +1,4 @@
-import type { WorkspaceGroup, WorkspaceInfo } from "../../../types";
+import type { WorkspaceGroup, WorkspaceInfo } from "@/types";
 
 const GROUP_ID_RANDOM_MODULUS = 1_000_000;
 const SORT_ORDER_FALLBACK = Number.MAX_SAFE_INTEGER;

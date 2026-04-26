@@ -1,7 +1,7 @@
 import type { RefObject } from "react";
 import { useCallback } from "react";
 import * as Sentry from "@sentry/react";
-import type { DebugEntry, WorkspaceInfo } from "../../../types";
+import type { DebugEntry, WorkspaceInfo } from "@/types";
 
 type Params = {
   isCompact: boolean;

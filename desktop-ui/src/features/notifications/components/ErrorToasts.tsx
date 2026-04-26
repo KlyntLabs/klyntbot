@@ -1,11 +1,11 @@
-import type { ErrorToast } from "../../../services/toasts";
+import type { ErrorToast } from "@services/toasts";
 import {
   ToastBody,
   ToastCard,
   ToastHeader,
   ToastTitle,
   ToastViewport,
-} from "../../design-system/components/toast/ToastPrimitives";
+} from "@/features/design-system/components/toast/ToastPrimitives";
 
 type ErrorToastsProps = {
   toasts: ErrorToast[];

@@ -2,7 +2,7 @@
 import { act, renderHook } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
-import type { WorkspaceInfo } from "../../../types";
+import type { WorkspaceInfo } from "@/types";
 import { useSidebarLayoutActions } from "./useSidebarLayoutActions";
 
 const workspace: WorkspaceInfo = {

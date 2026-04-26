@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import type { GitFileStatus, WorkspaceInfo } from "../../../types";
-import { getGitStatus } from "../../../services/tauri";
+import type { GitFileStatus, WorkspaceInfo } from "@/types";
+import { getGitStatus } from "@services/tauri";
 
 type GitStatusState = {
   branchName: string;

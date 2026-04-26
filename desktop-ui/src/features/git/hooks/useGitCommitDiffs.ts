@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import type { GitCommitDiff, WorkspaceInfo } from "../../../types";
-import { getGitCommitDiff } from "../../../services/tauri";
+import type { GitCommitDiff, WorkspaceInfo } from "@/types";
+import { getGitCommitDiff } from "@services/tauri";
 
 type CommitDiffState = {
   diffs: GitCommitDiff[];

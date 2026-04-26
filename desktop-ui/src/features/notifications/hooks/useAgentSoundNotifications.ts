@@ -1,9 +1,9 @@
 import { useCallback, useMemo, useRef } from "react";
-import errorSoundUrl from "../../../assets/error-notification.mp3";
-import successSoundUrl from "../../../assets/success-notification.mp3";
-import type { DebugEntry } from "../../../types";
-import { playNotificationSound } from "../../../utils/notificationSounds";
-import { useAppServerEvents } from "../../app/hooks/useAppServerEvents";
+import errorSoundUrl from "@/assets/error-notification.mp3";
+import successSoundUrl from "@/assets/success-notification.mp3";
+import type { DebugEntry } from "@/types";
+import { playNotificationSound } from "@utils/notificationSounds";
+import { useAppServerEvents } from "@app/hooks/useAppServerEvents";
 
 const DEFAULT_MIN_DURATION_MS = 60_000; // 1 minute
 

@@ -2,7 +2,7 @@
 import { act, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
 import { describe, expect, it, vi } from "vitest";
-import type { ComposerEditorSettings } from "../../../types";
+import type { ComposerEditorSettings } from "@/types";
 import { Composer } from "./Composer";
 
 vi.mock("../../../services/dragDrop", () => ({

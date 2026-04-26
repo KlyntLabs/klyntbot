@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import type {
   RequestUserInputRequest,
   RequestUserInputResponse,
-} from "../../../types";
+} from "@/types";
 
 type RequestUserInputMessageProps = {
   requests: RequestUserInputRequest[];

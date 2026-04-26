@@ -1,4 +1,4 @@
-import type { AccountSnapshot, LocalUsageDay } from "../../types";
+import type { AccountSnapshot, LocalUsageDay } from "@/types";
 
 export function formatCompactNumber(value: number | null | undefined) {
   if (value === null || value === undefined) {

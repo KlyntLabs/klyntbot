@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type { WorkspaceInfo } from "../../../types";
+import type { WorkspaceInfo } from "@/types";
 
 const STARTING_DRAFT_CLEAR_MS = 1500;
 const STARTING_DRAFT_FALLBACK_MS = 4000;

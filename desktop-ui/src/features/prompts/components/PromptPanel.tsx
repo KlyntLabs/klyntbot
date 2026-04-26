@@ -5,14 +5,14 @@ import {
   useState,
   type MouseEvent as ReactMouseEvent,
 } from "react";
-import type { CustomPromptOption } from "../../../types";
-import { expandCustomPromptText, getPromptArgumentHint } from "../../../utils/customPrompts";
-import type { PanelTabId } from "../../layout/components/PanelTabs";
-import { PanelShell } from "../../layout/components/PanelShell";
+import type { CustomPromptOption } from "@/types";
+import { expandCustomPromptText, getPromptArgumentHint } from "@utils/customPrompts";
+import type { PanelTabId } from "@/features/layout/components/PanelTabs";
+import { PanelShell } from "@/features/layout/components/PanelShell";
 import {
   PanelMeta,
   PanelSearchField,
-} from "../../design-system/components/panel/PanelPrimitives";
+} from "@/features/design-system/components/panel/PanelPrimitives";
 import { Menu, MenuItem } from "@tauri-apps/api/menu";
 import { LogicalPosition } from "@tauri-apps/api/dpi";
 import { getCurrentWindow } from "@tauri-apps/api/window";

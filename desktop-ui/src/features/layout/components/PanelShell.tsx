@@ -3,7 +3,7 @@ import type { ReactNode } from "react";
 import {
   PanelFrame,
   PanelHeader,
-} from "../../design-system/components/panel/PanelPrimitives";
+} from "@/features/design-system/components/panel/PanelPrimitives";
 import { PanelTabs, type PanelTabId } from "./PanelTabs";
 
 type PanelShellProps = {

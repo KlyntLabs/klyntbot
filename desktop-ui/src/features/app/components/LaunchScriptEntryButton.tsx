@@ -1,5 +1,5 @@
-import type { LaunchScriptEntry, LaunchScriptIconId } from "../../../types";
-import { PopoverSurface } from "../../design-system/components/popover/PopoverPrimitives";
+import type { LaunchScriptEntry, LaunchScriptIconId } from "@/types";
+import { PopoverSurface } from "@/features/design-system/components/popover/PopoverPrimitives";
 import { useMenuController } from "../hooks/useMenuController";
 import { LaunchScriptIconPicker } from "./LaunchScriptIconPicker";
 import { getLaunchScriptIcon, getLaunchScriptIconLabel } from "../utils/launchScriptIcons";

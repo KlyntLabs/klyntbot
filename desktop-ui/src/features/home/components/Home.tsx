@@ -2,7 +2,7 @@ import type {
   AccountSnapshot,
   LocalUsageSnapshot,
   RateLimitSnapshot,
-} from "../../../types";
+} from "@/types";
 import { HomeActions } from "./HomeActions";
 import { HomeLatestAgentsSection } from "./HomeLatestAgentsSection";
 import { HomeUsageSection } from "./HomeUsageSection";
@@ -54,7 +54,7 @@ export function Home({
   return (
     <div className="home">
       <div className="home-hero">
-        <div className="home-title">Codex Monitor</div>
+        <div className="home-title">Klynt</div>
         <div className="home-subtitle">
           Orchestrate agents across your local projects.
         </div>

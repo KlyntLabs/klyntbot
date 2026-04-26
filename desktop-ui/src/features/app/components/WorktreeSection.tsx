@@ -1,8 +1,8 @@
 import Layers from "lucide-react/dist/esm/icons/layers";
 import type { MouseEvent, ReactNode } from "react";
 
-import type { ThreadSummary, WorkspaceInfo } from "../../../types";
-import type { ThreadStatusById } from "../../../utils/threadStatus";
+import type { ThreadSummary, WorkspaceInfo } from "@/types";
+import type { ThreadStatusById } from "@utils/threadStatus";
 import { ThreadList } from "./ThreadList";
 import { ThreadLoading } from "./ThreadLoading";
 import { WorktreeCard } from "./WorktreeCard";

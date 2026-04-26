@@ -166,7 +166,7 @@ describe("useThreadItemEvents", () => {
 
   it("adds lifecycle status for web search items", () => {
     const { result } = makeOptions();
-    const item: ItemPayload = { type: "webSearch", id: "search-1", query: "codex monitor" };
+    const item: ItemPayload = { type: "webSearch", id: "search-1", query: "klynt" };
 
     act(() => {
       result.current.onItemStarted("ws-1", "thread-1", item);

@@ -2,12 +2,12 @@ import { createPortal } from "react-dom";
 import type { MouseEvent, MutableRefObject } from "react";
 import Plus from "lucide-react/dist/esm/icons/plus";
 
-import type { ThreadSummary, WorkspaceInfo } from "../../../types";
-import type { ThreadStatusById } from "../../../utils/threadStatus";
+import type { ThreadSummary, WorkspaceInfo } from "@/types";
+import type { ThreadStatusById } from "@utils/threadStatus";
 import {
   PopoverMenuItem,
   PopoverSurface,
-} from "../../design-system/components/popover/PopoverPrimitives";
+} from "@/features/design-system/components/popover/PopoverPrimitives";
 import { PinnedThreadList } from "./PinnedThreadList";
 import type { SidebarOverlayMenuAnchor, ThreadBucket } from "./sidebarTypes";
 

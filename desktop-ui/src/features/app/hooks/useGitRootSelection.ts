@@ -1,6 +1,6 @@
 import { useCallback } from "react";
-import { pickWorkspacePath } from "../../../services/tauri";
-import type { WorkspaceInfo } from "../../../types";
+import { pickWorkspacePath } from "@services/tauri";
+import type { WorkspaceInfo } from "@/types";
 
 type UseGitRootSelectionOptions = {
   activeWorkspace: WorkspaceInfo | null;

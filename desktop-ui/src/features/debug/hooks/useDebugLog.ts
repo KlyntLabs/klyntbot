@@ -1,5 +1,5 @@
 import { useCallback, useRef, useState } from "react";
-import type { DebugEntry } from "../../../types";
+import type { DebugEntry } from "@/types";
 
 const MAX_DEBUG_ENTRIES = 200;
 

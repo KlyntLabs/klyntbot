@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { subscribeWindowDragDrop } from "../../../services/dragDrop";
+import { subscribeWindowDragDrop } from "@/services/dragDrop";
 
 const imageExtensions = [
   ".png",

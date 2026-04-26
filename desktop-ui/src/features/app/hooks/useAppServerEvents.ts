@@ -3,16 +3,16 @@ import type {
   AppServerEvent,
   ApprovalRequest,
   RequestUserInputRequest,
-} from "../../../types";
-import { subscribeAppServerEvents } from "../../../services/events";
+} from "@/types";
+import { subscribeAppServerEvents } from "@services/events";
 import {
   getAppServerParams,
   getAppServerRawMethod,
   getAppServerRequestId,
   isApprovalRequestMethod,
   isSupportedAppServerMethod,
-} from "../../../utils/appServerEvents";
-import type { SupportedAppServerMethod } from "../../../utils/appServerEvents";
+} from "@utils/appServerEvents";
+import type { SupportedAppServerMethod } from "@utils/appServerEvents";
 
 type AgentDelta = {
   workspaceId: string;

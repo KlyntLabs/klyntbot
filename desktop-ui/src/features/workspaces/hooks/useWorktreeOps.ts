@@ -1,14 +1,14 @@
 import { useCallback, useState } from "react";
 import type { Dispatch, SetStateAction } from "react";
 import * as Sentry from "@sentry/react";
-import type { DebugEntry, WorkspaceInfo } from "../../../types";
+import type { DebugEntry, WorkspaceInfo } from "@/types";
 import {
   addClone as addCloneService,
   addWorktree as addWorktreeService,
   removeWorktree as removeWorktreeService,
   renameWorktree as renameWorktreeService,
   renameWorktreeUpstream as renameWorktreeUpstreamService,
-} from "../../../services/tauri";
+} from "@services/tauri";
 
 type UseWorktreeOpsOptions = {
   onDebug?: (entry: DebugEntry) => void;

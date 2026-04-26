@@ -1,7 +1,7 @@
 import { useMemo, useState, type MouseEvent } from "react";
 
-import type { ThreadSummary } from "../../../types";
-import type { ThreadStatusById } from "../../../utils/threadStatus";
+import type { ThreadSummary } from "@/types";
+import type { ThreadStatusById } from "@utils/threadStatus";
 import { ThreadRow } from "./ThreadRow";
 import { buildThreadRowVisibility } from "./threadRowVisibility";
 

@@ -5,7 +5,7 @@ import {
   GlassMaterialVariant,
 } from "tauri-plugin-liquid-glass-api";
 import { Effect, EffectState, getCurrentWindow } from "@tauri-apps/api/window";
-import type { DebugEntry } from "../../../types";
+import type { DebugEntry } from "@/types";
 
 type Params = {
   reduceTransparency: boolean;

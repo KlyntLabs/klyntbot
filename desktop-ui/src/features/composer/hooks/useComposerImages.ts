@@ -1,5 +1,5 @@
 import { useCallback, useMemo, useState } from "react";
-import { pickImageFiles } from "../../../services/tauri";
+import { pickImageFiles } from "@services/tauri";
 
 type UseComposerImagesArgs = {
   activeThreadId: string | null;

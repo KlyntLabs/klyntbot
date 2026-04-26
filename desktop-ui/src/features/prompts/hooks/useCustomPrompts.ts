@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type { CustomPromptOption, DebugEntry, WorkspaceInfo } from "../../../types";
+import type { CustomPromptOption, DebugEntry, WorkspaceInfo } from "@/types";
 import {
   createPrompt as createPromptService,
   deletePrompt as deletePromptService,
@@ -8,7 +8,7 @@ import {
   getWorkspacePromptsDir as getWorkspacePromptsDirService,
   movePrompt as movePromptService,
   updatePrompt as updatePromptService,
-} from "../../../services/tauri";
+} from "@services/tauri";
 
 type UseCustomPromptsOptions = {
   activeWorkspace: WorkspaceInfo | null;

@@ -2,8 +2,8 @@
 import { act } from "react";
 import { createRoot } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { AppServerEvent } from "../../../types";
-import { subscribeAppServerEvents } from "../../../services/events";
+import type { AppServerEvent } from "@/types";
+import { subscribeAppServerEvents } from "@services/events";
 import { useAppServerEvents } from "./useAppServerEvents";
 
 vi.mock("../../../services/events", () => ({

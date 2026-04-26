@@ -1,8 +1,8 @@
 import { useCallback } from "react";
 import type { Dispatch, MutableRefObject, SetStateAction } from "react";
 import * as Sentry from "@sentry/react";
-import type { DebugEntry, WorkspaceInfo, WorkspaceSettings } from "../../../types";
-import { normalizeRootPath } from "../../threads/utils/threadNormalize";
+import type { DebugEntry, WorkspaceInfo, WorkspaceSettings } from "@/types";
+import { normalizeRootPath } from "@threads/utils/threadNormalize";
 import {
   addWorkspace as addWorkspaceService,
   addWorkspaceFromGitUrl as addWorkspaceFromGitUrlService,
@@ -11,7 +11,7 @@ import {
   listWorkspaces,
   removeWorkspace as removeWorkspaceService,
   updateWorkspaceSettings as updateWorkspaceSettingsService,
-} from "../../../services/tauri";
+} from "@services/tauri";
 
 type UseWorkspaceCrudOptions = {
   onDebug?: (entry: DebugEntry) => void;

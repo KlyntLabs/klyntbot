@@ -4,8 +4,8 @@ import type {
   SendMessageResult,
   ServiceTier,
   WorkspaceInfo,
-} from "../../../types";
-import { generateRunMetadata } from "../../../services/tauri";
+} from "@/types";
+import { generateRunMetadata } from "@services/tauri";
 
 export type WorkspaceRunMode = "local" | "worktree";
 

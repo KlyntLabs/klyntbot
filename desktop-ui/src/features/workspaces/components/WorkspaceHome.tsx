@@ -15,25 +15,25 @@ import type {
   ModelOption,
   SkillOption,
   WorkspaceInfo,
-} from "../../../types";
-import { ComposerInput } from "../../composer/components/ComposerInput";
-import { useComposerImages } from "../../composer/hooks/useComposerImages";
-import { useComposerAutocompleteState } from "../../composer/hooks/useComposerAutocompleteState";
-import { usePromptHistory } from "../../composer/hooks/usePromptHistory";
+} from "@/types";
+import { ComposerInput } from "@/features/composer/components/ComposerInput";
+import { useComposerImages } from "@/features/composer/hooks/useComposerImages";
+import { useComposerAutocompleteState } from "@/features/composer/hooks/useComposerAutocompleteState";
+import { usePromptHistory } from "@/features/composer/hooks/usePromptHistory";
 import type {
   WorkspaceHomeRun,
   WorkspaceHomeRunInstance,
   WorkspaceRunMode,
 } from "../hooks/useWorkspaceHome";
-import { computeDictationInsertion } from "../../../utils/dictation";
-import { isComposingEvent } from "../../../utils/keys";
-import { FileEditorCard } from "../../shared/components/FileEditorCard";
+import { computeDictationInsertion } from "@utils/dictation";
+import { isComposingEvent } from "@utils/keys";
+import { FileEditorCard } from "@/features/shared/components/FileEditorCard";
 import { WorkspaceHomeRunControls } from "./WorkspaceHomeRunControls";
 import { WorkspaceHomeHistory } from "./WorkspaceHomeHistory";
 import { WorkspaceHomeGitInitBanner } from "./WorkspaceHomeGitInitBanner";
 import { buildIconPath } from "./workspaceHomeHelpers";
 import { useWorkspaceHomeSuggestionsStyle } from "../hooks/useWorkspaceHomeSuggestionsStyle";
-import type { ThreadStatusById } from "../../../utils/threadStatus";
+import type { ThreadStatusById } from "@utils/threadStatus";
 
 type WorkspaceHomeProps = {
   workspace: WorkspaceInfo;

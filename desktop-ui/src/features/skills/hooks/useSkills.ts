@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type { DebugEntry, SkillOption, WorkspaceInfo } from "../../../types";
-import { getSkillsList } from "../../../services/tauri";
-import { subscribeAppServerEvents } from "../../../services/events";
-import { isSkillsUpdateAvailableEvent } from "../../../utils/appServerEvents";
+import type { DebugEntry, SkillOption, WorkspaceInfo } from "@/types";
+import { getSkillsList } from "@services/tauri";
+import { subscribeAppServerEvents } from "@services/events";
+import { isSkillsUpdateAvailableEvent } from "@utils/appServerEvents";
 
 type UseSkillsOptions = {
   activeWorkspace: WorkspaceInfo | null;

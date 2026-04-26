@@ -35,3 +35,14 @@ tests/fixtures/hello_plugin/plugin.wasm
 .qwen/
 gha-creds-*.json
 .claude/scheduled_tasks.lock
+
+# desktop-ui (merged from desktop-ui/.gitignore)
+desktop-ui/node_modules
+desktop-ui/dist
+desktop-ui/dist-ssr
+desktop-ui/*.local
+desktop-ui/release-artifacts
+desktop-ui/Klynt.zip
+desktop-ui/public/assets/material-icons/
+desktop-ui/result
+desktop-ui/skills-lock.json

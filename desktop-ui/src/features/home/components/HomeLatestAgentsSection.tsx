@@ -1,4 +1,4 @@
-import { formatRelativeTime } from "../../../utils/time";
+import { formatRelativeTime } from "@utils/time";
 import type { LatestAgentRun } from "../homeTypes";
 
 type HomeLatestAgentsSectionProps = {

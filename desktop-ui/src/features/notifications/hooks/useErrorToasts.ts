@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import type { ErrorToast } from "../../../services/toasts";
-import { subscribeErrorToasts } from "../../../services/toasts";
+import type { ErrorToast } from "@services/toasts";
+import { subscribeErrorToasts } from "@services/toasts";
 
 const DEFAULT_ERROR_TOAST_DURATION_MS = 6000;
 

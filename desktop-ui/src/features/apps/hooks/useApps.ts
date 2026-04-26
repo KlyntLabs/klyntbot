@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type { AppOption, DebugEntry, WorkspaceInfo } from "../../../types";
-import { getAppsList } from "../../../services/tauri";
-import { subscribeAppServerEvents } from "../../../services/events";
-import { getAppServerParams, isAppListUpdatedEvent } from "../../../utils/appServerEvents";
+import type { AppOption, DebugEntry, WorkspaceInfo } from "@/types";
+import { getAppsList } from "@services/tauri";
+import { subscribeAppServerEvents } from "@services/events";
+import { getAppServerParams, isAppListUpdatedEvent } from "@utils/appServerEvents";
 
 type UseAppsOptions = {
   activeWorkspace: WorkspaceInfo | null;

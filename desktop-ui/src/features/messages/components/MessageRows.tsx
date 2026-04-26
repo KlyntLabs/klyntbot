@@ -16,9 +16,9 @@ import Wrench from "lucide-react/dist/esm/icons/wrench";
 import X from "lucide-react/dist/esm/icons/x";
 import { exportMarkdownFile } from "@services/tauri";
 import { pushErrorToast } from "@services/toasts";
-import type { ConversationItem } from "../../../types";
-import type { ParsedFileLocation } from "../../../utils/fileLinks";
-import { PierreDiffBlock } from "../../git/components/PierreDiffBlock";
+import type { ConversationItem } from "@/types";
+import type { ParsedFileLocation } from "@utils/fileLinks";
+import { PierreDiffBlock } from "@/features/git/components/PierreDiffBlock";
 import {
   MAX_COMMAND_OUTPUT_LINES,
   basename,

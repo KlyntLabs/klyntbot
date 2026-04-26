@@ -4,7 +4,7 @@ import type {
   GitHubPullRequest,
   GitHubPullRequestComment,
   GitHubPullRequestDiff,
-} from "../../../types";
+} from "@/types";
 
 type GitHubIssuesState = {
   issues: GitHubIssue[];

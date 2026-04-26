@@ -9,10 +9,10 @@ import Plug from "lucide-react/dist/esm/icons/plug";
 import RotateCcw from "lucide-react/dist/esm/icons/rotate-ccw";
 import ScrollText from "lucide-react/dist/esm/icons/scroll-text";
 import Wrench from "lucide-react/dist/esm/icons/wrench";
-import { PopoverSurface } from "../../design-system/components/popover/PopoverPrimitives";
+import { PopoverSurface } from "@/features/design-system/components/popover/PopoverPrimitives";
 import { ReviewInlinePrompt } from "./ReviewInlinePrompt";
-import type { ReviewPromptState, ReviewPromptStep } from "../../threads/hooks/useReviewPrompt";
-import { getFileTypeIconUrl } from "../../../utils/fileTypeIcons";
+import type { ReviewPromptState, ReviewPromptStep } from "@threads/hooks/useReviewPrompt";
+import { getFileTypeIconUrl } from "@utils/fileTypeIcons";
 
 type ComposerSuggestionsPopoverProps = {
   highlightIndex: number;

@@ -1,5 +1,5 @@
 import { useEffect } from "react";
-import { isMacPlatform } from "../../../utils/shortcuts";
+import { isMacPlatform } from "@utils/shortcuts";
 
 type UseNewAgentShortcutOptions = {
   isEnabled: boolean;

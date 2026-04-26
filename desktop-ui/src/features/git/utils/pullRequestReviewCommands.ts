@@ -1,4 +1,4 @@
-import type { PullRequestReviewIntent } from "../../../types";
+import type { PullRequestReviewIntent } from "@/types";
 
 export type PullRequestReviewCommand =
   | { intent: PullRequestReviewIntent; question?: string }

@@ -10,7 +10,7 @@ afterEach(() => {
 
 describe("MobileRemoteWorkspacePrompt", () => {
   it("focuses paths textarea and moves caret to end after selecting a recent path", async () => {
-    const recentPath = "/Users/vlad/dev/codex-monitor/cm";
+    const recentPath = "/Users/vlad/dev/klynt/cm";
     function PromptHarness() {
       const [value, setValue] = useState("");
       return (

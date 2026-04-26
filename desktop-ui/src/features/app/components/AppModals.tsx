@@ -1,13 +1,13 @@
 import { lazy, memo, Suspense } from "react";
 import type { ComponentType } from "react";
-import type { BranchInfo, WorkspaceInfo } from "../../../types";
-import type { SettingsViewProps } from "../../settings/components/SettingsView";
-import { useRenameThreadPrompt } from "../../threads/hooks/useRenameThreadPrompt";
-import { useClonePrompt } from "../../workspaces/hooks/useClonePrompt";
-import { useWorktreePrompt } from "../../workspaces/hooks/useWorktreePrompt";
-import { useWorkspaceFromUrlPrompt } from "../../workspaces/hooks/useWorkspaceFromUrlPrompt";
-import type { BranchSwitcherState } from "../../git/hooks/useBranchSwitcher";
-import { useGitBranches } from "../../git/hooks/useGitBranches";
+import type { BranchInfo, WorkspaceInfo } from "@/types";
+import type { SettingsViewProps } from "@settings/components/SettingsView";
+import { useRenameThreadPrompt } from "@threads/hooks/useRenameThreadPrompt";
+import { useClonePrompt } from "@/features/workspaces/hooks/useClonePrompt";
+import { useWorktreePrompt } from "@/features/workspaces/hooks/useWorktreePrompt";
+import { useWorkspaceFromUrlPrompt } from "@/features/workspaces/hooks/useWorkspaceFromUrlPrompt";
+import type { BranchSwitcherState } from "@/features/git/hooks/useBranchSwitcher";
+import { useGitBranches } from "@/features/git/hooks/useGitBranches";
 
 const RenameThreadPrompt = lazy(() =>
   import("../../threads/components/RenameThreadPrompt").then((module) => ({

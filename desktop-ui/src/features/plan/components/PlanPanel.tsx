@@ -1,4 +1,4 @@
-import type { TurnPlan } from "../../../types";
+import type { TurnPlan } from "@/types";
 
 type PlanPanelProps = {
   plan: TurnPlan | null;

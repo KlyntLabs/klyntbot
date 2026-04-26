@@ -3,8 +3,8 @@ import type {
   LocalUsageDay,
   LocalUsageSnapshot,
   RateLimitSnapshot,
-} from "../../types";
-import { formatRelativeTime } from "../../utils/time";
+} from "@/types";
+import { formatRelativeTime } from "@utils/time";
 import { getUsageLabels } from "../app/utils/usageLabels";
 import {
   buildWindowCaption,

@@ -3,9 +3,9 @@ import { Menu, MenuItem } from "@tauri-apps/api/menu";
 import { LogicalPosition } from "@tauri-apps/api/dpi";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 
-import type { WorkspaceInfo } from "../../../types";
-import { pushErrorToast } from "../../../services/toasts";
-import { fileManagerName } from "../../../utils/platformPaths";
+import type { WorkspaceInfo } from "@/types";
+import { pushErrorToast } from "@services/toasts";
+import { fileManagerName } from "@utils/platformPaths";
 
 type SidebarMenuHandlers = {
   onDeleteThread: (workspaceId: string, threadId: string) => void;

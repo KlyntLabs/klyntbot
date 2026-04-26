@@ -1,4 +1,4 @@
-import type { ThreadSummary } from "../../../types";
+import type { ThreadSummary } from "@/types";
 
 type RootRowGroup<Row extends { depth: number }> = {
   root: Row;

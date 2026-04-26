@@ -5,15 +5,15 @@ import type { SelectedLineRange } from "@pierre/diffs";
 import { WorkerPoolContextProvider } from "@pierre/diffs/react";
 import GitCommitHorizontal from "lucide-react/dist/esm/icons/git-commit-horizontal";
 import RotateCcw from "lucide-react/dist/esm/icons/rotate-ccw";
-import type { ParsedDiffLine } from "../../../utils/diff";
-import { workerFactory } from "../../../utils/diffsWorker";
+import type { ParsedDiffLine } from "@utils/diff";
+import { workerFactory } from "@utils/diffsWorker";
 import type {
   PullRequestReviewIntent,
   PullRequestSelectionRange,
-} from "../../../types";
+} from "@/types";
 import {
   DIFF_VIEWER_HIGHLIGHTER_OPTIONS,
-} from "../../design-system/diff/diffViewerTheme";
+} from "@/features/design-system/diff/diffViewerTheme";
 import { ImageDiffCard } from "./ImageDiffCard";
 import { splitPath } from "./GitDiffPanel.utils";
 import { DiffCard } from "./GitDiffViewerDiffCard";

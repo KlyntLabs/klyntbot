@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useRef } from "react";
-import { useDictation } from "../../dictation/hooks/useDictation";
-import { useDictationModel } from "../../dictation/hooks/useDictationModel";
-import { useHoldToDictate } from "../../dictation/hooks/useHoldToDictate";
-import type { AppSettings } from "../../../types";
-import { requestDictationPermission } from "../../../services/tauri";
+import { useDictation } from "@/features/dictation/hooks/useDictation";
+import { useDictationModel } from "@/features/dictation/hooks/useDictationModel";
+import { useHoldToDictate } from "@/features/dictation/hooks/useHoldToDictate";
+import type { AppSettings } from "@/types";
+import { requestDictationPermission } from "@services/tauri";
 
 type DictationController = {
   dictationModel: ReturnType<typeof useDictationModel>;

@@ -1,8 +1,8 @@
 // @vitest-environment jsdom
 import { act, renderHook } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { WorkspaceInfo } from "../../../types";
-import { getGitStatus } from "../../../services/tauri";
+import type { WorkspaceInfo } from "@/types";
+import { getGitStatus } from "@services/tauri";
 import { useGitStatus } from "./useGitStatus";
 
 vi.mock("../../../services/tauri", () => ({
@@ -11,7 +11,7 @@ vi.mock("../../../services/tauri", () => ({
 
 const workspace: WorkspaceInfo = {
   id: "workspace-1",
-  name: "CodexMonitor",
+  name: "Klynt",
   path: "/tmp/codex",
   connected: true,
   settings: { sidebarCollapsed: false },
@@ -19,7 +19,7 @@ const workspace: WorkspaceInfo = {
 
 const secondaryWorkspace: WorkspaceInfo = {
   id: "workspace-2",
-  name: "CodexMonitor Secondary",
+  name: "Klynt Secondary",
   path: "/tmp/codex-secondary",
   connected: true,
   settings: { sidebarCollapsed: false },

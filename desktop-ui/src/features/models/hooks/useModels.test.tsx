@@ -1,8 +1,8 @@
 // @vitest-environment jsdom
 import { act, renderHook, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import type { WorkspaceInfo } from "../../../types";
-import { getConfigModel, getModelList } from "../../../services/tauri";
+import type { WorkspaceInfo } from "@/types";
+import { getConfigModel, getModelList } from "@services/tauri";
 import { useModels } from "./useModels";
 
 vi.mock("../../../services/tauri", () => ({
@@ -12,7 +12,7 @@ vi.mock("../../../services/tauri", () => ({
 
 const workspace: WorkspaceInfo = {
   id: "workspace-1",
-  name: "CodexMonitor",
+  name: "Klynt",
   path: "/tmp/codex",
   connected: true,
   settings: { sidebarCollapsed: false },

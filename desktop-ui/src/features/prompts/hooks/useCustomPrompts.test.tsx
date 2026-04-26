@@ -1,8 +1,8 @@
 // @vitest-environment jsdom
 import { act, renderHook } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
-import type { WorkspaceInfo } from "../../../types";
-import { getGlobalPromptsDir } from "../../../services/tauri";
+import type { WorkspaceInfo } from "@/types";
+import { getGlobalPromptsDir } from "@services/tauri";
 import { useCustomPrompts } from "./useCustomPrompts";
 
 vi.mock("../../../services/tauri", () => ({
