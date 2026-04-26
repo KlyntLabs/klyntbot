@@ -654,8 +654,6 @@ export default function MainApp() {
 	const { apps } = useApps({
 		activeWorkspace,
 		activeThreadId,
-		enabled: appSettings.experimentalAppsEnabled,
-		onDebug: addDebugEntry,
 	});
 
 	useThreadCodexSyncOrchestration({
