@@ -31,10 +31,7 @@ async fn server_handles_many_frames_across_connections() {
             break;
         }
         if std::time::Instant::now() > deadline {
-            panic!(
-                "only got {} frames in 2s",
-                received.lock().unwrap().len()
-            );
+            panic!("only got {} frames in 2s", received.lock().unwrap().len());
         }
         tokio::time::sleep(Duration::from_millis(10)).await;
     }

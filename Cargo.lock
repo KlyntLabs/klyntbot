@@ -4121,6 +4121,7 @@ dependencies = [
  "futures-util",
  "jiff",
  "klyntbot-server",
+ "mcp-bridge",
  "mimalloc",
  "open",
  "platform-macos",
@@ -8534,6 +8535,23 @@ dependencies = [
  "tools-core",
  "tracing",
  "tracing-subscriber",
+]
+
+[[package]]
+name = "mcp-bridge"
+version = "0.1.0"
+dependencies = [
+ "app-core",
+ "common",
+ "config",
+ "desktop-shared",
+ "serde",
+ "serde_json",
+ "tempfile",
+ "thiserror 2.0.18",
+ "tokio",
+ "tokio-util",
+ "tracing",
 ]
 
 [[package]]

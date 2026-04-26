@@ -29,8 +29,8 @@ pub async fn write_frame<W: AsyncWrite + Unpin>(
     frame: &BridgeFrame,
 ) -> Result<(), FrameError> {
     let body = serde_json::to_vec(frame)?;
-    let len_u32: u32 = u32::try_from(body.len())
-        .map_err(|_| FrameError::TooLarge(u32::MAX, MAX_FRAME_BYTES))?;
+    let len_u32: u32 =
+        u32::try_from(body.len()).map_err(|_| FrameError::TooLarge(u32::MAX, MAX_FRAME_BYTES))?;
     if len_u32 > MAX_FRAME_BYTES {
         return Err(FrameError::TooLarge(len_u32, MAX_FRAME_BYTES));
     }
@@ -97,7 +97,7 @@ mod tests {
 #[cfg(test)]
 mod framing_tests {
     use super::*;
-    use tokio::io::{duplex, AsyncWriteExt};
+    use tokio::io::{AsyncWriteExt, duplex};
 
     fn sample_frame() -> BridgeFrame {
         BridgeFrame {
@@ -132,12 +132,18 @@ mod framing_tests {
     async fn read_frame_errors_on_too_large_length_prefix() {
         let (mut writer, mut reader) = duplex(64);
         // Bogus length: 10 MB > 1 MB cap.
-        writer.write_all(&(10_000_000u32).to_le_bytes()).await.unwrap();
+        writer
+            .write_all(&(10_000_000u32).to_le_bytes())
+            .await
+            .unwrap();
         writer.shutdown().await.unwrap();
         drop(writer);
 
         let res = read_frame(&mut reader).await;
-        assert!(matches!(res, Err(FrameError::TooLarge(_, _))), "got: {res:?}");
+        assert!(
+            matches!(res, Err(FrameError::TooLarge(_, _))),
+            "got: {res:?}"
+        );
     }
 
     #[tokio::test]
@@ -150,7 +156,10 @@ mod framing_tests {
             payload: serde_json::Value::String(huge),
         };
         let res = write_frame(&mut sink, &frame).await;
-        assert!(matches!(res, Err(FrameError::TooLarge(_, _))), "got: {res:?}");
+        assert!(
+            matches!(res, Err(FrameError::TooLarge(_, _))),
+            "got: {res:?}"
+        );
     }
 
     #[tokio::test]

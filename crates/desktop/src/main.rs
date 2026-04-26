@@ -176,7 +176,7 @@ fn run_mcp_stdio() {
         let (app, events) = app_core::AppCore::init_with_sender(
             common::AppMode::Server,
             Some(config),
-            None,                  // notification_sender — not needed for stdio MCP
+            None, // notification_sender — not needed for stdio MCP
             Some(event_emitter),
         )
         .await

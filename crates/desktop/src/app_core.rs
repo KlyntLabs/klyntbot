@@ -16,7 +16,6 @@ use tokio::sync::{broadcast, mpsc};
 use tokio_util::sync::CancellationToken;
 use tracing::{debug, info, warn};
 
-
 /// Process-wide handle to the MCP→desktop event bridge. Held forever so
 /// the accept loop runs for the desktop's lifetime; on shutdown the
 /// `Drop` impl unlinks the socket.
@@ -34,8 +33,6 @@ impl AppEventEmitter for TauriEventEmitter {
         }
     }
 }
-
-
 
 /// Initialize `AppCore` and wire event channels to Tauri emitters.
 ///
@@ -71,10 +68,7 @@ pub async fn init(
         let handler: mcp_bridge::server::FrameHandler = Box::new(move |frame| {
             use tauri::Emitter;
             if let Err(e) = app_handle_for_bridge.emit(&frame.event, frame.payload) {
-                tracing::warn!(
-                    "mcp-bridge: failed to re-emit event {}: {e}",
-                    frame.event
-                );
+                tracing::warn!("mcp-bridge: failed to re-emit event {}: {e}", frame.event);
             }
         });
         match mcp_bridge::BridgeServer::start(socket_path.clone(), handler).await {

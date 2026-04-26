@@ -29,12 +29,9 @@ async fn chat_thread_helper_bridges_as_chat_thread_updated() {
     let path = dir.path().join("e2e1.sock");
     let received: Arc<Mutex<Vec<BridgeFrame>>> = Arc::new(Mutex::new(Vec::new()));
     let r = received.clone();
-    let server = BridgeServer::start(
-        path.clone(),
-        Box::new(move |f| r.lock().unwrap().push(f)),
-    )
-    .await
-    .unwrap();
+    let server = BridgeServer::start(path.clone(), Box::new(move |f| r.lock().unwrap().push(f)))
+        .await
+        .unwrap();
     tokio::time::sleep(Duration::from_millis(20)).await;
 
     let emitter = SocketBridgeEmitter::new(BridgeClient::new(path));
@@ -53,12 +50,9 @@ async fn arbitrary_emit_event_bridges_unchanged() {
     let path = dir.path().join("e2e2.sock");
     let received: Arc<Mutex<Vec<BridgeFrame>>> = Arc::new(Mutex::new(Vec::new()));
     let r = received.clone();
-    let server = BridgeServer::start(
-        path.clone(),
-        Box::new(move |f| r.lock().unwrap().push(f)),
-    )
-    .await
-    .unwrap();
+    let server = BridgeServer::start(path.clone(), Box::new(move |f| r.lock().unwrap().push(f)))
+        .await
+        .unwrap();
     tokio::time::sleep(Duration::from_millis(20)).await;
 
     let emitter = SocketBridgeEmitter::new(BridgeClient::new(path));

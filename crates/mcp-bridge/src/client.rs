@@ -5,7 +5,7 @@ use tokio::sync::mpsc;
 use tokio::time::timeout;
 use tracing::trace;
 
-use crate::protocol::{write_frame, BridgeFrame};
+use crate::protocol::{BridgeFrame, write_frame};
 
 const CONNECT_TIMEOUT: Duration = Duration::from_millis(200);
 const WRITE_TIMEOUT: Duration = Duration::from_millis(200);

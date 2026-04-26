@@ -4,7 +4,7 @@ use tokio::net::{UnixListener, UnixStream};
 use tokio_util::sync::CancellationToken;
 use tracing::{debug, error, warn};
 
-use crate::protocol::{read_frame, BridgeFrame};
+use crate::protocol::{BridgeFrame, read_frame};
 
 /// Synchronous handler invoked once per inbound frame. Must be cheap and
 /// non-blocking — the connection reader awaits its return.
@@ -25,10 +25,7 @@ pub struct BridgeServerHandle {
 impl BridgeServer {
     /// Bind the socket, spawn the accept loop, return the running server.
     /// Removes any stale socket file at `socket_path` first.
-    pub async fn start(
-        socket_path: PathBuf,
-        handler: FrameHandler,
-    ) -> std::io::Result<Self> {
+    pub async fn start(socket_path: PathBuf, handler: FrameHandler) -> std::io::Result<Self> {
         let _ = std::fs::remove_file(&socket_path);
         if let Some(parent) = socket_path.parent() {
             // Best-effort: ensure parent dir exists (e.g. ~/.klyntbot).
