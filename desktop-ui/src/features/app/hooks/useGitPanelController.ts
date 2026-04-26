@@ -126,9 +126,6 @@ export function useGitPanelController({
   const shouldLoadDiffs =
     Boolean(activeWorkspace) &&
     (diffSource === "local" ? shouldLoadLocalDiffs : diffUiVisible);
-  const shouldLoadGitLog =
-    Boolean(activeWorkspace) && (gitPanelMode === "log" || diffUiVisible);
-
   const {
     diffs: gitDiffs,
     isLoading: isDiffLoading,
@@ -182,7 +179,7 @@ export function useGitPanelController({
     isLoading: gitLogLoading,
     error: gitLogError,
     refresh: refreshGitLog,
-  } = useGitLog(activeWorkspace, shouldLoadGitLog);
+  } = useGitLog(activeWorkspace);
 
   const {
     diffs: gitCommitDiffs,
