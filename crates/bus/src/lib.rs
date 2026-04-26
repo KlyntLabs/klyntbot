@@ -10,7 +10,7 @@ pub mod learning_events;
 pub mod queue;
 
 pub use context_updates::{ContextUpdate, ContextUpdateQueue, ContextUpdateReason, UpdatePriority};
-pub use domain_events::{CorrectionKind, DomainEvent, DomainEventBus, FeedbackResponse};
+pub use domain_events::{CodingMemoryKind, CorrectionKind, DomainEvent, DomainEventBus, FeedbackResponse};
 pub use event_domain::EventDomain;
 pub use events::{InboundMessage, MessageKind, OutboundMessage};
 pub use learning_events::{LearningEvent, LearningEventBus};
