@@ -1,7 +1,7 @@
 import { type RefObject, useCallback, useEffect, useRef } from "react";
-import { getCurrentWindow, isTauri } from "../tauri-bridge";
+import { getCurrentWindow, isTauri } from "@/utils/tauri-bridge";
 
-// Shrinks/grows the launcher Tauri window to the content's scrollHeight.
+// Shrinks/grows the current Tauri window to the content's scrollHeight.
 // ResizeObserver fires on layout-affecting changes (data load, mode switch,
 // async-rendered widgets) — no MutationObserver needed.
 export function useWindowAutoResize(

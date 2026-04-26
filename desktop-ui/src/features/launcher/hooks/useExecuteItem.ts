@@ -1,6 +1,6 @@
 import { parseDurationToEndsAt } from "../lib/parseDuration";
 import type { LauncherStoreApi } from "../store";
-import { ipc } from "../tauri-bridge";
+import { ipc } from "@/utils/tauri-bridge";
 import type { LauncherExecuteResult, LauncherItem } from "../types";
 
 export interface ExecuteItemOptions {

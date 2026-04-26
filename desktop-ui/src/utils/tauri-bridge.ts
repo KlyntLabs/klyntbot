@@ -101,12 +101,11 @@ export function currentWindowLabel(): string {
 	};
 	const label = w.__TAURI_INTERNALS__?.metadata?.currentWindow?.label;
 	if (label) return label;
-	// Browser-only dev fallback so `localhost:1420/#/launcher` still routes.
-	if (
-		typeof window.location !== "undefined" &&
-		window.location.hash === "#/launcher"
-	) {
-		return "launcher";
+	// Browser-only dev fallbacks so `localhost:1420/#/launcher` and `#/tray`
+	// still route to the right component.
+	if (typeof window.location !== "undefined") {
+		if (window.location.hash === "#/launcher") return "launcher";
+		if (window.location.hash === "#/tray") return "tray";
 	}
 	return "main";
 }

@@ -4,14 +4,14 @@ import { useDndActive } from "../hooks/useDndActive";
 import { executeItem } from "../hooks/useExecuteItem";
 import { useKeyboardNavigation } from "../hooks/useKeyboardNavigation";
 import { useLauncherSearch } from "../hooks/useLauncherSearch";
-import { useTransparentBackground } from "../hooks/useTransparentBackground";
-import { useWindowAutoResize } from "../hooks/useWindowAutoResize";
+import { useTransparentBackground } from "@/hooks/window/useTransparentBackground";
+import { useWindowAutoResize } from "@/hooks/window/useWindowAutoResize";
 import {
 	LauncherStoreProvider,
 	useLauncherApi,
 	useLauncherState,
 } from "../store";
-import { emit, getCurrentWindow, isTauri, listen } from "../tauri-bridge";
+import { emit, getCurrentWindow, isTauri, listen } from "@/utils/tauri-bridge";
 import { ActionMenu } from "./ActionMenu";
 import { ArgChipBar } from "./ArgChipBar";
 import { Dashboard } from "./Dashboard";

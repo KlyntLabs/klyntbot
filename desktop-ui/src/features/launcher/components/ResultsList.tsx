@@ -2,7 +2,7 @@ import { useEffect, useRef } from "react";
 import { useDndActive } from "../hooks/useDndActive";
 import { formatRemaining } from "../lib/formatRemaining";
 import { useLauncherApi, useLauncherState } from "../store";
-import { convertFileSrc, isTauri } from "../tauri-bridge";
+import { convertFileSrc, isTauri } from "@/utils/tauri-bridge";
 import type { FocusSession, LauncherItem } from "../types";
 
 interface ResultsListProps {

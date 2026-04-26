@@ -1,6 +1,6 @@
 import { useEffect, useRef } from "react";
 import { useLauncherApi, useLauncherState } from "../store";
-import { getCurrentWindow, isTauri } from "../tauri-bridge";
+import { getCurrentWindow, isTauri } from "@/utils/tauri-bridge";
 
 export function LauncherInput() {
 	const inputRef = useRef<HTMLInputElement>(null);

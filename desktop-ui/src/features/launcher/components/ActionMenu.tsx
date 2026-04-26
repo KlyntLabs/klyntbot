@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useLauncherApi, useLauncherState } from "../store";
-import { ipc } from "../tauri-bridge";
+import { ipc } from "@/utils/tauri-bridge";
 import type { LauncherItem, LauncherItemKind } from "../types";
 
 interface Action {

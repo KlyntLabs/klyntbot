@@ -1,6 +1,6 @@
 import { useEffect } from "react";
 import { useLauncherApi, useLauncherState } from "../store";
-import { ipc } from "../tauri-bridge";
+import { ipc } from "@/utils/tauri-bridge";
 import type { DashboardData } from "../types";
 
 export function useDashboardData() {

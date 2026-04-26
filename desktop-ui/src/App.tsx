@@ -2,7 +2,7 @@ import { lazy, Suspense } from "react";
 import "./styles/index.css";
 
 import MainApp from "@app/components/MainApp";
-import { currentWindowLabel } from "@/features/launcher/tauri-bridge";
+import { currentWindowLabel } from "@/utils/tauri-bridge";
 import { useWindowLabel } from "@/features/layout/hooks/useWindowLabel";
 
 const AboutView = lazy(() =>
@@ -14,6 +14,12 @@ const AboutView = lazy(() =>
 const Launcher = lazy(() =>
 	import("@/features/launcher/components/Launcher").then((module) => ({
 		default: module.Launcher,
+	})),
+);
+
+const Tray = lazy(() =>
+	import("@/features/tray/components/Tray").then((module) => ({
+		default: module.Tray,
 	})),
 );
 
@@ -29,6 +35,14 @@ export default function App() {
 		return (
 			<Suspense fallback={null}>
 				<Launcher />
+			</Suspense>
+		);
+	}
+
+	if (realLabel === "tray" || windowLabel === "tray") {
+		return (
+			<Suspense fallback={null}>
+				<Tray />
 			</Suspense>
 		);
 	}

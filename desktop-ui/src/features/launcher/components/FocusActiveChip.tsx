@@ -1,5 +1,5 @@
 import { formatRemaining } from "../lib/formatRemaining";
-import { ipc } from "../tauri-bridge";
+import { ipc } from "@/utils/tauri-bridge";
 
 interface Props {
 	endsAt: string;

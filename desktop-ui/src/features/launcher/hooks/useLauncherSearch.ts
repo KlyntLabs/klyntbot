@@ -1,6 +1,6 @@
 import { useEffect, useRef } from "react";
 import { useLauncherApi, useLauncherState } from "../store";
-import { ipc } from "../tauri-bridge";
+import { ipc } from "@/utils/tauri-bridge";
 import type { LauncherItem } from "../types";
 
 export function useLauncherSearch() {
