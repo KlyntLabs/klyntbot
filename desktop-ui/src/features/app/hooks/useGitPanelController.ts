@@ -58,6 +58,7 @@ export function useGitPanelController({
     null,
   );
   const [diffSource, setDiffSource] = useState<GitDiffSource>("local");
+  void gitDiffIgnoreWhitespaceChanges;
 
   const { groups: perFileDiffGroups, viewerEntries: perFileDiffs } = useMemo(
     () => buildPerFileThreadDiffs(activeItems),
@@ -185,12 +186,7 @@ export function useGitPanelController({
     diffs: gitCommitDiffs,
     isLoading: gitCommitDiffsLoading,
     error: gitCommitDiffsError,
-  } = useGitCommitDiffs(
-    activeWorkspace,
-    selectedCommitSha,
-    shouldLoadDiffs && diffSource === "commit",
-    gitDiffIgnoreWhitespaceChanges,
-  );
+  } = useGitCommitDiffs(activeWorkspace, selectedCommitSha);
 
   const activeDiffs =
     diffSource === "commit"
