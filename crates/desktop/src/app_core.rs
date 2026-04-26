@@ -405,6 +405,55 @@ fn wire_event_channels(
         });
     }
 
+    // Phase 4: forward CodingMemoryUpdated → entity:updated, and
+    // DataVersionBumped → data:version_bumped, so Plan 1's tauriEventBridge.ts
+    // can invalidate the matching TanStack Query keys in every webview.
+    {
+        let mut event_rx = channels.domain_event_bus.subscribe();
+        let app_handle_clone = app_handle.clone();
+        let token = shutdown.clone();
+        tokio::spawn(async move {
+            use tauri::Emitter;
+            loop {
+                tokio::select! {
+                    _ = token.cancelled() => break,
+                    result = event_rx.recv() => match result {
+                        Ok(bus::DomainEvent::CodingMemoryUpdated { kind, id }) => {
+                            let entity_kind = match kind {
+                                bus::CodingMemoryKind::Fact => desktop_shared::types::EntityKind::CodingFact,
+                                bus::CodingMemoryKind::Episode => desktop_shared::types::EntityKind::CodingEpisode,
+                            };
+                            let payload = desktop_shared::events::EntityUpdatedPayload {
+                                entity_kind,
+                                id,
+                            };
+                            if let Err(e) = app_handle_clone
+                                .emit(desktop_shared::events::ENTITY_UPDATED, &payload)
+                            {
+                                tracing::warn!("phase4: failed to emit entity:updated for coding memory: {e}");
+                            }
+                        }
+                        Ok(bus::DomainEvent::DataVersionBumped { previous, current }) => {
+                            // Generic "broad invalidate" signal — payload is informational only.
+                            let payload = serde_json::json!({
+                                "previous": previous,
+                                "current": current,
+                            });
+                            if let Err(e) = app_handle_clone.emit("data:version_bumped", &payload) {
+                                tracing::warn!("phase4: failed to emit data:version_bumped: {e}");
+                            }
+                        }
+                        Ok(_) => {}
+                        Err(tokio::sync::broadcast::error::RecvError::Lagged(n)) => {
+                            tracing::warn!("phase4 forwarder lagged by {n} events");
+                        }
+                        Err(tokio::sync::broadcast::error::RecvError::Closed) => break,
+                    }
+                }
+            }
+        });
+    }
+
     // Pipeline events → extraction + consolidation
     {
         let app_handle_clone = app_handle.clone();
