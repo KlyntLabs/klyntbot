@@ -81,6 +81,8 @@ pub fn snippet_from_alert(alert: &MirrorAlert) -> NarrativeSnippet {
                 }),
                 user_feedback: None,
                 dismissed_at: None,
+                coding_alert_kind: None,
+                coding_alert_severity: None,
             }
         }
         MirrorAlert::TrialUnpromising { trial_id, reason } => NarrativeSnippet {
@@ -97,6 +99,8 @@ pub fn snippet_from_alert(alert: &MirrorAlert) -> NarrativeSnippet {
             }),
             user_feedback: None,
             dismissed_at: None,
+            coding_alert_kind: None,
+            coding_alert_severity: None,
         },
         MirrorAlert::MetaRuleProposed {
             rule_id,
@@ -114,6 +118,24 @@ pub fn snippet_from_alert(alert: &MirrorAlert) -> NarrativeSnippet {
             suggested_action: Some(SuggestedAction::ApproveMetaRule { rule_id: *rule_id }),
             user_feedback: None,
             dismissed_at: None,
+            coding_alert_kind: None,
+            coding_alert_severity: None,
+        },
+        MirrorAlert::Coding {
+            kind,
+            severity,
+            payload,
+        } => NarrativeSnippet {
+            id: Uuid::new_v4(),
+            created_at: Timestamp::now(),
+            alert_type: MirrorAlertType::Coding,
+            headline: format!("Coding alert: {kind}"),
+            body: payload.to_string(),
+            suggested_action: Some(SuggestedAction::ViewDetails),
+            user_feedback: None,
+            dismissed_at: None,
+            coding_alert_kind: Some(kind.clone()),
+            coding_alert_severity: Some(severity.clone()),
         },
     }
 }

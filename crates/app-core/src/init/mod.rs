@@ -469,6 +469,17 @@ impl AppCore {
                 trial_evaluator,
             );
 
+            // Phase-5 coding mirror sources — pattern effectiveness, stale-memory,
+            // coding meta-rules, project-skill drift. Registered alongside the six
+            // built-in sources in `MirrorEngine::start`.
+            let coding_mirror = crate::coding_memory::mirror::register_coding_sources(
+                storage_pool.clone(),
+                mirror_repo.clone(),
+                started.shutdown.clone(),
+            )
+            .await
+            .map_err(|e| format!("register_coding_sources: {e}"))?;
+
             // Bootstrap brain version 1 on first run
             let bootstrap_archiver =
                 ::cognitive::mirror::sources::ConfigArchiverSource::new(mirror_repo.clone(), None);
@@ -498,10 +509,14 @@ impl AppCore {
 
             let mut all_handles = started.flush_handles;
             all_handles.push(retention_handle);
+            all_handles.extend(coding_mirror.flush_handles);
+
+            let mut all_consumers = started.consumers;
+            all_consumers.extend(coding_mirror.consumers);
 
             (
                 Some(Arc::new(facade)),
-                started.consumers,
+                all_consumers,
                 all_handles,
                 started.shutdown,
             )
@@ -1108,9 +1123,11 @@ impl AppCore {
 
         // ── Phase-5 SessionEndPass wiring ────────────────────────────────
         {
-            let session_summary_repo = coding_memory::reforge::SessionSummaryRepo::new(storage_pool.clone());
+            let session_summary_repo =
+                coding_memory::reforge::SessionSummaryRepo::new(storage_pool.clone());
             let co_act = ::cognitive::CoActivationRepo::new(storage_pool.inner().clone());
-            let utilization = coding_memory::recall::telemetry::RecallInvocationRepo::new(storage_pool.clone());
+            let utilization =
+                coding_memory::recall::telemetry::RecallInvocationRepo::new(storage_pool.clone());
             let session_end_pass = Arc::new(coding_memory::reforge::SessionEndPass::new(
                 session_summary_repo.clone(),
                 co_act,
@@ -1620,7 +1637,13 @@ impl AppCore {
         if let Some(ref facade) = core.mirror_facade {
             let reg = core.agent.tool_registry();
             let mut registry = reg.write().await;
-            registry.register(tools::MirrorTool::new(Arc::clone(facade)));
+            let coding_alerts =
+                ::coding_memory::mirror::coding_alerts_query::CodingAlertsQuery::new(
+                    storage_pool.clone(),
+                );
+            registry.register(
+                tools::MirrorTool::new(Arc::clone(facade)).with_coding_alerts(coding_alerts),
+            );
             info!("Mirror tool registered");
         }
 

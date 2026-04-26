@@ -782,6 +782,8 @@ mod tests {
             memory_type: crate::types::DEFAULT_MEMORY_TYPE.to_string(),
             scope_type: "system".to_string(),
             scope_id: None,
+            scope_repo_id: None,
+            metadata: None,
         };
         fact_repo.upsert(&fact).await.unwrap();
 

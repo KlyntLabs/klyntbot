@@ -5,9 +5,8 @@
 -- changes authorized until first release.
 
 -- === semantic_facts additions =============================================
+-- scope_repo_id and metadata are now created by cognitive/001_cognitive_tables.sql
 
-ALTER TABLE semantic_facts ADD COLUMN scope_repo_id TEXT NULL;
-ALTER TABLE semantic_facts ADD COLUMN metadata TEXT NULL;
 ALTER TABLE semantic_facts ADD COLUMN actor_id TEXT DEFAULT 'local_user';
 
 CREATE INDEX IF NOT EXISTS idx_semantic_facts_scope_repo
@@ -16,11 +15,9 @@ CREATE INDEX IF NOT EXISTS idx_semantic_facts_actor
     ON semantic_facts(actor_id);
 
 -- === episodic_memories additions ==========================================
+-- kind, scope_repo_id and metadata are now created by cognitive/001_cognitive_tables.sql
 
-ALTER TABLE episodic_memories ADD COLUMN kind TEXT DEFAULT 'general';
 ALTER TABLE episodic_memories ADD COLUMN actor_id TEXT DEFAULT 'local_user';
-ALTER TABLE episodic_memories ADD COLUMN scope_repo_id TEXT NULL;
-ALTER TABLE episodic_memories ADD COLUMN metadata TEXT NULL;
 
 CREATE INDEX IF NOT EXISTS idx_episodic_kind
     ON episodic_memories(kind);

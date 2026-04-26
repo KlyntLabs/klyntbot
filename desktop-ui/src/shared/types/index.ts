@@ -266,6 +266,12 @@ export type {
   CliHealthRow,
   CodingMemoryStatusResponse,
   DiagnoseResult,
+  EffectivenessTrendBucket,
+  EffectivenessTrendsResponse,
+  MirrorAlertRow,
+  ProjectSkillRow,
   RecallInvocationRow,
+  ReforgeCycleDiffResponse,
+  ReforgeCycleSummary,
   SessionReplayEntry,
 } from "./coding-memory";

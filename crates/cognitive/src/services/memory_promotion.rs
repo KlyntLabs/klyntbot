@@ -118,6 +118,8 @@ mod tests {
             memory_type: "observation".into(),
             scope_type: "persona".into(),
             scope_id: Some("builtin-deep-analyst".into()),
+            scope_repo_id: None,
+            metadata: None,
         };
         repo.upsert(&fact).await.unwrap();
 

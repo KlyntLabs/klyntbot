@@ -50,6 +50,7 @@ pub async fn run_reforge(
     community_repo: Option<&crate::repos::CommunityRepo>,
     co_activation_repo_for_split: Option<&crate::repos::CoActivationRepo>,
     domain_event_bus: Option<Arc<bus::DomainEventBus>>,
+    coding_phase_runner: Option<&dyn super::CodingPhaseRunner>,
 ) -> Option<ReforgeResult> {
     let mut result = ReforgeResult::default();
 
@@ -207,6 +208,25 @@ pub async fn run_reforge(
     }
 
     // ------------------------------------------------------------------
+    // Phase 2.5: Coding Synthesis (extension hook)
+    // ------------------------------------------------------------------
+    if let Some(runner) = coding_phase_runner {
+        info!("Reforge Phase 2.5: Coding Synthesis");
+        match runner.run_synthesis().await {
+            Ok(out) => {
+                debug!(applied = out.applied, "Phase 2.5 complete");
+                if let Some(n) = out.narrative {
+                    result.phase_errors.push(format!("phase 2.5 narrative: {n}"));
+                }
+            }
+            Err(e) => {
+                warn!("Phase 2.5 failed: {e}");
+                result.phase_errors.push(format!("phase 2.5: {e}"));
+            }
+        }
+    }
+
+    // ------------------------------------------------------------------
     // Phase 4: Narrate (LLM call #3)
     // ------------------------------------------------------------------
     info!("Reforge Phase 4: Narrate");
@@ -271,6 +291,17 @@ pub async fn run_reforge(
     }
 
     // ------------------------------------------------------------------
+    // Phase 3.5: Rule Artifact Generation (extension hook)
+    // ------------------------------------------------------------------
+    if let Some(runner) = coding_phase_runner {
+        info!("Reforge Phase 3.5: Rule Artifact Generation");
+        if let Err(e) = runner.run_rule_artifacts().await {
+            warn!("Phase 3.5 failed: {e}");
+            result.phase_errors.push(format!("phase 3.5: {e}"));
+        }
+    }
+
+    // ------------------------------------------------------------------
     // Phase 6: Optimize
     // ------------------------------------------------------------------
     info!("Reforge Phase 6: Optimize");
@@ -313,6 +344,17 @@ pub async fn run_reforge(
         }
     } else {
         debug!("Reforge Phase 6: skipped (no autotuner bridge)");
+    }
+
+    // ------------------------------------------------------------------
+    // Phase 6 extension: selective-delete signal
+    // ------------------------------------------------------------------
+    if let Some(runner) = coding_phase_runner {
+        info!("Reforge Phase 6 ext: selective-delete signal");
+        if let Err(e) = runner.run_selective_delete().await {
+            warn!("Phase 6 selective-delete failed: {e}");
+            result.phase_errors.push(format!("phase 6 selective-delete: {e}"));
+        }
     }
 
     // ------------------------------------------------------------------
@@ -508,6 +550,17 @@ pub async fn run_reforge(
             Err(e) => {
                 debug!("Phase 6.5b: failed to build community input: {e}");
             }
+        }
+    }
+
+    // ------------------------------------------------------------------
+    // Phase 6.5 extension: cross-session fact dedup
+    // ------------------------------------------------------------------
+    if let Some(runner) = coding_phase_runner {
+        info!("Reforge Phase 6.5 ext: cross-session dedup");
+        if let Err(e) = runner.run_cross_session_dedup().await {
+            warn!("Phase 6.5 cross-session dedup failed: {e}");
+            result.phase_errors.push(format!("phase 6.5 cross-dedup: {e}"));
         }
     }
 

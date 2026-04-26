@@ -164,6 +164,15 @@ const SensitivityInspectorPanel = lazy(() =>
 const RecallToolLogPanel = lazy(() =>
   import("../features/coding-memory").then((m) => ({ default: m.RecallToolLogPanel })),
 );
+const MirrorAlertsFeedPanel = lazy(() =>
+  import("../features/coding-memory").then((m) => ({ default: m.MirrorAlertsFeedPanel })),
+);
+const PatternEffectivenessPanel = lazy(() =>
+  import("../features/coding-memory").then((m) => ({ default: m.PatternEffectivenessPanel })),
+);
+const ReforgeCycleDiffPanel = lazy(() =>
+  import("../features/coding-memory").then((m) => ({ default: m.ReforgeCycleDiffPanel })),
+);
 
 // (Debug feature — now integrated into System page)
 
@@ -408,6 +417,9 @@ export const router = createHashRouter([
           { path: "cost", element: <CostTrackerPanel /> },
           { path: "sensitivity", element: <SensitivityInspectorPanel /> },
           { path: "recall-log", element: <RecallToolLogPanel /> },
+          { path: "mirror-alerts", element: <MirrorAlertsFeedPanel /> },
+          { path: "pattern-effectiveness", element: <PatternEffectivenessPanel /> },
+          { path: "reforge-diff", element: <ReforgeCycleDiffPanel /> },
         ],
       },
       { path: "/projects", element: <ProjectsListPage /> },

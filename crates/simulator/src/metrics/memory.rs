@@ -161,6 +161,8 @@ mod tests {
             memory_type: "semantic".to_string(),
             scope_type: "global".to_string(),
             scope_id: None,
+            scope_repo_id: None,
+            metadata: None,
         };
         repo.upsert(&fact).await.expect("upsert fact");
 
@@ -207,6 +209,8 @@ mod tests {
             memory_type: "semantic".to_string(),
             scope_type: "global".to_string(),
             scope_id: None,
+            scope_repo_id: None,
+            metadata: None,
         };
         repo.upsert(&fact).await.expect("upsert negated fact");
 

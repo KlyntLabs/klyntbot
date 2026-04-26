@@ -879,6 +879,8 @@ mod tests {
             memory_type: DEFAULT_MEMORY_TYPE.to_string(),
             scope_type: "system".to_string(),
             scope_id: None,
+            scope_repo_id: None,
+            metadata: None,
         }
     }
 
@@ -1233,6 +1235,8 @@ mod tests {
             memory_type: crate::types::DEFAULT_MEMORY_TYPE.to_string(),
             scope_type: "system".to_string(),
             scope_id: None,
+            scope_repo_id: None,
+            metadata: None,
         };
         repo.upsert(&fact).await.unwrap();
 
@@ -1269,6 +1273,8 @@ mod tests {
             memory_type: crate::types::DEFAULT_MEMORY_TYPE.to_string(),
             scope_type: "system".to_string(),
             scope_id: None,
+            scope_repo_id: None,
+            metadata: None,
         };
         repo.upsert(&f1).await.unwrap();
 
@@ -1295,6 +1301,8 @@ mod tests {
             memory_type: crate::types::DEFAULT_MEMORY_TYPE.to_string(),
             scope_type: "system".to_string(),
             scope_id: None,
+            scope_repo_id: None,
+            metadata: None,
         };
         repo.upsert(&f2).await.unwrap();
 
@@ -1335,6 +1343,8 @@ mod tests {
             memory_type: crate::types::DEFAULT_MEMORY_TYPE.to_string(),
             scope_type: "system".to_string(),
             scope_id: None,
+            scope_repo_id: None,
+            metadata: None,
         };
         repo.upsert(&f1).await.unwrap();
 
@@ -1377,6 +1387,8 @@ mod tests {
             memory_type: crate::types::DEFAULT_MEMORY_TYPE.to_string(),
             scope_type: "system".to_string(),
             scope_id: None,
+            scope_repo_id: None,
+            metadata: None,
         };
         repo.upsert(&f1).await.unwrap();
 
@@ -1402,6 +1414,8 @@ mod tests {
             memory_type: crate::types::DEFAULT_MEMORY_TYPE.to_string(),
             scope_type: "system".to_string(),
             scope_id: None,
+            scope_repo_id: None,
+            metadata: None,
         };
         repo.upsert(&f2).await.unwrap();
 

@@ -323,6 +323,8 @@ mod tests {
             memory_type: DEFAULT_MEMORY_TYPE.to_string(),
             scope_type: "system".to_string(),
             scope_id: None,
+            scope_repo_id: None,
+            metadata: None,
         }
     }
 

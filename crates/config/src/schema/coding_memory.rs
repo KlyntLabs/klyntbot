@@ -127,6 +127,10 @@ impl Default for CodingRecallConfig {
 pub struct CodingReforgeConfig {
     pub nightly_cron: String,
     pub rule_artifacts: CodingRuleArtifactsConfig,
+    /// Optional override model for Phase 2.5 synthesis.
+    pub synth_model: Option<String>,
+    /// Optional override model for Phase 3.5 rule artifacts.
+    pub rules_model: Option<String>,
 }
 
 impl Default for CodingReforgeConfig {
@@ -134,6 +138,8 @@ impl Default for CodingReforgeConfig {
         Self {
             nightly_cron: "0 3 * * *".to_string(),
             rule_artifacts: CodingRuleArtifactsConfig::default(),
+            synth_model: None,
+            rules_model: None,
         }
     }
 }

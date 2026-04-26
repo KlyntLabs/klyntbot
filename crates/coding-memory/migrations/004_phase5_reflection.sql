@@ -54,13 +54,14 @@ CREATE INDEX IF NOT EXISTS idx_selective_delete_memory
     ON selective_delete_log(memory_id, applied_at);
 
 -- ─────────────────────────────────────────────────────────────────────
--- Coding-alert kind / severity columns on the existing mirror_snippets table
--- (mirror_snippets is owned by cognitive; we ALTER it in-place per
--- pre-release policy — no separate cross-crate migration needed)
+-- skill_versions extensions for project-skill evolver
+-- (coding_alert_kind / coding_alert_severity on mirror_snippets are added
+-- by cognitive migration 008; do not duplicate here.)
 -- ─────────────────────────────────────────────────────────────────────
-ALTER TABLE mirror_snippets ADD COLUMN coding_alert_kind     TEXT NULL;
-ALTER TABLE mirror_snippets ADD COLUMN coding_alert_severity TEXT NULL;
+ALTER TABLE skill_versions ADD COLUMN source_pattern_id TEXT NULL;
+ALTER TABLE skill_versions ADD COLUMN status TEXT DEFAULT 'active';
 
-CREATE INDEX IF NOT EXISTS idx_mirror_snippets_coding_kind
-    ON mirror_snippets(coding_alert_kind, created_at)
-    WHERE coding_alert_kind IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_skill_versions_source_pattern
+    ON skill_versions(source_pattern_id) WHERE source_pattern_id IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_skill_versions_status
+    ON skill_versions(status, scope, scope_repo_id);

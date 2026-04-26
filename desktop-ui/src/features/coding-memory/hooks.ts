@@ -2,7 +2,12 @@ import { useQuery } from "@shared/hooks";
 import type {
   CliHealthRow,
   CodingMemoryStatusResponse,
+  EffectivenessTrendsResponse,
+  MirrorAlertRow,
+  ProjectSkillRow,
   RecallInvocationRow,
+  ReforgeCycleDiffResponse,
+  ReforgeCycleSummary,
   SessionReplayEntry,
 } from "@shared/types";
 
@@ -81,6 +86,67 @@ export function useSessionRecallOverlay(sessionId: string, limit = 200, offset =
       limit,
       offset,
     },
+    null,
+  );
+}
+
+export function useMirrorAlertsFeed(kind?: string, severity?: string, repo?: string, limit = 50) {
+  return useQuery<MirrorAlertRow[] | null>(
+    "coding_memory_mirror_alerts_feed",
+    {
+      kind: kind ?? null,
+      severity: severity ?? null,
+      repo: repo ?? null,
+      limit,
+    },
+    null,
+  );
+}
+
+export function useMirrorAlertAction() {
+  return useQuery<undefined | null>("coding_memory_mirror_alert_action", null, null);
+}
+
+export function useEffectivenessTrends(patternId: string) {
+  return useQuery<EffectivenessTrendsResponse | null>(
+    "coding_memory_effectiveness_trends",
+    patternId ? { patternId } : null,
+    null,
+  );
+}
+
+export function useReforgeCycleList() {
+  return useQuery<ReforgeCycleSummary[] | null>(
+    "coding_memory_reforge_cycle_list",
+    undefined,
+    null,
+  );
+}
+
+export function useReforgeCycleDiff(
+  repoId: string,
+  artifact: string,
+  beforeCycleId?: string,
+  afterCycleId?: string,
+) {
+  return useQuery<ReforgeCycleDiffResponse | null>(
+    "coding_memory_reforge_cycle_diff",
+    repoId
+      ? {
+          repoId,
+          artifact,
+          beforeCycleId: beforeCycleId ?? null,
+          afterCycleId: afterCycleId ?? null,
+        }
+      : null,
+    null,
+  );
+}
+
+export function useProjectSkills(repoId: string) {
+  return useQuery<ProjectSkillRow[] | null>(
+    "coding_memory_project_skills_for_repo",
+    repoId ? { repoId } : null,
     null,
   );
 }

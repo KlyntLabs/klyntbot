@@ -17,10 +17,10 @@ pub use sources::{
 pub use types::{
     AutotunerBridge, BrainVersion, CategorySpend, EarlyTrialEvaluator, FeedbackTarget,
     FinanceDriftSnapshot, GeneratedNarrative, MetaRule, MetaRuleAction, MetaRuleSource,
-    MetaRuleStatus, MirrorAlert, MirrorAlertType, MirrorResponse, MirrorState, NarrativeContext,
-    NarrativeSnippet, PreviewRecommendation, RoutingSnapshot, SkillRouteStats, SuggestedAction,
-    TaskFocusSnapshot, TrendDirection, TrendNarrative, TrialEarlySignals, TrialPreview,
-    UserFeedback,
+    MetaRuleStatus, MirrorAlert, MirrorAlertSeverity, MirrorAlertType, MirrorResponse, MirrorState,
+    NarrativeContext, NarrativeSnippet, PreviewRecommendation, RoutingSnapshot, SkillRouteStats,
+    SuggestedAction, TaskFocusSnapshot, TrendDirection, TrendNarrative, TrialEarlySignals,
+    TrialPreview, UserFeedback,
 };
 
 #[cfg(test)]

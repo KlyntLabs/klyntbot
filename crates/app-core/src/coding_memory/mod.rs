@@ -4,6 +4,10 @@
 pub mod handlers;
 /// Claude Code settings.json installer.
 pub mod installer;
+/// Phase-5 mirror source wiring.
+pub mod mirror;
+/// Phase-5 panel handlers.
+pub mod panels_phase5;
 /// Phase-4 recall handlers.
 pub mod recall;
 /// Phase-5 Reforge wiring (session-end pass, coding phase handlers).

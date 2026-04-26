@@ -91,6 +91,7 @@ impl RuleArtifactGenerationPhase {
     }
 }
 
+#[allow(clippy::type_complexity)]
 async fn build_plan(
     handlers: &CodingPhaseHandlers<'_>,
     repo_id: &str,

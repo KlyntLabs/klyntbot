@@ -149,6 +149,13 @@ pub fn cognitive_migrations() -> Vec<FeatureMigration> {
                 .to_string(),
             sql: include_str!("../../migrations/007_procedural_rules_extension.sql").to_string(),
         },
+        FeatureMigration {
+            feature_name: "cognitive_mirror".to_string(),
+            version: 2,
+            description: "Add coding_alert_kind and coding_alert_severity to mirror_snippets"
+                .to_string(),
+            sql: include_str!("../../migrations/008_mirror_coding_alert.sql").to_string(),
+        },
     ]
 }
 

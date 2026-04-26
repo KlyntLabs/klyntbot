@@ -41,3 +41,45 @@ export interface DiagnoseResult {
   ok: boolean;
   message: string;
 }
+
+export interface MirrorAlertRow {
+  id: string;
+  kind: string;
+  severity: string;
+  headline: string;
+  payload: string;
+  createdAt: string;
+  dismissed: boolean;
+}
+
+export interface EffectivenessTrendBucket {
+  at: string;
+  score: number;
+}
+
+export interface EffectivenessTrendsResponse {
+  patternId: string;
+  patternName: string;
+  buckets: EffectivenessTrendBucket[];
+}
+
+export interface ReforgeCycleSummary {
+  cycleId: string;
+  ranAt: string;
+  repos: string[];
+  artifactsWritten: number;
+}
+
+export interface ReforgeCycleDiffResponse {
+  beforeBody: string;
+  afterBody: string;
+  sectionLabels: string[];
+}
+
+export interface ProjectSkillRow {
+  skillName: string;
+  repoId: string;
+  activeVersion: number;
+  status: string;
+  effectiveness: number;
+}

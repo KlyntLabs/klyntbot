@@ -486,6 +486,12 @@ async fn test_cognitive_context_source_with_facts() {
         project_id: None,
         scope_type: "system".to_string(),
         scope_id: None,
+        effectiveness_score: 0.5,
+        stability: 1.0,
+        scope_repo_id: None,
+        last_applied: None,
+        application_count: 0,
+        metadata: None,
     };
     rule_repo.upsert(&rule).await.unwrap();
 
@@ -995,6 +1001,7 @@ async fn test_reforge_cycle_end_to_end() {
         None, // no community repo
         None, // no co_activation repo for split
         None, // no domain event bus
+        None, // no coding phase runner
     )
     .await;
 
@@ -1179,6 +1186,7 @@ async fn test_reforge_phase6_with_autotuner_bridge() {
         None, // no community repo
         None, // no co_activation repo for split
         None, // no domain event bus
+        None, // no coding phase runner
     )
     .await;
 
@@ -1341,6 +1349,7 @@ async fn test_reforge_with_feedback_signals() {
         None, // no community repo
         None, // no co_activation repo for split
         None, // no domain event bus
+        None, // no coding phase runner
     )
     .await;
 

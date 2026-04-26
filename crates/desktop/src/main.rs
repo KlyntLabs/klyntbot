@@ -1038,6 +1038,12 @@ fn run_desktop_app() {
             commands::coding_memory::coding_memory_recall_decision_points,
             commands::coding_memory::coding_memory_recall_log,
             commands::coding_memory::coding_memory_session_replay_recall_overlay,
+            commands::coding_memory::coding_memory_mirror_alerts_feed,
+            commands::coding_memory::coding_memory_mirror_alert_action,
+            commands::coding_memory::coding_memory_effectiveness_trends,
+            commands::coding_memory::coding_memory_reforge_cycle_list,
+            commands::coding_memory::coding_memory_reforge_cycle_diff,
+            commands::coding_memory::coding_memory_project_skills_for_repo,
             // Shortcuts
             commands::shortcuts::shortcuts_get,
             commands::shortcuts::shortcuts_update,

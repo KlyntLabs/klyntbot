@@ -84,6 +84,8 @@ pub struct NarrativeSnippet {
     pub suggested_action: Option<SuggestedAction>,
     pub user_feedback: Option<UserFeedback>,
     pub dismissed_at: Option<Timestamp>,
+    pub coding_alert_kind: Option<String>,
+    pub coding_alert_severity: Option<MirrorAlertSeverity>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -113,6 +115,7 @@ pub enum MirrorAlertType {
     RoutingDrift,
     TrialUnpromising,
     MetaRuleProposed,
+    Coding,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -158,6 +161,26 @@ pub struct GeneratedNarrative {
     pub improvement_highlights: Vec<String>,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "lowercase")]
+pub enum MirrorAlertSeverity {
+    Low,
+    Medium,
+    High,
+    Critical,
+}
+
+impl MirrorAlertSeverity {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            MirrorAlertSeverity::Low => "low",
+            MirrorAlertSeverity::Medium => "medium",
+            MirrorAlertSeverity::High => "high",
+            MirrorAlertSeverity::Critical => "critical",
+        }
+    }
+}
+
 /// Alert emitted by signal sources when patterns are detected
 #[derive(Debug, Clone)]
 pub enum MirrorAlert {
@@ -174,6 +197,11 @@ pub enum MirrorAlert {
         rule_id: Uuid,
         rule_text: String,
         source: MetaRuleSource,
+    },
+    Coding {
+        kind: String,
+        severity: MirrorAlertSeverity,
+        payload: serde_json::Value,
     },
 }
 

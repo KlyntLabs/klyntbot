@@ -13,6 +13,7 @@ ai-core.workspace = true
 common.workspace = true
 bus.workspace = true
 config.workspace = true
+coding-memory.workspace = true
 cognitive.workspace = true
 providers.workspace = true
 session.workspace = true

@@ -20,7 +20,9 @@ CREATE TABLE IF NOT EXISTS semantic_facts (
     project_id      TEXT,  -- logical FK to projects.id (not enforced, separate database)
     memory_type     TEXT DEFAULT 'fact',
     scope_type      TEXT NOT NULL DEFAULT 'system',
-    scope_id        TEXT
+    scope_id        TEXT,
+    scope_repo_id   TEXT,
+    metadata        TEXT
 );
 
 CREATE INDEX IF NOT EXISTS idx_semantic_facts_domain ON semantic_facts(domain);
@@ -42,7 +44,10 @@ CREATE TABLE IF NOT EXISTS episodic_memories (
     access_count    INTEGER NOT NULL DEFAULT 0,
     project_id      TEXT,   -- logical FK to projects.id (not enforced, separate database)
     scope_type      TEXT NOT NULL DEFAULT 'system',
-    scope_id        TEXT
+    scope_id        TEXT,
+    scope_repo_id   TEXT,
+    metadata        TEXT,
+    kind            TEXT
 );
 
 CREATE INDEX IF NOT EXISTS idx_episodic_domain ON episodic_memories(domain);

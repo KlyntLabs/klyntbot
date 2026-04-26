@@ -20,7 +20,7 @@ use coding_memory::retrieval_skills::{
 };
 use coding_memory::scope::{AnchoredSymbol, CausalEdgeKind, ProvenanceKind, Sensitivity};
 use coding_memory::sink::{InProcessSink, MemorySink};
-use coding_memory::skills::{PhaseStubEvolver, ProjectSkillLocation, SkillId, SkillScope};
+use coding_memory::skills::{ProjectSkillLocation, SkillId, SkillScope};
 use coding_memory::{RecallInvocationRow, RetrievalSkillRegistry};
 
 #[test]
@@ -84,10 +84,6 @@ async fn phase1_stub_services_return_not_implemented() {
     // apply returns Result<EscalationOutcome> — just verify it compiles + runs.
     let out = skill.apply(&ctx).await;
     assert!(out.is_ok());
-
-    let evolver = PhaseStubEvolver;
-    use coding_memory::skills::ProjectSkillEvolver;
-    assert!(evolver.evolve("repo").await.is_err());
 
     // Turn trace exists as a type (not returned — just referenced).
     let _: Option<TurnTrace> = None;

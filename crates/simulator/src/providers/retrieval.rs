@@ -170,6 +170,8 @@ mod tests {
             memory_type: "fact".into(),
             scope_type: "system".into(),
             scope_id: None,
+            scope_repo_id: None,
+            metadata: None,
         };
         repo.upsert(&fact).await.unwrap();
 
@@ -225,6 +227,8 @@ mod tests {
                 memory_type: "fact".to_string(),
                 scope_type: "system".to_string(),
                 scope_id: None,
+                scope_repo_id: None,
+                metadata: None,
             };
             repo.upsert(&fact).await.unwrap();
         }

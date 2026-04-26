@@ -7,6 +7,7 @@ license.workspace = true
 
 [dependencies]
 common = { workspace = true }
+ai-core = { workspace = true }
 bus = { workspace = true }
 storage = { workspace = true }
 providers = { workspace = true }

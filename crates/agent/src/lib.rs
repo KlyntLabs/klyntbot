@@ -9,6 +9,7 @@
 pub mod adapters;
 pub mod autotuner;
 pub mod domain_searchers;
+pub mod handlers;
 pub mod services;
 
 // ── Core modules ─────────────────────────────────────────────────────────────

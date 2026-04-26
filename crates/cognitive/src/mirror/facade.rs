@@ -775,6 +775,8 @@ mod tests {
             suggested_action: None,
             user_feedback: None,
             dismissed_at: None,
+            coding_alert_kind: None,
+            coding_alert_severity: None,
         };
         facade.repo.insert_snippet(&snippet).await.unwrap();
 

@@ -31,6 +31,12 @@ pub(crate) const DEV_COMMANDS: &[&str] = &[
     "coding_memory_recall_decision_points",
     "coding_memory_recall_log",
     "coding_memory_session_replay_recall_overlay",
+    "coding_memory_mirror_alerts_feed",
+    "coding_memory_mirror_alert_action",
+    "coding_memory_effectiveness_trends",
+    "coding_memory_reforge_cycle_list",
+    "coding_memory_reforge_cycle_diff",
+    "coding_memory_project_skills_for_repo",
 ];
 
 #[tauri::command]
@@ -217,6 +223,65 @@ pub async fn coding_memory_session_replay_recall_overlay(
         .await.map_err(|e| e.to_string())
 }
 
+#[tauri::command]
+pub async fn coding_memory_mirror_alerts_feed(
+    state: State<'_, Arc<AppCore>>,
+    args: MirrorAlertsFeedArgs,
+) -> Result<Vec<MirrorAlertRow>, ApiError> {
+    app_core::coding_memory::panels_phase5::mirror_alerts_feed(state.storage_pool.clone(), args)
+        .await
+        .map_err(|e| ApiError::new("INTERNAL_ERROR", e.to_string()))
+}
+
+#[tauri::command]
+pub async fn coding_memory_mirror_alert_action(
+    state: State<'_, Arc<AppCore>>,
+    args: MirrorAlertActionArgs,
+) -> Result<(), ApiError> {
+    app_core::coding_memory::panels_phase5::mirror_alert_action(state.storage_pool.clone(), args)
+        .await
+        .map_err(|e| ApiError::new("INTERNAL_ERROR", e.to_string()))
+}
+
+#[tauri::command]
+pub async fn coding_memory_effectiveness_trends(
+    state: State<'_, Arc<AppCore>>,
+    pattern_id: String,
+) -> Result<EffectivenessTrendsResponse, ApiError> {
+    app_core::coding_memory::panels_phase5::effectiveness_trends(state.storage_pool.clone(), pattern_id)
+        .await
+        .map_err(|e| ApiError::new("INTERNAL_ERROR", e.to_string()))
+}
+
+#[tauri::command]
+pub async fn coding_memory_reforge_cycle_list(
+    state: State<'_, Arc<AppCore>>,
+) -> Result<Vec<ReforgeCycleSummary>, ApiError> {
+    app_core::coding_memory::panels_phase5::reforge_cycle_list(state.storage_pool.clone())
+        .await
+        .map_err(|e| ApiError::new("INTERNAL_ERROR", e.to_string()))
+}
+
+#[tauri::command]
+pub async fn coding_memory_reforge_cycle_diff(
+    state: State<'_, Arc<AppCore>>,
+    args: ReforgeCycleDiffArgs,
+) -> Result<ReforgeCycleDiffResponse, ApiError> {
+    app_core::coding_memory::panels_phase5::reforge_cycle_diff(state.storage_pool.clone(), args)
+        .await
+        .map_err(|e| ApiError::new("INTERNAL_ERROR", e.to_string()))
+}
+
+#[tauri::command]
+pub async fn coding_memory_project_skills_for_repo(
+    state: State<'_, Arc<AppCore>>,
+    repo_id: String,
+) -> Result<Vec<ProjectSkillRow>, ApiError> {
+    app_core::coding_memory::panels_phase5::project_skills_for_repo(state.storage_pool.clone(), repo_id)
+        .await
+        .map_err(|e| ApiError::new("INTERNAL_ERROR", e.to_string()))
+}
+
 /// dev_server dispatcher — wired by dev_server/mod.rs.
 pub(crate) async fn dispatch_dev(
     cmd: &str,
@@ -355,6 +420,33 @@ pub(crate) async fn dispatch_dev(
         "coding_memory_session_replay_recall_overlay" => {
             let a: SessionRecallOverlayArgs = match dev::parse_params(body) { Ok(v) => v, Err(e) => return Some(Err(e)) };
             dev::val(app_core::coding_memory::recall::session_recall_overlay_handler(core.recall.as_ref()?, a.session_id, a.limit, a.offset).await.map_err(|e| ApiError::new("INTERNAL_ERROR", e.to_string())))
+        }
+        "coding_memory_mirror_alerts_feed" => {
+            let a: MirrorAlertsFeedArgs = match dev::parse_params(body) { Ok(v) => v, Err(e) => return Some(Err(e)) };
+            dev::val(app_core::coding_memory::panels_phase5::mirror_alerts_feed(core.storage_pool.clone(), a).await.map_err(|e| ApiError::new("INTERNAL_ERROR", e.to_string())))
+        }
+        "coding_memory_mirror_alert_action" => {
+            let a: MirrorAlertActionArgs = match dev::parse_params(body) { Ok(v) => v, Err(e) => return Some(Err(e)) };
+            dev::val(app_core::coding_memory::panels_phase5::mirror_alert_action(core.storage_pool.clone(), a).await.map_err(|e| ApiError::new("INTERNAL_ERROR", e.to_string())))
+        }
+        "coding_memory_effectiveness_trends" => {
+            #[derive(serde::Deserialize)]
+            struct A { pattern_id: String }
+            let a: A = match dev::parse_params(body) { Ok(v) => v, Err(e) => return Some(Err(e)) };
+            dev::val(app_core::coding_memory::panels_phase5::effectiveness_trends(core.storage_pool.clone(), a.pattern_id).await.map_err(|e| ApiError::new("INTERNAL_ERROR", e.to_string())))
+        }
+        "coding_memory_reforge_cycle_list" => {
+            dev::val(app_core::coding_memory::panels_phase5::reforge_cycle_list(core.storage_pool.clone()).await.map_err(|e| ApiError::new("INTERNAL_ERROR", e.to_string())))
+        }
+        "coding_memory_reforge_cycle_diff" => {
+            let a: ReforgeCycleDiffArgs = match dev::parse_params(body) { Ok(v) => v, Err(e) => return Some(Err(e)) };
+            dev::val(app_core::coding_memory::panels_phase5::reforge_cycle_diff(core.storage_pool.clone(), a).await.map_err(|e| ApiError::new("INTERNAL_ERROR", e.to_string())))
+        }
+        "coding_memory_project_skills_for_repo" => {
+            #[derive(serde::Deserialize)]
+            struct A { repo_id: String }
+            let a: A = match dev::parse_params(body) { Ok(v) => v, Err(e) => return Some(Err(e)) };
+            dev::val(app_core::coding_memory::panels_phase5::project_skills_for_repo(core.storage_pool.clone(), a.repo_id).await.map_err(|e| ApiError::new("INTERNAL_ERROR", e.to_string())))
         }
         _ => return None,
     })

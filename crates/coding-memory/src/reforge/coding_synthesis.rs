@@ -149,6 +149,7 @@ async fn fetch_workflow_patterns(
         .collect())
 }
 
+#[allow(clippy::type_complexity)]
 async fn fetch_repo_context(
     pool: &storage::StoragePool,
     repo_id: &str,
@@ -206,6 +207,7 @@ async fn fetch_causal_chain_groups(
     Ok(Vec::new())
 }
 
+#[allow(clippy::type_complexity)]
 async fn fetch_counterfactuals(
     pool: &storage::StoragePool,
     since: &Timestamp,

@@ -127,6 +127,8 @@ struct SnippetRow {
     action_json: Option<String>,
     user_feedback: Option<String>,
     dismissed_at: Option<String>,
+    coding_alert_kind: Option<String>,
+    coding_alert_severity: Option<String>,
 }
 
 impl TryFrom<SnippetRow> for NarrativeSnippet {
@@ -146,6 +148,11 @@ impl TryFrom<SnippetRow> for NarrativeSnippet {
             .map(serde_json::from_str)
             .transpose()?;
         let dismissed_at = row.dismissed_at.as_deref().map(parse_rfc3339).transpose()?;
+        let coding_alert_severity = row
+            .coding_alert_severity
+            .as_deref()
+            .map(str_to_enum)
+            .transpose()?;
         Ok(NarrativeSnippet {
             id: Uuid::parse_str(&row.id)
                 .map_err(|e| common::KlyntbotError::Storage(format!("bad uuid: {e}")))?,
@@ -156,6 +163,8 @@ impl TryFrom<SnippetRow> for NarrativeSnippet {
             suggested_action,
             user_feedback,
             dismissed_at,
+            coding_alert_kind: row.coding_alert_kind,
+            coding_alert_severity,
         })
     }
 }
@@ -346,11 +355,17 @@ impl MirrorRepo {
             .as_ref()
             .map(serde_json::to_string)
             .transpose()?;
+        let coding_alert_severity = snippet
+            .coding_alert_severity
+            .as_ref()
+            .map(enum_to_str)
+            .transpose()?;
         sqlx::query(
             r#"
             INSERT INTO mirror_snippets
-                (id, created_at, alert_type, headline, body, action_json, user_feedback, dismissed_at)
-            VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)
+                (id, created_at, alert_type, headline, body, action_json, user_feedback, dismissed_at,
+                 coding_alert_kind, coding_alert_severity)
+            VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)
             "#,
         )
         .bind(snippet.id.to_string())
@@ -361,6 +376,8 @@ impl MirrorRepo {
         .bind(action_json)
         .bind(user_feedback)
         .bind(snippet.dismissed_at.map(|d| d.to_string()))
+        .bind(snippet.coding_alert_kind.as_ref())
+        .bind(coding_alert_severity)
         .execute(self.db())
         .await
         .map_err(|e| common::KlyntbotError::Storage(e.to_string()))?;
@@ -963,6 +980,8 @@ mod tests {
             suggested_action: Some(SuggestedAction::ViewDetails),
             user_feedback: None,
             dismissed_at: None,
+            coding_alert_kind: None,
+            coding_alert_severity: None,
         }
     }
 

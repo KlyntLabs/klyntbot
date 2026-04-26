@@ -223,6 +223,8 @@ mod tests {
             memory_type: "fact".into(),
             scope_type: "system".into(),
             scope_id: None,
+            scope_repo_id: None,
+            metadata: None,
         };
         assert!((convergence_score(&fact) - 0.42).abs() < f64::EPSILON);
     }

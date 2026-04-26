@@ -3,8 +3,14 @@
 //! - Dispatches `DomainEvent::CodingSessionEnded` into `SessionEndPass`.
 //! - Builds `CodingPhaseHandlers` for the cron `run_reforge` call.
 
+use async_trait::async_trait;
 use bus::{DomainEvent, DomainEventBus};
-use coding_memory::reforge::SessionEndPass;
+use coding_memory::reforge::types::CodingPhaseHandlers;
+use coding_memory::reforge::{
+    CodingSynthesisHandler, CodingSynthesisPhase, CrossSessionDedup, RuleArtifactGenerationPhase,
+    RuleArtifactsHandler, SelectiveDeleteSignal, SessionEndPass,
+};
+use cognitive::services::reforge::CodingPhaseRunnerOutcome;
 use std::sync::Arc;
 use tracing::warn;
 
@@ -30,4 +36,123 @@ pub async fn register_session_end_dispatch(
             }
         }
     });
+}
+
+// ---------------------------------------------------------------------------
+// CodingPhaseRunnerImpl — concrete bridge from cognitive trait to coding-memory phases
+// ---------------------------------------------------------------------------
+
+/// Concrete runner that satisfies the cognitive trait via the coding-memory phases.
+pub struct CodingPhaseRunnerImpl {
+    pool: storage::StoragePool,
+    fact_repo: cognitive::SemanticFactRepo,
+    episodic_repo: cognitive::EpisodicMemoryRepo,
+    rule_repo: cognitive::ProceduralRuleRepo,
+    co_activation_repo: cognitive::CoActivationRepo,
+    utilization_repo: coding_memory::recall::telemetry::RecallInvocationRepo,
+    session_summary_repo: coding_memory::reforge::SessionSummaryRepo,
+    selective_delete_log: coding_memory::reforge::selective_delete::SelectiveDeleteLogRepo,
+    pattern_effectiveness_log:
+        coding_memory::mirror::pattern_effectiveness::PatternEffectivenessLogRepo,
+    synthesis_handler: Option<Arc<dyn CodingSynthesisHandler>>,
+    rule_artifacts_handler: Option<Arc<dyn RuleArtifactsHandler>>,
+    enabled_artifacts: Vec<String>,
+    bus: Option<Arc<bus::DomainEventBus>>,
+}
+
+impl CodingPhaseRunnerImpl {
+    /// Production constructor.
+    #[allow(clippy::too_many_arguments)]
+    pub fn new(
+        pool: storage::StoragePool,
+        synthesis_handler: Option<Arc<dyn CodingSynthesisHandler>>,
+        rule_artifacts_handler: Option<Arc<dyn RuleArtifactsHandler>>,
+        enabled_artifacts: Vec<String>,
+        bus: Option<Arc<bus::DomainEventBus>>,
+    ) -> Self {
+        let db = pool.inner().clone();
+        let fact_repo = cognitive::SemanticFactRepo::new(db.clone());
+        let episodic_repo = cognitive::EpisodicMemoryRepo::new(db.clone());
+        let rule_repo = cognitive::ProceduralRuleRepo::new(db.clone());
+        let co_activation_repo = cognitive::CoActivationRepo::new(db.clone());
+        let utilization_repo = coding_memory::recall::telemetry::RecallInvocationRepo::new(pool.clone());
+        let session_summary_repo = coding_memory::reforge::SessionSummaryRepo::new(pool.clone());
+        let selective_delete_log =
+            coding_memory::reforge::selective_delete::SelectiveDeleteLogRepo::new(pool.clone());
+        let pattern_effectiveness_log =
+            coding_memory::mirror::pattern_effectiveness::PatternEffectivenessLogRepo::new(pool.clone());
+        Self {
+            pool,
+            fact_repo,
+            episodic_repo,
+            rule_repo,
+            co_activation_repo,
+            utilization_repo,
+            session_summary_repo,
+            selective_delete_log,
+            pattern_effectiveness_log,
+            synthesis_handler,
+            rule_artifacts_handler,
+            enabled_artifacts,
+            bus,
+        }
+    }
+
+    /// Test constructor — no LLM handlers, no enabled artifacts.
+    pub fn new_for_test(pool: storage::StoragePool) -> Self {
+        Self::new(pool, None, None, vec![], None)
+    }
+
+    fn handlers(&self) -> CodingPhaseHandlers<'_> {
+        CodingPhaseHandlers {
+            synthesis: self.synthesis_handler.as_deref(),
+            rule_artifacts: self.rule_artifacts_handler.as_deref(),
+            fact_repo: &self.fact_repo,
+            episodic_repo: &self.episodic_repo,
+            rule_repo: &self.rule_repo,
+            co_activation_repo: &self.co_activation_repo,
+            utilization_repo: &self.utilization_repo,
+            session_summary_repo: &self.session_summary_repo,
+            selective_delete_log: &self.selective_delete_log,
+            pattern_effectiveness_log: &self.pattern_effectiveness_log,
+            bus: self.bus.clone(),
+        }
+    }
+}
+
+#[async_trait]
+impl cognitive::services::reforge::CodingPhaseRunner for CodingPhaseRunnerImpl {
+    async fn run_synthesis(&self) -> common::Result<CodingPhaseRunnerOutcome> {
+        let applied = CodingSynthesisPhase::run(&self.handlers()).await?;
+        Ok(CodingPhaseRunnerOutcome {
+            applied,
+            narrative: None,
+        })
+    }
+
+    async fn run_rule_artifacts(&self) -> common::Result<CodingPhaseRunnerOutcome> {
+        let applied =
+            RuleArtifactGenerationPhase::run(&self.handlers(), &self.enabled_artifacts).await?;
+        Ok(CodingPhaseRunnerOutcome {
+            applied,
+            narrative: None,
+        })
+    }
+
+    async fn run_cross_session_dedup(&self) -> common::Result<CodingPhaseRunnerOutcome> {
+        let applied = CrossSessionDedup::run(&self.fact_repo, 0.92).await?;
+        Ok(CodingPhaseRunnerOutcome {
+            applied,
+            narrative: None,
+        })
+    }
+
+    async fn run_selective_delete(&self) -> common::Result<CodingPhaseRunnerOutcome> {
+        let applied =
+            SelectiveDeleteSignal::apply(&self.pool, &self.selective_delete_log).await?;
+        Ok(CodingPhaseRunnerOutcome {
+            applied,
+            narrative: None,
+        })
+    }
 }

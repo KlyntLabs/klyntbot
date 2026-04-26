@@ -1141,6 +1141,9 @@ mod tests {
                 project_id: None,
                 scope_type: "system".into(),
                 scope_id: None,
+                scope_repo_id: None,
+                metadata: None,
+                kind: None,
             },
             cognitive::EpisodicMemory {
                 id: "m2".into(),
@@ -1156,6 +1159,9 @@ mod tests {
                 project_id: None,
                 scope_type: "system".into(),
                 scope_id: None,
+                scope_repo_id: None,
+                metadata: None,
+                kind: None,
             },
         ];
         let result = build_memory_snapshot(&memories);

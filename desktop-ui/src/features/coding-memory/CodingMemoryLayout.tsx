@@ -9,6 +9,9 @@ const tabs = [
   { to: "cost", label: "Cost Tracker" },
   { to: "sensitivity", label: "Sensitivity Inspector" },
   { to: "recall-log", label: "Recall Log" },
+  { to: "mirror-alerts", label: "Mirror Alerts" },
+  { to: "pattern-effectiveness", label: "Pattern Effectiveness" },
+  { to: "reforge-diff", label: "Reforge Diff" },
 ];
 
 export function CodingMemoryLayout() {

@@ -534,6 +534,77 @@ fn register_cron_callbacks(
                                 metric_registry: Some(&metric_registry),
                             };
 
+                        // Build coding-specific Phase 2.5 / 3.5 handlers.
+                        let synth_handler: Option<
+                            std::sync::Arc<dyn coding_memory::reforge::CodingSynthesisHandler>,
+                        > = cog_provider.as_ref().map(|p| {
+                            let model = cog_config
+                                .coding_memory
+                                .reforge
+                                .synth_model
+                                .clone()
+                                .unwrap_or_else(|| p.default_model().to_string());
+                            let params = providers::ChatParams::new(model)
+                                .with_temperature(0.2)
+                                .with_response_format(providers::ResponseFormat::JsonObject);
+                            std::sync::Arc::new(
+                                agent::handlers::coding_synthesis::CodingSynthesisHandlerImpl::new(
+                                    p.clone(),
+                                    params,
+                                ),
+                            )
+                                as std::sync::Arc<
+                                    dyn coding_memory::reforge::CodingSynthesisHandler,
+                                >
+                        });
+                        let rules_handler: Option<
+                            std::sync::Arc<dyn coding_memory::reforge::RuleArtifactsHandler>,
+                        > = cog_provider.as_ref().map(|p| {
+                            let model = cog_config
+                                .coding_memory
+                                .reforge
+                                .rules_model
+                                .clone()
+                                .unwrap_or_else(|| p.default_model().to_string());
+                            let params = providers::ChatParams::new(model)
+                                .with_temperature(0.2)
+                                .with_response_format(providers::ResponseFormat::JsonObject);
+                            std::sync::Arc::new(
+                                agent::handlers::rule_artifacts::RuleArtifactsHandlerImpl::new(
+                                    p.clone(),
+                                    params,
+                                ),
+                            )
+                                as std::sync::Arc<dyn coding_memory::reforge::RuleArtifactsHandler>
+                        });
+
+                        let enabled_artifacts = {
+                            let r = &cog_config.coding_memory.reforge;
+                            let mut v = Vec::new();
+                            if r.rule_artifacts.claude_md {
+                                v.push("claude_md".into());
+                            }
+                            if r.rule_artifacts.agents_md {
+                                v.push("agents_md".into());
+                            }
+                            if r.rule_artifacts.cursorrules {
+                                v.push("cursorrules".into());
+                            }
+                            if r.rule_artifacts.continue_rules {
+                                v.push("continue_rules".into());
+                            }
+                            v
+                        };
+
+                        let coding_runner =
+                            crate::coding_memory::reforge::CodingPhaseRunnerImpl::new(
+                                storage::StoragePool::from_existing(pool.clone()),
+                                synth_handler,
+                                rules_handler,
+                                enabled_artifacts,
+                                Some(domain_event_bus.clone()),
+                            );
+
                         match cognitive::services::reforge::service::run_reforge(
                             &repos_reforge.reforge_state,
                             &repos_reforge.skill_version,
@@ -565,6 +636,7 @@ fn register_cron_callbacks(
                             Some(&cognitive::CommunityRepo::new(pool.clone())),
                             Some(&co_activation_repo),
                             Some(domain_event_bus),
+                            Some(&coding_runner),
                         )
                         .await
                         {

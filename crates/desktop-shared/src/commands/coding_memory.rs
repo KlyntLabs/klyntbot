@@ -248,3 +248,125 @@ pub struct SessionRecallOverlayArgs {
 fn default_limit_200() -> i64 {
     200
 }
+
+/// Args for `coding_memory_mirror_alerts_feed`.
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct MirrorAlertsFeedArgs {
+    /// Filter by kind (string form of `CodingMirrorAlertKind`).
+    pub kind: Option<String>,
+    /// Filter by severity.
+    pub severity: Option<String>,
+    /// Filter by repo.
+    pub repo: Option<String>,
+    /// Pagination limit.
+    pub limit: Option<u32>,
+}
+
+/// Row in the alerts feed.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MirrorAlertRow {
+    /// Snippet id.
+    pub id: String,
+    /// Kind.
+    pub kind: String,
+    /// Severity.
+    pub severity: String,
+    /// Headline.
+    pub headline: String,
+    /// JSON payload.
+    pub payload: String,
+    /// When created (RFC 3339).
+    pub created_at: String,
+    /// Dismissed?.
+    pub dismissed: bool,
+}
+
+/// Args for `coding_memory_mirror_alert_action`.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MirrorAlertActionArgs {
+    /// Alert id.
+    pub id: String,
+    /// `approve` | `reject` | `snooze`.
+    pub action: String,
+}
+
+/// Bucket for the effectiveness chart.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct EffectivenessTrendBucket {
+    /// ISO date.
+    pub at: String,
+    /// Effectiveness after.
+    pub score: f32,
+}
+
+/// Response for `coding_memory_effectiveness_trends`.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct EffectivenessTrendsResponse {
+    /// Pattern id.
+    pub pattern_id: String,
+    /// Pattern name (from `procedural_rules.rule`).
+    pub pattern_name: String,
+    /// Buckets ordered oldest-first.
+    pub buckets: Vec<EffectivenessTrendBucket>,
+}
+
+/// Args for `coding_memory_reforge_cycle_diff`.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ReforgeCycleDiffArgs {
+    /// Repo id.
+    pub repo_id: String,
+    /// Artifact (`claude_md` | `agents_md` | `cursorrules` | `continue_rules`).
+    pub artifact: String,
+    /// Cycle id (left side).
+    pub before_cycle_id: Option<String>,
+    /// Cycle id (right side); `None` ⇒ current.
+    pub after_cycle_id: Option<String>,
+}
+
+/// Response for `coding_memory_reforge_cycle_diff`.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ReforgeCycleDiffResponse {
+    /// Left body.
+    pub before_body: String,
+    /// Right body.
+    pub after_body: String,
+    /// Section labels for color-coding the diff.
+    pub section_labels: Vec<String>,
+}
+
+/// Cycle summary row.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ReforgeCycleSummary {
+    /// Cycle id.
+    pub cycle_id: String,
+    /// When run.
+    pub ran_at: String,
+    /// Repos affected.
+    pub repos: Vec<String>,
+    /// Artifacts written.
+    pub artifacts_written: u32,
+}
+
+/// Project-skill row for the in-app skill listing.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ProjectSkillRow {
+    /// Skill name.
+    pub skill_name: String,
+    /// Repo id.
+    pub repo_id: String,
+    /// Active version.
+    pub active_version: i64,
+    /// Status.
+    pub status: String,
+    /// Effectiveness score (live).
+    pub effectiveness: f32,
+}

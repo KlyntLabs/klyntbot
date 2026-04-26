@@ -40,6 +40,8 @@ pub mod retrieval_skills;
 pub mod scope;
 /// `MemorySink` trait + `InProcessSink` / `IngestSocketSink` stubs.
 pub mod sink;
+/// Project skill evolver — Detect, Synthesize, Write, Journal, Supersede.
+pub mod skill_evolver;
 /// Scope-aware skill store extension + project skill evolution.
 pub mod skills;
 
@@ -90,7 +92,7 @@ pub fn coding_memory_migrations() -> Vec<FeatureMigration> {
             feature_name: "coding_memory".to_string(),
             version: 4,
             description: "Phase-5: session_summaries, pattern_effectiveness_log, \
-                          selective_delete_log; mirror_snippets coding alert columns."
+                          selective_delete_log."
                 .to_string(),
             sql: include_str!("../migrations/004_phase5_reflection.sql").to_string(),
         },

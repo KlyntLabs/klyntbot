@@ -63,6 +63,7 @@ dependencies = [
  "autotuner",
  "base64 0.22.1",
  "bus",
+ "coding-memory",
  "cognitive",
  "common",
  "config",
@@ -2395,6 +2396,7 @@ dependencies = [
 name = "coding-memory"
 version = "0.1.1"
 dependencies = [
+ "ai-core",
  "async-trait",
  "blake3",
  "bus",
@@ -2402,12 +2404,14 @@ dependencies = [
  "cognitive",
  "common",
  "context_engine",
+ "dirs",
  "jiff",
  "proptest",
  "providers",
  "regex",
  "serde",
  "serde_json",
+ "sha2",
  "sqlx",
  "storage",
  "tempfile",
@@ -14454,6 +14458,7 @@ version = "0.1.1"
 dependencies = [
  "async-trait",
  "bus",
+ "coding-memory",
  "cognitive",
  "common",
  "config",
