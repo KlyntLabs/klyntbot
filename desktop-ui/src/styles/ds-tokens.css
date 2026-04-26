@@ -1,4 +1,14 @@
 :root {
+  /* Typographic scale — anchor on --fs-sm (12.5px), step ~1.1x.
+     Pick the role, not a number, so sizes stay harmonious. */
+  --fs-2xs: 10.5px;  /* badges, tiny meta */
+  --fs-xs:  11.5px;  /* section labels, secondary text */
+  --fs-sm:  12.5px;  /* default UI body — nav items, buttons */
+  --fs-md:  13.5px;  /* emphasized body */
+  --fs-lg:  15px;    /* section headings */
+  --fs-xl:  17px;    /* page titles */
+  --fs-base: var(--fs-sm);
+
   --ds-surface-overlay: var(--surface-context-core);
   --ds-surface-card: var(--surface-card-strong);
   --ds-surface-muted: var(--surface-card-muted);

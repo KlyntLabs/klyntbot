@@ -302,6 +302,7 @@ pub async fn coding_memory_project_skills_for_repo(
 }
 
 /// dev_server dispatcher — wired by dev_server/mod.rs.
+#[cfg(debug_assertions)]
 pub(crate) async fn dispatch_dev(
     cmd: &str,
     core: &Arc<AppCore>,

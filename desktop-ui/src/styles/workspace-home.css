@@ -37,7 +37,7 @@
 }
 
 .workspace-home-path {
-  font-size: 12px;
+  font-size: var(--fs-sm);
   color: var(--text-muted);
   word-break: break-all;
 }
@@ -54,7 +54,7 @@
 }
 
 .workspace-home-git-banner-title {
-  font-size: 12px;
+  font-size: var(--fs-sm);
   color: var(--text-strong);
 }
 
@@ -66,7 +66,7 @@
 
 .workspace-home-git-banner-actions button {
   padding: 8px 12px;
-  font-size: 12px;
+  font-size: var(--fs-sm);
 }
 
 .workspace-home-composer {
@@ -98,7 +98,7 @@
 }
 
 .workspace-home-error {
-  font-size: 12px;
+  font-size: var(--fs-sm);
   color: var(--text-danger);
   background: rgba(236, 72, 153, 0.08);
   border-radius: 10px;
@@ -120,14 +120,14 @@
 }
 
 .workspace-home-section-title {
-  font-size: 12px;
+  font-size: var(--fs-sm);
   text-transform: uppercase;
   letter-spacing: 0.08em;
   color: var(--text-faint);
 }
 
 .workspace-home-section-meta {
-  font-size: 12px;
+  font-size: var(--fs-sm);
   color: var(--text-muted);
 }
 
@@ -155,7 +155,7 @@
 }
 
 .workspace-home-agent-warning {
-  font-size: 12px;
+  font-size: var(--fs-sm);
   color: var(--text-muted);
   background: var(--surface-muted);
   border: 1px solid var(--border-muted);
@@ -172,7 +172,7 @@
   background: var(--surface-1);
   color: var(--text-strong);
   font-family: var(--code-font-family);
-  font-size: 13px;
+  font-size: var(--fs-sm);
   line-height: 1.5;
   padding: 10px 12px;
 }
@@ -221,7 +221,7 @@
 }
 
 .workspace-home-control.composer-select-wrap .composer-select {
-  font-size: 12px;
+  font-size: var(--fs-sm);
   color: var(--text-stronger);
   padding: 0 16px 0 0;
 }
@@ -236,7 +236,7 @@
 }
 
 .workspace-home-mode-note {
-  font-size: 13px;
+  font-size: var(--fs-sm);
   color: var(--text-muted);
 }
 
@@ -279,7 +279,7 @@
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  font-size: 11px;
+  font-size: var(--fs-xs);
   color: var(--text-faint);
   pointer-events: none;
   user-select: none;
@@ -321,7 +321,7 @@
   border: none;
   background: transparent;
   color: var(--text-muted);
-  font-size: 12px;
+  font-size: var(--fs-sm);
   padding: 6px 8px;
   text-align: left;
   border-radius: 8px;
@@ -365,18 +365,18 @@
 }
 
 .workspace-home-run-title {
-  font-size: 16px;
+  font-size: var(--fs-lg);
   font-weight: 600;
   color: var(--text-strong);
 }
 
 .workspace-home-run-meta {
-  font-size: 12px;
+  font-size: var(--fs-sm);
   color: var(--text-muted);
 }
 
 .workspace-home-run-error {
-  font-size: 12px;
+  font-size: var(--fs-sm);
   color: var(--text-danger);
   background: rgba(236, 72, 153, 0.08);
   border-radius: 10px;
@@ -387,7 +387,7 @@
 .workspace-home-run-error-list {
   display: grid;
   gap: 4px;
-  font-size: 11px;
+  font-size: var(--fs-xs);
   color: var(--text-muted);
 }
 
@@ -399,7 +399,7 @@
 }
 
 .workspace-home-run-time {
-  font-size: 12px;
+  font-size: var(--fs-sm);
   color: var(--text-faint);
   white-space: nowrap;
 }
@@ -445,12 +445,12 @@
 }
 
 .workspace-home-instance-title {
-  font-size: 13px;
+  font-size: var(--fs-sm);
   font-weight: 600;
 }
 
 .workspace-home-instance-status {
-  font-size: 11px;
+  font-size: var(--fs-xs);
   color: var(--text-muted);
 }
 
@@ -469,7 +469,7 @@
 }
 
 .workspace-home-empty {
-  font-size: 13px;
+  font-size: var(--fs-sm);
   color: var(--text-muted);
   padding: 12px;
   border-radius: 12px;

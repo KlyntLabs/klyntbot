@@ -39,7 +39,7 @@
   align-items: center;
   justify-content: space-between;
   padding: 6px 20px;
-  font-size: 12px;
+  font-size: var(--fs-sm);
   gap: 12px;
 }
 
@@ -65,7 +65,7 @@
 }
 
 .debug-empty {
-  font-size: 12px;
+  font-size: var(--fs-sm);
   color: var(--text-faint);
 }
 
@@ -78,7 +78,7 @@
 .debug-meta {
   display: flex;
   gap: 10px;
-  font-size: 11px;
+  font-size: var(--fs-xs);
   color: var(--text-muted);
   align-items: center;
 }
@@ -86,7 +86,7 @@
 .debug-source {
   text-transform: uppercase;
   letter-spacing: 0.08em;
-  font-size: 10px;
+  font-size: var(--fs-2xs);
   padding: 2px 6px;
   border-radius: 999px;
   background: var(--surface-control);
@@ -104,7 +104,7 @@
 
 .debug-payload {
   margin: 0;
-  font-size: 11px;
+  font-size: var(--fs-xs);
   line-height: 1.4;
   color: var(--text-stronger);
   white-space: pre-wrap;

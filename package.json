@@ -3,7 +3,7 @@
   "private": true,
   "description": "Root delegation scripts for Klynt. Frontend lives in desktop-ui/.",
   "scripts": {
-    "dev": "cd crates/desktop && tauri dev",
+    "dev": "cd crates/desktop && cargo tauri dev",
     "dev:vite": "cd desktop-ui && bun run dev:vite",
     "build": "cd desktop-ui && bun run build",
     "test": "cd desktop-ui && bun run test",

@@ -41,7 +41,7 @@
   align-items: center;
   gap: 12px;
   padding: 6px 12px;
-  font-size: 12px;
+  font-size: var(--fs-sm);
 }
 
 .terminal-tabs {
@@ -63,7 +63,7 @@
   color: var(--text-muted);
   padding: 4px 12px;
   border-radius: 999px;
-  font-size: 11px;
+  font-size: var(--fs-xs);
   letter-spacing: 0.04em;
   text-transform: uppercase;
   cursor: pointer;
@@ -83,7 +83,7 @@
 }
 
 .terminal-tab-close {
-  font-size: 12px;
+  font-size: var(--fs-sm);
   color: var(--text-faint);
 }
 
@@ -93,7 +93,7 @@
   color: var(--text-muted);
   padding: 4px 12px;
   border-radius: 999px;
-  font-size: 12px;
+  font-size: var(--fs-sm);
   cursor: pointer;
 }
 
@@ -162,7 +162,7 @@
   color: var(--text-muted);
   pointer-events: none;
   text-align: center;
-  font-size: 12px;
+  font-size: var(--fs-sm);
   padding: 16px;
 }
 

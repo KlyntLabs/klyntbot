@@ -33,14 +33,14 @@
 }
 
 .composer-queue-title {
-  font-size: 10px;
+  font-size: var(--fs-2xs);
   text-transform: uppercase;
   letter-spacing: 0.1em;
   color: var(--text-fainter);
 }
 
 .composer-queue-hint {
-  font-size: 11px;
+  font-size: var(--fs-xs);
   line-height: 1.4;
   color: var(--text-faint);
 }
@@ -59,7 +59,7 @@
   border-radius: 8px;
   background: var(--surface-item);
   color: var(--text-quiet);
-  font-size: 11px;
+  font-size: var(--fs-xs);
 }
 
 .composer-queue-text {
@@ -73,7 +73,7 @@
   border: none;
   background: transparent;
   color: var(--text-faint);
-  font-size: 11px;
+  font-size: var(--fs-xs);
   padding: 2px 4px;
   cursor: pointer;
 }
@@ -108,14 +108,14 @@
 }
 
 .composer-followup-title {
-  font-size: 10px;
+  font-size: var(--fs-2xs);
   letter-spacing: 0.08em;
   text-transform: uppercase;
   color: var(--text-fainter);
 }
 
 .composer-followup-copy {
-  font-size: 11px;
+  font-size: var(--fs-xs);
   line-height: 1.4;
   color: var(--text-subtle);
 }
@@ -127,7 +127,7 @@
 }
 
 .composer-context-action {
-  font-size: 11px;
+  font-size: var(--fs-xs);
   padding: 6px 11px;
   border-radius: 999px;
   border: 1px solid var(--cm-border-emphasis);
@@ -235,7 +235,7 @@
   background: var(--surface-card);
   border: 1px solid var(--border-muted);
   color: var(--text-muted);
-  font-size: 11px;
+  font-size: var(--fs-xs);
   max-width: 100%;
   position: relative;
 }
@@ -338,7 +338,7 @@
   background: transparent;
   color: inherit;
   padding: 6px 4px 4px;
-  font-size: 14px;
+  font-size: var(--fs-md);
   line-height: 1.5;
   -webkit-app-region: no-drag;
   overflow-y: hidden;
@@ -354,7 +354,7 @@
   color: var(--text-strong);
   padding: 0;
   border-radius: 999px;
-  font-size: 12px;
+  font-size: var(--fs-sm);
   cursor: pointer;
   width: 30px;
   height: 30px;
@@ -437,7 +437,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 11px;
+  font-size: var(--fs-xs);
   letter-spacing: 0.02em;
   text-transform: uppercase;
   color: var(--text-subtle);
@@ -451,7 +451,7 @@
   border: 1px solid rgba(255, 120, 120, 0.4);
   background: rgba(255, 120, 120, 0.08);
   color: var(--text-strong);
-  font-size: 12px;
+  font-size: var(--fs-sm);
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -459,7 +459,7 @@
 }
 
 .composer-dictation-error-dismiss {
-  font-size: 11px;
+  font-size: var(--fs-xs);
   padding: 4px 8px;
 }
 
@@ -470,7 +470,7 @@
   border: 1px solid rgba(120, 190, 255, 0.4);
   background: rgba(120, 190, 255, 0.12);
   color: var(--text-strong);
-  font-size: 12px;
+  font-size: var(--fs-sm);
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -595,7 +595,7 @@
 }
 
 .composer-suggestion-section {
-  font-size: 10px;
+  font-size: var(--fs-2xs);
   font-weight: 700;
   letter-spacing: 0.08em;
   text-transform: uppercase;
@@ -645,7 +645,7 @@
 }
 
 .composer-suggestion-title {
-  font-size: 12px;
+  font-size: var(--fs-sm);
   font-weight: 600;
   width: 100%;
   white-space: normal;
@@ -654,7 +654,7 @@
 }
 
 .composer-suggestion-description {
-  font-size: 10px;
+  font-size: var(--fs-2xs);
   color: var(--text-muted);
   width: 100%;
   white-space: normal;
@@ -690,7 +690,7 @@
   grid-template-columns: auto;
   align-items: center;
   gap: 8px;
-  font-size: 11px;
+  font-size: var(--fs-xs);
   color: var(--text-muted);
 }
 
@@ -723,7 +723,7 @@
   border-radius: 999px;
   background: var(--surface-command);
   color: var(--text-emphasis);
-  font-size: 10px;
+  font-size: var(--fs-2xs);
   white-space: nowrap;
   opacity: 0;
   pointer-events: none;
@@ -810,7 +810,7 @@
 }
 
 .composer-plan-toggle-label {
-  font-size: 11px;
+  font-size: var(--fs-xs);
   color: var(--text-muted);
   line-height: 1;
 }
@@ -872,7 +872,7 @@
   border: none;
   background: transparent;
   color: var(--text-muted);
-  font-size: 11px;
+  font-size: var(--fs-xs);
   padding: 2px 18px 2px 0;
   cursor: pointer;
   width: auto;
@@ -976,7 +976,7 @@
     min-height: 52px;
     max-height: 168px;
     height: 52px;
-    font-size: 16px;
+    font-size: var(--fs-lg);
     padding: 8px 2px;
   }
 
@@ -1012,6 +1012,6 @@
   }
 
   .app.layout-phone .composer-select {
-    font-size: 12px;
+    font-size: var(--fs-sm);
   }
 }

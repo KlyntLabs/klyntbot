@@ -89,7 +89,7 @@
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  font-size: 12px;
+  font-size: var(--fs-sm);
   font-weight: 600;
 }
 
@@ -104,7 +104,7 @@
 }
 
 .settings-mobile-detail-title {
-  font-size: 12px;
+  font-size: var(--fs-sm);
   font-weight: 600;
   color: var(--text-subtle);
 }
@@ -117,7 +117,7 @@
 }
 
 .settings-field-label {
-  font-size: 12px;
+  font-size: var(--fs-sm);
   font-weight: 600;
   color: var(--text-strong);
 }
@@ -146,11 +146,11 @@
 
 .settings-button-compact {
   padding: 6px 10px;
-  font-size: 12px;
+  font-size: var(--fs-sm);
 }
 
 .settings-help {
-  font-size: 11px;
+  font-size: var(--fs-xs);
   color: var(--text-subtle);
 }
 
@@ -199,7 +199,7 @@
 }
 
 .settings-mobile-remote-name {
-  font-size: 12px;
+  font-size: var(--fs-sm);
   font-weight: 600;
   color: var(--text-strong);
 }
@@ -210,7 +210,7 @@
   justify-content: center;
   border-radius: 999px;
   padding: 2px 8px;
-  font-size: 10px;
+  font-size: var(--fs-2xs);
   font-weight: 700;
   letter-spacing: 0.02em;
   color: var(--text-strong);
@@ -219,7 +219,7 @@
 }
 
 .settings-mobile-remote-meta {
-  font-size: 11px;
+  font-size: var(--fs-xs);
   color: var(--text-subtle);
   white-space: nowrap;
   overflow: hidden;
@@ -227,7 +227,7 @@
 }
 
 .settings-mobile-remote-last {
-  font-size: 10px;
+  font-size: var(--fs-2xs);
   color: var(--text-faint);
 }
 
@@ -241,7 +241,7 @@
 .settings-mobile-remote-action {
   min-width: 28px;
   padding: 5px 8px;
-  font-size: 11px;
+  font-size: var(--fs-xs);
 }
 
 .settings-mobile-remote-action-danger {
@@ -284,7 +284,7 @@
 }
 
 .settings-add-remote-title {
-  font-size: 14px;
+  font-size: var(--fs-md);
   font-weight: 700;
   color: #f5f8ff;
 }
@@ -320,13 +320,13 @@
 }
 
 .settings-delete-remote-title {
-  font-size: 14px;
+  font-size: var(--fs-md);
   font-weight: 700;
   color: #f5f8ff;
 }
 
 .settings-delete-remote-message {
-  font-size: 12px;
+  font-size: var(--fs-sm);
   color: rgba(232, 240, 251, 0.86);
   line-height: 1.45;
 }
@@ -381,7 +381,7 @@
   background: var(--surface-1);
   color: var(--text-strong);
   font-family: var(--code-font-family);
-  font-size: 11px;
+  font-size: var(--fs-xs);
   line-height: 1.4;
   overflow-x: auto;
   white-space: pre-wrap;
@@ -448,7 +448,7 @@
   background: var(--surface-1);
   color: var(--text-strong);
   font-family: var(--code-font-family);
-  font-size: 13px;
+  font-size: var(--fs-sm);
   line-height: 1.5;
   padding: 10px 12px;
 }
@@ -465,7 +465,7 @@
 }
 
 .settings-agents-error {
-  font-size: 12px;
+  font-size: var(--fs-sm);
   color: var(--text-danger);
   background: rgba(236, 72, 153, 0.08);
   border-radius: 10px;
@@ -486,7 +486,7 @@
 .settings-agents-stepper-value {
   min-width: 2ch;
   text-align: center;
-  font-size: 13px;
+  font-size: var(--fs-sm);
   font-weight: 700;
   color: var(--text-strong);
 }
@@ -496,7 +496,7 @@
   height: 28px;
   padding: 0;
   line-height: 1;
-  font-size: 14px;
+  font-size: var(--fs-md);
   font-weight: 700;
   display: inline-flex;
   align-items: center;
@@ -538,7 +538,7 @@
 }
 
 .settings-agents-inline-label {
-  font-size: 10px;
+  font-size: var(--fs-2xs);
   font-weight: 600;
   letter-spacing: 0.01em;
   color: var(--text-muted);
@@ -546,7 +546,7 @@
 }
 
 .settings-agents-inline-separator {
-  font-size: 11px;
+  font-size: var(--fs-xs);
   color: var(--text-muted);
   opacity: 0.8;
 }
@@ -589,7 +589,7 @@
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  font-size: 12px;
+  font-size: var(--fs-sm);
   color: var(--text-subtle);
 }
 
@@ -613,7 +613,7 @@
 }
 
 .settings-download-meta {
-  font-size: 11px;
+  font-size: var(--fs-xs);
   color: var(--text-subtle);
 }
 
@@ -625,14 +625,14 @@
   border: 1px solid var(--border-muted);
   background: var(--surface-control);
   color: var(--text-strong);
-  font-size: 12px;
+  font-size: var(--fs-sm);
   transition: border-color var(--ds-dur-normal) var(--ds-ease-out-soft),
               box-shadow var(--ds-dur-normal) var(--ds-ease-out-soft);
 }
 
 .settings-input--compact {
   padding: 8px 10px;
-  font-size: 11px;
+  font-size: var(--fs-xs);
 }
 
 .settings-input--scale {
@@ -662,7 +662,7 @@
 
 .settings-scale-reset {
   padding: 8px 12px;
-  font-size: 12px;
+  font-size: var(--fs-sm);
 }
 
 .settings-select {
@@ -671,7 +671,7 @@
   border: 1px solid var(--border-muted);
   background: var(--surface-control);
   color: var(--text-strong);
-  font-size: 12px;
+  font-size: var(--fs-sm);
   transition: border-color var(--ds-dur-normal) var(--ds-ease-out-soft),
               box-shadow var(--ds-dur-normal) var(--ds-ease-out-soft);
 }
@@ -683,7 +683,7 @@
 
 .settings-select--compact {
   padding: 6px 8px;
-  font-size: 11px;
+  font-size: var(--fs-xs);
 }
 
 .settings-segmented {
@@ -725,7 +725,7 @@
   border-radius: 999px;
   background: transparent;
   color: var(--text-muted);
-  font-size: 12px;
+  font-size: var(--fs-sm);
   font-weight: 600;
   padding: 0;
   min-width: 72px;
@@ -768,14 +768,14 @@
 }
 
 .settings-section-title {
-  font-size: 15px;
+  font-size: var(--fs-lg);
   font-weight: 600;
   color: var(--text-strong);
   margin-bottom: 4px;
 }
 
 .settings-section-subtitle {
-  font-size: 12px;
+  font-size: var(--fs-sm);
   color: var(--text-subtle);
   margin-bottom: 16px;
 }
@@ -783,7 +783,7 @@
 .settings-subsection-title {
   margin-top: 18px;
   margin-bottom: 6px;
-  font-size: 12px;
+  font-size: var(--fs-sm);
   font-weight: 700;
   letter-spacing: 0.02em;
   text-transform: uppercase;
@@ -791,7 +791,7 @@
 }
 
 .settings-subsection-subtitle {
-  font-size: 12px;
+  font-size: var(--fs-sm);
   color: var(--text-subtle);
   margin-bottom: 12px;
 }
@@ -822,7 +822,7 @@
 }
 
 .settings-group-error {
-  font-size: 11px;
+  font-size: var(--fs-xs);
   color: var(--status-error);
 }
 
@@ -858,7 +858,7 @@
 }
 
 .settings-group-copies-label {
-  font-size: 11px;
+  font-size: var(--fs-xs);
   color: var(--text-faint);
 }
 
@@ -876,7 +876,7 @@
   border: 1px solid var(--border-muted);
   background: var(--surface-control);
   color: var(--text-strong);
-  font-size: 11px;
+  font-size: var(--fs-xs);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -904,7 +904,7 @@
 
 .settings-project-group-label {
   text-transform: uppercase;
-  font-size: 11px;
+  font-size: var(--fs-xs);
   letter-spacing: 0.08em;
   color: var(--text-faint);
   padding-left: 4px;
@@ -929,13 +929,13 @@
 }
 
 .settings-project-name {
-  font-size: 13px;
+  font-size: var(--fs-sm);
   font-weight: 600;
   color: var(--text-strong);
 }
 
 .settings-project-path {
-  font-size: 11px;
+  font-size: var(--fs-xs);
   color: var(--text-subtle);
   white-space: nowrap;
   overflow: hidden;
@@ -1016,7 +1016,7 @@
 }
 
 .settings-open-app-status {
-  font-size: 11px;
+  font-size: var(--fs-xs);
   color: var(--status-error);
   padding: 2px 6px;
   border-radius: 999px;
@@ -1033,7 +1033,7 @@
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  font-size: 11px;
+  font-size: var(--fs-xs);
   color: var(--text-muted);
 }
 
@@ -1123,7 +1123,7 @@
   border-radius: 12px;
   border: 1px solid var(--border-muted);
   background: var(--surface-card);
-  font-size: 11px;
+  font-size: var(--fs-xs);
   color: var(--text-muted);
 }
 
@@ -1154,7 +1154,7 @@
 }
 .settings-empty {
   color: var(--text-faint);
-  font-size: 12px;
+  font-size: var(--fs-sm);
 }
 
 .settings-toggle-row {
@@ -1187,13 +1187,13 @@
 }
 
 .settings-toggle-title {
-  font-size: 13px;
+  font-size: var(--fs-sm);
   font-weight: 600;
   color: var(--text-strong);
 }
 
 .settings-toggle-subtitle {
-  font-size: 11px;
+  font-size: var(--fs-xs);
   color: var(--text-subtle);
 }
 

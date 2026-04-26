@@ -41,12 +41,12 @@
 }
 
 .about-version {
-  font-size: 12px;
+  font-size: var(--fs-sm);
   color: var(--text-faint);
 }
 
 .about-tagline {
-  font-size: 13px;
+  font-size: var(--fs-sm);
   color: var(--text-muted);
   max-width: 260px;
 }
@@ -62,12 +62,12 @@
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  font-size: 12px;
+  font-size: var(--fs-sm);
 }
 
 .about-footer {
   margin-top: 8px;
-  font-size: 11px;
+  font-size: var(--fs-xs);
   color: var(--text-faint);
 }
 
@@ -76,7 +76,7 @@
   background: transparent;
   color: var(--text-emphasis);
   cursor: pointer;
-  font-size: 12px;
+  font-size: var(--fs-sm);
   padding: 0;
 }
 

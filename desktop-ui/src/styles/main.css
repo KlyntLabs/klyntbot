@@ -157,7 +157,7 @@
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  font-size: 12px;
+  font-size: var(--fs-sm);
 }
 
 .open-app-icon {
@@ -213,7 +213,7 @@
 }
 
 .launch-script-title {
-  font-size: 12px;
+  font-size: var(--fs-sm);
   font-weight: 600;
   color: var(--text-stronger);
   margin-bottom: 8px;
@@ -226,7 +226,7 @@
   background: var(--surface-control);
   color: var(--text-strong);
   padding: 8px;
-  font-size: 12px;
+  font-size: var(--fs-sm);
   resize: vertical;
   min-height: 96px;
 }
@@ -238,19 +238,19 @@
   background: var(--surface-control);
   color: var(--text-strong);
   padding: 6px 8px;
-  font-size: 12px;
+  font-size: var(--fs-sm);
   margin-bottom: 8px;
 }
 
 .launch-script-help {
   margin-top: 6px;
-  font-size: 11px;
+  font-size: var(--fs-xs);
   color: var(--text-muted);
 }
 
 .launch-script-error {
   margin-top: 8px;
-  font-size: 11px;
+  font-size: var(--fs-xs);
   color: var(--text-danger);
 }
 
@@ -476,7 +476,7 @@
 }
 
 .workspace-title {
-  font-size: 16px;
+  font-size: var(--fs-lg);
   font-weight: 600;
   letter-spacing: 0.01em;
   max-width: min(32vw, 420px);
@@ -487,13 +487,13 @@
 
 .workspace-separator {
   color: var(--text-faint);
-  font-size: 10px;
+  font-size: var(--fs-2xs);
   opacity: 0.7;
 }
 
 .workspace-branch {
   color: var(--text-subtle);
-  font-size: 12px;
+  font-size: var(--fs-sm);
   font-weight: 500;
   min-width: 0;
   overflow: hidden;
@@ -504,7 +504,7 @@
 
 .workspace-branch-static {
   color: var(--text-stronger);
-  font-size: 12px;
+  font-size: var(--fs-sm);
   font-weight: 600;
   padding: 2px 10px;
   border-radius: 999px;
@@ -530,7 +530,7 @@
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  font-size: 12px;
+  font-size: var(--fs-sm);
   font-weight: 600;
   max-width: min(44vw, 520px);
   overflow: hidden;
@@ -559,7 +559,7 @@
 }
 
 .worktree-info-title {
-  font-size: 12px;
+  font-size: var(--fs-sm);
   font-weight: 600;
   color: var(--text-stronger);
 }
@@ -577,14 +577,14 @@
 }
 
 .worktree-info-label {
-  font-size: 10px;
+  font-size: var(--fs-2xs);
   text-transform: uppercase;
   letter-spacing: 0.08em;
   color: var(--text-faint);
 }
 
 .worktree-info-code {
-  font-size: 11px;
+  font-size: var(--fs-xs);
   color: var(--text-stronger);
   background: rgba(255, 255, 255, 0.06);
   border: 1px solid var(--border-muted);
@@ -622,7 +622,7 @@
 
 .worktree-info-subtle {
   text-wrap: auto;
-  font-size: 11px;
+  font-size: var(--fs-xs);
   color: var(--text-faint);
 }
 
@@ -632,7 +632,7 @@
   color: var(--text-stronger);
   border-radius: 8px;
   padding: 6px 10px;
-  font-size: 12px;
+  font-size: var(--fs-sm);
   font-weight: 600;
   cursor: pointer;
   text-align: left;
@@ -654,7 +654,7 @@
   color: var(--text-stronger);
   border-radius: 8px;
   padding: 6px 8px;
-  font-size: 12px;
+  font-size: var(--fs-sm);
   flex: 1;
 }
 
@@ -678,7 +678,7 @@
 }
 
 .worktree-info-error {
-  font-size: 11px;
+  font-size: var(--fs-xs);
   color: var(--text-danger);
 }
 
@@ -691,7 +691,7 @@
 .worktree-info-upstream-button {
   align-self: flex-start;
   padding: 6px 10px;
-  font-size: 12px;
+  font-size: var(--fs-sm);
   font-weight: 600;
   border-radius: 8px;
 }
@@ -723,7 +723,7 @@
 }
 
 .workspace-branch-caret {
-  font-size: 11px;
+  font-size: var(--fs-xs);
   color: var(--text-faint);
   display: inline-flex;
   transform: rotate(90deg);
@@ -773,7 +773,7 @@
   background: transparent;
   color: var(--text-quiet);
   cursor: pointer;
-  font-size: 12px;
+  font-size: var(--fs-sm);
 }
 
 .branch-action:hover {
@@ -805,7 +805,7 @@
   background: var(--surface-card);
   color: var(--text-stronger);
   padding: 6px 8px;
-  font-size: 12px;
+  font-size: var(--fs-sm);
 }
 
 .branch-input:focus {
@@ -818,7 +818,7 @@
   background: var(--surface-card-strong);
   color: var(--text-stronger);
   padding: 6px 8px;
-  font-size: 12px;
+  font-size: var(--fs-sm);
   cursor: pointer;
 }
 
@@ -833,7 +833,7 @@
 }
 
 .branch-create-hint {
-  font-size: 11px;
+  font-size: var(--fs-xs);
   color: var(--text-faint);
   padding: 2px 8px 0;
 }
@@ -853,7 +853,7 @@
   padding: 6px 8px;
   border-radius: 8px;
   color: var(--text-muted);
-  font-size: 12px;
+  font-size: var(--fs-sm);
   cursor: pointer;
 }
 
@@ -864,13 +864,13 @@
 }
 
 .branch-empty {
-  font-size: 11px;
+  font-size: var(--fs-xs);
   color: var(--text-faint);
   padding: 4px 8px;
 }
 
 .branch-error {
-  font-size: 11px;
+  font-size: var(--fs-xs);
   color: rgba(255, 160, 160, 0.9);
   padding: 6px 8px 2px;
   white-space: pre-wrap;
@@ -890,7 +890,7 @@
   border-radius: 999px;
   border: 1px solid var(--border-subtle);
   padding: 3px 8px;
-  font-size: 11px;
+  font-size: var(--fs-xs);
   font-weight: 600;
   line-height: 1;
   white-space: nowrap;
