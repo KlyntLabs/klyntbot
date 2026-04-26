@@ -162,9 +162,25 @@ fn run_mcp_stdio() {
         let config = config::load_with_env_overrides()
             .await
             .expect("config load failed");
-        let (app, events) = app_core::AppCore::init(common::AppMode::Server, Some(config))
-            .await
-            .expect("init failed");
+        // Wire a SocketBridgeEmitter so global events (entity:updated,
+        // provider:degraded, …) emitted by tools and handlers in this MCP
+        // child process flow back to a running desktop app via the
+        // bridge socket. When no desktop is running, frames are dropped
+        // silently — the MCP child still functions standalone.
+        let socket_path = mcp_bridge::bridge_socket_path()
+            .unwrap_or_else(|| std::path::PathBuf::from("/tmp/klynt-mcp-events.sock"));
+        let bridge_client = mcp_bridge::BridgeClient::new(socket_path);
+        let event_emitter: std::sync::Arc<dyn ::app_core::AppEventEmitter> =
+            std::sync::Arc::new(mcp_bridge::SocketBridgeEmitter::new(bridge_client));
+
+        let (app, events) = app_core::AppCore::init_with_sender(
+            common::AppMode::Server,
+            Some(config),
+            None,                  // notification_sender — not needed for stdio MCP
+            Some(event_emitter),
+        )
+        .await
+        .expect("init failed");
         let app = Arc::new(app);
 
         // Drain unused EventChannels — both receivers must close before task exits.
